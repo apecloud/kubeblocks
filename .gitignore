@@ -1,0 +1,13 @@
+*.exe
+*.swp
+.DS_Store
+.coverage/
+.idea/
+.vimrc
+.vscode/
+_dist/
+bin/
+vendor/
+tmp/
+pkg/resources/static/k3s
+pkg/resources/static/k3d/

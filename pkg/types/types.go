@@ -32,12 +32,17 @@ const (
 	// all cluster will be created in this network, so they can communicate with each other
 	CliDockerNetwork = "k3d-opencli-playground"
 
-	// K3sImage is k3s image tag
-	K3sImage = "rancher/k3s:v1.21.10-k3s1"
-	// K3dToolsImage is k3d tools image tag
-	K3dToolsImage = "ghcr.io/k3d-io/k3d-tools:5.4.1"
-	// K3dProxyImage is k3d proxy image tag
-	K3dProxyImage = "ghcr.io/k3d-io/k3d-proxy:5.4.1"
+	// K3sImageTag is k3s image tag
+	K3sImageTag = "v1.23.8-k3s1"
+	// K3sImage is k3s image repo
+	K3sImage = "rancher/k3s:" + K3sImageTag
+
+	// K3dVersion is k3d release version
+	K3dVersion = "5.4.4"
+	// K3dToolsImage is k3d tools image repo
+	K3dToolsImage = "ghcr.io/k3d-io/k3d-tools:" + K3dVersion
+	// K3dProxyImage is k3d proxy image repo
+	K3dProxyImage = "ghcr.io/k3d-io/k3d-proxy:" + K3dVersion
 
 	// GoosLinux is os.GOOS linux string
 	GoosLinux = "linux"

@@ -17,15 +17,13 @@ limitations under the License.
 package playground
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"github.com/infracreate/opencli/pkg/cluster"
-	"github.com/infracreate/opencli/pkg/utils"
+	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cluster"
+	"jihulab.com/infracreate/dbaas-system/opencli/pkg/utils"
 )
 
 var installer = cluster.LocalInstaller
@@ -45,6 +43,7 @@ func NewPlaygroundCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		Short: "Bootstrap a dbaas in local host",
 		Long:  "Bootstrap a dbaas in local host",
 		Run: func(cmd *cobra.Command, args []string) {
+			//nolint
 			cmd.Help()
 		},
 	}
@@ -66,8 +65,7 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Bootstrap a dbaas in local host",
-		Long:  "Bootstrap a dbaas in local host",
+		Short: "Bootstrap a DBaaS",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Run())
 		},
@@ -83,10 +81,11 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "destroy",
-		Short: "Destroy the playground in local host",
-		Long:  "Destroy the playground in local host",
+		Short: "Destroy the playground cluster.",
 		Run: func(cmd *cobra.Command, args []string) {
-			destroyPlayground(streams)
+			if err := destroyPlayground(streams); err != nil {
+				utils.Errf("%v", err)
+			}
 		},
 	}
 	return cmd
@@ -95,8 +94,7 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 func newStatusCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status",
-		Short: "Display playground cluster status",
-		Long:  "Display playground cluster status",
+		Short: "Display playground cluster status.",
 		Run: func(cmd *cobra.Command, args []string) {
 			statusCmd(streams)
 		},
@@ -109,28 +107,28 @@ func (o *InitOptions) Validate() error {
 }
 
 func (o *InitOptions) Run() error {
-	fmt.Fprint(o.Out, "Start to init playground\n")
+	utils.Info("Initializing playground cluster...")
 
 	var err error
 
 	defer func() {
 		err := utils.CleanUpPlayground()
 		if err != nil {
-			fmt.Fprintf(o.ErrOut, "Fail to clean up: %v\n", err)
+			utils.Errf("Fail to clean up: %v", err)
 		}
 	}()
 
-	//// Step.1 Set up K3s as dbaas control plane cluster
-	//err = installer.Install()
-	//if err != nil {
-	//	return errors.Wrap(err, "Fail to set up k3d cluster")
-	//}
-	//
-	//// Step.2 Deal with KUBECONFIG
-	//err = installer.GenKubeconfig()
-	//if err != nil {
-	//	return errors.Wrap(err, "Fail to generate kubeconfig")
-	//}
+	// Step.1 Set up K3s as dbaas control plane cluster
+	err = installer.Install()
+	if err != nil {
+		return errors.Wrap(err, "Fail to set up k3d cluster")
+	}
+
+	// Step.2 Deal with KUBECONFIG
+	err = installer.GenKubeconfig()
+	if err != nil {
+		return errors.Wrap(err, "Fail to generate kubeconfig")
+	}
 	err = installer.SetKubeconfig()
 	if err != nil {
 		return errors.Wrap(err, "Fail to set kubeconfig")
@@ -152,18 +150,18 @@ func destroyPlayground(streams genericclioptions.IOStreams) error {
 	if err := installer.Uninstall(); err != nil {
 		return err
 	}
-	fmt.Fprint(streams.Out, "Successfully destroy playground cluster.")
+	utils.Info("Successfully destroyed playground cluster.")
 	return nil
 }
 
 func statusCmd(streams genericclioptions.IOStreams) {
-	fmt.Fprintf(streams.Out, "Checking cluster status...")
+	utils.Info("Checking cluster status...")
 	status := installer.GetStatus()
-	stop := printClusterStatus(status)
+	stop := printClusterStatusK3d(status)
 	if stop {
 		return
 	}
-	fmt.Fprintf(streams.Out, "Checking database cluster status...")
+	utils.Info("Checking database cluster status...")
 }
 
 func printGuide() {

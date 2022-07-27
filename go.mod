@@ -1,4 +1,4 @@
-module github.com/infracreate/opencli
+module jihulab.com/infracreate/dbaas-system/opencli
 
 go 1.18
 

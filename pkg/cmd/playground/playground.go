@@ -18,12 +18,14 @@ package playground
 
 import (
 	"fmt"
-	"github.com/infracreate/opencli/pkg/cluster"
-	"github.com/infracreate/opencli/pkg/utils"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+
+	"github.com/infracreate/opencli/pkg/cluster"
+	"github.com/infracreate/opencli/pkg/utils"
 )
 
 var installer = cluster.LocalInstaller
@@ -118,17 +120,17 @@ func (o *InitOptions) Run() error {
 		}
 	}()
 
-	// Step.1 Set up K3s as dbaas control plane cluster
-	err = installer.Install()
-	if err != nil {
-		return errors.Wrap(err, "Fail to set up k3d cluster")
-	}
-
-	// Step.2 Deal with KUBECONFIG
-	err = installer.GenKubeconfig()
-	if err != nil {
-		return errors.Wrap(err, "Fail to generate kubeconfig")
-	}
+	//// Step.1 Set up K3s as dbaas control plane cluster
+	//err = installer.Install()
+	//if err != nil {
+	//	return errors.Wrap(err, "Fail to set up k3d cluster")
+	//}
+	//
+	//// Step.2 Deal with KUBECONFIG
+	//err = installer.GenKubeconfig()
+	//if err != nil {
+	//	return errors.Wrap(err, "Fail to generate kubeconfig")
+	//}
 	err = installer.SetKubeconfig()
 	if err != nil {
 		return errors.Wrap(err, "Fail to set kubeconfig")
@@ -157,7 +159,7 @@ func destroyPlayground(streams genericclioptions.IOStreams) error {
 func statusCmd(streams genericclioptions.IOStreams) {
 	fmt.Fprintf(streams.Out, "Checking cluster status...")
 	status := installer.GetStatus()
-	stop := printClusterStatusK3d(status)
+	stop := printClusterStatus(status)
 	if stop {
 		return
 	}

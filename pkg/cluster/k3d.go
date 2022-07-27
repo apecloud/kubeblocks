@@ -19,11 +19,6 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"github.com/infracreate/opencli/pkg/resources"
-	"github.com/infracreate/opencli/pkg/utils/helm"
-	"github.com/k3d-io/k3d/v5/pkg/runtimes"
-	"github.com/pkg/errors"
-	"helm.sh/helm/v3/pkg/action"
 	"io"
 	"io/ioutil"
 	"net"
@@ -38,16 +33,32 @@ import (
 	docker "github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
-	"github.com/infracreate/opencli/pkg/types"
-	"github.com/infracreate/opencli/pkg/utils"
 	k3dClient "github.com/k3d-io/k3d/v5/pkg/client"
 	config "github.com/k3d-io/k3d/v5/pkg/config/v1alpha4"
+	"github.com/k3d-io/k3d/v5/pkg/runtimes"
 	k3d "github.com/k3d-io/k3d/v5/pkg/types"
+	"github.com/pkg/errors"
+	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/repo"
+
+	"github.com/infracreate/opencli/pkg/provider"
+	"github.com/infracreate/opencli/pkg/resources"
+	"github.com/infracreate/opencli/pkg/types"
+	"github.com/infracreate/opencli/pkg/utils"
+	"github.com/infracreate/opencli/pkg/utils/helm"
+)
+
+const (
+	clusterName = "opencli-playground"
+	namespace   = "opencli-playground"
+	dbCluster   = "mycluster"
+	engineType  = "mysql"
 )
 
 var (
 	LocalInstaller Installer = &PlaygroundInstaller{
-		ctx: context.Background(),
+		ctx:      context.Background(),
+		provider: provider.NewProvider(engineType),
 	}
 
 	dockerCli client.APIClient
@@ -56,65 +67,9 @@ var (
 	errf      = utils.Errf
 )
 
-const (
-	clusterName = "opencli-playground"
-	namespace   = "opencli-playground"
-	dbCluster   = "playground-dbcluster"
-)
-
 type k3dSetupOptions struct {
 	dryRun bool
 }
-
-var (
-	repos = []helm.RepoEntry{
-		{
-			Name: "prometheus-community",
-			Url:  "https://prometheus-community.github.io/helm-charts",
-		},
-		{
-			Name: "mysql-operator",
-			Url:  "https://mysql.github.io/mysql-operator/",
-		},
-	}
-
-	baseCharts = []helm.InstallOpts{
-		{
-			Name:      "prometheus",
-			Chart:     "prometheus-community/kube-prometheus-stack",
-			Namespace: namespace,
-			Wait:      true,
-			Sets: []string{
-				"prometheusOperator.admissionWebhooks.patch.image.repository=weidixian/ingress-nginx-kube-webhook-certgen",
-				"kube-state-metrics.image.repository=jiamiao442/kube-state-metrics",
-			},
-		},
-	}
-
-	dbCharts = []helm.InstallOpts{
-		{
-			Name:      "my-mysql-operator",
-			Chart:     "mysql-operator/mysql-operator",
-			Namespace: namespace,
-			Wait:      true,
-			Sets:      []string{},
-		},
-		{
-			Name:      dbCluster,
-			Chart:     "mysql-operator/mysql-innodbcluster",
-			Namespace: namespace,
-			Wait:      true,
-			Sets: []string{
-				"credentials.root.user='root'",
-				"credentials.root.password='sakila'",
-				"credentials.root.host='%'",
-				"serverInstances=1",
-				"routerInstances=1",
-				"tls.useSelfSigned=true",
-			},
-		},
-	}
-)
 
 func init() {
 	var err error
@@ -126,8 +81,9 @@ func init() {
 
 // PlaygroundInstaller will handle the playground cluster creation and management
 type PlaygroundInstaller struct {
-	ctx context.Context
-	cfg config.ClusterConfig
+	ctx      context.Context
+	cfg      config.ClusterConfig
+	provider provider.Provider
 }
 
 // Install install a k3d cluster
@@ -142,6 +98,7 @@ func (d *PlaygroundInstaller) Install() error {
 	o := k3dSetupOptions{
 		dryRun: false,
 	}
+
 	err = o.setUpK3d(d.ctx, d.cfg)
 	if err != nil {
 		return errors.Wrap(err, "failed to setup k3d cluster")
@@ -223,7 +180,7 @@ func (d *PlaygroundInstaller) GenKubeconfig() error {
 		return errors.Wrap(err, "unrecognized kubeconfig format")
 	}
 
-	// Replace host config with loop back address
+	// Replace host provider with loop back address
 	cfgHostContent := strings.ReplaceAll(kubeConfig, hostToReplace, "127.0.0.1")
 	err = ioutil.WriteFile(configPath, []byte(cfgHostContent), 0600)
 	if err != nil {
@@ -270,34 +227,34 @@ func (d *PlaygroundInstaller) InstallDeps() error {
 	var err error
 
 	info("Add dependent repos...")
-	err = addRepos(repos)
+	err = addRepos(d.provider.GetRepos())
 	if err != nil {
 		return errors.Wrap(err, "Failed to add dependent repos")
 	}
 
 	var wg sync.WaitGroup
 	info("Install base charts...")
-	err = installCharts(baseCharts, &wg)
+	err = installCharts(d.provider.GetBaseCharts(namespace), &wg)
 	if err != nil {
 		return errors.Wrap(err, "Failed to install base charts")
 	}
 
-	info("install playground database cluster...")
-	err = installCharts(dbCharts, &wg)
+	info("Install database cluster...")
+	err = installCharts(d.provider.GetDBCharts("default", dbCluster), &wg)
 	if err != nil {
 		return errors.Wrap(err, "Failed to install playground database cluster")
 	}
 
-	info("wait database cluster to online...")
+	info("Wait database cluster to online...")
 	wg.Wait()
 
-	info("port forward to local host")
+	info("Port forward to local host")
 	portForward()
 
 	return nil
 }
 
-// BuildClusterRunConfig returns the run-config for the k3d cluster
+// BuildClusterRunConfig returns the run-provider for the k3d cluster
 func BuildClusterRunConfig() (config.ClusterConfig, error) {
 	createOpts := buildClusterCreateOpts()
 	cluster, err := buildClusterConfig(createOpts)
@@ -351,7 +308,7 @@ func buildClusterConfig(opts k3d.ClusterCreateOpts) (k3d.Cluster, error) {
 		Host: k3d.DefaultAPIHost,
 	}
 
-	// build cluster config
+	// build cluster provider
 	clusterConfig := k3d.Cluster{
 		Name:    clusterName,
 		Network: network,
@@ -604,11 +561,9 @@ func fillK3dCluster(cluster *k3d.Cluster, status *types.ClusterStatus) {
 	}
 
 	// get k3d cluster kubeconfig
-	helm.SetKubeconfig(utils.ConfigPath(clusterName))
-	helm.SetNamespace(namespace)
-	cfg, err := helm.NewActionConfig()
+	cfg, err := helm.NewActionConfig(nil, namespace, utils.ConfigPath(clusterName))
 	if err != nil {
-		c.Reason = fmt.Sprintf("Failed to get helm action config: %s", err.Error())
+		c.Reason = fmt.Sprintf("Failed to get helm action provider: %s", err.Error())
 	}
 	list := action.NewList(cfg)
 	list.SetStateMask()
@@ -626,9 +581,9 @@ func fillK3dCluster(cluster *k3d.Cluster, status *types.ClusterStatus) {
 	status.K3d.K3dCluster = append(status.K3d.K3dCluster, c)
 }
 
-func addRepos(repos []helm.RepoEntry) error {
+func addRepos(repos []repo.Entry) error {
 	for _, r := range repos {
-		if err := r.Add(); err != nil {
+		if err := helm.AddRepo(&r); err != nil {
 			return err
 		}
 	}
@@ -636,14 +591,14 @@ func addRepos(repos []helm.RepoEntry) error {
 }
 
 func installCharts(charts []helm.InstallOpts, wg *sync.WaitGroup) error {
-	for _, c := range charts {
+	for _, chart := range charts {
 		wg.Add(1)
 		go func(chart helm.InstallOpts) {
 			defer wg.Done()
-			if _, err := chart.Install(); err != nil {
+			if _, err := chart.Install(utils.ConfigPath(clusterName)); err != nil {
 				infof("install chart %s error: %s\n", chart.Name, err.Error())
 			}
-		}(c)
+		}(chart)
 	}
 	return nil
 }

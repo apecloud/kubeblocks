@@ -18,6 +18,7 @@ package playground
 
 import (
 	"github.com/fatih/color"
+
 	"github.com/infracreate/opencli/pkg/types"
 	"github.com/infracreate/opencli/pkg/utils"
 )
@@ -30,7 +31,7 @@ var (
 	y              = green("✔")
 )
 
-func printClusterStatusK3d(status types.ClusterStatus) bool {
+func printClusterStatus(status types.ClusterStatus) bool {
 	utils.InfoP(0, "K3d images status:")
 	if status.K3dImages.Reason != "" {
 		utils.Info(x, "K3d images:", status.K3dImages.Reason)

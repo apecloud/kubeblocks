@@ -20,13 +20,12 @@ import (
 	"fmt"
 	"os"
 
+	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/bench"
+	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/dbaas"
+	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/dbcluster"
+	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/playground"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-
-	"github.com/infracreate/opencli/pkg/cmd/bench"
-	"github.com/infracreate/opencli/pkg/cmd/dbaas"
-	"github.com/infracreate/opencli/pkg/cmd/dbcluster"
-	"github.com/infracreate/opencli/pkg/cmd/playground"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -66,20 +65,21 @@ func NewRootCmd() *cobra.Command {
 }
 
 func runHelp(cmd *cobra.Command, args []string) {
+	//nolint
 	cmd.Help()
 }
 
-// initConfig reads in provider file and ENV variables if set.
+// initConfig reads in config file and ENV variables if set.
 func initConfig() {
 	if cfgFile != "" {
-		// Use provider file from the flag.
+		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
 	} else {
 		// Find home directory.
 		home, err := os.UserHomeDir()
 		cobra.CheckErr(err)
 
-		// Search provider in home directory with name ".opencli" (without extension).
+		// Search config in home directory with name ".opencli" (without extension).
 		viper.AddConfigPath(home)
 		viper.SetConfigType("yaml")
 		viper.SetConfigName(".opencli")
@@ -87,8 +87,8 @@ func initConfig() {
 
 	viper.AutomaticEnv() // read in environment variables that match
 
-	// If a provider file is found, read it in.
+	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using provider file:", viper.ConfigFileUsed())
+		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
 }

@@ -26,7 +26,7 @@ import (
 func NewDbaasCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dbaas",
-		Short: "dbaas Ops command",
+		Short: "DBaaS operation commands",
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Println("dbaas called")
 		},

@@ -16,7 +16,7 @@ limitations under the License.
 
 package cluster
 
-import "github.com/infracreate/opencli/pkg/types"
+import "jihulab.com/infracreate/dbaas-system/opencli/pkg/types"
 
 // Installer defines the interface for handling the cluster(k3d/k3s) management
 type Installer interface {

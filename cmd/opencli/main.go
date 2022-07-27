@@ -18,8 +18,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/infracreate/opencli/pkg/cmd"
 	"os"
+
+	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd"
 )
 
 func main() {

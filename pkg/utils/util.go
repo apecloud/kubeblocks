@@ -18,14 +18,17 @@ package utils
 
 import (
 	"fmt"
-	"github.com/infracreate/opencli/pkg/types"
-	"github.com/pkg/errors"
 	"io"
 	"io/fs"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
+
+	l "github.com/k3d-io/k3d/v5/pkg/logger"
+	"github.com/pkg/errors"
+
+	"jihulab.com/infracreate/dbaas-system/opencli/pkg/types"
 )
 
 var (
@@ -37,24 +40,28 @@ var (
 	InfoP func(padding int, a ...interface{})
 	// Errf print error with format
 	Errf func(format string, a ...interface{})
+	// Debugf print error with format
+	Debugf func(format string, a ...interface{})
 )
 
 func init() {
 	Info = func(a ...interface{}) {
-		fmt.Println(a...)
-	}
-	Errf = func(format string, a ...interface{}) {
-		fmt.Printf(format, a...)
+		l.Log().Info(a...)
 	}
 	Infof = func(format string, a ...interface{}) {
-		fmt.Printf(format, a...)
+		l.Log().Infof(format, a...)
 	}
 	InfoP = func(padding int, a ...interface{}) {
-		fmt.Printf("%*s", padding, "")
-		fmt.Println(a...)
+		l.Log().Infof(fmt.Sprintf("%*s %%v", padding, ""), a...)
+	}
+	Errf = func(format string, a ...interface{}) {
+		l.Log().Errorf(format, a...)
+	}
+	Debugf = func(format string, a ...interface{}) {
+		l.Log().Debugf(format, a...)
 	}
 	if _, err := GetCliHomeDir(); err != nil {
-		fmt.Println("Failed to build opencli home dir:", err)
+		l.Log().Error("Failed to create opencli home dir:", err)
 	}
 }
 

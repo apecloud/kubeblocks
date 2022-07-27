@@ -26,7 +26,7 @@ import (
 func NewDbclusterCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dbcluster",
-		Short: "dbcluster Ops command",
+		Short: "DB cluster operation command",
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Println("dbcluster called")
 		},

@@ -17,22 +17,24 @@ limitations under the License.
 package helm
 
 import (
-	"github.com/infracreate/opencli/pkg/utils"
 	"github.com/stretchr/testify/assert"
+	"helm.sh/helm/v3/pkg/repo"
+
 	"testing"
+
+	"github.com/infracreate/opencli/pkg/utils"
 )
 
 func TestAddRepo(t *testing.T) {
-	r := RepoEntry{
+	r := repo.Entry{
 		Name: "mysql-operator",
-		Url:  "https://mysql.github.io/mysql-operator/",
+		URL:  "https://mysql.github.io/mysql-operator/",
 	}
-	r.Add()
+	AddRepo(&r)
 }
 
 func TestInstall(t *testing.T) {
 	is := assert.New(t)
-	SetKubeconfig(utils.ConfigPath("opencli-playground"))
 	installs := []InstallOpts{
 		{
 			Name:      "my-mysql-operator",
@@ -55,7 +57,7 @@ func TestInstall(t *testing.T) {
 	}
 
 	for _, i := range installs {
-		res, err := i.Install()
+		res, err := i.Install(utils.ConfigPath("config"))
 		is.Equal(err, nil)
 		is.Equal(res.Name, i.Name)
 	}

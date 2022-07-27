@@ -17,29 +17,32 @@ limitations under the License.
 package helm
 
 import (
+	"context"
 	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"strings"
+	"syscall"
+	"time"
+
 	"github.com/ghodss/yaml"
-	"github.com/infracreate/opencli/pkg/utils"
 	"github.com/pkg/errors"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
+	"helm.sh/helm/v3/pkg/registry"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
-	"io/ioutil"
-	"log"
-	"os"
-	"strings"
+	"helm.sh/helm/v3/pkg/storage/driver"
+	"k8s.io/client-go/util/homedir"
+
+	"github.com/infracreate/opencli/pkg/utils"
 )
-
-var settings = cli.New()
-
-type RepoEntry struct {
-	Name string
-	Url  string
-}
 
 type InstallOpts struct {
 	Name      string
@@ -47,24 +50,12 @@ type InstallOpts struct {
 	Namespace string
 	Sets      []string
 	Wait      bool
+	Version   string
 }
 
-func debug(format string, v ...interface{}) {
-	if settings.Debug {
-		format = fmt.Sprintf("[debug] %s\n", format)
-		log.Output(2, fmt.Sprintf(format, v...))
-	}
-}
-func SetKubeconfig(config string) {
-	settings.KubeConfig = config
-}
-
-func SetNamespace(ns string) {
-	settings.SetNamespace(ns)
-}
-
-// Add will add a repo
-func (r *RepoEntry) Add() error {
+// AddRepo will add a repo
+func AddRepo(r *repo.Entry) error {
+	settings := cli.New()
 	repoFile := settings.RepositoryConfig
 	b, err := ioutil.ReadFile(repoFile)
 	if err != nil && !os.IsNotExist(err) {
@@ -76,11 +67,6 @@ func (r *RepoEntry) Add() error {
 		return err
 	}
 
-	c := repo.Entry{
-		Name: r.Name,
-		URL:  r.Url,
-	}
-
 	// Check if the repo Name is legal
 	if strings.Contains(r.Name, "/") {
 		return errors.Errorf("repository Name (%s) contains '/', please specify a different Name without '/'", r.Name)
@@ -88,7 +74,7 @@ func (r *RepoEntry) Add() error {
 
 	if f.Has(r.Name) {
 		existing := f.Get(r.Name)
-		if c != *existing {
+		if *r != *existing {
 
 			// The input coming in for the Name is different from what is already
 			// configured. Return an error.
@@ -99,16 +85,16 @@ func (r *RepoEntry) Add() error {
 		return nil
 	}
 
-	cp, err := repo.NewChartRepository(&c, getter.All(settings))
+	cp, err := repo.NewChartRepository(r, getter.All(settings))
 	if err != nil {
 		return err
 	}
 
 	if _, err := cp.DownloadIndexFile(); err != nil {
-		return errors.Wrapf(err, "looks like %q is not a valid Chart repository or cannot be reached", r.Url)
+		return errors.Wrapf(err, "looks like %q is not a valid Chart repository or cannot be reached", r.URL)
 	}
 
-	f.Update(&c)
+	f.Update(r)
 
 	if err := f.WriteFile(repoFile, 0644); err != nil {
 		return err
@@ -118,15 +104,31 @@ func (r *RepoEntry) Add() error {
 }
 
 // Install will install a Chart
-func (i *InstallOpts) Install() (*release.Release, error) {
-	actionConfig := new(action.Configuration)
-	helmDriver := os.Getenv("HELM_DRIVER")
-	if err := actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), helmDriver, debug); err != nil {
+func (i *InstallOpts) Install(cfg string) (*release.Release, error) {
+	utils.InfoP(1, "Install "+i.Chart+" ...")
+
+	settings := cli.New()
+	actionConfig, err := NewActionConfig(settings, "", cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Does not work now
+	// If a release does not exist, install it.
+	histClient := action.NewHistory(actionConfig)
+	histClient.Max = 1
+	if _, err := histClient.Run(i.Name); err != nil && err != driver.ErrReleaseNotFound {
 		return nil, err
 	}
 
 	client := action.NewInstall(actionConfig)
 	client.ReleaseName = i.Name
+	client.Namespace = i.Namespace
+	client.CreateNamespace = true
+	client.Wait = i.Wait
+	client.Timeout = time.Second * 300
+	client.Version = i.Version
+	client.Keyring = defaultKeyring()
 
 	cp, err := client.ChartPathOptions.LocateChart(i.Chart, settings)
 	if err != nil {
@@ -149,26 +151,66 @@ func (i *InstallOpts) Install() (*release.Release, error) {
 		return nil, err
 	}
 
-	if i.Namespace != "" {
-		client.Namespace = i.Namespace
-		client.CreateNamespace = true
-	} else {
-		client.Namespace = settings.Namespace()
-	}
-	client.Wait = i.Wait
+	// Create context and prepare the handle of SIGTERM
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
 
-	res, err := client.Run(chartRequested, vals)
-	if err != nil {
+	// Set up channel on which to send signal notifications.
+	// We must use a buffered channel or risk missing the signal
+	// if we're not ready to receive when the signal is sent.
+	cSignal := make(chan os.Signal, 2)
+	signal.Notify(cSignal, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-cSignal
+		utils.Infof("Install has been cancelled.\n")
+		cancel()
+	}()
+
+	res, err := client.RunWithContext(ctx, chartRequested, vals)
+	if err != nil && err.Error() != "cannot re-use a name that is still in use" {
 		return nil, err
 	}
 	return res, nil
 }
 
-func NewActionConfig() (*action.Configuration, error) {
+func NewActionConfig(s *cli.EnvSettings, ns string, config string) (*action.Configuration, error) {
+	var settings = s
 	cfg := new(action.Configuration)
-	err := cfg.Init(settings.RESTClientGetter(), settings.Namespace(), os.Getenv("HELM_DRIVER"), debug)
+	if settings == nil {
+		settings = cli.New()
+	}
+
+	settings.SetNamespace(ns)
+	settings.KubeConfig = config
+	registryClient, err := registry.NewClient(
+		registry.ClientOptDebug(settings.Debug),
+		registry.ClientOptEnableCache(true),
+		registry.ClientOptWriter(os.Stdout),
+		registry.ClientOptCredentialsFile(settings.RegistryConfig),
+	)
+	if err != nil {
+		return nil, err
+	}
+	cfg.RegistryClient = registryClient
+
+	debug := func(format string, v ...interface{}) {
+		if settings.Debug {
+			format = fmt.Sprintf("[debug] %s\n", format)
+			log.Output(2, fmt.Sprintf(format, v...))
+		}
+	}
+
+	err = cfg.Init(settings.RESTClientGetter(), settings.Namespace(), os.Getenv("HELM_DRIVER"), debug)
 	if err != nil {
 		return nil, err
 	}
 	return cfg, nil
+}
+
+// defaultKeyring returns the expanded path to the default keyring.
+func defaultKeyring() string {
+	if v, ok := os.LookupEnv("GNUPGHOME"); ok {
+		return filepath.Join(v, "pubring.gpg")
+	}
+	return filepath.Join(homedir.HomeDir(), ".gnupg", "pubring.gpg")
 }

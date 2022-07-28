@@ -1,6 +1,8 @@
 include dependency.mk
 
-VERSION ?= 0.1.0
+IMG ?= docker.io/infracreate/opencli
+CLI_VERSION ?= 0.1.0
+TAG ?= v$(CLI_VERSION)
 
 K3S_VERSION ?= v1.23.8+k3s1
 K3D_VERSION ?= 5.4.4
@@ -25,9 +27,12 @@ export GOPRIVATE=jihulab.com/infracreate
 export GOPROXY=https://goproxy.cn,direct
 
 
-#LD_FLAGS="-s -w -X main.version=v${VERSION} -X main.buildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` -X main.gitCommit=`git rev-parse HEAD`  -X ./pkg/types/types.K3sImageTag=${K3S_IMG_TAG} -X ./pkg/types/types.K3dVersion=${K3D_VERSION} "
-#LD_FLAGS="-s -w -X main.version=v${VERSION} -X main.buildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` -X main.gitCommit=`git rev-parse HEAD`  -X jihulab.com/infracreate/dbaas-system/opencli/pkg/types/types.K3sImageTag=${K3S_IMG_TAG} -X jihulab.com/infracreate/dbaas-system/opencli/pkg/types/types.K3dVersion=${K3D_VERSION} "
-LD_FLAGS="-s -w -X jihulab.com/infracreate/dbaas-system/opencli/pkg/version.Version=v${VERSION} -X main.buildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` -X main.gitCommit=`git rev-parse HEAD`"
+LD_FLAGS="-s -w \
+	-X jihulab.com/infracreate/dbaas-system/opencli/version.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` \
+	-X jihulab.com/infracreate/dbaas-system/opencli/version.GitCommit=`git rev-parse HEAD` \
+	-X jihulab.com/infracreate/dbaas-system/opencli/version.Version=${CLI_VERSION} \
+	-X jihulab.com/infracreate/dbaas-system/opencli/version.K3sImageTag=${K3S_IMG_TAG} \
+	-X jihulab.com/infracreate/dbaas-system/opencli/version.K3dVersion=${K3D_VERSION}"
 
 
 .DEFAULT_GOAL := bin/opencli
@@ -64,7 +69,7 @@ lint: golangci
 staticcheck: staticchecktool
 	$(STATICCHECK) ./...
 
-goimports:
+goimports: goimportstool
 	$(GOIMPORTS) -local jihulab.com/infracreate/dbaas-system/opencli -w $$(go list -f {{.Dir}} ./...)
 
 .PHONY: go-check
@@ -90,6 +95,14 @@ mod-vendor:
 	$(GO) mod tidy
 	$(GO) mod vendor
 	$(GO) mod verify
+
+
+# Run docker build
+.PHONY: docker-build
+docker-build: clean bin/opencli.linux.amd64 bin/opencli.linux.arm64 bin/opencli.darwin.arm64 bin/opencli.darwin.amd64 bin/opencli.windows.amd64
+	DOCKER_BUILDKIT=1 docker build . -t ${IMG}:${TAG}
+
+
 
 .PHONY: reviewable
 reviewable: lint staticcheck fmt go-check

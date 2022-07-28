@@ -17,29 +17,28 @@ limitations under the License.
 package dbcluster
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
-// NewDbclusterCmd creates the dbcluster command
-func NewDbclusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+type ListOptions struct {
+	AllNamespaces bool
+}
+
+func NewListCmd(f cmdutil.Factory) *cobra.Command {
+	o := &ListOptions{}
 	cmd := &cobra.Command{
-		Use:   "dbcluster",
-		Short: "DB cluster operation command",
+		Use:   "list",
+		Short: "List all database cluster",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("dbcluster called")
+			cmdutil.CheckErr(o.Run(f))
 		},
 	}
 
-	// add subcommands
-	cmd.AddCommand(
-		NewListCmd(f),
-		NewDescribeCmd(f, streams),
-		NewConnectCmd(f),
-	)
-
+	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	return cmd
+}
+
+func (l *ListOptions) Run(f cmdutil.Factory) error {
+	return nil
 }

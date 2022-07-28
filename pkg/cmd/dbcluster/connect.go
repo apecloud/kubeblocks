@@ -14,17 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cluster
+package dbcluster
 
-import "jihulab.com/infracreate/dbaas-system/opencli/pkg/types"
+import (
+	"github.com/spf13/cobra"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-// Installer defines the interface for handling the cluster(k3d/k3s) management
-type Installer interface {
-	Install() error
-	Uninstall() error
-	GenKubeconfig() error
-	SetKubeconfig() error
-	InstallDeps() error
-	GetStatus() types.ClusterStatus
-	PrintGuide() error
+	"jihulab.com/infracreate/dbaas-system/opencli/pkg/utils"
+)
+
+func NewConnectCmd(f cmdutil.Factory) *cobra.Command {
+
+	cmd := &cobra.Command{
+		Use:   "connect",
+		Short: "Connect to the database cluster",
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) == 0 {
+				utils.Errf("You must specify a database cluster name to connect.")
+				return
+			}
+		},
+	}
+
+	return cmd
 }

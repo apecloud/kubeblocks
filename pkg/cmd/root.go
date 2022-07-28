@@ -20,12 +20,13 @@ import (
 	"fmt"
 	"os"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/bench"
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/dbaas"
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/dbcluster"
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/playground"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -47,7 +48,7 @@ func NewRootCmd() *cobra.Command {
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 	matchVersionKubeConfigFlags.AddFlags(flags)
 
-	//f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
+	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
 	ioStreams := genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}
 
 	flags.ParseErrorsWhitelist.UnknownFlags = true
@@ -56,7 +57,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.AddCommand(
 		playground.NewPlaygroundCmd(ioStreams),
 		dbaas.NewDbaasCmd(),
-		dbcluster.NewDbclusterCmd(),
+		dbcluster.NewDbclusterCmd(f, ioStreams),
 		bench.NewBenchCmd(),
 	)
 

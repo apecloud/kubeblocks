@@ -19,7 +19,7 @@ package provider
 import (
 	"helm.sh/helm/v3/pkg/repo"
 
-	"github.com/infracreate/opencli/pkg/utils/helm"
+	"jihulab.com/infracreate/dbaas-system/opencli/pkg/utils/helm"
 )
 
 type MysqlOperator struct{}
@@ -39,44 +39,44 @@ func (o *MysqlOperator) GetRepos() []repo.Entry {
 
 func (o *MysqlOperator) GetBaseCharts(ns string) []helm.InstallOpts {
 	return []helm.InstallOpts{
-		//{
-		//	Name:      "prometheus",
-		//	Chart:     "prometheus-community/kube-prometheus-stack",
-		//	Wait:      true,
-		//	Version:   "38.0.2",
-		//	Namespace: ns,
-		//	Sets: []string{
-		//		"prometheusOperator.admissionWebhooks.patch.image.repository=weidixian/ingress-nginx-kube-webhook-certgen",
-		//		"kube-state-metrics.image.repository=jiamiao442/kube-state-metrics",
-		//		"kubeStateMetrics.enabled=false",
-		//		"grafana.sidecar.dashboards.searchNamespace=ALL",
-		//		"prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues=false",
-		//		"prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false",
-		//	},
-		//},
+		{
+			Name:      "prometheus",
+			Chart:     "prometheus-community/kube-prometheus-stack",
+			Wait:      true,
+			Version:   "38.0.2",
+			Namespace: ns,
+			Sets: []string{
+				"prometheusOperator.admissionWebhooks.patch.image.repository=weidixian/ingress-nginx-kube-webhook-certgen",
+				"kube-state-metrics.image.repository=jiamiao442/kube-state-metrics",
+				"kubeStateMetrics.enabled=false",
+				"grafana.sidecar.dashboards.searchNamespace=ALL",
+				"prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues=false",
+				"prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false",
+			},
+		},
 	}
 }
 
 func (o *MysqlOperator) GetDBCharts(ns string, dbname string) []helm.InstallOpts {
 	return []helm.InstallOpts{
-		//{
-		//	Name:      "mysql-operator",
-		//	Chart:     "mysql-operator/mysql-operator",
-		//	Wait:      true,
-		//	Version:   "2.0.5",
-		//	Namespace: "mysql-operator",
-		//	Sets:      []string{},
-		//},
+		{
+			Name:      "mysql-operator",
+			Chart:     "mysql-operator/mysql-operator",
+			Wait:      true,
+			Version:   "2.0.5",
+			Namespace: "mysql-operator",
+			Sets:      []string{},
+		},
 		{
 			Name:      dbname,
 			Chart:     "mysql-operator/mysql-innodbcluster",
-			Wait:      false,
+			Wait:      true,
 			Namespace: ns,
 			Version:   "2.0.5",
 			Sets: []string{
-				"credentials.root.user='root'",
+				"credentials.root.user=root",
 				"credentials.root.password=sakila",
-				"credentials.root.host='%'",
+				"credentials.root.host=%",
 				"serverInstances=1",
 				"routerInstances=1",
 				"tls.useSelfSigned=true",

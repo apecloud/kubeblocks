@@ -14,17 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cluster
+package playground
 
-import "jihulab.com/infracreate/dbaas-system/opencli/pkg/types"
-
-// Installer defines the interface for handling the cluster(k3d/k3s) management
-type Installer interface {
-	Install() error
-	Uninstall() error
-	GenKubeconfig() error
-	SetKubeconfig() error
-	InstallDeps() error
-	GetStatus() types.ClusterStatus
-	PrintGuide() error
-}
+const (
+	dbClusterName      = "mycluster"
+	clusterName        = "opencli-playground"
+	clusterNamespace   = "opencli-playground"
+	dbClusterNamespace = "default"
+	defaultEngine      = "mysql"
+	defaultProvider    = "cloudape.com"
+	defaultVersion     = "8.0.29"
+)

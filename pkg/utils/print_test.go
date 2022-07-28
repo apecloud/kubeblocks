@@ -14,17 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cluster
+package utils
 
-import "jihulab.com/infracreate/dbaas-system/opencli/pkg/types"
+import (
+	"os"
+	"testing"
+	"text/template"
+)
 
-// Installer defines the interface for handling the cluster(k3d/k3s) management
-type Installer interface {
-	Install() error
-	Uninstall() error
-	GenKubeconfig() error
-	SetKubeconfig() error
-	InstallDeps() error
-	GetStatus() types.ClusterStatus
-	PrintGuide() error
+func TestPrint(t *testing.T) {
+	clusterInfo := PlayGroundInfo{
+		DBCluster:     "mycluster",
+		DBPort:        "3306",
+		DBNamespace:   "default",
+		Namespace:     "opencli-playground",
+		GrafanaSvc:    "prometheus-grafana",
+		GrafanaPort:   "9100",
+		GrafanaUser:   "admin",
+		GrafanaPasswd: "prom-operator",
+	}
+
+	tmpl, _ := template.New("test").Parse(playgroundTmpl)
+	_ = tmpl.Execute(os.Stdout, clusterInfo)
+}
+
+func TestInfo(t *testing.T) {
+	InfoP(1, x, "image"+"test"+"not ready")
 }

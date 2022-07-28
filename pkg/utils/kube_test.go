@@ -14,17 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cluster
+package utils
 
-import "jihulab.com/infracreate/dbaas-system/opencli/pkg/types"
+import (
+	"fmt"
+	"testing"
+)
 
-// Installer defines the interface for handling the cluster(k3d/k3s) management
-type Installer interface {
-	Install() error
-	Uninstall() error
-	GenKubeconfig() error
-	SetKubeconfig() error
-	InstallDeps() error
-	GetStatus() types.ClusterStatus
-	PrintGuide() error
+func TestKube(t *testing.T) {
+	PortForward("", fmt.Sprintf("service/%s", "cluster"), "3306")
 }

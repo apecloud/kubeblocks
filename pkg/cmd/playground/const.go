@@ -17,11 +17,11 @@ limitations under the License.
 package playground
 
 const (
-	dbClusterName      = "mycluster"
-	clusterName        = "opencli-playground"
-	clusterNamespace   = "opencli-playground"
-	dbClusterNamespace = "default"
+	DBClusterName      = "mycluster"
+	ClusterName        = "opencli-playground"
+	ClusterNamespace   = "opencli-playground"
+	DBClusterNamespace = "default"
 	defaultEngine      = "mysql"
 	defaultProvider    = "cloudape.com"
-	defaultVersion     = "8.0.29"
+	DefaultVersion     = "8.0.29"
 )

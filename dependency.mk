@@ -38,8 +38,8 @@ else
 STATICCHECK=$(shell which staticcheck)
 endif
 
-.PHONY: goimports
-goimports:
+.PHONY: goimportstool
+goimportstool:
 ifeq (, $(shell which goimports))
 	@{ \
 	set -e ;\

@@ -16,6 +16,8 @@ limitations under the License.
 
 package types
 
+import "jihulab.com/infracreate/dbaas-system/opencli/version"
+
 const (
 	// OpenCliDefaultHome defines opencli default home name
 	OpenCliDefaultHome = ".opencli"
@@ -32,18 +34,6 @@ const (
 	// all cluster will be created in this network, so they can communicate with each other
 	CliDockerNetwork = "k3d-opencli-playground"
 
-	// K3sImageTag is k3s image tag
-	K3sImageTag = "v1.23.8-k3s1"
-	// K3sImage is k3s image repo
-	K3sImage = "rancher/k3s:" + K3sImageTag
-
-	// K3dVersion is k3d release version
-	K3dVersion = "5.4.4"
-	// K3dToolsImage is k3d tools image repo
-	K3dToolsImage = "ghcr.io/k3d-io/k3d-tools:" + K3dVersion
-	// K3dProxyImage is k3d proxy image repo
-	K3dProxyImage = "ghcr.io/k3d-io/k3d-proxy:" + K3dVersion
-
 	// GoosLinux is os.GOOS linux string
 	GoosLinux = "linux"
 	// GoosDarwin is os.GOOS darwin string
@@ -53,6 +43,16 @@ const (
 
 	// PlaygroundSourceName is the playground default operator
 	PlaygroundSourceName = "innodbclusters"
+)
+
+var (
+	// K3sImage is k3s image repo
+	K3sImage = "rancher/k3s:" + version.K3sImageTag
+
+	// K3dToolsImage is k3d tools image repo
+	K3dToolsImage = "docker.io/infracreate/k3d-tools:" + version.K3dVersion
+	// K3dProxyImage is k3d proxy image repo
+	K3dProxyImage = "docker.io/infracreate/k3d-proxy:" + version.K3dVersion
 )
 
 type K3dImages struct {

@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -30,19 +31,35 @@ import (
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/dbaas"
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/dbcluster"
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/playground"
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/version"
+	"jihulab.com/infracreate/dbaas-system/opencli/version"
 )
 
+// RootFlags describes a struct that holds flags that can be set on root level of the command
+type RootFlags struct {
+	version bool
+}
+
 var cfgFile string
+
+var rootFlags = RootFlags{}
 
 func NewRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "opencli",
-		Short: "A Command Line Interface(CLI) library for dbaas.",
-		Run:   runHelp,
+		Short: "A Command Line Interface(CLI) library for DBaaS.",
+		Run: func(cmd *cobra.Command, args []string) {
+			if rootFlags.version {
+				printVersion()
+			} else {
+				runHelp(cmd, args)
+			}
+		},
 	}
 
 	flags := rootCmd.PersistentFlags()
+
+	// add local flags
+	rootCmd.Flags().BoolVar(&rootFlags.version, "version", false, "Show version")
 
 	kubeConfigFlags := genericclioptions.NewConfigFlags(true)
 	kubeConfigFlags.AddFlags(flags)
@@ -60,7 +77,6 @@ func NewRootCmd() *cobra.Command {
 		dbaas.NewDbaasCmd(),
 		dbcluster.NewDbclusterCmd(f, ioStreams),
 		bench.NewBenchCmd(f),
-		newVersionCmd(),
 	)
 
 	cobra.OnInitialize(initConfig)
@@ -96,13 +112,9 @@ func initConfig() {
 	}
 }
 
-func newVersionCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "version",
-		Short: "Show opencli version",
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println(version.Version)
-		},
-	}
-	return cmd
+func printVersion() {
+	fmt.Printf("opencli version %s\n", version.GetVersion())
+	fmt.Printf("k3d version %s\n", version.K3dVersion)
+	fmt.Printf("k3s version %s (default)\n", strings.Replace(version.K3sImageTag, "-", "+", 1))
+	fmt.Printf("git commit %s (build date %s)\n", version.GitCommit, version.BuildDate)
 }

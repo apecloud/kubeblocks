@@ -16,11 +16,4 @@ limitations under the License.
 
 package version
 
-var (
-	version = "v0.1"
-)
-
-// GetVersion returns the semver string of the version
-func GetVersion() string {
-	return version
-}
+var Version = "UNKNOWN"

@@ -42,7 +42,7 @@ func (o *MysqlOperator) GetBaseCharts(ns string) []helm.InstallOpts {
 		{
 			Name:      "prometheus",
 			Chart:     "prometheus-community/kube-prometheus-stack",
-			Wait:      true,
+			Wait:      false,
 			Version:   "38.0.2",
 			Namespace: ns,
 			Sets: []string{
@@ -64,14 +64,14 @@ func (o *MysqlOperator) GetDBCharts(ns string, dbname string) []helm.InstallOpts
 			Chart:     "mysql-operator/mysql-operator",
 			Wait:      true,
 			Version:   "2.0.5",
-			Namespace: "mysql-operator",
+			Namespace: ns,
 			Sets:      []string{},
 		},
 		{
 			Name:      dbname,
 			Chart:     "oci://yimeisun.azurecr.io/helm-chart/mysql-innodbcluster",
 			Wait:      true,
-			Namespace: ns,
+			Namespace: "default",
 			Version:   "1.0.0",
 			Sets:      []string{},
 			LoginOpts: &helm.LoginOpts{

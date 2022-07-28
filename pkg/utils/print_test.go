@@ -17,9 +17,7 @@ limitations under the License.
 package utils
 
 import (
-	"os"
 	"testing"
-	"text/template"
 )
 
 func TestPrint(t *testing.T) {
@@ -33,9 +31,7 @@ func TestPrint(t *testing.T) {
 		GrafanaUser:   "admin",
 		GrafanaPasswd: "prom-operator",
 	}
-
-	tmpl, _ := template.New("test").Parse(playgroundTmpl)
-	_ = tmpl.Execute(os.Stdout, clusterInfo)
+	PrintPlaygroundGuild(clusterInfo)
 }
 
 func TestInfo(t *testing.T) {

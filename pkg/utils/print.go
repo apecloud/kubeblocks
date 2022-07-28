@@ -44,6 +44,17 @@ type PlayGroundInfo struct {
 	GrafanaPasswd string
 }
 
+type DBClusterInfo struct {
+	DBCluster   string
+	Version     string
+	Topology    string
+	Status      string
+	StartTime   string
+	Labels      string
+	RootUser    string
+	DBNamespace string
+}
+
 var playgroundTmpl = `
 Notes:
 ** Please be patient while playground is being deployed **
@@ -52,13 +63,16 @@ DBaaS playground v0.1.0 Start SUCCESSFULLY!
 To view the db clusters by command client:
   opencli dbcluster list
 
-Execute the following command in another terminal
-  kubectl port-forward --address 0.0.0.0 service/{{.DBCluster}} {{.DBPort}}
+Execute the following in another terminal first:
   kubectl port-forward --namespace {{.Namespace}} svc/{{.GrafanaSvc}} {{.GrafanaPort}}:80
 
 To view the Grafana: http://127.0.0.1:{{.GrafanaPort}}   {{.GrafanaUser}}/{{.GrafanaPasswd}}
 
 ** MySQL cluster {{.DBCluster}} is being created **
+Execute the following in another terminal first:
+
+  kubectl port-forward --address 0.0.0.0 service/{{.DBCluster}} {{.DBPort}}
+
 Execute the following to get the administrator credentials:
 
   MYSQL_ROOT_PASSWORD=$(kubectl get secret --namespace {{.DBNamespace}} {{.DBCluster}}-cluster-secret -o jsonpath="{.data.rootPassword}" | base64 -d)
@@ -73,6 +87,26 @@ To connect to your database:
   2. To connect to primary service(read/write) by JDBC:
 
       jdbc:mysql://127.0.0.1:{{.DBPort}}/mysql
+
+`
+
+var clusterInfoTmpl = `
+Name:           {{.DBCluster}}
+Kind:           MySQL
+Version:        {{.Version}}
+Topology mode:  {{.Topology}}
+CPU:            N/A
+Memory:         N/A
+Storage:        {{.Storage}}
+Status:         {{.Status}}
+Started:        {{.StartTime}}
+labels:			{{.Labels}}
+
+# connect information
+Username:       {{.RootUser}}
+Password:       MYSQL_ROOT_PASSWORD=$(kubectl get secret --namespace {{.DBNamespace}} {{.DBCluster}}-cluster-secret -o jsonpath="{.data.rootPassword}" | base64 -d)
+Connect:        mysql -h 127.0.0.1 -u{{.RootUser}} -p"$MYSQL_ROOT_PASSWORD"
+
 `
 
 func PrintClusterStatus(status types.ClusterStatus) bool {
@@ -124,12 +158,20 @@ func PrintClusterStatus(status types.ClusterStatus) bool {
 }
 
 func PrintPlaygroundGuild(info PlayGroundInfo) error {
-	tmpl, err := template.New("test").Parse(playgroundTmpl)
+	return PrintTemplate(playgroundTmpl, info)
+}
+
+func PrintClusterInfo(info DBClusterInfo) error {
+	return PrintTemplate(clusterInfoTmpl, info)
+}
+
+func PrintTemplate(t string, data interface{}) error {
+	tmpl, err := template.New("_").Parse(t)
 	if err != nil {
 		return err
 	}
 
-	err = tmpl.Execute(os.Stdout, info)
+	err = tmpl.Execute(os.Stdout, data)
 	if err != nil {
 		return err
 	}

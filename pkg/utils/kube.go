@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubectl/pkg/util"
 )
 
-func PortForward(cfg string, svc string, port string) error {
+func PortForward(svc string, port string) error {
 	f := buildFactory()
 	restClient, err := f.RESTClient()
 	if err != nil {

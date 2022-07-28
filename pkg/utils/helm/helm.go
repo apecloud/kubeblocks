@@ -51,6 +51,13 @@ type InstallOpts struct {
 	Sets      []string
 	Wait      bool
 	Version   string
+	LoginOpts *LoginOpts
+}
+
+type LoginOpts struct {
+	User   string
+	Passwd string
+	URL    string
 }
 
 // AddRepo will add a repo
@@ -113,6 +120,11 @@ func (i *InstallOpts) Install(cfg string) (*release.Release, error) {
 		return nil, err
 	}
 
+	err = i.TryToLogin(actionConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	// TODO: Does not work now
 	// If a release does not exist, install it.
 	histClient := action.NewHistory(actionConfig)
@@ -171,6 +183,15 @@ func (i *InstallOpts) Install(cfg string) (*release.Release, error) {
 		return nil, err
 	}
 	return res, nil
+}
+
+func (i *InstallOpts) TryToLogin(cfg *action.Configuration) error {
+	if i.LoginOpts == nil {
+		return nil
+	}
+
+	return cfg.RegistryClient.Login(i.LoginOpts.URL, registry.LoginOptBasicAuth(i.LoginOpts.User, i.LoginOpts.Passwd),
+		registry.LoginOptInsecure(false))
 }
 
 func NewActionConfig(s *cli.EnvSettings, ns string, config string) (*action.Configuration, error) {

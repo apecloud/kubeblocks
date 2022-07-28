@@ -38,27 +38,22 @@ func TestInstall(t *testing.T) {
 	is := assert.New(t)
 	installs := []InstallOpts{
 		{
-			Name:      "my-mysql-operator",
-			Chart:     "mysql-operator/mysql-operator",
-			Namespace: "mysql-operator",
+			Name:      "my",
+			Chart:     "oci://yimeisun.azurecr.io/helm-chart/mysql-innodbcluster",
+			Wait:      true,
+			Namespace: "default",
+			Version:   "1.0.0",
 			Sets:      []string{},
-		},
-		{
-			Name:      "mycluster",
-			Chart:     "mysql-operator/mysql-innodbcluster",
-			Namespace: "mysql-operator",
-			Sets: []string{"credentials.root.user='root'",
-				"credentials.root.password='sakila'",
-				"credentials.root.host='%'",
-				"serverInstances=1",
-				"routerInstances=1",
-				"tls.useSelfSigned=true",
+			LoginOpts: &LoginOpts{
+				User:   "yimeisun",
+				Passwd: "8V+PmX1oSDv4pumDvZp6m7LS8iPgbY3A",
+				URL:    "yimeisun.azurecr.io",
 			},
 		},
 	}
 
 	for _, i := range installs {
-		res, err := i.Install(utils.ConfigPath("config"))
+		res, err := i.Install(utils.ConfigPath("opencli-playground"))
 		is.Equal(err, nil)
 		is.Equal(res.Name, i.Name)
 	}

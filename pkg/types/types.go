@@ -50,6 +50,9 @@ const (
 	GoosDarwin = "darwin"
 	// GoosWindows is os.GOOS windows string
 	GoosWindows = "windows"
+
+	// PlaygroundSourceName is the playground default operator
+	PlaygroundSourceName = "innodbclusters"
 )
 
 type K3dImages struct {

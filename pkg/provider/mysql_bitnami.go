@@ -19,7 +19,7 @@ package provider
 import (
 	"helm.sh/helm/v3/pkg/repo"
 
-	"github.com/infracreate/opencli/pkg/utils/helm"
+	"jihulab.com/infracreate/dbaas-system/opencli/pkg/utils/helm"
 )
 
 type BitnamiMysql struct{}

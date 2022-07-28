@@ -23,13 +23,14 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/bench"
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/dbaas"
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/dbcluster"
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/playground"
-
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	"jihulab.com/infracreate/dbaas-system/opencli/version"
 )
 
 var cfgFile string
@@ -59,6 +60,7 @@ func NewRootCmd() *cobra.Command {
 		dbaas.NewDbaasCmd(),
 		dbcluster.NewDbclusterCmd(f, ioStreams),
 		bench.NewBenchCmd(),
+		newVersionCmd(),
 	)
 
 	cobra.OnInitialize(initConfig)
@@ -92,4 +94,15 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
+}
+
+func newVersionCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "version",
+		Short: "Show opencli version",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println(version.GetVersion())
+		},
+	}
+	return cmd
 }

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -28,6 +29,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/briandowns/spinner"
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	"helm.sh/helm/v3/pkg/action"
@@ -113,9 +115,12 @@ func AddRepo(r *repo.Entry) error {
 // Install will install a Chart
 func (i *InstallOpts) Install(cfg string) (*release.Release, error) {
 	utils.InfoP(1, "Install "+i.Chart+" ...")
+	s := spinner.New(spinner.CharSets[rand.Intn(44)], 100*time.Millisecond)
+	s.Color("green")
+	s.Start()
 
 	settings := cli.New()
-	actionConfig, err := NewActionConfig(settings, settings.Namespace(), cfg)
+	actionConfig, err := NewActionConfig(settings, i.Namespace, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -179,6 +184,7 @@ func (i *InstallOpts) Install(cfg string) (*release.Release, error) {
 	}()
 
 	res, err := client.RunWithContext(ctx, chartRequested, vals)
+	s.Stop()
 	if err != nil && err.Error() != "cannot re-use a name that is still in use" {
 		return nil, err
 	}
@@ -206,7 +212,7 @@ func NewActionConfig(s *cli.EnvSettings, ns string, config string) (*action.Conf
 	registryClient, err := registry.NewClient(
 		registry.ClientOptDebug(settings.Debug),
 		registry.ClientOptEnableCache(true),
-		registry.ClientOptWriter(os.Stdout),
+		registry.ClientOptWriter(ioutil.Discard),
 		registry.ClientOptCredentialsFile(settings.RegistryConfig),
 	)
 	if err != nil {

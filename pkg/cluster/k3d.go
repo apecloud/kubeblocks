@@ -609,13 +609,13 @@ func addRepos(repos []repo.Entry) error {
 func installCharts(pi *PlaygroundInstaller, wg *sync.WaitGroup) error {
 	install := func(cs []helm.InstallOpts, wg *sync.WaitGroup) {
 		for _, c := range cs {
-			wg.Add(1)
-			go func(c helm.InstallOpts) {
-				defer wg.Done()
-				if _, err := c.Install(utils.ConfigPath(pi.ClusterName)); err != nil {
-					infof("Installing chart %s error: %s\n", c.Name, err.Error())
-				}
-			}(c)
+			//wg.Add(1)
+			//go func(c helm.InstallOpts) {
+			//	defer wg.Done()
+			if _, err := c.Install(utils.ConfigPath(pi.ClusterName)); err != nil {
+				infof("Installing chart %s error: %s\n", c.Name, err.Error())
+			}
+			//}(c)
 		}
 	}
 
@@ -624,12 +624,12 @@ func installCharts(pi *PlaygroundInstaller, wg *sync.WaitGroup) error {
 	install(charts, wg)
 
 	// install database cluster to default namespace
-	charts = pi.Provider.GetDBCharts("default", pi.DBCluster)
+	charts = pi.Provider.GetDBCharts(pi.Namespace, pi.DBCluster)
 	install(charts, wg)
 	return nil
 }
 
 // Deprecated
 func portForward(dbCluster string) error {
-	return utils.PortForward("", fmt.Sprintf("service/%s", dbCluster), "3306")
+	return utils.PortForward(fmt.Sprintf("service/%s", dbCluster), "3306")
 }

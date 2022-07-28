@@ -27,7 +27,7 @@ export GOPROXY=https://goproxy.cn,direct
 
 #LD_FLAGS="-s -w -X main.version=v${VERSION} -X main.buildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` -X main.gitCommit=`git rev-parse HEAD`  -X ./pkg/types/types.K3sImageTag=${K3S_IMG_TAG} -X ./pkg/types/types.K3dVersion=${K3D_VERSION} "
 #LD_FLAGS="-s -w -X main.version=v${VERSION} -X main.buildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` -X main.gitCommit=`git rev-parse HEAD`  -X jihulab.com/infracreate/dbaas-system/opencli/pkg/types/types.K3sImageTag=${K3S_IMG_TAG} -X jihulab.com/infracreate/dbaas-system/opencli/pkg/types/types.K3dVersion=${K3D_VERSION} "
-LD_FLAGS="-s -w -X main.version=v${VERSION} -X main.buildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` -X main.gitCommit=`git rev-parse HEAD`"
+LD_FLAGS="-s -w -X jihulab.com/infracreate/dbaas-system/opencli/pkg/version.Version=v${VERSION} -X main.buildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` -X main.gitCommit=`git rev-parse HEAD`"
 
 
 .DEFAULT_GOAL := bin/opencli

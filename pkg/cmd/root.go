@@ -30,7 +30,7 @@ import (
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/dbaas"
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/dbcluster"
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/playground"
-	"jihulab.com/infracreate/dbaas-system/opencli/version"
+	"jihulab.com/infracreate/dbaas-system/opencli/pkg/version"
 )
 
 var cfgFile string
@@ -59,7 +59,7 @@ func NewRootCmd() *cobra.Command {
 		playground.NewPlaygroundCmd(ioStreams),
 		dbaas.NewDbaasCmd(),
 		dbcluster.NewDbclusterCmd(f, ioStreams),
-		bench.NewBenchCmd(),
+		bench.NewBenchCmd(f),
 		newVersionCmd(),
 	)
 
@@ -101,7 +101,7 @@ func newVersionCmd() *cobra.Command {
 		Use:   "version",
 		Short: "Show opencli version",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println(version.GetVersion())
+			fmt.Println(version.Version)
 		},
 	}
 	return cmd

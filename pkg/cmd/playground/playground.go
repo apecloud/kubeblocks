@@ -31,11 +31,11 @@ import (
 
 var installer = &cluster.PlaygroundInstaller{
 	Ctx:         context.Background(),
-	ClusterName: clusterName,
+	ClusterName: ClusterName,
 	// control plane will install in this namespace, database cluster will
 	// install in the default namespace
-	Namespace: clusterNamespace,
-	DBCluster: dbClusterName,
+	Namespace: ClusterNamespace,
+	DBCluster: DBClusterName,
 }
 
 type InitOptions struct {
@@ -86,7 +86,7 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 
 	cmd.Flags().StringVar(&o.Engine, "engine", defaultEngine, "Database engine type")
 	cmd.Flags().StringVar(&o.Provider, "provider", defaultProvider, "Database provider")
-	cmd.Flags().StringVar(&o.Version, "version", defaultVersion, "Database engine version")
+	cmd.Flags().StringVar(&o.Version, "version", DefaultVersion, "Database engine version")
 	cmd.Flags().BoolVar(&o.DryRun, "dry-run", false, "Dry run the playground init")
 	return cmd
 }

@@ -22,5 +22,9 @@ import (
 )
 
 func TestKube(t *testing.T) {
-	PortForward("", fmt.Sprintf("service/%s", "cluster"), "3306")
+	PortForward(fmt.Sprintf("service/%s", "cluster"), "3306")
+}
+
+func TestKubeBuilder(t *testing.T) {
+
 }

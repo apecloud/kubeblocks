@@ -17,16 +17,26 @@ limitations under the License.
 package playground
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cluster"
+	"jihulab.com/infracreate/dbaas-system/opencli/pkg/provider"
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/utils"
 )
 
-var installer = cluster.LocalInstaller
+var installer = &cluster.PlaygroundInstaller{
+	Ctx:         context.Background(),
+	ClusterName: clusterName,
+	// control plane will install in this namespace, database cluster will
+	// install in the default namespace
+	Namespace: clusterNamespace,
+	DBCluster: dbClusterName,
+}
 
 type InitOptions struct {
 	genericclioptions.IOStreams
@@ -51,8 +61,9 @@ func NewPlaygroundCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	// add subcommands
 	cmd.AddCommand(
 		newInitCmd(streams),
-		newDestroyCmd(streams),
-		newStatusCmd(streams),
+		newDestroyCmd(),
+		newStatusCmd(),
+		newGuideCmd(),
 	)
 
 	return cmd
@@ -67,23 +78,25 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		Use:   "init",
 		Short: "Bootstrap a DBaaS",
 		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(o.Complete())
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
 
-	cmd.Flags().StringVar(&o.Engine, "engine", "mysql", "Database engine type")
-	cmd.Flags().StringVar(&o.Provider, "provider", "cloudape.com", "Database provider")
-	cmd.Flags().StringVar(&o.Version, "version", "8.0.29", "Database engine version")
+	cmd.Flags().StringVar(&o.Engine, "engine", defaultEngine, "Database engine type")
+	cmd.Flags().StringVar(&o.Provider, "provider", defaultProvider, "Database provider")
+	cmd.Flags().StringVar(&o.Version, "version", defaultVersion, "Database engine version")
 	cmd.Flags().BoolVar(&o.DryRun, "dry-run", false, "Dry run the playground init")
 	return cmd
 }
 
-func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func newDestroyCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "destroy",
 		Short: "Destroy the playground cluster.",
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := destroyPlayground(streams); err != nil {
+			if err := destroyPlayground(); err != nil {
 				utils.Errf("%v", err)
 			}
 		},
@@ -91,15 +104,33 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func newStatusCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func newStatusCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Display playground cluster status.",
 		Run: func(cmd *cobra.Command, args []string) {
-			statusCmd(streams)
+			statusCmd()
 		},
 	}
 	return cmd
+}
+
+func newGuideCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "guide",
+		Short: "Display playground cluster user guide.",
+		Run: func(cmd *cobra.Command, args []string) {
+			if err := installer.PrintGuide(); err != nil {
+				utils.Errf("%v", err)
+			}
+		},
+	}
+	return cmd
+}
+
+func (o *InitOptions) Complete() error {
+	installer.Provider = provider.NewProvider(o.Engine)
+	return nil
 }
 
 func (o *InitOptions) Validate() error {
@@ -141,12 +172,15 @@ func (o *InitOptions) Run() error {
 	}
 
 	// Step.4 print guide information
-	printGuide()
+	err = installer.PrintGuide()
+	if err != nil {
+		return errors.Wrap(err, "Failed to print user guide")
+	}
 
 	return nil
 }
 
-func destroyPlayground(streams genericclioptions.IOStreams) error {
+func destroyPlayground() error {
 	if err := installer.Uninstall(); err != nil {
 		return err
 	}
@@ -154,16 +188,13 @@ func destroyPlayground(streams genericclioptions.IOStreams) error {
 	return nil
 }
 
-func statusCmd(streams genericclioptions.IOStreams) {
+func statusCmd() {
 	utils.Info("Checking cluster status...")
 	status := installer.GetStatus()
-	stop := printClusterStatusK3d(status)
+	stop := utils.PrintClusterStatus(status)
 	if stop {
 		return
 	}
+	// TODO
 	utils.Info("Checking database cluster status...")
-}
-
-func printGuide() {
-
 }

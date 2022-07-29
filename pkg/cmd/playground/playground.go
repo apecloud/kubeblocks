@@ -19,6 +19,7 @@ package playground
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -212,4 +213,8 @@ func statusCmd() {
 	}
 	// TODO
 	utils.Info("Checking database cluster status...")
+}
+
+func SetKubeconfig() error {
+	return os.Setenv("KUBECONFIG", utils.ConfigPath(ClusterName))
 }

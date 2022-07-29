@@ -21,7 +21,10 @@ const (
 	ClusterName        = "opencli-playground"
 	ClusterNamespace   = "opencli-playground"
 	DBClusterNamespace = "default"
-	defaultEngine      = "mysql"
+	DefaultEngine      = "mysql"
 	defaultProvider    = "cloudape.com"
 	DefaultVersion     = "8.0.29"
+	DefaultRootUser    = "root"
+	DefaultPassword    = "sakila"
+	DefaultPort        = "3306"
 )

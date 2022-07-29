@@ -17,21 +17,25 @@ limitations under the License.
 package dbcluster
 
 import (
+	"context"
 	"fmt"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/describe"
 
+	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/playground"
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/types"
+	"jihulab.com/infracreate/dbaas-system/opencli/pkg/utils"
 )
 
 type DescribeOptions struct {
@@ -48,6 +52,7 @@ type DescribeOptions struct {
 	DescriberSettings *describe.DescriberSettings
 	FilenameOptions   *resource.FilenameOptions
 
+	client dynamic.Interface
 	genericclioptions.IOStreams
 }
 
@@ -94,6 +99,18 @@ func (o *DescribeOptions) Complete(f cmdutil.Factory, args []string) error {
 		return describe.DescriberFn(f, mapping)
 	}
 
+	// used to fetch the resource
+	config, err := f.ToRESTConfig()
+	if err != nil {
+		return nil
+	}
+
+	client, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
+	o.client = client
 	o.NewBuilder = f.NewBuilder
 
 	return nil
@@ -114,20 +131,20 @@ func (o *DescribeOptions) Run() error {
 		return err
 	}
 
-	allErrs := []error{}
+	var allErrs []error
 	infos, err := r.Infos()
 	if err != nil {
-		if apierrors.IsNotFound(err) && len(o.BuilderArgs) == 2 {
-			return o.DescribeMatchingResources(err, o.BuilderArgs[0], o.BuilderArgs[1])
-		}
-		allErrs = append(allErrs, err)
+		return err
 	}
 
 	errs := sets.NewString()
-	first := true
 	for _, info := range infos {
+		clusterInfo := utils.DBClusterInfo{
+			RootUser: playground.DefaultRootUser,
+			DBPort:   playground.DefaultPort,
+		}
+
 		mapping := info.ResourceMapping()
-		describer, err := o.Describer(mapping)
 		if err != nil {
 			if errs.Has(err.Error()) {
 				continue
@@ -136,21 +153,15 @@ func (o *DescribeOptions) Run() error {
 			errs.Insert(err.Error())
 			continue
 		}
-		s, err := describer.Describe(info.Namespace, info.Name, *o.DescriberSettings)
+
+		clusterInfo.DBNamespace = info.Namespace
+		clusterInfo.DBCluster = info.Name
+		obj, err := o.client.Resource(mapping.Resource).Namespace(o.Namespace).Get(context.TODO(), info.Name, metav1.GetOptions{})
 		if err != nil {
-			if errs.Has(err.Error()) {
-				continue
-			}
-			allErrs = append(allErrs, err)
-			errs.Insert(err.Error())
-			continue
+			return err
 		}
-		if first {
-			first = false
-			fmt.Fprint(o.Out, s)
-		} else {
-			fmt.Fprintf(o.Out, "\n\n%s", s)
-		}
+		buildClusterInfo(obj, &clusterInfo)
+		utils.PrintClusterInfo(clusterInfo)
 	}
 
 	if len(infos) == 0 && len(allErrs) == 0 {
@@ -165,41 +176,26 @@ func (o *DescribeOptions) Run() error {
 	return utilerrors.NewAggregate(allErrs)
 }
 
-func (o *DescribeOptions) DescribeMatchingResources(originalError error, resource, prefix string) error {
-	r := o.NewBuilder().
-		Unstructured().
-		NamespaceParam(o.Namespace).DefaultNamespace().
-		ResourceTypeOrNameArgs(true, resource).
-		SingleResourceType().
-		RequestChunksOf(o.DescriberSettings.ChunkSize).
-		Flatten().
-		Do()
-	mapping, err := r.ResourceMapping()
-	if err != nil {
-		return err
+func buildClusterInfo(obj *unstructured.Unstructured, info *utils.DBClusterInfo) {
+	for k, v := range obj.GetLabels() {
+		info.Labels = info.Labels + fmt.Sprintf("%s:%s ", k, v)
 	}
-	describer, err := o.Describer(mapping)
-	if err != nil {
-		return err
+
+	status := obj.Object["status"].(map[string]interface{})
+	cluster := status["cluster"].(map[string]interface{})
+	spec := obj.Object["spec"].(map[string]interface{})
+
+	info.Version = spec["version"].(string)
+	info.Instances = spec["instances"].(int64)
+	info.ServerId = spec["baseServerId"].(int64)
+	info.Secret = spec["secretName"].(string)
+	info.StartTime = status["createTime"].(string)
+	info.Status = cluster["status"].(string)
+	info.OnlineInstances = cluster["onlineInstances"].(int64)
+	info.Topology = "Cluster"
+	if info.Instances == 1 {
+		info.Topology = "Standalone"
 	}
-	infos, err := r.Infos()
-	if err != nil {
-		return err
-	}
-	isFound := false
-	for ix := range infos {
-		info := infos[ix]
-		if strings.HasPrefix(info.Name, prefix) {
-			isFound = true
-			s, err := describer.Describe(info.Namespace, info.Name, *o.DescriberSettings)
-			if err != nil {
-				return err
-			}
-			fmt.Fprintf(o.Out, "%s\n", s)
-		}
-	}
-	if !isFound {
-		return originalError
-	}
-	return nil
+	info.Engine = playground.DefaultEngine
+	info.Storage = 2
 }

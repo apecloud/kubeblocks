@@ -114,7 +114,7 @@ func AddRepo(r *repo.Entry) error {
 
 // Install will install a Chart
 func (i *InstallOpts) Install(cfg string) (*release.Release, error) {
-	utils.InfoP(1, "Install "+i.Chart+" ...")
+	utils.InfoP(1, "Install "+i.Chart+"...")
 	s := spinner.New(spinner.CharSets[rand.Intn(44)], 100*time.Millisecond)
 	s.Color("green")
 	s.Start()

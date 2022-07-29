@@ -1,0 +1,54 @@
+stages:
+  - build
+  - upload
+  - release
+
+
+variables:
+  DARWIN_ARM64: "darwin-arm64"
+  LINUX_AMD64: "linux-amd64"
+  DARWIN_ARM64_BINARY: "opencli-${DARWIN_ARM64}-${CI_COMMIT_TAG}.tar.gz"
+  LINUX_AMD64_BINARY: "opencli-${LINUX_AMD64}-${CI_COMMIT_TAG}.tar.gz"
+  PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/infracreate/${CI_COMMIT_TAG}/"
+
+
+build-job:
+  stage: build
+  image: golang:1.18
+  script:
+    - mkdir -p ${DARWIN_ARM64} ${LINUX_AMD64}
+    - GOOS=darwin ARCH=arm64 make
+    - mv bin/opencli ${DARWIN_ARM64}/opencli
+    - tar -zcvf ${DARWIN_ARM64_BINARY} ${DARWIN_ARM64}
+    - mv ${DARWIN_ARM64_BINARY} bin/
+    - GOOS=linux ARCH=amd64 make
+    - mv bin/opencli ${LINUX_AMD64}/opencli
+    - tar -zcvf ${LINUX_AMD64_BINARY} ${LINUX_AMD64}
+    - mv ${DARWIN_ARM64_BINARY} ${LINUX_AMD64_BINARY} bin/
+  rules:
+    - if: $CI_COMMIT_TAG
+  artifacts:
+    paths:
+      - bin/
+
+upload-job:
+  stage: upload
+  image: curlimages/curl:latest
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - |
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file bin/${DARWIN_ARM64_BINARY} ${PACKAGE_REGISTRY_URL}
+    - |
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file bin/${LINUX_AMD64_BINARY} ${PACKAGE_REGISTRY_URL}
+
+release-job:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:v0.4.0
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - |
+      release-cli create --name "Release $CI_COMMIT_TAG" --tag-name $CI_COMMIT_TAG \
+        --assets-link "{\"name\":\"${DARWIN_ARM64_BINARY}\",\"url\":\"${PACKAGE_REGISTRY_URL}${DARWIN_ARM64_BINARY}\"}" \
+        --assets-link "{\"name\":\"${LINUX_AMD64_BINARY}\",\"url\":\"${PACKAGE_REGISTRY_URL}${LINUX_AMD64_BINARY}\"}"

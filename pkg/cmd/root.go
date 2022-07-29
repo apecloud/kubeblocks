@@ -44,6 +44,7 @@ var cfgFile string
 var rootFlags = RootFlags{}
 
 func NewRootCmd() *cobra.Command {
+	playground.SetKubeconfig()
 	rootCmd := &cobra.Command{
 		Use:   "opencli",
 		Short: "A Command Line Interface(CLI) library for DBaaS.",

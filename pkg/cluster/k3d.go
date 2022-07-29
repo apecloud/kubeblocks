@@ -628,8 +628,3 @@ func installCharts(pi *PlaygroundInstaller, wg *sync.WaitGroup) error {
 	install(charts, wg)
 	return nil
 }
-
-// Deprecated
-func portForward(dbCluster string) error {
-	return utils.PortForward(fmt.Sprintf("service/%s", dbCluster), "3306")
-}

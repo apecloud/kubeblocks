@@ -118,6 +118,7 @@ func (i *InstallOpts) Install(cfg string) (*release.Release, error) {
 	s := spinner.New(spinner.CharSets[rand.Intn(44)], 100*time.Millisecond)
 	s.Color("green")
 	s.Start()
+	defer s.Stop()
 
 	settings := cli.New()
 	actionConfig, err := NewActionConfig(settings, i.Namespace, cfg)
@@ -184,7 +185,6 @@ func (i *InstallOpts) Install(cfg string) (*release.Release, error) {
 	}()
 
 	res, err := client.RunWithContext(ctx, chartRequested, vals)
-	s.Stop()
 	if err != nil && err.Error() != "cannot re-use a name that is still in use" {
 		return nil, err
 	}

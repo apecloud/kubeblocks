@@ -17,8 +17,6 @@ limitations under the License.
 package dbcluster
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -29,14 +27,11 @@ func NewDbclusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	cmd := &cobra.Command{
 		Use:   "dbcluster",
 		Short: "DB cluster operation command",
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("dbcluster called")
-		},
 	}
 
 	// add subcommands
 	cmd.AddCommand(
-		NewListCmd(f),
+		NewListCmd(f, streams),
 		NewDescribeCmd(f, streams),
 		NewConnectCmd(f),
 	)

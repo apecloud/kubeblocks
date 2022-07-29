@@ -131,6 +131,7 @@ installFile() {
 
     if [ $? -eq 0 ] && [ -f "$OPENCLI_CLI_FILE" ]; then
         echo "opencli installed successfully."
+        opencli --version
         echo -e "Make sure your docker service is running and begin your journey with opencli:\n"
         echo -e "\t$OPENCLI_CLI_FILENAME playground init"
     else

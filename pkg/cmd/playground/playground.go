@@ -18,6 +18,7 @@ package playground
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -64,6 +65,7 @@ func NewPlaygroundCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		newDestroyCmd(),
 		newStatusCmd(),
 		newGuideCmd(),
+		newPortForward(),
 	)
 
 	return cmd
@@ -121,6 +123,19 @@ func newGuideCmd() *cobra.Command {
 		Short: "Display playground cluster user guide.",
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := installer.PrintGuide(); err != nil {
+				utils.Errf("%v", err)
+			}
+		},
+	}
+	return cmd
+}
+
+func newPortForward() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "port-forward",
+		Short: "Display playground cluster user guide.",
+		Run: func(cmd *cobra.Command, args []string) {
+			if err := utils.PortForward(fmt.Sprintf("service/%s", DBClusterName), "3306"); err != nil {
 				utils.Errf("%v", err)
 			}
 		},

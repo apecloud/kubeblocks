@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	docker "github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -243,6 +244,7 @@ func (d *PlaygroundInstaller) InstallDeps() error {
 		return errors.Wrap(err, "Failed to install playground database cluster")
 	}
 	info("Waiting for database cluster to be ready...")
+	time.Sleep(10 * time.Second)
 	wg.Wait()
 
 	return nil
@@ -607,24 +609,40 @@ func addRepos(repos []repo.Entry) error {
 }
 
 func installCharts(pi *PlaygroundInstaller, wg *sync.WaitGroup) error {
-	install := func(cs []helm.InstallOpts, wg *sync.WaitGroup) {
+	install := func(cs []helm.InstallOpts, wg *sync.WaitGroup) error {
 		for _, c := range cs {
-			//wg.Add(1)
-			//go func(c helm.InstallOpts) {
-			//	defer wg.Done()
-			if _, err := c.Install(utils.ConfigPath(pi.ClusterName)); err != nil {
-				infof("Installing chart %s error: %s\n", c.Name, err.Error())
+			times := 1 + c.TryTimes
+			flag := false
+			for i := 0; i < times; i++ {
+				_, err := c.Install(utils.ConfigPath(pi.ClusterName))
+				if err != nil {
+					infof("Installing chart %s error: %s\n", c.Name, err.Error())
+					continue
+				} else {
+					flag = true
+					break
+				}
 			}
-			//}(c)
+			if !flag {
+				infof("Installing chart %s error\n", c.Name)
+				return errors.Errorf("Install chart %s error", c.Name)
+			}
 		}
+		return nil
 	}
 
 	info("Installing playground database cluster...")
 	charts := pi.Provider.GetBaseCharts(pi.Namespace)
-	install(charts, wg)
+	err := install(charts, wg)
+	if err != nil {
+		return err
+	}
 
 	// install database cluster to default namespace
 	charts = pi.Provider.GetDBCharts(pi.Namespace, pi.DBCluster)
-	install(charts, wg)
+	err = install(charts, wg)
+	if err != nil {
+		return err
+	}
 	return nil
 }

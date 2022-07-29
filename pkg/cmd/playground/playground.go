@@ -84,7 +84,7 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&o.Engine, "engine", defaultEngine, "Database engine type")
+	cmd.Flags().StringVar(&o.Engine, "engine", DefaultEngine, "Database engine type")
 	cmd.Flags().StringVar(&o.Provider, "provider", defaultProvider, "Database provider")
 	cmd.Flags().StringVar(&o.Version, "version", DefaultVersion, "Database engine version")
 	cmd.Flags().BoolVar(&o.DryRun, "dry-run", false, "Dry run the playground init")

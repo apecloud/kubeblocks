@@ -45,14 +45,21 @@ type PlayGroundInfo struct {
 }
 
 type DBClusterInfo struct {
-	DBCluster   string
-	Version     string
-	Topology    string
-	Status      string
-	StartTime   string
-	Labels      string
-	RootUser    string
-	DBNamespace string
+	DBCluster       string
+	DBPort          string
+	Version         string
+	Topology        string
+	Status          string
+	StartTime       string
+	Labels          string
+	RootUser        string
+	DBNamespace     string
+	Instances       int64
+	ServerId        int64
+	Secret          string
+	OnlineInstances int64
+	Storage         int64
+	Engine          string
 }
 
 var playgroundTmpl = `
@@ -92,15 +99,17 @@ To connect to your database:
 
 var clusterInfoTmpl = `
 Name:           {{.DBCluster}}
-Kind:           MySQL
+Kind:           {{.Engine}}
 Version:        {{.Version}}
 Topology mode:  {{.Topology}}
 CPU:            N/A
 Memory:         N/A
-Storage:        {{.Storage}}
+Storage:        {{.Storage}}Gi
 Status:         {{.Status}}
 Started:        {{.StartTime}}
-labels:			{{.Labels}}
+labels:         {{.Labels}}
+ServerId:       {{.ServerId}}
+Endpoint:       127.0.0.1:{{.DBPort}}
 
 # connect information
 Username:       {{.RootUser}}

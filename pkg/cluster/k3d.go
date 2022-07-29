@@ -299,7 +299,7 @@ func buildClusterConfig(clusterName string, opts k3d.ClusterCreateOpts) (k3d.Clu
 		External: false,
 	}
 
-	port, err := findAvailablePort(6443)
+	port, err := findAvailablePort(6444)
 	if err != nil {
 		panic(err)
 	}

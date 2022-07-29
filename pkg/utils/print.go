@@ -68,28 +68,34 @@ Notes:
 DBaaS playground v0.1.0 Start SUCCESSFULLY!
 
 To view the db clusters by command client:
+
   opencli dbcluster list
 
 Execute the following in another terminal first:
-  kubectl port-forward --namespace {{.Namespace}} svc/{{.GrafanaSvc}} {{.GrafanaPort}}:80
 
-To view the Grafana: http://127.0.0.1:{{.GrafanaPort}}   {{.GrafanaUser}}/{{.GrafanaPasswd}}
+  kubectl --kubeconfig ~/.kube/{{.Namespace}} port-forward --namespace {{.Namespace}} svc/{{.GrafanaSvc}} {{.GrafanaPort}}:80
+
+To view the Grafana:
+
+  open http://127.0.0.1:{{.GrafanaPort}}/d/549c2bf8936f7767ea6ac47c47b00f2a/mysql_for_demo
+  
+  User: {{.GrafanaUser}}
+  Password: {{.GrafanaPasswd}}
 
 ** MySQL cluster {{.DBCluster}} is being created **
 Execute the following in another terminal first:
 
-  kubectl port-forward --address 0.0.0.0 service/{{.DBCluster}} {{.DBPort}}
+  kubectl --kubeconfig ~/.kube/{{.Namespace}} port-forward --address 0.0.0.0 service/{{.DBCluster}} {{.DBPort}}
 
 Execute the following to get the administrator credentials:
 
-  MYSQL_ROOT_PASSWORD=$(kubectl get secret --namespace {{.DBNamespace}} {{.DBCluster}}-cluster-secret -o jsonpath="{.data.rootPassword}" | base64 -d)
+  MYSQL_ROOT_PASSWORD=$(kubectl --kubeconfig ~/.kube/{{.Namespace}} get secret --namespace {{.DBNamespace}} {{.DBCluster}}-cluster-secret -o jsonpath="{.data.rootPassword}" | base64 -d)
 
 To connect to your database:
 
   1. To connect to primary service (read/write):
 
       mysql -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD"
-
 
   2. To connect to primary service(read/write) by JDBC:
 

@@ -53,6 +53,7 @@ type InstallOpts struct {
 	Sets      []string
 	Wait      bool
 	Version   string
+	TryTimes  int
 	LoginOpts *LoginOpts
 }
 

@@ -53,6 +53,7 @@ func (o *MysqlOperator) GetBaseCharts(ns string) []helm.InstallOpts {
 				"prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues=false",
 				"prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false",
 			},
+			TryTimes: 2,
 		},
 	}
 }
@@ -66,6 +67,7 @@ func (o *MysqlOperator) GetDBCharts(ns string, dbname string) []helm.InstallOpts
 			Version:   "2.0.5",
 			Namespace: ns,
 			Sets:      []string{},
+			TryTimes:  2,
 		},
 		{
 			Name:      dbname,
@@ -79,6 +81,7 @@ func (o *MysqlOperator) GetDBCharts(ns string, dbname string) []helm.InstallOpts
 				Passwd: "8V+PmX1oSDv4pumDvZp6m7LS8iPgbY3A",
 				URL:    "yimeisun.azurecr.io",
 			},
+			TryTimes: 2,
 		},
 	}
 }

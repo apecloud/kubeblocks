@@ -100,9 +100,8 @@ mod-vendor:
 # Run docker build
 .PHONY: docker-build
 docker-build: clean bin/opencli.linux.amd64 bin/opencli.linux.arm64 bin/opencli.darwin.arm64 bin/opencli.darwin.amd64 bin/opencli.windows.amd64
-	DOCKER_BUILDKIT=1 docker build . -t ${IMG}:${TAG}
-
-
+	docker build . -t ${IMG}:${TAG}
+    docker push ${IMG}:${TAG}
 
 .PHONY: reviewable
 reviewable: lint staticcheck fmt go-check

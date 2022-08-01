@@ -12,8 +12,8 @@ mkdir -p "$K3D_IMAGE_DIR"
 
 function download_k3d_images() {
   k3d_images=(
-    "ghcr.io/k3d-io/k3d-tools:${K3D_VERSION}"
-    "ghcr.io/k3d-io/k3d-proxy:${K3D_VERSION}"
+    "docker.io/infracreate/k3d-tools:${K3D_VERSION}"
+    "docker.io/infracreate/k3d-proxy:${K3D_VERSION}"
     "docker.io/rancher/k3s:${K3S_VERSION}")
 
   for IMG in ${k3d_images[*]}; do

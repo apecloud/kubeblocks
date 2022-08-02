@@ -58,7 +58,7 @@ func NewBenchCmd(f cmdutil.Factory) *cobra.Command {
 	}
 
 	cmd.PersistentFlags().IntVar(&maxProcs, "max-procs", 0, "runtime.GOMAXPROCS")
-	cmd.PersistentFlags().StringVarP(&dbName, "db", "D", "test", "Database name")
+	cmd.PersistentFlags().StringVarP(&dbName, "db", "D", "opencli_test", "Database name")
 	cmd.PersistentFlags().StringVarP(&host, "host", "H", "127.0.0.1", "Database host")
 	cmd.PersistentFlags().StringVarP(&user, "user", "U", "root", "Database user")
 	cmd.PersistentFlags().StringVarP(&password, "password", "p", "sakila", "Database password")

@@ -38,10 +38,12 @@ type PlayGroundInfo struct {
 	DBPort        string
 	DBNamespace   string
 	Namespace     string
+	ClusterName   string
 	GrafanaSvc    string
 	GrafanaPort   string
 	GrafanaUser   string
 	GrafanaPasswd string
+	Version       string
 }
 
 type DBClusterInfo struct {
@@ -64,42 +66,30 @@ type DBClusterInfo struct {
 
 var playgroundTmpl = `
 Notes:
-** Please be patient while playground is being deployed **
-DBaaS playground v0.1.0 Start SUCCESSFULLY!
+Open DBaaS Playground v{{.Version}} Start SUCCESSFULLY!
+MySQL Standalone Cluster "{{.DBCluster}}" has been CREATED!
 
-To view the db clusters by command client:
+1. Basic commands for dbcluster:
+  opencli dbcluster list                     # list all database clusters
+  opencli dbcluster describe {{.DBCluster}}       # get dbcluster information
+  opencli bench tpcc {{.DBCluster}}               # run tpcc benchmark 1min on dbcluster
 
-  opencli dbcluster list
+2. To connect to mysql database:
+  MYSQL_ROOT_PASSWORD=$(kubectl --kubeconfig ~/.kube/{{.ClusterName}} get secret --namespace {{.DBNamespace}} {{.DBCluster}}-cluster-secret -o jsonpath="{.data.rootPassword}" | base64 -d)
+  mysql -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD"
 
-Execute the following in another terminal first:
-
-  kubectl --kubeconfig ~/.kube/{{.Namespace}} port-forward --namespace {{.Namespace}} svc/{{.GrafanaSvc}} {{.GrafanaPort}}:80
-
-To view the Grafana:
-
+3. To view the Grafana:
   open http://127.0.0.1:{{.GrafanaPort}}/d/549c2bf8936f7767ea6ac47c47b00f2a/mysql_for_demo
-  
-  User: {{.GrafanaUser}}
-  Password: {{.GrafanaPasswd}}
+  User:{{.GrafanaUser}}
+  Password:{{.GrafanaPasswd}}
 
-** MySQL cluster {{.DBCluster}} is being created **
-Execute the following in another terminal first:
+4. Uninstall Playground:
+  opencli playground destroy
 
-  kubectl --kubeconfig ~/.kube/{{.Namespace}} port-forward --address 0.0.0.0 service/{{.DBCluster}} {{.DBPort}}
-
-Execute the following to get the administrator credentials:
-
-  MYSQL_ROOT_PASSWORD=$(kubectl --kubeconfig ~/.kube/{{.Namespace}} get secret --namespace {{.DBNamespace}} {{.DBCluster}}-cluster-secret -o jsonpath="{.data.rootPassword}" | base64 -d)
-
-To connect to your database:
-
-  1. To connect to primary service (read/write):
-
-      mysql -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD"
-
-  2. To connect to primary service(read/write) by JDBC:
-
-      jdbc:mysql://127.0.0.1:{{.DBPort}}/mysql
+--------------------------------------------------------------------
+To view this guide next time:         opencli playground guide
+To get more help information:         opencli help
+Use "opencli [command] --help" for more information about a command.
 
 `
 

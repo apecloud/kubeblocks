@@ -40,6 +40,8 @@ import (
 	"helm.sh/helm/v3/pkg/repo"
 
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/provider"
+	"jihulab.com/infracreate/dbaas-system/opencli/version"
+
 	//"jihulab.com/infracreate/dbaas-system/opencli/pkg/resources"
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/types"
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/utils"
@@ -256,10 +258,12 @@ func (d *PlaygroundInstaller) PrintGuide() error {
 		DBPort:        "3306",
 		DBNamespace:   "default",
 		Namespace:     d.Namespace,
+		ClusterName:   d.ClusterName,
 		GrafanaSvc:    "prometheus-grafana",
 		GrafanaPort:   "9100",
 		GrafanaUser:   "admin",
 		GrafanaPasswd: "prom-operator",
+		Version:       version.Version,
 	}
 	return utils.PrintPlaygroundGuild(info)
 }

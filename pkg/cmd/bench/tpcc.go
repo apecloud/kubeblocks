@@ -236,6 +236,9 @@ func runSimpleBench(f cmdutil.Factory, args []string) {
 		return
 	}
 
+	utils.Infof("Clean default bench database \"%s\"", dbName)
+	executeTpcc("cleanup")
+
 	utils.Info("Preparing data...")
 	executeTpcc("prepare")
 

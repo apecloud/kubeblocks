@@ -161,7 +161,9 @@ func (o *DescribeOptions) Run() error {
 			return err
 		}
 		buildClusterInfo(obj, &clusterInfo)
-		utils.PrintClusterInfo(clusterInfo)
+		if err = utils.PrintClusterInfo(clusterInfo); err != nil {
+			allErrs = append(allErrs, err)
+		}
 	}
 
 	if len(infos) == 0 && len(allErrs) == 0 {

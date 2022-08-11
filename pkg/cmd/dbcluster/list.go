@@ -24,14 +24,13 @@ import (
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v3/pkg/cli/output"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/describe"
+	ctrlcli "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/playground"
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/types"
@@ -52,8 +51,16 @@ type ListOptions struct {
 	DescriberSettings *describe.DescriberSettings
 	FilenameOptions   *resource.FilenameOptions
 
-	client dynamic.Interface
+	client ctrlcli.Client
 	genericclioptions.IOStreams
+}
+
+func getClusterGVK() schema.GroupVersionKind {
+	return schema.GroupVersionKind{
+		Group:   "mysql.oracle.com",
+		Version: "v2",
+		Kind:    "InnoDBCluster",
+	}
 }
 
 func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -98,73 +105,50 @@ func (o *ListOptions) Complete(f cmdutil.Factory, args []string) error {
 	// used to fetch the resource
 	config, err := f.ToRESTConfig()
 	if err != nil {
-		return nil
-	}
-
-	client, err := dynamic.NewForConfig(config)
-	if err != nil {
 		return err
 	}
 
-	o.client = client
+	c, err := ctrlcli.New(config, ctrlcli.Options{})
+	if err != nil {
+		return err
+	}
+	o.client = c
 	o.NewBuilder = f.NewBuilder
 
 	return nil
 }
 
 func (o *ListOptions) Run() error {
-	r := o.NewBuilder().
-		Unstructured().
-		ContinueOnError().
-		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
-		FilenameParam(o.EnforceNamespace, o.FilenameOptions).
-		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
-		RequestChunksOf(o.DescriberSettings.ChunkSize).
-		Flatten().
-		Do()
-	err := r.Err()
-	if err != nil {
-		return err
-	}
 
-	var allErrs []error
-	infos, err := r.Infos()
-	if err != nil {
+	ctx := context.Background()
+	ul := &unstructured.UnstructuredList{}
+	ul.SetGroupVersionKind(getClusterGVK())
+
+	// TODO: need to apply  MatchingLabels
+	//ml := ctrlcli.MatchingLabels()
+	if err := o.client.List(ctx, ul, ctrlcli.InNamespace("default")); err != nil {
 		return err
 	}
 
 	table := uitable.New()
 	table.AddRow("NAMESPACE", "NAME", "INSTANCES", "ONLINE", "STATUS", "DESCRIPTION", "TYPE", "LABEL")
-	errs := sets.NewString()
-	for _, info := range infos {
+	for _, dbCluster := range ul.Items {
 		clusterInfo := utils.DBClusterInfo{
 			RootUser: playground.DefaultRootUser,
 			DBPort:   playground.DefaultPort,
 		}
 
-		mapping := info.ResourceMapping()
-		if err != nil {
-			if errs.Has(err.Error()) {
-				continue
-			}
-			allErrs = append(allErrs, err)
-			errs.Insert(err.Error())
-			continue
-		}
-
-		clusterInfo.DBNamespace = info.Namespace
-		clusterInfo.DBCluster = info.Name
-		obj, err := o.client.Resource(mapping.Resource).Namespace(o.Namespace).Get(context.TODO(), info.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		buildClusterInfo(obj, &clusterInfo)
+		clusterInfo.DBNamespace = dbCluster.GetNamespace()
+		clusterInfo.DBCluster = dbCluster.GetName()
+		buildClusterInfo(&dbCluster, &clusterInfo)
 		table.AddRow(clusterInfo.DBNamespace, clusterInfo.DBCluster, clusterInfo.Instances, clusterInfo.OnlineInstances,
 			clusterInfo.Status, "Example MySQL", fmt.Sprintf("%s %s", clusterInfo.Engine, clusterInfo.Topology), clusterInfo.Labels)
 	}
 
-	output.EncodeTable(o.Out, table)
-	if len(infos) == 0 && len(allErrs) == 0 {
+	if err := output.EncodeTable(o.Out, table); err != nil {
+		return err
+	}
+	if len(ul.Items) == 0 {
 		// if we wrote no output, and had no errors, be sure we output something.
 		if o.AllNamespaces {
 			fmt.Fprintln(o.ErrOut, "No resources found")
@@ -172,5 +156,5 @@ func (o *ListOptions) Run() error {
 			fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
 		}
 	}
-	return utilerrors.NewAggregate(allErrs)
+	return nil
 }

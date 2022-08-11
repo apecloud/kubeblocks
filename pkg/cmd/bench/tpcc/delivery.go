@@ -8,9 +8,15 @@ import (
 )
 
 type deliveryData struct {
-	wID         int
-	oCarrierID  int
-	olDeliveryD string
+	wID        int
+	oCarrierID int
+	//olDeliveryD string
+}
+
+type deliveryOrder struct {
+	oID    int
+	cID    int
+	amount float64
 }
 
 const (
@@ -45,12 +51,9 @@ func (w *Workloader) runDelivery(ctx context.Context, thread int) error {
 	if err != nil {
 		return err
 	}
+	//nolint
 	defer tx.Rollback()
-	type deliveryOrder struct {
-		oID    int
-		cID    int
-		amount float64
-	}
+
 	orders := make([]deliveryOrder, 10)
 	for i := 0; i < districtPerWarehouse; i++ {
 		if err = s.deliveryStmts[deliverySelectNewOrder].QueryRowContext(ctx, d.wID, i+1).Scan(&orders[i].oID); err == sql.ErrNoRows {

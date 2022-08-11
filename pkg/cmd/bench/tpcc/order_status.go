@@ -47,6 +47,7 @@ func (w *Workloader) runOrderStatus(ctx context.Context, thread int) error {
 	if err != nil {
 		return err
 	}
+	//nolint
 	defer tx.Rollback()
 
 	if d.cID == 0 {
@@ -101,13 +102,13 @@ func (w *Workloader) runOrderStatus(ctx context.Context, thread int) error {
 	}
 	defer rows.Close()
 
-	items := make([]orderItem, 0, 4)
+	//items := make([]orderItem, 0, 4)
 	for rows.Next() {
 		var item orderItem
 		if err := rows.Scan(&item.olIID, &item.olSupplyWID, &item.olQuantity, &item.olAmount, &item.olDeliveryD); err != nil {
 			return err
 		}
-		items = append(items, item)
+		//items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
 		return err

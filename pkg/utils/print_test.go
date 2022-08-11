@@ -31,6 +31,7 @@ func TestPrint(t *testing.T) {
 		GrafanaUser:   "admin",
 		GrafanaPasswd: "prom-operator",
 	}
+	//nolint
 	PrintPlaygroundGuild(clusterInfo)
 }
 

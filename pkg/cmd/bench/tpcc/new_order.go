@@ -168,6 +168,7 @@ func (w *Workloader) runNewOrder(ctx context.Context, thread int) error {
 	if err != nil {
 		return err
 	}
+	//nolint
 	defer tx.Rollback()
 
 	// TODO: support prepare statement

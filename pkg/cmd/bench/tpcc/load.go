@@ -103,8 +103,7 @@ s_dist_07, s_dist_08, s_dist_09, s_dist_10, s_ytd, s_order_cnt, s_remote_cnt, s_
 		sRemoteCnt := 0
 		sData := randOriginalString(s.R, s.Buf)
 
-		var v []string
-		v = []string{fmt.Sprintf(`(%d, %d, %d, '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', %d, %d, %d, '%s')`,
+		v := []string{fmt.Sprintf(`(%d, %d, %d, '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', %d, %d, %d, '%s')`,
 			sIID, sWID, sQuantity, sDist01, sDist02, sDist03, sDist04, sDist05, sDist06, sDist07, sDist08, sDist09, sDist10, sYtd, sOrderCnt, sRemoteCnt, sData)}
 
 		if err := l.InsertValue(ctx, v); err != nil {

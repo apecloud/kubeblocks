@@ -110,7 +110,7 @@ func (c *CSVWorkLoader) CleanupThread(ctx context.Context, _ int) {
 	if s.Conn != nil {
 		s.Conn.Close()
 	}
-	for k, _ := range s.loaders {
+	for k := range s.loaders {
 		s.loaders[k].Close(ctx)
 	}
 }

@@ -28,6 +28,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/containers/common/pkg/retry"
 	docker "github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
@@ -51,8 +52,8 @@ import (
 var (
 	dockerCli client.APIClient
 	info      = utils.Info
-	infof     = utils.Infof
-	errf      = utils.Errf
+	//infof     = utils.Infof
+	errf = utils.Errf
 )
 
 type k3dSetupOptions struct {
@@ -614,21 +615,17 @@ func addRepos(repos []repo.Entry) error {
 
 func installCharts(pi *PlaygroundInstaller, wg *sync.WaitGroup) error {
 	install := func(cs []helm.InstallOpts, wg *sync.WaitGroup) error {
+		ctx := context.Background()
 		for _, c := range cs {
-			times := 1 + c.TryTimes
-			flag := false
-			for i := 0; i < times; i++ {
-				_, err := c.Install(utils.ConfigPath(pi.ClusterName))
-				if err != nil {
-					infof("Installing chart %s error: %s\n", c.Name, err.Error())
-					continue
-				} else {
-					flag = true
-					break
-				}
+			opts := retry.Options{
+				MaxRetry: 1 + c.TryTimes,
 			}
-			if !flag {
-				infof("Installing chart %s error\n", c.Name)
+			if err := retry.IfNecessary(ctx, func() error {
+				if _, err := c.Install(utils.ConfigPath(pi.ClusterName)); err != nil {
+					return err
+				}
+				return nil
+			}, &opts); err != nil {
 				return errors.Errorf("Install chart %s error", c.Name)
 			}
 		}

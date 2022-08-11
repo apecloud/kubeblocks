@@ -15,6 +15,7 @@ func (w *Workloader) runStockLevel(ctx context.Context, thread int) error {
 	if err != nil {
 		return err
 	}
+	//nolint
 	defer tx.Rollback()
 
 	wID := randInt(s.R, 1, w.cfg.Warehouses)

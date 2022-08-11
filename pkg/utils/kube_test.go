@@ -22,6 +22,7 @@ import (
 )
 
 func TestKube(t *testing.T) {
+	//nolint
 	PortForward(fmt.Sprintf("service/%s", "cluster"), "3306")
 }
 

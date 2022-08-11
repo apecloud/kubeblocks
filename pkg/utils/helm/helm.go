@@ -117,7 +117,9 @@ func AddRepo(r *repo.Entry) error {
 func (i *InstallOpts) Install(cfg string) (*release.Release, error) {
 	utils.InfoP(1, "Install "+i.Chart+"...")
 	s := spinner.New(spinner.CharSets[rand.Intn(44)], 100*time.Millisecond)
-	s.Color("green")
+	if err := s.Color("green"); err != nil {
+		return nil, err
+	}
 	s.Start()
 	defer s.Stop()
 
@@ -224,6 +226,7 @@ func NewActionConfig(s *cli.EnvSettings, ns string, config string) (*action.Conf
 	debug := func(format string, v ...interface{}) {
 		if settings.Debug {
 			format = fmt.Sprintf("[debug] %s\n", format)
+			//nolint
 			log.Output(2, fmt.Sprintf(format, v...))
 		}
 	}

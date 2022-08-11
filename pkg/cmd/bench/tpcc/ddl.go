@@ -297,14 +297,13 @@ CREATE TABLE IF NOT EXISTS item (
 		return err
 	}
 
-	if w.useFK {
-		// TODO: Add foreign key constraint
-	}
+	//if w.useFK {
+	//	// TODO: Add foreign key constraint
+	//}
 
-	if w.parts > 1 {
-		// TODO: add PARTITION
-
-	}
+	//if w.parts > 1 {
+	//	// TODO: add PARTITION
+	//}
 
 	return nil
 }

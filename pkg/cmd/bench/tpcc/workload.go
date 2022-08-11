@@ -193,7 +193,7 @@ func (w *Workloader) CleanupThread(ctx context.Context, threadID int) {
 	if s.Conn != nil {
 		s.Conn.Close()
 	}
-	for k, _ := range s.loaders {
+	for k := range s.loaders {
 		s.loaders[k].Close(ctx)
 	}
 }
@@ -299,13 +299,13 @@ func (w *Workloader) Run(ctx context.Context, threadID int) error {
 	if w.cfg.Wait {
 		start := time.Now()
 		time.Sleep(time.Duration(txn.keyingTime * float64(time.Second)))
-		w.waitTimeMeasurement.Measure(fmt.Sprintf("keyingTime-%s", txn.name), time.Now().Sub(start), nil)
+		w.waitTimeMeasurement.Measure(fmt.Sprintf("keyingTime-%s", txn.name), time.Since(start), nil)
 	}
 
 	start := time.Now()
 	err := txn.action(ctx, threadID)
 
-	w.rtMeasurement.Measure(txn.name, time.Now().Sub(start), err)
+	w.rtMeasurement.Measure(txn.name, time.Since(start), err)
 
 	// 5.2.5.4, For each transaction type, think time is taken independently from a negative exponential distribution.
 	// Think time, T t , is computed from the following equation: Tt = -log(r) * (mean think time),
@@ -317,7 +317,7 @@ func (w *Workloader) Run(ctx context.Context, threadID int) error {
 			thinkTime = txn.thinkingTime * 10
 		}
 		time.Sleep(time.Duration(thinkTime * float64(time.Second)))
-		w.waitTimeMeasurement.Measure(fmt.Sprintf("thinkingTime-%s", txn.name), time.Now().Sub(start), nil)
+		w.waitTimeMeasurement.Measure(fmt.Sprintf("thinkingTime-%s", txn.name), time.Since(start), nil)
 	}
 	// TODO: add check
 	return err
@@ -406,17 +406,17 @@ func (w *Workloader) beginTx(ctx context.Context) (*sql.Tx, error) {
 	return tx, err
 }
 
-func prepareStmts(ctx context.Context, conn *sql.Conn, queries []string) []*sql.Stmt {
-	stmts := make([]*sql.Stmt, len(queries))
-	for i, query := range queries {
-		if len(query) == 0 {
-			continue
-		}
-		stmts[i] = prepareStmt(ctx, conn, query)
-	}
-
-	return stmts
-}
+//func prepareStmts(ctx context.Context, conn *sql.Conn, queries []string) []*sql.Stmt {
+//	stmts := make([]*sql.Stmt, len(queries))
+//	for i, query := range queries {
+//		if len(query) == 0 {
+//			continue
+//		}
+//		stmts[i] = prepareStmt(ctx, conn, query)
+//	}
+//
+//	return stmts
+//}
 
 func prepareStmt(ctx context.Context, conn *sql.Conn, query string) *sql.Stmt {
 	stmt, err := conn.PrepareContext(ctx, query)

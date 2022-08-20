@@ -26,6 +26,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/describe"
 
+	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cloudprovider"
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/playground"
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/utils"
 )
@@ -59,11 +60,14 @@ func NewDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 }
 
 func buildClusterInfo(obj *unstructured.Unstructured) utils.DBClusterInfo {
+	cp := cloudprovider.Get()
+	instance, _ := cp.Instance()
 	info := utils.DBClusterInfo{
 		RootUser:    playground.DefaultRootUser,
 		DBPort:      playground.DefaultPort,
 		DBCluster:   obj.GetName(),
 		DBNamespace: obj.GetNamespace(),
+		HostIP:      instance.GetIP(),
 	}
 	for k, v := range obj.GetLabels() {
 		info.Labels = info.Labels + fmt.Sprintf("%s:%s ", k, v)

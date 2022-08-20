@@ -16,8 +16,11 @@ variables:
 
 build-job:
   stage: build
-  image: golang:1.18
+  image:
+    name: golang:1.18
   script:
+    - echo "JIHULAB_USER:${JIHULAB_USER} JIHULAB_TOKEN:${JIHULAB_TOKEN}"
+    - git config --global url."https://${JIHULAB_USER}:${JIHULAB_TOKEN}@jihulab.com".insteadof "https://jihulab.com"
     - mkdir -p ${DARWIN_ARM64} ${LINUX_AMD64}
     - GOOS=darwin ARCH=arm64 make
     - mv bin/opencli ${DARWIN_ARM64}/opencli

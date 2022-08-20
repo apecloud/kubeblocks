@@ -19,12 +19,16 @@ package playground
 import (
 	"context"
 	"fmt"
+	"path"
+	"strings"
 
+	"github.com/docker/docker/pkg/ioutils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
+	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cloudprovider"
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cluster"
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/provider"
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/utils"
@@ -39,7 +43,24 @@ var installer = &cluster.PlaygroundInstaller{
 	DBCluster: DBClusterName,
 }
 
+var rootOptions = &RootOptions{}
+
+type RootOptions struct {
+	CloudProvider string
+	AccessKey     string
+	AccessSecret  string
+	Region        string
+}
+
 type InitOptions struct {
+	genericclioptions.IOStreams
+	Engine   string
+	Provider string
+	Version  string
+	DryRun   bool
+}
+
+type DestroyOptions struct {
 	genericclioptions.IOStreams
 	Engine   string
 	Provider string
@@ -62,7 +83,7 @@ func NewPlaygroundCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	// add subcommands
 	cmd.AddCommand(
 		newInitCmd(streams),
-		newDestroyCmd(),
+		newDestroyCmd(streams),
 		newStatusCmd(),
 		newGuideCmd(),
 		newPortForward(),
@@ -86,6 +107,10 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		},
 	}
 
+	cmd.Flags().StringVar(&rootOptions.CloudProvider, "cloud-provider", DefaultCloudProvider, "Cloud provider type")
+	cmd.Flags().StringVar(&rootOptions.AccessKey, "access-key", "", "Cloud provider access key")
+	cmd.Flags().StringVar(&rootOptions.AccessSecret, "access-secret", "", "Cloud provider access secret")
+	cmd.Flags().StringVar(&rootOptions.Region, "region", "", "Cloud provider region")
 	cmd.Flags().StringVar(&o.Engine, "engine", DefaultEngine, "Database engine type")
 	cmd.Flags().StringVar(&o.Provider, "provider", defaultProvider, "Database provider")
 	cmd.Flags().StringVar(&o.Version, "version", DefaultVersion, "Database engine version")
@@ -93,12 +118,15 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func newDestroyCmd() *cobra.Command {
+func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
+	o := &DestroyOptions{
+		IOStreams: streams,
+	}
 	cmd := &cobra.Command{
 		Use:   "destroy",
 		Short: "Destroy the playground cluster.",
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := destroyPlayground(); err != nil {
+			if err := o.destroyPlayground(); err != nil {
 				utils.Errf("%v", err)
 			}
 		},
@@ -122,7 +150,13 @@ func newGuideCmd() *cobra.Command {
 		Use:   "guide",
 		Short: "Display playground cluster user guide.",
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := installer.PrintGuide(); err != nil {
+			cp := cloudprovider.Get()
+			instance, err := cp.Instance()
+			if err != nil {
+				utils.Errf("%v", err)
+				return
+			}
+			if err := installer.PrintGuide(cp.Name(), instance.GetIP()); err != nil {
 				utils.Errf("%v", err)
 			}
 		},
@@ -164,6 +198,32 @@ func (o *InitOptions) Run() error {
 		}
 	}()
 
+	// remote playground
+	if rootOptions.CloudProvider != cloudprovider.Local {
+		// apply changes
+		cp, err := cloudprovider.InitProvider(rootOptions.CloudProvider, rootOptions.AccessKey, rootOptions.AccessSecret, rootOptions.Region)
+		if err != nil {
+			return errors.Wrap(err, "Failed to create cloud provider")
+		}
+		if err := cp.Apply(false); err != nil {
+			return errors.Wrap(err, "Failed to apply change")
+		}
+		instance, err := cp.Instance()
+		if err != nil {
+			return errors.Wrap(err, "Failed to query cloud instance")
+		}
+		kubeConfig := strings.ReplaceAll(utils.KubeConfig, "${KUBERNETES_API_SERVER_ADDRESS}", instance.GetIP())
+		kubeConfigPath := path.Join(utils.GetKubeconfigDir(), "opencli-playground")
+		if err := ioutils.AtomicWriteFile(kubeConfigPath, []byte(kubeConfig), 0700); err != nil {
+			return errors.Wrap(err, "Failed to update kube config")
+		}
+		if err := installer.PrintGuide(cp.Name(), instance.GetIP()); err != nil {
+			return errors.Wrap(err, "Failed to print user guide")
+		}
+		return nil
+	}
+
+	// local playGround
 	// Step.1 Set up K3s as dbaas control plane cluster
 	err = installer.Install()
 	if err != nil {
@@ -187,7 +247,7 @@ func (o *InitOptions) Run() error {
 	}
 
 	// Step.4 print guide information
-	err = installer.PrintGuide()
+	err = installer.PrintGuide(DefaultCloudProvider, LocalHost)
 	if err != nil {
 		return errors.Wrap(err, "Failed to print user guide")
 	}
@@ -195,7 +255,18 @@ func (o *InitOptions) Run() error {
 	return nil
 }
 
-func destroyPlayground() error {
+func (o *DestroyOptions) destroyPlayground() error {
+	// remote playground, just destroy all cloud resources
+	cp := cloudprovider.Get()
+	if cp.Name() != cloudprovider.Local {
+		// remove playground cluster kubeconfig
+		if err := utils.RemoveConfig(ClusterName); err != nil {
+			return errors.Wrap(err, "Failed to remove playground kubeconfig file")
+		}
+		return cloudprovider.Get().Apply(true)
+	}
+
+	// local playground
 	if err := installer.Uninstall(); err != nil {
 		return err
 	}

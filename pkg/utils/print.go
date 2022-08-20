@@ -43,6 +43,8 @@ type PlayGroundInfo struct {
 	GrafanaPort   string
 	GrafanaUser   string
 	GrafanaPasswd string
+	HostIP        string
+	CloudProvider string
 	Version       string
 }
 
@@ -62,6 +64,7 @@ type DBClusterInfo struct {
 	OnlineInstances int64
 	Storage         int64
 	Engine          string
+	HostIP          string
 }
 
 var playgroundTmpl = `
@@ -70,18 +73,18 @@ Open DBaaS Playground v{{.Version}} Start SUCCESSFULLY!
 MySQL Standalone Cluster "{{.DBCluster}}" has been CREATED!
 
 1. Basic commands for dbcluster:
-  opencli dbcluster list                     # list all database clusters
-  opencli dbcluster describe {{.DBCluster}}       # get dbcluster information
-  opencli bench tpcc {{.DBCluster}}               # run tpcc benchmark 1min on dbcluster
+  opencli --kubeconfig ~/.kube/{{.ClusterName}} dbcluster list                          # list all database clusters
+  opencli --kubeconfig ~/.kube/{{.ClusterName}} dbcluster describe {{.DBCluster}}       # get dbcluster information
+  opencli bench --host {{.HostIP}} tpcc {{.DBCluster}}                                  # run tpcc benchmark 1min on dbcluster
 
 2. To connect to mysql database:
   MYSQL_ROOT_PASSWORD=$(kubectl --kubeconfig ~/.kube/{{.ClusterName}} get secret --namespace {{.DBNamespace}} {{.DBCluster}}-cluster-secret -o jsonpath="{.data.rootPassword}" | base64 -d)
-  mysql -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD"
+  mysql -h {{.HostIP}} -uroot -p"$MYSQL_ROOT_PASSWORD"
 
 3. To view the Grafana:
-  open http://127.0.0.1:{{.GrafanaPort}}/d/549c2bf8936f7767ea6ac47c47b00f2a/mysql_for_demo
-  User:{{.GrafanaUser}}
-  Password:{{.GrafanaPasswd}}
+  open http://{{.HostIP}}:{{.GrafanaPort}}/d/549c2bf8936f7767ea6ac47c47b00f2a/mysql_for_demo
+  User: {{.GrafanaUser}}
+  Password: {{.GrafanaPasswd}}
 
 4. Uninstall Playground:
   opencli playground destroy
@@ -89,6 +92,7 @@ MySQL Standalone Cluster "{{.DBCluster}}" has been CREATED!
 --------------------------------------------------------------------
 To view this guide next time:         opencli playground guide
 To get more help information:         opencli help
+{{if ne .CloudProvider "local"}}To login to remote host:              ssh -i ~/.opendbaas/ssh/id_rsa ec2-user@{{.HostIP}}{{end}}
 Use "opencli [command] --help" for more information about a command.
 
 `
@@ -105,12 +109,12 @@ Status:         {{.Status}}
 Started:        {{.StartTime}}
 labels:         {{.Labels}}
 ServerId:       {{.ServerId}}
-Endpoint:       127.0.0.1:{{.DBPort}}
+Endpoint:       {{.HostIP}}:{{.DBPort}}
 
 # connect information
 Username:       {{.RootUser}}
-Password:       MYSQL_ROOT_PASSWORD=$(kubectl get secret --namespace {{.DBNamespace}} {{.DBCluster}}-cluster-secret -o jsonpath="{.data.rootPassword}" | base64 -d)
-Connect:        mysql -h 127.0.0.1 -u{{.RootUser}} -p"$MYSQL_ROOT_PASSWORD"
+Password:       MYSQL_ROOT_PASSWORD=$(kubectl --kubeconfig ~/.kube/opencli-playground get secret --namespace {{.DBNamespace}} {{.DBCluster}}-cluster-secret -o jsonpath="{.data.rootPassword}" | base64 -d)
+Connect:        mysql -h {{.HostIP}} -u{{.RootUser}} -p"$MYSQL_ROOT_PASSWORD"
 
 `
 

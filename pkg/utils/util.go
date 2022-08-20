@@ -17,13 +17,21 @@ limitations under the License.
 package utils
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"io/fs"
 	"io/ioutil"
+	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
+
+	"golang.org/x/crypto/ssh"
 
 	l "github.com/k3d-io/k3d/v5/pkg/logger"
 	"github.com/pkg/errors"
@@ -159,4 +167,51 @@ func RemoveConfig(name string) error {
 		return err
 	}
 	return nil
+}
+
+func GetPublicIP() (string, error) {
+	resp, err := http.Get("https://ifconfig.me")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
+}
+
+// MakeSSHKeyPair make a pair of public and private keys for SSH access.
+// Public key is encoded in the format for inclusion in an OpenSSH authorized_keys file.
+// Private Key generated is PEM encoded
+func MakeSSHKeyPair(pubKeyPath, privateKeyPath string) error {
+	if err := os.MkdirAll(path.Dir(pubKeyPath), os.FileMode(0700)); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(path.Dir(privateKeyPath), os.FileMode(0700)); err != nil {
+		return err
+	}
+	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		return err
+	}
+
+	// generate and write private key as PEM
+	privateKeyFile, err := os.OpenFile(privateKeyPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	defer privateKeyFile.Close()
+	if err != nil {
+		return err
+	}
+	privateKeyPEM := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(privateKey)}
+	if err := pem.Encode(privateKeyFile, privateKeyPEM); err != nil {
+		return err
+	}
+
+	// generate and write public key
+	pub, err := ssh.NewPublicKey(&privateKey.PublicKey)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(pubKeyPath, ssh.MarshalAuthorizedKey(pub), 0655)
 }

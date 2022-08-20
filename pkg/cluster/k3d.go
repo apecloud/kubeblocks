@@ -253,8 +253,10 @@ func (d *PlaygroundInstaller) InstallDeps() error {
 	return nil
 }
 
-func (d *PlaygroundInstaller) PrintGuide() error {
+func (d *PlaygroundInstaller) PrintGuide(cloudProvider string, hostIP string) error {
 	info := utils.PlayGroundInfo{
+		HostIP:        hostIP,
+		CloudProvider: cloudProvider,
 		DBCluster:     d.DBCluster,
 		DBPort:        "3306",
 		DBNamespace:   "default",

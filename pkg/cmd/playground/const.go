@@ -17,14 +17,16 @@ limitations under the License.
 package playground
 
 const (
-	DBClusterName      = "mycluster"
-	ClusterName        = "opencli-playground"
-	ClusterNamespace   = "opencli-playground"
-	DBClusterNamespace = "default"
-	DefaultEngine      = "mysql"
-	defaultProvider    = "cloudape.com"
-	DefaultVersion     = "8.0.29"
-	DefaultRootUser    = "root"
-	DefaultPassword    = "sakila"
-	DefaultPort        = "3306"
+	DBClusterName        = "mycluster"
+	ClusterName          = "opencli-playground"
+	ClusterNamespace     = "opencli-playground"
+	DBClusterNamespace   = "default"
+	DefaultEngine        = "mysql"
+	DefaultCloudProvider = "local"
+	defaultProvider      = "cloudape.com"
+	DefaultVersion       = "8.0.29"
+	DefaultRootUser      = "root"
+	DefaultPassword      = "sakila"
+	DefaultPort          = "3306"
+	LocalHost            = "127.0.0.1"
 )

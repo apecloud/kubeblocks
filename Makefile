@@ -1,7 +1,7 @@
 include dependency.mk
 
 IMG ?= docker.io/infracreate/opencli
-CLI_VERSION ?= 0.1.0
+CLI_VERSION ?= 0.2.0
 TAG ?= v$(CLI_VERSION)
 
 K3S_VERSION ?= v1.23.8+k3s1

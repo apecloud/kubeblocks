@@ -174,7 +174,7 @@ checkHttpRequestCLI
 
 if [ -z "$1" ]; then
     echo "Getting the latest opencli..."
-    ret_val="v0.1.0" 
+    ret_val="v0.2.0"
 elif [[ $1 == v* ]]; then
     ret_val=$1
 else

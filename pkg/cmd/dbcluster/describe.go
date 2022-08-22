@@ -47,7 +47,7 @@ func NewDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.setup(f, args))
 			cmdutil.CheckErr(o.run(
-				func(clusterInfo utils.DBClusterInfo) {
+				func(clusterInfo *utils.DBClusterInfo) {
 					//nolint
 					utils.PrintClusterInfo(clusterInfo)
 				}, func() error {
@@ -59,7 +59,7 @@ func NewDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	return cmd
 }
 
-func buildClusterInfo(obj *unstructured.Unstructured) utils.DBClusterInfo {
+func buildClusterInfo(obj *unstructured.Unstructured) *utils.DBClusterInfo {
 	cp := cloudprovider.Get()
 	instance, _ := cp.Instance()
 	info := utils.DBClusterInfo{
@@ -81,8 +81,11 @@ func buildClusterInfo(obj *unstructured.Unstructured) utils.DBClusterInfo {
 	info.Instances = spec["instances"].(int64)
 	info.ServerId = spec["baseServerId"].(int64)
 	info.Secret = spec["secretName"].(string)
-	info.StartTime = status["createTime"].(string)
 	info.Status = cluster["status"].(string)
+	info.StartTime = ""
+	if info.Status == "ONLINE" {
+		info.StartTime = status["createTime"].(string)
+	}
 	info.OnlineInstances = cluster["onlineInstances"].(int64)
 	info.Topology = "Cluster"
 	if info.Instances == 1 {
@@ -90,5 +93,5 @@ func buildClusterInfo(obj *unstructured.Unstructured) utils.DBClusterInfo {
 	}
 	info.Engine = playground.DefaultEngine
 	info.Storage = 2
-	return info
+	return &info
 }

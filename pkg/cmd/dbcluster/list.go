@@ -57,7 +57,7 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 			table := uitable.New()
 			table.AddRow("NAMESPACE", "NAME", "INSTANCES", "ONLINE", "STATUS", "DESCRIPTION", "TYPE", "LABEL")
 			cmdutil.CheckErr(o.run(
-				func(clusterInfo utils.DBClusterInfo) {
+				func(clusterInfo *utils.DBClusterInfo) {
 					table.AddRow(clusterInfo.DBNamespace, clusterInfo.DBCluster, clusterInfo.Instances, clusterInfo.OnlineInstances,
 						clusterInfo.Status, "Example MySQL", fmt.Sprintf("%s %s", clusterInfo.Engine, clusterInfo.Topology), clusterInfo.Labels)
 				}, func() error {

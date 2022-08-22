@@ -199,10 +199,11 @@ func MakeSSHKeyPair(pubKeyPath, privateKeyPath string) error {
 
 	// generate and write private key as PEM
 	privateKeyFile, err := os.OpenFile(privateKeyPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
-	defer privateKeyFile.Close()
 	if err != nil {
 		return err
 	}
+	defer privateKeyFile.Close()
+
 	privateKeyPEM := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(privateKey)}
 	if err := pem.Encode(privateKeyFile, privateKeyPEM); err != nil {
 		return err

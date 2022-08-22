@@ -67,14 +67,14 @@ func NewCSVWorkloader(db *sql.DB, cfg *Config) (*CSVWorkLoader, error) {
 		for _, t := range strings.Split(cfg.SpecifiedTables, ",") {
 			if _, ok := w.tables[t]; !ok {
 				return nil, fmt.Errorf("\nTable %s is not supported.\nSupported tables: item, customer, district, "+
-					"orders, new_order, order_line, history, warehouse, stock.", t)
+					"orders, new_order, order_line, history, warehouse, stock", t)
 			}
 			w.tables[t] = true
 		}
 	}
 
 	if !w.tables[tableOrders] && w.tables[tableOrderLine] {
-		return nil, fmt.Errorf("\nTable orders must be specified if you want to generate table order_line.")
+		return nil, fmt.Errorf("\nTable orders must be specified if you want to generate table order_line")
 	}
 	if w.db != nil {
 		w.createTableWg.Add(cfg.Threads)
@@ -129,22 +129,22 @@ func (c *CSVWorkLoader) Prepare(ctx context.Context, threadID int) error {
 	return prepareWorkload(ctx, c, c.cfg.Threads, c.cfg.Warehouses, threadID)
 }
 
-// CSV type doesn't support CheckPrepare
+// CheckPrepare CSV type doesn't support CheckPrepare
 func (c *CSVWorkLoader) CheckPrepare(_ context.Context, _ int) error {
 	return nil
 }
 
-// CSV type doesn't support Run
+// Run CSV type doesn't support Run
 func (c *CSVWorkLoader) Run(_ context.Context, _ int) error {
 	return nil
 }
 
-// CSV type doesn't support Cleanup
+// Cleanup CSV type doesn't support Cleanup
 func (c *CSVWorkLoader) Cleanup(_ context.Context, _ int) error {
 	return nil
 }
 
-// CSV type doesn't support Check
+// Check CSV type doesn't support Check
 func (c *CSVWorkLoader) Check(_ context.Context, _ int) error {
 	return nil
 }

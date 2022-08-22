@@ -1,7 +1,7 @@
 ---
 name: Feature request
 about: Suggest an idea for this project
-title: ''
+title: "[Features]"
 labels: enhancement
 assignees: ''
 
@@ -11,7 +11,7 @@ assignees: ''
 A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
 
 **If this is a new feature, please describe the motivation and goals.**
-A clear and concise description of why you want to happen
+A clear and concise description of why you want to happen, link the design doc if possible
 
 **Describe the solution you'd like**
 A clear and concise description of what you want to happen.

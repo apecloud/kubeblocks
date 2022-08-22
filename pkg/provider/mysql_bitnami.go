@@ -22,7 +22,9 @@ import (
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/utils/helm"
 )
 
-type BitnamiMysql struct{}
+type BitnamiMysql struct {
+	serverVersion string
+}
 
 func (o *BitnamiMysql) GetRepos() []repo.Entry {
 	return []repo.Entry{
@@ -60,7 +62,7 @@ func (o *BitnamiMysql) GetDBCharts(ns string, dbname string) []helm.InstallOpts 
 			Chart:     "bitnami/mysql",
 			Wait:      true,
 			Namespace: ns,
-			Version:   "9.2.1",
+			Version:   o.serverVersion,
 			Sets: []string{
 				"metrics.enabled=true",
 				"metrics.serviceMonitor.enabled=true",

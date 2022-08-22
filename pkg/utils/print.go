@@ -170,7 +170,7 @@ func PrintPlaygroundGuild(info PlayGroundInfo) error {
 	return PrintTemplate(playgroundTmpl, info)
 }
 
-func PrintClusterInfo(info DBClusterInfo) error {
+func PrintClusterInfo(info *DBClusterInfo) error {
 	return PrintTemplate(clusterInfoTmpl, info)
 }
 

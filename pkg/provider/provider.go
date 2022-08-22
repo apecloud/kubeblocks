@@ -30,12 +30,16 @@ type Provider interface {
 	GetDBCharts(ns string, dbname string) []helm.InstallOpts
 }
 
-func NewProvider(e string) Provider {
+func NewProvider(e string, v string) Provider {
 	switch buildEngineType(e) {
 	case BitnamiMySQL:
-		return new(BitnamiMysql)
+		return &BitnamiMysql{
+			serverVersion: v,
+		}
 	case MySQLOperator:
-		return new(MysqlOperator)
+		return &MysqlOperator{
+			serverVersion: v,
+		}
 	default:
 		return nil
 	}

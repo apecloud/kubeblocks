@@ -178,7 +178,7 @@ func newPortForward() *cobra.Command {
 }
 
 func (o *InitOptions) Complete() error {
-	installer.Provider = provider.NewProvider(o.Engine)
+	installer.Provider = provider.NewProvider(o.Engine, o.Version)
 	return nil
 }
 

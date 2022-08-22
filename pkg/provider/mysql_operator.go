@@ -22,7 +22,9 @@ import (
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/utils/helm"
 )
 
-type MysqlOperator struct{}
+type MysqlOperator struct {
+	serverVersion string
+}
 
 func (o *MysqlOperator) GetRepos() []repo.Entry {
 	return []repo.Entry{
@@ -83,8 +85,10 @@ func (o *MysqlOperator) GetDBCharts(ns string, dbname string) []helm.InstallOpts
 			Chart:     "oci://yimeisun.azurecr.io/helm-chart/mysql-innodbcluster",
 			Wait:      true,
 			Namespace: "default",
-			Version:   "1.0.0",
-			Sets:      []string{},
+			Version:   "1.1.0",
+			Sets: []string{
+				"serverVersion=" + o.serverVersion,
+			},
 			LoginOpts: &helm.LoginOpts{
 				User:   "yimeisun",
 				Passwd: "8V+PmX1oSDv4pumDvZp6m7LS8iPgbY3A",

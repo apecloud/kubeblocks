@@ -110,7 +110,7 @@ func NewWorkloader(db *sql.DB, cfg *Config) (workload.Workloader, error) {
 	}
 
 	if cfg.PartitionType < PartitionTypeHash || cfg.PartitionType > PartitionTypeListAsRange {
-		panic(fmt.Errorf("Unknown partition type %d", cfg.PartitionType))
+		panic(fmt.Errorf("unknown partition type %d", cfg.PartitionType))
 	}
 	switch l := len(cfg.Weight); l {
 	case 0:
@@ -121,10 +121,10 @@ func NewWorkloader(db *sql.DB, cfg *Config) (workload.Workloader, error) {
 			totalWeight += w
 		}
 		if totalWeight != 100 {
-			panic(fmt.Errorf("The sum of weight should be 100: %v", cfg.Weight))
+			panic(fmt.Errorf("the sum of weight should be 100: %v", cfg.Weight))
 		}
 	default:
-		panic(fmt.Errorf("Should specify exact 5 weights: %v", cfg.Weight))
+		panic(fmt.Errorf("should specify exact 5 weights: %v", cfg.Weight))
 	}
 
 	resetMaxLat := func(m *measurement.Measurement) {

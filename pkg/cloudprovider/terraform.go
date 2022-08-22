@@ -14,6 +14,7 @@ import (
 	"github.com/docker/docker/pkg/ioutils"
 	terraform "github.com/hashicorp/terraform/libterraform"
 	"github.com/pkg/errors"
+
 	"jihulab.com/infracreate/dbaas-system/opencli/pkg/utils"
 )
 
@@ -112,6 +113,7 @@ func tfApply(template string, tfDir string, destroy bool) error {
 	}
 
 	wd, _ := os.Getwd()
+	// nolint
 	defer os.Chdir(wd)
 
 	if err := os.Chdir(tfDir); err != nil {

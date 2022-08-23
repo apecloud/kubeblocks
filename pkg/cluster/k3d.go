@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 The OpenCli Authors
+Copyright © 2022 The dbctl Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,13 +40,13 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/repo"
 
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/provider"
-	"jihulab.com/infracreate/dbaas-system/opencli/version"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/provider"
+	"jihulab.com/infracreate/dbaas-system/dbctl/version"
 
-	//"jihulab.com/infracreate/dbaas-system/opencli/pkg/resources"
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/types"
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/utils"
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/utils/helm"
+	//"jihulab.com/infracreate/dbaas-system/dbctl/pkg/resources"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/types"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/utils"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/utils/helm"
 )
 
 var (
@@ -202,7 +202,7 @@ func (d *PlaygroundInstaller) GenKubeconfig() error {
 
 // SetKubeconfig set kubeconfig environment of cluster
 func (d *PlaygroundInstaller) SetKubeconfig() error {
-	info("Setting kubeconfig env for opencli playground...")
+	info("Setting kubeconfig env for dbctl playground...")
 	return os.Setenv("KUBECONFIG", utils.ConfigPath(d.cfg.Cluster.Name))
 }
 

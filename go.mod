@@ -1,4 +1,4 @@
-module jihulab.com/infracreate/dbaas-system/opencli
+module jihulab.com/infracreate/dbaas-system/dbctl
 
 go 1.18
 

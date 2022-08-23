@@ -7,10 +7,9 @@ assignees: ''
 
 ---
 
-** 提案概览**
-** Summary**
+**Summary**
 
-** Motivation and Goals**
+**Motivation and Goals**
 
 **Background、 Restriction and User stories**
 

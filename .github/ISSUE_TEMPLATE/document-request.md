@@ -20,3 +20,13 @@ assignees: ''
 
 **其他说明（如有）**
 描述注意事项、限制条件、警告、风险与规避措施、数据库安全、部署历史、需要的基础设施、参考文档/文献等
+
+** Summary**
+
+** Motivation and Goals**
+
+Background、 Restriction and User stories
+
+Design、interface、plan
+
+Others

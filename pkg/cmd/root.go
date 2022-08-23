@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 The OpenCli Authors
+Copyright © 2022 The dbctl Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,11 +27,11 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/bench"
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/dbaas"
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/dbcluster"
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/playground"
-	"jihulab.com/infracreate/dbaas-system/opencli/version"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cmd/bench"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cmd/dbaas"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cmd/dbcluster"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cmd/playground"
+	"jihulab.com/infracreate/dbaas-system/dbctl/version"
 )
 
 // RootFlags describes a struct that holds flags that can be set on root level of the command
@@ -45,7 +45,7 @@ var rootFlags = RootFlags{}
 
 func NewRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
-		Use:   "opencli",
+		Use:   "dbctl",
 		Short: "A Command Line Interface(CLI) library for DBaaS.",
 		Run: func(cmd *cobra.Command, args []string) {
 			if rootFlags.version {
@@ -98,10 +98,10 @@ func initConfig() {
 		home, err := os.UserHomeDir()
 		cobra.CheckErr(err)
 
-		// Search config in home directory with name ".opencli" (without extension).
+		// Search config in home directory with name ".dbctl" (without extension).
 		viper.AddConfigPath(home)
 		viper.SetConfigType("yaml")
-		viper.SetConfigName(".opencli")
+		viper.SetConfigName(".dbctl")
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
@@ -113,7 +113,7 @@ func initConfig() {
 }
 
 func printVersion() {
-	fmt.Printf("opencli version %s\n", version.GetVersion())
+	fmt.Printf("dbctl version %s\n", version.GetVersion())
 	fmt.Printf("k3d version %s\n", version.K3dVersion)
 	fmt.Printf("k3s version %s (default)\n", strings.Replace(version.K3sImageTag, "-", "+", 1))
 	fmt.Printf("git commit %s (build date %s)\n", version.GitCommit, version.BuildDate)

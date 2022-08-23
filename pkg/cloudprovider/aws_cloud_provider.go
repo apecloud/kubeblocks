@@ -7,7 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/utils"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/utils"
 )
 
 type awsCloudProvider struct {

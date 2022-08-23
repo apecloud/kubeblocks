@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 The OpenCli Authors
+Copyright © 2022 The dbctl Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,9 +28,9 @@ import (
 	"k8s.io/kubectl/pkg/describe"
 	ctrlcli "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/utils"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/utils"
 
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/types"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/types"
 )
 
 type commandOptions struct {

@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 The OpenCli Authors
+Copyright © 2022 The dbctl Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,13 +16,13 @@ limitations under the License.
 
 package types
 
-import "jihulab.com/infracreate/dbaas-system/opencli/version"
+import "jihulab.com/infracreate/dbaas-system/dbctl/version"
 
 const (
-	// OpenCliDefaultHome defines opencli default home name
-	OpenCliDefaultHome = ".opencli"
-	// OpenCliHomeEnv defines opencli home system env
-	OpenCliHomeEnv = "OPENCLI_HOME"
+	// dbctlDefaultHome defines dbctl default home name
+	DBCtlDefaultHome = ".dbctl"
+	// dbctlHomeEnv defines dbctl home system env
+	DBCtlHomeEnv = "DBCTL_HOME"
 
 	// K3sTokenPath is the path to k3s token
 	K3sTokenPath = "/var/lib/rancher/k3s/server/token"
@@ -30,9 +30,9 @@ const (
 	K3sKubeConfigLocation = "/etc/rancher/k3s/k3s.yaml"
 	// K3sExternalKubeConfigLocation is where to generate kubeconfig for external access
 	K3sExternalKubeConfigLocation = "/etc/rancher/k3s/k3s-external.yaml"
-	// CliDockerNetwork is docker network for k3d cluster when `opencli playground`
+	// CliDockerNetwork is docker network for k3d cluster when `dbctl playground`
 	// all cluster will be created in this network, so they can communicate with each other
-	CliDockerNetwork = "k3d-opencli-playground"
+	CliDockerNetwork = "k3d-dbctl-playground"
 
 	// GoosLinux is os.GOOS linux string
 	GoosLinux = "linux"

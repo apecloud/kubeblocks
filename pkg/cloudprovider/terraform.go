@@ -15,7 +15,7 @@ import (
 	terraform "github.com/hashicorp/terraform/libterraform"
 	"github.com/pkg/errors"
 
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/utils"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/utils"
 )
 
 type TFPlugin struct {

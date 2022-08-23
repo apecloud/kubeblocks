@@ -1,3 +1,7 @@
+![Release status](https://jihulab.com/infracreate/dbaas-system/dbctl/-/badges/release.svg)
+![Pipeline](https://jihulab.com/infracreate/dbaas-system/opencli/badges/main/pipeline.svg)
+![Codecoverage](https://jihulab.com/infracreate/dbaas-system/opencli/badges/main/coverage.svg)
+
 # dbactl
 
 DBaaS 的命令行工具，有如下主要功能：
@@ -14,25 +18,25 @@ DBaaS 的命令行工具，有如下主要功能：
 ## 安装
 ### 脚本安装
 
-执行如下命令安装 `opencli`:
+执行如下命令安装 `dbctl`:
 ```bash
-curl -fsSL http://54.223.93.54:8000/infracreate/v0.2.0/install_opencli.sh | bash
+curl -fsSL http://54.223.93.54:8000/infracreate/v0.2.0/install_dbctl.sh | bash
 ```
 
 ### 编译安装
 
 1. 克隆源码，如 `git clone git@github.com:apecloud/dbactl.git`
 2. 在源码目录，运行如下命令：
-   * `make` 编译生成 `opencli`，位于 `bin/opencli`
-   * `make clean` 清理之前生成的 `opencli`
+   * `make` 编译生成 `dbctl`，位于 `bin/dbctl`
+   * `make clean` 清理之前生成的 `dbctl`
 
 ## 快速开始
 
-执行 `opencli --help` 获取支持的命令。
+执行 `dbctl --help` 获取支持的命令。
 
 执行如下命令，在本地快速部署一个实验环境：
 ```bash
-opencli playground init
+dbctl playground init
 ```
 >注意：执行该命令需要确保已经安装 `docker` 并启动。
 

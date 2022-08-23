@@ -1,4 +1,4 @@
-# dbactl
+# Kubelego
 
-A command line interface library for dbaas.
+An open source data management platform
 

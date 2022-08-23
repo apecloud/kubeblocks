@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 The OpenCli Authors
+Copyright © 2022 The dbctl Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 
 	"github.com/fatih/color"
 
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/types"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/types"
 )
 
 var (
@@ -73,9 +73,9 @@ Open DBaaS Playground v{{.Version}} Start SUCCESSFULLY!
 MySQL Standalone Cluster "{{.DBCluster}}" has been CREATED!
 
 1. Basic commands for dbcluster:
-  opencli --kubeconfig ~/.kube/{{.ClusterName}} dbcluster list                          # list all database clusters
-  opencli --kubeconfig ~/.kube/{{.ClusterName}} dbcluster describe {{.DBCluster}}       # get dbcluster information
-  opencli bench --host {{.HostIP}} tpcc {{.DBCluster}}                                  # run tpcc benchmark 1min on dbcluster
+  dbctl --kubeconfig ~/.kube/{{.ClusterName}} dbcluster list                          # list all database clusters
+  dbctl --kubeconfig ~/.kube/{{.ClusterName}} dbcluster describe {{.DBCluster}}       # get dbcluster information
+  dbctl bench --host {{.HostIP}} tpcc {{.DBCluster}}                                  # run tpcc benchmark 1min on dbcluster
 
 2. To connect to mysql database:
   MYSQL_ROOT_PASSWORD=$(kubectl --kubeconfig ~/.kube/{{.ClusterName}} get secret --namespace {{.DBNamespace}} {{.DBCluster}}-cluster-secret -o jsonpath="{.data.rootPassword}" | base64 -d)
@@ -87,13 +87,13 @@ MySQL Standalone Cluster "{{.DBCluster}}" has been CREATED!
   Password: {{.GrafanaPasswd}}
 
 4. Uninstall Playground:
-  opencli playground destroy
+  dbctl playground destroy
 
 --------------------------------------------------------------------
-To view this guide next time:         opencli playground guide
-To get more help information:         opencli help
+To view this guide next time:         dbctl playground guide
+To get more help information:         dbctl help
 {{if ne .CloudProvider "local"}}To login to remote host:              ssh -i ~/.opendbaas/ssh/id_rsa ec2-user@{{.HostIP}}{{end}}
-Use "opencli [command] --help" for more information about a command.
+Use "dbctl [command] --help" for more information about a command.
 
 `
 
@@ -113,7 +113,7 @@ Endpoint:       {{.HostIP}}:{{.DBPort}}
 
 # connect information
 Username:       {{.RootUser}}
-Password:       MYSQL_ROOT_PASSWORD=$(kubectl --kubeconfig ~/.kube/opencli-playground get secret --namespace {{.DBNamespace}} {{.DBCluster}}-cluster-secret -o jsonpath="{.data.rootPassword}" | base64 -d)
+Password:       MYSQL_ROOT_PASSWORD=$(kubectl --kubeconfig ~/.kube/dbctl-playground get secret --namespace {{.DBNamespace}} {{.DBCluster}}-cluster-secret -o jsonpath="{.data.rootPassword}" | base64 -d)
 Connect:        mysql -h {{.HostIP}} -u{{.RootUser}} -p"$MYSQL_ROOT_PASSWORD"
 
 `

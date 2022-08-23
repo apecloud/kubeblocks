@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 The OpenCli Authors
+Copyright © 2022 The dbctl Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/cobra"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/utils"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/utils"
 )
 
 func NewConnectCmd(f cmdutil.Factory) *cobra.Command {

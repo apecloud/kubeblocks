@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 The OpenCli Authors
+Copyright © 2022 The dbctl Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,10 +28,10 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cloudprovider"
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cluster"
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/provider"
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/utils"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cloudprovider"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cluster"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/provider"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/utils"
 )
 
 var installer = &cluster.PlaygroundInstaller{
@@ -213,7 +213,7 @@ func (o *InitOptions) Run() error {
 			return errors.Wrap(err, "Failed to query cloud instance")
 		}
 		kubeConfig := strings.ReplaceAll(utils.KubeConfig, "${KUBERNETES_API_SERVER_ADDRESS}", instance.GetIP())
-		kubeConfigPath := path.Join(utils.GetKubeconfigDir(), "opencli-playground")
+		kubeConfigPath := path.Join(utils.GetKubeconfigDir(), "dbctl-playground")
 		if err := ioutils.AtomicWriteFile(kubeConfigPath, []byte(kubeConfig), 0700); err != nil {
 			return errors.Wrap(err, "Failed to update kube config")
 		}

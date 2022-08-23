@@ -1,6 +1,6 @@
 include dependency.mk
 
-IMG ?= docker.io/infracreate/opencli
+IMG ?= docker.io/infracreate/dbctl
 CLI_VERSION ?= 0.2.0
 TAG ?= v$(CLI_VERSION)
 
@@ -28,23 +28,23 @@ export GOPROXY=https://goproxy.cn,direct
 
 
 LD_FLAGS="-s -w \
-	-X jihulab.com/infracreate/dbaas-system/opencli/version.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` \
-	-X jihulab.com/infracreate/dbaas-system/opencli/version.GitCommit=`git rev-parse HEAD` \
-	-X jihulab.com/infracreate/dbaas-system/opencli/version.Version=${CLI_VERSION} \
-	-X jihulab.com/infracreate/dbaas-system/opencli/version.K3sImageTag=${K3S_IMG_TAG} \
-	-X jihulab.com/infracreate/dbaas-system/opencli/version.K3dVersion=${K3D_VERSION}"
+	-X jihulab.com/infracreate/dbaas-system/dbctl/version.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` \
+	-X jihulab.com/infracreate/dbaas-system/dbctl/version.GitCommit=`git rev-parse HEAD` \
+	-X jihulab.com/infracreate/dbaas-system/dbctl/version.Version=${CLI_VERSION} \
+	-X jihulab.com/infracreate/dbaas-system/dbctl/version.K3sImageTag=${K3S_IMG_TAG} \
+	-X jihulab.com/infracreate/dbaas-system/dbctl/version.K3dVersion=${K3D_VERSION}"
 
 
-.DEFAULT_GOAL := bin/opencli
+.DEFAULT_GOAL := bin/dbctl
 
-bin/opencli:
-	$(MAKE) bin/opencli.$(OS).$(ARCH)
-	mv bin/opencli.$(OS).$(ARCH) bin/opencli
+bin/dbctl:
+	$(MAKE) bin/dbctl.$(OS).$(ARCH)
+	mv bin/dbctl.$(OS).$(ARCH) bin/dbctl
 
 # Build binary
-#bin/opencli.%: download_k3s_bin_script download_k3s_images go-check
-bin/opencli.%: go-check
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${LD_FLAGS} -o $@ cmd/opencli/main.go
+#bin/dbctl.%: download_k3s_bin_script download_k3s_images go-check
+bin/dbctl.%: go-check
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${LD_FLAGS} -o $@ cmd/dbctl/main.go
 
 
 .PHONY: download_k3s_bin_script
@@ -61,7 +61,7 @@ download_k3d:
 
 .PHONY: clean
 clean:
-	rm -f bin/opencli*
+	rm -f bin/dbctl*
 
 lint: golangci
 	$(GOLANGCILINT) run ./...
@@ -70,7 +70,7 @@ staticcheck: staticchecktool
 	$(STATICCHECK) ./...
 
 goimports: goimportstool
-	$(GOIMPORTS) -local jihulab.com/infracreate/dbaas-system/opencli -w $$(go list -f {{.Dir}} ./...)
+	$(GOIMPORTS) -local jihulab.com/infracreate/dbaas-system/dbctl -w $$(go list -f {{.Dir}} ./...)
 
 .PHONY: go-check
 go-check: fmt vet
@@ -99,7 +99,7 @@ mod-vendor:
 
 # Run docker build
 .PHONY: docker-build
-docker-build: clean bin/opencli.linux.amd64 bin/opencli.linux.arm64 bin/opencli.darwin.arm64 bin/opencli.darwin.amd64 bin/opencli.windows.amd64
+docker-build: clean bin/dbctl.linux.amd64 bin/dbctl.linux.arm64 bin/dbctl.darwin.arm64 bin/dbctl.darwin.amd64 bin/dbctl.windows.amd64
 	docker build . -t ${IMG}:${TAG}
     docker push ${IMG}:${TAG}
 

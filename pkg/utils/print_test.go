@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 The OpenCli Authors
+Copyright © 2022 The dbctl Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ func TestPrint(t *testing.T) {
 		DBCluster:     "mycluster",
 		DBPort:        "3306",
 		DBNamespace:   "default",
-		Namespace:     "opencli-playground",
+		Namespace:     "dbctl-playground",
 		GrafanaSvc:    "prometheus-grafana",
 		GrafanaPort:   "9100",
 		GrafanaUser:   "admin",

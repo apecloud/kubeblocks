@@ -1,8 +1,4 @@
-![Release status](https://jihulab.com/infracreate/dbaas-system/opencli/-/badges/release.svg)
-![Pipeline](https://jihulab.com/infracreate/dbaas-system/opencli/badges/develop/pipeline.svg)
-![Codecoverage](https://jihulab.com/infracreate/dbaas-system/opencli/badges/develop/coverage.svg)
-
-# opencli
+# dbactl
 
 DBaaS 的命令行工具，有如下主要功能：
 * DBaaS 部署与运维
@@ -25,7 +21,7 @@ curl -fsSL http://54.223.93.54:8000/infracreate/v0.2.0/install_opencli.sh | bash
 
 ### 编译安装
 
-1. 克隆源码，如 `git clone git@jihulab.com:infracreate/dbaas-system/opencli.git`
+1. 克隆源码，如 `git clone git@github.com:apecloud/dbactl.git`
 2. 在源码目录，运行如下命令：
    * `make` 编译生成 `opencli`，位于 `bin/opencli`
    * `make clean` 清理之前生成的 `opencli`

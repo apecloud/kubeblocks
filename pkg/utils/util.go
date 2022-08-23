@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 The OpenCli Authors
+Copyright © 2022 The dbctl Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ import (
 	l "github.com/k3d-io/k3d/v5/pkg/logger"
 	"github.com/pkg/errors"
 
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/types"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/types"
 )
 
 var (
@@ -69,7 +69,7 @@ func init() {
 		l.Log().Debugf(format, a...)
 	}
 	if _, err := GetCliHomeDir(); err != nil {
-		l.Log().Error("Failed to create opencli home dir:", err)
+		l.Log().Error("Failed to create dbctl home dir:", err)
 	}
 }
 
@@ -88,22 +88,22 @@ func CloseQuietly(d io.Closer) {
 	_ = d.Close()
 }
 
-// GetCliHomeDir return opencli home dir
+// GetCliHomeDir return dbctl home dir
 func GetCliHomeDir() (string, error) {
 	var cliHome string
-	if custom := os.Getenv(types.OpenCliHomeEnv); custom != "" {
+	if custom := os.Getenv(types.DBCtlHomeEnv); custom != "" {
 		cliHome = custom
 	} else {
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return "", err
 		}
-		cliHome = filepath.Join(home, types.OpenCliDefaultHome)
+		cliHome = filepath.Join(home, types.DBCtlDefaultHome)
 	}
 	if _, err := os.Stat(cliHome); err != nil && os.IsNotExist(err) {
 		err := os.MkdirAll(cliHome, 0750)
 		if err != nil {
-			return "", errors.Wrap(err, "error when create opencli home directory")
+			return "", errors.Wrap(err, "error when create dbctl home directory")
 		}
 	}
 	return cliHome, nil

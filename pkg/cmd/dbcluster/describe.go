@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 The OpenCli Authors
+Copyright © 2022 The dbctl Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,9 +26,9 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/describe"
 
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cloudprovider"
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/cmd/playground"
-	"jihulab.com/infracreate/dbaas-system/opencli/pkg/utils"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cloudprovider"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cmd/playground"
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/utils"
 )
 
 func NewDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {

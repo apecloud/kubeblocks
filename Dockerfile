@@ -3,5 +3,5 @@
 FROM gcr.io/distroless/static:nonroot
 
 WORKDIR /
-COPY bin/opencli.* /
+COPY bin/dbctl.* /
 USER nonroot:nonroott

@@ -64,7 +64,7 @@ clean:
 	rm -f bin/dbctl*
 
 lint: golangci
-	$(GOLANGCILINT) run ./...
+	$(GOLANGCILINT) run ./... --timeout=5m
 
 staticcheck: staticchecktool
 	$(STATICCHECK) ./...
@@ -112,3 +112,18 @@ check-diff: reviewable
 	git --no-pager diff
 	git diff --quiet || (echo please run 'make reviewable' to include all changes && false)
 	echo branch is clean
+
+
+.PHONY: ci-test-pre
+ci-test-pre:
+	$(MAKE)
+	bin/dbctl playground destroy
+	bin/dbctl playground init
+
+.PHONY: ci-test
+ci-test: ci-test-pre test
+	bin/dbctl playground destroy
+	go tool cover -html=cover.out -o cover.html
+	go tool cover -func=cover.out -o cover_total.out
+	python3 /datatestsuites/infratest.py -t 0 -c filepath:./cover_total.out,percent:60%
+

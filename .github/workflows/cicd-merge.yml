@@ -1,0 +1,17 @@
+name: CICD-MERGE
+
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  make-test:
+    if: github.event.pull_request.merged == true
+    runs-on: [ self-hosted, aws-eks-k8s-runner ]
+    steps:
+      - uses: actions/checkout@v3
+      - name: make test
+        run: |
+          git config --global url."https://${{ secrets.JIHULAB_USER }}:${{ secrets.JIHULAB_TOKEN }}@jihulab.com".insteadof "https://jihulab.com"
+          make ci-test

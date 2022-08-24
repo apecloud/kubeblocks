@@ -1,0 +1,14 @@
+name: CICD-PULL-REQUEST
+
+on:
+  pull_request:
+
+jobs:
+  make-test:
+    runs-on: [ self-hosted, aws-ec2-k8s-runner ]
+    steps:
+      - uses: actions/checkout@v3
+      - name: make test
+        run: |
+          git config --global url."https://${{ secrets.JIHULAB_USER }}:${{ secrets.JIHULAB_TOKEN }}@jihulab.com".insteadof "https://jihulab.com"
+          make ci-test

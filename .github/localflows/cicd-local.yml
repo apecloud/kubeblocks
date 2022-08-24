@@ -1,0 +1,24 @@
+name: CICD-PUSH
+
+on: push
+
+jobs:
+  make-build:
+    runs-on: [self-hosted ]
+    steps:
+      - uses: actions/checkout@v3
+      - name: make build
+        run: |
+          git config --global url."https://huangzhangshu:cH_yUXYN5XhCphyaUPH3@jihulab.com".insteadof "https://jihulab.com"
+          make mod-vendor
+          make lint
+  make-test:
+    runs-on: [ self-hosted ]
+    needs: [make-build]
+    steps:
+      - uses: actions/checkout@v3
+      - name: make test
+        run: |
+          git config --global url."https://huangzhangshu:cH_yUXYN5XhCphyaUPH3@jihulab.com".insteadof "https://jihulab.com"
+          make ci-test
+

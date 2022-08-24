@@ -1,0 +1,35 @@
+name: CICD-PUSH
+
+on:
+  push:
+    branches:
+      - '*'
+    tags-ignore:
+      - '*'
+
+jobs:
+  make-build:
+    if: startsWith(github.event.head_commit.message, 'Merge pull request') != true
+    runs-on: [self-hosted, aws-eks-k8s-runner ]
+    steps:
+      - uses: actions/checkout@v3
+      - name: make build
+        run: |
+          git config --global url."https://${{ secrets.JIHULAB_USER }}:${{ secrets.JIHULAB_TOKEN }}@jihulab.com".insteadof "https://jihulab.com"
+          make mod-vendor
+          make lint
+  make-test:
+    if: startsWith(github.event.head_commit.message, 'Merge pull request') != true
+    runs-on: [ self-hosted, aws-eks-k8s-runner ]
+    needs: [make-build]
+    steps:
+      - uses: actions/checkout@v3
+      - name: make test
+        run: |
+          git config --global url."https://${{ secrets.JIHULAB_USER }}:${{ secrets.JIHULAB_TOKEN }}@jihulab.com".insteadof "https://jihulab.com"
+          make ci-test
+      - name: upload cover result
+        uses: actions/upload-artifact@v3
+        with:
+          name: cover_result
+          path: cover.html

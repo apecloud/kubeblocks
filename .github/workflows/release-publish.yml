@@ -1,0 +1,73 @@
+name: RELEASE-PUBILSH
+
+on:
+  release:
+    types:
+      - published
+
+env:
+  DARWIN_ARM64: "darwin-arm64"
+  LINUX_AMD64: "linux-amd64"
+  DARWIN_ARM64_BINARY: "dbctl-darwin-arm64-${{ github.ref_name }}.tar.gz"
+  LINUX_AMD64_BINARY: "dbctl-linux-amd64-${{ github.ref_name }}.tar.gz"
+  INSTALL_SHELL: "install_dbctl.sh"
+  INSTALL_DOCKER_SHELL: "install_dbctl_docker.sh"
+
+jobs:
+  upload-release:
+    name: Upload Release Asset
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: make build
+        run: |
+          git config --global url."https://${{ secrets.JIHULAB_USER }}:${{ secrets.JIHULAB_TOKEN }}@jihulab.com".insteadof "https://jihulab.com"
+          mkdir -p ${{ env.DARWIN_ARM64 }} ${{ env.LINUX_AMD64 }}
+          GOOS=darwin ARCH=arm64 make
+          mv bin/dbctl ${{ env.DARWIN_ARM64 }}/dbctl
+          tar -zcvf ${{ env.DARWIN_ARM64_BINARY }} ${{ env.DARWIN_ARM64 }}
+          mv ${{ env.DARWIN_ARM64_BINARY }} bin/
+          GOOS=linux ARCH=amd64 make
+          mv bin/dbctl ${{ env.LINUX_AMD64 }}/dbctl
+          tar -zcvf ${{ env.LINUX_AMD64_BINARY }} ${{ env.LINUX_AMD64 }}
+          mv ${{ env.LINUX_AMD64_BINARY }} bin/
+      - name: "get upload_url"
+        id: release
+        run: echo "::set-output name=upload_url::https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$(jq --raw-output '.release.id' $GITHUB_EVENT_PATH)/assets{?name,label}"
+      - name: upload release asset
+        uses: actions/upload-release-asset@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+        with:
+          upload_url: ${{ steps.release.outputs.upload_url }}
+          asset_path: ./bin/${{ env.DARWIN_ARM64_BINARY }}
+          asset_name: ${{ env.DARWIN_ARM64_BINARY }}
+          asset_content_type: application/zip
+      - name: upload release asset
+        uses: actions/upload-release-asset@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+        with:
+          upload_url: ${{ steps.release.outputs.upload_url }}
+          asset_path: ./bin/${{ env.LINUX_AMD64_BINARY }}
+          asset_name: ${{ env.LINUX_AMD64_BINARY }}
+          asset_content_type: application/zip
+      - name: upload release asset
+        uses: actions/upload-release-asset@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+        with:
+          upload_url: ${{ steps.release.outputs.upload_url }}
+          asset_path: ./hack/${{ env.INSTALL_SHELL }}
+          asset_name: ${{ env.INSTALL_SHELL }}
+          asset_content_type: text/plan
+      - name: upload release asset
+        uses: actions/upload-release-asset@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+        with:
+          upload_url: ${{ steps.release.outputs.upload_url }}
+          asset_path: ./hack/${{ env.INSTALL_DOCKER_SHELL }}
+          asset_name: ${{ env.INSTALL_DOCKER_SHELL }}
+          asset_content_type: text/plan
+

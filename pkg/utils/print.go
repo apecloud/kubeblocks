@@ -67,6 +67,15 @@ type DBClusterInfo struct {
 	HostIP          string
 }
 
+type BackupJobInfo struct {
+	Name           string
+	Namespace      string
+	Phase          string
+	StartTime      string
+	CompletionTime string
+	Labels         string
+}
+
 var playgroundTmpl = `
 Notes:
 Open DBaaS Playground v{{.Version}} Start SUCCESSFULLY!

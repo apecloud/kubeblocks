@@ -24,7 +24,7 @@ const (
 	DefaultEngine        = "mysql"
 	DefaultCloudProvider = "local"
 	defaultProvider      = "cloudape.com"
-	DefaultVersion       = "8.0.30"
+	DefaultVersion       = "8.0.28"
 	DefaultRootUser      = "root"
 	DefaultPassword      = "sakila"
 	DefaultPort          = "3306"

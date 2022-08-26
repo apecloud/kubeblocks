@@ -43,6 +43,12 @@ const (
 
 	// PlaygroundSourceName is the playground default operator
 	PlaygroundSourceName = "innodbclusters"
+
+	// BackupJobSourceName is the playground default operator
+	BackupJobSourceName = "backupJobs"
+
+	// RestoreJobSourceName is the playground default operator
+	RestoreJobSourceName = "restoreJobs"
 )
 
 var (

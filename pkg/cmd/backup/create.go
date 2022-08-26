@@ -133,7 +133,7 @@ func NewBackupJobInstance(namespace, name string) *unstructured.Unstructured {
 				"name":      name,
 			},
 			"spec": map[string]interface{}{
-				"backupPolicyName": "backup-policy-1",
+				"backupPolicyName": "backup-policy-demo",
 				"backupType":       "full",
 				"ttl":              "168h0m0s",
 			},

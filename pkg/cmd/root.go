@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cmd/backup"
 	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cmd/bench"
 	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cmd/dbaas"
 	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cmd/dbcluster"
@@ -77,6 +78,7 @@ func NewRootCmd() *cobra.Command {
 		dbaas.NewDbaasCmd(),
 		dbcluster.NewDbclusterCmd(f, ioStreams),
 		bench.NewBenchCmd(f),
+		backup.NewBackupCmd(f, ioStreams),
 	)
 
 	cobra.OnInitialize(initConfig)

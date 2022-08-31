@@ -1,15 +1,17 @@
 name: Move issues
 on:
   issues:
-    types:
-      - assigned
+    types: [opened, assigned]
+
+env:
+  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
 jobs:
   move_issues:
     runs-on: ubuntu-latest
     steps:
       - name: Get project data
         env:
-          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           ORGANIZATION: apecloud
           PROJECT_NUMBER: 2
 
@@ -32,12 +34,20 @@ jobs:
 
           echo 'PROJECT_ID='$(jq '.data.organization.projectNext.id' project_data.json) >> $GITHUB_ENV
           echo 'COMPONENT_FIELD_ID='$(jq '.data.organization.projectNext.fields.nodes[] | select(.name== "Status") | .id' project_data.json) >> $GITHUB_ENV
+
+      - name: Opened Issue
+        if: |
+          github.event.action == 'opened'
+        run: |
+          echo 'BACKENDPORTAL_OPTION_ID='$(jq '.data.organization.projectNext.fields.nodes[] | select(.name== "Status") |.settings | fromjson.options[] | select(.name=="Backlog") |.id' project_data.json) >> $GITHUB_ENV
+      - name: Assigned Issue
+        if: |
+          github.event.action == 'assigned'
+        run: |
           echo 'BACKENDPORTAL_OPTION_ID='$(jq '.data.organization.projectNext.fields.nodes[] | select(.name== "Status") |.settings | fromjson.options[] | select(.name=="Todo") |.id' project_data.json) >> $GITHUB_ENV
-          
-          
+
       - name: Add Issue to project
         env:
-          GITHUB_TOKEN:  ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           ISSUE_ID: ${{ github.event.issue.node_id }}
         run: |
           item_id="$( gh api graphql -f query='
@@ -52,8 +62,6 @@ jobs:
           echo 'ITEM_ID='$item_id >> $GITHUB_ENV        
 
       - name: Set fields
-        env:
-          GITHUB_TOKEN:  ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         run: |
           gh api graphql -f query='
             mutation (

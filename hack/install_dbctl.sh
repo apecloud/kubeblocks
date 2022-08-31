@@ -20,10 +20,23 @@ DBCTL_CLI_BREW_FILE="${DBCTL_BREW_INSTALL_DIR}/${DBCTL_CLI_FILENAME}"
 
 # created a read-only token to access dbctl packages on jihu.
 # should be removed later
-DBCTL_CLI_TOKEN_USERNAME="gitlab+deploy-token-3512"
-DBCTL_CLI_TOKEN_PASSWORD="wJBLrdCpJRiFsW67k3Y7"
-DBCTL_CLI_TOKEN=${DBCTL_CLI_TOKEN_USERNAME}:${DBCTL_CLI_TOKEN_PASSWORD}
-DOWNLOAD_BASE="https://${DBCTL_CLI_TOKEN}@jihulab.com/api/v4/projects/40734/packages/generic/infracreate/"
+# DBCTL_CLI_TOKEN_USERNAME="gitlab+deploy-token-3512"
+# DBCTL_CLI_TOKEN_PASSWORD="wJBLrdCpJRiFsW67k3Y7"
+# TOKEN=${DBCTL_CLI_TOKEN_USERNAME}:${DBCTL_CLI_TOKEN_PASSWORD}
+# DOWNLOAD_BASE="https://${DBCTL_CLI_TOKEN}@jihulab.com/api/v4/projects/40734/packages/generic/infracreate/"
+
+TOKEN="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"
+REPO="apecloud/kubeblocks"
+GITHUB="https://api.github.com"
+DOWNLOAD_BASE="https://github.com/${REPO}/releases/download"
+FILE="dbctl-darwin-arm64-v0.3.0.tar.gz"      # the name of your release asset file, e.g. build.tar.gz
+
+
+gh_curl() {
+  curl -H "Authorization: token $TOKEN" \
+       -H "Accept: application/vnd.github.v3.raw" \
+       $@
+}
 
 getSystemInfo() {
     ARCH=$(uname -m)
@@ -79,7 +92,7 @@ checkHttpRequestCLI() {
     fi
 }
 
-checkExisting() {
+checkExistingDBCtl() {
 
     if [ -f "$DBCTL_CLI_FILE" ]; then
         echo -e "\ndbctl is detected: $DBCTL_CLI_FILE"
@@ -96,20 +109,42 @@ checkExisting() {
 
 downloadFile() {
     LATEST_RELEASE_TAG=$1
-
     DBCTL_CLI_ARTIFACT="${DBCTL_CLI_FILENAME}-${OS}-${ARCH}-${LATEST_RELEASE_TAG}.tar.gz"
+
+    if [ "$LATEST_RELEASE_TAG" = "latest" ] ; then
+      tag_name=`gh_curl -s $GITHUB/repos/$REPO/releases/latest | jq ".tag_name"`
+      LATEST_RELEASE_TAG=`echo $tag_name | sed 's/\"//g'`
+      DBCTL_CLI_ARTIFACT="${DBCTL_CLI_FILENAME}-${OS}-${ARCH}-${LATEST_RELEASE_TAG}.tar.gz"
+      parser=".[0].assets | map(select(.name == \"$DBCTL_CLI_ARTIFACT\"))[0].id"
+    else
+      parser=". | map(select(.tag_name == \"$LATEST_RELEASE_TAG\"))[0].assets | map(select(.name == \"$DBCTL_CLI_ARTIFACT\"))[0].id"
+    fi;
+
+    asset_id=`gh_curl -s $GITHUB/repos/$REPO/releases | jq "$parser"`
+
+    if [ "$asset_id" = "null" ] || [ -z "$asset_id" ]; then
+      echo "ERROR: LATEST_RELEASE_TAG not found $LATEST_RELEASE_TAG"
+      exit 1
+    fi;
+
     # convert `-` to `_` to let it work
     DOWNLOAD_URL="${DOWNLOAD_BASE}/${LATEST_RELEASE_TAG}/${DBCTL_CLI_ARTIFACT}"
-    
+
     # Create the temp directory
     DBCTL_TMP_ROOT=$(mktemp -dt dbctl-install-XXXXXX)
     ARTIFACT_TMP_FILE="$DBCTL_TMP_ROOT/$DBCTL_CLI_ARTIFACT"
     # todo curl with token
     echo "Downloading ..."
+
+    DOWNLOAD_ASSET_URL="https://$TOKEN:@api.github.com/repos/$REPO/releases/assets/$asset_id"
     if [ "$DBCTL_HTTP_REQUEST_CLI" == "curl" ]; then
-        curl -SL "$DOWNLOAD_URL" -o "$ARTIFACT_TMP_FILE"
+      curl -SL -q --header 'Accept:application/octet-stream' \
+        "$DOWNLOAD_ASSET_URL" -o "$ARTIFACT_TMP_FILE"
+        # curl -SL "$DOWNLOAD_URL" -o "$ARTIFACT_TMP_FILE"
     else
-        wget -O "$ARTIFACT_TMP_FILE" "$DOWNLOAD_URL"
+      wget -q --auth-no-challenge --header='Accept:application/octet-stream' \
+        "$DOWNLOAD_ASSET_URL" -O "$ARTIFACT_TMP_FILE"
+        # wget -O "$ARTIFACT_TMP_FILE" "$DOWNLOAD_URL"
     fi
 
     if [ ! -f "$ARTIFACT_TMP_FILE" ]; then
@@ -175,7 +210,7 @@ checkHttpRequestCLI
 
 if [ -z "$1" ]; then
     echo "Getting the latest dbctl..."
-    ret_val="v0.2.0"
+    ret_val="latest"
 elif [[ $1 == v* ]]; then
     ret_val=$1
 else

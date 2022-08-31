@@ -22,7 +22,7 @@
  
 
 # 提案命名规则：产品名称vMajor-XX调研/需求/概要设计/详细设计
-示例：kubelegov0-XX概要设计，vMajor遵循产品主版本号
+示例：kubeblocksv0-XX概要设计，vMajor遵循产品主版本号
 
 # 发布检查项 
 示例：

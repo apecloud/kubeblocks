@@ -40,6 +40,10 @@ func NewProvider(e string, v string) Provider {
 		return &MysqlOperator{
 			serverVersion: v,
 		}
+	case WeSQL:
+		return &Wesql{
+			serverVersion: v,
+		}
 	default:
 		return nil
 	}
@@ -52,6 +56,10 @@ func buildEngineType(e string) EngineType {
 
 	if strings.Contains(e, "mysql") {
 		return MySQLOperator
+	}
+
+	if strings.Contains(e, "wesql") {
+		return WeSQL
 	}
 
 	return UnknownEngine

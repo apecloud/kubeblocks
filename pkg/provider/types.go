@@ -21,5 +21,6 @@ type EngineType string
 const (
 	MySQLOperator EngineType = "MySQLOperator"
 	BitnamiMySQL  EngineType = "BitnamiMySQL"
+	WeSQL         EngineType = "WeSQL"
 	UnknownEngine EngineType = "UnknownEngine"
 )

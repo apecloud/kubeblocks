@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cmd"
+	"github.com/apecloud/kubeblocks/pkg/cmd"
 )
 
 func main() {

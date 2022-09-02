@@ -40,13 +40,13 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/repo"
 
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/provider"
-	"jihulab.com/infracreate/dbaas-system/dbctl/version"
+	"github.com/apecloud/kubeblocks/pkg/provider"
+	"github.com/apecloud/kubeblocks/version"
 
-	//"jihulab.com/infracreate/dbaas-system/dbctl/pkg/resources"
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/types"
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/utils"
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/utils/helm"
+	//"github.com/apecloud/kubeblocks/pkg/resources"
+	"github.com/apecloud/kubeblocks/pkg/types"
+	"github.com/apecloud/kubeblocks/pkg/utils"
+	"github.com/apecloud/kubeblocks/pkg/utils/helm"
 )
 
 var (

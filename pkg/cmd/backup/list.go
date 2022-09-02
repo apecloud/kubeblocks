@@ -19,6 +19,7 @@ package backup
 import (
 	"context"
 	"fmt"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/gosuri/uitable"
@@ -34,8 +35,8 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/describe"
 
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/types"
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/utils"
+	"github.com/apecloud/kubeblocks/pkg/types"
+	"github.com/apecloud/kubeblocks/pkg/utils"
 )
 
 type ListOptions struct {

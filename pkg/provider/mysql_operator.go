@@ -19,7 +19,7 @@ package provider
 import (
 	"helm.sh/helm/v3/pkg/repo"
 
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/utils/helm"
+	"github.com/apecloud/kubeblocks/pkg/utils/helm"
 )
 
 type MysqlOperator struct {

@@ -16,7 +16,7 @@ limitations under the License.
 
 package cluster
 
-import "jihulab.com/infracreate/dbaas-system/dbctl/pkg/types"
+import "github.com/apecloud/kubeblocks/pkg/types"
 
 // Installer defines the interface for handling the cluster(k3d/k3s) management
 type Installer interface {

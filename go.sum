@@ -208,6 +208,8 @@ github.com/antihax/optional v0.0.0-20180407024304-ca021399b1a6/go.mod h1:V8iCPQY
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20210826220005-b48c857c3a0e/go.mod h1:F7bn7fEU90QkQ3tnmaTx3LTKLEDqnwWODIYppRQ5hnY=
 github.com/aokoli/goutils v1.0.1/go.mod h1:SijmP0QR8LtwsmDs8Yii5Z/S4trXFGFC2oO5g9DP+DQ=
+github.com/apecloud/terraform v1.2.6-alpha20220813 h1:e9FVGnknJ9B062Vf98CTsnU6C4fazsNfZvQdohfuUho=
+github.com/apecloud/terraform v1.2.6-alpha20220813/go.mod h1:NvHGUePOLbeLMx4kZTWgEaKW3gDrWye61gwJEpLwo4o=
 github.com/apparentlymart/go-cidr v1.1.0 h1:2mAhrMoF+nhXqxTzSZMUzDHkLjmIHC+Zzn4tdgBZjnU=
 github.com/apparentlymart/go-cidr v1.1.0/go.mod h1:EBcsNrHc3zQeuaeCeCtQruQm+n9/YjEn/vI25Lg7Gwc=
 github.com/apparentlymart/go-dump v0.0.0-20180507223929-23540a00eaa3/go.mod h1:oL81AME2rN47vu18xqj1S1jPIPuN7afo62yKTNn3XMM=
@@ -2522,8 +2524,6 @@ honnef.co/go/tools v0.0.1-2020.1.5/go.mod h1:X/FiERA/W4tHapMX5mGpAtMSVEeEUOyHaw9
 honnef.co/go/tools v0.2.1/go.mod h1:lPVVZ2BS5TfnjLyizF7o7hv7j9/L+8cZY2hLyjP9cGY=
 inet.af/netaddr v0.0.0-20211027220019-c74959edd3b6 h1:acCzuUSQ79tGsM/O50VRFySfMm19IoMKL+sZztZkCxw=
 inet.af/netaddr v0.0.0-20211027220019-c74959edd3b6/go.mod h1:y3MGhcFMlh0KZPMuXXow8mpjxxAk3yoDNsp4cQz54i8=
-jihulab.com/infracreate/terraform v1.2.6-alpha20220813 h1:aiv3ppIIMImVyZ/3W0XAvag7aPX+SFZx9mBIXDQ6HUM=
-jihulab.com/infracreate/terraform v1.2.6-alpha20220813/go.mod h1:NvHGUePOLbeLMx4kZTWgEaKW3gDrWye61gwJEpLwo4o=
 k8s.io/api v0.20.1/go.mod h1:KqwcCVogGxQY3nBlRpwt+wpAMF/KjaCc7RpywacvqUo=
 k8s.io/api v0.20.4/go.mod h1:++lNL1AJMkDymriNniQsWRkMDzRaX2Y/POTUi8yvqYQ=
 k8s.io/api v0.20.6/go.mod h1:X9e8Qag6JV/bL5G6bU8sdVRltWKmdHsFUGS3eVndqE8=

@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/cobra"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/utils"
+	"github.com/apecloud/kubeblocks/pkg/utils"
 )
 
 func NewConnectCmd(f cmdutil.Factory) *cobra.Command {

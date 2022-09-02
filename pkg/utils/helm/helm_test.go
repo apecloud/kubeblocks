@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"helm.sh/helm/v3/pkg/repo"
 
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/utils"
+	"github.com/apecloud/kubeblocks/pkg/utils"
 )
 
 func TestAddRepo(t *testing.T) {

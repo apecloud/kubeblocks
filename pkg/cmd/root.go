@@ -27,12 +27,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cmd/backup"
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cmd/bench"
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cmd/dbaas"
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cmd/dbcluster"
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cmd/playground"
-	"jihulab.com/infracreate/dbaas-system/dbctl/version"
+	"github.com/apecloud/kubeblocks/pkg/cmd/backup"
+	"github.com/apecloud/kubeblocks/pkg/cmd/bench"
+	"github.com/apecloud/kubeblocks/pkg/cmd/dbaas"
+	"github.com/apecloud/kubeblocks/pkg/cmd/dbcluster"
+	"github.com/apecloud/kubeblocks/pkg/cmd/playground"
+	"github.com/apecloud/kubeblocks/version"
 )
 
 // RootFlags describes a struct that holds flags that can be set on root level of the command

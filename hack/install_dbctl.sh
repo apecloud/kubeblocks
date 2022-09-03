@@ -18,13 +18,6 @@ DBCTL_CLI_FILENAME=dbctl
 DBCTL_CLI_FILE="${DBCTL_INSTALL_DIR}/${DBCTL_CLI_FILENAME}"
 DBCTL_CLI_BREW_FILE="${DBCTL_BREW_INSTALL_DIR}/${DBCTL_CLI_FILENAME}"
 
-# created a read-only token to access dbctl packages on jihu.
-# should be removed later
-# DBCTL_CLI_TOKEN_USERNAME="gitlab+deploy-token-3512"
-# DBCTL_CLI_TOKEN_PASSWORD="wJBLrdCpJRiFsW67k3Y7"
-# TOKEN=${DBCTL_CLI_TOKEN_USERNAME}:${DBCTL_CLI_TOKEN_PASSWORD}
-# DOWNLOAD_BASE="https://${DBCTL_CLI_TOKEN}@jihulab.com/api/v4/projects/40734/packages/generic/infracreate/"
-
 TOKEN="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"
 REPO="apecloud/kubeblocks"
 GITHUB="https://api.github.com"

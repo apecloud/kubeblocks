@@ -1,4 +1,4 @@
-module jihulab.com/infracreate/dbaas-system/dbctl
+module github.com/apecloud/kubeblocks
 
 go 1.18
 
@@ -286,7 +286,7 @@ require (
 )
 
 replace (
-	github.com/hashicorp/terraform => jihulab.com/infracreate/terraform v1.2.6-alpha20220813
+	github.com/hashicorp/terraform => github.com/apecloud/terraform v1.2.6-alpha20220813
 	github.com/spf13/afero => github.com/spf13/afero v1.2.2
 	google.golang.org/grpc => google.golang.org/grpc v1.29.1
 )

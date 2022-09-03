@@ -16,7 +16,7 @@ limitations under the License.
 
 package types
 
-import "jihulab.com/infracreate/dbaas-system/dbctl/version"
+import "github.com/apecloud/kubeblocks/version"
 
 const (
 	// dbctlDefaultHome defines dbctl default home name

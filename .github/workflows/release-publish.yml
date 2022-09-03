@@ -12,6 +12,7 @@ env:
   LINUX_AMD64_BINARY: "dbctl-linux-amd64-${{ github.ref_name }}.tar.gz"
   INSTALL_SHELL: "install_dbctl.sh"
   INSTALL_DOCKER_SHELL: "install_dbctl_docker.sh"
+  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
 jobs:
   upload-release:
@@ -21,7 +22,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: make build
         run: |
-          git config --global url."https://${{ secrets.JIHULAB_USER }}:${{ secrets.JIHULAB_TOKEN }}@jihulab.com".insteadof "https://jihulab.com"
+          git config --global url."https://${{ secrets.PERSONAL_ACCESS_TOKEN }}:@github.com".insteadof "https://github.com"
           mkdir -p ${{ env.DARWIN_ARM64 }} ${{ env.LINUX_AMD64 }}
           GOOS=darwin ARCH=arm64 make
           mv bin/dbctl ${{ env.DARWIN_ARM64 }}/dbctl

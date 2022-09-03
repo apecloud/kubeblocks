@@ -36,7 +36,7 @@ import (
 	l "github.com/k3d-io/k3d/v5/pkg/logger"
 	"github.com/pkg/errors"
 
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/types"
+	"github.com/apecloud/kubeblocks/pkg/types"
 )
 
 var (

@@ -22,7 +22,7 @@ import (
 
 	"github.com/fatih/color"
 
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/types"
+	"github.com/apecloud/kubeblocks/pkg/types"
 )
 
 var (

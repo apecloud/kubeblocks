@@ -28,7 +28,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/describe"
 
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/utils"
+	"github.com/apecloud/kubeblocks/pkg/utils"
 )
 
 func getClusterGVK() schema.GroupVersionKind {

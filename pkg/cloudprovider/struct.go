@@ -10,7 +10,7 @@ import (
 	"github.com/docker/docker/pkg/ioutils"
 	"github.com/pkg/errors"
 
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/utils"
+	"github.com/apecloud/kubeblocks/pkg/utils"
 )
 
 const (

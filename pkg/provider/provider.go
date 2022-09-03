@@ -21,7 +21,7 @@ import (
 
 	"helm.sh/helm/v3/pkg/repo"
 
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/utils/helm"
+	"github.com/apecloud/kubeblocks/pkg/utils/helm"
 )
 
 type Provider interface {
@@ -40,6 +40,10 @@ func NewProvider(e string, v string) Provider {
 		return &MysqlOperator{
 			serverVersion: v,
 		}
+	case WeSQL:
+		return &Wesql{
+			serverVersion: v,
+		}
 	default:
 		return nil
 	}
@@ -52,6 +56,10 @@ func buildEngineType(e string) EngineType {
 
 	if strings.Contains(e, "mysql") {
 		return MySQLOperator
+	}
+
+	if strings.Contains(e, "wesql") {
+		return WeSQL
 	}
 
 	return UnknownEngine

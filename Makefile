@@ -89,7 +89,7 @@ endif
 
 .DEFAULT_GOAL := help
 .PHONY: all
-all: build
+all: manager dbctl
 
 ##@ General
 
@@ -144,13 +144,16 @@ lint: ## Run golangci-lint against code.
 staticcheck: staticchecktool ## Run staticcheck against code. 
 	$(STATICCHECK) ./...
 
+.PHONY: build-checks
+build-checks: generate fmt vet goimports lint ## Run build checks.
+
 .PHONY: mod-download
 mod-download: ## Run go mod download against go modules.
 	$(GO) mod download
 
 .PHONY: mod-vendor
 mod-vendor: ## Run go mod tidy->vendor->verify against go modules.
-	$(GO) mod tidy
+	$(GO) mod tidy -compat=1.18
 	$(GO) mod vendor
 	$(GO) mod verify
 
@@ -189,28 +192,31 @@ CLI_LD_FLAGS ="-s -w \
 	-X github.com/apecloud/kubeblocks/version.K3dVersion=${K3D_VERSION}"
 
 
-build-cli-checks: generate fmt vet goimports lint ## Run build CLI checks.
-
 
 bin/dbctl.%: ## Cross build bin/dbctl.$(OS).$(ARCH) CLI.
 	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${CLI_LD_FLAGS} -o $@ cmd/dbctl/main.go
 
-bin/dbctl: OS=$(shell $(GO) env GOOS)
-bin/dbctl: ARCH=$(shell $(GO) env GOARCH)
-bin/dbctl: build-cli-checks ## Build bin/dbctl CLI.
+.PHONY: dbctl
+dbctl: OS=$(shell $(GO) env GOOS)
+dbctl: ARCH=$(shell $(GO) env GOARCH)
+dbctl: build-checks ## Build bin/dbctl CLI.
 	$(MAKE) bin/dbctl.$(OS).$(ARCH)
 	mv bin/dbctl.$(OS).$(ARCH) bin/dbctl
 
+.PHONY: clean
+clean-dbctl: ## Clean bin/dbctl* CLI tools.
+	rm -f bin/dbctl*
+
 .PHONY: docker-build-cli
-docker-build-cli: clean build-cli-checks bin/dbctl.linux.amd64 bin/dbctl.linux.arm64 bin/dbctl.darwin.arm64 bin/dbctl.darwin.amd64 bin/dbctl.windows.amd64 ## Build docker image with the dbctl.
-	docker build . -t ${CLI_IMG}:${CLI_TAG}
+docker-build-cli: clean-dbctl build-checks bin/dbctl.linux.amd64 bin/dbctl.linux.arm64 bin/dbctl.darwin.arm64 bin/dbctl.darwin.amd64 bin/dbctl.windows.amd64 ## Build docker image with the dbctl.
+	docker build . -t ${CLI_IMG}:${CLI_TAG} -f Dockerfile.dbctl
 	docker push ${CLI_IMG}:${CLI_TAG}
 
 
-##@ Build
+##@ Operator Controller Manager
 
-.PHONY: build
-build: generate cue-fmt fmt vet goimports lint ## Build manager binary.
+.PHONY: manager
+manager: cue-fmt build-checks ## Build manager binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
 
 

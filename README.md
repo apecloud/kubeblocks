@@ -25,7 +25,6 @@ Features/Enhancement:
 ```shell
 $ make help
 
-
 Usage:
   make <target>
 
@@ -41,6 +40,7 @@ Development
   cue-vet          Run cue vet against code.
   lint             Run golangci-lint against code.
   staticcheck      Run staticcheck against code. 
+  build-checks     Run build checks.
   mod-download     Run go mod download against go modules.
   mod-vendor       Run go mod tidy->vendor->verify against go modules.
   test             Run tests.
@@ -49,10 +49,12 @@ Development
   goimports        Run goimports against code.
 
 CLI
+  dbctl            Build bin/dbctl CLI.
+  clean-dbctl      Clean bin/dbctl* CLI tools.
   docker-build-cli  Build docker image with the dbctl.
 
-Build
-  build            Build manager binary.
+Operator Controller Manager
+  manager          Build manager binary.
   webhook-cert     Create root CA certificates for admission webhooks testing.
   run              Run a controller from your host.
   run-delve        Run Delve debugger.

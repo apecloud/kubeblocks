@@ -1,13 +1,17 @@
 # Mac OS X files
 .DS_Store
 
+
 # Binaries for programs and plugins
 *.exe
 *.exe~
-*.swp
 *.dll
 *.so
 *.dylib
+*.tar.gz
+*.tgz
+bin
+testbin/*
 
 # Test binary, build with `go test -c`
 *.test
@@ -19,11 +23,18 @@
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
 .glide/
 
-# IDE files
-.vimrc
-.history/
+# Kubernetes Generated files - skip generated files, except for vendored files
+zz_generated.*
+!vendor/**/zz_generated.*
+
+# editor and IDE paraphernalia
 .vscode/
 .idea/
+.history/
+.vimrc
+*.swp
+*.swo
+*~
 
 # Dependency directories (remove the comment below to include it)
 vendor/

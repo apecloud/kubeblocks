@@ -1,0 +1,28 @@
+# Standard Kubernetes Kind declaration. Required.
+apiVersion: dataprotection.infracreate.com/v1alpha1
+# Standard Kubernetes Kind declaration. Required.
+kind: BackupJob
+# Standard Kubernetes metadata. Required.
+metadata:
+  # Backup name. Maybe any valid Kubernetes object name. Required.
+  name: backup-success-demo
+
+  labels:
+    dataprotection.infracreate.com/backup-type: full
+    # if type is incremental, parrentName is required.
+    #dataprotection.infracreate.com/parent-backup-name: null
+    # reference db cluster name
+    db.infracreate.com/name: mysqlcluster
+    dataprotection.infracreate.com/backup-policy-name: backup-policy-demo
+    # backup index begin to 0 (full) for incremental.
+    dataprotection.infracreate.com/backup-index: "0"
+
+# Parameters about the backup. Required.
+spec:
+  backupPolicyName: backup-policy-demo
+
+  # Backup Type. full or incremental. if unset, default is full.
+  backupType: full
+
+  # ttl value  from backup policy optional, not clean if unset.
+  ttl: 168h0m0s

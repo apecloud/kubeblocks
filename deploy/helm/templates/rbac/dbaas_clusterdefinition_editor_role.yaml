@@ -1,0 +1,24 @@
+# permissions for end users to edit clusterdefinitions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "opendbaas-core.fullname" . }}-clusterdefinition-editor-role
+rules:
+- apiGroups:
+  - dbaas.infracreate.com
+  resources:
+  - clusterdefinitions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dbaas.infracreate.com
+  resources:
+  - clusterdefinitions/status
+  verbs:
+  - get

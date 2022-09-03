@@ -1,0 +1,77 @@
+{{- if .Values.admissionWebhooks.enabled }}
+{{- if .Values.createSelfSignedCert }}
+{{- $ca := genCA (printf "*.%s.svc" (include "opendbaas-core.namespace" .)) 36500 -}}
+{{- $cert := genSignedCert (printf "%s.%s.svc" (include "opendbaas-core.serviceName" .) (include "opendbaas-core.namespace" .)) nil nil 36500 $ca -}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "opendbaas-core.fullname" . }}.{{ template "opendbaas-core.namespace" . }}.svc.tls-ca
+  labels: 
+    {{- include "opendbaas-core.selectorLabels" . | nindent 4 }}
+data:
+  rootCA.crt: {{ $ca.Cert | b64enc }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "opendbaas-core.fullname" . }}.{{ template "opendbaas-core.namespace" . }}.svc.tls-pair
+  labels: {{ include "opendbaas-core.labels" . | nindent 4 }}
+  annotations:
+    self-signed-cert: "true"
+type: kubernetes.io/tls
+data:
+  tls.key: {{ $cert.Key | b64enc }}
+  tls.crt: {{ $cert.Cert | b64enc }}
+{{- end }}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: {{ include "opendbaas-core.fullname" . }}-mutating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "opendbaas-core.fullname" . }}-webhook
+      path: /mutate-dac-infracreate-com-v1alpha1-databaseinstance
+  failurePolicy: Fail
+  name: mdatabaseinstance.kb.io
+  rules:
+  - apiGroups:
+    - dac.infracreate.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - databaseinstances
+  sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  creationTimestamp: null
+  name: {{ include "opendbaas-core.fullname" . }}-validating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "opendbaas-core.fullname" . }}-webhook
+      path: /validate-dac-infracreate-com-v1alpha1-databaseinstance
+  failurePolicy: Fail
+  name: vdatabaseinstance.kb.io
+  rules:
+  - apiGroups:
+    - dac.infracreate.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - databaseinstances
+  sideEffects: None
+{{- end }}

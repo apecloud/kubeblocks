@@ -1,0 +1,78 @@
+domain: infracreate.com
+layout:
+- go.kubebuilder.io/v3
+multigroup: true
+projectName: opendbaas-core
+repo: github.com/apecloud/kubeblocks
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: infracreate.com
+  group: dbaas
+  kind: Cluster
+  path: github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: infracreate.com
+  group: dbaas
+  kind: ClusterDefinition
+  path: github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: infracreate.com
+  group: dbaas
+  kind: AppVersion
+  path: github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: infracreate.com
+  group: dbaas
+  kind: BackupTool
+  path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: infracreate.com
+  group: dataprotection
+  kind: BackupPolicy
+  path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: infracreate.com
+  group: dataprotection
+  kind: BackupJob
+  path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: infracreate.com
+  group: dataprotection
+  kind: RestoreJob
+  path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: infracreate.com
+  group: dataprotection
+  kind: BackupPolicyTemplate
+  path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
+  version: v1alpha1
+version: "3"

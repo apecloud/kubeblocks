@@ -1,0 +1,6 @@
+apiVersion: dataprotection.infracreate.com/v1alpha1
+kind: BackupJob
+metadata:
+  name: backupjob-sample
+spec:
+  # TODO(user): Add fields here

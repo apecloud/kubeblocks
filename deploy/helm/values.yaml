@@ -1,0 +1,103 @@
+# Default values for opendbaas-core.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: docker.io/infracreate/opendbaas-core
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+enableDebugLog: true
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+
+podSecurityContext:
+  runAsNonRoot: true
+  # readOnlyRootFilesystem: true
+  # runAsUser: 1000
+  # fsGroup: 2000
+  # TODO(user): For common cases that do not require escalating privileges
+  # it is recommended to ensure that all your Pods/Containers are restrictive.
+  # More info: https://kubernetes.io/docs/concepts/security/pod-security-standards/#restricted
+  # Please uncomment the following code if your project does NOT have to work on old Kubernetes
+  # versions < 1.19 or on vendors versions which do NOT support this field by default (i.e. Openshift < 4.11 ).
+  # seccompProfile:
+  #   type: RuntimeDefault
+
+service:
+  type: ClusterIP
+  port: 8443
+  # -- Service node port.
+  # Only used if `metricsService.type` is `NodePort`.
+  nodePort:
+
+metricsService:
+  type: ClusterIP
+  # metrics server will be exposed at this port.
+  port: 8080
+  # -- Service node port.
+  # Only used if `metricsService.type` is `NodePort`.
+  nodePort:
+
+# -- Topology spread constraints.
+topologySpreadConstraints: []
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # TODO(user): Configure the resources accordingly based on the project requirements.
+  # More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+  # limits:
+  #   cpu: 500m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 10m
+  #   memory: 64Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+serviceMonitor:
+  enabled: false
+
+podDisruptionBudget:
+  minAvailable: 1
+  maxUnavailable:
+
+admissionWebhooks:
+  enabled: false
+
+kubeRBACProxyImageRepo: docker.io/infracreate/kube-rbac-proxy:v0.12.0

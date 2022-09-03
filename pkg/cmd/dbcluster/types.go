@@ -28,9 +28,9 @@ import (
 	"k8s.io/kubectl/pkg/describe"
 	ctrlcli "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/utils"
+	"github.com/apecloud/kubeblocks/pkg/utils"
 
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/types"
+	"github.com/apecloud/kubeblocks/pkg/types"
 )
 
 type commandOptions struct {

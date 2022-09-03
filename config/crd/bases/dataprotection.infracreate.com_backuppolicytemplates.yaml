@@ -1,0 +1,77 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.9.0
+  creationTimestamp: null
+  name: backuppolicytemplates.dataprotection.infracreate.com
+spec:
+  group: dataprotection.infracreate.com
+  names:
+    categories:
+    - dbaas
+    kind: BackupPolicyTemplate
+    listKind: BackupPolicyTemplateList
+    plural: backuppolicytemplates
+    singular: backuppolicytemplate
+  scope: Cluster
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: BackupPolicyTemplate is the Schema for the BackupPolicyTemplates
+          API (defined by ISV)
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: BackupPolicyTemplateSpec defines the desired state of BackupPolicyTemplate
+            properties:
+              backupToolName:
+                description: which backup tool to perform database backup, only support
+                  one tool.
+                type: string
+              onFailAttempted:
+                description: limit count of backup stop retries on fail. if unset,
+                  retry unlimit attempted.
+                format: int32
+                type: integer
+              schedule:
+                default: 0 7 * * *
+                description: The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+                type: string
+              ttl:
+                description: TTL is a time.Duration-parseable string describing how
+                  long the Backup should be retained for.
+                type: string
+            required:
+            - backupToolName
+            - schedule
+            type: object
+          status:
+            description: BackupPolicyTemplateStatus defines the observed state of
+              BackupPolicyTemplate
+            properties:
+              failureReason:
+                type: string
+              phase:
+                description: The current phase. Valid values are New, Available, InProgress,
+                  Failed.
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

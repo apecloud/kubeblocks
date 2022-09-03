@@ -1,0 +1,57 @@
+# Default values for wesqlapp.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  registry: 
+  repository: docker.io/infracreate/wesql-server-8.0
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: 0.1-SNAPSHOT
+
+## MySQL Cluster parameters
+cluster:
+  ## CLUSTER_ID
+  clusterId: "1"
+  ## CLUSTER_START_INDEX
+  clusterStartIndex: "1"
+  ## @param cluster.replicaSetCount
+  replicaSetCount: 3
+  ## MYSQL_TEMPLATE_CONFIG
+  templateConfig:
+  ## MYSQL_CUSTOM_CONFIG
+  customConfig:
+  ## MYSQL_DYNAMIC_CONFIG
+  dynamicConfig:
+
+## MySQL Authentication parameters
+auth:
+  ## MYSQL_ROOT_HOST
+  rootHost: "%"
+  ## MYSQL_ROOT_USER
+  rootUser: "root"
+  ## @param auth.rootPassword Password for the `root` user. Ignored if existing secret is provided
+  ##  MYSQL_ROOT_PASSWORD if null then MYSQL_ALLOW_EMPTY_PASSWORD=true
+  rootPassword: ""
+  ## @param auth.createDatabase Wheter to create the .Values.auth.database or not
+  ##
+  createDatabase: true
+  ## @param auth.database Name for a custom database to create
+  ## MYSQL_DATABASE
+  database: "mydb"
+  ## @param auth.username Name for a custom user to create
+  ## MYSQL_USER
+  username: "u1"
+  ## MYSQL_PASSWORD
+  password: "u1"
+  ## @param auth.replicationUser MySQL replication user
+  ##
+  replicationUser: "replicator"
+  ## @param auth.replicationPassword MySQL replication user password. Ignored if existing secret is provided
+  ##
+  replicationPassword: ""
+ 
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+appVersionOverride: ""

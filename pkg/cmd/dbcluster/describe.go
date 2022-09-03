@@ -26,9 +26,9 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/describe"
 
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cloudprovider"
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cmd/playground"
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/utils"
+	"github.com/apecloud/kubeblocks/pkg/cloudprovider"
+	"github.com/apecloud/kubeblocks/pkg/cmd/playground"
+	"github.com/apecloud/kubeblocks/pkg/utils"
 )
 
 func NewDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {

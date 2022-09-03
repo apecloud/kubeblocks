@@ -3,7 +3,6 @@ export GONOSUMDB=github.com/apecloud
 export GOPRIVATE=github.com/apecloud
 export GOPROXY=https://goproxy.cn
 
-
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -84,7 +83,6 @@ DOCKER_NO_BUILD_CACHE ?= false
 ifeq ($(DOCKER_NO_BUILD_CACHE), true)
 	DOCKER_BUILD_ARGS = $(DOCKER_BUILD_ARGS) --no-cache
 endif
-
 
 
 .DEFAULT_GOAL := help

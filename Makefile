@@ -1,7 +1,7 @@
 include dependency.mk
 
 IMG ?= docker.io/infracreate/dbctl
-CLI_VERSION ?= 0.2.0
+CLI_VERSION ?= 0.4.0
 TAG ?= v$(CLI_VERSION)
 
 K3S_VERSION ?= v1.23.8+k3s1
@@ -21,18 +21,18 @@ else
 GOBIN=$(shell $(GO) env GOBIN)
 endif
 
-export GONOPROXY=jihulab.com/infracreate
-export GONOSUMDB=jihulab.com/infracreate
-export GOPRIVATE=jihulab.com/infracreate
+export GONOPROXY=github.com/apecloud
+export GONOSUMDB=github.com/apecloud
+export GOPRIVATE=github.com/apecloud
 export GOPROXY=https://goproxy.cn,direct
 
 
 LD_FLAGS="-s -w \
-	-X jihulab.com/infracreate/dbaas-system/dbctl/version.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` \
-	-X jihulab.com/infracreate/dbaas-system/dbctl/version.GitCommit=`git rev-parse HEAD` \
-	-X jihulab.com/infracreate/dbaas-system/dbctl/version.Version=${CLI_VERSION} \
-	-X jihulab.com/infracreate/dbaas-system/dbctl/version.K3sImageTag=${K3S_IMG_TAG} \
-	-X jihulab.com/infracreate/dbaas-system/dbctl/version.K3dVersion=${K3D_VERSION}"
+	-X github.com/apecloud/kubeblocks/version.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` \
+	-X github.com/apecloud/kubeblocks/version.GitCommit=`git rev-parse HEAD` \
+	-X github.com/apecloud/kubeblocks/version.Version=${CLI_VERSION} \
+	-X github.com/apecloud/kubeblocks/version.K3sImageTag=${K3S_IMG_TAG} \
+	-X github.com/apecloud/kubeblocks/version.K3dVersion=${K3D_VERSION}"
 
 
 .DEFAULT_GOAL := bin/dbctl
@@ -70,7 +70,7 @@ staticcheck: staticchecktool
 	$(STATICCHECK) ./...
 
 goimports: goimportstool
-	$(GOIMPORTS) -local jihulab.com/infracreate/dbaas-system/dbctl -w $$(go list -f {{.Dir}} ./...)
+	$(GOIMPORTS) -local github.com/apecloud/kubeblocks -w $$(go list -f {{.Dir}} ./...)
 
 .PHONY: go-check
 go-check: fmt vet

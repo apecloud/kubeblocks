@@ -28,10 +28,10 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cloudprovider"
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cluster"
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/provider"
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/utils"
+	"github.com/apecloud/kubeblocks/pkg/cloudprovider"
+	"github.com/apecloud/kubeblocks/pkg/cluster"
+	"github.com/apecloud/kubeblocks/pkg/provider"
+	"github.com/apecloud/kubeblocks/pkg/utils"
 )
 
 var installer = &cluster.PlaygroundInstaller{

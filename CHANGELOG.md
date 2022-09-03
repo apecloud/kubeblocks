@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.0] - 2022-08-13
 ### Added
 - Support deploy playground to cloud.
-- Integrate [terraform](https://jihulab.com/infracreate/terraform) to operating cloud resources
+- Integrate [terraform](https://github.com/apecloud/terraform) to operating cloud resources
  
 ### Changed
 

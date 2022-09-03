@@ -29,8 +29,8 @@ import (
 	"github.com/spf13/cobra"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/cmd/bench/tpcc"
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/utils"
+	"github.com/apecloud/kubeblocks/pkg/cmd/bench/tpcc"
+	"github.com/apecloud/kubeblocks/pkg/utils"
 )
 
 var tpccConfig tpcc.Config

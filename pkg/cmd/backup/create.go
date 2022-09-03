@@ -19,6 +19,8 @@ package backup
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,9 +31,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/describe"
-	"time"
 
-	"jihulab.com/infracreate/dbaas-system/dbctl/pkg/types"
+	"github.com/apecloud/kubeblocks/pkg/types"
 )
 
 type CreateOptions struct {

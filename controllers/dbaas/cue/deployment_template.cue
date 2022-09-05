@@ -17,10 +17,10 @@ role_group: {
 	replicas: int
 }
 
-statefulset: {
-	apiVersion: "apps/v1"
-	kind:       "StatefulSet"
-	metadata: {
+deployment: {
+	"apiVersion": "apps/v1"
+	"kind":       "Deployment"
+	"metadata": {
 		namespace: cluster.metadata.namespace
 		name:      "\(cluster.metadata.name)-\(component.type)-\(component.name)"
 		labels: {
@@ -31,17 +31,15 @@ statefulset: {
 			"app.kubernetes.io/created-by": "controller-manager"
 		}
 	}
-	spec: {
-		selector:
+	"spec": {
+		replicas: role_group.replicas
+		selector: {
 			matchLabels: {
 				"app.kubernetes.io/name":      "\(component.clusterType)-\(component.clusterDefName)"
 				"app.kubernetes.io/instance":  "\(cluster.metadata.name)-\(component.type)-\(component.name)"
 				"app.kubernetes.io/component": "\(component.type)-\(component.name)"
 			}
-		serviceName:         "\(cluster.metadata.name)-\(component.type)-\(component.name)"
-		replicas:            role_group.replicas
-		minReadySeconds:     10
-		podManagementPolicy: "Parallel"
+		}
 		template: {
 			metadata:
 				labels: {
@@ -55,6 +53,5 @@ statefulset: {
 				containers:                    component.containers
 			}
 		}
-		volumeClaimTemplates: component.volumeClaimTemplates
 	}
 }

@@ -12,15 +12,17 @@ component: {
 	containers: [...]
 	volumeClaimTemplates: [...]
 }
-role_group: {
-	name:     string
-	replicas: int
+roleGroup: {
+	updateStrategy: {
+		maxUnavailable: int | string
+		minAvailable:   int | string
+	}
 }
 
-statefulset: {
-	apiVersion: "apps/v1"
-	kind:       "StatefulSet"
-	metadata: {
+pdb: {
+	"apiVersion": "policy/v1"
+	"kind":       "PodDisruptionBudget"
+	"metadata": {
 		namespace: cluster.metadata.namespace
 		name:      "\(cluster.metadata.name)-\(component.type)-\(component.name)"
 		labels: {
@@ -31,30 +33,19 @@ statefulset: {
 			"app.kubernetes.io/created-by": "controller-manager"
 		}
 	}
-	spec: {
-		selector:
+	"spec": {
+		if roleGroup.updateStrategy.minAvailable != _|_ {
+			minAvailable: roleGroup.updateStrategy.minAvailable
+		}
+		if roleGroup.updateStrategy.maxUnavailable != _|_ {
+			maxUnavailable: roleGroup.updateStrategy.maxUnavailable
+		}
+		selector: {
 			matchLabels: {
 				"app.kubernetes.io/name":      "\(component.clusterType)-\(component.clusterDefName)"
 				"app.kubernetes.io/instance":  "\(cluster.metadata.name)-\(component.type)-\(component.name)"
 				"app.kubernetes.io/component": "\(component.type)-\(component.name)"
 			}
-		serviceName:         "\(cluster.metadata.name)-\(component.type)-\(component.name)"
-		replicas:            role_group.replicas
-		minReadySeconds:     10
-		podManagementPolicy: "Parallel"
-		template: {
-			metadata:
-				labels: {
-					"app.kubernetes.io/name":      "\(component.clusterType)-\(component.clusterDefName)"
-					"app.kubernetes.io/instance":  "\(cluster.metadata.name)-\(component.type)-\(component.name)"
-					"app.kubernetes.io/component": "\(component.type)-\(component.name)"
-					// "app.kubernetes.io/version" : # TODO
-				}
-			spec: {
-				terminationGracePeriodSeconds: 10
-				containers:                    component.containers
-			}
 		}
-		volumeClaimTemplates: component.volumeClaimTemplates
 	}
 }

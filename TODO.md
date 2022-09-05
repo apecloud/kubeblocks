@@ -9,10 +9,10 @@
   - [ ] CR spec.terminationPolicy handling
 - [ ] managed resources handling
   - [ ] nodeGroup attached Service kind
-  - [ ] deployment workloads
+  - [x] deployment workloads
   - [ ] PDB
-  - [ ] label handling:
-    - [ ] deploy & sts workloads's labels and spec.template.metadata.labels (check https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/)
+  - [x] label handling:
+    - [x] deploy & sts workloads's labels and spec.template.metadata.labels (check https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/)
 - [ ] immutable spec properties handling (via validating webhook)
 - [ ] CR status handling
 - [ ] checked AppVersion CR status
@@ -32,4 +32,4 @@
 - [ ] cannot delete AppVersion CR if any referencing CRs (Cluster)
 
 ### Test
-- [ ] unit test
+- [x] unit test

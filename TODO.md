@@ -10,7 +10,7 @@
 - [ ] managed resources handling
   - [ ] nodeGroup attached Service kind
   - [x] deployment workloads
-  - [ ] PDB
+  - [x] PDB
   - [x] label handling:
     - [x] deploy & sts workloads's labels and spec.template.metadata.labels (check https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/)
 - [ ] immutable spec properties handling (via validating webhook)
@@ -18,7 +18,7 @@
 - [ ] checked AppVersion CR status
 - [ ] checked ClusterDefinition CR status
 - [ ] CR update handling
-  - [ ] PVC volume expansion (spec.components[].volumeClaimTemplates only works for initial statefulset creation)
+  - [x] PVC volume expansion (spec.components[].volumeClaimTemplates only works for initial statefulset creation)
   - [ ] spec.components[].serviceType
 - [x] merge components from all the CRs
 

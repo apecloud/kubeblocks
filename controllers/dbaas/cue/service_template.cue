@@ -37,10 +37,10 @@ service: {
 	}
 	"spec": {
 		"selector": {
-			"app.kubernetes.io/instance": cluster.metadata.name
-			"app.kubernetes.io/component":  "\(component.type)-\(component.name)"
+			"app.kubernetes.io/instance":  cluster.metadata.name
+			"app.kubernetes.io/component": "\(component.type)-\(component.name)"
 		}
 		ports: roleGroup.service.ports
-		type: roleGroup.service.type
+		type:  roleGroup.service.type
 	}
 }

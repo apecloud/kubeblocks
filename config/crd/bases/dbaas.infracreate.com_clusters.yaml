@@ -680,7 +680,7 @@ spec:
                   type: object
                 type: array
               terminationPolicy:
-                default: DoNotTerminate
+                default: Halt
                 enum:
                 - DoNotTerminate
                 - Halt

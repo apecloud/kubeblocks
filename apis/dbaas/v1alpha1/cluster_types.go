@@ -37,7 +37,7 @@ type ClusterSpec struct {
 	// +optional
 	Components []ClusterComponent `json:"components,omitempty"`
 
-	// +kubebuilder:default=DoNotTerminate
+	// +kubebuilder:default=Halt
 	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
 	TerminatingPolicy string `json:"terminationPolicy,omitempty"`
 }

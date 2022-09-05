@@ -104,11 +104,18 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, cluster, dbClusterFinalizerName, func() error {
-		return r.deleteExternalResources(reqCtx, cluster)
-	})
-	if res != nil {
-		return *res, err
+	if cluster.Spec.TerminatingPolicy != "DoNotTerminate" {
+		res, err := intctrlutil.HandleCRDeletion(reqCtx, r, cluster, dbClusterFinalizerName, func() error {
+			if err := r.deleteExternalResources(reqCtx, cluster); err != nil {
+				return err
+			}
+			if cluster.Spec.TerminatingPolicy == "Delete" || cluster.Spec.TerminatingPolicy == "WipeOut" {
+			}
+			return nil
+		})
+		if res != nil {
+			return *res, err
+		}
 	}
 
 	if cluster.Status.ObservedGeneration == cluster.GetObjectMeta().GetGeneration() {
@@ -116,14 +123,14 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	clusterdefinition := &dbaasv1alpha1.ClusterDefinition{}
-	if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: cluster.Namespace,
 		Name:      cluster.Spec.ClusterDefRef,
 	}, clusterdefinition); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	appversion := &dbaasv1alpha1.AppVersion{}
-	if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: cluster.Namespace,
 		Name:      cluster.Spec.AppVersionRef,
 	}, appversion); err != nil {
@@ -230,6 +237,32 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 		patch := client.MergeFrom(secret.DeepCopy())
 		controllerutil.RemoveFinalizer(&secret, dbClusterFinalizerName)
 		if err := r.Patch(reqCtx.Ctx, &secret, patch); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster) error {
+
+	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+	if err := r.Get(reqCtx.Ctx, client.ObjectKey{
+		Name: cluster.Spec.ClusterDefRef,
+	}, clusterDef); err != nil {
+		return err
+	}
+
+	ml := client.MatchingLabels{
+		"app.kubernetes.io/instance": cluster.GetName(),
+		"app.kubernetes.io/name":     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
+	}
+
+	pvcList := &corev1.PersistentVolumeClaimList{}
+	if err := r.List(reqCtx.Ctx, pvcList, ml); err != nil {
+		return err
+	}
+	for _, pvc := range pvcList.Items {
+		if err := r.Delete(reqCtx.Ctx, &pvc); err != nil {
 			return err
 		}
 	}

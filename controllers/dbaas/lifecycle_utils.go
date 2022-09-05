@@ -476,7 +476,7 @@ func createOrReplaceResources(ctx context.Context,
 			for _, vct := range stsObj.Spec.VolumeClaimTemplates {
 				var vctProto *corev1.PersistentVolumeClaim
 				for _, i := range stsProto.Spec.VolumeClaimTemplates {
-					if i.Name == vctProto.Name {
+					if i.Name == stsProto.Name {
 						vctProto = &i
 						break
 					}

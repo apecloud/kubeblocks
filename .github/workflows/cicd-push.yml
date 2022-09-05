@@ -36,3 +36,10 @@ jobs:
         with:
           name: cover_result
           path: cover.html
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./cover.out
+          flags: core-unittests
+          name: codecov-umbrella

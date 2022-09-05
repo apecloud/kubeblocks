@@ -134,8 +134,12 @@ cue-fmt: cuetool ## Run cue fmt against code.
 cue-vet: cuetool ## Run cue vet against code.
 	$(CUE) vet controllers/dbaas/cue/*.cue
 
+.PHONY: fast-lint
+fast-lint: # [INTERNAL] fast lint
+	$(GOLANGCILINT) run ./...
+
 .PHONY: lint
-lint: ## Run golangci-lint against code.
+lint: generate ## Run golangci-lint against code.
 	$(GOLANGCILINT) run ./... --timeout=5m
 
 .PHONY: staticcheck
@@ -143,7 +147,7 @@ staticcheck: staticchecktool ## Run staticcheck against code.
 	$(STATICCHECK) ./...
 
 .PHONY: build-checks
-build-checks: generate fmt vet goimports lint ## Run build checks.
+build-checks: generate fmt vet goimports fast-lint ## Run build checks.
 
 .PHONY: mod-download
 mod-download: ## Run go mod download against go modules.
@@ -321,7 +325,7 @@ ci-test: ci-test-pre test ## Run CI tests.
 ##@ Contributor
 
 .PHONY: reviewable
-reviewable: fmt vet goimports lint staticcheck ## Run code checks to proceed with PR reviews.
+reviewable: build-checks ## Run code checks to proceed with PR reviews.
 	$(GO) mod tidy -compat=1.18
 
 .PHONY: check-diff

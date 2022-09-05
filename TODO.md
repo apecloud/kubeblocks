@@ -7,8 +7,8 @@
 - [ ] CR delete handling
   - [x] delete secondary resources
   - [ ] CR spec.terminationPolicy handling
-- [ ] managed resources handling
-  - [ ] nodeGroup attached Service kind
+- [x] managed resources handling
+  - [x] roleGroup attached Service kind
   - [x] deployment workloads
   - [x] PDB
   - [x] label handling:

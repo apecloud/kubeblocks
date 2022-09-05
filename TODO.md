@@ -17,9 +17,9 @@
 - [ ] CR status handling
 - [ ] checked AppVersion CR status
 - [ ] checked ClusterDefinition CR status
-- [ ] CR update handling
+- [x] CR update handling
   - [x] PVC volume expansion (spec.components[].volumeClaimTemplates only works for initial statefulset creation)
-  - [ ] spec.components[].serviceType
+  - [x] spec.components[].serviceType
 - [x] merge components from all the CRs
 
 ### ClusterDefinition CR controller

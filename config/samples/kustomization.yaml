@@ -1,0 +1,14 @@
+## Append samples you want in your CSV to this file as resources ##
+resources:
+- dataprotection_v1alpha1_backupconfig.yaml
+- dataprotection_v1alpha1_backupjob.yaml
+- dataprotection_v1alpha1_backuppolicy.yaml
+- dataprotection_v1alpha1_backuptool.yaml
+- dataprotection_v1alpha1_restorejob.yaml
+- dbaas_v1alpha1_appversion.yaml
+- dbaas_v1alpha1_cluster.yaml
+- dbaas_v1alpha1_clusterdefinition.yaml
+- mysql_appversion.yaml
+- mysql_cluster.yaml
+- mysql_clusterdefinition.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

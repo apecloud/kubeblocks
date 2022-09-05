@@ -1,0 +1,1294 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: |-
+      [
+        {
+          "apiVersion": "dataprotection.infracreate.com/v1alpha1",
+          "kind": "BackupConfig",
+          "metadata": {
+            "name": "backupconfig-sample"
+          },
+          "spec": null
+        },
+        {
+          "apiVersion": "dataprotection.infracreate.com/v1alpha1",
+          "kind": "BackupJob",
+          "metadata": {
+            "name": "backupjob-sample"
+          },
+          "spec": null
+        },
+        {
+          "apiVersion": "dataprotection.infracreate.com/v1alpha1",
+          "kind": "BackupPolicy",
+          "metadata": {
+            "name": "backuppolicy-sample"
+          },
+          "spec": null
+        },
+        {
+          "apiVersion": "dataprotection.infracreate.com/v1alpha1",
+          "kind": "BackupTool",
+          "metadata": {
+            "name": "backuptool-sample"
+          },
+          "spec": null
+        },
+        {
+          "apiVersion": "dataprotection.infracreate.com/v1alpha1",
+          "kind": "RestoreJob",
+          "metadata": {
+            "name": "restorejob-sample"
+          },
+          "spec": null
+        },
+        {
+          "apiVersion": "dbaas.infracreate.com/v1alpha1",
+          "kind": "AppVersion",
+          "metadata": {
+            "name": "appversion-mongodb-3.4"
+          },
+          "spec": {
+            "clusterDefinitionRef": "a-vendor-mongodbcluster",
+            "components": [
+              {
+                "containers": [
+                  {
+                    "args": [],
+                    "command": [],
+                    "env": [
+                      {
+                        "name": "MONGO_INITDB_ROOT_USERNAME",
+                        "value": "root"
+                      },
+                      {
+                        "name": "MONGO_INITDB_ROOT_PASSWORD",
+                        "value": "example"
+                      }
+                    ],
+                    "image": "mongodb:20190725_1.1.8",
+                    "imagePullPolicy": "IfNotPresent",
+                    "name": "mongod",
+                    "ports": [],
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/data",
+                        "name": "data"
+                      },
+                      {
+                        "mountPath": "/log",
+                        "name": "log"
+                      }
+                    ]
+                  }
+                ],
+                "type": "mongos"
+              },
+              {
+                "containers": [
+                  {
+                    "env": [
+                      {
+                        "name": "MONGO_INITDB_ROOT_USERNAME",
+                        "value": "root"
+                      },
+                      {
+                        "name": "MONGO_INITDB_ROOT_PASSWORD",
+                        "value": "example"
+                      }
+                    ],
+                    "image": "mongodb:20190725_1.1.8",
+                    "imagePullPolicy": "IfNotPresent",
+                    "name": "mongod"
+                  }
+                ],
+                "type": "configserver"
+              },
+              {
+                "containers": [
+                  {
+                    "env": [
+                      {
+                        "name": "MONGO_INITDB_REPLICASET_ID",
+                        "value": "${OPENDBAAS_SHARD_ID}"
+                      },
+                      {
+                        "name": "MONGO_INITDB_ROOT_USERNAME",
+                        "value": "root"
+                      },
+                      {
+                        "name": "MONGO_INITDB_ROOT_PASSWORD",
+                        "value": "example"
+                      }
+                    ],
+                    "image": "mongodb:20190725_1.1.8",
+                    "imagePullPolicy": "IfNotPresent",
+                    "name": "mongod"
+                  }
+                ],
+                "type": "shard"
+              }
+            ]
+          },
+          "status": {
+            "message": "clusterDefinitionRef not found",
+            "phase": "Failed"
+          }
+        },
+        {
+          "apiVersion": "dbaas.infracreate.com/v1alpha1",
+          "kind": "AppVersion",
+          "metadata": {
+            "name": "appversion-mysql-latest"
+          },
+          "spec": {
+            "clusterDefinitionRef": "mysql-cluster-definition",
+            "components": [
+              {
+                "containers": [
+                  {
+                    "image": "registry.jihulab.com/infracreate/mysql-server/mysql/wesql-server-arm:latest",
+                    "name": "mysql"
+                  }
+                ],
+                "type": "replicasets"
+              }
+            ]
+          }
+        },
+        {
+          "apiVersion": "dbaas.infracreate.com/v1alpha1",
+          "kind": "Cluster",
+          "metadata": {
+            "name": "mongo-cluster-idxxxxx",
+            "namespace": "default"
+          },
+          "spec": {
+            "appVersionRef": "appversion-mongodb-3.4",
+            "clusterDefinitionRef": "a-vendor-mongodbcluster",
+            "components": [
+              {
+                "name": "mongos1",
+                "replicas": 1,
+                "resources": {
+                  "limits": {
+                    "cpu": "1000m",
+                    "memory": "2Gi"
+                  },
+                  "requests": {
+                    "cpu": "1000m",
+                    "memory": "2Gi"
+                  }
+                },
+                "roleGroups": [
+                  {
+                    "name": "mongos-primary1",
+                    "replicas": 2,
+                    "type": "mongos-primary"
+                  }
+                ],
+                "type": "mongos"
+              },
+              {
+                "name": "shard1",
+                "replicas": 2,
+                "resources": {
+                  "limits": {
+                    "cpu": "1000m",
+                    "memory": "2Gi"
+                  },
+                  "requests": {
+                    "cpu": "1000m",
+                    "memory": "2Gi"
+                  }
+                },
+                "roleGroups": [
+                  {
+                    "name": "ro1",
+                    "replicas": 1,
+                    "type": "ro"
+                  }
+                ],
+                "type": "shard",
+                "volumeClaimTemplates": [
+                  {
+                    "metadata": {
+                      "name": "data"
+                    },
+                    "spec": {
+                      "accessModes": [
+                        "ReadWriteOnce"
+                      ],
+                      "resources": {
+                        "requests": {
+                          "storage": "1Gi"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "metadata": {
+                      "name": "log"
+                    },
+                    "spec": {
+                      "accessModes": [
+                        "ReadWriteOnce"
+                      ],
+                      "resources": {
+                        "requests": {
+                          "storage": "1Gi"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "shard2",
+                "replicas": 1,
+                "resources": {
+                  "limits": {
+                    "cpu": "1000m",
+                    "memory": "2Gi"
+                  },
+                  "requests": {
+                    "cpu": "1000m",
+                    "memory": "2Gi"
+                  }
+                },
+                "type": "shard",
+                "volumeClaimTemplates": [
+                  {
+                    "metadata": {
+                      "name": "data"
+                    },
+                    "spec": {
+                      "accessModes": [
+                        "ReadWriteOnce"
+                      ],
+                      "resources": {
+                        "requests": {
+                          "storage": "1Gi"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "metadata": {
+                      "name": "log"
+                    },
+                    "spec": {
+                      "accessModes": [
+                        "ReadWriteOnce"
+                      ],
+                      "resources": {
+                        "requests": {
+                          "storage": "1Gi"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "configserver1",
+                "replicas": 1,
+                "resources": {
+                  "limits": {
+                    "cpu": "1000m",
+                    "memory": "2Gi"
+                  },
+                  "requests": {
+                    "cpu": "1000m",
+                    "memory": "2Gi"
+                  }
+                },
+                "type": "configserver"
+              }
+            ],
+            "terminationPolicy": "Halt"
+          },
+          "status": {
+            "components": [
+              {
+                "id": "mongo-cluster-idxxxxx-mongos-66b6c48dd5",
+                "message": "",
+                "phase": "Running",
+                "roleGroups": [
+                  {
+                    "id": "mongo-cluster-idxxxxx-mongos-primary-67b6c48dd",
+                    "refWorkload": "deploy/{metadata.name}-{component.type}",
+                    "type": "mongos-primary"
+                  }
+                ],
+                "type": "mongos"
+              },
+              {
+                "id": "mongo-cluster-idxxxxx-mongos-76b6c48dd5",
+                "phase": "Running",
+                "roleGroups": [
+                  {
+                    "id": "mongo-cluster-idxxxxx-mongos-primary-77b6c48dd",
+                    "refWorkload": "{metadata.name}-{component.type}-pod",
+                    "type": "mongos-primary"
+                  }
+                ],
+                "type": "mongos"
+              },
+              {
+                "id": "mongo-cluster-idxxxxx-shard-86b6c48dd5",
+                "phase": "Running",
+                "roleGroups": [
+                  {
+                    "id": "mongo-cluster-idxxxxx-primary-87b6c48dd",
+                    "refWorkload": "sts/{metadata.name}-{component.type}",
+                    "type": "primary"
+                  },
+                  {
+                    "id": "mongo-cluster-idxxxxx-secondary-88b6c48dd",
+                    "refWorkload": "{metadata.name}-{component.type}-statefulset",
+                    "type": "secondary"
+                  },
+                  {
+                    "id": "mongo-cluster-idxxxxx-hidden-89b6c48dd",
+                    "refWorkload": "{metadata.name}-{component.type}-statefulset",
+                    "type": "hidden"
+                  }
+                ],
+                "type": "shard"
+              }
+            ],
+            "message": "",
+            "observedGeneration": 1,
+            "phase": "Running"
+          }
+        },
+        {
+          "apiVersion": "dbaas.infracreate.com/v1alpha1",
+          "kind": "Cluster",
+          "metadata": {
+            "name": "mysql-cluster-01",
+            "namespace": "default"
+          },
+          "spec": {
+            "appVersionRef": "appversion-mysql-latest",
+            "clusterDefinitionRef": "mysql-cluster-definition"
+          }
+        },
+        {
+          "apiVersion": "dbaas.infracreate.com/v1alpha1",
+          "kind": "ClusterDefinition",
+          "metadata": {
+            "name": "a-vendor-mongodbcluster"
+          },
+          "spec": {
+            "cluster": {
+              "components": [
+                "mongos",
+                "configserver",
+                "shard"
+              ],
+              "strategies": {
+                "create": {
+                  "order": [
+                    "configserver",
+                    "mongos",
+                    "shard"
+                  ]
+                },
+                "default": {
+                  "order": [
+                    "mongos",
+                    "configserver",
+                    "shard"
+                  ]
+                }
+              }
+            },
+            "components": [
+              {
+                "antiAffinity": true,
+                "defaultReplicas": 1,
+                "isStateless": true,
+                "maxAvailable": 256,
+                "minAvailable": 0,
+                "roleGroups": [
+                  "mongos-primary"
+                ],
+                "scripts": {
+                  "create": {
+                    "post": [
+                      {
+                        "args": [
+                          "sh.addshard('${OPENDBAAS_SHARD[0]_ID}/${OPENDBAAS_SHARD[0]_PRIMARY[0]_HOST}:${OPENDBAAS_SHARD[0]_PRIMARY[0]_PORT}')"
+                        ],
+                        "command": [
+                          "mongo ${OPENDBAAS_SELF_HOSTNAME}:${OPENDBAAS_SELF_PORT}"
+                        ],
+                        "container": "mongodb-client:latest"
+                      }
+                    ]
+                  }
+                },
+                "service": {
+                  "ports": [
+                    {
+                      "port": 80,
+                      "protocol": "TCP",
+                      "targetPort": 9376
+                    }
+                  ],
+                  "type": "LoadBalancer"
+                },
+                "strategies": {
+                  "create": {
+                    "order": []
+                  },
+                  "upgrade": {
+                    "order": []
+                  }
+                },
+                "typeName": "mongos"
+              },
+              {
+                "containers": [
+                  {
+                    "args": [],
+                    "command": [],
+                    "env": [
+                      {
+                        "name": "MONGO_INITDB_ROOT_USERNAME",
+                        "value": "root"
+                      },
+                      {
+                        "name": "MONGO_INITDB_ROOT_PASSWORD",
+                        "value": "example"
+                      }
+                    ],
+                    "image": "mongodb:20190725_1.1.8",
+                    "imagePullPolicy": "IfNotPresent",
+                    "name": "mongod",
+                    "ports": [],
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/data",
+                        "name": "data"
+                      },
+                      {
+                        "mountPath": "/log",
+                        "name": "log"
+                      }
+                    ]
+                  }
+                ],
+                "maxAvailable": 1,
+                "minAvailable": 1,
+                "roleGroups": [
+                  "primary",
+                  "secondary",
+                  "hidden"
+                ],
+                "strategies": {
+                  "create": {
+                    "order": [
+                      "primary",
+                      "secondary",
+                      "hidden"
+                    ]
+                  },
+                  "default": {
+                    "order": [
+                      "hidden",
+                      "secondary",
+                      "primary"
+                    ]
+                  }
+                },
+                "typeName": "configserver"
+              },
+              {
+                "containers": [
+                  {
+                    "args": [],
+                    "command": [],
+                    "env": [
+                      {
+                        "name": "MONGO_INITDB_ROOT_USERNAME",
+                        "value": "root"
+                      },
+                      {
+                        "name": "MONGO_INITDB_ROOT_PASSWORD",
+                        "value": "example"
+                      }
+                    ],
+                    "image": "mongodb:20190725_1.1.8",
+                    "imagePullPolicy": "IfNotPresent",
+                    "name": "mongod",
+                    "ports": [],
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/data",
+                        "name": "data"
+                      },
+                      {
+                        "mountPath": "/log",
+                        "name": "log"
+                      }
+                    ]
+                  }
+                ],
+                "defaultReplicas": 2,
+                "isQuorum": true,
+                "maxAvailable": 256,
+                "minAvailable": 2,
+                "roleGroups": [
+                  "primary",
+                  "secondary",
+                  "hidden",
+                  "readonly"
+                ],
+                "strategies": {
+                  "create": {
+                    "order": []
+                  },
+                  "default": {
+                    "order": [
+                      "readonly",
+                      "hidden",
+                      "secondary",
+                      "primary"
+                    ]
+                  }
+                },
+                "typeName": "shard"
+              }
+            ],
+            "defaultTerminationPolicy": "DoNotTerminate",
+            "roleGroupTemplates": [
+              {
+                "maxAvailable": 1,
+                "minAvailable": 1,
+                "scripts": {
+                  "create": {
+                    "post": [
+                      {
+                        "args": [
+                          ""
+                        ],
+                        "command": [
+                          "sh",
+                          "-c"
+                        ],
+                        "container": ""
+                      }
+                    ]
+                  }
+                },
+                "typeName": "mongos-primary"
+              },
+              {
+                "maxAvailable": 1,
+                "minAvailable": 1,
+                "scripts": {
+                  "create": {
+                    "post": [
+                      {
+                        "args": [
+                          ""
+                        ],
+                        "command": [
+                          "sh",
+                          "-c"
+                        ],
+                        "container": ""
+                      }
+                    ]
+                  }
+                },
+                "typeName": "primary",
+                "updateStrategy": {
+                  "maxSurge": 0,
+                  "maxUnavailable": 1
+                }
+              },
+              {
+                "minAvailable": 1,
+                "scripts": {
+                  "create": {
+                    "post": [
+                      {
+                        "command": [
+                          "mongo --eval set to secondary"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "typeName": "secondary"
+              },
+              {
+                "maxAvailable": 1,
+                "minAvailable": 1,
+                "scripts": {
+                  "create": {
+                    "post": [
+                      {
+                        "command": [
+                          "mongo {{hidden[0].ip:hidden[0].port}} --eval set to hidden"
+                        ],
+                        "container": "mongodb-client:latest"
+                      }
+                    ]
+                  }
+                },
+                "typeName": "hidden",
+                "updateStrategy": {
+                  "maxSurge": 0,
+                  "maxUnavailable": 1
+                }
+              },
+              {
+                "minAvailable": 0,
+                "typeName": "readonly"
+              }
+            ],
+            "type": "state.mongodb"
+          }
+        },
+        {
+          "apiVersion": "dbaas.infracreate.com/v1alpha1",
+          "kind": "ClusterDefinition",
+          "metadata": {
+            "name": "mysql-cluster-definition"
+          },
+          "spec": {
+            "cluster": {
+              "components": [
+                "replicasets"
+              ]
+            },
+            "components": [
+              {
+                "containers": [
+                  {
+                    "args": [
+                      "cluster_info=\"\"; for (( i=0; i\u003c$OPENDBAAS_REPLICASETS_PRIMARY_N; i++ )); do\n\n  if [ $i -ne 0 ]; then\n    cluster_info=\"$cluster_info;\";\n  fi;\n  host=$(eval echo \\$OPENDBAAS_REPLICASETS_PRIMARY_\"$i\"_HOSTNAME)\n  cluster_info=\"$cluster_info$host:13306\";\ndone; idx=0; while IFS='-' read -ra ADDR; do\n\n  for i in \"${ADDR[@]}\"; do\n    idx=$i;\n  done;\ndone \u003c\u003c\u003c \"$OPENDBAAS_MY_POD_NAME\"; echo $idx; cluster_info=\"$cluster_info@$(($idx+1))\"; echo $cluster_info; docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info=\"$cluster_info\" --cluster-id=1\n"
+                    ],
+                    "command": [
+                      "/usr/bin/bash",
+                      "-c"
+                    ],
+                    "env": [
+                      {
+                        "name": "MYSQL_ROOT_PASSWORD",
+                        "valueFrom": {
+                          "secretKeyRef": {
+                            "key": "password",
+                            "name": "$(OPENDBAAS_MY_SECRET_NAME)"
+                          }
+                        }
+                      }
+                    ],
+                    "imagePullPolicy": "IfNotPresent",
+                    "name": "mysql",
+                    "ports": [
+                      {
+                        "containerPort": 3306,
+                        "name": "mysql",
+                        "protocol": "TCP"
+                      },
+                      {
+                        "containerPort": 13306,
+                        "name": "paxos",
+                        "protocol": "TCP"
+                      }
+                    ],
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/var/lib/mysql",
+                        "name": "data"
+                      },
+                      {
+                        "mountPath": "/var/log",
+                        "name": "log"
+                      }
+                    ]
+                  }
+                ],
+                "defaultReplicas": 1,
+                "roleGroups": [
+                  "primary"
+                ],
+                "typeName": "replicasets"
+              }
+            ],
+            "roleGroupTemplates": [
+              {
+                "defaultReplicas": 3,
+                "typeName": "primary"
+              }
+            ],
+            "type": "state.mysql-8"
+          }
+        }
+      ]
+    capabilities: Basic Install
+    operators.operatorframework.io/builder: operator-sdk-v1.22.0
+    operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+  name: opendbaas-core.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: AppVersion is the Schema for the appversions API
+      displayName: App Version
+      kind: AppVersion
+      name: appversions.dbaas.infracreate.com
+      version: v1alpha1
+    - kind: BackupConfig
+      name: backupconfigs.dataprotection.infracreate.com
+      version: v1alpha1
+    - description: BackupJob is the Schema for the backupjobs API (defined by User)
+      displayName: Backup Job
+      kind: BackupJob
+      name: backupjobs.dataprotection.infracreate.com
+      version: v1alpha1
+    - description: BackupPolicy is the Schema for the backuppolicies API  (defined
+        by User)
+      displayName: Backup Policy
+      kind: BackupPolicy
+      name: backuppolicies.dataprotection.infracreate.com
+      version: v1alpha1
+    - description: BackupPolicyTemplate is the Schema for the BackupPolicyTemplates
+        API (defined by ISV)
+      displayName: Backup Policy Template
+      kind: BackupPolicyTemplate
+      name: backuppolicytemplates.dataprotection.infracreate.com
+      version: v1alpha1
+    - kind: BackupTool
+      name: backuptools.dataprotection.infracreate.com
+      version: v1alpha1
+    - description: ClusterDefinition is the Schema for the clusterdefinitions API
+      displayName: Cluster Definition
+      kind: ClusterDefinition
+      name: clusterdefinitions.dbaas.infracreate.com
+      version: v1alpha1
+    - description: Cluster is the Schema for the clusters API
+      displayName: Cluster
+      kind: Cluster
+      name: clusters.dbaas.infracreate.com
+      version: v1alpha1
+    - description: RestoreJob is the Schema for the restorejobs API (defined by User)
+      displayName: Restore Job
+      kind: RestoreJob
+      name: restorejobs.dataprotection.infracreate.com
+      version: v1alpha1
+  description: OpenDBaaS-Core
+  displayName: OpenDBaaS-Core
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      clusterPermissions:
+      - rules:
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          - statefulsets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments/finalizers
+          - statefulsets/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - apps
+          resources:
+          - deployments/status
+          - statefulsets/status
+          verbs:
+          - get
+        - apiGroups:
+          - batch
+          resources:
+          - jobs
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          - persistentvolumeclaims
+          - resourcequotas
+          - secrets
+          - services
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps/finalizers
+          - persistentvolumeclaims/finalizers
+          - resourcequotas/finalizers
+          - secrets/finalizers
+          - services/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - ""
+          resources:
+          - endpoints
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - endpoints
+          - pods
+          verbs:
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+        - apiGroups:
+          - ""
+          resources:
+          - persistentvolumeclaims/status
+          - resourcequotas/status
+          - services/status
+          verbs:
+          - get
+        - apiGroups:
+          - ""
+          resources:
+          - pods/exec
+          verbs:
+          - create
+        - apiGroups:
+          - dataprotection.infracreate.com
+          resources:
+          - backupjobs
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - dataprotection.infracreate.com
+          resources:
+          - backupjobs/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - dataprotection.infracreate.com
+          resources:
+          - backupjobs/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - dataprotection.infracreate.com
+          resources:
+          - backuppolicies
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - dataprotection.infracreate.com
+          resources:
+          - backuppolicies/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - dataprotection.infracreate.com
+          resources:
+          - backuppolicies/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - dataprotection.infracreate.com
+          resources:
+          - backuppolicytemplates
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - dataprotection.infracreate.com
+          resources:
+          - backuppolicytemplates/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - dataprotection.infracreate.com
+          resources:
+          - backuppolicytemplates/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - dataprotection.infracreate.com
+          resources:
+          - backuptools
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - dataprotection.infracreate.com
+          resources:
+          - backuptools/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - dataprotection.infracreate.com
+          resources:
+          - backuptools/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - dataprotection.infracreate.com
+          resources:
+          - restorejobs
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - dataprotection.infracreate.com
+          resources:
+          - restorejobs/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - dataprotection.infracreate.com
+          resources:
+          - restorejobs/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - dbaas.infracreate.com
+          resources:
+          - appversions
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - dbaas.infracreate.com
+          resources:
+          - appversions/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - dbaas.infracreate.com
+          resources:
+          - appversions/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - dbaas.infracreate.com
+          resources:
+          - clusterdefinitions
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - dbaas.infracreate.com
+          resources:
+          - clusterdefinitions/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - dbaas.infracreate.com
+          resources:
+          - clusterdefinitions/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - dbaas.infracreate.com
+          resources:
+          - clusters
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - dbaas.infracreate.com
+          resources:
+          - clusters/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - dbaas.infracreate.com
+          resources:
+          - clusters/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - policy
+          resources:
+          - poddisruptionbudgets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - policy
+          resources:
+          - poddisruptionbudgets/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - rolebindings
+          - roles
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - authentication.k8s.io
+          resources:
+          - tokenreviews
+          verbs:
+          - create
+        - apiGroups:
+          - authorization.k8s.io
+          resources:
+          - subjectaccessreviews
+          verbs:
+          - create
+        serviceAccountName: opendbaas-core-controller-manager
+      deployments:
+      - label:
+          control-plane: controller-manager
+        name: opendbaas-core-controller-manager
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              control-plane: controller-manager
+          strategy: {}
+          template:
+            metadata:
+              annotations:
+                kubectl.kubernetes.io/default-container: manager
+              labels:
+                control-plane: controller-manager
+            spec:
+              containers:
+              - args:
+                - --secure-listen-address=0.0.0.0:8443
+                - --upstream=http://127.0.0.1:8080/
+                - --logtostderr=true
+                - --v=0
+                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.12.0
+                name: kube-rbac-proxy
+                ports:
+                - containerPort: 8443
+                  name: https
+                  protocol: TCP
+                resources:
+                  limits:
+                    cpu: 500m
+                    memory: 128Mi
+                  requests:
+                    cpu: 5m
+                    memory: 64Mi
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
+              - args:
+                - --health-probe-bind-address=:8081
+                - --metrics-bind-address=127.0.0.1:8080
+                - --leader-elect
+                command:
+                - /manager
+                image: docker.io/infracreate/opendbaas-core:latest
+                livenessProbe:
+                  httpGet:
+                    path: /healthz
+                    port: 8081
+                  initialDelaySeconds: 15
+                  periodSeconds: 20
+                name: manager
+                readinessProbe:
+                  httpGet:
+                    path: /readyz
+                    port: 8081
+                  initialDelaySeconds: 5
+                  periodSeconds: 10
+                resources:
+                  limits:
+                    cpu: 500m
+                    memory: 128Mi
+                  requests:
+                    cpu: 10m
+                    memory: 64Mi
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
+              securityContext:
+                runAsNonRoot: true
+              serviceAccountName: opendbaas-core-controller-manager
+              terminationGracePeriodSeconds: 10
+      permissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+        serviceAccountName: opendbaas-core-controller-manager
+    strategy: deployment
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - dbaas
+  links:
+  - name: Opendbaas Core
+    url: https://opendbaas-core.domain
+  maturity: alpha
+  provider:
+    name: infreacreate.com
+  version: 0.0.0

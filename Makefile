@@ -387,7 +387,18 @@ KUSTOMIZE_INSTALL_SCRIPT ?= "$(GITHUB_PROXY)https://raw.githubusercontent.com/ku
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
 $(KUSTOMIZE): $(LOCALBIN)
-	curl -s $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN)
+ifeq (, $(shell which kustomize))
+	@{ \
+	set -e ;\
+	echo 'installing kustomize ' ;\
+	curl -s $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN) ;\
+	}
+KUSTOMIZE=$(LOCALBIN)/kustomize
+else
+KUSTOMIZE=$(shell which kustomize)
+endif
+
+
 
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
@@ -399,9 +410,16 @@ envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 
+.PHONY: bundle
+bundle: manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
+	operator-sdk generate kustomize manifests -q
+	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
+	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle $(BUNDLE_GEN_FLAGS)
+	operator-sdk bundle validate ./bundle
+
 
 .PHONY: install-docker-buildx
-install-docker-buildx: ## Create `docker buildx` builder.
+install-docker-buildx: ## Create and use docker buildx builder.
 	docker buildx create --platform linux/amd64,linux/arm64 --name x-builder --driver docker-container --use
 
 .PHONY: golangci
@@ -474,4 +492,4 @@ endif
 .PHONY: brew-install-prerequisite
 brew-install-prerequisite: ## Use `brew install` to install required dependencies. 
 	brew install docker --cask
-	brew install k3d go kubebuilder delve golangci-lint staticcheck kustomize step cue
+	brew install k3d go kubebuilder operator-sdk delve golangci-lint staticcheck kustomize step cue

@@ -1,0 +1,76 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+  name: opendbaas-core.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: AppVersion is the Schema for the appversions API
+      displayName: App Version
+      kind: AppVersion
+      name: appversions.dbaas.infracreate.com
+      version: v1alpha1
+    - description: BackupJob is the Schema for the backupjobs API (defined by User)
+      displayName: Backup Job
+      kind: BackupJob
+      name: backupjobs.dataprotection.infracreate.com
+      version: v1alpha1
+    - description: BackupPolicy is the Schema for the backuppolicies API  (defined
+        by User)
+      displayName: Backup Policy
+      kind: BackupPolicy
+      name: backuppolicies.dataprotection.infracreate.com
+      version: v1alpha1
+    - description: BackupPolicyTemplate is the Schema for the BackupPolicyTemplates
+        API (defined by ISV)
+      displayName: Backup Policy Template
+      kind: BackupPolicyTemplate
+      name: backuppolicytemplates.dataprotection.infracreate.com
+      version: v1alpha1
+    - description: ClusterDefinition is the Schema for the clusterdefinitions API
+      displayName: Cluster Definition
+      kind: ClusterDefinition
+      name: clusterdefinitions.dbaas.infracreate.com
+      version: v1alpha1
+    - description: Cluster is the Schema for the clusters API
+      displayName: Cluster
+      kind: Cluster
+      name: clusters.dbaas.infracreate.com
+      version: v1alpha1
+    - description: RestoreJob is the Schema for the restorejobs API (defined by User)
+      displayName: Restore Job
+      kind: RestoreJob
+      name: restorejobs.dataprotection.infracreate.com
+      version: v1alpha1
+  description: OpenDBaaS-Core
+  displayName: OpenDBaaS-Core
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - dbaas
+  links:
+  - name: Opendbaas Core
+    url: https://opendbaas-core.domain
+  maturity: alpha
+  provider:
+    name: infreacreate.com
+  version: 0.0.0

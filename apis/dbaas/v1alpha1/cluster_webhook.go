@@ -17,10 +17,19 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
+	"fmt"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	dbaaswebhook "github.com/apecloud/kubeblocks/internal/webhook"
 )
 
 // log is for logging in this package.
@@ -53,17 +62,17 @@ var _ webhook.Validator = &Cluster{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *Cluster) ValidateCreate() error {
 	clusterlog.Info("validate create", "name", r.Name)
-
-	// TODO(user): fill in your validation logic upon object creation.
-	return nil
+	return r.validate()
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	clusterlog.Info("validate update", "name", r.Name)
-
-	// TODO(user): fill in your validation logic upon object update.
-	return nil
+	lastCluster := old.(*Cluster)
+	if lastCluster.Spec.ClusterDefRef != r.Spec.ClusterDefRef {
+		return newInvalidError(ClusterKind, r.Name, "spec.clusterDefinitionRef", "clusterDefinitionRef is immutable, you can not update it. ")
+	}
+	return r.validate()
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
@@ -72,4 +81,93 @@ func (r *Cluster) ValidateDelete() error {
 
 	// TODO(user): fill in your validation logic upon object deletion.
 	return nil
+}
+
+// Validate Cluster.spec is legal
+func (r *Cluster) validate() error {
+	var (
+		allErrs    field.ErrorList
+		ctx        = context.Background()
+		clusterDef = &ClusterDefinition{}
+	)
+
+	r.validateAppVersionRef(&allErrs)
+
+	err := dbaaswebhook.GetWebHookClient().Get(ctx, types.NamespacedName{
+		Namespace: r.Namespace,
+		Name:      r.Spec.ClusterDefRef,
+	}, clusterDef)
+
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterDefinitionRef"),
+			r.Spec.ClusterDefRef, err.Error()))
+	} else {
+		r.validateComponents(&allErrs, clusterDef)
+	}
+
+	if len(allErrs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: APIVersion, Kind: ClusterKind},
+			r.Name, allErrs)
+	}
+	return nil
+}
+
+// ValidateAppVersionRef validate spec.appVersion is legal
+func (r *Cluster) validateAppVersionRef(allErrs *field.ErrorList) {
+	err := dbaaswebhook.GetWebHookClient().Get(context.Background(), types.NamespacedName{
+		Namespace: r.Namespace,
+		Name:      r.Spec.AppVersionRef,
+	}, &AppVersion{})
+	if err != nil {
+		*allErrs = append(*allErrs, field.Invalid(field.NewPath("spec").Child("appVersionRef"),
+			r.Spec.ClusterDefRef, err.Error()))
+	}
+}
+
+// ValidateComponents validate spec.components is legal
+func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *ClusterDefinition) {
+	var (
+		// invalid component type slice
+		invalidComponentTypes = make([]string, 0)
+		// duplicate component name map
+		duplicateComponentNames = make(map[string]struct{})
+		componentNameMap        = make(map[string]struct{})
+		componentTypeMap        = make(map[string]struct{})
+	)
+
+	for _, v := range clusterDef.Spec.Components {
+		componentTypeMap[v.TypeName] = struct{}{}
+	}
+
+	for _, v := range r.Spec.Components {
+		if _, ok := componentTypeMap[v.Type]; !ok {
+			invalidComponentTypes = append(invalidComponentTypes, v.Type)
+		}
+
+		if _, ok := componentNameMap[v.Name]; ok {
+			duplicateComponentNames[v.Name] = struct{}{}
+		}
+		componentNameMap[v.Name] = struct{}{}
+		// TODO validate roleGroups
+	}
+	if len(invalidComponentTypes) > 0 {
+		*allErrs = append(*allErrs, field.NotFound(field.NewPath("spec.components"),
+			getComponentTypeNotFoundMsg(invalidComponentTypes, r.Spec.ClusterDefRef)))
+	}
+
+	if len(duplicateComponentNames) > 0 {
+		*allErrs = append(*allErrs, field.Duplicate(field.NewPath("spec.components"),
+			fmt.Sprintf("component name %v is duplicated", r.getDuplicateMapKeys(duplicateComponentNames))))
+	}
+}
+
+func (r *Cluster) getDuplicateMapKeys(m map[string]struct{}) []string {
+	keys := make([]string, len(m))
+	i := 0
+	for k := range m {
+		keys[i] = k
+		i++
+	}
+	return keys
 }

@@ -17,14 +17,29 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
+	"fmt"
+	"reflect"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	dbaaswebhook "github.com/apecloud/kubeblocks/internal/webhook"
 )
 
 // log is for logging in this package.
-var clusterdefinitionlog = logf.Log.WithName("clusterdefinition-resource")
+var (
+	clusterdefinitionlog = logf.Log.WithName("clusterdefinition-resource")
+	componentTag         = "component"
+	roleGroupTag         = "roleGroupTag"
+)
 
 func (r *ClusterDefinition) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
@@ -46,30 +61,162 @@ func (r *ClusterDefinition) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-dbaas-infracreate-com-v1alpha1-clusterdefinition,mutating=false,failurePolicy=fail,sideEffects=None,groups=dbaas.infracreate.com,resources=clusterdefinitions,verbs=create;update,versions=v1alpha1,name=vclusterdefinition.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-dbaas-infracreate-com-v1alpha1-clusterdefinition,mutating=false,failurePolicy=fail,sideEffects=None,groups=dbaas.infracreate.com,resources=clusterdefinitions,verbs=create;update;delete,versions=v1alpha1,name=vclusterdefinition.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &ClusterDefinition{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *ClusterDefinition) ValidateCreate() error {
 	clusterdefinitionlog.Info("validate create", "name", r.Name)
-
-	// TODO(user): fill in your validation logic upon object creation.
-	return nil
+	return r.validate()
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *ClusterDefinition) ValidateUpdate(old runtime.Object) error {
 	clusterdefinitionlog.Info("validate update", "name", r.Name)
-
-	// TODO(user): fill in your validation logic upon object update.
-	return nil
+	return r.validate()
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *ClusterDefinition) ValidateDelete() error {
 	clusterdefinitionlog.Info("validate delete", "name", r.Name)
+	return r.handleDeletion()
+}
 
-	// TODO(user): fill in your validation logic upon object deletion.
+// handleDeletion If there is an referencing cluster or appVersion, it is forbidden to delete
+func (r *ClusterDefinition) handleDeletion() error {
+	var (
+		clusterList    = &ClusterList{}
+		appVersionList = &AppVersionList{}
+		err            error
+		ctx            = context.Background()
+	)
+	if err = dbaaswebhook.GetWebHookClient().List(ctx, clusterList,
+		client.MatchingLabels{ClusterDefLabelKey: r.Name}, client.Limit(1),
+	); err != nil {
+		return err
+	}
+	if err = dbaaswebhook.GetWebHookClient().List(ctx, appVersionList,
+		client.MatchingLabels{ClusterDefLabelKey: r.Name}, client.Limit(1),
+	); err != nil {
+		return err
+	}
+	// exist referencing cluster or appVersion resource
+	if len(clusterList.Items) > 0 || len(appVersionList.Items) > 0 {
+		return newInvalidError(ClusterDefinitionKind, r.Name, "", "cannot be deleted because of existing referencing Cluster or AppVersion.")
+	}
 	return nil
+}
+
+// Validate ClusterDefinition.spec is legal
+func (r *ClusterDefinition) validate() error {
+	var (
+		allErrs field.ErrorList
+	)
+	// clusterDefinition components to map
+	componentMap := make(map[string]struct{})
+	for _, v := range r.Spec.Components {
+		componentMap[v.TypeName] = struct{}{}
+	}
+
+	fieldPath := field.NewPath("spec.cluster.strategies")
+	r.validateClusterDefinitionStrategies(&allErrs, componentMap, r.Spec.Cluster.Strategies, fieldPath, componentTag, "")
+
+	roleGroupMap := r.validateComponents(&allErrs)
+
+	r.validateRoleGroupTemplates(&allErrs, roleGroupMap)
+	if len(allErrs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: APIVersion, Kind: ClusterDefinitionKind},
+			r.Name, allErrs)
+	}
+	return nil
+}
+
+// ValidateClusterDefinitionStrategies validate spec.cluster.strategies is legal, including strategy.orders and cluster.components consistent
+func (r *ClusterDefinition) validateClusterDefinitionStrategies(allErrs *field.ErrorList,
+	m map[string]struct{},
+	strategies ClusterDefinitionStrategies,
+	rootField *field.Path,
+	tag string,
+	resourceType string) {
+	var (
+		strategy ClusterDefinitionStrategy
+		v        = reflect.ValueOf(strategies)
+		t        = reflect.TypeOf(strategies)
+		filedNum = t.NumField()
+	)
+	for i := 0; i < filedNum; i++ {
+		filedName := t.Field(i).Name
+		strategy = v.FieldByName(filedName).Interface().(ClusterDefinitionStrategy)
+		if strategy.Order != nil {
+			orderField := rootField.Child(filedName).Child("order")
+			// determine whether there is a missing type
+			if len(strategy.Order) != len(m) {
+				*allErrs = append(*allErrs, field.NotFound(orderField, r.getMissingMsg(tag, resourceType)))
+				continue
+			}
+			// determine whether there is a nonexistent type
+			invalidElements := r.getInvalidElementsInArray(m, strategy.Order)
+			if len(invalidElements) > 0 {
+				*allErrs = append(*allErrs, field.NotFound(orderField, r.getNotFoundMsg(invalidElements, tag, resourceType)))
+			}
+		}
+	}
+}
+
+// ValidateComponents validate spec.components is legal
+func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) map[string]struct{} {
+	roleGroupMap := make(map[string]struct{})
+	for _, v := range r.Spec.Components {
+		tmpRoleGroupMap := make(map[string]struct{})
+		for _, role := range v.RoleGroups {
+			roleGroupMap[role] = struct{}{}
+			tmpRoleGroupMap[role] = struct{}{}
+		}
+		path := fmt.Sprintf("spec.components[%s].strategies", v.TypeName)
+		r.validateClusterDefinitionStrategies(allErrs, tmpRoleGroupMap, v.Strategies, field.NewPath(path), roleGroupTag, v.TypeName)
+	}
+	return roleGroupMap
+}
+
+// ValidateRoleGroupTemplates validate spec.roleGroupTemplates is legal
+func (r *ClusterDefinition) validateRoleGroupTemplates(allErrs *field.ErrorList, roleGroupMap map[string]struct{}) {
+	invalidElements := make([]string, 0)
+	for _, v := range r.Spec.RoleGroupTemplates {
+		if _, ok := roleGroupMap[v.TypeName]; !ok {
+			invalidElements = append(invalidElements, v.TypeName)
+		}
+	}
+	if len(invalidElements) > 0 {
+		*allErrs = append(*allErrs, field.NotFound(field.NewPath("spec.roleGroupTemplates"), r.getNotFoundMsg(invalidElements, roleGroupTag, "?")))
+	}
+}
+
+func (r *ClusterDefinition) getInvalidElementsInArray(m map[string]struct{}, arr []string) []string {
+	invalidElements := make([]string, 0)
+	for _, v := range arr {
+		if _, ok := m[v]; !ok {
+			invalidElements = append(invalidElements, v)
+		}
+	}
+	return invalidElements
+}
+
+func (r *ClusterDefinition) getNotFoundMsg(invalidElements []string, tag string, componentType string) string {
+	if tag == componentTag {
+		return fmt.Sprintf("component type %s Not Found in spec.components", invalidElements)
+	} else {
+		return fmt.Sprintf("roleGroup %s Not Found in spec.components[%s].roleGroups", invalidElements, componentType)
+	}
+
+}
+
+func (r *ClusterDefinition) getMissingMsg(tag, componentType string) string {
+	if tag == componentTag {
+		return "missing component types compared with spec.components"
+	} else {
+		return fmt.Sprintf("missing roleGroup compared with spec.components[%s].roleGroups", componentType)
+	}
+
 }

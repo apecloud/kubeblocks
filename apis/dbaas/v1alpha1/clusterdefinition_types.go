@@ -230,7 +230,7 @@ type ClusterDefinitionStatusGeneration struct {
 	// ClusterDefinition sync. status
 	// +kubebuilder:validation:Enum={InSync,OutOfSync}
 	// +optional
-	ClusterDefSyncStatus string `json:"clusterDefSyncStatus,omitempty"`
+	ClusterDefSyncStatus Status `json:"clusterDefSyncStatus,omitempty"`
 }
 
 func init() {

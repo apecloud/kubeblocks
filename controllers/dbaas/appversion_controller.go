@@ -18,6 +18,7 @@ package dbaas
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -51,7 +52,22 @@ func appVersionUpdateHandler(cli client.Client, ctx context.Context, clusterDef 
 	for _, item := range list.Items {
 		if item.Status.ClusterDefGeneration != clusterDef.GetObjectMeta().GetGeneration() {
 			patch := client.MergeFrom(item.DeepCopy())
-			item.Status.ClusterDefSyncStatus = "OutOfSync"
+			notFoundComponentTypes, noContainersComponents := item.GetInconsistentComponentsInfo(clusterDef)
+			if len(notFoundComponentTypes) > 0 {
+				item.Status.Message = fmt.Sprintf("component %v not found in clusterDefinition.", notFoundComponentTypes)
+			}
+			if len(noContainersComponents) > 0 {
+				item.Status.Message += fmt.Sprintf("component %v no containers in clusterDefinition and appVersion.", noContainersComponents)
+			}
+			if len(notFoundComponentTypes) > 0 || len(noContainersComponents) > 0 {
+				item.Status.ClusterDefSyncStatus = dbaasv1alpha1.OutOfSyncStatus
+				item.Status.Phase = dbaasv1alpha1.UnAvailablePhase
+			} else {
+				item.Status.ClusterDefSyncStatus = dbaasv1alpha1.InSyncStatus
+				item.Status.Phase = dbaasv1alpha1.AvailablePhase
+				item.Status.Message = ""
+			}
+			item.Status.ClusterDefGeneration = clusterDef.Generation
 			if err = cli.Status().Patch(ctx, &item, patch); err != nil {
 				return err
 			}
@@ -100,6 +116,10 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return *res, err
 	}
 
+	if appVersion.Status.ObservedGeneration == appVersion.GetGeneration() {
+		return intctrlutil.Reconciled()
+	}
+
 	clusterdefinition := &dbaasv1alpha1.ClusterDefinition{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: appVersion.Namespace,
@@ -114,6 +134,14 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 	appVersion.ObjectMeta.Labels["clusterdefinition.infracreate.com/name"] = clusterdefinition.Name
 	if err = r.Client.Patch(reqCtx.Ctx, appVersion, patch); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
+	appVersion.Status.ClusterDefSyncStatus = dbaasv1alpha1.InSyncStatus
+	appVersion.Status.Phase = dbaasv1alpha1.AvailablePhase
+	appVersion.Status.ObservedGeneration = appVersion.GetGeneration()
+	appVersion.Status.ClusterDefGeneration = clusterdefinition.GetGeneration()
+	if err = r.Client.Status().Patch(ctx, appVersion, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 

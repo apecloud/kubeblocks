@@ -12,7 +12,7 @@ component: {
 	containers: [...]
 	volumeClaimTemplates: [...]
 }
-role_group: {
+roleGroup: {
 	name:     string
 	replicas: int
 }
@@ -22,7 +22,7 @@ statefulset: {
 	kind:       "StatefulSet"
 	metadata: {
 		namespace: cluster.metadata.namespace
-		name:      "\(cluster.metadata.name)-\(component.type)-\(component.name)"
+		name:      "\(cluster.metadata.name)-\(component.name)-\(roleGroup.name)"
 		labels: {
 			"app.kubernetes.io/name":     "\(component.clusterType)-\(component.clusterDefName)"
 			"app.kubernetes.io/instance": cluster.metadata.name
@@ -35,18 +35,18 @@ statefulset: {
 		selector:
 			matchLabels: {
 				"app.kubernetes.io/name":      "\(component.clusterType)-\(component.clusterDefName)"
-				"app.kubernetes.io/instance":  "\(cluster.metadata.name)-\(component.type)-\(component.name)"
+				"app.kubernetes.io/instance":  "\(cluster.metadata.name)-\(component.name)-\(roleGroup.name)"
 				"app.kubernetes.io/component": "\(component.type)-\(component.name)"
 			}
-		serviceName:         "\(cluster.metadata.name)-\(component.type)-\(component.name)"
-		replicas:            role_group.replicas
+		serviceName:         "\(cluster.metadata.name)-\(component.name)-\(roleGroup.name)"
+		replicas:            roleGroup.replicas
 		minReadySeconds:     10
 		podManagementPolicy: "Parallel"
 		template: {
 			metadata:
 				labels: {
 					"app.kubernetes.io/name":      "\(component.clusterType)-\(component.clusterDefName)"
-					"app.kubernetes.io/instance":  "\(cluster.metadata.name)-\(component.type)-\(component.name)"
+					"app.kubernetes.io/instance":  "\(cluster.metadata.name)-\(component.name)-\(roleGroup.name)"
 					"app.kubernetes.io/component": "\(component.type)-\(component.name)"
 					// "app.kubernetes.io/version" : # TODO
 				}

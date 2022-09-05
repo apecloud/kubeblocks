@@ -13,15 +13,17 @@ component: {
 	volumeClaimTemplates: [...]
 }
 roleGroup: {
-	updateStrategy: {
-		maxUnavailable: int | string
-		minAvailable:   int | string
+	name:     string
+	type:     string
+	replicas: int
+	service: {
+		ports: [...]
+		type: string
 	}
 }
-
-pdb: {
-	"apiVersion": "policy/v1"
-	"kind":       "PodDisruptionBudget"
+service: {
+	"apiVersion": "v1"
+	"kind":       "Service"
 	"metadata": {
 		namespace: cluster.metadata.namespace
 		name:      "\(cluster.metadata.name)-\(component.name)-\(roleGroup.name)"
@@ -34,18 +36,11 @@ pdb: {
 		}
 	}
 	"spec": {
-		if roleGroup.updateStrategy.minAvailable != _|_ {
-			minAvailable: roleGroup.updateStrategy.minAvailable
+		"selector": {
+			"app.kubernetes.io/instance": cluster.metadata.name
+			"app.kubernetes.io/component":  "\(component.type)-\(component.name)"
 		}
-		if roleGroup.updateStrategy.maxUnavailable != _|_ {
-			maxUnavailable: roleGroup.updateStrategy.maxUnavailable
-		}
-		selector: {
-			matchLabels: {
-				"app.kubernetes.io/name":      "\(component.clusterType)-\(component.clusterDefName)"
-				"app.kubernetes.io/instance":  "\(cluster.metadata.name)-\(component.name)-\(roleGroup.name)"
-				"app.kubernetes.io/component": "\(component.type)-\(component.name)"
-			}
-		}
+		ports: roleGroup.service.ports
+		type: roleGroup.service.type
 	}
 }

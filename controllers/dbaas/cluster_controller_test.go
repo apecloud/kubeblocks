@@ -3,6 +3,7 @@ package dbaas
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"time"
 
 	policyv1 "k8s.io/api/policy/v1"
@@ -315,6 +316,59 @@ spec:
 					"app.kubernetes.io/instance": key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(pdbList.Items) != 0
+			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting the scope")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	Context("When creating cluster", func() {
+		It("Should create service if service configured", func() {
+			By("By creating a cluster")
+			toCreate, _, _, key := newClusterObj(nil, nil)
+			toCreate.Spec.Components = append(toCreate.Spec.Components, dbaasv1alpha1.ClusterComponent{
+				Name: "proxy",
+				Type: "proxy",
+				RoleGroups: []dbaasv1alpha1.ClusterRoleGroup{
+					{
+						Name: "proxy",
+						Type: "proxy",
+						Service: corev1.ServiceSpec{
+							Ports: []corev1.ServicePort{
+								{
+									Protocol:   "TCP",
+									Port:       80,
+									TargetPort: intstr.FromInt(8080),
+								},
+							},
+							Type: "LoadBalancer",
+						},
+					},
+				},
+			})
+			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+
+			fetchedG1 := &dbaasv1alpha1.Cluster{}
+
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedG1)
+				return fetchedG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+
+			svcList := &corev1.ServiceList{}
+			Eventually(func() bool {
+				Expect(k8sClient.List(context.Background(), svcList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				for _, svc := range svcList.Items {
+					if svc.Spec.Type == "LoadBalancer" {
+						return true
+					}
+				}
+				return false
 			}, timeout, interval).Should(BeTrue())
 
 			By("Deleting the scope")

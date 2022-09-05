@@ -273,6 +273,7 @@ func mergeRoleGroups(roleGroupTemplate *dbaasv1alpha1.RoleGroupTemplate, cluster
 	roleGroup.MaxAvailable = roleGroupTemplate.MaxAvailable
 	roleGroup.MinAvailable = roleGroupTemplate.MinAvailable
 	roleGroup.UpdateStrategy = roleGroupTemplate.UpdateStrategy
+	roleGroup.Name = roleGroupTemplate.TypeName
 	if clusterRoleGroup == nil || clusterRoleGroup.Type != roleGroupTemplate.TypeName {
 		return roleGroup
 	}
@@ -416,6 +417,14 @@ func prepareRoleGroupObjs(ctx context.Context, cli client.Client, obj interface{
 	}
 	*params.applyObjs = append(*params.applyObjs, pdb)
 
+	if params.roleGroup.Service.Ports != nil {
+		svc, err := buildSvc(*params)
+		if err != nil {
+			return err
+		}
+		*params.applyObjs = append(*params.applyObjs, svc)
+	}
+
 	return nil
 }
 
@@ -552,6 +561,56 @@ func buildSvcs(params createParams, sts *appsv1.StatefulSet) ([]client.Object, e
 	return svcs, nil
 }
 
+func buildSvc(params createParams) (*corev1.Service, error) {
+	cueFS, _ := debme.FS(cueTemplates, "cue")
+
+	cueTpl, err := params.getCacheCUETplValue("service_template.cue", func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("service_template.cue"))
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+	clusterStrByte, err := params.getCacheBytesValue("cluster", func() ([]byte, error) {
+		return json.Marshal(params.cluster)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("cluster", clusterStrByte); err != nil {
+		return nil, err
+	}
+
+	componentStrByte, err := json.Marshal(params.component)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("component", componentStrByte); err != nil {
+		return nil, err
+	}
+
+	roleGroupStrByte, err := json.Marshal(params.roleGroup)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("roleGroup", roleGroupStrByte); err != nil {
+		return nil, err
+	}
+
+	svcStrByte, err := cueValue.Lookup("service")
+	if err != nil {
+		return nil, err
+	}
+
+	svc := corev1.Service{}
+	if err = json.Unmarshal(svcStrByte, &svc); err != nil {
+		return nil, err
+	}
+
+	return &svc, nil
+}
+
 func randomString(length int) string {
 	res, _ := password.Generate(length, 0, 0, false, false)
 	return res
@@ -640,7 +699,7 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err = cueValue.Fill("role_group", roleGroupStrByte); err != nil {
+	if err = cueValue.Fill("roleGroup", roleGroupStrByte); err != nil {
 		return nil, err
 	}
 
@@ -723,7 +782,7 @@ func buildDeploy(params createParams) (*appsv1.Deployment, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err = cueValue.Fill("role_group", roleGroupStrByte); err != nil {
+	if err = cueValue.Fill("roleGroup", roleGroupStrByte); err != nil {
 		return nil, err
 	}
 
@@ -820,7 +879,7 @@ func buildPdb(params createParams) (*policyv1.PodDisruptionBudget, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err = cueValue.Fill("role_group", roleGroupStrByte); err != nil {
+	if err = cueValue.Fill("roleGroup", roleGroupStrByte); err != nil {
 		return nil, err
 	}
 

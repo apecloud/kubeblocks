@@ -140,7 +140,7 @@ fast-lint: # [INTERNAL] fast lint
 
 .PHONY: lint
 lint: generate ## Run golangci-lint against code.
-	$(GOLANGCILINT) run ./...
+	$(GOLANGCILINT) run ./... --timeout=5m
 
 .PHONY: staticcheck
 staticcheck: staticchecktool ## Run staticcheck against code. 
@@ -243,8 +243,8 @@ endif
 # Run with Delve for development purposes against the configured Kubernetes cluster in ~/.kube/config
 # Delve is a debugger for the Go programming language. More info: https://github.com/go-delve/delve
 run-delve: manifests generate fmt vet  ## Run Delve debugger.
-    $(GO) build -gcflags "all=-trimpath=$(shell go env GOPATH)" -o bin/manager ./cmd/manager/main.go
-    dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./bin/manager
+	$(GO) build -gcflags "all=-trimpath=$(shell go env GOPATH)" -o bin/manager ./cmd/manager/main.go
+	dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./bin/manager
 
 
 .PHONY: docker-build

@@ -23,14 +23,16 @@ import (
 	"testing"
 	"time"
 
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/sethvargo/go-password/password"
-
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -109,6 +111,7 @@ var _ = Describe("Cluster Controller", func() {
 	const finalizer = "finalizer/protection"
 	const timeout = time.Second * 10
 	const interval = time.Second * 1
+	const clusterDefLabelKey = "clusterdefinition.infracreate.com/name"
 
 	getObj := func(key client.ObjectKey) *corev1.ConfigMap {
 		cm := &corev1.ConfigMap{}
@@ -159,6 +162,50 @@ var _ = Describe("Cluster Controller", func() {
 				return client.IgnoreNotFound(err)
 			}
 		}, timeout, interval).Should(Succeed())
+	}
+
+	createClusterDefinition := func() *dbaasv1alpha1.ClusterDefinition {
+		By("By create clusterDefinition")
+		clusterYaml := `
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: cm-mysql-clusterdefinition
+  namespace: default
+spec:
+  type: state.mysql-8
+  components:
+  - typeName: replicaSets
+    roleGroups:
+    - primary
+    - follower`
+		obj := &dbaasv1alpha1.ClusterDefinition{}
+		_ = yaml.Unmarshal([]byte(clusterYaml), obj)
+		Ω(k8sClient.Create(context.Background(), obj)).ShouldNot(HaveOccurred())
+		return obj
+	}
+
+	createAppversion := func() *dbaasv1alpha1.AppVersion {
+		By("By create appVersion")
+		clusterYaml := fmt.Sprintf(`
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind: AppVersion
+metadata:
+  name: common-appversion
+  namespace: default
+  labels:
+    %s: cm-mysql-clusterdefinition
+spec:
+  clusterDefinitionRef: common-clusterdefinition
+  components:
+  - type: replicaSets
+    podSpec:
+      containers:
+      - name: main`, clusterDefLabelKey)
+		obj := &dbaasv1alpha1.AppVersion{}
+		_ = yaml.Unmarshal([]byte(clusterYaml), obj)
+		Ω(k8sClient.Create(context.Background(), obj)).ShouldNot(HaveOccurred())
+		return obj
 	}
 
 	BeforeEach(func() {
@@ -283,6 +330,27 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(controllerutil.ContainsFinalizer(obj, finalizer)).Should(BeTrue())
 			Expect(res).ShouldNot(BeNil())
 			Expect(*res == cRes).Should(BeTrue())
+		})
+
+		It("Do delete CR with existing referencing CR", func() {
+			clusterDef := createClusterDefinition()
+			createAppversion()
+			statusHandler := func() error {
+				patch := client.MergeFrom(clusterDef.DeepCopy())
+				clusterDef.Status.Phase = dbaasv1alpha1.DeletingPhase
+				return k8sClient.Status().Patch(ctx, clusterDef, patch)
+			}
+			_, _ = ValidateReferenceCR(reqCtx, k8sClient, clusterDef, clusterDefLabelKey, statusHandler, &dbaasv1alpha1.AppVersionList{})
+			newClusterDef := &dbaasv1alpha1.ClusterDefinition{}
+			Eventually(func() bool {
+				if err := k8sClient.Get(ctx, types.NamespacedName{
+					Namespace: clusterDef.Namespace,
+					Name:      clusterDef.Name,
+				}, newClusterDef); err != nil {
+					return false
+				}
+				return newClusterDef.Status.Phase == dbaasv1alpha1.DeletingPhase
+			}, time.Second*10, time.Second*1).Should(BeTrue())
 		})
 	})
 })

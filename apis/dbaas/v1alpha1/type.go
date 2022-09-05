@@ -19,6 +19,10 @@ const (
 	AvailablePhase   Phase = "Available"
 	UnAvailablePhase Phase = "UnAvailable"
 	DeletingPhase    Phase = "Deleting"
+	CreatingPhase    Phase = "Creating"
+	RunningPhase     Phase = "Running"
+	FailedPhase      Phase = "Failed"
+	UpdatingPhase    Phase = "Updating"
 )
 
 type Status string

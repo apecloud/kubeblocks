@@ -19,6 +19,7 @@ package dbaas
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -112,6 +113,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if cluster.Status.ObservedGeneration == cluster.GetObjectMeta().GetGeneration() {
+		// check cluster all pods is ready
+		if r.needCheckClusterForReady(cluster) {
+			if err = checkClusterIsReady(reqCtx.Ctx, r.Client, cluster); err != nil {
+				return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "checkClusterIsReady")
+			}
+		}
 		return intctrlutil.Reconciled()
 	}
 
@@ -129,6 +136,16 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}, appversion); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
+
+	if appversion.Status.Phase != dbaasv1alpha1.AvailablePhase || clusterdefinition.Status.Phase != dbaasv1alpha1.AvailablePhase {
+		patch := client.MergeFrom(cluster.DeepCopy())
+		cluster.Status.Message = "Cluster.status.phase or AppVersion.status.phase is not Available,this problem needs to be solved first"
+		if err = r.Client.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
+	}
+
 	task, err := buildClusterCreationTasks(clusterdefinition, appversion, cluster)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -150,7 +167,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	_, ok := cluster.ObjectMeta.Labels[clusterDefLabelKey]
 	if !ok {
 		cluster.ObjectMeta.Labels[clusterDefLabelKey] = clusterdefinition.Name
-		cluster.ObjectMeta.Labels[AppVersionLabelKey] = appversion.Name
+		cluster.ObjectMeta.Labels[appVersionLabelKey] = appversion.Name
 		if err = r.Client.Patch(reqCtx.Ctx, cluster, patch); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
@@ -210,8 +227,8 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 	}
 
 	ml := client.MatchingLabels{
-		"app.kubernetes.io/instance": cluster.GetName(),
-		"app.kubernetes.io/name":     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
+		appInstanceLabelKey: cluster.GetName(),
+		appNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
 	}
 
 	stsList := &appsv1.StatefulSetList{}
@@ -279,8 +296,8 @@ func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *d
 		for _, roleGroup := range component.RoleGroups {
 
 			ml := client.MatchingLabels{
-				"app.kubernetes.io/instance": fmt.Sprintf("%s-%s-%s", cluster.GetName(), component.TypeName, roleGroup),
-				"app.kubernetes.io/name":     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
+				appInstanceLabelKey: fmt.Sprintf("%s-%s-%s", cluster.GetName(), component.TypeName, roleGroup),
+				appNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
 			}
 
 			pvcList := &corev1.PersistentVolumeClaimList{}
@@ -296,4 +313,9 @@ func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *d
 	}
 
 	return nil
+}
+
+func (r *ClusterReconciler) needCheckClusterForReady(cluster *dbaasv1alpha1.Cluster) bool {
+	return cluster.Status.Phase != "" && cluster.Status.Phase != dbaasv1alpha1.RunningPhase &&
+		cluster.Status.Phase != dbaasv1alpha1.DeletingPhase
 }

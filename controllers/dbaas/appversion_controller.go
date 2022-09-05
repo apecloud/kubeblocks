@@ -119,7 +119,7 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return r.Client.Status().Patch(ctx, appVersion, patch)
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, appVersion,
-			AppVersionLabelKey, statusHandler, &dbaasv1alpha1.ClusterList{}); res != nil || err != nil {
+			appVersionLabelKey, statusHandler, &dbaasv1alpha1.ClusterList{}); res != nil || err != nil {
 			return res, err
 		}
 		return nil, r.deleteExternalResources(reqCtx, appVersion)

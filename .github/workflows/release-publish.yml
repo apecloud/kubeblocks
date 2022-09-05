@@ -24,11 +24,11 @@ jobs:
         run: |
           git config --global url."https://${{ secrets.PERSONAL_ACCESS_TOKEN }}:@github.com".insteadof "https://github.com"
           mkdir -p ${{ env.DARWIN_ARM64 }} ${{ env.LINUX_AMD64 }}
-          GOOS=darwin ARCH=arm64 make
+          GOOS=darwin ARCH=arm64 make dbctl
           mv bin/dbctl ${{ env.DARWIN_ARM64 }}/dbctl
           tar -zcvf ${{ env.DARWIN_ARM64_BINARY }} ${{ env.DARWIN_ARM64 }}
           mv ${{ env.DARWIN_ARM64_BINARY }} bin/
-          GOOS=linux ARCH=amd64 make
+          GOOS=linux ARCH=amd64 make dbctl
           mv bin/dbctl ${{ env.LINUX_AMD64 }}/dbctl
           tar -zcvf ${{ env.LINUX_AMD64_BINARY }} ${{ env.LINUX_AMD64 }}
           mv ${{ env.LINUX_AMD64_BINARY }} bin/

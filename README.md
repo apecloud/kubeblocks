@@ -1,9 +1,13 @@
 # Kubeblocks
 
-![Release status](https://github.com/apecloud/kubeblocks/-/badges/release.svg)
-![Pipeline](https://github.com/apecloud/kubeblocks/badges/first-demo/pipeline.svg)
-![Codecoverage](https://github.com/apecloud/kubeblockst/badges/first-demo/coverage.svg)
-
+[![Build status](https://github.com/apecloud/kubeblocks/workflows/CICD-PUSH/badge.svg)](https://github.com/apecloud/kubeblocks/actions/workflows/cicd-push.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/apecloud/kubeblocks)](https://goreportcard.com/report/github.com/apecloud/kubeblocks)
+[![Docker Pulls](https://img.shields.io/docker/pulls/infracreate/opendbaas-core)](https://hub.docker.com/r/infracreate/opendbaas-core)
+[![codecov](https://codecov.io/gh/apecloud/kubeblocks/branch/main/graph/badge.svg)](https://codecov.io/gh/apecloud/kubeblocks)
+[![LICENSE](https://img.shields.io/github/license/apecloud/kubeblocks.svg?style=flat-square)](/LICENSE)
+[![Releases](https://img.shields.io/github/release/apecloud/kubeblocks/all.svg?style=flat-square)](https://github.com/apecloud/kubeblocks/releases)
+[![TODOs](https://img.shields.io/endpoint?url=https://api.tickgit.com/badge?repo=github.com/apecloud/kubeblocks)](https://www.tickgit.com/browse?repo=github.com/apecloud/kubeblocks)
+[![Artifact HUB](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/apecloud)](https://artifacthub.io/packages/search?repo=apecloud)
 
 ## Overview
 

@@ -1,4 +1,4 @@
-# Kubelego
+# Kubeblocks
 
 ![Release status](https://github.com/apecloud/kubeblocks/-/badges/release.svg)
 ![Pipeline](https://github.com/apecloud/kubeblocks/badges/first-demo/pipeline.svg)

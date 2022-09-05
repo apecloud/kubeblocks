@@ -134,16 +134,20 @@ cue-fmt: cuetool ## Run cue fmt against code.
 cue-vet: cuetool ## Run cue vet against code.
 	$(CUE) vet controllers/dbaas/cue/*.cue
 
-.PHONY: lint
-lint: ## Run golangci-lint against code.
+.PHONY: fast-lint
+fast-lint: # [INTERNAL] fast lint
 	$(GOLANGCILINT) run ./...
+
+.PHONY: lint
+lint: generate ## Run golangci-lint against code.
+	$(GOLANGCILINT) run ./... --timeout=5m
 
 .PHONY: staticcheck
 staticcheck: staticchecktool ## Run staticcheck against code. 
 	$(STATICCHECK) ./...
 
 .PHONY: build-checks
-build-checks: generate fmt vet goimports lint ## Run build checks.
+build-checks: generate fmt vet goimports fast-lint ## Run build checks.
 
 .PHONY: mod-download
 mod-download: ## Run go mod download against go modules.
@@ -239,8 +243,8 @@ endif
 # Run with Delve for development purposes against the configured Kubernetes cluster in ~/.kube/config
 # Delve is a debugger for the Go programming language. More info: https://github.com/go-delve/delve
 run-delve: manifests generate fmt vet  ## Run Delve debugger.
-    $(GO) build -gcflags "all=-trimpath=$(shell go env GOPATH)" -o bin/manager ./cmd/manager/main.go
-    dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./bin/manager
+	$(GO) build -gcflags "all=-trimpath=$(shell go env GOPATH)" -o bin/manager ./cmd/manager/main.go
+	dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./bin/manager
 
 
 .PHONY: docker-build
@@ -321,7 +325,7 @@ ci-test: ci-test-pre test ## Run CI tests.
 ##@ Contributor
 
 .PHONY: reviewable
-reviewable: fmt vet goimports lint staticcheck ## Run code checks to proceed with PR reviews.
+reviewable: build-checks ## Run code checks to proceed with PR reviews.
 	$(GO) mod tidy -compat=1.18
 
 .PHONY: check-diff

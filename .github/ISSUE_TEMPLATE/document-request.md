@@ -1,7 +1,7 @@
 ---
 name: Document request
 about: 'Write to async communication '
-title: "[Doc]DBaaSv0-"
+title: "[Doc]KubeBlocks-"
 labels: documentation
 assignees: ''
 
@@ -9,10 +9,4 @@ assignees: ''
 
 **Summary**
 
-**Motivation and Goals**
-
-**Background、 Restriction and User stories**
-
-**Design、interface、Development/test plan**
-
-**Others**
+**Refer to following link for the document**

@@ -136,7 +136,7 @@ cue-vet: cuetool ## Run cue vet against code.
 
 .PHONY: lint
 lint: ## Run golangci-lint against code.
-	$(GOLANGCILINT) run ./...
+	$(GOLANGCILINT) run ./... --timeout=5m
 
 .PHONY: staticcheck
 staticcheck: staticchecktool ## Run staticcheck against code. 

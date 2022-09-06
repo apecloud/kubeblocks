@@ -3,7 +3,6 @@ package cloudprovider
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 
@@ -52,7 +51,7 @@ func initProvider() {
 		defaultProvider, _ = NewProvider(Local, "", "", "")
 		return
 	}
-	content, err := ioutil.ReadFile(providerCfg)
+	content, err := os.ReadFile(providerCfg)
 	if err != nil {
 		panic(errors.Wrap(err, "Failed to read provider configs"))
 	}

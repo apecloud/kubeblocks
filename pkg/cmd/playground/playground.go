@@ -54,10 +54,14 @@ type RootOptions struct {
 
 type InitOptions struct {
 	genericclioptions.IOStreams
-	Engine   string
-	Provider string
-	Version  string
-	DryRun   bool
+	Engine     string
+	Provider   string
+	Version    string
+	DryRun     bool
+	Backup     bool
+	S3Endpoint string
+	S3Region   string
+	S3Bucket   string
 }
 
 type DestroyOptions struct {
@@ -87,6 +91,8 @@ func NewPlaygroundCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		newStatusCmd(),
 		newGuideCmd(),
 		newPortForward(),
+		newInstallCmd(streams),
+		newUnInstallCmd(streams),
 	)
 
 	return cmd
@@ -178,11 +184,39 @@ func newPortForward() *cobra.Command {
 }
 
 func (o *InitOptions) Complete() error {
-	installer.Provider = provider.NewProvider(o.Engine, o.Version)
+	if o.Backup {
+		installer.Provider = &provider.DataProtection{
+			ServerVersion: o.Version,
+			AccessKey:     rootOptions.AccessKey,
+			SecretKey:     rootOptions.AccessSecret,
+			S3Endpoint:    o.S3Endpoint,
+			S3Bucket:      o.S3Bucket,
+			Region:        o.S3Region,
+		}
+	} else {
+		installer.Provider = provider.NewProvider(o.Engine, o.Version)
+	}
 	return nil
 }
 
 func (o *InitOptions) Validate() error {
+	if o.Backup {
+		if rootOptions.AccessKey == "" {
+			return errors.New("--access-key is required")
+		}
+		if rootOptions.AccessSecret == "" {
+			return errors.New("--access-secret is required")
+		}
+		if o.S3Region == "" {
+			return errors.New("--s3-region is required")
+		}
+		if o.S3Endpoint == "" {
+			return errors.New("--s3-endpoint is required")
+		}
+		if o.S3Bucket == "" {
+			return errors.New("--s3-bucket is required")
+		}
+	}
 	return nil
 }
 
@@ -283,4 +317,108 @@ func statusCmd() {
 	}
 	// TODO
 	utils.Info("Checking database cluster status...")
+}
+
+func newInstallCmd(streams genericclioptions.IOStreams) *cobra.Command {
+	o := &InitOptions{
+		IOStreams: streams,
+	}
+
+	cmd := &cobra.Command{
+		Use:   "install",
+		Short: "Install database cluster resource",
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(o.Complete())
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.InstallPlayground())
+		},
+	}
+
+	cmd.Flags().BoolVar(&o.Backup, "backup", false, "playground init the backup module")
+	cmd.Flags().StringVar(&rootOptions.AccessKey, "access-key", "", "Cloud provider access key")
+	cmd.Flags().StringVar(&rootOptions.AccessSecret, "access-secret", "", "Cloud provider access secret")
+	cmd.Flags().StringVar(&rootOptions.Region, "region", "", "Cloud provider region")
+	cmd.Flags().StringVar(&o.Engine, "engine", DefaultEngine, "Database engine type")
+	cmd.Flags().StringVar(&o.Version, "version", DefaultVersion, "Database engine version")
+	cmd.Flags().StringVar(&o.S3Endpoint, "s3-endpoint", DefaultS3Endpoint, "s3 endpoint for backup init")
+	cmd.Flags().StringVar(&o.S3Region, "s3-region", DefaultS3Region, "s3 region for backup init")
+	cmd.Flags().StringVar(&o.S3Bucket, "s3-bucket", DefaultS3Region, "s3 bucket name for backup init")
+	cmd.Flags().BoolVar(&o.DryRun, "dry-run", false, "Dry run the playground init")
+	return cmd
+}
+
+func (o *InitOptions) InstallPlayground() error {
+	utils.Info("Installing playground database cluster...")
+
+	var err error
+
+	defer func() {
+		err := utils.CleanUpPlayground()
+		if err != nil {
+			utils.Errf("Fail to clean up: %v", err)
+		}
+	}()
+
+	// Step.1 Install dependencies
+	err = installer.InstallDeps()
+	if err != nil {
+		return errors.Wrap(err, "Failed to install dependencies")
+	}
+
+	// Step.2 print guide information
+	err = installer.PrintGuide(DefaultCloudProvider, LocalHost)
+	if err != nil {
+		return errors.Wrap(err, "Failed to print user guide")
+	}
+
+	return nil
+}
+
+func (o *InitOptions) UnInstallPlayground() error {
+	utils.Info("UnInstalling playground database cluster...")
+
+	var err error
+
+	defer func() {
+		err := utils.CleanUpPlayground()
+		if err != nil {
+			utils.Errf("Fail to clean up: %v", err)
+		}
+	}()
+
+	// UnInstall data protection and mysql operator
+	installer.Provider = &provider.DataProtection{}
+	err = installer.UnInstallDeps()
+	if err != nil {
+		return errors.Wrap(err, "Failed to uninstall dependencies")
+	}
+
+	// UnInstall bitnami mysql
+	installer.Provider = &provider.BitnamiMysql{}
+	err = installer.UnInstallDeps()
+	if err != nil {
+		return errors.Wrap(err, "Failed to uninstall dependencies")
+	}
+	return nil
+}
+
+func newUnInstallCmd(streams genericclioptions.IOStreams) *cobra.Command {
+	o := &InitOptions{
+		IOStreams: streams,
+	}
+
+	cmd := &cobra.Command{
+		Use:   "uninstall",
+		Short: "Uninstall database cluster resource",
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(o.Complete())
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.UnInstallPlayground())
+		},
+	}
+	cmd.Flags().StringVar(&o.Engine, "engine", DefaultEngine, "Database engine type")
+	cmd.Flags().StringVar(&o.Version, "version", DefaultVersion, "Database engine version")
+	cmd.Flags().BoolVar(&o.DryRun, "dry-run", false, "Dry run the playground uninstall")
+
+	return cmd
 }

@@ -19,7 +19,6 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -191,7 +190,7 @@ func (d *PlaygroundInstaller) GenKubeconfig() error {
 
 	// Replace host config with loop back address
 	cfgHostContent := strings.ReplaceAll(kubeConfig, hostToReplace, "127.0.0.1")
-	err = ioutil.WriteFile(configPath, []byte(cfgHostContent), 0600)
+	err = os.WriteFile(configPath, []byte(cfgHostContent), 0600)
 	if err != nil {
 		errf("Fail to re-write host kubeconfig")
 	}
@@ -628,7 +627,7 @@ func installCharts(pi *PlaygroundInstaller, wg *sync.WaitGroup) error {
 				}
 				return nil
 			}, &opts); err != nil {
-				return errors.Errorf("Install chart %s error", c.Name)
+				return errors.Errorf("Install chart %s error: %s", c.Name, err)
 			}
 		}
 		return nil
@@ -646,6 +645,54 @@ func installCharts(pi *PlaygroundInstaller, wg *sync.WaitGroup) error {
 	err = install(charts, wg)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func (pi *PlaygroundInstaller) UnInstallDeps() error {
+	unInstall := func(cs []helm.InstallOpts) error {
+		ctx := context.Background()
+		for _, c := range cs {
+			opts := retry.Options{
+				MaxRetry: 1 + c.TryTimes,
+			}
+			if err := retry.IfNecessary(ctx, func() error {
+				if _, err := c.UnInstall(utils.ConfigPath(pi.ClusterName)); err != nil {
+					return err
+				}
+				return nil
+			}, &opts); err != nil {
+				return errors.Errorf("UnInstall chart %s error: %s", c.Name, err)
+			}
+		}
+		return nil
+	}
+
+	info("UnInstalling playground database cluster...")
+	charts := pi.Provider.GetBaseCharts(pi.Namespace)
+	err := unInstall(charts)
+	if err != nil {
+		return err
+	}
+
+	// uninstall database cluster to default namespace
+	charts = pi.Provider.GetDBCharts(pi.Namespace, pi.DBCluster)
+
+	if err = unInstall(charts); err != nil {
+		return err
+	}
+
+	if err = removeRepos(pi.Provider.GetRepos()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func removeRepos(repos []repo.Entry) error {
+	for _, r := range repos {
+		if err := helm.RemoveRepo(&r); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -19,7 +19,7 @@ package helm
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"math/rand"
 	"os"
@@ -67,7 +67,7 @@ type LoginOpts struct {
 func AddRepo(r *repo.Entry) error {
 	settings := cli.New()
 	repoFile := settings.RepositoryConfig
-	b, err := ioutil.ReadFile(repoFile)
+	b, err := os.ReadFile(repoFile)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -113,6 +113,49 @@ func AddRepo(r *repo.Entry) error {
 	return nil
 }
 
+// RemoveRepo will remove a repo
+func RemoveRepo(r *repo.Entry) error {
+	settings := cli.New()
+	repoFile := settings.RepositoryConfig
+	b, err := os.ReadFile(repoFile)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	var f repo.File
+	if err := yaml.Unmarshal(b, &f); err != nil {
+		return err
+	}
+
+	if f.Has(r.Name) {
+		f.Remove(r.Name)
+		if err := f.WriteFile(repoFile, 0644); err != nil {
+			return err
+		}
+	}
+	utils.Infof("%s has been remove to your repositories\n", r.Name)
+	return nil
+}
+
+// GetInstalled get helm package if installed.
+func (i *InstallOpts) GetInstalled(cfg string) (*release.Release, error) {
+	settings := cli.New()
+	actionConfig, err := NewActionConfig(settings, i.Namespace, cfg)
+	if err != nil {
+		return nil, err
+	}
+	getClient := action.NewGet(actionConfig)
+	res, err := getClient.Run(i.Name)
+	if err != nil {
+		if strings.Contains(err.Error(), "release: not found") {
+			return nil, nil
+		}
+		utils.Infof("Failed check %s installed\n", i.Name)
+		return nil, err
+	}
+	return res, nil
+}
+
 // Install will install a Chart
 func (i *InstallOpts) Install(cfg string) (*release.Release, error) {
 	utils.InfoP(1, "Install "+i.Chart+"...")
@@ -122,6 +165,11 @@ func (i *InstallOpts) Install(cfg string) (*release.Release, error) {
 	}
 	s.Start()
 	defer s.Stop()
+
+	res, _ := i.GetInstalled(cfg)
+	if res != nil {
+		return res, nil
+	}
 
 	settings := cli.New()
 	actionConfig, err := NewActionConfig(settings, i.Namespace, cfg)
@@ -187,7 +235,7 @@ func (i *InstallOpts) Install(cfg string) (*release.Release, error) {
 		cancel()
 	}()
 
-	res, err := client.RunWithContext(ctx, chartRequested, vals)
+	res, err = client.RunWithContext(ctx, chartRequested, vals)
 	if err != nil && err.Error() != "cannot re-use a name that is still in use" {
 		return nil, err
 	}
@@ -215,7 +263,7 @@ func NewActionConfig(s *cli.EnvSettings, ns string, config string) (*action.Conf
 	registryClient, err := registry.NewClient(
 		registry.ClientOptDebug(settings.Debug),
 		registry.ClientOptEnableCache(true),
-		registry.ClientOptWriter(ioutil.Discard),
+		registry.ClientOptWriter(io.Discard),
 		registry.ClientOptCredentialsFile(settings.RegistryConfig),
 	)
 	if err != nil {
@@ -244,4 +292,37 @@ func defaultKeyring() string {
 		return filepath.Join(v, "pubring.gpg")
 	}
 	return filepath.Join(homedir.HomeDir(), ".gnupg", "pubring.gpg")
+}
+
+// Install will install a Chart
+func (i *InstallOpts) UnInstall(cfg string) (*release.UninstallReleaseResponse, error) {
+	utils.InfoP(1, "UnInstall "+i.Chart+"...")
+	s := spinner.New(spinner.CharSets[rand.Intn(44)], 100*time.Millisecond)
+	if err := s.Color("green"); err != nil {
+		return nil, err
+	}
+	s.Start()
+	defer s.Stop()
+
+	settings := cli.New()
+	actionConfig, err := NewActionConfig(settings, i.Namespace, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	err = i.TryToLogin(actionConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	client := action.NewUninstall(actionConfig)
+	client.Wait = i.Wait
+	client.Timeout = time.Second * 300
+
+	res, err := client.Run(i.Name)
+	// ignore not found error
+	if err != nil && !strings.Contains(err.Error(), "release: not found") {
+		return nil, err
+	}
+	return res, nil
 }

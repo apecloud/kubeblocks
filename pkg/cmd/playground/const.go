@@ -29,4 +29,6 @@ const (
 	DefaultPassword      = "sakila"
 	DefaultPort          = "3306"
 	LocalHost            = "127.0.0.1"
+	DefaultS3Endpoint    = "https://s3.cn-north-1.amazonaws.com.cn"
+	DefaultS3Region      = "cn-north-1"
 )

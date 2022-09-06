@@ -73,12 +73,17 @@ func (o *MysqlOperator) GetDBCharts(ns string, dbname string) []helm.InstallOpts
 	return []helm.InstallOpts{
 		{
 			Name:      "mysql-operator",
-			Chart:     "mysql-operator/mysql-operator",
+			Chart:     "oci://yimeisun.azurecr.io/helm-chart/mysql-operator",
 			Wait:      true,
-			Version:   "2.0.5",
+			Version:   "2.0.6",
 			Namespace: ns,
 			Sets:      []string{},
-			TryTimes:  2,
+			LoginOpts: &helm.LoginOpts{
+				User:   helmUser,
+				Passwd: helmPasswd,
+				URL:    helmURL,
+			},
+			TryTimes: 2,
 		},
 		{
 			Name:      dbname,
@@ -90,9 +95,9 @@ func (o *MysqlOperator) GetDBCharts(ns string, dbname string) []helm.InstallOpts
 				"serverVersion=" + o.serverVersion,
 			},
 			LoginOpts: &helm.LoginOpts{
-				User:   "yimeisun",
-				Passwd: "8V+PmX1oSDv4pumDvZp6m7LS8iPgbY3A",
-				URL:    "yimeisun.azurecr.io",
+				User:   helmUser,
+				Passwd: helmPasswd,
+				URL:    helmURL,
 			},
 			TryTimes: 2,
 		},

@@ -21,9 +21,8 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -109,8 +108,18 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, appVersion, appVersionFinalizerName, func() error {
-		return r.deleteExternalResources(reqCtx, appVersion)
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, appVersion, appVersionFinalizerName, func() (*ctrl.Result, error) {
+		statusHandler := func() error {
+			patch := client.MergeFrom(appVersion.DeepCopy())
+			appVersion.Status.Phase = dbaasv1alpha1.DeletingPhase
+			appVersion.Status.Message = "cannot be deleted because of existing referencing Cluster."
+			return r.Client.Status().Patch(ctx, appVersion, patch)
+		}
+		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, appVersion,
+			AppVersionLabelKey, statusHandler, &dbaasv1alpha1.ClusterList{}); res != nil || err != nil {
+			return res, err
+		}
+		return nil, r.deleteExternalResources(reqCtx, appVersion)
 	})
 	if res != nil {
 		return *res, err
@@ -132,7 +141,7 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if appVersion.ObjectMeta.Labels == nil {
 		appVersion.ObjectMeta.Labels = map[string]string{}
 	}
-	appVersion.ObjectMeta.Labels["clusterdefinition.infracreate.com/name"] = clusterdefinition.Name
+	appVersion.ObjectMeta.Labels[clusterDefLabelKey] = clusterdefinition.Name
 	if err = r.Client.Patch(reqCtx.Ctx, appVersion, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}

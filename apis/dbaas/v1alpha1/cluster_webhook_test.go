@@ -34,7 +34,7 @@ var _ = Describe("cluster webhook", func() {
 	Context("When cluster create and update", func() {
 		It("Should webhook validate passed", func() {
 			By("By testing creating a new clusterDefinition when no appVersion and clusterDefinition")
-			cluster, _ := createTestCluster(clusterDefinitionName, appVersionName, clusterName, AppVersionLabelKey)
+			cluster, _ := createTestCluster(clusterDefinitionName, appVersionName, clusterName)
 			Expect(k8sClient.Create(ctx, cluster)).ShouldNot(Succeed())
 
 			By("By creating a new clusterDefinition")
@@ -49,7 +49,7 @@ var _ = Describe("cluster webhook", func() {
 			Expect(k8sClient.Create(ctx, appVersion)).Should(Succeed())
 
 			By("By creating a new Cluster")
-			cluster, _ = createTestCluster(clusterDefinitionName, appVersionName, clusterName, AppVersionLabelKey)
+			cluster, _ = createTestCluster(clusterDefinitionName, appVersionName, clusterName)
 			Expect(k8sClient.Create(ctx, cluster)).Should(Succeed())
 
 			By("By testing update spec.clusterDefinitionRef")
@@ -70,15 +70,13 @@ var _ = Describe("cluster webhook", func() {
 	})
 })
 
-func createTestCluster(clusterDefinitionName, appVersionName, clusterName, appVersionLabel string) (*Cluster, error) {
+func createTestCluster(clusterDefinitionName, appVersionName, clusterName string) (*Cluster, error) {
 	clusterYaml := fmt.Sprintf(`
 apiVersion: dbaas.infracreate.com/v1alpha1
 kind: Cluster
 metadata:
   name: %s
   namespace: default
-  labels:
-     %s: %s
 spec:
   clusterDefinitionRef: %s
   appVersionRef: %s
@@ -89,7 +87,7 @@ spec:
   - name: proxy
     type: proxy
     replicas: 1
-`, clusterName, appVersionLabel, appVersionName, clusterDefinitionName, appVersionName)
+`, clusterName, clusterDefinitionName, appVersionName)
 	cluster := &Cluster{}
 	err := yaml.Unmarshal([]byte(clusterYaml), cluster)
 	return cluster, err

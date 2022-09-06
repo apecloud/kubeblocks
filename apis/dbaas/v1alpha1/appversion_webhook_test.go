@@ -27,7 +27,6 @@ var _ = Describe("appVersion webhook", func() {
 	var (
 		clusterDefinitionName = "appversion-webhook-mysql-definition"
 		appVersionName        = "appversion-webhook-mysql-appversion"
-		clusterName           = "appversion-webhook-mysql-cluster"
 	)
 	Context("When appVersion create and update", func() {
 		It("Should webhook validate passed", func() {
@@ -55,11 +54,6 @@ var _ = Describe("appVersion webhook", func() {
 			appVersion.Spec.ClusterDefinitionRef = "test"
 			Expect(k8sClient.Update(ctx, appVersion)).ShouldNot(Succeed())
 
-			By("By testing delete appVersion ")
-			cluster, _ := createTestCluster(clusterDefinitionName, appVersionName, clusterName, AppVersionLabelKey)
-			Expect(k8sClient.Create(ctx, cluster)).Should(Succeed())
-			Expect(k8sClient.Delete(ctx, appVersion)).ShouldNot(Succeed())
-
 		})
 	})
 })
@@ -73,9 +67,6 @@ func createTestAppVersionObj(clusterDefinitionName, appVersionName string) *AppV
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      appVersionName,
 			Namespace: "default",
-			Labels: map[string]string{
-				ClusterDefLabelKey: clusterDefinitionName,
-			},
 		},
 		Spec: AppVersionSpec{
 			ClusterDefinitionRef: clusterDefinitionName,

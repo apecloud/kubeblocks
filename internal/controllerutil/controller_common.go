@@ -17,10 +17,12 @@ limitations under the License.
 package controllerutil
 
 import (
+	"reflect"
 	"time"
 
 	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/conversion"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -70,14 +72,14 @@ func Requeue(logger logr.Logger, msg string, keysAndValues ...string) (reconcile
 	return reconcile.Result{Requeue: true}, nil
 }
 
-// Handled CR deletion flow, will add finalizer if discovered a non-deleting object and remove finalizer during
+// HandleCRDeletion Handled CR deletion flow, will add finalizer if discovered a non-deleting object and remove finalizer during
 // deletion process. Pass optional 'deletionHandler' func for external dependency deletion. Return Result pointer
 // if required to return out of outer 'Reconcile' reconciliation loop.
 func HandleCRDeletion(reqCtx RequestCtx,
 	r client.Writer,
 	cr client.Object,
 	finalizer string,
-	deletionHandler func() error) (*ctrl.Result, error) {
+	deletionHandler func() (*ctrl.Result, error)) (*ctrl.Result, error) {
 	// examine DeletionTimestamp to determine if object is under deletion
 	if cr.GetDeletionTimestamp().IsZero() {
 		// The object is not being deleted, so if it does not have our finalizer,
@@ -95,11 +97,16 @@ func HandleCRDeletion(reqCtx RequestCtx,
 		if controllerutil.ContainsFinalizer(cr, finalizer) {
 			// our finalizer is present, so lets handle any external dependency
 			if deletionHandler != nil {
-				if err := deletionHandler(); err != nil {
+				if res, err := deletionHandler(); err != nil {
 					// if fail to delete the external dependency here, return with error
 					// so that it can be retried
-					res, err := CheckedRequeueWithError(err, reqCtx.Log, "")
-					return &res, err
+					if res == nil {
+						res, err := CheckedRequeueWithError(err, reqCtx.Log, "")
+						return &res, err
+					}
+					return res, err
+				} else if res != nil {
+					return res, nil
 				}
 			}
 			// remove our finalizer from the list and update it.
@@ -113,6 +120,37 @@ func HandleCRDeletion(reqCtx RequestCtx,
 		// Stop reconciliation as the item is being deleted
 		res, err := Reconciled()
 		return &res, err
+	}
+	return nil, nil
+}
+
+// ValidateReferenceCR validate is exist referencing CRs. if exists,requeue reconcile after 30 seconds
+func ValidateReferenceCR(reqCtx RequestCtx, cli client.Client, obj client.Object,
+	labelKey string, statusHandler func() error, objLists ...client.ObjectList) (*ctrl.Result, error) {
+	for _, objList := range objLists {
+		// get referencing cr list
+		if err := cli.List(reqCtx.Ctx, objList,
+			client.MatchingLabels{labelKey: obj.GetName()}, client.Limit(1),
+		); err != nil {
+			return nil, err
+		}
+		if v, err := conversion.EnforcePtr(objList); err != nil {
+			return nil, err
+		} else {
+			// check list items
+			items := v.FieldByName("Items")
+			if items.IsValid() {
+				switch items.Kind() {
+				case reflect.Slice:
+					if items.Len() > 0 {
+						if err = statusHandler(); err != nil {
+							return nil, err
+						}
+						return &reconcile.Result{Requeue: true, RequeueAfter: 30 * time.Second}, nil
+					}
+				}
+			}
+		}
 	}
 	return nil, nil
 }

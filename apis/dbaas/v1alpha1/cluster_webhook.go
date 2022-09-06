@@ -28,8 +28,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
-
-	dbaaswebhook "github.com/apecloud/kubeblocks/internal/webhook"
 )
 
 // log is for logging in this package.
@@ -90,10 +88,13 @@ func (r *Cluster) validate() error {
 		ctx        = context.Background()
 		clusterDef = &ClusterDefinition{}
 	)
+	if webhookMgr == nil {
+		return nil
+	}
 
 	r.validateAppVersionRef(&allErrs)
 
-	err := dbaaswebhook.GetWebHookClient().Get(ctx, types.NamespacedName{
+	err := webhookMgr.client.Get(ctx, types.NamespacedName{
 		Namespace: r.Namespace,
 		Name:      r.Spec.ClusterDefRef,
 	}, clusterDef)
@@ -113,14 +114,15 @@ func (r *Cluster) validate() error {
 	return nil
 }
 
-// ValidateAppVersionRef validate spec.appVersion is legal
+// ValidateAppVersionRef validate spec.appVersionRef is legal
 func (r *Cluster) validateAppVersionRef(allErrs *field.ErrorList) {
-	err := dbaaswebhook.GetWebHookClient().Get(context.Background(), types.NamespacedName{
+	appVersion := &AppVersion{}
+	err := webhookMgr.client.Get(context.Background(), types.NamespacedName{
 		Namespace: r.Namespace,
 		Name:      r.Spec.AppVersionRef,
-	}, &AppVersion{})
+	}, appVersion)
 	if err != nil {
-		*allErrs = append(*allErrs, field.Invalid(field.NewPath("spec").Child("appVersionRef"),
+		*allErrs = append(*allErrs, field.Invalid(field.NewPath("spec.appVersionRef"),
 			r.Spec.ClusterDefRef, err.Error()))
 	}
 }

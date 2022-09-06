@@ -17,11 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
 	"fmt"
 	"reflect"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,8 +27,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
-
-	dbaaswebhook "github.com/apecloud/kubeblocks/internal/webhook"
 )
 
 // log is for logging in this package.
@@ -61,7 +56,7 @@ func (r *ClusterDefinition) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-dbaas-infracreate-com-v1alpha1-clusterdefinition,mutating=false,failurePolicy=fail,sideEffects=None,groups=dbaas.infracreate.com,resources=clusterdefinitions,verbs=create;update;delete,versions=v1alpha1,name=vclusterdefinition.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-dbaas-infracreate-com-v1alpha1-clusterdefinition,mutating=false,failurePolicy=fail,sideEffects=None,groups=dbaas.infracreate.com,resources=clusterdefinitions,verbs=create;update,versions=v1alpha1,name=vclusterdefinition.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &ClusterDefinition{}
 
@@ -80,31 +75,6 @@ func (r *ClusterDefinition) ValidateUpdate(old runtime.Object) error {
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *ClusterDefinition) ValidateDelete() error {
 	clusterdefinitionlog.Info("validate delete", "name", r.Name)
-	return r.handleDeletion()
-}
-
-// handleDeletion If there is an referencing cluster or appVersion, it is forbidden to delete
-func (r *ClusterDefinition) handleDeletion() error {
-	var (
-		clusterList    = &ClusterList{}
-		appVersionList = &AppVersionList{}
-		err            error
-		ctx            = context.Background()
-	)
-	if err = dbaaswebhook.GetWebHookClient().List(ctx, clusterList,
-		client.MatchingLabels{ClusterDefLabelKey: r.Name}, client.Limit(1),
-	); err != nil {
-		return err
-	}
-	if err = dbaaswebhook.GetWebHookClient().List(ctx, appVersionList,
-		client.MatchingLabels{ClusterDefLabelKey: r.Name}, client.Limit(1),
-	); err != nil {
-		return err
-	}
-	// exist referencing cluster or appVersion resource
-	if len(clusterList.Items) > 0 || len(appVersionList.Items) > 0 {
-		return newInvalidError(ClusterDefinitionKind, r.Name, "", "cannot be deleted because of existing referencing Cluster or AppVersion.")
-	}
 	return nil
 }
 

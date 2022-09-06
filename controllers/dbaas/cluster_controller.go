@@ -104,8 +104,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, cluster, dbClusterFinalizerName, func() error {
-		return r.deleteExternalResources(reqCtx, cluster)
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, cluster, dbClusterFinalizerName, func() (*ctrl.Result, error) {
+		return nil, r.deleteExternalResources(reqCtx, cluster)
 	})
 	if res != nil {
 		return *res, err
@@ -150,6 +150,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	_, ok := cluster.ObjectMeta.Labels[clusterDefLabelKey]
 	if !ok {
 		cluster.ObjectMeta.Labels[clusterDefLabelKey] = clusterdefinition.Name
+		cluster.ObjectMeta.Labels[AppVersionLabelKey] = appversion.Name
 		if err = r.Client.Patch(reqCtx.Ctx, cluster, patch); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}

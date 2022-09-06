@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -31,8 +29,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
-
-	dbaaswebhook "github.com/apecloud/kubeblocks/internal/webhook"
 )
 
 // log is for logging in this package.
@@ -58,7 +54,7 @@ func (r *AppVersion) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-dbaas-infracreate-com-v1alpha1-appversion,mutating=false,failurePolicy=fail,sideEffects=None,groups=dbaas.infracreate.com,resources=appversions,verbs=create;update;delete,versions=v1alpha1,name=vappversion.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-dbaas-infracreate-com-v1alpha1-appversion,mutating=false,failurePolicy=fail,sideEffects=None,groups=dbaas.infracreate.com,resources=appversions,verbs=create;update,versions=v1alpha1,name=vappversion.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &AppVersion{}
 
@@ -82,18 +78,6 @@ func (r *AppVersion) ValidateUpdate(old runtime.Object) error {
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *AppVersion) ValidateDelete() error {
 	appversionlog.Info("validate delete", "name", r.Name)
-	clusterList := &ClusterList{}
-	err := dbaaswebhook.GetWebHookClient().List(context.Background(), clusterList,
-		client.MatchingLabels{AppVersionLabelKey: r.Name}, client.Limit(1),
-	)
-	if err != nil {
-		return err
-	}
-	// exists referenced cluster resource
-	if len(clusterList.Items) > 0 {
-		return newInvalidError(AppVersionKind, r.Name, "",
-			fmt.Sprintf("cannot be deleted because of existing referencing Cluster."))
-	}
 	return nil
 }
 
@@ -104,7 +88,10 @@ func (r *AppVersion) validate() error {
 		ctx        = context.Background()
 		clusterDef = &ClusterDefinition{}
 	)
-	err := dbaaswebhook.GetWebHookClient().Get(ctx, types.NamespacedName{
+	if webhookMgr == nil {
+		return nil
+	}
+	err := webhookMgr.client.Get(ctx, types.NamespacedName{
 		Namespace: r.Namespace,
 		Name:      r.Spec.ClusterDefinitionRef,
 	}, clusterDef)

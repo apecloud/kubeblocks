@@ -21,7 +21,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
-    - description: appVersion phase
+    - description: status phase
       jsonPath: .status.phase
       name: PHASE
       type: string
@@ -43,7 +43,8 @@ spec:
           metadata:
             type: object
           spec:
-            description: AppVersionSpec defines the desired state of AppVersion
+            description: AppVersionSpec defines the desired state of AppVersion,spec
+              is immutable
             properties:
               clusterDefinitionRef:
                 description: ref ClusterDefinition
@@ -1682,10 +1683,11 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: phase - in list of [Available,UnAvailable]
+                description: phase - in list of [Available,UnAvailable,Deleting]
                 enum:
                 - Available
                 - UnAvailable
+                - Deleting
                 type: string
             type: object
         type: object

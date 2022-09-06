@@ -24,12 +24,8 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// AppVersionSpec defines the desired state of AppVersion
+// AppVersionSpec defines the desired state of AppVersion,spec is immutable
 type AppVersionSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	// spec is immutable
-
 	// ref ClusterDefinition
 	// +kubebuilder:validation:Required
 	ClusterDefinitionRef string `json:"clusterDefinitionRef,omitempty"`
@@ -40,8 +36,8 @@ type AppVersionSpec struct {
 
 // AppVersionStatus defines the observed state of AppVersion
 type AppVersionStatus struct {
-	// phase - in list of [Available,UnAvailable]
-	// +kubebuilder:validation:Enum={Available,UnAvailable}
+	// phase - in list of [Available,UnAvailable,Deleting]
+	// +kubebuilder:validation:Enum={Available,UnAvailable,Deleting}
 	Phase Phase `json:"phase,omitempty"`
 	// +optional
 	Message string `json:"message,omitempty"`
@@ -56,7 +52,7 @@ type AppVersionStatus struct {
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:categories={dbaas},scope=Cluster
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
-//+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="appVersion phase"
+//+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
 
 // AppVersion is the Schema for the appversions API
 type AppVersion struct {

@@ -27,7 +27,6 @@ import (
 var _ = Describe("clusterDefinition webhook", func() {
 	var (
 		clusterDefinitionName = "clusterdefinition-webhook-mysql-definition"
-		appVersionName        = "clusterdefinition-webhook-appversion"
 	)
 	Context("When clusterDefinition create and update", func() {
 		It("Should webhook validate passed", func() {
@@ -67,11 +66,6 @@ var _ = Describe("clusterDefinition webhook", func() {
 			// validate spec.roleGroupTemplates
 			clusterDef.Spec.RoleGroupTemplates[0].TypeName = "primary_test"
 			Expect(k8sClient.Update(ctx, clusterDef)).ShouldNot(Succeed())
-
-			By("By testing delete clusterDefinition ")
-			appVersion := createTestAppVersionObj(clusterDefinitionName, appVersionName)
-			Expect(k8sClient.Create(ctx, appVersion)).Should(Succeed())
-			Expect(k8sClient.Delete(ctx, clusterDef)).ShouldNot(Succeed())
 
 		})
 	})

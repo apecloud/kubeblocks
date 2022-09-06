@@ -743,8 +743,7 @@ spec:
                 - Running
                 - Failed
                 - Creating
-                - Upgrading
-                - Scaling
+                - Rebuilding
                 - Deleting
                 - Deleted
                 type: string

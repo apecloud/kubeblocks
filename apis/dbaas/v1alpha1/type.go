@@ -1,5 +1,10 @@
 package v1alpha1
 
+import (
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+)
+
 const (
 	APIVersion            = "dbaas.infracreate.com/v1alpha1"
 	AppVersionKind        = "AppVersion"
@@ -13,6 +18,7 @@ type Phase string
 const (
 	AvailablePhase   Phase = "Available"
 	UnAvailablePhase Phase = "UnAvailable"
+	DeletingPhase    Phase = "Deleting"
 )
 
 type Status string
@@ -23,8 +29,12 @@ const (
 	InSyncStatus    Status = "InSync"
 )
 
-// label keys
-const (
-	AppVersionLabelKey = "appversion.infracreate.com/name"
-	ClusterDefLabelKey = "clusterdefinition.infracreate.com/name"
-)
+var webhookMgr *webhookManager
+
+type webhookManager struct {
+	client client.Client
+}
+
+func RegisterWebhookManager(mgr manager.Manager) {
+	webhookMgr = &webhookManager{mgr.GetClient()}
+}

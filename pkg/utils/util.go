@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -126,7 +125,7 @@ func SaveToTemp(file fs.File, format string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	tempFile, err := ioutil.TempFile(tempDir, format)
+	tempFile, err := os.CreateTemp(tempDir, format)
 	if err != nil {
 		return "", err
 	}
@@ -175,7 +174,7 @@ func GetPublicIP() (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -214,5 +213,5 @@ func MakeSSHKeyPair(pubKeyPath, privateKeyPath string) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(pubKeyPath, ssh.MarshalAuthorizedKey(pub), 0655)
+	return os.WriteFile(pubKeyPath, ssh.MarshalAuthorizedKey(pub), 0655)
 }

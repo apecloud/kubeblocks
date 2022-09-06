@@ -110,6 +110,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				return err
 			}
 			if cluster.Spec.TerminatingPolicy == "Delete" || cluster.Spec.TerminatingPolicy == "WipeOut" {
+				return r.deletePVCs(reqCtx, cluster)
 			}
 			return nil
 		})
@@ -252,19 +253,26 @@ func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *d
 		return err
 	}
 
-	ml := client.MatchingLabels{
-		"app.kubernetes.io/instance": cluster.GetName(),
-		"app.kubernetes.io/name":     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
-	}
+	for _, component := range clusterDef.Spec.Components {
 
-	pvcList := &corev1.PersistentVolumeClaimList{}
-	if err := r.List(reqCtx.Ctx, pvcList, ml); err != nil {
-		return err
-	}
-	for _, pvc := range pvcList.Items {
-		if err := r.Delete(reqCtx.Ctx, &pvc); err != nil {
-			return err
+		for _, roleGroup := range component.RoleGroups {
+
+			ml := client.MatchingLabels{
+				"app.kubernetes.io/instance": fmt.Sprintf("%s-%s-%s", cluster.GetName(), component.TypeName, roleGroup),
+				"app.kubernetes.io/name":     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
+			}
+
+			pvcList := &corev1.PersistentVolumeClaimList{}
+			if err := r.List(reqCtx.Ctx, pvcList, ml); err != nil {
+				return err
+			}
+			for _, pvc := range pvcList.Items {
+				if err := r.Delete(reqCtx.Ctx, &pvc); err != nil {
+					return err
+				}
+			}
 		}
 	}
+
 	return nil
 }

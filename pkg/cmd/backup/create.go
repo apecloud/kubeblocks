@@ -18,8 +18,9 @@ package backup
 
 import (
 	"context"
-	"fmt"
 	"time"
+
+	"github.com/apecloud/kubeblocks/pkg/utils"
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -118,7 +119,7 @@ func (o *CreateOptions) Run() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(obj)
+	utils.PrintObjYaml(obj)
 	return nil
 }
 

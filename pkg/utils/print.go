@@ -17,8 +17,12 @@ limitations under the License.
 package utils
 
 import (
+	"fmt"
 	"os"
 	"text/template"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/kustomize/kyaml/yaml"
 
 	"github.com/fatih/color"
 
@@ -74,6 +78,17 @@ type BackupJobInfo struct {
 	StartTime      string
 	CompletionTime string
 	Labels         string
+}
+
+type BackupSnapInfo struct {
+	Name          string
+	Namespace     string
+	ReadyToUse    bool
+	CreationTime  string
+	RestoreSize   string
+	SourcePVC     string
+	SnapshotClass string
+	Labels        string
 }
 
 var playgroundTmpl = `
@@ -195,4 +210,13 @@ func PrintTemplate(t string, data interface{}) error {
 	}
 
 	return nil
+}
+
+func PrintObjYaml(obj *unstructured.Unstructured) {
+	data, err := yaml.Marshal(obj)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	fmt.Println(string(data))
 }

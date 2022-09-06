@@ -19,10 +19,7 @@ package helm
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"helm.sh/helm/v3/pkg/repo"
-
-	"github.com/apecloud/kubeblocks/pkg/utils"
 )
 
 func TestAddRepo(t *testing.T) {
@@ -32,29 +29,4 @@ func TestAddRepo(t *testing.T) {
 	}
 	//nolint
 	AddRepo(&r)
-}
-
-func TestInstall(t *testing.T) {
-	is := assert.New(t)
-	installs := []InstallOpts{
-		{
-			Name:      "my",
-			Chart:     "oci://yimeisun.azurecr.io/helm-chart/mysql-innodbcluster",
-			Wait:      true,
-			Namespace: "default",
-			Version:   "1.0.0",
-			Sets:      []string{},
-			LoginOpts: &LoginOpts{
-				User:   "yimeisun",
-				Passwd: "8V+PmX1oSDv4pumDvZp6m7LS8iPgbY3A",
-				URL:    "yimeisun.azurecr.io",
-			},
-		},
-	}
-
-	for _, i := range installs {
-		res, err := i.Install(utils.ConfigPath("dbctl-playground"))
-		is.Equal(err, nil)
-		is.Equal(res.Name, i.Name)
-	}
 }

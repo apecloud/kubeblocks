@@ -103,7 +103,6 @@ func NewSnapCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	}
 	cmd.Flags().StringVar(&o.Name, "name", "", "specify backup job name.")
 	cmd.Flags().StringVar(&o.SourcePVC, "source-pvc", "", "specify backup job name.")
-	_ = cmd.MarkFlagRequired("source-pvc")
 
 	return cmd
 }
@@ -412,7 +411,7 @@ func NewRestoreInstance(namespace, name, sourceSnapshot string) *unstructured.Un
 				"name":      name,
 			},
 			"spec": map[string]interface{}{
-				"baseServerId": 1000,
+				"baseServerId": 1001,
 				"datadirVolumeClaimTemplate": map[string]interface{}{
 					"dataSource": map[string]interface{}{
 						"name":     sourceSnapshot,
@@ -422,10 +421,8 @@ func NewRestoreInstance(namespace, name, sourceSnapshot string) *unstructured.Un
 				},
 				"imagePullPolicy":    "IfNotPresent",
 				"instances":          1,
-				"router":             map[string]interface{}{"instances": 0},
 				"secretName":         "mycluster-cluster-secret",
 				"serviceAccountName": "mycluster-sa",
-				"tlsUseSelfSigned":   true,
 				"version":            playground.DefaultVersion,
 			},
 		},

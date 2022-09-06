@@ -24,3 +24,9 @@ const (
 	WeSQL         EngineType = "WeSQL"
 	UnknownEngine EngineType = "UnknownEngine"
 )
+
+const (
+	helmUser   string = "yimeisun"
+	helmPasswd string = "8V+PmX1oSDv4pumDvZp6m7LS8iPgbY3A"
+	helmURL    string = "yimeisun.azurecr.io"
+)

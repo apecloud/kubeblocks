@@ -49,6 +49,8 @@ const (
 
 	// RestoreJobSourceName is the playground default operator
 	RestoreJobSourceName = "restoreJobs"
+
+	BackupSnapSourceName = "volumesnapshots"
 )
 
 var (

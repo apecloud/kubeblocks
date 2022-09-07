@@ -652,7 +652,9 @@ func installCharts(pi *PlaygroundInstaller, wg *sync.WaitGroup) error {
 func (pi *PlaygroundInstaller) UnInstallDeps() error {
 	unInstall := func(cs []helm.InstallOpts) error {
 		ctx := context.Background()
-		for _, c := range cs {
+		for i := range cs {
+			// reverse chart order for uninstall.
+			c := cs[len(cs)-i-1]
 			opts := retry.Options{
 				MaxRetry: 1 + c.TryTimes,
 			}
@@ -667,22 +669,20 @@ func (pi *PlaygroundInstaller) UnInstallDeps() error {
 		}
 		return nil
 	}
-
 	info("UnInstalling playground database cluster...")
-	charts := pi.Provider.GetBaseCharts(pi.Namespace)
-	err := unInstall(charts)
-	if err != nil {
-		return err
-	}
-
 	// uninstall database cluster to default namespace
-	charts = pi.Provider.GetDBCharts(pi.Namespace, pi.DBCluster)
+	charts := pi.Provider.GetDBCharts(pi.Namespace, pi.DBCluster)
 
-	if err = unInstall(charts); err != nil {
+	if err := unInstall(charts); err != nil {
 		return err
 	}
 
-	if err = removeRepos(pi.Provider.GetRepos()); err != nil {
+	charts = pi.Provider.GetBaseCharts(pi.Namespace)
+	if err := unInstall(charts); err != nil {
+		return err
+	}
+
+	if err := removeRepos(pi.Provider.GetRepos()); err != nil {
 		return err
 	}
 	return nil

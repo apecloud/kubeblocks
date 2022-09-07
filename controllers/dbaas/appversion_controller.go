@@ -19,6 +19,7 @@ package dbaas
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -53,10 +54,10 @@ func appVersionUpdateHandler(cli client.Client, ctx context.Context, clusterDef 
 			patch := client.MergeFrom(item.DeepCopy())
 			notFoundComponentTypes, noContainersComponents := item.GetInconsistentComponentsInfo(clusterDef)
 			if len(notFoundComponentTypes) > 0 {
-				item.Status.Message = fmt.Sprintf("component %v not found in clusterDefinition.", notFoundComponentTypes)
+				item.Status.Message = fmt.Sprintf("component %s not found in clusterDefinition.", strings.Join(notFoundComponentTypes, ","))
 			}
 			if len(noContainersComponents) > 0 {
-				item.Status.Message += fmt.Sprintf("component %v no containers in clusterDefinition and appVersion.", noContainersComponents)
+				item.Status.Message += fmt.Sprintf("component %s no containers in clusterDefinition and appVersion.", strings.Join(noContainersComponents, ","))
 			}
 			if len(notFoundComponentTypes) > 0 || len(noContainersComponents) > 0 {
 				item.Status.ClusterDefSyncStatus = dbaasv1alpha1.OutOfSyncStatus

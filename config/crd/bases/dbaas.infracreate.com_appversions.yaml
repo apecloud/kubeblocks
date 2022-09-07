@@ -43,8 +43,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: AppVersionSpec defines the desired state of AppVersion,spec
-              is immutable
+            description: AppVersionSpec defines the desired state of AppVersion
             properties:
               clusterDefinitionRef:
                 description: ref ClusterDefinition

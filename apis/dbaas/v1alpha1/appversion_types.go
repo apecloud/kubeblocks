@@ -24,7 +24,7 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// AppVersionSpec defines the desired state of AppVersion,spec is immutable
+// AppVersionSpec defines the desired state of AppVersion
 type AppVersionSpec struct {
 	// ref ClusterDefinition
 	// +kubebuilder:validation:Required

@@ -124,7 +124,7 @@ func HandleCRDeletion(reqCtx RequestCtx,
 	return nil, nil
 }
 
-// ValidateReferenceCR validate is exist referencing CRs. if exists,requeue reconcile after 30 seconds
+// ValidateReferenceCR validate is exist referencing CRs. if exists, requeue reconcile after 30 seconds
 func ValidateReferenceCR(reqCtx RequestCtx, cli client.Client, obj client.Object,
 	labelKey string, statusHandler func() error, objLists ...client.ObjectList) (*ctrl.Result, error) {
 	for _, objList := range objLists {
@@ -139,16 +139,17 @@ func ValidateReferenceCR(reqCtx RequestCtx, cli client.Client, obj client.Object
 		} else {
 			// check list items
 			items := v.FieldByName("Items")
-			if items.IsValid() {
-				switch items.Kind() {
-				case reflect.Slice:
-					if items.Len() > 0 {
-						if err = statusHandler(); err != nil {
-							return nil, err
-						}
-						return &reconcile.Result{Requeue: true, RequeueAfter: 30 * time.Second}, nil
+			if !items.IsValid() || items.Kind() != reflect.Slice {
+				continue
+			}
+			if items.Len() > 0 {
+				if statusHandler != nil {
+					if err = statusHandler(); err != nil {
+						return nil, err
 					}
 				}
+				res, err := RequeueAfter(30*time.Second, reqCtx.Log, "")
+				return &res, err
 			}
 		}
 	}

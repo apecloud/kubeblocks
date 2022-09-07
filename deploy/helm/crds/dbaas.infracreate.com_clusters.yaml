@@ -713,15 +713,26 @@ spec:
                 - OutOfSync
                 type: string
               components:
-                items:
+                additionalProperties:
+                  description: ClusterStatusComponent record components status information
                   properties:
-                    id:
-                      type: string
                     message:
+                      description: Message record the component details message in
+                        current phase
                       type: string
                     phase:
+                      description: Phase - in list of [Running, Failed, Creating,
+                        Updating, Deleting, Deleted]
+                      enum:
+                      - Running
+                      - Failed
+                      - Creating
+                      - Updating
+                      - Deleting
+                      - Deleted
                       type: string
                     roleGroups:
+                      description: RoleGroups reference roleGroups in ClusterDefinition
                       items:
                         properties:
                           id:
@@ -733,10 +744,14 @@ spec:
                         type: object
                       type: array
                     type:
+                      description: Type component type
                       type: string
                   type: object
-                type: array
+                description: Components record the current status information of all
+                  components of the cluster
+                type: object
               message:
+                description: Message cluster details message in current phase
                 type: string
               observedGeneration:
                 description: observedGeneration is the most recent generation observed
@@ -744,6 +759,70 @@ spec:
                   is updated on mutation by the API Server.
                 format: int64
                 type: integer
+              operations:
+                description: Operations declares which operations the cluster supports
+                properties:
+                  horizontalScalable:
+                    description: HorizontalScalable which components of the cluster
+                      support horizontalScaling, and the replicas range limit.
+                    items:
+                      properties:
+                        max:
+                          description: Max maximum of replicas when operation is horizontalScaling
+                          type: integer
+                        min:
+                          description: Min minimum of replicas when operation is horizontalScaling,
+                          type: integer
+                        name:
+                          description: Name component name
+                          type: string
+                        volumeClaimTemplateNames:
+                          description: VolumeClaimTemplateNames which VolumeClaimTemplate
+                            of the component support volumeExpansion
+                          items:
+                            type: string
+                          type: array
+                      type: object
+                    type: array
+                  restartable:
+                    description: Restartable which components of the cluster support
+                      restart.
+                    items:
+                      type: string
+                    type: array
+                  upgradable:
+                    description: Upgradable whether the cluster supports upgrade.
+                      if multiple appVersions existed, it is true
+                    type: boolean
+                  verticalScalable:
+                    description: VerticalScalable which components of the cluster
+                      support verticalScaling.
+                    items:
+                      type: string
+                    type: array
+                  volumeExpandable:
+                    description: VolumeExpandable which components of the cluster
+                      and its volumeClaimTemplates support volumeExpansion.
+                    items:
+                      properties:
+                        max:
+                          description: Max maximum of replicas when operation is horizontalScaling
+                          type: integer
+                        min:
+                          description: Min minimum of replicas when operation is horizontalScaling,
+                          type: integer
+                        name:
+                          description: Name component name
+                          type: string
+                        volumeClaimTemplateNames:
+                          description: VolumeClaimTemplateNames which VolumeClaimTemplate
+                            of the component support volumeExpansion
+                          items:
+                            type: string
+                          type: array
+                      type: object
+                    type: array
+                type: object
               phase:
                 description: phase - in list of [Running, Failed, Creating, Updating,
                   Deleting, Deleted]

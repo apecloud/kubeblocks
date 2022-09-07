@@ -24,12 +24,12 @@
 
 ### ClusterDefinition CR controller
 - [x] track changes and update associated CRs (Cluster, AppVersion) status
-- [ ] cannot delete ClusterDefinition CR if any referencing CRs (Cluster, AppVersion)
+- [x] cannot delete ClusterDefinition CR if any referencing CRs (Cluster, AppVersion)
 
 ### AppVersion CR controller
-- [ ] immutable spec handling (via validating webhook)
-- [ ] CR status handling
-- [ ] cannot delete AppVersion CR if any referencing CRs (Cluster)
+- [x] immutable spec handling (via validating webhook)
+- [x] CR status handling
+- [x] cannot delete AppVersion CR if any referencing CRs (Cluster)
 
 ### Test
-- [ ] unit test
+- [x] unit test

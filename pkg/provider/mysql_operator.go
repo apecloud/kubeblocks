@@ -43,7 +43,7 @@ func (o *MysqlOperator) GetBaseCharts(ns string) []helm.InstallOpts {
 	return []helm.InstallOpts{
 		{
 			Name:      "prometheus",
-			Chart:     "prometheus-community/kube-prometheus-stack",
+			Chart:     "oci://yimeisun.azurecr.io/helm-chart/kube-prometheus-stack",
 			Wait:      false,
 			Version:   "38.0.2",
 			Namespace: ns,
@@ -63,6 +63,11 @@ func (o *MysqlOperator) GetBaseCharts(ns string) []helm.InstallOpts {
 				"thanosRuler.thanosRulerSpec.image.repository=infracreate/thanos",
 				"prometheus-node-exporter.image.repository=infracreate/node-exporter",
 				"grafana.sidecar.image.repository=infracreate/k8s-sidecar",
+			},
+			LoginOpts: &helm.LoginOpts{
+				User:   helmUser,
+				Passwd: helmPasswd,
+				URL:    helmURL,
 			},
 			TryTimes: 2,
 		},

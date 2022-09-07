@@ -212,6 +212,44 @@ spec:
 		})
 	})
 
+	Context("When deleting cluster", func() {
+		It("Should delete cluster resources according to termination policy", func() {
+			By("By creating a cluster")
+			toCreate, _, _, key := newClusterObj(nil, nil)
+
+			toCreate.Spec.TerminationPolicy = dbaasv1alpha1.DoNotTerminate
+
+			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+
+			fetchedG1 := &dbaasv1alpha1.Cluster{}
+
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedG1)
+				return fetchedG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+
+			fetchedG1.Spec.TerminationPolicy = dbaasv1alpha1.Halt
+			Expect(k8sClient.Update(context.Background(), fetchedG1)).Should(Succeed())
+
+			fetchedG2 := &dbaasv1alpha1.Cluster{}
+
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedG2)
+				return fetchedG2.Status.ObservedGeneration == 2
+			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting the cluster")
+			Eventually(func() bool {
+				if err := deleteClusterNWait(key); err != nil {
+					return false
+				}
+				tmp := &dbaasv1alpha1.Cluster{}
+				err := k8sClient.Get(context.Background(), key, tmp)
+				return apierrors.IsNotFound(err)
+			}, timeout, interval).Should(BeTrue())
+		})
+	})
+
 	Context("When updating cluster replicas", func() {
 		It("Should create/delete pod to the replicas number", func() {
 			By("By creating a cluster")

@@ -1,3 +1,4 @@
+export GONOPROXY=github.com/apecloud
 export GONOSUMDB=github.com/apecloud
 export GOPRIVATE=github.com/apecloud
 export GOPROXY=https://goproxy.cn

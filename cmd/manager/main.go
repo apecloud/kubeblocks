@@ -188,6 +188,9 @@ func main() {
 	}
 
 	if viper.GetBool("enable_webhooks") {
+
+		dbaasv1alpha1.RegisterWebhookManager(mgr)
+
 		if err = (&dbaasv1alpha1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Cluster")
 			os.Exit(1)

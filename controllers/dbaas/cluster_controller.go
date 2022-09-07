@@ -105,14 +105,18 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if cluster.Spec.TerminatingPolicy != "DoNotTerminate" {
-		res, err := intctrlutil.HandleCRDeletion(reqCtx, r, cluster, dbClusterFinalizerName, func() error {
+		res, err := intctrlutil.HandleCRDeletion(reqCtx, r, cluster, dbClusterFinalizerName, func() (*ctrl.Result, error) {
 			if err := r.deleteExternalResources(reqCtx, cluster); err != nil {
-				return err
+				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+				return &res, err
 			}
 			if cluster.Spec.TerminatingPolicy == "Delete" || cluster.Spec.TerminatingPolicy == "WipeOut" {
-				return r.deletePVCs(reqCtx, cluster)
+				err := r.deletePVCs(reqCtx, cluster)
+				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+				return &res, err
 			}
-			return nil
+			res, err := intctrlutil.Reconciled()
+			return &res, err
 		})
 		if res != nil {
 			return *res, err
@@ -158,6 +162,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	_, ok := cluster.ObjectMeta.Labels[clusterDefLabelKey]
 	if !ok {
 		cluster.ObjectMeta.Labels[clusterDefLabelKey] = clusterdefinition.Name
+		cluster.ObjectMeta.Labels[AppVersionLabelKey] = appversion.Name
 		if err = r.Client.Patch(reqCtx.Ctx, cluster, patch); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}

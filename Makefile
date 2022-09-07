@@ -140,7 +140,7 @@ fast-lint: # [INTERNAL] fast lint
 
 .PHONY: lint
 lint: generate ## Run golangci-lint against code.
-	$(GOLANGCILINT) run ./... --timeout=5m
+	$(MAKE) fast-lint
 
 .PHONY: staticcheck
 staticcheck: staticchecktool ## Run staticcheck against code. 

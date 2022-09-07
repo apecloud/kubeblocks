@@ -50,9 +50,9 @@ type ClusterStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// phase - in list of [Running, Failed, Creating, Upgrading, Scaling, Deleting, Deleted]
-	// +kubebuilder:validation:Enum={Running,Failed,Creating,Upgrading,Scaling,Deleting,Deleted}
-	Phase string `json:"phase,omitempty"`
+	// phase - in list of [Running, Failed, Creating, Updating, Deleting, Deleted]
+	// +kubebuilder:validation:Enum={Running,Failed,Creating,Updating,Deleting,Deleted}
+	Phase Phase `json:"phase,omitempty"`
 
 	// +optional
 	Message string `json:"message,omitempty"`

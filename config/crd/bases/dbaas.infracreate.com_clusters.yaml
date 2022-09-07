@@ -737,14 +737,13 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: phase - in list of [Running, Failed, Creating, Upgrading,
-                  Scaling, Deleting, Deleted]
+                description: phase - in list of [Running, Failed, Creating, Updating,
+                  Deleting, Deleted]
                 enum:
                 - Running
                 - Failed
                 - Creating
-                - Upgrading
-                - Scaling
+                - Updating
                 - Deleting
                 - Deleted
                 type: string

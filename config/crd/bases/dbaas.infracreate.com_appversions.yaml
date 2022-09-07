@@ -17,7 +17,15 @@ spec:
     singular: appversion
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    - description: status phase
+      jsonPath: .status.phase
+      name: PHASE
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: AppVersion is the Schema for the appversions API
@@ -1669,11 +1677,16 @@ spec:
                 type: string
               message:
                 type: string
+              observedGeneration:
+                description: generation number
+                format: int64
+                type: integer
               phase:
-                description: phase - in list of [Running, Failed]
+                description: phase - in list of [Available,UnAvailable,Deleting]
                 enum:
-                - Running
-                - Failed
+                - Available
+                - UnAvailable
+                - Deleting
                 type: string
             type: object
         type: object

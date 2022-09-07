@@ -19,7 +19,15 @@ spec:
     singular: clusterdefinition
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    - description: status phase
+      jsonPath: .status.phase
+      name: PHASE
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: ClusterDefinition is the Schema for the clusterdefinitions API
@@ -2243,12 +2251,20 @@ spec:
           status:
             description: ClusterDefinitionStatus defines the observed state of ClusterDefinition
             properties:
+              message:
+                type: string
               observedGeneration:
                 description: observedGeneration is the most recent generation observed
                   for this ClusterDefinition. It corresponds to the ClusterDefinition's
                   generation, which is updated on mutation by the API Server.
                 format: int64
                 type: integer
+              phase:
+                description: phase - in list of [Available,Deleting]
+                enum:
+                - Available
+                - Deleting
+                type: string
             type: object
         type: object
     served: true

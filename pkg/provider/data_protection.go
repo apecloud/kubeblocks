@@ -32,24 +32,7 @@ type DataProtection struct {
 }
 
 func (o *DataProtection) GetRepos() []repo.Entry {
-	return []repo.Entry{
-		{
-			Name: "prometheus-community",
-			URL:  "https://prometheus-community.github.io/helm-charts",
-		},
-		{
-			Name: "mysql-operator",
-			URL:  "https://mysql.github.io/mysql-operator/",
-		},
-		{
-			Name: "piraeus-charts",
-			URL:  "https://piraeus.io/helm-charts/",
-		},
-		{
-			Name: "cloudve",
-			URL:  "https://github.com/CloudVE/helm-charts/raw/master",
-		},
-	}
+	return []repo.Entry{}
 }
 
 func (o *DataProtection) GetBaseCharts(ns string) []helm.InstallOpts {
@@ -60,12 +43,17 @@ func (o *DataProtection) GetDBCharts(ns string, dbname string) []helm.InstallOpt
 	return []helm.InstallOpts{
 		{
 			Name:      "mysql-operator",
-			Chart:     "mysql-operator/mysql-operator",
+			Chart:     "oci://yimeisun.azurecr.io/helm-chart/mysql-operator",
 			Wait:      true,
 			Version:   "2.0.6",
 			Namespace: ns,
 			Sets:      []string{},
-			TryTimes:  2,
+			LoginOpts: &helm.LoginOpts{
+				User:   helmUser,
+				Passwd: helmPasswd,
+				URL:    helmURL,
+			},
+			TryTimes: 2,
 		},
 		{
 			Name:      dbname,
@@ -77,26 +65,31 @@ func (o *DataProtection) GetDBCharts(ns string, dbname string) []helm.InstallOpt
 				"serverVersion=" + o.ServerVersion,
 			},
 			LoginOpts: &helm.LoginOpts{
-				User:   "yimeisun",
-				Passwd: "8V+PmX1oSDv4pumDvZp6m7LS8iPgbY3A",
-				URL:    "yimeisun.azurecr.io",
+				User:   helmUser,
+				Passwd: helmPasswd,
+				URL:    helmURL,
 			},
 			TryTimes: 2,
 		},
 		{
 			Name:      "snapshot-controller",
-			Chart:     "piraeus-charts/snapshot-controller",
+			Chart:     "oci://yimeisun.azurecr.io/helm-chart/snapshot-controller",
 			Wait:      true,
 			Version:   "1.5.1",
 			Namespace: ns,
 			Sets: []string{
 				"image.repository=registry.aliyuncs.com/google_containers/snapshot-controller",
 			},
+			LoginOpts: &helm.LoginOpts{
+				User:   helmUser,
+				Passwd: helmPasswd,
+				URL:    helmURL,
+			},
 			TryTimes: 2,
 		},
 		{
 			Name:      "csi-s3",
-			Chart:     "cloudve/csi-s3",
+			Chart:     "oci://yimeisun.azurecr.io/helm-chart/csi-s3",
 			Wait:      true,
 			Version:   "0.31.3",
 			Namespace: ns,
@@ -106,6 +99,11 @@ func (o *DataProtection) GetDBCharts(ns string, dbname string) []helm.InstallOpt
 				"secret.endpoint=" + o.S3Endpoint,
 				"storageClass.singleBucket=" + o.S3Bucket,
 				"storageClass.mountOptions=--memory-limit 1000 --dir-mode 0777 --file-mode 0666 --region " + o.Region,
+			},
+			LoginOpts: &helm.LoginOpts{
+				User:   helmUser,
+				Passwd: helmPasswd,
+				URL:    helmURL,
 			},
 			TryTimes: 2,
 		},

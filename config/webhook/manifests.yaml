@@ -67,6 +67,46 @@ webhooks:
   sideEffects: None
 - admissionReviewVersions:
   - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-dbaas-infracreate-com-v1alpha1-opsdefinition
+  failurePolicy: Fail
+  name: mopsdefinition.kb.io
+  rules:
+  - apiGroups:
+    - dbaas.infracreate.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - opsdefinitions
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-dbaas-infracreate-com-v1alpha1-opsrequest
+  failurePolicy: Fail
+  name: mopsrequest.kb.io
+  rules:
+  - apiGroups:
+    - dbaas.infracreate.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - opsrequests
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -151,4 +191,44 @@ webhooks:
     - UPDATE
     resources:
     - clusterdefinitions
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-dbaas-infracreate-com-v1alpha1-opsdefinition
+  failurePolicy: Fail
+  name: vopsdefinition.kb.io
+  rules:
+  - apiGroups:
+    - dbaas.infracreate.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - opsdefinitions
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-dbaas-infracreate-com-v1alpha1-opsrequest
+  failurePolicy: Fail
+  name: vopsrequest.kb.io
+  rules:
+  - apiGroups:
+    - dbaas.infracreate.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - opsrequests
   sideEffects: None

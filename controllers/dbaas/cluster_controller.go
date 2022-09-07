@@ -57,7 +57,7 @@ func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *db
 	for _, item := range list.Items {
 		if item.Status.ClusterDefGeneration != clusterDef.GetObjectMeta().GetGeneration() {
 			patch := client.MergeFrom(item.DeepCopy())
-			item.Status.ClusterDefSyncStatus = "OutOfSync"
+			item.Status.ClusterDefSyncStatus = dbaasv1alpha1.OutOfSyncStatus
 			if err = cli.Status().Patch(ctx, &item, patch); err != nil {
 				return err
 			}
@@ -137,16 +137,16 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	if res, err := r.checkReferencedCRStatus(reqCtx, cluster, appversion.Status.Phase, dbaasv1alpha1.AppVersionKind); res != nil {
+	if res, err = r.checkReferencedCRStatus(reqCtx, cluster, appversion.Status.Phase, dbaasv1alpha1.AppVersionKind); res != nil {
 		return *res, err
 	}
 
-	if res, err := r.checkReferencedCRStatus(reqCtx, cluster, clusterdefinition.Status.Phase, dbaasv1alpha1.ClusterDefinitionKind); res != nil {
+	if res, err = r.checkReferencedCRStatus(reqCtx, cluster, clusterdefinition.Status.Phase, dbaasv1alpha1.ClusterDefinitionKind); res != nil {
 		return *res, err
 	}
 
-	if err = r.updateClusterPhaseToCreatingOrUpdating(reqCtx.Ctx, cluster); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	if res, err = r.updateClusterPhaseToCreatingOrUpdating(reqCtx, cluster); res != nil {
+		return *res, err
 	}
 
 	task, err := buildClusterCreationTasks(clusterdefinition, appversion, cluster)
@@ -340,37 +340,89 @@ func (r *ClusterReconciler) needCheckClusterForReady(cluster *dbaasv1alpha1.Clus
 }
 
 // updateClusterPhase update cluster.status.phase
-func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(ctx context.Context, cluster *dbaasv1alpha1.Cluster) error {
+func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster) (*ctrl.Result, error) {
+	if slices.Index([]dbaasv1alpha1.Phase{dbaasv1alpha1.CreatingPhase, dbaasv1alpha1.UpdatingPhase},
+		cluster.Status.Phase) != -1 {
+		return nil, nil
+	}
 	patch := client.MergeFrom(cluster.DeepCopy())
 	if cluster.Status.Phase == "" {
 		cluster.Status.Phase = dbaasv1alpha1.CreatingPhase
-	} else if cluster.Status.Phase != dbaasv1alpha1.CreatingPhase {
+	} else {
 		cluster.Status.Phase = dbaasv1alpha1.UpdatingPhase
 	}
-	return r.Client.Status().Patch(ctx, cluster, patch)
+	if err := r.Client.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
+		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return &res, err
+	}
+	// send an event when cluster perform operations
+	r.Recorder.Eventf(cluster, corev1.EventTypeNormal, string(cluster.Status.Phase),
+		"Start %s in Cluster: %s", cluster.Status.Phase, cluster.Name)
+	return &ctrl.Result{}, nil
 }
 
 // checkClusterIsReady Check whether the cluster related pod resources are running. if ok, update Cluster.status.phase to Running
 func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *dbaasv1alpha1.Cluster) error {
-	statefulSetList := &appsv1.StatefulSetList{}
+	var (
+		statefulSetList         = &appsv1.StatefulSetList{}
+		isOk                    = true
+		needSyncStatusComponent bool
+		phase                   dbaasv1alpha1.Phase
+	)
 	if err := r.Client.List(ctx, statefulSetList,
 		client.InNamespace(cluster.Namespace),
 		client.MatchingLabels{appInstanceLabelKey: cluster.Name}); err != nil {
 		return err
 	}
-	isOk := true
+	patch := client.MergeFrom(cluster.DeepCopy())
 	for _, v := range statefulSetList.Items {
+		phase = cluster.Status.Phase
 		if v.Status.AvailableReplicas != *v.Spec.Replicas ||
-			v.Status.CurrentRevision != v.Status.UpdateRevision {
+			v.Status.CurrentRevision != v.Status.UpdateRevision ||
+			v.Status.ObservedGeneration != v.GetGeneration() {
 			isOk = false
-			break
+		} else {
+			phase = dbaasv1alpha1.RunningPhase
+		}
+		if ok := r.patchStatusComponentsWithStatefulSet(cluster, &v, phase); ok {
+			needSyncStatusComponent = true
 		}
 	}
+
 	if !isOk {
+		if needSyncStatusComponent {
+			_ = r.Client.Status().Patch(ctx, cluster, patch)
+		}
 		return fmt.Errorf("cluster is not ready")
 	}
-
-	patch := client.MergeFrom(cluster.DeepCopy())
 	cluster.Status.Phase = dbaasv1alpha1.RunningPhase
-	return r.Client.Status().Patch(ctx, cluster, patch)
+	if err := r.Client.Status().Patch(ctx, cluster, patch); err != nil {
+		return err
+	}
+	// send an event when Cluster.status.phase change to Running
+	r.Recorder.Eventf(cluster, corev1.EventTypeNormal, string(dbaasv1alpha1.RunningPhase), "Cluster: %s is ready, current phase is Running", cluster.Name)
+	return nil
+}
+
+// patchStatusComponentsWithStatefulSet  Modify status.components information, include component phase
+func (r *ClusterReconciler) patchStatusComponentsWithStatefulSet(cluster *dbaasv1alpha1.Cluster, statefulSet *appsv1.StatefulSet, phase dbaasv1alpha1.Phase) bool {
+	var (
+		cName           string
+		ok              bool
+		statusComponent *dbaasv1alpha1.ClusterStatusComponent
+	)
+	if cName, ok = statefulSet.Labels[appComponentLabelKey]; !ok {
+		return false
+	}
+	if cluster.Status.Components == nil {
+		cluster.Status.Components = map[string]*dbaasv1alpha1.ClusterStatusComponent{}
+	}
+	if statusComponent, ok = cluster.Status.Components[cName]; !ok {
+		cluster.Status.Components[cName] = &dbaasv1alpha1.ClusterStatusComponent{Phase: phase}
+		return true
+	} else if statusComponent.Phase != phase {
+		statusComponent.Phase = phase
+		return true
+	}
+	return false
 }

@@ -1,0 +1,13 @@
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind: OpsRequest
+metadata:
+  name: mysql-volumeexpansion
+  namespace: default
+spec:
+  clusterRef: mysql-cluster-01
+  type: VolumeExpansion
+  componentOps:
+    componentNames: [replicasets]
+    volumeExpansion:
+    - name: log
+      storage: "3Gi"

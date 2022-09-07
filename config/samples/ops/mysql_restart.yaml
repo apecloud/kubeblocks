@@ -1,0 +1,11 @@
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind: OpsRequest
+metadata:
+  name: mysql-restart
+  namespace: default
+spec:
+  clusterRef: mysql-cluster-01
+  type: Restart
+  ttlSecondsAfterSucceed: 3600
+  componentOps:
+    componentNames: [replicasets]

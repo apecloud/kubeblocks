@@ -1,0 +1,10 @@
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind: OpsDefinition
+metadata:
+  name: mysql-volumeexpansion-definition
+spec:
+  clusterDefinitionRef: mysql-cluster-definition
+  type: VolumeExpansion
+  strategies:
+    components:
+    - type: replicasets

@@ -1,0 +1,14 @@
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind: OpsRequest
+metadata:
+  name: mysql-horizontalscaling
+  namespace: default
+spec:
+  clusterRef: mysql-cluster-01
+  type: HorizontalScaling
+  componentOps:
+    componentNames: [replicasets]
+    horizontalScaling:
+      roleGroups:
+      - name: primary
+        replicas: 1

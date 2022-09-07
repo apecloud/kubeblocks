@@ -713,7 +713,7 @@ spec:
                 - OutOfSync
                 type: string
               components:
-                items:
+                additionalProperties:
                   properties:
                     id:
                       type: string
@@ -735,7 +735,7 @@ spec:
                     type:
                       type: string
                   type: object
-                type: array
+                type: object
               message:
                 type: string
               observedGeneration:

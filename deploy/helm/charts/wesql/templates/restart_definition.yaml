@@ -1,0 +1,12 @@
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind: OpsDefinition
+metadata:
+  name: wesql-restart-definition
+  labels:
+    {{- include "wesqlapp.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: wesql-clusterdefinition
+  type: Restart
+  strategies:
+    components:
+    - type: replicasets

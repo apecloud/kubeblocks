@@ -1,0 +1,7 @@
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind: OpsDefinition
+metadata:
+  name: mysql-upgrade-definition
+spec:
+  clusterDefinitionRef: mysql-cluster-definition
+  type: Upgrade

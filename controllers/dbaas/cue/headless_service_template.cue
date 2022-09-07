@@ -4,7 +4,7 @@ pod: {
 			"statefulset.kubernetes.io/pod-name": string
 			"app.kubernetes.io/name":             string
 			"app.kubernetes.io/instance":         string
-			"app.kubernetes.io/component":        string
+			"app.kubernetes.io/component-name":   string
 		}
 		name:      string
 		namespace: string
@@ -27,9 +27,9 @@ service: {
 		"name":      pod.metadata.name
 		"namespace": pod.metadata.namespace
 		labels: {
-			"app.kubernetes.io/instance":  pod.metadata.labels."app.kubernetes.io/instance"
-			"app.kubernetes.io/name":      pod.metadata.labels."app.kubernetes.io/name"
-			"app.kubernetes.io/component": pod.metadata.labels."app.kubernetes.io/component"
+			"app.kubernetes.io/instance":       pod.metadata.labels."app.kubernetes.io/instance"
+			"app.kubernetes.io/name":           pod.metadata.labels."app.kubernetes.io/name"
+			"app.kubernetes.io/component-name": pod.metadata.labels."app.kubernetes.io/component-name"
 			// "app.kubernetes.io/version" : # TODO
 			"app.kubernetes.io/created-by": "controller-manager"
 		}

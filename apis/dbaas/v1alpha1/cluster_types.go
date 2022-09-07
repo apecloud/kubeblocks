@@ -73,7 +73,7 @@ type ClusterStatus struct {
 	Message string `json:"message,omitempty"`
 
 	// +optional
-	Components []ClusterStatusComponent `json:"components,omitempty"`
+	Components map[string]*ClusterStatusComponent `json:"components,omitempty"`
 
 	ClusterDefinitionStatusGeneration `json:",inline"`
 }
@@ -164,7 +164,7 @@ type ClusterRoleGroup struct {
 type ClusterStatusComponent struct {
 	ID         string                   `json:"id,omitempty"`
 	Type       string                   `json:"type,omitempty"`
-	Phase      string                   `json:"phase,omitempty"`
+	Phase      Phase                    `json:"phase,omitempty"`
 	Message    string                   `json:"message,omitempty"`
 	RoleGroups []ClusterStatusRoleGroup `json:"roleGroups,omitempty"`
 }

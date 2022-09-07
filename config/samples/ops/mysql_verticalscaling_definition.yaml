@@ -1,0 +1,10 @@
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind: OpsDefinition
+metadata:
+  name: mysql-verticalscaling-definition
+spec:
+  clusterDefinitionRef: mysql-cluster-definition
+  type: VerticalScaling
+  strategies:
+    components:
+    - type: replicasets

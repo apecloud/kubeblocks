@@ -1,0 +1,117 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.9.0
+  creationTimestamp: null
+  name: opsdefinitions.dbaas.infracreate.com
+spec:
+  group: dbaas.infracreate.com
+  names:
+    categories:
+    - dbaas
+    kind: OpsDefinition
+    listKind: OpsDefinitionList
+    plural: opsdefinitions
+    shortNames:
+    - od
+    singular: opsdefinition
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    - description: OpsDefinition Status.
+      jsonPath: .status.phase
+      name: PHASE
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: OpsDefinition is the Schema for the opsdefinitions API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: OpsDefinitionSpec defines the desired state of OpsDefinition
+            properties:
+              clusterDefinitionRef:
+                description: ClusterDefinitionRef reference clusterDefinition resource
+                minLength: 1
+                type: string
+              strategies:
+                description: Strategy the execution strategy of the operation,exclude
+                  operation type of Upgrade
+                properties:
+                  components:
+                    description: Components is an array of component types, which
+                      defines the components that can be used by the operation .
+                    items:
+                      properties:
+                        type:
+                          description: component type
+                          type: string
+                      required:
+                      - type
+                      type: object
+                    minItems: 1
+                    type: array
+                required:
+                - components
+                type: object
+              type:
+                description: Type define the type of operation job
+                enum:
+                - Upgrade
+                - VerticalScaling
+                - VolumeExpansion
+                - HorizontalScaling
+                - Restart
+                type: string
+            required:
+            - clusterDefinitionRef
+            - type
+            type: object
+          status:
+            description: OpsDefinitionStatus defines the observed state of OpsDefinition
+            properties:
+              clusterDefGeneration:
+                description: ClusterDefinition generation number
+                format: int64
+                type: integer
+              clusterDefSyncStatus:
+                description: ClusterDefinition sync. status
+                enum:
+                - InSync
+                - OutOfSync
+                type: string
+              message:
+                type: string
+              observedGeneration:
+                format: int64
+                type: integer
+              phase:
+                enum:
+                - Available
+                - UnAvailable
+                type: string
+            required:
+            - phase
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

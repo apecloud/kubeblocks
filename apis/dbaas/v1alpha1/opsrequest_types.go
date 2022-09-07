@@ -1,0 +1,157 @@
+/*
+Copyright 2022.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package v1alpha1
+
+import (
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
+// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+
+// OpsRequestSpec defines the desired state of OpsRequest
+type OpsRequestSpec struct {
+	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
+
+	// ClusterRef reference clusterDefinition resource
+	// +kubebuilder:validation:Required
+	ClusterRef string `json:"clusterRef"`
+
+	// Type defines the operation type
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart}
+	Type OpsType `json:"type"`
+
+	// TTLSecondsAfterSucceed OpsRequest will be deleted after TTLSecondsAfterSucceed second when OpsRequest.status.phase is Running
+	// +optional
+	TTLSecondsAfterSucceed int `json:"ttlSecondsAfterSucceed,omitempty"`
+
+	// ClusterOps defines cluster level operations, like Upgrade
+	// +optional
+	ClusterOps *ClusterOps `json:"clusterOps,omitempty"`
+
+	// ComponentOps defines component level operations, like VolumeExpansion,VerticalScaling,HorizontalScaling
+	// +optional
+	ComponentOps *ComponentOps `json:"componentOps,omitempty"`
+}
+
+// OpsRequestStatus defines the observed state of OpsRequest
+type OpsRequestStatus struct {
+	// INSERT ADDITIONAL STATUS FIE`LD - define observed state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
+
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// +kubebuilder:validation:Enum={Pending,Running,Failed,Succeed}
+	Phase Phase `json:"phase,omitempty"`
+
+	// +optional
+	Components map[string]OpsRequestStatusComponent `json:"components,omitempty"`
+
+	// this means when start processing OpsRequest, status.Phase is Running
+	// +optional
+	StartTimestamp *metav1.Time `json:"StartTimestamp,omitempty"`
+
+	// the OpsRequest completion time
+	// +optional
+	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
+
+	// describe opsRequest detail status
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
+//+kubebuilder:object:root=true
+//+kubebuilder:subresource:status
+//+kubebuilder:resource:categories={dbaas,all},shortName=ops
+//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+//+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="Cluster Status."
+
+// OpsRequest is the Schema for the opsrequests API
+type OpsRequest struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   OpsRequestSpec   `json:"spec,omitempty"`
+	Status OpsRequestStatus `json:"status,omitempty"`
+}
+
+//+kubebuilder:object:root=true
+
+// OpsRequestList contains a list of OpsRequest
+type OpsRequestList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []OpsRequest `json:"items"`
+}
+
+type ClusterOps struct {
+	// +kubebuilder:validation:Required
+	Upgrade *Upgrade `json:"upgrade"`
+}
+
+type ComponentOps struct {
+	// ComponentNames defines which components perform the operation
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	ComponentNames []string `json:"componentNames,omitempty"`
+
+	// VolumeExpansion defines the variables that need to be input when expanding a volume
+	// +optional
+	VolumeExpansion []VolumeExpansion `json:"volumeExpansion,omitempty"`
+
+	// VerticalScaling defines the variables that need to be input when scaling compute resources
+	// +optional
+	VerticalScaling *corev1.ResourceRequirements `json:"verticalScaling,omitempty"`
+
+	// HorizontalScaling defines the variables that need to be input when scaling replicas
+	// +optional
+	HorizontalScaling *HorizontalScaling `json:"horizontalScaling,omitempty"`
+}
+
+type Upgrade struct {
+	// +kubebuilder:validation:Required
+	AppVersionRef string `json:"appVersionRef"`
+}
+
+type VolumeExpansion struct {
+	// the request storage size
+	// +kubebuilder:validation:Required
+	Storage string `json:"storage"`
+
+	// ClusterComponentVolumeClaimTemplate.Name
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+}
+
+type HorizontalScaling struct {
+	// +optional
+	Replicas int `json:"replicas,omitempty"`
+
+	// +optional
+	RoleGroups []ClusterRoleGroup `json:"roleGroups,omitempty"`
+}
+
+type OpsRequestStatusComponent struct {
+	Phase Phase `json:"phase,omitempty"`
+}
+
+func init() {
+	SchemeBuilder.Register(&OpsRequest{}, &OpsRequestList{})
+}

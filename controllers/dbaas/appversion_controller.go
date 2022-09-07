@@ -59,17 +59,16 @@ func appVersionUpdateHandler(cli client.Client, ctx context.Context, clusterDef 
 			} else if len(noContainersComponents) > 0 {
 				statusMsgs = append(statusMsgs, fmt.Sprintf("spec.components[*].type %v missing spec.components[*].containers in ClusterDefinition.spec.components[*] and AppVersion.spec.components[*]", noContainersComponents))
 			}
+
 			if len(statusMsgs) > 0 {
-				item.Status.Message = strings.Join(statusMsgs, ";")
-			}
-			item.Status.ClusterDefSyncStatus = dbaasv1alpha1.OutOfSyncStatus
-			if len(notFoundComponentTypes) > 0 || len(noContainersComponents) > 0 {
 				item.Status.Phase = dbaasv1alpha1.UnavailablePhase
+				item.Status.Message = strings.Join(statusMsgs, ";")
 			} else {
 				item.Status.Phase = dbaasv1alpha1.AvailablePhase
 				item.Status.Message = ""
 			}
 			item.Status.ClusterDefGeneration = clusterDef.Generation
+			item.Status.ClusterDefSyncStatus = dbaasv1alpha1.OutOfSyncStatus
 			if err = cli.Status().Patch(ctx, &item, patch); err != nil {
 				return err
 			}

@@ -103,6 +103,7 @@ func NewSnapCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	}
 	cmd.Flags().StringVar(&o.Name, "name", "", "specify backup job name.")
 	cmd.Flags().StringVar(&o.SourcePVC, "source-pvc", "", "specify backup job name.")
+	_ = cmd.MarkFlagRequired("source-pvc")
 
 	return cmd
 }

@@ -105,7 +105,7 @@ func (o *DataProtection) GetDBCharts(ns string, dbname string) []helm.InstallOpt
 				"secret.secretKey=" + o.SecretKey,
 				"secret.endpoint=" + o.S3Endpoint,
 				"storageClass.singleBucket=" + o.S3Bucket,
-				"storageClass.mountOptions='--memory-limit 1000 --dir-mode 0777 --file-mode 0666 --region " + o.Region + "'",
+				"storageClass.mountOptions=--memory-limit 1000 --dir-mode 0777 --file-mode 0666 --region " + o.Region,
 			},
 			TryTimes: 2,
 		},

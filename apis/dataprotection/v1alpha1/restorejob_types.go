@@ -87,6 +87,9 @@ type RestoreJobStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={dbaas},scope=Namespaced
+// +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="CompletionTime",type=date,JSONPath=`.status.completionTimestamp`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 // RestoreJob is the Schema for the restorejobs API (defined by User)
 type RestoreJob struct {
 	metav1.TypeMeta   `json:",inline"`

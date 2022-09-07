@@ -404,14 +404,14 @@ func prepareRoleGroupObjs(ctx context.Context, cli client.Client, obj interface{
 		}
 		*params.applyObjs = append(*params.applyObjs, sts)
 
-		svcs, err := buildSvcs(*params, sts)
+		svcs, err := buildHeadlessSvcs(*params, sts)
 		if err != nil {
 			return err
 		}
 		*params.applyObjs = append(*params.applyObjs, svcs...)
 	}
 
-	pdb, err := buildPdb(*params)
+	pdb, err := buildPDB(*params)
 	if err != nil {
 		return err
 	}
@@ -536,7 +536,7 @@ func createOrReplaceResources(ctx context.Context,
 	return nil
 }
 
-func buildSvcs(params createParams, sts *appsv1.StatefulSet) ([]client.Object, error) {
+func buildHeadlessSvcs(params createParams, sts *appsv1.StatefulSet) ([]client.Object, error) {
 	stsPodLabels := sts.Spec.Template.Labels
 	replicas := *sts.Spec.Replicas
 	svcs := make([]client.Object, replicas)
@@ -845,7 +845,7 @@ func buildHeadlessService(params createParams, pod *corev1.Pod) (*corev1.Service
 	return &svc, nil
 }
 
-func buildPdb(params createParams) (*policyv1.PodDisruptionBudget, error) {
+func buildPDB(params createParams) (*policyv1.PodDisruptionBudget, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
 	cueTpl, err := params.getCacheCUETplValue("pdb_template.cue", func() (*intctrlutil.CUETpl, error) {

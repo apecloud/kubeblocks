@@ -87,7 +87,7 @@ spec:
 					return false
 				}
 				return len(createdClusterDef.Finalizers) > 0 &&
-					createdClusterDef.Status.ObservedGeneration == createdClusterDef.GetObjectMeta().GetGeneration()
+					createdClusterDef.Status.ObservedGeneration == 1
 			}, time.Second*10, time.Second*1).Should(BeTrue())
 			By("By creating an appVersion")
 			appVerYaml := `

@@ -3,8 +3,9 @@ package dbaas
 import (
 	"context"
 	"fmt"
-	"github.com/sethvargo/go-password/password"
 	"time"
+
+	"github.com/sethvargo/go-password/password"
 
 	"k8s.io/apimachinery/pkg/util/intstr"
 

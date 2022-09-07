@@ -26,9 +26,9 @@ import (
 
 const (
 	DoNotTerminate TerminationPolicyType = "DoNotTerminate"
-	Halt                                 = "Halt"
-	Delete                               = "Delete"
-	WipeOut                              = "WipeOut"
+	Halt           TerminationPolicyType = "Halt"
+	Delete         TerminationPolicyType = "Delete"
+	WipeOut        TerminationPolicyType = "WipeOut"
 )
 
 type TerminationPolicyType string

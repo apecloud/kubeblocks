@@ -175,7 +175,7 @@ func (r *ClusterDefinition) getInvalidElementsInArray(m map[string]struct{}, arr
 
 func (r *ClusterDefinition) getNotFoundMsg(invalidElements []string, tag string, componentType string) string {
 	if tag == componentTag {
-		return fmt.Sprintf("component type %s Not Found in spec.components", invalidElements)
+		return fmt.Sprintf("component type %s Not Found in spec.components[*].typeName", invalidElements)
 	} else {
 		return fmt.Sprintf("roleGroup %s Not Found in spec.components[%s].roleGroups", invalidElements, componentType)
 	}
@@ -184,7 +184,7 @@ func (r *ClusterDefinition) getNotFoundMsg(invalidElements []string, tag string,
 
 func (r *ClusterDefinition) getMissingMsg(tag, componentType string) string {
 	if tag == componentTag {
-		return "missing component types compared with spec.components"
+		return "missing component types compared with spec.components[*].typeName"
 	} else {
 		return fmt.Sprintf("missing roleGroup compared with spec.components[%s].roleGroups", componentType)
 	}

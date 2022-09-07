@@ -154,13 +154,13 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 		// TODO validate roleGroups
 	}
 	if len(invalidComponentTypes) > 0 {
-		*allErrs = append(*allErrs, field.NotFound(field.NewPath("spec.components"),
+		*allErrs = append(*allErrs, field.NotFound(field.NewPath("spec.components[*].type"),
 			getComponentTypeNotFoundMsg(invalidComponentTypes, r.Spec.ClusterDefRef)))
 	}
 
 	if len(duplicateComponentNames) > 0 {
-		*allErrs = append(*allErrs, field.Duplicate(field.NewPath("spec.components"),
-			fmt.Sprintf("component name %v is duplicated", r.getDuplicateMapKeys(duplicateComponentNames))))
+		*allErrs = append(*allErrs, field.Duplicate(field.NewPath("spec.components[*].name"),
+			fmt.Sprintf(" %v is duplicated", r.getDuplicateMapKeys(duplicateComponentNames))))
 	}
 }
 

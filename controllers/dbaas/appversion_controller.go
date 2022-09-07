@@ -55,10 +55,9 @@ func appVersionUpdateHandler(cli client.Client, ctx context.Context, clusterDef 
 			notFoundComponentTypes, noContainersComponents := item.GetInconsistentComponentsInfo(clusterDef)
 			var statusMsgs []string
 			if len(notFoundComponentTypes) > 0 {
-				statusMsgs = append(statusMsgs, fmt.Sprintf("spec.components[*].type %v not found in clusterDefinition", notFoundComponentTypes))
-			}
-			if len(noContainersComponents) > 0 {
-				statusMsgs = append(statusMsgs, fmt.Sprintf("spec.components[*].type %v no containers in clusterDefinition and appVersion", notFoundComponentTypes))
+				statusMsgs = append(statusMsgs, fmt.Sprintf("spec.components[*].type %v not found in ClusterDefinition.spec.components[*].typeName", notFoundComponentTypes))
+			} else if len(noContainersComponents) > 0 {
+				statusMsgs = append(statusMsgs, fmt.Sprintf("spec.components[*].type %v missing spec.components[*].containers in ClusterDefinition.spec.components[*] and AppVersion.spec.components[*]", noContainersComponents))
 			}
 			if len(statusMsgs) > 0 {
 				item.Status.Message = strings.Join(statusMsgs, ";")

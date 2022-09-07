@@ -31,6 +31,8 @@ const (
 	WipeOut               = "WipeOut"
 )
 
+type TerminationPolicyType string
+
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
 	// ref ClusterDefinition, immutable
@@ -46,7 +48,7 @@ type ClusterSpec struct {
 
 	// +kubebuilder:default=Halt
 	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
-	TerminationPolicy string `json:"terminationPolicy,omitempty"`
+	TerminationPolicy TerminationPolicyType `json:"terminationPolicy,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster

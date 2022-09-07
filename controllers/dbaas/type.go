@@ -30,6 +30,9 @@ const (
 
 	// label keys
 	clusterDefLabelKey = "clusterdefinition.infracreate.com/name"
+	AppVersionLabelKey = "appversion.infracreate.com/name"
+	ClusterDefLabelKey = "clusterdefinition.infracreate.com/name"
+	InstanceLabelKey   = "app.kubernetes.io/instance"
 )
 
 type Component struct {

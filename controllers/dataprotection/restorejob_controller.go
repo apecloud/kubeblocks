@@ -76,8 +76,8 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	reqCtx.Log.Info("in RestoreJob Reconciler: name: " + restoreJob.Name + " phase: " + string(restoreJob.Status.Phase))
 
 	// handle finalizer
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, restoreJob, dataProtectionFinalizerName, func() error {
-		return r.deleteExternalResources(reqCtx, restoreJob)
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, restoreJob, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
+		return nil, r.deleteExternalResources(reqCtx, restoreJob)
 	})
 	if err != nil {
 		return *res, err

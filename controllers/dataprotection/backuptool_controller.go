@@ -67,8 +67,8 @@ func (r *BackupToolReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// handle finalizer
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, backupTool, dataProtectionFinalizerName, func() error {
-		return r.deleteExternalResources(reqCtx, backupTool)
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, backupTool, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
+		return nil, r.deleteExternalResources(reqCtx, backupTool)
 	})
 	if err != nil {
 		return *res, err

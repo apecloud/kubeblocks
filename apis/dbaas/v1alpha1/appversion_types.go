@@ -26,9 +26,6 @@ import (
 
 // AppVersionSpec defines the desired state of AppVersion
 type AppVersionSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// ref ClusterDefinition
 	// +kubebuilder:validation:Required
 	ClusterDefinitionRef string `json:"clusterDefinitionRef,omitempty"`
@@ -39,10 +36,14 @@ type AppVersionSpec struct {
 
 // AppVersionStatus defines the observed state of AppVersion
 type AppVersionStatus struct {
-	// phase - in list of [Running, Failed]
-	// +kubebuilder:validation:Enum={Running,Failed}
-	Phase   string `json:"phase,omitempty"`
+	// phase - in list of [Available,UnAvailable,Deleting]
+	// +kubebuilder:validation:Enum={Available,UnAvailable,Deleting}
+	Phase Phase `json:"phase,omitempty"`
+	// +optional
 	Message string `json:"message,omitempty"`
+	// generation number
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	ClusterDefinitionStatusGeneration `json:",inline"`
 }
@@ -50,6 +51,8 @@ type AppVersionStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:categories={dbaas},scope=Cluster
+//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+//+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
 
 // AppVersion is the Schema for the appversions API
 type AppVersion struct {

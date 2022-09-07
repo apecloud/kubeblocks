@@ -1,4 +1,3 @@
-export GONOPROXY=github.com/apecloud
 export GONOSUMDB=github.com/apecloud
 export GOPRIVATE=github.com/apecloud
 export GOPROXY=https://goproxy.cn
@@ -136,11 +135,11 @@ cue-vet: cuetool ## Run cue vet against code.
 
 .PHONY: fast-lint
 fast-lint: # [INTERNAL] fast lint
-	$(GOLANGCILINT) run ./...
+	$(GOLANGCILINT) run ./... --timeout=5m
 
 .PHONY: lint
 lint: generate ## Run golangci-lint against code.
-	$(GOLANGCILINT) run ./...
+	$(MAKE) fast-lint
 
 .PHONY: staticcheck
 staticcheck: staticchecktool ## Run staticcheck against code. 
@@ -243,8 +242,8 @@ endif
 # Run with Delve for development purposes against the configured Kubernetes cluster in ~/.kube/config
 # Delve is a debugger for the Go programming language. More info: https://github.com/go-delve/delve
 run-delve: manifests generate fmt vet  ## Run Delve debugger.
-    $(GO) build -gcflags "all=-trimpath=$(shell go env GOPATH)" -o bin/manager ./cmd/manager/main.go
-    dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./bin/manager
+	$(GO) build -gcflags "all=-trimpath=$(shell go env GOPATH)" -o bin/manager ./cmd/manager/main.go
+	dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./bin/manager
 
 
 .PHONY: docker-build
@@ -309,18 +308,14 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 ##@ CI
 
 .PHONY: ci-test-pre
-ci-test-pre: ## Prepare CI test environment.
-	$(MAKE) bin/dbctl
+ci-test-pre: dbctl ## Prepare CI test environment.
 	bin/dbctl playground destroy
 	bin/dbctl playground init
 
 .PHONY: ci-test
 ci-test: ci-test-pre test ## Run CI tests.
 	bin/dbctl playground destroy
-	go tool cover -html=cover.out -o cover.html
-	go tool cover -func=cover.out -o cover_total.out
-	python3 /datatestsuites/infratest.py -t 0 -c filepath:./cover_total.out,percent:60%
-
+	$(GO) tool cover -html=cover.out -o cover.html
 
 ##@ Contributor
 

@@ -3,6 +3,7 @@ package dbaas
 import (
 	"context"
 	"fmt"
+	"github.com/sethvargo/go-password/password"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -151,8 +152,9 @@ spec:
 			appVersionObj = assureAppVersionObj()
 		}
 
+		randomStr, _ := password.Generate(6, 0, 0, true, false)
 		key := types.NamespacedName{
-			Name:      "cluster",
+			Name:      "cluster" + randomStr,
 			Namespace: "default",
 		}
 

@@ -139,18 +139,16 @@ func ValidateReferenceCR(reqCtx RequestCtx, cli client.Client, obj client.Object
 		} else {
 			// check list items
 			items := v.FieldByName("Items")
-			if !items.IsValid() || items.Kind() != reflect.Slice {
+			if !items.IsValid() || items.Kind() != reflect.Slice || items.Len() == 0 {
 				continue
 			}
-			if items.Len() > 0 {
-				if statusHandler != nil {
-					if err = statusHandler(); err != nil {
-						return nil, err
-					}
+			if statusHandler != nil {
+				if err = statusHandler(); err != nil {
+					return nil, err
 				}
-				res, err := RequeueAfter(30*time.Second, reqCtx.Log, "")
-				return &res, err
 			}
+			res, err := RequeueAfter(30*time.Second, reqCtx.Log, "")
+			return &res, err
 		}
 	}
 	return nil, nil

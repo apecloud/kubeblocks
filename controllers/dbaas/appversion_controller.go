@@ -53,11 +53,15 @@ func appVersionUpdateHandler(cli client.Client, ctx context.Context, clusterDef 
 		if item.Status.ClusterDefGeneration != clusterDef.GetObjectMeta().GetGeneration() {
 			patch := client.MergeFrom(item.DeepCopy())
 			notFoundComponentTypes, noContainersComponents := item.GetInconsistentComponentsInfo(clusterDef)
+			var statusMsgs []string
 			if len(notFoundComponentTypes) > 0 {
-				item.Status.Message = fmt.Sprintf("component %s not found in clusterDefinition.", strings.Join(notFoundComponentTypes, ","))
+				statusMsgs = append(statusMsgs, fmt.Sprintf("component %v not found in clusterDefinition", notFoundComponentTypes))
 			}
 			if len(noContainersComponents) > 0 {
-				item.Status.Message += fmt.Sprintf("component %s no containers in clusterDefinition and appVersion.", strings.Join(noContainersComponents, ","))
+				statusMsgs = append(statusMsgs, fmt.Sprintf("component %v no containers in clusterDefinition and appVersion", notFoundComponentTypes))
+			}
+			if len(statusMsgs) > 0 {
+				item.Status.Message = strings.Join(statusMsgs, ";")
 			}
 			if len(notFoundComponentTypes) > 0 || len(noContainersComponents) > 0 {
 				item.Status.ClusterDefSyncStatus = dbaasv1alpha1.OutOfSyncStatus

@@ -109,11 +109,17 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 			return &res, err
 		}
+		switch cluster.Spec.TerminationPolicy {
+		case dbaasv1alpha1.DoNotTerminate:
+			res, err := intctrlutil.Reconciled()
+			return &res, err
+		case dbaasv1alpha1.Delete, dbaasv1alpha1.WipeOut:
+			err := r.deletePVCs(reqCtx, cluster)
+			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return &res, err
+		}
 		return nil, nil
 	})
-	if err := r.handleTerminationPolicy(reqCtx, cluster); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
 	if res != nil {
 		return *res, err
 	}
@@ -272,51 +278,6 @@ func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *d
 				}
 			}
 		}
-	}
-
-	return nil
-}
-
-func (r *ClusterReconciler) handleTerminationPolicy(reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster) error {
-
-	terminationPolicy := cluster.Spec.TerminationPolicy
-	finalizer := terminationPolicyFinalizerName
-
-	addTerminationPolicyFinalizer := func() error {
-		if !controllerutil.ContainsFinalizer(cluster, finalizer) {
-			controllerutil.AddFinalizer(cluster, finalizer)
-			if err := r.Update(reqCtx.Ctx, cluster); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	deleteTerminationPolicyFinalizer := func() error {
-		if controllerutil.ContainsFinalizer(cluster, finalizer) {
-			controllerutil.RemoveFinalizer(cluster, finalizer)
-			if err := r.Update(reqCtx.Ctx, cluster); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	switch terminationPolicy {
-	case dbaasv1alpha1.DoNotTerminate:
-		if cluster.GetDeletionTimestamp().IsZero() {
-			return addTerminationPolicyFinalizer()
-		}
-	case dbaasv1alpha1.Halt:
-		return deleteTerminationPolicyFinalizer()
-	case dbaasv1alpha1.Delete, dbaasv1alpha1.WipeOut:
-		if err := deleteTerminationPolicyFinalizer(); err != nil {
-			return err
-		}
-		if !cluster.GetDeletionTimestamp().IsZero() {
-			return r.deletePVCs(reqCtx, cluster)
-		}
-		return nil
 	}
 
 	return nil

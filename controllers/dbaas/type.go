@@ -24,10 +24,9 @@ import (
 
 const (
 	// name of our custom finalizer
-	dbClusterFinalizerName         = "cluster.infracreate.com/finalizer"
-	dbClusterDefFinalizerName      = "clusterdefinition.infracreate.com/finalizer"
-	appVersionFinalizerName        = "appversion.infracreate.com/finalizer"
-	terminationPolicyFinalizerName = "terminationpolicy.infracreate.com/finalizer"
+	dbClusterFinalizerName    = "cluster.infracreate.com/finalizer"
+	dbClusterDefFinalizerName = "clusterdefinition.infracreate.com/finalizer"
+	appVersionFinalizerName   = "appversion.infracreate.com/finalizer"
 
 	// label keys
 	clusterDefLabelKey = "clusterdefinition.infracreate.com/name"

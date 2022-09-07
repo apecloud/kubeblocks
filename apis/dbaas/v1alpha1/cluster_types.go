@@ -25,10 +25,10 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 const (
-	DoNotTerminate string = "DoNotTerminate"
-	Halt                  = "Halt"
-	Delete                = "Delete"
-	WipeOut               = "WipeOut"
+	DoNotTerminate TerminationPolicyType = "DoNotTerminate"
+	Halt                                 = "Halt"
+	Delete                               = "Delete"
+	WipeOut                              = "WipeOut"
 )
 
 type TerminationPolicyType string

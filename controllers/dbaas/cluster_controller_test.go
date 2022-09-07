@@ -25,6 +25,10 @@ var _ = Describe("Cluster Controller", func() {
 	const timeout = time.Second * 10
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
+	clusterObjKey := types.NamespacedName{
+		Name:      "my-cluster",
+		Namespace: "default",
+	}
 
 	checkedCreateObj := func(obj client.Object) error {
 		if err := k8sClient.Create(context.Background(), obj); err != nil && !apierrors.IsAlreadyExists(err) {
@@ -33,9 +37,29 @@ var _ = Describe("Cluster Controller", func() {
 		return nil
 	}
 
+	assureDefaultStorageClassObj := func() *storagev1.StorageClass {
+		By("By assure an default storageClass")
+		scYAML := `
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: csi-hostpath-sc
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: hostpath.csi.k8s.io
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+`
+		sc := &storagev1.StorageClass{}
+		Expect(yaml.Unmarshal([]byte(scYAML), sc)).Should(Succeed())
+		Expect(checkedCreateObj(sc)).Should(Succeed())
+		return sc
+	}
+
 	assureClusterDefObj := func() *dbaasv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
-		clusterDefYaml := `
+		clusterDefYAML := `
 apiVersion: dbaas.infracreate.com/v1alpha1
 kind: ClusterDefinition
 metadata:
@@ -94,14 +118,14 @@ spec:
     defaultReplicas: 3
 `
 		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
-		Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)).Should(Succeed())
+		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
 		Expect(checkedCreateObj(clusterDefinition)).Should(Succeed())
 		return clusterDefinition
 	}
 
 	assureAppVersionObj := func() *dbaasv1alpha1.AppVersion {
 		By("By assure an appVersion obj")
-		appVerYaml := `
+		appVerYAML := `
 apiVersion: dbaas.infracreate.com/v1alpha1
 kind:       AppVersion
 metadata:
@@ -115,7 +139,7 @@ spec:
       image: registry.jihulab.com/infracreate/mysql-server/mysql/wesql-server-arm:latest
 `
 		appVersion := &dbaasv1alpha1.AppVersion{}
-		Expect(yaml.Unmarshal([]byte(appVerYaml), appVersion)).Should(Succeed())
+		Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(Succeed())
 		Expect(checkedCreateObj(appVersion)).Should(Succeed())
 		return appVersion
 	}
@@ -132,25 +156,20 @@ spec:
 			appVersionObj = assureAppVersionObj()
 		}
 
-		key := types.NamespacedName{
-			Name:      "cluster",
-			Namespace: "default",
-		}
-
 		return &dbaasv1alpha1.Cluster{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: "dbaas.infracreate.com/v1alpha1",
 				Kind:       "Cluster",
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      key.Name,
-				Namespace: key.Namespace,
+				Name:      clusterObjKey.Name,
+				Namespace: clusterObjKey.Namespace,
 			},
 			Spec: dbaasv1alpha1.ClusterSpec{
 				ClusterDefRef: clusterDefObj.GetName(),
 				AppVersionRef: appVersionObj.GetName(),
 			},
-		}, clusterDefObj, appVersionObj, key
+		}, clusterDefObj, appVersionObj, clusterObjKey
 	}
 
 	deleteClusterNWait := func(key types.NamespacedName) error {
@@ -176,6 +195,10 @@ spec:
 	})
 	AfterEach(func() {
 		// Add any teardown steps that needs to be executed after each test
+		By("AfterEach scope")
+		Eventually(func() error {
+			return deleteClusterNWait(clusterObjKey)
+		}, timeout, interval).Should(Succeed())
 	})
 
 	Context("When creating cluster", func() {
@@ -195,14 +218,23 @@ spec:
 		It("Should update PVC request storage size accordingly", func() {
 			By("Check available storageclasses")
 			scList := &storagev1.StorageClassList{}
+			hasDefaultSC := false
 			_ = k8sClient.List(context.Background(), scList)
-			if len(scList.Items) == 0 {
-				// skip test if no available storage classes
-				By("No available storageclass, test skipped")
-				return
+			for _, sc := range scList.Items {
+				annot := sc.Annotations
+				if annot == nil {
+					continue
+				}
+				if v, ok := annot["storageclass.kubernetes.io/is-default-class"]; ok && v == "true" {
+					hasDefaultSC = true
+					break
+				}
+			}
+			if !hasDefaultSC {
+				assureDefaultStorageClassObj()
 			}
 
-			By("By creating a cluster")
+			By("By creating a cluster with volume claim")
 			toCreate, _, _, key := newClusterObj(nil, nil)
 			toCreate.Spec.Components = make([]dbaasv1alpha1.ClusterComponent, 1)
 			toCreate.Spec.Components[0] = dbaasv1alpha1.ClusterComponent{
@@ -311,7 +343,7 @@ spec:
 
 	Context("When updating cluster replicas", func() {
 		It("Should create/delete pod to the replicas number", func() {
-			By("By creating a cluster")
+			By("By creating a cluster with replicas")
 			toCreate, _, _, key := newClusterObj(nil, nil)
 			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
 

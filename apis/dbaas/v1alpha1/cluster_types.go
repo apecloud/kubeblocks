@@ -24,6 +24,13 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+const (
+	DoNotTerminate string = "DoNotTerminate"
+	Halt                  = "Halt"
+	Delete                = "Delete"
+	WipeOut               = "WipeOut"
+)
+
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
 	// ref ClusterDefinition, immutable
@@ -39,7 +46,7 @@ type ClusterSpec struct {
 
 	// +kubebuilder:default=Halt
 	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
-	TerminatingPolicy string `json:"terminationPolicy,omitempty"`
+	TerminationPolicy string `json:"terminationPolicy,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster

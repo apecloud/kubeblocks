@@ -104,13 +104,14 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	if cluster.Spec.TerminatingPolicy != "DoNotTerminate" {
+	if cluster.Spec.TerminationPolicy != dbaasv1alpha1.DoNotTerminate {
 		res, err := intctrlutil.HandleCRDeletion(reqCtx, r, cluster, dbClusterFinalizerName, func() (*ctrl.Result, error) {
 			if err := r.deleteExternalResources(reqCtx, cluster); err != nil {
 				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 				return &res, err
 			}
-			if cluster.Spec.TerminatingPolicy == "Delete" || cluster.Spec.TerminatingPolicy == "WipeOut" {
+			switch cluster.Spec.TerminationPolicy {
+			case dbaasv1alpha1.Delete, dbaasv1alpha1.WipeOut:
 				err := r.deletePVCs(reqCtx, cluster)
 				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 				return &res, err

@@ -412,7 +412,7 @@ func NewRestoreInstance(namespace, name, sourceSnapshot string) *unstructured.Un
 				"name":      name,
 			},
 			"spec": map[string]interface{}{
-				"baseServerId": 1001,
+				"baseServerId": 1000,
 				"datadirVolumeClaimTemplate": map[string]interface{}{
 					"dataSource": map[string]interface{}{
 						"name":     sourceSnapshot,
@@ -422,8 +422,10 @@ func NewRestoreInstance(namespace, name, sourceSnapshot string) *unstructured.Un
 				},
 				"imagePullPolicy":    "IfNotPresent",
 				"instances":          1,
+				"router":             map[string]interface{}{"instances": 0},
 				"secretName":         "mycluster-cluster-secret",
 				"serviceAccountName": "mycluster-sa",
+				"tlsUseSelfSigned":   true,
 				"version":            playground.DefaultVersion,
 			},
 		},

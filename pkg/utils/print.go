@@ -79,23 +79,40 @@ type BackupJobInfo struct {
 var playgroundTmpl = `
 Notes:
 Open DBaaS Playground v{{.Version}} Start SUCCESSFULLY!
-MySQL Standalone Cluster "{{.DBCluster}}" has been CREATED!
+MySQL X-Cluster(WeSQL) "{{.DBCluster}}" has been CREATED!
 
 1. Basic commands for dbcluster:
   dbctl --kubeconfig ~/.kube/{{.ClusterName}} dbcluster list                          # list all database clusters
   dbctl --kubeconfig ~/.kube/{{.ClusterName}} dbcluster describe {{.DBCluster}}       # get dbcluster information
-  dbctl bench --host {{.HostIP}} tpcc {{.DBCluster}}                                  # run tpcc benchmark 1min on dbcluster
+  MYSQL_ROOT_PASSWORD=$(kubectl --kubeconfig ~/.kube/{{.ClusterName}} get secret \
+	--namespace {{.DBNamespace}} {{.DBCluster}} \
+	-o jsonpath="{.data.rootPassword}" | base64 -d) 
+  dbctl bench --host {{.HostIP}} --port $MYSQL_PRIMARY_0 --password "$MYSQL_ROOT_PASSWORD" tpcc prepare|run|clean   # run tpcc benchmark 1min on dbcluster
 
-2. To connect to mysql database:
-  MYSQL_ROOT_PASSWORD=$(kubectl --kubeconfig ~/.kube/{{.ClusterName}} get secret --namespace {{.DBNamespace}} {{.DBCluster}}-cluster-secret -o jsonpath="{.data.rootPassword}" | base64 -d)
-  mysql -h {{.HostIP}} -uroot -p"$MYSQL_ROOT_PASSWORD"
+2. To port forward
+  MYSQL_PRIMARY_0=3306
+  MYSQL_PRIMARY_1=3307
+  MYSQL_PRIMARY_2=3308
+  kubectl --kubeconfig ~/.kube/{{.ClusterName}} port-forward \
+  	--address 0.0.0.0 svc/{{.DBCluster}}-replicasets-primary-0 $MYSQL_PRIMARY_0:3306
+  kubectl --kubeconfig ~/.kube/{{.ClusterName}} port-forward \
+  	--address 0.0.0.0 svc/{{.DBCluster}}-replicasets-primary-1 $MYSQL_PRIMARY_1:3306
+  kubectl --kubeconfig ~/.kube/{{.ClusterName}} port-forward \
+  	--address 0.0.0.0 svc/{{.DBCluster}}-replicasets-primary-2 $MYSQL_PRIMARY_2:3306
 
-3. To view the Grafana:
+3. To connect to mysql database:
+  Assume WeSQL leader node is {{.DBCluster}}-replicasets-primary-0. 
+  In practice, we can get cluster node role by sql " select * from information_schema.wesql_cluster_local; ".
+  
+  MYSQL_ROOT_PASSWORD=$(kubectl --kubeconfig ~/.kube/{{.ClusterName}} get secret --namespace {{.DBNamespace}} {{.DBCluster}} -o jsonpath="{.data.rootPassword}" | base64 -d)
+  mysql -h {{.HostIP}} -uroot -p"$MYSQL_ROOT_PASSWORD" -P$MYSQL_PRIMARY_0
+  
+4. To view the Grafana:
   open http://{{.HostIP}}:{{.GrafanaPort}}/d/549c2bf8936f7767ea6ac47c47b00f2a/mysql_for_demo
   User: {{.GrafanaUser}}
   Password: {{.GrafanaPasswd}}
 
-4. Uninstall Playground:
+5. Uninstall Playground:
   dbctl playground destroy
 
 --------------------------------------------------------------------

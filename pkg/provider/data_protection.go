@@ -36,7 +36,38 @@ func (o *DataProtection) GetRepos() []repo.Entry {
 }
 
 func (o *DataProtection) GetBaseCharts(ns string) []helm.InstallOpts {
-	return []helm.InstallOpts{}
+	return []helm.InstallOpts{
+		{
+			Name:      "prometheus",
+			Chart:     "oci://yimeisun.azurecr.io/helm-chart/kube-prometheus-stack",
+			Wait:      false,
+			Version:   "38.0.2",
+			Namespace: ns,
+			Sets: []string{
+				"prometheusOperator.admissionWebhooks.patch.image.repository=weidixian/ingress-nginx-kube-webhook-certgen",
+				"kube-state-metrics.image.repository=jiamiao442/kube-state-metrics",
+				"kubeStateMetrics.enabled=false",
+				"grafana.sidecar.dashboards.searchNamespace=ALL",
+				"prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues=false",
+				"prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false",
+				"alertmanager.alertmanagerSpec.image.repository=infracreate/alertmanager",
+				"prometheusOperator.image.repository=infracreate/prometheus-operator",
+				"prometheusOperator.prometheusConfigReloader.image.repository=infracreate/prometheus-config-reloader",
+				"prometheusOperator.thanosImage.repository=infracreate/thanos",
+				"prometheusOperator.prometheusSpec.image.repository=infracreate/prometheus",
+				"prometheus.prometheusSpec.image.repository=infracreate/prometheus",
+				"thanosRuler.thanosRulerSpec.image.repository=infracreate/thanos",
+				"prometheus-node-exporter.image.repository=infracreate/node-exporter",
+				"grafana.sidecar.image.repository=infracreate/k8s-sidecar",
+			},
+			LoginOpts: &helm.LoginOpts{
+				User:   helmUser,
+				Passwd: helmPasswd,
+				URL:    helmURL,
+			},
+			TryTimes: 2,
+		},
+	}
 }
 
 func (o *DataProtection) GetDBCharts(ns string, dbname string) []helm.InstallOpts {

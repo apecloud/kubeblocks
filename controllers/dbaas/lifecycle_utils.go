@@ -28,6 +28,7 @@ import (
 	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -272,6 +273,7 @@ func mergeRoleGroups(roleGroupTemplate *dbaasv1alpha1.RoleGroupTemplate, cluster
 	roleGroup.MaxAvailable = roleGroupTemplate.MaxAvailable
 	roleGroup.MinAvailable = roleGroupTemplate.MinAvailable
 	roleGroup.UpdateStrategy = roleGroupTemplate.UpdateStrategy
+	roleGroup.Name = roleGroupTemplate.TypeName
 	if clusterRoleGroup == nil || clusterRoleGroup.Type != roleGroupTemplate.TypeName {
 		return roleGroup
 	}
@@ -389,18 +391,41 @@ func prepareRoleGroupObjs(ctx context.Context, cli client.Client, obj interface{
 		return fmt.Errorf("invalid arg")
 	}
 
-	sts, err := buildSts(*params)
-	if err != nil {
-		return err
-	}
-	*params.applyObjs = append(*params.applyObjs, sts)
+	if params.component.IsStateless {
+		sts, err := buildDeploy(*params)
+		if err != nil {
+			return err
+		}
+		*params.applyObjs = append(*params.applyObjs, sts)
+	} else {
+		sts, err := buildSts(*params)
+		if err != nil {
+			return err
+		}
+		*params.applyObjs = append(*params.applyObjs, sts)
 
-	svcs, err := buildSvcs(*params, sts)
+		svcs, err := buildHeadlessSvcs(*params, sts)
+		if err != nil {
+			return err
+		}
+		*params.applyObjs = append(*params.applyObjs, svcs...)
+	}
+
+	pdb, err := buildPDB(*params)
 	if err != nil {
 		return err
 	}
-	*params.applyObjs = append(*params.applyObjs, svcs...)
-	return err
+	*params.applyObjs = append(*params.applyObjs, pdb)
+
+	if params.roleGroup.Service.Ports != nil {
+		svc, err := buildSvc(*params)
+		if err != nil {
+			return err
+		}
+		*params.applyObjs = append(*params.applyObjs, svc)
+	}
+
+	return nil
 }
 
 func createOrReplaceResources(ctx context.Context,
@@ -451,7 +476,7 @@ func createOrReplaceResources(ctx context.Context,
 			for _, vct := range stsObj.Spec.VolumeClaimTemplates {
 				var vctProto *corev1.PersistentVolumeClaim
 				for _, i := range stsProto.Spec.VolumeClaimTemplates {
-					if i.Name == vctProto.Name {
+					if i.Name == stsProto.Name {
 						vctProto = &i
 						break
 					}
@@ -511,7 +536,7 @@ func createOrReplaceResources(ctx context.Context,
 	return nil
 }
 
-func buildSvcs(params createParams, sts *appsv1.StatefulSet) ([]client.Object, error) {
+func buildHeadlessSvcs(params createParams, sts *appsv1.StatefulSet) ([]client.Object, error) {
 	stsPodLabels := sts.Spec.Template.Labels
 	replicas := *sts.Spec.Replicas
 	svcs := make([]client.Object, replicas)
@@ -534,6 +559,56 @@ func buildSvcs(params createParams, sts *appsv1.StatefulSet) ([]client.Object, e
 		svcs[i] = svc
 	}
 	return svcs, nil
+}
+
+func buildSvc(params createParams) (*corev1.Service, error) {
+	cueFS, _ := debme.FS(cueTemplates, "cue")
+
+	cueTpl, err := params.getCacheCUETplValue("service_template.cue", func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("service_template.cue"))
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+	clusterStrByte, err := params.getCacheBytesValue("cluster", func() ([]byte, error) {
+		return json.Marshal(params.cluster)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("cluster", clusterStrByte); err != nil {
+		return nil, err
+	}
+
+	componentStrByte, err := json.Marshal(params.component)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("component", componentStrByte); err != nil {
+		return nil, err
+	}
+
+	roleGroupStrByte, err := json.Marshal(params.roleGroup)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("roleGroup", roleGroupStrByte); err != nil {
+		return nil, err
+	}
+
+	svcStrByte, err := cueValue.Lookup("service")
+	if err != nil {
+		return nil, err
+	}
+
+	svc := corev1.Service{}
+	if err = json.Unmarshal(svcStrByte, &svc); err != nil {
+		return nil, err
+	}
+
+	return &svc, nil
 }
 
 func randomString(length int) string {
@@ -624,7 +699,7 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err = cueValue.Fill("role_group", roleGroupStrByte); err != nil {
+	if err = cueValue.Fill("roleGroup", roleGroupStrByte); err != nil {
 		return nil, err
 	}
 
@@ -674,6 +749,64 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 	return &sts, nil
 }
 
+func buildDeploy(params createParams) (*appsv1.Deployment, error) {
+	cueFS, _ := debme.FS(cueTemplates, "cue")
+
+	cueTpl, err := params.getCacheCUETplValue("deployment_template.cue", func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("deployment_template.cue"))
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+	clusterStrByte, err := params.getCacheBytesValue("cluster", func() ([]byte, error) {
+		return json.Marshal(params.cluster)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("cluster", clusterStrByte); err != nil {
+		return nil, err
+	}
+
+	componentStrByte, err := json.Marshal(params.component)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("component", componentStrByte); err != nil {
+		return nil, err
+	}
+
+	roleGroupStrByte, err := json.Marshal(params.roleGroup)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("roleGroup", roleGroupStrByte); err != nil {
+		return nil, err
+	}
+
+	stsStrByte, err := cueValue.Lookup("deployment")
+	if err != nil {
+		return nil, err
+	}
+
+	deploy := appsv1.Deployment{}
+	if err = json.Unmarshal(stsStrByte, &deploy); err != nil {
+		return nil, err
+	}
+
+	stsStrByte = injectEnv(stsStrByte, dbaasPrefix+"_MY_SECRET_NAME", params.cluster.Name)
+
+	if err = json.Unmarshal(stsStrByte, &deploy); err != nil {
+		return nil, err
+	}
+
+	// TODO: inject environment
+
+	return &deploy, nil
+}
+
 func buildHeadlessService(params createParams, pod *corev1.Pod) (*corev1.Service, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
@@ -710,6 +843,57 @@ func buildHeadlessService(params createParams, pod *corev1.Pod) (*corev1.Service
 	}
 
 	return &svc, nil
+}
+
+func buildPDB(params createParams) (*policyv1.PodDisruptionBudget, error) {
+	cueFS, _ := debme.FS(cueTemplates, "cue")
+
+	cueTpl, err := params.getCacheCUETplValue("pdb_template.cue", func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("pdb_template.cue"))
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+
+	clusterStrByte, err := params.getCacheBytesValue("cluster", func() ([]byte, error) {
+		return json.Marshal(params.cluster)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("cluster", clusterStrByte); err != nil {
+		return nil, err
+	}
+
+	componentStrByte, err := json.Marshal(params.component)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("component", componentStrByte); err != nil {
+		return nil, err
+	}
+
+	roleGroupStrByte, err := json.Marshal(params.roleGroup)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("roleGroup", roleGroupStrByte); err != nil {
+		return nil, err
+	}
+
+	pdbStrByte, err := cueValue.Lookup("pdb")
+	if err != nil {
+		return nil, err
+	}
+
+	pdb := policyv1.PodDisruptionBudget{}
+	if err = json.Unmarshal(pdbStrByte, &pdb); err != nil {
+		return nil, err
+	}
+
+	return &pdb, nil
 }
 
 func injectEnv(strByte []byte, key string, value string) []byte {

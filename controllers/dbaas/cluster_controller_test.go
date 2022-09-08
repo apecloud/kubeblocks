@@ -5,6 +5,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sethvargo/go-password/password"
+
+	"k8s.io/apimachinery/pkg/util/intstr"
+
+	policyv1 "k8s.io/api/policy/v1"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -89,9 +95,20 @@ spec:
           cluster_info="$cluster_info@$(($idx+1))";
           echo $cluster_info;
           docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
+  - typeName: proxy
+    roleGroups: ["proxy"]
+    defaultReplicas: 1
+    isStateless: true
+    containers:
+    - name: nginx
   roleGroupTemplates:
   - typeName: primary
     defaultReplicas: 3
+    updateStrategy:
+      # 对应 pdb 中的两个字段，两个中只能填一个
+      maxUnavailable: 1
+  - typeName: proxy
+    defaultReplicas: 2
 `
 		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 		Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)).Should(Succeed())
@@ -113,6 +130,10 @@ spec:
     containers:
     - name: mysql
       image: registry.jihulab.com/infracreate/mysql-server/mysql/wesql-server-arm:latest
+  - type: proxy
+    containers:
+    - name: nginx
+      image: nginx
 `
 		appVersion := &dbaasv1alpha1.AppVersion{}
 		Expect(yaml.Unmarshal([]byte(appVerYaml), appVersion)).Should(Succeed())
@@ -132,8 +153,9 @@ spec:
 			appVersionObj = assureAppVersionObj()
 		}
 
+		randomStr, _ := password.Generate(6, 0, 0, true, false)
 		key := types.NamespacedName{
-			Name:      "cluster",
+			Name:      "cluster" + randomStr,
 			Namespace: "default",
 		}
 
@@ -183,6 +205,213 @@ spec:
 			By("By creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
 			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+
+			By("Deleting the scope")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	Context("When deleting cluster", func() {
+		It("Should delete cluster resources according to termination policy", func() {
+			By("By creating a cluster")
+			toCreate, _, _, key := newClusterObj(nil, nil)
+
+			toCreate.Spec.TerminationPolicy = dbaasv1alpha1.DoNotTerminate
+
+			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+
+			fetchedG1 := &dbaasv1alpha1.Cluster{}
+
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedG1)
+				return fetchedG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+
+			fetchedG1.Spec.TerminationPolicy = dbaasv1alpha1.Halt
+			Expect(k8sClient.Update(context.Background(), fetchedG1)).Should(Succeed())
+
+			fetchedG2 := &dbaasv1alpha1.Cluster{}
+
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedG2)
+				return fetchedG2.Status.ObservedGeneration == 2
+			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting the cluster")
+			Eventually(func() bool {
+				if err := deleteClusterNWait(key); err != nil {
+					return false
+				}
+				tmp := &dbaasv1alpha1.Cluster{}
+				err := k8sClient.Get(context.Background(), key, tmp)
+				return apierrors.IsNotFound(err)
+			}, timeout, interval).Should(BeTrue())
+		})
+	})
+
+	Context("When updating cluster replicas", func() {
+		It("Should create/delete pod to the replicas number", func() {
+			By("By creating a cluster")
+			toCreate, _, _, key := newClusterObj(nil, nil)
+			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+
+			fetchedG1 := &dbaasv1alpha1.Cluster{}
+
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedG1)
+				return fetchedG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+
+			stsList := &appsv1.StatefulSetList{}
+			Eventually(func() bool {
+				Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				return len(stsList.Items) != 0
+			}, timeout, interval).Should(BeTrue())
+
+			By("By updating replica")
+			if fetchedG1.Spec.Components == nil {
+				fetchedG1.Spec.Components = []dbaasv1alpha1.ClusterComponent{}
+			}
+			updatedReplicas := 5
+			fetchedG1.Spec.Components = append(fetchedG1.Spec.Components, dbaasv1alpha1.ClusterComponent{
+				Name: "replicasets",
+				Type: "replicasets",
+				RoleGroups: []dbaasv1alpha1.ClusterRoleGroup{
+					{
+						Name:     "primary",
+						Type:     "primary",
+						Replicas: updatedReplicas,
+					},
+				},
+			})
+			Expect(k8sClient.Update(context.Background(), fetchedG1)).Should(Succeed())
+
+			fetchedG2 := &dbaasv1alpha1.Cluster{}
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedG2)
+				return fetchedG2.Status.ObservedGeneration == 2
+			}, timeout*2, interval).Should(BeTrue())
+
+			Eventually(func() bool {
+				Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				Expect(len(stsList.Items) != 0).Should(BeTrue())
+				return int(*stsList.Items[0].Spec.Replicas) == updatedReplicas
+			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting the scope")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	Context("When creating cluster", func() {
+		It("Should create deployment if component is stateless", func() {
+			By("By creating a cluster")
+			toCreate, _, _, key := newClusterObj(nil, nil)
+			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+
+			fetchedG1 := &dbaasv1alpha1.Cluster{}
+
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedG1)
+				return fetchedG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+
+			deployList := &appsv1.DeploymentList{}
+			Eventually(func() bool {
+				Expect(k8sClient.List(context.Background(), deployList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				return len(deployList.Items) != 0
+			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting the scope")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	Context("When creating cluster", func() {
+		It("Should create pdb if updateStrategy exists", func() {
+			By("By creating a cluster")
+			toCreate, _, _, key := newClusterObj(nil, nil)
+			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+
+			fetchedG1 := &dbaasv1alpha1.Cluster{}
+
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedG1)
+				return fetchedG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+
+			pdbList := &policyv1.PodDisruptionBudgetList{}
+			Eventually(func() bool {
+				Expect(k8sClient.List(context.Background(), pdbList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				return len(pdbList.Items) != 0
+			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting the scope")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	Context("When creating cluster", func() {
+		It("Should create service if service configured", func() {
+			By("By creating a cluster")
+			toCreate, _, _, key := newClusterObj(nil, nil)
+			toCreate.Spec.Components = append(toCreate.Spec.Components, dbaasv1alpha1.ClusterComponent{
+				Name: "proxy",
+				Type: "proxy",
+				RoleGroups: []dbaasv1alpha1.ClusterRoleGroup{
+					{
+						Name: "proxy",
+						Type: "proxy",
+						Service: corev1.ServiceSpec{
+							Ports: []corev1.ServicePort{
+								{
+									Protocol:   "TCP",
+									Port:       80,
+									TargetPort: intstr.FromInt(8080),
+								},
+							},
+							Type: "LoadBalancer",
+						},
+					},
+				},
+			})
+			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+
+			fetchedG1 := &dbaasv1alpha1.Cluster{}
+
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedG1)
+				return fetchedG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+
+			svcList := &corev1.ServiceList{}
+			Eventually(func() bool {
+				Expect(k8sClient.List(context.Background(), svcList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				for _, svc := range svcList.Items {
+					if svc.Spec.Type == "LoadBalancer" {
+						return true
+					}
+				}
+				return false
+			}, timeout, interval).Should(BeTrue())
 
 			By("Deleting the scope")
 			Eventually(func() error {
@@ -305,67 +534,7 @@ spec:
 			By("Deleting the scope")
 			Eventually(func() error {
 				return deleteClusterNWait(key)
-			}, timeout, interval).Should(Succeed())
-		})
-	})
-
-	Context("When updating cluster replicas", func() {
-		It("Should create/delete pod to the replicas number", func() {
-			By("By creating a cluster")
-			toCreate, _, _, key := newClusterObj(nil, nil)
-			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
-
-			fetchedG1 := &dbaasv1alpha1.Cluster{}
-
-			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), key, fetchedG1)
-				return fetchedG1.Status.ObservedGeneration == 1
-			}, timeout, interval).Should(BeTrue())
-
-			stsList := &appsv1.StatefulSetList{}
-			Eventually(func() bool {
-				Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
-				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				return len(stsList.Items) != 0
-			}, timeout, interval).Should(BeTrue())
-
-			By("By updating replica")
-			if fetchedG1.Spec.Components == nil {
-				fetchedG1.Spec.Components = []dbaasv1alpha1.ClusterComponent{}
-			}
-			updatedReplicas := 5
-			fetchedG1.Spec.Components = append(fetchedG1.Spec.Components, dbaasv1alpha1.ClusterComponent{
-				Name: "replicasets",
-				Type: "replicasets",
-				RoleGroups: []dbaasv1alpha1.ClusterRoleGroup{
-					{
-						Name:     "primary",
-						Type:     "primary",
-						Replicas: updatedReplicas,
-					},
-				},
-			})
-			Expect(k8sClient.Update(context.Background(), fetchedG1)).Should(Succeed())
-
-			fetchedG2 := &dbaasv1alpha1.Cluster{}
-			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), key, fetchedG2)
-				return fetchedG2.Status.ObservedGeneration == 2
-			}, timeout*2, interval).Should(BeTrue())
-
-			Eventually(func() bool {
-				Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
-				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				Expect(len(stsList.Items) != 0).Should(BeTrue())
-				return int(*stsList.Items[0].Spec.Replicas) == updatedReplicas
-			}, timeout, interval).Should(BeTrue())
-
-			By("Deleting the scope")
-			Eventually(func() error {
-				return deleteClusterNWait(key)
-			}, timeout, interval).Should(Succeed())
+			}, timeout*2, interval).Should(Succeed())
 		})
 	})
 })

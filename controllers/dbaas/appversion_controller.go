@@ -39,7 +39,7 @@ func init() {
 
 func appVersionUpdateHandler(cli client.Client, ctx context.Context, clusterDef *dbaasv1alpha1.ClusterDefinition) error {
 
-	labelSelector, err := labels.Parse("clusterdefinition.infracreate.com/name=" + clusterDef.GetName())
+	labelSelector, err := labels.Parse(clusterDefLabelKey + "=" + clusterDef.GetName())
 	if err != nil {
 		return err
 	}
@@ -62,11 +62,10 @@ func appVersionUpdateHandler(cli client.Client, ctx context.Context, clusterDef 
 			if len(statusMsgs) > 0 {
 				item.Status.Message = strings.Join(statusMsgs, ";")
 			}
+			item.Status.ClusterDefSyncStatus = dbaasv1alpha1.OutOfSyncStatus
 			if len(notFoundComponentTypes) > 0 || len(noContainersComponents) > 0 {
-				item.Status.ClusterDefSyncStatus = dbaasv1alpha1.OutOfSyncStatus
 				item.Status.Phase = dbaasv1alpha1.UnAvailablePhase
 			} else {
-				item.Status.ClusterDefSyncStatus = dbaasv1alpha1.InSyncStatus
 				item.Status.Phase = dbaasv1alpha1.AvailablePhase
 				item.Status.Message = ""
 			}

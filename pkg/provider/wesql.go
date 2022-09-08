@@ -40,9 +40,12 @@ func (o *Wesql) GetDBCharts(ns string, dbname string) []helm.InstallOpts {
 			Name:      "opendbaas-core",
 			Chart:     "oci://yimeisun.azurecr.io/helm-chart/opendbaas-core",
 			Wait:      true,
-			Version:   "0.1.0-alpha.3",
+			Version:   "0.1.0-alpha.4",
 			Namespace: "default",
-			Sets:      []string{},
+			Sets: []string{
+				"image.tag=latest",
+				"image.pullPolicy=Always",
+			},
 			LoginOpts: &helm.LoginOpts{
 				User:   helmUser,
 				Passwd: helmPasswd,

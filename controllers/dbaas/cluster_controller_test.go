@@ -450,6 +450,28 @@ spec:
 
 	Context("When updating cluster", func() {
 		It("Should update PVC request storage size accordingly", func() {
+			// this test required controller-manager component
+			By("Check available controller-manager status")
+			csList := &corev1.ComponentStatusList{}
+			_ = k8sClient.List(context.Background(), csList)
+			isCMAvailable := false
+			for _, cs := range csList.Items {
+				if cs.Name != "controller-manager" {
+					continue
+				}
+				for _, cond := range cs.Conditions {
+					if cond.Type == "Healthy" && cond.Status == "True" {
+						isCMAvailable = true
+						break
+					}
+				}
+			}
+			if !isCMAvailable {
+				// skip test if no available storage classes
+				By("The controller-manager is not available, test skipped")
+				return
+			}
+
 			By("Check available storageclasses")
 			scList := &storagev1.StorageClassList{}
 			hasDefaultSC := false
@@ -517,14 +539,19 @@ spec:
 				Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
 					"app.kubernetes.io/instance": key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				return len(stsList.Items) != 0
+
+				Expect(len(stsList.Items) == 1).Should(BeTrue())
+
+				sts := &stsList.Items[0]
+				Expect(sts.Spec.Replicas).ShouldNot(BeNil())
+				return sts.Status.AvailableReplicas == *sts.Spec.Replicas
 			}, timeout, interval).Should(BeTrue())
 
 			Eventually(func() bool {
 				pvcList := &corev1.PersistentVolumeClaimList{}
 				Expect(k8sClient.List(context.Background(), pvcList, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(pvcList.Items) != 0
-			}, timeout, interval).Should(BeTrue())
+			}, timeout*6, interval).Should(BeTrue())
 
 			comp := &fetchedG1.Spec.Components[0]
 			newStorageValue := resource.MustParse("2Gi")

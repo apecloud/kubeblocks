@@ -159,6 +159,9 @@ mod-vendor: ## Run go mod tidy->vendor->verify against go modules.
 	$(GO) mod vendor
 	$(GO) mod verify
 
+.PHONY: ctrl-test-current-ctx
+ctrl-test-current-ctx: manifests generate fmt vet ## Run tests.
+	$(GO) test ./... -coverprofile cover.out
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.

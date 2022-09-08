@@ -182,12 +182,15 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 
 	switch cluster.Spec.TerminationPolicy {
 	case dbaasv1alpha1.DoNotTerminate:
-		patch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Status.Phase = dbaasv1alpha1.DeletingPhase
-		cluster.Status.Message = string("spec.terminationPolicy " + cluster.Spec.TerminationPolicy + " is preventing deletion.")
-		if err := r.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
-			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-			return &res, err
+		if cluster.Status.Phase != dbaasv1alpha1.DeletingPhase {
+			patch := client.MergeFrom(cluster.DeepCopy())
+			cluster.Status.ObservedGeneration = cluster.Generation
+			cluster.Status.Phase = dbaasv1alpha1.DeletingPhase
+			cluster.Status.Message = fmt.Sprintf("spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
+			if err := r.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
+				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+				return &res, err
+			}
 		}
 		res, err := intctrlutil.Reconciled()
 		return &res, err

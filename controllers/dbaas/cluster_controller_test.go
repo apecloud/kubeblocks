@@ -450,6 +450,164 @@ spec:
 
 	Context("When updating cluster", func() {
 		It("Should update PVC request storage size accordingly", func() {
+			By("Check available storageclasses")
+			scList := &storagev1.StorageClassList{}
+			_ = k8sClient.List(context.Background(), scList)
+			if len(scList.Items) == 0 {
+				// skip test if no available storage classes
+				By("No available storageclass, test skipped")
+				return
+			}
+
+			By("By creating a cluster")
+			toCreate, _, _, key := newClusterObj(nil, nil)
+
+			toCreate.Spec.TerminationPolicy = dbaasv1alpha1.DoNotTerminate
+
+			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+
+			fetchedG1 := &dbaasv1alpha1.Cluster{}
+
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedG1)
+				return fetchedG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+
+			fetchedG1.Spec.TerminationPolicy = dbaasv1alpha1.Halt
+			Expect(k8sClient.Update(context.Background(), fetchedG1)).Should(Succeed())
+
+			fetchedG2 := &dbaasv1alpha1.Cluster{}
+
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedG2)
+				return fetchedG2.Status.ObservedGeneration == 2
+			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting the cluster")
+			Eventually(func() bool {
+				if err := deleteClusterNWait(key); err != nil {
+					return false
+				}
+			}
+
+			By("Deleting the scope")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout*2, interval).Should(Succeed())
+		})
+	})
+
+	Context("When creating cluster", func() {
+		It("Should create deployment if component is stateless", func() {
+			By("By creating a cluster")
+			toCreate, _, _, key := newClusterObj(nil, nil)
+			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+
+			fetchedG1 := &dbaasv1alpha1.Cluster{}
+
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedG1)
+				return fetchedG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+
+			deployList := &appsv1.DeploymentList{}
+			Eventually(func() bool {
+				Expect(k8sClient.List(context.Background(), deployList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				return len(deployList.Items) != 0
+			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting the scope")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	Context("When creating cluster", func() {
+		It("Should create pdb if updateStrategy exists", func() {
+			By("By creating a cluster")
+			toCreate, _, _, key := newClusterObj(nil, nil)
+			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+
+			fetchedG1 := &dbaasv1alpha1.Cluster{}
+
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedG1)
+				return fetchedG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+
+			pdbList := &policyv1.PodDisruptionBudgetList{}
+			Eventually(func() bool {
+				Expect(k8sClient.List(context.Background(), pdbList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				return len(pdbList.Items) != 0
+			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting the scope")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	Context("When creating cluster", func() {
+		It("Should create service if service configured", func() {
+			By("By creating a cluster")
+			toCreate, _, _, key := newClusterObj(nil, nil)
+			toCreate.Spec.Components = append(toCreate.Spec.Components, dbaasv1alpha1.ClusterComponent{
+				Name: "proxy",
+				Type: "proxy",
+				RoleGroups: []dbaasv1alpha1.ClusterRoleGroup{
+					{
+						Name: "proxy",
+						Type: "proxy",
+						Service: corev1.ServiceSpec{
+							Ports: []corev1.ServicePort{
+								{
+									Protocol:   "TCP",
+									Port:       80,
+									TargetPort: intstr.FromInt(8080),
+								},
+							},
+							Type: "LoadBalancer",
+						},
+					},
+				},
+			})
+			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+
+			fetchedG1 := &dbaasv1alpha1.Cluster{}
+
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedG1)
+				return fetchedG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+
+			svcList := &corev1.ServiceList{}
+			Eventually(func() bool {
+				Expect(k8sClient.List(context.Background(), svcList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				for _, svc := range svcList.Items {
+					if svc.Spec.Type == "LoadBalancer" {
+						return true
+					}
+				}
+				return false
+			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting the scope")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	Context("When updating cluster", func() {
+		It("Should update PVC request storage size accordingly", func() {
 			// this test required controller-manager component
 			By("Check available controller-manager status")
 			csList := &corev1.ComponentStatusList{}

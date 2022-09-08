@@ -17,8 +17,8 @@ spec:
       volumeMounts: 
       - mountPath: /data
         name: data
-      - mountPath: /log
-        name: data
+    #  - mountPath: /log
+    #    name: log
       ports:
       - containerPort: 3306
         protocol: TCP
@@ -82,4 +82,4 @@ spec:
       minAvailable: 0
       updateStrategy:
         maxSurge: 0
-        maxUnavailable: 1
+        maxUnavailable: 2

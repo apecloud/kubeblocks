@@ -105,7 +105,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, cluster, dbClusterFinalizerName, func() (*ctrl.Result, error) {
-		return nil, r.deleteExternalResources(reqCtx, cluster)
+		return r.deleteExternalResources(reqCtx, cluster)
 	})
 	if res != nil {
 		return *res, err
@@ -116,14 +116,14 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	clusterdefinition := &dbaasv1alpha1.ClusterDefinition{}
-	if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: cluster.Namespace,
 		Name:      cluster.Spec.ClusterDefRef,
 	}, clusterdefinition); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	appversion := &dbaasv1alpha1.AppVersion{}
-	if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: cluster.Namespace,
 		Name:      cluster.Spec.AppVersionRef,
 	}, appversion); err != nil {
@@ -173,18 +173,40 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster) error {
+func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster) (*ctrl.Result, error) {
 	//
 	// delete any external resources associated with the cronJob
 	//
 	// Ensure that delete implementation is idempotent and safe to invoke
 	// multiple times for same object.
 
+	switch cluster.Spec.TerminationPolicy {
+	case dbaasv1alpha1.DoNotTerminate:
+		if cluster.Status.Phase != dbaasv1alpha1.DeletingPhase {
+			patch := client.MergeFrom(cluster.DeepCopy())
+			cluster.Status.ObservedGeneration = cluster.Generation
+			cluster.Status.Phase = dbaasv1alpha1.DeletingPhase
+			cluster.Status.Message = fmt.Sprintf("spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
+			if err := r.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
+				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+				return &res, err
+			}
+		}
+		res, err := intctrlutil.Reconciled()
+		return &res, err
+	case dbaasv1alpha1.Delete, dbaasv1alpha1.WipeOut:
+		if err := r.deletePVCs(reqCtx, cluster); err != nil {
+			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return &res, err
+		}
+	}
+
 	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
 	if err := r.Get(reqCtx.Ctx, client.ObjectKey{
 		Name: cluster.Spec.ClusterDefRef,
 	}, clusterDef); err != nil {
-		return err
+		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return &res, err
 	}
 
 	ml := client.MatchingLabels{
@@ -194,7 +216,8 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 
 	stsList := &appsv1.StatefulSetList{}
 	if err := r.List(reqCtx.Ctx, stsList, ml); err != nil {
-		return err
+		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return &res, err
 	}
 	for _, sts := range stsList.Items {
 		if !controllerutil.ContainsFinalizer(&sts, dbClusterFinalizerName) {
@@ -203,12 +226,14 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 		patch := client.MergeFrom(sts.DeepCopy())
 		controllerutil.RemoveFinalizer(&sts, dbClusterFinalizerName)
 		if err := r.Patch(reqCtx.Ctx, &sts, patch); err != nil {
-			return err
+			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return &res, err
 		}
 	}
 	svcList := &corev1.ServiceList{}
 	if err := r.List(reqCtx.Ctx, svcList, ml); err != nil {
-		return err
+		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return &res, err
 	}
 	for _, svc := range svcList.Items {
 		if !controllerutil.ContainsFinalizer(&svc, dbClusterFinalizerName) {
@@ -217,12 +242,14 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 		patch := client.MergeFrom(svc.DeepCopy())
 		controllerutil.RemoveFinalizer(&svc, dbClusterFinalizerName)
 		if err := r.Patch(reqCtx.Ctx, &svc, patch); err != nil {
-			return err
+			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return &res, err
 		}
 	}
 	secretList := &corev1.SecretList{}
 	if err := r.List(reqCtx.Ctx, secretList, ml); err != nil {
-		return err
+		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return &res, err
 	}
 	for _, secret := range secretList.Items {
 		if !controllerutil.ContainsFinalizer(&secret, dbClusterFinalizerName) {
@@ -231,8 +258,42 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 		patch := client.MergeFrom(secret.DeepCopy())
 		controllerutil.RemoveFinalizer(&secret, dbClusterFinalizerName)
 		if err := r.Patch(reqCtx.Ctx, &secret, patch); err != nil {
-			return err
+			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return &res, err
 		}
 	}
+	return nil, nil
+}
+
+func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster) error {
+
+	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+	if err := r.Get(reqCtx.Ctx, client.ObjectKey{
+		Name: cluster.Spec.ClusterDefRef,
+	}, clusterDef); err != nil {
+		return err
+	}
+
+	for _, component := range clusterDef.Spec.Components {
+
+		for _, roleGroup := range component.RoleGroups {
+
+			ml := client.MatchingLabels{
+				"app.kubernetes.io/instance": fmt.Sprintf("%s-%s-%s", cluster.GetName(), component.TypeName, roleGroup),
+				"app.kubernetes.io/name":     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
+			}
+
+			pvcList := &corev1.PersistentVolumeClaimList{}
+			if err := r.List(reqCtx.Ctx, pvcList, ml); err != nil {
+				return err
+			}
+			for _, pvc := range pvcList.Items {
+				if err := r.Delete(reqCtx.Ctx, &pvc); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
 	return nil
 }

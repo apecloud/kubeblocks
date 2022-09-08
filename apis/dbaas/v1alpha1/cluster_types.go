@@ -46,6 +46,12 @@ type ClusterSpec struct {
 	// +optional
 	Components []ClusterComponent `json:"components,omitempty"`
 
+	// One of DoNotTerminate, Halt, Delete, WipeOut.
+	// Defaults to Halt.
+	// DoNotTerminate means block delete operation.
+	// Halt means delete resources such as sts,deploy,svc,pdb, but keep pvcs.
+	// Delete is based on Halt and delete pvcs.
+	// WipeOut is based on Delete and wipe out all snapshots and snapshot data from bucket.
 	// +kubebuilder:default=Halt
 	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
 	TerminationPolicy TerminationPolicyType `json:"terminationPolicy,omitempty"`

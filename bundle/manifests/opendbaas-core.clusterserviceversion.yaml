@@ -374,7 +374,48 @@ metadata:
           },
           "spec": {
             "appVersionRef": "appversion-mysql-latest",
-            "clusterDefinitionRef": "mysql-cluster-definition"
+            "clusterDefinitionRef": "mysql-cluster-definition",
+            "components": [
+              {
+                "name": "replicasets",
+                "roleGroups": [
+                  {
+                    "name": "primary",
+                    "replicas": 3,
+                    "type": "primary"
+                  }
+                ],
+                "type": "replicasets",
+                "volumeClaimTemplates": [
+                  {
+                    "name": "data",
+                    "spec": {
+                      "accessModes": [
+                        "ReadWriteOnce"
+                      ],
+                      "resources": {
+                        "requests": {
+                          "storage": "1Gi"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "name": "log",
+                    "spec": {
+                      "accessModes": [
+                        "ReadWriteOnce"
+                      ],
+                      "resources": {
+                        "requests": {
+                          "storage": "1Gi"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
           }
         },
         {
@@ -385,11 +426,6 @@ metadata:
           },
           "spec": {
             "cluster": {
-              "components": [
-                "mongos",
-                "configserver",
-                "shard"
-              ],
               "strategies": {
                 "create": {
                   "order": [
@@ -664,11 +700,6 @@ metadata:
             "name": "mysql-cluster-definition"
           },
           "spec": {
-            "cluster": {
-              "components": [
-                "replicasets"
-              ]
-            },
             "components": [
               {
                 "containers": [
@@ -707,11 +738,11 @@ metadata:
                     ],
                     "volumeMounts": [
                       {
-                        "mountPath": "/var/lib/mysql",
+                        "mountPath": "/data",
                         "name": "data"
                       },
                       {
-                        "mountPath": "/var/log",
+                        "mountPath": "/log",
                         "name": "log"
                       }
                     ]
@@ -1181,6 +1212,46 @@ spec:
             spec:
               containers:
               - args:
+                - --health-probe-bind-address=:8081
+                - --metrics-bind-address=127.0.0.1:8080
+                - --leader-elect
+                command:
+                - /manager
+                image: docker.io/infracreate/opendbaas-core:latest
+                livenessProbe:
+                  httpGet:
+                    path: /healthz
+                    port: 8081
+                  initialDelaySeconds: 15
+                  periodSeconds: 20
+                name: manager
+                ports:
+                - containerPort: 9443
+                  name: webhook-server
+                  protocol: TCP
+                readinessProbe:
+                  httpGet:
+                    path: /readyz
+                    port: 8081
+                  initialDelaySeconds: 5
+                  periodSeconds: 10
+                resources:
+                  limits:
+                    cpu: 500m
+                    memory: 128Mi
+                  requests:
+                    cpu: 10m
+                    memory: 64Mi
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
+                volumeMounts:
+                - mountPath: /tmp/k8s-webhook-server/serving-certs
+                  name: cert
+                  readOnly: true
+              - args:
                 - --secure-listen-address=0.0.0.0:8443
                 - --upstream=http://127.0.0.1:8080/
                 - --logtostderr=true
@@ -1203,42 +1274,15 @@ spec:
                   capabilities:
                     drop:
                     - ALL
-              - args:
-                - --health-probe-bind-address=:8081
-                - --metrics-bind-address=127.0.0.1:8080
-                - --leader-elect
-                command:
-                - /manager
-                image: docker.io/infracreate/opendbaas-core:latest
-                livenessProbe:
-                  httpGet:
-                    path: /healthz
-                    port: 8081
-                  initialDelaySeconds: 15
-                  periodSeconds: 20
-                name: manager
-                readinessProbe:
-                  httpGet:
-                    path: /readyz
-                    port: 8081
-                  initialDelaySeconds: 5
-                  periodSeconds: 10
-                resources:
-                  limits:
-                    cpu: 500m
-                    memory: 128Mi
-                  requests:
-                    cpu: 10m
-                    memory: 64Mi
-                securityContext:
-                  allowPrivilegeEscalation: false
-                  capabilities:
-                    drop:
-                    - ALL
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: opendbaas-core-controller-manager
               terminationGracePeriodSeconds: 10
+              volumes:
+              - name: cert
+                secret:
+                  defaultMode: 420
+                  secretName: webhook-server-cert
       permissions:
       - rules:
         - apiGroups:
@@ -1292,3 +1336,144 @@ spec:
   provider:
     name: infreacreate.com
   version: 0.0.0
+  webhookdefinitions:
+  - admissionReviewVersions:
+    - v1
+    containerPort: 443
+    deploymentName: opendbaas-core-controller-manager
+    failurePolicy: Fail
+    generateName: mappversion.kb.io
+    rules:
+    - apiGroups:
+      - dbaas.infracreate.com
+      apiVersions:
+      - v1alpha1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - appversions
+    sideEffects: None
+    targetPort: 9443
+    type: MutatingAdmissionWebhook
+    webhookPath: /mutate-dbaas-infracreate-com-v1alpha1-appversion
+  - admissionReviewVersions:
+    - v1
+    containerPort: 443
+    deploymentName: opendbaas-core-controller-manager
+    failurePolicy: Fail
+    generateName: mcluster.kb.io
+    rules:
+    - apiGroups:
+      - dbaas.infracreate.com
+      apiVersions:
+      - v1alpha1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - clusters
+    sideEffects: None
+    targetPort: 9443
+    type: MutatingAdmissionWebhook
+    webhookPath: /mutate-dbaas-infracreate-com-v1alpha1-cluster
+  - admissionReviewVersions:
+    - v1
+    containerPort: 443
+    deploymentName: opendbaas-core-controller-manager
+    failurePolicy: Fail
+    generateName: mclusterdefinition.kb.io
+    rules:
+    - apiGroups:
+      - dbaas.infracreate.com
+      apiVersions:
+      - v1alpha1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - clusterdefinitions
+    sideEffects: None
+    targetPort: 9443
+    type: MutatingAdmissionWebhook
+    webhookPath: /mutate-dbaas-infracreate-com-v1alpha1-clusterdefinition
+  - admissionReviewVersions:
+    - v1
+    - v1beta1
+    containerPort: 443
+    deploymentName: opendbaas-core-controller-manager
+    failurePolicy: Fail
+    generateName: mpod.kb.io
+    rules:
+    - apiGroups:
+      - ""
+      apiVersions:
+      - v1
+      operations:
+      - CREATE
+      resources:
+      - pods
+    sideEffects: None
+    targetPort: 9443
+    type: MutatingAdmissionWebhook
+    webhookPath: /mutate-v1-pod
+  - admissionReviewVersions:
+    - v1
+    containerPort: 443
+    deploymentName: opendbaas-core-controller-manager
+    failurePolicy: Fail
+    generateName: vappversion.kb.io
+    rules:
+    - apiGroups:
+      - dbaas.infracreate.com
+      apiVersions:
+      - v1alpha1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - appversions
+    sideEffects: None
+    targetPort: 9443
+    type: ValidatingAdmissionWebhook
+    webhookPath: /validate-dbaas-infracreate-com-v1alpha1-appversion
+  - admissionReviewVersions:
+    - v1
+    containerPort: 443
+    deploymentName: opendbaas-core-controller-manager
+    failurePolicy: Fail
+    generateName: vcluster.kb.io
+    rules:
+    - apiGroups:
+      - dbaas.infracreate.com
+      apiVersions:
+      - v1alpha1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - clusters
+    sideEffects: None
+    targetPort: 9443
+    type: ValidatingAdmissionWebhook
+    webhookPath: /validate-dbaas-infracreate-com-v1alpha1-cluster
+  - admissionReviewVersions:
+    - v1
+    containerPort: 443
+    deploymentName: opendbaas-core-controller-manager
+    failurePolicy: Fail
+    generateName: vclusterdefinition.kb.io
+    rules:
+    - apiGroups:
+      - dbaas.infracreate.com
+      apiVersions:
+      - v1alpha1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - clusterdefinitions
+    sideEffects: None
+    targetPort: 9443
+    type: ValidatingAdmissionWebhook
+    webhookPath: /validate-dbaas-infracreate-com-v1alpha1-clusterdefinition

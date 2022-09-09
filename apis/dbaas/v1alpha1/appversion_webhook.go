@@ -132,7 +132,7 @@ func (r *AppVersion) GetInconsistentComponentsInfo(clusterDef *ClusterDefinition
 	)
 
 	for _, v := range clusterDef.Spec.Components {
-		if v.PodSpec.Containers == nil || len(v.PodSpec.Containers) == 0 {
+		if v.PodSpec == nil || v.PodSpec.Containers == nil || len(v.PodSpec.Containers) == 0 {
 			componentMap[v.TypeName] = false
 		} else {
 			componentMap[v.TypeName] = true

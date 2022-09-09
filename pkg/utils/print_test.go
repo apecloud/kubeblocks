@@ -18,10 +18,12 @@ package utils
 
 import (
 	"testing"
+
+	"github.com/apecloud/kubeblocks/pkg/types"
 )
 
 func TestPrint(t *testing.T) {
-	clusterInfo := PlayGroundInfo{
+	clusterInfo := types.PlaygroundInfo{
 		DBCluster:     "mycluster",
 		DBPort:        "3306",
 		DBNamespace:   "default",
@@ -32,9 +34,5 @@ func TestPrint(t *testing.T) {
 		GrafanaPasswd: "prom-operator",
 	}
 	//nolint
-	PrintPlaygroundGuild(clusterInfo)
-}
-
-func TestInfo(t *testing.T) {
-	InfoP(1, x, "image"+"test"+"not ready")
+	PrintPlaygroundGuide(clusterInfo)
 }

@@ -128,8 +128,9 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Strategies ClusterDefinitionStrategies `json:"strategies,omitempty"`
 
+	// podSpec of final workload
 	// +optional
-	Containers []corev1.Container `json:"containers,omitempty"`
+	PodSpec corev1.PodSpec `json:"podSpec,omitempty"`
 
 	// Service defines the behavior of a service spec.
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status

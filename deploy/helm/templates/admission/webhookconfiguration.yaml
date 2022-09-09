@@ -27,51 +27,152 @@ data:
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: {{ include "opendbaas-core.fullname" . }}-mutating-webhook-configuration
+  name: mutating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
   - v1
   clientConfig:
     service:
-      name: {{ include "opendbaas-core.fullname" . }}-webhook
-      path: /mutate-dac-infracreate-com-v1alpha1-databaseinstance
+      name: webhook-service
+      namespace: system
+      path: /mutate-dbaas-infracreate-com-v1alpha1-appversion
   failurePolicy: Fail
-  name: mdatabaseinstance.kb.io
+  name: mappversion.kb.io
   rules:
   - apiGroups:
-    - dac.infracreate.com
+    - dbaas.infracreate.com
     apiVersions:
     - v1alpha1
     operations:
     - CREATE
     - UPDATE
     resources:
-    - databaseinstances
+    - appversions
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-dbaas-infracreate-com-v1alpha1-cluster
+  failurePolicy: Fail
+  name: mcluster.kb.io
+  rules:
+  - apiGroups:
+    - dbaas.infracreate.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusters
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-dbaas-infracreate-com-v1alpha1-clusterdefinition
+  failurePolicy: Fail
+  name: mclusterdefinition.kb.io
+  rules:
+  - apiGroups:
+    - dbaas.infracreate.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusterdefinitions
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-v1-pod
+  failurePolicy: Fail
+  name: mpod.kb.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - pods
   sideEffects: None
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  creationTimestamp: null
-  name: {{ include "opendbaas-core.fullname" . }}-validating-webhook-configuration
+  name: validating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
   - v1
   clientConfig:
     service:
-      name: {{ include "opendbaas-core.fullname" . }}-webhook
-      path: /validate-dac-infracreate-com-v1alpha1-databaseinstance
+      name: webhook-service
+      namespace: system
+      path: /validate-dbaas-infracreate-com-v1alpha1-appversion
   failurePolicy: Fail
-  name: vdatabaseinstance.kb.io
+  name: vappversion.kb.io
   rules:
   - apiGroups:
-    - dac.infracreate.com
+    - dbaas.infracreate.com
     apiVersions:
     - v1alpha1
     operations:
     - CREATE
     - UPDATE
     resources:
-    - databaseinstances
+    - appversions
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-dbaas-infracreate-com-v1alpha1-cluster
+  failurePolicy: Fail
+  name: vcluster.kb.io
+  rules:
+  - apiGroups:
+    - dbaas.infracreate.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusters
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-dbaas-infracreate-com-v1alpha1-clusterdefinition
+  failurePolicy: Fail
+  name: vclusterdefinition.kb.io
+  rules:
+  - apiGroups:
+    - dbaas.infracreate.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusterdefinitions
   sideEffects: None
 {{- end }}

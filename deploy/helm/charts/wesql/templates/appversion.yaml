@@ -8,7 +8,8 @@ spec:
   clusterDefinitionRef: wesql-clusterdefinition
   components:
   - type: replicasets
-    containers:
-    - name: mysql
-      image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
-      imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+    podSpec:
+      containers:
+      - name: mysql
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}

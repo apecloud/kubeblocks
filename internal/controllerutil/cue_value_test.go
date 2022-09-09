@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 The dbctl Authors
+Copyright 2022.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,18 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package controllerutil
 
-import (
-	"fmt"
-	"testing"
-)
+import "testing"
 
-func TestKube(t *testing.T) {
-	//nolint
-	PortForward(fmt.Sprintf("service/%s", "cluster"), "3306")
+func TestNewCUETplFromPath(t *testing.T) {
+	_, err := NewCUETplFromPath("cue.cue")
+	if err == nil {
+		t.Error("Expected error to fall through, got err")
+	}
 }
 
-func TestKubeBuilder(t *testing.T) {
+func TestNewCUETplFromBytes(t *testing.T) {
+	_, err := NewCUETplFromBytes([]byte(""), nil)
+	if err != nil {
+		t.Error("Expected error to fall through, got nil")
+	}
+}
 
+func TestNewCUETpl(t *testing.T) {
+	NewCUETpl("")
 }

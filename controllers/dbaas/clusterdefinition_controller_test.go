@@ -1,3 +1,19 @@
+/*
+Copyright 2022.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package dbaas
 
 import (
@@ -27,48 +43,49 @@ spec:
     roleGroups:
     - primary
     defaultReplicas: 1
-    containers:
-    - name: mysql
-      imagePullPolicy: IfNotPresent
-      ports:
-      - containerPort: 3306
-        protocol: TCP
-        name: mysql
-      - containerPort: 13306
-        protocol: TCP
-        name: paxos
-      volumeMounts:
-        - mountPath: /var/lib/mysql
-          name: data
-        - mountPath: /var/log
-          name: log
-      env:
-        - name: "MYSQL_ROOT_PASSWORD"
-          valueFrom:
-            secretKeyRef:
-              name: $(OPENDBAAS_MY_SECRET_NAME)
-              key: password
-      command: ["/usr/bin/bash", "-c"]
-      args:
-        - >
-          cluster_info="";
-          for (( i=0; i<$OPENDBAAS_REPLICASETS_PRIMARY_N; i++ )); do
-            if [ $i -ne 0 ]; then
-              cluster_info="$cluster_info;";
-            fi;
-            host=$(eval echo \$OPENDBAAS_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
-            cluster_info="$cluster_info$host:13306";
-          done;
-          idx=0;
-          while IFS='-' read -ra ADDR; do
-            for i in "${ADDR[@]}"; do
-              idx=$i;
+    podSpec:
+      containers:
+      - name: mysql
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3306
+          protocol: TCP
+          name: mysql
+        - containerPort: 13306
+          protocol: TCP
+          name: paxos
+        volumeMounts:
+          - mountPath: /var/lib/mysql
+            name: data
+          - mountPath: /var/log
+            name: log
+        env:
+          - name: "MYSQL_ROOT_PASSWORD"
+            valueFrom:
+              secretKeyRef:
+                name: $(OPENDBAAS_MY_SECRET_NAME)
+                key: password
+        command: ["/usr/bin/bash", "-c"]
+        args:
+          - >
+            cluster_info="";
+            for (( i=0; i<$OPENDBAAS_REPLICASETS_PRIMARY_N; i++ )); do
+              if [ $i -ne 0 ]; then
+                cluster_info="$cluster_info;";
+              fi;
+              host=$(eval echo \$OPENDBAAS_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
+              cluster_info="$cluster_info$host:13306";
             done;
-          done <<< "$OPENDBAAS_MY_POD_NAME";
-          echo $idx;
-          cluster_info="$cluster_info@$(($idx+1))";
-          echo $cluster_info;
-          docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
+            idx=0;
+            while IFS='-' read -ra ADDR; do
+              for i in "${ADDR[@]}"; do
+                idx=$i;
+              done;
+            done <<< "$OPENDBAAS_MY_POD_NAME";
+            echo $idx;
+            cluster_info="$cluster_info@$(($idx+1))";
+            echo $cluster_info;
+            docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
   roleGroupTemplates:
   - typeName: primary
     defaultReplicas: 3
@@ -87,7 +104,7 @@ spec:
 					return false
 				}
 				return len(createdClusterDef.Finalizers) > 0 &&
-					createdClusterDef.Status.ObservedGeneration == createdClusterDef.GetObjectMeta().GetGeneration()
+					createdClusterDef.Status.ObservedGeneration == 1
 			}, time.Second*10, time.Second*1).Should(BeTrue())
 			By("By creating an appVersion")
 			appVerYaml := `
@@ -99,9 +116,10 @@ spec:
   clusterDefinitionRef: mysql-cluster-definition
   components:
   - type: replicasets
-    containers:
-    - name: mysql
-      image: registry.jihulab.com/infracreate/mysql-server/mysql/wesql-server-arm:latest
+    podSpec: 
+      containers:
+      - name: mysql
+        image: registry.jihulab.com/infracreate/mysql-server/mysql/wesql-server-arm:latest
 `
 			appVersion := &dbaasv1alpha1.AppVersion{}
 			Expect(yaml.Unmarshal([]byte(appVerYaml), appVersion)).Should(Succeed())

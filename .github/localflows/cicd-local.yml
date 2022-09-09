@@ -6,12 +6,16 @@ env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
 jobs:
-  make-build:
+  make-test:
     runs-on: [self-hosted ]
     steps:
       - uses: actions/checkout@v3
-      - name: make build
-        run: |
+      - name: make test
+        run:  |
           git config --global url."https://${{ secrets.PERSONAL_ACCESS_TOKEN }}:@github.com".insteadof "https://github.com"
           make mod-vendor
           make lint
+          make test
+
+
+

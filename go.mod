@@ -10,7 +10,7 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/fatih/color v1.13.0
 	github.com/ghodss/yaml v1.0.0
-	github.com/go-logr/logr v1.2.2
+	github.com/go-logr/logr v1.2.3
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/gosuri/uitable v0.0.4
 	github.com/hashicorp/terraform v1.2.6
@@ -24,7 +24,6 @@ require (
 	github.com/sethvargo/go-password v0.2.0
 	github.com/spf13/cobra v1.5.0
 	github.com/spf13/viper v1.12.0
-	github.com/stretchr/testify v1.8.0
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
 	helm.sh/helm/v3 v3.9.2
 	k8s.io/api v0.24.3
@@ -238,6 +237,7 @@ require (
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/stretchr/testify v1.8.0 // indirect
 	github.com/subosito/gotenv v1.3.0 // indirect
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.0.232 // indirect
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/tag v1.0.233 // indirect

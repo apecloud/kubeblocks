@@ -110,10 +110,11 @@ func HandleCRDeletion(reqCtx RequestCtx,
 				}
 			}
 			// remove our finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(cr, finalizer)
-			if err := r.Update(reqCtx.Ctx, cr); err != nil {
-				res, err := CheckedRequeueWithError(err, reqCtx.Log, "")
-				return &res, err
+			if controllerutil.RemoveFinalizer(cr, finalizer) {
+				if err := r.Update(reqCtx.Ctx, cr); err != nil {
+					res, err := CheckedRequeueWithError(err, reqCtx.Log, "")
+					return &res, err
+				}
 			}
 		}
 

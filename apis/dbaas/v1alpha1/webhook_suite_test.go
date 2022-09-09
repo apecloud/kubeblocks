@@ -69,6 +69,8 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: false,
 		WebhookInstallOptions: envtest.WebhookInstallOptions{
 			Paths: []string{filepath.Join("..", "..", "..", "config", "webhook")},
+			// LocalServingHost: "host.docker.internal",
+			// LocalServingPort: 28080,
 		},
 	}
 

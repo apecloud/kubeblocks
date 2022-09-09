@@ -159,6 +159,9 @@ mod-vendor: ## Run go mod tidy->vendor->verify against go modules.
 	$(GO) mod vendor
 	$(GO) mod verify
 
+.PHONY: ctrl-test-current-ctx
+ctrl-test-current-ctx: manifests generate fmt vet ## Run operator controller tests with current $KUBECONFIG context
+	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./controllers/... -coverprofile cover.out
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
@@ -225,7 +228,7 @@ manager: cue-fmt build-checks ## Build manager binary.
 CERT_ROOT_CA ?= $(WEBHOOK_CERT_DIR)/rootCA.key
 .PHONY: webhook-cert
 webhook-cert: $(CERT_ROOT_CA) ## Create root CA certificates for admission webhooks testing.
-CERT_ROOT_CA:
+$(CERT_ROOT_CA):
 	mkdir -p $(WEBHOOK_CERT_DIR)
 	cd $(WEBHOOK_CERT_DIR) && \
 		step certificate create $(APP_NAME) rootCA.crt rootCA.key --profile root-ca --insecure --no-password && \

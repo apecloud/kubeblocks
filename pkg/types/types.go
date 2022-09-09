@@ -16,23 +16,11 @@ limitations under the License.
 
 package types
 
-import "github.com/apecloud/kubeblocks/version"
-
 const (
-	// dbctlDefaultHome defines dbctl default home name
+	// DBCtlDefaultHome defines dbctl default home name
 	DBCtlDefaultHome = ".dbctl"
-	// dbctlHomeEnv defines dbctl home system env
+	// DBCtlHomeEnv defines dbctl home system env
 	DBCtlHomeEnv = "DBCTL_HOME"
-
-	// K3sTokenPath is the path to k3s token
-	K3sTokenPath = "/var/lib/rancher/k3s/server/token"
-	// K3sKubeConfigLocation is default path of k3s kubeconfig
-	K3sKubeConfigLocation = "/etc/rancher/k3s/k3s.yaml"
-	// K3sExternalKubeConfigLocation is where to generate kubeconfig for external access
-	K3sExternalKubeConfigLocation = "/etc/rancher/k3s/k3s-external.yaml"
-	// CliDockerNetwork is docker network for k3d cluster when `dbctl playground`
-	// all cluster will be created in this network, so they can communicate with each other
-	CliDockerNetwork = "k3d-dbctl-playground"
 
 	// GoosLinux is os.GOOS linux string
 	GoosLinux = "linux"
@@ -51,38 +39,45 @@ const (
 	RestoreJobSourceName = "restoreJobs"
 )
 
-var (
-	// K3sImage is k3s image repo
-	K3sImage = "rancher/k3s:" + version.K3sImageTag
-
-	// K3dToolsImage is k3d tools image repo
-	K3dToolsImage = "docker.io/infracreate/k3d-tools:" + version.K3dVersion
-	// K3dProxyImage is k3d proxy image repo
-	K3dProxyImage = "docker.io/infracreate/k3d-proxy:" + version.K3dVersion
-)
-
-type K3dImages struct {
-	K3s      bool
-	K3dTools bool
-	K3dProxy bool
-	Reason   string
+type DBClusterInfo struct {
+	DBCluster       string
+	DBPort          string
+	Version         string
+	Topology        string
+	Status          string
+	StartTime       string
+	Labels          string
+	RootUser        string
+	DBNamespace     string
+	Instances       int64
+	ServerId        int64
+	Secret          string
+	OnlineInstances int64
+	Storage         int64
+	Engine          string
+	HostIP          string
 }
 
-// K3dStatus defines the status of k3d
-type K3dStatus struct {
-	Reason     string
-	K3dCluster []K3dCluster
+type BackupJobInfo struct {
+	Name           string
+	Namespace      string
+	Phase          string
+	StartTime      string
+	CompletionTime string
+	Labels         string
 }
 
-// K3dCluster defines the status of one k3d cluster
-type K3dCluster struct {
-	Name          string
-	Running       bool
-	ReleaseStatus map[string]string
-	Reason        string
-}
-
-type ClusterStatus struct {
-	K3dImages
-	K3d K3dStatus
+type PlaygroundInfo struct {
+	DBCluster     string
+	DBPort        string
+	DBNamespace   string
+	Namespace     string
+	ClusterName   string
+	GrafanaSvc    string
+	GrafanaPort   string
+	GrafanaUser   string
+	GrafanaPasswd string
+	HostIP        string
+	CloudProvider string
+	Version       string
 }

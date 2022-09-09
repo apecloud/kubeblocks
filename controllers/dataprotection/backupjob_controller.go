@@ -230,9 +230,9 @@ func (r *BackupJobReconciler) GetTargetCluster(
 	clusterItemsLen := len(clusterTarget.Items)
 	if clusterItemsLen != 1 {
 		if clusterItemsLen <= 0 {
-			return nil, errors.New("Can not found any stateful sets by labelsSelector.")
+			return nil, errors.New("can not found any stateful sets by labelsSelector")
 		}
-		return nil, errors.New("Match labels result more than one, check labelsSelector.")
+		return nil, errors.New("match labels result more than one, check labelsSelector")
 	}
 	return &clusterTarget.Items[0], nil
 }

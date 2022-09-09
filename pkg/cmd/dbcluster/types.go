@@ -28,8 +28,6 @@ import (
 	"k8s.io/kubectl/pkg/describe"
 	ctrlcli "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/pkg/utils"
-
 	"github.com/apecloud/kubeblocks/pkg/types"
 )
 
@@ -85,7 +83,7 @@ func (o *commandOptions) setup(f cmdutil.Factory, args []string) error {
 }
 
 // dbClusterHandler is iterator handlers function for dbClusters
-func (o *commandOptions) run(dbClusterHandler func(*utils.DBClusterInfo), postHandler func() error, opts ...ctrlcli.ListOption) error {
+func (o *commandOptions) run(dbClusterHandler func(*types.DBClusterInfo), postHandler func() error, opts ...ctrlcli.ListOption) error {
 	ctx := context.Background()
 	ul := &unstructured.UnstructuredList{}
 	ul.SetGroupVersionKind(getClusterGVK())

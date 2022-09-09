@@ -173,7 +173,7 @@ func mergeComponents(
 		AntiAffinity:    clusterDefComp.AntiAffinity,
 		IsQuorum:        clusterDefComp.IsQuorum,
 		Strategies:      clusterDefComp.Strategies,
-		Containers:      clusterDefComp.Containers,
+		PodSpec:         clusterDefComp.PodSpec,
 		Service:         clusterDefComp.Service,
 		Scripts:         clusterDefComp.Scripts,
 	}
@@ -181,66 +181,66 @@ func mergeComponents(
 		component.Name = clusterComp.Name
 	}
 
-	if appVerComp != nil && appVerComp.Containers != nil {
-		for _, container := range appVerComp.Containers {
-			i, c := getContainerByName(component.Containers, container.Name)
+	if appVerComp != nil && appVerComp.PodSpec.Containers != nil {
+		for _, container := range appVerComp.PodSpec.Containers {
+			i, c := getContainerByName(component.PodSpec.Containers, container.Name)
 			if c != nil {
 				if container.Image != "" {
-					component.Containers[i].Image = container.Image
+					component.PodSpec.Containers[i].Image = container.Image
 				}
 				if len(container.Command) != 0 {
-					component.Containers[i].Command = container.Command
+					component.PodSpec.Containers[i].Command = container.Command
 				}
 				if len(container.Args) != 0 {
-					component.Containers[i].Args = container.Args
+					component.PodSpec.Containers[i].Args = container.Args
 				}
 				if container.WorkingDir != "" {
-					component.Containers[i].WorkingDir = container.WorkingDir
+					component.PodSpec.Containers[i].WorkingDir = container.WorkingDir
 				}
 				if len(container.Ports) != 0 {
-					component.Containers[i].Ports = container.Ports
+					component.PodSpec.Containers[i].Ports = container.Ports
 				}
 				if len(container.EnvFrom) != 0 {
-					component.Containers[i].EnvFrom = container.EnvFrom
+					component.PodSpec.Containers[i].EnvFrom = container.EnvFrom
 				}
 				if len(container.Env) != 0 {
-					component.Containers[i].Env = container.Env
+					component.PodSpec.Containers[i].Env = container.Env
 				}
 				if container.Resources.Limits != nil || container.Resources.Requests != nil {
-					component.Containers[i].Resources = container.Resources
+					component.PodSpec.Containers[i].Resources = container.Resources
 				}
 				if len(container.VolumeMounts) != 0 {
-					component.Containers[i].VolumeMounts = container.VolumeMounts
+					component.PodSpec.Containers[i].VolumeMounts = container.VolumeMounts
 				}
 				if len(container.VolumeDevices) != 0 {
-					component.Containers[i].VolumeDevices = container.VolumeDevices
+					component.PodSpec.Containers[i].VolumeDevices = container.VolumeDevices
 				}
 				if container.LivenessProbe != nil {
-					component.Containers[i].LivenessProbe = container.LivenessProbe
+					component.PodSpec.Containers[i].LivenessProbe = container.LivenessProbe
 				}
 				if container.ReadinessProbe != nil {
-					component.Containers[i].ReadinessProbe = container.ReadinessProbe
+					component.PodSpec.Containers[i].ReadinessProbe = container.ReadinessProbe
 				}
 				if container.StartupProbe != nil {
-					component.Containers[i].StartupProbe = container.StartupProbe
+					component.PodSpec.Containers[i].StartupProbe = container.StartupProbe
 				}
 				if container.Lifecycle != nil {
-					component.Containers[i].Lifecycle = container.Lifecycle
+					component.PodSpec.Containers[i].Lifecycle = container.Lifecycle
 				}
 				if container.TerminationMessagePath != "" {
-					component.Containers[i].TerminationMessagePath = container.TerminationMessagePath
+					component.PodSpec.Containers[i].TerminationMessagePath = container.TerminationMessagePath
 				}
 				if container.TerminationMessagePolicy != "" {
-					component.Containers[i].TerminationMessagePolicy = container.TerminationMessagePolicy
+					component.PodSpec.Containers[i].TerminationMessagePolicy = container.TerminationMessagePolicy
 				}
 				if container.ImagePullPolicy != "" {
-					component.Containers[i].ImagePullPolicy = container.ImagePullPolicy
+					component.PodSpec.Containers[i].ImagePullPolicy = container.ImagePullPolicy
 				}
 				if container.SecurityContext != nil {
-					component.Containers[i].SecurityContext = container.SecurityContext
+					component.PodSpec.Containers[i].SecurityContext = container.SecurityContext
 				}
 			} else {
-				component.Containers = append(component.Containers, container)
+				component.PodSpec.Containers = append(component.PodSpec.Containers, container)
 			}
 		}
 	}
@@ -250,13 +250,13 @@ func mergeComponents(
 			component.VolumeClaimTemplates = toK8sVolumeClaimTemplates(clusterComp.VolumeClaimTemplates)
 		}
 		if clusterComp.Resources.Requests != nil || clusterComp.Resources.Limits != nil {
-			component.Containers[0].Resources = clusterComp.Resources
+			component.PodSpec.Containers[0].Resources = clusterComp.Resources
 		}
 		component.RoleGroups = clusterComp.RoleGroups
 	}
 	if component.VolumeClaimTemplates == nil {
-		for i := range component.Containers {
-			component.Containers[i].VolumeMounts = nil
+		for i := range component.PodSpec.Containers {
+			component.PodSpec.Containers[i].VolumeMounts = nil
 		}
 	}
 	return component

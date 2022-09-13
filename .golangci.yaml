@@ -1,7 +1,7 @@
 run:
   timeout: 30m
   skip-files:
-    # - "^zz_generated.*"
+    - "^zz_generated.*"
 
 output:
   # colored-line-number|line-number|json|tab|checkstyle|code-climate, default is "colored-line-number"

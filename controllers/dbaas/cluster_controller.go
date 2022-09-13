@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -336,8 +337,11 @@ func (r *ClusterReconciler) checkReferencedCRStatus(reqCtx intctrlutil.RequestCt
 }
 
 func (r *ClusterReconciler) needCheckClusterForReady(cluster *dbaasv1alpha1.Cluster) bool {
-	return cluster.Status.Phase != "" && cluster.Status.Phase != dbaasv1alpha1.RunningPhase &&
-		cluster.Status.Phase != dbaasv1alpha1.DeletingPhase
+	clusterPhase := []dbaasv1alpha1.Phase{"", dbaasv1alpha1.RunningPhase, dbaasv1alpha1.DeletingPhase}
+	if index := slices.Index(clusterPhase, cluster.Status.Phase); index != -1 {
+		return false
+	}
+	return true
 }
 
 // updateClusterPhase update cluster.status.phase

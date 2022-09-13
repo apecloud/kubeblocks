@@ -17,7 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
-var _ = Describe("BackupJob Controller", func() {
+var _ = Describe("BackupPolicyTemplate Controller", func() {
 
 	const timeout = time.Second * 10
 	const interval = time.Second * 1

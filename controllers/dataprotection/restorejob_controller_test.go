@@ -1,26 +1,24 @@
 package dataprotection
 
 import (
-	"context"
-	"time"
-
-	batchv1 "k8s.io/api/batch/v1"
-
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/sethvargo/go-password/password"
 	appv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"time"
+)
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-
+import (
+	"context"
 	. "github.com/onsi/ginkgo"
 
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
-var _ = Describe("BackupJob Controller", func() {
+var _ = Describe("RestoreJob Controller", func() {
 
 	const timeout = time.Second * 10
 	const interval = time.Second * 1
@@ -42,6 +40,58 @@ var _ = Describe("BackupJob Controller", func() {
 		return key
 	}
 
+	assureRestoreJobObj := func(backupJob string) *dataprotectionv1alpha1.RestoreJob {
+		By("By assure an restoreJob obj")
+		restoreJobYaml := `
+apiVersion: dataprotection.infracreate.com/v1alpha1
+kind: RestoreJob
+metadata:
+  name: restore-demo
+spec:
+  backupJobName: backup-success-demo
+  target:
+    databaseEngine: mysql
+    labelsSelector:
+      matchLabels:
+        mysql.oracle.com/cluster: mycluster
+  targetVolumes:
+    - name: mysql-restore-storage
+      persistentVolumeClaim:
+        claimName: datadir-mycluster-0
+  targetVolumeMounts:
+    - name: mysql-restore-storage
+      mountPath: /var/lib/mysql
+  onFailAttempted: 3
+`
+		restoreJob := &dataprotectionv1alpha1.RestoreJob{}
+		Expect(yaml.Unmarshal([]byte(restoreJobYaml), restoreJob)).Should(Succeed())
+		ns := genarateNS("restore-job-")
+		restoreJob.Name = ns.Name
+		restoreJob.Namespace = ns.Namespace
+		restoreJob.Spec.BackupJobName = backupJob
+
+		Expect(checkedCreateObj(restoreJob)).Should(Succeed())
+		return restoreJob
+	}
+
+	deleteRestoreJobWait := func(key types.NamespacedName) error {
+		Expect(func() error {
+			f := &dataprotectionv1alpha1.RestoreJob{}
+			if err := k8sClient.Get(context.Background(), key, f); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+			return k8sClient.Delete(context.Background(), f)
+		}()).Should(Succeed())
+
+		var err error
+		f := &dataprotectionv1alpha1.RestoreJob{}
+		eta := time.Now().Add(waitDuration)
+		for err = k8sClient.Get(context.Background(), key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(context.Background(), key, f) {
+			f = &dataprotectionv1alpha1.RestoreJob{}
+		}
+		return client.IgnoreNotFound(err)
+	}
+
 	assureBackupJobObj := func(backupPolicy string) *dataprotectionv1alpha1.BackupJob {
 		By("By assure an backupJob obj")
 		backupJobYaml := `
@@ -61,6 +111,8 @@ spec:
   backupPolicyName: backup-policy-demo
   backupType: full
   ttl: 168h0m0s
+status:
+  phase: Completed
 `
 		backupJob := &dataprotectionv1alpha1.BackupJob{}
 		Expect(yaml.Unmarshal([]byte(backupJobYaml), backupJob)).Should(Succeed())
@@ -73,7 +125,7 @@ spec:
 		return backupJob
 	}
 
-	deleteBackupJobNWait := func(key types.NamespacedName) error {
+	deleteBackupJobWait := func(key types.NamespacedName) error {
 		Expect(func() error {
 			f := &dataprotectionv1alpha1.BackupJob{}
 			if err := k8sClient.Get(context.Background(), key, f); err != nil {
@@ -130,7 +182,7 @@ spec:
 		return backupPolicy
 	}
 
-	deleteBackupPolicyNWait := func(key types.NamespacedName) error {
+	deleteBackupPolicyWait := func(key types.NamespacedName) error {
 		Expect(func() error {
 			f := &dataprotectionv1alpha1.BackupPolicy{}
 			if err := k8sClient.Get(context.Background(), key, f); err != nil {
@@ -207,7 +259,7 @@ spec:
 		return backupTool
 	}
 
-	deleteBackupToolNWait := func(key types.NamespacedName) error {
+	deleteBackupToolWait := func(key types.NamespacedName) error {
 		Expect(func() error {
 			f := &dataprotectionv1alpha1.BackupTool{}
 			if err := k8sClient.Get(context.Background(), key, f); err != nil {
@@ -495,17 +547,28 @@ spec:
 		return statefulSet
 	}
 
-	patchK8sJobStatus := func(jobStatus batchv1.JobConditionType, key types.NamespacedName) {
-		k8sJob := &batchv1.Job{}
-		Expect(k8sClient.Get(context.Background(), key, k8sJob)).Should(Succeed())
+	/*
+		patchK8sJobStatus := func(jobStatus batchv1.JobConditionType, key types.NamespacedName) {
+			k8sJob := &batchv1.Job{}
+			Expect(k8sClient.Get(context.Background(), key, k8sJob)).Should(Succeed())
 
-		patch := client.MergeFrom(k8sJob.DeepCopy())
-		jobCondition := batchv1.JobCondition{Type: jobStatus}
-		k8sJob.Status.Conditions = append(k8sJob.Status.Conditions, jobCondition)
-		Expect(k8sClient.Status().Patch(context.Background(), k8sJob, patch)).Should(Succeed())
+			patch := client.MergeFrom(k8sJob.DeepCopy())
+			jobCondition := batchv1.JobCondition{Type: jobStatus}
+			k8sJob.Status.Conditions = append(k8sJob.Status.Conditions, jobCondition)
+			Expect(k8sClient.Patch(context.Background(), k8sJob, patch)).Should(Succeed())
+		}*/
+	patchBackupJobStatus := func(phase dataprotectionv1alpha1.BackupJobPhase, key types.NamespacedName) {
+		backupJob := &dataprotectionv1alpha1.BackupJob{}
+		Expect(k8sClient.Get(context.Background(), key, backupJob)).Should(Succeed())
+
+		//patch := client.MergeFrom(backupJob.DeepCopy())
+
+		backupJob.Status.Phase = phase
+		Expect(k8sClient.Status().Update(context.Background(), backupJob)).Should(Succeed())
+		//Expect(k8sClient.Patch(context.Background(), backupJob, patch)).Should(Succeed())
 	}
 
-	Context("When creating backupJob", func() {
+	Context("When creating restoreJob", func() {
 		It("Should success with no error", func() {
 
 			By("By creating a statefulset")
@@ -518,17 +581,25 @@ spec:
 			backupPolicy := assureBackupPolicyObj(backupTool.Name)
 
 			By("By creating a backupJob from backupPolicy: " + backupPolicy.Name)
-			toCreate := assureBackupJobObj(backupPolicy.Name)
+			backupJob := assureBackupJobObj(backupPolicy.Name)
+
+			By("By creating a restoreJob from backupJob: " + backupJob.Name)
+			toCreate := assureRestoreJobObj(backupJob.Name)
 			key := types.NamespacedName{
 				Name:      toCreate.Name,
 				Namespace: toCreate.Namespace,
 			}
-			time.Sleep(waitDuration)
+			//time.Sleep(waitDuration)
 
-			patchK8sJobStatus(batchv1.JobComplete, key)
-			time.Sleep(waitDuration)
+			backupRet := &dataprotectionv1alpha1.BackupJob{}
+			Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: backupJob.Name, Namespace: backupJob.Namespace}, backupRet)).Should(Succeed())
 
-			result := &dataprotectionv1alpha1.BackupJob{}
+			patchBackupJobStatus(dataprotectionv1alpha1.BackupJobCompleted, types.NamespacedName{Name: backupJob.Name, Namespace: backupJob.Namespace})
+			time.Sleep(waitDuration)
+			backupRet = &dataprotectionv1alpha1.BackupJob{}
+			Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: backupJob.Name, Namespace: backupJob.Namespace}, backupRet)).Should(Succeed())
+
+			result := &dataprotectionv1alpha1.RestoreJob{}
 			Expect(k8sClient.Get(context.Background(), key, result)).Should(Succeed())
 
 			By("Deleting the scope")
@@ -538,67 +609,24 @@ spec:
 					Name:      backupPolicy.Name,
 					Namespace: backupPolicy.Namespace,
 				}
-				_ = deleteBackupPolicyNWait(key)
+				_ = deleteBackupPolicyWait(key)
 				key = types.NamespacedName{
 					Name:      backupTool.Name,
 					Namespace: backupTool.Namespace,
 				}
-				_ = deleteBackupToolNWait(key)
+				_ = deleteBackupToolWait(key)
+
+				key = types.NamespacedName{
+					Name:      backupJob.Name,
+					Namespace: backupJob.Namespace,
+				}
+				_ = deleteBackupJobWait(key)
 
 				key = types.NamespacedName{
 					Name:      toCreate.Name,
 					Namespace: toCreate.Namespace,
 				}
-				return deleteBackupJobNWait(key)
-			}, timeout, interval).Should(Succeed())
-		})
-	})
-
-	Context("When failed creating backupJob", func() {
-		It("Should failed with no error", func() {
-
-			By("By creating a statefulset")
-			_ = assureStatefulSetObj()
-
-			By("By creating a backupTool")
-			backupTool := assureBackupToolObj()
-
-			By("By creating a backupPolicy from backupTool: " + backupTool.Name)
-			backupPolicy := assureBackupPolicyObj(backupTool.Name)
-
-			By("By creating a backupJob from backupPolicy: " + backupPolicy.Name)
-			toCreate := assureBackupJobObj(backupPolicy.Name)
-			key := types.NamespacedName{
-				Name:      toCreate.Name,
-				Namespace: toCreate.Namespace,
-			}
-			time.Sleep(waitDuration)
-
-			patchK8sJobStatus(batchv1.JobFailed, key)
-			time.Sleep(waitDuration)
-
-			result := &dataprotectionv1alpha1.BackupJob{}
-			Expect(k8sClient.Get(context.Background(), key, result)).Should(Succeed())
-
-			By("Deleting the scope")
-
-			Eventually(func() error {
-				key = types.NamespacedName{
-					Name:      backupPolicy.Name,
-					Namespace: backupPolicy.Namespace,
-				}
-				_ = deleteBackupPolicyNWait(key)
-				key = types.NamespacedName{
-					Name:      backupTool.Name,
-					Namespace: backupTool.Namespace,
-				}
-				_ = deleteBackupToolNWait(key)
-
-				key = types.NamespacedName{
-					Name:      toCreate.Name,
-					Namespace: toCreate.Namespace,
-				}
-				return deleteBackupJobNWait(key)
+				return deleteRestoreJobWait(key)
 			}, timeout, interval).Should(Succeed())
 		})
 	})

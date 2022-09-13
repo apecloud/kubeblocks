@@ -135,8 +135,8 @@ cue-vet: cuetool ## Run cue vet against code.
 	$(CUE) vet controllers/dbaas/cue/*.cue
 
 .PHONY: fast-lint
-fast-lint: # [INTERNAL] fast lint
-	$(GOLANGCILINT) run ./... --timeout=5m
+fast-lint: staticchecktool  # [INTERNAL] fast lint
+	$(GOLANGCILINT) run ./...
 
 .PHONY: lint
 lint: generate ## Run golangci-lint against code.
@@ -145,6 +145,10 @@ lint: generate ## Run golangci-lint against code.
 .PHONY: staticcheck
 staticcheck: staticchecktool ## Run staticcheck against code. 
 	$(STATICCHECK) ./...
+
+.PHONY: loggercheck
+loggercheck: loggerchecktool ## Run loggercheck against code.
+	$(LOGGERCHECK) ./...
 
 .PHONY: build-checks
 build-checks: generate fmt vet goimports fast-lint ## Run build checks.
@@ -174,6 +178,11 @@ test-webhook-enabled: ## Run tests with webhooks enabled.
 .PHONY: cover-report
 cover-report: ## Generate cover.html from cover.out
 	$(GO) tool cover -html=cover.out -o cover.html
+ifeq ($(GOOS), darwin)
+	open ./cover.html
+else
+	echo "open cover.html with a HTML viewer."
+endif
 
 
 .PHONY: goimports
@@ -430,12 +439,26 @@ staticchecktool: ## Download staticcheck locally if necessary.
 ifeq (, $(shell which staticcheck))
 	@{ \
 	set -e ;\
-	echo 'installing honnef.co/go/tools/cmd/staticcheck ' ;\
-	go install honnef.co/go/tools/cmd/staticcheck@v0.3.2 ;\
+	echo 'installing honnef.co/go/tools/cmd/staticcheck' ;\
+	go install honnef.co/go/tools/cmd/staticcheck@latest;\
 	}
 STATICCHECK=$(GOBIN)/staticcheck
 else
 STATICCHECK=$(shell which staticcheck)
+endif
+
+
+.PHONY: loggerchecktool
+loggerchecktool: ## Download loggercheck locally if necessary.
+ifeq (, $(shell which loggercheck))
+	@{ \
+	set -e ;\
+	echo 'installing github.com/timonwong/loggercheck/cmd/loggercheck' ;\
+	go install github.com/timonwong/loggercheck/cmd/loggercheck@latest;\
+	}
+LOGGERCHECK=$(GOBIN)/loggercheck
+else
+LOGGERCHECK=$(shell which loggercheck)
 endif
 
 .PHONY: goimportstool

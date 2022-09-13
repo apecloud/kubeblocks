@@ -1,3 +1,52 @@
+run:
+  timeout: 30m
+  skip-files:
+    # - "^zz_generated.*"
+
+output:
+  # colored-line-number|line-number|json|tab|checkstyle|code-climate, default is "colored-line-number"
+  format: colored-line-number
+
+# check available linters @ https://golangci-lint.run/usage/linters/
+linters:
+  enable: # please keep this alphabetized
+  # Don't use soon to deprecated[1] linters that lead to false
+  # https://github.com/golangci/golangci-lint/issues/1841
+  # - deadcode
+  # - gocyclo
+  # - loggercheck # requires golangci-lint@v1.49.0
+  # - structcheck
+  # - varcheck
+    - errcheck
+    - gocritic
+    - goconst
+    - goimports
+    - gofmt  # We enable this as well as goimports for its simplify mode.
+    - gosimple
+    - govet
+    - ineffassign
+    - megacheck
+    - misspell
+    - nakedret
+    - staticcheck
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unused
+
 linters-settings:
   errcheck:
     check-blank: false # to keep `_ = viper.BindPFlag(...)` from throwing errors
+  staticcheck:
+    checks: [
+      "all",
+      "-ST1000", # ST1000 - Incorrect or missing package comment (non-default)
+      "-ST1003", # ST1003 – Poorly chosen identifier (non-default)
+      "-ST1016", # ST1016 – Use consistent method receiver names (non-default)
+      "-SA1019", # TODO(fix) Using a deprecated function, variable, constant or field
+      "-SA2002", # TODO(fix) Called testing.T.FailNow or SkipNow in a goroutine, which isn’t allowed
+    ]
+  stylecheck:
+    checks: [
+      "ST1019",  # Importing the same package multiple times.
+    ]

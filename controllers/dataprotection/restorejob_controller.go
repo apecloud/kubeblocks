@@ -291,7 +291,7 @@ func (r *RestoreJobReconciler) GetPodSpec(reqCtx intctrlutil.RequestCtx, restore
 	podSpec.Volumes = append(podSpec.Volumes, backupPolicy.Spec.RemoteVolumes...)
 
 	// TODO(dsj): mount readonly remote volumes for restore.
-	//podSpec.Volumes[0].PersistentVolumeClaim.ReadOnly = true
+	// podSpec.Volumes[0].PersistentVolumeClaim.ReadOnly = true
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
 
 	return podSpec, nil

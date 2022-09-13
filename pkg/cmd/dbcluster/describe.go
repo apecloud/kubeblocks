@@ -71,7 +71,7 @@ func buildClusterInfo(obj *unstructured.Unstructured) *types.DBClusterInfo {
 		HostIP:      instance.GetIP(),
 	}
 	for k, v := range obj.GetLabels() {
-		info.Labels = info.Labels + fmt.Sprintf("%s:%s ", k, v)
+		info.Labels += fmt.Sprintf("%s:%s ", k, v)
 	}
 
 	status := obj.Object["status"].(map[string]interface{})

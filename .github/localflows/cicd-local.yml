@@ -15,6 +15,7 @@ jobs:
           git config --global url."https://${{ secrets.PERSONAL_ACCESS_TOKEN }}:@github.com".insteadof "https://github.com"
           make mod-vendor
           make lint
+          make staticcheck
           make test
 
 

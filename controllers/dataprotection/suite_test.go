@@ -18,11 +18,13 @@ package dataprotection
 
 import (
 	"context"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"path/filepath"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"testing"
+
+	"k8s.io/client-go/kubernetes/scheme"
+	ctrl "sigs.k8s.io/controller-runtime"
+
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -58,18 +60,9 @@ var _ = BeforeSuite(func() {
 	ctx, cancel = context.WithCancel(context.TODO())
 
 	By("bootstrapping test environment")
-	/*
-		customApiServerFlags := []string{
-			"--secure-port=6884",
-		}
-		apiServerFlags := append([]string(nil), envtest.DefaultKubeAPIServerFlags...)
-		apiServerFlags = append(apiServerFlags, customApiServerFlags...)
-
-	*/
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
-		//KubeAPIServerFlags:    apiServerFlags,
 	}
 
 	var err error
@@ -77,12 +70,8 @@ var _ = BeforeSuite(func() {
 	cfg, err = testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
-	/*
-		err = dataprotectionv1alpha1.AddToScheme(scheme.Scheme)
-		Expect(err).NotTo(HaveOccurred())
-	*/
 
-	scheme := runtime.NewScheme()
+	scheme := scheme.Scheme
 	err = dataprotectionv1alpha1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 

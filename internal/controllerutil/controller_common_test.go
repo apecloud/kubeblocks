@@ -109,7 +109,6 @@ var _ = Describe("Cluster Controller", func() {
 	const finalizer = "finalizer/protection"
 	const timeout = time.Second * 10
 	const interval = time.Second * 1
-	const waitDuration = time.Second * 3
 
 	getObj := func(key client.ObjectKey) *corev1.ConfigMap {
 		cm := &corev1.ConfigMap{}
@@ -198,9 +197,9 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("Do normal deletion with finalizer should have finalizer removed and reconciled", func() {
-			obj, key := createObj()
+			_, key := createObj()
 			By("By delete obj")
-			obj = getObjWithFinalizer(key)
+			obj := getObjWithFinalizer(key)
 			Ω(k8sClient.Delete(ctx, obj)).ShouldNot(HaveOccurred())
 
 			By("By calling HandleCRDeletion")
@@ -215,9 +214,9 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("Do normal deletion with empty handler should have finalizer removed and reconciled", func() {
-			obj, key := createObj()
+			_, key := createObj()
 			By("By delete obj")
-			obj = getObjWithFinalizer(key)
+			obj := getObjWithFinalizer(key)
 			Ω(k8sClient.Delete(ctx, obj)).ShouldNot(HaveOccurred())
 
 			By("By calling HandleCRDeletion")
@@ -230,9 +229,9 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("Do normal deletion with error", func() {
-			obj, key := createObj()
+			_, key := createObj()
 			By("By delete obj")
-			obj = getObjWithFinalizer(key)
+			obj := getObjWithFinalizer(key)
 			Ω(k8sClient.Delete(ctx, obj)).ShouldNot(HaveOccurred())
 
 			By("By calling HandleCRDeletion")
@@ -247,9 +246,9 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("Do normal deletion with custom result", func() {
-			obj, key := createObj()
+			_, key := createObj()
 			By("By delete obj")
-			obj = getObjWithFinalizer(key)
+			obj := getObjWithFinalizer(key)
 			Ω(k8sClient.Delete(ctx, obj)).ShouldNot(HaveOccurred())
 
 			By("By calling HandleCRDeletion")
@@ -267,9 +266,9 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("Do normal deletion with custom result and error", func() {
-			obj, key := createObj()
+			_, key := createObj()
 			By("By delete obj")
-			obj = getObjWithFinalizer(key)
+			obj := getObjWithFinalizer(key)
 			Ω(k8sClient.Delete(ctx, obj)).ShouldNot(HaveOccurred())
 
 			By("By calling HandleCRDeletion")

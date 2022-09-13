@@ -11,9 +11,15 @@ jobs:
     runs-on: [ self-hosted, aws-ec2-k8s-runner ]
     steps:
       - uses: actions/checkout@v3
-      - name: make test
+      - name: make mod-vendor and lint
         run: |
           git config --global url."https://${{ secrets.PERSONAL_ACCESS_TOKEN }}:@github.com".insteadof "https://github.com"
+          make mod-vendor
+          make lint
+          make staticcheck  
+
+      - name: make test
+        run: |
           make test
 
       - name: upload coverage report

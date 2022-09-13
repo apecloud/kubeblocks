@@ -386,7 +386,11 @@ func (o *SnapshotOptions) CompleteRestore(f cmdutil.Factory, args []string) erro
 }
 
 func (o *SnapshotOptions) RunRestore() error {
-	snapshotObj := NewRestoreInstance(o.Namespace, o.Name, o.SourceSnapshot)
+	storageCapacity, err := o.getSourceSnapshotCapacity()
+	if err != nil {
+		return err
+	}
+	snapshotObj := NewRestoreInstance(o.Namespace, o.Name, o.SourceSnapshot, storageCapacity)
 
 	gvr := schema.GroupVersionResource{
 		Group:    "mysql.oracle.com",
@@ -402,7 +406,26 @@ func (o *SnapshotOptions) RunRestore() error {
 	return nil
 }
 
-func NewRestoreInstance(namespace, name, sourceSnapshot string) *unstructured.Unstructured {
+func (o *SnapshotOptions) getSourceSnapshotCapacity() (string, error) {
+	gvr := schema.GroupVersionResource{
+		Group:    "snapshot.storage.k8s.io",
+		Version:  "v1",
+		Resource: "volumesnapshots",
+	}
+
+	obj, err := o.client.Resource(gvr).Namespace(o.Namespace).Get(context.TODO(), o.SourceSnapshot, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	if obj.Object["status"] == nil {
+		return "", nil
+	}
+	status := obj.Object["status"].(map[string]interface{})
+
+	return status["restoreSize"].(string), nil
+}
+
+func NewRestoreInstance(namespace, name, sourceSnapshot, storageCapacity string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "mysql.oracle.com/v2",
@@ -418,6 +441,11 @@ func NewRestoreInstance(namespace, name, sourceSnapshot string) *unstructured.Un
 						"name":     sourceSnapshot,
 						"kind":     "VolumeSnapshot",
 						"apiGroup": "snapshot.storage.k8s.io",
+					},
+					"resources": map[string]interface{}{
+						"requests": map[string]interface{}{
+							"storage": storageCapacity,
+						},
 					},
 				},
 				"imagePullPolicy":    "IfNotPresent",

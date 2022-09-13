@@ -21,7 +21,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/go-logr/logr/testr"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -73,9 +72,6 @@ var _ = BeforeSuite(func() {
 	cfg, err = testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
-
-	err = dbaasv1alpha1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
 

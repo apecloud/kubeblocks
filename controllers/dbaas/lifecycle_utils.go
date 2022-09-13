@@ -302,21 +302,15 @@ func buildClusterCreationTasks(
 
 	applyObjs := make([]client.Object, 0, 3)
 	cacheCtx := map[string]interface{}{}
+
+	prepareSecretsTask := intctrlutil.NewTask()
+	prepareSecretsTask.ExecFunction = prepareSecretObjs
 	params := createParams{
 		cluster:           cluster,
 		clusterDefinition: clusterDefinition,
 		applyObjs:         &applyObjs,
 		cacheCtx:          &cacheCtx,
 	}
-
-	// update cluster status.phase to Creating or Updating when create or update cluster
-	updateClusterPhaseTask := intctrlutil.NewTask()
-	updateClusterPhaseTask.ExecFunction = updateClusterPhaseToCreatingOrUpdating
-	updateClusterPhaseTask.Context["exec"] = &params
-	rootTask.SubTasks = append(rootTask.SubTasks, updateClusterPhaseTask)
-
-	prepareSecretsTask := intctrlutil.NewTask()
-	prepareSecretsTask.ExecFunction = prepareSecretObjs
 	prepareSecretsTask.Context["exec"] = &params
 	rootTask.SubTasks = append(rootTask.SubTasks, prepareSecretsTask)
 
@@ -906,38 +900,4 @@ func injectEnv(strByte []byte, key string, value string) []byte {
 	str := string(strByte)
 	str = strings.ReplaceAll(str, "$("+key+")", value)
 	return []byte(str)
-}
-
-// updateClusterPhase update cluster.status.phase
-func updateClusterPhaseToCreatingOrUpdating(ctx context.Context, cli client.Client, obj interface{}) error {
-	params := obj.(*createParams)
-	patch := client.MergeFrom(params.cluster.DeepCopy())
-	if params.cluster.Status.Phase == "" {
-		params.cluster.Status.Phase = dbaasv1alpha1.CreatingPhase
-	} else if params.cluster.Status.Phase != dbaasv1alpha1.CreatingPhase {
-		params.cluster.Status.Phase = dbaasv1alpha1.UpdatingPhase
-	}
-	return cli.Status().Patch(ctx, params.cluster, patch)
-}
-
-// checkClusterIsReady Check whether the cluster related pod resources are running. if ok, update Cluster.status.phase to Running
-func checkClusterIsReady(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster) error {
-	statefulSetList := &appsv1.StatefulSetList{}
-	if err := cli.List(ctx, statefulSetList, client.MatchingLabels{appInstanceLabelKey: cluster.Name}); err != nil {
-		return err
-	}
-	isOk := true
-	for _, v := range statefulSetList.Items {
-		if v.Status.AvailableReplicas != *v.Spec.Replicas ||
-			v.Status.CurrentRevision != v.Status.UpdateRevision {
-			isOk = false
-			break
-		}
-	}
-	if isOk {
-		patch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Status.Phase = dbaasv1alpha1.RunningPhase
-		return cli.Status().Patch(ctx, cluster, patch)
-	}
-	return fmt.Errorf("cluster is not ready")
 }

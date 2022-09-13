@@ -118,6 +118,7 @@ func executeTpcc(action string) {
 	case "csv", "CSV":
 		if tpccConfig.OutputDir == "" {
 			fmt.Printf("Output Directory cannot be empty when generating files")
+			// nolint
 			os.Exit(1)
 		}
 		w, err = tpcc.NewCSVWorkloader(globalDB, &tpccConfig)

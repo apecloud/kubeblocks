@@ -49,7 +49,7 @@ type BackupPolicySpec struct {
 	// +kubebuilder:validation:Required
 	TargetVolume corev1.Volume `json:"targetVolume"`
 
-	// array of remote volumes from CSI driver defination.
+	// array of remote volumes from CSI driver definition.
 	// +kubebuilder:validation:MinItems=1
 	RemoteVolumes []corev1.Volume `json:"remoteVolumes" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 

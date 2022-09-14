@@ -86,8 +86,6 @@ endif
 
 
 .DEFAULT_GOAL := help
-.PHONY: all
-all: manager dbctl
 
 ##@ General
 
@@ -106,6 +104,9 @@ all: manager dbctl
 .PHONY: help
 help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+
+.PHONY: all
+all: manager dbctl ## Make all cmd binaries.
 
 ##@ Development
 
@@ -394,6 +395,7 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 KUSTOMIZE_VERSION ?= v4.5.7
 CONTROLLER_TOOLS_VERSION ?= v0.9.0
 HELM_VERSION ?= v3.9.0
+CUE_VERSION ?= v0.4.3
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "$(GITHUB_PROXY)https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
@@ -478,7 +480,7 @@ cuetool: ## Download cue locally if necessary.
 ifeq (, $(shell which cue))
 	@{ \
 	set -e ;\
-	go install github.com/cue-lang/cue@latest ;\
+	go install github.com/cue-lang/cue@$(CUE_VERSION) ;\
 	}
 CUE=$(GOBIN)/cue
 else
@@ -499,5 +501,4 @@ endif
 
 .PHONY: brew-install-prerequisite
 brew-install-prerequisite: ## Use `brew install` to install required dependencies. 
-	brew install docker --cask
-	brew install k3d go kubebuilder delve golangci-lint staticcheck kustomize step cue
+	brew install go kubebuilder delve golangci-lint staticcheck kustomize step cue

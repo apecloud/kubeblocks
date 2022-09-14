@@ -294,7 +294,7 @@ func defaultKeyring() string {
 	return filepath.Join(homedir.HomeDir(), ".gnupg", "pubring.gpg")
 }
 
-// Install will install a Chart
+// UnInstall will install a Chart
 func (i *InstallOpts) UnInstall(cfg string) (*release.UninstallReleaseResponse, error) {
 	utils.InfoP(1, "UnInstall "+i.Chart+"...")
 	s := spinner.New(spinner.CharSets[rand.Intn(44)], 100*time.Millisecond)

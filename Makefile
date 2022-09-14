@@ -480,7 +480,7 @@ cuetool: ## Download cue locally if necessary.
 ifeq (, $(shell which cue))
 	@{ \
 	set -e ;\
-	go install github.com/cue-lang/cue@$(CUE_VERSION) ;\
+	go install cuelang.org/go/cmd/cue@$(CUE_VERSION) ;\
 	}
 CUE=$(GOBIN)/cue
 else

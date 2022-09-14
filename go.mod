@@ -298,6 +298,7 @@ require (
 )
 
 replace (
+	// cuelang.org/go => github.com/cue-lang/cue v0.4.3
 	github.com/hashicorp/terraform => github.com/apecloud/terraform v1.2.6-alpha20220813
 	github.com/spf13/afero => github.com/spf13/afero v1.2.2
 	google.golang.org/grpc => google.golang.org/grpc v1.29.1

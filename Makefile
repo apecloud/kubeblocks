@@ -205,25 +205,6 @@ goimports: goimportstool ## Run goimports against code.
 	$(GOIMPORTS) -local github.com/apecloud/kubeblocks -w $$(go list -f {{.Dir}} ./...)
 
 
-
-.PHONY: build-dev-container
-build-dev-container: ## Build dev docker container image.
-ifneq ($(BUILDX_ENABLED), true)
-	docker build ./docker/. -f ./docker/Dockerfile-dev -t ${DEV_IMG}:latest
-else
-	docker buildx build ./docker/. $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -f ./docker/Dockerfile-dev -t ${DEV_IMG}:latest
-endif
-
-
-.PHONY: push-dev-container
-push-dev-container: ## Push dev docker container image.
-ifneq ($(BUILDX_ENABLED), true)
-	docker push ${DEV_IMG}:latest
-else
-	docker buildx build ./docker/. $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -f ./docker/Dockerfile-dev -t ${DEV_IMG}:latest --push
-endif
-
-
 ##@ CLI
 CLI_IMG ?= docker.io/infracreate/dbctl
 CLI_VERSION ?= 0.4.0

@@ -9,7 +9,7 @@ component: {
 	clusterType:    string
 	type:           string
 	name:           string
-	containers: [...]
+	podSpec: containers: [...]
 	volumeClaimTemplates: [...]
 }
 roleGroup: {

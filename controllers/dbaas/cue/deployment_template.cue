@@ -9,7 +9,7 @@ component: {
 	clusterType:    string
 	type:           string
 	name:           string
-	containers: [...]
+	podSpec: containers: [...]
 	volumeClaimTemplates: [...]
 }
 roleGroup: {
@@ -48,10 +48,7 @@ deployment: {
 					"app.kubernetes.io/component": "\(component.type)-\(component.name)"
 					// "app.kubernetes.io/version" : # TODO
 				}
-			spec: {
-				terminationGracePeriodSeconds: 10
-				containers:                    component.containers
-			}
+			spec: component.podSpec
 		}
 	}
 }

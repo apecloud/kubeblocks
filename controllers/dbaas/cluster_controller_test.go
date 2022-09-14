@@ -1,3 +1,19 @@
+/*
+Copyright 2022.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package dbaas
 
 import (
@@ -31,6 +47,10 @@ var _ = Describe("Cluster Controller", func() {
 	const timeout = time.Second * 10
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
+	clusterObjKey := types.NamespacedName{
+		Name:      "my-cluster",
+		Namespace: "default",
+	}
 
 	checkedCreateObj := func(obj client.Object) error {
 		if err := k8sClient.Create(context.Background(), obj); err != nil && !apierrors.IsAlreadyExists(err) {
@@ -39,9 +59,29 @@ var _ = Describe("Cluster Controller", func() {
 		return nil
 	}
 
+	assureDefaultStorageClassObj := func() *storagev1.StorageClass {
+		By("By assure an default storageClass")
+		scYAML := `
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: csi-hostpath-sc
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: hostpath.csi.k8s.io
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+`
+		sc := &storagev1.StorageClass{}
+		Expect(yaml.Unmarshal([]byte(scYAML), sc)).Should(Succeed())
+		Expect(checkedCreateObj(sc)).Should(Succeed())
+		return sc
+	}
+
 	assureClusterDefObj := func() *dbaasv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
-		clusterDefYaml := `
+		clusterDefYAML := `
 apiVersion: dbaas.infracreate.com/v1alpha1
 kind: ClusterDefinition
 metadata:
@@ -53,54 +93,56 @@ spec:
     roleGroups:
     - primary
     defaultReplicas: 1
-    containers:
-    - name: mysql
-      imagePullPolicy: IfNotPresent
-      ports:
-      - containerPort: 3306
-        protocol: TCP
-        name: mysql
-      - containerPort: 13306
-        protocol: TCP
-        name: paxos
-      volumeMounts:
-        - mountPath: /var/lib/mysql
-          name: data
-        - mountPath: /var/log
-          name: log
-      env:
-        - name: "MYSQL_ROOT_PASSWORD"
-          valueFrom:
-            secretKeyRef:
-              name: $(OPENDBAAS_MY_SECRET_NAME)
-              key: password
-      command: ["/usr/bin/bash", "-c"]
-      args:
-        - >
-          cluster_info="";
-          for (( i=0; i<$OPENDBAAS_REPLICASETS_PRIMARY_N; i++ )); do
-            if [ $i -ne 0 ]; then
-              cluster_info="$cluster_info;";
-            fi;
-            host=$(eval echo \$OPENDBAAS_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
-            cluster_info="$cluster_info$host:13306";
-          done;
-          idx=0;
-          while IFS='-' read -ra ADDR; do
-            for i in "${ADDR[@]}"; do
-              idx=$i;
+    podSpec:
+      containers:
+      - name: mysql
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3306
+          protocol: TCP
+          name: mysql
+        - containerPort: 13306
+          protocol: TCP
+          name: paxos
+        volumeMounts:
+          - mountPath: /var/lib/mysql
+            name: data
+          - mountPath: /var/log
+            name: log
+        env:
+          - name: "MYSQL_ROOT_PASSWORD"
+            valueFrom:
+              secretKeyRef:
+                name: $(OPENDBAAS_MY_SECRET_NAME)
+                key: password
+        command: ["/usr/bin/bash", "-c"]
+        args:
+          - >
+            cluster_info="";
+            for (( i=0; i<$OPENDBAAS_REPLICASETS_PRIMARY_N; i++ )); do
+              if [ $i -ne 0 ]; then
+                cluster_info="$cluster_info;";
+              fi;
+              host=$(eval echo \$OPENDBAAS_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
+              cluster_info="$cluster_info$host:13306";
             done;
-          done <<< "$OPENDBAAS_MY_POD_NAME";
-          echo $idx;
-          cluster_info="$cluster_info@$(($idx+1))";
-          echo $cluster_info;
-          docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
+            idx=0;
+            while IFS='-' read -ra ADDR; do
+              for i in "${ADDR[@]}"; do
+                idx=$i;
+              done;
+            done <<< "$OPENDBAAS_MY_POD_NAME";
+            echo $idx;
+            cluster_info="$cluster_info@$(($idx+1))";
+            echo $cluster_info;
+            docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
   - typeName: proxy
     roleGroups: ["proxy"]
     defaultReplicas: 1
     isStateless: true
-    containers:
-    - name: nginx
+    podSpec:
+      containers:
+      - name: nginx
   roleGroupTemplates:
   - typeName: primary
     defaultReplicas: 3
@@ -111,14 +153,14 @@ spec:
     defaultReplicas: 2
 `
 		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
-		Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)).Should(Succeed())
+		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
 		Expect(checkedCreateObj(clusterDefinition)).Should(Succeed())
 		return clusterDefinition
 	}
 
 	assureAppVersionObj := func() *dbaasv1alpha1.AppVersion {
 		By("By assure an appVersion obj")
-		appVerYaml := `
+		appVerYAML := `
 apiVersion: dbaas.infracreate.com/v1alpha1
 kind:       AppVersion
 metadata:
@@ -127,16 +169,18 @@ spec:
   clusterDefinitionRef: cluster-definition
   components:
   - type: replicasets
-    containers:
-    - name: mysql
-      image: registry.jihulab.com/infracreate/mysql-server/mysql/wesql-server-arm:latest
+    podSpec:
+      containers:
+      - name: mysql
+        image: registry.jihulab.com/infracreate/mysql-server/mysql/wesql-server-arm:latest
   - type: proxy
-    containers:
-    - name: nginx
-      image: nginx
+    podSpec: 
+      containers:
+      - name: nginx
+        image: nginx
 `
 		appVersion := &dbaasv1alpha1.AppVersion{}
-		Expect(yaml.Unmarshal([]byte(appVerYaml), appVersion)).Should(Succeed())
+		Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(Succeed())
 		Expect(checkedCreateObj(appVersion)).Should(Succeed())
 		return appVersion
 	}
@@ -196,8 +240,13 @@ spec:
 	BeforeEach(func() {
 		// Add any steup steps that needs to be executed before each test
 	})
+
 	AfterEach(func() {
 		// Add any teardown steps that needs to be executed after each test
+		By("AfterEach scope")
+		Eventually(func() error {
+			return deleteClusterNWait(clusterObjKey)
+		}, timeout, interval).Should(Succeed())
 	})
 
 	Context("When creating cluster", func() {
@@ -422,16 +471,47 @@ spec:
 
 	Context("When updating cluster", func() {
 		It("Should update PVC request storage size accordingly", func() {
-			By("Check available storageclasses")
-			scList := &storagev1.StorageClassList{}
-			_ = k8sClient.List(context.Background(), scList)
-			if len(scList.Items) == 0 {
+			// this test required controller-manager component
+			By("Check available controller-manager status")
+			csList := &corev1.ComponentStatusList{}
+			_ = k8sClient.List(context.Background(), csList)
+			isCMAvailable := false
+			for _, cs := range csList.Items {
+				if cs.Name != "controller-manager" {
+					continue
+				}
+				for _, cond := range cs.Conditions {
+					if cond.Type == "Healthy" && cond.Status == "True" {
+						isCMAvailable = true
+						break
+					}
+				}
+			}
+			if !isCMAvailable {
 				// skip test if no available storage classes
-				By("No available storageclass, test skipped")
+				By("The controller-manager is not available, test skipped")
 				return
 			}
 
-			By("By creating a cluster")
+			By("Check available storageclasses")
+			scList := &storagev1.StorageClassList{}
+			hasDefaultSC := false
+			_ = k8sClient.List(context.Background(), scList)
+			for _, sc := range scList.Items {
+				annot := sc.Annotations
+				if annot == nil {
+					continue
+				}
+				if v, ok := annot["storageclass.kubernetes.io/is-default-class"]; ok && v == "true" {
+					hasDefaultSC = true
+					break
+				}
+			}
+			if !hasDefaultSC {
+				assureDefaultStorageClassObj()
+			}
+
+			By("By creating a cluster with volume claim")
 			toCreate, _, _, key := newClusterObj(nil, nil)
 			toCreate.Spec.Components = make([]dbaasv1alpha1.ClusterComponent, 1)
 			toCreate.Spec.Components[0] = dbaasv1alpha1.ClusterComponent{
@@ -480,14 +560,19 @@ spec:
 				Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
 					"app.kubernetes.io/instance": key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				return len(stsList.Items) != 0
+
+				Expect(len(stsList.Items) == 1).Should(BeTrue())
+
+				sts := &stsList.Items[0]
+				Expect(sts.Spec.Replicas).ShouldNot(BeNil())
+				return sts.Status.AvailableReplicas == *sts.Spec.Replicas
 			}, timeout, interval).Should(BeTrue())
 
 			Eventually(func() bool {
 				pvcList := &corev1.PersistentVolumeClaimList{}
 				Expect(k8sClient.List(context.Background(), pvcList, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(pvcList.Items) != 0
-			}, timeout, interval).Should(BeTrue())
+			}, timeout*6, interval).Should(BeTrue())
 
 			comp := &fetchedG1.Spec.Components[0]
 			newStorageValue := resource.MustParse("2Gi")

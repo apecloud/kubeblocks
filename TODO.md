@@ -13,10 +13,10 @@
   - [x] PDB
   - [x] label handling:
     - [x] deploy & sts workloads's labels and spec.template.metadata.labels (check https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/)
-- [ ] immutable spec properties handling (via validating webhook)
-- [ ] CR status handling
-- [ ] checked AppVersion CR status
-- [ ] checked ClusterDefinition CR status
+- [x] immutable spec properties handling (via validating webhook)
+- [x] CR status handling
+- [x] checked AppVersion CR status
+- [x] checked ClusterDefinition CR status
 - [x] CR update handling
   - [x] PVC volume expansion (spec.components[].volumeClaimTemplates only works for initial statefulset creation)
   - [x] spec.components[].serviceType

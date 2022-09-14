@@ -3,17 +3,20 @@ name: CICD-PULL-REQUEST
 on:
   pull_request:
 
-env:
-  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
 jobs:
   make-test:
     runs-on: [ self-hosted, aws-ec2-k8s-runner ]
     steps:
       - uses: actions/checkout@v3
+      - name: make mod-vendor and lint
+        run: |
+          make mod-vendor
+          make lint
+          make staticcheck  
+
       - name: make test
         run: |
-          git config --global url."https://${{ secrets.PERSONAL_ACCESS_TOKEN }}:@github.com".insteadof "https://github.com"
           make test
 
       - name: upload coverage report

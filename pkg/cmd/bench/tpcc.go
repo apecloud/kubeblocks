@@ -26,10 +26,10 @@ import (
 
 	"github.com/pingcap/go-tpc/pkg/measurement"
 	"github.com/pingcap/go-tpc/pkg/workload"
+	"github.com/pingcap/go-tpc/tpcc"
 	"github.com/spf13/cobra"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"github.com/apecloud/kubeblocks/pkg/cmd/bench/tpcc"
 	"github.com/apecloud/kubeblocks/pkg/utils"
 )
 
@@ -118,6 +118,7 @@ func executeTpcc(action string) {
 	case "csv", "CSV":
 		if tpccConfig.OutputDir == "" {
 			fmt.Printf("Output Directory cannot be empty when generating files")
+			// nolint
 			os.Exit(1)
 		}
 		w, err = tpcc.NewCSVWorkloader(globalDB, &tpccConfig)

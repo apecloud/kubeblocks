@@ -11,7 +11,7 @@
 
 ## Overview
 
-Kubelego Core Driver Controller Manager.
+KubeBlocks Controller Manager.
 
 Features/Enhancement:
 - [Operator developer guides](OPERATOR_DEVELOPER.md)

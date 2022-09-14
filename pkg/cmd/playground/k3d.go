@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cluster
+package playground
 
 import (
 	"context"
@@ -28,30 +28,23 @@ import (
 	"time"
 
 	"github.com/containers/common/pkg/retry"
-	docker "github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	k3dClient "github.com/k3d-io/k3d/v5/pkg/client"
 	config "github.com/k3d-io/k3d/v5/pkg/config/v1alpha4"
 	"github.com/k3d-io/k3d/v5/pkg/runtimes"
 	k3d "github.com/k3d-io/k3d/v5/pkg/types"
 	"github.com/pkg/errors"
-	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/repo"
 
-	"github.com/apecloud/kubeblocks/pkg/provider"
+	"github.com/apecloud/kubeblocks/pkg/types"
 	"github.com/apecloud/kubeblocks/version"
 
-	//"github.com/apecloud/kubeblocks/pkg/resources"
-	"github.com/apecloud/kubeblocks/pkg/types"
 	"github.com/apecloud/kubeblocks/pkg/utils"
 	"github.com/apecloud/kubeblocks/pkg/utils/helm"
 )
 
 var (
-	dockerCli client.APIClient
-	info      = utils.Info
-	//infof     = utils.Infof
+	info = utils.Info
 	errf = utils.Errf
 )
 
@@ -59,28 +52,20 @@ type k3dSetupOptions struct {
 	dryRun bool
 }
 
-func init() {
-	var err error
-	dockerCli, err = client.NewClientWithOpts(client.FromEnv)
-	if err != nil {
-		panic(err)
-	}
-}
-
-// PlaygroundInstaller will handle the playground cluster creation and management
-type PlaygroundInstaller struct {
+// Installer will handle the playground cluster creation and management
+type Installer struct {
 	cfg config.ClusterConfig
 
 	Ctx         context.Context
-	Provider    provider.Provider
 	Namespace   string
 	Kubeconfig  string
 	ClusterName string
 	DBCluster   string
+	wesql       Wesql
 }
 
 // Install install a k3d cluster
-func (d *PlaygroundInstaller) Install() error {
+func (d *Installer) Install() error {
 	var err error
 
 	d.cfg, err = BuildClusterRunConfig(d.ClusterName)
@@ -100,7 +85,7 @@ func (d *PlaygroundInstaller) Install() error {
 }
 
 // Uninstall remove the k3d cluster
-func (d *PlaygroundInstaller) Uninstall() error {
+func (d *Installer) Uninstall() error {
 	clusters, err := k3dClient.ClusterList(d.Ctx, runtimes.SelectedRuntime)
 	if err != nil {
 		return errors.Wrap(err, "fail to get k3d cluster list")
@@ -156,7 +141,7 @@ func (d *PlaygroundInstaller) Uninstall() error {
 }
 
 // GenKubeconfig generate a kubeconfig to access the k3d cluster
-func (d *PlaygroundInstaller) GenKubeconfig() error {
+func (d *Installer) GenKubeconfig() error {
 	var err error
 	var cluster = d.cfg.Cluster.Name
 
@@ -200,42 +185,16 @@ func (d *PlaygroundInstaller) GenKubeconfig() error {
 }
 
 // SetKubeconfig set kubeconfig environment of cluster
-func (d *PlaygroundInstaller) SetKubeconfig() error {
+func (d *Installer) SetKubeconfig() error {
 	info("Setting kubeconfig env for dbctl playground...")
 	return os.Setenv("KUBECONFIG", utils.ConfigPath(d.cfg.Cluster.Name))
 }
 
-func (d *PlaygroundInstaller) GetStatus() types.ClusterStatus {
-	var status types.ClusterStatus
-	images, err := dockerCli.ImageList(d.Ctx, docker.ImageListOptions{})
-
-	if err != nil {
-		status.K3dImages.Reason = fmt.Sprintf("Failed to get image list:%s", err.Error())
-		return status
-	}
-
-	for _, image := range images {
-		fillK3dImageStatus(image, &status)
-	}
-
-	clusters, err := k3dClient.ClusterList(d.Ctx, runtimes.SelectedRuntime)
-	if err != nil {
-		status.K3d.Reason = fmt.Sprintf("Failed to get cluster list: %s", err.Error())
-		return status
-	}
-
-	status.K3d.K3dCluster = []types.K3dCluster{}
-	for _, cluster := range clusters {
-		fillK3dCluster(d.ClusterName, d.Namespace, cluster, &status)
-	}
-	return status
-}
-
-func (d *PlaygroundInstaller) InstallDeps() error {
+func (d *Installer) InstallDeps() error {
 	var err error
 
 	info("Add dependent repos...")
-	err = addRepos(d.Provider.GetRepos())
+	err = addRepos(d.wesql.GetRepos())
 	if err != nil {
 		return errors.Wrap(err, "Failed to add dependent repos")
 	}
@@ -252,8 +211,8 @@ func (d *PlaygroundInstaller) InstallDeps() error {
 	return nil
 }
 
-func (d *PlaygroundInstaller) PrintGuide(cloudProvider string, hostIP string) error {
-	info := utils.PlayGroundInfo{
+func (d *Installer) PrintGuide(cloudProvider string, hostIP string) error {
+	info := types.PlaygroundInfo{
 		HostIP:        hostIP,
 		CloudProvider: cloudProvider,
 		DBCluster:     d.DBCluster,
@@ -267,7 +226,7 @@ func (d *PlaygroundInstaller) PrintGuide(cloudProvider string, hostIP string) er
 		GrafanaPasswd: "prom-operator",
 		Version:       version.Version,
 	}
-	return utils.PrintPlaygroundGuild(info)
+	return utils.PrintPlaygroundGuide(info)
 }
 
 // BuildClusterRunConfig returns the run-config for the k3d cluster
@@ -303,7 +262,7 @@ func buildClusterCreateOpts() k3d.ClusterCreateOpts {
 
 func buildClusterConfig(clusterName string, opts k3d.ClusterCreateOpts) (k3d.Cluster, error) {
 	var network = k3d.ClusterNetwork{
-		Name:     types.CliDockerNetwork,
+		Name:     CliDockerNetwork,
 		External: false,
 	}
 
@@ -347,7 +306,7 @@ func buildClusterConfig(clusterName string, opts k3d.ClusterCreateOpts) (k3d.Clu
 	serverNode := k3d.Node{
 		Name:       k3dClient.GenerateNodeName(clusterConfig.Name, k3d.ServerRole, 0),
 		Role:       k3d.ServerRole,
-		Image:      types.K3sImage,
+		Image:      K3sImage,
 		ServerOpts: k3d.ServerOpts{},
 		Volumes:    []string{k3sImageDir + ":/var/lib/rancher/k3s/agent/images/"},
 	}
@@ -392,7 +351,7 @@ func buildLoadbalancer(cluster k3d.Cluster, opts k3d.ClusterCreateOpts) *k3d.Loa
 	}
 
 	lb.Node.Name = fmt.Sprintf("%s-%s-serverlb", k3d.DefaultObjectNamePrefix, cluster.Name)
-	lb.Node.Image = types.K3dProxyImage
+	lb.Node.Image = K3dProxyImage
 	lb.Node.Ports = nat.PortMap{
 		k3d.DefaultAPIPort: []nat.PortBinding{cluster.KubeAPI.Binding},
 	}
@@ -436,87 +395,6 @@ func buildKubeconfigOptions() config.SimpleConfigOptionsKubeconfig {
 	return opts
 }
 
-//func (o k3dSetupOptions) prepareK3sImages() error {
-//	info("Preparing K3s images...")
-//	embedK3sImage, err := resources.K3sImage.Open("static/k3s/images/k3s-airgap-images.tar.gz")
-//	if err != nil {
-//		return err
-//	}
-//	defer utils.CloseQuietly(embedK3sImage)
-//
-//	k3sImageDir, err := buildK3sImageDir()
-//	if err != nil {
-//		return err
-//	}
-//	k3sImagePath := filepath.Join(k3sImageDir, "k3s-airgap-images.tgz")
-//	info("saving k3s image airgap install tarball to", k3sImagePath)
-//
-//	if !o.dryRun {
-//		k3sImageFile, err := os.OpenFile(k3sImagePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
-//		if err != nil {
-//			return err
-//		}
-//		defer utils.CloseQuietly(k3sImageFile)
-//		if _, err := io.Copy(k3sImageFile, embedK3sImage); err != nil {
-//			return err
-//		}
-//	}
-//
-//	info("Successfully prepare k3s image: ", k3sImagePath)
-//	return nil
-//}
-
-//func (o k3dSetupOptions) loadK3dImages() error {
-//	info("Loading k3d images...")
-//	dir, err := resources.K3dImage.ReadDir("static/k3d/images")
-//	if err != nil {
-//		return err
-//	}
-//	for _, entry := range dir {
-//		file, err := resources.K3dImage.Open(path.Join("static/k3d/images", entry.Name()))
-//		if err != nil {
-//			return err
-//		}
-//		name := strings.Split(entry.Name(), ".")[0]
-//
-//		var (
-//			image    = "k3d-image-" + name + "-*.tar.gz"
-//			imageTgz string
-//			imageTar string
-//		)
-//
-//		if o.dryRun {
-//			info("Saving temporary image file:", image)
-//		} else {
-//			imageTgz, err = utils.SaveToTemp(file, image)
-//			if err != nil {
-//				return err
-//			}
-//			unzipCmd := exec.Command("gzip", "-d", imageTgz)
-//			output, err := unzipCmd.CombinedOutput()
-//			utils.InfoBytes(output)
-//			if err != nil {
-//				return err
-//			}
-//			imageTar = strings.TrimSuffix(imageTgz, ".gz")
-//		}
-//
-//		if o.dryRun {
-//			info("importing image to docker using temporary file :%s\n", image)
-//		} else {
-//			importCmd := exec.Command("docker", "image", "load", "-i", imageTar)
-//			output, err := importCmd.CombinedOutput()
-//			utils.InfoBytes(output)
-//			if err != nil {
-//				return err
-//			}
-//		}
-//	}
-//
-//	info("Successfully load k3d images")
-//	return nil
-//}
-
 func (o k3dSetupOptions) createCluster(ctx context.Context, cluster config.ClusterConfig) error {
 	info("Launching k3d cluster:", cluster.Cluster.Name)
 	if !o.dryRun {
@@ -543,66 +421,11 @@ func (o k3dSetupOptions) createCluster(ctx context.Context, cluster config.Clust
 }
 
 func (o k3dSetupOptions) setUpK3d(ctx context.Context, clusterConfig config.ClusterConfig) error {
-	//if err := o.prepareK3sImages(); err != nil {
-	//	return errors.Wrap(err, "failed to prepare k3s images")
-	//}
-	//
-	//if err := o.loadK3dImages(); err != nil {
-	//	return errors.Wrap(err, "failed to load k3d images")
-	//}
-
 	if err := o.createCluster(ctx, clusterConfig); err != nil {
 		return errors.Wrapf(err, "Failed to create cluster: %s", clusterConfig.Cluster.Name)
 	}
 
 	return nil
-}
-
-func fillK3dImageStatus(image docker.ImageSummary, status *types.ClusterStatus) {
-	if len(image.RepoTags) == 0 {
-		return
-	}
-	for _, tag := range image.RepoTags {
-		switch tag {
-		case types.K3sImage:
-			status.K3dImages.K3s = true
-		case types.K3dToolsImage:
-			status.K3dImages.K3dTools = true
-		case types.K3dProxyImage:
-			status.K3dImages.K3dProxy = true
-		}
-	}
-}
-
-func fillK3dCluster(clusterName string, ns string, cluster *k3d.Cluster, status *types.ClusterStatus) {
-	// Skip cluster that does not match
-	if cluster.Name != clusterName {
-		return
-	}
-
-	c := types.K3dCluster{
-		Name:    clusterName,
-		Running: true,
-	}
-
-	// get k3d cluster kubeconfig
-	cfg, err := helm.NewActionConfig(nil, ns, utils.ConfigPath(clusterName))
-	if err != nil {
-		c.Reason = fmt.Sprintf("Failed to get helm action provider: %s", err.Error())
-	}
-	list := action.NewList(cfg)
-	list.SetStateMask()
-	releases, err := list.Run()
-	if err != nil {
-		c.Reason = fmt.Sprintf("Failed to get helm releases: %s", err.Error())
-	}
-
-	rs := make(map[string]string)
-	for _, release := range releases {
-		rs[release.Name] = release.Info.Status.String()
-	}
-	c.ReleaseStatus = rs
-	status.K3d.K3dCluster = append(status.K3d.K3dCluster, c)
 }
 
 func addRepos(repos []repo.Entry) error {
@@ -614,7 +437,7 @@ func addRepos(repos []repo.Entry) error {
 	return nil
 }
 
-func installCharts(pi *PlaygroundInstaller, wg *sync.WaitGroup) error {
+func installCharts(in *Installer, wg *sync.WaitGroup) error {
 	install := func(cs []helm.InstallOpts, wg *sync.WaitGroup) error {
 		ctx := context.Background()
 		for _, c := range cs {
@@ -622,7 +445,7 @@ func installCharts(pi *PlaygroundInstaller, wg *sync.WaitGroup) error {
 				MaxRetry: 1 + c.TryTimes,
 			}
 			if err := retry.IfNecessary(ctx, func() error {
-				if _, err := c.Install(utils.ConfigPath(pi.ClusterName)); err != nil {
+				if _, err := c.Install(utils.ConfigPath(in.ClusterName)); err != nil {
 					return err
 				}
 				return nil
@@ -634,14 +457,14 @@ func installCharts(pi *PlaygroundInstaller, wg *sync.WaitGroup) error {
 	}
 
 	info("Installing playground database cluster...")
-	charts := pi.Provider.GetBaseCharts(pi.Namespace)
+	charts := in.wesql.GetBaseCharts(in.Namespace)
 	err := install(charts, wg)
 	if err != nil {
 		return err
 	}
 
 	// install database cluster to default namespace
-	charts = pi.Provider.GetDBCharts(pi.Namespace, pi.DBCluster)
+	charts = in.wesql.GetDBCharts(in.Namespace, in.DBCluster)
 	err = install(charts, wg)
 	if err != nil {
 		return err

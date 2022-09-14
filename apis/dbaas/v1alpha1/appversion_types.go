@@ -78,9 +78,9 @@ type AppVersionComponent struct {
 	// +kubebuilder:validation:MaxLength=12
 	Type string `json:"type"`
 
-	// if not nil, will replace ClusterDefinitionSpec.Containers in ClusterDefinition
+	// if not nil, will replace ClusterDefinitionSpec.PodSpec in ClusterDefinition
 	// +optional
-	Containers []corev1.Container `json:"containers,omitempty"`
+	PodSpec corev1.PodSpec `json:"podSpec,omitempty"`
 
 	// if not nil, will replace ClusterDefinitionSpec.Serivce in ClusterDefinition
 	// +optional

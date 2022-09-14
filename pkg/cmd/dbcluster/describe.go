@@ -28,6 +28,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/cloudprovider"
 	"github.com/apecloud/kubeblocks/pkg/cmd/playground"
+	"github.com/apecloud/kubeblocks/pkg/types"
 	"github.com/apecloud/kubeblocks/pkg/utils"
 )
 
@@ -47,7 +48,7 @@ func NewDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.setup(f, args))
 			cmdutil.CheckErr(o.run(
-				func(clusterInfo *utils.DBClusterInfo) {
+				func(clusterInfo *types.DBClusterInfo) {
 					//nolint
 					utils.PrintClusterInfo(clusterInfo)
 				}, func() error {
@@ -59,10 +60,10 @@ func NewDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	return cmd
 }
 
-func buildClusterInfo(obj *unstructured.Unstructured) *utils.DBClusterInfo {
+func buildClusterInfo(obj *unstructured.Unstructured) *types.DBClusterInfo {
 	cp := cloudprovider.Get()
 	instance, _ := cp.Instance()
-	info := utils.DBClusterInfo{
+	info := types.DBClusterInfo{
 		RootUser:    playground.DefaultRootUser,
 		DBPort:      playground.DefaultPort,
 		DBCluster:   obj.GetName(),
@@ -70,7 +71,7 @@ func buildClusterInfo(obj *unstructured.Unstructured) *utils.DBClusterInfo {
 		HostIP:      instance.GetIP(),
 	}
 	for k, v := range obj.GetLabels() {
-		info.Labels = info.Labels + fmt.Sprintf("%s:%s ", k, v)
+		info.Labels += fmt.Sprintf("%s:%s ", k, v)
 	}
 
 	status := obj.Object["status"].(map[string]interface{})

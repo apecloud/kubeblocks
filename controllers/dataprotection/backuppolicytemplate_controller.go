@@ -87,7 +87,7 @@ func (r *BackupPolicyTemplateReconciler) SetupWithManager(mgr ctrl.Manager) erro
 		Complete(r)
 }
 
-func (r *BackupPolicyTemplateReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, BackupPolicyTemplate *dataprotectionv1alpha1.BackupPolicyTemplate) error {
+func (r *BackupPolicyTemplateReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, backupPolicyTemplate *dataprotectionv1alpha1.BackupPolicyTemplate) error {
 	//
 	// delete any external resources associated with the cronJob
 	//

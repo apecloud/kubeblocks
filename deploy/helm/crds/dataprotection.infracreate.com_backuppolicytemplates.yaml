@@ -66,8 +66,6 @@ spec:
               failureReason:
                 type: string
               phase:
-                description: The current phase. Valid values are New, Available, InProgress,
-                  Failed.
                 type: string
             type: object
         type: object

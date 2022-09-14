@@ -9,11 +9,6 @@ import (
 )
 
 func NewCUETplFromPath(filePathString string) (*CUETpl, error) {
-	// temStrByte, err := os.ReadFile(filePathString)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// return NewCueValue(string(temStrByte)), nil
 	return NewCUETplFromBytes(os.ReadFile(filePathString))
 }
 

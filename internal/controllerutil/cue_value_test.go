@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 The dbctl Authors
+Copyright 2022.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,19 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package provider
+package controllerutil
 
-type EngineType string
+import "testing"
 
-const (
-	MySQLOperator EngineType = "MySQLOperator"
-	BitnamiMySQL  EngineType = "BitnamiMySQL"
-	WeSQL         EngineType = "WeSQL"
-	UnknownEngine EngineType = "UnknownEngine"
-)
+func TestNewCUETplFromPath(t *testing.T) {
+	_, err := NewCUETplFromPath("cue.cue")
+	if err == nil {
+		t.Error("Expected error to fall through, got err")
+	}
+}
 
-const (
-	helmUser   string = "yimeisun"
-	helmPasswd string = "8V+PmX1oSDv4pumDvZp6m7LS8iPgbY3A"
-	helmURL    string = "yimeisun.azurecr.io"
-)
+func TestNewCUETplFromBytes(t *testing.T) {
+	_, err := NewCUETplFromBytes([]byte(""), nil)
+	if err != nil {
+		t.Error("Expected error to fall through, got nil")
+	}
+}
+
+func TestNewCUETpl(t *testing.T) {
+	NewCUETpl("")
+}

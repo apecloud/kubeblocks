@@ -1,0 +1,86 @@
+# Based on https://github.com/microsoft/vscode-dev-containers/tree/v0.224.3/containers/go/.devcontainer/base.Dockerfile
+
+# [Choice] Go version: 1, 1.18, etc
+ARG GOVERSION=1.18
+FROM golang:${GOVERSION}-bullseye
+
+# [Option] Install zsh
+ARG INSTALL_ZSH="true"
+
+# [Options] Versions
+ARG KUBECTL_VERSION="latest"
+ARG HELM_VERSION="latest"
+ARG MINIKUBE_VERSION="latest"
+ARG DAPR_CLI_VERSION="latest"
+ARG PROTOC_VERSION="21.1"
+ARG PROTOC_GEN_GO_VERSION="1.28"
+ARG PROTOC_GEN_GO_GRPC_VERSION="1.2"
+ARG GOLANGCI_LINT_VERSION="1.45.2"
+
+# This Dockerfile adds a non-root 'dapr' user with sudo access. However, for Linux,
+# this user's GID/UID must match your local user UID/GID to avoid permission issues
+# with bind mounts. Update USER_UID / USER_GID if yours is not 1000. See
+# https://aka.ms/vscode-remote/containers/non-root-user for details.
+ARG USERNAME=kubeblock
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
+ARG DEBIAN_MIRROR=mirrors.aliyun.com
+
+# Other env vars
+ENV GO111MODULE=auto
+ENV CGO_ENABLED=0
+ENV DOCKER_BUILDKIT=1
+ENV DAPR_DEFAULT_IMAGE_REGISTRY=GHCR
+
+# RUN sed -i "s/deb\.debian\.org/$DEBIAN_MIRROR/g" /etc/apt/sources.list 
+# Setup image using library scripts and configure non-root user.
+COPY library-scripts/* custom-scripts/* first-run-notice.txt /tmp/staging/
+RUN #apt-get update \
+    #
+    # Install needed packages and setup the environment and non-root user
+    bash /tmp/staging/common-debian.sh "${INSTALL_ZSH}" "${USERNAME}" "${USER_UID}" "${USER_GID}" "true" "true" "true" \
+    #
+    # Additional custom configurations for non-root user.
+    && bash /tmp/staging/setup-user.sh "${USERNAME}" "${PATH}" \
+    #
+    # Install Docker CLI and Engine for Docker-in-Docker (using Docker CE).
+    && bash /tmp/staging/docker-in-docker-debian.sh "true" "${USERNAME}" "false" "latest" \
+    #
+    # Install Kubectl, Helm and Minkikube.
+    && bash /tmp/staging/kubectl-helm-debian.sh "${KUBECTL_VERSION}" "${HELM_VERSION}" "${MINIKUBE_VERSION}" \
+    #
+    # Install Go tools.
+    && bash /tmp/staging/go-debian.sh "none" "/usr/local/go" "/go" "${USERNAME}" "false" \
+    #
+    # Install tools for Dapr.
+    && bash /tmp/staging/install-dapr-tools.sh "${USERNAME}" "/usr/local/go" "/go" "${DAPR_CLI_VERSION}" "${PROTOC_VERSION}" "${PROTOC_GEN_GO_VERSION}" "${PROTOC_GEN_GO_GRPC_VERSION}" "${GOLANGCI_LINT_VERSION}" \
+    #
+    # Install the GitHub CLI.
+    && bash /tmp/staging/github-debian.sh "latest" \
+    #
+    # Install the Azure CLI.
+    && bash /tmp/staging/azcli-debian.sh "latest" \
+    #
+    # Copy our init scripts to /usr/local/share.
+    && mv -f -t /usr/local/share/ /tmp/staging/docker-bind-mount.sh /tmp/staging/devcontainer-init.sh /tmp/staging/setup-docker-multiarch.sh \
+    && chmod +x /usr/local/share/docker-bind-mount.sh /usr/local/share/devcontainer-init.sh  /usr/local/share/setup-docker-multiarch.sh \
+    && chown ${USERNAME}:root /usr/local/share/docker-bind-mount.sh /usr/local/share/devcontainer-init.sh  /usr/local/share/setup-docker-multiarch.sh \
+    #
+    # Move the first run notice to the correct location for Codespaces.
+    && mkdir -p /usr/local/etc/vscode-dev-containers/ \
+    && mv -f /tmp/staging/first-run-notice.txt /usr/local/etc/vscode-dev-containers/ \
+    #
+    # Set permissions for the workspace folder
+    && mkdir -p /workspaces && chown ${USERNAME} /workspaces \
+    #
+    # Clean up packages and the staging folder.
+    && apt-get autoremove -y && apt-get clean -y && rm -rf /tmp/staging
+
+# Mount for docker-in-docker
+VOLUME [ "/var/lib/docker" ]
+
+# Initialize Dapr devcontainer script
+ENTRYPOINT [ "/usr/local/share/devcontainer-init.sh" ]
+CMD [ "sleep", "infinity" ]
+
+USER ${USERNAME}

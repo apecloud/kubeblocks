@@ -1,3 +1,17 @@
+#
+# Copyright 2022 The Kubeblocks Authors
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+
 export GONOPROXY=github.com/apecloud
 export GONOSUMDB=github.com/apecloud
 export GOPRIVATE=github.com/apecloud
@@ -14,7 +28,7 @@ ENVTEST_K8S_VERSION = 1.24.1
 
 ENABLE_WEBHOOKS ?= false
 
-APP_NAME = opendbaas-core
+APP_NAME = kubeblock
 
 # Image URL to use all building/pushing image targets
 IMG ?= docker.io/infracreate/$(APP_NAME)
@@ -189,6 +203,25 @@ endif
 .PHONY: goimports
 goimports: goimportstool ## Run goimports against code.
 	$(GOIMPORTS) -local github.com/apecloud/kubeblocks -w $$(go list -f {{.Dir}} ./...)
+
+
+
+.PHONY: build-dev-container
+build-dev-container: ## Build dev docker container image.
+ifneq ($(BUILDX_ENABLED), true)
+	docker build ./docker/. -f ./docker/Dockerfile-dev -t ${DEV_IMG}:latest
+else
+	docker buildx build ./docker/. $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -f ./docker/Dockerfile-dev -t ${DEV_IMG}:latest
+endif
+
+
+.PHONY: push-dev-container
+push-dev-container: ## Push dev docker container image.
+ifneq ($(BUILDX_ENABLED), true)
+	docker push ${DEV_IMG}:latest
+else
+	docker buildx build ./docker/. $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -f ./docker/Dockerfile-dev -t ${DEV_IMG}:latest --push
+endif
 
 
 ##@ CLI
@@ -502,3 +535,7 @@ endif
 .PHONY: brew-install-prerequisite
 brew-install-prerequisite: ## Use `brew install` to install required dependencies. 
 	brew install go kubebuilder delve golangci-lint staticcheck kustomize step cue
+
+
+##@ VS-Code devcontainer
+include docker/docker.mk

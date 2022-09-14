@@ -64,7 +64,7 @@ func appVersionUpdateHandler(cli client.Client, ctx context.Context, clusterDef 
 			}
 			item.Status.ClusterDefSyncStatus = dbaasv1alpha1.OutOfSyncStatus
 			if len(notFoundComponentTypes) > 0 || len(noContainersComponents) > 0 {
-				item.Status.Phase = dbaasv1alpha1.UnAvailablePhase
+				item.Status.Phase = dbaasv1alpha1.UnavailablePhase
 			} else {
 				item.Status.Phase = dbaasv1alpha1.AvailablePhase
 				item.Status.Message = ""

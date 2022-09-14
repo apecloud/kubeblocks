@@ -337,11 +337,8 @@ func (r *ClusterReconciler) checkReferencedCRStatus(reqCtx intctrlutil.RequestCt
 }
 
 func (r *ClusterReconciler) needCheckClusterForReady(cluster *dbaasv1alpha1.Cluster) bool {
-	clusterPhase := []dbaasv1alpha1.Phase{"", dbaasv1alpha1.RunningPhase, dbaasv1alpha1.DeletingPhase}
-	if index := slices.Index(clusterPhase, cluster.Status.Phase); index != -1 {
-		return false
-	}
-	return true
+	return slices.Index([]dbaasv1alpha1.Phase{"", dbaasv1alpha1.RunningPhase, dbaasv1alpha1.DeletingPhase},
+		cluster.Status.Phase) == -1
 }
 
 // updateClusterPhase update cluster.status.phase

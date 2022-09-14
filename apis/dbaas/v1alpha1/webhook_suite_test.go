@@ -68,9 +68,9 @@ var _ = BeforeSuite(func() {
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: false,
 		WebhookInstallOptions: envtest.WebhookInstallOptions{
-			Paths: []string{filepath.Join("..", "..", "..", "config", "webhook")},
-			// LocalServingHost: "host.docker.internal",
-			// LocalServingPort: 28080,
+			Paths:            []string{filepath.Join("..", "..", "..", "config", "webhook")},
+			LocalServingHost: "host.docker.internal",
+			LocalServingPort: 9443,
 		},
 	}
 

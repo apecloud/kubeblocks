@@ -161,7 +161,7 @@ mod-vendor: ## Run go mod tidy->vendor->verify against go modules.
 
 .PHONY: ctrl-test-current-ctx
 ctrl-test-current-ctx: manifests generate fmt vet ## Run operator controller tests with current $KUBECONFIG context
-	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./controllers/... -coverprofile cover.out
+	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./... -coverprofile cover.out
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
@@ -170,6 +170,11 @@ test: manifests generate fmt vet envtest ## Run tests.
 .PHONY: test-webhook-enabled
 test-webhook-enabled: ## Run tests with webhooks enabled.
 	$(MAKE) test ENABLE_WEBHOOKS=true
+
+
+.PHONY: scorecard
+scorecard:  ## Run Operatok SDK Scorecard (https://sdk.operatorframework.io/docs/testing-operators/scorecard/) tests.
+	operator-sdk scorecard ./bundle/
 
 .PHONY: cover-report
 cover-report: ## Generate cover.html from cover.out
@@ -180,6 +185,9 @@ cover-report: ## Generate cover.html from cover.out
 goimports: goimportstool ## Run goimports against code.
 	$(GOIMPORTS) -local github.com/apecloud/kubeblocks -w $$(go list -f {{.Dir}} ./...)
 
+clean:
+	go clean ./...
+	rm -rf $(WEBHOOK_CERT_DIR)
 
 ##@ CLI
 CLI_IMG ?= docker.io/infracreate/dbctl
@@ -226,15 +234,18 @@ manager: cue-fmt build-checks ## Build manager binary.
 
 
 CERT_ROOT_CA ?= $(WEBHOOK_CERT_DIR)/rootCA.key
-.PHONY: webhook-cert
-webhook-cert: $(CERT_ROOT_CA) ## Create root CA certificates for admission webhooks testing.
+# .PHONY: webhook-cert
+webhook-cert: ## Create root CA certificates for admission webhooks testing.
+	$(MAKE) $(CERT_ROOT_CA)
+
+.PHONY: $(CERT_ROOT_CA)
 $(CERT_ROOT_CA):
 	mkdir -p $(WEBHOOK_CERT_DIR)
 	cd $(WEBHOOK_CERT_DIR) && \
 		step certificate create $(APP_NAME) rootCA.crt rootCA.key --profile root-ca --insecure --no-password && \
 		step certificate create $(APP_NAME)-svc tls.crt tls.key --profile leaf \
 			--ca rootCA.crt --ca-key rootCA.key \
-			--san $(APP_NAME)-svc --san $(APP_NAME)-svc.$(APP_NAME) --san $(APP_NAME)-svc.$(APP_NAME).svc --not-after 43200h --insecure --no-password
+			--san $(APP_NAME)-svc --san 127.0.0.1 --san host.docker.internal --san $(APP_NAME)-svc.$(APP_NAME) --san $(APP_NAME)-svc.$(APP_NAME).svc  --not-after 43200h --insecure --no-password
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.

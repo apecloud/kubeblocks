@@ -121,7 +121,7 @@ func main() {
 		// after the manager stops then its usage might be unsafe.
 		LeaderElectionReleaseOnCancel: true,
 
-		CertDir: viper.GetString("cert_dir"),
+		CertDir: viper.GetString("CERT_DIR"),
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

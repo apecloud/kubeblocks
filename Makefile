@@ -18,7 +18,7 @@ APP_NAME = opendbaas-core
 
 # Image URL to use all building/pushing image targets
 IMG ?= docker.io/infracreate/$(APP_NAME)
-VERSION ?= 0.1.0-alpha.4
+VERSION ?= 0.1.0-alpha.5
 CHART_PATH = deploy/helm
 
 

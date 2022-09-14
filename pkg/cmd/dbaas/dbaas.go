@@ -17,13 +17,33 @@ limitations under the License.
 package dbaas
 
 import (
+	"context"
 	"fmt"
-
+	"github.com/apecloud/kubeblocks/pkg/utils"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
+var (
+	installer = &Installer{
+		Ctx:         context.Background(),
+		ClusterName: ClusterName,
+		Namespace:   ClusterNamespace,
+		DBCluster:   DBClusterName,
+	}
+)
+
+type InitOptions struct {
+	genericclioptions.IOStreams
+	Engine  string
+	Version string
+	DryRun  bool
+}
+
 // NewDbaasCmd creates the dbaas command
-func NewDbaasCmd() *cobra.Command {
+func NewDbaasCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dbaas",
 		Short: "DBaaS operation commands",
@@ -31,5 +51,57 @@ func NewDbaasCmd() *cobra.Command {
 			fmt.Println("dbaas called")
 		},
 	}
+	cmd.AddCommand(
+		newInitCmd(streams),
+	)
+	return cmd
+}
+
+func (o *InitOptions) Complete() error {
+	return nil
+}
+
+func (o *InitOptions) Validate() error {
+	return nil
+}
+
+func (o *InitOptions) Run() error {
+	utils.Info("Initializing dbaas...")
+
+	var err error
+
+	defer func() {
+		err := utils.CleanUpPlayground()
+		if err != nil {
+			utils.Errf("Fail to clean up: %v", err)
+		}
+	}()
+
+	// Step.1 Install
+	err = installer.InstallDeps()
+	if err != nil {
+		return errors.Wrap(err, "Failed to install dependencies")
+	}
+
+	return nil
+}
+
+func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
+	o := &InitOptions{
+		IOStreams: streams,
+	}
+
+	cmd := &cobra.Command{
+		Use:   "init",
+		Short: "Bootstrap a DBaaS",
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(o.Complete())
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
+		},
+	}
+
+	cmd.Flags().StringVar(&installer.KubeConfig, "kube-config", "config", "KubeConfig path")
+	cmd.Flags().BoolVar(&o.DryRun, "dry-run", false, "Dry run the playground init")
 	return cmd
 }

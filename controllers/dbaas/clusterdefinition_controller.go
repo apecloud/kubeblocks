@@ -63,8 +63,19 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, dbClusterDef, dbClusterDefFinalizerName, func() error {
-		return r.deleteExternalResources(reqCtx, dbClusterDef)
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, dbClusterDef, dbClusterDefFinalizerName, func() (*ctrl.Result, error) {
+		statusHandler := func() error {
+			patch := client.MergeFrom(dbClusterDef.DeepCopy())
+			dbClusterDef.Status.Phase = dbaasv1alpha1.DeletingPhase
+			dbClusterDef.Status.Message = "cannot be deleted because of existing referencing Cluster or AppVersion."
+			return r.Client.Status().Patch(ctx, dbClusterDef, patch)
+		}
+		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, dbClusterDef,
+			clusterDefLabelKey, statusHandler, &dbaasv1alpha1.ClusterList{},
+			&dbaasv1alpha1.AppVersionList{}); res != nil || err != nil {
+			return res, err
+		}
+		return nil, r.deleteExternalResources(reqCtx, dbClusterDef)
 	})
 	if res != nil {
 		return *res, err
@@ -82,6 +93,7 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	statusPatch := client.MergeFrom(dbClusterDef.DeepCopy())
 	dbClusterDef.Status.ObservedGeneration = dbClusterDef.GetObjectMeta().GetGeneration()
+	dbClusterDef.Status.Phase = dbaasv1alpha1.AvailablePhase
 	if err = r.Client.Status().Patch(reqCtx.Ctx, dbClusterDef, statusPatch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}

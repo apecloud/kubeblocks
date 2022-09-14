@@ -79,8 +79,8 @@ func (r *BackupJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	reqCtx.Log.Info("in BackupJob Reconciler: name: " + backupJob.Name + " phase: " + string(backupJob.Status.Phase))
 
 	// handle finalizer
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, backupJob, dataProtectionFinalizerName, func() error {
-		return r.deleteExternalResources(reqCtx, backupJob)
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, backupJob, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
+		return nil, r.deleteExternalResources(reqCtx, backupJob)
 	})
 	if err != nil {
 		return *res, err
@@ -230,9 +230,9 @@ func (r *BackupJobReconciler) GetTargetCluster(
 	clusterItemsLen := len(clusterTarget.Items)
 	if clusterItemsLen != 1 {
 		if clusterItemsLen <= 0 {
-			return nil, errors.New("Can not found any stateful sets by labelsSelector.")
+			return nil, errors.New("can not found any stateful sets by labelsSelector")
 		}
-		return nil, errors.New("Match labels result more than one, check labelsSelector.")
+		return nil, errors.New("match labels result more than one, check labelsSelector")
 	}
 	return &clusterTarget.Items[0], nil
 }

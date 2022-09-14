@@ -29,7 +29,12 @@ const (
 	appVersionFinalizerName   = "appversion.infracreate.com/finalizer"
 
 	// label keys
-	clusterDefLabelKey = "clusterdefinition.infracreate.com/name"
+	clusterDefLabelKey         = "clusterdefinition.infracreate.com/name"
+	appVersionLabelKey         = "appversion.infracreate.com/name"
+	appInstanceLabelKey        = "app.kubernetes.io/instance"
+	appComponentLabelKey       = "app.kubernetes.io/component"
+	appNameLabelKey            = "app.kubernetes.io/name"
+	statefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
 )
 
 type Component struct {
@@ -46,7 +51,7 @@ type Component struct {
 	AntiAffinity         bool                                      `json:"antiAffinity,omitempty"`
 	IsQuorum             bool                                      `json:"isQuorum,omitempty"`
 	Strategies           dbaasv1alpha1.ClusterDefinitionStrategies `json:"strategies,omitempty"`
-	Containers           []corev1.Container                        `json:"containers,omitempty"`
+	PodSpec              *corev1.PodSpec                           `json:"podSpec,omitempty"`
 	Service              corev1.ServiceSpec                        `json:"service,omitempty"`
 	Scripts              dbaasv1alpha1.ClusterDefinitionScripts    `json:"scripts,omitempty"`
 	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate    `json:"volumeClaimTemplates,omitempty"`

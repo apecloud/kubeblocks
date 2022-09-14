@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubectl/pkg/describe"
 
 	"github.com/apecloud/kubeblocks/pkg/types"
-	"github.com/apecloud/kubeblocks/pkg/utils"
 )
 
 type ListOptions struct {
@@ -138,7 +137,7 @@ func (o *ListOptions) Run() error {
 	table.AddRow("NAMESPACE", "NAME", "PHASE", "COMPLETION_TIME", "CREATE_TIME")
 	errs := sets.NewString()
 	for _, info := range infos {
-		backupJobInfo := utils.BackupJobInfo{}
+		backupJobInfo := types.BackupJobInfo{}
 
 		mapping := info.ResourceMapping()
 		if err != nil {
@@ -174,9 +173,9 @@ func (o *ListOptions) Run() error {
 	return utilerrors.NewAggregate(allErrs)
 }
 
-func buildBackupJobInfo(obj *unstructured.Unstructured, info *utils.BackupJobInfo) {
+func buildBackupJobInfo(obj *unstructured.Unstructured, info *types.BackupJobInfo) {
 	for k, v := range obj.GetLabels() {
-		info.Labels = info.Labels + fmt.Sprintf("%s:%s ", k, v)
+		info.Labels += fmt.Sprintf("%s:%s ", k, v)
 	}
 	if obj.Object["status"] == nil {
 		return

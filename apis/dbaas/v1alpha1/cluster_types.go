@@ -24,6 +24,15 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+const (
+	DoNotTerminate TerminationPolicyType = "DoNotTerminate"
+	Halt           TerminationPolicyType = "Halt"
+	Delete         TerminationPolicyType = "Delete"
+	WipeOut        TerminationPolicyType = "WipeOut"
+)
+
+type TerminationPolicyType string
+
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
 	// ref ClusterDefinition, immutable
@@ -37,9 +46,15 @@ type ClusterSpec struct {
 	// +optional
 	Components []ClusterComponent `json:"components,omitempty"`
 
-	// +kubebuilder:default=DoNotTerminate
+	// One of DoNotTerminate, Halt, Delete, WipeOut.
+	// Defaults to Halt.
+	// DoNotTerminate means block delete operation.
+	// Halt means delete resources such as sts,deploy,svc,pdb, but keep pvcs.
+	// Delete is based on Halt and delete pvcs.
+	// WipeOut is based on Delete and wipe out all snapshots and snapshot data from bucket.
+	// +kubebuilder:default=Halt
 	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
-	TerminatingPolicy string `json:"terminationPolicy,omitempty"`
+	TerminationPolicy TerminationPolicyType `json:"terminationPolicy,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster
@@ -50,9 +65,9 @@ type ClusterStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// phase - in list of [Running, Failed, Creating, Upgrading, Scaling, Deleting, Deleted]
-	// +kubebuilder:validation:Enum={Running,Failed,Creating,Upgrading,Scaling,Deleting,Deleted}
-	Phase string `json:"phase,omitempty"`
+	// phase - in list of [Running, Failed, Creating, Updating, Deleting, Deleted]
+	// +kubebuilder:validation:Enum={Running,Failed,Creating,Updating,Deleting,Deleted}
+	Phase Phase `json:"phase,omitempty"`
 
 	// +optional
 	Message string `json:"message,omitempty"`
@@ -147,7 +162,7 @@ type ClusterRoleGroup struct {
 }
 
 type ClusterStatusComponent struct {
-	Id         string                   `json:"id,omitempty"`
+	ID         string                   `json:"id,omitempty"`
 	Type       string                   `json:"type,omitempty"`
 	Phase      string                   `json:"phase,omitempty"`
 	Message    string                   `json:"message,omitempty"`
@@ -155,7 +170,7 @@ type ClusterStatusComponent struct {
 }
 
 type ClusterStatusRoleGroup struct {
-	Id          string `json:"id,omitempty"`
+	ID          string `json:"id,omitempty"`
 	Type        string `json:"type,omitempty"`
 	RefWorkload string `json:"refWorkload,omitempty"`
 }

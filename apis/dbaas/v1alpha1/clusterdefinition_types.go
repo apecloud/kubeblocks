@@ -52,6 +52,11 @@ type ClusterDefinitionSpec struct {
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
 type ClusterDefinitionStatus struct {
+	// phase - in list of [Available,Deleting]
+	// +kubebuilder:validation:Enum={Available,Deleting}
+	Phase Phase `json:"phase,omitempty"`
+	// +optional
+	Message string `json:"message,omitempty"`
 	// observedGeneration is the most recent generation observed for this
 	// ClusterDefinition. It corresponds to the ClusterDefinition's generation, which is
 	// updated on mutation by the API Server.
@@ -62,6 +67,8 @@ type ClusterDefinitionStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:categories={dbaas},scope=Cluster,shortName=cd
+//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+//+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
 
 // ClusterDefinition is the Schema for the clusterdefinitions API
 type ClusterDefinition struct {
@@ -121,8 +128,9 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Strategies ClusterDefinitionStrategies `json:"strategies,omitempty"`
 
+	// podSpec of final workload
 	// +optional
-	Containers []corev1.Container `json:"containers,omitempty"`
+	PodSpec *corev1.PodSpec `json:"podSpec,omitempty"`
 
 	// Service defines the behavior of a service spec.
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -230,7 +238,7 @@ type ClusterDefinitionStatusGeneration struct {
 	// ClusterDefinition sync. status
 	// +kubebuilder:validation:Enum={InSync,OutOfSync}
 	// +optional
-	ClusterDefSyncStatus string `json:"clusterDefSyncStatus,omitempty"`
+	ClusterDefSyncStatus Status `json:"clusterDefSyncStatus,omitempty"`
 }
 
 func init() {

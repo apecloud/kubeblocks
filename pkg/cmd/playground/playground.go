@@ -29,21 +29,19 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/pkg/cloudprovider"
-	"github.com/apecloud/kubeblocks/pkg/cluster"
-	"github.com/apecloud/kubeblocks/pkg/provider"
 	"github.com/apecloud/kubeblocks/pkg/utils"
 )
 
-var installer = &cluster.PlaygroundInstaller{
-	Ctx:         context.Background(),
-	ClusterName: ClusterName,
-	// control plane will install in this namespace, database cluster will
-	// install in the default namespace
-	Namespace: ClusterNamespace,
-	DBCluster: DBClusterName,
-}
+var (
+	installer = &Installer{
+		Ctx:         context.Background(),
+		ClusterName: ClusterName,
+		Namespace:   ClusterNamespace,
+		DBCluster:   DBClusterName,
+	}
 
-var rootOptions = &RootOptions{}
+	rootOptions = &RootOptions{}
+)
 
 type RootOptions struct {
 	CloudProvider string
@@ -54,10 +52,9 @@ type RootOptions struct {
 
 type InitOptions struct {
 	genericclioptions.IOStreams
-	Engine   string
-	Provider string
-	Version  string
-	DryRun   bool
+	Engine  string
+	Version string
+	DryRun  bool
 }
 
 type DestroyOptions struct {
@@ -84,7 +81,6 @@ func NewPlaygroundCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd.AddCommand(
 		newInitCmd(streams),
 		newDestroyCmd(streams),
-		newStatusCmd(),
 		newGuideCmd(),
 		newPortForward(),
 	)
@@ -111,8 +107,6 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&rootOptions.AccessKey, "access-key", "", "Cloud provider access key")
 	cmd.Flags().StringVar(&rootOptions.AccessSecret, "access-secret", "", "Cloud provider access secret")
 	cmd.Flags().StringVar(&rootOptions.Region, "region", "", "Cloud provider region")
-	cmd.Flags().StringVar(&o.Engine, "engine", DefaultEngine, "Database engine type")
-	cmd.Flags().StringVar(&o.Provider, "provider", defaultProvider, "Database provider")
 	cmd.Flags().StringVar(&o.Version, "version", DefaultVersion, "Database engine version")
 	cmd.Flags().BoolVar(&o.DryRun, "dry-run", false, "Dry run the playground init")
 	return cmd
@@ -129,17 +123,6 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 			if err := o.destroyPlayground(); err != nil {
 				utils.Errf("%v", err)
 			}
-		},
-	}
-	return cmd
-}
-
-func newStatusCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "status",
-		Short: "Display playground cluster status.",
-		Run: func(cmd *cobra.Command, args []string) {
-			statusCmd()
 		},
 	}
 	return cmd
@@ -178,7 +161,9 @@ func newPortForward() *cobra.Command {
 }
 
 func (o *InitOptions) Complete() error {
-	installer.Provider = provider.NewProvider(o.Engine, o.Version)
+	installer.wesql = Wesql{
+		serverVersion: o.Version,
+	}
 	return nil
 }
 
@@ -212,7 +197,7 @@ func (o *InitOptions) Run() error {
 		if err != nil {
 			return errors.Wrap(err, "Failed to query cloud instance")
 		}
-		kubeConfig := strings.ReplaceAll(utils.KubeConfig, "${KUBERNETES_API_SERVER_ADDRESS}", instance.GetIP())
+		kubeConfig := strings.ReplaceAll(kubeConfig, "${KUBERNETES_API_SERVER_ADDRESS}", instance.GetIP())
 		kubeConfigPath := path.Join(utils.GetKubeconfigDir(), "dbctl-playground")
 		if err := ioutils.AtomicWriteFile(kubeConfigPath, []byte(kubeConfig), 0700); err != nil {
 			return errors.Wrap(err, "Failed to update kube config")
@@ -272,15 +257,4 @@ func (o *DestroyOptions) destroyPlayground() error {
 	}
 	utils.Info("Successfully destroyed playground cluster.")
 	return nil
-}
-
-func statusCmd() {
-	utils.Info("Checking cluster status...")
-	status := installer.GetStatus()
-	stop := utils.PrintClusterStatus(status)
-	if stop {
-		return
-	}
-	// TODO
-	utils.Info("Checking database cluster status...")
 }

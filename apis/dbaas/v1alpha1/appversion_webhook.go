@@ -17,7 +17,15 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
+	"fmt"
+	"reflect"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -53,23 +61,108 @@ var _ webhook.Validator = &AppVersion{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *AppVersion) ValidateCreate() error {
 	appversionlog.Info("validate create", "name", r.Name)
-
-	// TODO(user): fill in your validation logic upon object creation.
-	return nil
+	return r.validate()
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *AppVersion) ValidateUpdate(old runtime.Object) error {
 	appversionlog.Info("validate update", "name", r.Name)
-
-	// TODO(user): fill in your validation logic upon object update.
+	// determine whether r.spec content is modified
+	lastAppVersion := old.(*AppVersion)
+	if !reflect.DeepEqual(lastAppVersion.Spec, r.Spec) {
+		return newInvalidError(AppVersionKind, r.Name, "", "AppVersion.spec is immutable, you can not update it.")
+	}
 	return nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *AppVersion) ValidateDelete() error {
 	appversionlog.Info("validate delete", "name", r.Name)
-
-	// TODO(user): fill in your validation logic upon object deletion.
 	return nil
+}
+
+// Validate AppVersion.spec is legal
+func (r *AppVersion) validate() error {
+	var (
+		allErrs    field.ErrorList
+		ctx        = context.Background()
+		clusterDef = &ClusterDefinition{}
+	)
+	if webhookMgr == nil {
+		return nil
+	}
+	err := webhookMgr.client.Get(ctx, types.NamespacedName{
+		Namespace: r.Namespace,
+		Name:      r.Spec.ClusterDefinitionRef,
+	}, clusterDef)
+
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterDefinitionRef"),
+			r.Spec.ClusterDefinitionRef, err.Error()))
+	} else {
+		notFoundComponentTypes, noContainersComponents := r.GetInconsistentComponentsInfo(clusterDef)
+
+		if len(notFoundComponentTypes) > 0 {
+			allErrs = append(allErrs, field.NotFound(field.NewPath("spec.components[*].type"),
+				getComponentTypeNotFoundMsg(notFoundComponentTypes, r.Spec.ClusterDefinitionRef)))
+		}
+
+		if len(noContainersComponents) > 0 {
+			allErrs = append(allErrs, field.NotFound(field.NewPath("spec.components[*].type"),
+				fmt.Sprintf("spec.components[*].type %v missing spec.components[*].containers in ClusterDefinition.spec.components[*] and AppVersion.spec.components[*]", noContainersComponents)))
+		}
+	}
+
+	if len(allErrs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: APIVersion, Kind: AppVersionKind},
+			r.Name, allErrs)
+	}
+	return nil
+}
+
+// GetInconsistentComponentsInfo get appVersion invalid component type and no containers component compared with clusterDefinitionDef
+func (r *AppVersion) GetInconsistentComponentsInfo(clusterDef *ClusterDefinition) ([]string, []string) {
+
+	var (
+		// clusterDefinition components to map. the value of map represents whether there is a default containers
+		componentMap          = map[string]bool{}
+		notFoundComponentType = make([]string, 0)
+		noContainersComponent = make([]string, 0)
+	)
+
+	for _, v := range clusterDef.Spec.Components {
+		if v.PodSpec == nil || v.PodSpec.Containers == nil || len(v.PodSpec.Containers) == 0 {
+			componentMap[v.TypeName] = false
+		} else {
+			componentMap[v.TypeName] = true
+		}
+	}
+	// get not found component type in clusterDefinition
+	for _, v := range r.Spec.Components {
+		if _, ok := componentMap[v.Type]; !ok {
+			notFoundComponentType = append(notFoundComponentType, v.Type)
+		} else if v.PodSpec.Containers != nil && len(v.PodSpec.Containers) > 0 {
+			componentMap[v.Type] = true
+		}
+	}
+	// get no containers components in clusterDefinition and appVersion
+	for k, v := range componentMap {
+		if !v {
+			noContainersComponent = append(noContainersComponent, k)
+		}
+	}
+	return notFoundComponentType, noContainersComponent
+}
+
+func getComponentTypeNotFoundMsg(invalidComponentTypes []string, clusterDefName string) string {
+	return fmt.Sprintf(" %v is not found in ClusterDefinition.spec.components[*].typeName %s",
+		invalidComponentTypes, clusterDefName)
+}
+
+// NewInvalidError create an invalid api error
+func newInvalidError(kind, resourceName, path, reason string) error {
+	return apierrors.NewInvalid(schema.GroupKind{Group: APIVersion, Kind: kind},
+		resourceName, field.ErrorList{field.InternalError(field.NewPath(path),
+			fmt.Errorf(reason))})
 }

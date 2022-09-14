@@ -135,16 +135,20 @@ cue-vet: cuetool ## Run cue vet against code.
 	$(CUE) vet controllers/dbaas/cue/*.cue
 
 .PHONY: fast-lint
-fast-lint: # [INTERNAL] fast lint
+fast-lint: staticchecktool  # [INTERNAL] fast lint
 	$(GOLANGCILINT) run ./...
 
 .PHONY: lint
 lint: generate ## Run golangci-lint against code.
-	$(GOLANGCILINT) run ./... --timeout=5m
+	$(MAKE) fast-lint
 
 .PHONY: staticcheck
 staticcheck: staticchecktool ## Run staticcheck against code. 
 	$(STATICCHECK) ./...
+
+.PHONY: loggercheck
+loggercheck: loggerchecktool ## Run loggercheck against code.
+	$(LOGGERCHECK) ./...
 
 .PHONY: build-checks
 build-checks: generate fmt vet goimports fast-lint ## Run build checks.
@@ -159,6 +163,9 @@ mod-vendor: ## Run go mod tidy->vendor->verify against go modules.
 	$(GO) mod vendor
 	$(GO) mod verify
 
+.PHONY: ctrl-test-current-ctx
+ctrl-test-current-ctx: manifests generate fmt vet ## Run operator controller tests with current $KUBECONFIG context
+	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./controllers/... -coverprofile cover.out
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
@@ -171,6 +178,11 @@ test-webhook-enabled: ## Run tests with webhooks enabled.
 .PHONY: cover-report
 cover-report: ## Generate cover.html from cover.out
 	$(GO) tool cover -html=cover.out -o cover.html
+ifeq ($(GOOS), darwin)
+	open ./cover.html
+else
+	echo "open cover.html with a HTML viewer."
+endif
 
 
 .PHONY: goimports
@@ -225,7 +237,7 @@ manager: cue-fmt build-checks ## Build manager binary.
 CERT_ROOT_CA ?= $(WEBHOOK_CERT_DIR)/rootCA.key
 .PHONY: webhook-cert
 webhook-cert: $(CERT_ROOT_CA) ## Create root CA certificates for admission webhooks testing.
-CERT_ROOT_CA:
+$(CERT_ROOT_CA):
 	mkdir -p $(WEBHOOK_CERT_DIR)
 	cd $(WEBHOOK_CERT_DIR) && \
 		step certificate create $(APP_NAME) rootCA.crt rootCA.key --profile root-ca --insecure --no-password && \
@@ -309,18 +321,14 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 ##@ CI
 
 .PHONY: ci-test-pre
-ci-test-pre: ## Prepare CI test environment.
-	$(MAKE) bin/dbctl
+ci-test-pre: dbctl ## Prepare CI test environment.
 	bin/dbctl playground destroy
 	bin/dbctl playground init
 
 .PHONY: ci-test
 ci-test: ci-test-pre test ## Run CI tests.
 	bin/dbctl playground destroy
-	go tool cover -html=cover.out -o cover.html
-	go tool cover -func=cover.out -o cover_total.out
-	python3 /datatestsuites/infratest.py -t 0 -c filepath:./cover_total.out,percent:60%
-
+	$(GO) tool cover -html=cover.out -o cover.html
 
 ##@ Contributor
 
@@ -431,12 +439,26 @@ staticchecktool: ## Download staticcheck locally if necessary.
 ifeq (, $(shell which staticcheck))
 	@{ \
 	set -e ;\
-	echo 'installing honnef.co/go/tools/cmd/staticcheck ' ;\
-	go install honnef.co/go/tools/cmd/staticcheck@v0.3.2 ;\
+	echo 'installing honnef.co/go/tools/cmd/staticcheck' ;\
+	go install honnef.co/go/tools/cmd/staticcheck@latest;\
 	}
 STATICCHECK=$(GOBIN)/staticcheck
 else
 STATICCHECK=$(shell which staticcheck)
+endif
+
+
+.PHONY: loggerchecktool
+loggerchecktool: ## Download loggercheck locally if necessary.
+ifeq (, $(shell which loggercheck))
+	@{ \
+	set -e ;\
+	echo 'installing github.com/timonwong/loggercheck/cmd/loggercheck' ;\
+	go install github.com/timonwong/loggercheck/cmd/loggercheck@latest;\
+	}
+LOGGERCHECK=$(GOBIN)/loggercheck
+else
+LOGGERCHECK=$(shell which loggercheck)
 endif
 
 .PHONY: goimportstool

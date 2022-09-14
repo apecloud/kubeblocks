@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 The dbctl Authors
+Copyright 2022.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,19 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package playground
+package controllerutil
 
-const (
-	DBClusterName        = "mycluster"
-	ClusterName          = "dbctl-playground"
-	ClusterNamespace     = "dbctl-playground"
-	DBClusterNamespace   = "default"
-	DefaultEngine        = "mysql"
-	DefaultCloudProvider = "local"
-	defaultProvider      = "cloudape.com"
-	DefaultVersion       = "8.0.28"
-	DefaultRootUser      = "root"
-	DefaultPassword      = "sakila"
-	DefaultPort          = "3306"
-	LocalHost            = "127.0.0.1"
-)
+import "testing"
+
+func TestNewCUETplFromPath(t *testing.T) {
+	_, err := NewCUETplFromPath("cue.cue")
+	if err == nil {
+		t.Error("Expected error to fall through, got err")
+	}
+}
+
+func TestNewCUETplFromBytes(t *testing.T) {
+	_, err := NewCUETplFromBytes([]byte(""), nil)
+	if err != nil {
+		t.Error("Expected error to fall through, got nil")
+	}
+}
+
+func TestNewCUETpl(t *testing.T) {
+	NewCUETpl("")
+}

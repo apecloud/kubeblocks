@@ -19,18 +19,19 @@ package dbaas
 import (
 	"context"
 	"fmt"
+	"time"
 
-	"k8s.io/apimachinery/pkg/labels"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
+	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -104,7 +105,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, cluster, dbClusterFinalizerName, func() error {
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, cluster, dbClusterFinalizerName, func() (*ctrl.Result, error) {
 		return r.deleteExternalResources(reqCtx, cluster)
 	})
 	if res != nil {
@@ -112,23 +113,42 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if cluster.Status.ObservedGeneration == cluster.GetObjectMeta().GetGeneration() {
+		// check cluster all pods is ready
+		if r.needCheckClusterForReady(cluster) {
+			if err = r.checkClusterIsReady(reqCtx.Ctx, cluster); err != nil {
+				return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "checkClusterIsReady")
+			}
+		}
 		return intctrlutil.Reconciled()
 	}
 
 	clusterdefinition := &dbaasv1alpha1.ClusterDefinition{}
-	if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: cluster.Namespace,
 		Name:      cluster.Spec.ClusterDefRef,
 	}, clusterdefinition); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	appversion := &dbaasv1alpha1.AppVersion{}
-	if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: cluster.Namespace,
 		Name:      cluster.Spec.AppVersionRef,
 	}, appversion); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
+
+	if res, err := r.checkReferencedCRStatus(reqCtx, cluster, appversion.Status.Phase, dbaasv1alpha1.AppVersionKind); res != nil {
+		return *res, err
+	}
+
+	if res, err := r.checkReferencedCRStatus(reqCtx, cluster, clusterdefinition.Status.Phase, dbaasv1alpha1.ClusterDefinitionKind); res != nil {
+		return *res, err
+	}
+
+	if err = r.updateClusterPhaseToCreatingOrUpdating(reqCtx.Ctx, cluster); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
 	task, err := buildClusterCreationTasks(clusterdefinition, appversion, cluster)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -150,6 +170,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	_, ok := cluster.ObjectMeta.Labels[clusterDefLabelKey]
 	if !ok {
 		cluster.ObjectMeta.Labels[clusterDefLabelKey] = clusterdefinition.Name
+		cluster.ObjectMeta.Labels[appVersionLabelKey] = appversion.Name
 		if err = r.Client.Patch(reqCtx.Ctx, cluster, patch); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
@@ -172,28 +193,51 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster) error {
+func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster) (*ctrl.Result, error) {
 	//
 	// delete any external resources associated with the cronJob
 	//
 	// Ensure that delete implementation is idempotent and safe to invoke
 	// multiple times for same object.
 
+	switch cluster.Spec.TerminationPolicy {
+	case dbaasv1alpha1.DoNotTerminate:
+		if cluster.Status.Phase != dbaasv1alpha1.DeletingPhase {
+			patch := client.MergeFrom(cluster.DeepCopy())
+			cluster.Status.ObservedGeneration = cluster.Generation
+			cluster.Status.Phase = dbaasv1alpha1.DeletingPhase
+			cluster.Status.Message = fmt.Sprintf("spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
+			if err := r.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
+				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+				return &res, err
+			}
+		}
+		res, err := intctrlutil.Reconciled()
+		return &res, err
+	case dbaasv1alpha1.Delete, dbaasv1alpha1.WipeOut:
+		if err := r.deletePVCs(reqCtx, cluster); err != nil {
+			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return &res, err
+		}
+	}
+
 	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
 	if err := r.Get(reqCtx.Ctx, client.ObjectKey{
 		Name: cluster.Spec.ClusterDefRef,
 	}, clusterDef); err != nil {
-		return err
+		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return &res, err
 	}
 
 	ml := client.MatchingLabels{
-		"app.kubernetes.io/instance": cluster.GetName(),
-		"app.kubernetes.io/name":     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
+		appInstanceLabelKey: cluster.GetName(),
+		appNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
 	}
 
 	stsList := &appsv1.StatefulSetList{}
 	if err := r.List(reqCtx.Ctx, stsList, ml); err != nil {
-		return err
+		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return &res, err
 	}
 	for _, sts := range stsList.Items {
 		if !controllerutil.ContainsFinalizer(&sts, dbClusterFinalizerName) {
@@ -202,12 +246,14 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 		patch := client.MergeFrom(sts.DeepCopy())
 		controllerutil.RemoveFinalizer(&sts, dbClusterFinalizerName)
 		if err := r.Patch(reqCtx.Ctx, &sts, patch); err != nil {
-			return err
+			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return &res, err
 		}
 	}
 	svcList := &corev1.ServiceList{}
 	if err := r.List(reqCtx.Ctx, svcList, ml); err != nil {
-		return err
+		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return &res, err
 	}
 	for _, svc := range svcList.Items {
 		if !controllerutil.ContainsFinalizer(&svc, dbClusterFinalizerName) {
@@ -216,12 +262,14 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 		patch := client.MergeFrom(svc.DeepCopy())
 		controllerutil.RemoveFinalizer(&svc, dbClusterFinalizerName)
 		if err := r.Patch(reqCtx.Ctx, &svc, patch); err != nil {
-			return err
+			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return &res, err
 		}
 	}
 	secretList := &corev1.SecretList{}
 	if err := r.List(reqCtx.Ctx, secretList, ml); err != nil {
-		return err
+		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return &res, err
 	}
 	for _, secret := range secretList.Items {
 		if !controllerutil.ContainsFinalizer(&secret, dbClusterFinalizerName) {
@@ -230,8 +278,100 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 		patch := client.MergeFrom(secret.DeepCopy())
 		controllerutil.RemoveFinalizer(&secret, dbClusterFinalizerName)
 		if err := r.Patch(reqCtx.Ctx, &secret, patch); err != nil {
-			return err
+			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return &res, err
 		}
 	}
+	return nil, nil
+}
+
+func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster) error {
+
+	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+	if err := r.Get(reqCtx.Ctx, client.ObjectKey{
+		Name: cluster.Spec.ClusterDefRef,
+	}, clusterDef); err != nil {
+		return err
+	}
+
+	for _, component := range clusterDef.Spec.Components {
+
+		for _, roleGroup := range component.RoleGroups {
+
+			ml := client.MatchingLabels{
+				appInstanceLabelKey: fmt.Sprintf("%s-%s-%s", cluster.GetName(), component.TypeName, roleGroup),
+				appNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
+			}
+
+			pvcList := &corev1.PersistentVolumeClaimList{}
+			if err := r.List(reqCtx.Ctx, pvcList, ml); err != nil {
+				return err
+			}
+			for _, pvc := range pvcList.Items {
+				if err := r.Delete(reqCtx.Ctx, &pvc); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
 	return nil
+}
+
+// checkReferencingCRStatus check cluster referenced CR is available
+func (r *ClusterReconciler) checkReferencedCRStatus(reqCtx intctrlutil.RequestCtx,
+	cluster *dbaasv1alpha1.Cluster,
+	referencedCRPhase dbaasv1alpha1.Phase,
+	crKind string) (*ctrl.Result, error) {
+	if referencedCRPhase == dbaasv1alpha1.AvailablePhase {
+		return nil, nil
+	}
+	patch := client.MergeFrom(cluster.DeepCopy())
+	cluster.Status.Message = fmt.Sprintf("%s.status.phase is not Available, this problem needs to be solved first", crKind)
+	if err := r.Client.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
+		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return &res, err
+	}
+	res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
+	return &res, err
+}
+
+func (r *ClusterReconciler) needCheckClusterForReady(cluster *dbaasv1alpha1.Cluster) bool {
+	return slices.Index([]dbaasv1alpha1.Phase{"", dbaasv1alpha1.RunningPhase, dbaasv1alpha1.DeletingPhase},
+		cluster.Status.Phase) == -1
+}
+
+// updateClusterPhase update cluster.status.phase
+func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(ctx context.Context, cluster *dbaasv1alpha1.Cluster) error {
+	patch := client.MergeFrom(cluster.DeepCopy())
+	if cluster.Status.Phase == "" {
+		cluster.Status.Phase = dbaasv1alpha1.CreatingPhase
+	} else if cluster.Status.Phase != dbaasv1alpha1.CreatingPhase {
+		cluster.Status.Phase = dbaasv1alpha1.UpdatingPhase
+	}
+	return r.Client.Status().Patch(ctx, cluster, patch)
+}
+
+// checkClusterIsReady Check whether the cluster related pod resources are running. if ok, update Cluster.status.phase to Running
+func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *dbaasv1alpha1.Cluster) error {
+	statefulSetList := &appsv1.StatefulSetList{}
+	if err := r.Client.List(ctx, statefulSetList, &client.ListOptions{Namespace: cluster.Namespace},
+		client.MatchingLabels{appInstanceLabelKey: cluster.Name}); err != nil {
+		return err
+	}
+	isOk := true
+	for _, v := range statefulSetList.Items {
+		if v.Status.AvailableReplicas != *v.Spec.Replicas ||
+			v.Status.CurrentRevision != v.Status.UpdateRevision {
+			isOk = false
+			break
+		}
+	}
+	if !isOk {
+		return fmt.Errorf("cluster is not ready")
+	}
+
+	patch := client.MergeFrom(cluster.DeepCopy())
+	cluster.Status.Phase = dbaasv1alpha1.RunningPhase
+	return r.Client.Status().Patch(ctx, cluster, patch)
 }

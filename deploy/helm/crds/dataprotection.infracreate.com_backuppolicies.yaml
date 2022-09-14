@@ -51,7 +51,7 @@ spec:
                 format: int32
                 type: integer
               remoteVolumes:
-                description: array of remote volumes from CSI driver defination.
+                description: array of remote volumes from CSI driver definition.
                 items:
                   description: Volume represents a named volume in a pod that may
                     be accessed by any container in the pod.

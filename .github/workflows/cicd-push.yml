@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - '*'
+      - '*/*'
     tags-ignore:
       - '*'
 
@@ -11,28 +12,33 @@ env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
 jobs:
-  make-build:
-    if: startsWith(github.event.head_commit.message, 'Merge pull request') != true
+  make-test:
     runs-on: [self-hosted, aws-eks-k8s-runner ]
     steps:
       - uses: actions/checkout@v3
-      - name: make build
+      - name: make mod-vendor and lint
         run: |
           git config --global url."https://${{ secrets.PERSONAL_ACCESS_TOKEN }}:@github.com".insteadof "https://github.com"
           make mod-vendor
           make lint
-  make-test:
-    if: startsWith(github.event.head_commit.message, 'Merge pull request') != true
-    runs-on: [ self-hosted, aws-eks-k8s-runner ]
-    needs: [make-build]
-    steps:
-      - uses: actions/checkout@v3
+          make staticcheck
+
       - name: make test
         run: |
-          git config --global url."https://${{ secrets.PERSONAL_ACCESS_TOKEN }}:@github.com".insteadof "https://github.com"
-          make ci-test
+          make test
+          make cover-report
+
       - name: upload cover result
         uses: actions/upload-artifact@v3
         with:
           name: cover_result
           path: cover.html
+
+      - name: upload coverage report
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./cover.out
+          flags: unittests
+          name: codecov-report
+          verbose: true

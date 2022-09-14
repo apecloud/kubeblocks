@@ -76,8 +76,8 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	reqCtx.Log.Info("in RestoreJob Reconciler: name: " + restoreJob.Name + " phase: " + string(restoreJob.Status.Phase))
 
 	// handle finalizer
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, restoreJob, dataProtectionFinalizerName, func() error {
-		return r.deleteExternalResources(reqCtx, restoreJob)
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, restoreJob, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
+		return nil, r.deleteExternalResources(reqCtx, restoreJob)
 	})
 	if err != nil {
 		return *res, err
@@ -291,13 +291,12 @@ func (r *RestoreJobReconciler) GetPodSpec(reqCtx intctrlutil.RequestCtx, restore
 	podSpec.Volumes = append(podSpec.Volumes, backupPolicy.Spec.RemoteVolumes...)
 
 	// TODO(dsj): mount readonly remote volumes for restore.
-	//podSpec.Volumes[0].PersistentVolumeClaim.ReadOnly = true
+	// podSpec.Volumes[0].PersistentVolumeClaim.ReadOnly = true
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
 
 	return podSpec, nil
 }
 
-// GetPodSpec(reqCtx intctrlutil.RequestCtx, restoreJob *dataprotectionv1alpha1.RestoreJob) (corev1.PodSpec, error) {
 func (r *RestoreJobReconciler) PatchTargetCluster(reqCtx intctrlutil.RequestCtx, restoreJob *dataprotectionv1alpha1.RestoreJob, patch []byte) error {
 	// get stateful service
 	clusterTarget := &appv1.StatefulSetList{}

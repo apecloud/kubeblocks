@@ -29,6 +29,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+
 	//+kubebuilder:scaffold:imports
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -68,6 +69,8 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: false,
 		WebhookInstallOptions: envtest.WebhookInstallOptions{
 			Paths: []string{filepath.Join("..", "..", "..", "config", "webhook")},
+			// LocalServingHost: "host.docker.internal",
+			// LocalServingPort: 28080,
 		},
 	}
 
@@ -110,6 +113,8 @@ var _ = BeforeSuite(func() {
 
 	err = (&Cluster{}).SetupWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
+
+	RegisterWebhookManager(mgr)
 
 	//+kubebuilder:scaffold:webhook
 

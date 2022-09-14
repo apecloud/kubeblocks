@@ -28,6 +28,7 @@ import (
 	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -172,7 +173,7 @@ func mergeComponents(
 		AntiAffinity:    clusterDefComp.AntiAffinity,
 		IsQuorum:        clusterDefComp.IsQuorum,
 		Strategies:      clusterDefComp.Strategies,
-		Containers:      clusterDefComp.Containers,
+		PodSpec:         clusterDefComp.PodSpec,
 		Service:         clusterDefComp.Service,
 		Scripts:         clusterDefComp.Scripts,
 	}
@@ -180,66 +181,66 @@ func mergeComponents(
 		component.Name = clusterComp.Name
 	}
 
-	if appVerComp != nil && appVerComp.Containers != nil {
-		for _, container := range appVerComp.Containers {
-			i, c := getContainerByName(component.Containers, container.Name)
+	if appVerComp != nil && appVerComp.PodSpec.Containers != nil {
+		for _, container := range appVerComp.PodSpec.Containers {
+			i, c := getContainerByName(component.PodSpec.Containers, container.Name)
 			if c != nil {
 				if container.Image != "" {
-					component.Containers[i].Image = container.Image
+					component.PodSpec.Containers[i].Image = container.Image
 				}
 				if len(container.Command) != 0 {
-					component.Containers[i].Command = container.Command
+					component.PodSpec.Containers[i].Command = container.Command
 				}
 				if len(container.Args) != 0 {
-					component.Containers[i].Args = container.Args
+					component.PodSpec.Containers[i].Args = container.Args
 				}
 				if container.WorkingDir != "" {
-					component.Containers[i].WorkingDir = container.WorkingDir
+					component.PodSpec.Containers[i].WorkingDir = container.WorkingDir
 				}
 				if len(container.Ports) != 0 {
-					component.Containers[i].Ports = container.Ports
+					component.PodSpec.Containers[i].Ports = container.Ports
 				}
 				if len(container.EnvFrom) != 0 {
-					component.Containers[i].EnvFrom = container.EnvFrom
+					component.PodSpec.Containers[i].EnvFrom = container.EnvFrom
 				}
 				if len(container.Env) != 0 {
-					component.Containers[i].Env = container.Env
+					component.PodSpec.Containers[i].Env = container.Env
 				}
 				if container.Resources.Limits != nil || container.Resources.Requests != nil {
-					component.Containers[i].Resources = container.Resources
+					component.PodSpec.Containers[i].Resources = container.Resources
 				}
 				if len(container.VolumeMounts) != 0 {
-					component.Containers[i].VolumeMounts = container.VolumeMounts
+					component.PodSpec.Containers[i].VolumeMounts = container.VolumeMounts
 				}
 				if len(container.VolumeDevices) != 0 {
-					component.Containers[i].VolumeDevices = container.VolumeDevices
+					component.PodSpec.Containers[i].VolumeDevices = container.VolumeDevices
 				}
 				if container.LivenessProbe != nil {
-					component.Containers[i].LivenessProbe = container.LivenessProbe
+					component.PodSpec.Containers[i].LivenessProbe = container.LivenessProbe
 				}
 				if container.ReadinessProbe != nil {
-					component.Containers[i].ReadinessProbe = container.ReadinessProbe
+					component.PodSpec.Containers[i].ReadinessProbe = container.ReadinessProbe
 				}
 				if container.StartupProbe != nil {
-					component.Containers[i].StartupProbe = container.StartupProbe
+					component.PodSpec.Containers[i].StartupProbe = container.StartupProbe
 				}
 				if container.Lifecycle != nil {
-					component.Containers[i].Lifecycle = container.Lifecycle
+					component.PodSpec.Containers[i].Lifecycle = container.Lifecycle
 				}
 				if container.TerminationMessagePath != "" {
-					component.Containers[i].TerminationMessagePath = container.TerminationMessagePath
+					component.PodSpec.Containers[i].TerminationMessagePath = container.TerminationMessagePath
 				}
 				if container.TerminationMessagePolicy != "" {
-					component.Containers[i].TerminationMessagePolicy = container.TerminationMessagePolicy
+					component.PodSpec.Containers[i].TerminationMessagePolicy = container.TerminationMessagePolicy
 				}
 				if container.ImagePullPolicy != "" {
-					component.Containers[i].ImagePullPolicy = container.ImagePullPolicy
+					component.PodSpec.Containers[i].ImagePullPolicy = container.ImagePullPolicy
 				}
 				if container.SecurityContext != nil {
-					component.Containers[i].SecurityContext = container.SecurityContext
+					component.PodSpec.Containers[i].SecurityContext = container.SecurityContext
 				}
 			} else {
-				component.Containers = append(component.Containers, container)
+				component.PodSpec.Containers = append(component.PodSpec.Containers, container)
 			}
 		}
 	}
@@ -249,13 +250,13 @@ func mergeComponents(
 			component.VolumeClaimTemplates = toK8sVolumeClaimTemplates(clusterComp.VolumeClaimTemplates)
 		}
 		if clusterComp.Resources.Requests != nil || clusterComp.Resources.Limits != nil {
-			component.Containers[0].Resources = clusterComp.Resources
+			component.PodSpec.Containers[0].Resources = clusterComp.Resources
 		}
 		component.RoleGroups = clusterComp.RoleGroups
 	}
 	if component.VolumeClaimTemplates == nil {
-		for i := range component.Containers {
-			component.Containers[i].VolumeMounts = nil
+		for i := range component.PodSpec.Containers {
+			component.PodSpec.Containers[i].VolumeMounts = nil
 		}
 	}
 	return component
@@ -272,6 +273,7 @@ func mergeRoleGroups(roleGroupTemplate *dbaasv1alpha1.RoleGroupTemplate, cluster
 	roleGroup.MaxAvailable = roleGroupTemplate.MaxAvailable
 	roleGroup.MinAvailable = roleGroupTemplate.MinAvailable
 	roleGroup.UpdateStrategy = roleGroupTemplate.UpdateStrategy
+	roleGroup.Name = roleGroupTemplate.TypeName
 	if clusterRoleGroup == nil || clusterRoleGroup.Type != roleGroupTemplate.TypeName {
 		return roleGroup
 	}
@@ -389,18 +391,41 @@ func prepareRoleGroupObjs(ctx context.Context, cli client.Client, obj interface{
 		return fmt.Errorf("invalid arg")
 	}
 
-	sts, err := buildSts(*params)
-	if err != nil {
-		return err
-	}
-	*params.applyObjs = append(*params.applyObjs, sts)
+	if params.component.IsStateless {
+		sts, err := buildDeploy(*params)
+		if err != nil {
+			return err
+		}
+		*params.applyObjs = append(*params.applyObjs, sts)
+	} else {
+		sts, err := buildSts(*params)
+		if err != nil {
+			return err
+		}
+		*params.applyObjs = append(*params.applyObjs, sts)
 
-	svcs, err := buildSvcs(*params, sts)
+		svcs, err := buildHeadlessSvcs(*params, sts)
+		if err != nil {
+			return err
+		}
+		*params.applyObjs = append(*params.applyObjs, svcs...)
+	}
+
+	pdb, err := buildPDB(*params)
 	if err != nil {
 		return err
 	}
-	*params.applyObjs = append(*params.applyObjs, svcs...)
-	return err
+	*params.applyObjs = append(*params.applyObjs, pdb)
+
+	if params.roleGroup.Service.Ports != nil {
+		svc, err := buildSvc(*params)
+		if err != nil {
+			return err
+		}
+		*params.applyObjs = append(*params.applyObjs, svc)
+	}
+
+	return nil
 }
 
 func createOrReplaceResources(ctx context.Context,
@@ -451,7 +476,7 @@ func createOrReplaceResources(ctx context.Context,
 			for _, vct := range stsObj.Spec.VolumeClaimTemplates {
 				var vctProto *corev1.PersistentVolumeClaim
 				for _, i := range stsProto.Spec.VolumeClaimTemplates {
-					if i.Name == vctProto.Name {
+					if i.Name == vct.Name {
 						vctProto = &i
 						break
 					}
@@ -511,7 +536,7 @@ func createOrReplaceResources(ctx context.Context,
 	return nil
 }
 
-func buildSvcs(params createParams, sts *appsv1.StatefulSet) ([]client.Object, error) {
+func buildHeadlessSvcs(params createParams, sts *appsv1.StatefulSet) ([]client.Object, error) {
 	stsPodLabels := sts.Spec.Template.Labels
 	replicas := *sts.Spec.Replicas
 	svcs := make([]client.Object, replicas)
@@ -520,10 +545,10 @@ func buildSvcs(params createParams, sts *appsv1.StatefulSet) ([]client.Object, e
 		pod.ObjectMeta.Name = fmt.Sprintf("%s-%d", sts.GetName(), i)
 		pod.ObjectMeta.Namespace = sts.Namespace
 		pod.ObjectMeta.Labels = map[string]string{
-			"statefulset.kubernetes.io/pod-name": pod.ObjectMeta.Name,
-			"app.kubernetes.io/name":             stsPodLabels["app.kubernetes.io/name"],
-			"app.kubernetes.io/instance":         stsPodLabels["app.kubernetes.io/instance"],
-			"app.kubernetes.io/component":        stsPodLabels["app.kubernetes.io/name"],
+			statefulSetPodNameLabelKey: pod.ObjectMeta.Name,
+			appNameLabelKey:            stsPodLabels[appNameLabelKey],
+			appInstanceLabelKey:        stsPodLabels[appInstanceLabelKey],
+			appComponentLabelKey:       stsPodLabels[appNameLabelKey],
 		}
 		pod.Spec.Containers = sts.Spec.Template.Spec.Containers
 
@@ -534,6 +559,56 @@ func buildSvcs(params createParams, sts *appsv1.StatefulSet) ([]client.Object, e
 		svcs[i] = svc
 	}
 	return svcs, nil
+}
+
+func buildSvc(params createParams) (*corev1.Service, error) {
+	cueFS, _ := debme.FS(cueTemplates, "cue")
+
+	cueTpl, err := params.getCacheCUETplValue("service_template.cue", func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("service_template.cue"))
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+	clusterStrByte, err := params.getCacheBytesValue("cluster", func() ([]byte, error) {
+		return json.Marshal(params.cluster)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("cluster", clusterStrByte); err != nil {
+		return nil, err
+	}
+
+	componentStrByte, err := json.Marshal(params.component)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("component", componentStrByte); err != nil {
+		return nil, err
+	}
+
+	roleGroupStrByte, err := json.Marshal(params.roleGroup)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("roleGroup", roleGroupStrByte); err != nil {
+		return nil, err
+	}
+
+	svcStrByte, err := cueValue.Lookup("service")
+	if err != nil {
+		return nil, err
+	}
+
+	svc := corev1.Service{}
+	if err = json.Unmarshal(svcStrByte, &svc); err != nil {
+		return nil, err
+	}
+
+	return &svc, nil
 }
 
 func randomString(length int) string {
@@ -624,7 +699,7 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err = cueValue.Fill("role_group", roleGroupStrByte); err != nil {
+	if err = cueValue.Fill("roleGroup", roleGroupStrByte); err != nil {
 		return nil, err
 	}
 
@@ -674,6 +749,64 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 	return &sts, nil
 }
 
+func buildDeploy(params createParams) (*appsv1.Deployment, error) {
+	cueFS, _ := debme.FS(cueTemplates, "cue")
+
+	cueTpl, err := params.getCacheCUETplValue("deployment_template.cue", func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("deployment_template.cue"))
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+	clusterStrByte, err := params.getCacheBytesValue("cluster", func() ([]byte, error) {
+		return json.Marshal(params.cluster)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("cluster", clusterStrByte); err != nil {
+		return nil, err
+	}
+
+	componentStrByte, err := json.Marshal(params.component)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("component", componentStrByte); err != nil {
+		return nil, err
+	}
+
+	roleGroupStrByte, err := json.Marshal(params.roleGroup)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("roleGroup", roleGroupStrByte); err != nil {
+		return nil, err
+	}
+
+	stsStrByte, err := cueValue.Lookup("deployment")
+	if err != nil {
+		return nil, err
+	}
+
+	deploy := appsv1.Deployment{}
+	if err = json.Unmarshal(stsStrByte, &deploy); err != nil {
+		return nil, err
+	}
+
+	stsStrByte = injectEnv(stsStrByte, dbaasPrefix+"_MY_SECRET_NAME", params.cluster.Name)
+
+	if err = json.Unmarshal(stsStrByte, &deploy); err != nil {
+		return nil, err
+	}
+
+	// TODO: inject environment
+
+	return &deploy, nil
+}
+
 func buildHeadlessService(params createParams, pod *corev1.Pod) (*corev1.Service, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
@@ -710,6 +843,57 @@ func buildHeadlessService(params createParams, pod *corev1.Pod) (*corev1.Service
 	}
 
 	return &svc, nil
+}
+
+func buildPDB(params createParams) (*policyv1.PodDisruptionBudget, error) {
+	cueFS, _ := debme.FS(cueTemplates, "cue")
+
+	cueTpl, err := params.getCacheCUETplValue("pdb_template.cue", func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("pdb_template.cue"))
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+
+	clusterStrByte, err := params.getCacheBytesValue("cluster", func() ([]byte, error) {
+		return json.Marshal(params.cluster)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("cluster", clusterStrByte); err != nil {
+		return nil, err
+	}
+
+	componentStrByte, err := json.Marshal(params.component)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("component", componentStrByte); err != nil {
+		return nil, err
+	}
+
+	roleGroupStrByte, err := json.Marshal(params.roleGroup)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("roleGroup", roleGroupStrByte); err != nil {
+		return nil, err
+	}
+
+	pdbStrByte, err := cueValue.Lookup("pdb")
+	if err != nil {
+		return nil, err
+	}
+
+	pdb := policyv1.PodDisruptionBudget{}
+	if err = json.Unmarshal(pdbStrByte, &pdb); err != nil {
+		return nil, err
+	}
+
+	return &pdb, nil
 }
 
 func injectEnv(strByte []byte, key string, value string) []byte {

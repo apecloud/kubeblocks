@@ -49,7 +49,7 @@ type BackupPolicySpec struct {
 	// +kubebuilder:validation:Required
 	TargetVolume corev1.Volume `json:"targetVolume"`
 
-	// array of remote volumes from CSI driver defination.
+	// array of remote volumes from CSI driver definition.
 	// +kubebuilder:validation:MinItems=1
 	RemoteVolumes []corev1.Volume `json:"remoteVolumes" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
@@ -58,7 +58,7 @@ type BackupPolicySpec struct {
 	OnFailAttempted int32 `json:"onFailAttempted,omitempty"`
 }
 
-// TODO (dsj): target cluster need redefined from Cluster API
+// TargetCluster TODO (dsj): target cluster need redefined from Cluster API
 type TargetCluster struct {
 	// database engine to support in the backup.
 	// +kubebuilder:validation:Enum={mysql}
@@ -95,6 +95,7 @@ type BackupPolicyStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={dbaas},scope=Namespaced
+
 // BackupPolicy is the Schema for the backuppolicies API  (defined by User)
 type BackupPolicy struct {
 	metav1.TypeMeta   `json:",inline"`

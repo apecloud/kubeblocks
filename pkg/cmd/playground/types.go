@@ -1,6 +1,59 @@
-package utils
+/*
+Copyright © 2022 The dbctl Authors
 
-var KubeConfig = `
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package playground
+
+import "github.com/apecloud/kubeblocks/version"
+
+const (
+	DBClusterName        = "mycluster"
+	ClusterName          = "dbctl-playground"
+	ClusterNamespace     = "dbctl-playground"
+	DBClusterNamespace   = "default"
+	DefaultEngine        = "wesql"
+	DefaultCloudProvider = "local"
+	DefaultVersion       = "8.0.28"
+	DefaultRootUser      = "root"
+	DefaultPassword      = "sakila"
+	DefaultPort          = "3306"
+	LocalHost            = "127.0.0.1"
+
+	helmUser   = "yimeisun"
+	helmPasswd = "8V+PmX1oSDv4pumDvZp6m7LS8iPgbY3A"
+	helmURL    = "yimeisun.azurecr.io"
+
+	// K3sKubeConfigLocation is default path of k3s kubeconfig
+	K3sKubeConfigLocation = "/etc/rancher/k3s/k3s.yaml"
+	// K3sExternalKubeConfigLocation is where to generate kubeconfig for external access
+	K3sExternalKubeConfigLocation = "/etc/rancher/k3s/k3s-external.yaml"
+	// CliDockerNetwork is docker network for k3d cluster when `dbctl playground`
+	// all cluster will be created in this network, so they can communicate with each other
+	CliDockerNetwork = "k3d-dbctl-playground"
+)
+
+var (
+	// K3sImage is k3s image repo
+	K3sImage = "rancher/k3s:" + version.K3sImageTag
+	// K3dToolsImage is k3d tools image repo
+	K3dToolsImage = "docker.io/infracreate/k3d-tools:" + version.K3dVersion
+	// K3dProxyImage is k3d proxy image repo
+	K3dProxyImage = "docker.io/infracreate/k3d-proxy:" + version.K3dVersion
+)
+
+var kubeConfig = `
 apiVersion: v1
 clusters:
 - cluster:

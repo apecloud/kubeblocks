@@ -1,17 +1,17 @@
 package dataprotection
 
 import (
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"context"
+	"time"
+
 	"github.com/sethvargo/go-password/password"
 	appv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
-)
 
-import (
-	"context"
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+
 	. "github.com/onsi/ginkgo"
 
 	. "github.com/onsi/gomega"
@@ -547,25 +547,13 @@ spec:
 		return statefulSet
 	}
 
-	/*
-		patchK8sJobStatus := func(jobStatus batchv1.JobConditionType, key types.NamespacedName) {
-			k8sJob := &batchv1.Job{}
-			Expect(k8sClient.Get(context.Background(), key, k8sJob)).Should(Succeed())
-
-			patch := client.MergeFrom(k8sJob.DeepCopy())
-			jobCondition := batchv1.JobCondition{Type: jobStatus}
-			k8sJob.Status.Conditions = append(k8sJob.Status.Conditions, jobCondition)
-			Expect(k8sClient.Patch(context.Background(), k8sJob, patch)).Should(Succeed())
-		}*/
 	patchBackupJobStatus := func(phase dataprotectionv1alpha1.BackupJobPhase, key types.NamespacedName) {
 		backupJob := &dataprotectionv1alpha1.BackupJob{}
 		Expect(k8sClient.Get(context.Background(), key, backupJob)).Should(Succeed())
 
-		//patch := client.MergeFrom(backupJob.DeepCopy())
-
+		patch := client.MergeFrom(backupJob.DeepCopy())
 		backupJob.Status.Phase = phase
-		Expect(k8sClient.Status().Update(context.Background(), backupJob)).Should(Succeed())
-		//Expect(k8sClient.Patch(context.Background(), backupJob, patch)).Should(Succeed())
+		Expect(k8sClient.Status().Patch(context.Background(), backupJob, patch)).Should(Succeed())
 	}
 
 	Context("When creating restoreJob", func() {
@@ -589,15 +577,9 @@ spec:
 				Name:      toCreate.Name,
 				Namespace: toCreate.Namespace,
 			}
-			//time.Sleep(waitDuration)
-
-			backupRet := &dataprotectionv1alpha1.BackupJob{}
-			Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: backupJob.Name, Namespace: backupJob.Namespace}, backupRet)).Should(Succeed())
 
 			patchBackupJobStatus(dataprotectionv1alpha1.BackupJobCompleted, types.NamespacedName{Name: backupJob.Name, Namespace: backupJob.Namespace})
 			time.Sleep(waitDuration)
-			backupRet = &dataprotectionv1alpha1.BackupJob{}
-			Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: backupJob.Name, Namespace: backupJob.Namespace}, backupRet)).Should(Succeed())
 
 			result := &dataprotectionv1alpha1.RestoreJob{}
 			Expect(k8sClient.Get(context.Background(), key, result)).Should(Succeed())

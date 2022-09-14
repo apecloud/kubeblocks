@@ -259,7 +259,7 @@ func (o *SnapshotOptions) RunSnapList() error {
 	table.AddRow("NAMESPACE", "NAME", "READYTOUSE", "SOURCEPVC", "RESTORESIZE", "SNAPSHOTCLASS", "CREATE_TIME")
 	errs := sets.NewString()
 	for _, info := range infos {
-		backupSnapInfo := utils.BackupSnapInfo{}
+		backupSnapInfo := types.BackupSnapInfo{}
 
 		mapping := info.ResourceMapping()
 		if err != nil {
@@ -295,10 +295,7 @@ func (o *SnapshotOptions) RunSnapList() error {
 	return utilerrors.NewAggregate(allErrs)
 }
 
-func buildBackupSnapInfo(obj *unstructured.Unstructured, info *utils.BackupSnapInfo) {
-	for k, v := range obj.GetLabels() {
-		info.Labels = info.Labels + fmt.Sprintf("%s:%s ", k, v)
-	}
+func buildBackupSnapInfo(obj *unstructured.Unstructured, info *types.BackupSnapInfo) {
 	if obj.Object["status"] == nil {
 		return
 	}

@@ -188,14 +188,11 @@ spec:
       && rsync -avrP /tmp/data/ ${DATA_DIR}/ \
       && rm -rf /tmp/data/ \
       && chmod -R 0777 ${DATA_DIR}
-
-  # Optional
   incrementalRestoreCommands: []
   backupCommands:
     - echo "DB_HOST=${DB_HOST} DB_USER=${DB_USER} DB_PASSWORD=${DB_PASSWORD} DATA_DIR=${DATA_DIR} BACKUP_DIR=${BACKUP_DIR} BACKUP_NAME=${BACKUP_NAME}";
       mkdir -p /${BACKUP_DIR};
       xtrabackup --compress --backup  --safe-slave-backup --slave-info --stream=xbstream --host=${DB_HOST} --user=${DB_USER} --password=${DB_PASSWORD} --datadir=${DATA_DIR} > /${BACKUP_DIR}/${BACKUP_NAME}.xbstream
-  # Optional
   incrementalBackupCommands: []
 `
 		backupTool := &dataprotectionv1alpha1.BackupTool{}

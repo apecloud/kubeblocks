@@ -30,6 +30,9 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/kustomize/kyaml/yaml"
+
 	"golang.org/x/crypto/ssh"
 
 	l "github.com/k3d-io/k3d/v5/pkg/logger"
@@ -214,4 +217,13 @@ func MakeSSHKeyPair(pubKeyPath, privateKeyPath string) error {
 		return err
 	}
 	return os.WriteFile(pubKeyPath, ssh.MarshalAuthorizedKey(pub), 0655)
+}
+
+func PrintObjYaml(obj *unstructured.Unstructured) {
+	data, err := yaml.Marshal(obj)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	fmt.Println(string(data))
 }

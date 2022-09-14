@@ -119,9 +119,6 @@ type ClusterComponent struct {
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
-	// ref roleGroups in ClusterDefinition
-	RoleGroups []ClusterRoleGroup `json:"roleGroups,omitempty"`
-
 	// +optional
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 
@@ -145,34 +142,11 @@ type ClusterComponent struct {
 	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
 }
 
-type ClusterRoleGroup struct {
-	// +optional
-	Name string `json:"name,omitempty"`
-
-	// roleGroup name in ClusterDefinition
-	// +optional
-	Type string `json:"type,omitempty"`
-
-	// +kubebuilder:default=-1
-	// +optional
-	Replicas int `json:"replicas,omitempty"`
-
-	// +optional
-	Service corev1.ServiceSpec `json:"service,omitempty"`
-}
-
 type ClusterStatusComponent struct {
-	ID         string                   `json:"id,omitempty"`
-	Type       string                   `json:"type,omitempty"`
-	Phase      string                   `json:"phase,omitempty"`
-	Message    string                   `json:"message,omitempty"`
-	RoleGroups []ClusterStatusRoleGroup `json:"roleGroups,omitempty"`
-}
-
-type ClusterStatusRoleGroup struct {
-	ID          string `json:"id,omitempty"`
-	Type        string `json:"type,omitempty"`
-	RefWorkload string `json:"refWorkload,omitempty"`
+	ID      string `json:"id,omitempty"`
+	Type    string `json:"type,omitempty"`
+	Phase   string `json:"phase,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 
 type ClusterComponentVolumeClaimTemplate struct {

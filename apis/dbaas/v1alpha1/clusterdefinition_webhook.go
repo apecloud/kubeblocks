@@ -18,8 +18,6 @@ package v1alpha1
 
 import (
 	"fmt"
-	"reflect"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -33,7 +31,6 @@ import (
 var (
 	clusterdefinitionlog = logf.Log.WithName("clusterdefinition-resource")
 	componentTag         = "component"
-	roleGroupTag         = "roleGroupTag"
 )
 
 func (r *ClusterDefinition) SetupWebhookWithManager(mgr ctrl.Manager) error {
@@ -89,12 +86,8 @@ func (r *ClusterDefinition) validate() error {
 		componentMap[v.TypeName] = struct{}{}
 	}
 
-	fieldPath := field.NewPath("spec.cluster.strategies")
-	r.validateClusterDefinitionStrategies(&allErrs, componentMap, r.Spec.Cluster.Strategies, fieldPath, componentTag, "")
+	r.validateComponents(&allErrs)
 
-	roleGroupMap := r.validateComponents(&allErrs)
-
-	r.validateRoleGroupTemplates(&allErrs, roleGroupMap)
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
 			schema.GroupKind{Group: APIVersion, Kind: ClusterDefinitionKind},
@@ -103,64 +96,10 @@ func (r *ClusterDefinition) validate() error {
 	return nil
 }
 
-// ValidateClusterDefinitionStrategies validate spec.cluster.strategies is legal, including strategy.orders and cluster.components consistent
-func (r *ClusterDefinition) validateClusterDefinitionStrategies(allErrs *field.ErrorList,
-	m map[string]struct{},
-	strategies ClusterDefinitionStrategies,
-	rootField *field.Path,
-	tag string,
-	resourceType string) {
-	var (
-		strategy ClusterDefinitionStrategy
-		v        = reflect.ValueOf(strategies)
-		t        = reflect.TypeOf(strategies)
-		filedNum = t.NumField()
-	)
-	for i := 0; i < filedNum; i++ {
-		filedName := t.Field(i).Name
-		strategy = v.FieldByName(filedName).Interface().(ClusterDefinitionStrategy)
-		if strategy.Order != nil {
-			orderField := rootField.Child(filedName).Child("order")
-			// determine whether there is a missing type
-			if len(strategy.Order) != len(m) {
-				*allErrs = append(*allErrs, field.NotFound(orderField, r.getMissingMsg(tag, resourceType)))
-				continue
-			}
-			// determine whether there is a nonexistent type
-			invalidElements := r.getInvalidElementsInArray(m, strategy.Order)
-			if len(invalidElements) > 0 {
-				*allErrs = append(*allErrs, field.NotFound(orderField, r.getNotFoundMsg(invalidElements, tag, resourceType)))
-			}
-		}
-	}
-}
-
 // ValidateComponents validate spec.components is legal
 func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) map[string]struct{} {
-	roleGroupMap := make(map[string]struct{})
-	for _, v := range r.Spec.Components {
-		tmpRoleGroupMap := make(map[string]struct{})
-		for _, role := range v.RoleGroups {
-			roleGroupMap[role] = struct{}{}
-			tmpRoleGroupMap[role] = struct{}{}
-		}
-		path := fmt.Sprintf("spec.components[%s].strategies", v.TypeName)
-		r.validateClusterDefinitionStrategies(allErrs, tmpRoleGroupMap, v.Strategies, field.NewPath(path), roleGroupTag, v.TypeName)
-	}
-	return roleGroupMap
-}
-
-// ValidateRoleGroupTemplates validate spec.roleGroupTemplates is legal
-func (r *ClusterDefinition) validateRoleGroupTemplates(allErrs *field.ErrorList, roleGroupMap map[string]struct{}) {
-	invalidElements := make([]string, 0)
-	for _, v := range r.Spec.RoleGroupTemplates {
-		if _, ok := roleGroupMap[v.TypeName]; !ok {
-			invalidElements = append(invalidElements, v.TypeName)
-		}
-	}
-	if len(invalidElements) > 0 {
-		*allErrs = append(*allErrs, field.NotFound(field.NewPath("spec.roleGroupTemplates"), r.getNotFoundMsg(invalidElements, roleGroupTag, "?")))
-	}
+	// TODO validate Consensus ComponentType
+	return nil
 }
 
 func (r *ClusterDefinition) getInvalidElementsInArray(m map[string]struct{}, arr []string) []string {

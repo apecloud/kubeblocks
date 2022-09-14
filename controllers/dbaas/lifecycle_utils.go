@@ -42,7 +42,6 @@ type createParams struct {
 	clusterDefinition *dbaasv1alpha1.ClusterDefinition
 	cluster           *dbaasv1alpha1.Cluster
 	component         *Component
-	roleGroup         *RoleGroup
 	applyObjs         *[]client.Object
 	cacheCtx          *map[string]interface{}
 }
@@ -110,24 +109,6 @@ func getClusterComponentsByType(components []dbaasv1alpha1.ClusterComponent, typ
 	return comps
 }
 
-func getRoleGroupTemplateByType(roleGroups []dbaasv1alpha1.RoleGroupTemplate, typeName string) *dbaasv1alpha1.RoleGroupTemplate {
-	for _, roleGroup := range roleGroups {
-		if roleGroup.TypeName == typeName {
-			return &roleGroup
-		}
-	}
-	return nil
-}
-
-func getClusterRoleGroupByType(clusterRoleGroups []dbaasv1alpha1.ClusterRoleGroup, typeName string) *dbaasv1alpha1.ClusterRoleGroup {
-	for _, roleGroup := range clusterRoleGroups {
-		if roleGroup.Type == typeName {
-			return &roleGroup
-		}
-	}
-	return nil
-}
-
 func getContainerByName(containers []corev1.Container, name string) (int, *corev1.Container) {
 	for i, container := range containers {
 		if container.Name == name {
@@ -165,14 +146,12 @@ func mergeComponents(
 		ClusterType:     clusterDef.Spec.Type,
 		Name:            clusterDefComp.TypeName,
 		Type:            clusterDefComp.TypeName,
-		RoleGroupNames:  clusterDefComp.RoleGroups,
 		MinAvailable:    clusterDefComp.MinAvailable,
 		MaxAvailable:    clusterDefComp.MaxAvailable,
 		DefaultReplicas: clusterDefComp.DefaultReplicas,
-		IsStateless:     clusterDefComp.IsStateless,
 		AntiAffinity:    clusterDefComp.AntiAffinity,
-		IsQuorum:        clusterDefComp.IsQuorum,
-		Strategies:      clusterDefComp.Strategies,
+		ComponentType:   clusterDefComp.ComponentType,
+		ConsensusSpec:   clusterDefComp.ConsensusSpec,
 		PodSpec:         clusterDefComp.PodSpec,
 		Service:         clusterDefComp.Service,
 		Scripts:         clusterDefComp.Scripts,

@@ -36,36 +36,9 @@ var _ = Describe("clusterDefinition webhook", func() {
 			Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
 
 			By("By update a  clusterDefinition")
-			// validate spec.cluster.strategies.create?.order and spec.components[?].typeName is consistent, including component typeName and length
-			createOrder := clusterDef.Spec.Cluster.Strategies.Create.Order
-			createOrder[0] = "replicaset"
 			Expect(k8sClient.Update(ctx, clusterDef)).ShouldNot(Succeed())
-			// restore
-			createOrder[0] = "replicaSets"
 
-			By("By testing spec.cluster.strategies.create.order is consistent with spec.components[?].typeName")
-			clusterDef.Spec.Cluster.Strategies.Create.Order = []string{"replicaSets", "proxy", "proxy_test"}
-			Expect(k8sClient.Update(ctx, clusterDef)).ShouldNot(Succeed())
-			// restore
-			clusterDef.Spec.Cluster.Strategies.Create.Order = createOrder
-
-			// validate spec.components[?].roleGroups and .strategies.create.order is consistent, including roleGroup name and length
-			roleGroups := clusterDef.Spec.Components[0].Strategies.Create.Order
-			roleGroups[0] = "primary_test"
-			Expect(k8sClient.Update(ctx, clusterDef)).ShouldNot(Succeed())
-			// restore
-			roleGroups[0] = "primary"
-
-			By("By testing spec.components[?].strategies.create.order is consistent with spec.components[?].roleGroups")
-			clusterDef.Spec.Components[0].Strategies.Create.Order = []string{"primary", "follower", "candidate"}
-			Expect(k8sClient.Update(ctx, clusterDef)).ShouldNot(Succeed())
-			// restore
-			clusterDef.Spec.Components[0].Strategies.Create.Order = []string{"primary", "follower"}
-
-			By("By testing spec.roleGroupTemplates[?].typeName is consistent with spec.components[?].roleGroups ")
-			// validate spec.roleGroupTemplates
-			clusterDef.Spec.RoleGroupTemplates[0].TypeName = "primary_test"
-			Expect(k8sClient.Update(ctx, clusterDef)).ShouldNot(Succeed())
+			//TODO test ConsensusType
 
 		})
 	})

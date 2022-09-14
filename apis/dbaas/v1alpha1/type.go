@@ -17,8 +17,12 @@ type Phase string
 // CR.Status.Phase
 const (
 	AvailablePhase   Phase = "Available"
-	UnAvailablePhase Phase = "UnAvailable"
+	UnavailablePhase Phase = "Unavailable"
 	DeletingPhase    Phase = "Deleting"
+	CreatingPhase    Phase = "Creating"
+	RunningPhase     Phase = "Running"
+	FailedPhase      Phase = "Failed"
+	UpdatingPhase    Phase = "Updating"
 )
 
 type Status string

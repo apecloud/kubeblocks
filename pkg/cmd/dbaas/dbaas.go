@@ -19,6 +19,7 @@ package dbaas
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/cloudprovider"
 	"github.com/apecloud/kubeblocks/pkg/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -42,6 +43,14 @@ type InitOptions struct {
 	DryRun  bool
 }
 
+type DestroyOptions struct {
+	genericclioptions.IOStreams
+	Engine   string
+	Provider string
+	Version  string
+	DryRun   bool
+}
+
 // NewDbaasCmd creates the dbaas command
 func NewDbaasCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
@@ -52,7 +61,8 @@ func NewDbaasCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		},
 	}
 	cmd.AddCommand(
-		newInitCmd(streams),
+		newInstallCmd(streams),
+		newUninstallCmd(streams),
 	)
 	return cmd
 }
@@ -86,13 +96,31 @@ func (o *InitOptions) Run() error {
 	return nil
 }
 
-func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func (o *DestroyOptions) uninstallDBaaS() error {
+	cp := cloudprovider.Get()
+	if cp.Name() != cloudprovider.Local {
+		// remove playground cluster kubeconfig
+		if err := utils.RemoveConfig(ClusterName); err != nil {
+			return errors.Wrap(err, "Failed to remove playground kubeconfig file")
+		}
+		return cloudprovider.Get().Apply(true)
+	}
+
+	// local playground
+	if err := installer.Uninstall(); err != nil {
+		return err
+	}
+	utils.Info("Successfully uninstall dbaas.")
+	return nil
+}
+
+func newInstallCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	o := &InitOptions{
 		IOStreams: streams,
 	}
 
 	cmd := &cobra.Command{
-		Use:   "init",
+		Use:   "install",
 		Short: "Bootstrap a DBaaS",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete())
@@ -103,5 +131,21 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 
 	cmd.Flags().StringVar(&installer.KubeConfig, "kube-config", "config", "KubeConfig path")
 	cmd.Flags().BoolVar(&o.DryRun, "dry-run", false, "Dry run the playground init")
+	return cmd
+}
+
+func newUninstallCmd(streams genericclioptions.IOStreams) *cobra.Command {
+	o := &DestroyOptions{
+		IOStreams: streams,
+	}
+	cmd := &cobra.Command{
+		Use:   "uninstall",
+		Short: "Uninstall dbaas operator.",
+		Run: func(cmd *cobra.Command, args []string) {
+			if err := o.uninstallDBaaS(); err != nil {
+				utils.Errf("%v", err)
+			}
+		},
+	}
 	return cmd
 }

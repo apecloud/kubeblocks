@@ -83,3 +83,38 @@ func installCharts(in *Installer, wg *sync.WaitGroup) error {
 
 	return nil
 }
+
+// Uninstall remove dbaas
+func (in *Installer) Uninstall() error {
+
+	uninstall := func(cs []helm.InstallOpts) error {
+		ctx := context.Background()
+		for _, c := range cs {
+			opts := retry.Options{
+				MaxRetry: 1 + c.TryTimes,
+			}
+			if err := retry.IfNecessary(ctx, func() error {
+				if _, err := c.Uninstall(utils.ConfigPath(in.KubeConfig)); err != nil {
+					return err
+				}
+				return nil
+			}, &opts); err != nil {
+				return errors.Errorf("Uninstall chart %s error: %s", c.Name, err.Error())
+			}
+		}
+		return nil
+	}
+
+	utils.Info("Uninstalling dbaas...")
+	charts := []helm.InstallOpts{
+		{
+			Name: "opendbaas-core",
+		},
+	}
+	err := uninstall(charts)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

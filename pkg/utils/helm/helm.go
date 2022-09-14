@@ -194,6 +194,53 @@ func (i *InstallOpts) Install(cfg string) (*release.Release, error) {
 	return res, nil
 }
 
+// Uninstall will uninstall a Chart
+func (i *InstallOpts) Uninstall(cfg string) (*release.UninstallReleaseResponse, error) {
+	utils.InfoP(1, "Uninstall "+i.Chart+"...")
+	s := spinner.New(spinner.CharSets[rand.Intn(44)], 100*time.Millisecond)
+	if err := s.Color("green"); err != nil {
+		return nil, err
+	}
+	s.Start()
+	defer s.Stop()
+
+	settings := cli.New()
+	actionConfig, err := NewActionConfig(settings, i.Namespace, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	err = i.TryToLogin(actionConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	client := action.NewUninstall(actionConfig)
+	client.Wait = i.Wait
+	client.Timeout = time.Second * 300
+
+	// Create context and prepare the handle of SIGTERM
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+
+	// Set up channel on which to send signal notifications.
+	// We must use a buffered channel or risk missing the signal
+	// if we're not ready to receive when the signal is sent.
+	cSignal := make(chan os.Signal, 2)
+	signal.Notify(cSignal, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-cSignal
+		utils.Infof("Install has been cancelled.\n")
+		cancel()
+	}()
+
+	res, err := client.Run(i.Name)
+	if err != nil && err.Error() != "cannot re-use a name that is still in use" {
+		return nil, err
+	}
+	return res, nil
+}
+
 func (i *InstallOpts) TryToLogin(cfg *action.Configuration) error {
 	if i.LoginOpts == nil {
 		return nil

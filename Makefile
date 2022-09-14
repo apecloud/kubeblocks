@@ -394,6 +394,7 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 KUSTOMIZE_VERSION ?= v4.5.7
 CONTROLLER_TOOLS_VERSION ?= v0.9.0
 HELM_VERSION ?= v3.9.0
+CUE_VERSION ?= v0.4.3
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "$(GITHUB_PROXY)https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
@@ -478,7 +479,7 @@ cuetool: ## Download cue locally if necessary.
 ifeq (, $(shell which cue))
 	@{ \
 	set -e ;\
-	go install github.com/cue-lang/cue@latest ;\
+	go install github.com/cue-lang/cue@$(CUE_VERSION) ;\
 	}
 CUE=$(GOBIN)/cue
 else

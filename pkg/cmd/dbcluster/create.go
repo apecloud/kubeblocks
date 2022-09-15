@@ -3,7 +3,6 @@ package dbcluster
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/types"
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +39,7 @@ func NewCreateCmd(f cmdutil.Factory) *cobra.Command {
 		Use:   "create",
 		Short: "Create a database cluster",
 		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Complete(f, args))
 			cmdutil.CheckErr(o.Run())
 		},
@@ -54,9 +54,23 @@ func NewCreateCmd(f cmdutil.Factory) *cobra.Command {
 	return cmd
 }
 
-func (o *CreateOptions) Complete(f cmdutil.Factory, args []string) error {
+func (o *CreateOptions) Validate() error {
+	if len(o.FilePath) > 0 {
+		return nil
+	}
+	if len(o.Name) == 0 {
+		return fmt.Errorf("name can not be empty")
+	}
+	if len(o.ClusterDefRef) == 0 {
+		return fmt.Errorf("cluster-definition can not be empty")
+	}
+	if len(o.AppVersionRef) == 0 {
+		return fmt.Errorf("app-version can not be empty")
+	}
+	return nil
+}
 
-	o.BuilderArgs = append([]string{types.BackupJobSourceName}, args...)
+func (o *CreateOptions) Complete(f cmdutil.Factory, args []string) error {
 
 	// used to fetch the resource
 	config, err := f.ToRESTConfig()
@@ -122,10 +136,9 @@ spec:
 		}
 	}
 	gvr := schema.GroupVersionResource{Group: "dbaas.infracreate.com", Version: "v1alpha1", Resource: "clusters"}
-	obj, err := o.client.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), &clusterObj, metav1.CreateOptions{})
+	_, err := o.client.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), &clusterObj, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
-	fmt.Println(obj)
 	return nil
 }

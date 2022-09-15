@@ -35,6 +35,7 @@ func NewDbclusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		NewDescribeCmd(f, streams),
 		NewConnectCmd(f),
 		NewCreateCmd(f),
+		NewDeleteCmd(f),
 	)
 
 	return cmd

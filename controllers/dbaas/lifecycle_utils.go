@@ -149,6 +149,7 @@ func mergeComponents(
 		MinAvailable:    clusterDefComp.MinAvailable,
 		MaxAvailable:    clusterDefComp.MaxAvailable,
 		DefaultReplicas: clusterDefComp.DefaultReplicas,
+		Replicas:        clusterDefComp.DefaultReplicas,
 		AntiAffinity:    clusterDefComp.AntiAffinity,
 		ComponentType:   clusterDefComp.ComponentType,
 		ConsensusSpec:   clusterDefComp.ConsensusSpec,
@@ -225,13 +226,18 @@ func mergeComponents(
 	}
 	if clusterComp != nil {
 		component.Name = clusterComp.Name
+
+		// respect user's declaration
+		if clusterComp.Replicas > 0 {
+			component.Replicas = clusterComp.Replicas
+		}
+
 		if clusterComp.VolumeClaimTemplates != nil {
 			component.VolumeClaimTemplates = toK8sVolumeClaimTemplates(clusterComp.VolumeClaimTemplates)
 		}
 		if clusterComp.Resources.Requests != nil || clusterComp.Resources.Limits != nil {
 			component.PodSpec.Containers[0].Resources = clusterComp.Resources
 		}
-		component.RoleGroups = clusterComp.RoleGroups
 	}
 	if component.VolumeClaimTemplates == nil {
 		for i := range component.PodSpec.Containers {
@@ -241,43 +247,11 @@ func mergeComponents(
 	return component
 }
 
-func mergeRoleGroups(roleGroupTemplate *dbaasv1alpha1.RoleGroupTemplate, clusterRoleGroup *dbaasv1alpha1.ClusterRoleGroup) *RoleGroup {
-	if roleGroupTemplate == nil {
-		return nil
-	}
-	roleGroup := &RoleGroup{}
-	roleGroup.Type = roleGroupTemplate.TypeName
-	roleGroup.Scripts = roleGroupTemplate.Scripts
-	roleGroup.Replicas = roleGroupTemplate.DefaultReplicas
-	roleGroup.MaxAvailable = roleGroupTemplate.MaxAvailable
-	roleGroup.MinAvailable = roleGroupTemplate.MinAvailable
-	roleGroup.UpdateStrategy = roleGroupTemplate.UpdateStrategy
-	roleGroup.Name = roleGroupTemplate.TypeName
-	if clusterRoleGroup == nil || clusterRoleGroup.Type != roleGroupTemplate.TypeName {
-		return roleGroup
-	}
-	roleGroup.Name = clusterRoleGroup.Name
-	if clusterRoleGroup.Replicas >= 0 {
-		roleGroup.Replicas = clusterRoleGroup.Replicas
-	}
-	roleGroup.Service = clusterRoleGroup.Service
-	return roleGroup
-}
-
 func buildClusterCreationTasks(
 	clusterDefinition *dbaasv1alpha1.ClusterDefinition,
 	appVersion *dbaasv1alpha1.AppVersion,
 	cluster *dbaasv1alpha1.Cluster) (*intctrlutil.Task, error) {
 	rootTask := intctrlutil.NewTask()
-
-	orderedComponentNames := clusterDefinition.Spec.Cluster.Strategies.Create.Order
-	components := clusterDefinition.Spec.Components
-
-	if len(orderedComponentNames) == 0 {
-		for _, comp := range clusterDefinition.Spec.Components {
-			orderedComponentNames = append(orderedComponentNames, comp.TypeName)
-		}
-	}
 
 	applyObjs := make([]client.Object, 0, 3)
 	cacheCtx := map[string]interface{}{}
@@ -293,39 +267,28 @@ func buildClusterCreationTasks(
 	prepareSecretsTask.Context["exec"] = &params
 	rootTask.SubTasks = append(rootTask.SubTasks, prepareSecretsTask)
 
-	roleGroups := clusterDefinition.Spec.RoleGroupTemplates
-	buildTask := func(component *Component, orderedRoleGroupNames []string) {
+	buildTask := func(component *Component) {
 		componentTask := intctrlutil.NewTask()
-		for _, roleGroupName := range orderedRoleGroupNames {
-			roleGroupTemplate := getRoleGroupTemplateByType(roleGroups, roleGroupName)
-			clusterRoleGroup := getClusterRoleGroupByType(component.RoleGroups, roleGroupName)
-			roleGroup := mergeRoleGroups(roleGroupTemplate, clusterRoleGroup)
-			roleGroupTask := intctrlutil.NewTask()
-			roleGroupTask.ExecFunction = prepareRoleGroupObjs
-			iParams := params
-			iParams.component = component
-			iParams.roleGroup = roleGroup
-			roleGroupTask.Context["exec"] = &iParams
-			componentTask.SubTasks = append(componentTask.SubTasks, roleGroupTask)
-		}
+		componentTask.ExecFunction = prepareComponentObjs
+		iParams := params
+		iParams.component = component
+		componentTask.Context["exec"] = &iParams
 		rootTask.SubTasks = append(rootTask.SubTasks, componentTask)
 	}
 
+	components := clusterDefinition.Spec.Components
 	useDefaultComp := len(cluster.Spec.Components) == 0
-	for _, componentName := range orderedComponentNames {
+	for _, component := range components {
+		componentName := component.TypeName
 		clusterDefComponent := getClusterDefinitionComponentByType(components, componentName)
-		orderedRoleGroupNames := clusterDefComponent.Strategies.Create.Order
 		appVersionComponent := getAppVersionComponentByType(appVersion.Spec.Components, componentName)
-		if len(orderedRoleGroupNames) == 0 {
-			orderedRoleGroupNames = clusterDefComponent.RoleGroups
-		}
 
 		if useDefaultComp {
-			buildTask(mergeComponents(clusterDefinition, clusterDefComponent, appVersionComponent, nil), orderedRoleGroupNames)
+			buildTask(mergeComponents(clusterDefinition, clusterDefComponent, appVersionComponent, nil))
 		} else {
 			clusterComps := getClusterComponentsByType(cluster.Spec.Components, componentName)
 			for _, clusterComp := range clusterComps {
-				buildTask(mergeComponents(clusterDefinition, clusterDefComponent, appVersionComponent, clusterComp), orderedRoleGroupNames)
+				buildTask(mergeComponents(clusterDefinition, clusterDefComponent, appVersionComponent, clusterComp))
 			}
 		}
 	}
@@ -364,19 +327,20 @@ func prepareSecretObjs(ctx context.Context, cli client.Client, obj interface{}) 
 	return nil
 }
 
-func prepareRoleGroupObjs(ctx context.Context, cli client.Client, obj interface{}) error {
+// TODO handle componentType
+func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{}) error {
 	params, ok := obj.(*createParams)
 	if !ok {
 		return fmt.Errorf("invalid arg")
 	}
 
-	if params.component.IsStateless {
+	if params.component.ComponentType == dbaasv1alpha1.Stateless {
 		sts, err := buildDeploy(*params)
 		if err != nil {
 			return err
 		}
 		*params.applyObjs = append(*params.applyObjs, sts)
-	} else {
+	} else if params.component.ComponentType == dbaasv1alpha1.Stateful {
 		sts, err := buildSts(*params)
 		if err != nil {
 			return err
@@ -388,6 +352,12 @@ func prepareRoleGroupObjs(ctx context.Context, cli client.Client, obj interface{
 			return err
 		}
 		*params.applyObjs = append(*params.applyObjs, svcs...)
+	} else if params.component.ComponentType == dbaasv1alpha1.Consensus {
+		cs, err := buildConsensusSet(*params)
+		if err != nil {
+			return err
+		}
+		*params.applyObjs = append(*params.applyObjs, cs)
 	}
 
 	pdb, err := buildPDB(*params)
@@ -396,13 +366,13 @@ func prepareRoleGroupObjs(ctx context.Context, cli client.Client, obj interface{
 	}
 	*params.applyObjs = append(*params.applyObjs, pdb)
 
-	if params.roleGroup.Service.Ports != nil {
-		svc, err := buildSvc(*params)
-		if err != nil {
-			return err
-		}
-		*params.applyObjs = append(*params.applyObjs, svc)
-	}
+	//if params.roleGroup.Service.Ports != nil {
+	//	svc, err := buildSvc(*params)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	*params.applyObjs = append(*params.applyObjs, svc)
+	//}
 
 	return nil
 }
@@ -728,6 +698,11 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 	return &sts, nil
 }
 
+func buildConsensusSet(params createParams) (*appsv1.StatefulSet, error) {
+	// TODO finish me
+	return nil, nil
+}
+
 func buildDeploy(params createParams) (*appsv1.Deployment, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
@@ -754,14 +729,6 @@ func buildDeploy(params createParams) (*appsv1.Deployment, error) {
 		return nil, err
 	}
 	if err = cueValue.Fill("component", componentStrByte); err != nil {
-		return nil, err
-	}
-
-	roleGroupStrByte, err := json.Marshal(params.roleGroup)
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("roleGroup", roleGroupStrByte); err != nil {
 		return nil, err
 	}
 

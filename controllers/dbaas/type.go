@@ -45,6 +45,7 @@ type Component struct {
 	MinAvailable         int                                    `json:"minAvailable,omitempty"`
 	MaxAvailable         int                                    `json:"maxAvailable,omitempty"`
 	DefaultReplicas      int                                    `json:"defaultReplicas,omitempty"`
+	Replicas             int                                    `json:"replicas,omitempty"`
 	AntiAffinity         bool                                   `json:"antiAffinity,omitempty"`
 	ComponentType        dbaasv1alpha1.ComponentType            `json:"componentType,omitempty"`
 	ConsensusSpec        dbaasv1alpha1.ConsensusSpec            `json:"consensusSpec,omitempty"`

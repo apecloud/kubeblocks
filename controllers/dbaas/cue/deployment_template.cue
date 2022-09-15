@@ -9,12 +9,9 @@ component: {
 	clusterType:    string
 	type:           string
 	name:           string
+	replicas:				int
 	podSpec: containers: [...]
 	volumeClaimTemplates: [...]
-}
-roleGroup: {
-	name:     string
-	replicas: int
 }
 
 deployment: {
@@ -22,7 +19,7 @@ deployment: {
 	"kind":       "Deployment"
 	"metadata": {
 		namespace: cluster.metadata.namespace
-		name:      "\(cluster.metadata.name)-\(component.name)-\(roleGroup.name)"
+		name:      "\(cluster.metadata.name)-\(component.name)"
 		labels: {
 			"app.kubernetes.io/name":     "\(component.clusterType)-\(component.clusterDefName)"
 			"app.kubernetes.io/instance": cluster.metadata.name
@@ -32,11 +29,11 @@ deployment: {
 		}
 	}
 	"spec": {
-		replicas: roleGroup.replicas
+		replicas: component.replicas
 		selector: {
 			matchLabels: {
 				"app.kubernetes.io/name":      "\(component.clusterType)-\(component.clusterDefName)"
-				"app.kubernetes.io/instance":  "\(cluster.metadata.name)-\(component.name)-\(roleGroup.name)"
+				"app.kubernetes.io/instance":  "\(cluster.metadata.name)-\(component.name)"
 				"app.kubernetes.io/component": "\(component.type)-\(component.name)"
 			}
 		}
@@ -44,7 +41,7 @@ deployment: {
 			metadata:
 				labels: {
 					"app.kubernetes.io/name":      "\(component.clusterType)-\(component.clusterDefName)"
-					"app.kubernetes.io/instance":  "\(cluster.metadata.name)-\(component.name)-\(roleGroup.name)"
+					"app.kubernetes.io/instance":  "\(cluster.metadata.name)-\(component.name)"
 					"app.kubernetes.io/component": "\(component.type)-\(component.name)"
 					// "app.kubernetes.io/version" : # TODO
 				}

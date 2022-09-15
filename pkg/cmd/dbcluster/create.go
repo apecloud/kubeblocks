@@ -2,6 +2,7 @@ package dbcluster
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
@@ -16,10 +17,12 @@ import (
 )
 
 type CreateOptions struct {
-	Namespace     string
-	Name          string
-	ClusterDefRef string
-	AppVersionRef string
+	Namespace         string
+	Name              string
+	ClusterDefRef     string
+	AppVersionRef     string
+	TerminationPolicy string
+	Components        string
 
 	FilePath string
 
@@ -50,6 +53,8 @@ func NewCreateCmd(f cmdutil.Factory) *cobra.Command {
 	cmd.Flags().StringVar(&o.Namespace, "namespace", "default", "DBCluster namespace")
 	cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "ClusterDefinition reference")
 	cmd.Flags().StringVar(&o.AppVersionRef, "app-version", "", "AppVersion reference")
+	cmd.Flags().StringVar(&o.TerminationPolicy, "termination-policy", "Halt", "Termination policy")
+	cmd.Flags().StringVar(&o.Components, "components", "", "Components json string")
 
 	return cmd
 }
@@ -99,39 +104,22 @@ func (o *CreateOptions) Run() error {
 			return nil
 		}
 	} else {
-		clusterYamlByte := []byte(`
-apiVersion: dbaas.infracreate.com/v1alpha1
-kind: Cluster
-metadata:
-  name: mysql-cluster-01
-  namespace: default
-spec:
-  clusterDefinitionRef: mysql-cluster-definition
-  appVersionRef: appversion-mysql-latest
-  components:
-  - name: replicasets
-    type: replicasets
-    roleGroups:
-    - name: primary
-      type: primary
-      replicas: 3
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-    - name: log
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-`)
-		if err := yaml.Unmarshal(clusterYamlByte, &clusterObj); err != nil {
+		clusterJsonByte := []byte(fmt.Sprintf(`
+{
+  "apiVersion": "dbaas.infracreate.com/v1alpha1",
+  "kind": "Cluster",
+  "metadata": {
+    "name": "%s",
+    "namespace": "%s"
+  },
+  "spec": {
+    "clusterDefinitionRef": "%s",
+    "appVersionRef": "%s",
+    "components": %s
+  }
+}
+`, o.Name, o.Namespace, o.ClusterDefRef, o.AppVersionRef, o.Components))
+		if err := json.Unmarshal(clusterJsonByte, &clusterObj); err != nil {
 			return err
 		}
 	}

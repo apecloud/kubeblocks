@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	cuelang.org/go v0.4.3
+	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/briandowns/spinner v1.18.1
 	github.com/containers/common v0.49.1
 	github.com/docker/docker v20.10.17+incompatible
@@ -59,7 +60,6 @@ require (
 	github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1 // indirect
-	github.com/Masterminds/sprig/v3 v3.2.2 // indirect
 	github.com/Masterminds/squirrel v1.5.3 // indirect
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/Microsoft/hcsshim v0.9.3 // indirect

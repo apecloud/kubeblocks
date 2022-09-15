@@ -94,6 +94,32 @@ type ClusterDefinitionCluster struct {
 	Strategies ClusterDefinitionStrategies `json:"strategies,omitempty"`
 }
 
+// config template对于了container的mountPath
+// configTemplateRefs:
+// 	 - name: mysql-tree-node-template-8.0
+//     volumeName: config1
+//   - name: mysql-tree-node2
+//     volumeName: config2
+// for containner
+// volumeMounts:
+//   #将my.cnf configmap mount到pod的指定目录下，/data/config
+//   #在pod中，会存在file: /data/config/my.cnf.override
+//   #polardb-x在entrypoint的脚本会将my.cnf.override合并到/data/mysql/conf/my.cnf文件中
+//   - mountPath: /data/config
+//     name: config1
+//   - mountPath: /etc/config
+//	   name: config2
+
+type ConfigTemplate struct {
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=128
+	Name string `json:"name,omitempty"`
+
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=32
+	VolumeName string `json:"volumeName,omitempty"`
+}
+
 type ClusterDefinitionComponent struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
@@ -116,6 +142,10 @@ type ClusterDefinitionComponent struct {
 	// isStateless define this components
 	// +kubebuilder:default=false
 	IsStateless bool `json:"isStateless,omitempty"`
+
+	// config list
+	// +optional
+	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
 
 	// antiAffinity defines components should have anti-affinity constraint to same component type
 	// +kubebuilder:default=false

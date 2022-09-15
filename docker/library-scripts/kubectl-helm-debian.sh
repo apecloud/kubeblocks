@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+docker/#!/usr/bin/env bash
 
 # Copyright 2021 The Dapr Authors
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -157,7 +157,7 @@ echo "Downloading kubectl..."
 if [ "${KUBECTL_VERSION}" = "latest" ] || [ "${KUBECTL_VERSION}" = "lts" ] || [ "${KUBECTL_VERSION}" = "current" ] || [ "${KUBECTL_VERSION}" = "stable" ]; then
     KUBECTL_VERSION="$(curl -sSL https://dl.k8s.io/release/stable.txt)"
 else
-    find_version_from_git_tags KUBECTL_VERSION https://github.com/kubernetes/kubernetes
+    find_version_from_git_tags KUBECTL_VERSION ${GITHUB_PROXY}https://github.com/kubernetes/kubernetes
 fi
 if [ "${KUBECTL_VERSION::1}" != 'v' ]; then
     KUBECTL_VERSION="v${KUBECTL_VERSION}"
@@ -183,7 +183,7 @@ chown -R "${USERNAME}" "/home/${USERNAME}/.oh-my-zsh"
 
 # Install Helm, verify signature and checksum
 echo "Downloading Helm..."
-find_version_from_git_tags HELM_VERSION "https://github.com/helm/helm"
+find_version_from_git_tags HELM_VERSION "${GITHUB_PROXY}https://github.com/helm/helm"
 if [ "${HELM_VERSION::1}" != 'v' ]; then
     HELM_VERSION="v${HELM_VERSION}"
 fi
@@ -191,7 +191,7 @@ mkdir -p /tmp/helm
 helm_filename="helm-${HELM_VERSION}-linux-${architecture}.tar.gz"
 tmp_helm_filename="/tmp/helm/${helm_filename}"
 curl -sSL "https://get.helm.sh/${helm_filename}" -o "${tmp_helm_filename}"
-curl -sSL "https://github.com/helm/helm/releases/download/${HELM_VERSION}/${helm_filename}.asc" -o "${tmp_helm_filename}.asc"
+curl -sSL "${GITHUB_PROXY}https://github.com/helm/helm/releases/download/${HELM_VERSION}/${helm_filename}.asc" -o "${tmp_helm_filename}.asc"
 export GNUPGHOME="/tmp/helm/gnupg"
 mkdir -p "${GNUPGHOME}"
 chmod 700 ${GNUPGHOME}
@@ -207,7 +207,7 @@ if ! gpg --verify "${tmp_helm_filename}.asc" > ${GNUPGHOME}/verify.log 2>&1; the
 fi
 if [ "${HELM_SHA256}" = "automatic" ]; then
     curl -sSL "https://get.helm.sh/${helm_filename}.sha256" -o "${tmp_helm_filename}.sha256"
-    curl -sSL "https://github.com/helm/helm/releases/download/${HELM_VERSION}/${helm_filename}.sha256.asc" -o "${tmp_helm_filename}.sha256.asc"
+    curl -sSL "${GITHUB_PROXY}https://github.com/helm/helm/releases/download/${HELM_VERSION}/${helm_filename}.sha256.asc" -o "${tmp_helm_filename}.sha256.asc"
     if ! gpg --verify "${tmp_helm_filename}.sha256.asc" > /tmp/helm/gnupg/verify.log 2>&1; then
         echo "Verification failed!"
         cat /tmp/helm/gnupg/verify.log
@@ -231,7 +231,7 @@ if [ "${MINIKUBE_VERSION}" != "none" ]; then
     if [ "${MINIKUBE_VERSION}" = "latest" ] || [ "${MINIKUBE_VERSION}" = "lts" ] || [ "${MINIKUBE_VERSION}" = "current" ] || [ "${MINIKUBE_VERSION}" = "stable" ]; then
         MINIKUBE_VERSION="latest"
     else
-        find_version_from_git_tags MINIKUBE_VERSION https://github.com/kubernetes/minikube
+        find_version_from_git_tags MINIKUBE_VERSION ${GITHUB_PROXY}https://github.com/kubernetes/minikube
         if [ "${MINIKUBE_VERSION::1}" != "v" ]; then
             MINIKUBE_VERSION="v${MINIKUBE_VERSION}"
         fi

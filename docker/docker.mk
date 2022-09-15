@@ -11,66 +11,81 @@
 # limitations under the License.
 #
 
+# To use buildx: https://github.com/docker/buildx#docker-ce
+export DOCKER_CLI_EXPERIMENTAL=enabled
+
+DEBIAN_MIRROR=mirrors.aliyun.com
+
+
 # Docker image build and push setting
 DOCKER:=docker
 DOCKERFILE_DIR?=./docker
 
-
-# To use buildx: https://github.com/docker/buildx#docker-ce
-export DOCKER_CLI_EXPERIMENTAL=enabled
-
-# check the required environment variables
-check-docker-env:
-ifeq ($(DAPR_REGISTRY),)
-	$(error DAPR_REGISTRY environment variable must be set)
-endif
-ifeq ($(DAPR_TAG),)
-	$(error DAPR_TAG environment variable must be set)
-endif
-
-check-arch:
-ifeq ($(TARGET_OS),)
-	$(error TARGET_OS environment variable must be set)
-endif
-ifeq ($(TARGET_ARCH),)
-	$(error TARGET_ARCH environment variable must be set)
-endif
-
-
-################################################################################
-# Target: build-dev-container, push-dev-container                              #
-################################################################################
+# Image URL to use all building/pushing image targets
+IMG ?= docker.io/infracreate/$(APP_NAME)
+CLI_IMG ?= docker.io/infracreate/dbctl
+CLI_TAG ?= v$(CLI_VERSION)
 
 # Update whenever you upgrade dev container image
-DEV_CONTAINER_VERSION_TAG?=latest
+DEV_CONTAINER_VERSION_TAG ?= latest
+DEV_CONTAINER_IMAGE_NAME = docker.io/infracreate/$(APP_NAME)-dev
 
-# Use this to pin a specific version of the Dapr CLI to a devcontainer
-DEV_CONTAINER_CLI_TAG?=1.8.0
-
-# Dapr container image name
-DEV_CONTAINER_IMAGE_NAME= docker.io/infracreate/$(APP_NAME)-dev
-
-DEV_CONTAINER_DOCKERFILE=Dockerfile-dev
-DOCKERFILE_DIR=./docker
-
-check-docker-env-for-dev-container:
-ifeq ($(DAPR_REGISTRY),)
-	$(error DAPR_REGISTRY environment variable must be set)
-endif
+DEV_CONTAINER_DOCKERFILE = Dockerfile-dev
+DOCKERFILE_DIR = ./docker
 
 .PHONY: build-dev-container
-build-dev-container: ## Build dev docker container image.
+build-dev-container: DOCKER_BUILD_ARGS += --build-arg DEBIAN_MIRROR=$(DEBIAN_MIRROR) --build-arg GITHUB_PROXY=$(GITHUB_PROXY)
+build-dev-container: ## Build dev container image.
 ifneq ($(BUILDX_ENABLED), true)
-	docker build $(DOCKERFILE_DIR)/. -f $(DOCKERFILE_DIR)/${DEV_CONTAINER_DOCKERFILE} -t $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG)
+	docker build $(DOCKERFILE_DIR)/. $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/${DEV_CONTAINER_DOCKERFILE} -t $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG)
 else
 	docker buildx build $(DOCKERFILE_DIR)/. $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -f $(DOCKERFILE_DIR)/$(DEV_CONTAINER_DOCKERFILE) -t $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG)
 endif
 
 
 .PHONY: push-dev-container
-push-dev-container: ## Push dev docker container image.
+push-dev-container: ## Push dev container image.
 ifneq ($(BUILDX_ENABLED), true)
 	docker push $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG)
 else
 	docker buildx build $(DOCKERFILE_DIR)/. $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -f $(DOCKERFILE_DIR)/$(DEV_CONTAINER_DOCKERFILE) -t $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG) --push
+endif
+
+
+.PHONY: build-cli-container
+build-cli-container: clean-dbctl build-checks bin/dbctl.linux.amd64 bin/dbctl.linux.arm64 bin/dbctl.darwin.arm64 bin/dbctl.darwin.amd64 bin/dbctl.windows.amd64 ## Build dbctl CLI container image.
+	docker build $(DOCKERFILE_DIR)/. -t ${CLI_IMG}:${CLI_TAG} -f $(DOCKERFILE_DIR)/Dockerfile-dbctl
+
+.PHONY: push-cli-container
+push-cli-container: clean-dbctl build-checks bin/dbctl.linux.amd64 bin/dbctl.linux.arm64 bin/dbctl.darwin.arm64 bin/dbctl.darwin.amd64 bin/dbctl.windows.amd64 ## Push dbctl CLI container image.
+	docker push ${CLI_IMG}:${CLI_TAG}
+
+
+.PHONY: build-manager-container
+build-manager-container: test ## Build Operator manager container image.
+ifneq ($(BUILDX_ENABLED), true)
+	docker build . -t ${IMG}:${VERSION} -t ${IMG}:latest
+else
+ifeq ($(TAG_LATEST), true)
+	docker buildx build $(DOCKERFILE_DIR)/. $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest
+else
+	docker buildx build $(DOCKERFILE_DIR)/. $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION}
+endif
+endif
+
+
+.PHONY: push-manager-container
+push-manager-container: ## Push Operator manager container image.
+ifneq ($(BUILDX_ENABLED), true)
+ifeq ($(TAG_LATEST), true)
+	docker push ${IMG}:latest
+else
+	docker push ${IMG}:${VERSION}
+endif
+else
+ifeq ($(TAG_LATEST), true)
+	docker buildx build $(DOCKERFILE_DIR)/. $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest --push
+else
+	docker buildx build $(DOCKERFILE_DIR)/. $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} --push
+endif
 endif

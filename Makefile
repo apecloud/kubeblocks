@@ -11,11 +11,22 @@
 # limitations under the License.
 #
 
+################################################################################
+# Variables                                                                    #
+################################################################################
 
-export GONOPROXY=github.com/apecloud
-export GONOSUMDB=github.com/apecloud
-export GOPRIVATE=github.com/apecloud
-export GOPROXY=https://goproxy.cn
+export GO111MODULE ?= on
+# export GOPROXY ?= https://proxy.golang.org
+export GOPROXY ?= https://goproxy.cn
+export GOSUMDB ?= sum.golang.org
+export GONOPROXY ?= github.com/apecloud
+export GONOSUMDB ?= github.com/apecloud
+export GOPRIVATE ?= github.com/apecloud
+
+
+
+GIT_COMMIT  = $(shell git rev-list -1 HEAD)
+GIT_VERSION = $(shell git describe --always --abbrev=7 --dirty)
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
@@ -30,8 +41,7 @@ ENABLE_WEBHOOKS ?= false
 
 APP_NAME = kubeblock
 
-# Image URL to use all building/pushing image targets
-IMG ?= docker.io/infracreate/$(APP_NAME)
+
 VERSION ?= 0.1.0-alpha.4
 CHART_PATH = deploy/helm
 
@@ -174,7 +184,7 @@ mod-download: ## Run go mod download against go modules.
 
 .PHONY: mod-vendor
 mod-vendor: ## Run go mod tidy->vendor->verify against go modules.
-	$(GO) mod tidy -compat=1.18
+	$(GO) mod tidy -compat=1.19
 	$(GO) mod vendor
 	$(GO) mod verify
 
@@ -206,19 +216,23 @@ goimports: goimportstool ## Run goimports against code.
 
 
 ##@ CLI
-CLI_IMG ?= docker.io/infracreate/dbctl
-CLI_VERSION ?= 0.4.0
-CLI_TAG ?= v$(CLI_VERSION)
+ifdef REL_VERSION
+	CLI_VERSION := $(REL_VERSION)
+else
+	CLI_VERSION := edge
+	CLI_TAG := latest
+endif
 K3S_VERSION ?= v1.23.8+k3s1
 K3D_VERSION ?= 5.4.4
 K3S_IMG_TAG ?= $(subst +,-,$(K3S_VERSION))
 
 CLI_LD_FLAGS ="-s -w \
 	-X github.com/apecloud/kubeblocks/version.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` \
-	-X github.com/apecloud/kubeblocks/version.GitCommit=`git rev-parse HEAD` \
-	-X github.com/apecloud/kubeblocks/version.Version=${CLI_VERSION} \
-	-X github.com/apecloud/kubeblocks/version.K3sImageTag=${K3S_IMG_TAG} \
-	-X github.com/apecloud/kubeblocks/version.K3dVersion=${K3D_VERSION}"
+	-X github.com/apecloud/kubeblocks/version.GitCommit=$(GIT_COMMIT) \
+	-X github.com/apecloud/kubeblocks/version.GitVersion=$(GIT_VERSION) \
+	-X github.com/apecloud/kubeblocks/version.Version=$(CLI_VERSION) \
+	-X github.com/apecloud/kubeblocks/version.K3sImageTag=$(K3S_IMG_TAG) \
+	-X github.com/apecloud/kubeblocks/version.K3dVersion=$(K3D_VERSION)"
 
 
 
@@ -236,10 +250,6 @@ dbctl: build-checks ## Build bin/dbctl CLI.
 clean-dbctl: ## Clean bin/dbctl* CLI tools.
 	rm -f bin/dbctl*
 
-.PHONY: docker-build-cli
-docker-build-cli: clean-dbctl build-checks bin/dbctl.linux.amd64 bin/dbctl.linux.arm64 bin/dbctl.darwin.arm64 bin/dbctl.darwin.amd64 bin/dbctl.windows.amd64 ## Build docker image with the dbctl.
-	docker build . -t ${CLI_IMG}:${CLI_TAG} -f Dockerfile.dbctl
-	docker push ${CLI_IMG}:${CLI_TAG}
 
 
 ##@ Operator Controller Manager
@@ -274,34 +284,6 @@ run-delve: manifests generate fmt vet  ## Run Delve debugger.
 	dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./bin/manager
 
 
-.PHONY: docker-build
-docker-build: test ## Build docker image with the manager.
-ifneq ($(BUILDX_ENABLED), true)
-	docker build . -t ${IMG}:${VERSION} -t ${IMG}:latest
-else
-ifeq ($(TAG_LATEST), true)
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest
-else
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION}
-endif
-endif
-
-
-.PHONY: docker-push
-docker-push: ## Push docker image with the manager.
-ifneq ($(BUILDX_ENABLED), true)
-ifeq ($(TAG_LATEST), true)
-	docker push ${IMG}:latest
-else
-	docker push ${IMG}:${VERSION}
-endif
-else
-ifeq ($(TAG_LATEST), true)
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest --push
-else
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} --push
-endif
-endif
 
 
 ##@ Deployment
@@ -433,6 +415,7 @@ install-docker-buildx: ## Create `docker buildx` builder.
 	docker buildx create --platform linux/amd64,linux/arm64 --name x-builder --driver docker-container --use
 
 .PHONY: golangci
+golangci: GOLANGCILINT_VERSION = 1.49.0
 golangci: ## Download golangci-lint locally if necessary.
 ifneq ($(shell which golangci-lint),)
 	echo golangci-lint is already installed
@@ -518,5 +501,5 @@ brew-install-prerequisite: ## Use `brew install` to install required dependencie
 	brew install go kubebuilder delve golangci-lint staticcheck kustomize step cue
 
 
-##@ VS-Code devcontainer
+##@ Docker containers 
 include docker/docker.mk

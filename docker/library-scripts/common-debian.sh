@@ -1,23 +1,4 @@
 #!/usr/bin/env bash
-
-# Copyright 2021 The Dapr Authors
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#     http://www.apache.org/licenses/LICENSE-2.0
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-#
-# Initializes the devcontainer tasks each time the container starts.
-# Users can edit this copy under /usr/local/share in the container to
-# customize this as needed for their custom localhost bindings.
-
-# Source: https://github.com/microsoft/vscode-dev-containers/blob/v0.224.3/script-library/common-debian.sh
-
 #-------------------------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See https://go.microsoft.com/fwlink/?linkid=2090316 for license information.
@@ -39,6 +20,7 @@ INSTALL_OH_MYS=${6:-"true"}
 ADD_NON_FREE_PACKAGES=${7:-"false"}
 SCRIPT_DIR="$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)"
 MARKER_FILE="/usr/local/etc/vscode-dev-containers/common"
+# GITHUB_PROXY=${GITHUB_PROXY:-"https://github.91chi.fun/"}
 
 if [ "$(id -u)" -ne 0 ]; then
     echo -e 'Script must be run as root. Use sudo, su, or add "USER root" to your Dockerfile before running this script.'
@@ -94,7 +76,9 @@ apt_get_update_if_needed()
 # Replace Debian APT mirror sites.
 apt_switch_mirror_site()
 {
-    sed -i -E "s/(deb|1|security)\.debian\.org/$DEBIAN_MIRROR/g" /etc/apt/sources.list \
+    if [ ! -z "$DEBIAN_MIRROR" ]; then
+        sed -i -E "s/(deb|1|security)\.debian\.org/$DEBIAN_MIRROR/g" /etc/apt/sources.list
+    fi
 }
 
 # Run install apt-utils to avoid debconf warning then verify presence of other common developer tools and dependencies
@@ -128,7 +112,7 @@ if [ "${PACKAGES_ALREADY_INSTALLED}" != "true" ]; then
         libkrb5-3 \
         libgssapi-krb5-2 \
         libicu[0-9][0-9] \
-        liblttng-ust0 \
+        liblttng-ust[0-9] \
         libstdc++6 \
         zlib1g \
         locales \
@@ -232,7 +216,7 @@ else
     fi
 fi
 
-# Add add sudo support for non-root user
+# Add sudo support for non-root user
 if [ "${USERNAME}" != "root" ] && [ "${EXISTING_NON_ROOT_USER}" != "${USERNAME}" ]; then
     echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME
     chmod 0440 /etc/sudoers.d/$USERNAME
@@ -314,7 +298,7 @@ cat << 'EOF' > /usr/local/bin/systemctl
 #!/bin/sh
 set -e
 if [ -d "/run/systemd/system" ]; then
-    exec /bin/systemctl/systemctl "$@"
+    exec /bin/systemctl "$@"
 else
     echo '\n"systemd" is not running in this container due to its overhead.\nUse the "service" command to start services instead. e.g.: \n\nservice --status-all'
 fi
@@ -414,7 +398,7 @@ if [ "${INSTALL_ZSH}" = "true" ]; then
             -c fsck.zeroPaddedFilemode=ignore \
             -c fetch.fsck.zeroPaddedFilemode=ignore \
             -c receive.fsck.zeroPaddedFilemode=ignore \
-            "https://github.com/ohmyzsh/ohmyzsh" "${oh_my_install_dir}" 2>&1
+            "${GITHUB_PROXY}https://github.com/ohmyzsh/ohmyzsh" "${oh_my_install_dir}" 2>&1
         echo -e "$(cat "${template_path}")\nDISABLE_AUTO_UPDATE=true\nDISABLE_UPDATE_PROMPT=true" > ${user_rc_file}
         sed -i -e 's/ZSH_THEME=.*/ZSH_THEME="codespaces"/g' ${user_rc_file}
 

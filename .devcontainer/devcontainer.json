@@ -1,7 +1,9 @@
 {
 	"name": "Kubeblock Dev Environment",
 	// Update the container version when you publish dev-container
-	"image": "docker.io/infracreate/kubeblock-dev:latest",
+	// "image": "docker.io/infracreate/kubeblock-dev:latest", 
+	// Temporarily use DAPR container
+	"image": "ghcr.io/dapr/dapr-dev:0.1.8",
 	// Replace with uncommented line below to build your own local copy of the image
 	// "dockerFile": "../docker/Dockerfile-dev",
 	"containerEnv": {
@@ -39,7 +41,7 @@
 	// On Linux, this will prevent new files getting created as root, but you
 	// may need to update the USER_UID and USER_GID in docker/Dockerfile-dev
 	// to match your user if not 1000.
-	"remoteUser": "kubeblock",
+	// "remoteUser": "1000",
 	"runArgs": [
 		// Enable ptrace-based debugging for go
 		"--cap-add=SYS_PTRACE",

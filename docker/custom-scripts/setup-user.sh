@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 #
+# Copyright 2022 The Kubeblocks Authors
 # Copyright 2021 The Dapr Authors
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +15,7 @@
 #
 # Syntax: ./setup-user.sh [USERNAME] [SECURE_PATH_BASE]
 
-USERNAME=${1:-"dapr"}
+USERNAME=${1:-"vscode"}
 SECURE_PATH_BASE=${2:-$PATH}
 
 set -e

@@ -1,23 +1,4 @@
 #!/usr/bin/env bash
-
-# Copyright 2021 The Dapr Authors
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#     http://www.apache.org/licenses/LICENSE-2.0
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-#
-# Initializes the devcontainer tasks each time the container starts.
-# Users can edit this copy under /usr/local/share in the container to
-# customize this as needed for their custom localhost bindings.
-
-# Source: https://github.com/microsoft/vscode-dev-containers/blob/v0.224.3/script-library/go-debian.sh
-
 #-------------------------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See https://go.microsoft.com/fwlink/?linkid=2090316 for license information.
@@ -189,18 +170,26 @@ if [ "${TARGET_GO_VERSION}" != "none" ] && ! type go > /dev/null 2>&1; then
     set -e
     if [ "$exit_code" != "0" ]; then
         echo "(!) Download failed."
-        # Try one break fix version number less if we get a failure
+        # Try one break fix version number less if we get a failure. Use "set +e" since "set -e" can cause failures in valid scenarios.
+        set +e
         major="$(echo "${TARGET_GO_VERSION}" | grep -oE '^[0-9]+' || echo '')"
         minor="$(echo "${TARGET_GO_VERSION}" | grep -oP '^[0-9]+\.\K[0-9]+' || echo '')"
         breakfix="$(echo "${TARGET_GO_VERSION}" | grep -oP '^[0-9]+\.[0-9]+\.\K[0-9]+' 2>/dev/null || echo '')"
+        # Handle Go's odd version pattern where "0" releases omit the last part
         if [ "${breakfix}" = "" ] || [ "${breakfix}" = "0" ]; then
             ((minor=minor-1))
             TARGET_GO_VERSION="${major}.${minor}"
+            # Look for latest version from previous minor release
             find_version_from_git_tags TARGET_GO_VERSION "https://go.googlesource.com/go" "tags/go" "." "true"
         else 
             ((breakfix=breakfix-1))
-           TARGET_GO_VERSION="${major}.${minor}.${breakfix}"
+            if [ "${breakfix}" = "0" ]; then
+                TARGET_GO_VERSION="${major}.${minor}"
+            else 
+                TARGET_GO_VERSION="${major}.${minor}.${breakfix}"
+            fi
         fi
+        set -e
         echo "Trying ${TARGET_GO_VERSION}..."
         curl -fsSL -o /tmp/go.tar.gz "https://golang.org/dl/go${TARGET_GO_VERSION}.linux-${architecture}.tar.gz"
     fi
@@ -223,8 +212,7 @@ GO_TOOLS="\
     github.com/uudashr/gopkgs/v2/cmd/gopkgs@latest \
     github.com/ramya-rao-a/go-outline@latest \
     github.com/go-delve/delve/cmd/dlv@latest \
-    github.com/josharian/impl@latest \
-    github.com/fatih/gomodifytags@latest"
+    github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
 if [ "${INSTALL_GO_TOOLS}" = "true" ]; then
     echo "Installing common Go tools..."
     export PATH=${TARGET_GOROOT}/bin:${PATH}

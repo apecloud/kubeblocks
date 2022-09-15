@@ -189,7 +189,7 @@ else
     # Get the last version from the GitHub APIs
     docker_dash_compose_version=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r ".tag_name")
     echo "(*) Installing docker-compose ${docker_dash_compose_version}..."
-    curl -fsSL "https://github.com/docker/compose/releases/download/${docker_dash_compose_version}/docker-compose-linux-${target_compose_arch}" -o /usr/local/bin/docker-compose
+    curl -fsSL "${GITHUB_PROXY}https://github.com/docker/compose/releases/download/${docker_dash_compose_version}/docker-compose-linux-${target_compose_arch}" -o /usr/local/bin/docker-compose
     chmod +x /usr/local/bin/docker-compose
 fi
 ### Diff end

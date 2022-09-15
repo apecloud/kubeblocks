@@ -102,46 +102,24 @@ checkExistingDBCtl() {
 
 downloadFile() {
     LATEST_RELEASE_TAG=$1
-    DBCTL_CLI_ARTIFACT="${DBCTL_CLI_FILENAME}-${OS}-${ARCH}-${LATEST_RELEASE_TAG}.tar.gz"
 
     if [ "$LATEST_RELEASE_TAG" = "latest" ] ; then
-      tag_name=`gh_curl -s $GITHUB/repos/$REPO/releases/latest | jq ".tag_name"`
-      LATEST_RELEASE_TAG=`echo $tag_name | sed 's/\"//g'`
-      DBCTL_CLI_ARTIFACT="${DBCTL_CLI_FILENAME}-${OS}-${ARCH}-${LATEST_RELEASE_TAG}.tar.gz"
-      parser=".[0].assets | map(select(.name == \"$DBCTL_CLI_ARTIFACT\"))[0].id"
-    else
-      parser=". | map(select(.tag_name == \"$LATEST_RELEASE_TAG\"))[0].assets | map(select(.name == \"$DBCTL_CLI_ARTIFACT\"))[0].id"
+      LATEST_RELEASE_TAG=`gh_curl -s $GITHUB/repos/$REPO/releases/latest | grep '.tag_name'| awk -F: '{print $2}'| sed 's/,//g;s/\"//g;s/ //g'`
     fi;
 
-    asset_id=`gh_curl -s $GITHUB/repos/$REPO/releases | jq "$parser"`
-
-    if [ "$asset_id" = "null" ] || [ -z "$asset_id" ]; then
-      echo "ERROR: LATEST_RELEASE_TAG not found $LATEST_RELEASE_TAG"
-      exit 1
-    fi;
-
-    # convert `-` to `_` to let it work
-    DOWNLOAD_URL="${DOWNLOAD_BASE}/${LATEST_RELEASE_TAG}/${DBCTL_CLI_ARTIFACT}"
+    DBCTL_CLI_ARTIFACT="${DBCTL_CLI_FILENAME}-${OS}-${ARCH}-${LATEST_RELEASE_TAG}.tar.gz"
+    asset_id=`gh_curl -s $GITHUB/repos/$REPO/releases/tags/$LATEST_RELEASE_TAG | grep -B 2 "\"name\": \"$DBCTL_CLI_ARTIFACT\"" | grep -w id | awk -F: '{print $2}'| sed 's/,//g;s/\"//g;s/ //g'`
 
     # Create the temp directory
     DBCTL_TMP_ROOT=$(mktemp -dt dbctl-install-XXXXXX)
     ARTIFACT_TMP_FILE="$DBCTL_TMP_ROOT/$DBCTL_CLI_ARTIFACT"
-    # todo curl with token
-    echo "Downloading ..."
 
+    echo "Downloading ..."
     DOWNLOAD_ASSET_URL="https://$TOKEN:@api.github.com/repos/$REPO/releases/assets/$asset_id"
-    if [ "$DBCTL_HTTP_REQUEST_CLI" == "curl" ]; then
-      curl -SL -q --header 'Accept:application/octet-stream' \
-        "$DOWNLOAD_ASSET_URL" -o "$ARTIFACT_TMP_FILE"
-        # curl -SL "$DOWNLOAD_URL" -o "$ARTIFACT_TMP_FILE"
-    else
-      wget -q --auth-no-challenge --header='Accept:application/octet-stream' \
-        "$DOWNLOAD_ASSET_URL" -O "$ARTIFACT_TMP_FILE"
-        # wget -O "$ARTIFACT_TMP_FILE" "$DOWNLOAD_URL"
-    fi
+    curl -SL -q --header 'Accept:application/octet-stream' "$DOWNLOAD_ASSET_URL" -o "$ARTIFACT_TMP_FILE"
 
     if [ ! -f "$ARTIFACT_TMP_FILE" ]; then
-        echo "failed to download $DOWNLOAD_URL ..."
+        echo "failed to download $DBCTL_CLI_ARTIFACT ..."
         exit 1
     fi
 }

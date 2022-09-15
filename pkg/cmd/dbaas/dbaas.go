@@ -43,7 +43,7 @@ type InitOptions struct {
 	DryRun  bool
 }
 
-type DestroyOptions struct {
+type UninstallOptions struct {
 	genericclioptions.IOStreams
 	Engine   string
 	Provider string
@@ -96,7 +96,7 @@ func (o *InitOptions) Run() error {
 	return nil
 }
 
-func (o *DestroyOptions) uninstallDBaaS() error {
+func (o *UninstallOptions) Run() error {
 	cp := cloudprovider.Get()
 	if cp.Name() != cloudprovider.Local {
 		// remove playground cluster kubeconfig
@@ -135,16 +135,14 @@ func newInstallCmd(streams genericclioptions.IOStreams) *cobra.Command {
 }
 
 func newUninstallCmd(streams genericclioptions.IOStreams) *cobra.Command {
-	o := &DestroyOptions{
+	o := &UninstallOptions{
 		IOStreams: streams,
 	}
 	cmd := &cobra.Command{
 		Use:   "uninstall",
 		Short: "Uninstall dbaas operator.",
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := o.uninstallDBaaS(); err != nil {
-				utils.Errf("%v", err)
-			}
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 	return cmd

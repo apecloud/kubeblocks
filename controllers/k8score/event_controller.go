@@ -29,7 +29,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// EventReconciler reconciles a AppVersion object
+// EventReconciler reconciles an Event object
 type EventReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme

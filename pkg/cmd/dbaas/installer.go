@@ -2,19 +2,17 @@ package dbaas
 
 import (
 	"context"
+	"sync"
+	"time"
+
 	"github.com/apecloud/kubeblocks/pkg/utils"
 	"github.com/apecloud/kubeblocks/pkg/utils/helm"
 	"github.com/containers/common/pkg/retry"
-	config "github.com/k3d-io/k3d/v5/pkg/config/v1alpha4"
 	"github.com/pkg/errors"
-	"sync"
-	"time"
 )
 
 // Installer will handle the playground cluster creation and management
 type Installer struct {
-	cfg config.ClusterConfig
-
 	Ctx         context.Context
 	Namespace   string
 	KubeConfig  string

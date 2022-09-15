@@ -174,7 +174,7 @@ func (i *InstallOpts) Install(cfg string) (*release.Release, error) {
 
 	// Create context and prepare the handle of SIGTERM
 	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
+	_, cancel := context.WithCancel(ctx)
 
 	// Set up channel on which to send signal notifications.
 	// We must use a buffered channel or risk missing the signal
@@ -221,7 +221,7 @@ func (i *InstallOpts) Uninstall(cfg string) (*release.UninstallReleaseResponse, 
 
 	// Create context and prepare the handle of SIGTERM
 	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
+	_, cancel := context.WithCancel(ctx)
 
 	// Set up channel on which to send signal notifications.
 	// We must use a buffered channel or risk missing the signal

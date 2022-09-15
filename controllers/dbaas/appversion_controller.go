@@ -64,7 +64,7 @@ func appVersionUpdateHandler(cli client.Client, ctx context.Context, clusterDef 
 			}
 			item.Status.ClusterDefSyncStatus = dbaasv1alpha1.OutOfSyncStatus
 			if len(notFoundComponentTypes) > 0 || len(noContainersComponents) > 0 {
-				item.Status.Phase = dbaasv1alpha1.UnAvailablePhase
+				item.Status.Phase = dbaasv1alpha1.UnavailablePhase
 			} else {
 				item.Status.Phase = dbaasv1alpha1.AvailablePhase
 				item.Status.Message = ""
@@ -119,7 +119,7 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return r.Client.Status().Patch(ctx, appVersion, patch)
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, appVersion,
-			AppVersionLabelKey, statusHandler, &dbaasv1alpha1.ClusterList{}); res != nil || err != nil {
+			appVersionLabelKey, statusHandler, &dbaasv1alpha1.ClusterList{}); res != nil || err != nil {
 			return res, err
 		}
 		return nil, r.deleteExternalResources(reqCtx, appVersion)

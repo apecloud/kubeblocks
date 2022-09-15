@@ -175,7 +175,7 @@ func (o *ListOptions) Run() error {
 
 func buildBackupJobInfo(obj *unstructured.Unstructured, info *types.BackupJobInfo) {
 	for k, v := range obj.GetLabels() {
-		info.Labels = info.Labels + fmt.Sprintf("%s:%s ", k, v)
+		info.Labels += fmt.Sprintf("%s:%s ", k, v)
 	}
 	if obj.Object["status"] == nil {
 		return

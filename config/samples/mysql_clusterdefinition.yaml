@@ -9,29 +9,30 @@ spec:
     roleGroups:
     - primary
     defaultReplicas: 1
-    containers:
-    - name: mysql
-      imagePullPolicy: IfNotPresent
-      ports:
-      - containerPort: 3306
-        protocol: TCP
-        name: mysql
-      - containerPort: 13306
-        protocol: TCP
-        name: paxos
-      volumeMounts:
-        - mountPath: /data
-          name: data
-        - mountPath: /log
-          name: log
-      env:
-        - name: "MYSQL_ROOT_PASSWORD"
-          valueFrom:
-            secretKeyRef:
-              name: $(OPENDBAAS_MY_SECRET_NAME)
-              key: password
-      command: ["/usr/bin/bash", "-c"]
-      args:
+    podSpec:
+      containers:
+      - name: mysql
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3306
+          protocol: TCP
+          name: mysql
+        - containerPort: 13306
+          protocol: TCP
+          name: paxos
+        volumeMounts:
+          - mountPath: /data
+            name: data
+          - mountPath: /log
+            name: log
+        env:
+          - name: "MYSQL_ROOT_PASSWORD"
+            valueFrom:
+              secretKeyRef:
+                name: $(OPENDBAAS_MY_SECRET_NAME)
+                key: password
+        command: ["/usr/bin/bash", "-c"]
+        args:
         - >
           cluster_info="";
           for (( i=0; i<$OPENDBAAS_REPLICASETS_PRIMARY_N; i++ )); do

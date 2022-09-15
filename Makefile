@@ -86,8 +86,6 @@ endif
 
 
 .DEFAULT_GOAL := help
-.PHONY: all
-all: manager dbctl
 
 ##@ General
 
@@ -106,6 +104,9 @@ all: manager dbctl
 .PHONY: help
 help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+
+.PHONY: all
+all: manager dbctl ## Make all cmd binaries.
 
 ##@ Development
 
@@ -135,8 +136,8 @@ cue-vet: cuetool ## Run cue vet against code.
 	$(CUE) vet controllers/dbaas/cue/*.cue
 
 .PHONY: fast-lint
-fast-lint: # [INTERNAL] fast lint
-	$(GOLANGCILINT) run ./... --timeout=5m
+fast-lint: staticchecktool  # [INTERNAL] fast lint
+	$(GOLANGCILINT) run ./...
 
 .PHONY: lint
 lint: generate ## Run golangci-lint against code.
@@ -145,6 +146,10 @@ lint: generate ## Run golangci-lint against code.
 .PHONY: staticcheck
 staticcheck: staticchecktool ## Run staticcheck against code. 
 	$(STATICCHECK) ./...
+
+.PHONY: loggercheck
+loggercheck: loggerchecktool ## Run loggercheck against code.
+	$(LOGGERCHECK) ./...
 
 .PHONY: build-checks
 build-checks: generate fmt vet goimports fast-lint ## Run build checks.
@@ -174,6 +179,11 @@ test-webhook-enabled: ## Run tests with webhooks enabled.
 .PHONY: cover-report
 cover-report: ## Generate cover.html from cover.out
 	$(GO) tool cover -html=cover.out -o cover.html
+ifeq ($(GOOS), darwin)
+	open ./cover.html
+else
+	echo "open cover.html with a HTML viewer."
+endif
 
 
 .PHONY: goimports
@@ -385,6 +395,7 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 KUSTOMIZE_VERSION ?= v4.5.7
 CONTROLLER_TOOLS_VERSION ?= v0.9.0
 HELM_VERSION ?= v3.9.0
+CUE_VERSION ?= v0.4.3
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "$(GITHUB_PROXY)https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
@@ -430,12 +441,26 @@ staticchecktool: ## Download staticcheck locally if necessary.
 ifeq (, $(shell which staticcheck))
 	@{ \
 	set -e ;\
-	echo 'installing honnef.co/go/tools/cmd/staticcheck ' ;\
-	go install honnef.co/go/tools/cmd/staticcheck@v0.3.2 ;\
+	echo 'installing honnef.co/go/tools/cmd/staticcheck' ;\
+	go install honnef.co/go/tools/cmd/staticcheck@latest;\
 	}
 STATICCHECK=$(GOBIN)/staticcheck
 else
 STATICCHECK=$(shell which staticcheck)
+endif
+
+
+.PHONY: loggerchecktool
+loggerchecktool: ## Download loggercheck locally if necessary.
+ifeq (, $(shell which loggercheck))
+	@{ \
+	set -e ;\
+	echo 'installing github.com/timonwong/loggercheck/cmd/loggercheck' ;\
+	go install github.com/timonwong/loggercheck/cmd/loggercheck@latest;\
+	}
+LOGGERCHECK=$(GOBIN)/loggercheck
+else
+LOGGERCHECK=$(shell which loggercheck)
 endif
 
 .PHONY: goimportstool
@@ -455,7 +480,7 @@ cuetool: ## Download cue locally if necessary.
 ifeq (, $(shell which cue))
 	@{ \
 	set -e ;\
-	go install github.com/cue-lang/cue@latest ;\
+	go install cuelang.org/go/cmd/cue@$(CUE_VERSION) ;\
 	}
 CUE=$(GOBIN)/cue
 else
@@ -476,5 +501,4 @@ endif
 
 .PHONY: brew-install-prerequisite
 brew-install-prerequisite: ## Use `brew install` to install required dependencies. 
-	brew install docker --cask
-	brew install k3d go kubebuilder delve golangci-lint staticcheck kustomize step cue
+	brew install go@1.18 kubebuilder delve golangci-lint staticcheck kustomize step cue

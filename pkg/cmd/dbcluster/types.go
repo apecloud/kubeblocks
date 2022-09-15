@@ -89,7 +89,7 @@ func (o *commandOptions) run(dbClusterHandler func(*types.DBClusterInfo), postHa
 	ul.SetGroupVersionKind(getClusterGVK())
 
 	// TODO: need to apply  MatchingLabels
-	//ml := ctrlcli.MatchingLabels()
+	// ml := ctrlcli.MatchingLabels()
 	if err := o.client.List(ctx, ul); err != nil {
 		return err
 	}

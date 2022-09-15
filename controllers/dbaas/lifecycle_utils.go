@@ -545,10 +545,10 @@ func buildHeadlessSvcs(params createParams, sts *appsv1.StatefulSet) ([]client.O
 		pod.ObjectMeta.Name = fmt.Sprintf("%s-%d", sts.GetName(), i)
 		pod.ObjectMeta.Namespace = sts.Namespace
 		pod.ObjectMeta.Labels = map[string]string{
-			"statefulset.kubernetes.io/pod-name": pod.ObjectMeta.Name,
-			"app.kubernetes.io/name":             stsPodLabels["app.kubernetes.io/name"],
-			"app.kubernetes.io/instance":         stsPodLabels["app.kubernetes.io/instance"],
-			"app.kubernetes.io/component":        stsPodLabels["app.kubernetes.io/name"],
+			statefulSetPodNameLabelKey: pod.ObjectMeta.Name,
+			appNameLabelKey:            stsPodLabels[appNameLabelKey],
+			appInstanceLabelKey:        stsPodLabels[appInstanceLabelKey],
+			appComponentLabelKey:       stsPodLabels[appNameLabelKey],
 		}
 		pod.Spec.Containers = sts.Spec.Template.Spec.Containers
 

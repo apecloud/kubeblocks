@@ -18,6 +18,7 @@ testbin/*
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+cover.html
 .coverage/
 
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736

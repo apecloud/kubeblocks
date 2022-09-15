@@ -162,7 +162,7 @@ type ClusterRoleGroup struct {
 }
 
 type ClusterStatusComponent struct {
-	Id         string                   `json:"id,omitempty"`
+	ID         string                   `json:"id,omitempty"`
 	Type       string                   `json:"type,omitempty"`
 	Phase      string                   `json:"phase,omitempty"`
 	Message    string                   `json:"message,omitempty"`
@@ -170,7 +170,7 @@ type ClusterStatusComponent struct {
 }
 
 type ClusterStatusRoleGroup struct {
-	Id          string `json:"id,omitempty"`
+	ID          string `json:"id,omitempty"`
 	Type        string `json:"type,omitempty"`
 	RefWorkload string `json:"refWorkload,omitempty"`
 }

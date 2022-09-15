@@ -366,14 +366,6 @@ func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{
 	}
 	*params.applyObjs = append(*params.applyObjs, pdb)
 
-	//if params.roleGroup.Service.Ports != nil {
-	//	svc, err := buildSvc(*params)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	*params.applyObjs = append(*params.applyObjs, svc)
-	//}
-
 	return nil
 }
 
@@ -539,14 +531,6 @@ func buildSvc(params createParams) (*corev1.Service, error) {
 		return nil, err
 	}
 
-	roleGroupStrByte, err := json.Marshal(params.roleGroup)
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("roleGroup", roleGroupStrByte); err != nil {
-		return nil, err
-	}
-
 	svcStrByte, err := cueValue.Lookup("service")
 	if err != nil {
 		return nil, err
@@ -644,14 +628,6 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 		return nil, err
 	}
 
-	roleGroupStrByte, err := json.Marshal(params.roleGroup)
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("roleGroup", roleGroupStrByte); err != nil {
-		return nil, err
-	}
-
 	stsStrByte, err := cueValue.Lookup("statefulset")
 	if err != nil {
 		return nil, err
@@ -668,7 +644,7 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 		return nil, err
 	}
 
-	prefix := dbaasPrefix + "_" + strings.ToUpper(params.component.Type) + "_" + strings.ToUpper(params.roleGroup.Name) + "_"
+	prefix := dbaasPrefix + "_" + strings.ToUpper(params.component.Type) + "_" + strings.ToUpper(params.component.Name) + "_"
 	replicas := int(*sts.Spec.Replicas)
 	for i := range sts.Spec.Template.Spec.Containers {
 		// inject self scope env
@@ -700,6 +676,13 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 
 func buildConsensusSet(params createParams) (*appsv1.StatefulSet, error) {
 	// TODO finish me
+	//if params.roleGroup.Service.Ports != nil {
+	//	svc, err := buildSvc(*params)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	*params.applyObjs = append(*params.applyObjs, svc)
+	//}
 	return nil, nil
 }
 
@@ -818,14 +801,6 @@ func buildPDB(params createParams) (*policyv1.PodDisruptionBudget, error) {
 		return nil, err
 	}
 	if err = cueValue.Fill("component", componentStrByte); err != nil {
-		return nil, err
-	}
-
-	roleGroupStrByte, err := json.Marshal(params.roleGroup)
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("roleGroup", roleGroupStrByte); err != nil {
 		return nil, err
 	}
 

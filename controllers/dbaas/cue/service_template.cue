@@ -9,24 +9,20 @@ component: {
 	clusterType:    string
 	type:           string
 	name:           string
-	podSpec: containers: [...]
-	volumeClaimTemplates: [...]
-}
-roleGroup: {
-	name:     string
-	type:     string
-	replicas: int
 	service: {
 		ports: [...]
 		type: string
 	}
+	podSpec: containers: [...]
+	volumeClaimTemplates: [...]
 }
+
 service: {
 	"apiVersion": "v1"
 	"kind":       "Service"
 	"metadata": {
 		namespace: cluster.metadata.namespace
-		name:      "\(cluster.metadata.name)-\(component.name)-\(roleGroup.name)"
+		name:      "\(cluster.metadata.name)-\(component.name)"
 		labels: {
 			"app.kubernetes.io/name":     "\(component.clusterType)-\(component.clusterDefName)"
 			"app.kubernetes.io/instance": cluster.metadata.name
@@ -40,7 +36,7 @@ service: {
 			"app.kubernetes.io/instance":  cluster.metadata.name
 			"app.kubernetes.io/component": "\(component.type)-\(component.name)"
 		}
-		ports: roleGroup.service.ports
-		type:  roleGroup.service.type
+		ports: component.service.ports
+		type:  component.service.type
 	}
 }

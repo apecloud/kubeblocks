@@ -140,6 +140,7 @@ type ClusterComponent struct {
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
 	// +optional
 	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
+	// TODO free6om: should remove ServiceType or put Service here instead
 }
 
 type ClusterStatusComponent struct {

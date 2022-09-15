@@ -25,6 +25,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"strings"
 )
 
 // log is for logging in this package.
@@ -97,9 +98,64 @@ func (r *ClusterDefinition) validate() error {
 }
 
 // ValidateComponents validate spec.components is legal
-func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) map[string]struct{} {
-	// TODO validate Consensus ComponentType
-	return nil
+func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
+	//TODO typeName duplication validate
+
+	for _, component := range r.Spec.Components {
+		if component.ComponentType != Consensus {
+			continue
+		}
+
+		// if consensus
+		consensusSpec := component.ConsensusSpec
+
+		// roleObserveQuery and Leader are required
+		if strings.TrimSpace(consensusSpec.Leader.Name) == "" {
+			*allErrs = append(*allErrs,
+				field.Required(field.NewPath("spec.components[*].consensusSpec.leader.name"),
+					"leader name can't be blank when componentType is Consensus"))
+		}
+
+		// Leader.Replicas should not present or should set to 1
+		if consensusSpec.Leader.Replicas != 0 && consensusSpec.Leader.Replicas != 1 {
+			*allErrs = append(*allErrs,
+				field.Invalid(field.NewPath("spec.components[*].consensusSpec.leader.replicas"),
+					consensusSpec.Leader.Replicas,
+					"leader replicas can only be 1"))
+		}
+
+		// Leader.replicas + Follower.replicas should be odd
+		candidates := 1
+		for _, member := range consensusSpec.Followers {
+			candidates += member.Replicas
+		}
+		if candidates%2 == 0 {
+			*allErrs = append(*allErrs,
+				field.Invalid(field.NewPath("spec.components[*].consensusSpec.candidates(leader.replicas+followers[*].replicas)"),
+					candidates,
+					"candidates(leader+followers) should be odd"))
+		}
+		// if component.replicas is 1, then only Leader should be present. just omit if present
+
+		// if Followers.Replicas present, Leader.Replicas(that is 1) + Followers.Replicas + Learner.Replicas should equal to component.defaultReplicas
+		isFollowerPresent := false
+		memberCount := 1
+		for _, member := range consensusSpec.Followers {
+			if member.Replicas > 0 {
+				isFollowerPresent = true
+				memberCount += member.Replicas
+			}
+		}
+		if isFollowerPresent {
+			memberCount += consensusSpec.Learner.Replicas
+			if memberCount != component.DefaultReplicas {
+				*allErrs = append(*allErrs,
+					field.Invalid(field.NewPath("spec.components[*].consensusSpec.defaultReplicas"),
+						component.DefaultReplicas,
+						"#(members) should be equal to defaultReplicas"))
+			}
+		}
+	}
 }
 
 func (r *ClusterDefinition) getInvalidElementsInArray(m map[string]struct{}, arr []string) []string {

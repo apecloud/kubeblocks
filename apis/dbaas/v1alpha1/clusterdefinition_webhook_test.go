@@ -26,7 +26,8 @@ import (
 
 var _ = Describe("clusterDefinition webhook", func() {
 	var (
-		clusterDefinitionName = "clusterdefinition-webhook-mysql-definition"
+		clusterDefinitionName  = "clusterdefinition-webhook-mysql-definition"
+		clusterDefinitionName2 = "clusterdefinition-webhook-mysql-definition2"
 	)
 	Context("When clusterDefinition create and update", func() {
 		It("Should webhook validate passed", func() {
@@ -35,10 +36,32 @@ var _ = Describe("clusterDefinition webhook", func() {
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
 			Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
 
-			By("By update a  clusterDefinition")
-			Expect(k8sClient.Update(ctx, clusterDef)).ShouldNot(Succeed())
+			By("By creating a new clusterDefinition with componentType==Consensus but consensusSpec not present")
+			clusterDef, _ = createTestClusterDefinitionObj2(clusterDefinitionName2)
+			Expect(k8sClient.Create(ctx, clusterDef)).ShouldNot(Succeed())
 
-			//TODO test ConsensusType
+			By("Set Leader.Replicas > 1")
+			clusterDef.Spec.Components[0].ConsensusSpec.Learner.Replicas = 2
+			Expect(k8sClient.Create(ctx, clusterDef)).ShouldNot(Succeed())
+			// restore clusterDef
+			clusterDef.Spec.Components[0].ConsensusSpec.Learner.Replicas = 0
+
+			By("Set Followers.Replicas to odd")
+			followers := make([]ConsensusMember, 1)
+			followers[0] = ConsensusMember{Name: "follower", AccessMode: "Readonly", Replicas: 3}
+			clusterDef.Spec.Components[0].ConsensusSpec.Followers = followers
+			Expect(k8sClient.Create(ctx, clusterDef)).ShouldNot(Succeed())
+
+			By("Set Followers.Replicas to 2, component.defaultReplicas to 4, " +
+				"which means Leader.Replicas(1) + Followers.Replicas(2) + Learner.Replicas(0) != component.defaultReplicas")
+			followers[0].Replicas = 2
+			clusterDef.Spec.Components[0].DefaultReplicas = 4
+			Expect(k8sClient.Create(ctx, clusterDef)).ShouldNot(Succeed())
+
+			By("Set a 5 nodes cluster with 1 leader, 2 followers and 2 learners")
+			clusterDef.Spec.Components[0].DefaultReplicas = 5
+			clusterDef.Spec.Components[0].ConsensusSpec.Learner = ConsensusMember{Name: "learner", AccessMode: None, Replicas: 2}
+			Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
 
 		})
 	})
@@ -53,25 +76,29 @@ metadata:
   name:     %s
 spec:
   type: state.mysql-8
-  cluster:
-    strategies:
-      create:
-        order: [replicaSets,proxy]
   components:
   - typeName: replicaSets
-    roleGroups:
-    - primary
-    - follower
-    strategies:
-      create:
-        order: [primary,follower]
+    componentType: Stateful
   - typeName: proxy
-   
-  roleGroupTemplates:
-  - typeName: primary
-    defaultReplicas: 1
-  - typeName: follower
-    defaultReplicas: 2`, name)
+`, name)
+	clusterDefinition := &ClusterDefinition{}
+	err := yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)
+	return clusterDefinition, err
+}
+
+// createTestClusterDefinitionObj2 create an invalid obj
+func createTestClusterDefinitionObj2(name string) (*ClusterDefinition, error) {
+	clusterDefYaml := fmt.Sprintf(`
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind:       ClusterDefinition
+metadata:
+  name:     %s
+spec:
+  type: state.mysql-8
+  components:
+  - typeName: mysql-rafted
+    componentType: Consensus
+`, name)
 	clusterDefinition := &ClusterDefinition{}
 	err := yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)
 	return clusterDefinition, err

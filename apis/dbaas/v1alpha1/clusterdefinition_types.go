@@ -122,12 +122,13 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Scripts ClusterDefinitionScripts `json:"scripts,omitempty"`
 
-	// componentType defines type of the component
+	// ComponentType defines type of the component
 	// +kubebuilder:validation:Required
-	// +kubebuilder:default=stateless
+	// +kubebuilder:default=Stateless
+	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus}
 	ComponentType ComponentType `json:"componentType,omitempty"`
 
-	// consensusSpec defines consensus related spec if componentType is Consensus
+	// ConsensusSpec defines consensus related spec if componentType is Consensus
 	// CAN'T be empty if componentType is Consensus
 	// +optional
 	ConsensusSpec ConsensusSpec `json:"consensusSpec,omitempty"`
@@ -136,73 +137,76 @@ type ClusterDefinitionComponent struct {
 type ComponentType string
 
 const (
-	Stateless ComponentType = "stateless"
-	Stateful  ComponentType = "stateful"
-	Consensus ComponentType = "consensus"
+	Stateless ComponentType = "Stateless"
+	Stateful  ComponentType = "Stateful"
+	Consensus ComponentType = "Consensus"
 )
 
 type ConsensusSpec struct {
-	// roleObserveQuery, role observing query
+	// RoleObserveQuery, role observing query
 	// return a role name which should be one of Leader.Name、Followers[*].Name or Learner.Name
 	// +kubebuilder:validation:Required
 	RoleObserveQuery string `json:"roleObserveQuery,omitempty"`
 
-	// leader, one single leader
+	// Leader, one single leader
 	// +kubebuilder:validation:Required
 	Leader ConsensusMember `json:"leader,omitempty"`
 
-	// followers, has voting right but not Leader
-	// +kubebuilder:validation:Required
+	// Followers, has voting right but not Leader
+	// +optional
 	Followers []ConsensusMember `json:"followers,omitempty"`
 
-	//learner, no voting right
+	//Learner, no voting right
 	// +optional
 	Learner ConsensusMember `json:"learner,omitempty"`
 
-	// updateStrategy, Pods update strategy
+	// UpdateStrategy, Pods update strategy
 	// options: serial, bestEffortParallel, parallel
 	// serial: update Pods one by one that guarantee minimum component unavailable time
 	// 		Learner -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader
 	// bestEffortParallel: update Pods in parallel that guarantee minimum component un-writable time
 	//		Learner, Follower(minority) in parallel -> Follower(majority) -> Leader, keep majority online all the time
 	// parallel: force parallel
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=serial
+	// +kubebuilder:default=Serial
+	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
+	// +optional
 	UpdateStrategy ComponentUpdateStrategy `json:"updateStrategy,omitempty"`
 }
 
 type ConsensusMember struct {
-	// name, role name
+	// Name, role name
 	// +kubebuilder:validation:Required
 	Name string `json:"name,omitempty"`
 
-	// accessMode, what service this member capable for
+	// AccessMode, what service this member capable for
 	// +kubebuilder:validation:Required
-	// +kubebuilder:default=none
+	// +kubebuilder:default=None
+	// +kubebuilder:validation:Enum={None, Readonly, ReadWrite}
 	AccessMode AccessMode `json:"accessMode,omitempty"`
 
-	// replicas, number of Pods of this role
+	// Replicas, number of Pods of this role
 	// default 1 for Leader
 	// default 0 for Learner
 	// default Components[*].Replicas - Leader.Replicas - Learner.Replicas for Followers
 	// +kubebuilder:default=0
+	// +kubebuilder:validation:Minimum=0
 	Replicas int `json:"replicas,omitempty"`
 }
 
 type AccessMode string
 
 const (
-	ReadWrite AccessMode = "readWrite"
-	Readonly  AccessMode = "readonly"
-	None      AccessMode = "none"
+	ReadWrite AccessMode = "ReadWrite"
+	Readonly  AccessMode = "Readonly"
+	None      AccessMode = "None"
 )
 
 type ComponentUpdateStrategy string
 
 const (
-	Serial             ComponentUpdateStrategy = "serial"
-	BestEffortParallel ComponentUpdateStrategy = "bestEffortParallel"
-	Parallel           ComponentUpdateStrategy = "parallel"
+	Serial             ComponentUpdateStrategy = "Serial"
+	BestEffortParallel ComponentUpdateStrategy = "BestEffortParallel"
+	Parallel           ComponentUpdateStrategy = "Parallel"
 )
 
 type ClusterDefinitionScripts struct {

@@ -128,10 +128,10 @@ var _ = Describe("tpl template", func() {
 
 		container2 := container.DeepCopy()
 		container2.Name = "mysql2"
-		container2.VolumeMounts[1].Name = container2.VolumeMounts[1].Name + "123"
+		container2.VolumeMounts[1].Name += "_not_found"
 		container3 := container.DeepCopy()
 		container3.Name = "mysql3"
-		container3.VolumeMounts[0].Name = container3.VolumeMounts[0].Name + "123"
+		container3.VolumeMounts[0].Name += "_not_found"
 
 		statefulSet.Spec.Template.Spec.Containers = []v1.Container{
 			*container2, *container3, container}
@@ -143,8 +143,8 @@ var _ = Describe("tpl template", func() {
 		initContainer2.Name = "init_mysql_2"
 		initContainer3 := container.DeepCopy()
 		initContainer3.Name = "init_mysql_3"
-		initContainer.VolumeMounts[0].Name = initContainer.VolumeMounts[0].Name + "_init_container"
-		initContainer.VolumeMounts[1].Name = initContainer.VolumeMounts[1].Name + "_init_container"
+		initContainer.VolumeMounts[0].Name += "_init_container"
+		initContainer.VolumeMounts[1].Name += "_init_container"
 		statefulSet.Spec.Template.Spec.InitContainers = []v1.Container{
 			*initContainer, *initContainer2, *initContainer3}
 

@@ -18,8 +18,9 @@ package backup
 
 import (
 	"context"
-	"fmt"
 	"time"
+
+	"github.com/apecloud/kubeblocks/pkg/utils"
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -118,13 +119,12 @@ func (o *RestoreOptions) Complete(f cmdutil.Factory, args []string) error {
 func (o *RestoreOptions) Run() error {
 	restoreJobName := "restorejob-" + time.Now().Format("20060102150405")
 	restoreJobObj := NewRestoreJobInstance(o.Namespace, restoreJobName, o.DbCluster, o.BackupJobName)
-	fmt.Println(restoreJobObj)
 	gvr := schema.GroupVersionResource{Group: "dataprotection.infracreate.com", Version: "v1alpha1", Resource: "restorejobs"}
 	obj, err := o.client.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), restoreJobObj, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
-	fmt.Println(obj)
+	utils.PrintObjYaml(obj)
 	return nil
 }
 

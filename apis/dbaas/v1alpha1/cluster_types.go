@@ -139,8 +139,10 @@ type ClusterComponent struct {
 	// Several other fields do not apply to ExternalName services.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
 	// +optional
-	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
+	Service corev1.ServiceSpec `json:"service,omitempty"`
+	// ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
 	// TODO free6om: should remove ServiceType or put Service here instead
+	// TODO do we allow users to customize Service ?
 }
 
 type ClusterStatusComponent struct {

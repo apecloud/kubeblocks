@@ -19,6 +19,7 @@ package dbaas
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"time"
 
 	"github.com/sethvargo/go-password/password"
@@ -88,6 +89,7 @@ spec:
   type: state.mysql-8
   components:
   - typeName: replicasets
+    componentType: Stateful
     defaultReplicas: 1
     podSpec:
       containers:
@@ -404,18 +406,16 @@ spec:
 				Name: "proxy",
 				Type: "proxy",
 
-				//Service: corev1.ServiceSpec{
-				//	Ports: []corev1.ServicePort{
-				//		{
-				//			Protocol:   "TCP",
-				//			Port:       80,
-				//			TargetPort: intstr.FromInt(8080),
-				//		},
-				//	},
-				//	Type: "LoadBalancer",
-				//},
-				ServiceType: "LoadBalancer",
-				// TODO free6om: Service, not ServiceType
+				Service: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Protocol:   "TCP",
+							Port:       80,
+							TargetPort: intstr.FromInt(8080),
+						},
+					},
+					Type: "LoadBalancer",
+				},
 			})
 			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
 

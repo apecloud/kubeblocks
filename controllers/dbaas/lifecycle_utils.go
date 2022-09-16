@@ -238,6 +238,11 @@ func mergeComponents(
 		if clusterComp.Resources.Requests != nil || clusterComp.Resources.Limits != nil {
 			component.PodSpec.Containers[0].Resources = clusterComp.Resources
 		}
+
+		// respect user's declaration
+		if clusterComp.Service.Ports != nil {
+			component.Service = clusterComp.Service
+		}
 	}
 	if component.VolumeClaimTemplates == nil {
 		for i := range component.PodSpec.Containers {
@@ -365,6 +370,14 @@ func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{
 		return err
 	}
 	*params.applyObjs = append(*params.applyObjs, pdb)
+
+	if params.component.Service.Ports != nil {
+		svc, err := buildSvc(*params)
+		if err != nil {
+			return err
+		}
+		*params.applyObjs = append(*params.applyObjs, svc)
+	}
 
 	return nil
 }

@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -86,7 +87,7 @@ func (o *commandOptions) setup(f cmdutil.Factory, args []string) error {
 func (o *commandOptions) run(dbClusterHandler func(*types.DBClusterInfo), postHandler func() error, opts ...ctrlcli.ListOption) error {
 	ctx := context.Background()
 	ul := &unstructured.UnstructuredList{}
-	ul.SetGroupVersionKind(getClusterGVK())
+	ul.SetGroupVersionKind(schema.GroupVersionKind{})
 
 	// TODO: need to apply  MatchingLabels
 	// ml := ctrlcli.MatchingLabels()

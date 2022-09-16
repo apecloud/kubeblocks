@@ -523,16 +523,13 @@ func createOrReplaceResources(ctx context.Context,
 			continue
 		}
 
-		/** ConfigMap kind objects should only be applied once
-		 *
-		 * The Config is not allowed to be modified.
-		 * Once ISV adjusts the ConfigTemplateRef field of CusterDefinition, or ISV modifies the wrong configuration content,
-		 * it may cause the application cluster may fail.
-		 *
-		 * TODO: check whether the configmap object is a config file of component
-		 * label check: ConfigMap.Labels["app.kubernetes.io/ins-configure"]
-		 *
-		 **/
+		// ConfigMap kind objects should only be applied once
+		//
+		// The Config is not allowed to be modified.
+		// Once ISV adjusts the ConfigTemplateRef field of CusterDefinition, or ISV modifies the wrong config file, it may cause the application cluster may fail.
+		//
+		// TODO(zhixu.zt): Check whether the configmap object is a config file of component
+		// Label check: ConfigMap.Labels["app.kubernetes.io/ins-configure"]
 		if _, ok := obj.(*corev1.ConfigMap); ok {
 			continue
 		}
@@ -985,20 +982,9 @@ func injectEnv(strByte []byte, key string, value string) []byte {
 	return []byte(str)
 }
 
-/**
- * buildCfg process workflow
- *
- * step1: getCfgTpl list from ClusterDefinition()
- * step2: getCfgTpl list from AppVersion()
- * step3: merge CfgTpl: AppVersion replace CD
- * step4: prepare go template Built-in Objects or Built-in Functions
- * step5: render config
- * step6: generate ConfigMap object from cue template
- * step7: update data of ConfigMap object with rendered config
- * step8: create Pod's volume with configMap objects
- *
- **/
+// buildCfg generate volumes for PodTemplate, volumeMount for container, and configmap for config files
 func buildCfg(params createParams, sts *appsv1.StatefulSet, ctx context.Context, cli client.Client) ([]client.Object, error) {
+	// Need to merge configTemplateRef of AppVersion.Components[*].ConfigTemplateRefs and ClusterDefinition.Components[*].ConfigTemplateRefs
 	tpls, err := params.getConfigTemplates()
 	if err != nil {
 		return nil, err
@@ -1010,7 +996,9 @@ func buildCfg(params createParams, sts *appsv1.StatefulSet, ctx context.Context,
 	clusterName := params.cluster.Name
 	namespaceName := params.cluster.Namespace
 
+	// New ConfigTemplateBuilder
 	cfgTemplateBuilder := NewCfgTemplateBuilder(clusterName, namespaceName)
+	// Prepare built-in objects and built-in functions
 	if err := cfgTemplateBuilder.InjectBuiltInObjectsAndFunctions(sts.Spec.Template, tpls, params.component, params.roleGroup); err != nil {
 		return nil, err
 	}
@@ -1030,17 +1018,22 @@ func buildCfg(params createParams, sts *appsv1.StatefulSet, ctx context.Context,
 		if isExist {
 			continue
 		}
+
+		// Generate ConfigMap objects for config files
 		configmap, err := generateConfigMapFromTpl(cfgTemplateBuilder, cmName, tpl, params, ctx, cli)
 		if err != nil {
 			return nil, err
 		}
 
+		// The owner of the configmap object is a cluster of users,
+		// in order to manage the life cycle of configmap
 		if err := controllerutil.SetOwnerReference(params.cluster, configmap, scheme); err != nil {
 			return nil, err
 		}
 		configs = append(configs, configmap)
 	}
 
+	// Generate Pod Volumes for ConfigMap objects
 	return configs, checkAndUpdatePodVolumes(sts, volumes)
 }
 
@@ -1104,12 +1097,16 @@ func getInstanceCmName(sts *appsv1.StatefulSet, tpl *dbaasv1alpha1.ConfigTemplat
 	return fmt.Sprintf("%s-%s-config", sts.GetName(), tpl.VolumeName)
 }
 
+// generateConfigMapFromTpl render config file by config template provided ISV
 func generateConfigMapFromTpl(tplBuilder *ConfigTemplateBuilder, cmName string, tplCfg dbaasv1alpha1.ConfigTemplate, params createParams, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
+	// Render config template by TplEngine
+	// The template namespace must be the same as the ClusterDefinition namespace
 	configs, err := processConfigMapTemplate(ctx, cli, tplBuilder, tplCfg, params.clusterDefinition.GetNamespace())
 	if err != nil {
 		return nil, err
 	}
 
+	// Using ConfigMap cue template render to configmap of config
 	return generateConfigMapWithTemplate(configs, params, cmName, tplCfg.Name)
 }
 
@@ -1147,6 +1144,7 @@ func generateConfigMapWithTemplate(configs map[string]string, params createParam
 		return nil, err
 	}
 
+	// Generate config files context by render cue template
 	if err = cueValue.Fill("meta", configBytes); err != nil {
 		return nil, err
 	}
@@ -1161,16 +1159,14 @@ func generateConfigMapWithTemplate(configs map[string]string, params createParam
 		return nil, err
 	}
 
-	// update rendered config
+	// Update rendered config
 	cm.Data = configs
 	return &cm, nil
 }
 
-// process workflow
-// step1: get template configmap
-// step2: parse file list from cm.data
-// step3: generate cm with configmap template
+// processConfigMapTemplate Render config file using template engine
 func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder *ConfigTemplateBuilder, tplCfg dbaasv1alpha1.ConfigTemplate, namespace string) (map[string]string, error) {
+	// if ClusterDefinition namespace is empty, ConfigMap namespace is default
 	if namespace == "" {
 		namespace = defaultNamespace
 	}
@@ -1181,7 +1177,7 @@ func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder
 	}
 
 	cmObj := &corev1.ConfigMap{}
-	//  require template configmap exist
+	//  Require template configmap exist
 	if err := cli.Get(ctx, cmKey, cmObj); err != nil {
 		return nil, err
 	}

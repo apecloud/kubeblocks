@@ -17,16 +17,16 @@ limitations under the License.
 package dbaas
 
 import (
-	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type BuiltinObjectsFunc func() map[string]interface{}
 
 type ResourceDefinition struct {
-	MemorySize int
+	MemorySize int64
 	CoreNum    int
 }
 
@@ -45,7 +45,7 @@ type ConfigTemplateBuilder struct {
 	clusterName string
 
 	// Global Var
-	ComponentValues *ComponentTemplateValues
+	componentValues *ComponentTemplateValues
 }
 
 func NewCfgTemplateBuilder(clusterName, namespace string) *ConfigTemplateBuilder {
@@ -55,10 +55,10 @@ func NewCfgTemplateBuilder(clusterName, namespace string) *ConfigTemplateBuilder
 	}
 }
 
-func (c *ConfigTemplateBuilder) Render(configs *map[string]string) (map[string]string, error) {
-	rendered := make(map[string]string)
-	engine := controllerutil.NewTplEngine(c.builtinObjects(), nil)
-	for file, configContext := range *configs {
+func (c *ConfigTemplateBuilder) Render(configs map[string]string) (map[string]string, error) {
+	rendered := make(map[string]string, len(configs))
+	engine := intctrlutil.NewTplEngine(c.builtinObjects(), nil)
+	for file, configContext := range configs {
 		newContext, err := engine.Render(configContext)
 		if err != nil {
 			return nil, err
@@ -69,48 +69,48 @@ func (c *ConfigTemplateBuilder) Render(configs *map[string]string) (map[string]s
 	return rendered, nil
 }
 
-func (c *ConfigTemplateBuilder) builtinObjects() *controllerutil.TplValues {
-	return &controllerutil.TplValues{
+func (c *ConfigTemplateBuilder) builtinObjects() *intctrlutil.TplValues {
+	return &intctrlutil.TplValues{
 		"Cluster": map[string]interface{}{
 			"Namespace": c.namespace,
 			"Name":      c.clusterName,
 		},
-		"Component": c.ComponentValues,
+		"Component": c.componentValues,
 	}
 }
 
-func (c *ConfigTemplateBuilder) InjectBuiltInObjectsAndFunctions(statefulSet *appsv1.StatefulSet, configs []dbaasv1alpha1.ConfigTemplate, component *Component, group *RoleGroup) error {
-	if err := injectBuiltInObjects(c, statefulSet, component, group, configs); err != nil {
+func (c *ConfigTemplateBuilder) InjectBuiltInObjectsAndFunctions(podTemplate corev1.PodTemplateSpec, configs []dbaasv1alpha1.ConfigTemplate, component *Component, group *RoleGroup) error {
+	if err := injectBuiltInObjects(c, podTemplate, component, group, configs); err != nil {
 		return err
 	}
 
-	if err := injectBuiltInFunctions(c, statefulSet, component, group); err != nil {
+	if err := injectBuiltInFunctions(c, podTemplate, component, group); err != nil {
 		return err
 	}
 	return nil
 }
 
-func injectBuiltInFunctions(tplBuilder *ConfigTemplateBuilder, sts *appsv1.StatefulSet, component *Component, group *RoleGroup) error {
+func injectBuiltInFunctions(tplBuilder *ConfigTemplateBuilder, podTemplate corev1.PodTemplateSpec, component *Component, group *RoleGroup) error {
 	// TODO add built-in function
 	return nil
 }
 
-func injectBuiltInObjects(tplBuilder *ConfigTemplateBuilder, sts *appsv1.StatefulSet, component *Component, group *RoleGroup, configs []dbaasv1alpha1.ConfigTemplate) error {
-	var Resource *ResourceDefinition
-	container := controllerutil.GetContainerUsingConfig(sts, configs)
+func injectBuiltInObjects(tplBuilder *ConfigTemplateBuilder, podTemplate corev1.PodTemplateSpec, component *Component, group *RoleGroup, configs []dbaasv1alpha1.ConfigTemplate) error {
+	var resource *ResourceDefinition
+	container := intctrlutil.GetContainerUsingConfig(podTemplate, configs)
 	if container != nil && len(container.Resources.Limits) > 0 {
-		Resource = &ResourceDefinition{
-			MemorySize: controllerutil.GetMemorySize(container.Resources.Limits),
-			CoreNum:    controllerutil.GetCoreNum(container.Resources.Limits),
+		resource = &ResourceDefinition{
+			MemorySize: intctrlutil.GetMemorySize(*container),
+			CoreNum:    intctrlutil.GetCoreNum(*container),
 		}
 	}
 
-	tplBuilder.ComponentValues = &ComponentTemplateValues{
+	tplBuilder.componentValues = &ComponentTemplateValues{
 		Name: component.Name,
 		// TODO add Component service name
 		ServiceName: "",
 		Replicas:    group.Replicas,
-		Resource:    Resource,
+		Resource:    resource,
 	}
 
 	return nil

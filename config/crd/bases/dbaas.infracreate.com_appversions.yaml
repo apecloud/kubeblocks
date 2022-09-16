@@ -51,6 +51,22 @@ spec:
               components:
                 items:
                   properties:
+                    configTemplateRefs:
+                      description: DBaas provides a configuration extension mechanism
+                        to handle configuration differences between versions, the
+                        configTemplateRefs field, together with configTemplateRefs
+                        in the ClusterDefinition, determines the final configuration
+                        file
+                      items:
+                        properties:
+                          name:
+                            maxLength: 128
+                            type: string
+                          volumeName:
+                            maxLength: 32
+                            type: string
+                        type: object
+                      type: array
                     podSpec:
                       description: if not nil, will replace ClusterDefinitionSpec.PodSpec
                         in ClusterDefinition

@@ -104,7 +104,9 @@ spec:
                         constraint to same component type
                       type: boolean
                     configTemplateRefs:
-                      description: config list
+                      description: The configTemplateRefs field provided by ISV, and
+                        finally this configTemplateRefs will be rendered into the
+                        user's own configuration file according to the user's cluster
                       items:
                         properties:
                           name:

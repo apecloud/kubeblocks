@@ -41,10 +41,10 @@ var _ = Describe("clusterDefinition webhook", func() {
 			Expect(k8sClient.Create(ctx, clusterDef)).ShouldNot(Succeed())
 
 			By("Set Leader.Replicas > 1")
-			clusterDef.Spec.Components[0].ConsensusSpec.Learner.Replicas = 2
+			clusterDef.Spec.Components[0].ConsensusSpec.Leader.Replicas = 2
 			Expect(k8sClient.Create(ctx, clusterDef)).ShouldNot(Succeed())
 			// restore clusterDef
-			clusterDef.Spec.Components[0].ConsensusSpec.Learner.Replicas = 0
+			clusterDef.Spec.Components[0].ConsensusSpec.Leader.Replicas = 0
 
 			By("Set Followers.Replicas to odd")
 			followers := make([]ConsensusMember, 1)
@@ -60,6 +60,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 
 			By("Set a 5 nodes cluster with 1 leader, 2 followers and 2 learners")
 			clusterDef.Spec.Components[0].DefaultReplicas = 5
+			clusterDef.Spec.Components[0].ConsensusSpec.Leader = ConsensusMember{Name: "leader", AccessMode: ReadWrite}
 			clusterDef.Spec.Components[0].ConsensusSpec.Learner = ConsensusMember{Name: "learner", AccessMode: None, Replicas: 2}
 			Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
 

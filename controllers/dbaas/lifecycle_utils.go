@@ -40,6 +40,7 @@ import (
 
 type createParams struct {
 	clusterDefinition *dbaasv1alpha1.ClusterDefinition
+	appVersion        *dbaasv1alpha1.AppVersion
 	cluster           *dbaasv1alpha1.Cluster
 	component         *Component
 	roleGroup         *RoleGroup
@@ -48,7 +49,8 @@ type createParams struct {
 }
 
 const (
-	dbaasPrefix = "OPENDBAAS"
+	dbaasPrefix      = "OPENDBAAS"
+	defaultNamespace = "default"
 )
 
 var (
@@ -80,6 +82,50 @@ func (c createParams) getCacheCUETplValue(key string, valueCreator func() (*intc
 	}
 	(*c.cacheCtx)[key] = v
 	return v, err
+}
+
+func (c createParams) getConfigTemplates() ([]dbaasv1alpha1.ConfigTemplate, error) {
+	var appVersionTpl []dbaasv1alpha1.ConfigTemplate
+	for _, component := range c.appVersion.Spec.Components {
+		if component.Type == c.component.Name {
+			appVersionTpl = component.ConfigTemplateRefs
+			break
+		}
+	}
+	return mergeConfigTemplates(appVersionTpl, c.getComponentConfigTemplates())
+}
+
+// mergeConfigTemplates merge AppVersion.Components[*].ConfigTemplateRefs and ClusterDefinition.Components[*].ConfigTemplateRefs
+func mergeConfigTemplates(appVersionTpl []dbaasv1alpha1.ConfigTemplate, cdTpl []dbaasv1alpha1.ConfigTemplate) ([]dbaasv1alpha1.ConfigTemplate, error) {
+	if len(appVersionTpl) == 0 {
+		return cdTpl, nil
+	}
+
+	if len(cdTpl) == 0 {
+		return appVersionTpl, nil
+	}
+
+	mergedCfgTpl := make([]dbaasv1alpha1.ConfigTemplate, 0, len(appVersionTpl)+len(cdTpl))
+	mergedTplMap := make(map[string]bool, cap(mergedCfgTpl))
+
+	for i := range appVersionTpl {
+		if _, ok := (mergedTplMap)[appVersionTpl[i].VolumeName]; ok {
+			return nil, fmt.Errorf("ConfigTemplate require not same volumeName [%s]", appVersionTpl[i].Name)
+		}
+		mergedCfgTpl = append(mergedCfgTpl, appVersionTpl[i])
+		mergedTplMap[appVersionTpl[i].VolumeName] = true
+	}
+
+	for i := range cdTpl {
+		// AppVersion replace clusterDefinition
+		if _, ok := (mergedTplMap)[cdTpl[i].VolumeName]; ok {
+			continue
+		}
+		mergedCfgTpl = append(mergedCfgTpl, cdTpl[i])
+		mergedTplMap[cdTpl[i].VolumeName] = true
+	}
+
+	return mergedCfgTpl, nil
 }
 
 func (c createParams) getComponentConfigTemplates() []dbaasv1alpha1.ConfigTemplate {
@@ -263,11 +309,16 @@ func mergeComponents(
 		}
 		component.RoleGroups = clusterComp.RoleGroups
 	}
-	if component.VolumeClaimTemplates == nil {
-		for i := range component.PodSpec.Containers {
-			component.PodSpec.Containers[i].VolumeMounts = nil
-		}
-	}
+
+	// TODO(zhixu.zt) We need to reserve the VolumeMounts of the container for ConfigMap or Secret,
+	// At present, it is possible to distinguish between ConfigMap volume and normal volume,
+	// Compare the VolumeName of configTemplateRef and Name of VolumeMounts
+	//
+	// if component.VolumeClaimTemplates == nil {
+	//	 for i := range component.PodSpec.Containers {
+	//	 	component.PodSpec.Containers[i].VolumeMounts = nil
+	//	 }
+	// }
 	return component
 }
 
@@ -319,6 +370,7 @@ func buildClusterCreationTasks(
 		clusterDefinition: clusterDefinition,
 		applyObjs:         &applyObjs,
 		cacheCtx:          &cacheCtx,
+		appVersion:        appVersion,
 	}
 	prepareSecretsTask.Context["exec"] = &params
 	rootTask.SubTasks = append(rootTask.SubTasks, prepareSecretsTask)
@@ -471,12 +523,19 @@ func createOrReplaceResources(ctx context.Context,
 			continue
 		}
 
-		// Config kind objects
+		/** ConfigMap kind objects should only be applied once
+		 *
+		 * The Config is not allowed to be modified.
+		 * Once ISV adjusts the ConfigTemplateRef field of CusterDefinition, or ISV modifies the wrong configuration content,
+		 * it may cause the application cluster may fail.
+		 *
+		 * TODO: check whether the configmap object is a config file of component
+		 * label check: ConfigMap.Labels["app.kubernetes.io/ins-configure"]
+		 *
+		 **/
 		if _, ok := obj.(*corev1.ConfigMap); ok {
 			continue
 		}
-
-		// -
 
 		key := client.ObjectKey{
 			Namespace: obj.GetNamespace(),
@@ -926,33 +985,43 @@ func injectEnv(strByte []byte, key string, value string) []byte {
 	return []byte(str)
 }
 
+/**
+ * buildCfg process workflow
+ *
+ * step1: getCfgTpl list from ClusterDefinition()
+ * step2: getCfgTpl list from AppVersion()
+ * step3: merge CfgTpl: AppVersion replace CD
+ * step4: prepare go template Built-in Objects or Built-in Functions
+ * step5: render config
+ * step6: generate ConfigMap object from cue template
+ * step7: update data of ConfigMap object with rendered config
+ * step8: create Pod's volume with configMap objects
+ *
+ **/
 func buildCfg(params createParams, sts *appsv1.StatefulSet, ctx context.Context, cli client.Client) ([]client.Object, error) {
-	// step1: getConfigTemplate from ClusterDefinition()
-	// step2: getConfigMap for configmapRef
-	// step3: prepare go template Built-in Objects or Built-in Functions
-	// step4: render config
-	// step5: GenerateConfigMap from result of render
-	// step6: update statefulSet Pod.Template container
-
-	tpls := params.getComponentConfigTemplates()
-	if tpls == nil {
+	tpls, err := params.getConfigTemplates()
+	if err != nil {
+		return nil, err
+	}
+	if len(tpls) == 0 {
 		return nil, nil
 	}
 
 	clusterName := params.cluster.Name
 	namespaceName := params.cluster.Namespace
 
-	cfgTemplate := NewCfgTemplateBuilder(clusterName, namespaceName)
-	if err := cfgTemplate.InjectBuiltInObjectsAndFunctions(sts, tpls, params.component, params.roleGroup); err != nil {
+	cfgTemplateBuilder := NewCfgTemplateBuilder(clusterName, namespaceName)
+	if err := cfgTemplateBuilder.InjectBuiltInObjectsAndFunctions(sts.Spec.Template, tpls, params.component, params.roleGroup); err != nil {
 		return nil, err
 	}
 
-	configs := make([]client.Object, len(tpls))
-	volumes := make(map[string]*dbaasv1alpha1.ConfigTemplate)
+	configs := make([]client.Object, 0, len(tpls))
+	volumes := make(map[string]dbaasv1alpha1.ConfigTemplate, len(tpls))
+	// TODO Support Update AppVersionRef of Cluster
 	for _, tpl := range tpls {
-		// check config cm already exists
+		// Check config cm already exists
 		cmName := getInstanceCmName(sts, &tpl)
-		volumes[cmName] = &tpl
+		volumes[cmName] = tpl
 		isExist, err := isAlreadyExists(cmName, params.cluster.Namespace, ctx, cli)
 		if err != nil {
 			return nil, err
@@ -960,45 +1029,54 @@ func buildCfg(params createParams, sts *appsv1.StatefulSet, ctx context.Context,
 		if isExist {
 			continue
 		}
-		configmap, err := generateConfigMapFromTpl(cfgTemplate, cmName, tpl, params, ctx, cli)
+		configmap, err := generateConfigMapFromTpl(cfgTemplateBuilder, cmName, tpl, params, ctx, cli)
 		if err != nil {
 			return nil, err
 		}
 
 		scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
-		if err = controllerutil.SetOwnerReference(params.cluster, configmap, scheme); err != nil {
+		if err := controllerutil.SetOwnerReference(params.cluster, configmap, scheme); err != nil {
 			return nil, err
 		}
 		configs = append(configs, configmap)
 	}
 
-	checkAndUpdatePodVolumes(sts, volumes)
-	return configs, nil
+	return configs, checkAndUpdatePodVolumes(sts, volumes)
 }
 
-func checkAndUpdatePodVolumes(sts *appsv1.StatefulSet, volumes map[string]*dbaasv1alpha1.ConfigTemplate) {
-	if sts.Spec.Template.Spec.Volumes == nil {
-		sts.Spec.Template.Spec.Volumes = make([]corev1.Volume, len(volumes))
+func checkAndUpdatePodVolumes(sts *appsv1.StatefulSet, volumes map[string]dbaasv1alpha1.ConfigTemplate) error {
+	podVolumes := make([]corev1.Volume, 0, len(sts.Spec.Template.Spec.Volumes)+len(volumes))
+	if len(sts.Spec.Template.Spec.Volumes) > 0 {
+		copy(podVolumes, sts.Spec.Template.Spec.Volumes)
 	}
 
-	podVolumes := sts.Spec.Template.Spec.Volumes
 	for cmName, tpl := range volumes {
 		// not cm volume
-		volume := intctrlutil.GetVolumeMountName(podVolumes, cmName)
-		if volume != nil {
-			updateConfigMapVolume(volume, cmName, tpl.VolumeName)
-		} else {
-			addConfigMapVolume(podVolumes, cmName, tpl.VolumeName)
+		volumeMounted := intctrlutil.GetVolumeMountName(podVolumes, cmName)
+		// Update ConfigMap Volume
+		if volumeMounted != nil {
+			configMapVolume := volumeMounted.ConfigMap
+			if configMapVolume == nil {
+				return fmt.Errorf("mount volume[%s] type require ConfigMap: [%+v]", volumeMounted.Name, volumeMounted)
+			}
+			configMapVolume.Name = cmName
+			continue
 		}
+
+		// Add New ConfigMap Volume
+		podVolumes = append(podVolumes, corev1.Volume{
+			Name: tpl.VolumeName,
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
+				},
+			},
+		})
 	}
-}
 
-func updateConfigMapVolume(volume *corev1.Volume, cmName string, volumeName string) {
-	// TODO update configmap volume
-}
-
-func addConfigMapVolume(volumes []corev1.Volume, cmName string, volumeName string) {
-	// TODO add configmap volume
+	// Update PodTemplate Volumes
+	sts.Spec.Template.Spec.Volumes = podVolumes
+	return nil
 }
 
 func isAlreadyExists(cmName string, namespace string, ctx context.Context, cli client.Client) (bool, error) {
@@ -1021,6 +1099,7 @@ func isAlreadyExists(cmName string, namespace string, ctx context.Context, cli c
 	return true, nil
 }
 
+// {{statefull.Name}}-{{appVersion.Name}}-{{tpl.Name}}-"config"
 func getInstanceCmName(sts *appsv1.StatefulSet, tpl *dbaasv1alpha1.ConfigTemplate) string {
 	return fmt.Sprintf("%s-%s-config", sts.GetName(), tpl.VolumeName)
 }
@@ -1047,16 +1126,16 @@ func generateConfigMapWithTemplate(configs map[string]string, params createParam
 
 	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
 	// prepare cue data
-	configMeta := map[string]interface{}{
-		"clusterDefinition": map[string]string{
+	configMeta := map[string]map[string]string{
+		"clusterDefinition": {
 			"name": params.clusterDefinition.GetName(),
 			"type": params.clusterDefinition.Spec.Type,
 		},
-		"cluster": map[string]string{
+		"cluster": {
 			"name":      params.cluster.GetName(),
 			"namespace": params.cluster.GetNamespace(),
 		},
-		"component": map[string]string{
+		"component": {
 			"name":         params.component.Name,
 			"type":         params.component.Type,
 			"configName":   cmName,
@@ -1087,12 +1166,14 @@ func generateConfigMapWithTemplate(configs map[string]string, params createParam
 	return &cm, nil
 }
 
+// process workflow
+// step1: get template configmap
+// step2: parse file list from cm.data
+// step3: generate cm with configmap template
 func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder *ConfigTemplateBuilder, tplCfg dbaasv1alpha1.ConfigTemplate, namespace string) (map[string]string, error) {
-
-	// process workflow
-	// step1: get template configmap
-	// step2: parse file list from cm.data
-	// step3: generate cm with configmap template
+	if namespace == "" {
+		namespace = defaultNamespace
+	}
 
 	cmKey := client.ObjectKey{
 		Namespace: namespace,
@@ -1106,5 +1187,5 @@ func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder
 	}
 
 	// TODO process invalid data: e.g empty data
-	return tplBuilder.Render(&cmObj.Data)
+	return tplBuilder.Render(cmObj.Data)
 }

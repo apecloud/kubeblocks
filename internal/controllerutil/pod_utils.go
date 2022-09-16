@@ -17,29 +17,84 @@ limitations under the License.
 package controllerutil
 
 import (
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
-func GetContainerUsingConfig(sts *appsv1.StatefulSet, configs []dbaasv1alpha1.ConfigTemplate) *corev1.Container {
+// GetContainerUsingConfig function description:
+// Search the container using the configmap of config from the pod
+//
+// Return: The first container pointer of using configs
+//
+// e.g: ClusterDefinition.configTemplateRef:
+//	- Name: "mysql-8.0-config"
+//	  VolumeName: "mysql_config"
+//
+//
+// PodTemplate.containers[*].volumeMounts:
+//  - mountPath: /data/config
+//    name: mysql_config
+//  - mountPath: /data
+//    name: data
+//  - mountPath: /log
+//    name: log
+func GetContainerUsingConfig(podTemplate corev1.PodTemplateSpec, configs []dbaasv1alpha1.ConfigTemplate) *corev1.Container {
 	// volumes := sts.Spec.Template.Spec.Volumes
-	containers := sts.Spec.Template.Spec.Containers
-	initContainers := sts.Spec.Template.Spec.InitContainers
+	containers := podTemplate.Spec.Containers
+	initContainers := podTemplate.Spec.InitContainers
 
-	if container := GetContainerWithTplList(containers, configs); container != nil {
+	if container := getContainerWithTplList(containers, configs); container != nil {
 		return container
 	}
 
-	if container := GetContainerWithTplList(initContainers, configs); container != nil {
+	if container := getContainerWithTplList(initContainers, configs); container != nil {
 		return container
 	}
 
 	return nil
 }
 
-func GetContainerWithTplList(containers []corev1.Container, configs []dbaasv1alpha1.ConfigTemplate) *corev1.Container {
+// GetPodContainerWithVolumeMount function description:
+// Search which containers mounting the volume
+//
+// Case: When the configmap update, we restart all containers who using configmap
+//
+// Return: all containers mount volumeName
+//
+func GetPodContainerWithVolumeMount(pod *corev1.Pod, volumeName string) []*corev1.Container {
+	containers := pod.Spec.Containers
+	if len(containers) == 0 {
+		return nil
+	}
+	return getContainerWithVolumeMount(containers, volumeName)
+}
+
+// GetVolumeMountName function description:
+// Find the volume of pod using name of cm
+//
+// Case: When the configmap object of configuration is modified by user, we need to query whose volumeName
+//
+// Return: The volume pointer of pod
+func GetVolumeMountName(volumes []corev1.Volume, resourceName string) *corev1.Volume {
+	for i := range volumes {
+		if volumes[i].ConfigMap != nil && volumes[i].ConfigMap.Name == resourceName {
+			return &volumes[i]
+		}
+
+		if volumes[i].Projected != nil {
+			for j := range volumes[i].Projected.Sources {
+				if volumes[i].Projected.Sources[j].ConfigMap != nil && volumes[i].Projected.Sources[j].ConfigMap.Name == resourceName {
+					return &volumes[i]
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func getContainerWithTplList(containers []corev1.Container, configs []dbaasv1alpha1.ConfigTemplate) *corev1.Container {
 	if len(containers) == 0 {
 		return nil
 	}
@@ -48,19 +103,6 @@ func GetContainerWithTplList(containers []corev1.Container, configs []dbaasv1alp
 		volumeMounts := containers[i].VolumeMounts
 		if len(volumeMounts) > 0 && checkContainerWithVolumeMount(volumeMounts, configs) {
 			return &containers[i]
-		}
-	}
-
-	return nil
-}
-
-func GetContainerWithVolumeMount(containers []corev1.Container, volumeMountName string) *corev1.Container {
-	for i := range containers {
-		volumeMounts := containers[i].VolumeMounts
-		for j := range volumeMounts {
-			if volumeMounts[j].Name == volumeMountName {
-				return &containers[i]
-			}
 		}
 	}
 
@@ -81,30 +123,38 @@ func checkContainerWithVolumeMount(volumeMounts []corev1.VolumeMount, configs []
 	return len(configs) == len(volumes)
 }
 
-func GetVolumeMountName(volumes []corev1.Volume, resourceName string) *corev1.Volume {
-	for i := range volumes {
-		if volumes[i].ConfigMap != nil && volumes[i].ConfigMap.Name == resourceName {
-			return &volumes[i]
-		}
-
-		if volumes[i].Projected != nil {
-			for j := range volumes[i].Projected.Sources {
-				if volumes[i].Projected.Sources[j].ConfigMap != nil && volumes[i].Projected.Sources[j].ConfigMap.Name == resourceName {
-					return &volumes[i]
-				}
+func getContainerWithVolumeMount(containers []corev1.Container, volumeName string) []*corev1.Container {
+	mountContainers := make([]*corev1.Container, 0, len(containers))
+	for i := range containers {
+		volumeMounts := containers[i].VolumeMounts
+		for j := range volumeMounts {
+			if volumeMounts[j].Name == volumeName {
+				mountContainers = append(mountContainers, &containers[i])
+				break
 			}
 		}
 	}
 
-	return nil
+	return mountContainers
 }
 
-func GetCoreNum(limits corev1.ResourceList) int {
-	// TODO cal cpu
-	return -1
+// GetCoreNum:
+// if not Resource field return 0 else Resources.Limits.cpu
+func GetCoreNum(container corev1.Container) int {
+	limits := container.Resources.Limits
+	if val, ok := (limits)[corev1.ResourceCPU]; ok {
+		return int(val.Value())
+	}
+
+	return 0
 }
 
-func GetMemorySize(limits corev1.ResourceList) int {
-	// TODO cal MemorySize
-	return -1
+// GetMemorySize
+// if not Resource field, return 0 else Resources.Limits.memory
+func GetMemorySize(container corev1.Container) int64 {
+	limits := container.Resources.Limits
+	if val, ok := (limits)[corev1.ResourceMemory]; ok {
+		return val.Value()
+	}
+	return 0
 }

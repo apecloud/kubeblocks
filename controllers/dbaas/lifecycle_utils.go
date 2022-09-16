@@ -1018,6 +1018,7 @@ func buildCfg(params createParams, sts *appsv1.StatefulSet, ctx context.Context,
 	configs := make([]client.Object, 0, len(tpls))
 	volumes := make(map[string]dbaasv1alpha1.ConfigTemplate, len(tpls))
 	// TODO Support Update AppVersionRef of Cluster
+	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
 	for _, tpl := range tpls {
 		// Check config cm already exists
 		cmName := getInstanceCmName(sts, &tpl)
@@ -1034,7 +1035,6 @@ func buildCfg(params createParams, sts *appsv1.StatefulSet, ctx context.Context,
 			return nil, err
 		}
 
-		scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
 		if err := controllerutil.SetOwnerReference(params.cluster, configmap, scheme); err != nil {
 			return nil, err
 		}

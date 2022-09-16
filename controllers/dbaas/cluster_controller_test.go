@@ -19,10 +19,11 @@ package dbaas
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"time"
 
 	"github.com/sethvargo/go-password/password"
+
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	policyv1 "k8s.io/api/policy/v1"
 

@@ -156,7 +156,7 @@ type ConsensusSpec struct {
 	// +optional
 	Followers []ConsensusMember `json:"followers,omitempty"`
 
-	//Learner, no voting right
+	// Learner, no voting right
 	// +optional
 	Learner ConsensusMember `json:"learner,omitempty"`
 

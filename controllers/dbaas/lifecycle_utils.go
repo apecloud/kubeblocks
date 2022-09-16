@@ -339,13 +339,14 @@ func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{
 		return fmt.Errorf("invalid arg")
 	}
 
-	if params.component.ComponentType == dbaasv1alpha1.Stateless {
+	switch params.component.ComponentType {
+	case dbaasv1alpha1.Stateless:
 		sts, err := buildDeploy(*params)
 		if err != nil {
 			return err
 		}
 		*params.applyObjs = append(*params.applyObjs, sts)
-	} else if params.component.ComponentType == dbaasv1alpha1.Stateful {
+	case dbaasv1alpha1.Stateful:
 		sts, err := buildSts(*params)
 		if err != nil {
 			return err
@@ -357,7 +358,7 @@ func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{
 			return err
 		}
 		*params.applyObjs = append(*params.applyObjs, svcs...)
-	} else if params.component.ComponentType == dbaasv1alpha1.Consensus {
+	case dbaasv1alpha1.Consensus:
 		cs, err := buildConsensusSet(*params)
 		if err != nil {
 			return err
@@ -689,13 +690,7 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 
 func buildConsensusSet(params createParams) (*appsv1.StatefulSet, error) {
 	// TODO finish me
-	//if params.roleGroup.Service.Ports != nil {
-	//	svc, err := buildSvc(*params)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	*params.applyObjs = append(*params.applyObjs, svc)
-	//}
+
 	return nil, nil
 }
 

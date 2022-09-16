@@ -27,18 +27,19 @@ import (
 //
 // Return: The first container pointer of using configs
 //
-// e.g: ClusterDefinition.configTemplateRef:
-//	- Name: "mysql-8.0-config"
-//	  VolumeName: "mysql_config"
+//	e.g.:
+//	ClusterDefinition.configTemplateRef:
+//		 - Name: "mysql-8.0-config"
+//		   VolumeName: "mysql_config"
 //
 //
-// PodTemplate.containers[*].volumeMounts:
-//  - mountPath: /data/config
-//    name: mysql_config
-//  - mountPath: /data
-//    name: data
-//  - mountPath: /log
-//    name: log
+//	PodTemplate.containers[*].volumeMounts:
+//		 - mountPath: /data/config
+//		   name: mysql_config
+//		 - mountPath: /data
+//		   name: data
+//		 - mountPath: /log
+//		   name: log
 func GetContainerUsingConfig(podTemplate corev1.PodTemplateSpec, configs []dbaasv1alpha1.ConfigTemplate) *corev1.Container {
 	// volumes := sts.Spec.Template.Spec.Volumes
 	containers := podTemplate.Spec.Containers
@@ -61,7 +62,6 @@ func GetContainerUsingConfig(podTemplate corev1.PodTemplateSpec, configs []dbaas
 // Case: When the configmap update, we restart all containers who using configmap
 //
 // Return: all containers mount volumeName
-//
 func GetPodContainerWithVolumeMount(pod *corev1.Pod, volumeName string) []*corev1.Container {
 	containers := pod.Spec.Containers
 	if len(containers) == 0 {

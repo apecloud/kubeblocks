@@ -110,6 +110,11 @@ downloadFile() {
     DBCTL_CLI_ARTIFACT="${DBCTL_CLI_FILENAME}-${OS}-${ARCH}-${LATEST_RELEASE_TAG}.tar.gz"
     asset_id=`gh_curl -s $GITHUB/repos/$REPO/releases/tags/$LATEST_RELEASE_TAG | grep -B 2 "\"name\": \"$DBCTL_CLI_ARTIFACT\"" | grep -w id | awk -F: '{print $2}'| sed 's/,//g;s/\"//g;s/ //g'`
 
+    if [ "$asset_id" = "null" ] || [ -z "$asset_id" ]; then
+        echo "ERROR: LATEST_RELEASE_TAG not found $LATEST_RELEASE_TAG"
+        exit 1
+    fi;
+
     # Create the temp directory
     DBCTL_TMP_ROOT=$(mktemp -dt dbctl-install-XXXXXX)
     ARTIFACT_TMP_FILE="$DBCTL_TMP_ROOT/$DBCTL_CLI_ARTIFACT"

@@ -138,7 +138,7 @@ func getContainerWithVolumeMount(containers []corev1.Container, volumeName strin
 	return mountContainers
 }
 
-// GetCoreNum:
+// GetCoreNum function description:
 // if not Resource field return 0 else Resources.Limits.cpu
 func GetCoreNum(container corev1.Container) int {
 	limits := container.Resources.Limits
@@ -149,7 +149,7 @@ func GetCoreNum(container corev1.Container) int {
 	return 0
 }
 
-// GetMemorySize
+// GetMemorySize function description:
 // if not Resource field, return 0 else Resources.Limits.memory
 func GetMemorySize(container corev1.Container) int64 {
 	limits := container.Resources.Limits

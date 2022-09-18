@@ -17,23 +17,27 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 
 	"golang.org/x/crypto/ssh"
 
+	"github.com/go-logr/logr"
 	l "github.com/k3d-io/k3d/v5/pkg/logger"
 	"github.com/pkg/errors"
 
@@ -204,4 +208,28 @@ func PrintObjYaml(obj *unstructured.Unstructured) {
 		return
 	}
 	fmt.Println(string(data))
+}
+
+type RetryOptions struct {
+	MaxRetry int
+	Delay    time.Duration
+}
+
+func DoWithRetry(ctx context.Context, logger logr.Logger, operation func() error, options *RetryOptions) error {
+	err := operation()
+	for attempt := 0; err != nil && attempt < options.MaxRetry; attempt++ {
+		delay := time.Duration(int(math.Pow(2, float64(attempt)))) * time.Second
+		if options.Delay != 0 {
+			delay = options.Delay
+		}
+		logger.Info(fmt.Sprintf("Failed, retrying in %s ... (%d/%d). Error: %v", delay, attempt+1, options.MaxRetry, err))
+		select {
+		case <-time.After(delay):
+			break
+		case <-ctx.Done():
+			return err
+		}
+		err = operation()
+	}
+	return err
 }

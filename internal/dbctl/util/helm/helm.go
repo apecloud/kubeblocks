@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"math/rand"
 	"os"
@@ -366,7 +365,7 @@ func FakeActionConfig() *action.Configuration {
 
 	return &action.Configuration{
 		Releases:       storage.Init(driver.NewMemory()),
-		KubeClient:     &kubefake.FailingKubeClient{PrintingKubeClient: kubefake.PrintingKubeClient{Out: ioutil.Discard}},
+		KubeClient:     &kubefake.FailingKubeClient{PrintingKubeClient: kubefake.PrintingKubeClient{Out: io.Discard}},
 		Capabilities:   chartutil.DefaultCapabilities,
 		RegistryClient: registryClient,
 		Log: func(format string, v ...interface{}) {

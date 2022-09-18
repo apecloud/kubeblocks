@@ -136,8 +136,9 @@ all: manager dbctl ## Make all cmd binaries.
 
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./controllers/dbaas;./controllers/dataprotection;./controllers/k8score;./cmd/manager" output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/* $(CHART_PATH)/crds
+	$(CONTROLLER_GEN) rbac:roleName=loadbalancer-role  paths="./controllers/loadbalancer" output:dir=config/loadbalancer
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -149,7 +150,7 @@ fmt: ## Run go fmt against code.
 
 .PHONY: vet
 vet: ## Run go vet against code.
-	$(GO) vet ./...
+	GOOS=linux $(GO) vet ./...
 
 .PHONY: cue-fmt
 cue-fmt: cuetool ## Run cue fmt against code.
@@ -251,13 +252,46 @@ clean-dbctl: ## Clean bin/dbctl* CLI tools.
 	rm -f bin/dbctl*
 
 
+##@ Load Balancer
+
+LB_IMG ?= docker.io/infracreate/loadbalancer
+LB_VERSION ?= 0.1.0
+LB_TAG ?= v$(LB_VERSION)
+
+.PHONY: loadbalancer
+loadbalancer: build-checks ## Build loadbalancer binary.
+	$(GO) generate -x ./...
+	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer ./cmd/loadbalancer/main.go
+
+.PHONY: docker-build-loadbalancer
+docker-build-loadbalancer: ## Push docker image with the loadbalancer.
+ifneq ($(BUILDX_ENABLED), true)
+	docker build . -t ${LB_IMG}:${LB_TAG} -t ${LB_IMG}:latest -f ./docker/Dockerfile-loadbalancer
+else
+ifeq ($(TAG_LATEST), true)
+	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:latest -f ./docker/Dockerfile-loadbalancer
+else
+	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:${LB_TAG} -f ./docker/Dockerfile-loadbalancer
+endif
+endif
+
+.PHONY: docker-push-loadbalancer
+docker-push-loadbalancer: test ## Push docker image with the loadbalancer.
+ifneq ($(BUILDX_ENABLED), true)
+	docker build . -t ${LB_IMG}:${LB_TAG} -t ${LB_IMG}:latest -f Dockerfile.loadbalancer
+else
+ifeq ($(TAG_LATEST), true)
+	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:latest -f Dockerfile.loadbalancer
+else
+	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:${LB_TAG} -f Dockerfile.loadbalancer
+endif
+endif
 
 ##@ Operator Controller Manager
 
 .PHONY: manager
 manager: cue-fmt build-checks ## Build manager binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
-
 
 CERT_ROOT_CA ?= $(WEBHOOK_CERT_DIR)/rootCA.key
 .PHONY: webhook-cert
@@ -400,15 +434,28 @@ $(KUSTOMIZE): $(LOCALBIN)
 	curl -s $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN)
 
 .PHONY: controller-gen
-controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
-$(CONTROLLER_GEN): $(LOCALBIN)
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
+controller-gen: ## Download controller-gen locally if necessary.
+ifeq (, $(shell which controller-gen))
+	@{ \
+	set -e ;\
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION) ;\
+	}
+CONTROLLER_GEN=$(GOBIN)/controller-gen
+else
+CONTROLLER_GEN=$(shell which controller-gen)
+endif
 
 .PHONY: envtest
-envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
-$(ENVTEST): $(LOCALBIN)
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
-
+envtest: ## Download setup-envtest locally if necessary.
+ifeq (, $(shell which setup-envtest))
+	@{ \
+	set -e ;\
+	go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest ;\
+	}
+ENVTEST=$(GOBIN)/setup-envtest
+else
+ENVTEST=$(shell which setup-envtest)
+endif
 
 .PHONY: install-docker-buildx
 install-docker-buildx: ## Create `docker buildx` builder.

@@ -20,8 +20,9 @@ import (
 	"fmt"
 	"math"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	corev1 "k8s.io/api/core/v1"
+
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // calReverseRebaseBuffer Cal reserved memory for system

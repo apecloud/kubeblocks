@@ -43,15 +43,13 @@ func NewCreateCmd(f cmdutil.Factory) *cobra.Command {
 		Use:   "create",
 		Short: "Create a database cluster",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Validate(args))
 			cmdutil.CheckErr(o.Complete(f, args))
 			cmdutil.CheckErr(o.Run())
 		},
 	}
 
 	cmd.Flags().StringVarP(&o.FilePath, "file", "f", "", "Use yaml file to create cluster")
-	cmd.Flags().StringVar(&o.Name, "name", "", "DBCluster name")
-	cmd.Flags().StringVar(&o.Namespace, "namespace", "default", "DBCluster namespace")
 	cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "ClusterDefinition reference")
 	cmd.Flags().StringVar(&o.AppVersionRef, "app-version", "", "AppVersion reference")
 	cmd.Flags().StringVar(&o.TerminationPolicy, "termination-policy", "Halt", "Termination policy")
@@ -60,12 +58,12 @@ func NewCreateCmd(f cmdutil.Factory) *cobra.Command {
 	return cmd
 }
 
-func (o *CreateOptions) Validate() error {
+func (o *CreateOptions) Validate(args []string) error {
 	if len(o.FilePath) > 0 {
 		return nil
 	}
-	if len(o.Name) == 0 {
-		return fmt.Errorf("name can not be empty")
+	if len(args) < 1 {
+		return fmt.Errorf("missing cluster name")
 	}
 	if len(o.ClusterDefRef) == 0 {
 		return fmt.Errorf("cluster-definition can not be empty")
@@ -77,6 +75,16 @@ func (o *CreateOptions) Validate() error {
 }
 
 func (o *CreateOptions) Complete(f cmdutil.Factory, args []string) error {
+
+	var err error
+	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
+	}
+
+	if len(args) > 0 {
+		o.Name = args[0]
+	}
 
 	// used to fetch the resource
 	config, err := f.ToRESTConfig()

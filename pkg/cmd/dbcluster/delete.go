@@ -37,26 +37,33 @@ func NewDeleteCmd(f cmdutil.Factory) *cobra.Command {
 		Use:   "delete",
 		Short: "Delete a database cluster",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Validate(args))
 			cmdutil.CheckErr(o.Complete(f, args))
 			cmdutil.CheckErr(o.Run())
 		},
 	}
 
-	cmd.Flags().StringVar(&o.Name, "name", "", "DBCluster name")
-	cmd.Flags().StringVar(&o.Namespace, "namespace", "default", "DBCluster namespace")
-
 	return cmd
 }
 
-func (o *DeleteOptions) Validate() error {
-	if len(o.Name) == 0 {
-		return fmt.Errorf("name can not be empty")
+func (o *DeleteOptions) Validate(args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("missing cluster name")
 	}
 	return nil
 }
 
 func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string) error {
+
+	var err error
+	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
+	}
+
+	if len(args) > 0 {
+		o.Name = args[0]
+	}
 
 	// used to fetch the resource
 	config, err := f.ToRESTConfig()

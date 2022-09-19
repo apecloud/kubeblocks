@@ -20,7 +20,7 @@ type Installer struct {
 	DBCluster   string
 }
 
-func (d *Installer) InstallDeps() error {
+func (d *Installer) Install() error {
 	var err error
 
 	var wg sync.WaitGroup

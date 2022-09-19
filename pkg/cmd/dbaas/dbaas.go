@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/apecloud/kubeblocks/pkg/cloudprovider"
 	"github.com/apecloud/kubeblocks/pkg/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -37,7 +36,7 @@ var (
 	}
 )
 
-type InitOptions struct {
+type InstallOptions struct {
 	genericclioptions.IOStreams
 	Engine  string
 	Version string
@@ -68,28 +67,13 @@ func NewDbaasCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func (o *InitOptions) Complete() error {
-	return nil
-}
-
-func (o *InitOptions) Validate() error {
-	return nil
-}
-
-func (o *InitOptions) Run() error {
+func (o *InstallOptions) Run() error {
 	utils.Info("Initializing dbaas...")
 
 	var err error
 
-	defer func() {
-		err := utils.CleanUpPlayground()
-		if err != nil {
-			utils.Errf("Fail to clean up: %v", err)
-		}
-	}()
-
 	// Step.1 Install
-	err = installer.InstallDeps()
+	err = installer.Install()
 	if err != nil {
 		return errors.Wrap(err, "Failed to install dependencies")
 	}
@@ -98,16 +82,6 @@ func (o *InitOptions) Run() error {
 }
 
 func (o *UninstallOptions) Run() error {
-	cp := cloudprovider.Get()
-	if cp.Name() != cloudprovider.Local {
-		// remove playground cluster kubeconfig
-		if err := utils.RemoveConfig(ClusterName); err != nil {
-			return errors.Wrap(err, "Failed to remove playground kubeconfig file")
-		}
-		return cloudprovider.Get().Apply(true)
-	}
-
-	// local playground
 	if err := installer.Uninstall(); err != nil {
 		return err
 	}
@@ -116,7 +90,7 @@ func (o *UninstallOptions) Run() error {
 }
 
 func newInstallCmd(streams genericclioptions.IOStreams) *cobra.Command {
-	o := &InitOptions{
+	o := &InstallOptions{
 		IOStreams: streams,
 	}
 
@@ -124,14 +98,15 @@ func newInstallCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		Use:   "install",
 		Short: "Bootstrap a DBaaS",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete())
-			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
 
-	cmd.Flags().StringVar(&installer.KubeConfig, "kube-config", "config", "KubeConfig path")
-	cmd.Flags().BoolVar(&o.DryRun, "dry-run", false, "Dry run the playground init")
+	installer.KubeConfig, _ = cmd.Flags().GetString("kubeconfig")
+	if len(installer.KubeConfig) == 0 {
+		installer.KubeConfig = "config"
+	}
+
 	return cmd
 }
 

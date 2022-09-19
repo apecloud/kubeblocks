@@ -6,12 +6,12 @@ metadata:
     {{- include "wesqlapp.labels" . | nindent 4 }}
 spec:
   type: stat.mysql
-  podSpec:
-    components:
-    - typeName: replicasets
-      roleGroups:
-      - primary
-      defaultReplicas: 1
+  components:
+  - typeName: replicasets
+    roleGroups:
+    - primary
+    defaultReplicas: 1
+    podSpec:
       containers:
       - name: mysql
         imagePullPolicy: IfNotPresent

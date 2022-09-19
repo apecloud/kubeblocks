@@ -193,7 +193,7 @@ goimports: goimportstool ## Run goimports against code.
 
 ##@ CLI
 CLI_IMG ?= docker.io/infracreate/dbctl
-CLI_VERSION ?= 0.4.0
+CLI_VERSION ?= 0.5.0
 CLI_TAG ?= v$(CLI_VERSION)
 K3S_VERSION ?= v1.23.8+k3s1
 K3D_VERSION ?= 5.4.4

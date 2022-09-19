@@ -67,6 +67,26 @@ webhooks:
   sideEffects: None
 - admissionReviewVersions:
   - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-dbaas-infracreate-com-v1alpha1-consensusset
+  failurePolicy: Fail
+  name: mconsensusset.kb.io
+  rules:
+  - apiGroups:
+    - dbaas.infracreate.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - consensussets
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -151,4 +171,24 @@ webhooks:
     - UPDATE
     resources:
     - clusterdefinitions
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-dbaas-infracreate-com-v1alpha1-consensusset
+  failurePolicy: Fail
+  name: vconsensusset.kb.io
+  rules:
+  - apiGroups:
+    - dbaas.infracreate.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - consensussets
   sideEffects: None

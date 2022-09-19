@@ -331,6 +331,32 @@ rules:
   - patch
   - update
 - apiGroups:
+  - dbaas.infracreate.com
+  resources:
+  - consensussets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dbaas.infracreate.com
+  resources:
+  - consensussets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dbaas.infracreate.com
+  resources:
+  - consensussets/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - policy
   resources:
   - poddisruptionbudgets

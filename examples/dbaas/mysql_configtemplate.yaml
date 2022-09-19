@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-tree-node-template-8.0
+  namespace: default
+data:
+  my.cnf: |-
+    [mysqld]
+    innodb-buffer-pool-size=512M
+    log-bin=master-bin
+    gtid_mode=OFF
+    consensus_auto_leader_transfer=ON
+    
+    log-error=/data/mysql/log/mysqld.err
+    character-sets-dir=/usr/share/mysql-8.0/charsets
+    datadir=/data/mysql/data
+    port=3306
+    general_log=1
+    general_log_file=/data/mysql/mysqld.log
+    pid-file=/data/mysql/run/mysqld.pid
+    server-id=1
+    slow_query_log=1
+    slow_query_log_file=/data/mysql/mysqld-slow.log
+    socket=/data/mysql/tmp/mysqld.sock
+    ssl-ca=/data/mysql/std_data/cacert.pem
+    ssl-cert=/data/mysql/std_data/server-cert.pem
+    ssl-key=/data/mysql/std_data/server-key.pem
+    tmpdir=/data/mysql/tmp/
+    loose-sha256_password_auto_generate_rsa_keys=0
+    loose-caching_sha2_password_auto_generate_rsa_keys=0
+    secure-file-priv=/data/mysql
+    
+    [client]
+    password=
+    user=root
+    port=3306
+    socket=/data/mysql/tmp/mysqld.sock
+    host=localhost

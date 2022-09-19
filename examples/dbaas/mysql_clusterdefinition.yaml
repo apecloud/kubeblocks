@@ -6,6 +6,9 @@ spec:
   type: state.mysql-8
   components:
   - typeName: replicasets
+    configTemplateRefs:
+    - name: mysql-tree-node-template-8.0
+      volumeName: mysql-config
     roleGroups:
     - primary
     defaultReplicas: 1
@@ -25,6 +28,8 @@ spec:
             name: data
           - mountPath: /log
             name: log
+          - mountPath: /data/mysql
+            name: mysql-config
         env:
           - name: "MYSQL_ROOT_PASSWORD"
             valueFrom:

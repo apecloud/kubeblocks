@@ -19,7 +19,6 @@ package playground
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -176,7 +175,7 @@ func (d *Installer) GenKubeconfig() error {
 
 	// Replace host config with loop back address
 	cfgHostContent := strings.ReplaceAll(kubeConfig, hostToReplace, "127.0.0.1")
-	err = ioutil.WriteFile(configPath, []byte(cfgHostContent), 0600)
+	err = os.WriteFile(configPath, []byte(cfgHostContent), 0600)
 	if err != nil {
 		errf("Fail to re-write host kubeconfig")
 	}
@@ -451,7 +450,7 @@ func installCharts(in *Installer, wg *sync.WaitGroup) error {
 				}
 				return nil
 			}, &opts); err != nil {
-				return errors.Errorf("Install chart %s error", c.Name)
+				return errors.Errorf("Install chart %s error: %s", c.Name, err)
 			}
 		}
 		return nil

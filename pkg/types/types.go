@@ -37,6 +37,8 @@ const (
 
 	// RestoreJobSourceName is the playground default operator
 	RestoreJobSourceName = "restoreJobs"
+
+	BackupSnapSourceName = "volumesnapshots"
 )
 
 type DBClusterInfo struct {
@@ -80,4 +82,15 @@ type PlaygroundInfo struct {
 	HostIP        string
 	CloudProvider string
 	Version       string
+}
+
+type BackupSnapInfo struct {
+	Name          string
+	Namespace     string
+	ReadyToUse    bool
+	CreationTime  string
+	RestoreSize   string
+	SourcePVC     string
+	SnapshotClass string
+	Labels        string
 }

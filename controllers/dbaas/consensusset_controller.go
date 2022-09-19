@@ -18,6 +18,9 @@ package dbaas
 
 import (
 	"context"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -58,5 +61,11 @@ func (r *ConsensusSetReconciler) Reconcile(ctx context.Context, req ctrl.Request
 func (r *ConsensusSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dbaasv1alpha1.ConsensusSet{}).
+		Owns(&appsv1.StatefulSet{}).
+		Owns(&corev1.Service{}).
+		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.Secret{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
+		Owns(&policyv1.PodDisruptionBudget{}).
 		Complete(r)
 }

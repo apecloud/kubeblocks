@@ -85,12 +85,12 @@ spec:
               name: cert
               readOnly: true
           {{- end }}
-      {{- with .Values.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
       {{- with .Values.affinity }}
       affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       terminationGracePeriodSeconds: 10
@@ -102,9 +102,9 @@ spec:
         - name: manager-config
           configMap:
             name: manager-config
-      {{- if .Values.admissionWebhooks.enabled }}
-      - name: cert
-        secret:
-          defaultMode: 420
-          secretName: {{ include "opendbaas-core.fullname" . }}.{{ template "opendbaas-core.namespace" . }}.svc.tls-pair
-      {{- end }}
+        {{- if .Values.admissionWebhooks.enabled }}
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: {{ include "opendbaas-core.fullname" . }}.{{ .Release.Namespace }}.svc.tls-pair
+        {{- end }}

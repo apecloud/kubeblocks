@@ -131,7 +131,7 @@ type ClusterDefinitionComponent struct {
 	// ConsensusSpec defines consensus related spec if componentType is Consensus
 	// CAN'T be empty if componentType is Consensus
 	// +optional
-	ConsensusSpec ConsensusSpec `json:"consensusSpec,omitempty"`
+	ConsensusSpec ConsensusSetSpec `json:"consensusSpec,omitempty"`
 }
 
 type ComponentType string
@@ -140,73 +140,6 @@ const (
 	Stateless ComponentType = "Stateless"
 	Stateful  ComponentType = "Stateful"
 	Consensus ComponentType = "Consensus"
-)
-
-type ConsensusSpec struct {
-	// RoleObserveQuery, role observing query
-	// return a role name which should be one of Leader.Name、Followers[*].Name or Learner.Name
-	// +kubebuilder:validation:Required
-	RoleObserveQuery string `json:"roleObserveQuery,omitempty"`
-
-	// Leader, one single leader
-	// +kubebuilder:validation:Required
-	Leader ConsensusMember `json:"leader,omitempty"`
-
-	// Followers, has voting right but not Leader
-	// +optional
-	Followers []ConsensusMember `json:"followers,omitempty"`
-
-	// Learner, no voting right
-	// +optional
-	Learner ConsensusMember `json:"learner,omitempty"`
-
-	// UpdateStrategy, Pods update strategy
-	// options: serial, bestEffortParallel, parallel
-	// serial: update Pods one by one that guarantee minimum component unavailable time
-	// 		Learner -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader
-	// bestEffortParallel: update Pods in parallel that guarantee minimum component un-writable time
-	//		Learner, Follower(minority) in parallel -> Follower(majority) -> Leader, keep majority online all the time
-	// parallel: force parallel
-	// +kubebuilder:default=Serial
-	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
-	// +optional
-	UpdateStrategy ComponentUpdateStrategy `json:"updateStrategy,omitempty"`
-}
-
-type ConsensusMember struct {
-	// Name, role name
-	// +kubebuilder:validation:Required
-	Name string `json:"name,omitempty"`
-
-	// AccessMode, what service this member capable for
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=None
-	// +kubebuilder:validation:Enum={None, Readonly, ReadWrite}
-	AccessMode AccessMode `json:"accessMode,omitempty"`
-
-	// Replicas, number of Pods of this role
-	// default 1 for Leader
-	// default 0 for Learner
-	// default Components[*].Replicas - Leader.Replicas - Learner.Replicas for Followers
-	// +kubebuilder:default=0
-	// +kubebuilder:validation:Minimum=0
-	Replicas int `json:"replicas,omitempty"`
-}
-
-type AccessMode string
-
-const (
-	ReadWrite AccessMode = "ReadWrite"
-	Readonly  AccessMode = "Readonly"
-	None      AccessMode = "None"
-)
-
-type ComponentUpdateStrategy string
-
-const (
-	Serial             ComponentUpdateStrategy = "Serial"
-	BestEffortParallel ComponentUpdateStrategy = "BestEffortParallel"
-	Parallel           ComponentUpdateStrategy = "Parallel"
 )
 
 type ClusterDefinitionScripts struct {

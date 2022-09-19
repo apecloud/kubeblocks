@@ -35,13 +35,147 @@ spec:
           spec:
             description: ConsensusSetSpec defines the desired state of ConsensusSet
             properties:
-              foo:
-                description: Foo is an example field of ConsensusSet. Edit consensusset_types.go
-                  to remove/update
+              followers:
+                description: Followers, has voting right but not Leader
+                items:
+                  properties:
+                    accessMode:
+                      default: None
+                      description: AccessMode, what service this member capable for
+                      enum:
+                      - None
+                      - Readonly
+                      - ReadWrite
+                      type: string
+                    name:
+                      description: Name, role name
+                      type: string
+                    replicas:
+                      default: 0
+                      description: Replicas, number of Pods of this role default 1
+                        for Leader default 0 for Learner default Components[*].Replicas
+                        - Leader.Replicas - Learner.Replicas for Followers
+                      minimum: 0
+                      type: integer
+                  type: object
+                type: array
+              leader:
+                description: Leader, one single leader
+                properties:
+                  accessMode:
+                    default: None
+                    description: AccessMode, what service this member capable for
+                    enum:
+                    - None
+                    - Readonly
+                    - ReadWrite
+                    type: string
+                  name:
+                    description: Name, role name
+                    type: string
+                  replicas:
+                    default: 0
+                    description: Replicas, number of Pods of this role default 1 for
+                      Leader default 0 for Learner default Components[*].Replicas
+                      - Leader.Replicas - Learner.Replicas for Followers
+                    minimum: 0
+                    type: integer
+                type: object
+              learner:
+                description: Learner, no voting right
+                properties:
+                  accessMode:
+                    default: None
+                    description: AccessMode, what service this member capable for
+                    enum:
+                    - None
+                    - Readonly
+                    - ReadWrite
+                    type: string
+                  name:
+                    description: Name, role name
+                    type: string
+                  replicas:
+                    default: 0
+                    description: Replicas, number of Pods of this role default 1 for
+                      Leader default 0 for Learner default Components[*].Replicas
+                      - Leader.Replicas - Learner.Replicas for Followers
+                    minimum: 0
+                    type: integer
+                type: object
+              roleObserveQuery:
+                description: RoleObserveQuery, role observing query return a role
+                  name which should be one of Leader.Name、Followers[*].Name or Learner.Name
+                type: string
+              updateStrategy:
+                default: Serial
+                description: 'UpdateStrategy, Pods update strategy options: serial,
+                  bestEffortParallel, parallel serial: update Pods one by one that
+                  guarantee minimum component unavailable time Learner -> Follower(with
+                  AccessMode=none) -> Follower(with AccessMode=readonly) -> Follower(with
+                  AccessMode=readWrite) -> Leader bestEffortParallel: update Pods
+                  in parallel that guarantee minimum component un-writable time Learner,
+                  Follower(minority) in parallel -> Follower(majority) -> Leader,
+                  keep majority online all the time parallel: force parallel'
+                enum:
+                - Serial
+                - BestEffortParallel
+                - Parallel
                 type: string
             type: object
           status:
             description: ConsensusSetStatus defines the observed state of ConsensusSet
+            properties:
+              consensusSetConditions:
+                description: ConsensusSetCondition
+                items:
+                  properties:
+                    lastTransitionTime:
+                      description: Last time the condition transitioned from one status
+                        to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of consensusset condition.
+                      type: string
+                  type: object
+                type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed
+                  for this ConsensusSet.
+                format: int64
+                type: integer
+              readyFollowers:
+                default: 0
+                description: ReadyFollowers, ready follower pods
+                type: integer
+              readyLeader:
+                default: 0
+                description: ReadyLeader, ready leader pod, 0 or 1
+                type: integer
+              readyLearners:
+                default: 0
+                description: ReadyLearners, ready learner pods
+                type: integer
+              readyReplicas:
+                default: 0
+                description: ReadyReplicas is the number of pods created for this
+                  ConsensusSet with a Ready Condition.
+                type: integer
+              replicas:
+                default: 0
+                description: Replicas is the number of Pods created by the controller
+                type: integer
             type: object
         type: object
     served: true

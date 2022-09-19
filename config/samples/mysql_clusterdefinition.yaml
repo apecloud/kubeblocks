@@ -6,6 +6,9 @@ spec:
   type: state.mysql-8
   components:
   - typeName: replicasets
+    configTemplateRefs:
+    - name: mysql-tree-node-template-8.0
+      volumeName: mysql-config
     roleGroups:
     - primary
     defaultReplicas: 1
@@ -24,6 +27,8 @@ spec:
           name: data
         - mountPath: /log
           name: log
+        - mountPath: /data/config/mysql
+          name: mysql-config
       env:
         - name: "MYSQL_ROOT_PASSWORD"
           valueFrom:
@@ -50,6 +55,12 @@ spec:
           echo $idx;
           cluster_info="$cluster_info@$(($idx+1))";
           echo $cluster_info;
+          mkdir -p /data/mysql/log;
+          mkdir -p /data/mysql/data;
+          mkdir -p /data/mysql/std_data;
+          mkdir -p /data/mysql/tmp;
+          mkdir -p /data/mysql/run;
+          chmod +777 -R /data/mysql;
           docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
   roleGroupTemplates:
   - typeName: primary

@@ -112,6 +112,9 @@ func (o *CreateOptions) Run() error {
 			return nil
 		}
 	} else {
+		if len(o.Components) == 0 {
+			o.Components = "[]"
+		}
 		clusterJsonByte := []byte(fmt.Sprintf(`
 {
   "apiVersion": "dbaas.infracreate.com/v1alpha1",
@@ -122,10 +125,11 @@ func (o *CreateOptions) Run() error {
   },
   "spec": {
     "clusterDefinitionRef": "%s",
-    "appVersionRef": "%s"
+    "appVersionRef": "%s",
+    "components": %s
   }
 }
-`, o.Name, o.Namespace, o.ClusterDefRef, o.AppVersionRef))
+`, o.Name, o.Namespace, o.ClusterDefRef, o.AppVersionRef, o.Components))
 		if err := json.Unmarshal(clusterJsonByte, &clusterObj); err != nil {
 			return err
 		}

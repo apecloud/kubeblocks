@@ -132,9 +132,14 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
 
-	// antiAffinity defines components should have anti-affinity constraint to same component type
-	// +kubebuilder:default=false
-	AntiAffinity bool `json:"antiAffinity,omitempty"`
+	// podAntiAffinity defines pods of component anti-affnity
+	// +kubebuilder:default=preferred
+	// +kubebuilder:validation:Enum={preferred,required}
+	PodAntiAffinity string `json:"podAntiAffinity,omitempty"`
+
+	// TopologySpreadConstraint describes how a group of pods ought to spread across topology domains
+	// +optional
+	TopologySpreadConstraint TopologySpreadConstraint `json:"topologySpreadConstraint,omitempty"`
 
 	// isQuorum defines odd number of pods & N/2+1 pods
 	// +kubebuilder:default=false
@@ -254,6 +259,20 @@ type ClusterDefinitionStatusGeneration struct {
 	// +kubebuilder:validation:Enum={InSync,OutOfSync}
 	// +optional
 	ClusterDefSyncStatus Status `json:"clusterDefSyncStatus,omitempty"`
+}
+
+// TopologySpreadConstraint specifies how to spread matching pods among the given topology.
+// It is a minimal version of corev1.TopologySpreadConstraint to avoid to add too many fields of API
+// Refer to https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints
+type TopologySpreadConstraint struct {
+	// MaxSkew describes the degree to which Pods may be unevenly distributed
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:ExclusiveMinimum=0
+	MaxSkew int `json:"maxSkew,omitempty"`
+	// WhenUnsatisfiable indicates how to deal with a Pod if it doesn't satisfy the spread constraint
+	// +kubebuilder:default=DoNotSchedule
+	// +kubebuilder:validation:Enum={DoNotSchedule,ScheduleAnyway}
+	WhenUnsatisfiable string `json:"whenUnsatisfiable,omitempty"`
 }
 
 func init() {

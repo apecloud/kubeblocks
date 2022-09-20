@@ -24,6 +24,7 @@ import (
 
 type Wesql struct {
 	serverVersion string
+	dbReplicas    string
 }
 
 func (o *Wesql) GetRepos() []repo.Entry {
@@ -61,6 +62,7 @@ func (o *Wesql) GetDBCharts(ns string, dbname string) []helm.InstallOpts {
 			Version:   "0.1.0",
 			Sets: []string{
 				"serverVersion=" + o.serverVersion,
+				"replicaCount=" + o.dbReplicas,
 			},
 			LoginOpts: &helm.LoginOpts{
 				User:   helmUser,

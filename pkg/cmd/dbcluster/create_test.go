@@ -43,14 +43,14 @@ var _ = Describe("Create", func() {
 			AppVersionRef: "app-version",
 			Components:    "",
 		}
-		o.Complete(tf, []string{"test"})
+		Expect(o.Complete(tf, []string{"test"})).Should(Succeed())
 		Expect(o.Namespace).To(Equal("default"))
 		Expect(o.Name).To(Equal("test"))
 
 		Expect(o.Run()).Should(Succeed())
 
 		del := &DeleteOptions{}
-		del.Complete(tf, []string{"test"})
+		Expect(del.Complete(tf, []string{"test"})).Should(Succeed())
 		Expect(del.Namespace).To(Equal("default"))
 		Expect(del.Run()).Should(Succeed())
 	})

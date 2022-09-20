@@ -48,7 +48,7 @@ type Component struct {
 	Replicas             int                                    `json:"replicas,omitempty"`
 	AntiAffinity         bool                                   `json:"antiAffinity,omitempty"`
 	ComponentType        dbaasv1alpha1.ComponentType            `json:"componentType,omitempty"`
-	ConsensusSpec        dbaasv1alpha1.ConsensusSpec            `json:"consensusSpec,omitempty"`
+	ConsensusSpec        dbaasv1alpha1.ConsensusSetSpec         `json:"consensusSpec,omitempty"`
 	PodSpec              *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	Service              corev1.ServiceSpec                     `json:"service,omitempty"`
 	Scripts              dbaasv1alpha1.ClusterDefinitionScripts `json:"scripts,omitempty"`

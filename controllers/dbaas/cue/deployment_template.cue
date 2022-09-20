@@ -9,7 +9,7 @@ component: {
 	clusterType:    string
 	type:           string
 	name:           string
-	replicas:				int
+	replicas:       int
 	podSpec: containers: [...]
 	volumeClaimTemplates: [...]
 }

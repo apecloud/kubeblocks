@@ -31,6 +31,11 @@ type ConsensusSetSpec struct {
 	// +kubebuilder:validation:Required
 	RoleObserveQuery string `json:"roleObserveQuery,omitempty"`
 
+	// Replicas, number of pods in this ConsensusSet
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=1
+	Replicas int `json:"replicas,omitempty"`
+
 	// Leader, one single leader
 	// +kubebuilder:validation:Required
 	Leader ConsensusMember `json:"leader,omitempty"`
@@ -54,6 +59,29 @@ type ConsensusSetSpec struct {
 	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
 	// +optional
 	UpdateStrategy UpdateStrategy `json:"updateStrategy,omitempty"`
+
+	// selector is a label query over pods that should match the replica count.
+	// It must match the pod template's labels.
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+	// +optional
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+
+	// template is the object that describes the pod that will be created if
+	// insufficient replicas are detected. Each pod stamped out by the StatefulSet
+	// will fulfill this Template, but have a unique identity from the rest
+	// of the StatefulSet.
+	// +optional
+	Template v1.PodTemplateSpec `json:"template,omitempty"`
+
+	// volumeClaimTemplates is a list of claims that pods are allowed to reference.
+	// The StatefulSet controller is responsible for mapping network identities to
+	// claims in a way that maintains the identity of a pod. Every claim in
+	// this list must have at least one matching (by name) volumeMount in one
+	// container in the template. A claim in this list takes precedence over
+	// any volumes in the template, with the same name.
+	// TODO: Define the behavior if a claim already exists with the same name.
+	// +optional
+	VolumeClaimTemplates []v1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
 }
 
 type ConsensusMember struct {
@@ -73,7 +101,7 @@ type ConsensusMember struct {
 	// default Components[*].Replicas - Leader.Replicas - Learner.Replicas for Followers
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
-	Replicas int `json:"replicas,omitempty"`
+	Replicas int32 `json:"replicas,omitempty"`
 }
 
 type AccessMode string
@@ -98,29 +126,39 @@ type ConsensusSetStatus struct {
 	// Replicas is the number of Pods created by the controller
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=0
-	Replicas int `json:"replicas,omitempty"`
+	Replicas int32 `json:"replicas,omitempty"`
 
 	// ReadyReplicas is the number of pods created for this ConsensusSet with a Ready Condition.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=0
-	ReadyReplicas int `json:"readyReplicas,omitempty"`
+	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
 
 	// ReadyLeader, ready leader pod, 0 or 1
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=0
 	// +kubebuilder:minimum=0
 	// +kubebuilder:maximum=1
-	ReadyLeader int `json:"readyLeader,omitempty"`
+	ReadyLeader int32 `json:"readyLeader,omitempty"`
 
 	// ReadyFollowers, ready follower pods
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=0
-	ReadyFollowers int `json:"readyFollowers,omitempty"`
+	ReadyFollowers int32 `json:"readyFollowers,omitempty"`
 
 	// ReadyLearners, ready learner pods
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=0
-	ReadyLearners int `json:"readyLearners,omitempty"`
+	ReadyLearners int32 `json:"readyLearners,omitempty"`
+
+	// IsReadWriteServiceReady, indicates readWrite service ready status
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=false
+	IsReadWriteServiceReady bool `json:"isReadWriteServiceReady,omitempty"`
+
+	// IsReadonlyServiceReady, indicates readonly service ready status
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=false
+	IsReadonlyServiceReady bool `json:"isReadonlyServiceReady,omitempty"`
 
 	// ConsensusSetCondition
 	// +optional
@@ -148,7 +186,7 @@ type ConsensusSetCondition struct {
 	// +optional
 	Reason string `json:"reason,omitempty"`
 
-	// A human readable message indicating details about the transition.
+	// A human-readable message indicating details about the transition.
 	// +optional
 	Message string `json:"message,omitempty"`
 }

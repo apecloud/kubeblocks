@@ -124,7 +124,7 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 		}
 
 		// Leader.replicas + Follower.replicas should be odd
-		candidates := 1
+		candidates := int32(1)
 		for _, member := range consensusSpec.Followers {
 			candidates += member.Replicas
 		}
@@ -138,7 +138,7 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 
 		// if Followers.Replicas present, Leader.Replicas(that is 1) + Followers.Replicas + Learner.Replicas should equal to component.defaultReplicas
 		isFollowerPresent := false
-		memberCount := 1
+		memberCount := int32(1)
 		for _, member := range consensusSpec.Followers {
 			if member.Replicas > 0 {
 				isFollowerPresent = true
@@ -147,7 +147,7 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 		}
 		if isFollowerPresent {
 			memberCount += consensusSpec.Learner.Replicas
-			if memberCount != component.DefaultReplicas {
+			if memberCount != int32(component.DefaultReplicas) {
 				*allErrs = append(*allErrs,
 					field.Invalid(field.NewPath("spec.components[*].consensusSpec.defaultReplicas"),
 						component.DefaultReplicas,

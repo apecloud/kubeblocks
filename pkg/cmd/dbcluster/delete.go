@@ -10,27 +10,17 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/describe"
 )
 
 type DeleteOptions struct {
-	Namespace     string
-	Name          string
-	ClusterDefRef string
-	AppVersionRef string
-
-	FilePath string
-
-	BuilderArgs []string
-
-	DescriberSettings *describe.DescriberSettings
+	Namespace string
+	Name      string
 
 	client dynamic.Interface
 	genericclioptions.IOStreams
 }
 
 func NewDeleteCmd(f cmdutil.Factory) *cobra.Command {
-
 	o := &DeleteOptions{}
 
 	cmd := &cobra.Command{

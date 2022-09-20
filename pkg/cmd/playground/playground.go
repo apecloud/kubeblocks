@@ -52,9 +52,10 @@ type RootOptions struct {
 
 type InitOptions struct {
 	genericclioptions.IOStreams
-	Engine  string
-	Version string
-	DryRun  bool
+	Engine     string
+	Version    string
+	DBReplicas string
+	DryRun     bool
 }
 
 type DestroyOptions struct {
@@ -62,7 +63,7 @@ type DestroyOptions struct {
 	Engine   string
 	Provider string
 	Version  string
-	DryRun   bool
+	DryRun   string
 }
 
 // NewPlaygroundCmd creates the playground command
@@ -108,6 +109,7 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&rootOptions.AccessSecret, "access-secret", "", "Cloud provider access secret")
 	cmd.Flags().StringVar(&rootOptions.Region, "region", "", "Cloud provider region")
 	cmd.Flags().StringVar(&o.Version, "version", DefaultVersion, "Database engine version")
+	cmd.Flags().StringVar(&o.DBReplicas, "replicas", DefaultDBReplicas, "Database cluster replicas")
 	cmd.Flags().BoolVar(&o.DryRun, "dry-run", false, "Dry run the playground init")
 	return cmd
 }
@@ -163,6 +165,7 @@ func newPortForward() *cobra.Command {
 func (o *InitOptions) Complete() error {
 	installer.wesql = Wesql{
 		serverVersion: o.Version,
+		dbReplicas:    o.DBReplicas,
 	}
 	return nil
 }

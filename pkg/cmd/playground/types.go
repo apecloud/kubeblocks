@@ -32,6 +32,7 @@ const (
 	LocalHost            = "127.0.0.1"
 	DefaultS3Endpoint    = "https://s3.cn-north-1.amazonaws.com.cn"
 	DefaultS3Region      = "cn-north-1"
+	DefaultDBReplicas    = "3"
 
 	// K3sKubeConfigLocation is default path of k3s kubeconfig
 	K3sKubeConfigLocation = "/etc/rancher/k3s/k3s.yaml"

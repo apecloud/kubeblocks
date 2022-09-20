@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.configTemplate.name }}
+data:
+  my.cnf: |-
+    {{- .Values.configTemplate.configuration | nindent 4 }}

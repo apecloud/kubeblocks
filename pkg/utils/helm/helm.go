@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"os"
@@ -34,12 +35,15 @@ import (
 	"github.com/pkg/errors"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
+	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
+	kubefake "helm.sh/helm/v3/pkg/kube/fake"
 	"helm.sh/helm/v3/pkg/registry"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
 
 	"github.com/apecloud/kubeblocks/pkg/utils"
@@ -267,7 +271,7 @@ func (i *InstallOpts) UnInstall(cfg *action.Configuration) error {
 		}
 		return nil
 	}, &opts); err != nil {
-		return errors.Errorf("Install chart %s error: %s", i.Name, err.Error())
+		return errors.Errorf("UnInstall chart %s error: %s", i.Name, err.Error())
 	}
 
 	return nil
@@ -352,4 +356,20 @@ func NewActionConfig(ns string, config string) (*action.Configuration, error) {
 		return nil, err
 	}
 	return cfg, nil
+}
+
+func FakeActionConfig() *action.Configuration {
+	registryClient, err := registry.NewClient()
+	if err != nil {
+		return nil
+	}
+
+	return &action.Configuration{
+		Releases:       storage.Init(driver.NewMemory()),
+		KubeClient:     &kubefake.FailingKubeClient{PrintingKubeClient: kubefake.PrintingKubeClient{Out: ioutil.Discard}},
+		Capabilities:   chartutil.DefaultCapabilities,
+		RegistryClient: registryClient,
+		Log: func(format string, v ...interface{}) {
+		},
+	}
 }

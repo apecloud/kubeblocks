@@ -17,72 +17,96 @@ limitations under the License.
 package dbaas
 
 import (
+	"bytes"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+
+	"github.com/apecloud/kubeblocks/pkg/utils/helm"
 )
 
 var _ = Describe("dbaas", func() {
 	var cmd *cobra.Command
 	var streams genericclioptions.IOStreams
+	buf := new(bytes.Buffer)
+	errbuf := new(bytes.Buffer)
 
 	BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		streams, _, buf, errbuf = genericclioptions.NewTestIOStreams()
 	})
 
-	Context("command", func() {
-		It("dbaas", func() {
-			tf := cmdtesting.NewTestFactory().WithNamespace("test")
-			defer tf.Cleanup()
+	It("dbaas", func() {
+		tf := cmdtesting.NewTestFactory().WithNamespace("test")
+		defer tf.Cleanup()
 
-			cmd = NewDbaasCmd(tf, streams)
-			Expect(cmd != nil).Should(BeTrue())
-			Expect(cmd.HasSubCommands()).Should(BeTrue())
-		})
+		cmd = NewDbaasCmd(tf, streams)
+		Expect(cmd != nil).Should(BeTrue())
+		Expect(cmd.HasSubCommands()).Should(BeTrue())
+	})
 
-		It("install", func() {
-			tf := cmdtesting.NewTestFactory().WithNamespace("test")
-			defer tf.Cleanup()
+	It("check install", func() {
+		tf := cmdtesting.NewTestFactory().WithNamespace("test")
+		defer tf.Cleanup()
 
-			var cfg string
-			cmd = newInstallCmd(tf, streams)
-			cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
+		var cfg string
+		cmd = newInstallCmd(tf, streams)
+		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
+		cmd.SetOut(buf)
+		cmd.SetErr(errbuf)
 
-			Expect(cmd != nil).Should(BeTrue())
-			Expect(cmd.HasSubCommands()).Should(BeFalse())
-			o := &InstallOptions{
-				Options: Options{
-					IOStreams: streams,
-				},
-			}
+		Expect(cmd != nil).Should(BeTrue())
+		Expect(cmd.HasSubCommands()).Should(BeFalse())
 
-			Expect(o.Complete(tf, cmd)).To(Succeed())
-			Expect(o.KubeConfig).To(Equal(""))
-			Expect(o.Namespace).To(Equal("test"))
-		})
+		o := &InstallOptions{
+			Options: Options{
+				IOStreams: streams,
+			},
+		}
+		Expect(o.Complete(tf, cmd)).To(Succeed())
+		Expect(o.Namespace).To(Equal("test"))
+	})
 
-		It("uninstall", func() {
-			tf := cmdtesting.NewTestFactory().WithNamespace("test")
-			defer tf.Cleanup()
+	It("run install", func() {
+		o := &InstallOptions{
+			Options: Options{
+				IOStreams: streams,
+				cfg:       helm.FakeActionConfig(),
+				Namespace: "default",
+			},
+			Version: defaultVersion,
+		}
+		Expect(o.Run()).To(Succeed())
+	})
 
-			var cfg string
-			cmd = newUninstallCmd(tf, streams)
-			cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
+	It("check uninstall", func() {
+		tf := cmdtesting.NewTestFactory().WithNamespace("test")
+		defer tf.Cleanup()
 
-			Expect(cmd != nil).Should(BeTrue())
-			Expect(cmd.HasSubCommands()).Should(BeFalse())
+		var cfg string
+		cmd = newUninstallCmd(tf, streams)
+		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
 
-			o := &InstallOptions{
-				Options: Options{
-					IOStreams: streams,
-				},
-			}
-			Expect(o.Complete(tf, cmd)).To(Succeed())
-			Expect(o.KubeConfig).To(Equal(""))
-			Expect(o.Namespace).To(Equal("test"))
-		})
+		Expect(cmd != nil).Should(BeTrue())
+		Expect(cmd.HasSubCommands()).Should(BeFalse())
+
+		o := &Options{
+			IOStreams: streams,
+		}
+		Expect(o.Complete(tf, cmd)).To(Succeed())
+		Expect(o.Namespace).To(Equal("test"))
+	})
+
+	It("run uninstall", func() {
+		o := &Options{
+			IOStreams: streams,
+			cfg:       helm.FakeActionConfig(),
+			Namespace: "default",
+		}
+
+		Expect(o.Run()).To(MatchError(MatchRegexp("Failed to uninstall dbaas")))
 	})
 })

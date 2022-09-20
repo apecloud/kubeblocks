@@ -35,9 +35,8 @@ type CreateOptions struct {
 	genericclioptions.IOStreams
 }
 
-func NewCreateCmd(f cmdutil.Factory) *cobra.Command {
-
-	o := &CreateOptions{}
+func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &CreateOptions{IOStreams: streams}
 
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -123,11 +122,10 @@ func (o *CreateOptions) Run() error {
   },
   "spec": {
     "clusterDefinitionRef": "%s",
-    "appVersionRef": "%s",
-    "components": %s
+    "appVersionRef": "%s"
   }
 }
-`, o.Name, o.Namespace, o.ClusterDefRef, o.AppVersionRef, o.Components))
+`, o.Name, o.Namespace, o.ClusterDefRef, o.AppVersionRef))
 		if err := json.Unmarshal(clusterJsonByte, &clusterObj); err != nil {
 			return err
 		}

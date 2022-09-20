@@ -15,7 +15,7 @@ type Installer struct {
 }
 
 func (i *Installer) Install() error {
-	dbaasChart := helm.InstallOpts{
+	chart := helm.InstallOpts{
 		Name:      "opendbaas-core",
 		Chart:     "oci://yimeisun.azurecr.io/helm-chart/opendbaas-core",
 		Wait:      true,
@@ -29,7 +29,7 @@ func (i *Installer) Install() error {
 		TryTimes: 2,
 	}
 
-	err := dbaasChart.Install(i.cfg)
+	err := chart.Install(i.cfg)
 	if err != nil {
 		return err
 	}
@@ -40,7 +40,8 @@ func (i *Installer) Install() error {
 // Uninstall remove dbaas
 func (i *Installer) Uninstall() error {
 	chart := helm.InstallOpts{
-		Name: "opendbaas-core",
+		Name:      "opendbaas-core",
+		Namespace: i.Namespace,
 	}
 
 	err := chart.UnInstall(i.cfg)

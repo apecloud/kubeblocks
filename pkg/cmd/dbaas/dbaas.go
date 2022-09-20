@@ -21,6 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"helm.sh/helm/v3/pkg/action"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
@@ -31,8 +32,9 @@ const defaultVersion = "0.1.0-alpha.5"
 
 type Options struct {
 	genericclioptions.IOStreams
-	Namespace  string
-	KubeConfig string
+
+	cfg       *action.Configuration
+	Namespace string
 }
 
 type InstallOptions struct {
@@ -45,9 +47,6 @@ func NewDbaasCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	cmd := &cobra.Command{
 		Use:   "dbaas",
 		Short: "DBaaS operation commands",
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("dbaas called")
-		},
 	}
 	cmd.AddCommand(
 		newInstallCmd(f, streams),
@@ -64,13 +63,14 @@ func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	cfg, err := cmd.Flags().GetString("kubeconfig")
+	kubeconfig, err := cmd.Flags().GetString("kubeconfig")
 	if err != nil {
 		return err
 	}
 
-	if len(cfg) > 0 {
-		o.KubeConfig = cfg
+	o.cfg, err = helm.NewActionConfig(o.Namespace, kubeconfig)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -79,18 +79,13 @@ func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 func (o *InstallOptions) Run() error {
 	fmt.Fprintln(o.Out, "Installing dbaas...")
 
-	cfg, err := helm.NewActionConfig(o.Namespace, o.KubeConfig)
-	if err != nil {
-		return err
-	}
-
 	installer := Installer{
-		cfg:       cfg,
+		cfg:       o.cfg,
 		Namespace: o.Namespace,
 		Version:   o.Version,
 	}
 
-	err = installer.Install()
+	err := installer.Install()
 	if err != nil {
 		return errors.Wrap(err, "Failed to install dbaas")
 	}
@@ -102,13 +97,8 @@ func (o *InstallOptions) Run() error {
 func (o *Options) Run() error {
 	fmt.Fprintln(o.Out, "Uninstalling dbaas...")
 
-	cfg, err := helm.NewActionConfig(o.Namespace, o.KubeConfig)
-	if err != nil {
-		return err
-	}
-
 	installer := Installer{
-		cfg:       cfg,
+		cfg:       o.cfg,
 		Namespace: o.Namespace,
 	}
 

@@ -161,6 +161,10 @@ func GetKubeconfigDir() string {
 }
 
 func ConfigPath(name string) string {
+	if len(name) == 0 {
+		return ""
+	}
+
 	return filepath.Join(GetKubeconfigDir(), name)
 }
 

@@ -46,11 +46,7 @@ func (o *Wesql) GetDBCharts(ns string, dbname string) []helm.InstallOpts {
 				"image.tag=latest",
 				"image.pullPolicy=Always",
 			},
-			LoginOpts: &helm.LoginOpts{
-				User:   helmUser,
-				Passwd: helmPasswd,
-				URL:    helmURL,
-			},
+			Login:    true,
 			TryTimes: 2,
 		},
 		{
@@ -62,11 +58,7 @@ func (o *Wesql) GetDBCharts(ns string, dbname string) []helm.InstallOpts {
 			Sets: []string{
 				"serverVersion=" + o.serverVersion,
 			},
-			LoginOpts: &helm.LoginOpts{
-				User:   helmUser,
-				Passwd: helmPasswd,
-				URL:    helmURL,
-			},
+			Login:    true,
 			TryTimes: 2,
 		},
 	}

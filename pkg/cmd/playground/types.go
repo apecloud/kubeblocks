@@ -33,10 +33,6 @@ const (
 	DefaultS3Endpoint    = "https://s3.cn-north-1.amazonaws.com.cn"
 	DefaultS3Region      = "cn-north-1"
 
-	helmUser   = "yimeisun"
-	helmPasswd = "8V+PmX1oSDv4pumDvZp6m7LS8iPgbY3A"
-	helmURL    = "yimeisun.azurecr.io"
-
 	// K3sKubeConfigLocation is default path of k3s kubeconfig
 	K3sKubeConfigLocation = "/etc/rancher/k3s/k3s.yaml"
 	// K3sExternalKubeConfigLocation is where to generate kubeconfig for external access

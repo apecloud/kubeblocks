@@ -24,12 +24,12 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/briandowns/spinner"
+	"github.com/containers/common/pkg/retry"
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	"helm.sh/helm/v3/pkg/action"
@@ -41,9 +41,14 @@ import (
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
 	"helm.sh/helm/v3/pkg/storage/driver"
-	"k8s.io/client-go/util/homedir"
 
 	"github.com/apecloud/kubeblocks/pkg/utils"
+)
+
+const (
+	helmUser   = "yimeisun"
+	helmPasswd = "8V+PmX1oSDv4pumDvZp6m7LS8iPgbY3A"
+	helmURL    = "yimeisun.azurecr.io"
 )
 
 type InstallOpts struct {
@@ -54,7 +59,7 @@ type InstallOpts struct {
 	Wait      bool
 	Version   string
 	TryTimes  int
-	LoginOpts *LoginOpts
+	Login     bool
 }
 
 type LoginOpts struct {
@@ -138,13 +143,8 @@ func RemoveRepo(r *repo.Entry) error {
 }
 
 // GetInstalled get helm package if installed.
-func (i *InstallOpts) GetInstalled(cfg string) (*release.Release, error) {
-	settings := cli.New()
-	actionConfig, err := NewActionConfig(settings, i.Namespace, cfg)
-	if err != nil {
-		return nil, err
-	}
-	getClient := action.NewGet(actionConfig)
+func (i *InstallOpts) GetInstalled(cfg *action.Configuration) (*release.Release, error) {
+	getClient := action.NewGet(cfg)
 	res, err := getClient.Run(i.Name)
 	if err != nil {
 		if strings.Contains(err.Error(), "release: not found") {
@@ -157,51 +157,63 @@ func (i *InstallOpts) GetInstalled(cfg string) (*release.Release, error) {
 }
 
 // Install will install a Chart
-func (i *InstallOpts) Install(cfg string) (*release.Release, error) {
+func (i *InstallOpts) Install(cfg *action.Configuration) error {
+	ctx := context.Background()
+	opts := retry.Options{
+		MaxRetry: 1 + i.TryTimes,
+	}
+
+	if err := retry.IfNecessary(ctx, func() error {
+		if err := i.tryInstall(cfg); err != nil {
+			return err
+		}
+		return nil
+	}, &opts); err != nil {
+		return errors.Errorf("Install chart %s error: %s", i.Name, err.Error())
+	}
+
+	return nil
+}
+
+func (i *InstallOpts) tryInstall(cfg *action.Configuration) error {
 	utils.InfoP(1, "Install "+i.Chart+"...")
 	s := spinner.New(spinner.CharSets[rand.Intn(44)], 100*time.Millisecond)
 	if err := s.Color("green"); err != nil {
-		return nil, err
+		return err
 	}
 	s.Start()
 	defer s.Stop()
 
 	res, _ := i.GetInstalled(cfg)
 	if res != nil {
-		return res, nil
+		return nil
 	}
 
 	settings := cli.New()
-	actionConfig, err := NewActionConfig(settings, i.Namespace, cfg)
+	err := i.tryLogin(cfg)
 	if err != nil {
-		return nil, err
-	}
-
-	err = i.TryToLogin(actionConfig)
-	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// TODO: Does not work now
 	// If a release does not exist, install it.
-	histClient := action.NewHistory(actionConfig)
+	histClient := action.NewHistory(cfg)
 	histClient.Max = 1
 	if _, err := histClient.Run(i.Name); err != nil && err != driver.ErrReleaseNotFound {
-		return nil, err
+		return err
 	}
 
-	client := action.NewInstall(actionConfig)
+	client := action.NewInstall(cfg)
 	client.ReleaseName = i.Name
 	client.Namespace = i.Namespace
 	client.CreateNamespace = true
 	client.Wait = i.Wait
 	client.Timeout = time.Second * 300
 	client.Version = i.Version
-	client.Keyring = defaultKeyring()
 
 	cp, err := client.ChartPathOptions.LocateChart(i.Chart, settings)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	setOpts := values.Options{
@@ -211,13 +223,13 @@ func (i *InstallOpts) Install(cfg string) (*release.Release, error) {
 	p := getter.All(settings)
 	vals, err := setOpts.MergeValues(p)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Check Chart dependencies to make sure all are present in /charts
 	chartRequested, err := loader.Load(cp)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Create context and prepare the handle of SIGTERM
@@ -235,35 +247,47 @@ func (i *InstallOpts) Install(cfg string) (*release.Release, error) {
 		cancel()
 	}()
 
-	res, err = client.RunWithContext(ctx, chartRequested, vals)
+	_, err = client.RunWithContext(ctx, chartRequested, vals)
 	if err != nil && err.Error() != "cannot re-use a name that is still in use" {
-		return nil, err
+		return err
 	}
-	return res, nil
+	return nil
 }
 
-// Uninstall will uninstall a Chart
-func (i *InstallOpts) Uninstall(cfg string) (*release.UninstallReleaseResponse, error) {
-	utils.InfoP(1, "Uninstall "+i.Chart+"...")
+// UnInstall will uninstall a Chart
+func (i *InstallOpts) UnInstall(cfg *action.Configuration) error {
+	ctx := context.Background()
+	opts := retry.Options{
+		MaxRetry: 1 + i.TryTimes,
+	}
+
+	if err := retry.IfNecessary(ctx, func() error {
+		if err := i.tryUnInstall(cfg); err != nil {
+			return err
+		}
+		return nil
+	}, &opts); err != nil {
+		return errors.Errorf("Install chart %s error: %s", i.Name, err.Error())
+	}
+
+	return nil
+}
+
+func (i *InstallOpts) tryUnInstall(cfg *action.Configuration) error {
+	utils.InfoP(1, "Uninstall "+i.Name+"...")
 	s := spinner.New(spinner.CharSets[rand.Intn(44)], 100*time.Millisecond)
 	if err := s.Color("green"); err != nil {
-		return nil, err
+		return err
 	}
 	s.Start()
 	defer s.Stop()
 
-	settings := cli.New()
-	actionConfig, err := NewActionConfig(settings, i.Namespace, cfg)
+	err := i.tryLogin(cfg)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	err = i.TryToLogin(actionConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	client := action.NewUninstall(actionConfig)
+	client := action.NewUninstall(cfg)
 	client.Wait = i.Wait
 	client.Timeout = time.Second * 300
 
@@ -282,28 +306,25 @@ func (i *InstallOpts) Uninstall(cfg string) (*release.UninstallReleaseResponse, 
 		cancel()
 	}()
 
-	res, err := client.Run(i.Name)
-	if err != nil && err.Error() != "cannot re-use a name that is still in use" {
-		return nil, err
+	_, err = client.Run(i.Name)
+	if err != nil {
+		return err
 	}
-	return res, nil
+	return nil
 }
 
-func (i *InstallOpts) TryToLogin(cfg *action.Configuration) error {
-	if i.LoginOpts == nil {
+func (i *InstallOpts) tryLogin(cfg *action.Configuration) error {
+	if !i.Login {
 		return nil
 	}
 
-	return cfg.RegistryClient.Login(i.LoginOpts.URL, registry.LoginOptBasicAuth(i.LoginOpts.User, i.LoginOpts.Passwd),
+	return cfg.RegistryClient.Login(helmURL, registry.LoginOptBasicAuth(helmUser, helmPasswd),
 		registry.LoginOptInsecure(false))
 }
 
-func NewActionConfig(s *cli.EnvSettings, ns string, config string) (*action.Configuration, error) {
-	var settings = s
+func NewActionConfig(ns string, config string) (*action.Configuration, error) {
+	settings := cli.New()
 	cfg := new(action.Configuration)
-	if settings == nil {
-		settings = cli.New()
-	}
 
 	settings.SetNamespace(ns)
 	settings.KubeConfig = config
@@ -331,45 +352,4 @@ func NewActionConfig(s *cli.EnvSettings, ns string, config string) (*action.Conf
 		return nil, err
 	}
 	return cfg, nil
-}
-
-// defaultKeyring returns the expanded path to the default keyring.
-func defaultKeyring() string {
-	if v, ok := os.LookupEnv("GNUPGHOME"); ok {
-		return filepath.Join(v, "pubring.gpg")
-	}
-	return filepath.Join(homedir.HomeDir(), ".gnupg", "pubring.gpg")
-}
-
-// UnInstall will install a Chart
-func (i *InstallOpts) UnInstall(cfg string) (*release.UninstallReleaseResponse, error) {
-	utils.InfoP(1, "UnInstall "+i.Chart+"...")
-	s := spinner.New(spinner.CharSets[rand.Intn(44)], 100*time.Millisecond)
-	if err := s.Color("green"); err != nil {
-		return nil, err
-	}
-	s.Start()
-	defer s.Stop()
-
-	settings := cli.New()
-	actionConfig, err := NewActionConfig(settings, i.Namespace, cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	err = i.TryToLogin(actionConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	client := action.NewUninstall(actionConfig)
-	client.Wait = i.Wait
-	client.Timeout = time.Second * 300
-
-	res, err := client.Run(i.Name)
-	// ignore not found error
-	if err != nil && !strings.Contains(err.Error(), "release: not found") {
-		return nil, err
-	}
-	return res, nil
 }

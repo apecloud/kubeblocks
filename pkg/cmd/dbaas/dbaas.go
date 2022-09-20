@@ -17,42 +17,31 @@ limitations under the License.
 package dbaas
 
 import (
-	"context"
 	"fmt"
 
-	"github.com/apecloud/kubeblocks/pkg/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+
+	"github.com/apecloud/kubeblocks/pkg/utils/helm"
 )
 
-var (
-	installer = &Installer{
-		Ctx:         context.Background(),
-		ClusterName: ClusterName,
-		Namespace:   ClusterNamespace,
-		DBCluster:   DBClusterName,
-	}
-)
+const defaultVersion = "0.1.0-alpha.5"
 
-type InstallOptions struct {
+type Options struct {
 	genericclioptions.IOStreams
-	Engine  string
-	Version string
-	DryRun  bool
+	Namespace  string
+	KubeConfig string
 }
 
-type UninstallOptions struct {
-	genericclioptions.IOStreams
-	Engine   string
-	Provider string
-	Version  string
-	DryRun   bool
+type InstallOptions struct {
+	Options
+	Version string
 }
 
 // NewDbaasCmd creates the dbaas command
-func NewDbaasCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func NewDbaasCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dbaas",
 		Short: "DBaaS operation commands",
@@ -61,63 +50,106 @@ func NewDbaasCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		},
 	}
 	cmd.AddCommand(
-		newInstallCmd(streams),
-		newUninstallCmd(streams),
+		newInstallCmd(f, streams),
+		newUninstallCmd(f, streams),
 	)
 	return cmd
 }
 
-func (o *InstallOptions) Run() error {
-	utils.Info("Initializing dbaas...")
-
+func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
 
-	// Step.1 Install
-	err = installer.Install()
+	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
-		return errors.Wrap(err, "Failed to install dependencies")
-	}
-
-	return nil
-}
-
-func (o *UninstallOptions) Run() error {
-	if err := installer.Uninstall(); err != nil {
 		return err
 	}
-	utils.Info("Successfully uninstall dbaas.")
+
+	cfg, err := cmd.Flags().GetString("kubeconfig")
+	if err != nil {
+		return err
+	}
+
+	if len(cfg) > 0 {
+		o.KubeConfig = cfg
+	}
+
 	return nil
 }
 
-func newInstallCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func (o *InstallOptions) Run() error {
+	fmt.Fprintln(o.Out, "Installing dbaas...")
+
+	cfg, err := helm.NewActionConfig(o.Namespace, o.KubeConfig)
+	if err != nil {
+		return err
+	}
+
+	installer := Installer{
+		cfg:       cfg,
+		Namespace: o.Namespace,
+		Version:   o.Version,
+	}
+
+	err = installer.Install()
+	if err != nil {
+		return errors.Wrap(err, "Failed to install dbaas")
+	}
+
+	fmt.Fprintln(o.Out, "Successfully install dbaas.")
+	return nil
+}
+
+func (o *Options) Run() error {
+	fmt.Fprintln(o.Out, "Uninstalling dbaas...")
+
+	cfg, err := helm.NewActionConfig(o.Namespace, o.KubeConfig)
+	if err != nil {
+		return err
+	}
+
+	installer := Installer{
+		cfg:       cfg,
+		Namespace: o.Namespace,
+	}
+
+	if err := installer.Uninstall(); err != nil {
+		return errors.Wrap(err, "Failed to uninstall dbaas")
+	}
+
+	fmt.Fprintln(o.Out, "Successfully uninstall dbaas.")
+	return nil
+}
+
+func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &InstallOptions{
-		IOStreams: streams,
+		Options: Options{
+			IOStreams: streams,
+		},
 	}
 
 	cmd := &cobra.Command{
 		Use:   "install",
 		Short: "Bootstrap a DBaaS",
 		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(o.Complete(f, cmd))
 			cmdutil.CheckErr(o.Run())
 		},
 	}
 
-	installer.KubeConfig, _ = cmd.Flags().GetString("kubeconfig")
-	if len(installer.KubeConfig) == 0 {
-		installer.KubeConfig = "config"
-	}
+	cmd.Flags().StringVar(&o.Version, "version", defaultVersion, "DBaaS version")
 
 	return cmd
 }
 
-func newUninstallCmd(streams genericclioptions.IOStreams) *cobra.Command {
-	o := &UninstallOptions{
+func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &Options{
 		IOStreams: streams,
 	}
 	cmd := &cobra.Command{
 		Use:   "uninstall",
 		Short: "Uninstall dbaas operator.",
 		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(o.Complete(f, cmd))
 			cmdutil.CheckErr(o.Run())
 		},
 	}

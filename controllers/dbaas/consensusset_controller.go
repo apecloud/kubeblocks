@@ -18,6 +18,7 @@ package dbaas
 
 import (
 	"context"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -47,9 +48,27 @@ type ConsensusSetReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.2/pkg/reconcile
 func (r *ConsensusSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx: ctx,
+		Req: req,
+		Log: log.FromContext(ctx).WithValues("consensusset", req.NamespacedName),
+	}
+	
+	cs := &dbaasv1alpha1.ConsensusSet{}
+	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, cs); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, cs, "", func() (*ctrl.Result, error) {
+		return r.deleteExternalResources(reqCtx, cs)
+	})
+	if err != nil {
+		return *res, err
+	}
 
-	// TODO(user): your logic here
+	if cs.Status. {
+		
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -59,4 +78,10 @@ func (r *ConsensusSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dbaasv1alpha1.ConsensusSet{}).
 		Complete(r)
+}
+
+func (r *ConsensusSetReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, cs *dbaasv1alpha1.ConsensusSet) (*ctrl.Result, error) {
+	// TODO finish me
+	
+	return nil, nil
 }

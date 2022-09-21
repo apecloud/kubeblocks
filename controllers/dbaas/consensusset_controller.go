@@ -111,13 +111,77 @@ func buildConsensusSetCreationTasks(
 	cs *dbaasv1alpha1.ConsensusSet) (*intctrlutil.Task, error) {
 	rootTask := intctrlutil.NewTask()
 
+	// create readWrite service
+	// TODO if service not created
+	rootTask.SubTasks = prepareServiceCreationTask(rootTask.SubTasks, cs, dbaasv1alpha1.ReadWrite)
+
 	// create readonly service
+	// TODO if service not created
+	rootTask.SubTasks = prepareServiceCreationTask(rootTask.SubTasks, cs, dbaasv1alpha1.Readonly)
 
 	// create headless service
+	rootTask.SubTasks = prepareHeadlessServiceCreationTask(rootTask.SubTasks, cs)
 
 	// create stateful set
+	rootTask.SubTasks = prepareStatefulSetCreationTask(rootTask.SubTasks, cs)
 
 	return &rootTask, nil
+}
+
+type serviceParams struct {
+	setName        types.NamespacedName
+	selectorLabels []string
+	// port           int
+}
+
+func prepareStatefulSetCreationTask(tasks []intctrlutil.Task, cs *dbaasv1alpha1.ConsensusSet) []intctrlutil.Task {
+	// TODO finish me
+	return tasks
+}
+
+func prepareHeadlessServiceCreationTask(tasks []intctrlutil.Task, cs *dbaasv1alpha1.ConsensusSet) []intctrlutil.Task {
+	// TODO finish me
+	return tasks
+}
+
+func prepareServiceCreationTask(tasks []intctrlutil.Task, cs *dbaasv1alpha1.ConsensusSet, accessMode dbaasv1alpha1.AccessMode) []intctrlutil.Task {
+	serviceTask := intctrlutil.NewTask()
+	serviceTask.ExecFunction = prepareServiceObj
+	params := prepareServiceParams(cs, accessMode)
+	serviceTask.Context["exec"] = params
+	return append(tasks, serviceTask)
+}
+
+func prepareServiceParams(cs *dbaasv1alpha1.ConsensusSet, accessMode dbaasv1alpha1.AccessMode) *serviceParams {
+	params := &serviceParams{}
+	params.setName = types.NamespacedName{
+		Namespace: cs.Namespace,
+		Name:      cs.Name + "-" + string(accessMode),
+	}
+	// TODO port mapping to port in PodSpec
+	params.selectorLabels = appendLabelsIfMatch(make([]string, 0), accessMode, cs.Spec.Leader, cs.Spec.Learner)
+
+	for _, member := range cs.Spec.Followers {
+		params.selectorLabels = appendLabelsIfMatch(params.selectorLabels, accessMode, member)
+	}
+
+	return params
+}
+
+func appendLabelsIfMatch(labels []string, accessMode dbaasv1alpha1.AccessMode, members ...dbaasv1alpha1.ConsensusMember) []string {
+	for _, member := range members {
+		if accessMode == member.AccessMode {
+			labels = append(labels, consensusSetRoleLabelKey+"="+member.Name)
+		}
+	}
+
+	return labels
+}
+
+func prepareServiceObj(ctx context.Context, cli client.Client, params interface{}) error {
+	// TODO finish me
+
+	return nil
 }
 
 func (r *ConsensusSetReconciler) updateStatusBySubResources(ctx context.Context, cs *dbaasv1alpha1.ConsensusSet) error {

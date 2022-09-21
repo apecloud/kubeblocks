@@ -54,12 +54,19 @@ auth:
 
 configTemplate:
   ## @param config template name
-  name: mysql-3node-tpl-8.0
+  ## name: mysql-3node-tpl-8.0
 
   ## @param config template context
   configuration: |-
     [mysqld]
-    innodb-buffer-pool-size=512M
+    # aliyun buffer pool: https://help.aliyun.com/document_detail/162326.html?utm_content=g_1000230851&spm=5176.20966629.toubu.3.f2991ddcpxxvD1#title-rey-j7j-4dt
+    
+    {{- if .Component.Resource -}}
+    innodb-buffer-pool-size={{ mysql_buffer_size_cal .Component.Resource false }}
+    {{ else -}}
+    innodb-buffer-pool-size=128M
+    {{- end -}}
+
     log-bin=master-bin
     gtid_mode=OFF
     consensus_auto_leader_transfer=ON
@@ -71,19 +78,16 @@ configTemplate:
     general_log=1
     general_log_file=/data/mysql/mysqld.log
     pid-file=/data/mysql/run/mysqld.pid
-    server-id=1
     slow_query_log=1
     slow_query_log_file=/data/mysql/mysqld-slow.log
     socket=/data/mysql/tmp/mysqld.sock
-    ssl-ca=/data/mysql/std_data/cacert.pem
-    ssl-cert=/data/mysql/std_data/server-cert.pem
-    ssl-key=/data/mysql/std_data/server-key.pem
     tmpdir=/data/mysql/tmp/
     loose-sha256_password_auto_generate_rsa_keys=0
     loose-caching_sha2_password_auto_generate_rsa_keys=0
     secure-file-priv=/data/mysql
     
     [client]
+    port=3306
     socket=/data/mysql/tmp/mysqld.sock
     host=localhost
 

@@ -9,7 +9,7 @@ spec:
   components:
   - typeName: replicasets
     configTemplateRefs:
-    - name: {{ .Values.configTemplate.name }}
+    - name: mysql-3node-tpl-8.0
       volumeName: mysql-config
     roleGroups:
     - primary
@@ -23,7 +23,7 @@ spec:
           name: data
       #  - mountPath: /log
       #    name: log
-        - mountPath: /data/config/mysql
+        - mountPath: /opt/mysql
           name: mysql-config
         ports:
         - containerPort: 3306
@@ -83,11 +83,10 @@ spec:
           echo $cluster_info; echo {{ .Values.cluster.replicaSetCount }}; 
           mkdir -p /data/mysql/log;
           mkdir -p /data/mysql/data;
-          mkdir -p /data/mysql/std_data;
           mkdir -p /data/mysql/tmp;
           mkdir -p /data/mysql/run;
           chmod +777 -R /data/mysql;
-          docker-entrypoint.sh mysqld --defaults-file=/data/config/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$cluster_info" --cluster-id=$CLUSTER_ID
+          docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$cluster_info" --cluster-id=$CLUSTER_ID
   roleGroupTemplates:
     - typeName: primary
       defaultReplicas: {{ .Values.cluster.replicaSetCount | default 3 }}

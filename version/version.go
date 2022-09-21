@@ -22,13 +22,16 @@ THE SOFTWARE.
 package version
 
 // Version is the string that contains version
-var Version string
+var Version = "edge"
 
 // BuildDate is the string of binary build date
 var BuildDate string
 
 // GitCommit is the string of git commit ID
 var GitCommit string
+
+// GitVersion is the string of git version tag
+var GitVersion string
 
 // K3dVersion is k3d release version
 var K3dVersion = "5.4.4"

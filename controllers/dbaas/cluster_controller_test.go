@@ -1,5 +1,5 @@
 /*
-Copyright 2022.
+Copyright 2022 The Kubeblocks Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -147,7 +147,6 @@ spec:
   - typeName: primary
     defaultReplicas: 3
     updateStrategy:
-      # 对应 pdb 中的两个字段，两个中只能填一个
       maxUnavailable: 1
   - typeName: proxy
     defaultReplicas: 2

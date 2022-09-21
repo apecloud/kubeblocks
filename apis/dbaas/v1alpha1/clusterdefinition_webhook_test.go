@@ -26,7 +26,8 @@ import (
 
 var _ = Describe("clusterDefinition webhook", func() {
 	var (
-		clusterDefinitionName = "clusterdefinition-webhook-mysql-definition"
+		clusterDefinitionName  = "clusterdefinition-webhook-mysql-definition"
+		clusterDefinitionName2 = "clusterdefinition-webhook-mysql-definition2"
 	)
 	Context("When clusterDefinition create and update", func() {
 		It("Should webhook validate passed", func() {
@@ -35,37 +36,33 @@ var _ = Describe("clusterDefinition webhook", func() {
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
 			Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
 
-			By("By update a  clusterDefinition")
-			// validate spec.cluster.strategies.create?.order and spec.components[?].typeName is consistent, including component typeName and length
-			createOrder := clusterDef.Spec.Cluster.Strategies.Create.Order
-			createOrder[0] = "replicaset"
-			Expect(k8sClient.Update(ctx, clusterDef)).ShouldNot(Succeed())
-			// restore
-			createOrder[0] = "replicaSets"
+			By("By creating a new clusterDefinition with componentType==Consensus but consensusSpec not present")
+			clusterDef, _ = createTestClusterDefinitionObj2(clusterDefinitionName2)
+			Expect(k8sClient.Create(ctx, clusterDef)).ShouldNot(Succeed())
 
-			By("By testing spec.cluster.strategies.create.order is consistent with spec.components[?].typeName")
-			clusterDef.Spec.Cluster.Strategies.Create.Order = []string{"replicaSets", "proxy", "proxy_test"}
-			Expect(k8sClient.Update(ctx, clusterDef)).ShouldNot(Succeed())
-			// restore
-			clusterDef.Spec.Cluster.Strategies.Create.Order = createOrder
+			By("Set Leader.Replicas > 1")
+			clusterDef.Spec.Components[0].ConsensusSpec.Leader.Replicas = 2
+			Expect(k8sClient.Create(ctx, clusterDef)).ShouldNot(Succeed())
+			// restore clusterDef
+			clusterDef.Spec.Components[0].ConsensusSpec.Leader.Replicas = 0
 
-			// validate spec.components[?].roleGroups and .strategies.create.order is consistent, including roleGroup name and length
-			roleGroups := clusterDef.Spec.Components[0].Strategies.Create.Order
-			roleGroups[0] = "primary_test"
-			Expect(k8sClient.Update(ctx, clusterDef)).ShouldNot(Succeed())
-			// restore
-			roleGroups[0] = "primary"
+			By("Set Followers.Replicas to odd")
+			followers := make([]ConsensusMember, 1)
+			followers[0] = ConsensusMember{Name: "follower", AccessMode: "Readonly", Replicas: 3}
+			clusterDef.Spec.Components[0].ConsensusSpec.Followers = followers
+			Expect(k8sClient.Create(ctx, clusterDef)).ShouldNot(Succeed())
 
-			By("By testing spec.components[?].strategies.create.order is consistent with spec.components[?].roleGroups")
-			clusterDef.Spec.Components[0].Strategies.Create.Order = []string{"primary", "follower", "candidate"}
-			Expect(k8sClient.Update(ctx, clusterDef)).ShouldNot(Succeed())
-			// restore
-			clusterDef.Spec.Components[0].Strategies.Create.Order = []string{"primary", "follower"}
+			By("Set Followers.Replicas to 2, component.defaultReplicas to 4, " +
+				"which means Leader.Replicas(1) + Followers.Replicas(2) + Learner.Replicas(0) != component.defaultReplicas")
+			followers[0].Replicas = 2
+			clusterDef.Spec.Components[0].DefaultReplicas = 4
+			Expect(k8sClient.Create(ctx, clusterDef)).ShouldNot(Succeed())
 
-			By("By testing spec.roleGroupTemplates[?].typeName is consistent with spec.components[?].roleGroups ")
-			// validate spec.roleGroupTemplates
-			clusterDef.Spec.RoleGroupTemplates[0].TypeName = "primary_test"
-			Expect(k8sClient.Update(ctx, clusterDef)).ShouldNot(Succeed())
+			By("Set a 5 nodes cluster with 1 leader, 2 followers and 2 learners")
+			clusterDef.Spec.Components[0].DefaultReplicas = 5
+			clusterDef.Spec.Components[0].ConsensusSpec.Leader = ConsensusMember{Name: "leader", AccessMode: ReadWrite}
+			clusterDef.Spec.Components[0].ConsensusSpec.Learner = ConsensusMember{Name: "learner", AccessMode: None, Replicas: 2}
+			Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
 
 		})
 	})
@@ -80,25 +77,29 @@ metadata:
   name:     %s
 spec:
   type: state.mysql-8
-  cluster:
-    strategies:
-      create:
-        order: [replicaSets,proxy]
   components:
   - typeName: replicaSets
-    roleGroups:
-    - primary
-    - follower
-    strategies:
-      create:
-        order: [primary,follower]
+    componentType: Stateful
   - typeName: proxy
-   
-  roleGroupTemplates:
-  - typeName: primary
-    defaultReplicas: 1
-  - typeName: follower
-    defaultReplicas: 2`, name)
+`, name)
+	clusterDefinition := &ClusterDefinition{}
+	err := yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)
+	return clusterDefinition, err
+}
+
+// createTestClusterDefinitionObj2 create an invalid obj
+func createTestClusterDefinitionObj2(name string) (*ClusterDefinition, error) {
+	clusterDefYaml := fmt.Sprintf(`
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind:       ClusterDefinition
+metadata:
+  name:     %s
+spec:
+  type: state.mysql-8
+  components:
+  - typeName: mysql-rafted
+    componentType: Consensus
+`, name)
 	clusterDefinition := &ClusterDefinition{}
 	err := yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)
 	return clusterDefinition, err

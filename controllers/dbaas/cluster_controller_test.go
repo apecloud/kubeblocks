@@ -90,8 +90,7 @@ spec:
   type: state.mysql-8
   components:
   - typeName: replicasets
-    roleGroups:
-    - primary
+    componentType: Stateful
     defaultReplicas: 1
     podSpec:
       containers:
@@ -137,20 +136,10 @@ spec:
             echo $cluster_info;
             docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
   - typeName: proxy
-    roleGroups: ["proxy"]
     defaultReplicas: 1
-    isStateless: true
     podSpec:
       containers:
       - name: nginx
-  roleGroupTemplates:
-  - typeName: primary
-    defaultReplicas: 3
-    updateStrategy:
-      # 对应 pdb 中的两个字段，两个中只能填一个
-      maxUnavailable: 1
-  - typeName: proxy
-    defaultReplicas: 2
 `
 		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
@@ -327,15 +316,9 @@ spec:
 			}
 			updatedReplicas := 5
 			fetchedG1.Spec.Components = append(fetchedG1.Spec.Components, dbaasv1alpha1.ClusterComponent{
-				Name: "replicasets",
-				Type: "replicasets",
-				RoleGroups: []dbaasv1alpha1.ClusterRoleGroup{
-					{
-						Name:     "primary",
-						Type:     "primary",
-						Replicas: updatedReplicas,
-					},
-				},
+				Name:     "replicasets",
+				Type:     "replicasets",
+				Replicas: updatedReplicas,
 			})
 			Expect(k8sClient.Update(context.Background(), fetchedG1)).Should(Succeed())
 
@@ -423,21 +406,16 @@ spec:
 			toCreate.Spec.Components = append(toCreate.Spec.Components, dbaasv1alpha1.ClusterComponent{
 				Name: "proxy",
 				Type: "proxy",
-				RoleGroups: []dbaasv1alpha1.ClusterRoleGroup{
-					{
-						Name: "proxy",
-						Type: "proxy",
-						Service: corev1.ServiceSpec{
-							Ports: []corev1.ServicePort{
-								{
-									Protocol:   "TCP",
-									Port:       80,
-									TargetPort: intstr.FromInt(8080),
-								},
-							},
-							Type: "LoadBalancer",
+
+				Service: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Protocol:   "TCP",
+							Port:       80,
+							TargetPort: intstr.FromInt(8080),
 						},
 					},
+					Type: "LoadBalancer",
 				},
 			})
 			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())

@@ -32,16 +32,9 @@ type ClusterDefinitionSpec struct {
 	// +kubebuilder:validation:MaxLength=24
 	Type string `json:"type"`
 
-	// +optional
-	Cluster ClusterDefinitionCluster `json:"cluster,omitempty"`
-
 	// +kubebuilder:validation:MinItems=1
 	// +optional
 	Components []ClusterDefinitionComponent `json:"components,omitempty"`
-
-	// +kubebuilder:validation:MinItems=1
-	// +optional
-	RoleGroupTemplates []RoleGroupTemplate `json:"roleGroupTemplates,omitempty"`
 
 	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
 	DefaultTerminatingPolicy string `json:"defaultTerminationPolicy,omitempty"`
@@ -88,19 +81,10 @@ type ClusterDefinitionList struct {
 	Items           []ClusterDefinition `json:"items"`
 }
 
-type ClusterDefinitionCluster struct {
-
-	// +optional
-	Strategies ClusterDefinitionStrategies `json:"strategies,omitempty"`
-}
-
 type ClusterDefinitionComponent struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
 	TypeName string `json:"typeName,omitempty"`
-
-	// roleGroups specify roleGroupTemplate name
-	RoleGroups []string `json:"roleGroups,omitempty"`
 
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
@@ -113,20 +97,9 @@ type ClusterDefinitionComponent struct {
 	// +kubebuilder:validation:Minimum=0
 	DefaultReplicas int `json:"defaultReplicas,omitempty"`
 
-	// isStateless define this components
-	// +kubebuilder:default=false
-	IsStateless bool `json:"isStateless,omitempty"`
-
 	// antiAffinity defines components should have anti-affinity constraint to same component type
 	// +kubebuilder:default=false
 	AntiAffinity bool `json:"antiAffinity,omitempty"`
-
-	// isQuorum defines odd number of pods & N/2+1 pods
-	// +kubebuilder:default=false
-	IsQuorum bool `json:"isQuorum,omitempty"`
-
-	// +optional
-	Strategies ClusterDefinitionStrategies `json:"strategies,omitempty"`
 
 	// podSpec of final workload
 	// +optional
@@ -150,20 +123,93 @@ type ClusterDefinitionComponent struct {
 	Scripts ClusterDefinitionScripts `json:"scripts,omitempty"`
 
 	Probes ClusterDefinitionProbes `json:"probes,omitempty"`
+
+	// ComponentType defines type of the component
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=Stateless
+	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus}
+	ComponentType ComponentType `json:"componentType,omitempty"`
+
+	// ConsensusSpec defines consensus related spec if componentType is Consensus
+	// CAN'T be empty if componentType is Consensus
+	// +optional
+	ConsensusSpec ConsensusSpec `json:"consensusSpec,omitempty"`
 }
 
-type ClusterDefinitionStrategies struct {
-	Default         ClusterDefinitionStrategy `json:"default,omitempty"`
-	Create          ClusterDefinitionStrategy `json:"create,omitempty"`
-	Upgrade         ClusterDefinitionStrategy `json:"upgrade,omitempty"`
-	VerticalScale   ClusterDefinitionStrategy `json:"verticalScale,omitempty"`
-	HorizontalScale ClusterDefinitionStrategy `json:"horizontalScale,omitempty"`
-	Delete          ClusterDefinitionStrategy `json:"delete,omitempty"`
+type ComponentType string
+
+const (
+	Stateless ComponentType = "Stateless"
+	Stateful  ComponentType = "Stateful"
+	Consensus ComponentType = "Consensus"
+)
+
+type ConsensusSpec struct {
+	// RoleObserveQuery, role observing query
+	// return a role name which should be one of Leader.Name、Followers[*].Name or Learner.Name
+	// +kubebuilder:validation:Required
+	RoleObserveQuery string `json:"roleObserveQuery,omitempty"`
+
+	// Leader, one single leader
+	// +kubebuilder:validation:Required
+	Leader ConsensusMember `json:"leader,omitempty"`
+
+	// Followers, has voting right but not Leader
+	// +optional
+	Followers []ConsensusMember `json:"followers,omitempty"`
+
+	// Learner, no voting right
+	// +optional
+	Learner ConsensusMember `json:"learner,omitempty"`
+
+	// UpdateStrategy, Pods update strategy
+	// options: serial, bestEffortParallel, parallel
+	// serial: update Pods one by one that guarantee minimum component unavailable time
+	// 		Learner -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader
+	// bestEffortParallel: update Pods in parallel that guarantee minimum component un-writable time
+	//		Learner, Follower(minority) in parallel -> Follower(majority) -> Leader, keep majority online all the time
+	// parallel: force parallel
+	// +kubebuilder:default=Serial
+	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
+	// +optional
+	UpdateStrategy ComponentUpdateStrategy `json:"updateStrategy,omitempty"`
 }
 
-type ClusterDefinitionStrategy struct {
-	Order []string `json:"order,omitempty"`
+type ConsensusMember struct {
+	// Name, role name
+	// +kubebuilder:validation:Required
+	Name string `json:"name,omitempty"`
+
+	// AccessMode, what service this member capable for
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=None
+	// +kubebuilder:validation:Enum={None, Readonly, ReadWrite}
+	AccessMode AccessMode `json:"accessMode,omitempty"`
+
+	// Replicas, number of Pods of this role
+	// default 1 for Leader
+	// default 0 for Learner
+	// default Components[*].Replicas - Leader.Replicas - Learner.Replicas for Followers
+	// +kubebuilder:default=0
+	// +kubebuilder:validation:Minimum=0
+	Replicas int `json:"replicas,omitempty"`
 }
+
+type AccessMode string
+
+const (
+	ReadWrite AccessMode = "ReadWrite"
+	Readonly  AccessMode = "Readonly"
+	None      AccessMode = "None"
+)
+
+type ComponentUpdateStrategy string
+
+const (
+	Serial             ComponentUpdateStrategy = "Serial"
+	BestEffortParallel ComponentUpdateStrategy = "BestEffortParallel"
+	Parallel           ComponentUpdateStrategy = "Parallel"
+)
 
 type ClusterDefinitionScripts struct {
 	Default         ClusterDefinitionScript `json:"default,omitempty"`
@@ -185,31 +231,6 @@ type ClusterDefinitionContainerCMD struct {
 	Args      []string `json:"args,omitempty"`
 }
 
-type RoleGroupTemplate struct {
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=12
-	TypeName string `json:"typeName,omitempty"`
-	// +kubebuilder:default=0
-	// +kubebuilder:validation:Minimum=0
-	MinAvailable int `json:"minAvailable,omitempty"`
-	// +kubebuilder:validation:Minimum=0
-	MaxAvailable int `json:"maxAvailable,omitempty"`
-	// +kubebuilder:default=0
-	// +kubebuilder:validation:Minimum=0
-	DefaultReplicas int                             `json:"defaultReplicas,omitempty"`
-	UpdateStrategy  ClusterDefinitionUpdateStrategy `json:"updateStrategy,omitempty"`
-	// script exec order：component.pre => roleGroup.pre => component.exec => roleGroup.exec => roleGroup.post => component.post
-	// builtin ENV variables:
-	// self: OPENDBAAS_SELF_{builtin_properties}
-	// rule: OPENDBAAS_{conponent_name}[n]-{roleGroup_name}[n]-{builtin_properties}
-	// builtin_properties:
-	// - ID # which shows in Cluster.status
-	// - HOST # e.g. example-mongodb2-0.example-mongodb2-svc.default.svc.cluster.local
-	// - PORT
-	// - N # number of current component/roleGroup
-	Scripts ClusterDefinitionScripts `json:"scripts,omitempty"`
-}
-
 type ClusterDefinitionUpdateStrategy struct {
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=0
@@ -217,12 +238,6 @@ type ClusterDefinitionUpdateStrategy struct {
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	MaxSurge int `json:"maxSurge,omitempty"`
-}
-
-type ClusterDefinitionRoleGroupScript struct {
-	Pre  []ClusterDefinitionContainerCMD `json:"pre,omitempty"`
-	Exec []ClusterDefinitionContainerCMD `json:"exec,omitempty"`
-	Post []ClusterDefinitionContainerCMD `json:"post,omitempty"`
 }
 
 type ClusterDefinitionConnectionCredential struct {

@@ -297,6 +297,7 @@ func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *d
 	inNS := client.InNamespace(cluster.Namespace)
 	appName := fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name)
 	for _, component := range clusterDef.Spec.Components {
+<<<<<<< HEAD
 		for _, roleGroup := range component.RoleGroups {
 			ml := client.MatchingLabels{
 				appInstanceLabelKey: fmt.Sprintf("%s-%s-%s", cluster.GetName(), component.TypeName, roleGroup),
@@ -304,12 +305,20 @@ func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *d
 			}
 			pvcList := &corev1.PersistentVolumeClaimList{}
 			if err := r.List(reqCtx.Ctx, pvcList, inNS, ml); err != nil {
+=======
+		ml := client.MatchingLabels{
+			appInstanceLabelKey: fmt.Sprintf("%s-%s", cluster.GetName(), component.TypeName),
+			appNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
+		}
+
+		pvcList := &corev1.PersistentVolumeClaimList{}
+		if err := r.List(reqCtx.Ctx, pvcList, ml); err != nil {
+			return err
+		}
+		for _, pvc := range pvcList.Items {
+			if err := r.Delete(reqCtx.Ctx, &pvc); err != nil {
+>>>>>>> consensus-api
 				return err
-			}
-			for _, pvc := range pvcList.Items {
-				if err := r.Delete(reqCtx.Ctx, &pvc); err != nil {
-					return err
-				}
 			}
 		}
 	}

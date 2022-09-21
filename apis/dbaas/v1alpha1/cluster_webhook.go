@@ -151,7 +151,6 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 			duplicateComponentNames[v.Name] = struct{}{}
 		}
 		componentNameMap[v.Name] = struct{}{}
-		// TODO validate roleGroups
 	}
 	if len(invalidComponentTypes) > 0 {
 		*allErrs = append(*allErrs, field.NotFound(field.NewPath("spec.components[*].type"),

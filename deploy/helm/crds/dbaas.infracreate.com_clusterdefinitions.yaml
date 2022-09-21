@@ -47,54 +47,6 @@ spec:
           spec:
             description: ClusterDefinitionSpec defines the desired state of ClusterDefinition
             properties:
-              cluster:
-                properties:
-                  strategies:
-                    properties:
-                      create:
-                        properties:
-                          order:
-                            items:
-                              type: string
-                            type: array
-                        type: object
-                      default:
-                        properties:
-                          order:
-                            items:
-                              type: string
-                            type: array
-                        type: object
-                      delete:
-                        properties:
-                          order:
-                            items:
-                              type: string
-                            type: array
-                        type: object
-                      horizontalScale:
-                        properties:
-                          order:
-                            items:
-                              type: string
-                            type: array
-                        type: object
-                      upgrade:
-                        properties:
-                          order:
-                            items:
-                              type: string
-                            type: array
-                        type: object
-                      verticalScale:
-                        properties:
-                          order:
-                            items:
-                              type: string
-                            type: array
-                        type: object
-                    type: object
-                type: object
               components:
                 items:
                   properties:
@@ -103,18 +55,118 @@ spec:
                       description: antiAffinity defines components should have anti-affinity
                         constraint to same component type
                       type: boolean
+                    componentType:
+                      default: Stateless
+                      description: ComponentType defines type of the component
+                      enum:
+                      - Stateless
+                      - Stateful
+                      - Consensus
+                      type: string
+                    consensusSpec:
+                      description: ConsensusSpec defines consensus related spec if
+                        componentType is Consensus CAN'T be empty if componentType
+                        is Consensus
+                      properties:
+                        followers:
+                          description: Followers, has voting right but not Leader
+                          items:
+                            properties:
+                              accessMode:
+                                default: None
+                                description: AccessMode, what service this member
+                                  capable for
+                                enum:
+                                - None
+                                - Readonly
+                                - ReadWrite
+                                type: string
+                              name:
+                                description: Name, role name
+                                type: string
+                              replicas:
+                                default: 0
+                                description: Replicas, number of Pods of this role
+                                  default 1 for Leader default 0 for Learner default
+                                  Components[*].Replicas - Leader.Replicas - Learner.Replicas
+                                  for Followers
+                                minimum: 0
+                                type: integer
+                            type: object
+                          type: array
+                        leader:
+                          description: Leader, one single leader
+                          properties:
+                            accessMode:
+                              default: None
+                              description: AccessMode, what service this member capable
+                                for
+                              enum:
+                              - None
+                              - Readonly
+                              - ReadWrite
+                              type: string
+                            name:
+                              description: Name, role name
+                              type: string
+                            replicas:
+                              default: 0
+                              description: Replicas, number of Pods of this role default
+                                1 for Leader default 0 for Learner default Components[*].Replicas
+                                - Leader.Replicas - Learner.Replicas for Followers
+                              minimum: 0
+                              type: integer
+                          type: object
+                        learner:
+                          description: Learner, no voting right
+                          properties:
+                            accessMode:
+                              default: None
+                              description: AccessMode, what service this member capable
+                                for
+                              enum:
+                              - None
+                              - Readonly
+                              - ReadWrite
+                              type: string
+                            name:
+                              description: Name, role name
+                              type: string
+                            replicas:
+                              default: 0
+                              description: Replicas, number of Pods of this role default
+                                1 for Leader default 0 for Learner default Components[*].Replicas
+                                - Leader.Replicas - Learner.Replicas for Followers
+                              minimum: 0
+                              type: integer
+                          type: object
+                        roleObserveQuery:
+                          description: RoleObserveQuery, role observing query return
+                            a role name which should be one of Leader.Name、Followers[*].Name
+                            or Learner.Name
+                          type: string
+                        updateStrategy:
+                          default: Serial
+                          description: 'UpdateStrategy, Pods update strategy options:
+                            serial, bestEffortParallel, parallel serial: update Pods
+                            one by one that guarantee minimum component unavailable
+                            time Learner -> Follower(with AccessMode=none) -> Follower(with
+                            AccessMode=readonly) -> Follower(with AccessMode=readWrite)
+                            -> Leader bestEffortParallel: update Pods in parallel
+                            that guarantee minimum component un-writable time Learner,
+                            Follower(minority) in parallel -> Follower(majority) ->
+                            Leader, keep majority online all the time parallel: force
+                            parallel'
+                          enum:
+                          - Serial
+                          - BestEffortParallel
+                          - Parallel
+                          type: string
+                      type: object
                     defaultReplicas:
                       default: 0
                       minimum: 0
                       type: integer
-                    isQuorum:
-                      default: false
-                      description: isQuorum defines odd number of pods & N/2+1 pods
-                      type: boolean
-                    isStateless:
-                      default: false
-                      description: isStateless define this components
-                      type: boolean
                     maxAvailable:
                       minimum: 0
                       type: integer
@@ -7399,11 +7451,6 @@ spec:
                       required:
                       - containers
                       type: object
-                    roleGroups:
-                      description: roleGroups specify roleGroupTemplate name
-                      items:
-                        type: string
-                      type: array
                     scripts:
                       description: 'script exec order：component.pre => roleGroup.pre
                         => component.exec => roleGroup.exec => roleGroup.post => component.post
@@ -7943,51 +7990,6 @@ spec:
                             https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types'
                           type: string
                       type: object
-                    strategies:
-                      properties:
-                        create:
-                          properties:
-                            order:
-                              items:
-                                type: string
-                              type: array
-                          type: object
-                        default:
-                          properties:
-                            order:
-                              items:
-                                type: string
-                              type: array
-                          type: object
-                        delete:
-                          properties:
-                            order:
-                              items:
-                                type: string
-                              type: array
-                          type: object
-                        horizontalScale:
-                          properties:
-                            order:
-                              items:
-                                type: string
-                              type: array
-                          type: object
-                        upgrade:
-                          properties:
-                            order:
-                              items:
-                                type: string
-                              type: array
-                          type: object
-                        verticalScale:
-                          properties:
-                            order:
-                              items:
-                                type: string
-                              type: array
-                          type: object
-                      type: object
                     typeName:
                       maxLength: 12
                       type: string
@@ -8009,245 +8011,6 @@ spec:
                 - Delete
                 - WipeOut
                 type: string
-              roleGroupTemplates:
-                items:
-                  properties:
-                    defaultReplicas:
-                      default: 0
-                      minimum: 0
-                      type: integer
-                    maxAvailable:
-                      minimum: 0
-                      type: integer
-                    minAvailable:
-                      default: 0
-                      minimum: 0
-                      type: integer
-                    scripts:
-                      description: 'script exec order：component.pre => roleGroup.pre
-                        => component.exec => roleGroup.exec => roleGroup.post => component.post
-                        builtin ENV variables: self: OPENDBAAS_SELF_{builtin_properties}
-                        rule: OPENDBAAS_{conponent_name}[n]-{roleGroup_name}[n]-{builtin_properties}
-                        builtin_properties: - ID # which shows in Cluster.status -
-                        HOST # e.g. example-mongodb2-0.example-mongodb2-svc.default.svc.cluster.local
-                        - PORT - N # number of current component/roleGroup'
-                      properties:
-                        create:
-                          properties:
-                            post:
-                              items:
-                                properties:
-                                  args:
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    type: string
-                                type: object
-                              type: array
-                            pre:
-                              items:
-                                properties:
-                                  args:
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    type: string
-                                type: object
-                              type: array
-                          type: object
-                        default:
-                          properties:
-                            post:
-                              items:
-                                properties:
-                                  args:
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    type: string
-                                type: object
-                              type: array
-                            pre:
-                              items:
-                                properties:
-                                  args:
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    type: string
-                                type: object
-                              type: array
-                          type: object
-                        delete:
-                          properties:
-                            post:
-                              items:
-                                properties:
-                                  args:
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    type: string
-                                type: object
-                              type: array
-                            pre:
-                              items:
-                                properties:
-                                  args:
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    type: string
-                                type: object
-                              type: array
-                          type: object
-                        horizontalScale:
-                          properties:
-                            post:
-                              items:
-                                properties:
-                                  args:
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    type: string
-                                type: object
-                              type: array
-                            pre:
-                              items:
-                                properties:
-                                  args:
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    type: string
-                                type: object
-                              type: array
-                          type: object
-                        upgrade:
-                          properties:
-                            post:
-                              items:
-                                properties:
-                                  args:
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    type: string
-                                type: object
-                              type: array
-                            pre:
-                              items:
-                                properties:
-                                  args:
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    type: string
-                                type: object
-                              type: array
-                          type: object
-                        verticalScale:
-                          properties:
-                            post:
-                              items:
-                                properties:
-                                  args:
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    type: string
-                                type: object
-                              type: array
-                            pre:
-                              items:
-                                properties:
-                                  args:
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    type: string
-                                type: object
-                              type: array
-                          type: object
-                      type: object
-                    typeName:
-                      maxLength: 12
-                      type: string
-                    updateStrategy:
-                      properties:
-                        maxSurge:
-                          default: 0
-                          minimum: 0
-                          type: integer
-                        maxUnavailable:
-                          default: 1
-                          minimum: 0
-                          type: integer
-                      type: object
-                  type: object
-                minItems: 1
-                type: array
               type:
                 description: Type define well known cluster types. Valid values are
                   in-list of [state.redis, mq.mqtt, mq.kafka, state.mysql-8, state.mysql-5.7,

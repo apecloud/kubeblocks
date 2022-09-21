@@ -233,9 +233,9 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 		appInstanceLabelKey: cluster.GetName(),
 		appNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
 	}
-
+	inNS := client.InNamespace(cluster.Namespace)
 	stsList := &appsv1.StatefulSetList{}
-	if err := r.List(reqCtx.Ctx, stsList, ml); err != nil {
+	if err := r.List(reqCtx.Ctx, stsList, inNS, ml); err != nil {
 		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		return &res, err
 	}
@@ -251,7 +251,7 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 		}
 	}
 	svcList := &corev1.ServiceList{}
-	if err := r.List(reqCtx.Ctx, svcList, ml); err != nil {
+	if err := r.List(reqCtx.Ctx, svcList, inNS, ml); err != nil {
 		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		return &res, err
 	}
@@ -267,7 +267,7 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 		}
 	}
 	secretList := &corev1.SecretList{}
-	if err := r.List(reqCtx.Ctx, secretList, ml); err != nil {
+	if err := r.List(reqCtx.Ctx, secretList, inNS, ml); err != nil {
 		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		return &res, err
 	}
@@ -294,7 +294,18 @@ func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *d
 		return err
 	}
 
+	inNS := client.InNamespace(cluster.Namespace)
+	appName := fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name)
 	for _, component := range clusterDef.Spec.Components {
+<<<<<<< HEAD
+		for _, roleGroup := range component.RoleGroups {
+			ml := client.MatchingLabels{
+				appInstanceLabelKey: fmt.Sprintf("%s-%s-%s", cluster.GetName(), component.TypeName, roleGroup),
+				appNameLabelKey:     appName,
+			}
+			pvcList := &corev1.PersistentVolumeClaimList{}
+			if err := r.List(reqCtx.Ctx, pvcList, inNS, ml); err != nil {
+=======
 		ml := client.MatchingLabels{
 			appInstanceLabelKey: fmt.Sprintf("%s-%s", cluster.GetName(), component.TypeName),
 			appNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
@@ -306,11 +317,11 @@ func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *d
 		}
 		for _, pvc := range pvcList.Items {
 			if err := r.Delete(reqCtx.Ctx, &pvc); err != nil {
+>>>>>>> consensus-api
 				return err
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -351,7 +362,8 @@ func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(ctx context.C
 // checkClusterIsReady Check whether the cluster related pod resources are running. if ok, update Cluster.status.phase to Running
 func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *dbaasv1alpha1.Cluster) error {
 	statefulSetList := &appsv1.StatefulSetList{}
-	if err := r.Client.List(ctx, statefulSetList, &client.ListOptions{Namespace: cluster.Namespace},
+	if err := r.Client.List(ctx, statefulSetList,
+		client.InNamespace(cluster.Namespace),
 		client.MatchingLabels{appInstanceLabelKey: cluster.Name}); err != nil {
 		return err
 	}

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -152,7 +151,7 @@ func tfApply(template string, tfDir string, destroy bool) error {
 }
 
 func parseInstancePublicIP(stateFile string) (string, error) {
-	content, err := ioutil.ReadFile(stateFile)
+	content, err := os.ReadFile(stateFile)
 	if err != nil {
 		return "", errors.Wrap(err, "Failed to read terraform state")
 	}

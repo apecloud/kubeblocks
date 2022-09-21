@@ -1,7 +1,6 @@
 package cloudprovider
 
 import (
-	"io/ioutil"
 	"os"
 	"path"
 
@@ -79,7 +78,7 @@ func (p *awsCloudProvider) Apply(destroy bool) error {
 			return errors.Wrap(err, "Failed to init ssh key")
 		}
 	}
-	pubKey, err := ioutil.ReadFile(publicKeyFile)
+	pubKey, err := os.ReadFile(publicKeyFile)
 	if err != nil {
 		return errors.Wrap(err, "Failed to read ssh public key")
 	}

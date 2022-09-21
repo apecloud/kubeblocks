@@ -24,12 +24,14 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/kustomize/kyaml/yaml"
 
 	"golang.org/x/crypto/ssh"
 
@@ -126,7 +128,7 @@ func SaveToTemp(file fs.File, format string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	tempFile, err := ioutil.TempFile(tempDir, format)
+	tempFile, err := os.CreateTemp(tempDir, format)
 	if err != nil {
 		return "", err
 	}
@@ -175,7 +177,7 @@ func GetPublicIP() (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -214,5 +216,14 @@ func MakeSSHKeyPair(pubKeyPath, privateKeyPath string) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(pubKeyPath, ssh.MarshalAuthorizedKey(pub), 0655)
+	return os.WriteFile(pubKeyPath, ssh.MarshalAuthorizedKey(pub), 0655)
+}
+
+func PrintObjYaml(obj *unstructured.Unstructured) {
+	data, err := yaml.Marshal(obj)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	fmt.Println(string(data))
 }

@@ -129,6 +129,8 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Scripts ClusterDefinitionScripts `json:"scripts,omitempty"`
 
+	Probes ClusterDefinitionProbes `json:"probes,omitempty"`
+
 	// ComponentType defines type of the component
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Stateless
@@ -194,6 +196,29 @@ type ClusterDefinitionStatusGeneration struct {
 	// +kubebuilder:validation:Enum={InSync,OutOfSync}
 	// +optional
 	ClusterDefSyncStatus Status `json:"clusterDefSyncStatus,omitempty"`
+}
+
+type ClusterDefinitionProbeCMDs struct {
+	writes  []string `json:"writes,omitempty"`
+	queries []string `json:"queries,omitempty"`
+}
+
+type ClusterDefinitionProbe struct {
+	// +kubebuilder:default=true
+	Enable bool `json:"enable,omitempty"`
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	periodSeconds int `json:"periodSeconds,omitempty"`
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	failureThreshold int                        `json:"failureThreshold,omitempty"`
+	Commands         ClusterDefinitionProbeCMDS `json:"commands,omitempty"`
+}
+
+type ClusterDefinitionProbes struct {
+	RunningPorbe     ClusterDefinitionProbe `json:"runningProbe,omitempty"`
+	StatusPorbe      ClusterDefinitionProbe `json:"statusProbe,omitempty"`
+	RoleChangedPorbe ClusterDefinitionProbe `json:"roleChangedProbe,omitempty"`
 }
 
 func init() {

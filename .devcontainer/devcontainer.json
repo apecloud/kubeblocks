@@ -1,9 +1,11 @@
 {
+	// Reference Doc: https://code.visualstudio.com/remote/advancedcontainers/overview
 	"name": "Kubeblock Dev Environment",
 	// Update the container version when you publish dev-container
 	// "image": "docker.io/infracreate/kubeblock-dev:latest", 
 	// Temporarily use DAPR container
 	"image": "ghcr.io/dapr/dapr-dev:0.1.8",
+	// "image": "docker.io/infracreate/kubeblock-dev:latest",
 	// Replace with uncommented line below to build your own local copy of the image
 	// "dockerFile": "../docker/Dockerfile-dev",
 	"containerEnv": {
@@ -30,6 +32,9 @@
 		// Bind mount docker socket under an alias to support docker-from-docker
 		"type=bind,source=/var/run/docker.sock,target=/var/run/docker-host.sock",
 
+		// Bind mount docker socket under an alias to support docker-from-docker
+		"type=bind,source=${env:HOME}${env:USERPROFILE}/.minikube/cache,target=/home/dapr/.minikube/cache",
+
 		// Uncomment to clone local .kube/config into devcontainer
 		// "type=bind,source=${env:HOME}${env:USERPROFILE}/.kube,target=/home/dapr/.kube-localhost",
 
@@ -41,7 +46,7 @@
 	// On Linux, this will prevent new files getting created as root, but you
 	// may need to update the USER_UID and USER_GID in docker/Dockerfile-dev
 	// to match your user if not 1000.
-	// "remoteUser": "1000",
+	// "remoteUser": "kubeblocks",
 	"runArgs": [
 		// Enable ptrace-based debugging for go
 		"--cap-add=SYS_PTRACE",
@@ -58,6 +63,7 @@
 		// Run the entrypoint defined in container image.
 		"--init"
 	],
+	"postStartCommand": "sudo chown $USER:$USER $HOME/.minikube",
 	"settings": {
 		"go.toolsManagement.checkForUpdates": "local",
 		"go.useLanguageServer": true,

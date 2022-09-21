@@ -30,11 +30,11 @@ CLI_TAG ?= v$(CLI_VERSION)
 DEV_CONTAINER_VERSION_TAG ?= latest
 DEV_CONTAINER_IMAGE_NAME = docker.io/infracreate/$(APP_NAME)-dev
 
-DEV_CONTAINER_DOCKERFILE = Dockerfile-dev
+DEV_CONTAINER_DOCKERFILE = Dockerfile-dapr-dev
 DOCKERFILE_DIR = ./docker
 
 .PHONY: build-dev-container
-build-dev-container: DOCKER_BUILD_ARGS += --build-arg DEBIAN_MIRROR=$(DEBIAN_MIRROR) --build-arg GITHUB_PROXY=$(GITHUB_PROXY)
+build-dev-container: DOCKER_BUILD_ARGS += --build-arg DEBIAN_MIRROR=$(DEBIAN_MIRROR) --build-arg GITHUB_PROXY=$(GITHUB_PROXY) --build-arg GOPROXY=$(GOPROXY)
 build-dev-container: ## Build dev container image.
 ifneq ($(BUILDX_ENABLED), true)
 	docker build $(DOCKERFILE_DIR)/. $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/${DEV_CONTAINER_DOCKERFILE} -t $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG)
@@ -44,6 +44,7 @@ endif
 
 
 .PHONY: push-dev-container
+push-dev-container: DOCKER_BUILD_ARGS += --build-arg DEBIAN_MIRROR=$(DEBIAN_MIRROR) --build-arg GITHUB_PROXY=$(GITHUB_PROXY) --build-arg GOPROXY=$(GOPROXY)
 push-dev-container: ## Push dev container image.
 ifneq ($(BUILDX_ENABLED), true)
 	docker push $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG)

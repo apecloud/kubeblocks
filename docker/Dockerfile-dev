@@ -5,7 +5,7 @@ ARG GOVERSION=1.18
 FROM golang:${GOVERSION}-bullseye
 
 # Copy library scripts to execute
-COPY library-scripts/*.sh library-scripts/*.env custom-scripts/*.sh /tmp/library-scripts/
+COPY library-scripts/*.sh library-scripts/*.env /tmp/library-scripts/
 
 # [Option] Install zsh
 ARG INSTALL_ZSH="true"
@@ -16,13 +16,15 @@ ARG HELM_VERSION="latest"
 ARG MINIKUBE_VERSION="latest"
 ARG GOLANGCI_LINT_VERSION="1.49.0"
 
-ARG USERNAME=vscode
+ARG USERNAME=kubeblocks
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
-ARG DEBIAN_MIRROR=mirrors.aliyun.com
-ARG GITHUB_PROXY=https://github.91chi.fun/
+ARG DEBIAN_MIRROR=
+ARG GITHUB_PROXY=
+ARG GOPROXY=
 
 # Other env vars
+ENV GOPROXY=${GOPROXY}
 ENV GO111MODULE=auto
 ENV CGO_ENABLED=0
 ENV DOCKER_BUILDKIT=1
@@ -32,6 +34,8 @@ ENV GITHUB_PROXY=${GITHUB_PROXY}
 RUN bash /tmp/library-scripts/common-debian.sh "${INSTALL_ZSH}" "${USERNAME}" "${USER_UID}" "${USER_GID}" "${UPGRADE_PACKAGES}" "true" "true" \
     && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
+# Copy library scripts to execute
+COPY custom-scripts/*.sh /tmp/library-scripts/
 # Additional custom configurations for non-root user.
 RUN bash /tmp/library-scripts/setup-user.sh "${USERNAME}" "${PATH}" \
     #
@@ -51,14 +55,13 @@ RUN bash /tmp/library-scripts/setup-user.sh "${USERNAME}" "${PATH}" \
     #
     # Move the first run notice to the correct location for Codespaces.
     && mkdir -p /usr/local/etc/vscode-dev-containers/ \
-    && mv -f /tmp/library-scripts/first-run-notice.txt /usr/local/etc/vscode-dev-containers/ \
+    # && mv -f /tmp/library-scripts/first-run-notice.txt /usr/local/etc/vscode-dev-containers/ \
     #
     # Set permissions for the workspace folder
     && mkdir -p /workspaces && chown ${USERNAME} /workspaces \
     #
     # Clean up packages and the library-scripts folder.
     && apt-get autoremove -y && apt-get clean -y && rm -rf /tmp/library-scripts/
-
 
 # [Optional] Uncomment the next line to use go get to install anything else you need
 # RUN go get -x <your-dependency-or-tool>

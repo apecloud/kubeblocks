@@ -18,6 +18,8 @@ package dbaas
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -25,6 +27,15 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 )
+
+type InsClassType struct {
+	memSize int64
+	cpu     int
+	// recommended buffer size
+	bufferSize string
+
+	maxBufferSize int
+}
 
 var _ = Describe("tpl template", func() {
 
@@ -53,7 +64,16 @@ cluster_namespace = {{ .Cluster.Namespace }}
 component_name = {{ .Component.Name }}
 component_replica = {{ .Component.Replicas }}
 
-{{- $buffer_pool_size_tmp := default 2147483648 .Component.Resource }}
+{{ if .Component.Resource -}}
+test_size = {{ mysql_buffer_size_cal .Component.Resource false }}
+{{- else -}}
+test_size = 128M
+{{- end -}}
+
+{{- $buffer_pool_size_tmp := 2147483648 -}}
+{{- if .Component.Resource -}}
+{{- $buffer_pool_size_tmp = .Component.Resource.MemorySize -}}
+{{- end }}
 innodb_buffer_pool_size = {{ $buffer_pool_size_tmp }}
 loose_rds_audit_log_buffer_size = {{ div $buffer_pool_size_tmp 100 }}
 loose_innodb_replica_log_parse_buf_size = {{ div $buffer_pool_size_tmp 10 }}
@@ -74,6 +94,30 @@ cluster_name = my_test
 cluster_namespace = default
 component_name = replicasets
 component_replica = 5
+
+test_size = 4096M
+innodb_buffer_pool_size = 8589934592
+loose_rds_audit_log_buffer_size = 85899345
+loose_innodb_replica_log_parse_buf_size = 858993459
+loose_innodb_primary_flush_max_lsn_lag =  780903144
+`
+		MYSQL_CFG_RENDERED_CONTEXT_WITHOUT_RES = `
+[mysqld]
+loose_query_cache_type          = OFF
+loose_query_cache_size          = 0
+loose_innodb_thread_concurrency = 0
+loose_concurrent_insert         = 0
+loose_gts_lease                 = 2000
+loose_log_bin_use_v1_row_events = off
+loose_binlog_checksum           = crc32
+
+#test
+cluster_name = my_test
+cluster_namespace = default
+component_name = replicasets
+component_replica = 5
+
+test_size = 128M
 innodb_buffer_pool_size = 2147483648
 loose_rds_audit_log_buffer_size = 21474836
 loose_innodb_replica_log_parse_buf_size = 214748364
@@ -108,17 +152,266 @@ loose_innodb_primary_flush_max_lsn_lag =  195225786
 		It("test render", func() {
 			cfgBuilder := NewCfgTemplateBuilder("my_test", "default")
 
-			Expect(cfgBuilder.InjectBuiltInObjectsAndFunctions(*podTemplate, cfgTemplate, component, group)).To(BeNil())
+			Expect(cfgBuilder.InjectBuiltInObjectsAndFunctions(*podTemplate, cfgTemplate, component, group)).Should(BeNil())
+
+			cfgBuilder.componentValues.Resource = &ResourceDefinition{
+				MemorySize: 8 * 1024 * 1024 * 1024,
+				CoreNum:    4,
+			}
 
 			rendered, err := cfgBuilder.Render(map[string]string{
 				MYSQL_CFG_NAME: MYSQL_CFG_TMP_CONTEXT,
 			})
 
 			// Debug
-			fmt.Print(rendered[MYSQL_CFG_NAME])
+			fmt.Println(rendered[MYSQL_CFG_NAME])
 
-			Expect(err).To(BeNil())
-			Expect(rendered[MYSQL_CFG_NAME]).To(Equal(MYSQL_CFG_RENDERED_CONTEXT))
+			Expect(err).Should(BeNil())
+			Expect(rendered[MYSQL_CFG_NAME]).Should(Equal(MYSQL_CFG_RENDERED_CONTEXT))
+
+			// for test without resource
+			{
+				cfgBuilder.componentValues.Resource = nil
+				rendered, err := cfgBuilder.Render(map[string]string{
+					MYSQL_CFG_NAME: MYSQL_CFG_TMP_CONTEXT,
+				})
+
+				fmt.Println(rendered[MYSQL_CFG_NAME])
+
+				Expect(err).Should(BeNil())
+				Expect(rendered[MYSQL_CFG_NAME]).Should(Equal(MYSQL_CFG_RENDERED_CONTEXT_WITHOUT_RES))
+			}
+
+		})
+	})
+
+	Context("calMysqlPoolSizeByResource test", func() {
+		It("mysql test", func() {
+			Expect(calMysqlPoolSizeByResource(nil, false)).Should(Equal("128M"))
+
+			Expect(calMysqlPoolSizeByResource(nil, true)).Should(Equal("128M"))
+
+			// for small instance class
+			Expect(calMysqlPoolSizeByResource(&ResourceDefinition{
+				MemorySize: 1024 * 1024 * 1024,
+				CoreNum:    1,
+			}, false)).Should(Equal("128M"))
+
+			Expect(calMysqlPoolSizeByResource(&ResourceDefinition{
+				MemorySize: 2 * 1024 * 1024 * 1024,
+				CoreNum:    2,
+			}, false)).Should(Equal("256M"))
+
+			// for shard
+			Expect(calMysqlPoolSizeByResource(&ResourceDefinition{
+				MemorySize: 2 * 1024 * 1024 * 1024,
+				CoreNum:    2,
+			}, true)).Should(Equal("1024M"))
+
+			insClassTest := []InsClassType{
+				// for 2 core
+				{
+					memSize:       4,
+					cpu:           2,
+					bufferSize:    "1024M",
+					maxBufferSize: 1024,
+				},
+				{
+					memSize:       8,
+					cpu:           2,
+					bufferSize:    "4096M",
+					maxBufferSize: 4096,
+				},
+				{
+					memSize:       16,
+					cpu:           2,
+					bufferSize:    "9216M",
+					maxBufferSize: 10240,
+				},
+				// for 4 core
+				{
+					memSize:       8,
+					cpu:           4,
+					bufferSize:    "4096M",
+					maxBufferSize: 4096,
+				},
+				{
+					memSize:       16,
+					cpu:           4,
+					bufferSize:    "9216M",
+					maxBufferSize: 10240,
+				},
+				{
+					memSize:       32,
+					cpu:           4,
+					bufferSize:    "21504M",
+					maxBufferSize: 22528,
+				},
+				// for 8 core
+				{
+					memSize:       16,
+					cpu:           8,
+					bufferSize:    "9216M",
+					maxBufferSize: 10240,
+				},
+				{
+					memSize:       32,
+					cpu:           8,
+					bufferSize:    "21504M",
+					maxBufferSize: 22528,
+				},
+				{
+					memSize:       64,
+					cpu:           8,
+					bufferSize:    "45056M",
+					maxBufferSize: 48128,
+				},
+				// for 12 core
+				{
+					memSize:       24,
+					cpu:           12,
+					bufferSize:    "15360M",
+					maxBufferSize: 16384,
+				},
+				{
+					memSize:       48,
+					cpu:           12,
+					bufferSize:    "33792M",
+					maxBufferSize: 35840,
+				},
+				{
+					memSize:       96,
+					cpu:           12,
+					bufferSize:    "69632M",
+					maxBufferSize: 73728,
+				},
+				// for 16 core
+				{
+					memSize:       32,
+					cpu:           16,
+					bufferSize:    "21504M",
+					maxBufferSize: 22528,
+				},
+				{
+					memSize:       64,
+					cpu:           16,
+					bufferSize:    "45056M",
+					maxBufferSize: 48128,
+				},
+				{
+					memSize:       128,
+					cpu:           16,
+					bufferSize:    "93184M",
+					maxBufferSize: 99328,
+				},
+				// for 24 core
+				{
+					memSize:       48,
+					cpu:           24,
+					bufferSize:    "32768M",
+					maxBufferSize: 34816,
+				},
+				{
+					memSize:       96,
+					cpu:           24,
+					bufferSize:    "69632M",
+					maxBufferSize: 73728,
+				},
+				{
+					memSize:       192,
+					cpu:           24,
+					bufferSize:    "140288M",
+					maxBufferSize: 149504,
+				},
+				// for 32 core
+				{
+					memSize:       64,
+					cpu:           32,
+					bufferSize:    "45056M",
+					maxBufferSize: 47104,
+				},
+				{
+					memSize:       128,
+					cpu:           32,
+					bufferSize:    "93184M",
+					maxBufferSize: 99328,
+				},
+				{
+					memSize:       256,
+					cpu:           32,
+					bufferSize:    "188416M",
+					maxBufferSize: 200704,
+				},
+				// for 52 core
+				{
+					memSize:       96,
+					cpu:           52,
+					bufferSize:    "67584M",
+					maxBufferSize: 72704,
+				},
+				{
+					memSize:       192,
+					cpu:           52,
+					bufferSize:    "140288M",
+					maxBufferSize: 149504,
+				},
+				{
+					memSize:       384,
+					cpu:           52,
+					bufferSize:    "283648M",
+					maxBufferSize: 302080,
+				},
+				// for 64 core
+				{
+					memSize:       256,
+					cpu:           64,
+					bufferSize:    "188416M",
+					maxBufferSize: 200704,
+				},
+				{
+					memSize:       512,
+					cpu:           64,
+					bufferSize:    "378880M",
+					maxBufferSize: 403456,
+				},
+				// for 102
+				{
+					memSize:       768,
+					cpu:           102,
+					bufferSize:    "569344M",
+					maxBufferSize: 607232,
+				},
+				// for 104 core
+				{
+					memSize:       192,
+					cpu:           104,
+					bufferSize:    "138240M",
+					maxBufferSize: 147456,
+				},
+				{
+					memSize:       384,
+					cpu:           104,
+					bufferSize:    "282624M",
+					maxBufferSize: 302080,
+				},
+			}
+
+			// for debug
+			for _, r := range insClassTest {
+				fmt.Printf("cal : %s, expect [%v] [%s]\n", calMysqlPoolSizeByResource(&ResourceDefinition{
+					MemorySize: r.memSize * 1024 * 1024 * 1024, // 4G
+					CoreNum:    r.cpu,                          // 2core
+				}, false), r, r.bufferSize)
+			}
+
+			for _, r := range insClassTest {
+				ret := calMysqlPoolSizeByResource(&ResourceDefinition{
+					MemorySize: r.memSize * 1024 * 1024 * 1024, // 4G
+					CoreNum:    r.cpu,                          // 2core
+				}, false)
+				Expect(ret).Should(Equal(r.bufferSize))
+				Expect(strconv.ParseInt(strings.Trim(ret, "M"), 10, 64)).Should(BeNumerically("<=", r.maxBufferSize))
+			}
 		})
 	})
 

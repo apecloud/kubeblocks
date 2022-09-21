@@ -17,13 +17,13 @@ limitations under the License.
 package dbaas
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	"fmt"
+	"math"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	corev1 "k8s.io/api/core/v1"
 )
-
-type BuiltinObjectsFunc func() map[string]interface{}
 
 type ResourceDefinition struct {
 	MemorySize int64
@@ -45,7 +45,8 @@ type ConfigTemplateBuilder struct {
 	clusterName string
 
 	// Global Var
-	componentValues *ComponentTemplateValues
+	componentValues  *ComponentTemplateValues
+	buildinFunctions *intctrlutil.BuiltinObjectsFunc
 }
 
 func NewCfgTemplateBuilder(clusterName, namespace string) *ConfigTemplateBuilder {
@@ -57,7 +58,7 @@ func NewCfgTemplateBuilder(clusterName, namespace string) *ConfigTemplateBuilder
 
 func (c *ConfigTemplateBuilder) Render(configs map[string]string) (map[string]string, error) {
 	rendered := make(map[string]string, len(configs))
-	engine := intctrlutil.NewTplEngine(c.builtinObjects(), nil)
+	engine := intctrlutil.NewTplEngine(c.builtinObjects(), c.buildinFunctions)
 	for file, configContext := range configs {
 		newContext, err := engine.Render(configContext)
 		if err != nil {
@@ -92,6 +93,9 @@ func (c *ConfigTemplateBuilder) InjectBuiltInObjectsAndFunctions(podTemplate cor
 
 func injectBuiltInFunctions(tplBuilder *ConfigTemplateBuilder, podTemplate corev1.PodTemplateSpec, component *Component, group *RoleGroup) error {
 	// TODO add built-in function
+	tplBuilder.buildinFunctions = &intctrlutil.BuiltinObjectsFunc{
+		"mysql_buffer_size_cal": calMysqlPoolSizeByResource,
+	}
 	return nil
 }
 
@@ -114,4 +118,76 @@ func injectBuiltInObjects(tplBuilder *ConfigTemplateBuilder, podTemplate corev1.
 	}
 
 	return nil
+}
+
+// calReverseRebaseBuffer Cal reserved memory for system
+func calReverseRebaseBuffer(memSizeMB int64, cpuNum int) int64 {
+	const (
+		RebaseMemorySize        = int64(2048)
+		ReverseRebaseBufferSize = 285
+	)
+
+	// MIN(RDS ins class for mem / 2, 2048)
+	r1 := int64(math.Min(float64(memSizeMB>>1), float64(RebaseMemorySize)))
+	// MAX(RDS ins class for CPU * 64, RDS ins class for mem / 64)
+	r2 := int64(math.Max(float64(cpuNum<<6), float64(memSizeMB>>6)))
+
+	return r1 + r2 + memSizeMB>>6 + ReverseRebaseBufferSize
+}
+
+// https://help.aliyun.com/document_detail/162326.html?utm_content=g_1000230851&spm=5176.20966629.toubu.3.f2991ddcpxxvD1#title-rey-j7j-4dt
+// build-in function
+// calMysqlPoolSizeByResource Cal mysql buffer size
+func calMysqlPoolSizeByResource(resource *ResourceDefinition, isShared bool) string {
+	const (
+		DefaultPoolSize      = "128M"
+		MinBufferSizeMB      = 128
+		SmallClassMemorySize = int64(1024 * 1024 * 1024)
+	)
+
+	if resource == nil || resource.CoreNum == 0 || resource.MemorySize == 0 {
+		return DefaultPoolSize
+	}
+
+	// small instance class
+	// mem_size <= 1G or
+	// core <= 2
+	if resource.MemorySize <= SmallClassMemorySize {
+		return DefaultPoolSize
+	}
+
+	memSizeMB := resource.MemorySize / 1024 / 1024
+	maxBufferSize := int32(memSizeMB * 80 / 100)
+	totalMemorySize := memSizeMB
+
+	if !isShared {
+		reverseBuffer := calReverseRebaseBuffer(memSizeMB, resource.CoreNum)
+		totalMemorySize = memSizeMB - reverseBuffer
+
+		// for small instance class
+		if resource.CoreNum <= 2 {
+			totalMemorySize -= 128
+		}
+	}
+
+	if totalMemorySize <= MinBufferSizeMB {
+		return DefaultPoolSize
+	}
+
+	// (total_memory - reverseBuffer) * 75
+	bufferSize := int32(totalMemorySize * 75 / 100)
+	if bufferSize > maxBufferSize {
+		bufferSize = maxBufferSize
+	}
+
+	// https://dev.mysql.com/doc/refman/8.0/en/innodb-parameters.html#sysvar_innodb_buffer_pool_size
+	// Buffer size require aligned 128MB or 1G
+	var alignedSize int32 = 128
+	if bufferSize > 1024 {
+		alignedSize = 1024
+	}
+
+	bufferSize /= alignedSize
+	bufferSize *= alignedSize
+	return fmt.Sprintf("%dM", bufferSize)
 }

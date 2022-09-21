@@ -30,8 +30,6 @@ const (
 )
 
 type TplValues map[string]interface{}
-
-// type TplFunctions map[string]interface{}
 type BuiltinObjectsFunc map[string]interface{}
 
 type TplEngine struct {

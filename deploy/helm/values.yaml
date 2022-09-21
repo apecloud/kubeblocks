@@ -49,15 +49,18 @@ service:
   type: ClusterIP
   port: 8443
   # -- Service node port.
-  # Only used if `metricsService.type` is `NodePort`.
+  # Only used if `service.type` is `NodePort`.
   nodePort:
 
-metricsService:
-  type: ClusterIP
+
+## Metrics serviceMonitor parameters
+## Enable this if you're using Prometheus Operator
+##
+serviceMonitor:
+  enabled: false
   # metrics server will be exposed at this port.
   port: 8080
-  # -- Service node port.
-  # Only used if `metricsService.type` is `NodePort`.
+  # Only used if `service.type` is `NodePort`.
   nodePort:
 
 # -- Topology spread constraints.
@@ -90,14 +93,12 @@ tolerations: []
 
 affinity: {}
 
-serviceMonitor:
-  enabled: false
-
 podDisruptionBudget:
   minAvailable: 1
   maxUnavailable:
 
 admissionWebhooks:
-  enabled: false
+  enabled: true
+  createSelfSignedCert: true
 
 kubeRBACProxyImageRepo: docker.io/infracreate/kube-rbac-proxy:v0.12.0

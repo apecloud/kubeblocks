@@ -24,6 +24,7 @@ import (
 
 type Wesql struct {
 	serverVersion string
+	dbReplicas    string
 }
 
 func (o *Wesql) GetRepos() []repo.Entry {
@@ -40,17 +41,13 @@ func (o *Wesql) GetDBCharts(ns string, dbname string) []helm.InstallOpts {
 			Name:      "opendbaas-core",
 			Chart:     "oci://yimeisun.azurecr.io/helm-chart/opendbaas-core",
 			Wait:      true,
-			Version:   "0.1.0-alpha.4",
+			Version:   "0.1.0-alpha.5",
 			Namespace: "default",
 			Sets: []string{
 				"image.tag=latest",
 				"image.pullPolicy=Always",
 			},
-			LoginOpts: &helm.LoginOpts{
-				User:   helmUser,
-				Passwd: helmPasswd,
-				URL:    helmURL,
-			},
+			Login:    true,
 			TryTimes: 2,
 		},
 		{
@@ -61,12 +58,9 @@ func (o *Wesql) GetDBCharts(ns string, dbname string) []helm.InstallOpts {
 			Version:   "0.1.0",
 			Sets: []string{
 				"serverVersion=" + o.serverVersion,
+				"replicaCount=" + o.dbReplicas,
 			},
-			LoginOpts: &helm.LoginOpts{
-				User:   helmUser,
-				Passwd: helmPasswd,
-				URL:    helmURL,
-			},
+			Login:    true,
 			TryTimes: 2,
 		},
 	}

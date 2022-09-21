@@ -10,7 +10,10 @@ spec:
   components:
   - name: replicasets # user-defined
     type: replicasets # ref clusterdefinition components.typename
-    replicas: {{ .Values.replicaCount }}
+    roleGroups: 
+    - name: primary
+      type: primary
+      replicas: {{ .Values.replicaCount | default 3 }}
     {{- with  .Values.resources }}
     resources: 
       limits: 

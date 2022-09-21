@@ -61,6 +61,14 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
+{{/*
+Create the name of the webhook service
+*/}}
+{{- define "opendbaas-core.svcName" -}}
+{{ include "opendbaas-core.fullname" . }}
+{{- end }}
+
+
 {{/* Create the default PodDisruptionBudget to use */}}
 {{- define "podDisruptionBudget.spec" -}}
 {{- if and .Values.podDisruptionBudget.minAvailable .Values.podDisruptionBudget.maxUnavailable }}

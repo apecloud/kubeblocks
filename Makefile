@@ -42,7 +42,7 @@ ENABLE_WEBHOOKS ?= false
 APP_NAME = kubeblock
 
 
-VERSION ?= 0.1.0-alpha.4
+VERSION ?= 0.1.0-alpha.5
 CHART_PATH = deploy/helm
 
 
@@ -498,7 +498,7 @@ endif
 
 .PHONY: brew-install-prerequisite
 brew-install-prerequisite: ## Use `brew install` to install required dependencies. 
-	brew install go kubebuilder delve golangci-lint staticcheck kustomize step cue
+	brew install go@1.18 kubebuilder delve golangci-lint staticcheck kustomize step cue
 
 
 ##@ Docker containers 

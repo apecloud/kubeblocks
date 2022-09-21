@@ -18,8 +18,9 @@ package backup
 
 import (
 	"context"
-	"fmt"
 	"time"
+
+	"github.com/apecloud/kubeblocks/pkg/utils"
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -118,7 +119,7 @@ func (o *CreateOptions) Run() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(obj)
+	utils.PrintObjYaml(obj)
 	return nil
 }
 
@@ -132,7 +133,7 @@ func NewBackupJobInstance(namespace, name string) *unstructured.Unstructured {
 				"name":      name,
 			},
 			"spec": map[string]interface{}{
-				"backupPolicyName": "backup-policy-1",
+				"backupPolicyName": "backup-policy-demo",
 				"backupType":       "full",
 				"ttl":              "168h0m0s",
 			},

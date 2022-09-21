@@ -1,20 +1,24 @@
 {{- if .Values.admissionWebhooks.enabled }}
-{{- if .Values.createSelfSignedCert }}
-{{- $ca := genCA (printf "*.%s.svc" (include "opendbaas-core.namespace" .)) 36500 -}}
-{{- $cert := genSignedCert (printf "%s.%s.svc" (include "opendbaas-core.serviceName" .) (include "opendbaas-core.namespace" .)) nil nil 36500 $ca -}}
+{{- $ca := genCA (printf "*.%s.svc" ( .Release.Namespace )) 36500 }}
+{{- $cert := genSignedCert (printf "%s.%s.svc" (include "opendbaas-core.svcName" .) ( .Release.Namespace )) nil nil 36500 $ca }}
+{{- if .Values.admissionWebhooks.createSelfSignedCert }}
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ include "opendbaas-core.fullname" . }}.{{ template "opendbaas-core.namespace" . }}.svc.tls-ca
+  name: {{ include "opendbaas-core.fullname" . }}.{{ .Release.Namespace }}.svc.tls-ca
   labels: 
     {{- include "opendbaas-core.selectorLabels" . | nindent 4 }}
+  annotations:
+    self-signed-cert: "true"
+type: kubernetes.io/tls
 data:
+  rootCA.key: {{ $ca.Key | b64enc }}
   rootCA.crt: {{ $ca.Cert | b64enc }}
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ include "opendbaas-core.fullname" . }}.{{ template "opendbaas-core.namespace" . }}.svc.tls-pair
+  name: {{ include "opendbaas-core.fullname" . }}.{{ .Release.Namespace }}.svc.tls-pair
   labels: {{ include "opendbaas-core.labels" . | nindent 4 }}
   annotations:
     self-signed-cert: "true"
@@ -27,15 +31,19 @@ data:
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: mutating-webhook-configuration
+  name: {{ include "opendbaas-core.fullname" . }}-mutating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
   - v1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: {{ include "opendbaas-core.svcName" . }}
+      namespace: {{ .Release.Namespace }}
       path: /mutate-dbaas-infracreate-com-v1alpha1-appversion
+      port: {{ .Values.service.port }}
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
+    caBundle: {{ $ca.Cert | b64enc }}
+    {{- end }}
   failurePolicy: Fail
   name: mappversion.kb.io
   rules:
@@ -53,9 +61,13 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: {{ include "opendbaas-core.svcName" . }}
+      namespace: {{ .Release.Namespace }}
       path: /mutate-dbaas-infracreate-com-v1alpha1-cluster
+      port: {{ .Values.service.port }}
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
+    caBundle: {{ $ca.Cert | b64enc }}
+    {{- end }}
   failurePolicy: Fail
   name: mcluster.kb.io
   rules:
@@ -73,9 +85,13 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: {{ include "opendbaas-core.svcName" . }}
+      namespace: {{ .Release.Namespace }}
       path: /mutate-dbaas-infracreate-com-v1alpha1-clusterdefinition
+      port: {{ .Values.service.port }}
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
+    caBundle: {{ $ca.Cert | b64enc }}
+    {{- end }}
   failurePolicy: Fail
   name: mclusterdefinition.kb.io
   rules:
@@ -94,9 +110,13 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: {{ include "opendbaas-core.svcName" . }}
+      namespace: {{ .Release.Namespace }}
       path: /mutate-v1-pod
+      port: {{ .Values.service.port }}
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
+    caBundle: {{ $ca.Cert | b64enc }}
+    {{- end }}
   failurePolicy: Fail
   name: mpod.kb.io
   rules:
@@ -113,15 +133,19 @@ webhooks:
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: validating-webhook-configuration
+  name: {{ include "opendbaas-core.fullname" . }}-validating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
   - v1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: {{ include "opendbaas-core.svcName" . }}
+      namespace: {{ .Release.Namespace }}
       path: /validate-dbaas-infracreate-com-v1alpha1-appversion
+      port: {{ .Values.service.port }}
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
+    caBundle: {{ $ca.Cert | b64enc }}
+    {{- end }}
   failurePolicy: Fail
   name: vappversion.kb.io
   rules:
@@ -139,9 +163,13 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: {{ include "opendbaas-core.svcName" . }}
+      namespace: {{ .Release.Namespace }}
       path: /validate-dbaas-infracreate-com-v1alpha1-cluster
+      port: {{ .Values.service.port }}
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
+    caBundle: {{ $ca.Cert | b64enc }}
+    {{- end }}
   failurePolicy: Fail
   name: vcluster.kb.io
   rules:
@@ -159,9 +187,13 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: {{ include "opendbaas-core.svcName" . }}
+      namespace: {{ .Release.Namespace }}
       path: /validate-dbaas-infracreate-com-v1alpha1-clusterdefinition
+      port: {{ .Values.service.port }}
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
+    caBundle: {{ $ca.Cert | b64enc }}
+    {{- end }}
   failurePolicy: Fail
   name: vclusterdefinition.kb.io
   rules:

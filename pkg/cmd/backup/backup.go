@@ -22,7 +22,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
-// NewBackupCmd creates the dbcluster command
+// NewBackupCmd creates the backup command
 func NewBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "backup",
@@ -34,6 +34,7 @@ func NewBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		NewListCmd(f, streams),
 		NewCreateCmd(f, streams),
 		NewRestoreCmd(f, streams),
+		NewSnapshotCmd(f, streams),
 	)
 
 	return cmd

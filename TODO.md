@@ -4,9 +4,9 @@
 
 ### Cluster CR controller
 - [x] secondary resources finalizer
-- [ ] CR delete handling
+- [x] CR delete handling
   - [x] delete secondary resources
-  - [ ] CR spec.terminationPolicy handling
+  - [x] CR spec.terminationPolicy handling
 - [x] managed resources handling
   - [x] roleGroup attached Service kind
   - [x] deployment workloads

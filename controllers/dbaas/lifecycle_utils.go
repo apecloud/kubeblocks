@@ -155,6 +155,7 @@ func mergeComponents(
 		ConsensusSpec:   clusterDefComp.ConsensusSpec,
 		PodSpec:         clusterDefComp.PodSpec,
 		Service:         clusterDefComp.Service,
+		ReadonlyService: clusterDefComp.ReadonlyService,
 		Scripts:         clusterDefComp.Scripts,
 	}
 	if clusterComp != nil {
@@ -332,7 +333,6 @@ func prepareSecretObjs(ctx context.Context, cli client.Client, obj interface{}) 
 	return nil
 }
 
-// TODO handle componentType
 func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{}) error {
 	params, ok := obj.(*createParams)
 	if !ok {
@@ -359,11 +359,19 @@ func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{
 		}
 		*params.applyObjs = append(*params.applyObjs, svcs...)
 	case dbaasv1alpha1.Consensus:
-		cs, err := buildConsensusSet(*params)
+		css, err := buildConsensusSet(*params)
 		if err != nil {
 			return err
 		}
-		*params.applyObjs = append(*params.applyObjs, cs)
+		css.GetLabels()
+		*params.applyObjs = append(*params.applyObjs, css)
+
+		svcs, err := buildHeadlessSvcs(*params, css)
+		if err != nil {
+			return err
+		}
+		*params.applyObjs = append(*params.applyObjs, svcs...)
+
 	}
 
 	pdb, err := buildPDB(*params)
@@ -377,10 +385,38 @@ func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{
 		if err != nil {
 			return err
 		}
+		if params.component.ComponentType == dbaasv1alpha1.Consensus {
+			addSelectorLabels(svc, params.component, dbaasv1alpha1.ReadWrite)
+		}
+		*params.applyObjs = append(*params.applyObjs, svc)
+	}
+
+	if params.component.ReadonlyService.Ports != nil &&
+		params.component.ComponentType == dbaasv1alpha1.Consensus {
+		svc, err := buildSvc(*params)
+		if err != nil {
+			return err
+		}
+		addSelectorLabels(svc, params.component, dbaasv1alpha1.Readonly)
 		*params.applyObjs = append(*params.applyObjs, svc)
 	}
 
 	return nil
+}
+
+func addSelectorLabels(service *corev1.Service, component *Component, accessMode dbaasv1alpha1.AccessMode) {
+	addSelector := func(service *corev1.Service, member dbaasv1alpha1.ConsensusMember, accessMode dbaasv1alpha1.AccessMode) {
+		if member.AccessMode == accessMode {
+			service.Spec.Selector[consensusSetRoleLabelKey] = member.Name
+		}
+	}
+
+	addSelector(service, component.ConsensusSpec.Leader, accessMode)
+	addSelector(service, component.ConsensusSpec.Learner, accessMode)
+
+	for _, member := range component.ConsensusSpec.Followers {
+		addSelector(service, member, accessMode)
+	}
 }
 
 func createOrReplaceResources(ctx context.Context,
@@ -688,10 +724,9 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 	return &sts, nil
 }
 
+// buildConsensusSet build on a stateful set
 func buildConsensusSet(params createParams) (*appsv1.StatefulSet, error) {
-	// TODO finish me
-
-	return nil, nil
+	return buildSts(params)
 }
 
 func buildDeploy(params createParams) (*appsv1.Deployment, error) {

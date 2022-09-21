@@ -106,9 +106,16 @@ type ClusterDefinitionComponent struct {
 	PodSpec *corev1.PodSpec `json:"podSpec,omitempty"`
 
 	// Service defines the behavior of a service spec.
+	// provide readWrite service when ComponentType is Consensus
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Service corev1.ServiceSpec `json:"service,omitempty"`
+
+	// ReadonlyService defines the behavior of a service spec.
+	// provide readonly service when ComponentType is Consensus
+	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
+	ReadonlyService corev1.ServiceSpec `json:"readonlyService,omitempty"`
 
 	// script exec order：component.pre => roleGroup.pre => component.exec => roleGroup.exec => roleGroup.post => component.post
 	// builtin ENV variables:

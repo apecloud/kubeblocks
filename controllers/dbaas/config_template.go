@@ -47,12 +47,19 @@ type ConfigTemplateBuilder struct {
 	// Global Var
 	componentValues  *ComponentTemplateValues
 	buildinFunctions *intctrlutil.BuiltinObjectsFunc
+
+	// DBaas cluster object
+	component *Component
+	cluster   *dbaasv1alpha1.Cluster
+	podSpec   *corev1.PodSpec
+	roleGroup *RoleGroup
 }
 
-func NewCfgTemplateBuilder(clusterName, namespace string) *ConfigTemplateBuilder {
+func NewCfgTemplateBuilder(clusterName, namespace string, cluster *dbaasv1alpha1.Cluster) *ConfigTemplateBuilder {
 	return &ConfigTemplateBuilder{
 		namespace:   namespace,
 		clusterName: clusterName,
+		cluster:     cluster,
 	}
 }
 
@@ -72,15 +79,15 @@ func (c *ConfigTemplateBuilder) Render(configs map[string]string) (map[string]st
 
 func (c *ConfigTemplateBuilder) builtinObjects() *intctrlutil.TplValues {
 	return &intctrlutil.TplValues{
-		"Cluster": map[string]interface{}{
-			"Namespace": c.namespace,
-			"Name":      c.clusterName,
-		},
-		"Component": c.componentValues,
+		"Cluster":           c.cluster,
+		"Component":         c.component,
+		"ComponentResource": c.componentValues.Resource,
+		"PodSpec":           c.podSpec,
+		"RoleGroup":         c.roleGroup,
 	}
 }
 
-func (c *ConfigTemplateBuilder) InjectBuiltInObjectsAndFunctions(podTemplate corev1.PodTemplateSpec, configs []dbaasv1alpha1.ConfigTemplate, component *Component, group *RoleGroup) error {
+func (c *ConfigTemplateBuilder) InjectBuiltInObjectsAndFunctions(podTemplate *corev1.PodTemplateSpec, configs []dbaasv1alpha1.ConfigTemplate, component *Component, group *RoleGroup) error {
 	if err := injectBuiltInObjects(c, podTemplate, component, group, configs); err != nil {
 		return err
 	}
@@ -91,17 +98,23 @@ func (c *ConfigTemplateBuilder) InjectBuiltInObjectsAndFunctions(podTemplate cor
 	return nil
 }
 
-func injectBuiltInFunctions(tplBuilder *ConfigTemplateBuilder, podTemplate corev1.PodTemplateSpec, component *Component, group *RoleGroup) error {
+func injectBuiltInFunctions(tplBuilder *ConfigTemplateBuilder, podTemplate *corev1.PodTemplateSpec, component *Component, group *RoleGroup) error {
 	// TODO add built-in function
 	tplBuilder.buildinFunctions = &intctrlutil.BuiltinObjectsFunc{
-		"mysql_buffer_size_cal": calMysqlPoolSizeByResource,
+		"mysql_buffer_size":       calMysqlPoolSizeByResource,
+		"get_volume_path_by_name": getVolumeMountPathByName,
+		"get_pvc_by_name":         getPvcByName,
+		"get_env_by_name":         getEnvByName,
+		"get_port_by_name":        getPortByName,
+		"cal_mysql_buffer_size":   calMysqlPoolSize,
+		"get_arg_by_name":         getArgByName,
 	}
 	return nil
 }
 
-func injectBuiltInObjects(tplBuilder *ConfigTemplateBuilder, podTemplate corev1.PodTemplateSpec, component *Component, group *RoleGroup, configs []dbaasv1alpha1.ConfigTemplate) error {
+func injectBuiltInObjects(tplBuilder *ConfigTemplateBuilder, podTemplate *corev1.PodTemplateSpec, component *Component, group *RoleGroup, configs []dbaasv1alpha1.ConfigTemplate) error {
 	var resource *ResourceDefinition
-	container := intctrlutil.GetContainerUsingConfig(podTemplate, configs)
+	container := intctrlutil.GetContainerUsingConfig(*podTemplate, configs)
 	if container != nil && len(container.Resources.Limits) > 0 {
 		resource = &ResourceDefinition{
 			MemorySize: intctrlutil.GetMemorySize(*container),
@@ -116,6 +129,10 @@ func injectBuiltInObjects(tplBuilder *ConfigTemplateBuilder, podTemplate corev1.
 		Replicas:    group.Replicas,
 		Resource:    resource,
 	}
+
+	tplBuilder.podSpec = &podTemplate.Spec
+	tplBuilder.component = component
+	tplBuilder.roleGroup = group
 
 	return nil
 }
@@ -190,4 +207,58 @@ func calMysqlPoolSizeByResource(resource *ResourceDefinition, isShared bool) str
 	bufferSize /= alignedSize
 	bufferSize *= alignedSize
 	return fmt.Sprintf("%dM", bufferSize)
+}
+
+func calMysqlPoolSize(container corev1.Container) string {
+	if len(container.Resources.Limits) == 0 {
+		return ""
+	}
+	resource := ResourceDefinition{
+		MemorySize: intctrlutil.GetMemorySize(container),
+		CoreNum:    intctrlutil.GetCoreNum(container),
+	}
+	return calMysqlPoolSizeByResource(&resource, false)
+
+}
+
+func getVolumeMountPathByName(container *corev1.Container, volumeName string) string {
+	for _, v := range container.VolumeMounts {
+		if v.Name == volumeName {
+			return v.MountPath
+		}
+	}
+	return ""
+}
+
+func getPvcByName(volumes []corev1.Volume, volumeName string) *corev1.VolumeSource {
+	for _, v := range volumes {
+		if v.Name == volumeName {
+			return &v.VolumeSource
+		}
+	}
+	return nil
+}
+
+func getEnvByName(container *corev1.Container, envName string) string {
+	for _, v := range container.Env {
+		if v.Name == envName {
+			return v.Value
+		}
+	}
+	return ""
+}
+
+func getArgByName(container *corev1.Container, argName string) string {
+	// TODO Support parse command args
+	return ""
+}
+
+func getPortByName(container *corev1.Container, portName string) *corev1.ContainerPort {
+	for _, v := range container.Ports {
+		if v.Name == portName {
+			return &v
+		}
+	}
+
+	return nil
 }

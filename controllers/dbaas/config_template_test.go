@@ -26,6 +26,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type InsClassType struct {
@@ -62,17 +63,17 @@ loose_binlog_checksum           = crc32
 cluster_name = {{ .Cluster.Name }}
 cluster_namespace = {{ .Cluster.Namespace }}
 component_name = {{ .Component.Name }}
-component_replica = {{ .Component.Replicas }}
+component_replica = {{ .RoleGroup.Replicas }}
 
-{{ if .Component.Resource -}}
-test_size = {{ mysql_buffer_size_cal .Component.Resource false }}
+{{ if .ComponentResource -}}
+test_size = {{ mysql_buffer_size .ComponentResource false }}
 {{- else -}}
 test_size = 128M
 {{- end -}}
 
 {{- $buffer_pool_size_tmp := 2147483648 -}}
-{{- if .Component.Resource -}}
-{{- $buffer_pool_size_tmp = .Component.Resource.MemorySize -}}
+{{- if .ComponentResource -}}
+{{- $buffer_pool_size_tmp = .ComponentResource.MemorySize -}}
 {{- end }}
 innodb_buffer_pool_size = {{ $buffer_pool_size_tmp }}
 loose_rds_audit_log_buffer_size = {{ div $buffer_pool_size_tmp 100 }}
@@ -127,7 +128,51 @@ loose_innodb_primary_flush_max_lsn_lag =  195225786
 
 	BeforeEach(func() {
 		// Add any steup steps that needs to be executed before each test
-		podTemplate = &corev1.PodTemplateSpec{}
+		podTemplate = &corev1.PodTemplateSpec{
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name: "mytest",
+						VolumeMounts: []corev1.VolumeMount{
+							{
+								Name:      "data",
+								MountPath: "/data/mysql",
+							},
+							{
+								Name:      "log",
+								MountPath: "/log/mysql",
+							},
+						},
+						Env: []corev1.EnvVar{
+							{
+								Name:  "t1",
+								Value: "value1",
+							},
+							{
+								Name:  "t2",
+								Value: "value2",
+							},
+							{
+								Name:  "a",
+								Value: "b",
+							},
+						},
+						Ports: []corev1.ContainerPort{
+							{
+								Name:          "mysql",
+								ContainerPort: 3356,
+								Protocol:      "TCP",
+							},
+							{
+								Name:          "paxos",
+								ContainerPort: 3356,
+								Protocol:      "TCP",
+							},
+						},
+					},
+				},
+			},
+		}
 		component = &Component{
 			ClusterDefName: "mysql-three-node-definition",
 			ClusterType:    "state.mysql-8",
@@ -150,9 +195,18 @@ loose_innodb_primary_flush_max_lsn_lag =  195225786
 	// for test GetContainerWithVolumeMount
 	Context("ConfigTemplateBuilder sample test", func() {
 		It("test render", func() {
-			cfgBuilder := NewCfgTemplateBuilder("my_test", "default")
+			cfgBuilder := NewCfgTemplateBuilder(
+				"my_test",
+				"default",
+				&dbaasv1alpha1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my_test",
+						Namespace: "default",
+					},
+				},
+			)
 
-			Expect(cfgBuilder.InjectBuiltInObjectsAndFunctions(*podTemplate, cfgTemplate, component, group)).Should(BeNil())
+			Expect(cfgBuilder.InjectBuiltInObjectsAndFunctions(podTemplate, cfgTemplate, component, group)).Should(BeNil())
 
 			cfgBuilder.componentValues.Resource = &ResourceDefinition{
 				MemorySize: 8 * 1024 * 1024 * 1024,
@@ -182,6 +236,39 @@ loose_innodb_primary_flush_max_lsn_lag =  195225786
 				Expect(rendered[MYSQL_CFG_NAME]).Should(Equal(MYSQL_CFG_RENDERED_CONTEXT_WITHOUT_RES))
 			}
 
+		})
+		It("test built-in function", func() {
+			cfgBuilder := NewCfgTemplateBuilder(
+				"my_test",
+				"default",
+				&dbaasv1alpha1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my_test",
+						Namespace: "default",
+					},
+				},
+			)
+
+			Expect(cfgBuilder.InjectBuiltInObjectsAndFunctions(podTemplate, cfgTemplate, component, group)).Should(BeNil())
+
+			rendered, err := cfgBuilder.Render(map[string]string{
+				"a":              "{{ get_volume_path_by_name ( index .PodSpec.Containers 0 ) \"log\" }}",
+				"b":              "{{ get_volume_path_by_name ( index .PodSpec.Containers 0 ) \"data\" }}",
+				"c":              "{{ ( get_port_by_name ( index .PodSpec.Containers 0 ) \"mysql\" ).ContainerPort }}",
+				"d":              "{{ cal_mysql_buffer_size ( index .PodSpec.Containers 0 ) }}",
+				"e":              "{{ get_arg_by_name ( index .PodSpec.Containers 0 ) \"User\" }}",
+				"invalid_volume": "{{ get_volume_path_by_name ( index .PodSpec.Containers 0 ) \"invalid\" }}",
+				"invalid_port":   "{{ get_port_by_name ( index .PodSpec.Containers 0 ) \"invalid\" }}",
+			})
+
+			Expect(err).Should(BeNil())
+			Expect(rendered["a"]).Should(Equal("/log/mysql"))
+			Expect(rendered["b"]).Should(Equal("/data/mysql"))
+			Expect(rendered["c"]).Should(Equal("3356"))
+			Expect(rendered["d"]).Should(Equal(""))
+			Expect(rendered["e"]).Should(Equal(""))
+			Expect(rendered["invalid_volume"]).Should(Equal(""))
+			Expect(rendered["invalid_port"]).Should(Equal("nil"))
 		})
 	})
 

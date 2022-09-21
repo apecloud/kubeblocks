@@ -997,9 +997,9 @@ func buildCfg(params createParams, sts *appsv1.StatefulSet, ctx context.Context,
 	namespaceName := params.cluster.Namespace
 
 	// New ConfigTemplateBuilder
-	cfgTemplateBuilder := NewCfgTemplateBuilder(clusterName, namespaceName)
+	cfgTemplateBuilder := NewCfgTemplateBuilder(clusterName, namespaceName, params.cluster)
 	// Prepare built-in objects and built-in functions
-	if err := cfgTemplateBuilder.InjectBuiltInObjectsAndFunctions(sts.Spec.Template, tpls, params.component, params.roleGroup); err != nil {
+	if err := cfgTemplateBuilder.InjectBuiltInObjectsAndFunctions(&sts.Spec.Template, tpls, params.component, params.roleGroup); err != nil {
 		return nil, err
 	}
 

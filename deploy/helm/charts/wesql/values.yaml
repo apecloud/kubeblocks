@@ -61,11 +61,11 @@ configTemplate:
     [mysqld]
     # aliyun buffer pool: https://help.aliyun.com/document_detail/162326.html?utm_content=g_1000230851&spm=5176.20966629.toubu.3.f2991ddcpxxvD1#title-rey-j7j-4dt
     
-    {{- if .Component.Resource -}}
+    {{ if .Component.Resource -}}
     innodb-buffer-pool-size={{ mysql_buffer_size_cal .Component.Resource false }}
-    {{ else -}}
+    {{- else -}}
     innodb-buffer-pool-size=128M
-    {{- end -}}
+    {{- end }}
 
     log-bin=master-bin
     gtid_mode=OFF

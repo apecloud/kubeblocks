@@ -26,6 +26,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -65,15 +66,16 @@ cluster_namespace = {{ .Cluster.Namespace }}
 component_name = {{ .Component.Name }}
 component_replica = {{ .RoleGroup.Replicas }}
 
-{{ if .ComponentResource -}}
-test_size = {{ mysql_buffer_size .ComponentResource false }}
-{{- else -}}
+{{- $test_value := call_buffer_size_by_resource ( index .PodSpec.Containers 0 ) }}
+{{ if $test_value -}}
+test_size = {{ $test_value }}
+{{- else }}
 test_size = 128M
-{{- end -}}
+{{ end -}}
 
-{{- $buffer_pool_size_tmp := 2147483648 -}}
-{{- if .ComponentResource -}}
-{{- $buffer_pool_size_tmp = .ComponentResource.MemorySize -}}
+{{ $buffer_pool_size_tmp := 2147483648 -}}
+{{ if .ComponentResource -}}
+{{ $buffer_pool_size_tmp = .ComponentResource.MemorySize }}
 {{- end }}
 innodb_buffer_pool_size = {{ $buffer_pool_size_tmp }}
 loose_rds_audit_log_buffer_size = {{ div $buffer_pool_size_tmp 100 }}
@@ -95,34 +97,11 @@ cluster_name = my_test
 cluster_namespace = default
 component_name = replicasets
 component_replica = 5
-
 test_size = 4096M
 innodb_buffer_pool_size = 8589934592
 loose_rds_audit_log_buffer_size = 85899345
 loose_innodb_replica_log_parse_buf_size = 858993459
 loose_innodb_primary_flush_max_lsn_lag =  780903144
-`
-		MYSQL_CFG_RENDERED_CONTEXT_WITHOUT_RES = `
-[mysqld]
-loose_query_cache_type          = OFF
-loose_query_cache_size          = 0
-loose_innodb_thread_concurrency = 0
-loose_concurrent_insert         = 0
-loose_gts_lease                 = 2000
-loose_log_bin_use_v1_row_events = off
-loose_binlog_checksum           = crc32
-
-#test
-cluster_name = my_test
-cluster_namespace = default
-component_name = replicasets
-component_replica = 5
-
-test_size = 128M
-innodb_buffer_pool_size = 2147483648
-loose_rds_audit_log_buffer_size = 21474836
-loose_innodb_replica_log_parse_buf_size = 214748364
-loose_innodb_primary_flush_max_lsn_lag =  195225786
 `
 	)
 
@@ -167,6 +146,27 @@ loose_innodb_primary_flush_max_lsn_lag =  195225786
 								Name:          "paxos",
 								ContainerPort: 3356,
 								Protocol:      "TCP",
+							},
+						},
+						Resources: corev1.ResourceRequirements{
+							Limits: map[corev1.ResourceName]resource.Quantity{
+								corev1.ResourceMemory: resource.MustParse("8Gi"),
+								corev1.ResourceCPU:    resource.MustParse("4"),
+							},
+						},
+					},
+					{
+						Name: "invalid_contaienr",
+					},
+				},
+				Volumes: []corev1.Volume{
+					{
+						Name: "config",
+						VolumeSource: corev1.VolumeSource{
+							ConfigMap: &corev1.ConfigMapVolumeSource{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: "cluster_name_for_test",
+								},
 							},
 						},
 					},
@@ -219,23 +219,10 @@ loose_innodb_primary_flush_max_lsn_lag =  195225786
 
 			// Debug
 			fmt.Println(rendered[MYSQL_CFG_NAME])
+			fmt.Printf("%s\n", MYSQL_CFG_RENDERED_CONTEXT)
 
 			Expect(err).Should(BeNil())
 			Expect(rendered[MYSQL_CFG_NAME]).Should(Equal(MYSQL_CFG_RENDERED_CONTEXT))
-
-			// for test without resource
-			{
-				cfgBuilder.componentValues.Resource = nil
-				rendered, err := cfgBuilder.Render(map[string]string{
-					MYSQL_CFG_NAME: MYSQL_CFG_TMP_CONTEXT,
-				})
-
-				fmt.Println(rendered[MYSQL_CFG_NAME])
-
-				Expect(err).Should(BeNil())
-				Expect(rendered[MYSQL_CFG_NAME]).Should(Equal(MYSQL_CFG_RENDERED_CONTEXT_WITHOUT_RES))
-			}
-
 		})
 		It("test built-in function", func() {
 			cfgBuilder := NewCfgTemplateBuilder(
@@ -252,23 +239,44 @@ loose_innodb_primary_flush_max_lsn_lag =  195225786
 			Expect(cfgBuilder.InjectBuiltInObjectsAndFunctions(podTemplate, cfgTemplate, component, group)).Should(BeNil())
 
 			rendered, err := cfgBuilder.Render(map[string]string{
-				"a":              "{{ get_volume_path_by_name ( index .PodSpec.Containers 0 ) \"log\" }}",
-				"b":              "{{ get_volume_path_by_name ( index .PodSpec.Containers 0 ) \"data\" }}",
-				"c":              "{{ ( get_port_by_name ( index .PodSpec.Containers 0 ) \"mysql\" ).ContainerPort }}",
-				"d":              "{{ cal_mysql_buffer_size ( index .PodSpec.Containers 0 ) }}",
-				"e":              "{{ get_arg_by_name ( index .PodSpec.Containers 0 ) \"User\" }}",
-				"invalid_volume": "{{ get_volume_path_by_name ( index .PodSpec.Containers 0 ) \"invalid\" }}",
-				"invalid_port":   "{{ get_port_by_name ( index .PodSpec.Containers 0 ) \"invalid\" }}",
+				"a":                 "{{ get_volume_path_by_name ( index .PodSpec.Containers 0 ) \"log\" }}",
+				"b":                 "{{ get_volume_path_by_name ( index .PodSpec.Containers 0 ) \"data\" }}",
+				"c":                 "{{ ( get_port_by_name ( index .PodSpec.Containers 0 ) \"mysql\" ).ContainerPort }}",
+				"d":                 "{{ call_buffer_size_by_resource ( index .PodSpec.Containers 0 ) }}",
+				"e":                 "{{ get_arg_by_name ( index .PodSpec.Containers 0 ) \"User\" }}",
+				"f":                 "{{ get_volume_path_by_name ( get_container_by_name .PodSpec.Containers \"mytest\") \"data\" }}",
+				"i":                 "{{ get_env_by_name ( index .PodSpec.Containers 0 ) \"a\" }}",
+				"j":                 "{{ ( get_pvc_by_name .PodSpec.Volumes \"config\" ).ConfigMap.Name }}",
+				"invalid_volume":    "{{ get_volume_path_by_name ( index .PodSpec.Containers 0 ) \"invalid\" }}",
+				"invalid_port":      "{{ get_port_by_name ( index .PodSpec.Containers 0 ) \"invalid\" }}",
+				"invalid_container": "{{ get_container_by_name .PodSpec.Containers  \"invalid\" }}",
+				"invalid_resource":  "{{ call_buffer_size_by_resource ( index .PodSpec.Containers 1 ) }}",
+				"invalid_env":       "{{ get_env_by_name ( index .PodSpec.Containers 0 ) \"invalid\" }}",
+				"invalid_pvc":       "{{ get_pvc_by_name .PodSpec.Volumes \"invalid\" }}",
 			})
 
 			Expect(err).Should(BeNil())
+			// for test volumeMounts
 			Expect(rendered["a"]).Should(Equal("/log/mysql"))
+			// for test volumeMounts
 			Expect(rendered["b"]).Should(Equal("/data/mysql"))
+			// for test port
 			Expect(rendered["c"]).Should(Equal("3356"))
-			Expect(rendered["d"]).Should(Equal(""))
+			// for test resource
+			Expect(rendered["d"]).Should(Equal("4096M"))
+			// for test args
 			Expect(rendered["e"]).Should(Equal(""))
+			// for test volumeMounts
+			Expect(rendered["f"]).Should(Equal("/data/mysql"))
+			// for test env
+			Expect(rendered["i"]).Should(Equal("b"))
+			// for test volume
+			Expect(rendered["j"]).Should(Equal("cluster_name_for_test"))
 			Expect(rendered["invalid_volume"]).Should(Equal(""))
 			Expect(rendered["invalid_port"]).Should(Equal("nil"))
+			Expect(rendered["invalid_container"]).Should(Equal("nil"))
+			Expect(rendered["invalid_env"]).Should(Equal(""))
+			Expect(rendered["invalid_pvc"]).Should(Equal("nil"))
 		})
 	})
 

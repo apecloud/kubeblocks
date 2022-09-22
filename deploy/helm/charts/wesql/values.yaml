@@ -64,7 +64,7 @@ configTemplate:
     {{- $log_root := get_volume_path_by_name ( index .PodSpec.Containers 0 ) "log" }}
     {{- $data_root := get_volume_path_by_name ( index .PodSpec.Containers 0 ) "data" }}
     {{- $mysql_port_info := get_port_by_name ( index .PodSpec.Containers 0 ) "mysql" }}
-    {{- $pool_buffer_size := ( cal_mysql_buffer_size ( index .PodSpec.Containers 0 ) ) }}
+    {{- $pool_buffer_size := ( call_buffer_size_by_resource ( index .PodSpec.Containers 0 ) ) }}
 
 
     {{- if $pool_buffer_size }}

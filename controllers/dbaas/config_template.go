@@ -17,9 +17,6 @@ limitations under the License.
 package dbaas
 
 import (
-	"fmt"
-	"math"
-
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	corev1 "k8s.io/api/core/v1"
@@ -77,13 +74,22 @@ func (c *ConfigTemplateBuilder) Render(configs map[string]string) (map[string]st
 	return rendered, nil
 }
 
+// General Built-in objects
+const (
+	BuiltinClusterObject           = "Cluster"
+	BuiltinComponentObject         = "Component"
+	BuiltinPodObject               = "PodSpec"
+	BuiltinRoleObject              = "RoleGroup"
+	BuiltinComponentResourceObject = "ComponentResource"
+)
+
 func (c *ConfigTemplateBuilder) builtinObjects() *intctrlutil.TplValues {
 	return &intctrlutil.TplValues{
-		"Cluster":           c.cluster,
-		"Component":         c.component,
-		"ComponentResource": c.componentValues.Resource,
-		"PodSpec":           c.podSpec,
-		"RoleGroup":         c.roleGroup,
+		BuiltinClusterObject:           c.cluster,
+		BuiltinComponentObject:         c.component,
+		BuiltinPodObject:               c.podSpec,
+		BuiltinRoleObject:              c.roleGroup,
+		BuiltinComponentResourceObject: c.componentValues.Resource,
 	}
 }
 
@@ -98,16 +104,30 @@ func (c *ConfigTemplateBuilder) InjectBuiltInObjectsAndFunctions(podTemplate *co
 	return nil
 }
 
+// General Built-in functions
+const (
+	BuiltinGetVolumeFunctionName    = "get_volume_path_by_name"
+	BuiltinGetPvcFunctionName       = "get_pvc_by_name"
+	BuiltinGetEnvFunctionName       = "get_env_by_name"
+	BuiltinGetArgFunctionName       = "get_arg_by_name"
+	BuiltinGetPortFunctionName      = "get_port_by_name"
+	BuiltinGetContainerFunctionName = "get_container_by_name"
+
+	// BuiltinMysqlCalBufferFunctionName Mysql Built-in
+	// TODO: This function migrate to configuration template
+	BuiltinMysqlCalBufferFunctionName = "call_buffer_size_by_resource"
+)
+
 func injectBuiltInFunctions(tplBuilder *ConfigTemplateBuilder, podTemplate *corev1.PodTemplateSpec, component *Component, group *RoleGroup) error {
 	// TODO add built-in function
 	tplBuilder.buildinFunctions = &intctrlutil.BuiltinObjectsFunc{
-		"mysql_buffer_size":       calMysqlPoolSizeByResource,
-		"get_volume_path_by_name": getVolumeMountPathByName,
-		"get_pvc_by_name":         getPvcByName,
-		"get_env_by_name":         getEnvByName,
-		"get_port_by_name":        getPortByName,
-		"cal_mysql_buffer_size":   calMysqlPoolSize,
-		"get_arg_by_name":         getArgByName,
+		BuiltinMysqlCalBufferFunctionName: calDbPoolSize,
+		BuiltinGetVolumeFunctionName:      getVolumeMountPathByName,
+		BuiltinGetPvcFunctionName:         getPvcByName,
+		BuiltinGetEnvFunctionName:         getEnvByName,
+		BuiltinGetPortFunctionName:        getPortByName,
+		BuiltinGetArgFunctionName:         getArgByName,
+		BuiltinGetContainerFunctionName:   getPodContainerByName,
 	}
 	return nil
 }
@@ -133,132 +153,6 @@ func injectBuiltInObjects(tplBuilder *ConfigTemplateBuilder, podTemplate *corev1
 	tplBuilder.podSpec = &podTemplate.Spec
 	tplBuilder.component = component
 	tplBuilder.roleGroup = group
-
-	return nil
-}
-
-// calReverseRebaseBuffer Cal reserved memory for system
-func calReverseRebaseBuffer(memSizeMB int64, cpuNum int) int64 {
-	const (
-		RebaseMemorySize        = int64(2048)
-		ReverseRebaseBufferSize = 285
-	)
-
-	// MIN(RDS ins class for mem / 2, 2048)
-	r1 := int64(math.Min(float64(memSizeMB>>1), float64(RebaseMemorySize)))
-	// MAX(RDS ins class for CPU * 64, RDS ins class for mem / 64)
-	r2 := int64(math.Max(float64(cpuNum<<6), float64(memSizeMB>>6)))
-
-	return r1 + r2 + memSizeMB>>6 + ReverseRebaseBufferSize
-}
-
-// https://help.aliyun.com/document_detail/162326.html?utm_content=g_1000230851&spm=5176.20966629.toubu.3.f2991ddcpxxvD1#title-rey-j7j-4dt
-// build-in function
-// calMysqlPoolSizeByResource Cal mysql buffer size
-func calMysqlPoolSizeByResource(resource *ResourceDefinition, isShared bool) string {
-	const (
-		DefaultPoolSize      = "128M"
-		MinBufferSizeMB      = 128
-		SmallClassMemorySize = int64(1024 * 1024 * 1024)
-	)
-
-	if resource == nil || resource.CoreNum == 0 || resource.MemorySize == 0 {
-		return DefaultPoolSize
-	}
-
-	// small instance class
-	// mem_size <= 1G or
-	// core <= 2
-	if resource.MemorySize <= SmallClassMemorySize {
-		return DefaultPoolSize
-	}
-
-	memSizeMB := resource.MemorySize / 1024 / 1024
-	maxBufferSize := int32(memSizeMB * 80 / 100)
-	totalMemorySize := memSizeMB
-
-	if !isShared {
-		reverseBuffer := calReverseRebaseBuffer(memSizeMB, resource.CoreNum)
-		totalMemorySize = memSizeMB - reverseBuffer
-
-		// for small instance class
-		if resource.CoreNum <= 2 {
-			totalMemorySize -= 128
-		}
-	}
-
-	if totalMemorySize <= MinBufferSizeMB {
-		return DefaultPoolSize
-	}
-
-	// (total_memory - reverseBuffer) * 75
-	bufferSize := int32(totalMemorySize * 75 / 100)
-	if bufferSize > maxBufferSize {
-		bufferSize = maxBufferSize
-	}
-
-	// https://dev.mysql.com/doc/refman/8.0/en/innodb-parameters.html#sysvar_innodb_buffer_pool_size
-	// Buffer size require aligned 128MB or 1G
-	var alignedSize int32 = 128
-	if bufferSize > 1024 {
-		alignedSize = 1024
-	}
-
-	bufferSize /= alignedSize
-	bufferSize *= alignedSize
-	return fmt.Sprintf("%dM", bufferSize)
-}
-
-func calMysqlPoolSize(container corev1.Container) string {
-	if len(container.Resources.Limits) == 0 {
-		return ""
-	}
-	resource := ResourceDefinition{
-		MemorySize: intctrlutil.GetMemorySize(container),
-		CoreNum:    intctrlutil.GetCoreNum(container),
-	}
-	return calMysqlPoolSizeByResource(&resource, false)
-
-}
-
-func getVolumeMountPathByName(container *corev1.Container, volumeName string) string {
-	for _, v := range container.VolumeMounts {
-		if v.Name == volumeName {
-			return v.MountPath
-		}
-	}
-	return ""
-}
-
-func getPvcByName(volumes []corev1.Volume, volumeName string) *corev1.VolumeSource {
-	for _, v := range volumes {
-		if v.Name == volumeName {
-			return &v.VolumeSource
-		}
-	}
-	return nil
-}
-
-func getEnvByName(container *corev1.Container, envName string) string {
-	for _, v := range container.Env {
-		if v.Name == envName {
-			return v.Value
-		}
-	}
-	return ""
-}
-
-func getArgByName(container *corev1.Container, argName string) string {
-	// TODO Support parse command args
-	return ""
-}
-
-func getPortByName(container *corev1.Container, portName string) *corev1.ContainerPort {
-	for _, v := range container.Ports {
-		if v.Name == portName {
-			return &v
-		}
-	}
 
 	return nil
 }

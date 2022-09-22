@@ -46,17 +46,19 @@ type ConfigTemplateBuilder struct {
 	buildinFunctions *intctrlutil.BuiltinObjectsFunc
 
 	// DBaas cluster object
-	component *Component
-	cluster   *dbaasv1alpha1.Cluster
-	podSpec   *corev1.PodSpec
-	roleGroup *RoleGroup
+	component  *Component
+	appVersion *dbaasv1alpha1.AppVersion
+	cluster    *dbaasv1alpha1.Cluster
+	podSpec    *corev1.PodSpec
+	roleGroup  *RoleGroup
 }
 
-func NewCfgTemplateBuilder(clusterName, namespace string, cluster *dbaasv1alpha1.Cluster) *ConfigTemplateBuilder {
+func NewCfgTemplateBuilder(clusterName, namespace string, cluster *dbaasv1alpha1.Cluster, version *dbaasv1alpha1.AppVersion) *ConfigTemplateBuilder {
 	return &ConfigTemplateBuilder{
 		namespace:   namespace,
 		clusterName: clusterName,
 		cluster:     cluster,
+		appVersion:  version,
 	}
 }
 
@@ -80,6 +82,7 @@ const (
 	BuiltinComponentObject         = "Component"
 	BuiltinPodObject               = "PodSpec"
 	BuiltinRoleObject              = "RoleGroup"
+	BuiltinAppVersionObject        = "Version"
 	BuiltinComponentResourceObject = "ComponentResource"
 )
 
@@ -90,6 +93,7 @@ func (c *ConfigTemplateBuilder) builtinObjects() *intctrlutil.TplValues {
 		BuiltinPodObject:               c.podSpec,
 		BuiltinRoleObject:              c.roleGroup,
 		BuiltinComponentResourceObject: c.componentValues.Resource,
+		BuiltinAppVersionObject:        c.appVersion,
 	}
 }
 

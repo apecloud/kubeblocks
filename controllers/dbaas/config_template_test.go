@@ -204,6 +204,7 @@ loose_innodb_primary_flush_max_lsn_lag =  780903144
 						Namespace: "default",
 					},
 				},
+				nil,
 			)
 
 			Expect(cfgBuilder.InjectBuiltInObjectsAndFunctions(podTemplate, cfgTemplate, component, group)).Should(BeNil())
@@ -234,6 +235,7 @@ loose_innodb_primary_flush_max_lsn_lag =  780903144
 						Namespace: "default",
 					},
 				},
+				nil,
 			)
 
 			Expect(cfgBuilder.InjectBuiltInObjectsAndFunctions(podTemplate, cfgTemplate, component, group)).Should(BeNil())

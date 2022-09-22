@@ -184,7 +184,7 @@ mod-download: ## Run go mod download against go modules.
 
 .PHONY: mod-vendor
 mod-vendor: ## Run go mod tidy->vendor->verify against go modules.
-	$(GO) mod tidy -compat=1.19
+	$(GO) mod tidy -compat=1.18
 	$(GO) mod vendor
 	$(GO) mod verify
 

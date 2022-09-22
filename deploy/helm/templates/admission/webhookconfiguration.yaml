@@ -10,6 +10,7 @@ metadata:
     {{- include "opendbaas-core.selectorLabels" . | nindent 4 }}
   annotations:
     self-signed-cert: "true"
+type: kubernetes.io/tls
 data:
   tls.key: {{ $ca.Key | b64enc }}
   tls.crt: {{ $ca.Cert | b64enc }}

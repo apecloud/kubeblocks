@@ -28,13 +28,13 @@ Notes:
 Open DBaaS Playground v{{.Version}} Start SUCCESSFULLY!
 MySQL X-Cluster(WeSQL) "{{.DBCluster}}" has been CREATED!
 
-1. Basic commands for dbcluster:
-  dbctl --kubeconfig ~/.kube/{{.ClusterName}} dbcluster list                          # list all database clusters
-  dbctl --kubeconfig ~/.kube/{{.ClusterName}} dbcluster describe {{.DBCluster}}       # get dbcluster information
+1. Basic commands for cluster:
+  dbctl --kubeconfig ~/.kube/{{.ClusterName}} cluster list                          # list all database clusters
+  dbctl --kubeconfig ~/.kube/{{.ClusterName}} cluster describe {{.DBCluster}}       # get cluster information
   MYSQL_ROOT_PASSWORD=$(kubectl --kubeconfig ~/.kube/{{.ClusterName}} get secret \
 	--namespace {{.DBNamespace}} {{.DBCluster}} \
 	-o jsonpath="{.data.rootPassword}" | base64 -d) 
-  dbctl bench --host {{.HostIP}} --port $MYSQL_PRIMARY_0 --password "$MYSQL_ROOT_PASSWORD" tpcc prepare|run|clean   # run tpcc benchmark 1min on dbcluster
+  dbctl bench --host {{.HostIP}} --port $MYSQL_PRIMARY_0 --password "$MYSQL_ROOT_PASSWORD" tpcc prepare|run|clean   # run tpcc benchmark 1min on cluster
 
 2. To port forward
   MYSQL_PRIMARY_0=3306
@@ -95,11 +95,11 @@ var dbaasTmpl = `
 Notes:
 KubeBlocks v{{.Version}} Install SUCCESSFULLY!
 
-1. Basic commands for dbcluster:
-  dbctl dbcluster create <your cluster name> --cluster-definition=wesql-clusterdefinition --app-version=wesql-appversion-8.0.29 # create your cluster
-  dbctl dbcluster list                          # list all database clusters
-  dbctl dbcluster describe <your cluster name>       # get dbcluster information
-  dbctl dbcluster delete <your cluster name> # delete your cluster
+1. Basic commands for cluster:
+  dbctl cluster create <your cluster name> --cluster-definition=wesql-clusterdefinition --app-version=wesql-appversion-8.0.29 # create your cluster
+  dbctl cluster list                          # list all database clusters
+  dbctl cluster describe <your cluster name>       # get cluster information
+  dbctl cluster delete <your cluster name> # delete your cluster
 
 2. Uninstall DBaaS:
   dbctl dbaas uninstall

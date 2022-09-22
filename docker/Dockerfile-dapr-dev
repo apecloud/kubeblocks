@@ -1,0 +1,8 @@
+FROM ghcr.io/dapr/dapr-dev:0.1.8
+
+ARG USERNAME=dapr
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
+
+USER ${USERNAME}:${USER_GID}
+WORKDIR /home/${USERNAME}/.minikube

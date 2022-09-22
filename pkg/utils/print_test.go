@@ -36,3 +36,11 @@ func TestPrint(t *testing.T) {
 	//nolint
 	PrintPlaygroundGuide(clusterInfo)
 }
+
+func TestPrintDBaaSInfo(t *testing.T) {
+	info := types.DBaasInfo{
+		Version: "0.1.0-alpha.5",
+	}
+	//nolint
+	PrintDBaaSGuide(info)
+}

@@ -17,6 +17,9 @@ import (
 	"k8s.io/kubectl/pkg/describe"
 )
 
+var defaultClusterDef = "wesql-clusterdefinition"
+var defaultAppVersion = "wesql-appversion-8.0.29"
+
 type CreateOptions struct {
 	Namespace         string
 	Name              string
@@ -49,8 +52,8 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	}
 
 	cmd.Flags().StringVarP(&o.FilePath, "file", "f", "", "Use yaml file to create cluster")
-	cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "ClusterDefinition reference")
-	cmd.Flags().StringVar(&o.AppVersionRef, "app-version", "", "AppVersion reference")
+	cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", defaultClusterDef, "ClusterDefinition reference")
+	cmd.Flags().StringVar(&o.AppVersionRef, "app-version", defaultAppVersion, "AppVersion reference")
 	cmd.Flags().StringVar(&o.TerminationPolicy, "termination-policy", "Halt", "Termination policy")
 	cmd.Flags().StringVar(&o.Components, "components", "", "Components json string")
 

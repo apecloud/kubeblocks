@@ -51,6 +51,7 @@ func NewDbaasCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	cmd.AddCommand(
 		newInstallCmd(f, streams),
 		newUninstallCmd(f, streams),
+		newGuideCmd(),
 	)
 	return cmd
 }
@@ -91,7 +92,7 @@ func (o *InstallOptions) Run() error {
 	}
 
 	fmt.Fprintln(o.Out, "Successfully install dbaas.")
-	return nil
+	return installer.PrintGuide()
 }
 
 func (o *Options) Run() error {
@@ -141,6 +142,19 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
 			cmdutil.CheckErr(o.Run())
+		},
+	}
+	return cmd
+}
+
+func newGuideCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "guide",
+		Short: "Show DBaaS guide",
+		Run: func(cmd *cobra.Command, args []string) {
+			installer := Installer{}
+			cmd.Flags().StringVar(&installer.Version, "version", defaultVersion, "DBaaS version")
+			cmdutil.CheckErr(installer.PrintGuide())
 		},
 	}
 	return cmd

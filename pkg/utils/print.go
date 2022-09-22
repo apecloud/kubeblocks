@@ -91,12 +91,36 @@ Connect:        mysql -h {{.HostIP}} -u{{.RootUser}} -p"$MYSQL_ROOT_PASSWORD"
 
 `
 
+var dbaasTmpl = `
+Notes:
+Open DBaaS v{{.Version}} Start SUCCESSFULLY!
+
+1. Basic commands for dbcluster:
+  dbctl dbcluster create <your cluster name> --cluster-definition=wesql-clusterdefinition --app-version=wesql-appversion-8.0.29 # create your cluster
+  dbctl dbcluster list                          # list all database clusters
+  dbctl dbcluster describe <your cluster name>       # get dbcluster information
+  dbctl dbcluster delete <your cluster name> # delete your cluster
+
+2. Uninstall DBaaS:
+  dbctl dbaas uninstall
+
+--------------------------------------------------------------------
+To view this guide next time:         dbctl dbaas guide
+To get more help information:         dbctl help
+Use "dbctl [command] --help" for more information about a command.
+
+`
+
 func PrintPlaygroundGuide(info types.PlaygroundInfo) error {
 	return PrintTemplate(playgroundTmpl, info)
 }
 
 func PrintClusterInfo(info *types.DBClusterInfo) error {
 	return PrintTemplate(clusterInfoTmpl, info)
+}
+
+func PrintDBaaSGuide(info types.DBaasInfo) error {
+	return PrintTemplate(dbaasTmpl, info)
 }
 
 func PrintTemplate(t string, data interface{}) error {

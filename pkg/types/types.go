@@ -94,3 +94,7 @@ type BackupSnapInfo struct {
 	SnapshotClass string
 	Labels        string
 }
+
+type DBaasInfo struct {
+	Version string
+}

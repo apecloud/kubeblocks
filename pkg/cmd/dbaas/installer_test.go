@@ -40,4 +40,12 @@ var _ = Describe("installer", func() {
 		}
 		Expect(i.Uninstall()).To(MatchError("UnInstall chart opendbaas-core error: uninstall: Release not loaded: opendbaas-core: release: not found"))
 	})
+
+	It("guide", func() {
+		i := Installer{
+			cfg:     helm.FakeActionConfig(),
+			Version: defaultVersion,
+		}
+		Expect(i.PrintGuide()).Should(Succeed())
+	})
 })

@@ -115,8 +115,17 @@ func (o *CreateOptions) Run() error {
 			return nil
 		}
 	} else {
-		if len(o.Components) == 0 {
-			o.Components = "[]"
+		components := "[]"
+		if len(o.Components) > 0 {
+			yamlByte, err := os.ReadFile(o.Components)
+			if err != nil {
+				return err
+			}
+			jsonByte, err := yaml.YAMLToJSON(yamlByte)
+			if err != nil {
+				return err
+			}
+			components = string(jsonByte)
 		}
 		clusterJsonByte := []byte(fmt.Sprintf(`
 {
@@ -132,7 +141,7 @@ func (o *CreateOptions) Run() error {
     "components": %s
   }
 }
-`, o.Name, o.Namespace, o.ClusterDefRef, o.AppVersionRef, o.Components))
+`, o.Name, o.Namespace, o.ClusterDefRef, o.AppVersionRef, components))
 		if err := json.Unmarshal(clusterJsonByte, &clusterObj); err != nil {
 			return err
 		}

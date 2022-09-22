@@ -50,7 +50,56 @@ auth:
   ## @param auth.replicationPassword MySQL replication user password. Ignored if existing secret is provided
   ##
   replicationPassword: ""
+
+
+configTemplate:
+  ## @param config template name
+  ## name: mysql-3node-tpl-8.0
+
+  ## @param config template context
+  configuration: |-
+    [mysqld]
+    # aliyun buffer pool: https://help.aliyun.com/document_detail/162326.html?utm_content=g_1000230851&spm=5176.20966629.toubu.3.f2991ddcpxxvD1#title-rey-j7j-4dt
+    
+    {{- $log_root := getVolumePathByName ( index .PodSpec.Containers 0 ) "log" }}
+    {{- $data_root := getVolumePathByName ( index .PodSpec.Containers 0 ) "data" }}
+    {{- $mysql_port_info := getPortByName ( index .PodSpec.Containers 0 ) "mysql" }}
+    {{- $pool_buffer_size := ( callBufferSizeByResource ( index .PodSpec.Containers 0 ) ) }}
+
+
+    {{- if $pool_buffer_size }}
+    innodb-buffer-pool-size={{ $pool_buffer_size }}
+    {{- end }}
+    
+    # require port
+    {{- $mysql_port := 3306 }}
+    {{- if $mysql_port_info }}
+    {{- $mysql_port = $mysql_port_info.ContainerPort }}
+    {{- end }}
+
+    log-bin=master-bin
+    gtid_mode=OFF
+    consensus_auto_leader_transfer=ON
  
+    port={{ $mysql_port }}
+    
+    datadir={{ $data_root }}/data
+    {{ if $log_root }}
+    # Mysql error log
+    log-error={{ $log_root }}/mysqld.err
+    # SQL access log
+    general_log=1
+    general_log_file={{ $log_root }}/mysqld.log
+    {{- end }}
+ 
+    pid-file=/var/run/mysqld/mysqld.pid
+    socket=/var/run/mysqld/mysqld.sock
+ 
+    [client]
+    port={{ $mysql_port }}
+    socket=/var/run/mysqld/mysqld.sock
+    
+
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-3node-tpl-8.0
+data:
+  my.cnf: |-
+    {{- .Values.configTemplate.configuration | nindent 4 }}

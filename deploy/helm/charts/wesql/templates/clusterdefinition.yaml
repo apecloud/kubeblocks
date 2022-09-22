@@ -8,6 +8,9 @@ spec:
   type: stat.mysql
   components:
   - typeName: replicasets
+    configTemplateRefs:
+    - name: mysql-3node-tpl-8.0
+      volumeName: mysql-config
     roleGroups:
     - primary
     defaultReplicas: 1
@@ -16,10 +19,12 @@ spec:
       - name: mysql
         imagePullPolicy: IfNotPresent
         volumeMounts:
-        - mountPath: /data
+        - mountPath: /data/mysql
           name: data
       #  - mountPath: /log
       #    name: log
+        - mountPath: /opt/mysql
+          name: mysql-config
         ports:
         - containerPort: 3306
           protocol: TCP
@@ -76,7 +81,9 @@ spec:
           echo $idx; 
           cluster_info="$cluster_info@$(($idx+1))"; 
           echo $cluster_info; echo {{ .Values.cluster.replicaSetCount }}; 
-          docker-entrypoint.sh mysqld --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$cluster_info" --cluster-id=$CLUSTER_ID
+          mkdir -p /data/mysql/data;
+          chmod +777 -R /data/mysql;
+          docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$cluster_info" --cluster-id=$CLUSTER_ID
   roleGroupTemplates:
     - typeName: primary
       defaultReplicas: {{ .Values.cluster.replicaSetCount | default 3 }}

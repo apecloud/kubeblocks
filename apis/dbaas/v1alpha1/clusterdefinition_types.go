@@ -94,6 +94,16 @@ type ClusterDefinitionCluster struct {
 	Strategies ClusterDefinitionStrategies `json:"strategies,omitempty"`
 }
 
+type ConfigTemplate struct {
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=128
+	Name string `json:"name,omitempty"`
+
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=32
+	VolumeName string `json:"volumeName,omitempty"`
+}
+
 type ClusterDefinitionComponent struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
@@ -116,6 +126,11 @@ type ClusterDefinitionComponent struct {
 	// isStateless define this components
 	// +kubebuilder:default=false
 	IsStateless bool `json:"isStateless,omitempty"`
+
+	// The configTemplateRefs field provided by ISV, and
+	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster
+	// +optional
+	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
 
 	// antiAffinity defines components should have anti-affinity constraint to same component type
 	// +kubebuilder:default=false

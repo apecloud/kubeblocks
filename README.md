@@ -23,6 +23,7 @@ Features/Enhancement:
   - Pod Disruption Budget (PDB)
   - CRDs installation
   - Self-signed certificates for admission webhook configurations
+- [Configuration template guides](docs/configuration/configuration_tpl_developer.md)
 
 ## Quick start
 

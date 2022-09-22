@@ -12,8 +12,8 @@ metadata:
     self-signed-cert: "true"
 type: kubernetes.io/tls
 data:
-  rootCA.key: {{ $ca.Key | b64enc }}
-  rootCA.crt: {{ $ca.Cert | b64enc }}
+  tls.key: {{ $ca.Key | b64enc }}
+  tls.crt: {{ $ca.Cert | b64enc }}
 ---
 apiVersion: v1
 kind: Secret

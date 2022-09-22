@@ -66,7 +66,7 @@ cluster_namespace = {{ .Cluster.Namespace }}
 component_name = {{ .Component.Name }}
 component_replica = {{ .RoleGroup.Replicas }}
 
-{{- $test_value := call_buffer_size_by_resource ( index .PodSpec.Containers 0 ) }}
+{{- $test_value := callBufferSizeByResource ( index .PodSpec.Containers 0 ) }}
 {{ if $test_value -}}
 test_size = {{ $test_value }}
 {{- else }}
@@ -241,20 +241,20 @@ loose_innodb_primary_flush_max_lsn_lag =  780903144
 			Expect(cfgBuilder.InjectBuiltInObjectsAndFunctions(podTemplate, cfgTemplate, component, group)).Should(BeNil())
 
 			rendered, err := cfgBuilder.Render(map[string]string{
-				"a":                 "{{ get_volume_path_by_name ( index .PodSpec.Containers 0 ) \"log\" }}",
-				"b":                 "{{ get_volume_path_by_name ( index .PodSpec.Containers 0 ) \"data\" }}",
-				"c":                 "{{ ( get_port_by_name ( index .PodSpec.Containers 0 ) \"mysql\" ).ContainerPort }}",
-				"d":                 "{{ call_buffer_size_by_resource ( index .PodSpec.Containers 0 ) }}",
-				"e":                 "{{ get_arg_by_name ( index .PodSpec.Containers 0 ) \"User\" }}",
-				"f":                 "{{ get_volume_path_by_name ( get_container_by_name .PodSpec.Containers \"mytest\") \"data\" }}",
-				"i":                 "{{ get_env_by_name ( index .PodSpec.Containers 0 ) \"a\" }}",
-				"j":                 "{{ ( get_pvc_by_name .PodSpec.Volumes \"config\" ).ConfigMap.Name }}",
-				"invalid_volume":    "{{ get_volume_path_by_name ( index .PodSpec.Containers 0 ) \"invalid\" }}",
-				"invalid_port":      "{{ get_port_by_name ( index .PodSpec.Containers 0 ) \"invalid\" }}",
-				"invalid_container": "{{ get_container_by_name .PodSpec.Containers  \"invalid\" }}",
-				"invalid_resource":  "{{ call_buffer_size_by_resource ( index .PodSpec.Containers 1 ) }}",
-				"invalid_env":       "{{ get_env_by_name ( index .PodSpec.Containers 0 ) \"invalid\" }}",
-				"invalid_pvc":       "{{ get_pvc_by_name .PodSpec.Volumes \"invalid\" }}",
+				"a":                 "{{ getVolumePathByName ( index .PodSpec.Containers 0 ) \"log\" }}",
+				"b":                 "{{ getVolumePathByName ( index .PodSpec.Containers 0 ) \"data\" }}",
+				"c":                 "{{ ( getPortByName ( index .PodSpec.Containers 0 ) \"mysql\" ).ContainerPort }}",
+				"d":                 "{{ callBufferSizeByResource ( index .PodSpec.Containers 0 ) }}",
+				"e":                 "{{ getArgByName ( index .PodSpec.Containers 0 ) \"User\" }}",
+				"f":                 "{{ getVolumePathByName ( getContainerByName .PodSpec.Containers \"mytest\") \"data\" }}",
+				"i":                 "{{ getEnvByName ( index .PodSpec.Containers 0 ) \"a\" }}",
+				"j":                 "{{ ( getPvcByName .PodSpec.Volumes \"config\" ).ConfigMap.Name }}",
+				"invalid_volume":    "{{ getVolumePathByName ( index .PodSpec.Containers 0 ) \"invalid\" }}",
+				"invalid_port":      "{{ getPortByName ( index .PodSpec.Containers 0 ) \"invalid\" }}",
+				"invalid_container": "{{ getContainerByName .PodSpec.Containers  \"invalid\" }}",
+				"invalid_resource":  "{{ callBufferSizeByResource ( index .PodSpec.Containers 1 ) }}",
+				"invalid_env":       "{{ getEnvByName ( index .PodSpec.Containers 0 ) \"invalid\" }}",
+				"invalid_pvc":       "{{ getPvcByName .PodSpec.Volumes \"invalid\" }}",
 			})
 
 			Expect(err).Should(BeNil())

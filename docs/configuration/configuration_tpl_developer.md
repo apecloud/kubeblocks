@@ -78,37 +78,37 @@ Configuration Tpl集成了go template的模版函数，主要包括如下类型�
 Configuration Tpl 也提供了一些Built-in function，主要是为了让ISV编写配置模版更方便，目前主要提供了两类函数：
 
 1. General Function, 对Container信息的抽取:
-   * get_volume_path_by_name: 获取volumeMount的路径, e.g: 在生产mysql配置的时候，需要知道数据卷的路径，就可以通过下面的function来获取
+   * getVolumePathByName: 获取volumeMount的路径, e.g: 在生产mysql配置的时候，需要知道数据卷的路径，就可以通过下面的function来获取
    
-    `(get_volume_path_by_name $container "data")`
+    `(getVolumePathByName $container "data")`
 
     mysql的配置模版生产datadir optional的逻辑如下：
 ```
     #for my.cnf render
     
-    {{- $data_root := get_volume_path_by_name ( index .PodSpec.Containers 0 ) "data" }}
+    {{- $data_root := getVolumePathByName ( index .PodSpec.Containers 0 ) "data" }}
     # render datadir optional
     datadir={{ $data_root }}/data
 ```
    
-   * get_pvc_by_name
-   * get_env_by_name
-   * get_port_by_name
-   * get_container_by_name
+   * getPvcByName: 获取container的pvc信息, 接口和getVolumePathByName类似, e.g: `(getPvcByName $container "data")`
+   * getEnvByName: 获取container的env信息, 接口和getVolumePathByName类似, e.g: `(getEnvByName $container "MYSQL_PASSWORD")`
+   * getPortByName: 获取container的port信息, 接口和getVolumePathByName类似, e.g: `(getEnvByName $container "mysql")`
+   * getContainerByName: 根据名称获取容器信息, e.g: `(getContainerByName .PodSpec.Containers "mysql")`
 
 2. Specific engine functions: 为了简化配置模版的复杂的，对不同引擎提供了一些built-in function来简化引擎参数的生成逻辑
 
-   * call_buffer_size_by_resource: 根据container的资源定义，计算pool buffer推荐值 
+   * callBufferSizeByResource: 根据container的资源定义，计算pool buffer推荐值 
    
     这个场景主要是考虑mysql根据规格计算pool比较麻烦，参考aws/aliyun的不同规格的buffer推荐参数，也参考了mysql文档中对相关参数的限制性约束，提供的一个built-in function, 接口使用如下：
  
-   ` call_buffer_size_by_resource $container_object `
+   ` callBufferSizeByResource $container_object `
  
    mysql的配置模版中的使用场景:
 ```
     #for my.cnf render
     
-    {{- $pool_buffer_size := ( call_buffer_size_by_resource ( index .PodSpec.Containers 0 ) ) }}
+    {{- $pool_buffer_size := ( callBufferSizeByResource ( index .PodSpec.Containers 0 ) ) }}
 
     {{- if $pool_buffer_size }}
     innodb-buffer-pool-size={{ $pool_buffer_size }}

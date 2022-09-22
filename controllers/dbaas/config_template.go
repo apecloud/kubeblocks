@@ -110,16 +110,16 @@ func (c *ConfigTemplateBuilder) InjectBuiltInObjectsAndFunctions(podTemplate *co
 
 // General Built-in functions
 const (
-	BuiltinGetVolumeFunctionName    = "get_volume_path_by_name"
-	BuiltinGetPvcFunctionName       = "get_pvc_by_name"
-	BuiltinGetEnvFunctionName       = "get_env_by_name"
-	BuiltinGetArgFunctionName       = "get_arg_by_name"
-	BuiltinGetPortFunctionName      = "get_port_by_name"
-	BuiltinGetContainerFunctionName = "get_container_by_name"
+	BuiltinGetVolumeFunctionName    = "getVolumePathByName"
+	BuiltinGetPvcFunctionName       = "getPvcByName"
+	BuiltinGetEnvFunctionName       = "getEnvByName"
+	BuiltinGetArgFunctionName       = "getArgByName"
+	BuiltinGetPortFunctionName      = "getPortByName"
+	BuiltinGetContainerFunctionName = "getContainerByName"
 
 	// BuiltinMysqlCalBufferFunctionName Mysql Built-in
 	// TODO: This function migrate to configuration template
-	BuiltinMysqlCalBufferFunctionName = "call_buffer_size_by_resource"
+	BuiltinMysqlCalBufferFunctionName = "callBufferSizeByResource"
 )
 
 func injectBuiltInFunctions(tplBuilder *ConfigTemplateBuilder, podTemplate *corev1.PodTemplateSpec, component *Component, group *RoleGroup) error {

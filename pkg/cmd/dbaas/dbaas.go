@@ -51,7 +51,6 @@ func NewDbaasCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	cmd.AddCommand(
 		newInstallCmd(f, streams),
 		newUninstallCmd(f, streams),
-		newGuideCmd(),
 	)
 	return cmd
 }
@@ -91,8 +90,10 @@ func (o *InstallOptions) Run() error {
 		return errors.Wrap(err, "Failed to install dbaas")
 	}
 
-	fmt.Fprintln(o.Out, "Successfully install dbaas.")
-	return installer.PrintGuide()
+	fmt.Fprintln(o.Out, "KubeBlocks v{{.Version}} Install SUCCESSFULLY!\n"+
+		"You can now create a database cluster by running the following command:\n"+
+		"dbctl cluster create <you cluster name>")
+	return nil
 }
 
 func (o *Options) Run() error {
@@ -142,19 +143,6 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
 			cmdutil.CheckErr(o.Run())
-		},
-	}
-	return cmd
-}
-
-func newGuideCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "guide",
-		Short: "Show DBaaS guide",
-		Run: func(cmd *cobra.Command, args []string) {
-			installer := Installer{}
-			cmd.Flags().StringVar(&installer.Version, "version", defaultVersion, "DBaaS version")
-			cmdutil.CheckErr(installer.PrintGuide())
 		},
 	}
 	return cmd

@@ -119,10 +119,6 @@ func PrintClusterInfo(info *types.DBClusterInfo) error {
 	return PrintTemplate(clusterInfoTmpl, info)
 }
 
-func PrintDBaaSGuide(info types.DBaasInfo) error {
-	return PrintTemplate(dbaasTmpl, info)
-}
-
 func PrintTemplate(t string, data interface{}) error {
 	tmpl, err := template.New("_").Parse(t)
 	if err != nil {

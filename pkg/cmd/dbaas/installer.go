@@ -1,8 +1,6 @@
 package dbaas
 
 import (
-	"github.com/apecloud/kubeblocks/pkg/types"
-	"github.com/apecloud/kubeblocks/pkg/utils"
 	"helm.sh/helm/v3/pkg/action"
 
 	"github.com/apecloud/kubeblocks/pkg/utils/helm"
@@ -52,11 +50,4 @@ func (i *Installer) Uninstall() error {
 	}
 
 	return nil
-}
-
-func (i *Installer) PrintGuide() error {
-	dbaasInfo := types.DBaasInfo{
-		Version: i.Version,
-	}
-	return utils.PrintDBaaSGuide(dbaasInfo)
 }

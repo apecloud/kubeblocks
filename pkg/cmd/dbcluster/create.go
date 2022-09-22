@@ -28,8 +28,6 @@ type CreateOptions struct {
 	TerminationPolicy string
 	Components        string
 
-	FilePath string
-
 	BuilderArgs []string
 
 	DescriberSettings *describe.DescriberSettings
@@ -51,19 +49,15 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		},
 	}
 
-	cmd.Flags().StringVarP(&o.FilePath, "file", "f", "", "Use yaml file to create cluster")
 	cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", defaultClusterDef, "ClusterDefinition reference")
 	cmd.Flags().StringVar(&o.AppVersionRef, "app-version", defaultAppVersion, "AppVersion reference")
 	cmd.Flags().StringVar(&o.TerminationPolicy, "termination-policy", "Halt", "Termination policy")
-	cmd.Flags().StringVar(&o.Components, "components", "", "Components json string")
+	cmd.Flags().StringVar(&o.Components, "components", "", "Use yaml file to specify the cluster components")
 
 	return cmd
 }
 
 func (o *CreateOptions) Validate(args []string) error {
-	if len(o.FilePath) > 0 {
-		return nil
-	}
 	if len(args) < 1 {
 		return fmt.Errorf("missing cluster name")
 	}
@@ -106,28 +100,19 @@ func (o *CreateOptions) Complete(f cmdutil.Factory, args []string) error {
 
 func (o *CreateOptions) Run() error {
 	clusterObj := unstructured.Unstructured{}
-	if len(o.FilePath) > 0 {
-		fileByte, err := os.ReadFile(o.FilePath)
+	components := "[]"
+	if len(o.Components) > 0 {
+		yamlByte, err := os.ReadFile(o.Components)
 		if err != nil {
 			return err
 		}
-		if err := yaml.Unmarshal(fileByte, &clusterObj); err != nil {
-			return nil
+		jsonByte, err := yaml.YAMLToJSON(yamlByte)
+		if err != nil {
+			return err
 		}
-	} else {
-		components := "[]"
-		if len(o.Components) > 0 {
-			yamlByte, err := os.ReadFile(o.Components)
-			if err != nil {
-				return err
-			}
-			jsonByte, err := yaml.YAMLToJSON(yamlByte)
-			if err != nil {
-				return err
-			}
-			components = string(jsonByte)
-		}
-		clusterJsonByte := []byte(fmt.Sprintf(`
+		components = string(jsonByte)
+	}
+	clusterJsonByte := []byte(fmt.Sprintf(`
 {
   "apiVersion": "dbaas.infracreate.com/v1alpha1",
   "kind": "Cluster",
@@ -142,9 +127,8 @@ func (o *CreateOptions) Run() error {
   }
 }
 `, o.Name, o.Namespace, o.ClusterDefRef, o.AppVersionRef, components))
-		if err := json.Unmarshal(clusterJsonByte, &clusterObj); err != nil {
-			return err
-		}
+	if err := json.Unmarshal(clusterJsonByte, &clusterObj); err != nil {
+		return err
 	}
 	gvr := schema.GroupVersionResource{Group: "dbaas.infracreate.com", Version: "v1alpha1", Resource: "clusters"}
 	_, err := o.client.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), &clusterObj, metav1.CreateOptions{})

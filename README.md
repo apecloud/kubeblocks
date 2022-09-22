@@ -23,6 +23,7 @@ Features/Enhancement:
   - Pod Disruption Budget (PDB)
   - CRDs installation
   - Self-signed certificates for admission webhook configurations
+- [Configuration template guides](docs/configuration/configuration_tpl_developer.md)
 
 ## Quick start
 
@@ -102,7 +103,6 @@ Build Dependencies
   helmtool         Download helm locally if necessary.
   brew-install-prerequisite  Use `brew install` to install required dependencies. 
 ```
-
 
 # TODO
 - [ ] CI/CD integration

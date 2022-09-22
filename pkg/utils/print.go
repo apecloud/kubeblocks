@@ -93,7 +93,7 @@ Connect:        mysql -h {{.HostIP}} -u{{.RootUser}} -p"$MYSQL_ROOT_PASSWORD"
 
 var dbaasTmpl = `
 Notes:
-Open DBaaS v{{.Version}} Start SUCCESSFULLY!
+KubeBlocks v{{.Version}} Install SUCCESSFULLY!
 
 1. Basic commands for dbcluster:
   dbctl dbcluster create <your cluster name> --cluster-definition=wesql-clusterdefinition --app-version=wesql-appversion-8.0.29 # create your cluster

@@ -184,7 +184,7 @@ mod-download: ## Run go mod download against go modules.
 
 .PHONY: mod-vendor
 mod-vendor: ## Run go mod tidy->vendor->verify against go modules.
-	$(GO) mod tidy -compat=1.19
+	$(GO) mod tidy -compat=1.18
 	$(GO) mod vendor
 	$(GO) mod verify
 
@@ -217,10 +217,10 @@ goimports: goimportstool ## Run goimports against code.
 
 ##@ CLI
 ifdef REL_VERSION
-	CLI_VERSION := $(REL_VERSION)
+CLI_VERSION := $(REL_VERSION)
 else
-	CLI_VERSION := edge
-	CLI_TAG := latest
+CLI_VERSION := edge
+CLI_TAG := latest
 endif
 K3S_VERSION ?= v1.23.8+k3s1
 K3D_VERSION ?= 5.4.4

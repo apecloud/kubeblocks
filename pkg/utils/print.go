@@ -91,26 +91,6 @@ Connect:        mysql -h {{.HostIP}} -u{{.RootUser}} -p"$MYSQL_ROOT_PASSWORD"
 
 `
 
-var dbaasTmpl = `
-Notes:
-KubeBlocks v{{.Version}} Install SUCCESSFULLY!
-
-1. Basic commands for cluster:
-  dbctl cluster create <your cluster name> --cluster-definition=wesql-clusterdefinition --app-version=wesql-appversion-8.0.29 # create your cluster
-  dbctl cluster list                          # list all database clusters
-  dbctl cluster describe <your cluster name>       # get cluster information
-  dbctl cluster delete <your cluster name> # delete your cluster
-
-2. Uninstall DBaaS:
-  dbctl dbaas uninstall
-
---------------------------------------------------------------------
-To view this guide next time:         dbctl dbaas guide
-To get more help information:         dbctl help
-Use "dbctl [command] --help" for more information about a command.
-
-`
-
 func PrintPlaygroundGuide(info types.PlaygroundInfo) error {
 	return PrintTemplate(playgroundTmpl, info)
 }

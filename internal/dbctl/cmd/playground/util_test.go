@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package playground
 
 import (
 	"testing"
@@ -34,5 +34,5 @@ func TestPrint(t *testing.T) {
 		GrafanaPasswd: "prom-operator",
 	}
 	//nolint
-	PrintPlaygroundGuide(clusterInfo)
+	printPlaygroundGuide(clusterInfo)
 }

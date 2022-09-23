@@ -14,7 +14,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/describe"
 )
 
 var defaultClusterDef = "wesql-clusterdefinition"
@@ -27,10 +26,6 @@ type CreateOptions struct {
 	AppVersionRef     string
 	TerminationPolicy string
 	Components        string
-
-	BuilderArgs []string
-
-	DescriberSettings *describe.DescriberSettings
 
 	client dynamic.Interface
 	genericclioptions.IOStreams

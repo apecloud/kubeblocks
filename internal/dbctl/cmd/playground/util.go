@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package playground
 
 import (
 	"os"
@@ -70,36 +70,11 @@ Use "dbctl [command] --help" for more information about a command.
 
 `
 
-var clusterInfoTmpl = `
-Name:           {{.DBCluster}}
-Kind:           {{.Engine}}
-Version:        {{.Version}}
-Topology mode:  {{.Topology}}
-CPU:            N/A
-Memory:         N/A
-Storage:        {{.Storage}}Gi
-Status:         {{.Status}}
-Started:        {{.StartTime}}
-labels:         {{.Labels}}
-ServerId:       {{.ServerId}}
-Endpoint:       {{.HostIP}}:{{.DBPort}}
-
-# connect information
-Username:       {{.RootUser}}
-Password:       MYSQL_ROOT_PASSWORD=$(kubectl --kubeconfig ~/.kube/dbctl-playground get secret --namespace {{.DBNamespace}} {{.DBCluster}}-cluster-secret -o jsonpath="{.data.rootPassword}" | base64 -d)
-Connect:        mysql -h {{.HostIP}} -u{{.RootUser}} -p"$MYSQL_ROOT_PASSWORD"
-
-`
-
-func PrintPlaygroundGuide(info types.PlaygroundInfo) error {
-	return PrintTemplate(playgroundTmpl, info)
+func printPlaygroundGuide(info types.PlaygroundInfo) error {
+	return printTemplate(playgroundTmpl, info)
 }
 
-func PrintClusterInfo(info *types.DBClusterInfo) error {
-	return PrintTemplate(clusterInfoTmpl, info)
-}
-
-func PrintTemplate(t string, data interface{}) error {
+func printTemplate(t string, data interface{}) error {
 	tmpl, err := template.New("_").Parse(t)
 	if err != nil {
 		return err

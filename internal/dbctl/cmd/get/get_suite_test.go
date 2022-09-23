@@ -1,4 +1,4 @@
-package list_test
+package get_test
 
 import (
 	"testing"

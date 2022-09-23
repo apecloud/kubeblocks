@@ -99,7 +99,6 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		Short: "Bootstrap a DBaaS",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete())
-			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
@@ -167,10 +166,6 @@ func (o *InitOptions) Complete() error {
 		serverVersion: o.Version,
 		dbReplicas:    o.DBReplicas,
 	}
-	return nil
-}
-
-func (o *InitOptions) Validate() error {
 	return nil
 }
 

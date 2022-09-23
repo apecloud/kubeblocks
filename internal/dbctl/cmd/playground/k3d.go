@@ -221,7 +221,7 @@ func (i *Installer) PrintGuide(cloudProvider string, hostIP string) error {
 		GrafanaPasswd: "prom-operator",
 		Version:       version.Version,
 	}
-	return util.PrintPlaygroundGuide(info)
+	return printPlaygroundGuide(info)
 }
 
 // BuildClusterRunConfig returns the run-config for the k3d cluster

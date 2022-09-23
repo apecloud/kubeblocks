@@ -44,7 +44,6 @@ func (o *DeleteOptions) Validate(args []string) error {
 }
 
 func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string) error {
-
 	var err error
 	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {

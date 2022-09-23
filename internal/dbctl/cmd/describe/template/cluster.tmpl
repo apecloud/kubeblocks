@@ -1,0 +1,17 @@
+Name:              {{.metadata.name}}
+Status:            {{.status.phase}}
+AppVersion:        {{.spec.appVersionRef}}
+ClusterDefinition: {{.spec.clusterDefinitionRef}}
+TerminationPolicy: {{.spec.terminationPolicy}}
+creationTimestamp: {{.metadata.creationTimestamp}}
+components: {{range .spec.components}}
+  -name:          {{.name}}
+   replicas:      {{(index .roleGroups 0).replicas}}
+   requests:
+     cpu:         {{.resources.requests.cpu}}
+     memory:      {{.resources.requests.memory}}
+   limits:
+     cpu:         {{.resources.limits.cpu}}
+     memory:      {{.resources.limits.memory}}
+   storageSize:   {{(index .volumeClaimTemplates 0).spec.resources.requests.storage}}
+{{end}}

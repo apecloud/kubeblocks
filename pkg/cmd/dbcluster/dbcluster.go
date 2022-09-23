@@ -25,7 +25,7 @@ import (
 // NewDbclusterCmd creates the dbcluster command
 func NewDbclusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "dbcluster",
+		Use:   "cluster",
 		Short: "DB cluster operation command",
 	}
 

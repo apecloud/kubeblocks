@@ -90,7 +90,9 @@ func (o *InstallOptions) Run() error {
 		return errors.Wrap(err, "Failed to install dbaas")
 	}
 
-	fmt.Fprintln(o.Out, "Successfully install dbaas.")
+	fmt.Fprintln(o.Out, "KubeBlocks v{{.Version}} Install SUCCESSFULLY!\n"+
+		"You can now create a database cluster by running the following command:\n"+
+		"dbctl cluster create <you cluster name>")
 	return nil
 }
 

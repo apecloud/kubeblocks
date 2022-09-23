@@ -199,8 +199,8 @@ type ClusterDefinitionStatusGeneration struct {
 }
 
 type ClusterDefinitionProbeCMDs struct {
-	writes  []string `json:"writes,omitempty"`
-	queries []string `json:"queries,omitempty"`
+	Writes  []string `json:"writes,omitempty"`
+	Queries []string `json:"queries,omitempty"`
 }
 
 type ClusterDefinitionProbe struct {
@@ -208,11 +208,11 @@ type ClusterDefinitionProbe struct {
 	Enable bool `json:"enable,omitempty"`
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
-	periodSeconds int `json:"periodSeconds,omitempty"`
+	PeriodSeconds int `json:"periodSeconds,omitempty"`
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
-	failureThreshold int                        `json:"failureThreshold,omitempty"`
-	Commands         ClusterDefinitionProbeCMDS `json:"commands,omitempty"`
+	FailureThreshold int                        `json:"failureThreshold,omitempty"`
+	Commands         ClusterDefinitionProbeCMDs `json:"commands,omitempty"`
 }
 
 type ClusterDefinitionProbes struct {

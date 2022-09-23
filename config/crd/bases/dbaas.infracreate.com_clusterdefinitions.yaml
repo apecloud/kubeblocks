@@ -7453,6 +7453,84 @@ spec:
                       required:
                       - containers
                       type: object
+                    probes:
+                      properties:
+                        roleChangedProbe:
+                          properties:
+                            commands:
+                              properties:
+                                queries:
+                                  items:
+                                    type: string
+                                  type: array
+                                writes:
+                                  items:
+                                    type: string
+                                  type: array
+                              type: object
+                            enable:
+                              default: true
+                              type: boolean
+                            failureThreshold:
+                              default: 1
+                              minimum: 1
+                              type: integer
+                            periodSeconds:
+                              default: 1
+                              minimum: 1
+                              type: integer
+                          type: object
+                        runningProbe:
+                          properties:
+                            commands:
+                              properties:
+                                queries:
+                                  items:
+                                    type: string
+                                  type: array
+                                writes:
+                                  items:
+                                    type: string
+                                  type: array
+                              type: object
+                            enable:
+                              default: true
+                              type: boolean
+                            failureThreshold:
+                              default: 1
+                              minimum: 1
+                              type: integer
+                            periodSeconds:
+                              default: 1
+                              minimum: 1
+                              type: integer
+                          type: object
+                        statusProbe:
+                          properties:
+                            commands:
+                              properties:
+                                queries:
+                                  items:
+                                    type: string
+                                  type: array
+                                writes:
+                                  items:
+                                    type: string
+                                  type: array
+                              type: object
+                            enable:
+                              default: true
+                              type: boolean
+                            failureThreshold:
+                              default: 1
+                              minimum: 1
+                              type: integer
+                            periodSeconds:
+                              default: 1
+                              minimum: 1
+                              type: integer
+                          type: object
+                      type: object
                     readonlyService:
                       description: ReadonlyService defines the behavior of a service
                         spec. provide readonly service when ComponentType is Consensus

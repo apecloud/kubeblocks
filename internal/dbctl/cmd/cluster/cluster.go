@@ -14,19 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package cluster
 
 import (
-	"fmt"
-	"os"
-
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd"
+	"github.com/spf13/cobra"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
-func main() {
-	cmd := cmd.NewRootCmd()
-	if err := cmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+// NewDbclusterCmd creates the dbcluster command
+func NewDbclusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "cluster",
+		Short: "DB cluster operation command",
 	}
+
+	// add subcommands
+	cmd.AddCommand(
+		NewListCmd(f, streams),
+		NewDescribeCmd(f, streams),
+		NewConnectCmd(f),
+		NewCreateCmd(f, streams),
+		NewDeleteCmd(f),
+	)
+
+	return cmd
 }

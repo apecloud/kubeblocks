@@ -23,7 +23,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"io/fs"
 	"net/http"
 	"os"
 	"path"
@@ -121,31 +120,6 @@ func GetTempDir() (string, error) {
 		return "", err
 	}
 	return tmpDir, nil
-}
-
-func SaveToTemp(file fs.File, format string) (string, error) {
-	tempDir, err := GetTempDir()
-	if err != nil {
-		return "", err
-	}
-	tempFile, err := os.CreateTemp(tempDir, format)
-	if err != nil {
-		return "", err
-	}
-	defer CloseQuietly(tempFile)
-
-	if _, err := io.Copy(tempFile, file); err != nil {
-		return "", err
-	}
-
-	return tempFile.Name(), nil
-}
-
-// InfoBytes is a helper function to print a byte array
-func InfoBytes(b []byte) {
-	if len(b) != 0 {
-		Info(string(b))
-	}
 }
 
 // GetKubeconfigDir returns the kubeconfig directory.

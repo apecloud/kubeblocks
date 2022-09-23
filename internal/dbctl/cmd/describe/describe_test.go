@@ -14,31 +14,37 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package list
+package describe
 
 import (
 	"fmt"
 	"net/http"
 	"testing"
 
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest/fake"
+
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
-func TestListCmd(t *testing.T) {
+func TestDescribeCmd(t *testing.T) {
 	buildTestCmd := func(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 		cmd := Command{
 			Factory:   f,
 			Streams:   streams,
-			Short:     "Test list.",
-			GroupKind: schema.GroupKind{Group: "", Kind: "pods"},
+			Short:     "Test describe.",
+			GroupKind: []schema.GroupKind{{Group: "", Kind: "pods"}},
+			Template:  []string{"test.tmpl"},
+			PrintExtra: func() error {
+				fmt.Fprintln(streams.Out, "test print fun")
+				return nil
+			},
 		}
 		return cmd.Build()
 	}
@@ -56,15 +62,15 @@ func TestListCmd(t *testing.T) {
 	}
 
 	pods, _, _ := cmdtesting.TestData()
-	tf := mockClient(pods)
+	tf := mockClient(&pods.Items[0])
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := buildTestCmd(tf, streams)
-	cmd.Run(cmd, []string{})
+	cmd.Run(cmd, []string{"foo"})
 
-	fmt.Print(buf.String())
-	expected := `NAME   AGE
-foo    <unknown>
-bar    <unknown>
+	expected := `Name:foo
+Namespace:test
+Kind:Pod
+test print fun
 `
 	if expected != buf.String() {
 		t.Errorf("unexpected result: %s", buf.String())

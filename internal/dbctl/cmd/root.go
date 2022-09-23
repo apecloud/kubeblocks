@@ -76,7 +76,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.AddCommand(
 		playground.NewPlaygroundCmd(ioStreams),
 		dbaas.NewDbaasCmd(f, ioStreams),
-		cluster.NewDbclusterCmd(f, ioStreams),
+		cluster.NewClusterCmd(f, ioStreams),
 		bench.NewBenchCmd(f),
 		backup.NewBackupCmd(f, ioStreams),
 	)

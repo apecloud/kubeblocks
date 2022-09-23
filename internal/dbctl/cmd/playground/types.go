@@ -22,22 +22,11 @@ const (
 	DBClusterName        = "mycluster"
 	ClusterName          = "dbctl-playground"
 	ClusterNamespace     = "dbctl-playground"
-	DBClusterNamespace   = "default"
-	DefaultEngine        = "wesql"
 	DefaultCloudProvider = "local"
 	DefaultVersion       = "8.0.28"
-	DefaultRootUser      = "root"
-	DefaultPassword      = "sakila"
-	DefaultPort          = "3306"
 	LocalHost            = "127.0.0.1"
-	DefaultS3Endpoint    = "https://s3.cn-north-1.amazonaws.com.cn"
-	DefaultS3Region      = "cn-north-1"
 	DefaultDBReplicas    = "3"
 
-	// K3sKubeConfigLocation is default path of k3s kubeconfig
-	K3sKubeConfigLocation = "/etc/rancher/k3s/k3s.yaml"
-	// K3sExternalKubeConfigLocation is where to generate kubeconfig for external access
-	K3sExternalKubeConfigLocation = "/etc/rancher/k3s/k3s-external.yaml"
 	// CliDockerNetwork is docker network for k3d cluster when `dbctl playground`
 	// all cluster will be created in this network, so they can communicate with each other
 	CliDockerNetwork = "k3d-dbctl-playground"

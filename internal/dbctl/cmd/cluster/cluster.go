@@ -22,18 +22,17 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
-// NewDbclusterCmd creates the dbcluster command
-func NewDbclusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+// NewClusterCmd creates the cluster command
+func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "cluster",
-		Short: "DB cluster operation command",
+		Short: "Database cluster operation command",
 	}
 
 	// add subcommands
 	cmd.AddCommand(
 		NewListCmd(f, streams),
 		NewDescribeCmd(f, streams),
-		NewConnectCmd(f),
 		NewCreateCmd(f, streams),
 		NewDeleteCmd(f),
 	)

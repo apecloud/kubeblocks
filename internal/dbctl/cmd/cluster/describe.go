@@ -17,82 +17,23 @@ limitations under the License.
 package cluster
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/describe"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/cloudprovider"
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/playground"
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
-	"github.com/apecloud/kubeblocks/internal/dbctl/util"
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/describe"
 )
 
 func NewDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &commandOptions{
-		FilenameOptions: &resource.FilenameOptions{},
-		DescriberSettings: &describe.DescriberSettings{
-			ShowEvents: true,
+	cmd := describe.Command{
+		Factory: f,
+		Streams: streams,
+		Short:   "Describe database cluster info.",
+		GroupKind: []schema.GroupKind{
+			{Group: "dbaas.infracreate.com", Kind: "Cluster"},
 		},
-
-		IOStreams: streams,
+		Template: []string{"cluster.tmpl"},
 	}
-
-	cmd := &cobra.Command{
-		Use:   "describe",
-		Short: "Describe database cluster info",
-		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.setup(f, args))
-			cmdutil.CheckErr(o.run(
-				func(clusterInfo *types.DBClusterInfo) {
-					//nolint
-					util.PrintClusterInfo(clusterInfo)
-				}, func() error {
-					return nil
-				}))
-		},
-	}
-
-	return cmd
-}
-
-func buildClusterInfo(obj *unstructured.Unstructured) *types.DBClusterInfo {
-	cp := cloudprovider.Get()
-	instance, _ := cp.Instance()
-	info := types.DBClusterInfo{
-		RootUser:    playground.DefaultRootUser,
-		DBPort:      playground.DefaultPort,
-		DBCluster:   obj.GetName(),
-		DBNamespace: obj.GetNamespace(),
-		HostIP:      instance.GetIP(),
-	}
-	for k, v := range obj.GetLabels() {
-		info.Labels += fmt.Sprintf("%s:%s ", k, v)
-	}
-
-	status := obj.Object["status"].(map[string]interface{})
-	cluster := status["cluster"].(map[string]interface{})
-	spec := obj.Object["spec"].(map[string]interface{})
-
-	info.Version = spec["version"].(string)
-	info.Instances = spec["instances"].(int64)
-	info.ServerId = spec["baseServerId"].(int64)
-	info.Secret = spec["secretName"].(string)
-	info.Status = cluster["status"].(string)
-	info.StartTime = ""
-	if info.Status == "ONLINE" {
-		info.StartTime = status["createTime"].(string)
-	}
-	info.OnlineInstances = cluster["onlineInstances"].(int64)
-	info.Topology = "Cluster"
-	if info.Instances == 1 {
-		info.Topology = "Standalone"
-	}
-	info.Engine = playground.DefaultEngine
-	info.Storage = 2
-	return &info
+	return cmd.Build()
 }

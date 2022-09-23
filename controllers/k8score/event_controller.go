@@ -18,6 +18,9 @@ package k8score
 
 import (
 	"context"
+	"encoding/json"
+	"k8s.io/apimachinery/pkg/types"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,6 +30,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+)
+
+const (
+	consensusSetRoleLabelKey = "cs.dbaas.apecloud.com/role"
 )
 
 // EventReconciler reconciles a AppVersion object
@@ -56,7 +63,61 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	reqCtx.Log.V(1).Info("event watcher")
 
+	event := &corev1.Event{}
+	if err := r.Client.Get(ctx, req.NamespacedName, event); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "getEventError")
+	}
+
+	switch event.InvolvedObject.FieldPath {
+	case "spec.containers.KBProbeRoleChangedCheck":
+		err := r.handleRoleChangedEvent(ctx, event)
+		if err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "handleRoleChangedEventError")
+		}
+	}
+
 	return ctrl.Result{}, nil
+}
+
+// TODO probeMessage should be defined by @xuanchi
+type probeMessage struct {
+	code string
+	data probeMessageData
+}
+
+type probeMessageData struct {
+	role    string
+	message string
+}
+
+func (r *EventReconciler) handleRoleChangedEvent(ctx context.Context, event *corev1.Event) error {
+	// get role
+	message := &probeMessage{}
+	err := json.Unmarshal([]byte(event.Message), message)
+	if err != nil {
+		return err
+	}
+	role := strings.ToLower(message.data.role)
+
+	// get pod
+	pod := &corev1.Pod{}
+	podName := types.NamespacedName{
+		Namespace: event.InvolvedObject.Namespace,
+		Name:      event.InvolvedObject.Name,
+	}
+	if err := r.Client.Get(ctx, podName, pod); err != nil {
+		return err
+	}
+
+	// update label
+	patch := client.MergeFrom(pod.DeepCopy())
+	pod.Labels[consensusSetRoleLabelKey] = role
+	err = r.Client.Patch(ctx, pod, patch)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

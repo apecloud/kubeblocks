@@ -14,19 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package util
 
 import (
-	"fmt"
-	"os"
+	"testing"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
-func main() {
-	cmd := cmd.NewRootCmd()
-	if err := cmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+func TestPrint(t *testing.T) {
+	clusterInfo := types.PlaygroundInfo{
+		DBCluster:     "mycluster",
+		DBPort:        "3306",
+		DBNamespace:   "default",
+		Namespace:     "dbctl-playground",
+		GrafanaSvc:    "prometheus-grafana",
+		GrafanaPort:   "9100",
+		GrafanaUser:   "admin",
+		GrafanaPasswd: "prom-operator",
 	}
+	//nolint
+	PrintPlaygroundGuide(clusterInfo)
 }

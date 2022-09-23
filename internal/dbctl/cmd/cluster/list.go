@@ -14,19 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package cluster
 
 import (
-	"fmt"
-	"os"
+	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd"
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/list"
 )
 
-func main() {
-	cmd := cmd.NewRootCmd()
-	if err := cmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	cmd := list.Command{
+		Factory:   f,
+		Streams:   streams,
+		Short:     "List all database cluster.",
+		GroupKind: schema.GroupKind{Group: "dbaas.infracreate.com", Kind: "Cluster"},
 	}
+	return cmd.Build()
 }

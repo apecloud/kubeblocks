@@ -14,19 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package cluster
 
 import (
-	"fmt"
-	"os"
+	"github.com/spf13/cobra"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
-func main() {
-	cmd := cmd.NewRootCmd()
-	if err := cmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+func NewConnectCmd(f cmdutil.Factory) *cobra.Command {
+
+	cmd := &cobra.Command{
+		Use:   "connect",
+		Short: "Connect to the database cluster",
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) == 0 {
+				util.Errf("You must specify a database cluster name to connect.")
+				return
+			}
+		},
 	}
+
+	return cmd
 }

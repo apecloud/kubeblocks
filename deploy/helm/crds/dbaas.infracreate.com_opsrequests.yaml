@@ -21,13 +21,13 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .metadata.creationTimestamp
-      name: AGE
-      type: date
     - description: Cluster Status.
       jsonPath: .status.phase
       name: PHASE
       type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -54,6 +54,7 @@ spec:
                   upgrade:
                     properties:
                       appVersionRef:
+                        description: AppVersionRef reference AppVersion
                         type: string
                     required:
                     - appVersionRef
@@ -82,6 +83,7 @@ spec:
                       replicas:
                         type: integer
                       roleGroups:
+                        description: RoleGroups reference roleGroups in ClusterDefinition
                         items:
                           properties:
                             name:
@@ -542,8 +544,19 @@ spec:
                 additionalProperties:
                   properties:
                     phase:
+                      description: Phase - in list of [Running, Failed, Creating,
+                        Updating, Deleting, Deleted]
+                      enum:
+                      - Running
+                      - Failed
+                      - Creating
+                      - Updating
+                      - Deleting
+                      - Deleted
                       type: string
                   type: object
+                description: Components record the status information of components
+                  with spec.componentOps.componentNames
                 type: object
               conditions:
                 description: describe opsRequest detail status

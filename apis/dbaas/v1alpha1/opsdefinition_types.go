@@ -40,7 +40,7 @@ type OpsDefinitionSpec struct {
 
 	// Strategy the execution strategy of the operation,exclude operation type of Upgrade
 	// +optional
-	Strategy *Strategy `json:"strategies"`
+	Strategy *Strategy `json:"strategies,omitempty"`
 }
 
 // OpsDefinitionStatus defines the observed state of OpsDefinition
@@ -52,6 +52,7 @@ type OpsDefinitionStatus struct {
 	// +kubebuilder:validation:Enum={Available,UnAvailable}
 	Phase Phase `json:"phase"`
 
+	// Message record the OpsDefinition details message in current phase
 	// +optional
 	Message string `json:"message,omitempty"`
 
@@ -64,8 +65,8 @@ type OpsDefinitionStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:categories={dbaas},scope=Cluster,shortName=od
-//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 //+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="OpsDefinition Status."
+//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // OpsDefinition is the Schema for the opsdefinitions API
 type OpsDefinition struct {

@@ -17,13 +17,9 @@ limitations under the License.
 package operations
 
 import (
-	"context"
 	"sync"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -32,55 +28,7 @@ import (
 var (
 	opsManagerOnce sync.Once
 	opsManager     *OpsManager
-	clusterLockIns = &ClusterLock{}
 )
-
-type ClusterLock struct {
-	clusterLockMap map[string]*sync.Mutex
-
-	mu sync.Mutex
-}
-
-type OpsBehaviour struct {
-	FromClusterPhases []dbaasv1alpha1.Phase
-	ToClusterPhase    dbaasv1alpha1.Phase
-	// Action The action running time should be short. if it fails, it will be reconciled by the OpsRequest controller.
-	// if you do not want to be reconciled when the operation fails,
-	// you need to call PatchOpsStatus function in ops_util.go and set OpsRequest.status.phase to Failed
-	Action func(opsResource *OpsResource) error
-	// ReconcileAction loop until the operation is completed when OpsRequest.status.phase is Running
-	ReconcileAction func(opsResource *OpsResource) error
-	// ActionStartedCondition append to OpsRequest.status.conditions when start performing Action function
-	ActionStartedCondition func(opsRequest *dbaasv1alpha1.OpsRequest) *metav1.Condition
-}
-
-type OpsResource struct {
-	Ctx        context.Context
-	Client     client.Client
-	OpsRequest *dbaasv1alpha1.OpsRequest
-	Cluster    *dbaasv1alpha1.Cluster
-	Recorder   record.EventRecorder
-}
-
-type OpsManager struct {
-	OpsMap map[dbaasv1alpha1.OpsType]*OpsBehaviour
-}
-
-func (cl *ClusterLock) GetLock(cluster *dbaasv1alpha1.Cluster) *sync.Mutex {
-	cl.mu.Lock()
-	defer cl.mu.Unlock()
-
-	if cl.clusterLockMap == nil {
-		cl.clusterLockMap = map[string]*sync.Mutex{}
-	}
-	if mu, ok := cl.clusterLockMap[cluster.Namespace]; ok {
-		return mu
-	} else {
-		mu = &sync.Mutex{}
-		cl.clusterLockMap[cluster.Name] = mu
-		return mu
-	}
-}
 
 // RegisterOps register operation with OpsType and OpsBehaviour
 func (opsMgr *OpsManager) RegisterOps(opsType dbaasv1alpha1.OpsType, opsBehaviour *OpsBehaviour) {
@@ -95,12 +43,10 @@ func (opsMgr *OpsManager) MainEnter(opsRes *OpsResource) (*ctrl.Result, error) {
 		ok           bool
 	)
 
-	clusterMu := clusterLockIns.GetLock(opsRes.Cluster)
-	clusterMu.Lock()
-	defer clusterMu.Unlock()
-
 	if opsBehaviour, ok = opsMgr.OpsMap[opsRes.OpsRequest.Spec.Type]; !ok {
 		return nil, patchOpsBehaviourNotFound(opsRes)
+	} else if opsBehaviour.Action == nil {
+		return nil, nil
 	}
 
 	if ok, err = opsMgr.validateClusterPhaseAndOperations(opsRes, opsBehaviour); err != nil || !ok {
@@ -119,9 +65,6 @@ func (opsMgr *OpsManager) MainEnter(opsRes *OpsResource) (*ctrl.Result, error) {
 		}
 	}
 
-	if opsBehaviour.Action == nil {
-		return nil, nil
-	}
 	if err = opsBehaviour.Action(opsRes); err != nil {
 		return nil, err
 	}
@@ -161,10 +104,11 @@ func (opsMgr *OpsManager) ReconcileMainEnter(opsRes *OpsResource) error {
 func (opsMgr *OpsManager) validateClusterPhaseAndOperations(opsRes *OpsResource, behaviour *OpsBehaviour) (bool, error) {
 	isOkClusterPhase := false
 	for _, v := range behaviour.FromClusterPhases {
-		if opsRes.Cluster.Status.Phase == v {
-			isOkClusterPhase = true
-			break
+		if opsRes.Cluster.Status.Phase != v {
+			continue
 		}
+		isOkClusterPhase = true
+		break
 	}
 	opsRequestAnnotation := getOpsRequestAnnotation(opsRes.Cluster)
 	if behaviour.ToClusterPhase != "" && opsRequestAnnotation != nil {

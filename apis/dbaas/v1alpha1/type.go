@@ -62,19 +62,6 @@ const (
 	RestartType           OpsType = "Restart"
 )
 
-const (
-	// label keys
-
-	AppInstanceLabelKey      = "app.kubernetes.io/instance"
-	AppComponentNameLabelKey = "app.kubernetes.io/component-name"
-
-	// annotation keys
-
-	RestartAnnotationKey    = "infracreate.com/restart"
-	OpsRequestAnnotationKey = "infracreate.com/ops-request"
-	ClusterDefLabelKey      = "clusterdefinition.infracreate.com/name"
-)
-
 var webhookMgr *webhookManager
 
 type webhookManager struct {

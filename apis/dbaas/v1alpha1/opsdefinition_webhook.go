@@ -84,8 +84,7 @@ func (r *OpsDefinition) ValidateDelete() error {
 func (r *OpsDefinition) validate() error {
 	var (
 		clusterDef = &ClusterDefinition{}
-
-		allErrs field.ErrorList
+		allErrs    field.ErrorList
 	)
 	if webhookMgr == nil {
 		return nil
@@ -118,11 +117,12 @@ func (r *OpsDefinition) validateStrategyComponents(clusterDef *ClusterDefinition
 		componentMap[v.TypeName] = &v
 	}
 	// get component types where is not exists in Cluster.spec.components[*].typeName
-	if strategy != nil && strategy.Components != nil {
-		for _, v := range strategy.Components {
-			if _, ok := componentMap[v.Type]; !ok {
-				notFoundComponentType = append(notFoundComponentType, v.Type)
-			}
+	if strategy == nil || strategy.Components == nil {
+		return
+	}
+	for _, v := range strategy.Components {
+		if _, ok := componentMap[v.Type]; !ok {
+			notFoundComponentType = append(notFoundComponentType, v.Type)
 		}
 	}
 	if len(notFoundComponentType) > 0 {

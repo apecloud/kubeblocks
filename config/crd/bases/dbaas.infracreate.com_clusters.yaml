@@ -714,14 +714,25 @@ spec:
                 type: string
               components:
                 additionalProperties:
+                  description: ClusterStatusComponent record components status information
                   properties:
-                    id:
-                      type: string
                     message:
+                      description: Message record the component details message in
+                        current phase
                       type: string
                     phase:
+                      description: Phase - in list of [Running, Failed, Creating,
+                        Updating, Deleting, Deleted]
+                      enum:
+                      - Running
+                      - Failed
+                      - Creating
+                      - Updating
+                      - Deleting
+                      - Deleted
                       type: string
                     roleGroups:
+                      description: RoleGroups reference roleGroups in ClusterDefinition
                       items:
                         properties:
                           id:
@@ -733,10 +744,14 @@ spec:
                         type: object
                       type: array
                     type:
+                      description: Type component type
                       type: string
                   type: object
+                description: Components record the current status information of all
+                  components of the cluster
                 type: object
               message:
+                description: Message cluster details message in current phase
                 type: string
               observedGeneration:
                 description: observedGeneration is the most recent generation observed

@@ -69,9 +69,11 @@ type ClusterStatus struct {
 	// +kubebuilder:validation:Enum={Running,Failed,Creating,Updating,Deleting,Deleted}
 	Phase Phase `json:"phase,omitempty"`
 
+	// Message cluster details message in current phase
 	// +optional
 	Message string `json:"message,omitempty"`
 
+	// Components record the current status information of all components of the cluster
 	// +optional
 	Components map[string]*ClusterStatusComponent `json:"components,omitempty"`
 
@@ -161,11 +163,22 @@ type ClusterRoleGroup struct {
 	Service corev1.ServiceSpec `json:"service,omitempty"`
 }
 
+// ClusterStatusComponent record components status information
 type ClusterStatusComponent struct {
-	ID         string                   `json:"id,omitempty"`
-	Type       string                   `json:"type,omitempty"`
-	Phase      Phase                    `json:"phase,omitempty"`
-	Message    string                   `json:"message,omitempty"`
+	// Type component type
+	// +optional
+	Type string `json:"type,omitempty"`
+
+	// Phase - in list of [Running, Failed, Creating, Updating, Deleting, Deleted]
+	// +kubebuilder:validation:Enum={Running,Failed,Creating,Updating,Deleting,Deleted}
+	Phase Phase `json:"phase,omitempty"`
+
+	// Message record the component details message in current phase
+	// +optional
+	Message string `json:"message,omitempty"`
+
+	// RoleGroups reference roleGroups in ClusterDefinition
+	// +optional
 	RoleGroups []ClusterStatusRoleGroup `json:"roleGroups,omitempty"`
 }
 

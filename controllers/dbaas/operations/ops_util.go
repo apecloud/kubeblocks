@@ -40,6 +40,9 @@ func ReconcileActionWithCluster(opsRes *OpsResource) error {
 		opsRequest.Status.Components = map[string]dbaasv1alpha1.OpsRequestStatusComponent{}
 	}
 	for k, v := range opsRes.Cluster.Status.Components {
+		// the operation occurs in the cluster, such as upgrade.
+		// However, it is also possible that only the corresponding components in the cluster have changed,
+		// and the phase is updating So we need to monitor these components and send the corresponding event
 		if statusComponent, ok := opsRequest.Status.Components[k]; (!ok && v.Phase == dbaasv1alpha1.UpdatingPhase) || statusComponent.Phase != v.Phase {
 			isChanged = true
 			opsRequest.Status.Components[k] = dbaasv1alpha1.OpsRequestStatusComponent{Phase: v.Phase}
@@ -187,7 +190,7 @@ func getOpsRequestAnnotation(cluster *dbaasv1alpha1.Cluster) *string {
 	if cluster.Annotations == nil {
 		return nil
 	}
-	if val, ok := cluster.Annotations[dbaasv1alpha1.OpsRequestAnnotationKey]; ok {
+	if val, ok := cluster.Annotations[OpsRequestAnnotationKey]; ok {
 		return &val
 	}
 	return nil
@@ -244,11 +247,11 @@ func deleteOpsRequestAnnotationInCluster(opsRes *OpsResource) error {
 	if opsRes.Cluster.Annotations == nil {
 		return nil
 	}
-	if val, ok := opsRes.Cluster.Annotations[dbaasv1alpha1.OpsRequestAnnotationKey]; !ok || val != opsRes.OpsRequest.Name {
+	if val, ok := opsRes.Cluster.Annotations[OpsRequestAnnotationKey]; !ok || val != opsRes.OpsRequest.Name {
 		return nil
 	}
 	patch := client.MergeFrom(opsRes.Cluster.DeepCopy())
-	delete(opsRes.Cluster.Annotations, dbaasv1alpha1.OpsRequestAnnotationKey)
+	delete(opsRes.Cluster.Annotations, OpsRequestAnnotationKey)
 	return opsRes.Client.Patch(opsRes.Ctx, opsRes.Cluster, patch)
 }
 
@@ -258,6 +261,6 @@ func addOpsRequestAnnotationToCluster(opsRes *OpsResource) error {
 	if opsRes.Cluster.Annotations == nil {
 		opsRes.Cluster.Annotations = map[string]string{}
 	}
-	opsRes.Cluster.Annotations[dbaasv1alpha1.OpsRequestAnnotationKey] = opsRes.OpsRequest.Name
+	opsRes.Cluster.Annotations[OpsRequestAnnotationKey] = opsRes.OpsRequest.Name
 	return opsRes.Client.Patch(opsRes.Ctx, opsRes.Cluster, patch)
 }

@@ -83,8 +83,8 @@ func validateStorageClass(opsRes *OpsResource, pvcSpec corev1.PersistentVolumeCl
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	if err := opsRes.Client.List(opsRes.Ctx, pvcList, client.InNamespace(opsRes.Cluster.Namespace),
 		client.MatchingLabels{
-			dbaasv1alpha1.AppInstanceLabelKey:      opsRes.Cluster.Name,
-			dbaasv1alpha1.AppComponentNameLabelKey: componentName,
+			AppInstanceLabelKey:      opsRes.Cluster.Name,
+			AppComponentNameLabelKey: componentName,
 		}); err != nil {
 		return nil, err
 	}

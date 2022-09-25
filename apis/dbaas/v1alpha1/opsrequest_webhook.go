@@ -112,8 +112,9 @@ func (r *OpsRequest) getOpsDefinition(ctx context.Context, cluster *Cluster) (*O
 	var (
 		opsDefinitionList = &OpsDefinitionList{}
 		opsDefinition     = &OpsDefinition{}
+		clusterDefLabel   = "clusterdefinition.infracreate.com/name"
 	)
-	if err := webhookMgr.client.List(ctx, opsDefinitionList, client.MatchingLabels{ClusterDefLabelKey: cluster.Spec.ClusterDefRef}); err != nil {
+	if err := webhookMgr.client.List(ctx, opsDefinitionList, client.MatchingLabels{clusterDefLabel: cluster.Spec.ClusterDefRef}); err != nil {
 		return nil, err
 	}
 	for _, v := range opsDefinitionList.Items {

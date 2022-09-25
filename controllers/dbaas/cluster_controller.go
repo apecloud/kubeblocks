@@ -115,8 +115,11 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if cluster.Status.ObservedGeneration == cluster.GetObjectMeta().GetGeneration() {
 		// check cluster all pods is ready
 		if r.needCheckClusterForReady(cluster) {
-			if err = r.checkClusterIsReady(reqCtx.Ctx, cluster); err != nil {
+			if ok, err := r.checkClusterIsReady(reqCtx.Ctx, cluster); !ok || err != nil {
 				return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "checkClusterIsReady")
+			}
+			if err = r.patchClusterToRunning(reqCtx.Ctx, cluster); err != nil {
+				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 			}
 		}
 		return intctrlutil.Reconciled()
@@ -362,7 +365,7 @@ func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctr
 }
 
 // checkClusterIsReady Check whether the cluster related pod resources are running. if ok, update Cluster.status.phase to Running
-func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *dbaasv1alpha1.Cluster) error {
+func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *dbaasv1alpha1.Cluster) (bool, error) {
 	var (
 		statefulSetList         = &appsv1.StatefulSetList{}
 		isOk                    = true
@@ -372,7 +375,7 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 	if err := r.Client.List(ctx, statefulSetList,
 		client.InNamespace(cluster.Namespace),
 		client.MatchingLabels{appInstanceLabelKey: cluster.Name}); err != nil {
-		return err
+		return false, err
 	}
 	patch := client.MergeFrom(cluster.DeepCopy())
 	for _, v := range statefulSetList.Items {
@@ -388,13 +391,16 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 			needSyncStatusComponent = true
 		}
 	}
-
-	if !isOk {
-		if needSyncStatusComponent {
-			_ = r.Client.Status().Patch(ctx, cluster, patch)
+	if needSyncStatusComponent {
+		if err := r.Client.Status().Patch(ctx, cluster, patch); err != nil {
+			return false, err
 		}
-		return fmt.Errorf("cluster is not ready")
 	}
+	return isOk, nil
+}
+
+func (r *ClusterReconciler) patchClusterToRunning(ctx context.Context, cluster *dbaasv1alpha1.Cluster) error {
+	patch := client.MergeFrom(cluster.DeepCopy())
 	cluster.Status.Phase = dbaasv1alpha1.RunningPhase
 	if err := r.Client.Status().Patch(ctx, cluster, patch); err != nil {
 		return err

@@ -60,12 +60,12 @@ func restartStatefulSet(opsRes *OpsResource, componentNameMap map[string]struct{
 	)
 	if err = opsRes.Client.List(opsRes.Ctx, statefulSetList,
 		client.InNamespace(opsRes.Cluster.Namespace),
-		client.MatchingLabels{dbaasv1alpha1.AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
+		client.MatchingLabels{AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
 		return err
 	}
 
 	for _, v := range statefulSetList.Items {
-		cName := v.Labels[dbaasv1alpha1.AppComponentNameLabelKey]
+		cName := v.Labels[AppComponentNameLabelKey]
 		if _, ok := componentNameMap[cName]; !ok {
 			continue
 		}
@@ -74,9 +74,9 @@ func restartStatefulSet(opsRes *OpsResource, componentNameMap map[string]struct{
 		}
 		// check whether the statefulSet has been restarted
 		isRestarted := true
-		stsRestartTimeStamp := v.Spec.Template.Annotations[dbaasv1alpha1.RestartAnnotationKey]
+		stsRestartTimeStamp := v.Spec.Template.Annotations[RestartAnnotationKey]
 		if res, _ := time.Parse(time.RFC3339, stsRestartTimeStamp); startTimestamp.After(res) {
-			v.Spec.Template.Annotations[dbaasv1alpha1.RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
+			v.Spec.Template.Annotations[RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
 			isRestarted = false
 		}
 		if isRestarted {

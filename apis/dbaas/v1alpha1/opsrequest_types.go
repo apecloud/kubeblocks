@@ -61,6 +61,7 @@ type OpsRequestStatus struct {
 	// +kubebuilder:validation:Enum={Pending,Running,Failed,Succeed}
 	Phase Phase `json:"phase,omitempty"`
 
+	// Components record the status information of components with spec.componentOps.componentNames
 	// +optional
 	Components map[string]OpsRequestStatusComponent `json:"components,omitempty"`
 
@@ -80,8 +81,8 @@ type OpsRequestStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:categories={dbaas,all},shortName=ops
-//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 //+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="Cluster Status."
+//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // OpsRequest is the Schema for the opsrequests API
 type OpsRequest struct {
@@ -126,6 +127,7 @@ type ComponentOps struct {
 }
 
 type Upgrade struct {
+	// AppVersionRef reference AppVersion
 	// +kubebuilder:validation:Required
 	AppVersionRef string `json:"appVersionRef"`
 }
@@ -144,11 +146,14 @@ type HorizontalScaling struct {
 	// +optional
 	Replicas int `json:"replicas,omitempty"`
 
+	// RoleGroups reference roleGroups in ClusterDefinition
 	// +optional
 	RoleGroups []ClusterRoleGroup `json:"roleGroups,omitempty"`
 }
 
 type OpsRequestStatusComponent struct {
+	// Phase - in list of [Running, Failed, Creating, Updating, Deleting, Deleted]
+	// +kubebuilder:validation:Enum={Running,Failed,Creating,Updating,Deleting,Deleted}
 	Phase Phase `json:"phase,omitempty"`
 }
 

@@ -56,7 +56,7 @@ var _ = Describe("OpsRequest Controller", func() {
 apiVersion: dbaas.infracreate.com/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: cluster-definition-for-ops
+  name: cluster-definition-ops
 spec:
   type: state.mysql-8
   components:
@@ -258,9 +258,12 @@ spec:
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 			// test sync OpsDefinition.status when update clusterDefinition
-			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDef.Name}, clusterDef)
-			clusterDef.Spec.Type = "state.mysql-5.7"
-			Expect(k8sClient.Update(context.Background(), clusterDef)).Should(Succeed())
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDef.Name}, clusterDef)
+				clusterDef.Spec.DefaultTerminatingPolicy = "Delete"
+				err := k8sClient.Update(context.Background(), clusterDef)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
 
 			Eventually(func() bool {
 				_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDef.Name}, clusterDef)

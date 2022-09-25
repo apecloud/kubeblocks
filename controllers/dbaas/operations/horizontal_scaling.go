@@ -44,9 +44,11 @@ func HorizontalScalingAction(opsRes *OpsResource) error {
 		}
 		for _, v := range horizontalScaling.RoleGroups {
 			for i, r := range component.RoleGroups {
-				if r.Name == v.Name {
-					opsRes.Cluster.Spec.Components[index].RoleGroups[i].Replicas = v.Replicas
+				if r.Name != v.Name {
+					continue
 				}
+				opsRes.Cluster.Spec.Components[index].RoleGroups[i].Replicas = v.Replicas
+				break
 			}
 		}
 	}

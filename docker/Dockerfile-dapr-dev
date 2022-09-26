@@ -1,8 +1,21 @@
 FROM ghcr.io/dapr/dapr-dev:0.1.8
 
+ARG TARGETOS
+ARG TARGETARCH
+
 ARG USERNAME=dapr
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
+ARG ORAS_VERSION=0.14.1
+ARG GITHUB_PROXY=
+
+
+RUN curl -LO ${GITHUB_PROXY}https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_${TARGETOS}_${TARGETARCH}.tar.gz \
+    && mkdir -p oras-install/ \
+    && tar -zxf oras_${ORAS_VERSION}_*.tar.gz -C oras-install/ \
+    && sudo mv oras-install/oras /usr/local/bin/ \
+    && rm -rf oras_${ORAS_VERSION}_*.tar.gz oras-install/
+
 
 USER ${USERNAME}:${USER_GID}
 WORKDIR /home/${USERNAME}/.minikube

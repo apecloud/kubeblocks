@@ -496,10 +496,75 @@ else
 HELM=$(shell which helm)
 endif
 
+
+.PHONY: oras
+oras: ORAS_VERSION=0.14.1
+oras: ## Download ORAS locally if necessary.
+ifeq (, $(shell which oras))
+	@{ \
+	set -e ;\
+	echo 'installing oras' ;\
+	curl -LO $(GITHUB_PROXY)https://github.com/oras-project/oras/releases/download/v$(ORAS_VERSION)/oras_$(ORAS_VERSION)_$(GOOS)_$(GOARCH).tar.gz && \
+	mkdir -p oras-install/ && \
+	tar -zxf oras_$(ORAS_VERSION)_*.tar.gz -C oras-install/ && \
+	sudo mv oras-install/oras /usr/local/bin/ && \
+	rm -rf oras_$(ORAS_VERSION)_*.tar.gz oras-install/ ;\
+	echo 'Successfully installed' ;\
+	}
+endif
+ORAS=$(shell which oras)
+
+
+.PHONY: minikube
+minikube: ## Download minikube locally if necessary.
+ifeq (, $(shell which minikube))
+	@{ \
+	set -e ;\
+	echo 'installing minikube' ;\
+	curl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-$(GOOS)-$(GOARCH) && chmod +x minikube && sudo mv minikube /usr/local/bin ;\
+	echo 'Successfully installed' ;\
+	}
+endif
+MINIKUBE=$(shell which minikube)
+
+
 .PHONY: brew-install-prerequisite
 brew-install-prerequisite: ## Use `brew install` to install required dependencies. 
-	brew install go@1.18 kubebuilder delve golangci-lint staticcheck kustomize step cue
+	brew install go@1.18 kubebuilder delve golangci-lint staticcheck kustomize step cue oras jq yq
 
+##@ Minikube
+K8S_VERSION ?= v1.22.15
+IMAGES_REPO ?= yimeisun.azurecr.io/minikube-artifacts
+IMAGES_TAG  ?= k8s-$(K8S_VERSION)-$(GOARCH)-image
+MINIKUBE_REGISTRY_MIRROR ?= https://tenxhptk.mirror.aliyuncs.com
+MINIKUBE_IMAGE_REPO ?= registry.cn-hangzhou.aliyuncs.com/google_containers
+
+
+DOWNLOAD_K8S_IMAGES: oras k8s-$(K8S_VERSION)-$(GOARCH)-images.tar.gz
+k8s-$(K8S_VERSION)-$(GOARCH)-images.tar.gz:
+	$(ORAS) pull $(IMAGES_REPO):$(IMAGES_TAG)
+
+.PHONY: minikube-start
+minikube-start: minikube ## Start minikube cluster.
+ifeq (, $(shell minikube status -ojson | jq -r '.Host' | grep Running))
+	$(MINIKUBE) start --kubernetes-version=$(K8S_VERSION) --registry-mirror=${REGISTRY_MIRROR} --image-repository=${MINIKUBE_IMAGE_REPO}
+endif
+	# @$(MAKE) DOWNLOAD_K8S_IMAGES
+	# @docker cp k8s-$(K8S_VERSION)-$(GOARCH)-images.tar.gz minikube:/var/tmp/k8s-$(K8S_VERSION)-$(GOARCH)-images.tar.gz
+	# @docker exec --workdir /var/tmp minikube docker load --input k8s-$(K8S_VERSION)-$(GOARCH)-images.tar.gz
+	# @docker exec --workdir /var/tmp minikube rm -f k8s-$(K8S_VERSION)-$(GOARCH)-images.tar.gz
+	$(MINIKUBE) addons enable auto-pause
+	$(MINIKUBE) addons enable metrics-server
+	$(MINIKUBE) addons enable csi-hostpath-driver
+	$(MINIKUBE) addons enable volumesnapshots
+	$(MINIKUBE) update-context
+	kubectl patch storageclass standard -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
+	kubectl patch storageclass csi-hostpath-sc -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+
+
+.PHONY: minikube-delete
+minikube-delete: minikube ## Delete minikube cluster. 
+	$(MINIKUBE) delete
 
 ##@ Docker containers 
 include docker/docker.mk

@@ -18,6 +18,14 @@
 		// the localhost bind-mount /var/run/docker-host.sock.
 		// "BIND_LOCALHOST_DOCKER": "true"
 	},
+	"remoteEnv": {
+		"GO111MODULE": "on",
+		"GOPROXY": "https://goproxy.cn",
+		"GOSUMDB": "sum.golang.org",
+		"GONOPROXY": "github.com/apecloud",
+		"GONOSUMDB": "github.com/apecloud",
+		"GOPRIVATE": "github.com/apecloud"
+	},
 	"extensions": [
 		"davidanson.vscode-markdownlint",
 		"golang.go",

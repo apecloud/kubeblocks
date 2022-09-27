@@ -47,7 +47,7 @@ type ClusterSpec struct {
 	Components []ClusterComponent `json:"components,omitempty"`
 
 	// Affinity describes affinities which specific by users
-	Affinity Affinity `json:"affinity,omitempty`
+	Affinity Affinity `json:"affinity,omitempty"`
 
 	// One of DoNotTerminate, Halt, Delete, WipeOut.
 	// Defaults to Halt.
@@ -186,7 +186,7 @@ type ClusterComponentVolumeClaimTemplate struct {
 type Affinity struct {
 	// TopologyKeys describe topologyKeys for `topologySpreadConstraint` and `podAntiAffinity` in ClusterDefinition API
 	// +kubebuilder:validation:MinItems=1
-	TopologyKeys []string `json:"topologyKeys`
+	TopologyKeys []string `json:"topologyKeys"`
 	// NodeLabels describe constrain which nodes Pod can be scheduled on based on node labels
 	// +optional
 	// +kubebuilder:validation:MinItems=1

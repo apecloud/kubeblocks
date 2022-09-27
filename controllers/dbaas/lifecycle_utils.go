@@ -216,21 +216,22 @@ func mergeComponents(
 		return nil
 	}
 	component := &Component{
-		ClusterDefName:  clusterDef.Name,
-		ClusterType:     clusterDef.Spec.Type,
-		Name:            clusterDefComp.TypeName,
-		Type:            clusterDefComp.TypeName,
-		RoleGroupNames:  clusterDefComp.RoleGroups,
-		MinAvailable:    clusterDefComp.MinAvailable,
-		MaxAvailable:    clusterDefComp.MaxAvailable,
-		DefaultReplicas: clusterDefComp.DefaultReplicas,
-		IsStateless:     clusterDefComp.IsStateless,
-		AntiAffinity:    clusterDefComp.AntiAffinity,
-		IsQuorum:        clusterDefComp.IsQuorum,
-		Strategies:      clusterDefComp.Strategies,
-		PodSpec:         clusterDefComp.PodSpec,
-		Service:         clusterDefComp.Service,
-		Scripts:         clusterDefComp.Scripts,
+		ClusterDefName:           clusterDef.Name,
+		ClusterType:              clusterDef.Spec.Type,
+		Name:                     clusterDefComp.TypeName,
+		Type:                     clusterDefComp.TypeName,
+		RoleGroupNames:           clusterDefComp.RoleGroups,
+		MinAvailable:             clusterDefComp.MinAvailable,
+		MaxAvailable:             clusterDefComp.MaxAvailable,
+		DefaultReplicas:          clusterDefComp.DefaultReplicas,
+		IsStateless:              clusterDefComp.IsStateless,
+		PodAntiAffinity:          clusterDefComp.PodAntiAffinity,
+		TopologySpreadConstraint: clusterDefComp.TopologySpreadConstraint,
+		IsQuorum:                 clusterDefComp.IsQuorum,
+		Strategies:               clusterDefComp.Strategies,
+		PodSpec:                  clusterDefComp.PodSpec,
+		Service:                  clusterDefComp.Service,
+		Scripts:                  clusterDefComp.Scripts,
 	}
 	if clusterComp != nil {
 		component.Name = clusterComp.Name

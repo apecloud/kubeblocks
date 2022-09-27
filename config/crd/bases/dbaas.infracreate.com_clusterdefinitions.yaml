@@ -98,11 +98,6 @@ spec:
               components:
                 items:
                   properties:
-                    antiAffinity:
-                      default: false
-                      description: antiAffinity defines components should have anti-affinity
-                        constraint to same component type
-                      type: boolean
                     configTemplateRefs:
                       description: The configTemplateRefs field provided by ISV, and
                         finally this configTemplateRefs will be rendered into the
@@ -136,6 +131,13 @@ spec:
                       default: 0
                       minimum: 0
                       type: integer
+                    podAntiAffinity:
+                      default: preferred
+                      description: podAntiAffinity defines pods of component anti-affnity
+                      enum:
+                      - preferred
+                      - required
+                      type: string
                     podSpec:
                       description: podSpec of final workload
                       properties:
@@ -8001,6 +8003,25 @@ spec:
                                 type: string
                               type: array
                           type: object
+                      type: object
+                    topologySpreadConstraint:
+                      description: TopologySpreadConstraint describes how a group
+                        of pods ought to spread across topology domains
+                      properties:
+                        maxSkew:
+                          default: 1
+                          description: MaxSkew describes the degree to which Pods
+                            may be unevenly distributed
+                          minimum: 1
+                          type: integer
+                        whenUnsatisfiable:
+                          default: DoNotSchedule
+                          description: WhenUnsatisfiable indicates how to deal with
+                            a Pod if it doesn't satisfy the spread constraint
+                          enum:
+                          - DoNotSchedule
+                          - ScheduleAnyway
+                          type: string
                       type: object
                     typeName:
                       maxLength: 12

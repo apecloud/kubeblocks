@@ -50,6 +50,26 @@ spec:
           spec:
             description: ClusterSpec defines the desired state of Cluster
             properties:
+              affinity:
+                description: Affinity describes affinities which specific by users
+                properties:
+                  nodeLabels:
+                    description: NodeLabels describe constrain which nodes Pod can
+                      be scheduled on based on node labels
+                    items:
+                      type: string
+                    minItems: 1
+                    type: array
+                  topologyKeys:
+                    description: TopologyKeys describe topologyKeys for `topologySpreadConstraint`
+                      and `podAntiAffinity` in ClusterDefinition API
+                    items:
+                      type: string
+                    minItems: 1
+                    type: array
+                required:
+                - topologyKeys
+                type: object
               appVersionRef:
                 description: ref AppVersion
                 type: string

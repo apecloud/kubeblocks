@@ -1,5 +1,5 @@
 /*
-Copyright 2022.
+Copyright 2022 The Kubeblocks Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,6 +43,7 @@ type BackupPolicyTemplateSpec struct {
 
 // The current phase. Valid values are New, Available, InProgress, Failed.
 // +enum
+
 type BackupPolicyTemplatePhase string
 
 // These are the valid statuses of BackupPolicyTemplate.
@@ -68,6 +69,7 @@ type BackupPolicyTemplateStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={dbaas},scope=Cluster
+
 // BackupPolicyTemplate is the Schema for the BackupPolicyTemplates API (defined by ISV)
 type BackupPolicyTemplate struct {
 	metav1.TypeMeta   `json:",inline"`

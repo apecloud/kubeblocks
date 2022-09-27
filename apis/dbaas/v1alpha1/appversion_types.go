@@ -1,5 +1,5 @@
 /*
-Copyright 2022.
+Copyright 2022 The Kubeblocks Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -77,6 +77,12 @@ type AppVersionComponent struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
 	Type string `json:"type"`
+
+	// DBaas provides a configuration extension mechanism to handle configuration differences between versions,
+	// the configTemplateRefs field, together with configTemplateRefs in the ClusterDefinition,
+	// determines the final configuration file
+	// +optional
+	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
 
 	// if not nil, will replace ClusterDefinitionSpec.PodSpec in ClusterDefinition
 	// +optional

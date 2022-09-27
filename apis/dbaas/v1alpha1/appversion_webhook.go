@@ -1,5 +1,5 @@
 /*
-Copyright 2022.
+Copyright 2022 The Kubeblocks Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -142,10 +142,8 @@ func (r *AppVersion) GetInconsistentComponentsInfo(clusterDef *ClusterDefinition
 	for _, v := range r.Spec.Components {
 		if _, ok := componentMap[v.Type]; !ok {
 			notFoundComponentType = append(notFoundComponentType, v.Type)
-		} else {
-			if v.PodSpec.Containers != nil && len(v.PodSpec.Containers) > 0 {
-				componentMap[v.Type] = true
-			}
+		} else if v.PodSpec.Containers != nil && len(v.PodSpec.Containers) > 0 {
+			componentMap[v.Type] = true
 		}
 	}
 	// get no containers components in clusterDefinition and appVersion

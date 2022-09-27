@@ -1,7 +1,32 @@
-export GONOPROXY=github.com/apecloud
-export GONOSUMDB=github.com/apecloud
-export GOPRIVATE=github.com/apecloud
-export GOPROXY=https://goproxy.cn
+#
+# Copyright 2022 The Kubeblocks Authors
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+################################################################################
+# Variables                                                                    #
+################################################################################
+
+export GO111MODULE ?= on
+# export GOPROXY ?= https://proxy.golang.org
+export GOPROXY ?= https://goproxy.cn
+export GOSUMDB ?= sum.golang.org
+export GONOPROXY ?= github.com/apecloud
+export GONOSUMDB ?= github.com/apecloud
+export GOPRIVATE ?= github.com/apecloud
+
+
+
+GIT_COMMIT  = $(shell git rev-list -1 HEAD)
+GIT_VERSION = $(shell git describe --always --abbrev=7 --dirty)
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
@@ -14,11 +39,10 @@ ENVTEST_K8S_VERSION = 1.24.1
 
 ENABLE_WEBHOOKS ?= false
 
-APP_NAME = opendbaas-core
+APP_NAME = kubeblock
 
-# Image URL to use all building/pushing image targets
-IMG ?= docker.io/infracreate/$(APP_NAME)
-VERSION ?= 0.1.0-alpha.4
+
+VERSION ?= 0.1.0-alpha.5
 CHART_PATH = deploy/helm
 
 
@@ -86,8 +110,6 @@ endif
 
 
 .DEFAULT_GOAL := help
-.PHONY: all
-all: manager dbctl
 
 ##@ General
 
@@ -106,6 +128,9 @@ all: manager dbctl
 .PHONY: help
 help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+
+.PHONY: all
+all: manager dbctl ## Make all cmd binaries.
 
 ##@ Development
 
@@ -135,8 +160,8 @@ cue-vet: cuetool ## Run cue vet against code.
 	$(CUE) vet controllers/dbaas/cue/*.cue
 
 .PHONY: fast-lint
-fast-lint: # [INTERNAL] fast lint
-	$(GOLANGCILINT) run ./... --timeout=5m
+fast-lint: staticchecktool  # [INTERNAL] fast lint
+	$(GOLANGCILINT) run ./...
 
 .PHONY: lint
 lint: generate ## Run golangci-lint against code.
@@ -145,6 +170,10 @@ lint: generate ## Run golangci-lint against code.
 .PHONY: staticcheck
 staticcheck: staticchecktool ## Run staticcheck against code. 
 	$(STATICCHECK) ./...
+
+.PHONY: loggercheck
+loggercheck: loggerchecktool ## Run loggercheck against code.
+	$(LOGGERCHECK) ./...
 
 .PHONY: build-checks
 build-checks: generate fmt vet goimports fast-lint ## Run build checks.
@@ -179,6 +208,11 @@ scorecard:  ## Run Operatok SDK Scorecard (https://sdk.operatorframework.io/docs
 .PHONY: cover-report
 cover-report: ## Generate cover.html from cover.out
 	$(GO) tool cover -html=cover.out -o cover.html
+ifeq ($(GOOS), darwin)
+	open ./cover.html
+else
+	echo "open cover.html with a HTML viewer."
+endif
 
 
 .PHONY: goimports
@@ -190,19 +224,23 @@ clean:
 	rm -rf $(WEBHOOK_CERT_DIR)
 
 ##@ CLI
-CLI_IMG ?= docker.io/infracreate/dbctl
-CLI_VERSION ?= 0.4.0
-CLI_TAG ?= v$(CLI_VERSION)
+ifdef REL_VERSION
+CLI_VERSION := $(REL_VERSION)
+else
+CLI_VERSION := edge
+CLI_TAG := latest
+endif
 K3S_VERSION ?= v1.23.8+k3s1
 K3D_VERSION ?= 5.4.4
 K3S_IMG_TAG ?= $(subst +,-,$(K3S_VERSION))
 
 CLI_LD_FLAGS ="-s -w \
 	-X github.com/apecloud/kubeblocks/version.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` \
-	-X github.com/apecloud/kubeblocks/version.GitCommit=`git rev-parse HEAD` \
-	-X github.com/apecloud/kubeblocks/version.Version=${CLI_VERSION} \
-	-X github.com/apecloud/kubeblocks/version.K3sImageTag=${K3S_IMG_TAG} \
-	-X github.com/apecloud/kubeblocks/version.K3dVersion=${K3D_VERSION}"
+	-X github.com/apecloud/kubeblocks/version.GitCommit=$(GIT_COMMIT) \
+	-X github.com/apecloud/kubeblocks/version.GitVersion=$(GIT_VERSION) \
+	-X github.com/apecloud/kubeblocks/version.Version=$(CLI_VERSION) \
+	-X github.com/apecloud/kubeblocks/version.K3sImageTag=$(K3S_IMG_TAG) \
+	-X github.com/apecloud/kubeblocks/version.K3dVersion=$(K3D_VERSION)"
 
 
 
@@ -220,10 +258,6 @@ dbctl: build-checks ## Build bin/dbctl CLI.
 clean-dbctl: ## Clean bin/dbctl* CLI tools.
 	rm -f bin/dbctl*
 
-.PHONY: docker-build-cli
-docker-build-cli: clean-dbctl build-checks bin/dbctl.linux.amd64 bin/dbctl.linux.arm64 bin/dbctl.darwin.arm64 bin/dbctl.darwin.amd64 bin/dbctl.windows.amd64 ## Build docker image with the dbctl.
-	docker build . -t ${CLI_IMG}:${CLI_TAG} -f Dockerfile.dbctl
-	docker push ${CLI_IMG}:${CLI_TAG}
 
 
 ##@ Operator Controller Manager
@@ -261,34 +295,6 @@ run-delve: manifests generate fmt vet  ## Run Delve debugger.
 	dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./bin/manager
 
 
-.PHONY: docker-build
-docker-build: test ## Build docker image with the manager.
-ifneq ($(BUILDX_ENABLED), true)
-	docker build . -t ${IMG}:${VERSION} -t ${IMG}:latest
-else
-ifeq ($(TAG_LATEST), true)
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest
-else
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION}
-endif
-endif
-
-
-.PHONY: docker-push
-docker-push: ## Push docker image with the manager.
-ifneq ($(BUILDX_ENABLED), true)
-ifeq ($(TAG_LATEST), true)
-	docker push ${IMG}:latest
-else
-	docker push ${IMG}:${VERSION}
-endif
-else
-ifeq ($(TAG_LATEST), true)
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest --push
-else
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} --push
-endif
-endif
 
 
 ##@ Deployment
@@ -396,6 +402,7 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 KUSTOMIZE_VERSION ?= v4.5.7
 CONTROLLER_TOOLS_VERSION ?= v0.9.0
 HELM_VERSION ?= v3.9.0
+CUE_VERSION ?= v0.4.3
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "$(GITHUB_PROXY)https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
@@ -437,6 +444,7 @@ install-docker-buildx: ## Create and use docker buildx builder.
 	docker buildx create --platform linux/amd64,linux/arm64 --name x-builder --driver docker-container --use
 
 .PHONY: golangci
+golangci: GOLANGCILINT_VERSION = 1.49.0
 golangci: ## Download golangci-lint locally if necessary.
 ifneq ($(shell which golangci-lint),)
 	echo golangci-lint is already installed
@@ -459,12 +467,26 @@ staticchecktool: ## Download staticcheck locally if necessary.
 ifeq (, $(shell which staticcheck))
 	@{ \
 	set -e ;\
-	echo 'installing honnef.co/go/tools/cmd/staticcheck ' ;\
-	go install honnef.co/go/tools/cmd/staticcheck@v0.3.2 ;\
+	echo 'installing honnef.co/go/tools/cmd/staticcheck' ;\
+	go install honnef.co/go/tools/cmd/staticcheck@latest;\
 	}
 STATICCHECK=$(GOBIN)/staticcheck
 else
 STATICCHECK=$(shell which staticcheck)
+endif
+
+
+.PHONY: loggerchecktool
+loggerchecktool: ## Download loggercheck locally if necessary.
+ifeq (, $(shell which loggercheck))
+	@{ \
+	set -e ;\
+	echo 'installing github.com/timonwong/loggercheck/cmd/loggercheck' ;\
+	go install github.com/timonwong/loggercheck/cmd/loggercheck@latest;\
+	}
+LOGGERCHECK=$(GOBIN)/loggercheck
+else
+LOGGERCHECK=$(shell which loggercheck)
 endif
 
 .PHONY: goimportstool
@@ -484,7 +506,7 @@ cuetool: ## Download cue locally if necessary.
 ifeq (, $(shell which cue))
 	@{ \
 	set -e ;\
-	go install github.com/cue-lang/cue@latest ;\
+	go install cuelang.org/go/cmd/cue@$(CUE_VERSION) ;\
 	}
 CUE=$(GOBIN)/cue
 else
@@ -503,7 +525,75 @@ else
 HELM=$(shell which helm)
 endif
 
+
+.PHONY: oras
+oras: ORAS_VERSION=0.14.1
+oras: ## Download ORAS locally if necessary.
+ifeq (, $(shell which oras))
+	@{ \
+	set -e ;\
+	echo 'installing oras' ;\
+	curl -LO $(GITHUB_PROXY)https://github.com/oras-project/oras/releases/download/v$(ORAS_VERSION)/oras_$(ORAS_VERSION)_$(GOOS)_$(GOARCH).tar.gz && \
+	mkdir -p oras-install/ && \
+	tar -zxf oras_$(ORAS_VERSION)_*.tar.gz -C oras-install/ && \
+	sudo mv oras-install/oras /usr/local/bin/ && \
+	rm -rf oras_$(ORAS_VERSION)_*.tar.gz oras-install/ ;\
+	echo 'Successfully installed' ;\
+	}
+endif
+ORAS=$(shell which oras)
+
+
+.PHONY: minikube
+minikube: ## Download minikube locally if necessary.
+ifeq (, $(shell which minikube))
+	@{ \
+	set -e ;\
+	echo 'installing minikube' ;\
+	curl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-$(GOOS)-$(GOARCH) && chmod +x minikube && sudo mv minikube /usr/local/bin ;\
+	echo 'Successfully installed' ;\
+	}
+endif
+MINIKUBE=$(shell which minikube)
+
+
 .PHONY: brew-install-prerequisite
 brew-install-prerequisite: ## Use `brew install` to install required dependencies. 
-	brew install docker --cask
-	brew install k3d go kubebuilder operator-sdk delve golangci-lint staticcheck kustomize step cue
+	brew install go@1.18 kubebuilder operator-sdk delve golangci-lint staticcheck kustomize step cue oras jq yq
+
+##@ Minikube
+K8S_VERSION ?= v1.22.15
+IMAGES_REPO ?= yimeisun.azurecr.io/minikube-artifacts
+IMAGES_TAG  ?= k8s-$(K8S_VERSION)-$(GOARCH)-image
+MINIKUBE_REGISTRY_MIRROR ?= https://tenxhptk.mirror.aliyuncs.com
+MINIKUBE_IMAGE_REPO ?= registry.cn-hangzhou.aliyuncs.com/google_containers
+
+
+DOWNLOAD_K8S_IMAGES: oras k8s-$(K8S_VERSION)-$(GOARCH)-images.tar.gz
+k8s-$(K8S_VERSION)-$(GOARCH)-images.tar.gz:
+	$(ORAS) pull $(IMAGES_REPO):$(IMAGES_TAG)
+
+.PHONY: minikube-start
+minikube-start: minikube ## Start minikube cluster.
+ifeq (, $(shell minikube status -ojson | jq -r '.Host' | grep Running))
+	$(MINIKUBE) start --kubernetes-version=$(K8S_VERSION) --registry-mirror=${REGISTRY_MIRROR} --image-repository=${MINIKUBE_IMAGE_REPO}
+endif
+	# @$(MAKE) DOWNLOAD_K8S_IMAGES
+	# @docker cp k8s-$(K8S_VERSION)-$(GOARCH)-images.tar.gz minikube:/var/tmp/k8s-$(K8S_VERSION)-$(GOARCH)-images.tar.gz
+	# @docker exec --workdir /var/tmp minikube docker load --input k8s-$(K8S_VERSION)-$(GOARCH)-images.tar.gz
+	# @docker exec --workdir /var/tmp minikube rm -f k8s-$(K8S_VERSION)-$(GOARCH)-images.tar.gz
+	$(MINIKUBE) addons enable auto-pause
+	$(MINIKUBE) addons enable metrics-server
+	$(MINIKUBE) addons enable csi-hostpath-driver
+	$(MINIKUBE) addons enable volumesnapshots
+	$(MINIKUBE) update-context
+	kubectl patch storageclass standard -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
+	kubectl patch storageclass csi-hostpath-sc -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+
+
+.PHONY: minikube-delete
+minikube-delete: minikube ## Delete minikube cluster. 
+	$(MINIKUBE) delete
+
+##@ Docker containers 
+include docker/docker.mk

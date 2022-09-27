@@ -1,5 +1,5 @@
 /*
-Copyright 2022.
+Copyright 2022 The Kubeblocks Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ func Reconciled() (reconcile.Result, error) {
 // CheckedRequeueWithError is a convenience wrapper around logging an error message
 // separate from the stacktrace and then passing the error through to the controller
 // manager, this will ignore not-found errors.
-func CheckedRequeueWithError(err error, logger logr.Logger, msg string, keysAndValues ...string) (reconcile.Result, error) {
+func CheckedRequeueWithError(err error, logger logr.Logger, msg string, keysAndValues ...interface{}) (reconcile.Result, error) {
 	if apierrors.IsNotFound(err) {
 		return Reconciled()
 	}
@@ -46,14 +46,14 @@ func CheckedRequeueWithError(err error, logger logr.Logger, msg string, keysAndV
 		logger.Info(err.Error())
 	} else {
 		// Info log the error message and then let the reconciler dump the stacktrace
-		logger.Info(msg, keysAndValues)
+		logger.Info(msg, keysAndValues...)
 	}
 	return reconcile.Result{}, err
 }
 
-func RequeueAfter(duration time.Duration, logger logr.Logger, msg string, keysAndValues ...string) (reconcile.Result, error) {
+func RequeueAfter(duration time.Duration, logger logr.Logger, msg string, keysAndValues ...interface{}) (reconcile.Result, error) {
 	if msg != "" {
-		logger.Info(msg, keysAndValues)
+		logger.Info(msg, keysAndValues...)
 	} else {
 		logger.V(1).Info("retry-after", "duration", duration)
 	}
@@ -63,9 +63,9 @@ func RequeueAfter(duration time.Duration, logger logr.Logger, msg string, keysAn
 	}, nil
 }
 
-func Requeue(logger logr.Logger, msg string, keysAndValues ...string) (reconcile.Result, error) {
+func Requeue(logger logr.Logger, msg string, keysAndValues ...interface{}) (reconcile.Result, error) {
 	if msg != "" {
-		logger.Info(msg, keysAndValues)
+		logger.Info(msg, keysAndValues...)
 	} else {
 		logger.V(1).Info("requeue")
 	}

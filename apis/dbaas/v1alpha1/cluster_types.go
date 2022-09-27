@@ -1,5 +1,5 @@
 /*
-Copyright 2022.
+Copyright 2022 The Kubeblocks Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -126,7 +126,7 @@ type ClusterComponent struct {
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 
 	// serviceType determines how the Service is exposed. Valid
-	// options are ExternalName, ClusterIP, NodePort, and LoadBalancer.
+	// options are ClusterIP, NodePort, and LoadBalancer.
 	// "ClusterIP" allocates a cluster-internal IP address for load-balancing
 	// to endpoints. Endpoints are determined by the selector or if that is not
 	// specified, by manual construction of an Endpoints object or
@@ -138,9 +138,9 @@ type ClusterComponent struct {
 	// "LoadBalancer" builds on NodePort and creates an external load-balancer
 	// (if supported in the current cloud) which routes to the same endpoints
 	// as the clusterIP.
-	// "ExternalName" aliases this service to the specified externalName.
-	// Several other fields do not apply to ExternalName services.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
+	// +kubebuilder:default=ClusterIP
+	// +kubebuilder:validation:Enum={ClusterIP,NodePort,LoadBalancer}
 	// +optional
 	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
 }
@@ -162,7 +162,7 @@ type ClusterRoleGroup struct {
 }
 
 type ClusterStatusComponent struct {
-	Id         string                   `json:"id,omitempty"`
+	ID         string                   `json:"id,omitempty"`
 	Type       string                   `json:"type,omitempty"`
 	Phase      string                   `json:"phase,omitempty"`
 	Message    string                   `json:"message,omitempty"`
@@ -170,7 +170,7 @@ type ClusterStatusComponent struct {
 }
 
 type ClusterStatusRoleGroup struct {
-	Id          string `json:"id,omitempty"`
+	ID          string `json:"id,omitempty"`
 	Type        string `json:"type,omitempty"`
 	RefWorkload string `json:"refWorkload,omitempty"`
 }

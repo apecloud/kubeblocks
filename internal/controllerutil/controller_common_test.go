@@ -1,5 +1,5 @@
 /*
-Copyright 2022.
+Copyright 2022 The Kubeblocks Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,11 +26,11 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/sethvargo/go-password/password"
-
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -109,7 +109,7 @@ var _ = Describe("Cluster Controller", func() {
 	const finalizer = "finalizer/protection"
 	const timeout = time.Second * 10
 	const interval = time.Second * 1
-	const waitDuration = time.Second * 3
+	const referencedLabelKey = "referenced/name"
 
 	getObj := func(key client.ObjectKey) *corev1.ConfigMap {
 		cm := &corev1.ConfigMap{}
@@ -162,6 +162,26 @@ var _ = Describe("Cluster Controller", func() {
 		}, timeout, interval).Should(Succeed())
 	}
 
+	createReferencedConfigMap := func(label string) *corev1.ConfigMap {
+		By("By create obj")
+		randomStr, _ := password.Generate(6, 0, 0, true, false)
+		key := client.ObjectKey{
+			Name:      "cm-" + randomStr,
+			Namespace: "default",
+		}
+		obj := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      key.Name,
+				Namespace: key.Namespace,
+				Labels: map[string]string{
+					referencedLabelKey: label,
+				},
+			},
+		}
+		Ω(k8sClient.Create(context.Background(), obj)).ShouldNot(HaveOccurred())
+		return obj
+	}
+
 	BeforeEach(func() {
 		// Add any steup steps that needs to be executed before each test
 	})
@@ -198,9 +218,9 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("Do normal deletion with finalizer should have finalizer removed and reconciled", func() {
-			obj, key := createObj()
+			_, key := createObj()
 			By("By delete obj")
-			obj = getObjWithFinalizer(key)
+			obj := getObjWithFinalizer(key)
 			Ω(k8sClient.Delete(ctx, obj)).ShouldNot(HaveOccurred())
 
 			By("By calling HandleCRDeletion")
@@ -215,9 +235,9 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("Do normal deletion with empty handler should have finalizer removed and reconciled", func() {
-			obj, key := createObj()
+			_, key := createObj()
 			By("By delete obj")
-			obj = getObjWithFinalizer(key)
+			obj := getObjWithFinalizer(key)
 			Ω(k8sClient.Delete(ctx, obj)).ShouldNot(HaveOccurred())
 
 			By("By calling HandleCRDeletion")
@@ -230,9 +250,9 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("Do normal deletion with error", func() {
-			obj, key := createObj()
+			_, key := createObj()
 			By("By delete obj")
-			obj = getObjWithFinalizer(key)
+			obj := getObjWithFinalizer(key)
 			Ω(k8sClient.Delete(ctx, obj)).ShouldNot(HaveOccurred())
 
 			By("By calling HandleCRDeletion")
@@ -247,9 +267,9 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("Do normal deletion with custom result", func() {
-			obj, key := createObj()
+			_, key := createObj()
 			By("By delete obj")
-			obj = getObjWithFinalizer(key)
+			obj := getObjWithFinalizer(key)
 			Ω(k8sClient.Delete(ctx, obj)).ShouldNot(HaveOccurred())
 
 			By("By calling HandleCRDeletion")
@@ -267,9 +287,9 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("Do normal deletion with custom result and error", func() {
-			obj, key := createObj()
+			_, key := createObj()
 			By("By delete obj")
-			obj = getObjWithFinalizer(key)
+			obj := getObjWithFinalizer(key)
 			Ω(k8sClient.Delete(ctx, obj)).ShouldNot(HaveOccurred())
 
 			By("By calling HandleCRDeletion")
@@ -284,6 +304,28 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(controllerutil.ContainsFinalizer(obj, finalizer)).Should(BeTrue())
 			Expect(res).ShouldNot(BeNil())
 			Expect(*res == cRes).Should(BeTrue())
+		})
+
+		It("Do delete CR with existing referencing CR", func() {
+			obj, key := createObj()
+			_ = createReferencedConfigMap(key.Name)
+			statusHandler := func() error {
+				obj.Data = map[string]string{
+					"phase": "deleting",
+				}
+				return k8sClient.Update(ctx, obj)
+			}
+			_, _ = ValidateReferenceCR(reqCtx, k8sClient, obj, referencedLabelKey, statusHandler, &corev1.ConfigMapList{})
+			newObj := &corev1.ConfigMap{}
+			Eventually(func() bool {
+				if err := k8sClient.Get(ctx, types.NamespacedName{
+					Namespace: obj.Namespace,
+					Name:      obj.Name,
+				}, newObj); err != nil {
+					return false
+				}
+				return newObj.Data["phase"] == "deleting"
+			}, time.Second*10, time.Second*1).Should(BeTrue())
 		})
 	})
 })

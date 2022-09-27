@@ -4,11 +4,11 @@ go 1.18
 
 require (
 	cuelang.org/go v0.4.3
+	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/briandowns/spinner v1.18.1
 	github.com/containers/common v0.49.1
 	github.com/docker/docker v20.10.17+incompatible
 	github.com/docker/go-connections v0.4.0
-	github.com/fatih/color v1.13.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-logr/logr v1.2.3
 	github.com/go-sql-driver/mysql v1.6.0
@@ -20,11 +20,11 @@ require (
 	github.com/onsi/gomega v1.20.0
 	github.com/pingcap/go-tpc v1.0.8
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.12.1
 	github.com/sethvargo/go-password v0.2.0
 	github.com/spf13/cobra v1.5.0
 	github.com/spf13/viper v1.12.0
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
+	golang.org/x/exp v0.0.0-20220909182711-5c715a9e8561
 	helm.sh/helm/v3 v3.9.2
 	k8s.io/api v0.24.3
 	k8s.io/apiextensions-apiserver v0.24.2
@@ -34,6 +34,7 @@ require (
 	k8s.io/kubectl v0.24.3
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
 	sigs.k8s.io/controller-runtime v0.12.3
+	sigs.k8s.io/kustomize/kyaml v0.13.6
 )
 
 require (
@@ -59,7 +60,6 @@ require (
 	github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1 // indirect
-	github.com/Masterminds/sprig/v3 v3.2.2 // indirect
 	github.com/Masterminds/squirrel v1.5.3 // indirect
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/Microsoft/hcsshim v0.9.3 // indirect
@@ -106,6 +106,7 @@ require (
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d // indirect
 	github.com/fatih/camelcase v1.0.0 // indirect
+	github.com/fatih/color v1.13.0 // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/fvbommel/sortorder v1.0.2 // indirect
 	github.com/go-errors/errors v1.0.1 // indirect
@@ -225,6 +226,7 @@ require (
 	github.com/pkg/browser v0.0.0-20201207095918-0426ae3fba23 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/posener/complete v1.2.3 // indirect
+	github.com/prometheus/client_golang v1.12.1 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
@@ -262,12 +264,12 @@ require (
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.19.1 // indirect
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
-	go4.org/unsafe/assume-no-moving-gc v0.0.0-20211027215541-db492cf91b37 // indirect
-	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3 // indirect
+	go4.org/unsafe/assume-no-moving-gc v0.0.0-20220617031537-928513b29760 // indirect
+	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/net v0.0.0-20220624214902-1bab6f366d9e // indirect
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f // indirect
-	golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8 // indirect
+	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65 // indirect
@@ -291,7 +293,6 @@ require (
 	oras.land/oras-go v1.2.0 // indirect
 	sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2 // indirect
 	sigs.k8s.io/kustomize/api v0.11.4 // indirect
-	sigs.k8s.io/kustomize/kyaml v0.13.6 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )

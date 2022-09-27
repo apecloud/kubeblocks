@@ -1,5 +1,5 @@
 /*
-Copyright 2022.
+Copyright 2022 The Kubeblocks Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -230,9 +230,9 @@ func (r *BackupJobReconciler) GetTargetCluster(
 	clusterItemsLen := len(clusterTarget.Items)
 	if clusterItemsLen != 1 {
 		if clusterItemsLen <= 0 {
-			return nil, errors.New("Can not found any stateful sets by labelsSelector.")
+			return nil, errors.New("can not found any stateful sets by labelsSelector")
 		}
-		return nil, errors.New("Match labels result more than one, check labelsSelector.")
+		return nil, errors.New("match labels result more than one, check labelsSelector")
 	}
 	return &clusterTarget.Items[0], nil
 }

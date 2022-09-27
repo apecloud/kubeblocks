@@ -19,13 +19,13 @@ spec:
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.phase
-      name: Phase
+      name: PHASE
       type: string
     - jsonPath: .status.completionTimestamp
-      name: CompletionTime
+      name: COMPLETIONTIME
       type: date
     - jsonPath: .metadata.creationTimestamp
-      name: Age
+      name: AGE
       type: date
     name: v1alpha1
     schema:

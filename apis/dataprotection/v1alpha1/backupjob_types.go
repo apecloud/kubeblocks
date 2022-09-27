@@ -1,5 +1,5 @@
 /*
-Copyright 2022.
+Copyright 2022 The Kubeblocks Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -112,9 +112,10 @@ type BackupJobStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={dbaas},scope=Namespaced
-// +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
-// +kubebuilder:printcolumn:name="CompletionTime",type=date,JSONPath=`.status.completionTimestamp`
-// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
+// +kubebuilder:printcolumn:name="PHASE",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="COMPLETIONTIME",type=date,JSONPath=`.status.completionTimestamp`
+// +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
+
 // BackupJob is the Schema for the backupjobs API (defined by User)
 type BackupJob struct {
 	metav1.TypeMeta   `json:",inline"`

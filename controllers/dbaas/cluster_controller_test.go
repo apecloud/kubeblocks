@@ -1,5 +1,5 @@
 /*
-Copyright 2022.
+Copyright 2022 The Kubeblocks Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -79,6 +79,69 @@ allowVolumeExpansion: true
 		return sc
 	}
 
+	assureCfgTplConfigMapObj := func(cmName string) *corev1.ConfigMap {
+		By("By assure an cm obj")
+		appVerYAML := `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-tree-node-template-8.0
+  namespace: default
+data:
+  my.cnf: |-
+    [mysqld]
+    innodb-buffer-pool-size=512M
+    log-bin=master-bin
+    gtid_mode=OFF
+    consensus_auto_leader_transfer=ON
+    
+    log-error=/data/mysql/log/mysqld.err
+    character-sets-dir=/usr/share/mysql-8.0/charsets
+    datadir=/data/mysql/data
+    port=3306
+    general_log=1
+    general_log_file=/data/mysql/mysqld.log
+    pid-file=/data/mysql/run/mysqld.pid
+    server-id=1
+    slow_query_log=1
+    slow_query_log_file=/data/mysql/mysqld-slow.log
+    socket=/data/mysql/tmp/mysqld.sock
+    ssl-ca=/data/mysql/std_data/cacert.pem
+    ssl-cert=/data/mysql/std_data/server-cert.pem
+    ssl-key=/data/mysql/std_data/server-key.pem
+    tmpdir=/data/mysql/tmp/
+    loose-sha256_password_auto_generate_rsa_keys=0
+    loose-caching_sha2_password_auto_generate_rsa_keys=0
+    secure-file-priv=/data/mysql
+    
+    [client]
+    password=
+    user=root
+    port=3306
+    socket=/data/mysql/tmp/mysqld.sock
+    host=localhost
+`
+		cfgCM := &corev1.ConfigMap{}
+		Expect(yaml.Unmarshal([]byte(appVerYAML), cfgCM)).Should(Succeed())
+		Expect(checkedCreateObj(cfgCM)).Should(Succeed())
+		return cfgCM
+	}
+
+	// config template对于了container的mountPath
+	// configTemplateRefs:
+	// 	 - name: mysql-tree-node-template-8.0
+	//     volumeName: config1
+	//   - name: mysql-tree-node2
+	//     volumeName: config2
+	// for containner
+	// volumeMounts:
+	//   #将my.cnf configmap mount到pod的指定目录下，/data/config
+	//   #在pod中，会存在file: /data/config/my.cnf.override
+	//   #polardb-x在entrypoint的脚本会将my.cnf.override合并到/data/mysql/conf/my.cnf文件中
+	//   - mountPath: /data/config
+	//     name: config1
+	//   - mountPath: /etc/config
+	//	   name: config2
 	assureClusterDefObj := func() *dbaasv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
 		clusterDefYAML := `
@@ -90,6 +153,9 @@ spec:
   type: state.mysql-8
   components:
   - typeName: replicasets
+    configTemplateRefs: 
+    - name: mysql-tree-node-template-8.0 
+      volumeName: mysql-config
     roleGroups:
     - primary
     defaultReplicas: 1
@@ -109,6 +175,8 @@ spec:
             name: data
           - mountPath: /var/log
             name: log
+          - mountPath: /data/config
+            name: mysql-config
         env:
           - name: "MYSQL_ROOT_PASSWORD"
             valueFrom:
@@ -147,7 +215,6 @@ spec:
   - typeName: primary
     defaultReplicas: 3
     updateStrategy:
-      # 对应 pdb 中的两个字段，两个中只能填一个
       maxUnavailable: 1
   - typeName: proxy
     defaultReplicas: 2
@@ -169,6 +236,9 @@ spec:
   clusterDefinitionRef: cluster-definition
   components:
   - type: replicasets
+    configTemplateRefs: 
+    - name: mysql-tree-node-template-8.0 
+      volumeName: mysql-config
     podSpec:
       containers:
       - name: mysql
@@ -191,6 +261,7 @@ spec:
 	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.AppVersion, types.NamespacedName) {
 		// setup Cluster obj required default ClusterDefinition and AppVersion objects if not provided
 		if clusterDefObj == nil {
+			assureCfgTplConfigMapObj("")
 			clusterDefObj = assureClusterDefObj()
 		}
 		if appVersionObj == nil {

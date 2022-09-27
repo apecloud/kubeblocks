@@ -103,6 +103,20 @@ spec:
                       description: antiAffinity defines components should have anti-affinity
                         constraint to same component type
                       type: boolean
+                    configTemplateRefs:
+                      description: The configTemplateRefs field provided by ISV, and
+                        finally this configTemplateRefs will be rendered into the
+                        user's own configuration file according to the user's cluster
+                      items:
+                        properties:
+                          name:
+                            maxLength: 128
+                            type: string
+                          volumeName:
+                            maxLength: 32
+                            type: string
+                        type: object
+                      type: array
                     defaultReplicas:
                       default: 0
                       minimum: 0

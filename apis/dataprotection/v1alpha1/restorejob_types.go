@@ -1,5 +1,5 @@
 /*
-Copyright 2022.
+Copyright 2022 The Kubeblocks Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -87,6 +87,10 @@ type RestoreJobStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={dbaas},scope=Namespaced
+// +kubebuilder:printcolumn:name="PHASE",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="COMPLETIONTIME",type=date,JSONPath=`.status.completionTimestamp`
+// +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
+
 // RestoreJob is the Schema for the restorejobs API (defined by User)
 type RestoreJob struct {
 	metav1.TypeMeta   `json:",inline"`

@@ -1,5 +1,5 @@
 /*
-Copyright 2022.
+Copyright 2022 The Kubeblocks Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -291,13 +291,12 @@ func (r *RestoreJobReconciler) GetPodSpec(reqCtx intctrlutil.RequestCtx, restore
 	podSpec.Volumes = append(podSpec.Volumes, backupPolicy.Spec.RemoteVolumes...)
 
 	// TODO(dsj): mount readonly remote volumes for restore.
-	//podSpec.Volumes[0].PersistentVolumeClaim.ReadOnly = true
+	// podSpec.Volumes[0].PersistentVolumeClaim.ReadOnly = true
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
 
 	return podSpec, nil
 }
 
-// GetPodSpec(reqCtx intctrlutil.RequestCtx, restoreJob *dataprotectionv1alpha1.RestoreJob) (corev1.PodSpec, error) {
 func (r *RestoreJobReconciler) PatchTargetCluster(reqCtx intctrlutil.RequestCtx, restoreJob *dataprotectionv1alpha1.RestoreJob, patch []byte) error {
 	// get stateful service
 	clusterTarget := &appv1.StatefulSetList{}

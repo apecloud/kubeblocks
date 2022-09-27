@@ -5,7 +5,7 @@ plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
 multigroup: true
-projectName: opendbaas-core
+projectName: kubeblocks
 repo: github.com/apecloud/kubeblocks
 resources:
 - api:

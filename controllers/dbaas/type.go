@@ -1,5 +1,5 @@
 /*
-Copyright 2022.
+Copyright 2022 The Kubeblocks Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,10 +29,12 @@ const (
 	appVersionFinalizerName   = "appversion.infracreate.com/finalizer"
 
 	// label keys
-	clusterDefLabelKey = "clusterdefinition.infracreate.com/name"
-	AppVersionLabelKey = "appversion.infracreate.com/name"
-	ClusterDefLabelKey = "clusterdefinition.infracreate.com/name"
-	InstanceLabelKey   = "app.kubernetes.io/instance"
+	clusterDefLabelKey         = "clusterdefinition.infracreate.com/name"
+	appVersionLabelKey         = "appversion.infracreate.com/name"
+	appInstanceLabelKey        = "app.kubernetes.io/instance"
+	appComponentLabelKey       = "app.kubernetes.io/component"
+	appNameLabelKey            = "app.kubernetes.io/name"
+	statefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
 )
 
 type Component struct {

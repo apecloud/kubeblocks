@@ -534,30 +534,39 @@ brew-install-prerequisite: ## Use `brew install` to install required dependencie
 
 ##@ Minikube
 K8S_VERSION ?= v1.22.15
-IMAGES_REPO ?= yimeisun.azurecr.io/minikube-artifacts
-IMAGES_TAG  ?= k8s-$(K8S_VERSION)-$(GOARCH)-image
 MINIKUBE_REGISTRY_MIRROR ?= https://tenxhptk.mirror.aliyuncs.com
 MINIKUBE_IMAGE_REPO ?= registry.cn-hangzhou.aliyuncs.com/google_containers
 
+CSI_ATTACHER_IMG=$(MINIKUBE_IMAGE_REPO)/csi-attacher:v3.1.0
+CSI_PROVISIONER_IMG=$(MINIKUBE_IMAGE_REPO)/csi-provisioner:v2.1.0
+CSI_RESIZER_IMG=$(MINIKUBE_IMAGE_REPO)/csi-resizer:v1.1.0
+CSI_SNAPSHOTTER_IMG=$(MINIKUBE_IMAGE_REPO)/csi-snapshotter:v4.0.0
+CSI_EXT_HMA_IMG=$(MINIKUBE_IMAGE_REPO)/csi-external-health-monitor-agent:v0.2.0
+CSI_EXT_HMC_IMG=$(MINIKUBE_IMAGE_REPO)/csi-external-health-monitor-controller:v0.2.0
+CSI_NODE_DRIVER_REG_IMG=$(MINIKUBE_IMAGE_REPO)/csi-node-driver-registrar:v2.0.1
+LIVENESSPROBE_IMG=$(MINIKUBE_IMAGE_REPO)/livenessprobe:v2.2.0
+HOSTPATHPLUGIN_IMG=$(MINIKUBE_IMAGE_REPO)/hostpathplugin:v1.6.0
 
-DOWNLOAD_K8S_IMAGES: oras k8s-$(K8S_VERSION)-$(GOARCH)-images.tar.gz
-k8s-$(K8S_VERSION)-$(GOARCH)-images.tar.gz:
-	$(ORAS) pull $(IMAGES_REPO):$(IMAGES_TAG)
 
 .PHONY: minikube-start
+minikube-start: DOCKER_PULL_CMD=ssh --native-ssh=false docker pull
 minikube-start: minikube ## Start minikube cluster.
-ifeq (, $(shell minikube status -ojson | jq -r '.Host' | grep Running))
+ifeq (, $(shell $(MINIKUBE) status -ojson | jq -r '.Host' | grep Running))
 	$(MINIKUBE) start --kubernetes-version=$(K8S_VERSION) --registry-mirror=${REGISTRY_MIRROR} --image-repository=${MINIKUBE_IMAGE_REPO}
 endif
-	# @$(MAKE) DOWNLOAD_K8S_IMAGES
-	# @docker cp k8s-$(K8S_VERSION)-$(GOARCH)-images.tar.gz minikube:/var/tmp/k8s-$(K8S_VERSION)-$(GOARCH)-images.tar.gz
-	# @docker exec --workdir /var/tmp minikube docker load --input k8s-$(K8S_VERSION)-$(GOARCH)-images.tar.gz
-	# @docker exec --workdir /var/tmp minikube rm -f k8s-$(K8S_VERSION)-$(GOARCH)-images.tar.gz
-	$(MINIKUBE) addons enable auto-pause
-	$(MINIKUBE) addons enable metrics-server
-	$(MINIKUBE) addons enable csi-hostpath-driver
-	$(MINIKUBE) addons enable volumesnapshots
 	$(MINIKUBE) update-context
+	$(MINIKUBE) addons enable metrics-server
+	$(MINIKUBE) addons enable volumesnapshots
+	$(MINIKUBE) $(DOCKER_PULL_CMD) $(CSI_ATTACHER_IMG) &
+	$(MINIKUBE) $(DOCKER_PULL_CMD) $(CSI_RESIZER_IMG) &
+	$(MINIKUBE) $(DOCKER_PULL_CMD) $(CSI_SNAPSHOTTER_IMG) &
+	$(MINIKUBE) $(DOCKER_PULL_CMD) $(CSI_EXT_HMA_IMG) &
+	$(MINIKUBE) $(DOCKER_PULL_CMD) $(CSI_EXT_HMC_IMG) &
+	$(MINIKUBE) $(DOCKER_PULL_CMD) $(CSI_NODE_DRIVER_REG_IMG) &
+	$(MINIKUBE) $(DOCKER_PULL_CMD) $(LIVENESSPROBE_IMG) &
+	$(MINIKUBE) $(DOCKER_PULL_CMD) $(HOSTPATHPLUGIN_IMG) &
+	$(MINIKUBE) $(DOCKER_PULL_CMD) $(CSI_PROVISIONER_IMG)
+	$(MINIKUBE) addons enable csi-hostpath-driver
 	kubectl patch storageclass standard -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
 	kubectl patch storageclass csi-hostpath-sc -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
 

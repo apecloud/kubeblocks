@@ -187,10 +187,9 @@ type Affinity struct {
 	// TopologyKeys describe topologyKeys for `topologySpreadConstraint` and `podAntiAffinity` in ClusterDefinition API
 	// +kubebuilder:validation:MinItems=1
 	TopologyKeys []string `json:"topologyKeys"`
-	// NodeLabels describe constrain which nodes Pod can be scheduled on based on node labels
+	// NodeLabels describe constrain which nodes pod can be scheduled on based on node labels
 	// +optional
-	// +kubebuilder:validation:MinItems=1
-	NodeLabels []string `json:"nodeLabels,omitempty"`
+	NodeLabels map[string]string `json:"nodeLabels,omitempty"`
 }
 
 func init() {

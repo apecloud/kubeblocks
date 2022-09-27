@@ -153,7 +153,11 @@ func (o *SnapshotOptions) RunCreate() error {
 	if err != nil {
 		return err
 	}
-	util.PrintObjYaml(obj)
+
+	err = util.PrintObjYAML(obj)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -397,7 +401,10 @@ func (o *SnapshotOptions) RunRestore() error {
 	if err != nil {
 		return err
 	}
-	util.PrintObjYaml(obj)
+	err = util.PrintObjYAML(obj)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

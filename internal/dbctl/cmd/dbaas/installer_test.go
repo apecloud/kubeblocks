@@ -20,6 +20,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
 )
 
@@ -28,7 +29,7 @@ var _ = Describe("installer", func() {
 		i := Installer{
 			cfg:       helm.FakeActionConfig(),
 			Namespace: "default",
-			Version:   defaultVersion,
+			Version:   types.DbaasDefaultVersion,
 		}
 		Expect(i.Install()).Should(Succeed())
 	})

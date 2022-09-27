@@ -17,16 +17,41 @@ limitations under the License.
 package helm
 
 import (
-	"testing"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 
 	"helm.sh/helm/v3/pkg/repo"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
-func TestAddRepo(t *testing.T) {
-	r := repo.Entry{
-		Name: "mysql-operator",
-		URL:  "https://mysql.github.io/mysql-operator/",
-	}
-	//nolint
-	AddRepo(&r)
-}
+var _ = Describe("helm util", func() {
+
+	It("add Repo", func() {
+		r := repo.Entry{
+			Name: "mysql-operator",
+			URL:  "https://mysql.github.io/mysql-operator/",
+		}
+		Expect(AddRepo(&r)).Should(Succeed())
+		Expect(RemoveRepo(&r)).Should(Succeed())
+	})
+
+	It("Action Config", func() {
+		cfg, err := NewActionConfig("test", "config")
+		Expect(err == nil).To(BeTrue())
+		Expect(cfg != nil).To(BeTrue())
+	})
+
+	It("Install", func() {
+		o := &InstallOpts{
+			Name:      types.DbaasHelmName,
+			Chart:     types.DbaasHelmChart,
+			Namespace: "default",
+			Version:   types.DbaasDefaultVersion,
+		}
+		cfg := FakeActionConfig()
+		Expect(cfg != nil).Should(BeTrue())
+		Expect(o.Install(cfg)).Should(Succeed())
+		Expect(o.UnInstall(cfg)).Should(Succeed())
+	})
+})

@@ -20,7 +20,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/list"
 )
 
-var _ = Describe("List", func() {
+var _ = Describe("Get", func() {
 	var cmd *cobra.Command
 	var streams genericclioptions.IOStreams
 	buf := new(bytes.Buffer)

@@ -17,9 +17,10 @@ limitations under the License.
 package dbaas
 
 import (
+	corev1 "k8s.io/api/core/v1"
+
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	corev1 "k8s.io/api/core/v1"
 )
 
 type ResourceDefinition struct {

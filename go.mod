@@ -27,7 +27,6 @@ require (
 	golang.org/x/exp v0.0.0-20220909182711-5c715a9e8561
 	helm.sh/helm/v3 v3.9.2
 	k8s.io/api v0.24.3
-	k8s.io/apiextensions-apiserver v0.24.2
 	k8s.io/apimachinery v0.24.3
 	k8s.io/cli-runtime v0.24.3
 	k8s.io/client-go v0.24.3
@@ -286,6 +285,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	inet.af/netaddr v0.0.0-20211027220019-c74959edd3b6 // indirect
+	k8s.io/apiextensions-apiserver v0.24.2 // indirect
 	k8s.io/apiserver v0.24.2 // indirect
 	k8s.io/component-base v0.24.3 // indirect
 	k8s.io/klog/v2 v2.60.1 // indirect

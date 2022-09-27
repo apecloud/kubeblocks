@@ -17,9 +17,10 @@ limitations under the License.
 package list
 
 import (
-	"fmt"
 	"net/http"
-	"testing"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,7 +33,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
-func TestListCmd(t *testing.T) {
+var _ = Describe("Describe", func() {
 	buildTestCmd := func(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 		cmd := Command{
 			Factory:   f,
@@ -55,18 +56,17 @@ func TestListCmd(t *testing.T) {
 		return tf
 	}
 
-	pods, _, _ := cmdtesting.TestData()
-	tf := mockClient(pods)
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := buildTestCmd(tf, streams)
-	cmd.Run(cmd, []string{})
+	It("run", func() {
+		pods, _, _ := cmdtesting.TestData()
+		tf := mockClient(pods)
+		streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+		cmd := buildTestCmd(tf, streams)
+		cmd.Run(cmd, []string{})
 
-	fmt.Print(buf.String())
-	expected := `NAME   AGE
+		expected := `NAME   AGE
 foo    <unknown>
 bar    <unknown>
 `
-	if expected != buf.String() {
-		t.Errorf("unexpected result: %s", buf.String())
-	}
-}
+		Expect(buf.String()).To(Equal(expected))
+	})
+})

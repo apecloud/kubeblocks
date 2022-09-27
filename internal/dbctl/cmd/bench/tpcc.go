@@ -27,21 +27,16 @@ import (
 	"github.com/pingcap/go-tpc/pkg/measurement"
 	"github.com/pingcap/go-tpc/pkg/workload"
 	"github.com/pingcap/go-tpc/tpcc"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-
-	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
 var tpccConfig tpcc.Config
 
-func NewTpccCmd(f cmdutil.Factory) *cobra.Command {
+func NewTpccCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "tpcc",
 		Short: "Run a TPCC benchmark",
-		Run: func(cmd *cobra.Command, args []string) {
-			runSimpleBench(f, args)
-		},
 	}
 
 	cmd.PersistentFlags().IntVar(&tpccConfig.Parts, "parts", 1, "Number to partition warehouses")
@@ -58,8 +53,8 @@ func newPrepareCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "prepare",
 		Short: "Prepare data for TPCC",
-		Run: func(cmd *cobra.Command, args []string) {
-			executeTpcc("prepare")
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return executeTpcc("prepare")
 		},
 	}
 
@@ -78,8 +73,8 @@ func newRunCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Run workload",
-		Run: func(cmd *cobra.Command, args []string) {
-			executeTpcc("run")
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return executeTpcc("run")
 		},
 	}
 
@@ -94,32 +89,35 @@ func newCleanCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "cleanup",
 		Short: "Cleanup data for TPCC",
-		Run: func(cmd *cobra.Command, args []string) {
-			executeTpcc("cleanup")
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return executeTpcc("cleanup")
 		},
 	}
 	return cmd
 }
 
-func executeTpcc(action string) {
+func executeTpcc(action string) error {
 	runtime.GOMAXPROCS(maxProcs)
 
-	openDB()
-	defer closeDB()
-
-	tpccConfig.DBName = dbName
-	tpccConfig.Threads = threads
-	tpccConfig.Isolation = isolationLevel
 	var (
 		w   workload.Workloader
 		err error
 	)
+
+	err = openDB()
+	defer func() { _ = closeDB() }()
+	if err != nil {
+		return err
+	}
+
+	tpccConfig.DBName = dbName
+	tpccConfig.Threads = threads
+	tpccConfig.Isolation = isolationLevel
+
 	switch tpccConfig.OutputType {
 	case "csv", "CSV":
 		if tpccConfig.OutputDir == "" {
-			fmt.Printf("Output Directory cannot be empty when generating files")
-			// nolint
-			os.Exit(1)
+			return errors.New("Output Directory cannot be empty when generating files")
 		}
 		w, err = tpcc.NewCSVWorkloader(globalDB, &tpccConfig)
 	default:
@@ -127,8 +125,7 @@ func executeTpcc(action string) {
 	}
 
 	if err != nil {
-		fmt.Printf("Failed to init work loader: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to init work loader: %v", err)
 	}
 
 	timeoutCtx, cancel := context.WithTimeout(globalCtx, totalTime)
@@ -138,6 +135,7 @@ func executeTpcc(action string) {
 
 	fmt.Println("Finished")
 	w.OutputStats(true)
+	return nil
 }
 
 func executeWorkload(ctx context.Context, w workload.Workloader, threads int, action string) {
@@ -181,10 +179,16 @@ func executeWorkload(ctx context.Context, w workload.Workloader, threads int, ac
 }
 
 func execute(ctx context.Context, w workload.Workloader, action string, threads, index int) error {
+	var err error
 	count := totalCount / threads
-
 	ctx = w.InitThread(ctx, index)
 	defer w.CleanupThread(ctx, index)
+
+	defer func() {
+		if recover() != nil {
+			fmt.Fprintln(os.Stdout, "Unexpected error")
+		}
+	}()
 
 	switch action {
 	case "prepare":
@@ -194,11 +198,11 @@ func execute(ctx context.Context, w workload.Workloader, action string, threads,
 				return err
 			}
 		}
-		return w.Prepare(ctx, index)
+		err = w.Prepare(ctx, index)
 	case "cleanup":
-		return w.Cleanup(ctx, index)
+		err = w.Cleanup(ctx, index)
 	case "check":
-		return w.Check(ctx, index)
+		err = w.Check(ctx, index)
 	}
 
 	for i := 0; i < count || count <= 0; i++ {
@@ -220,33 +224,5 @@ func execute(ctx context.Context, w workload.Workloader, action string, threads,
 		}
 	}
 
-	return nil
-}
-
-// runSimpleBench for a bench that specified database cluster name, we always bench this
-// cluster and ignore other connection info
-func runSimpleBench(f cmdutil.Factory, args []string) {
-	if len(args) == 0 {
-		util.Info("You must specify a cluster name")
-		return
-	}
-
-	clusterName := args[0]
-	if clusterName != "mycluster" {
-		util.Infof("Do not find \"%s\" cluster", clusterName)
-		return
-	}
-
-	util.Infof("Clean default bench database \"%s\"", dbName)
-	executeTpcc("cleanup")
-
-	util.Info("Preparing data...")
-	executeTpcc("prepare")
-
-	util.Info("Run tpcc 60s ...")
-	totalTime = 60 * time.Second
-	executeTpcc("run")
-
-	util.Info("Clean up data...")
-	executeTpcc("cleanup")
+	return err
 }

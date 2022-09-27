@@ -66,7 +66,6 @@ func (o *CreateOptions) Validate(args []string) error {
 }
 
 func (o *CreateOptions) Complete(f cmdutil.Factory, args []string) error {
-
 	var err error
 	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {

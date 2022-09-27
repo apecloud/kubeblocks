@@ -118,7 +118,11 @@ func (o *CreateOptions) Run() error {
 	if err != nil {
 		return err
 	}
-	util.PrintObjYaml(obj)
+
+	err = util.PrintObjYAML(obj)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

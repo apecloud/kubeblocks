@@ -26,6 +26,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
 )
 
@@ -61,25 +62,25 @@ var _ = Describe("dbaas", func() {
 		Expect(cmd != nil).Should(BeTrue())
 		Expect(cmd.HasSubCommands()).Should(BeFalse())
 
-		o := &InstallOptions{
-			Options: Options{
+		o := &installOptions{
+			options: options{
 				IOStreams: streams,
 			},
 		}
-		Expect(o.Complete(tf, cmd)).To(Succeed())
+		Expect(o.complete(tf, cmd)).To(Succeed())
 		Expect(o.Namespace).To(Equal("test"))
 	})
 
 	It("run install", func() {
-		o := &InstallOptions{
-			Options: Options{
+		o := &installOptions{
+			options: options{
 				IOStreams: streams,
 				cfg:       helm.FakeActionConfig(),
 				Namespace: "default",
 			},
-			Version: defaultVersion,
+			Version: types.DbaasDefaultVersion,
 		}
-		Expect(o.Run()).To(Succeed())
+		Expect(o.run()).To(Succeed())
 	})
 
 	It("check uninstall", func() {
@@ -93,20 +94,20 @@ var _ = Describe("dbaas", func() {
 		Expect(cmd != nil).Should(BeTrue())
 		Expect(cmd.HasSubCommands()).Should(BeFalse())
 
-		o := &Options{
+		o := &options{
 			IOStreams: streams,
 		}
-		Expect(o.Complete(tf, cmd)).To(Succeed())
+		Expect(o.complete(tf, cmd)).To(Succeed())
 		Expect(o.Namespace).To(Equal("test"))
 	})
 
 	It("run uninstall", func() {
-		o := &Options{
+		o := &options{
 			IOStreams: streams,
 			cfg:       helm.FakeActionConfig(),
 			Namespace: "default",
 		}
 
-		Expect(o.Run()).To(MatchError(MatchRegexp("Failed to uninstall dbaas")))
+		Expect(o.run()).To(MatchError(MatchRegexp("Failed to uninstall dbaas")))
 	})
 })

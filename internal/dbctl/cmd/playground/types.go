@@ -25,11 +25,14 @@ const (
 	DefaultCloudProvider = "local"
 	DefaultVersion       = "8.0.28"
 	LocalHost            = "127.0.0.1"
-	DefaultDBReplicas    = "3"
+	DefaultReplicas      = 3
 
 	// CliDockerNetwork is docker network for k3d cluster when `dbctl playground`
 	// all cluster will be created in this network, so they can communicate with each other
 	CliDockerNetwork = "k3d-dbctl-playground"
+
+	wesqlHelmChart = "oci://yimeisun.azurecr.io/helm-chart/wesqlcluster"
+	wesqlVersion   = "0.1.0"
 )
 
 var (

@@ -3,6 +3,7 @@ package dbaas
 import (
 	"helm.sh/helm/v3/pkg/action"
 
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
 )
 
@@ -16,8 +17,8 @@ type Installer struct {
 
 func (i *Installer) Install() error {
 	chart := helm.InstallOpts{
-		Name:      "opendbaas-core",
-		Chart:     "oci://yimeisun.azurecr.io/helm-chart/opendbaas-core",
+		Name:      types.DbaasHelmName,
+		Chart:     types.DbaasHelmChart,
 		Wait:      true,
 		Version:   i.Version,
 		Namespace: i.Namespace,
@@ -40,7 +41,7 @@ func (i *Installer) Install() error {
 // Uninstall remove dbaas
 func (i *Installer) Uninstall() error {
 	chart := helm.InstallOpts{
-		Name:      "opendbaas-core",
+		Name:      types.DbaasHelmName,
 		Namespace: i.Namespace,
 	}
 

@@ -19,9 +19,9 @@ import (
 	dbaasctrl "github.com/apecloud/kubeblocks/controllers/dbaas"
 )
 
-func TestDbcluster(t *testing.T) {
+func TestCluster(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Dbcluster Suite")
+	RunSpecs(t, "Cluster Suite")
 }
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to

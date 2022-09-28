@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 The dbctl Authors
+Copyright 2022.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,22 +19,30 @@ package playground
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
-var _ = Describe("util", func() {
-	It("Print Guide info", func() {
-		clusterInfo := types.PlaygroundInfo{
-			DBCluster:     "mycluster",
-			DBPort:        "3306",
-			DBNamespace:   "default",
-			Namespace:     "dbctl-playground",
-			GrafanaSvc:    "prometheus-grafana",
-			GrafanaPort:   "9100",
-			GrafanaUser:   "admin",
-			GrafanaPasswd: "prom-operator",
-		}
-		Expect(printPlaygroundGuide(clusterInfo)).Should(Succeed())
+var _ = Describe("wesql", func() {
+	wesql := &Wesql{
+		serverVersion: wesqlVersion,
+		replicas:      1,
+	}
+
+	It("Get repos", func() {
+		repos := wesql.getRepos()
+		Expect(repos != nil).To(BeTrue())
+		Expect(len(repos)).To(Equal(0))
+	})
+
+	It("Get base charts", func() {
+		charts := wesql.getBaseCharts("test")
+		Expect(charts != nil).Should(BeTrue())
+		Expect(len(charts)).To(Equal(1))
+	})
+
+	It("Get database charts", func() {
+		charts := wesql.getDBCharts("test", "test")
+		Expect(charts != nil).Should(BeTrue())
+		Expect(len(charts)).To(Equal(1))
+		Expect(charts[0].Chart).To(Equal(wesqlHelmChart))
 	})
 })

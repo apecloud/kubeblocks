@@ -29,6 +29,13 @@ const (
 	// GoosWindows is os.GOOS windows string
 	GoosWindows = "windows"
 
+	// DbaasDefaultVersion default kubeblocks version to install
+	DbaasDefaultVersion = "0.1.0-alpha.5"
+	// DbaasHelmName helm name for installing kubeblocks
+	DbaasHelmName = "opendbaas-core"
+	// DbaasHelmChart the helm chart for installing kubeblocks
+	DbaasHelmChart = "oci://yimeisun.azurecr.io/helm-chart/opendbaas-core"
+
 	// PlaygroundSourceName is the playground default operator
 	PlaygroundSourceName = "innodbclusters"
 

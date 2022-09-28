@@ -30,7 +30,7 @@ const (
 	mysqlDriver = "mysql"
 )
 
-func openDB() {
+func openDB() error {
 	var (
 		tmpDB *sql.DB
 		err   error
@@ -40,7 +40,7 @@ func openDB() {
 	fullDsn := fmt.Sprintf("%s?multiStatements=true", ds)
 	globalDB, err = sql.Open(mysqlDriver, fullDsn)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	if err := globalDB.Ping(); err != nil {
 		errString := err.Error()
@@ -49,17 +49,22 @@ func openDB() {
 			tmpDB, _ = sql.Open(mysqlDriver, tmpDs)
 			defer tmpDB.Close()
 			if _, err := tmpDB.Exec(createDBDDL + dbName); err != nil {
-				panic(fmt.Errorf("failed to create database, err %v", err))
+				return fmt.Errorf("failed to create database, err %v", err)
 			}
 		} else {
 			globalDB = nil
 		}
+		return err
 	}
+	return nil
 }
 
-func closeDB() {
+func closeDB() error {
 	if globalDB != nil {
-		globalDB.Close()
+		err := globalDB.Close()
+		if err != nil {
+			return err
+		}
 	}
-	globalDB = nil
+	return nil
 }

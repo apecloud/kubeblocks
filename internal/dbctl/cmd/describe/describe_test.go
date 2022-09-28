@@ -19,12 +19,13 @@ package describe
 import (
 	"fmt"
 	"net/http"
-	"testing"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest/fake"
 
-	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -33,9 +34,9 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
-func TestDescribeCmd(t *testing.T) {
-	buildTestCmd := func(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-		cmd := Command{
+var _ = Describe("Describe", func() {
+	testCmd := func(f cmdutil.Factory, streams genericclioptions.IOStreams) *Command {
+		cmd := &Command{
 			Factory:   f,
 			Streams:   streams,
 			Short:     "Test describe.",
@@ -46,7 +47,7 @@ func TestDescribeCmd(t *testing.T) {
 				return nil
 			},
 		}
-		return cmd.Build()
+		return cmd
 	}
 
 	mockClient := func(data runtime.Object) *cmdtesting.TestFactory {
@@ -61,18 +62,32 @@ func TestDescribeCmd(t *testing.T) {
 		return tf
 	}
 
-	pods, _, _ := cmdtesting.TestData()
-	tf := mockClient(&pods.Items[0])
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := buildTestCmd(tf, streams)
-	cmd.Run(cmd, []string{"foo"})
+	It("complete", func() {
+		pods, _, _ := cmdtesting.TestData()
+		tf := mockClient(&pods.Items[0])
+		streams, _, _, _ := genericclioptions.NewTestIOStreams()
+		cmd := testCmd(tf, streams)
+		Expect(cmd.complete([]string{})).To(MatchError("You must specify the name of resource to describe."))
 
-	expected := `Name:foo
+		cmd.Template = []string{}
+		Expect(cmd.complete([]string{"test"})).To(MatchError("The number of resource type is not equal to template."))
+
+		cmd.GroupKind = []schema.GroupKind{}
+		Expect(cmd.complete([]string{"test"})).To(MatchError("You must specify the resource type to describe."))
+	})
+
+	It("run", func() {
+		pods, _, _ := cmdtesting.TestData()
+		tf := mockClient(&pods.Items[0])
+		streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+		cmd := testCmd(tf, streams).Build()
+		cmd.Run(cmd, []string{"foo"})
+
+		expected := `Name:foo
 Namespace:test
 Kind:Pod
 test print fun
 `
-	if expected != buf.String() {
-		t.Errorf("unexpected result: %s", buf.String())
-	}
-}
+		Expect(buf.String()).To(Equal(expected))
+	})
+})

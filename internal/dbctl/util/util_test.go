@@ -39,6 +39,7 @@ var _ = Describe("util", func() {
 		Expect(len(path) == 0).Should(BeTrue())
 		path = ConfigPath("test")
 		Expect(len(path) > 0).Should(BeTrue())
+		Expect(RemoveConfig("")).Should(HaveOccurred())
 	})
 
 	It("Print yaml", func() {
@@ -62,6 +63,8 @@ var _ = Describe("util", func() {
 
 	It("Others", func() {
 		PrintVersion()
-		_, _ = GetPublicIP()
+		_, err := GetPublicIP()
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(MakeSSHKeyPair("", "")).Should(HaveOccurred())
 	})
 })

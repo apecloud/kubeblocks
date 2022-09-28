@@ -1,5 +1,3 @@
-//go:build linux
-
 /*
 Copyright 2022.
 
@@ -25,9 +23,10 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"strings"
 	"time"
+
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/viper"

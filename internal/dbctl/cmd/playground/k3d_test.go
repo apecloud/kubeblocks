@@ -28,9 +28,9 @@ var _ = Describe("playground", func() {
 	installer := &installer{
 		ctx:         context.Background(),
 		cfg:         config.ClusterConfig{},
-		clusterName: ClusterName,
+		clusterName: "k3d-test",
 		namespace:   ClusterNamespace,
-		dbCluster:   DBClusterName,
+		dbCluster:   "k3d-test-dbcluster",
 		wesql: Wesql{
 			serverVersion: wesqlVersion,
 			replicas:      1,

@@ -21,6 +21,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"github.com/google/go-cmp/cmp"
 	"strconv"
 	"strings"
 
@@ -455,11 +456,19 @@ func createOrReplaceResources(ctx context.Context,
 			if err := cli.Get(ctx, key, stsObj); err != nil {
 				return err
 			}
+			templateDiff := cmp.Diff(stsObj.Spec.Template, stsProto.Spec.Template)
 			stsObj.Spec.Template = stsProto.Spec.Template
 			stsObj.Spec.Replicas = stsProto.Spec.Replicas
 			stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
 			if err := cli.Update(ctx, stsObj); err != nil {
 				return err
+			}
+			// handle ConsensusSet Update
+			if templateDiff != "" {
+				err := handleConsensusSetUpdate(ctx, cli, cluster, stsObj)
+				if err != nil {
+					return err
+				}
 			}
 			// check stsObj.Spec.VolumeClaimTemplates storage
 			// request size and find attached PVC and patch request
@@ -524,6 +533,19 @@ func createOrReplaceResources(ctx context.Context,
 			continue
 		}
 	}
+	return nil
+}
+
+// TODO finish me
+func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, stsObj *appsv1.StatefulSet) error {
+	// get pods owned by stsObj
+	// get componentName from sysObj.name
+	// get component.updateStrategy from cluster by componentName
+	// get pod label and name, compute plan
+	// execute plan
+	// cmp pod.template with stsObj.template
+	// if diff, kill pod, return
+
 	return nil
 }
 
@@ -726,7 +748,13 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 
 // buildConsensusSet build on a stateful set
 func buildConsensusSet(params createParams) (*appsv1.StatefulSet, error) {
-	return buildSts(params)
+	sts, err := buildSts(params)
+	if err != nil {
+		return sts, err
+	}
+
+	sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
+	return sts, err
 }
 
 func buildDeploy(params createParams) (*appsv1.Deployment, error) {

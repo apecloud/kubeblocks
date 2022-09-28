@@ -2,8 +2,9 @@ package aws
 
 import (
 	"context"
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
-	mock_aws "github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/aws/mocks"
+	"strings"
+	"time"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -11,8 +12,9 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
-	"strings"
-	"time"
+
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
+	mock_aws "github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/aws/mocks"
 )
 
 var _ = Describe("AwsService", func() {
@@ -83,10 +85,8 @@ var _ = Describe("AwsService", func() {
 			metadataMACPath + primaryMAC + metadataVPCcidrs:   subnet,
 		}
 
-		if overrides != nil {
-			for k, v := range overrides {
-				data[k] = v
-			}
+		for k, v := range overrides {
+			data[k] = v
 		}
 		return imdsService{fakeIMDS(data)}
 	}
@@ -232,6 +232,7 @@ var _ = Describe("AwsService", func() {
 					break
 				}
 			}
+			Expect(err).Should(BeNil())
 			Expect(eni2).ShouldNot(BeNil())
 			Expect(service.checkOutOfSyncState(eniId2, eni2.IPv4Addresses, enis.NetworkInterfaces[1].PrivateIpAddresses)).Should(BeFalse())
 		})

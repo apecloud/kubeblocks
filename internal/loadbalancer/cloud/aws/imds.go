@@ -3,10 +3,11 @@ package aws
 import (
 	"context"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/aws/aws-sdk-go/aws/awserr"
 )
 
 type imdsService struct {

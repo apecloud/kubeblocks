@@ -1,15 +1,15 @@
-package cloud
+package aws
 
 import (
 	"context"
 	"fmt"
 	"math"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -41,8 +41,14 @@ var (
 	ErrNoNetworkInterfaces = errors.New("No network interfaces found for ENI")
 )
 
+func init() {
+	cloud.RegisterProvider(cloud.ProviderAWS, func(args ...interface{}) (cloud.Provider, error) {
+		return NewAwsService(args[0].(logr.Logger))
+	})
+}
+
 type awsService struct {
-	ec2Svc           *ec2.EC2
+	ec2Svc           EC2
 	imdsSvc          imdsService
 	securityGroups   []string
 	instanceId       string
@@ -57,87 +63,6 @@ type awsService struct {
 	logger           logr.Logger
 }
 
-type imdsService struct {
-	*ec2metadata.EC2Metadata
-}
-
-func (i *imdsService) getList(ctx context.Context, key string) ([]string, error) {
-	data, err := i.GetMetadataWithContext(ctx, key)
-	if err != nil {
-		return nil, err
-	}
-	return strings.Fields(data), nil
-}
-
-func (i *imdsService) getSecurityGroupIds(ctx context.Context, mac string) ([]string, error) {
-	key := fmt.Sprintf("network/interfaces/macs/%s/security-group-ids", mac)
-	return i.getList(ctx, key)
-}
-
-func (i *imdsService) getAZ(ctx context.Context) (string, error) {
-	return i.GetMetadataWithContext(ctx, "placement/availability-zone")
-}
-
-func (i *imdsService) getLocalIPv4(ctx context.Context) (string, error) {
-	return i.GetMetadataWithContext(ctx, "local-ipv4")
-}
-
-func (i *imdsService) getInstanceId(ctx context.Context) (string, error) {
-	return i.GetMetadataWithContext(ctx, "instance-id")
-}
-
-func (i *imdsService) getInstanceType(ctx context.Context) (string, error) {
-	return i.GetMetadataWithContext(ctx, "instance-type")
-}
-
-func (i *imdsService) getPrimaryMAC(ctx context.Context) (string, error) {
-	return i.GetMetadataWithContext(ctx, "mac")
-}
-
-func (i *imdsService) getInterfaceIdByMAC(ctx context.Context, mac string) (string, error) {
-	key := fmt.Sprintf("network/interfaces/macs/%s/interface-id", mac)
-	return i.GetMetadataWithContext(ctx, key)
-}
-
-func (i *imdsService) getSubnetId(ctx context.Context, mac string) (string, error) {
-	key := fmt.Sprintf("network/interfaces/macs/%s/subnet-id", mac)
-	return i.GetMetadataWithContext(ctx, key)
-}
-
-func (i *imdsService) getMACs(ctx context.Context) ([]string, error) {
-	macs, err := i.getList(ctx, "network/interfaces/macs")
-	if err != nil {
-		return nil, err
-	}
-	for index, item := range macs {
-		macs[index] = strings.TrimSuffix(item, "/")
-	}
-	return macs, nil
-}
-
-func (i *imdsService) getInterfaceDeviceNumber(ctx context.Context, mac string) (int, error) {
-	key := fmt.Sprintf("network/interfaces/macs/%s/device-number", mac)
-	data, err := i.GetMetadataWithContext(ctx, key)
-	if err != nil {
-		return 0, err
-	}
-	n, err := strconv.Atoi(data)
-	if err != nil {
-		return 0, err
-	}
-	return n, nil
-}
-
-func (i *imdsService) getSubnetIPv4CIDRBlock(ctx context.Context, mac string) (string, error) {
-	key := fmt.Sprintf("network/interfaces/macs/%s/subnet-ipv4-cidr-block", mac)
-	return i.GetMetadataWithContext(ctx, key)
-}
-
-func (i *imdsService) getInterfacePrivateAddresses(ctx context.Context, mac string) ([]string, error) {
-	key := fmt.Sprintf("network/interfaces/macs/%s/local-ipv4s", mac)
-	return i.getList(ctx, key)
-}
-
 func NewAwsService(logger logr.Logger) (*awsService, error) {
 	svc := &awsService{
 		logger: logger,
@@ -150,7 +75,7 @@ func NewAwsService(logger logr.Logger) (*awsService, error) {
 		STSRegionalEndpoint: endpoints.RegionalSTSEndpoint,
 	}
 	sess := session.Must(session.NewSession(&awsCfg))
-	svc.imdsSvc = imdsService{EC2Metadata: ec2metadata.New(sess)}
+	svc.imdsSvc = imdsService{IMDS: ec2metadata.New(sess)}
 
 	region, err := svc.imdsSvc.Region()
 	if err != nil {
@@ -158,38 +83,28 @@ func NewAwsService(logger logr.Logger) (*awsService, error) {
 	}
 	awsCfg.WithRegion(region).WithDisableSSL(true)
 	svc.ec2Svc = ec2.New(sess.Copy(&awsCfg))
-	logger.Info("Init aws client", "endpoint", svc.ec2Svc.Endpoint, "region", region)
 
 	if err := svc.initWithEC2Metadata(context.Background()); err != nil {
 		return nil, errors.Wrap(err, "Failed to init ec2 metadata")
 	}
 	svc.logger = logger.WithValues("instance", svc.instanceId)
 
-	sgIds, err := svc.imdsSvc.getSecurityGroupIds(context.Background(), svc.primaryENImac)
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to get security groups for primary ENI")
-	}
-	svc.securityGroups = sgIds
-
-	if err = svc.fetchInstanceTypeLimits(); err != nil {
+	if err = svc.initInstanceTypeLimits(); err != nil {
 		return nil, errors.Wrap(err, "Failed to init instance limits")
 	}
 
-	go wait.Forever(svc.cleanLeadedENIs, 1*time.Minute)
+	go wait.Forever(svc.cleanLeakedENIs, 1*time.Minute)
 
 	return svc, nil
 }
 
-// clean leaked network interface created by local instance
-func (c *awsService) cleanLeadedENIs() {
-	c.logger.Info("Start cleaning leaked enis")
-
+func (c *awsService) findLeakedENis() ([]*ec2.NetworkInterface, error) {
 	input := &ec2.DescribeNetworkInterfacesInput{
 		Filters: []*ec2.Filter{
 			{
 				Name: aws.String("tag-key"),
 				Values: []*string{
-					aws.String(TagENINode),
+					aws.String(cloud.TagENINode),
 				},
 			},
 			{
@@ -203,38 +118,45 @@ func (c *awsService) cleanLeadedENIs() {
 	}
 
 	needClean := func(eni *ec2.NetworkInterface) bool {
+		ctxLog := c.logger.WithValues("eni id", eni.NetworkInterfaceId)
+
 		var (
 			tags  = convertSDKTagsToTags(eni.TagSet)
 			eniId = aws.StringValue(eni.NetworkInterfaceId)
 		)
-		node, ok := tags[TagENINode]
+		node, ok := tags[cloud.TagENINode]
 		if !ok || node != c.instanceId {
 			return true
 		}
 
-		retagMap := map[string]string{
-			TagENICreatedAt: time.Now().Format(time.RFC3339),
+		if eni.Attachment != nil {
+			ctxLog.Info("ENI is attached, skip it", "attachment id", eni.Attachment.AttachmentId)
+			return false
 		}
-		createdAt, ok := tags[TagENICreatedAt]
+
+		retagMap := map[string]string{
+			cloud.TagENICreatedAt: time.Now().Format(time.RFC3339),
+		}
+		createdAt, ok := tags[cloud.TagENICreatedAt]
 		if !ok {
-			c.logger.Info("Timestamp tag not exists, tag it")
+			ctxLog.Info("Timestamp tag not exists, tag it")
 			if err := c.tagENI(eniId, retagMap); err != nil {
-				c.logger.Error(err, "Failed to add tag for eni", "eni id", eniId)
+				ctxLog.Error(err, "Failed to add tag for eni", "eni id", eniId)
 			}
 			return false
 		}
 
 		t, err := time.Parse(time.RFC3339, createdAt)
 		if err != nil {
-			c.logger.Error(err, "Timestamp tag is wrong, retagging it with current timestamp", "time", createdAt)
+			ctxLog.Error(err, "Timestamp tag is wrong, retagging it with current timestamp", "time", createdAt)
 			if err := c.tagENI(eniId, retagMap); err != nil {
-				c.logger.Error(err, "Failed to retagging for eni", "eni id", eniId)
+				ctxLog.Error(err, "Failed to retagging for eni", "eni id", eniId)
 			}
 			return false
 		}
 
 		if time.Since(t) < MinENILifeTime {
-			c.logger.Info("Found an leaked eni created less than 10 minutes ago, skip it")
+			ctxLog.Info("Found an leaked eni created less than 10 minutes ago, skip it")
 			return false
 		}
 
@@ -252,10 +174,22 @@ func (c *awsService) cleanLeadedENIs() {
 		return true
 	}
 	if err := c.ec2Svc.DescribeNetworkInterfacesPagesWithContext(context.Background(), input, pageFn); err != nil {
-		c.logger.Error(err, "Failed to describe leaked enis")
-		return
+		c.logger.Error(err, "")
+		return nil, errors.Wrap(err, "Failed to describe leaked enis")
 	}
 
+	return leakedENIs, nil
+}
+
+// clean leaked network interface created by local instance
+func (c *awsService) cleanLeakedENIs() {
+	c.logger.Info("Start cleaning leaked enis")
+
+	leakedENIs, err := c.findLeakedENis()
+	if err != nil {
+		c.logger.Info("Failed to find leaked enis, skip")
+		return
+	}
 	if len(leakedENIs) == 0 {
 		c.logger.Info("No leaked enis found created by local instance, skip cleaning")
 		return
@@ -338,6 +272,12 @@ func (c *awsService) initWithEC2Metadata(ctx context.Context) error {
 	}
 	kvs = append(kvs, "subnet id", c.subnetID)
 
+	c.securityGroups, err = c.imdsSvc.getSecurityGroupIds(ctx, c.primaryENImac)
+	if err != nil {
+		return err
+	}
+	kvs = append(kvs, "security groups", c.securityGroups)
+
 	return nil
 }
 
@@ -356,7 +296,7 @@ func (c *awsService) GetENILimit() int {
 	return c.eniLimit
 }
 
-func (c *awsService) fetchInstanceTypeLimits() error {
+func (c *awsService) initInstanceTypeLimits() error {
 	describeInstanceTypesInput := &ec2.DescribeInstanceTypesInput{InstanceTypes: []*string{aws.String(c.instanceType)}}
 	output, err := c.ec2Svc.DescribeInstanceTypesWithContext(context.Background(), describeInstanceTypesInput)
 	if err != nil || len(output.InstanceTypes) != 1 {
@@ -374,13 +314,13 @@ func (c *awsService) fetchInstanceTypeLimits() error {
 	return errors.New(fmt.Sprintf("Unknown instance type %s", c.instanceType))
 }
 
-func (c *awsService) DescribeAllENIs() (map[string]*ENIMetadata, error) {
+func (c *awsService) DescribeAllENIs() (map[string]*cloud.ENIMetadata, error) {
 	attachedENIList, err := c.GetAttachedENIs()
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to get local ENI metadata")
 	}
 
-	attachedENIMap := make(map[string]ENIMetadata, len(attachedENIList))
+	attachedENIMap := make(map[string]cloud.ENIMetadata, len(attachedENIList))
 	for _, eni := range attachedENIList {
 		attachedENIMap[eni.ENIId] = eni
 	}
@@ -399,7 +339,7 @@ func (c *awsService) DescribeAllENIs() (map[string]*ENIMetadata, error) {
 	}
 
 	var (
-		result = make(map[string]*ENIMetadata, len(response.NetworkInterfaces))
+		result = make(map[string]*cloud.ENIMetadata, len(response.NetworkInterfaces))
 	)
 	for _, item := range response.NetworkInterfaces {
 
@@ -415,7 +355,7 @@ func (c *awsService) DescribeAllENIs() (map[string]*ENIMetadata, error) {
 		result[eniId] = &eniMetadata
 
 		// Check IPv4 addresses
-		c.logOutOfSyncState(eniId, eniMetadata.IPv4Addresses, item.PrivateIpAddresses)
+		c.checkOutOfSyncState(eniId, eniMetadata.IPv4Addresses, item.PrivateIpAddresses)
 	}
 	return result, nil
 }
@@ -434,8 +374,10 @@ func (c *awsService) AssignPrivateIpAddresses(eniId string, privateIP string) er
 // Comparing the IMDS IPv4 addresses attached to the ENI with the DescribeNetworkInterfaces AWS API call, which
 // technically should be the source of truth and contain the freshest information. Let's just do a quick scan here
 // and output some diagnostic messages if we find stale info in the IMDS result.
-func (c *awsService) logOutOfSyncState(eniID string, imdsIPv4s, ec2IPv4s []*ec2.NetworkInterfacePrivateIpAddress) {
-	ctxLog := c.logger.WithName("logOutOfSyncState").WithValues("eni id", eniID)
+func (c *awsService) checkOutOfSyncState(eniID string, imdsIPv4s, ec2IPv4s []*ec2.NetworkInterfacePrivateIpAddress) bool {
+	ctxLog := c.logger.WithName("checkOutOfSyncState").WithValues("eni id", eniID)
+
+	synced := true
 
 	imdsIPv4Set := sets.String{}
 	imdsPrimaryIP := ""
@@ -456,19 +398,23 @@ func (c *awsService) logOutOfSyncState(eniID string, imdsIPv4s, ec2IPv4s []*ec2.
 	missingIMDS := ec2IPv4Set.Difference(imdsIPv4Set).List()
 	missingDNI := imdsIPv4Set.Difference(ec2IPv4Set).List()
 	if len(missingIMDS) > 0 {
+		synced = false
 		strMissing := strings.Join(missingIMDS, ",")
 		ctxLog.Info("DescribeNetworkInterfaces yielded private IPv4 addresses that were not yet found in IMDS.", "ip list", strMissing)
 	}
 	if len(missingDNI) > 0 {
+		synced = false
 		strMissing := strings.Join(missingDNI, ",")
 		ctxLog.Info("IMDS query yielded stale IPv4 addresses that were not found in DescribeNetworkInterfaces.", "ip list", strMissing)
 	}
 	if imdsPrimaryIP != ec2IPv4PrimaryIP {
+		synced = false
 		ctxLog.Info("Primary IPs do not match", "imds", imdsPrimaryIP, "ec2", ec2IPv4PrimaryIP)
 	}
+	return synced
 }
 
-func (c *awsService) GetAttachedENIs() (eniList []ENIMetadata, err error) {
+func (c *awsService) GetAttachedENIs() (eniList []cloud.ENIMetadata, err error) {
 	ctx := context.TODO()
 
 	macs, err := c.imdsSvc.getMACs(ctx)
@@ -477,7 +423,7 @@ func (c *awsService) GetAttachedENIs() (eniList []ENIMetadata, err error) {
 	}
 	c.logger.Info("Total number of interfaces found", "count", len(macs))
 
-	enis := make([]ENIMetadata, len(macs))
+	enis := make([]cloud.ENIMetadata, len(macs))
 	for i, mac := range macs {
 		enis[i], err = c.getENIMetadata(mac)
 		if err != nil {
@@ -487,11 +433,11 @@ func (c *awsService) GetAttachedENIs() (eniList []ENIMetadata, err error) {
 	return enis, nil
 }
 
-func (c *awsService) getENIMetadata(eniMAC string) (ENIMetadata, error) {
+func (c *awsService) getENIMetadata(eniMAC string) (cloud.ENIMetadata, error) {
 	var (
 		err       error
 		deviceNum int
-		result    ENIMetadata
+		result    cloud.ENIMetadata
 		ctx       = context.TODO()
 	)
 
@@ -533,7 +479,7 @@ func (c *awsService) getENIMetadata(eniMAC string) (ENIMetadata, error) {
 		}
 	}
 
-	return ENIMetadata{
+	return cloud.ENIMetadata{
 		ENIId:          eniID,
 		MAC:            eniMAC,
 		DeviceNumber:   deviceNum,
@@ -587,6 +533,7 @@ func (c *awsService) AllocIPAddresses(eniID string) (*ec2.AssignPrivateIpAddress
 	return output, nil
 }
 
+/*
 func (c *awsService) GetIPv4sFromEC2(eniID string) (addrList []*ec2.NetworkInterfacePrivateIpAddress, err error) {
 	eniIds := make([]*string, 0)
 	eniIds = append(eniIds, aws.String(eniID))
@@ -611,6 +558,7 @@ func (c *awsService) GetIPv4sFromEC2(eniID string) (addrList []*ec2.NetworkInter
 
 	return firstNI.PrivateIpAddresses, nil
 }
+*/
 
 func (c *awsService) AllocENI() (string, error) {
 	eniID, err := c.createENI()
@@ -649,10 +597,10 @@ func (c *awsService) AllocENI() (string, error) {
 func (c *awsService) createENI() (string, error) {
 	eniDescription := fmt.Sprintf("kubeblocks-lb-%s", c.instanceId)
 	tags := map[string]string{
-		TagENINode:              c.instanceId,
-		TagENICreatedAt:         time.Now().Format(time.RFC3339),
-		TagENIKubeBlocksManaged: "true",
-		ENINoManageTagKey:       "true",
+		cloud.TagENINode:              c.instanceId,
+		cloud.TagENICreatedAt:         time.Now().Format(time.RFC3339),
+		cloud.TagENIKubeBlocksManaged: "true",
+		ENINoManageTagKey:             "true",
 	}
 	tagSpec := []*ec2.TagSpecification{
 		{
@@ -728,12 +676,12 @@ func (c *awsService) awsGetFreeDeviceNumber() (int, error) {
 	return 0, errors.New("no available device number")
 }
 
-func (c *awsService) deleteENI(eniName string) error {
-	ctxLog := c.logger.WithValues("eni name", eniName)
+func (c *awsService) deleteENI(eniId string) error {
+	ctxLog := c.logger.WithValues("eni id", eniId)
 	ctxLog.Info("Trying to delete ENI")
 
 	deleteInput := &ec2.DeleteNetworkInterfaceInput{
-		NetworkInterfaceId: aws.String(eniName),
+		NetworkInterfaceId: aws.String(eniId),
 	}
 	f := func() error {
 		if _, err := c.ec2Svc.DeleteNetworkInterfaceWithContext(context.Background(), deleteInput); err != nil {
@@ -776,19 +724,17 @@ func (c *awsService) freeENI(eniId string, sleepDelayAfterDetach time.Duration) 
 	}
 	f := func() error {
 		if _, err := c.ec2Svc.DetachNetworkInterfaceWithContext(context.Background(), detachInput); err != nil {
-			ctxLog.Error(err, "Failed to detach ENI")
-			return errors.New("Failed to detach ENI from EC2 instance, giving up")
+			return errors.Wrap(err, "Failed to detach ENI")
 		}
-		ctxLog.Info("Successfully detached ENI")
 		return nil
 	}
 
 	// Retry detaching the ENI from the instance
 	err = util.DoWithRetry(context.Background(), c.logger, f, &util.RetryOptions{MaxRetry: 10, Delay: 3 * time.Second})
 	if err != nil {
-		ctxLog.Error(err, "Failed to detach ENI")
 		return err
 	}
+	ctxLog.Info("Successfully detached ENI")
 
 	// It does take awhile for EC2 to detach ENI from instance, so we wait 2s before trying the delete.
 	time.Sleep(sleepDelayAfterDetach)
@@ -838,8 +784,8 @@ func (c *awsService) getENIAttachmentID(eniID string) (*string, error) {
 	return attachID, nil
 }
 
-func (c *awsService) WaitForENIAndIPsAttached(eniId string) (eniMetadata ENIMetadata, err error) {
-	var result ENIMetadata
+func (c *awsService) WaitForENIAttached(eniId string) (eniMetadata cloud.ENIMetadata, err error) {
+	var result cloud.ENIMetadata
 	f := func() error {
 		enis, err := c.GetAttachedENIs()
 		if err != nil {

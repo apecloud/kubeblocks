@@ -30,9 +30,9 @@ var _ = Describe("ServiceController", func() {
 		svcPort       = 12345
 		svcTargetPort = 80
 		svcNamespace  = "default"
-		masterHostIP  = "172.31.0.2"
-		localHostIP   = "172.31.0.1"
-		svcVIP        = "1.1.1.1"
+		masterHostIP  = "172.31.1.2"
+		localHostIP   = "172.31.1.1"
+		svcVIP        = "172.31.1.100"
 
 		subnet = "172.31.0.0/16"
 
@@ -55,10 +55,10 @@ var _ = Describe("ServiceController", func() {
 		eniIp32 = "172.31.3.11"
 	)
 
-	resetController := func() (*mock_cloud.MockService, *mock_network.MockClient) {
+	resetController := func() (*mock_cloud.MockProvider, *mock_network.MockClient) {
 		ctrl := gomock.NewController(GinkgoT())
 
-		mockService := mock_cloud.NewMockService(ctrl)
+		mockService := mock_cloud.NewMockProvider(ctrl)
 		mockNetwork := mock_network.NewMockClient(ctrl)
 		serviceController.maxIPsPerENI = 5
 		serviceController.maxENI = 2

@@ -66,7 +66,7 @@ type ServiceController struct {
 
 	logger       logr.Logger
 	nc           network.Client
-	cloud        cloud.Service
+	cloud        cloud.Provider
 	hostIP       string
 	maxIPsPerENI int
 	maxENI       int
@@ -83,7 +83,7 @@ func NewServiceController(logger logr.Logger, client client.Client, scheme *runt
 		cachedENIs: make(map[string]*cloud.ENIMetadata),
 	}
 
-	awsSvc, err := cloud.NewService("aws", logger)
+	awsSvc, err := cloud.NewProvider(cloud.ProviderAWS, logger)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to initialize AWS SDK cloud")
 	}
@@ -668,7 +668,7 @@ func (c *ServiceController) tryAllocAndAttachENI() error {
 	c.logger.Info("Successfully create new eni, waiting for attached", "eni id", eniId)
 
 	// waiting for ENI attached
-	eni, err := c.cloud.WaitForENIAndIPsAttached(eniId)
+	eni, err := c.cloud.WaitForENIAttached(eniId)
 	if err != nil {
 		return errors.Wrap(err, "Unable to discover attached ENI from metadata service")
 	}

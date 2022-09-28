@@ -1,10 +1,12 @@
 package cloud
 
 import (
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
+	"sync"
 )
 
 const (
@@ -14,9 +16,14 @@ const (
 	TagENIKubeBlocksManaged = "kubeblocks.apecloud.com/managed"
 )
 
-// TODO abstract parameters, make them cloud neutral
+type newFunc func(...interface{}) (Provider, error)
 
-type Service interface {
+var (
+	lock      sync.RWMutex
+	providers = make(map[string]newFunc)
+)
+
+type Provider interface {
 	GetENILimit() int
 
 	GetENIIPv4Limit() int
@@ -33,9 +40,28 @@ type Service interface {
 
 	AssignPrivateIpAddresses(id string, ip string) error
 
-	WaitForENIAndIPsAttached(id string) (ENIMetadata, error)
+	WaitForENIAttached(id string) (ENIMetadata, error)
 
 	ModifySourceDestCheck(id string, enabled bool) error
+}
+
+func NewProvider(name string, logger logr.Logger) (Provider, error) {
+	lock.RLock()
+	defer lock.RUnlock()
+	f, ok := providers[name]
+	if !ok {
+		return nil, errors.New("Unknown cloud provider")
+	}
+	return f(logger)
+}
+
+func RegisterProvider(name string, f newFunc) {
+	lock.Lock()
+	defer lock.Unlock()
+	if _, ok := providers[name]; ok {
+		panic(fmt.Sprintf("Cloud provider %s exists", name))
+	}
+	providers[name] = f
 }
 
 type ENIMetadata struct {
@@ -51,6 +77,7 @@ type ENIMetadata struct {
 	// SubnetIPv4CIDR is the IPv4 CIDR of network interface
 	SubnetIPv4CIDR string
 
+	// TODO refactor fields, make them cloud neutral
 	// The ip addresses allocated for the network interface
 	IPv4Addresses []*ec2.NetworkInterfacePrivateIpAddress
 
@@ -65,13 +92,4 @@ func (eni ENIMetadata) PrimaryIPv4Address() string {
 		}
 	}
 	return ""
-}
-
-func NewService(provider string, logger logr.Logger) (Service, error) {
-	switch provider {
-	case ProviderAWS:
-		return NewAwsService(logger)
-	default:
-		return nil, errors.New("Unknown cloud provider")
-	}
 }

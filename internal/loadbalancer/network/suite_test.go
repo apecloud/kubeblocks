@@ -3,7 +3,6 @@ package network
 import (
 	"testing"
 
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	. "github.com/onsi/ginkgo"
@@ -20,7 +19,6 @@ func TestNetwork(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(logger)
 })
 
 var _ = AfterSuite(func() {

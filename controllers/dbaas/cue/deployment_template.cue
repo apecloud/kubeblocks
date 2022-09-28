@@ -55,7 +55,7 @@ deployment: {
 		topologySpreadConstraints: [for _, key in cluster.spec.affinity.topologyKeys {
 			topologyKey: key
 			maxSkew: 1
-			whenUnsatisfiable: DoNotSchedule
+			whenUnsatisfiable: "DoNotSchedule"
 			labelSelector: {
 				matchLabels: {
 				  "app.kubernetes.io/name":      "\(component.clusterType)-\(component.clusterDefName)"

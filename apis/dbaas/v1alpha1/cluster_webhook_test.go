@@ -80,6 +80,9 @@ metadata:
 spec:
   clusterDefinitionRef: %s
   appVersionRef: %s
+  affinity:
+    topologyKeys:
+    - kubernetes.io/hostname
   components:
   - name: replicaSets
     type: replicaSets

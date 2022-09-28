@@ -273,6 +273,9 @@ spec:
 			Name:      "cluster" + randomStr,
 			Namespace: "default",
 		}
+		affinity := dbaasv1alpha1.Affinity{
+			TopologyKeys: []string{"kubernetes.io/hostname"},
+		}
 
 		return &dbaasv1alpha1.Cluster{
 			TypeMeta: metav1.TypeMeta{
@@ -286,6 +289,7 @@ spec:
 			Spec: dbaasv1alpha1.ClusterSpec{
 				ClusterDefRef: clusterDefObj.GetName(),
 				AppVersionRef: appVersionObj.GetName(),
+				Affinity:      affinity,
 			},
 		}, clusterDefObj, appVersionObj, key
 	}

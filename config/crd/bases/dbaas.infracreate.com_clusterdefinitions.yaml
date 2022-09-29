@@ -133,7 +133,9 @@ spec:
                       type: integer
                     podAntiAffinity:
                       default: preferred
-                      description: podAntiAffinity defines pods of component anti-affnity
+                      description: PodAntiAffinity defines pods of component anti-affnity
+                        Defaults to Preferred Preferred means try spread pods by topologyKey
+                        Required means must spread pods by topologyKey
                       enum:
                       - preferred
                       - required

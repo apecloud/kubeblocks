@@ -20,8 +20,11 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/labels"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -465,7 +468,7 @@ func createOrReplaceResources(ctx context.Context,
 			}
 			// handle ConsensusSet Update
 			if templateDiff != "" {
-				err := handleConsensusSetUpdate(ctx, cli, cluster, stsObj)
+				_, err := handleConsensusSetUpdate(ctx, cli, cluster, stsObj)
 				if err != nil {
 					return err
 				}
@@ -536,17 +539,215 @@ func createOrReplaceResources(ctx context.Context,
 	return nil
 }
 
-// TODO finish me
-func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, stsObj *appsv1.StatefulSet) error {
-	// get pods owned by stsObj
-	// get componentName from sysObj.name
-	// get component.updateStrategy from cluster by componentName
-	// get pod label and name, compute plan
-	// execute plan
-	// cmp pod.template with stsObj.template
-	// if diff, kill pod, return
+func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, stsObj *appsv1.StatefulSet) (bool, error) {
+	// get podList owned by stsObj
+	podList := &corev1.PodList{}
+	if err := cli.List(ctx, podList,
+		&client.ListOptions{Namespace: stsObj.Namespace},
+		client.MatchingLabelsSelector{Selector: labels.Everything()}); err != nil {
+		return false, err
+	}
+	pods := make([]corev1.Pod, 0)
+	for _, pod := range podList.Items {
+		if isMemberOf(stsObj, &pod) {
+			pods = append(pods, pod)
+		}
+	}
 
-	return nil
+	// get typeName from stsObj.name
+	typeName := getComponentTypeName(*cluster, *stsObj)
+
+	// get component from ClusterDefinition by typeName
+	component, err := getComponent(ctx, cli, cluster, typeName)
+	if err != nil {
+		return false, err
+	}
+
+	// get pod label and name, compute plan
+	plan := generateUpdatePlan(ctx, cli, stsObj, pods, component)
+	// execute plan
+	return plan.walkOneStep()
+}
+
+func generateUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod, component dbaasv1alpha1.ClusterDefinitionComponent) *Plan {
+	plan := &Plan{}
+	plan.WalkFunc = func(obj interface{}) (bool, error) {
+		pod := obj.(corev1.Pod)
+		spec := stsObj.Spec.Template.Spec
+		if cmp.Equal(pod.Spec, spec) {
+			return false, nil
+		}
+		if err := cli.Delete(ctx, &pod); err != nil {
+			return false, nil
+		}
+
+		return true, nil
+	}
+
+	// now all are followers
+	leader := component.ConsensusSpec.Leader.Name
+	learner := component.ConsensusSpec.Learner.Name
+	noneFollowers := make(map[string]string)
+	readonlyFollowers := make(map[string]string)
+	readWriteFollowers := make(map[string]string)
+	exist := "EXIST"
+	for _, follower := range component.ConsensusSpec.Followers {
+		switch follower.AccessMode {
+		case dbaasv1alpha1.None:
+			noneFollowers[follower.Name] = exist
+		case dbaasv1alpha1.Readonly:
+			readonlyFollowers[follower.Name] = exist
+		case dbaasv1alpha1.ReadWrite:
+			readWriteFollowers[follower.Name] = exist
+		}
+	}
+
+	// make a Serial pod list
+	sort.SliceStable(pods, func(i, j int) bool {
+		roleI := pods[i].Labels[consensusSetRoleLabelKey]
+		roleJ := pods[j].Labels[consensusSetRoleLabelKey]
+		// isLearner(i)
+		if roleI == learner {
+			return true
+		}
+
+		// isLearner(j)
+		if roleJ == learner {
+			return false
+		}
+
+		// isLeader(i)
+		if roleI == leader {
+			return false
+		}
+
+		// isLeader(j)
+		if roleJ == leader {
+			return true
+		}
+
+		if noneFollowers[roleI] == exist {
+			return true
+		}
+		if noneFollowers[roleJ] == exist {
+			return false
+		}
+
+		if readonlyFollowers[roleI] == exist {
+			return true
+		}
+		if readonlyFollowers[roleJ] == exist {
+			return false
+		}
+
+		if readWriteFollowers[roleI] == exist {
+			return true
+		}
+
+		return false
+	})
+
+	// generate plan by updateStrategy
+	switch component.ConsensusSpec.UpdateStrategy {
+	case dbaasv1alpha1.Serial:
+		// learner -> followers(none->readonly->readwrite) -> leader
+		start := plan.Start
+		for _, pod := range pods {
+			nextStep := &Step{}
+			nextStep.Obj = pod
+			start.NextSteps = append(start.NextSteps, nextStep)
+			start = nextStep
+		}
+	case dbaasv1alpha1.Parallel:
+		// leader & followers & learner
+		start := plan.Start
+		for _, pod := range pods {
+			nextStep := &Step{}
+			nextStep.Obj = pod
+			start.NextSteps = append(start.NextSteps, nextStep)
+		}
+	case dbaasv1alpha1.BestEffortParallel:
+		// learner & 1/2 followers -> 1/2 followers -> leader
+		start := plan.Start
+		// append learner
+		index := 0
+		for _, pod := range pods {
+			if pod.Labels[consensusSetRoleLabelKey] != learner {
+				break
+			}
+			nextStep := &Step{}
+			nextStep.Obj = pod
+			start.NextSteps = append(start.NextSteps, nextStep)
+			index++
+		}
+		if len(start.NextSteps) > 0 {
+			start = start.NextSteps[0]
+		}
+		// append 1/2 followers
+		podList := pods[index:]
+		end := int((len(podList) - 1) / 2)
+		for i := 0; i < end; i++ {
+			nextStep := &Step{}
+			nextStep.Obj = podList[i]
+			start.NextSteps = append(start.NextSteps, nextStep)
+		}
+
+		if len(start.NextSteps) > 0 {
+			start = start.NextSteps[0]
+		}
+		// append the other 1/2 followers
+		podList = podList[end:]
+		end = len(podList) - 1
+		for i := 0; i < end; i++ {
+			nextStep := &Step{}
+			nextStep.Obj = podList[i]
+			start.NextSteps = append(start.NextSteps, nextStep)
+		}
+
+		if len(start.NextSteps) > 0 {
+			start = start.NextSteps[0]
+		}
+		// append leader
+		podList = podList[end:]
+		for _, pod := range podList {
+			nextStep := &Step{}
+			nextStep.Obj = pod
+			start.NextSteps = append(start.NextSteps, nextStep)
+		}
+	}
+
+	return plan
+}
+
+func getComponent(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, typeName string) (dbaasv1alpha1.ClusterDefinitionComponent, error) {
+	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+	name := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Spec.ClusterDefRef,
+	}
+	if err := cli.Get(ctx, name, clusterDef); err != nil {
+		return dbaasv1alpha1.ClusterDefinitionComponent{}, err
+	}
+
+	for _, component := range clusterDef.Spec.Components {
+		if component.TypeName == typeName {
+			return component, nil
+		}
+	}
+
+	return dbaasv1alpha1.ClusterDefinitionComponent{}, errors.New("componentDef not found: " + typeName)
+}
+
+func getComponentTypeName(cluster dbaasv1alpha1.Cluster, stsObj appsv1.StatefulSet) string {
+	names := strings.Split(stsObj.Name, "-")
+	name := names[len(names)-1]
+	for _, component := range cluster.Spec.Components {
+		if name == component.Name {
+			return component.Type
+		}
+	}
+
+	return ""
 }
 
 func buildHeadlessSvcs(params createParams, sts *appsv1.StatefulSet) ([]client.Object, error) {

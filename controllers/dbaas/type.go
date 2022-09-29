@@ -37,7 +37,7 @@ const (
 	appNameLabelKey            = "app.kubernetes.io/name"
 	statefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
 	consensusSetLabelKey       = "consensusset.infracreate.com/name"
-	consensusSetRoleLabelKey   = "cs.dbaas.apecloud.com/role"
+	consensusSetRoleLabelKey   = "cs.dbaas.infracreate.com/role"
 )
 
 type Component struct {

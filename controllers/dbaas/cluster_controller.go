@@ -363,7 +363,12 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 			isOk = false
 			break
 		}
+
+		// if v is consensusSet
+		// TODO
+		// if ! walkEnd, isOk = false, break
 	}
+
 	if !isOk {
 		return fmt.Errorf("cluster is not ready")
 	}

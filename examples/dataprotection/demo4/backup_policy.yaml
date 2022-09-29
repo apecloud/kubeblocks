@@ -28,15 +28,15 @@ spec:
     # ref definition is more general, but need to integrate with dbaas, define labelsSelector instead.
     labelsSelector:
       matchLabels:
-        mysql.oracle.com/cluster: mycluster
+        app.kubernetes.io/instance: wesql-cluster
 
-    secretName: mycluster-cluster-secret
+    secretName: wesql-cluster
 
   # array of database volumes storage for backup.
   targetVolume:
     name: mysql-persistent-storage
     persistentVolumeClaim:
-      claimName: datadir-mycluster-0
+      claimName: data-wesql-cluster-replicasets-primary-1
 
   # array of remote volumes from CSI driver definition.
   remoteVolumes:

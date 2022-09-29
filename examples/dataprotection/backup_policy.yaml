@@ -21,29 +21,36 @@ spec:
   backupToolName: xtrabackup-mysql
 
   # inherit from backup config
-  backupConfigName: backup-config-mysql
+  backupPolicyTemplateName: backup-config-mysql
   # database cluster service selector
   target:
     databaseEngine: mysql
     # ref definition is more general, but need to integrate with dbaas, define labelsSelector instead.
     labelsSelector:
       matchLabels:
-        mysql.oracle.com/cluster: mycluster
+        app.kubernetes.io/instance: wesql-cluster
 
-    secretName: mycluster-cluster-secret
+    # the target database secret that backup tool can connect.
+    secret:
+      # the secret name
+      name: wesql-cluster
+      # which key name for user
+      keyUser: username
+      # which key name for password
+      keyPassword: password
 
-  # array of database volumes storage for backup.
-  targetVolume:
-    name: mysql-persistent-storage
+  hooks:
+    preCommands:
+      - touch /var/lib/mysql/.restore
+    postCommands:
+      - rm -f /var/lib/mysql/.restore
+
+  # backup remote volume from CSI driver definition.
+  remoteVolume:
+    name: backup-remote-volume
     persistentVolumeClaim:
-      claimName: datadir-mycluster-0
-
-  # array of remote volumes from CSI driver definition.
-  remoteVolumes:
-    - name: backup-remote-volume
-      persistentVolumeClaim:
-        claimName: backup-host-path-pvc
+      claimName: backup-s3-pvc
 
 
-  # !!DISCUSS Number of backup retries on fail.
+  # Number of backup retries on fail.
   onFailAttempted: 3

@@ -8,12 +8,12 @@ metadata:
   name: backup-success-demo
 
   labels:
-    dataprotection.infracreate.com/backup-type: full
+    dataprotection.infracreate.com/backup-type: snapshot
     # if type is incremental, parrentName is required.
     #dataprotection.infracreate.com/parent-backup-name: null
     # reference db cluster name
-    db.infracreate.com/name: mysqlcluster
-    dataprotection.infracreate.com/backup-policy-name: backup-policy-demo
+    clusters.dbaas.infracreate.com/name: wesql-cluster
+    backuppolicies.dataprotection.infracreate.com/name: backup-policy-demo
     # backup index begin to 0 (full) for incremental.
     dataprotection.infracreate.com/backup-index: "0"
 
@@ -21,8 +21,8 @@ metadata:
 spec:
   backupPolicyName: backup-policy-demo
 
-  # Backup Type. full or incremental. if unset, default is full.
-  backupType: full
+  # Backup Type. full or incremental or snapshot. if unset, default is full.
+  backupType: snapshot
 
   # ttl value  from backup policy optional, not clean if unset.
   ttl: 168h0m0s

@@ -14,7 +14,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
-	mock_aws "github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/aws/mocks"
+	mockaws "github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/aws/mocks"
 )
 
 var _ = Describe("AwsService", func() {
@@ -102,9 +102,9 @@ var _ = Describe("AwsService", func() {
 		return tags
 	}
 
-	setup := func(overrides map[string]interface{}) (*gomock.Controller, *awsService, *mock_aws.MockEC2) {
+	setup := func(overrides map[string]interface{}) (*gomock.Controller, *awsService, *mockaws.MockEC2) {
 		ctrl := gomock.NewController(GinkgoT())
-		mockEC2 := mock_aws.NewMockEC2(ctrl)
+		mockEC2 := mockaws.NewMockEC2(ctrl)
 		service := &awsService{
 			instanceId: instanceId,
 			logger:     logger,

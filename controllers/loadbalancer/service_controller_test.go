@@ -18,9 +18,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	mockagent "github.com/apecloud/kubeblocks/internal/loadbalancer/agent/mocks"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
-	mock_cloud "github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/mocks"
-	mock_network "github.com/apecloud/kubeblocks/internal/loadbalancer/network/mocks"
+	mockcloud "github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/mocks"
+	mocknetwork "github.com/apecloud/kubeblocks/internal/loadbalancer/network/mocks"
 )
 
 var _ = Describe("ServiceController", func() {
@@ -55,20 +56,18 @@ var _ = Describe("ServiceController", func() {
 		eniIp32 = "172.31.3.11"
 	)
 
-	resetController := func() (*mock_cloud.MockProvider, *mock_network.MockClient) {
+	resetController := func() (*mockcloud.MockProvider, *mocknetwork.MockClient, *mockagent.MockENIManager) {
 		ctrl := gomock.NewController(GinkgoT())
 
-		mockService := mock_cloud.NewMockProvider(ctrl)
-		mockNetwork := mock_network.NewMockClient(ctrl)
-		serviceController.maxIPsPerENI = 5
-		serviceController.maxENI = 2
-		serviceController.minPrivateIP = 2
+		mockProvider := mockcloud.NewMockProvider(ctrl)
+		mockNetwork := mocknetwork.NewMockClient(ctrl)
+		mockENIManager := mockagent.NewMockENIManager(ctrl)
 		serviceController.hostIP = localHostIP
-		serviceController.cloud = mockService
+		serviceController.cp = mockProvider
 		serviceController.nc = mockNetwork
-		serviceController.cachedENIs = make(map[string]*cloud.ENIMetadata)
+		serviceController.em = mockENIManager
 
-		return mockService, mockNetwork
+		return mockProvider, mockNetwork, mockENIManager
 	}
 
 	getMockENIs := func() map[string]*cloud.ENIMetadata {
@@ -214,7 +213,7 @@ var _ = Describe("ServiceController", func() {
 			oldMasterAnnotations[AnnotationKeyLoadBalancerType] = AnnotationValueLoadBalancerType
 			oldMasterAnnotations[AnnotationKeyPrivateIP] = svcVIP
 			svc.SetAnnotations(oldMasterAnnotations)
-			serviceController.putCachedENI(svcVIP, &cloud.ENIMetadata{})
+			serviceController.SetPrivateIP(svcVIP, &cloud.ENIMetadata{})
 			role, err = serviceController.checkRoleForService(context.Background(), svc)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(role == RoleOldMaster).Should(BeTrue())
@@ -223,11 +222,14 @@ var _ = Describe("ServiceController", func() {
 
 	Context("When create service", func() {
 		It("Should success with no error", func() {
-			mockCloud, mockNetwork := resetController()
+			mockCloud, mockNetwork, mockENIManager := resetController()
 
 			By("By creating service")
+
+			// TODO move this to eni tests
 			enis := getMockENIs()
 			mockCloud.EXPECT().DescribeAllENIs().Return(enis, nil)
+
 			response := &ec2.AssignPrivateIpAddressesOutput{
 				AssignedPrivateIpAddresses: []*ec2.AssignedPrivateIpAddress{
 					{
@@ -235,6 +237,8 @@ var _ = Describe("ServiceController", func() {
 					},
 				},
 			}
+			eni := &cloud.ENIMetadata{ENIId: eniId2}
+			mockENIManager.EXPECT().ChooseBusiestENI().Return(eni, nil)
 			mockCloud.EXPECT().AllocIPAddresses(eniId2).Return(response, nil)
 			mockNetwork.EXPECT().SetupNetworkForService(gomock.Any(), gomock.Any()).Return(nil)
 			svc, key := newSvcObj(true, true)
@@ -260,7 +264,7 @@ var _ = Describe("ServiceController", func() {
 
 	Context("When update service, on old master", func() {
 		It("Should success without error", func() {
-			_, mockNetwork := resetController()
+			_, mockNetwork, _ := resetController()
 			eni := &cloud.ENIMetadata{ENIId: eniId2}
 			mockNetwork.EXPECT().CleanNetworkForService(eniIp24, eni).Return(nil)
 			mockNetwork.EXPECT().CleanNetworkForService(gomock.Any(), gomock.Any()).Return(nil)
@@ -272,12 +276,12 @@ var _ = Describe("ServiceController", func() {
 			svc.GetAnnotations()[AnnotationKeyENIId] = eniId2
 			svc.GetAnnotations()[AnnotationKeyPrivateIP] = eniIp24
 			svc.GetAnnotations()[AnnotationKeyMasterHost] = masterHostIP
-			serviceController.putCachedENI(eniIp24, eni)
-			Expect(serviceController.getCachedENI(eniIp24) != nil).Should(BeTrue())
+			serviceController.SetPrivateIP(eniIp24, eni)
+			Expect(serviceController.GetPrivateIP(eniIp24) != nil).Should(BeTrue())
 			Expect(k8sClient.Update(context.Background(), svc)).Should(Succeed())
 
 			Eventually(func() bool {
-				return serviceController.getCachedENI(eniIp24) == nil
+				return serviceController.GetPrivateIP(eniIp24) == nil
 			}, timeout, interval).Should(BeTrue())
 		})
 	})

@@ -1,13 +1,8 @@
 package cloud
 
 import (
-	"fmt"
-	"sync"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -15,13 +10,6 @@ const (
 	TagENICreatedAt         = "kubeblocks.apecloud.com/created-at"
 	TagENINode              = "kubeblocks.apecloud.com/instance-id"
 	TagENIKubeBlocksManaged = "kubeblocks.apecloud.com/managed"
-)
-
-type newFunc func(...interface{}) (Provider, error)
-
-var (
-	lock      sync.RWMutex
-	providers = make(map[string]newFunc)
 )
 
 type Provider interface {
@@ -44,25 +32,6 @@ type Provider interface {
 	WaitForENIAttached(id string) (ENIMetadata, error)
 
 	ModifySourceDestCheck(id string, enabled bool) error
-}
-
-func NewProvider(name string, logger logr.Logger) (Provider, error) {
-	lock.RLock()
-	defer lock.RUnlock()
-	f, ok := providers[name]
-	if !ok {
-		return nil, errors.New("Unknown cloud provider")
-	}
-	return f(logger)
-}
-
-func RegisterProvider(name string, f newFunc) {
-	lock.Lock()
-	defer lock.Unlock()
-	if _, ok := providers[name]; ok {
-		panic(fmt.Sprintf("Cloud provider %s exists", name))
-	}
-	providers[name] = f
 }
 
 type ENIMetadata struct {

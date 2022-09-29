@@ -74,11 +74,11 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	serviceController = &ServiceController{
-		logger:     logger,
-		cachedENIs: make(map[string]*cloud.ENIMetadata),
-		Client:     k8sManager.GetClient(),
-		Scheme:     k8sManager.GetScheme(),
-		Recorder:   k8sManager.GetEventRecorderFor("LoadBalancer"),
+		logger:   logger,
+		cache:    make(map[string]*cloud.ENIMetadata),
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("LoadBalancer"),
 	}
 	err = serviceController.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())

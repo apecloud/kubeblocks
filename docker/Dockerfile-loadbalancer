@@ -32,6 +32,7 @@ RUN go mod download
 
 # Copy the go source
 COPY cmd/loadbalancer/main.go cmd/loadbalancer/main.go
+COPY apis/ apis/
 COPY internal/ internal/
 COPY controllers/ controllers/
 

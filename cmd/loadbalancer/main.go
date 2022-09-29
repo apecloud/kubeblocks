@@ -26,6 +26,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/factory"
+
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
+	iptableswrapper "github.com/apecloud/kubeblocks/internal/loadbalancer/iptables"
+	netlinkwrapper "github.com/apecloud/kubeblocks/internal/loadbalancer/netlink"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/network"
+	procfswrapper "github.com/apecloud/kubeblocks/internal/loadbalancer/procfs"
+
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	"github.com/go-logr/logr"
@@ -115,17 +124,33 @@ func main() {
 		go pprofListening(logger)
 	}
 
-	endpointController, err := lb.NewEndpointController(logger, mgr.GetClient(), mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"))
+	cp, err := factory.NewProvider(cloud.ProviderAWS, logger)
 	if err != nil {
-		setupLog.Error(err, "Failed to init endpoints controller")
-		os.Exit(1)
-	}
-	if err := endpointController.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "Endpoints")
+		setupLog.Error(err, "Failed to initialize cloud provider")
 		os.Exit(1)
 	}
 
-	serviceController, err := lb.NewServiceController(logger, mgr.GetClient(), mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"))
+	ipt, err := iptableswrapper.NewIPTables()
+	if err != nil {
+		setupLog.Error(err, "Failed to init iptables")
+		os.Exit(1)
+	}
+	nc, err := network.NewClient(logger, netlinkwrapper.NewNetLink(), ipt, procfswrapper.NewProcFS())
+	if err != nil {
+		setupLog.Error(err, "Failed to init network client")
+		os.Exit(1)
+	}
+
+	em, err := agent.NewENIManager(logger, cp, nc)
+	if err != nil {
+		setupLog.Error(err, "Failed to init eni manager")
+		os.Exit(1)
+	}
+	if err := em.Start(); err != nil {
+		setupLog.Error(err, "Failed to start eni controller")
+	}
+
+	serviceController, err := lb.NewServiceController(logger, mgr.GetClient(), mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"), em, cp, nc)
 	if err != nil {
 		setupLog.Error(err, "Failed to init service controller")
 		os.Exit(1)
@@ -134,8 +159,15 @@ func main() {
 		setupLog.Error(err, "Failed to create controller", "controller", "Service")
 		os.Exit(1)
 	}
-	if err := serviceController.StartENIController(); err != nil {
-		setupLog.Error(err, "Failed to start eni controller")
+
+	endpointController, err := lb.NewEndpointController(logger, mgr.GetClient(), mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"))
+	if err != nil {
+		setupLog.Error(err, "Failed to init endpoints controller")
+		os.Exit(1)
+	}
+	if err := endpointController.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "Endpoints")
+		os.Exit(1)
 	}
 
 	//+kubebuilder:scaffold:builder

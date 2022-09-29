@@ -12,8 +12,8 @@ import (
 	"github.com/vishvananda/netlink"
 
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
-	mock_netlink "github.com/apecloud/kubeblocks/internal/loadbalancer/netlink/mocks"
-	mock_procfs "github.com/apecloud/kubeblocks/internal/loadbalancer/procfs/mocks"
+	mocknetlink "github.com/apecloud/kubeblocks/internal/loadbalancer/netlink/mocks"
+	mockprocfs "github.com/apecloud/kubeblocks/internal/loadbalancer/procfs/mocks"
 )
 
 var _ = Describe("Client", func() {
@@ -27,12 +27,12 @@ var _ = Describe("Client", func() {
 		subnet  = "172.31.0.0/16"
 	)
 
-	setup := func() (*gomock.Controller, Client, *mock_netlink.MockNetLink, *memoryIptables, *mock_procfs.MockProcFS) {
+	setup := func() (*gomock.Controller, Client, *mocknetlink.MockNetLink, *memoryIptables, *mockprocfs.MockProcFS) {
 		ctrl := gomock.NewController(GinkgoT())
 
 		ipt := NewMemoryIptables()
-		nl := mock_netlink.NewMockNetLink(ctrl)
-		procfs := mock_procfs.NewMockProcFS(ctrl)
+		nl := mocknetlink.NewMockNetLink(ctrl)
+		procfs := mockprocfs.NewMockProcFS(ctrl)
 		client, err := NewClient(logger, nl, ipt, procfs)
 		Expect(err == nil).Should(BeTrue())
 		return ctrl, client, nl, ipt, procfs
@@ -52,8 +52,8 @@ var _ = Describe("Client", func() {
 		It("Should success without error", func() {
 			ctrl, networkClient, mockNetlink, mockIPtables, _ := setup()
 
-			lo := mock_netlink.NewMockLink(ctrl)
-			eth1 := mock_netlink.NewMockLink(ctrl)
+			lo := mocknetlink.NewMockLink(ctrl)
+			eth1 := mocknetlink.NewMockLink(ctrl)
 			mockNetlink.EXPECT().LinkList().Return([]netlink.Link{lo, eth1}, nil).AnyTimes()
 
 			loHwAddr, err := net.ParseMAC(loMac)
@@ -99,8 +99,8 @@ var _ = Describe("Client", func() {
 		It("Should success without error", func() {
 			ctrl, networkClient, mockNetlink, mockIPtables, mockProcfs := setup()
 
-			lo := mock_netlink.NewMockLink(ctrl)
-			eth1 := mock_netlink.NewMockLink(ctrl)
+			lo := mocknetlink.NewMockLink(ctrl)
+			eth1 := mocknetlink.NewMockLink(ctrl)
 			mockNetlink.EXPECT().LinkList().Return([]netlink.Link{lo, eth1}, nil).AnyTimes()
 			mockNetlink.EXPECT().LinkSetUp(eth1).Return(nil).AnyTimes()
 

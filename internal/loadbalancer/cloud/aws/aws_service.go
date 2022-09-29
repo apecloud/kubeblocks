@@ -41,12 +41,6 @@ var (
 	ErrNoNetworkInterfaces = errors.New("No network interfaces found for ENI")
 )
 
-func init() {
-	cloud.RegisterProvider(cloud.ProviderAWS, func(args ...interface{}) (cloud.Provider, error) {
-		return NewAwsService(args[0].(logr.Logger))
-	})
-}
-
 type awsService struct {
 	ec2Svc           EC2
 	imdsSvc          imdsService

@@ -1,10 +1,9 @@
-package network
+package agent_test
 
 import (
 	"testing"
 
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
-
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	. "github.com/onsi/ginkgo"
@@ -18,7 +17,7 @@ var (
 func TestNetwork(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecsWithDefaultAndCustomReporters(t,
-		"Network Test Suite",
+		"Agent Test Suite",
 		[]Reporter{printer.NewlineReporter{}})
 }
 

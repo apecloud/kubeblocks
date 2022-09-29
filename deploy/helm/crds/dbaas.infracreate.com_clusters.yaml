@@ -108,6 +108,9 @@ spec:
                             type: string
                           type: array
                       type: object
+                    monitorEnhancementEnable:
+                      default: true
+                      type: boolean
                     name:
                       maxLength: 12
                       type: string

@@ -13,6 +13,7 @@ spec:
   components:
   - name: replicasets # user-defined
     type: replicasets # ref clusterdefinition components.typename
+    monitorEnhancementEnable: {{ .Values.monitor.enabled | default true }}
     roleGroups:
     - name: primary
       type: primary

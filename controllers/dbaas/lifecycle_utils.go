@@ -297,6 +297,56 @@ func buildPodAffinity(
 	return affinity
 }
 
+func mergeMonitorConfig(
+	clusterDef *dbaasv1alpha1.ClusterDefinition,
+	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
+	clusterComp *dbaasv1alpha1.ClusterComponent,
+	component *Component) {
+	monitorEnable := true
+	if clusterComp != nil {
+		monitorEnable = clusterComp.MonitorEnhancementEnable
+	}
+
+	characterType := clusterDefComp.CharacterType
+	if len(characterType) == 0 {
+		characterType = intctrlutil.CalcCharacterType(clusterDef.Spec.Type, clusterDefComp.TypeName)
+	}
+
+	if monitorEnable && !intctrlutil.IsWellKnownCharacterType(characterType) {
+		monitorEnable = false
+	}
+
+	if !monitorEnable {
+		component.Monitor = MonitorConfig{
+			Enable: false,
+		}
+		return
+	}
+
+	monitorConfig := clusterDefComp.Monitor
+	if monitorConfig.BuiltInEnable {
+		// TODO: Agamotto auto collect metrics for well known characterType
+		component.Monitor = MonitorConfig{
+			Enable: false,
+		}
+		return
+	}
+
+	if len(monitorConfig.Exporters) != 1 {
+		// TODO: support multiple exporters for ISV
+		component.Monitor = MonitorConfig{
+			Enable: false,
+		}
+		return
+	}
+
+	component.Monitor = MonitorConfig{
+		Enable:     true,
+		ScrapePath: monitorConfig.Exporters[0].ScrapePath,
+		ScrapePort: monitorConfig.Exporters[0].ScrapePort,
+	}
+}
+
 func mergeComponents(
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition,
@@ -406,6 +456,8 @@ func mergeComponents(
 	if len(component.PodSpec.TopologySpreadConstraints) == 0 && affinity != nil {
 		component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(cluster, affinity, component)
 	}
+
+	mergeMonitorConfig(clusterDef, clusterDefComp, clusterComp, component)
 
 	// TODO(zhixu.zt) We need to reserve the VolumeMounts of the container for ConfigMap or Secret,
 	// At present, it is possible to distinguish between ConfigMap volume and normal volume,

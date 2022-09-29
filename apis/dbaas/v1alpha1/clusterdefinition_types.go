@@ -104,10 +104,28 @@ type ConfigTemplate struct {
 	VolumeName string `json:"volumeName,omitempty"`
 }
 
+type ExporterConfig struct {
+	Name       string `json:"name,omitempty"`
+	ScrapePort int    `json:"scrapePort,omitempty"`
+	ScrapePath string `json:"scrapePath,omitempty"`
+}
+
+type MonitorConfig struct {
+	// +kubebuilder:default=true
+	// +optional
+	BuiltInEnable bool `json:"builtInEnable"`
+
+	// +kubebuilder:validation:Required
+	Exporters []ExporterConfig `json:"exporterConfig,omitempty"`
+}
+
 type ClusterDefinitionComponent struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
 	TypeName string `json:"typeName,omitempty"`
+
+	// +optional
+	CharacterType string `json:"characterType,omitempty"`
 
 	// roleGroups specify roleGroupTemplate name
 	RoleGroups []string `json:"roleGroups,omitempty"`
@@ -131,6 +149,13 @@ type ClusterDefinitionComponent struct {
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster
 	// +optional
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
+
+	// +optional
+	Monitor MonitorConfig `json:"monitor,omitempty"`
+
+	// antiAffinity defines components should have anti-affinity constraint to same component type
+	// +kubebuilder:default=false
+	AntiAffinity bool `json:"antiAffinity,omitempty"`
 
 	// isQuorum defines odd number of pods & N/2+1 pods
 	// +kubebuilder:default=false

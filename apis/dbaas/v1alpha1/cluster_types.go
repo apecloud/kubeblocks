@@ -137,6 +137,10 @@ type ClusterComponent struct {
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
+	// +kubebuilder:default=true
+	// +optional
+	MonitorEnhancementEnable bool `json:"monitorEnhancementEnable,omitempty"`
+
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 

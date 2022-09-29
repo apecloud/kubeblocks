@@ -6,6 +6,13 @@ spec:
   type: state.mysql-8
   components:
   - typeName: replicasets
+    characterType: mysql
+    monitor:
+      builtInEnable: false
+      exporterConfig:
+        - name: mysql
+          scrapePort: 9104
+          scrapePath: /metrics
     configTemplateRefs:
     - name: mysql-tree-node-template-8.0
       volumeName: mysql-config
@@ -63,6 +70,30 @@ spec:
             mkdir -p /data/mysql/run;
             chmod +777 -R /data/mysql;
             docker-entrypoint.sh mysqld --defaults-file=/data/config/mysql/my.cnf --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
+      - name: mysql_exporter
+        imagePullPolicy: IfNotPresent
+        env:
+          - name: MYSQL_ROOT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: $(OPENDBAAS_MY_SECRET_NAME)
+                key: password
+          - name: DATA_SOURCE_NAME
+            value: "root:$(MYSQL_ROOT_PASSWORD)@(localhost:3306)/"
+        ports:
+          - containerPort: 9104
+            protocol: TCP
+            name: scrape
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 9104
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 9104
+        resources:
+          {}
   roleGroupTemplates:
   - typeName: primary
     defaultReplicas: 3

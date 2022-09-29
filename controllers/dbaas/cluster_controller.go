@@ -365,8 +365,21 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 		}
 
 		// if v is consensusSet
-		// TODO
-		// if ! walkEnd, isOk = false, break
+		typeName := getComponentTypeName(*cluster, v)
+		componentDef, err := getComponent(ctx, r.Client, cluster, typeName)
+		if err != nil {
+			return err
+		}
+		if componentDef.ComponentType == dbaasv1alpha1.Consensus {
+			end, err := handleConsensusSetUpdate(ctx, r.Client, cluster, &v)
+			if err != nil {
+				return err
+			}
+			if !end {
+				isOk = false
+				break
+			}
+		}
 	}
 
 	if !isOk {

@@ -85,15 +85,6 @@ func (c createParams) getCacheCUETplValue(key string, valueCreator func() (*intc
 	return v, err
 }
 
-func getClusterDefinitionComponentByType(components []dbaasv1alpha1.ClusterDefinitionComponent, typeName string) *dbaasv1alpha1.ClusterDefinitionComponent {
-	for _, component := range components {
-		if component.TypeName == typeName {
-			return &component
-		}
-	}
-	return nil
-}
-
 func getAppVersionComponentByType(components []dbaasv1alpha1.AppVersionComponent, typeName string) *dbaasv1alpha1.AppVersionComponent {
 	for _, component := range components {
 		if component.Type == typeName {
@@ -290,15 +281,14 @@ func buildClusterCreationTasks(
 	useDefaultComp := len(cluster.Spec.Components) == 0
 	for _, component := range components {
 		componentName := component.TypeName
-		clusterDefComponent := getClusterDefinitionComponentByType(components, componentName)
 		appVersionComponent := getAppVersionComponentByType(appVersion.Spec.Components, componentName)
 
 		if useDefaultComp {
-			buildTask(mergeComponents(clusterDefinition, clusterDefComponent, appVersionComponent, nil))
+			buildTask(mergeComponents(clusterDefinition, &component, appVersionComponent, nil))
 		} else {
 			clusterComps := getClusterComponentsByType(cluster.Spec.Components, componentName)
 			for _, clusterComp := range clusterComps {
-				buildTask(mergeComponents(clusterDefinition, clusterDefComponent, appVersionComponent, clusterComp))
+				buildTask(mergeComponents(clusterDefinition, &component, appVersionComponent, clusterComp))
 			}
 		}
 	}
@@ -540,6 +530,19 @@ func createOrReplaceResources(ctx context.Context,
 }
 
 func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, stsObj *appsv1.StatefulSet) (bool, error) {
+	// get typeName from stsObj.name
+	typeName := getComponentTypeName(*cluster, *stsObj)
+
+	// get component from ClusterDefinition by typeName
+	component, err := getComponent(ctx, cli, cluster, typeName)
+	if err != nil {
+		return false, err
+	}
+
+	if component.ComponentType != dbaasv1alpha1.Consensus {
+		return true, nil
+	}
+
 	// get podList owned by stsObj
 	podList := &corev1.PodList{}
 	if err := cli.List(ctx, podList,
@@ -554,15 +557,6 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 		}
 	}
 
-	// get typeName from stsObj.name
-	typeName := getComponentTypeName(*cluster, *stsObj)
-
-	// get component from ClusterDefinition by typeName
-	component, err := getComponent(ctx, cli, cluster, typeName)
-	if err != nil {
-		return false, err
-	}
-
 	// get pod label and name, compute plan
 	plan := generateUpdatePlan(ctx, cli, stsObj, pods, component)
 	// execute plan
@@ -571,6 +565,7 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 
 func generateUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod, component dbaasv1alpha1.ClusterDefinitionComponent) *Plan {
 	plan := &Plan{}
+	plan.Start = &Step{}
 	plan.WalkFunc = func(obj interface{}) (bool, error) {
 		pod := obj.(corev1.Pod)
 		spec := stsObj.Spec.Template.Spec
@@ -606,40 +601,30 @@ func generateUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.S
 	sort.SliceStable(pods, func(i, j int) bool {
 		roleI := pods[i].Labels[consensusSetRoleLabelKey]
 		roleJ := pods[j].Labels[consensusSetRoleLabelKey]
-		// isLearner(i)
 		if roleI == learner {
 			return true
 		}
-
-		// isLearner(j)
 		if roleJ == learner {
 			return false
 		}
-
-		// isLeader(i)
 		if roleI == leader {
 			return false
 		}
-
-		// isLeader(j)
 		if roleJ == leader {
 			return true
 		}
-
 		if noneFollowers[roleI] == exist {
 			return true
 		}
 		if noneFollowers[roleJ] == exist {
 			return false
 		}
-
 		if readonlyFollowers[roleI] == exist {
 			return true
 		}
 		if readonlyFollowers[roleJ] == exist {
 			return false
 		}
-
 		if readWriteFollowers[roleI] == exist {
 			return true
 		}
@@ -721,11 +706,7 @@ func generateUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.S
 
 func getComponent(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, typeName string) (dbaasv1alpha1.ClusterDefinitionComponent, error) {
 	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
-	name := types.NamespacedName{
-		Namespace: cluster.Namespace,
-		Name:      cluster.Spec.ClusterDefRef,
-	}
-	if err := cli.Get(ctx, name, clusterDef); err != nil {
+	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
 		return dbaasv1alpha1.ClusterDefinitionComponent{}, err
 	}
 

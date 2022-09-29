@@ -149,7 +149,7 @@ type ClusterDefinitionComponent struct {
 
 	// TopologySpreadConstraint describes how a group of pods ought to spread across topology domains
 	// +optional
-	TopologySpreadConstraint TopologySpreadConstraint `json:"topologySpreadConstraint,omitempty"`
+	TopologySpreadConstraint *TopologySpreadConstraint `json:"topologySpreadConstraint,omitempty"`
 
 	// isQuorum defines odd number of pods & N/2+1 pods
 	// +kubebuilder:default=false

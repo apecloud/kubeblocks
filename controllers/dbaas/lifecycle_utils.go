@@ -22,18 +22,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
-	"k8s.io/apimachinery/pkg/labels"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/leaanthony/debme"
 	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -670,7 +670,7 @@ func generateUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.S
 		}
 		// append 1/2 followers
 		podList := pods[index:]
-		end := int((len(podList) - 1) / 2)
+		end := (len(podList) - 1) / 2
 		for i := 0; i < end; i++ {
 			nextStep := &Step{}
 			nextStep.Obj = podList[i]
@@ -705,12 +705,14 @@ func generateUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.S
 }
 
 func getComponent(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, typeName string) (dbaasv1alpha1.ClusterDefinitionComponent, error) {
+	println("getComponent: " + typeName)
 	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
 		return dbaasv1alpha1.ClusterDefinitionComponent{}, err
 	}
 
 	for _, component := range clusterDef.Spec.Components {
+		println("componentDef.TypeName: " + component.TypeName)
 		if component.TypeName == typeName {
 			return component, nil
 		}
@@ -720,15 +722,19 @@ func getComponent(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1
 }
 
 func getComponentTypeName(cluster dbaasv1alpha1.Cluster, stsObj appsv1.StatefulSet) string {
+	println("getComponentTypeName: " + stsObj.Name)
 	names := strings.Split(stsObj.Name, "-")
 	name := names[len(names)-1]
+	println("name is: " + name)
 	for _, component := range cluster.Spec.Components {
+		println("component.Name: " + component.Name)
 		if name == component.Name {
+			println("component.Type: " + component.Type)
 			return component.Type
 		}
 	}
 
-	return ""
+	return name
 }
 
 func buildHeadlessSvcs(params createParams, sts *appsv1.StatefulSet) ([]client.Object, error) {

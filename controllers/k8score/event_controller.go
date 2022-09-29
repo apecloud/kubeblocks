@@ -19,11 +19,11 @@ package k8score
 import (
 	"context"
 	"encoding/json"
-	"k8s.io/apimachinery/pkg/types"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -68,8 +68,7 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "getEventError")
 	}
 
-	switch event.InvolvedObject.FieldPath {
-	case "spec.containers.KBProbeRoleChangedCheck":
+	if event.InvolvedObject.FieldPath == "spec.containers.KBProbeRoleChangedCheck" {
 		err := r.handleRoleChangedEvent(ctx, event)
 		if err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "handleRoleChangedEventError")
@@ -81,13 +80,11 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 // TODO probeMessage should be defined by @xuanchi
 type probeMessage struct {
-	code string
-	data probeMessageData
+	Data probeMessageData `json:"data,omitempty"`
 }
 
 type probeMessageData struct {
-	role    string
-	message string
+	Role string `json:"role,omitempty"`
 }
 
 func (r *EventReconciler) handleRoleChangedEvent(ctx context.Context, event *corev1.Event) error {
@@ -97,7 +94,7 @@ func (r *EventReconciler) handleRoleChangedEvent(ctx context.Context, event *cor
 	if err != nil {
 		return err
 	}
-	role := strings.ToLower(message.data.role)
+	role := strings.ToLower(message.Data.Role)
 
 	// get pod
 	pod := &corev1.Pod{}

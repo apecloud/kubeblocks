@@ -38,8 +38,8 @@ func (p *Plan) walkOneStep() (bool, error) {
 	plan.Start.NextSteps = make([]*Step, 0)
 	for _, step := range p.Start.NextSteps {
 		for _, nextStep := range step.NextSteps {
-			if !containStep(p.Start.NextSteps, nextStep) {
-				plan.Start.NextSteps = append(p.Start.NextSteps, nextStep)
+			if !containStep(plan.Start.NextSteps, nextStep) {
+				plan.Start.NextSteps = append(plan.Start.NextSteps, nextStep)
 			}
 		}
 	}

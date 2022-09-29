@@ -271,6 +271,18 @@ type ClusterDefinitionStatusGeneration struct {
 	ClusterDefSyncStatus Status `json:"clusterDefSyncStatus,omitempty"`
 }
 
+// UnsatisfiableConstraintAction +enum
+type UnsatisfiableConstraintAction string
+
+const (
+	// DoNotSchedule instructs the scheduler not to schedule the pod
+	// when constraints are not satisfied.
+	DoNotSchedule UnsatisfiableConstraintAction = "DoNotSchedule"
+	// ScheduleAnyway instructs the scheduler to schedule the pod
+	// even if constraints are not satisfied.
+	ScheduleAnyway UnsatisfiableConstraintAction = "ScheduleAnyway"
+)
+
 // TopologySpreadConstraint specifies how to spread matching pods among the given topology.
 // It is a minimal version of corev1.TopologySpreadConstraint to avoid to add too many fields of API
 // Refer to https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints
@@ -282,7 +294,7 @@ type TopologySpreadConstraint struct {
 	// WhenUnsatisfiable indicates how to deal with a Pod if it doesn't satisfy the spread constraint
 	// +kubebuilder:default=DoNotSchedule
 	// +kubebuilder:validation:Enum={DoNotSchedule,ScheduleAnyway}
-	WhenUnsatisfiable corev1.UnsatisfiableConstraintAction `json:"whenUnsatisfiable,omitempty"`
+	WhenUnsatisfiable UnsatisfiableConstraintAction `json:"whenUnsatisfiable,omitempty"`
 }
 
 func init() {

@@ -8014,6 +8014,7 @@ spec:
                           default: 1
                           description: MaxSkew describes the degree to which Pods
                             may be unevenly distributed
+                          format: int32
                           minimum: 1
                           type: integer
                         whenUnsatisfiable:

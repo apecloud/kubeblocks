@@ -48,7 +48,7 @@ type Component struct {
 	MaxAvailable             int                                       `json:"maxAvailable,omitempty"`
 	DefaultReplicas          int                                       `json:"defaultReplicas,omitempty"`
 	IsStateless              bool                                      `json:"isStateless,omitempty"`
-	PodAntiAffinity          string                                    `json:"podAntiAffinity,omitempty"`
+	PodAntiAffinity          dbaasv1alpha1.PodAntiAffinity             `json:"podAntiAffinity,omitempty"`
 	TopologySpreadConstraint dbaasv1alpha1.TopologySpreadConstraint    `json:"topologySpreadConstraint,omitempty"`
 	IsQuorum                 bool                                      `json:"isQuorum,omitempty"`
 	Strategies               dbaasv1alpha1.ClusterDefinitionStrategies `json:"strategies,omitempty"`

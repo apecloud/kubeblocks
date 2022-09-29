@@ -104,6 +104,13 @@ type ConfigTemplate struct {
 	VolumeName string `json:"volumeName,omitempty"`
 }
 
+type PodAntiAffinity string
+
+const (
+	Preferred PodAntiAffinity = "preferred"
+	Required  PodAntiAffinity = "required"
+)
+
 type ClusterDefinitionComponent struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
@@ -132,10 +139,13 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
 
-	// podAntiAffinity defines pods of component anti-affnity
+	// PodAntiAffinity defines pods of component anti-affnity
+	// Defaults to Preferred
+	// Preferred means try spread pods by topologyKey
+	// Required means must spread pods by topologyKey
 	// +kubebuilder:default=preferred
 	// +kubebuilder:validation:Enum={preferred,required}
-	PodAntiAffinity string `json:"podAntiAffinity,omitempty"`
+	PodAntiAffinity PodAntiAffinity `json:"podAntiAffinity,omitempty"`
 
 	// TopologySpreadConstraint describes how a group of pods ought to spread across topology domains
 	// +optional

@@ -278,11 +278,11 @@ type TopologySpreadConstraint struct {
 	// MaxSkew describes the degree to which Pods may be unevenly distributed
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
-	MaxSkew int `json:"maxSkew,omitempty"`
+	MaxSkew int32 `json:"maxSkew,omitempty"`
 	// WhenUnsatisfiable indicates how to deal with a Pod if it doesn't satisfy the spread constraint
 	// +kubebuilder:default=DoNotSchedule
 	// +kubebuilder:validation:Enum={DoNotSchedule,ScheduleAnyway}
-	WhenUnsatisfiable string `json:"whenUnsatisfiable,omitempty"`
+	WhenUnsatisfiable corev1.UnsatisfiableConstraintAction `json:"whenUnsatisfiable,omitempty"`
 }
 
 func init() {

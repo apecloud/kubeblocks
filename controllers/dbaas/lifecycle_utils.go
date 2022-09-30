@@ -705,14 +705,12 @@ func generateUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.S
 }
 
 func getComponent(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, typeName string) (dbaasv1alpha1.ClusterDefinitionComponent, error) {
-	println("getComponent: " + typeName)
 	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
 		return dbaasv1alpha1.ClusterDefinitionComponent{}, err
 	}
 
 	for _, component := range clusterDef.Spec.Components {
-		println("componentDef.TypeName: " + component.TypeName)
 		if component.TypeName == typeName {
 			return component, nil
 		}
@@ -722,14 +720,10 @@ func getComponent(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1
 }
 
 func getComponentTypeName(cluster dbaasv1alpha1.Cluster, stsObj appsv1.StatefulSet) string {
-	println("getComponentTypeName: " + stsObj.Name)
 	names := strings.Split(stsObj.Name, "-")
 	name := names[len(names)-1]
-	println("name is: " + name)
 	for _, component := range cluster.Spec.Components {
-		println("component.Name: " + component.Name)
 		if name == component.Name {
-			println("component.Type: " + component.Type)
 			return component.Type
 		}
 	}

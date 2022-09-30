@@ -73,11 +73,7 @@ func Get() (CloudProvider, error) {
 }
 
 func InitProvider(provider, accessKey, accessSecret, region string) (CloudProvider, error) {
-	err := initProvider()
-	if err != nil {
-		return nil, err
-	}
-
+	_ = initProvider()
 	if defaultProvider.Name() != Local {
 		util.Infof("Cloud Provider %s has already inited, skip", provider)
 		return defaultProvider, nil

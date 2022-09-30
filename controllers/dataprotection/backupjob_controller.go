@@ -19,14 +19,10 @@ package dataprotection
 import (
 	"context"
 	"errors"
+	"fmt"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	"strings"
-	"time"
-
-	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/source"
-
 	appv1 "k8s.io/api/apps/v1"
+	"strings"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -43,8 +39,6 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
-
-const reQueueInterval = time.Second * 5
 
 // BackupJobReconciler reconciles a BackupJob object
 type BackupJobReconciler struct {
@@ -79,6 +73,10 @@ func (r *BackupJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		Req: req,
 		Log: log.FromContext(ctx).WithValues("backupJob", req.NamespacedName),
 	}
+	// 1. Get backupjob obj
+	// 2. if not found, get batchv1 job obj
+	// 3. if not found, get volumesnapshot obj
+
 	backupJob := &dataprotectionv1alpha1.BackupJob{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, backupJob); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -108,60 +106,155 @@ func (r *BackupJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 func (r *BackupJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dataprotectionv1alpha1.BackupJob{}).
-		Watches(&source.Kind{Type: &batchv1.Job{}}, &handler.EnqueueRequestForObject{}).
 		Owns(&batchv1.Job{}).
+		Owns(&snapshotv1.VolumeSnapshot{}).
 		Complete(r)
 }
 
 func (r *BackupJobReconciler) DoNewPhaseAction(
 	reqCtx intctrlutil.RequestCtx,
 	backupJob *dataprotectionv1alpha1.BackupJob) (ctrl.Result, error) {
-	if backupJob.Spec.BackupType == dataprotectionv1alpha1.BackupTypeSnapshot {
-		// 1. build pre command job
-		// 2. after job completed, create volume snapshot
-		if err := r.createPreCommandJob(reqCtx, backupJob); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
-	} else {
-		// 1. get backup tool
-		// 2. get backup policy
-		// 3. build a job pod sec
-		jobPodSpec, err := r.GetPodSpec(reqCtx, backupJob)
-		if err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
 
-		// create a new job to back up
-		key := types.NamespacedName{
-			Namespace: reqCtx.Req.Namespace,
-			Name:      backupJob.Name,
-		}
-		if err := r.CreateBatchV1Job(reqCtx, key, backupJob, jobPodSpec); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
-
-	}
 	// update Phase to InProgress
 	backupJob.Status.Phase = dataprotectionv1alpha1.BackupJobInProgress
 	backupJob.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now()}
 	if err := r.Client.Status().Update(reqCtx.Ctx, backupJob); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	return intctrlutil.RequeueAfter(reQueueInterval, reqCtx.Log, "")
+	return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+}
+
+func (r *BackupJobReconciler) DoInProgressPhaseAction(
+	reqCtx intctrlutil.RequestCtx,
+	backupJob *dataprotectionv1alpha1.BackupJob) (ctrl.Result, error) {
+
+	if backupJob.Spec.BackupType == dataprotectionv1alpha1.BackupTypeSnapshot {
+		// 1. create and ensure pre-command job completed
+		// 2. create and ensure volume snapshot ready
+		// 3. create and ensure post-command job completed
+		isOK, err := r.createPreCommandJobAndEnsure(reqCtx, backupJob)
+		if err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+		if !isOK {
+			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+		}
+		if err = r.createVolumeSnapshot(reqCtx, backupJob); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+		key := types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: backupJob.Name}
+		isOK, err = r.ensureVolumeSnapshotReady(reqCtx, key)
+		if err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+		if !isOK {
+			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+		}
+		msg := fmt.Sprintf("Created volumeSnapshot %s ready.", key.Name)
+		r.Recorder.Event(backupJob, corev1.EventTypeNormal, "CreatedVolumeSnapshot", msg)
+
+		isOK, err = r.createPostCommandJobAndEnsure(reqCtx, backupJob)
+		if err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+		if !isOK {
+			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+		}
+
+		backupJob.Status.Phase = dataprotectionv1alpha1.BackupJobCompleted
+		backupJob.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
+	} else {
+		// 1. create and ensure backup tool job finished
+		// 2. get job phase and update
+		err := r.createBackupToolJob(reqCtx, backupJob)
+		key := types.NamespacedName{Namespace: backupJob.Namespace, Name: backupJob.Name}
+		isOK, err := r.ensureBatchV1JobCompleted(reqCtx, key)
+		if err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+		if !isOK {
+			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+		}
+		job, err := r.GetBatchV1Job(reqCtx, backupJob)
+		if err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+		jobStatusConditions := job.Status.Conditions
+		if jobStatusConditions[0].Type == batchv1.JobComplete {
+			// update Phase to in Completed
+			backupJob.Status.Phase = dataprotectionv1alpha1.BackupJobCompleted
+			backupJob.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
+		} else if jobStatusConditions[0].Type == batchv1.JobFailed {
+			backupJob.Status.Phase = dataprotectionv1alpha1.BackupJobFailed
+			backupJob.Status.FailureReason = job.Status.Conditions[0].Reason
+		}
+	}
+
+	// finally, update backupJob status
+	msg := fmt.Sprintf("Completed backupJob.")
+	r.Recorder.Event(backupJob, corev1.EventTypeNormal, "CreatedBackupJob", msg)
+	if err := r.Client.Status().Update(reqCtx.Ctx, backupJob); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	return intctrlutil.Reconciled()
+}
+
+func (r *BackupJobReconciler) createPreCommandJobAndEnsure(reqCtx intctrlutil.RequestCtx,
+	backupJob *dataprotectionv1alpha1.BackupJob) (bool, error) {
+
+	emptyCmd, err := r.ensureEmptyHooksCommand(reqCtx, backupJob, true)
+	if err != nil {
+		return false, err
+	}
+	// if not defined commands, skip create job.
+	if emptyCmd {
+		return true, err
+	}
+
+	key := types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: backupJob.Name + "-pre"}
+	if err := r.createHooksCommandJob(reqCtx, backupJob, key); err != nil {
+		return false, err
+	}
+	msg := fmt.Sprintf("Waiting for a job %s to be created by the backupJob.", key.Name)
+	r.Recorder.Event(backupJob, corev1.EventTypeNormal, "CreatingPreCommandJob", msg)
+	return r.ensureBatchV1JobCompleted(reqCtx, key)
+}
+
+func (r *BackupJobReconciler) createPostCommandJobAndEnsure(reqCtx intctrlutil.RequestCtx,
+	backupJob *dataprotectionv1alpha1.BackupJob) (bool, error) {
+
+	emptyCmd, err := r.ensureEmptyHooksCommand(reqCtx, backupJob, false)
+	if err != nil {
+		return false, err
+	}
+	// if not defined commands, skip create job.
+	if emptyCmd {
+		return true, err
+	}
+
+	key := types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: backupJob.Name + "-post"}
+	if err := r.createHooksCommandJob(reqCtx, backupJob, key); err != nil {
+		return false, err
+	}
+	msg := fmt.Sprintf("Waiting for a job %s to be created by the backupJob.", key.Name)
+	r.Recorder.Event(backupJob, corev1.EventTypeNormal, "CreatingPostCommandJob", msg)
+	return r.ensureBatchV1JobCompleted(reqCtx, key)
 }
 
 func (r *BackupJobReconciler) ensureBatchV1JobCompleted(
 	reqCtx intctrlutil.RequestCtx, key types.NamespacedName) (bool, error) {
 	job := &batchv1.Job{}
-	if err := r.Client.Get(reqCtx.Ctx, key, job); err != nil {
+	exists, err := checkResourceExists(reqCtx.Ctx, r.Client, key, job)
+	if err != nil {
 		return false, err
 	}
-
-	jobStatusConditions := job.Status.Conditions
-	if len(jobStatusConditions) > 0 {
-		if jobStatusConditions[0].Type == batchv1.JobComplete ||
-			jobStatusConditions[0].Type == batchv1.JobFailed {
-			return true, nil
+	if exists {
+		jobStatusConditions := job.Status.Conditions
+		if len(jobStatusConditions) > 0 {
+			if jobStatusConditions[0].Type == batchv1.JobComplete ||
+				jobStatusConditions[0].Type == batchv1.JobFailed {
+				return true, nil
+			}
 		}
 	}
 	return false, nil
@@ -207,6 +300,7 @@ func (r *BackupJobReconciler) createVolumeSnapshot(
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: reqCtx.Req.Namespace,
 			Name:      reqCtx.Req.Name,
+			Labels:    buildBackupJobLabels(backupJob.Name),
 		},
 		Spec: snapshotv1.VolumeSnapshotSpec{
 			VolumeSnapshotClassName: &volumeSnapshotClassName,
@@ -223,36 +317,38 @@ func (r *BackupJobReconciler) createVolumeSnapshot(
 		return err
 	}
 
-	reqCtx.Log.Info("create a volume snapshot from backupJob", "snapshot", snap)
+	reqCtx.Log.Info("create a volumeSnapshot from backupJob", "snapshot", snap)
 	if err := r.Client.Create(reqCtx.Ctx, snap); err != nil {
 		return err
 	}
+	msg := fmt.Sprintf("Waiting for a volume snapshot %s to be created by the backupJob.", snap.Name)
+	r.Recorder.Event(backupJob, corev1.EventTypeNormal, "CreatingVolumeSnapshot", msg)
 	return nil
 }
 
-func (r *BackupJobReconciler) ensureVolumeSnapshotReady(
-	reqCtx intctrlutil.RequestCtx,
+func (r *BackupJobReconciler) ensureVolumeSnapshotReady(reqCtx intctrlutil.RequestCtx,
 	key types.NamespacedName) (bool, error) {
-	snap := &snapshotv1.VolumeSnapshot{}
 
-	if err := r.Get(reqCtx.Ctx, key, snap); err != nil {
+	snap := &snapshotv1.VolumeSnapshot{}
+	exists, err := checkResourceExists(reqCtx.Ctx, r.Client, key, snap)
+	if err != nil {
 		return false, err
 	}
 	ready := false
-
-	if snap.Status.ReadyToUse != nil {
-		ready = *(snap.Status.ReadyToUse)
+	if exists && snap.Status != nil {
+		if snap.Status.ReadyToUse != nil {
+			ready = *(snap.Status.ReadyToUse)
+		}
 	}
 
 	return ready, nil
 }
 
-func (r *BackupJobReconciler) createPreCommandJob(
+func (r *BackupJobReconciler) createBackupToolJob(
 	reqCtx intctrlutil.RequestCtx,
 	backupJob *dataprotectionv1alpha1.BackupJob) error {
 
-	// TODO(dsj): get namespace from self operator definition
-	key := types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: backupJob.Name + "-pre"}
+	key := types.NamespacedName{Namespace: backupJob.Namespace, Name: backupJob.Name}
 	job := batchv1.Job{}
 	exists, err := checkResourceExists(reqCtx.Ctx, r.Client, key, &job)
 	if err != nil {
@@ -263,23 +359,58 @@ func (r *BackupJobReconciler) createPreCommandJob(
 		return nil
 	}
 
-	jobPodSpec, err := r.BuildSnapshotPodSpec(reqCtx, backupJob, true)
+	toolPodSpec, err := r.BuildBackupToolPodSpec(reqCtx, backupJob)
 	if err != nil {
 		return err
 	}
 
-	if err = r.CreateBatchV1Job(reqCtx, key, backupJob, jobPodSpec); err != nil {
+	if err = r.CreateBatchV1Job(reqCtx, key, backupJob, toolPodSpec); err != nil {
 		return err
 	}
-
+	msg := fmt.Sprintf("Waiting for a job %s to be created by the backupJob.", key.Name)
+	r.Recorder.Event(backupJob, corev1.EventTypeNormal, "CreatingJob", msg)
 	return nil
 }
 
-func (r *BackupJobReconciler) createPostCommandJob(
+func (r *BackupJobReconciler) ensureEmptyHooksCommand(
 	reqCtx intctrlutil.RequestCtx,
-	backupJob *dataprotectionv1alpha1.BackupJob) error {
+	backupJob *dataprotectionv1alpha1.BackupJob,
+	isPreCommand bool) (bool, error) {
 
-	key := types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: backupJob.Name + "-post"}
+	// get backup policy
+	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
+	backupPolicyKey := types.NamespacedName{
+		Namespace: reqCtx.Req.Namespace,
+		Name:      backupJob.Spec.BackupPolicyName,
+	}
+
+	policyExists, err := checkResourceExists(reqCtx.Ctx, r.Client, backupPolicyKey, backupPolicy)
+	if err != nil {
+		msg := fmt.Sprintf("Failed to get backupPolicy %s .", backupPolicyKey.Name)
+		r.Recorder.Event(backupJob, corev1.EventTypeWarning, "BackupPolicyFailed", msg)
+		return false, err
+	}
+
+	if !policyExists {
+		msg := fmt.Sprintf("Not Found backupPolicy %s .", backupPolicyKey.Name)
+		r.Recorder.Event(backupJob, corev1.EventTypeWarning, "BackupPolicyFailed", msg)
+		return false, errors.New(msg)
+	}
+	commands := backupPolicy.Spec.Hooks.PreCommands
+	if !isPreCommand {
+		commands = backupPolicy.Spec.Hooks.PostCommands
+	}
+	if len(commands) <= 0 {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (r *BackupJobReconciler) createHooksCommandJob(
+	reqCtx intctrlutil.RequestCtx,
+	backupJob *dataprotectionv1alpha1.BackupJob,
+	key types.NamespacedName) error {
+
 	job := batchv1.Job{}
 	exists, err := checkResourceExists(reqCtx.Ctx, r.Client, key, &job)
 	if err != nil {
@@ -294,90 +425,14 @@ func (r *BackupJobReconciler) createPostCommandJob(
 	if err != nil {
 		return err
 	}
-	if err = r.CreateBatchV1Job(reqCtx, key, backupJob, jobPodSpec); err != nil {
-		return err
-	}
 
-	return nil
+	return r.CreateBatchV1Job(reqCtx, key, backupJob, jobPodSpec)
 }
 
-func (r *BackupJobReconciler) DoInProgressPhaseAction(
-	reqCtx intctrlutil.RequestCtx,
-	backupJob *dataprotectionv1alpha1.BackupJob) (ctrl.Result, error) {
-
-	if backupJob.Spec.BackupType == dataprotectionv1alpha1.BackupTypeSnapshot {
-		// 1. ensure pre-command job completed
-		// 2. create volume snapshot cr
-		// 3. ensure volume snapshot cr ready
-		// 4. create post-command job
-		// 5. ensure post-command job completed
-		key := types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: backupJob.Name + "-pre"}
-		isOK, err := r.ensureBatchV1JobCompleted(reqCtx, key)
-		if err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
-		if !isOK {
-			return intctrlutil.RequeueAfter(reQueueInterval, reqCtx.Log, "")
-		}
-		if err = r.createVolumeSnapshot(reqCtx, backupJob); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
-
-		key = types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: backupJob.Name}
-		isOK, err = r.ensureVolumeSnapshotReady(reqCtx, key)
-		if err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
-		if !isOK {
-			return intctrlutil.RequeueAfter(reQueueInterval, reqCtx.Log, "")
-		}
-
-		if err := r.createPostCommandJob(reqCtx, backupJob); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
-		key = types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: backupJob.Name + "-post"}
-		isOK, err = r.ensureBatchV1JobCompleted(reqCtx, key)
-		if err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
-		if !isOK {
-			return intctrlutil.RequeueAfter(reQueueInterval, reqCtx.Log, "")
-		}
-		backupJob.Status.Phase = dataprotectionv1alpha1.BackupJobCompleted
-		backupJob.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
-		if err := r.Client.Status().Update(reqCtx.Ctx, backupJob); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
-		return intctrlutil.Reconciled()
+func buildBackupJobLabels(backupJobName string) map[string]string {
+	return map[string]string{
+		"backupjobs.dataprotection.infracreate.com/name": backupJobName,
 	}
-
-	job, err := r.GetBatchV1Job(reqCtx, backupJob)
-	if err != nil {
-		// not found backup job, retry create job
-		backupJob.Status.Phase = dataprotectionv1alpha1.BackupJobNew
-	} else {
-		jobStatusConditions := job.Status.Conditions
-		if len(jobStatusConditions) > 0 {
-			if jobStatusConditions[0].Type == batchv1.JobComplete {
-				// update Phase to in Completed
-				backupJob.Status.Phase = dataprotectionv1alpha1.BackupJobCompleted
-				backupJob.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
-			} else if jobStatusConditions[0].Type == batchv1.JobFailed {
-				backupJob.Status.Phase = dataprotectionv1alpha1.BackupJobFailed
-				backupJob.Status.FailureReason = job.Status.Conditions[0].Reason
-			}
-		}
-	}
-	// reconcile until status is completed or failed
-	if backupJob.Status.Phase == dataprotectionv1alpha1.BackupJobInProgress ||
-		backupJob.Status.Phase == dataprotectionv1alpha1.BackupJobNew {
-		return intctrlutil.RequeueAfter(reQueueInterval, reqCtx.Log, "")
-	}
-
-	if err := r.Client.Status().Update(reqCtx.Ctx, backupJob); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-	return intctrlutil.Reconciled()
 }
 
 func (r *BackupJobReconciler) CreateBatchV1Job(
@@ -385,11 +440,13 @@ func (r *BackupJobReconciler) CreateBatchV1Job(
 	key types.NamespacedName,
 	backupJob *dataprotectionv1alpha1.BackupJob,
 	templatePodSpec corev1.PodSpec) error {
+
 	job := &batchv1.Job{
 		//TypeMeta:   metav1.TypeMeta{Kind: "Job", APIVersion: "batch/v1"},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: key.Namespace,
 			Name:      key.Name,
+			Labels:    buildBackupJobLabels(backupJob.Name),
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
@@ -428,32 +485,70 @@ func (r *BackupJobReconciler) GetBatchV1Job(reqCtx intctrlutil.RequestCtx, backu
 	return job, nil
 }
 
-func (r *BackupJobReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, backupJob *dataprotectionv1alpha1.BackupJob) error {
+func (r *BackupJobReconciler) deleteReferenceBatchV1Jobs(reqCtx intctrlutil.RequestCtx, backupJob *dataprotectionv1alpha1.BackupJob) error {
+	jobs := &batchv1.JobList{}
 
-	// delete k8s job.
-	job, err := r.GetBatchV1Job(reqCtx, backupJob)
-	if err != nil {
-		// not found backup job, do nothing
-		reqCtx.Log.Info(err.Error())
-		return nil
+	if err := r.Client.List(reqCtx.Ctx, jobs,
+		client.InNamespace(reqCtx.Req.Namespace),
+		client.MatchingLabels(buildBackupJobLabels(backupJob.Name))); err != nil {
+		return err
 	}
+	for _, job := range jobs.Items {
+		if controllerutil.ContainsFinalizer(&job, dataProtectionFinalizerName) {
+			patch := client.MergeFrom(job.DeepCopy())
+			controllerutil.RemoveFinalizer(&job, dataProtectionFinalizerName)
+			if err := r.Patch(reqCtx.Ctx, &job, patch); err != nil {
+				return err
+			}
+		}
 
-	if controllerutil.ContainsFinalizer(job, dataProtectionFinalizerName) {
-		patch := client.MergeFrom(job.DeepCopy())
-		controllerutil.RemoveFinalizer(job, dataProtectionFinalizerName)
-		if err := r.Patch(reqCtx.Ctx, job, patch); err != nil {
+		// delete pod when job deleting.
+		// ref: https://kubernetes.io/blog/2021/05/14/using-finalizers-to-control-deletion/
+		deletePropagation := metav1.DeletePropagationBackground
+		deleteOptions := &client.DeleteOptions{
+			PropagationPolicy: &deletePropagation,
+		}
+		if err := r.Client.Delete(reqCtx.Ctx, &job, deleteOptions); err != nil {
+			// failed delete k8s job, return error info.
 			return err
 		}
 	}
+	return nil
+}
 
-	// delete pod when job deleting.
-	// ref: https://kubernetes.io/blog/2021/05/14/using-finalizers-to-control-deletion/
-	deletePropagation := metav1.DeletePropagationBackground
-	deleteOptions := &client.DeleteOptions{
-		PropagationPolicy: &deletePropagation,
+func (r *BackupJobReconciler) deleteReferenceVolumeSnapshot(reqCtx intctrlutil.RequestCtx, backupJob *dataprotectionv1alpha1.BackupJob) error {
+	snaps := &snapshotv1.VolumeSnapshotList{}
+
+	if err := r.Client.List(reqCtx.Ctx, snaps,
+		client.InNamespace(reqCtx.Req.Namespace),
+		client.MatchingLabels(buildBackupJobLabels(backupJob.Name))); err != nil {
+		return err
 	}
-	if err := r.Client.Delete(reqCtx.Ctx, job, deleteOptions); err != nil {
-		// failed delete k8s job, return error info.
+	for _, i := range snaps.Items {
+		if controllerutil.ContainsFinalizer(&i, dataProtectionFinalizerName) {
+			patch := client.MergeFrom(i.DeepCopy())
+			controllerutil.RemoveFinalizer(&i, dataProtectionFinalizerName)
+			if err := r.Patch(reqCtx.Ctx, &i, patch); err != nil {
+				return err
+			}
+		}
+		deletePropagation := metav1.DeletePropagationBackground
+		deleteOptions := &client.DeleteOptions{
+			PropagationPolicy: &deletePropagation,
+		}
+		if err := r.Client.Delete(reqCtx.Ctx, &i, deleteOptions); err != nil {
+			// failed delete k8s job, return error info.
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *BackupJobReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, backupJob *dataprotectionv1alpha1.BackupJob) error {
+	if err := r.deleteReferenceBatchV1Jobs(reqCtx, backupJob); err != nil {
+		return err
+	}
+	if err := r.deleteReferenceVolumeSnapshot(reqCtx, backupJob); err != nil {
 		return err
 	}
 	return nil
@@ -497,7 +592,7 @@ func (r *BackupJobReconciler) GetTargetClusterPod(
 	return clusterPod, nil
 }
 
-func (r *BackupJobReconciler) GetPodSpec(reqCtx intctrlutil.RequestCtx, backupJob *dataprotectionv1alpha1.BackupJob) (corev1.PodSpec, error) {
+func (r *BackupJobReconciler) BuildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx, backupJob *dataprotectionv1alpha1.BackupJob) (corev1.PodSpec, error) {
 	podSpec := corev1.PodSpec{}
 	logger := reqCtx.Log
 
@@ -641,7 +736,7 @@ func (r *BackupJobReconciler) BuildSnapshotPodSpec(
 
 	container := corev1.Container{}
 	container.Name = backupJob.Name
-	container.Command = []string{"kubectl", "exec", clusterPod.Name, "-c", backupPolicy.Spec.Hooks.ContainerName}
+	container.Command = []string{"kubectl", "exec", "-i", clusterPod.Name, "-c", backupPolicy.Spec.Hooks.ContainerName, "--", "sh", "-c"}
 	if forPreCommand {
 		container.Args = backupPolicy.Spec.Hooks.PreCommands
 	} else {

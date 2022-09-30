@@ -108,12 +108,11 @@ spec:
     databaseEngine: mysql
     labelsSelector:
       matchLabels:
-        mysql.oracle.com/cluster: mycluster
-    secretName: mycluster-cluster-secret
-  targetVolume:
-    name: mysql-persistent-storage
-    persistentVolumeClaim:
-      claimName: datadir-mycluster-0
+        app.kubernetes.io/instance: wesql-cluster	
+    secret:
+      name: wesql-cluster
+      keyUser: username
+      keyPassword: password
   remoteVolumes:
     - name: backup-remote-volume
       persistentVolumeClaim:
@@ -176,19 +175,22 @@ spec:
 
     - name: BACKUP_DIR
       value: /data/$(BACKUP_DIR_PREFIX)
-
-  restoreCommands:
-    - |
-      echo "BACKUP_DIR=${BACKUP_DIR} BACKUP_NAME=${BACKUP_NAME} DATA_DIR=${DATA_DIR}" && \
-      mkdir -p /tmp/data/ && cd /tmp/data \
-      && xbstream -x < /${BACKUP_DIR}/${BACKUP_NAME}.xbstream \
-      && xtrabackup --decompress  --target-dir=/tmp/data/ \
-      && find . -name "*.qp"|xargs rm -f \
-      && rm -rf ${DATA_DIR}/* \
-      && rsync -avrP /tmp/data/ ${DATA_DIR}/ \
-      && rm -rf /tmp/data/ \
-      && chmod -R 0777 ${DATA_DIR}
-  incrementalRestoreCommands: []
+  physical:
+    restoreCommands:
+      - |
+        echo "BACKUP_DIR=${BACKUP_DIR} BACKUP_NAME=${BACKUP_NAME} DATA_DIR=${DATA_DIR}" && \
+        mkdir -p /tmp/data/ && cd /tmp/data \
+        && xbstream -x < /${BACKUP_DIR}/${BACKUP_NAME}.xbstream \
+        && xtrabackup --decompress  --target-dir=/tmp/data/ \
+        && find . -name "*.qp"|xargs rm -f \
+        && rm -rf ${DATA_DIR}/* \
+        && rsync -avrP /tmp/data/ ${DATA_DIR}/ \
+        && rm -rf /tmp/data/ \
+        && chmod -R 0777 ${DATA_DIR}
+    incrementalRestoreCommands: []
+  logical:
+    restoreCommands: []
+    incrementalRestoreCommands: []
   backupCommands:
     - echo "DB_HOST=${DB_HOST} DB_USER=${DB_USER} DB_PASSWORD=${DB_PASSWORD} DATA_DIR=${DATA_DIR} BACKUP_DIR=${BACKUP_DIR} BACKUP_NAME=${BACKUP_NAME}";
       mkdir -p /${BACKUP_DIR};
@@ -228,247 +230,59 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  generation: 1
+  generation: 2
   labels:
-    mysql.oracle.com/cluster: mycluster
-  name: mycluster
+    app.kubernetes.io/component: replicasets-replicasets
+    app.kubernetes.io/created-by: controller-manager
+    app.kubernetes.io/instance: wesql-cluster
+    app.kubernetes.io/name: stat.mysql-wesql-clusterdefinition
+  name: wesql-cluster-replicasets-primary
   namespace: default
 spec:
+  minReadySeconds: 10
   podManagementPolicy: Parallel
   replicas: 1
   revisionHistoryLimit: 10
   selector:
     matchLabels:
-      mysql.oracle.com/cluster: mycluster
-  serviceName: mycluster-instances
+      app.kubernetes.io/component: replicasets-replicasets
+      app.kubernetes.io/instance: wesql-cluster-replicasets-primary
+      app.kubernetes.io/name: stat.mysql-wesql-clusterdefinition
+  serviceName: wesql-cluster-replicasets-primary
   template:
     metadata:
+      creationTimestamp: null
       labels:
-        mysql.oracle.com/cluster: mycluster
+        app.kubernetes.io/component: replicasets-replicasets
+        app.kubernetes.io/instance: wesql-cluster-replicasets-primary
+        app.kubernetes.io/name: stat.mysql-wesql-clusterdefinition
     spec:
       containers:
-      - command:
-        - mysqlsh
-        - --pym
-        - mysqloperator
-        - sidecar
-        env:
-        - name: MY_POD_NAME
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: metadata.name
-        - name: MY_POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: metadata.namespace
-        - name: MYSQL_UNIX_PORT
-          value: /var/run/mysqld/mysql.sock
-        - name: MYSQLSH_USER_CONFIG_HOME
-          value: /mysqlsh
-        image: mysql/mysql-operator:8.0.30-2.0.6
+      - args: []
+        command:
+        - /bin/bash
+        - -c
+        image: docker.io/infracreate/wesql-server-8.0:0.1-SNAPSHOT
         imagePullPolicy: IfNotPresent
-        name: sidecar
-        resources: {}
-        securityContext:
-          runAsUser: 27
-        terminationMessagePath: /dev/termination-log
-        terminationMessagePolicy: File
-        volumeMounts:
-        - mountPath: /var/run/mysqld
-          name: rundir
-        - mountPath: /etc/my.cnf.d
-          name: mycnfdata
-          subPath: my.cnf.d
-        - mountPath: /etc/my.cnf
-          name: mycnfdata
-          subPath: my.cnf
-        - mountPath: /mysqlsh
-          name: shellhome
-      - args:
-        - mysqld
-        - --user=mysql
-        env:
-        - name: MYSQL_UNIX_PORT
-          value: /var/run/mysqld/mysql.sock
-        image: mysql/mysql-server:8.0.28
-        imagePullPolicy: IfNotPresent
-        lifecycle:
-          preStop:
-            exec:
-              command:
-              - sh
-              - -c
-              - sleep 20 && mysqladmin -ulocalroot shutdown
-        livenessProbe:
-          exec:
-            command:
-            - /livenessprobe.sh
-          failureThreshold: 10
-          initialDelaySeconds: 15
-          periodSeconds: 15
-          successThreshold: 1
-          timeoutSeconds: 1
         name: mysql
         ports:
         - containerPort: 3306
           name: mysql
           protocol: TCP
-        - containerPort: 33060
-          name: mysqlx
+        - containerPort: 13306
+          name: paxos
           protocol: TCP
-        - containerPort: 33061
-          name: gr-xcom
-          protocol: TCP
-        readinessProbe:
-          exec:
-            command:
-            - /readinessprobe.sh
-          failureThreshold: 10000
-          initialDelaySeconds: 10
-          periodSeconds: 5
-          successThreshold: 1
-          timeoutSeconds: 1
         resources: {}
-        startupProbe:
-          exec:
-            command:
-            - /livenessprobe.sh
-            - "8"
-          failureThreshold: 10000
-          initialDelaySeconds: 5
-          periodSeconds: 3
-          successThreshold: 1
-          timeoutSeconds: 1
         terminationMessagePath: /dev/termination-log
         terminationMessagePolicy: File
         volumeMounts:
         - mountPath: /var/lib/mysql
-          name: datadir
-        - mountPath: /var/run/mysqld
-          name: rundir
-        - mountPath: /etc/my.cnf.d
-          name: mycnfdata
-          subPath: my.cnf.d
-        - mountPath: /etc/my.cnf
-          name: mycnfdata
-          subPath: my.cnf
-        - mountPath: /livenessprobe.sh
-          name: initconfdir
-          subPath: livenessprobe.sh
-        - mountPath: /readinessprobe.sh
-          name: initconfdir
-          subPath: readinessprobe.sh
+          name: data
       dnsPolicy: ClusterFirst
-      initContainers:
-      - command:
-        - bash
-        - -c
-        - chown 27:27 /var/lib/mysql && chmod 0700 /var/lib/mysql
-        image: mysql/mysql-operator:8.0.30-2.0.6
-        imagePullPolicy: IfNotPresent
-        name: fixdatadir
-        resources: {}
-        securityContext:
-          runAsUser: 0
-        terminationMessagePath: /dev/termination-log
-        terminationMessagePolicy: File
-        volumeMounts:
-        - mountPath: /var/lib/mysql
-          name: datadir
-      - command:
-        - mysqlsh
-        - --log-level=@INFO
-        - --pym
-        - mysqloperator
-        - init
-        env:
-        - name: MY_POD_NAME
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: metadata.name
-        - name: MY_POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: metadata.namespace
-        - name: MYSQLSH_USER_CONFIG_HOME
-          value: /tmp
-        image: mysql/mysql-operator:8.0.30-2.0.6
-        imagePullPolicy: IfNotPresent
-        name: initconf
-        resources: {}
-        securityContext:
-          runAsUser: 27
-        terminationMessagePath: /dev/termination-log
-        terminationMessagePolicy: File
-        volumeMounts:
-        - mountPath: /mnt/initconf
-          name: initconfdir
-          readOnly: true
-        - mountPath: /var/lib/mysql
-          name: datadir
-        - mountPath: /mnt/mycnfdata
-          name: mycnfdata
-      - args:
-        - mysqld
-        - --user=mysql
-        env:
-        - name: MYSQL_INITIALIZE_ONLY
-          value: "1"
-        - name: MYSQL_ROOT_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: rootPassword
-              name: mycluster-cluster-secret
-        - name: MYSQLSH_USER_CONFIG_HOME
-          value: /tmp
-        image: mysql/mysql-server:8.0.28
-        imagePullPolicy: IfNotPresent
-        name: initmysql
-        resources: {}
-        terminationMessagePath: /dev/termination-log
-        terminationMessagePolicy: File
-        volumeMounts:
-        - mountPath: /var/lib/mysql
-          name: datadir
-        - mountPath: /var/run/mysqld
-          name: rundir
-        - mountPath: /etc/my.cnf.d
-          name: mycnfdata
-          subPath: my.cnf.d
-        - mountPath: /docker-entrypoint-initdb.d
-          name: mycnfdata
-          subPath: docker-entrypoint-initdb.d
-        - mountPath: /etc/my.cnf
-          name: mycnfdata
-          subPath: my.cnf
-      readinessGates:
-      - conditionType: mysql.oracle.com/configured
-      - conditionType: mysql.oracle.com/ready
       restartPolicy: Always
       schedulerName: default-scheduler
-      securityContext:
-        fsGroup: 27
-        runAsGroup: 27
-        runAsUser: 27
-      serviceAccount: mycluster-sa
-      serviceAccountName: mycluster-sa
-      subdomain: mycluster
+      securityContext: {}
       terminationGracePeriodSeconds: 30
-      volumes:
-      - emptyDir: {}
-        name: mycnfdata
-      - emptyDir: {}
-        name: rundir
-      - configMap:
-          defaultMode: 493
-          name: mycluster-initconf
-        name: initconfdir
-      - emptyDir: {}
-        name: shellhome
   updateStrategy:
     rollingUpdate:
       partition: 0
@@ -477,14 +291,17 @@ spec:
   - apiVersion: v1
     kind: PersistentVolumeClaim
     metadata:
-      name: datadir
+      creationTimestamp: null
+      name: data
     spec:
       accessModes:
       - ReadWriteOnce
       resources:
         requests:
-          storage: 2Gi
+          storage: 1Gi
       volumeMode: Filesystem
+    status:
+      phase: Pending
 `
 		statefulSet := &appv1.StatefulSet{}
 		Expect(yaml.Unmarshal([]byte(statefulYaml), statefulSet)).Should(Succeed())

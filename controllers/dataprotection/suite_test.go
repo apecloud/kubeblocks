@@ -18,6 +18,7 @@ package dataprotection
 
 import (
 	"context"
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"path/filepath"
 	"testing"
 
@@ -72,6 +73,10 @@ var _ = BeforeSuite(func() {
 	Expect(cfg).NotTo(BeNil())
 
 	scheme := scheme.Scheme
+
+	err = snapshotv1.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+
 	err = dataprotectionv1alpha1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 

@@ -25,6 +25,8 @@ import (
 
 const (
 	looseReversePathFilterValue = "2"
+
+	ErrAddressNotExists = "cannot assign requested address"
 )
 
 type iptablesRule struct {
@@ -102,7 +104,10 @@ func (c *networkClient) CleanNetworkForService(privateIP string, eni *cloud.ENIM
 
 	privateIPNet := &net.IPNet{IP: net.ParseIP(privateIP), Mask: net.IPv4Mask(255, 255, 255, 255)}
 	if err := c.nl.AddrDel(link, &netlink.Addr{IPNet: privateIPNet}); err != nil {
-		return errors.Wrapf(err, "Failed to remove addr for service")
+		if !strings.Contains(err.Error(), ErrAddressNotExists) {
+			return errors.Wrapf(err, "Failed to remove addr for service")
+		}
+		ctxLog.Info("Address not exists, skip delete", "address", privateIPNet.String())
 	}
 
 	// add iptables rules
@@ -176,7 +181,10 @@ func (c *networkClient) SetupNetworkForENI(eni *cloud.ENIMetadata) error {
 		}
 		c.logger.Info("Deleting unknown ip address", "ip", addr.String())
 		if err = c.nl.AddrDel(link, &addr); err != nil {
-			return errors.Wrapf(err, "Failed to delete ip %s from ENI", addr.IP.String())
+			if !strings.Contains(err.Error(), ErrAddressNotExists) {
+				return errors.Wrapf(err, "Failed to delete ip %s from ENI", addr.IP.String())
+			}
+			ctxLog.Info("Address not exists, skip delete", "address", addr.IP.String())
 		}
 	}
 
@@ -233,12 +241,16 @@ func (c *networkClient) SetupNetworkForENI(eni *cloud.ENIMetadata) error {
 		},
 	}
 	for _, r := range routes {
-		err := util.DoWithRetry(context.Background(), c.logger, func() error {
-			return c.nl.RouteReplace(&r)
-		}, &util.RetryOptions{MaxRetry: 10, Delay: 1 * time.Second})
+		// RouteReplace must do two times for new created enis
+		for i := 0; i < 2; i++ {
+			err := util.DoWithRetry(context.Background(), c.logger, func() error {
+				_ = c.nl.RouteReplace(&r)
+				return c.nl.RouteReplace(&r)
+			}, &util.RetryOptions{MaxRetry: 10, Delay: 1 * time.Second})
 
-		if err != nil {
-			return errors.Wrapf(err, "Failed to replace route: %s", r.String())
+			if err != nil {
+				return errors.Wrapf(err, "Failed to replace route: %s", r.String())
+			}
 		}
 		ctxLog.Info("Successfully add route", "route", r.String())
 	}

@@ -146,7 +146,7 @@ func main() {
 		setupLog.Error(err, "Failed to init eni manager")
 		os.Exit(1)
 	}
-	if err := em.Start(); err != nil {
+	if err := em.Start(make(chan struct{})); err != nil {
 		setupLog.Error(err, "Failed to start eni controller")
 	}
 

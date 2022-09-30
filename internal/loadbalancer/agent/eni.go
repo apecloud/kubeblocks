@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -62,7 +61,7 @@ func NewENIManager(logger logr.Logger, cp cloud.Provider, nc network.Client) (*e
 	return c, c.init()
 }
 
-func (c *eniManager) Start() error {
+func (c *eniManager) Start(stop chan struct{}) error {
 	enis, err := c.cp.DescribeAllENIs()
 	if err != nil {
 		return errors.Wrap(err, "Failed to get all enis, retry later")
@@ -89,7 +88,7 @@ func (c *eniManager) Start() error {
 			c.logger.Error(err, "Failed to ensure eni")
 		}
 	}
-	go wait.Forever(worker, 15*time.Second)
+	go wait.Until(worker, 15*time.Second, stop)
 
 	return nil
 }
@@ -104,7 +103,7 @@ func (c *eniManager) init() error {
 		eni := managedENIs[i]
 		c.logger.Info("Discovered managed ENI, trying to set it up", "eni id", eni.ENIId)
 
-		options := &util.RetryOptions{MaxRetry: 3, Delay: 10 * time.Second}
+		options := &util.RetryOptions{MaxRetry: 10, Delay: 1 * time.Second}
 		if err := util.DoWithRetry(context.Background(), c.logger, func() error {
 			return c.nc.SetupNetworkForENI(eni)
 		}, options); err != nil {
@@ -194,6 +193,10 @@ func (c *eniManager) ensureENI() error {
 	c.logger.Info("Local private ip buffer status", "info", string(b))
 
 	if totalSpare < min {
+		if len(enis) >= c.maxENI {
+			c.logger.Info("Limit exceed, can not alloc new eni", "current", enis, "max", c.maxENI)
+			return nil
+		}
 		if err := c.tryAllocAndAttachENI(); err != nil {
 			c.logger.Error(err, "Failed to alloc and attach new ENI")
 		}
@@ -207,15 +210,6 @@ func (c *eniManager) ensureENI() error {
 
 func (c *eniManager) tryAllocAndAttachENI() error {
 	c.logger.Info("Try to alloc and attach new eni")
-
-	enis, err := c.GetManagedENIs()
-	if err != nil {
-		return errors.Wrap(err, "Failed to get managed enis")
-	}
-	if len(enis) >= c.maxENI {
-		c.logger.Info("Limit exceed, can not alloc new eni", "current", enis, "max", c.maxENI)
-		return nil
-	}
 
 	// alloc ENI, use same sg and subnet as primary ENI
 	eniId, err := c.cp.AllocENI()
@@ -244,9 +238,6 @@ func (c *eniManager) tryDetachAndDeleteENI(enis []*cloud.ENIMetadata) error {
 
 	for _, eni := range enis {
 		if len(eni.IPv4Addresses) > 1 {
-			continue
-		}
-		if !aws.BoolValue(eni.IPv4Addresses[0].Primary) {
 			continue
 		}
 		if err := c.nc.CleanNetworkForENI(eni); err != nil {

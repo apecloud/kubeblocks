@@ -70,78 +70,6 @@ var _ = Describe("ServiceController", func() {
 		return mockProvider, mockNetwork, mockENIManager
 	}
 
-	getMockENIs := func() map[string]*cloud.ENIMetadata {
-		return map[string]*cloud.ENIMetadata{
-			eniId1: {
-				ENIId:          eniId1,
-				MAC:            eniMac1,
-				DeviceNumber:   0,
-				SubnetIPv4CIDR: subnet,
-				IPv4Addresses: []*ec2.NetworkInterfacePrivateIpAddress{
-					{
-						Primary:          aws.Bool(true),
-						PrivateIpAddress: aws.String(eniIp11),
-					},
-					{
-						Primary:          aws.Bool(true),
-						PrivateIpAddress: aws.String(eniIp12),
-					},
-					{
-						Primary:          aws.Bool(true),
-						PrivateIpAddress: aws.String(eniIp13),
-					},
-				},
-			},
-			// busiest ENI
-			eniId2: {
-				ENIId:          eniId2,
-				MAC:            eniMac2,
-				DeviceNumber:   1,
-				SubnetIPv4CIDR: subnet,
-				Tags: map[string]string{
-					cloud.TagENIKubeBlocksManaged: "true",
-					cloud.TagENINode:              masterHostIP,
-					cloud.TagENICreatedAt:         time.Now().String(),
-				},
-				IPv4Addresses: []*ec2.NetworkInterfacePrivateIpAddress{
-					{
-						Primary:          aws.Bool(true),
-						PrivateIpAddress: aws.String(eniIp21),
-					},
-					{
-						Primary:          aws.Bool(true),
-						PrivateIpAddress: aws.String(eniIp22),
-					},
-					{
-						Primary:          aws.Bool(true),
-						PrivateIpAddress: aws.String(eniIp23),
-					},
-				},
-			},
-			eniId3: {
-				ENIId:          eniId3,
-				MAC:            eniMac3,
-				DeviceNumber:   3,
-				SubnetIPv4CIDR: subnet,
-				Tags: map[string]string{
-					cloud.TagENIKubeBlocksManaged: "true",
-					cloud.TagENINode:              masterHostIP,
-					cloud.TagENICreatedAt:         time.Now().String(),
-				},
-				IPv4Addresses: []*ec2.NetworkInterfacePrivateIpAddress{
-					{
-						Primary:          aws.Bool(true),
-						PrivateIpAddress: aws.String(eniIp31),
-					},
-					{
-						Primary:          aws.Bool(true),
-						PrivateIpAddress: aws.String(eniIp32),
-					},
-				},
-			},
-		}
-	}
-
 	newSvcObj := func(managed bool, master bool) (*corev1.Service, *types.NamespacedName) {
 		randomStr, _ := password.Generate(6, 0, 0, true, false)
 		svcName := fmt.Sprintf("nginx-%s", randomStr)
@@ -225,11 +153,6 @@ var _ = Describe("ServiceController", func() {
 			mockCloud, mockNetwork, mockENIManager := resetController()
 
 			By("By creating service")
-
-			// TODO move this to eni tests
-			enis := getMockENIs()
-			mockCloud.EXPECT().DescribeAllENIs().Return(enis, nil)
-
 			response := &ec2.AssignPrivateIpAddressesOutput{
 				AssignedPrivateIpAddresses: []*ec2.AssignedPrivateIpAddress{
 					{

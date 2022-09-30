@@ -3,15 +3,18 @@ package loadbalancer
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/record"
-
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+)
+
+const (
+	AnnotationKeyEndpointsVersion = "service.kubernetes.io/apecloud-loadbalancer-endpoints-version"
 )
 
 type EndpointController struct {
@@ -45,22 +48,30 @@ func (c *EndpointController) Reconcile(ctx context.Context, req ctrl.Request) (c
 		listOptions = append(listOptions, client.MatchingLabels{k: v})
 	}
 
-	service := &corev1.Service{}
-	if err := c.Client.Get(ctx, req.NamespacedName, service); err != nil {
+	services := &corev1.ServiceList{}
+	if err := c.Client.List(ctx, services, listOptions...); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, c.logger, "")
 	}
 
-	if _, ok := service.Annotations[AnnotationKeyLoadBalancerType]; !ok {
-		ctxLog.Info("Ignore unrelated endpoints")
-		return intctrlutil.Reconciled()
-	}
+	for i := range services.Items {
+		service := &services.Items[i]
+		if _, ok := service.Annotations[AnnotationKeyLoadBalancerType]; !ok {
+			ctxLog.Info("Ignore unrelated endpoints")
+			return intctrlutil.Reconciled()
+		}
 
-	// endpoint changed, trigger service reconcile
-	service.SetGeneration(service.GetGeneration() + 1)
-	if err := c.Client.Update(ctx, service); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, c.logger, "")
+		// endpoint changed, trigger service reconcile
+		annotations := service.Annotations
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
+		annotations[AnnotationKeyEndpointsVersion] = endpoints.GetObjectMeta().GetResourceVersion()
+		service.SetAnnotations(annotations)
+		if err := c.Client.Update(ctx, service); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, c.logger, "")
+		}
+		ctxLog.Info("Successfully updated service")
 	}
-	ctxLog.Info("Successfully updated service generation")
 
 	return intctrlutil.Reconciled()
 }

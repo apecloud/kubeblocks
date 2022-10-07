@@ -1,9 +1,9 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
+  name: {{ include "loadbalancer.fullname" . }}-agent
   labels:
     {{- include "loadbalancer.labels" . | nindent 4 }}
-  name: {{ include "loadbalancer.fullname" . }}
 spec:
   selector:
     matchLabels:
@@ -22,7 +22,12 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
-      - name: loadbalancer
+      - name: agent
+        command:
+          - "/agent"
+        args:
+          - "--health-probe-bind-address=:8081"
+          - "--metrics-bind-address=127.0.0.1:8080"
         image: "{{ .Values.image.repository }}:v{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         securityContext:
@@ -31,18 +36,16 @@ spec:
           - name: health
             containerPort: 8081
             protocol: TCP
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: health
-          initialDelaySeconds: 5
-          periodSeconds: 20
         readinessProbe:
-          httpGet:
-            path: /readyz
-            port: health
+          exec:
+            command: [ "sh", "-c", "/bin/grpc_health_probe -addr=$HOST_IP:{{ .Values.agent.rpcPort }}"]
           initialDelaySeconds: 5
-          periodSeconds: 10
+          timeoutSeconds: 3
+        livenessProbe:
+          exec:
+            command: [ "sh", "-c", "/bin/grpc_health_probe -addr=$HOST_IP:{{ .Values.agent.rpcPort }}" ]
+          initialDelaySeconds: 10
+          timeoutSeconds: 3
         resources:
           {{- toYaml .Values.resources | nindent 12 }}
         env:
@@ -51,6 +54,8 @@ spec:
             fieldRef:
               apiVersion: v1
               fieldPath: status.hostIP
+        - name: RPC_PORT
+          value: "{{ .Values.agent.rpcPort }}"
         volumeMounts:
         - mountPath: /run/xtables.lock
           name: xtables-lock
@@ -59,7 +64,6 @@ spec:
       priorityClassName: system-node-critical
       restartPolicy: Always
       terminationGracePeriodSeconds: 15
-      serviceAccountName: {{ template "loadbalancer.serviceAccountName" . }}
       {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}

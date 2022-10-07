@@ -14,6 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// TODO assign multiple private ip from different subnets
+// TODO if mask of src address in policy rule little than 32 bit, causing routing problem
+// TODO include iptables binary in agent image
+// TODO monitor security group / subnet / vpc changes
+// TODO reuse pb.ENIMetadata
+// TODO enable grpc auth, transport credentials
+// TODO replace with k8s built-in grpc liveness/readiness probe when we can ensure k8s version > 1.23.0
+// TODO handle endpoint controller
+
 package main
 
 import (
@@ -26,15 +35,12 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/factory"
 
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
-	iptableswrapper "github.com/apecloud/kubeblocks/internal/loadbalancer/iptables"
-	netlinkwrapper "github.com/apecloud/kubeblocks/internal/loadbalancer/netlink"
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/network"
-	procfswrapper "github.com/apecloud/kubeblocks/internal/loadbalancer/procfs"
-
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	"github.com/go-logr/logr"
@@ -43,6 +49,7 @@ import (
 	uzap "go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
+	lb "github.com/apecloud/kubeblocks/controllers/loadbalancer"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	"k8s.io/apimachinery/pkg/runtime"
@@ -51,18 +58,20 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	lb "github.com/apecloud/kubeblocks/controllers/loadbalancer"
 	//+kubebuilder:scaffold:imports
 )
 
+// added lease.coordination.k8s.io for leader election
+//+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch
+
 const (
-	appName      = "loadbalancer"
+	appName      = "loadbalancer-controller"
 	RFC3339Mills = "2006-01-02T15:04:05.000"
 )
 
 var (
 	enableDebug string
+	rpcPort     string
 	scheme      = runtime.NewScheme()
 	setupLog    = ctrl.Log.WithName("setup")
 )
@@ -78,6 +87,7 @@ func init() {
 	viper.AddConfigPath(".")                               // optionally look for config in the working directory
 	viper.AutomaticEnv()
 	_ = viper.BindEnv(enableDebug, "ENABLE_DEBUG")
+	_ = viper.BindEnv(rpcPort, "RPC_PORT")
 
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
 }
@@ -85,8 +95,12 @@ func init() {
 func main() {
 	var metricsAddr string
 	var probeAddr string
+	var enableLeaderElection bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
+		"Enable leader election for controller manager. "+
+			"Enabling this will ensure there is only one active controller manager.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -114,6 +128,25 @@ func main() {
 		MetricsBindAddress:     metricsAddr,
 		HealthProbeBindAddress: probeAddr,
 		CertDir:                viper.GetString("cert_dir"),
+		LeaderElection:         enableLeaderElection,
+		// NOTES:
+		// following LeaderElectionID is generated via hash/fnv (FNV-1 and FNV-1a), in
+		// pattern of '{{ hashFNV .Repo }}.{{ .Domain }}', make sure regenerate this ID
+		// if you have forked from this project template.
+		LeaderElectionID: "002c317f.infracreate.com",
+
+		// NOTES:
+		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
+		// when the Manager ends. This requires the binary to immediately end when the
+		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
+		// speeds up voluntary leader transitions as the new leader don't have to wait
+		// LeaseDuration time first.
+		//
+		// In the default scaffold provided, the program ends immediately after
+		// the manager stops, so would be fine to enable this option. However,
+		// if you are doing or is intended to do any operation such as perform cleanups
+		// after the manager stops then its usage might be unsafe.
+		LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
 		setupLog.Error(err, "Failed to start manager")
@@ -124,33 +157,27 @@ func main() {
 		go pprofListening(logger)
 	}
 
+	cfg, err := rest.InClusterConfig()
+	if err != nil {
+		setupLog.Error(err, "Failed to get incluster config")
+		os.Exit(1)
+	}
+	// https://github.com/kubernetes-sigs/controller-runtime/issues/343
+	// The controller manager provided client is designed to do the right thing for controllers by default (which is to read from caches, meaning that it's not strongly consistent)
+	// We must use raw client to talk with apiserver
+	c, err := client.New(cfg, client.Options{Scheme: scheme})
+	if err != nil {
+		setupLog.Error(err, "Failed to init k8s client")
+		os.Exit(1)
+	}
+
 	cp, err := factory.NewProvider(cloud.ProviderAWS, logger)
 	if err != nil {
 		setupLog.Error(err, "Failed to initialize cloud provider")
 		os.Exit(1)
 	}
 
-	ipt, err := iptableswrapper.NewIPTables()
-	if err != nil {
-		setupLog.Error(err, "Failed to init iptables")
-		os.Exit(1)
-	}
-	nc, err := network.NewClient(logger, netlinkwrapper.NewNetLink(), ipt, procfswrapper.NewProcFS())
-	if err != nil {
-		setupLog.Error(err, "Failed to init network client")
-		os.Exit(1)
-	}
-
-	em, err := agent.NewENIManager(logger, cp, nc)
-	if err != nil {
-		setupLog.Error(err, "Failed to init eni manager")
-		os.Exit(1)
-	}
-	if err := em.Start(make(chan struct{})); err != nil {
-		setupLog.Error(err, "Failed to start eni controller")
-	}
-
-	serviceController, err := lb.NewServiceController(logger, mgr.GetClient(), mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"), em, cp, nc)
+	serviceController, err := lb.NewServiceController(logger, c, mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"), cp)
 	if err != nil {
 		setupLog.Error(err, "Failed to init service controller")
 		os.Exit(1)
@@ -160,15 +187,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	endpointController, err := lb.NewEndpointController(logger, mgr.GetClient(), mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"))
-	if err != nil {
-		setupLog.Error(err, "Failed to init endpoints controller")
-		os.Exit(1)
-	}
-	if err := endpointController.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "Endpoints")
-		os.Exit(1)
-	}
+	//endpointController, err := lb.NewEndpointController(logger, c, mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"))
+	//if err != nil {
+	//	setupLog.Error(err, "Failed to init endpoints controller")
+	//	os.Exit(1)
+	//}
+	//if err := endpointController.SetupWithManager(mgr); err != nil {
+	//	setupLog.Error(err, "Failed to create controller", "controller", "Endpoints")
+	//	os.Exit(1)
+	//}
 
 	//+kubebuilder:scaffold:builder
 

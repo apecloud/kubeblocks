@@ -99,7 +99,7 @@ var _ = Describe("ServiceController", func() {
 			annotations[AnnotationKeyLoadBalancerType] = AnnotationValueLoadBalancerType
 		}
 		if master {
-			annotations[AnnotationKeyMasterHost] = localHostIP
+			annotations[AnnotationKeyMasterNodeIP] = localHostIP
 		}
 		svc.SetAnnotations(annotations)
 		return svc, &types.NamespacedName{
@@ -130,7 +130,7 @@ var _ = Describe("ServiceController", func() {
 
 			newMasterAnnotations := make(map[string]string)
 			newMasterAnnotations[AnnotationKeyLoadBalancerType] = AnnotationValueLoadBalancerType
-			newMasterAnnotations[AnnotationKeyMasterHost] = masterHostIP
+			newMasterAnnotations[AnnotationKeyMasterNodeIP] = masterHostIP
 			serviceController.hostIP = masterHostIP
 			svc.SetAnnotations(newMasterAnnotations)
 			role, err = serviceController.checkRoleForService(context.Background(), svc)
@@ -139,9 +139,9 @@ var _ = Describe("ServiceController", func() {
 
 			oldMasterAnnotations := make(map[string]string)
 			oldMasterAnnotations[AnnotationKeyLoadBalancerType] = AnnotationValueLoadBalancerType
-			oldMasterAnnotations[AnnotationKeyPrivateIP] = svcVIP
+			oldMasterAnnotations[AnnotationKeyFloatingIP] = svcVIP
 			svc.SetAnnotations(oldMasterAnnotations)
-			serviceController.SetPrivateIP(svcVIP, &cloud.ENIMetadata{})
+			serviceController.SetFloatingIP(svcVIP, &cloud.ENIMetadata{})
 			role, err = serviceController.checkRoleForService(context.Background(), svc)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(role == RoleOldMaster).Should(BeTrue())
@@ -168,7 +168,7 @@ var _ = Describe("ServiceController", func() {
 			Expect(k8sClient.Create(context.Background(), svc)).Should(Succeed())
 			Eventually(func() bool {
 				Expect(k8sClient.Get(context.Background(), *key, svc)).Should(Succeed())
-				return svc.Annotations[AnnotationKeyPrivateIP] == eniIp24
+				return svc.Annotations[AnnotationKeyFloatingIP] == eniIp24
 			}, timeout, interval).Should(BeTrue())
 
 			By("By deleting service")
@@ -197,14 +197,14 @@ var _ = Describe("ServiceController", func() {
 			Expect(k8sClient.Create(context.Background(), svc)).Should(Succeed())
 
 			svc.GetAnnotations()[AnnotationKeyENIId] = eniId2
-			svc.GetAnnotations()[AnnotationKeyPrivateIP] = eniIp24
-			svc.GetAnnotations()[AnnotationKeyMasterHost] = masterHostIP
-			serviceController.SetPrivateIP(eniIp24, eni)
-			Expect(serviceController.GetPrivateIP(eniIp24) != nil).Should(BeTrue())
+			svc.GetAnnotations()[AnnotationKeyFloatingIP] = eniIp24
+			svc.GetAnnotations()[AnnotationKeyMasterNodeIP] = masterHostIP
+			serviceController.SetFloatingIP(eniIp24, eni)
+			Expect(serviceController.GetFloatingIP(eniIp24) != nil).Should(BeTrue())
 			Expect(k8sClient.Update(context.Background(), svc)).Should(Succeed())
 
 			Eventually(func() bool {
-				return serviceController.GetPrivateIP(eniIp24) == nil
+				return serviceController.GetFloatingIP(eniIp24) == nil
 			}, timeout, interval).Should(BeTrue())
 		})
 	})

@@ -31,17 +31,24 @@ COPY go.sum go.sum
 RUN go mod download
 
 # Copy the go source
-COPY cmd/loadbalancer/main.go cmd/loadbalancer/main.go
+COPY cmd/loadbalancer/ cmd/loadbalancer/
 COPY apis/ apis/
 COPY internal/ internal/
 COPY controllers/ controllers/
 
+RUN wget -O grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.13/grpc_health_probe-linux-${TARGETARCH}
+
 # Build
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o loadbalancer cmd/loadbalancer/main.go
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o controller ./cmd/loadbalancer/controller \
+    && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o agent ./cmd/loadbalancer/agent
 
 # TODO replace base image
 FROM vimagick/iptables
 WORKDIR /
-COPY --from=builder /workspace/loadbalancer .
+COPY --from=builder /workspace/controller .
+COPY --from=builder /workspace/agent .
+COPY --from=builder /workspace/grpc_health_probe /bin/grpc_health_probe
 
-ENTRYPOINT ["/loadbalancer"]
+RUN chmod +x /bin/grpc_health_probe
+
+ENTRYPOINT ["/agent"]

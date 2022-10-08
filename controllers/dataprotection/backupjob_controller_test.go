@@ -2,6 +2,7 @@ package dataprotection
 
 import (
 	"context"
+	corev1 "k8s.io/api/core/v1"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -113,10 +114,10 @@ spec:
       name: wesql-cluster
       keyUser: username
       keyPassword: password
-  remoteVolumes:
-    - name: backup-remote-volume
-      persistentVolumeClaim:
-        claimName: backup-host-path-pvc
+  remoteVolume:
+    name: backup-remote-volume
+    persistentVolumeClaim:
+      claimName: backup-host-path-pvc
   onFailAttempted: 3
 `
 		backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
@@ -167,14 +168,6 @@ spec:
   env:
     - name: DATA_DIR
       value: /var/lib/mysql
-
-    - name: BACKUP_DIR_PREFIX
-      valueFrom:
-        fieldRef:
-          fieldPath: metadata.namespace
-
-    - name: BACKUP_DIR
-      value: /data/$(BACKUP_DIR_PREFIX)
   physical:
     restoreCommands:
       - |
@@ -232,10 +225,7 @@ kind: StatefulSet
 metadata:
   generation: 2
   labels:
-    app.kubernetes.io/component: replicasets-replicasets
-    app.kubernetes.io/created-by: controller-manager
     app.kubernetes.io/instance: wesql-cluster
-    app.kubernetes.io/name: stat.mysql-wesql-clusterdefinition
   name: wesql-cluster-replicasets-primary
   namespace: default
 spec:
@@ -303,9 +293,79 @@ spec:
     status:
       phase: Pending
 `
+		podYaml := `
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: '2022-09-28T16:03:21Z'
+  generateName: wesql-cluster-replicasets-primary-
+  labels:
+    statefulset.kubernetes.io/pod-name: wesql-cluster-replicasets-primary-0
+  name: wesql-cluster-replicasets-primary-0
+  namespace: default
+spec:
+  containers:
+    - args:
+        - docker-entrypoint.sh mysqld
+      command:
+        - /bin/bash
+        - '-c'
+      env:
+        - name: OPENDBAAS_MY_POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: OPENDBAAS_REPLICASETS_PRIMARY_N
+          value: '1'
+        - name: OPENDBAAS_REPLICASETS_PRIMARY_0_HOSTNAME
+          value: wesql-cluster-replicasets-primary-0
+      image: 'docker.io/infracreate/wesql-server-8.0:0.1-SNAPSHOT'
+      imagePullPolicy: IfNotPresent
+      name: mysql
+      ports:
+        - containerPort: 3306
+          name: mysql
+          protocol: TCP
+        - containerPort: 13306
+          name: paxos
+          protocol: TCP
+      resources: {}
+      terminationMessagePath: /dev/termination-log
+      terminationMessagePolicy: File
+      volumeMounts:
+        - mountPath: /var/lib/mysql
+          name: data
+  hostname: wesql-cluster-replicasets-primary-0
+  preemptionPolicy: PreemptLowerPriority
+  priority: 0
+  restartPolicy: Always
+  securityContext: {}
+  subdomain: wesql-cluster-replicasets-primary
+  terminationGracePeriodSeconds: 30
+  tolerations:
+    - effect: NoExecute
+      key: node.kubernetes.io/not-ready
+      operator: Exists
+      tolerationSeconds: 300
+    - effect: NoExecute
+      key: node.kubernetes.io/unreachable
+      operator: Exists
+      tolerationSeconds: 300
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: data-wesql-cluster-replicasets-primary-0
+  phase: Running
+  qosClass: BestEffort
+`
 		statefulSet := &appv1.StatefulSet{}
 		Expect(yaml.Unmarshal([]byte(statefulYaml), statefulSet)).Should(Succeed())
 		Expect(checkedCreateObj(statefulSet)).Should(Succeed())
+
+		pod := &corev1.Pod{}
+		Expect(yaml.Unmarshal([]byte(podYaml), pod)).Should(Succeed())
+		Expect(checkedCreateObj(pod)).Should(Succeed())
 		return statefulSet
 	}
 

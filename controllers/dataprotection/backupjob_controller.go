@@ -686,12 +686,21 @@ func (r *BackupJobReconciler) BuildBackupToolPodSpec(reqCtx intctrlutil.RequestC
 		Value: backupJob.Name,
 	}
 
-	envBackupDir := corev1.EnvVar{
-		Name:  "BACKUP_DIR",
-		Value: remoteBackupPath,
+	envBackupDirPrefix := corev1.EnvVar{
+		Name: "BACKUP_DIR_PREFIX",
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				FieldPath: "metadata.namespace",
+			},
+		},
 	}
 
-	container.Env = []corev1.EnvVar{envDBHost, envDBUser, envDBPassword, envBackupName, envBackupDir}
+	envBackupDir := corev1.EnvVar{
+		Name:  "BACKUP_DIR",
+		Value: remoteBackupPath + "/$(BACKUP_DIR_PREFIX)",
+	}
+
+	container.Env = []corev1.EnvVar{envDBHost, envDBUser, envDBPassword, envBackupName, envBackupDirPrefix, envBackupDir}
 	// merge env from backup tool.
 	container.Env = append(container.Env, backupTool.Spec.Env...)
 

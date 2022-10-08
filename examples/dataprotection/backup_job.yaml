@@ -9,7 +9,7 @@ metadata:
 
   labels:
     dataprotection.infracreate.com/backup-type: snapshot
-    # if type is incremental, parrentName is required.
+    # if type is incremental, parentName is required.
     #dataprotection.infracreate.com/parent-backup-name: null
     # reference db cluster name
     clusters.dbaas.infracreate.com/name: wesql-cluster

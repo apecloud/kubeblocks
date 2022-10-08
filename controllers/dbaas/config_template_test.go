@@ -64,7 +64,7 @@ loose_binlog_checksum           = crc32
 cluster_name = {{ .Cluster.Name }}
 cluster_namespace = {{ .Cluster.Namespace }}
 component_name = {{ .Component.Name }}
-component_replica = {{ .RoleGroup.Replicas }}
+component_replica = {{ .Component.Replicas }}
 
 {{- $test_value := callBufferSizeByResource ( index .PodSpec.Containers 0 ) }}
 {{ if $test_value -}}
@@ -178,6 +178,7 @@ loose_innodb_primary_flush_max_lsn_lag =  780903144
 			ClusterType:    "state.mysql-8",
 			Name:           "replicasets",
 			Type:           "replicasets",
+			Replicas:       5,
 		}
 		cfgTemplate = []dbaasv1alpha1.ConfigTemplate{
 			{

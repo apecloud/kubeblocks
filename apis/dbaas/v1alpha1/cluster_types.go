@@ -136,8 +136,6 @@ type ClusterComponent struct {
 	// (if supported in the current cloud) which routes to the same endpoints
 	// as the clusterIP.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
-	// +kubebuilder:default=ClusterIP
-	// +kubebuilder:validation:Enum={ClusterIP,NodePort,LoadBalancer}
 	// +optional
 	Service corev1.ServiceSpec `json:"service,omitempty"`
 	// ServiceType corev1.ServiceType `json:"serviceType,omitempty"`

@@ -94,7 +94,6 @@ spec:
                           type: object
                       type: object
                     service:
-                      default: ClusterIP
                       description: 'serviceType determines how the Service is exposed.
                         Valid options are ClusterIP, NodePort, and LoadBalancer. "ClusterIP"
                         allocates a cluster-internal IP address for load-balancing
@@ -108,10 +107,6 @@ spec:
                         on NodePort and creates an external load-balancer (if supported
                         in the current cloud) which routes to the same endpoints as
                         the clusterIP. More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types'
-                      enum:
-                      - ClusterIP
-                      - NodePort
-                      - LoadBalancer
                       properties:
                         allocateLoadBalancerNodePorts:
                           description: allocateLoadBalancerNodePorts defines if NodePorts

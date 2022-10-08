@@ -2,7 +2,7 @@ domain: infracreate.com
 layout:
 - go.kubebuilder.io/v3
 multigroup: true
-projectName: opendbaas-core
+projectName: kubeblocks
 repo: github.com/apecloud/kubeblocks
 resources:
 - api:

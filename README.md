@@ -23,6 +23,7 @@ Features/Enhancement:
   - Pod Disruption Budget (PDB)
   - CRDs installation
   - Self-signed certificates for admission webhook configurations
+- [Configuration template guides](docs/configuration/configuration_tpl_developer.md)
 
 ## Quick start
 
@@ -34,6 +35,7 @@ Usage:
 
 General
   help             Display this help.
+  all              Make all cmd binaries.
 
 Development
   manifests        Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
@@ -44,9 +46,11 @@ Development
   cue-vet          Run cue vet against code.
   lint             Run golangci-lint against code.
   staticcheck      Run staticcheck against code. 
+  loggercheck      Run loggercheck against code.
   build-checks     Run build checks.
   mod-download     Run go mod download against go modules.
   mod-vendor       Run go mod tidy->vendor->verify against go modules.
+  ctrl-test-current-ctx  Run operator controller tests with current $KUBECONFIG context
   test             Run tests.
   test-webhook-enabled  Run tests with webhooks enabled.
   cover-report     Generate cover.html from cover.out
@@ -55,15 +59,12 @@ Development
 CLI
   dbctl            Build bin/dbctl CLI.
   clean-dbctl      Clean bin/dbctl* CLI tools.
-  docker-build-cli  Build docker image with the dbctl.
 
 Operator Controller Manager
   manager          Build manager binary.
   webhook-cert     Create root CA certificates for admission webhooks testing.
   run              Run a controller from your host.
   run-delve        Run Delve debugger.
-  docker-build     Build docker image with the manager.
-  docker-push      Push docker image with the manager.
 
 Deployment
   install          Install CRDs into the K8s cluster specified in ~/.kube/config.
@@ -97,12 +98,23 @@ Build Dependencies
   install-docker-buildx  Create `docker buildx` builder.
   golangci         Download golangci-lint locally if necessary.
   staticchecktool  Download staticcheck locally if necessary.
+  loggerchecktool  Download loggercheck locally if necessary.
   goimportstool    Download goimports locally if necessary.
   cuetool          Download cue locally if necessary.
   helmtool         Download helm locally if necessary.
+  oras             Download ORAS locally if necessary.
+  minikube         Download minikube locally if necessary.
   brew-install-prerequisite  Use `brew install` to install required dependencies. 
+
+Minikube
+  minikube-start   Start minikube cluster.
+  minikube-delete  Delete minikube cluster. 
+
+Docker containers 
+  build-dev-container  Build dev container image.
+  push-dev-container  Push dev container image.
+  build-cli-container  Build dbctl CLI container image.
+  push-cli-container  Push dbctl CLI container image.
+  build-manager-container  Build Operator manager container image.
+  push-manager-container  Push Operator manager container image.
 ```
-
-
-# TODO
-- [ ] CI/CD integration

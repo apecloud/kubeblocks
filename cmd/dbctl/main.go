@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/apecloud/kubeblocks/pkg/cmd"
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd"
 )
 
 func main() {

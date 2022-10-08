@@ -1,5 +1,5 @@
 /*
-Copyright 2022.
+Copyright 2022 The Kubeblocks Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -81,6 +81,16 @@ type ClusterDefinitionList struct {
 	Items           []ClusterDefinition `json:"items"`
 }
 
+type ConfigTemplate struct {
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=128
+	Name string `json:"name,omitempty"`
+
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=32
+	VolumeName string `json:"volumeName,omitempty"`
+}
+
 type ClusterDefinitionComponent struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
@@ -96,6 +106,11 @@ type ClusterDefinitionComponent struct {
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	DefaultReplicas int `json:"defaultReplicas,omitempty"`
+
+	// The configTemplateRefs field provided by ISV, and
+	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster
+	// +optional
+	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
 
 	// antiAffinity defines components should have anti-affinity constraint to same component type
 	// +kubebuilder:default=false

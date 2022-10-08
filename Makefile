@@ -1,7 +1,32 @@
-export GONOPROXY=github.com/apecloud
-export GONOSUMDB=github.com/apecloud
-export GOPRIVATE=github.com/apecloud
-export GOPROXY=https://goproxy.cn
+#
+# Copyright 2022 The Kubeblocks Authors
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+################################################################################
+# Variables                                                                    #
+################################################################################
+
+export GO111MODULE ?= on
+# export GOPROXY ?= https://proxy.golang.org
+export GOPROXY ?= https://goproxy.cn
+export GOSUMDB ?= sum.golang.org
+export GONOPROXY ?= github.com/apecloud
+export GONOSUMDB ?= github.com/apecloud
+export GOPRIVATE ?= github.com/apecloud
+
+
+
+GIT_COMMIT  = $(shell git rev-list -1 HEAD)
+GIT_VERSION = $(shell git describe --always --abbrev=7 --dirty)
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
@@ -14,11 +39,10 @@ ENVTEST_K8S_VERSION = 1.24.1
 
 ENABLE_WEBHOOKS ?= false
 
-APP_NAME = opendbaas-core
+APP_NAME = kubeblock
 
-# Image URL to use all building/pushing image targets
-IMG ?= docker.io/infracreate/$(APP_NAME)
-VERSION ?= 0.1.0-alpha.4
+
+VERSION ?= 0.1.0-alpha.5
 CHART_PATH = deploy/helm
 
 
@@ -192,19 +216,23 @@ goimports: goimportstool ## Run goimports against code.
 
 
 ##@ CLI
-CLI_IMG ?= docker.io/infracreate/dbctl
-CLI_VERSION ?= 0.5.0
-CLI_TAG ?= v$(CLI_VERSION)
+ifdef REL_VERSION
+CLI_VERSION := $(REL_VERSION)
+else
+CLI_VERSION := edge
+CLI_TAG := latest
+endif
 K3S_VERSION ?= v1.23.8+k3s1
 K3D_VERSION ?= 5.4.4
 K3S_IMG_TAG ?= $(subst +,-,$(K3S_VERSION))
 
 CLI_LD_FLAGS ="-s -w \
 	-X github.com/apecloud/kubeblocks/version.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` \
-	-X github.com/apecloud/kubeblocks/version.GitCommit=`git rev-parse HEAD` \
-	-X github.com/apecloud/kubeblocks/version.Version=${CLI_VERSION} \
-	-X github.com/apecloud/kubeblocks/version.K3sImageTag=${K3S_IMG_TAG} \
-	-X github.com/apecloud/kubeblocks/version.K3dVersion=${K3D_VERSION}"
+	-X github.com/apecloud/kubeblocks/version.GitCommit=$(GIT_COMMIT) \
+	-X github.com/apecloud/kubeblocks/version.GitVersion=$(GIT_VERSION) \
+	-X github.com/apecloud/kubeblocks/version.Version=$(CLI_VERSION) \
+	-X github.com/apecloud/kubeblocks/version.K3sImageTag=$(K3S_IMG_TAG) \
+	-X github.com/apecloud/kubeblocks/version.K3dVersion=$(K3D_VERSION)"
 
 
 
@@ -222,10 +250,6 @@ dbctl: build-checks ## Build bin/dbctl CLI.
 clean-dbctl: ## Clean bin/dbctl* CLI tools.
 	rm -f bin/dbctl*
 
-.PHONY: docker-build-cli
-docker-build-cli: clean-dbctl build-checks bin/dbctl.linux.amd64 bin/dbctl.linux.arm64 bin/dbctl.darwin.arm64 bin/dbctl.darwin.amd64 bin/dbctl.windows.amd64 ## Build docker image with the dbctl.
-	docker build . -t ${CLI_IMG}:${CLI_TAG} -f Dockerfile.dbctl
-	docker push ${CLI_IMG}:${CLI_TAG}
 
 
 ##@ Operator Controller Manager
@@ -260,34 +284,6 @@ run-delve: manifests generate fmt vet  ## Run Delve debugger.
 	dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./bin/manager
 
 
-.PHONY: docker-build
-docker-build: test ## Build docker image with the manager.
-ifneq ($(BUILDX_ENABLED), true)
-	docker build . -t ${IMG}:${VERSION} -t ${IMG}:latest
-else
-ifeq ($(TAG_LATEST), true)
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest
-else
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION}
-endif
-endif
-
-
-.PHONY: docker-push
-docker-push: ## Push docker image with the manager.
-ifneq ($(BUILDX_ENABLED), true)
-ifeq ($(TAG_LATEST), true)
-	docker push ${IMG}:latest
-else
-	docker push ${IMG}:${VERSION}
-endif
-else
-ifeq ($(TAG_LATEST), true)
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest --push
-else
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} --push
-endif
-endif
 
 
 ##@ Deployment
@@ -419,6 +415,7 @@ install-docker-buildx: ## Create `docker buildx` builder.
 	docker buildx create --platform linux/amd64,linux/arm64 --name x-builder --driver docker-container --use
 
 .PHONY: golangci
+golangci: GOLANGCILINT_VERSION = 1.49.0
 golangci: ## Download golangci-lint locally if necessary.
 ifneq ($(shell which golangci-lint),)
 	echo golangci-lint is already installed
@@ -499,6 +496,84 @@ else
 HELM=$(shell which helm)
 endif
 
+
+.PHONY: oras
+oras: ORAS_VERSION=0.14.1
+oras: ## Download ORAS locally if necessary.
+ifeq (, $(shell which oras))
+	@{ \
+	set -e ;\
+	echo 'installing oras' ;\
+	curl -LO $(GITHUB_PROXY)https://github.com/oras-project/oras/releases/download/v$(ORAS_VERSION)/oras_$(ORAS_VERSION)_$(GOOS)_$(GOARCH).tar.gz && \
+	mkdir -p oras-install/ && \
+	tar -zxf oras_$(ORAS_VERSION)_*.tar.gz -C oras-install/ && \
+	sudo mv oras-install/oras /usr/local/bin/ && \
+	rm -rf oras_$(ORAS_VERSION)_*.tar.gz oras-install/ ;\
+	echo 'Successfully installed' ;\
+	}
+endif
+ORAS=$(shell which oras)
+
+
+.PHONY: minikube
+minikube: ## Download minikube locally if necessary.
+ifeq (, $(shell which minikube))
+	@{ \
+	set -e ;\
+	echo 'installing minikube' ;\
+	curl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-$(GOOS)-$(GOARCH) && chmod +x minikube && sudo mv minikube /usr/local/bin ;\
+	echo 'Successfully installed' ;\
+	}
+endif
+MINIKUBE=$(shell which minikube)
+
+
 .PHONY: brew-install-prerequisite
 brew-install-prerequisite: ## Use `brew install` to install required dependencies. 
-	brew install go@1.18 kubebuilder delve golangci-lint staticcheck kustomize step cue
+	brew install go@1.18 kubebuilder delve golangci-lint staticcheck kustomize step cue oras jq yq
+
+##@ Minikube
+K8S_VERSION ?= v1.22.15
+MINIKUBE_REGISTRY_MIRROR ?= https://tenxhptk.mirror.aliyuncs.com
+MINIKUBE_IMAGE_REPO ?= registry.cn-hangzhou.aliyuncs.com/google_containers
+
+CSI_ATTACHER_IMG=$(MINIKUBE_IMAGE_REPO)/csi-attacher:v3.1.0
+CSI_PROVISIONER_IMG=$(MINIKUBE_IMAGE_REPO)/csi-provisioner:v2.1.0
+CSI_RESIZER_IMG=$(MINIKUBE_IMAGE_REPO)/csi-resizer:v1.1.0
+CSI_SNAPSHOTTER_IMG=$(MINIKUBE_IMAGE_REPO)/csi-snapshotter:v4.0.0
+CSI_EXT_HMA_IMG=$(MINIKUBE_IMAGE_REPO)/csi-external-health-monitor-agent:v0.2.0
+CSI_EXT_HMC_IMG=$(MINIKUBE_IMAGE_REPO)/csi-external-health-monitor-controller:v0.2.0
+CSI_NODE_DRIVER_REG_IMG=$(MINIKUBE_IMAGE_REPO)/csi-node-driver-registrar:v2.0.1
+LIVENESSPROBE_IMG=$(MINIKUBE_IMAGE_REPO)/livenessprobe:v2.2.0
+HOSTPATHPLUGIN_IMG=$(MINIKUBE_IMAGE_REPO)/hostpathplugin:v1.6.0
+
+
+.PHONY: minikube-start
+minikube-start: DOCKER_PULL_CMD=ssh --native-ssh=false docker pull
+minikube-start: minikube ## Start minikube cluster.
+ifeq (, $(shell $(MINIKUBE) status -ojson | jq -r '.Host' | grep Running))
+	$(MINIKUBE) start --kubernetes-version=$(K8S_VERSION) --registry-mirror=${REGISTRY_MIRROR} --image-repository=${MINIKUBE_IMAGE_REPO}
+endif
+	$(MINIKUBE) update-context
+	$(MINIKUBE) addons enable metrics-server
+	$(MINIKUBE) addons enable volumesnapshots
+	$(MINIKUBE) $(DOCKER_PULL_CMD) $(CSI_ATTACHER_IMG) &
+	$(MINIKUBE) $(DOCKER_PULL_CMD) $(CSI_RESIZER_IMG) &
+	$(MINIKUBE) $(DOCKER_PULL_CMD) $(CSI_SNAPSHOTTER_IMG) &
+	$(MINIKUBE) $(DOCKER_PULL_CMD) $(CSI_EXT_HMA_IMG) &
+	$(MINIKUBE) $(DOCKER_PULL_CMD) $(CSI_EXT_HMC_IMG) &
+	$(MINIKUBE) $(DOCKER_PULL_CMD) $(CSI_NODE_DRIVER_REG_IMG) &
+	$(MINIKUBE) $(DOCKER_PULL_CMD) $(LIVENESSPROBE_IMG) &
+	$(MINIKUBE) $(DOCKER_PULL_CMD) $(HOSTPATHPLUGIN_IMG) &
+	$(MINIKUBE) $(DOCKER_PULL_CMD) $(CSI_PROVISIONER_IMG)
+	$(MINIKUBE) addons enable csi-hostpath-driver
+	kubectl patch storageclass standard -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
+	kubectl patch storageclass csi-hostpath-sc -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+
+
+.PHONY: minikube-delete
+minikube-delete: minikube ## Delete minikube cluster. 
+	$(MINIKUBE) delete
+
+##@ Docker containers 
+include docker/docker.mk

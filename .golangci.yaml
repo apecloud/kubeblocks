@@ -1,11 +1,25 @@
+# options for analysis running
 run:
+  # default concurrency is a available CPU number
+  concurrency: 4
+
+  # timeout for analysis, e.g. 30s, 5m, default is 1m
+  deadline: 15m
+
   timeout: 30m
+
   skip-files:
     - "^zz_generated.*"
 
 output:
   # colored-line-number|line-number|json|tab|checkstyle|code-climate, default is "colored-line-number"
   format: colored-line-number
+
+  # print lines of code with issue, default is true
+  print-issued-lines: true
+
+  # print linter name in the end of issue text, default is true
+  print-linter-name: true
 
 # check available linters @ https://golangci-lint.run/usage/linters/
 linters:

@@ -11,7 +11,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
@@ -164,7 +163,7 @@ func (c *networkClient) SetupNetworkForENI(eni *cloud.ENIMetadata) error {
 
 	expectedIPMap := make(map[string]bool, len(eni.IPv4Addresses))
 	for _, ip := range eni.IPv4Addresses {
-		expectedIPMap[aws.StringValue(ip.PrivateIpAddress)] = true
+		expectedIPMap[ip.Address] = true
 	}
 
 	addrs, err := c.nl.AddrList(link, unix.AF_INET)

@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
-
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/status"
@@ -34,8 +32,8 @@ func (p Proxy) ChooseBusiestENI(ctx context.Context, request *pb.ChooseBusiestEN
 	for i := range eni.IPv4Addresses {
 		addr := eni.IPv4Addresses[i]
 		addrs = append(addrs, &pb.IPv4Address{
-			Address: aws.StringValue(addr.PrivateIpAddress),
-			Primary: aws.BoolValue(addr.Primary),
+			Address: addr.Address,
+			Primary: addr.Primary,
 		})
 	}
 	resp := &pb.ChooseBusiestENIResponse{
@@ -67,8 +65,8 @@ func (p Proxy) GetManagedENIs(ctx context.Context, request *pb.GetManagedENIsReq
 		for i := range eni.IPv4Addresses {
 			addr := eni.IPv4Addresses[i]
 			addrs = append(addrs, &pb.IPv4Address{
-				Address: aws.StringValue(addr.PrivateIpAddress),
-				Primary: aws.BoolValue(addr.Primary),
+				Address: addr.Address,
+				Primary: addr.Primary,
 			})
 		}
 		resp.Enis[enis[index].ENIId] = &pb.ENIMetadata{

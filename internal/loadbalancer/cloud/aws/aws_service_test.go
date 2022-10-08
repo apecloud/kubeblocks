@@ -409,18 +409,9 @@ var _ = Describe("AwsService", func() {
 			leakedENIs, err := service.FindLeakedENIs()
 			Expect(err).Should(BeNil())
 			Expect(len(leakedENIs)).Should(Equal(1))
-			Expect(leakedENIs[0].NetworkInterfaceId).Should(Equal(aws.String(eniId2)))
+			Expect(leakedENIs[0].ENIId).Should(Equal(eniId2))
 			_, ok := store[cloud.TagENICreatedAt]
 			Expect(ok).Should(BeTrue())
-
-			deleted := make(map[string]bool)
-			deleteHookFn := func(ctx aws.Context, input *ec2.DeleteNetworkInterfaceInput, opts ...request.Option) (*ec2.DeleteNetworkInterfaceOutput, error) {
-				deleted[aws.StringValue(input.NetworkInterfaceId)] = true
-				return nil, nil
-			}
-			mockEC2.EXPECT().DeleteNetworkInterfaceWithContext(gomock.Any(), gomock.Any()).DoAndReturn(deleteHookFn).Return(nil, nil)
-			service.cleanLeakedENIs()
-			Expect(deleted[eniId2]).ShouldNot(BeNil())
 		})
 	})
 
@@ -430,7 +421,14 @@ var _ = Describe("AwsService", func() {
 			var err error
 			_, service, mockEC2 := setup(nil)
 
-			mockEC2.EXPECT().AssignPrivateIpAddressesWithContext(gomock.Any(), gomock.Any()).Return(&ec2.AssignPrivateIpAddressesOutput{}, nil)
+			assignOutput := &ec2.AssignPrivateIpAddressesOutput{
+				AssignedPrivateIpAddresses: []*ec2.AssignedPrivateIpAddress{
+					{
+						PrivateIpAddress: aws.String(eniIp22),
+					},
+				},
+			}
+			mockEC2.EXPECT().AssignPrivateIpAddressesWithContext(gomock.Any(), gomock.Any()).Return(assignOutput, nil)
 			_, err = service.AllocIPAddresses(eniId2)
 			Expect(err).Should(BeNil())
 

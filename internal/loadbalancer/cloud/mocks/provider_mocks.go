@@ -23,7 +23,6 @@ package mock_cloud
 import (
 	reflect "reflect"
 
-	ec2 "github.com/aws/aws-sdk-go/service/ec2"
 	gomock "github.com/golang/mock/gomock"
 
 	cloud "github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
@@ -68,10 +67,10 @@ func (mr *MockProviderMockRecorder) AllocENI() *gomock.Call {
 }
 
 // AllocIPAddresses mocks base method.
-func (m *MockProvider) AllocIPAddresses(arg0 string) (*ec2.AssignPrivateIpAddressesOutput, error) {
+func (m *MockProvider) AllocIPAddresses(arg0 string) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AllocIPAddresses", arg0)
-	ret0, _ := ret[0].(*ec2.AssignPrivateIpAddressesOutput)
+	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -110,6 +109,20 @@ func (mr *MockProviderMockRecorder) DeallocIPAddresses(arg0, arg1 interface{}) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeallocIPAddresses", reflect.TypeOf((*MockProvider)(nil).DeallocIPAddresses), arg0, arg1)
 }
 
+// DeleteENI mocks base method.
+func (m *MockProvider) DeleteENI(arg0 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteENI", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteENI indicates an expected call of DeleteENI.
+func (mr *MockProviderMockRecorder) DeleteENI(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteENI", reflect.TypeOf((*MockProvider)(nil).DeleteENI), arg0)
+}
+
 // DescribeAllENIs mocks base method.
 func (m *MockProvider) DescribeAllENIs() (map[string]*cloud.ENIMetadata, error) {
 	m.ctrl.T.Helper()
@@ -123,6 +136,21 @@ func (m *MockProvider) DescribeAllENIs() (map[string]*cloud.ENIMetadata, error) 
 func (mr *MockProviderMockRecorder) DescribeAllENIs() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeAllENIs", reflect.TypeOf((*MockProvider)(nil).DescribeAllENIs))
+}
+
+// FindLeakedENIs mocks base method.
+func (m *MockProvider) FindLeakedENIs() ([]*cloud.ENIMetadata, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindLeakedENIs")
+	ret0, _ := ret[0].([]*cloud.ENIMetadata)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindLeakedENIs indicates an expected call of FindLeakedENIs.
+func (mr *MockProviderMockRecorder) FindLeakedENIs() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindLeakedENIs", reflect.TypeOf((*MockProvider)(nil).FindLeakedENIs))
 }
 
 // FreeENI mocks base method.

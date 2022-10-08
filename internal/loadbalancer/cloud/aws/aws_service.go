@@ -345,7 +345,7 @@ func (c *awsService) AssignPrivateIpAddresses(eniId string, privateIP string) er
 // Comparing the IMDS IPv4 addresses attached to the ENI with the DescribeNetworkInterfaces AWS API call, which
 // technically should be the source of truth and contain the freshest information. Let's just do a quick scan here
 // and output some diagnostic messages if we find stale info in the IMDS result.
-func (c *awsService) checkOutOfSyncState(eniID string, imdsIPv4s, ec2IPv4s []*ec2.NetworkInterfacePrivateIpAddress) bool {
+func (c *awsService) checkOutOfSyncState(eniID string, imdsIPv4s []*cloud.IPv4Address, ec2IPv4s []*ec2.NetworkInterfacePrivateIpAddress) bool {
 	ctxLog := c.logger.WithName("checkOutOfSyncState").WithValues("eni id", eniID)
 
 	synced := true
@@ -353,9 +353,9 @@ func (c *awsService) checkOutOfSyncState(eniID string, imdsIPv4s, ec2IPv4s []*ec
 	imdsIPv4Set := sets.String{}
 	imdsPrimaryIP := ""
 	for _, imdsIPv4 := range imdsIPv4s {
-		imdsIPv4Set.Insert(aws.StringValue(imdsIPv4.PrivateIpAddress))
-		if aws.BoolValue(imdsIPv4.Primary) {
-			imdsPrimaryIP = aws.StringValue(imdsIPv4.PrivateIpAddress)
+		imdsIPv4Set.Insert(imdsIPv4.Address)
+		if imdsIPv4.Primary {
+			imdsPrimaryIP = imdsIPv4.Address
 		}
 	}
 	ec2IPv4Set := sets.String{}
@@ -442,11 +442,11 @@ func (c *awsService) getENIMetadata(eniMAC string) (cloud.ENIMetadata, error) {
 		return result, err
 	}
 
-	ec2ip4s := make([]*ec2.NetworkInterfacePrivateIpAddress, len(ips))
+	ec2ip4s := make([]*cloud.IPv4Address, len(ips))
 	for i, ip := range ips {
-		ec2ip4s[i] = &ec2.NetworkInterfacePrivateIpAddress{
-			Primary:          aws.Bool(i == 0),
-			PrivateIpAddress: aws.String(ip),
+		ec2ip4s[i] = &cloud.IPv4Address{
+			Primary: i == 0,
+			Address: ip,
 		}
 	}
 

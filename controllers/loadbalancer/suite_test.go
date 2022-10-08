@@ -17,8 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
 )
 
 func TestLoadbalancer(t *testing.T) {
@@ -43,6 +41,8 @@ var (
 var _ = BeforeSuite(func() {
 	logf.SetLogger(logger)
 
+	var err error
+
 	ctx, cancel = context.WithCancel(context.TODO())
 
 	By("bootstrapping test environment")
@@ -51,7 +51,6 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: true,
 	}
 
-	var err error
 	// cfg is defined in this file globally.
 	cfg, err = testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
@@ -75,7 +74,7 @@ var _ = BeforeSuite(func() {
 
 	serviceController = &ServiceController{
 		logger:   logger,
-		cache:    make(map[string]*cloud.ENIMetadata),
+		cache:    make(map[string]*FloatingIP),
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("LoadBalancer"),

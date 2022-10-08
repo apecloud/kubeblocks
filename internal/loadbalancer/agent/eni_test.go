@@ -4,8 +4,6 @@ import (
 	"math"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -75,18 +73,18 @@ var _ = Describe("Eni", func() {
 				MAC:            eniMac1,
 				DeviceNumber:   0,
 				SubnetIPv4CIDR: subnet,
-				IPv4Addresses: []*ec2.NetworkInterfacePrivateIpAddress{
+				IPv4Addresses: []*cloud.IPv4Address{
 					{
-						Primary:          aws.Bool(true),
-						PrivateIpAddress: aws.String(eniIp11),
+						Primary: true,
+						Address: eniIp11,
 					},
 					{
-						Primary:          aws.Bool(true),
-						PrivateIpAddress: aws.String(eniIp12),
+						Primary: true,
+						Address: eniIp12,
 					},
 					{
-						Primary:          aws.Bool(true),
-						PrivateIpAddress: aws.String(eniIp13),
+						Primary: true,
+						Address: eniIp13,
 					},
 				},
 			},
@@ -101,18 +99,18 @@ var _ = Describe("Eni", func() {
 					cloud.TagENINode:              masterHostIP,
 					cloud.TagENICreatedAt:         time.Now().String(),
 				},
-				IPv4Addresses: []*ec2.NetworkInterfacePrivateIpAddress{
+				IPv4Addresses: []*cloud.IPv4Address{
 					{
-						Primary:          aws.Bool(true),
-						PrivateIpAddress: aws.String(eniIp21),
+						Primary: true,
+						Address: eniIp21,
 					},
 					{
-						Primary:          aws.Bool(false),
-						PrivateIpAddress: aws.String(eniIp22),
+						Primary: false,
+						Address: eniIp22,
 					},
 					{
-						Primary:          aws.Bool(false),
-						PrivateIpAddress: aws.String(eniIp23),
+						Primary: false,
+						Address: eniIp23,
 					},
 				},
 			},
@@ -126,14 +124,14 @@ var _ = Describe("Eni", func() {
 					cloud.TagENINode:              masterHostIP,
 					cloud.TagENICreatedAt:         time.Now().String(),
 				},
-				IPv4Addresses: []*ec2.NetworkInterfacePrivateIpAddress{
+				IPv4Addresses: []*cloud.IPv4Address{
 					{
-						Primary:          aws.Bool(true),
-						PrivateIpAddress: aws.String(eniIp31),
+						Primary: true,
+						Address: eniIp31,
 					},
 					{
-						Primary:          aws.Bool(false),
-						PrivateIpAddress: aws.String(eniIp32),
+						Primary: false,
+						Address: eniIp32,
 					},
 				},
 			},
@@ -145,10 +143,10 @@ var _ = Describe("Eni", func() {
 					cloud.TagENINode:              masterHostIP,
 					cloud.TagENICreatedAt:         time.Now().String(),
 				},
-				IPv4Addresses: []*ec2.NetworkInterfacePrivateIpAddress{
+				IPv4Addresses: []*cloud.IPv4Address{
 					{
-						Primary:          aws.Bool(true),
-						PrivateIpAddress: aws.String(eniIp41),
+						Primary: true,
+						Address: eniIp41,
 					},
 				},
 			},
@@ -217,6 +215,21 @@ var _ = Describe("Eni", func() {
 			Expect(manager.ensureENI()).Should(Succeed())
 			Expect(len(ids)).Should(Equal(1))
 			Expect(ids[0]).Should(Equal(eniId4))
+		})
+	})
+
+	Context("Clean leaked ENI", func() {
+		It("", func() {
+			manager, mockProvider, _ := setup()
+			enis := []*cloud.ENIMetadata{
+				{
+					ENIId:        eniId1,
+					DeviceNumber: 0,
+				},
+			}
+			mockProvider.EXPECT().FindLeakedENIs().Return(enis, nil)
+			mockProvider.EXPECT().DeleteENI(gomock.Any()).Return(nil).AnyTimes()
+			Expect(manager.cleanLeakedENIs()).Should(Succeed())
 		})
 	})
 })

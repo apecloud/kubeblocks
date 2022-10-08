@@ -1,8 +1,8 @@
 syntax = 'proto3';
 
-package node;
+package protocol;
 
-option go_package = "github.com/apecloud/kubeblocks/internal/loadbalancer/agent";
+option go_package = "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol";
 
 service Node {
   rpc ChooseBusiestENI(ChooseBusiestENIRequest) returns (ChooseBusiestENIResponse) {}

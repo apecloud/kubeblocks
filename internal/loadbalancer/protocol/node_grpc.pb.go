@@ -4,7 +4,7 @@
 // - protoc             v3.21.7
 // source: node.proto
 
-package agent
+package protocol
 
 import (
 	context "context"
@@ -39,7 +39,7 @@ func NewNodeClient(cc grpc.ClientConnInterface) NodeClient {
 
 func (c *nodeClient) ChooseBusiestENI(ctx context.Context, in *ChooseBusiestENIRequest, opts ...grpc.CallOption) (*ChooseBusiestENIResponse, error) {
 	out := new(ChooseBusiestENIResponse)
-	err := c.cc.Invoke(ctx, "/node.Node/ChooseBusiestENI", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/protocol.Node/ChooseBusiestENI", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func (c *nodeClient) ChooseBusiestENI(ctx context.Context, in *ChooseBusiestENIR
 
 func (c *nodeClient) GetManagedENIs(ctx context.Context, in *GetManagedENIsRequest, opts ...grpc.CallOption) (*GetManagedENIsResponse, error) {
 	out := new(GetManagedENIsResponse)
-	err := c.cc.Invoke(ctx, "/node.Node/GetManagedENIs", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/protocol.Node/GetManagedENIs", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (c *nodeClient) GetManagedENIs(ctx context.Context, in *GetManagedENIsReque
 
 func (c *nodeClient) SetupNetworkForService(ctx context.Context, in *SetupNetworkForServiceRequest, opts ...grpc.CallOption) (*SetupNetworkForServiceResponse, error) {
 	out := new(SetupNetworkForServiceResponse)
-	err := c.cc.Invoke(ctx, "/node.Node/SetupNetworkForService", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/protocol.Node/SetupNetworkForService", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (c *nodeClient) SetupNetworkForService(ctx context.Context, in *SetupNetwor
 
 func (c *nodeClient) CleanNetworkForService(ctx context.Context, in *CleanNetworkForServiceRequest, opts ...grpc.CallOption) (*CleanNetworkForServiceResponse, error) {
 	out := new(CleanNetworkForServiceResponse)
-	err := c.cc.Invoke(ctx, "/node.Node/CleanNetworkForService", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/protocol.Node/CleanNetworkForService", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func _Node_ChooseBusiestENI_Handler(srv interface{}, ctx context.Context, dec fu
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/node.Node/ChooseBusiestENI",
+		FullMethod: "/protocol.Node/ChooseBusiestENI",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(NodeServer).ChooseBusiestENI(ctx, req.(*ChooseBusiestENIRequest))
@@ -141,7 +141,7 @@ func _Node_GetManagedENIs_Handler(srv interface{}, ctx context.Context, dec func
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/node.Node/GetManagedENIs",
+		FullMethod: "/protocol.Node/GetManagedENIs",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(NodeServer).GetManagedENIs(ctx, req.(*GetManagedENIsRequest))
@@ -159,7 +159,7 @@ func _Node_SetupNetworkForService_Handler(srv interface{}, ctx context.Context, 
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/node.Node/SetupNetworkForService",
+		FullMethod: "/protocol.Node/SetupNetworkForService",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(NodeServer).SetupNetworkForService(ctx, req.(*SetupNetworkForServiceRequest))
@@ -177,7 +177,7 @@ func _Node_CleanNetworkForService_Handler(srv interface{}, ctx context.Context, 
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/node.Node/CleanNetworkForService",
+		FullMethod: "/protocol.Node/CleanNetworkForService",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(NodeServer).CleanNetworkForService(ctx, req.(*CleanNetworkForServiceRequest))
@@ -189,7 +189,7 @@ func _Node_CleanNetworkForService_Handler(srv interface{}, ctx context.Context, 
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Node_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "node.Node",
+	ServiceName: "protocol.Node",
 	HandlerType: (*NodeServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

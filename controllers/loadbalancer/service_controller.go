@@ -8,12 +8,8 @@ import (
 	"strings"
 	"sync"
 
-	"google.golang.org/grpc/credentials/insecure"
-
-	"github.com/google/uuid"
-	"google.golang.org/grpc"
-
 	"github.com/go-logr/logr"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -60,7 +56,7 @@ type ServiceController struct {
 	Recorder record.EventRecorder
 	logger   logr.Logger
 	cp       cloud.Provider
-	nodes    map[string]pb.NodeClient
+	nc       pb.NodeCache
 	cache    map[string]*FloatingIP
 }
 
@@ -83,7 +79,7 @@ func NewServiceController(logger logr.Logger, client client.Client, scheme *runt
 		Recorder: recorder,
 		logger:   logger,
 		cp:       cp,
-		nodes:    make(map[string]pb.NodeClient),
+		nc:       pb.NewNodeCache(rpcPort),
 		cache:    make(map[string]*FloatingIP),
 	}
 	if err := c.initNodes(); err != nil {
@@ -120,7 +116,7 @@ func (c *ServiceController) initNodes() error {
 func (c *ServiceController) initNode(nodeIP string) error {
 	ctxLog := c.logger.WithValues("node", nodeIP)
 
-	node, err := c.getNode(nodeIP)
+	node, err := c.nc.GetNode(nodeIP)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get rpc client for node %s", nodeIP)
 	}
@@ -160,35 +156,45 @@ func (c *ServiceController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.Reconciled()
 	}
 
-	if err := c.migrateFloatingIP(ctx, ctxLog, svc); err != nil {
+	if err := c.ensureFloatingIP(ctx, ctxLog, svc); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, ctxLog, "")
 	}
 
 	return intctrlutil.Reconciled()
 }
 
-func (c *ServiceController) migrateFloatingIP(ctx context.Context, ctxLog logr.Logger, svc *corev1.Service) error {
+func (c *ServiceController) ensureFloatingIP(ctx context.Context, ctxLog logr.Logger, svc *corev1.Service) error {
 	var (
 		err         error
 		annotations = svc.GetAnnotations()
 		fip         = c.GetFloatingIP(annotations[AnnotationKeyFloatingIP])
 	)
+
 	// service is in deleting
 	if !svc.GetDeletionTimestamp().IsZero() {
 		return c.deleteFloatingIP(ctx, ctxLog, fip, svc)
 	}
 
+	// service is in creating
 	masterNodeIP, err := c.getMasterNodeIP(svc)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get master nodes")
 	}
-
-	// service is in creating, just created
 	if fip == nil {
 		return c.createFloatingIP(ctx, ctxLog, masterNodeIP, svc)
 	}
 
+	return c.migrateFloatingIP(ctx, ctxLog, masterNodeIP, fip, svc)
+}
+
+func (c *ServiceController) migrateFloatingIP(ctx context.Context, ctxLog logr.Logger, masterNodeIP string, fip *FloatingIP, svc *corev1.Service) error {
 	c.logger.Info("Migrating floating ip", "src eni", fip.eni.EniId, "ip", fip.ip)
+
+	if fip.nodeIP == masterNodeIP && fip.eni.EniId == svc.GetAnnotations()[AnnotationKeyENIId] {
+		ctxLog.Info("Floating ip is in sync, do nothing")
+		return nil
+	}
+
 	var (
 		wg   = sync.WaitGroup{}
 		errs []error
@@ -205,7 +211,7 @@ func (c *ServiceController) migrateFloatingIP(ctx context.Context, ctxLog logr.L
 	wg.Wait()
 
 	var messages []string
-	for _, err = range errs {
+	for _, err := range errs {
 		if err == nil {
 			continue
 		}
@@ -224,7 +230,7 @@ func (c *ServiceController) migrateOnNewMaster(ctx context.Context, ctxLog logr.
 		return errors.Wrapf(err, "Failed to dealloc private ip %s", fip.ip)
 	}
 
-	node, err := c.getNode(masterNodeIP)
+	node, err := c.nc.GetNode(masterNodeIP)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get master node")
 	}
@@ -262,7 +268,7 @@ func (c *ServiceController) migrateOnNewMaster(ctx context.Context, ctxLog logr.
 func (c *ServiceController) migrateOnOldMaster(ctx context.Context, ctxLog logr.Logger, fip *FloatingIP) error {
 	ctxLog = ctxLog.WithName("migrateOnOldMaster").WithValues("node", fip.nodeIP)
 
-	node, err := c.getNode(fip.nodeIP)
+	node, err := c.nc.GetNode(fip.nodeIP)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get old master node")
 	}
@@ -281,7 +287,7 @@ func (c *ServiceController) migrateOnOldMaster(ctx context.Context, ctxLog logr.
 func (c *ServiceController) createFloatingIP(ctx context.Context, ctxLog logr.Logger, masterNodeIP string, svc *corev1.Service) error {
 	ctxLog = ctxLog.WithName("createFloatingIP").WithValues("node", masterNodeIP)
 
-	masterNode, err := c.getNode(masterNodeIP)
+	masterNode, err := c.nc.GetNode(masterNodeIP)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get master node")
 	}
@@ -329,7 +335,7 @@ func (c *ServiceController) deleteFloatingIP(ctx context.Context, ctxLog logr.Lo
 	}
 	ctxLog.Info("Successfully released floating ip")
 
-	node, err := c.getNode(fip.nodeIP)
+	node, err := c.nc.GetNode(fip.nodeIP)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get rpc client for node %s", fip.nodeIP)
 	}
@@ -517,36 +523,6 @@ func (c *ServiceController) getMasterNodeIP(svc *corev1.Service) (string, error)
 
 	c.logger.Info("Found master pods", "count", len(pods.Items))
 	return pods.Items[0].Status.HostIP, nil
-}
-
-func (c *ServiceController) getMasterNode(svc *corev1.Service) (pb.NodeClient, error) {
-	ip, err := c.getMasterNodeIP(svc)
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to get master node ip")
-	}
-	return c.getNode(ip)
-}
-
-func (c *ServiceController) getNode(ip string) (pb.NodeClient, error) {
-	var node pb.NodeClient
-
-	c.RLock()
-	node, ok := c.nodes[ip]
-	c.RUnlock()
-	if ok {
-		return node, nil
-	}
-
-	addr := fmt.Sprintf("%s:%d", ip, rpcPort)
-	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to dial: %v", addr)
-	}
-	node = pb.NewNodeClient(conn)
-	c.Lock()
-	c.nodes[ip] = node
-	c.Unlock()
-	return node, nil
 }
 
 func getServiceFullName(service *corev1.Service) string {

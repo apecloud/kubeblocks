@@ -20,10 +20,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	appv1 "k8s.io/api/apps/v1"
 	"strings"
 
+	appv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +37,7 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 )
 
 // BackupJobReconciler reconciles a BackupJob object
@@ -167,6 +167,9 @@ func (r *BackupJobReconciler) DoInProgressPhaseAction(
 		// 1. create and ensure backup tool job finished
 		// 2. get job phase and update
 		err := r.createBackupToolJob(reqCtx, backupJob)
+		if err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
 		key := types.NamespacedName{Namespace: backupJob.Namespace, Name: backupJob.Name}
 		isOK, err := r.ensureBatchV1JobCompleted(reqCtx, key)
 		if err != nil {
@@ -191,8 +194,7 @@ func (r *BackupJobReconciler) DoInProgressPhaseAction(
 	}
 
 	// finally, update backupJob status
-	msg := fmt.Sprintf("Completed backupJob.")
-	r.Recorder.Event(backupJob, corev1.EventTypeNormal, "CreatedBackupJob", msg)
+	r.Recorder.Event(backupJob, corev1.EventTypeNormal, "CreatedBackupJob", "Completed backupJob.")
 	if err := r.Client.Status().Update(reqCtx.Ctx, backupJob); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -400,7 +402,7 @@ func (r *BackupJobReconciler) ensureEmptyHooksCommand(
 	if !isPreCommand {
 		commands = backupPolicy.Spec.Hooks.PostCommands
 	}
-	if len(commands) <= 0 {
+	if len(commands) == 0 {
 		return true, nil
 	}
 	return false, nil

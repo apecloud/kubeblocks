@@ -8,8 +8,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/go-logr/logr"
 	"github.com/google/uuid"
+
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,17 +26,15 @@ import (
 )
 
 const (
-	FinalizerKey                    = "service.kubernetes.io/apecloud-loadbalancer-finalizer"
-	AnnotationKeyENIId              = "service.kubernetes.io/apecloud-loadbalancer-eni-id"
-	AnnotationKeyENINodeIP          = "service.kubernetes.io/apecloud-loadbalancer-eni-node-ip"
-	AnnotationKeyFloatingIP         = "service.kubernetes.io/apecloud-loadbalancer-floating-ip"
-	AnnotationKeyMasterNodeIP       = "service.kubernetes.io/apecloud-loadbalancer-master-node-ip"
-	AnnotationKeyLoadBalancerType   = "service.kubernetes.io/apecloud-loadbalancer-type"
-	AnnotationValueLoadBalancerType = "private-ip"
+	FinalizerKey = "service.kubernetes.io/apecloud-loadbalancer-finalizer"
 
-	RoleNewMaster = "new_master"
-	RoleOldMaster = "old_master"
-	RoleOthers    = "others"
+	AnnotationKeyENIId            = "service.kubernetes.io/apecloud-loadbalancer-eni-id"
+	AnnotationKeyENINodeIP        = "service.kubernetes.io/apecloud-loadbalancer-eni-node-ip"
+	AnnotationKeyFloatingIP       = "service.kubernetes.io/apecloud-loadbalancer-floating-ip"
+	AnnotationKeyMasterNodeIP     = "service.kubernetes.io/apecloud-loadbalancer-master-node-ip"
+	AnnotationKeyLoadBalancerType = "service.kubernetes.io/apecloud-loadbalancer-type"
+
+	AnnotationValueLoadBalancerType = "private-ip"
 )
 
 var (
@@ -82,19 +81,19 @@ func NewServiceController(logger logr.Logger, client client.Client, scheme *runt
 		nc:       pb.NewNodeCache(rpcPort),
 		cache:    make(map[string]*FloatingIP),
 	}
-	if err := c.initNodes(); err != nil {
+
+	nodeList := &corev1.NodeList{}
+	if err := c.Client.List(context.Background(), nodeList); err != nil {
+		return nil, errors.Wrap(err, "Failed to list cluster nodes")
+	}
+	if err := c.initNodes(nodeList); err != nil {
 		return nil, errors.Wrap(err, "Failed to init nodes")
 	}
 	return c, nil
 }
 
-func (c *ServiceController) initNodes() error {
-	clusterNodes := &corev1.NodeList{}
-	if err := c.Client.List(context.Background(), clusterNodes); err != nil {
-		return errors.Wrap(err, "Failed to list cluster nodes")
-	}
-
-	for _, item := range clusterNodes.Items {
+func (c *ServiceController) initNodes(nodeList *corev1.NodeList) error {
+	for _, item := range nodeList.Items {
 		var nodeIP string
 		for _, addr := range item.Status.Addresses {
 			if addr.Type != corev1.NodeInternalIP {
@@ -120,14 +119,14 @@ func (c *ServiceController) initNode(nodeIP string) error {
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get rpc client for node %s", nodeIP)
 	}
-	resp, err := node.GetManagedENIs(context.Background(), &pb.GetManagedENIsRequest{RequestId: uuid.New().String()})
+	resp, err := node.GetManagedENIs(context.Background(), &pb.GetManagedENIsRequest{RequestId: getRequestId()})
 	if err != nil {
 		return errors.Wrapf(err, "Failed to query enis from node %s", nodeIP)
 	}
 	for _, eni := range resp.GetEnis() {
 		for _, addr := range eni.Ipv4Addresses {
 			request := &pb.SetupNetworkForServiceRequest{
-				RequestId: uuid.New().String(),
+				RequestId: getRequestId(),
 				PrivateIp: addr.Address,
 				Eni:       eni,
 			}
@@ -235,31 +234,24 @@ func (c *ServiceController) migrateOnNewMaster(ctx context.Context, ctxLog logr.
 		return errors.Wrap(err, "Failed to get master node")
 	}
 
-	chooseENIRequest := &pb.ChooseBusiestENIRequest{
-		RequestId: uuid.New().String(),
-	}
-	resp, err := node.ChooseBusiestENI(ctx, chooseENIRequest)
+	newENI, err := c.tryAssignPrivateIP(ctxLog, fip.ip, node)
 	if err != nil {
-		return errors.Wrap(err, "Failed to choose busiest ENI")
+		return errors.Wrap(err, "Failed to assign private ip")
 	}
-
-	if err = c.cp.AssignPrivateIpAddresses(resp.Eni.EniId, fip.ip); err != nil {
-		return errors.Wrapf(err, "Failed to assign private ip %s on eni %s", fip.ip, fip.eni.EniId)
-	}
-	fip = &FloatingIP{ip: fip.ip, nodeIP: masterNodeIP, eni: resp.Eni}
-	c.SetFloatingIP(fip.ip, fip)
+	newFip := &FloatingIP{ip: fip.ip, nodeIP: masterNodeIP, eni: newENI}
+	c.SetFloatingIP(newFip.ip, newFip)
 
 	setupServiceRequest := &pb.SetupNetworkForServiceRequest{
-		RequestId: uuid.New().String(),
-		PrivateIp: fip.ip,
-		Eni:       resp.Eni,
+		RequestId: getRequestId(),
+		PrivateIp: newFip.ip,
+		Eni:       newENI,
 	}
 
 	if _, err = node.SetupNetworkForService(ctx, setupServiceRequest); err != nil {
 		return errors.Wrap(err, "Failed to setup host network stack for service")
 	}
 
-	if err := c.updateService(ctx, ctxLog, svc, fip, false); err != nil {
+	if err = c.updateService(ctx, ctxLog, svc, newFip, false); err != nil {
 		return err
 	}
 	return nil
@@ -273,7 +265,7 @@ func (c *ServiceController) migrateOnOldMaster(ctx context.Context, ctxLog logr.
 		return errors.Wrap(err, "Failed to get old master node")
 	}
 	cleanServiceRequest := &pb.CleanNetworkForServiceRequest{
-		RequestId: uuid.New().String(),
+		RequestId: getRequestId(),
 		PrivateIp: fip.ip,
 		Eni:       fip.eni,
 	}
@@ -306,7 +298,7 @@ func (c *ServiceController) createFloatingIP(ctx context.Context, ctxLog logr.Lo
 	c.SetFloatingIP(privateIP, fip)
 
 	request := &pb.SetupNetworkForServiceRequest{
-		RequestId: uuid.New().String(),
+		RequestId: getRequestId(),
 		PrivateIp: fip.ip,
 		Eni:       fip.eni,
 	}
@@ -340,7 +332,7 @@ func (c *ServiceController) deleteFloatingIP(ctx context.Context, ctxLog logr.Lo
 		return errors.Wrapf(err, "Failed to get rpc client for node %s", fip.nodeIP)
 	}
 	request := &pb.CleanNetworkForServiceRequest{
-		RequestId: uuid.New().String(),
+		RequestId: getRequestId(),
 		PrivateIp: fip.ip,
 		Eni:       fip.eni,
 	}
@@ -431,7 +423,7 @@ func (c *ServiceController) tryAllocPrivateIP(ctxLog logr.Logger, node pb.NodeCl
 	ctxLog = ctxLog.WithName("tryAllocPrivateIP")
 
 	request := &pb.ChooseBusiestENIRequest{
-		RequestId: uuid.New().String(),
+		RequestId: getRequestId(),
 	}
 	resp, err := node.ChooseBusiestENI(context.Background(), request)
 	if err != nil {
@@ -453,7 +445,7 @@ func (c *ServiceController) tryAssignPrivateIP(ctxLog logr.Logger, ip string, no
 	ctxLog = ctxLog.WithName("tryAssignPrivateIP").WithValues("ip", ip)
 
 	request := &pb.ChooseBusiestENIRequest{
-		RequestId: uuid.New().String(),
+		RequestId: getRequestId(),
 	}
 	resp, err := node.ChooseBusiestENI(context.Background(), request)
 	if err != nil {
@@ -527,4 +519,8 @@ func (c *ServiceController) getMasterNodeIP(svc *corev1.Service) (string, error)
 
 func getServiceFullName(service *corev1.Service) string {
 	return fmt.Sprintf("%s/%s", service.GetNamespace(), service.GetName())
+}
+
+func getRequestId() string {
+	return uuid.New().String()
 }

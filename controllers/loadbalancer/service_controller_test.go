@@ -28,34 +28,20 @@ var _ = Describe("ServiceController", func() {
 		interval      = 1 * time.Second
 		svcPort       = 12345
 		svcTargetPort = 80
-		rpcPort       = 19200
 		svcNamespace  = "default"
 		node1IP       = "172.31.1.2"
 		node2IP       = "172.31.1.1"
-		svcVIP        = "172.31.1.100"
-
-		subnet = "172.31.0.0/16"
 
 		eniId1  = "eni-01"
-		eniMac1 = "00:00:00:00:00:01"
 		eniIp11 = "172.31.1.10"
 		eniIp12 = "172.31.1.11"
-		eniIp13 = "172.31.1.12"
 
 		eniId2  = "eni-02"
-		eniMac2 = "00:00:00:00:00:02"
 		eniIp21 = "172.31.2.10"
 		eniIp22 = "172.31.2.11"
-		eniIp23 = "172.31.2.12"
-		eniIp24 = "172.31.2.14"
-
-		eniId3  = "eni-03"
-		eniMac3 = "00:00:00:00:00:03"
-		eniIp31 = "172.31.3.10"
-		eniIp32 = "172.31.3.11"
 	)
 
-	resetController := func() (*gomock.Controller, *mockcloud.MockProvider, *mock_protocol.MockNodeCache) {
+	setupController := func() (*gomock.Controller, *mockcloud.MockProvider, *mock_protocol.MockNodeCache) {
 		ctrl := gomock.NewController(GinkgoT())
 
 		mockProvider := mockcloud.NewMockProvider(ctrl)
@@ -112,122 +98,128 @@ var _ = Describe("ServiceController", func() {
 		// Add any teardown steps that needs to be executed after each test
 	})
 
-	Context("Get master node ip", func() {
+	Context("Init nodes", func() {
 		It("", func() {
-			//var (
-			//	role                            string
-			//	err                             error
-			//	svc, _                          = newSvcObj(false, false)
-			//	ctrl_, mockCloud, mockNodeCache = resetController()
-			//)
-			//
-			//role, err = serviceController.checkRoleForService(context.Background(), svc)
-			//Expect(err).ToNot(HaveOccurred())
-			//Expect(role == RoleOthers).Should(BeTrue())
-			//
-			//newMasterAnnotations := make(map[string]string)
-			//newMasterAnnotations[AnnotationKeyLoadBalancerType] = AnnotationValueLoadBalancerType
-			//newMasterAnnotations[AnnotationKeyMasterNodeIP] = node1IP
-			//serviceController.hostIP = node1IP
-			//svc.SetAnnotations(newMasterAnnotations)
-			//role, err = serviceController.checkRoleForService(context.Background(), svc)
-			//Expect(err).ToNot(HaveOccurred())
-			//Expect(role == RoleNewMaster).Should(BeTrue())
-			//
-			//oldMasterAnnotations := make(map[string]string)
-			//oldMasterAnnotations[AnnotationKeyLoadBalancerType] = AnnotationValueLoadBalancerType
-			//oldMasterAnnotations[AnnotationKeyFloatingIP] = svcVIP
-			//svc.SetAnnotations(oldMasterAnnotations)
-			//serviceController.SetFloatingIP(svcVIP, &cloud.ENIMetadata{})
-			//role, err = serviceController.checkRoleForService(context.Background(), svc)
-			//Expect(err).ToNot(HaveOccurred())
-			//Expect(role == RoleOldMaster).Should(BeTrue())
+			ctrl := gomock.NewController(GinkgoT())
+			mockCloud := mockcloud.NewMockProvider(ctrl)
+			mockNodeCache := mock_protocol.NewMockNodeCache(ctrl)
+
+			sc := &ServiceController{
+				Client: k8sClient,
+				logger: logger,
+				cp:     mockCloud,
+				nc:     mockNodeCache,
+				cache:  make(map[string]*FloatingIP),
+			}
+
+			mockNode := mock_protocol.NewMockNodeClient(ctrl)
+			mockNodeCache.EXPECT().GetNode(node1IP).Return(mockNode, nil).AnyTimes()
+
+			getENIResponse := &protocol.GetManagedENIsResponse{
+				Enis: map[string]*protocol.ENIMetadata{
+					eniId1: {
+						EniId: eniId1,
+						Ipv4Addresses: []*protocol.IPv4Address{
+							{
+								Primary: true,
+								Address: eniIp11,
+							},
+						},
+					},
+					eniId2: {
+						EniId: eniId2,
+						Ipv4Addresses: []*protocol.IPv4Address{
+							{
+								Primary: true,
+								Address: eniIp21,
+							},
+							{
+								Primary: false,
+								Address: eniIp22,
+							},
+						},
+					},
+				},
+			}
+			nodeList := &corev1.NodeList{
+				Items: []corev1.Node{
+					{
+						Status: corev1.NodeStatus{
+							Addresses: []corev1.NodeAddress{
+								{
+									Type:    corev1.NodeInternalIP,
+									Address: node1IP,
+								},
+							},
+						},
+					},
+				},
+			}
+			mockNode.EXPECT().GetManagedENIs(gomock.Any(), gomock.Any()).Return(getENIResponse, nil).AnyTimes()
+			mockNode.EXPECT().SetupNetworkForService(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+			Expect(sc.initNodes(nodeList)).Should(Succeed())
 		})
 	})
 
 	Context("Create and delete service", func() {
 		It("", func() {
-			ctrl, mockCloud, mockNodeCache := resetController()
+			ctrl, mockCloud, mockNodeCache := setupController()
+
+			var (
+				floatingIP        = eniIp12
+				oldNodeIP         = node1IP
+				newNodeIP         = node2IP
+				oldENIId          = eniId1
+				newENIId          = eniId2
+				chooseENIResponse *protocol.ChooseBusiestENIResponse
+			)
 
 			By("By creating service")
-			nodeClient := mock_protocol.NewMockNodeClient(ctrl)
-			mockNodeCache.EXPECT().GetNode(node1IP).Return(nodeClient, nil).AnyTimes()
+			mockOldNode := mock_protocol.NewMockNodeClient(ctrl)
+			mockNodeCache.EXPECT().GetNode(oldNodeIP).Return(mockOldNode, nil).AnyTimes()
 
-			chooseENIResponse := &protocol.ChooseBusiestENIResponse{
+			chooseENIResponse = &protocol.ChooseBusiestENIResponse{
 				Eni: &protocol.ENIMetadata{
-					EniId: eniId1,
+					EniId: oldENIId,
 				},
 			}
-			nodeClient.EXPECT().ChooseBusiestENI(gomock.Any(), gomock.Any()).Return(chooseENIResponse, nil).AnyTimes()
-			mockCloud.EXPECT().AllocIPAddresses(eniId1).Return(eniIp13, nil).AnyTimes()
-			nodeClient.EXPECT().SetupNetworkForService(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+			mockOldNode.EXPECT().ChooseBusiestENI(gomock.Any(), gomock.Any()).Return(chooseENIResponse, nil)
+			mockCloud.EXPECT().AllocIPAddresses(oldENIId).Return(floatingIP, nil)
+			mockOldNode.EXPECT().SetupNetworkForService(gomock.Any(), gomock.Any()).Return(nil, nil)
 
-			svc, key := newSvcObj(true, node1IP)
+			svc, key := newSvcObj(true, oldNodeIP)
 			Expect(k8sClient.Create(context.Background(), svc)).Should(Succeed())
 
-			fetchedSvc := corev1.Service{}
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), *key, &fetchedSvc)
-				return fetchedSvc.Annotations[AnnotationKeyFloatingIP] == eniIp13
+				_ = k8sClient.Get(context.Background(), *key, svc)
+				return svc.Annotations[AnnotationKeyFloatingIP] == floatingIP
 			}, timeout, interval).Should(BeTrue())
 
-			By("By deleting service")
-			mockCloud.EXPECT().DeallocIPAddresses(eniId1, []string{eniIp13}).Return(nil).AnyTimes()
-			nodeClient.EXPECT().CleanNetworkForService(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-			Expect(k8sClient.Delete(context.Background(), svc)).Should(Succeed())
-		})
-	})
-
-	Context("When update service, on old master", func() {
-		It("Should success without error", func() {
-			ctrl, mockCloud, mockNodeCache := resetController()
-			fip := &FloatingIP{
-				ip:     eniIp12,
-				nodeIP: node1IP,
-				eni: &protocol.ENIMetadata{
-					EniId:          eniId1,
-					Mac:            eniMac1,
-					DeviceNumber:   2,
-					SubnetIpv4Cidr: subnet,
-					Ipv4Addresses: []*protocol.IPv4Address{
-						{
-							Primary: true,
-							Address: eniIp11,
-						},
-						{
-							Primary: false,
-							Address: eniIp12,
-						},
-					},
-				},
-			}
-
-			By("do works on new master")
-			serviceController.SetFloatingIP(fip.ip, fip)
-			mockCloud.EXPECT().DeallocIPAddresses(gomock.Any(), []string{fip.ip}).Return(nil).AnyTimes()
+			By("By migrating service")
+			mockCloud.EXPECT().DeallocIPAddresses(eniId1, []string{floatingIP}).Return(nil)
 			mockNewNode := mock_protocol.NewMockNodeClient(ctrl)
-			chooseENIResponse := &protocol.ChooseBusiestENIResponse{
+			chooseENIResponse = &protocol.ChooseBusiestENIResponse{
 				Eni: &protocol.ENIMetadata{
-					EniId: eniId2,
+					EniId: newENIId,
 				},
 			}
 			mockNewNode.EXPECT().ChooseBusiestENI(gomock.Any(), gomock.Any()).Return(chooseENIResponse, nil).AnyTimes()
-			mockNodeCache.EXPECT().GetNode(node2IP).Return(mockNewNode, nil).AnyTimes()
-			mockCloud.EXPECT().AssignPrivateIpAddresses(eniId2, fip.ip).Return(nil).AnyTimes()
 			mockNewNode.EXPECT().SetupNetworkForService(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-
-			By("do works on old master")
-			mockOldNode := mock_protocol.NewMockNodeClient(ctrl)
+			mockNodeCache.EXPECT().GetNode(newNodeIP).Return(mockNewNode, nil).AnyTimes()
+			mockCloud.EXPECT().AssignPrivateIpAddresses(newENIId, floatingIP).Return(nil).AnyTimes()
 			mockOldNode.EXPECT().CleanNetworkForService(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-			mockNodeCache.EXPECT().GetNode(node1IP).Return(mockOldNode, nil).AnyTimes()
 
-			svc, key := newSvcObj(true, node2IP)
-			svc.GetAnnotations()[AnnotationKeyFloatingIP] = eniIp12
-			Expect(k8sClient.Create(context.Background(), svc)).Should(Succeed())
+			svc.GetAnnotations()[AnnotationKeyMasterNodeIP] = newNodeIP
+			Expect(k8sClient.Update(context.Background(), svc)).Should(Succeed())
 			Eventually(func() bool {
 				Expect(k8sClient.Get(context.Background(), *key, svc)).Should(Succeed())
-				return svc.Annotations[AnnotationKeyENIId] == eniId2
+				return svc.Annotations[AnnotationKeyENIId] == newENIId
 			}, timeout, interval).Should(BeTrue())
+
+			By("By deleting service")
+			mockCloud.EXPECT().DeallocIPAddresses(newENIId, []string{floatingIP}).Return(nil)
+			mockNewNode.EXPECT().CleanNetworkForService(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+			Expect(k8sClient.Delete(context.Background(), svc)).Should(Succeed())
 		})
 	})
 })

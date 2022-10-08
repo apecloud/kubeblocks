@@ -19,11 +19,15 @@ type Provider interface {
 
 	AllocENI() (string, error)
 
+	DeleteENI(id string) error
+
 	FreeENI(id string) error
 
 	DescribeAllENIs() (map[string]*ENIMetadata, error)
 
-	AllocIPAddresses(id string) (*ec2.AssignPrivateIpAddressesOutput, error)
+	FindLeakedENIs() ([]*ENIMetadata, error)
+
+	AllocIPAddresses(id string) (string, error)
 
 	DeallocIPAddresses(id string, ips []string) error
 

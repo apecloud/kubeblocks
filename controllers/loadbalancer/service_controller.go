@@ -13,7 +13,6 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -435,11 +434,10 @@ func (c *ServiceController) tryAllocPrivateIP(ctxLog logr.Logger, node pb.NodeCl
 	eni := resp.Eni
 	ctxLog.Info("Successfully choose busiest eni", "eni id", eni.EniId)
 
-	res, err := c.cp.AllocIPAddresses(eni.EniId)
+	ip, err := c.cp.AllocIPAddresses(eni.EniId)
 	if err != nil {
 		return "", nil, errors.Wrap(err, fmt.Sprintf("Failed to alloc private ip on eni %s", eni.EniId))
 	}
-	ip := aws.StringValue(res.AssignedPrivateIpAddresses[0].PrivateIpAddress)
 	ctxLog.Info("Successfully alloc private ip", "ip", ip, "eni id", eni.EniId)
 
 	return ip, eni, nil

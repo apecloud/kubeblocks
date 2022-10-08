@@ -3,10 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"google.golang.org/grpc/health/grpc_health_v1"
 	"net"
 	"os"
 	"time"
+
+	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/go-logr/zapr"
 	"github.com/spf13/viper"

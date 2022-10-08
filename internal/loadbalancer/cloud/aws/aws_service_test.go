@@ -406,7 +406,7 @@ var _ = Describe("AwsService", func() {
 				}
 			}
 			mockEC2.EXPECT().CreateTagsWithContext(gomock.Any(), gomock.Any()).DoAndReturn(recordCreatedTagsRequest).Return(nil, nil).AnyTimes()
-			leakedENIs, err := service.findLeakedENis()
+			leakedENIs, err := service.FindLeakedENIs()
 			Expect(err).Should(BeNil())
 			Expect(len(leakedENIs)).Should(Equal(1))
 			Expect(leakedENIs[0].NetworkInterfaceId).Should(Equal(aws.String(eniId2)))

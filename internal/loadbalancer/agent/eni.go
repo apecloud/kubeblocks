@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -83,12 +84,19 @@ func (c *eniManager) Start(stop chan struct{}) error {
 	}
 	c.logger.Info("Successfully disable primary eni source/destination check")
 
-	worker := func() {
+	f1 := func() {
 		if err := c.ensureENI(); err != nil {
 			c.logger.Error(err, "Failed to ensure eni")
 		}
 	}
-	go wait.Until(worker, 15*time.Second, stop)
+	go wait.Until(f1, 15*time.Second, stop)
+
+	f2 := func() {
+		if err := c.cleanLeakedENIs(); err != nil {
+			c.logger.Error(err, "Failed to clean leaked enis")
+		}
+	}
+	go wait.Until(f2, 1*time.Minute, stop)
 
 	return nil
 }
@@ -288,4 +296,31 @@ func (c *eniManager) getMaxENI() (int, error) {
 		return envMax, nil
 	}
 	return instanceMaxENI, nil
+}
+
+// clean leaked network interface created by local instance
+func (c *eniManager) cleanLeakedENIs() error {
+	c.logger.Info("Start cleaning leaked enis")
+
+	leakedENIs, err := c.cp.FindLeakedENIs()
+	if err != nil {
+		return errors.Wrap(err, "Failed to find leaked enis, skip")
+	}
+	if len(leakedENIs) == 0 {
+		c.logger.Info("No leaked enis found, skip cleaning")
+		return nil
+	}
+
+	var errs []string
+	for _, eni := range leakedENIs {
+		if err = c.cp.DeleteENI(eni.ENIId); err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %s", eni.ENIId, err.Error()))
+			continue
+		}
+		c.logger.Info("Successfully deleted leaked eni", "eni id", eni.ENIId)
+	}
+	if len(errs) != 0 {
+		return errors.New(fmt.Sprintf("Failed to delete leaked enis, err: %s", strings.Join(errs, "|")))
+	}
+	return nil
 }

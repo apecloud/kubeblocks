@@ -40,8 +40,9 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/factory"
 
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/viper"

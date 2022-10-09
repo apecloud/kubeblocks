@@ -294,7 +294,7 @@ type TopologySpreadConstraint struct {
 	// WhenUnsatisfiable indicates how to deal with a Pod if it doesn't satisfy the spread constraint
 	// +kubebuilder:default=DoNotSchedule
 	// +kubebuilder:validation:Enum={DoNotSchedule,ScheduleAnyway}
-	WhenUnsatisfiable UnsatisfiableConstraintAction `json:"whenUnsatisfiable,omitempty"`
+	WhenUnsatisfiable corev1.UnsatisfiableConstraintAction `json:"whenUnsatisfiable,omitempty"`
 }
 
 func init() {

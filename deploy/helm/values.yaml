@@ -47,7 +47,7 @@ podSecurityContext:
 
 service:
   type: ClusterIP
-  port: 8443
+  port: 9443
   # -- Service node port.
   # Only used if `service.type` is `NodePort`.
   nodePort:
@@ -100,5 +100,3 @@ podDisruptionBudget:
 admissionWebhooks:
   enabled: true
   createSelfSignedCert: true
-
-kubeRBACProxyImageRepo: docker.io/infracreate/kube-rbac-proxy:v0.12.0

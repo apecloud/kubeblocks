@@ -254,39 +254,11 @@ clean-dbctl: ## Clean bin/dbctl* CLI tools.
 
 ##@ Load Balancer
 
-LB_IMG ?= docker.io/infracreate/loadbalancer
-LB_VERSION ?= 0.1.0
-LB_TAG ?= v$(LB_VERSION)
-
 .PHONY: loadbalancer
 loadbalancer: build-checks ## Build loadbalancer binary.
 	$(GO) generate -x ./...
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer-controller ./cmd/loadbalancer/controller
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer-agent ./cmd/loadbalancer/agent
-
-.PHONY: docker-build-loadbalancer
-docker-build-loadbalancer: ## Push docker image with the loadbalancer.
-ifneq ($(BUILDX_ENABLED), true)
-	docker build . -t ${LB_IMG}:${LB_TAG} -t ${LB_IMG}:latest -f ./docker/Dockerfile-loadbalancer
-else
-ifeq ($(TAG_LATEST), true)
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:latest -f ./docker/Dockerfile-loadbalancer
-else
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:${LB_TAG} -f ./docker/Dockerfile-loadbalancer
-endif
-endif
-
-.PHONY: docker-push-loadbalancer
-docker-push-loadbalancer: test ## Push docker image with the loadbalancer.
-ifneq ($(BUILDX_ENABLED), true)
-	docker build . -t ${LB_IMG}:${LB_TAG} -t ${LB_IMG}:latest -f Dockerfile.loadbalancer
-else
-ifeq ($(TAG_LATEST), true)
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:latest -f Dockerfile.loadbalancer
-else
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:${LB_TAG} -f Dockerfile.loadbalancer
-endif
-endif
 
 ##@ Operator Controller Manager
 

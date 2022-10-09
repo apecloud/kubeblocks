@@ -188,15 +188,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	//endpointController, err := lb.NewEndpointController(logger, c, mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"))
-	//if err != nil {
-	//	setupLog.Error(err, "Failed to init endpoints controller")
-	//	os.Exit(1)
-	//}
-	//if err := endpointController.SetupWithManager(mgr); err != nil {
-	//	setupLog.Error(err, "Failed to create controller", "controller", "Endpoints")
-	//	os.Exit(1)
-	//}
+	/*
+		endpointController, err := lb.NewEndpointController(logger, c, mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"))
+		if err != nil {
+			setupLog.Error(err, "Failed to init endpoints controller")
+			os.Exit(1)
+		}
+		if err := endpointController.SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to create controller", "controller", "Endpoints")
+			os.Exit(1)
+		}
+	*/
 
 	//+kubebuilder:scaffold:builder
 

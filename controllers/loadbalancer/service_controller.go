@@ -8,9 +8,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/google/uuid"
-
 	"github.com/go-logr/logr"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -315,12 +314,11 @@ func (c *ServiceController) createFloatingIP(ctx context.Context, ctxLog logr.Lo
 }
 
 func (c *ServiceController) deleteFloatingIP(ctx context.Context, ctxLog logr.Logger, fip *FloatingIP, svc *corev1.Service) error {
-	ctxLog = ctxLog.WithName("deleteFloatingIP").WithValues("node", fip.nodeIP)
-
 	if fip == nil {
 		c.logger.Info("Service floating ip is nil, skip delete")
 		return nil
 	}
+	ctxLog = ctxLog.WithName("deleteFloatingIP").WithValues("node", fip.nodeIP)
 
 	if err := c.deletePrivateIP(ctx, fip.ip, svc); err != nil {
 		return errors.Wrap(err, "Failed to delete private ip")

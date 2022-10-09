@@ -27,7 +27,6 @@ const (
 	dbClusterFinalizerName    = "cluster.infracreate.com/finalizer"
 	dbClusterDefFinalizerName = "clusterdefinition.infracreate.com/finalizer"
 	appVersionFinalizerName   = "appversion.infracreate.com/finalizer"
-	consensusSetFinalizerName = "consensusset.infracreate.com/finalizer"
 
 	// label keys
 	clusterDefLabelKey         = "clusterdefinition.infracreate.com/name"
@@ -36,7 +35,6 @@ const (
 	appComponentLabelKey       = "app.kubernetes.io/component"
 	appNameLabelKey            = "app.kubernetes.io/name"
 	statefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
-	consensusSetLabelKey       = "consensusset.infracreate.com/name"
 	consensusSetRoleLabelKey   = "cs.dbaas.infracreate.com/role"
 )
 

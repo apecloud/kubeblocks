@@ -75,15 +75,6 @@ resources:
   kind: BackupPolicyTemplate
   path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
   version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: infracreate.com
-  group: dbaas
-  kind: ConsensusSet
-  path: github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1
-  version: v1alpha1
   webhooks:
     defaulting: true
     validation: true

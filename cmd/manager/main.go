@@ -219,17 +219,6 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "BackupPolicyTemplate")
 		os.Exit(1)
 	}
-	if err = (&dbaascontrollers.ConsensusSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ConsensusSet")
-		os.Exit(1)
-	}
-	if err = (&dbaasv1alpha1.ConsensusSet{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ConsensusSet")
-		os.Exit(1)
-	}
 	//+kubebuilder:scaffold:builder
 
 	if err = (&k8scorecontrollers.EventReconciler{

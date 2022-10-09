@@ -116,9 +116,6 @@ var _ = BeforeSuite(func() {
 
 	RegisterWebhookManager(mgr)
 
-	err = (&ConsensusSet{}).SetupWebhookWithManager(mgr)
-	Expect(err).NotTo(HaveOccurred())
-
 	//+kubebuilder:scaffold:webhook
 
 	go func() {

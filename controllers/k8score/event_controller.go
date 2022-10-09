@@ -68,14 +68,14 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "getEventError")
 	}
 
-	if event.InvolvedObject.FieldPath == "spec.containers.KBProbeRoleChangedCheck" {
+	if event.InvolvedObject.FieldPath == "spec.containers{KBProbeRoleChangedCheck}" {
 		err := r.handleRoleChangedEvent(ctx, event)
 		if err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "handleRoleChangedEventError")
 		}
 	}
 
-	return ctrl.Result{}, nil
+	return intctrlutil.Reconciled()
 }
 
 // TODO probeMessage should be defined by @xuanchi

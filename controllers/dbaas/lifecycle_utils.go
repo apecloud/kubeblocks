@@ -460,6 +460,8 @@ func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{
 		if err != nil {
 			return err
 		}
+		svc.Name = svc.Name + "-ro"
+		svc.Spec.Ports = params.component.ReadonlyService.Ports
 		addSelectorLabels(svc, params.component, dbaasv1alpha1.Readonly)
 		*params.applyObjs = append(*params.applyObjs, svc)
 	}

@@ -33,10 +33,12 @@ service: {
 	}
 	"spec": {
 		"selector": {
-			"app.kubernetes.io/instance":  cluster.metadata.name
+			"app.kubernetes.io/instance":  "\(cluster.metadata.name)-\(component.name)"
 			"app.kubernetes.io/component": "\(component.type)-\(component.name)"
 		}
 		ports: component.service.ports
-		type:  component.service.type
+		if component.service.type != _|_ {
+		  type:  component.service.type
+		}
 	}
 }

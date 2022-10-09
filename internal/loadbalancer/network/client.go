@@ -9,13 +9,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/util"
-
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
 	iptableswrapper "github.com/apecloud/kubeblocks/internal/loadbalancer/iptables"
 	netlinkwrapper "github.com/apecloud/kubeblocks/internal/loadbalancer/netlink"
@@ -23,7 +22,7 @@ import (
 )
 
 const (
-	looseReversePathFilterValue = "2"
+	LooseReversePathFilterValue = "2"
 
 	ErrAddressNotExists = "cannot assign requested address"
 )
@@ -330,12 +329,12 @@ func (c *networkClient) looseReversePathFilter(eni *cloud.ENIMetadata) error {
 		return errors.Wrapf(err, "Failed to read sysctl config %s", procKey)
 	}
 
-	if err := c.procfs.Set(procKey, looseReversePathFilterValue); err != nil {
+	if err := c.procfs.Set(procKey, LooseReversePathFilterValue); err != nil {
 		return errors.Wrapf(err, "Failed to update sysctl config %s", procKey)
 	}
 
 	c.logger.Info("Successfully loose network interface reverse path filter",
-		"from", src, "to", looseReversePathFilterValue, "eni id", eni.ENIId)
+		"from", src, "to", LooseReversePathFilterValue, "eni id", eni.ENIId)
 	return nil
 }
 

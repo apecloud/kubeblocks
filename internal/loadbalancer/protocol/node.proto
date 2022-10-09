@@ -63,11 +63,13 @@ message ENIMetadata {
 
   int32 device_number = 3;
 
-  string subnet_ipv4_cidr = 4;
+  string subnet_id = 4;
 
-  repeated IPv4Address ipv4_addresses = 5;
+  string subnet_ipv4_cidr = 5;
 
-  map<string, string> tags = 6;
+  repeated IPv4Address ipv4_addresses = 6;
+
+  map<string, string> tags = 7;
 }
 
 message IPv4Address {

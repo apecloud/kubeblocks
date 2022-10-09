@@ -7,14 +7,13 @@ import (
 	"os"
 	"time"
 
-	"google.golang.org/grpc/health/grpc_health_v1"
-
 	"github.com/go-logr/zapr"
 	"github.com/spf13/viper"
 	zaplogfmt "github.com/sykesm/zap-logfmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"

@@ -50,6 +50,9 @@ type ENIMetadata struct {
 	// 0 means it is primary interface
 	DeviceNumber int
 
+	// SubnetId is the subnet id of network interface
+	SubnetId string
+
 	// SubnetIPv4CIDR is the IPv4 CIDR of network interface
 	SubnetIPv4CIDR string
 

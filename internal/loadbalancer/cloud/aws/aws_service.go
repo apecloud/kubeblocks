@@ -8,9 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/util"
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
@@ -20,6 +17,9 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
 )
 
 const (
@@ -224,6 +224,7 @@ func (c *awsService) DescribeAllENIs() (map[string]*cloud.ENIMetadata, error) {
 		eniId := aws.StringValue(item.NetworkInterfaceId)
 
 		eniMetadata := attachedENIMap[eniId]
+		eniMetadata.SubnetId = aws.StringValue(item.SubnetId)
 		eniMetadata.Tags = convertSDKTagsToTags(item.TagSet)
 
 		result[eniId] = &eniMetadata

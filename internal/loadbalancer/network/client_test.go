@@ -134,7 +134,7 @@ var _ = Describe("Client", func() {
 			}
 			procKey := "net/ipv4/conf/eth1/rp_filter"
 			mockProcfs.EXPECT().Get(procKey).Return("1", nil)
-			mockProcfs.EXPECT().Set(procKey, looseReversePathFilterValue).Return(nil)
+			mockProcfs.EXPECT().Set(procKey, LooseReversePathFilterValue).Return(nil)
 			mockNetlink.EXPECT().AddrList(eth1, gomock.Any()).Return(addrs, nil)
 			mockNetlink.EXPECT().AddrDel(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 			mockNetlink.EXPECT().RouteDel(gomock.Any()).Return(nil).AnyTimes()

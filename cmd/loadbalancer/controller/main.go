@@ -22,6 +22,8 @@ limitations under the License.
 // TODO enable grpc auth, transport credentials
 // TODO replace with k8s built-in grpc liveness/readiness probe when we can ensure k8s version > 1.23.0
 // TODO handle endpoint controller
+// TODO define FloatingIP CRD
+// TODO implement device plugin to report floating ip resources
 
 package main
 
@@ -35,22 +37,19 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/factory"
-
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
-
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
-
 	"github.com/go-logr/logr"
 	"github.com/spf13/viper"
 	zaplogfmt "github.com/sykesm/zap-logfmt"
 	uzap "go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	lb "github.com/apecloud/kubeblocks/controllers/loadbalancer"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/factory"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	"k8s.io/apimachinery/pkg/runtime"
@@ -188,17 +187,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	/*
-		endpointController, err := lb.NewEndpointController(logger, c, mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"))
-		if err != nil {
-			setupLog.Error(err, "Failed to init endpoints controller")
-			os.Exit(1)
-		}
-		if err := endpointController.SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "Failed to create controller", "controller", "Endpoints")
-			os.Exit(1)
-		}
-	*/
+	endpointController, err := lb.NewEndpointController(logger, c, mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"))
+	if err != nil {
+		setupLog.Error(err, "Failed to init endpoints controller")
+		os.Exit(1)
+	}
+	if err := endpointController.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "Endpoints")
+		os.Exit(1)
+	}
 
 	//+kubebuilder:scaffold:builder
 

@@ -18,22 +18,27 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	pb "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol"
-
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
+	pb "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol"
 )
 
 const (
 	FinalizerKey = "service.kubernetes.io/apecloud-loadbalancer-finalizer"
 
-	AnnotationKeyENIId            = "service.kubernetes.io/apecloud-loadbalancer-eni-id"
-	AnnotationKeyENINodeIP        = "service.kubernetes.io/apecloud-loadbalancer-eni-node-ip"
-	AnnotationKeyFloatingIP       = "service.kubernetes.io/apecloud-loadbalancer-floating-ip"
-	AnnotationKeyMasterNodeIP     = "service.kubernetes.io/apecloud-loadbalancer-master-node-ip"
-	AnnotationKeyLoadBalancerType = "service.kubernetes.io/apecloud-loadbalancer-type"
+	AnnotationKeyENIId        = "service.kubernetes.io/apecloud-loadbalancer-eni-id"
+	AnnotationKeyENINodeIP    = "service.kubernetes.io/apecloud-loadbalancer-eni-node-ip"
+	AnnotationKeyFloatingIP   = "service.kubernetes.io/apecloud-loadbalancer-floating-ip"
+	AnnotationKeySubnetId     = "service.kubernetes.io/apecloud-loadbalancer-subnet-id"
+	AnnotationKeyMasterNodeIP = "service.kubernetes.io/apecloud-loadbalancer-master-node-ip"
 
+	AnnotationKeyLoadBalancerType   = "service.kubernetes.io/apecloud-loadbalancer-type"
 	AnnotationValueLoadBalancerType = "private-ip"
+
+	AnnotationKeyTrafficPolicy          = "service.kubernetes.io/apecloud-loadbalancer-traffic-policy"
+	AnnotationValueClusterTrafficPolicy = "Cluster"
+	AnnotationValueLocalTrafficPolicy   = "Local"
+	DefaultTrafficPolicy                = AnnotationValueClusterTrafficPolicy
 )
 
 var (
@@ -42,20 +47,22 @@ var (
 )
 
 type FloatingIP struct {
-	ip     string
-	nodeIP string
-	eni    *pb.ENIMetadata
+	ip       string
+	subnetId string
+	nodeIP   string
+	eni      *pb.ENIMetadata
 }
 
 type ServiceController struct {
 	sync.RWMutex
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
-	logger   logr.Logger
-	cp       cloud.Provider
-	nc       pb.NodeCache
-	cache    map[string]*FloatingIP
+	Scheme      *runtime.Scheme
+	Recorder    record.EventRecorder
+	logger      logr.Logger
+	cp          cloud.Provider
+	nc          pb.NodeCache
+	subnetToENI map[string]map[string]bool
+	cache       map[string]*FloatingIP
 }
 
 func init() {
@@ -72,13 +79,14 @@ func init() {
 
 func NewServiceController(logger logr.Logger, client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder, cp cloud.Provider) (*ServiceController, error) {
 	c := &ServiceController{
-		Client:   client,
-		Scheme:   scheme,
-		Recorder: recorder,
-		logger:   logger,
-		cp:       cp,
-		nc:       pb.NewNodeCache(rpcPort),
-		cache:    make(map[string]*FloatingIP),
+		Client:      client,
+		Scheme:      scheme,
+		Recorder:    recorder,
+		logger:      logger,
+		cp:          cp,
+		nc:          pb.NewNodeCache(rpcPort),
+		subnetToENI: make(map[string]map[string]bool),
+		cache:       make(map[string]*FloatingIP),
 	}
 
 	nodeList := &corev1.NodeList{}
@@ -89,6 +97,33 @@ func NewServiceController(logger logr.Logger, client client.Client, scheme *runt
 		return nil, errors.Wrap(err, "Failed to init nodes")
 	}
 	return c, nil
+}
+
+func (c *ServiceController) getFloatingIP(ip string) *FloatingIP {
+	c.RLock()
+	defer c.RUnlock()
+	fip := c.cache[ip]
+	if fip != nil {
+		c.logger.Info("Get floating ip from cache", "ip", fip, "eni id", fip.eni.EniId)
+	}
+	return fip
+}
+
+func (c *ServiceController) setFloatingIP(ip string, fip *FloatingIP) {
+	c.Lock()
+	defer c.Unlock()
+	c.cache[ip] = fip
+	c.logger.Info("Put floating ip to cache", "ip", ip, "eni id", fip.eni.EniId)
+}
+
+func (c *ServiceController) removeFloatingIP(ip string) {
+	c.Lock()
+	defer c.Unlock()
+	fip := c.cache[ip]
+	delete(c.cache, ip)
+	if fip != nil {
+		c.logger.Info("Delete floating ip from cache", "ip", ip, "eni id", fip.eni.EniId)
+	}
 }
 
 func (c *ServiceController) initNodes(nodeList *corev1.NodeList) error {
@@ -123,6 +158,14 @@ func (c *ServiceController) initNode(nodeIP string) error {
 		return errors.Wrapf(err, "Failed to query enis from node %s", nodeIP)
 	}
 	for _, eni := range resp.GetEnis() {
+
+		nodeIPs, ok := c.subnetToENI[eni.SubnetId]
+		if !ok {
+			nodeIPs = make(map[string]bool)
+		}
+		nodeIPs[nodeIP] = true
+		c.subnetToENI[eni.SubnetId] = nodeIPs
+
 		for _, addr := range eni.Ipv4Addresses {
 			request := &pb.SetupNetworkForServiceRequest{
 				RequestId: getRequestId(),
@@ -132,11 +175,15 @@ func (c *ServiceController) initNode(nodeIP string) error {
 			if _, err := node.SetupNetworkForService(context.Background(), request); err != nil {
 				return errors.Wrapf(err, "Failed to init service private ip %s for node %s", addr.Address, nodeIP)
 			}
-			c.SetFloatingIP(addr.Address, &FloatingIP{ip: addr.Address, nodeIP: nodeIP, eni: eni})
+			c.setFloatingIP(addr.Address, &FloatingIP{ip: addr.Address, subnetId: eni.SubnetId, nodeIP: nodeIP, eni: eni})
 			ctxLog.Info("Successfully init service", "private ip", addr.Address)
 		}
 	}
 	return nil
+}
+
+func (c *ServiceController) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).For(&corev1.Service{}).Complete(c)
 }
 
 func (c *ServiceController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -165,7 +212,7 @@ func (c *ServiceController) ensureFloatingIP(ctx context.Context, ctxLog logr.Lo
 	var (
 		err         error
 		annotations = svc.GetAnnotations()
-		fip         = c.GetFloatingIP(annotations[AnnotationKeyFloatingIP])
+		fip         = c.getFloatingIP(annotations[AnnotationKeyFloatingIP])
 	)
 
 	// service is in deleting
@@ -173,22 +220,23 @@ func (c *ServiceController) ensureFloatingIP(ctx context.Context, ctxLog logr.Lo
 		return c.deleteFloatingIP(ctx, ctxLog, fip, svc)
 	}
 
-	// service is in creating
-	masterNodeIP, err := c.getMasterNodeIP(svc)
+	nodeIP, err := c.chooseTrafficNode(svc)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get master nodes")
 	}
+
+	// service is in creating
 	if fip == nil {
-		return c.createFloatingIP(ctx, ctxLog, masterNodeIP, svc)
+		return c.createFloatingIP(ctx, ctxLog, nodeIP, svc)
 	}
 
-	return c.migrateFloatingIP(ctx, ctxLog, masterNodeIP, fip, svc)
+	return c.migrateFloatingIP(ctx, ctxLog, nodeIP, fip, svc)
 }
 
-func (c *ServiceController) migrateFloatingIP(ctx context.Context, ctxLog logr.Logger, masterNodeIP string, fip *FloatingIP, svc *corev1.Service) error {
+func (c *ServiceController) migrateFloatingIP(ctx context.Context, ctxLog logr.Logger, nodeIP string, fip *FloatingIP, svc *corev1.Service) error {
 	c.logger.Info("Migrating floating ip", "src eni", fip.eni.EniId, "ip", fip.ip)
 
-	if fip.nodeIP == masterNodeIP && fip.eni.EniId == svc.GetAnnotations()[AnnotationKeyENIId] {
+	if fip.nodeIP == nodeIP && fip.eni.EniId == svc.GetAnnotations()[AnnotationKeyENIId] {
 		ctxLog.Info("Floating ip is in sync, do nothing")
 		return nil
 	}
@@ -200,7 +248,7 @@ func (c *ServiceController) migrateFloatingIP(ctx context.Context, ctxLog logr.L
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		errs = append(errs, c.migrateOnNewMaster(ctx, ctxLog, masterNodeIP, fip, svc))
+		errs = append(errs, c.migrateOnNewMaster(ctx, ctxLog, nodeIP, fip, svc))
 	}()
 	go func() {
 		defer wg.Done()
@@ -221,14 +269,14 @@ func (c *ServiceController) migrateFloatingIP(ctx context.Context, ctxLog logr.L
 	return nil
 }
 
-func (c *ServiceController) migrateOnNewMaster(ctx context.Context, ctxLog logr.Logger, masterNodeIP string, fip *FloatingIP, svc *corev1.Service) error {
-	ctxLog.WithName("migrateOnNewMaster").WithValues("node", masterNodeIP)
+func (c *ServiceController) migrateOnNewMaster(ctx context.Context, ctxLog logr.Logger, nodeIP string, fip *FloatingIP, svc *corev1.Service) error {
+	ctxLog.WithName("migrateOnNewMaster").WithValues("node", nodeIP)
 
 	if err := c.cp.DeallocIPAddresses(fip.eni.EniId, []string{fip.ip}); err != nil {
 		return errors.Wrapf(err, "Failed to dealloc private ip %s", fip.ip)
 	}
 
-	node, err := c.nc.GetNode(masterNodeIP)
+	node, err := c.nc.GetNode(nodeIP)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get master node")
 	}
@@ -237,8 +285,8 @@ func (c *ServiceController) migrateOnNewMaster(ctx context.Context, ctxLog logr.
 	if err != nil {
 		return errors.Wrap(err, "Failed to assign private ip")
 	}
-	newFip := &FloatingIP{ip: fip.ip, nodeIP: masterNodeIP, eni: newENI}
-	c.SetFloatingIP(newFip.ip, newFip)
+	newFip := &FloatingIP{ip: fip.ip, subnetId: fip.subnetId, nodeIP: nodeIP, eni: newENI}
+	c.setFloatingIP(newFip.ip, newFip)
 
 	setupServiceRequest := &pb.SetupNetworkForServiceRequest{
 		RequestId: getRequestId(),
@@ -275,33 +323,34 @@ func (c *ServiceController) migrateOnOldMaster(ctx context.Context, ctxLog logr.
 	return nil
 }
 
-func (c *ServiceController) createFloatingIP(ctx context.Context, ctxLog logr.Logger, masterNodeIP string, svc *corev1.Service) error {
-	ctxLog = ctxLog.WithName("createFloatingIP").WithValues("node", masterNodeIP)
+func (c *ServiceController) createFloatingIP(ctx context.Context, ctxLog logr.Logger, nodeIP string, svc *corev1.Service) error {
+	ctxLog = ctxLog.WithName("createFloatingIP").WithValues("node", nodeIP)
 
-	masterNode, err := c.nc.GetNode(masterNodeIP)
+	node, err := c.nc.GetNode(nodeIP)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get master node")
 	}
 
-	privateIP, eni, err := c.tryAllocPrivateIP(ctxLog, masterNode)
+	privateIP, eni, err := c.tryAllocPrivateIP(ctxLog, node)
 	if err != nil {
 		return errors.Wrap(err, "Failed to alloc new private ip for service")
 	}
 	ctxLog.Info("Successfully alloc private ip")
 
 	fip := &FloatingIP{
-		ip:     privateIP,
-		nodeIP: masterNodeIP,
-		eni:    eni,
+		ip:       privateIP,
+		subnetId: eni.SubnetId,
+		nodeIP:   nodeIP,
+		eni:      eni,
 	}
-	c.SetFloatingIP(privateIP, fip)
+	c.setFloatingIP(privateIP, fip)
 
 	request := &pb.SetupNetworkForServiceRequest{
 		RequestId: getRequestId(),
 		PrivateIp: fip.ip,
 		Eni:       fip.eni,
 	}
-	if _, err = masterNode.SetupNetworkForService(ctx, request); err != nil {
+	if _, err = node.SetupNetworkForService(ctx, request); err != nil {
 		return errors.Wrap(err, "Failed to setup host network stack for service")
 	}
 	ctxLog.Info("Successfully setup service host network")
@@ -320,8 +369,15 @@ func (c *ServiceController) deleteFloatingIP(ctx context.Context, ctxLog logr.Lo
 	}
 	ctxLog = ctxLog.WithName("deleteFloatingIP").WithValues("node", fip.nodeIP)
 
-	if err := c.deletePrivateIP(ctx, fip.ip, svc); err != nil {
-		return errors.Wrap(err, "Failed to delete private ip")
+	annotations := svc.GetAnnotations()
+	eniId, ok := annotations[AnnotationKeyENIId]
+	if !ok {
+		return errors.New("Invalid service, private ip exists but eni id not found")
+	}
+
+	c.logger.Info("Deleting service private ip", "eni id", eniId, "ip", fip.ip)
+	if err := c.cp.DeallocIPAddresses(eniId, []string{fip.ip}); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("Failed to dealloc private ip address %s", fip.ip))
 	}
 	ctxLog.Info("Successfully released floating ip")
 
@@ -339,7 +395,7 @@ func (c *ServiceController) deleteFloatingIP(ctx context.Context, ctxLog logr.Lo
 	}
 	ctxLog.Info("Successfully clean service network on node")
 
-	c.DeleteFloatingIP(fip.ip)
+	c.removeFloatingIP(fip.ip)
 	ctxLog.Info("Successfully remove floating ip from cache")
 
 	if err := c.updateService(ctx, ctxLog, svc, fip, true); err != nil {
@@ -350,47 +406,6 @@ func (c *ServiceController) deleteFloatingIP(ctx context.Context, ctxLog logr.Lo
 
 }
 
-func (c *ServiceController) GetFloatingIP(ip string) *FloatingIP {
-	c.RLock()
-	defer c.RUnlock()
-	fip := c.cache[ip]
-	if fip != nil {
-		c.logger.Info("Get ip from cache", "ip", fip, "eni id", fip.eni.EniId)
-	}
-	return fip
-}
-
-func (c *ServiceController) SetFloatingIP(ip string, fip *FloatingIP) {
-	c.Lock()
-	defer c.Unlock()
-	c.cache[ip] = fip
-	c.logger.Info("Put ip to cache", "ip", ip, "eni id", fip.eni.EniId)
-}
-
-func (c *ServiceController) DeleteFloatingIP(ip string) {
-	c.Lock()
-	defer c.Unlock()
-	fip := c.cache[ip]
-	delete(c.cache, ip)
-	if fip != nil {
-		c.logger.Info("Delete ip from cache", "ip", ip, "eni id", fip.eni.EniId)
-	}
-}
-
-func (c *ServiceController) deletePrivateIP(ctx context.Context, privateIP string, svc *corev1.Service) error {
-	annotations := svc.GetAnnotations()
-	eniId, ok := annotations[AnnotationKeyENIId]
-	if !ok {
-		return errors.New("Invalid service, private ip exists but eni id not found")
-	}
-
-	c.logger.Info("Deleting service private ip", "eni id", eniId, "ip", privateIP)
-	if err := c.cp.DeallocIPAddresses(eniId, []string{privateIP}); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Failed to dealloc private ip address %s", privateIP))
-	}
-	return nil
-}
-
 func (c *ServiceController) updateService(ctx context.Context, logger logr.Logger, svc *corev1.Service, fip *FloatingIP, deleting bool) error {
 	annotations := svc.GetAnnotations()
 	if annotations == nil {
@@ -399,6 +414,7 @@ func (c *ServiceController) updateService(ctx context.Context, logger logr.Logge
 	annotations[AnnotationKeyENIId] = fip.eni.EniId
 	annotations[AnnotationKeyENINodeIP] = fip.nodeIP
 	annotations[AnnotationKeyFloatingIP] = fip.ip
+	annotations[AnnotationKeySubnetId] = fip.subnetId
 	svc.SetAnnotations(annotations)
 
 	if deleting {
@@ -458,41 +474,25 @@ func (c *ServiceController) tryAssignPrivateIP(ctxLog logr.Logger, ip string, no
 	return eni, nil
 }
 
-func (c *ServiceController) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).For(&corev1.Service{}).Complete(c)
-}
-
-/*
-func (c *ServiceController) restorePolicyRulesForServices(enis []cp.ENIMetadata) error {
-	rules, err := c.networkClient.GetRuleList()
-	if err != nil {
-		return errors.Wrap(err, "Failed to retrieve IP rule list")
-	}
-
-	for _, eni := range enis {
-		ipList, err := c.cp.GetIPv4sFromEC2(eni.ENIId)
-		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("Failed to get private ips on eni %s", eni.ENIId))
-		}
-
-		for _, ip := range ipList {
-			// Update ip rules in case there is a change in VPC CIDRs, AWS_VPC_K8S_CNI_EXTERNALSNAT setting
-			srcIPNet := net.IPNet{IP: net.ParseIP(aws.StringValue(ip.PrivateIpAddress)), Mask: net.CIDRMask(32, 32)}
-
-			err = c.networkClient.UpdateRuleListBySrc(rules, srcIPNet)
-			if err != nil {
-				c.logger.Error(err, "UpdateRuleListBySrc in nodeInit failed", "private IP", aws.StringValue(ip.PrivateIpAddress))
-			}
-		}
-	}
-	return nil
-}
-*/
-
-func (c *ServiceController) getMasterNodeIP(svc *corev1.Service) (string, error) {
-	masterNodeIP := svc.GetAnnotations()[AnnotationKeyMasterNodeIP]
+func (c *ServiceController) chooseTrafficNode(svc *corev1.Service) (string, error) {
+	var (
+		annotations = svc.GetAnnotations()
+	)
+	masterNodeIP := annotations[AnnotationKeyMasterNodeIP]
 	if masterNodeIP != "" {
 		return masterNodeIP, nil
+	}
+
+	trafficPolicy, ok := annotations[AnnotationKeyTrafficPolicy]
+	if !ok {
+		trafficPolicy = DefaultTrafficPolicy
+	}
+	if trafficPolicy == AnnotationValueClusterTrafficPolicy {
+		nodeIP, ok := annotations[AnnotationKeyENINodeIP]
+		if ok {
+			return nodeIP, nil
+		}
+		// TODO
 	}
 
 	matchLabels := client.MatchingLabels{}
@@ -500,8 +500,8 @@ func (c *ServiceController) getMasterNodeIP(svc *corev1.Service) (string, error)
 		matchLabels[k] = v
 	}
 	listOptions := []client.ListOption{
-		client.InNamespace(svc.GetNamespace()),
 		matchLabels,
+		client.InNamespace(svc.GetNamespace()),
 	}
 	pods := &corev1.PodList{}
 	if err := c.Client.List(context.Background(), pods, listOptions...); err != nil {

@@ -213,17 +213,13 @@ func (o *destroyOptions) destroyPlayground() error {
 	}
 
 	// remote playground, just destroy all cloud resources
-	cp, err := cloudprovider.Get()
-	if err != nil {
-		return err
-	}
-
-	if cp.Name() != cloudprovider.Local {
+	cp, _ := cloudprovider.Get()
+	if cp != nil && cp.Name() != cloudprovider.Local {
 		// remove playground cluster kubeconfig
 		if err := util.RemoveConfig(ClusterName); err != nil {
 			return errors.Wrap(err, "Failed to remove playground kubeconfig file")
 		}
-		cp, err = cloudprovider.Get()
+		cp, err := cloudprovider.Get()
 		if err != nil {
 			return err
 		}

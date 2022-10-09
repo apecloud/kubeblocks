@@ -368,6 +368,7 @@ rules:
     - delete
     - get
     - list
+    - patch
     - watch
 - apiGroups:
     - snapshot.storage.k8s.io
@@ -375,3 +376,4 @@ rules:
     - volumesnapshots/finalizers
   verbs:
     - update
+    - patch

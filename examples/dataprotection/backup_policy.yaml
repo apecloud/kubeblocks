@@ -41,9 +41,9 @@ spec:
 
   hooks:
     preCommands:
-      - touch /var/lib/mysql/.restore
+      - touch /data/mysql/.restore
     postCommands:
-      - rm -f /var/lib/mysql/.restore
+      - rm -f /data/mysql/.restore
 
   # backup remote volume from CSI driver definition.
   remoteVolume:

@@ -34,7 +34,6 @@ RUN go mod download
 COPY cmd/manager/main.go cmd/manager/main.go
 COPY apis/ apis/
 COPY internal/ internal/
-COPY pkg/ pkg/
 COPY controllers/ controllers/
 
 # Build

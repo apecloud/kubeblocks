@@ -28,23 +28,10 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: kube-rbac-proxy
-          securityContext: 
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          image: {{ .Values.kubeRBACProxyImageRepo }}
-          args:
-            - "--secure-listen-address=0.0.0.0:8443"
-            - "--upstream=http://127.0.0.1:8080/"
-            - "--logtostderr=true"
-            - "--v=0"
-          ports:
-            - containerPort: 8443
-              protocol: TCP
-              name: metrics
         - name: manager
           args:
             - "--health-probe-bind-address=:8081"
-            - "--metrics-bind-address=127.0.0.1:8080"
+            - "--metrics-bind-address=:8080"
             - "--leader-elect"
             - "-zap-encoder=console"
             - "-zap-time-encoding=iso8601"
@@ -59,11 +46,14 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
+            - name: webhook-server
+              containerPort: 9443
+              protocol: TCP
             - name: health
               containerPort: 8081
               protocol: TCP
-            - name: webhook-server
-              containerPort: 9443
+            - name: metrics
+              containerPort: 8080
               protocol: TCP
           livenessProbe:
             httpGet:

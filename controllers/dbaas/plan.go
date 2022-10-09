@@ -34,6 +34,7 @@ func (p *Plan) walkOneStep() (bool, error) {
 
 	// generate new plan
 	plan := &Plan{}
+	plan.Start = &Step{}
 	plan.WalkFunc = p.WalkFunc
 	plan.Start.NextSteps = make([]*Step, 0)
 	for _, step := range p.Start.NextSteps {

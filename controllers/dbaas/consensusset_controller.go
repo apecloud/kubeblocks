@@ -359,4 +359,13 @@ func isMemberOf(set *appsv1.StatefulSet, pod *corev1.Pod) bool {
 	return getParentName(pod) == set.Name
 }
 
+// getPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty
+// string is returned.
+func getPodRevision(pod *corev1.Pod) string {
+	if pod.Labels == nil {
+		return ""
+	}
+	return pod.Labels[appsv1.StatefulSetRevisionLabel]
+}
+
 // ------- end copy from stateful_set_utils.go ----

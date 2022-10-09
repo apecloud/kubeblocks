@@ -26,7 +26,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/leaanthony/debme"
 	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
@@ -429,7 +428,6 @@ func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{
 		if err != nil {
 			return err
 		}
-		css.GetLabels()
 		*params.applyObjs = append(*params.applyObjs, css)
 
 		svcs, err := buildHeadlessSvcs(*params, css)
@@ -529,7 +527,6 @@ func createOrReplaceResources(ctx context.Context,
 			if err := cli.Get(ctx, key, stsObj); err != nil {
 				return err
 			}
-			templateDiff := cmp.Diff(stsObj.Spec.Template, stsProto.Spec.Template)
 			stsObj.Spec.Template = stsProto.Spec.Template
 			stsObj.Spec.Replicas = stsProto.Spec.Replicas
 			stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
@@ -537,7 +534,7 @@ func createOrReplaceResources(ctx context.Context,
 				return err
 			}
 			// handle ConsensusSet Update
-			if templateDiff != "" {
+			if stsObj.Status.CurrentRevision != stsObj.Status.UpdateRevision {
 				_, err := handleConsensusSetUpdate(ctx, cli, cluster, stsObj)
 				if err != nil {
 					return err
@@ -648,8 +645,7 @@ func generateUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.S
 	plan.Start = &Step{}
 	plan.WalkFunc = func(obj interface{}) (bool, error) {
 		pod := obj.(corev1.Pod)
-		spec := stsObj.Spec.Template.Spec
-		if cmp.Equal(pod.Spec, spec) {
+		if getPodRevision(&pod) == stsObj.Status.UpdateRevision {
 			return false, nil
 		}
 		if err := cli.Delete(ctx, &pod); err != nil {
@@ -978,7 +974,7 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 		return nil, err
 	}
 
-	prefix := dbaasPrefix + "_" + strings.ToUpper(params.component.Type) + "_" + strings.ToUpper(params.component.Name) + "_"
+	prefix := dbaasPrefix + "_" + strings.ToUpper(params.component.Type) + "_"
 	replicas := int(*sts.Spec.Replicas)
 	for i := range sts.Spec.Template.Spec.Containers {
 		// inject self scope env

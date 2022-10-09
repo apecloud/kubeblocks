@@ -26,8 +26,8 @@ type BackupJobSpec struct {
 	// +kubebuilder:validation:Required
 	BackupPolicyName string `json:"backupPolicyName"`
 
-	// Backup Type. full or incremental. if unset, default is full.
-	// +kubebuilder:validation:Enum={full,incremental}
+	// Backup Type. full or incremental or snapshot. if unset, default is full.
+	// +kubebuilder:validation:Enum={full,incremental,snapshot}
 	// +kubebuilder:default=full
 	BackupType BackupJobType `json:"backupType"`
 
@@ -64,6 +64,8 @@ const (
 	BackupTypeFull BackupJobType = "full"
 
 	BackupTypeIncremental BackupJobType = "incremental"
+
+	BackupTypeSnapshot BackupJobType = "snapshot"
 )
 
 // BackupJobStatus defines the observed state of BackupJob

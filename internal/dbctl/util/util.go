@@ -225,7 +225,6 @@ func DoWithRetry(ctx context.Context, logger logr.Logger, operation func() error
 		logger.Info(fmt.Sprintf("Failed, retrying in %s ... (%d/%d). Error: %v", delay, attempt+1, options.MaxRetry, err))
 		select {
 		case <-time.After(delay):
-			break
 		case <-ctx.Done():
 			return err
 		}

@@ -9,7 +9,7 @@ spec:
   clusterDefinitionRef: wesql-clusterdefinition  # ref clusterdefinition.name
   affinity:
     topologyKeys:
-      - kubernetes.io/hostname
+    - kubernetes.io/hostname
   components:
   - name: replicasets # user-defined
     type: replicasets # ref clusterdefinition components.typename

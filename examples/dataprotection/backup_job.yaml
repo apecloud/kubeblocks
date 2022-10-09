@@ -5,7 +5,7 @@ kind: BackupJob
 # Standard Kubernetes metadata. Required.
 metadata:
   # Backup name. Maybe any valid Kubernetes object name. Required.
-  name: backup-success-demo
+  name: backup-job-demo
 
   labels:
     dataprotection.infracreate.com/backup-type: snapshot

@@ -35,9 +35,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 )
 
 // BackupJobReconciler reconciles a BackupJob object
@@ -214,11 +215,9 @@ func (r *BackupJobReconciler) createPreCommandJobAndEnsure(reqCtx intctrlutil.Re
 	}
 
 	key := types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: backupJob.Name + "-pre"}
-	if err := r.createHooksCommandJob(reqCtx, backupJob, key); err != nil {
+	if err := r.createHooksCommandJob(reqCtx, backupJob, key, true); err != nil {
 		return false, err
 	}
-	msg := fmt.Sprintf("Waiting for a job %s to be created by the backupJob.", key.Name)
-	r.Recorder.Event(backupJob, corev1.EventTypeNormal, "CreatingPreCommandJob", msg)
 	return r.ensureBatchV1JobCompleted(reqCtx, key)
 }
 
@@ -235,11 +234,9 @@ func (r *BackupJobReconciler) createPostCommandJobAndEnsure(reqCtx intctrlutil.R
 	}
 
 	key := types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: backupJob.Name + "-post"}
-	if err := r.createHooksCommandJob(reqCtx, backupJob, key); err != nil {
+	if err := r.createHooksCommandJob(reqCtx, backupJob, key, false); err != nil {
 		return false, err
 	}
-	msg := fmt.Sprintf("Waiting for a job %s to be created by the backupJob.", key.Name)
-	r.Recorder.Event(backupJob, corev1.EventTypeNormal, "CreatingPostCommandJob", msg)
 	return r.ensureBatchV1JobCompleted(reqCtx, key)
 }
 
@@ -296,7 +293,6 @@ func (r *BackupJobReconciler) createVolumeSnapshot(
 	// TODO(dsj): build pvc name 0
 	pvcTemplate := []string{target.Spec.VolumeClaimTemplates[0].Name, target.Name, "0"}
 	pvcName := strings.Join(pvcTemplate, "-")
-	volumeSnapshotClassName := "csi-aws-vsc"
 
 	snap = &snapshotv1.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
@@ -305,7 +301,6 @@ func (r *BackupJobReconciler) createVolumeSnapshot(
 			Labels:    buildBackupJobLabels(backupJob.Name),
 		},
 		Spec: snapshotv1.VolumeSnapshotSpec{
-			VolumeSnapshotClassName: &volumeSnapshotClassName,
 			Source: snapshotv1.VolumeSnapshotSource{
 				PersistentVolumeClaimName: &pvcName,
 			},
@@ -369,7 +364,7 @@ func (r *BackupJobReconciler) createBackupToolJob(
 	if err = r.CreateBatchV1Job(reqCtx, key, backupJob, toolPodSpec); err != nil {
 		return err
 	}
-	msg := fmt.Sprintf("Waiting for a job %s to be created by the backupJob.", key.Name)
+	msg := fmt.Sprintf("Waiting for a job %s to be created.", key.Name)
 	r.Recorder.Event(backupJob, corev1.EventTypeNormal, "CreatingJob", msg)
 	return nil
 }
@@ -377,7 +372,7 @@ func (r *BackupJobReconciler) createBackupToolJob(
 func (r *BackupJobReconciler) ensureEmptyHooksCommand(
 	reqCtx intctrlutil.RequestCtx,
 	backupJob *dataprotectionv1alpha1.BackupJob,
-	isPreCommand bool) (bool, error) {
+	preCommand bool) (bool, error) {
 
 	// get backup policy
 	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
@@ -398,9 +393,9 @@ func (r *BackupJobReconciler) ensureEmptyHooksCommand(
 		r.Recorder.Event(backupJob, corev1.EventTypeWarning, "BackupPolicyFailed", msg)
 		return false, errors.New(msg)
 	}
-	commands := backupPolicy.Spec.Hooks.PreCommands
-	if !isPreCommand {
-		commands = backupPolicy.Spec.Hooks.PostCommands
+	commands := backupPolicy.Spec.Hooks.PostCommands
+	if preCommand {
+		commands = backupPolicy.Spec.Hooks.PreCommands
 	}
 	if len(commands) == 0 {
 		return true, nil
@@ -411,7 +406,8 @@ func (r *BackupJobReconciler) ensureEmptyHooksCommand(
 func (r *BackupJobReconciler) createHooksCommandJob(
 	reqCtx intctrlutil.RequestCtx,
 	backupJob *dataprotectionv1alpha1.BackupJob,
-	key types.NamespacedName) error {
+	key types.NamespacedName,
+	preCommand bool) error {
 
 	job := batchv1.Job{}
 	exists, err := checkResourceExists(reqCtx.Ctx, r.Client, key, &job)
@@ -423,10 +419,13 @@ func (r *BackupJobReconciler) createHooksCommandJob(
 		return nil
 	}
 
-	jobPodSpec, err := r.BuildSnapshotPodSpec(reqCtx, backupJob, false)
+	jobPodSpec, err := r.BuildSnapshotPodSpec(reqCtx, backupJob, preCommand)
 	if err != nil {
 		return err
 	}
+
+	msg := fmt.Sprintf("Waiting for a job %s to be created.", key.Name)
+	r.Recorder.Event(backupJob, corev1.EventTypeNormal, "CreatingJob-"+key.Name, msg)
 
 	return r.CreateBatchV1Job(reqCtx, key, backupJob, jobPodSpec)
 }
@@ -718,7 +717,7 @@ func (r *BackupJobReconciler) BuildBackupToolPodSpec(reqCtx intctrlutil.RequestC
 func (r *BackupJobReconciler) BuildSnapshotPodSpec(
 	reqCtx intctrlutil.RequestCtx,
 	backupJob *dataprotectionv1alpha1.BackupJob,
-	forPreCommand bool) (corev1.PodSpec, error) {
+	preCommand bool) (corev1.PodSpec, error) {
 	podSpec := corev1.PodSpec{}
 	logger := reqCtx.Log
 
@@ -748,7 +747,7 @@ func (r *BackupJobReconciler) BuildSnapshotPodSpec(
 	container := corev1.Container{}
 	container.Name = backupJob.Name
 	container.Command = []string{"kubectl", "exec", "-i", clusterPod.Name, "-c", backupPolicy.Spec.Hooks.ContainerName, "--", "sh", "-c"}
-	if forPreCommand {
+	if preCommand {
 		container.Args = backupPolicy.Spec.Hooks.PreCommands
 	} else {
 		container.Args = backupPolicy.Spec.Hooks.PostCommands
@@ -765,7 +764,6 @@ func (r *BackupJobReconciler) BuildSnapshotPodSpec(
 	podSpec.Containers = []corev1.Container{container}
 
 	podSpec.Volumes = clusterPod.Spec.Volumes
-	podSpec.Volumes = append(podSpec.Volumes, backupPolicy.Spec.RemoteVolume)
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
 	podSpec.ServiceAccountName = "opendbaas-core"
 

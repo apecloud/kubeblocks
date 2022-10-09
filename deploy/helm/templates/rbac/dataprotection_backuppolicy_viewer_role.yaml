@@ -1,0 +1,20 @@
+# permissions for end users to view backuppolicies.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "opendbaas-core.fullname" . }}-backuppolicy-viewer-role
+rules:
+- apiGroups:
+  - dataprotection.infracreate.com
+  resources:
+  - backuppolicies
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - dataprotection.infracreate.com
+  resources:
+  - backuppolicies/status
+  verbs:
+  - get

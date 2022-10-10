@@ -1,0 +1,6 @@
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind: OpsRequest
+metadata:
+  name: opsrequest-sample
+spec:
+  # TODO(user): Add fields here

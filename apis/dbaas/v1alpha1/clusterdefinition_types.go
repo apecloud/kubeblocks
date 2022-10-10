@@ -274,7 +274,7 @@ type ConsensusMember struct {
 
 	// AccessMode, what service this member capable for
 	// +kubebuilder:validation:Required
-	// +kubebuilder:default=None
+	// +kubebuilder:default=ReadWrite
 	// +kubebuilder:validation:Enum={None, Readonly, ReadWrite}
 	AccessMode AccessMode `json:"accessMode,omitempty"`
 
@@ -302,77 +302,6 @@ const (
 	BestEffortParallel UpdateStrategy = "BestEffortParallel"
 	Parallel           UpdateStrategy = "Parallel"
 )
-
-// ConsensusSetStatus defines the observed state of ConsensusSet
-type ConsensusSetStatus struct {
-
-	// Replicas is the number of Pods created by the controller
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=0
-	Replicas int32 `json:"replicas,omitempty"`
-
-	// ReadyReplicas is the number of pods created for this ConsensusSet with a Ready Condition.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=0
-	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
-
-	// ReadyLeader, ready leader pod, 0 or 1
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=0
-	// +kubebuilder:minimum=0
-	// +kubebuilder:maximum=1
-	ReadyLeader int32 `json:"readyLeader,omitempty"`
-
-	// ReadyFollowers, ready follower pods
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=0
-	ReadyFollowers int32 `json:"readyFollowers,omitempty"`
-
-	// ReadyLearners, ready learner pods
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=0
-	ReadyLearners int32 `json:"readyLearners,omitempty"`
-
-	// IsReadWriteServiceReady, indicates readWrite service ready status
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=false
-	IsReadWriteServiceReady bool `json:"isReadWriteServiceReady,omitempty"`
-
-	// IsReadonlyServiceReady, indicates readonly service ready status
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=false
-	IsReadonlyServiceReady bool `json:"isReadonlyServiceReady,omitempty"`
-
-	// ConsensusSetCondition
-	// +optional
-	ConsensusSetConditions []ConsensusSetCondition `json:"consensusSetConditions,omitempty"`
-
-	// ObservedGeneration is the most recent generation observed for this ConsensusSet.
-	// +optional
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-}
-
-type ConsensusSetConditionType string
-
-type ConsensusSetCondition struct {
-	// Type of consensusset condition.
-	Type ConsensusSetConditionType `json:"type,omitempty"`
-
-	// Status of the condition, one of True, False, Unknown.
-	Status corev1.ConditionStatus `json:"status,omitempty"`
-
-	// Last time the condition transitioned from one status to another.
-	// +optional
-	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
-
-	// The reason for the condition's last transition.
-	// +optional
-	Reason string `json:"reason,omitempty"`
-
-	// A human-readable message indicating details about the transition.
-	// +optional
-	Message string `json:"message,omitempty"`
-}
 
 func init() {
 	SchemeBuilder.Register(&ClusterDefinition{}, &ClusterDefinitionList{})

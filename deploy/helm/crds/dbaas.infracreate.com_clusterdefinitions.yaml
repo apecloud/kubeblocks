@@ -87,7 +87,7 @@ spec:
                           items:
                             properties:
                               accessMode:
-                                default: None
+                                default: ReadWrite
                                 description: AccessMode, what service this member
                                   capable for
                                 enum:
@@ -113,7 +113,7 @@ spec:
                           description: Leader, one single leader
                           properties:
                             accessMode:
-                              default: None
+                              default: ReadWrite
                               description: AccessMode, what service this member capable
                                 for
                               enum:
@@ -137,7 +137,7 @@ spec:
                           description: Learner, no voting right
                           properties:
                             accessMode:
-                              default: None
+                              default: ReadWrite
                               description: AccessMode, what service this member capable
                                 for
                               enum:

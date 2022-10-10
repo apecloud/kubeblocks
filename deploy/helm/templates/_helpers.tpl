@@ -62,14 +62,15 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-Create the name of the webhook service
+Create the name of the webhook service.
 */}}
 {{- define "opendbaas-core.svcName" -}}
 {{ include "opendbaas-core.fullname" . }}
 {{- end }}
 
-
-{{/* Create the default PodDisruptionBudget to use */}}
+{{/*
+Create the default PodDisruptionBudget to use.
+*/}}
 {{- define "podDisruptionBudget.spec" -}}
 {{- if and .Values.podDisruptionBudget.minAvailable .Values.podDisruptionBudget.maxUnavailable }}
 {{- fail "Cannot set both .Values.podDisruptionBudget.minAvailable and .Values.podDisruptionBudget.maxUnavailable" -}}
@@ -81,3 +82,46 @@ minAvailable: {{ default 1 .Values.podDisruptionBudget.minAvailable }}
 maxUnavailable: {{ .Values.podDisruptionBudget.maxUnavailable }}
 {{- end }}
 {{- end }}
+
+{{/*
+Print KubeBlocks's logo.
+*/}}
+{{- define "_logo" -}}
+{{ print "\033[36m" }}
+{{ print " __    __          __                _______  __                   __                 " }}
+{{ print "|  \\  /  \\        |  \\              |       \\|  \\                 |  \\                " }}
+{{ print "| ▓▓ /  ▓▓__    __| ▓▓____   ______ | ▓▓▓▓▓▓▓\\ ▓▓ ______   _______| ▓▓   __  _______  " }}
+{{ print "| ▓▓/  ▓▓|  \\  |  \\ ▓▓    \\ /      \\| ▓▓__/ ▓▓ ▓▓/      \\ /       \\ ▓▓  /  \\/       \\ " }}
+{{ print "| ▓▓  ▓▓ | ▓▓  | ▓▓ ▓▓▓▓▓▓▓\\  ▓▓▓▓▓▓\\ ▓▓    ▓▓ ▓▓  ▓▓▓▓▓▓\\  ▓▓▓▓▓▓▓ ▓▓_/  ▓▓  ▓▓▓▓▓▓▓ " }}
+{{ print "| ▓▓▓▓▓\\ | ▓▓  | ▓▓ ▓▓  | ▓▓ ▓▓    ▓▓ ▓▓▓▓▓▓▓\\ ▓▓ ▓▓  | ▓▓ ▓▓     | ▓▓   ▓▓ \\▓▓    \\  " }}
+{{ print "| ▓▓ \\▓▓\\| ▓▓__/ ▓▓ ▓▓__/ ▓▓ ▓▓▓▓▓▓▓▓ ▓▓__/ ▓▓ ▓▓ ▓▓__/ ▓▓ ▓▓_____| ▓▓▓▓▓▓\\ _\\▓▓▓▓▓▓\\ " }}
+{{ print "| ▓▓  \\▓▓\\\\▓▓    ▓▓ ▓▓    ▓▓\\▓▓     \\ ▓▓    ▓▓ ▓▓\\▓▓    ▓▓\\▓▓     \\ ▓▓  \\▓▓\\       ▓▓ " }}
+{{ print " \\▓▓   \\▓▓ \\▓▓▓▓▓▓ \\▓▓▓▓▓▓▓  \\▓▓▓▓▓▓▓\\▓▓▓▓▓▓▓ \\▓▓ \\▓▓▓▓▓▓  \\▓▓▓▓▓▓▓\\▓▓   \\▓▓\\▓▓▓▓▓▓▓  " }}
+{{ print "\033[0m" }}
+{{- end }}
+
+{{/*
+Print line divider.
+*/}}
+{{- define "_divider" -}}
+{{ print "--------------------------------------------------------------------------------" }}
+{{- end }}
+
+{{/*
+Print the supplied value in yellow.
+*/}}
+{{- define "_fmt.yellow" -}}
+{{ print "\033[0;33m" . "\033[0m" }}
+{{- end }}
+
+{{/*
+Print the supplied value in blue.
+*/}}
+{{- define "_fmt.blue" -}}
+{{ print "\033[36m" . "\033[0m" }}
+{{- end }}
+
+
+
+                                                                                     
+                                                                                     

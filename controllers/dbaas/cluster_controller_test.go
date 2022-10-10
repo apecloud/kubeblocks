@@ -17,15 +17,11 @@ limitations under the License.
 package dbaas
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/remotecommand"
+	"os/exec"
 	"reflect"
 	"strconv"
 	"strings"
@@ -858,8 +854,8 @@ spec:
 			}, timeout*3, interval*5).Should(BeTrue())
 
 			By("By checking pods' role label")
-			observeRoleByIp := func(ip string) string {
-				url := "root@tcp(" + ip + ":3306)/information_schema?allowNativePasswords=true"
+			observeRole := func(ip string, port int32) string {
+				url := "root@tcp(" + ip + ":" + strconv.Itoa(int(port)) + ")/information_schema?allowNativePasswords=true"
 				sql := "select role from information_schema.wesql_cluster_local"
 				mysql := &Mysql{}
 				params := map[string]string{connectionURLKey: url}
@@ -876,34 +872,39 @@ spec:
 
 				Expect(mysql.Close()).Should(Succeed())
 
+				return strings.ToLower(role)
+			}
+
+			startPortForward := func(kind, name string, port int32) {
+				portStr := strconv.Itoa(int(port))
+				cmd := exec.Command("bash", "-c", "kubectl port-forward "+kind+"/"+name+" "+portStr+":"+portStr)
+				err := cmd.Start()
+				Expect(err).Should(Succeed())
+			}
+
+			stopPortForward := func(name string) {
+				cmd := exec.Command("bash", "-c", "ps aux | grep port-forward | grep -v grep | grep "+name+" | awk '{print $2}' | xargs kill -9")
+				Expect(cmd.Run()).Should(Succeed())
+			}
+
+			ip := "127.0.0.1"
+			observeRoleOfPod := func(pod *corev1.Pod) string {
+				kind := "pod"
+				name := pod.Name
+				port := pod.Spec.Containers[0].Ports[0].ContainerPort
+				startPortForward(kind, name, port)
+				role := observeRole(ip, port)
+				stopPortForward(name)
 				return role
 			}
 
-			observeRoleByExec := func(pod *corev1.Pod) string {
-				cmd := "mysql -h127.0.0.1 -uroot -e 'select role from information_schema.wesql_cluster_local'\n"
-				role := ""
-				Eventually(func() bool {
-					result, _, err := execInPod(cfg, pod.Namespace, pod.Name, cmd, "mysql")
-					if err != nil {
-						return false
-					}
-					if len(result) == 0 {
-						return false
-					}
-					result = strings.ToLower(result)
-					index := strings.Index(result, leader)
-					if index > -1 {
-						role = leader
-						return true
-					}
-					index = strings.Index(result, follower)
-					if index > -1 {
-						role = follower
-						return true
-					}
-					return false
-				}, timeout*4, interval).Should(BeTrue())
-
+			observeRoleOfService := func(svc *corev1.Service) string {
+				kind := "svc"
+				name := svc.Name
+				port := svc.Spec.Ports[0].Port
+				startPortForward(kind, name, port)
+				role := observeRole(ip, port)
+				stopPortForward(name)
 				return role
 			}
 
@@ -935,7 +936,7 @@ spec:
 			// TODO set pod label, remove this after probe is done
 			time.Sleep(interval * 2)
 			for _, pod := range pods {
-				role := observeRoleByExec(&pod)
+				role := observeRoleOfPod(&pod)
 				updateRole(&pod, role)
 			}
 			// end remove
@@ -969,9 +970,9 @@ spec:
 				svc, svcRo = svcRo, svc
 			}
 			// getRole should be leader through service
-			Expect(observeRoleByIp(svc.Spec.ClusterIP)).Should(Equal(leader))
+			Expect(observeRoleOfService(&svc)).Should(Equal(leader))
 			// getRole should be follower through readonlyService
-			Expect(observeRoleByIp(svcRo.Spec.ClusterIP)).Should(Equal(follower))
+			Expect(observeRoleOfService(&svcRo)).Should(Equal(follower))
 
 			By("By deleting leader pod")
 			leaderPod := &corev1.Pod{}
@@ -996,12 +997,12 @@ spec:
 			// TODO role should be updated automatically after probe done
 			// update it manually, remove this
 			for _, pod := range followerPods {
-				role := observeRoleByExec(pod)
+				role := observeRoleOfPod(pod)
 				updateRole(pod, role)
 			}
 			// end remove
 			time.Sleep(interval * 2)
-			Expect(observeRoleByIp(svc.Spec.ClusterIP)).Should(Equal(leader))
+			Expect(observeRoleOfService(&svc)).Should(Equal(leader))
 
 			By("Deleting the scope")
 			Eventually(func() error {
@@ -1054,46 +1055,6 @@ func hasStorage(assureDefaultStorageClassObj func() *storagev1.StorageClass) boo
 	return true
 }
 
-func execInPod(config *rest.Config, namespace, podName, command, containerName string) (string, string, error) {
-	k8sCli, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return "", "", err
-	}
-	cmd := []string{
-		"sh",
-		"-c",
-		command,
-	}
-	req := k8sCli.CoreV1().RESTClient().Post().
-		Resource("pods").
-		Name(podName).
-		Namespace(namespace).SubResource("exec").Param("container", containerName)
-	req.VersionedParams(
-		&corev1.PodExecOptions{
-			Command: cmd,
-			Stdin:   false,
-			Stdout:  true,
-			Stderr:  true,
-			TTY:     true,
-		},
-		scheme.ParameterCodec,
-	)
-
-	var stdout, stderr bytes.Buffer
-	exec, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
-	if err != nil {
-		return "", "", err
-	}
-	err = exec.Stream(remotecommand.StreamOptions{
-		Stdout: &stdout,
-		Stderr: &stderr,
-	})
-	if err != nil {
-		return "", "", err
-	}
-	return strings.TrimSpace(stdout.String()), strings.TrimSpace(stderr.String()), err
-}
-
 const (
 	// configurations to connect to Mysql, either a data source name represent by URL.
 	connectionURLKey = "url"
@@ -1103,17 +1064,6 @@ const (
 	maxOpenConnsKey    = "maxOpenConns"
 	connMaxLifetimeKey = "connMaxLifetime"
 	connMaxIdleTimeKey = "connMaxIdleTime"
-
-	// keys from request's metadata.
-	commandSQLKey = "sql"
-
-	// keys from response's metadata.
-	respOpKey           = "operation"
-	respSQLKey          = "sql"
-	respStartTimeKey    = "start-time"
-	respRowsAffectedKey = "rows-affected"
-	respEndTimeKey      = "end-time"
-	respDurationKey     = "duration"
 )
 
 // Mysql represents MySQL output bindings.

@@ -323,9 +323,6 @@ func mergeComponents(
 		Service:                  clusterDefComp.Service,
 		Scripts:                  clusterDefComp.Scripts,
 	}
-	if clusterComp != nil {
-		component.Name = clusterComp.Name
-	}
 
 	if appVerComp != nil && appVerComp.PodSpec.Containers != nil {
 		for _, container := range appVerComp.PodSpec.Containers {

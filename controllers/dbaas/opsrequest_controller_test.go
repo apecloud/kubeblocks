@@ -235,6 +235,7 @@ spec:
 			}, timeout, interval).Should(BeTrue())
 
 			verticalScalingOpsRequest := createOpsRequest("mysql-verticalscaling", clusterObject.Name, dbaasv1alpha1.VerticalScalingType)
+			verticalScalingOpsRequest.Spec.TTLSecondsAfterSucceed = 1
 			verticalScalingOpsRequest.Spec.ComponentOpsList = []*dbaasv1alpha1.ComponentOps{
 				{
 					ComponentNames: []string{"replicasets"},
@@ -255,6 +256,18 @@ spec:
 					verticalScalingOpsRequest)
 				return slices.Index([]dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase},
 					verticalScalingOpsRequest.Status.Phase) != -1
+			}, timeout, interval).Should(BeTrue())
+
+			By("test OpsRequest is succeed")
+			patch := client.MergeFrom(verticalScalingOpsRequest.DeepCopy())
+			verticalScalingOpsRequest.Status.Phase = dbaasv1alpha1.SucceedPhase
+			Expect(k8sClient.Status().Patch(context.Background(), verticalScalingOpsRequest, patch)).Should(Succeed())
+			Eventually(func() bool {
+				err := k8sClient.Get(context.Background(), client.ObjectKey{
+					Name:      verticalScalingOpsRequest.Name,
+					Namespace: verticalScalingOpsRequest.Namespace},
+					verticalScalingOpsRequest)
+				return apierrors.IsNotFound(err)
 			}, timeout, interval).Should(BeTrue())
 
 			By("Deleting the scope")

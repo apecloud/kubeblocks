@@ -211,6 +211,12 @@ spec:
 					{
 						Name: "replicasets",
 						Type: "replicasets",
+						RoleGroups: []dbaasv1alpha1.ClusterRoleGroup{
+							{
+								Name:     "primary",
+								Replicas: 1,
+							},
+						},
 						VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{
 							{
 								Name: "log",
@@ -231,7 +237,7 @@ spec:
 		}, clusterDefObj, appVersionObj, key
 	}
 
-	deleteClusterNWait := func(key types.NamespacedName) error {
+	deleteClusterWait := func(key types.NamespacedName) error {
 		Expect(func() error {
 			f := &dbaasv1alpha1.Cluster{}
 			if err := k8sClient.Get(context.Background(), key, f); err != nil {
@@ -562,7 +568,7 @@ spec:
 			}
 			Expect(k8sClient.Status().Update(context.Background(), clusterObject)).Should(Succeed())
 			opsRes.OpsRequest.Status.Phase = dbaasv1alpha1.RunningPhase
-			_ = GetOpsManager().ReconcileMainEnter(opsRes)
+			_ = GetOpsManager().Reconcile(opsRes)
 
 			By("Test VolumeExpansion")
 			// create storageClass
@@ -618,28 +624,51 @@ spec:
 					ComponentNames: []string{"replicasets"},
 					HorizontalScaling: &dbaasv1alpha1.HorizontalScaling{
 						Replicas: 1,
+						RoleGroups: []dbaasv1alpha1.ClusterRoleGroup{
+							{
+								Name:     "primary",
+								Replicas: 1,
+							},
+						},
 					},
 				},
 			}
 			opsRes.OpsRequest = ops
 			_ = HorizontalScalingAction(opsRes)
 
-			By("Test OpsManager.MainEnter function with ComponentOps")
-			_ = GetOpsManager().MainEnter(opsRes)
+			By("Test OpsManager.Do function with ComponentOps")
+			_ = GetOpsManager().Do(opsRes)
 			opsRes.Cluster.Status.Phase = dbaasv1alpha1.RunningPhase
 			opsRes.OpsRequest.Status.Phase = dbaasv1alpha1.RunningPhase
-			_ = GetOpsManager().MainEnter(opsRes)
-			_ = GetOpsManager().ReconcileMainEnter(opsRes)
+			_ = GetOpsManager().Do(opsRes)
+			_ = GetOpsManager().Reconcile(opsRes)
+			// test getOpsRequestAnnotation function
+			opsRes.Cluster.Annotations = map[string]string{
+				OpsRequestAnnotationKey: `{"Updating":"horizontalscaling_ops"}`,
+			}
+			_ = GetOpsManager().Do(opsRes)
+
+			By("Test OpsManager.Reconcile when opsRequest is succeed")
+			opsRes.OpsRequest.Status.Phase = dbaasv1alpha1.SucceedPhase
+			opsRes.Cluster.Status.Components = map[string]*dbaasv1alpha1.ClusterStatusComponent{
+				"replicasets": {
+					Phase: dbaasv1alpha1.RunningPhase,
+				},
+			}
+			_ = GetOpsManager().Reconcile(opsRes)
 
 			By("Test the functions in ops_util.go")
 			_ = patchOpsBehaviourNotFound(opsRes)
 			_ = patchClusterPhaseMisMatch(opsRes)
 			_ = patchClusterExistOtherOperation(opsRes, "horizontalscaling_ops")
 			_ = PatchClusterNotFound(opsRes)
+			_ = patchClusterPhaseWhenExistsOtherOps(opsRes, map[dbaasv1alpha1.Phase]string{
+				dbaasv1alpha1.PendingPhase: "mysql-restart",
+			})
 
 			By("Deleting the scope")
 			Eventually(func() error {
-				return deleteClusterNWait(key)
+				return deleteClusterWait(key)
 			}, timeout*2, interval).Should(Succeed())
 		})
 	})

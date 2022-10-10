@@ -96,7 +96,7 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	if opsRequest.Status.ObservedGeneration == opsRequest.GetGeneration() {
 		// waiting until OpsRequest.status.phase is Succeed
-		if err = operations.GetOpsManager().ReconcileMainEnter(opsRes); err != nil {
+		if err = operations.GetOpsManager().Reconcile(opsRes); err != nil {
 			return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "checkOpsIsCompleted")
 		}
 		return intctrlutil.Reconciled()
@@ -156,7 +156,7 @@ func (r *OpsRequestReconciler) processOpsRequest(opsRes *operations.OpsResource)
 	var (
 		err error
 	)
-	if err = operations.GetOpsManager().MainEnter(opsRes); err != nil {
+	if err = operations.GetOpsManager().Do(opsRes); err != nil {
 		return err
 	}
 	return nil

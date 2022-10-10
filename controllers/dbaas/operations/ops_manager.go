@@ -32,8 +32,8 @@ func (opsMgr *OpsManager) RegisterOps(opsType dbaasv1alpha1.OpsType, opsBehaviou
 	opsManager.OpsMap[opsType] = opsBehaviour
 }
 
-// MainEnter the common entry function for handling OpsRequest
-func (opsMgr *OpsManager) MainEnter(opsRes *OpsResource) error {
+// Do the common entry function for handling OpsRequest
+func (opsMgr *OpsManager) Do(opsRes *OpsResource) error {
 	var (
 		opsBehaviour *OpsBehaviour
 		err          error
@@ -70,9 +70,9 @@ func (opsMgr *OpsManager) MainEnter(opsRes *OpsResource) error {
 	return patchClusterStatus(opsRes, opsBehaviour.ToClusterPhase)
 }
 
-// ReconcileMainEnter reconcile entry function when OpsRequest.status.phase is Running.
+// Reconcile entry function when OpsRequest.status.phase is Running.
 // loop until the operation is completed.
-func (opsMgr *OpsManager) ReconcileMainEnter(opsRes *OpsResource) error {
+func (opsMgr *OpsManager) Reconcile(opsRes *OpsResource) error {
 	var (
 		opsBehaviour *OpsBehaviour
 		ok           bool

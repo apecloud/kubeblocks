@@ -175,7 +175,7 @@ func (r *ClusterDefinition) getNotFoundMsg(invalidElements []string, tag string,
 	if tag == componentTag {
 		return fmt.Sprintf("component type %s Not Found in spec.components[*].typeName", invalidElements)
 	}
-	return fmt.Sprintf("roleGroup %s Not Found in spec.components[%s].roleGroups", invalidElements, componentType)
+	return fmt.Sprintf("roleGroup %s not found in spec.components[%s].roleGroups", invalidElements, componentType)
 
 }
 

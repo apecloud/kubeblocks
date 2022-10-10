@@ -18,9 +18,15 @@ package dbaas
 
 import (
 	"context"
+	"database/sql"
+	"database/sql/driver"
 	"fmt"
+	"reflect"
+	"strconv"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
+	"github.com/pkg/errors"
 	"github.com/sethvargo/go-password/password"
 
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -47,6 +53,10 @@ var _ = Describe("Cluster Controller", func() {
 	const timeout = time.Second * 10
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
+
+	const leader = "leader"
+	const follower = "follower"
+
 	clusterObjKey := types.NamespacedName{
 		Name:      "my-cluster",
 		Namespace: "default",
@@ -298,6 +308,186 @@ spec:
 		return client.IgnoreNotFound(err)
 	}
 
+	// Consensus associate objs
+	// ClusterDefinition with componentType = Consensus
+	assureClusterDefWithConsensusObj := func() *dbaasv1alpha1.ClusterDefinition {
+		By("By assure an clusterDefinition obj with componentType = Consensus")
+		clusterDefYAML := `
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: cluster-definition-consensus
+spec:
+  type: state.mysql-8
+  components:
+  - typeName: replicasets
+    componentType: Consensus
+    consensusSpec:
+      leader:
+        name: "leader"
+        accessMode: ReadWrite
+      followers:
+      - name: "follower"
+        accessMode: Readonly
+      updateStrategy: Serial
+    service:
+      ports:
+      - protocol: TCP
+        port: 3306
+    readonlyService:
+      ports:
+      - protocol: TCP
+        port: 3306
+    configTemplateRefs: 
+    - name: mysql-tree-node-template-8.0 
+      volumeName: mysql-config
+    defaultReplicas: 3
+    podSpec:
+      containers:
+      - name: mysql
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3306
+          protocol: TCP
+          name: mysql
+        - containerPort: 13306
+          protocol: TCP
+          name: paxos
+        volumeMounts:
+          - mountPath: /var/lib/mysql
+            name: data
+          - mountPath: /var/log
+            name: log
+          - mountPath: /data/config
+            name: mysql-config
+        env:
+          - name: "MYSQL_ROOT_PASSWORD"
+            valueFrom:
+              secretKeyRef:
+                name: $(OPENDBAAS_MY_SECRET_NAME)
+                key: password
+        command: ["/usr/bin/bash", "-c"]
+        args:
+          - >
+            cluster_info="";
+            for (( i=0; i<$OPENDBAAS_REPLICASETS_N; i++ )); do
+              if [ $i -ne 0 ]; then
+                cluster_info="$cluster_info;";
+              fi;
+              host=$(eval echo \$OPENDBAAS_REPLICASETS_"$i"_HOSTNAME)
+              cluster_info="$cluster_info$host:13306";
+            done;
+            idx=0;
+            while IFS='-' read -ra ADDR; do
+              for i in "${ADDR[@]}"; do
+                idx=$i;
+              done;
+            done <<< "$OPENDBAAS_MY_POD_NAME";
+            echo $idx;
+            cluster_info="$cluster_info@$(($idx+1))";
+            echo $cluster_info;
+            docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
+`
+		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
+		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
+		Expect(checkedCreateObj(clusterDefinition)).Should(Succeed())
+		return clusterDefinition
+	}
+
+	assureAppVersionWithConsensusObj := func() *dbaasv1alpha1.AppVersion {
+		By("By assure an appVersion obj with componentType = Consensus")
+		appVerYAML := `
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind:       AppVersion
+metadata:
+  name:     app-version-consensus
+spec:
+  clusterDefinitionRef: cluster-definition-consensus
+  components:
+  - type: replicasets
+    configTemplateRefs: 
+    - name: mysql-tree-node-template-8.0 
+      volumeName: mysql-config
+    podSpec:
+      containers:
+      - name: mysql
+        image: docker.io/infracreate/wesql-server-8.0:0.1-SNAPSHOT
+`
+		appVersion := &dbaasv1alpha1.AppVersion{}
+		Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(Succeed())
+		Expect(checkedCreateObj(appVersion)).Should(Succeed())
+		return appVersion
+	}
+
+	newClusterWithConsensusObj := func(
+		clusterDefObj *dbaasv1alpha1.ClusterDefinition,
+		appVersionObj *dbaasv1alpha1.AppVersion,
+	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.AppVersion, types.NamespacedName) {
+		// setup Cluster obj required default ClusterDefinition and AppVersion objects if not provided
+		if clusterDefObj == nil {
+			assureCfgTplConfigMapObj("")
+			clusterDefObj = assureClusterDefWithConsensusObj()
+		}
+		if appVersionObj == nil {
+			appVersionObj = assureAppVersionWithConsensusObj()
+		}
+
+		randomStr, _ := password.Generate(6, 0, 0, true, false)
+		key := types.NamespacedName{
+			Name:      "cluster" + randomStr,
+			Namespace: "default",
+		}
+
+		return &dbaasv1alpha1.Cluster{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "dbaas.infracreate.com/v1alpha1",
+				Kind:       "Cluster",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      key.Name,
+				Namespace: key.Namespace,
+			},
+			Spec: dbaasv1alpha1.ClusterSpec{
+				ClusterDefRef: clusterDefObj.GetName(),
+				AppVersionRef: appVersionObj.GetName(),
+				Components: []dbaasv1alpha1.ClusterComponent{
+					{
+						Name: "wesql-test",
+						Type: "replicasets",
+						VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{
+							{
+								Name: "data",
+								Spec: corev1.PersistentVolumeClaimSpec{
+									AccessModes: []corev1.PersistentVolumeAccessMode{
+										corev1.ReadWriteOnce,
+									},
+									Resources: corev1.ResourceRequirements{
+										Requests: corev1.ResourceList{
+											corev1.ResourceStorage: resource.MustParse("1Gi"),
+										},
+									},
+								},
+							},
+							{
+								Name: "log",
+								Spec: corev1.PersistentVolumeClaimSpec{
+									AccessModes: []corev1.PersistentVolumeAccessMode{
+										corev1.ReadWriteOnce,
+									},
+									Resources: corev1.ResourceRequirements{
+										Requests: corev1.ResourceList{
+											corev1.ResourceStorage: resource.MustParse("1Gi"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}, clusterDefObj, appVersionObj, key
+	}
+
 	BeforeEach(func() {
 		// Add any steup steps that needs to be executed before each test
 	})
@@ -523,42 +713,8 @@ spec:
 		It("Should update PVC request storage size accordingly", func() {
 			// this test required controller-manager component
 			By("Check available controller-manager status")
-			csList := &corev1.ComponentStatusList{}
-			_ = k8sClient.List(context.Background(), csList)
-			isCMAvailable := false
-			for _, cs := range csList.Items {
-				if cs.Name != "controller-manager" {
-					continue
-				}
-				for _, cond := range cs.Conditions {
-					if cond.Type == "Healthy" && cond.Status == "True" {
-						isCMAvailable = true
-						break
-					}
-				}
-			}
-			if !isCMAvailable {
-				// skip test if no available storage classes
-				By("The controller-manager is not available, test skipped")
+			if !hasStorage(assureDefaultStorageClassObj) {
 				return
-			}
-
-			By("Check available storageclasses")
-			scList := &storagev1.StorageClassList{}
-			hasDefaultSC := false
-			_ = k8sClient.List(context.Background(), scList)
-			for _, sc := range scList.Items {
-				annot := sc.Annotations
-				if annot == nil {
-					continue
-				}
-				if v, ok := annot["storageclass.kubernetes.io/is-default-class"]; ok && v == "true" {
-					hasDefaultSC = true
-					break
-				}
-			}
-			if !hasDefaultSC {
-				assureDefaultStorageClassObj()
 			}
 
 			By("By creating a cluster with volume claim")
@@ -672,4 +828,391 @@ spec:
 			}, timeout*2, interval).Should(Succeed())
 		})
 	})
+
+	// Consensus associate test cases
+	Context("When creating cluster with componentType = Consensus", func() {
+		It("Should success with: "+
+			"1 pod with 'leader' role label set, "+
+			"2 pods with 'follower' role label set,"+
+			"1 service routes to 'leader' pod and "+
+			"1 service routes ro 'follower' pods", func() {
+			By("By checking storage")
+			if !hasStorage(assureDefaultStorageClassObj) {
+				return
+			}
+
+			By("By creating a cluster with componentType = Consensus")
+			toCreate, _, _, key := newClusterWithConsensusObj(nil, nil)
+			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+
+			By("By waiting the cluster is created")
+			cluster := &dbaasv1alpha1.Cluster{}
+			Eventually(func() bool {
+				Expect(k8sClient.Get(context.Background(), key, cluster)).Should(Succeed())
+				return cluster.Status.Phase == dbaasv1alpha1.AvailablePhase
+			}, timeout*100, interval*5).Should(BeTrue())
+
+			By("By checking pods' role label")
+			observeRole := func(ip string) string {
+				url := "root@tcp(" + ip + ":3306)/information_schema?allowNativePasswords=true"
+				sql := "select role from information_schema.wesql_cluster_local"
+				mysql := &Mysql{}
+				params := map[string]string{connectionURLKey: url}
+				Expect(mysql.Init(params)).Should(Succeed())
+
+				result, err := mysql.query(context.Background(), sql)
+				Expect(err).Should(BeNil())
+				Expect(len(result)).Should(Equal(1))
+				row, ok := result[0].(map[string]interface{})
+				Expect(ok).Should(BeTrue())
+				role, ok := row["role"].(string)
+				Expect(ok).Should(BeTrue())
+				Expect(role).ShouldNot(BeEmpty())
+
+				Expect(mysql.Close()).Should(Succeed())
+
+				return role
+			}
+
+			// TODO wait probe done @xuanchi
+			// before that, we fake it. remove this
+			updateRole := func(pod *corev1.Pod, role string) {
+				patch := client.MergeFrom(pod.DeepCopy())
+				pod.Labels[consensusSetRoleLabelKey] = role
+
+				Expect(k8sClient.Patch(context.Background(), pod, patch)).Should(Succeed())
+			}
+			// end remove
+
+			stsList := &appsv1.StatefulSetList{}
+			Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
+				"app.kubernetes.io/instance": key.Name,
+			}, client.InNamespace(key.Namespace))).Should(Succeed())
+			Expect(len(stsList.Items)).Should(Equal(1))
+			sts := &stsList.Items[0]
+			podList := &corev1.PodList{}
+			Expect(k8sClient.List(context.Background(), podList, client.InNamespace(key.Namespace))).Should(Succeed())
+			pods := make([]corev1.Pod, 0)
+			for _, pod := range podList.Items {
+				if isMemberOf(sts, &pod) {
+					pods = append(pods, pod)
+				}
+			}
+
+			// TODO set pod label, remove this after probe is done
+			for _, pod := range pods {
+				role := observeRole(pod.Status.PodIP)
+				updateRole(&pod, role)
+			}
+			// end remove
+
+			// should have 3 pods
+			Expect(len(pods)).Should(Equal(3))
+			// 1 leader
+			// 2 followers
+			leaderCount, followerCount := 0, 0
+			for _, pod := range pods {
+				switch pod.Labels[consensusSetRoleLabelKey] {
+				case leader:
+					leaderCount++
+				case follower:
+					followerCount++
+				}
+			}
+			Expect(leaderCount).Should(Equal(1))
+			Expect(followerCount).Should(Equal(2))
+
+			By("By checking services' status")
+			// we should have 2 services
+			svcList := &corev1.ServiceList{}
+			Expect(k8sClient.List(context.Background(), svcList, client.MatchingLabels{
+				"app.kubernetes.io/instance": key.Name,
+			}, client.InNamespace(key.Namespace))).Should(Succeed())
+			Expect(len(svcList.Items)).Should(Equal(2))
+			svc, svcRo := svcList.Items[0], svcList.Items[1]
+			roName := key.Name + "-" + cluster.Spec.Components[0].Name + "-ro"
+			if svc.Name == roName {
+				svc, svcRo = svcRo, svc
+			}
+			// getRole should be leader through service
+			Expect(observeRole(svc.Spec.ClusterIP)).Should(Equal(leader))
+			// getRole should be follower through readonlyService
+			Expect(observeRole(svcRo.Spec.ClusterIP)).Should(Equal(follower))
+
+			By("By deleting leader pod")
+			leaderPod := &corev1.Pod{}
+			followerPods := make([]*corev1.Pod, 0)
+			for _, pod := range pods {
+				switch pod.Labels[consensusSetRoleLabelKey] {
+				case leader:
+					leaderPod = &pod
+				case follower:
+					followerPods = append(followerPods, &pod)
+				}
+			}
+			Expect(k8sClient.Delete(context.Background(), leaderPod)).Should(Succeed())
+			time.Sleep(interval * 2)
+			Eventually(func() bool {
+				Expect(k8sClient.Get(context.Background(), types.NamespacedName{
+					Namespace: sts.Namespace,
+					Name:      sts.Name,
+				}, sts)).Should(Succeed())
+				return sts.Status.AvailableReplicas == 3
+			}, timeout, interval).Should(BeTrue())
+			// TODO role should be updated automatically after probe done
+			// update it manually, remove this
+			for _, pod := range followerPods {
+				role := observeRole(pod.Status.PodIP)
+				updateRole(pod, role)
+			}
+			// end remove
+			time.Sleep(interval * 2)
+			Expect(observeRole(svc.Spec.ClusterIP)).Should(Equal(leader))
+
+			By("Deleting the scope")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
 })
+
+func hasStorage(assureDefaultStorageClassObj func() *storagev1.StorageClass) bool {
+	csList := &corev1.ComponentStatusList{}
+	_ = k8sClient.List(context.Background(), csList)
+	isCMAvailable := false
+	for _, cs := range csList.Items {
+		if cs.Name != "controller-manager" {
+			continue
+		}
+		for _, cond := range cs.Conditions {
+			if cond.Type == "Healthy" && cond.Status == "True" {
+				isCMAvailable = true
+				break
+			}
+		}
+	}
+	if !isCMAvailable {
+		// skip test if no available storage classes
+		By("The controller-manager is not available, test skipped")
+		return false
+	}
+
+	By("Check available storageclasses")
+	scList := &storagev1.StorageClassList{}
+	hasDefaultSC := false
+	_ = k8sClient.List(context.Background(), scList)
+	for _, sc := range scList.Items {
+		annot := sc.Annotations
+		if annot == nil {
+			continue
+		}
+		if v, ok := annot["storageclass.kubernetes.io/is-default-class"]; ok && v == "true" {
+			hasDefaultSC = true
+			break
+		}
+	}
+	if !hasDefaultSC {
+		assureDefaultStorageClassObj()
+	}
+
+	return true
+}
+
+const (
+	// configurations to connect to Mysql, either a data source name represent by URL.
+	connectionURLKey = "url"
+
+	// other general settings for DB connections.
+	maxIdleConnsKey    = "maxIdleConns"
+	maxOpenConnsKey    = "maxOpenConns"
+	connMaxLifetimeKey = "connMaxLifetime"
+	connMaxIdleTimeKey = "connMaxIdleTime"
+
+	// keys from request's metadata.
+	commandSQLKey = "sql"
+
+	// keys from response's metadata.
+	respOpKey           = "operation"
+	respSQLKey          = "sql"
+	respStartTimeKey    = "start-time"
+	respRowsAffectedKey = "rows-affected"
+	respEndTimeKey      = "end-time"
+	respDurationKey     = "duration"
+)
+
+// Mysql represents MySQL output bindings.
+type Mysql struct {
+	db *sql.DB
+}
+
+// Init initializes the MySQL binding.
+func (m *Mysql) Init(metadata map[string]string) error {
+	p := metadata
+	url, ok := p[connectionURLKey]
+	if !ok || url == "" {
+		return fmt.Errorf("missing MySql connection string")
+	}
+
+	db, err := initDB(url)
+	if err != nil {
+		return err
+	}
+
+	err = propertyToInt(p, maxIdleConnsKey, db.SetMaxIdleConns)
+	if err != nil {
+		return err
+	}
+
+	err = propertyToInt(p, maxOpenConnsKey, db.SetMaxOpenConns)
+	if err != nil {
+		return err
+	}
+
+	err = propertyToDuration(p, connMaxIdleTimeKey, db.SetConnMaxIdleTime)
+	if err != nil {
+		return err
+	}
+
+	err = propertyToDuration(p, connMaxLifetimeKey, db.SetConnMaxLifetime)
+	if err != nil {
+		return err
+	}
+
+	err = db.Ping()
+	if err != nil {
+		return errors.Wrap(err, "unable to ping the DB")
+	}
+
+	m.db = db
+
+	return nil
+}
+
+// Close will close the DB.
+func (m *Mysql) Close() error {
+	if m.db != nil {
+		return m.db.Close()
+	}
+
+	return nil
+}
+
+func (m *Mysql) query(ctx context.Context, sql string) ([]interface{}, error) {
+	rows, err := m.db.QueryContext(ctx, sql)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error executing %s", sql)
+	}
+
+	defer func() {
+		_ = rows.Close()
+		_ = rows.Err()
+	}()
+
+	result, err := m.jsonify(rows)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error marshalling query result for %s", sql)
+	}
+
+	return result, nil
+}
+
+func propertyToInt(props map[string]string, key string, setter func(int)) error {
+	if v, ok := props[key]; ok {
+		if i, err := strconv.Atoi(v); err == nil {
+			setter(i)
+		} else {
+			return errors.Wrapf(err, "error converitng %s:%s to int", key, v)
+		}
+	}
+
+	return nil
+}
+
+func propertyToDuration(props map[string]string, key string, setter func(time.Duration)) error {
+	if v, ok := props[key]; ok {
+		if d, err := time.ParseDuration(v); err == nil {
+			setter(d)
+		} else {
+			return errors.Wrapf(err, "error converitng %s:%s to time duration", key, v)
+		}
+	}
+
+	return nil
+}
+
+func initDB(url string) (*sql.DB, error) {
+	if _, err := mysql.ParseDSN(url); err != nil {
+		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS) specified by %s", connectionURLKey)
+	}
+
+	db, err := sql.Open("mysql", url)
+	if err != nil {
+		return nil, errors.Wrap(err, "error opening DB connection")
+	}
+
+	return db, nil
+}
+
+func (m *Mysql) jsonify(rows *sql.Rows) ([]interface{}, error) {
+	columnTypes, err := rows.ColumnTypes()
+	if err != nil {
+		return nil, err
+	}
+
+	var ret []interface{}
+	for rows.Next() {
+		values := prepareValues(columnTypes)
+		err := rows.Scan(values...)
+		if err != nil {
+			return nil, err
+		}
+
+		r := m.convert(columnTypes, values)
+		ret = append(ret, r)
+	}
+
+	return ret, nil
+}
+
+func prepareValues(columnTypes []*sql.ColumnType) []interface{} {
+	types := make([]reflect.Type, len(columnTypes))
+	for i, tp := range columnTypes {
+		types[i] = tp.ScanType()
+	}
+
+	values := make([]interface{}, len(columnTypes))
+	for i := range values {
+		values[i] = reflect.New(types[i]).Interface()
+	}
+
+	return values
+}
+
+func (m *Mysql) convert(columnTypes []*sql.ColumnType, values []interface{}) map[string]interface{} {
+	r := map[string]interface{}{}
+
+	for i, ct := range columnTypes {
+		value := values[i]
+
+		switch v := values[i].(type) {
+		case driver.Valuer:
+			if vv, err := v.Value(); err == nil {
+				value = interface{}(vv)
+			}
+		case *sql.RawBytes:
+			// special case for sql.RawBytes, see https://github.com/go-sql-driver/mysql/blob/master/fields.go#L178
+			switch ct.DatabaseTypeName() {
+			case "VARCHAR", "CHAR", "TEXT", "LONGTEXT":
+				value = string(*v)
+			}
+		}
+
+		if value != nil {
+			r[ct.Name()] = value
+		}
+	}
+
+	return r
+}

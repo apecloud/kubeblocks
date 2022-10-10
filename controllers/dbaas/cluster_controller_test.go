@@ -17,12 +17,18 @@ limitations under the License.
 package dbaas
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/remotecommand"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
@@ -338,9 +344,6 @@ spec:
       ports:
       - protocol: TCP
         port: 3306
-    configTemplateRefs: 
-    - name: mysql-tree-node-template-8.0 
-      volumeName: mysql-config
     defaultReplicas: 3
     podSpec:
       containers:
@@ -354,19 +357,33 @@ spec:
           protocol: TCP
           name: paxos
         volumeMounts:
-          - mountPath: /var/lib/mysql
+          - mountPath: /data
             name: data
-          - mountPath: /var/log
-            name: log
-          - mountPath: /data/config
-            name: mysql-config
         env:
-          - name: "MYSQL_ROOT_PASSWORD"
-            valueFrom:
-              secretKeyRef:
-                name: $(OPENDBAAS_MY_SECRET_NAME)
-                key: password
-        command: ["/usr/bin/bash", "-c"]
+        - name: MYSQL_ROOT_HOST
+          value: '%'
+        - name: MYSQL_ROOT_USER
+          value: root
+        - name: MYSQL_ROOT_PASSWORD
+        - name: MYSQL_ALLOW_EMPTY_PASSWORD
+          value: "yes"
+        - name: MYSQL_DATABASE
+          value: mydb
+        - name: MYSQL_USER
+          value: u1
+        - name: MYSQL_PASSWORD
+          value: u1
+        - name: CLUSTER_ID
+          value: "1"
+        - name: CLUSTER_START_INDEX
+          value: "1"
+        - name: REPLICATIONUSER
+          value: replicator
+        - name: REPLICATION_PASSWORD
+        - name: MYSQL_TEMPLATE_CONFIG
+        - name: MYSQL_CUSTOM_CONFIG
+        - name: MYSQL_DYNAMIC_CONFIG
+        command: ["/bin/bash", "-c"]
         args:
           - >
             cluster_info="";
@@ -387,6 +404,8 @@ spec:
             cluster_info="$cluster_info@$(($idx+1))";
             echo $cluster_info;
             docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
+  connectionCredential:
+    user: root
 `
 		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
@@ -405,13 +424,11 @@ spec:
   clusterDefinitionRef: cluster-definition-consensus
   components:
   - type: replicasets
-    configTemplateRefs: 
-    - name: mysql-tree-node-template-8.0 
-      volumeName: mysql-config
     podSpec:
       containers:
       - name: mysql
         image: docker.io/infracreate/wesql-server-8.0:0.1-SNAPSHOT
+        imagePullPolicy: IfNotPresent
 `
 		appVersion := &dbaasv1alpha1.AppVersion{}
 		Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(Succeed())
@@ -457,19 +474,6 @@ spec:
 						VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{
 							{
 								Name: "data",
-								Spec: corev1.PersistentVolumeClaimSpec{
-									AccessModes: []corev1.PersistentVolumeAccessMode{
-										corev1.ReadWriteOnce,
-									},
-									Resources: corev1.ResourceRequirements{
-										Requests: corev1.ResourceList{
-											corev1.ResourceStorage: resource.MustParse("1Gi"),
-										},
-									},
-								},
-							},
-							{
-								Name: "log",
 								Spec: corev1.PersistentVolumeClaimSpec{
 									AccessModes: []corev1.PersistentVolumeAccessMode{
 										corev1.ReadWriteOnce,
@@ -849,11 +853,12 @@ spec:
 			cluster := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
 				Expect(k8sClient.Get(context.Background(), key, cluster)).Should(Succeed())
-				return cluster.Status.Phase == dbaasv1alpha1.AvailablePhase
-			}, timeout*100, interval*5).Should(BeTrue())
+
+				return cluster.Status.Phase == dbaasv1alpha1.RunningPhase
+			}, timeout*3, interval*5).Should(BeTrue())
 
 			By("By checking pods' role label")
-			observeRole := func(ip string) string {
+			observeRoleByIp := func(ip string) string {
 				url := "root@tcp(" + ip + ":3306)/information_schema?allowNativePasswords=true"
 				sql := "select role from information_schema.wesql_cluster_local"
 				mysql := &Mysql{}
@@ -870,6 +875,34 @@ spec:
 				Expect(role).ShouldNot(BeEmpty())
 
 				Expect(mysql.Close()).Should(Succeed())
+
+				return role
+			}
+
+			observeRoleByExec := func(pod *corev1.Pod) string {
+				cmd := "mysql -h127.0.0.1 -uroot -e 'select role from information_schema.wesql_cluster_local'\n"
+				role := ""
+				Eventually(func() bool {
+					result, _, err := execInPod(cfg, pod.Namespace, pod.Name, cmd, "mysql")
+					if err != nil {
+						return false
+					}
+					if len(result) == 0 {
+						return false
+					}
+					result = strings.ToLower(result)
+					index := strings.Index(result, leader)
+					if index > -1 {
+						role = leader
+						return true
+					}
+					index = strings.Index(result, follower)
+					if index > -1 {
+						role = follower
+						return true
+					}
+					return false
+				}, timeout*4, interval).Should(BeTrue())
 
 				return role
 			}
@@ -900,8 +933,9 @@ spec:
 			}
 
 			// TODO set pod label, remove this after probe is done
+			time.Sleep(interval * 2)
 			for _, pod := range pods {
-				role := observeRole(pod.Status.PodIP)
+				role := observeRoleByExec(&pod)
 				updateRole(&pod, role)
 			}
 			// end remove
@@ -935,9 +969,9 @@ spec:
 				svc, svcRo = svcRo, svc
 			}
 			// getRole should be leader through service
-			Expect(observeRole(svc.Spec.ClusterIP)).Should(Equal(leader))
+			Expect(observeRoleByIp(svc.Spec.ClusterIP)).Should(Equal(leader))
 			// getRole should be follower through readonlyService
-			Expect(observeRole(svcRo.Spec.ClusterIP)).Should(Equal(follower))
+			Expect(observeRoleByIp(svcRo.Spec.ClusterIP)).Should(Equal(follower))
 
 			By("By deleting leader pod")
 			leaderPod := &corev1.Pod{}
@@ -962,12 +996,12 @@ spec:
 			// TODO role should be updated automatically after probe done
 			// update it manually, remove this
 			for _, pod := range followerPods {
-				role := observeRole(pod.Status.PodIP)
+				role := observeRoleByExec(pod)
 				updateRole(pod, role)
 			}
 			// end remove
 			time.Sleep(interval * 2)
-			Expect(observeRole(svc.Spec.ClusterIP)).Should(Equal(leader))
+			Expect(observeRoleByIp(svc.Spec.ClusterIP)).Should(Equal(leader))
 
 			By("Deleting the scope")
 			Eventually(func() error {
@@ -1018,6 +1052,46 @@ func hasStorage(assureDefaultStorageClassObj func() *storagev1.StorageClass) boo
 	}
 
 	return true
+}
+
+func execInPod(config *rest.Config, namespace, podName, command, containerName string) (string, string, error) {
+	k8sCli, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return "", "", err
+	}
+	cmd := []string{
+		"sh",
+		"-c",
+		command,
+	}
+	req := k8sCli.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(podName).
+		Namespace(namespace).SubResource("exec").Param("container", containerName)
+	req.VersionedParams(
+		&corev1.PodExecOptions{
+			Command: cmd,
+			Stdin:   false,
+			Stdout:  true,
+			Stderr:  true,
+			TTY:     true,
+		},
+		scheme.ParameterCodec,
+	)
+
+	var stdout, stderr bytes.Buffer
+	exec, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
+	if err != nil {
+		return "", "", err
+	}
+	err = exec.Stream(remotecommand.StreamOptions{
+		Stdout: &stdout,
+		Stderr: &stderr,
+	})
+	if err != nil {
+		return "", "", err
+	}
+	return strings.TrimSpace(stdout.String()), strings.TrimSpace(stderr.String()), err
 }
 
 const (

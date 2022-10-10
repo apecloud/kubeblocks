@@ -67,6 +67,9 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: true,
 	}
 
+	useExistingCluster := true
+	testEnv.UseExistingCluster = &useExistingCluster
+
 	var err error
 	// cfg is defined in this file globally.
 	cfg, err = testEnv.Start()

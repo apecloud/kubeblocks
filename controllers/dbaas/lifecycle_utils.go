@@ -808,8 +808,7 @@ func getComponent(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1
 }
 
 func getComponentTypeName(cluster dbaasv1alpha1.Cluster, stsObj appsv1.StatefulSet) string {
-	names := strings.Split(stsObj.Name, "-")
-	name := names[len(names)-1]
+	name := stsObj.Name[len(cluster.Name)+1:]
 	for _, component := range cluster.Spec.Components {
 		if name == component.Name {
 			return component.Type

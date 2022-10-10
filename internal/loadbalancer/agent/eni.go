@@ -43,7 +43,6 @@ type eniManager struct {
 	maxIPsPerENI int
 	maxENI       int
 	minPrivateIP int
-	hostIP       string
 	resource     *NodeResource
 	cp           cloud.Provider
 }

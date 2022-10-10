@@ -66,9 +66,8 @@ import (
 //+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch
 
 const (
-	appName        = "loadbalancer-controller"
-	RFC3339Mills   = "2006-01-02T15:04:05.000"
-	DefaultRPCPort = 19200
+	appName      = "loadbalancer-controller"
+	RFC3339Mills = "2006-01-02T15:04:05.000"
 
 	EnvRPCPort     = "RPC_PORT"
 	EnvEnableDebug = "ENABLE_DEBUG"
@@ -192,15 +191,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	endpointController, err := lb.NewEndpointController(logger, c, mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"))
-	if err != nil {
-		setupLog.Error(err, "Failed to init endpoints controller")
-		os.Exit(1)
-	}
-	if err := endpointController.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "Endpoints")
-		os.Exit(1)
-	}
+	//endpointController, err := lb.NewEndpointController(logger, c, mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"))
+	//if err != nil {
+	//	setupLog.Error(err, "Failed to init endpoints controller")
+	//	os.Exit(1)
+	//}
+	//if err := endpointController.SetupWithManager(mgr); err != nil {
+	//	setupLog.Error(err, "Failed to create controller", "controller", "Endpoints")
+	//	os.Exit(1)
+	//}
 
 	//+kubebuilder:scaffold:builder
 

@@ -8320,10 +8320,9 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: phase - in list of [Available,Deleting]
+                description: phase - in list of [Available]
                 enum:
                 - Available
-                - Deleting
                 type: string
             type: object
         type: object

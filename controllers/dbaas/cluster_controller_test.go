@@ -159,6 +159,9 @@ spec:
     roleGroups:
     - primary
     defaultReplicas: 1
+    topologySpreadConstraint:
+      maxSkew: 1
+      whenUnsatisfiable: DoNotSchedule
     podSpec:
       containers:
       - name: mysql
@@ -274,7 +277,10 @@ spec:
 			Namespace: "default",
 		}
 		affinity := dbaasv1alpha1.Affinity{
-			TopologyKeys: []string{"kubernetes.io/hostname"},
+			TopologyKeys: []string{"testTopologyKey"},
+			NodeLabels: map[string]string{
+				"testLabelKey": "testLabelValue",
+			},
 		}
 
 		return &dbaasv1alpha1.Cluster{

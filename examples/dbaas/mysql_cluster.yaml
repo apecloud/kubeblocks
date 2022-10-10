@@ -21,10 +21,3 @@ spec:
         resources:
           requests:
             storage: 1Gi
-    - name: log
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi

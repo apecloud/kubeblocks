@@ -26,8 +26,6 @@ spec:
         volumeMounts:
           - mountPath: /data
             name: data
-          - mountPath: /log
-            name: log
           - mountPath: /data/config/mysql
             name: mysql-config
         env:

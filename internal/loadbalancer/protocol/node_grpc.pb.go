@@ -23,6 +23,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type NodeClient interface {
+	ChooseENI(ctx context.Context, in *ChooseENIRequest, opts ...grpc.CallOption) (*ChooseENIResponse, error)
 	DescribeAllENIs(ctx context.Context, in *DescribeAllENIsRequest, opts ...grpc.CallOption) (*DescribeAllENIsResponse, error)
 	SetupNetworkForENI(ctx context.Context, in *SetupNetworkForENIRequest, opts ...grpc.CallOption) (*SetupNetworkForENIResponse, error)
 	CleanNetworkForENI(ctx context.Context, in *CleanNetworkForENIRequest, opts ...grpc.CallOption) (*CleanNetworkForENIResponse, error)
@@ -36,6 +37,15 @@ type nodeClient struct {
 
 func NewNodeClient(cc grpc.ClientConnInterface) NodeClient {
 	return &nodeClient{cc}
+}
+
+func (c *nodeClient) ChooseENI(ctx context.Context, in *ChooseENIRequest, opts ...grpc.CallOption) (*ChooseENIResponse, error) {
+	out := new(ChooseENIResponse)
+	err := c.cc.Invoke(ctx, "/protocol.Node/ChooseENI", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *nodeClient) DescribeAllENIs(ctx context.Context, in *DescribeAllENIsRequest, opts ...grpc.CallOption) (*DescribeAllENIsResponse, error) {
@@ -87,6 +97,7 @@ func (c *nodeClient) CleanNetworkForService(ctx context.Context, in *CleanNetwor
 // All implementations must embed UnimplementedNodeServer
 // for forward compatibility
 type NodeServer interface {
+	ChooseENI(context.Context, *ChooseENIRequest) (*ChooseENIResponse, error)
 	DescribeAllENIs(context.Context, *DescribeAllENIsRequest) (*DescribeAllENIsResponse, error)
 	SetupNetworkForENI(context.Context, *SetupNetworkForENIRequest) (*SetupNetworkForENIResponse, error)
 	CleanNetworkForENI(context.Context, *CleanNetworkForENIRequest) (*CleanNetworkForENIResponse, error)
@@ -99,6 +110,9 @@ type NodeServer interface {
 type UnimplementedNodeServer struct {
 }
 
+func (UnimplementedNodeServer) ChooseENI(context.Context, *ChooseENIRequest) (*ChooseENIResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ChooseENI not implemented")
+}
 func (UnimplementedNodeServer) DescribeAllENIs(context.Context, *DescribeAllENIsRequest) (*DescribeAllENIsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DescribeAllENIs not implemented")
 }
@@ -125,6 +139,24 @@ type UnsafeNodeServer interface {
 
 func RegisterNodeServer(s grpc.ServiceRegistrar, srv NodeServer) {
 	s.RegisterService(&Node_ServiceDesc, srv)
+}
+
+func _Node_ChooseENI_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChooseENIRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NodeServer).ChooseENI(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/protocol.Node/ChooseENI",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NodeServer).ChooseENI(ctx, req.(*ChooseENIRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Node_DescribeAllENIs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -224,6 +256,10 @@ var Node_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "protocol.Node",
 	HandlerType: (*NodeServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ChooseENI",
+			Handler:    _Node_ChooseENI_Handler,
+		},
 		{
 			MethodName: "DescribeAllENIs",
 			Handler:    _Node_DescribeAllENIs_Handler,

@@ -15,9 +15,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
-
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
 	pb "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol"
 )
@@ -55,6 +54,7 @@ type ServiceController struct {
 	logger   logr.Logger
 	cp       cloud.Provider
 	nm       agent.NodeManager
+	tps      map[string]TrafficPolicy
 	cache    map[string]*FloatingIP
 }
 
@@ -69,6 +69,8 @@ func NewServiceController(logger logr.Logger, client client.Client, scheme *runt
 		cache:    make(map[string]*FloatingIP),
 	}
 
+	c.initTrafficPolicies()
+
 	nodeList := &corev1.NodeList{}
 	if err := c.Client.List(context.Background(), nodeList); err != nil {
 		return nil, errors.Wrap(err, "Failed to list cluster nodes")
@@ -77,6 +79,13 @@ func NewServiceController(logger logr.Logger, client client.Client, scheme *runt
 		return nil, errors.Wrap(err, "Failed to init nodes")
 	}
 	return c, nil
+}
+
+func (c *ServiceController) initTrafficPolicies() {
+	c.tps = map[string]TrafficPolicy{
+		AnnotationValueClusterTrafficPolicy: &ClusterTrafficPolicy{nm: c.nm},
+		AnnotationValueLocalTrafficPolicy:   &LocalTrafficPolicy{logger: c.logger, client: c.Client},
+	}
 }
 
 func (c *ServiceController) initNodes(nodeList *corev1.NodeList) error {
@@ -379,10 +388,10 @@ func (c *ServiceController) updateService(ctx context.Context, logger logr.Logge
 	return nil
 }
 
-func (c *ServiceController) tryAllocPrivateIP(ctxLog logr.Logger, node *agent.Node) (string, *pb.ENIMetadata, error) {
+func (c *ServiceController) tryAllocPrivateIP(ctxLog logr.Logger, node agent.Node) (string, *pb.ENIMetadata, error) {
 	ctxLog = ctxLog.WithName("tryAllocPrivateIP")
 
-	eni, err := node.ChooseBusiestENI()
+	eni, err := node.ChooseENI()
 	if err != nil {
 		return "", nil, errors.Wrap(err, "Failed to choose busiest ENI")
 	}
@@ -397,10 +406,10 @@ func (c *ServiceController) tryAllocPrivateIP(ctxLog logr.Logger, node *agent.No
 	return ip, eni, nil
 }
 
-func (c *ServiceController) tryAssignPrivateIP(ctxLog logr.Logger, ip string, node *agent.Node) (*pb.ENIMetadata, error) {
+func (c *ServiceController) tryAssignPrivateIP(ctxLog logr.Logger, ip string, node agent.Node) (*pb.ENIMetadata, error) {
 	ctxLog = ctxLog.WithName("tryAssignPrivateIP").WithValues("ip", ip)
 
-	eni, err := node.ChooseBusiestENI()
+	eni, err := node.ChooseENI()
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to choose busiest ENI")
 	}
@@ -426,14 +435,12 @@ func (c *ServiceController) chooseTrafficNode(svc *corev1.Service) (string, erro
 		trafficPolicy = DefaultTrafficPolicy
 	}
 
-	switch trafficPolicy {
-	case AnnotationValueClusterTrafficPolicy:
-		return (&ClusterTrafficPolicy{nm: c.nm}).ChooseNode(svc)
-	case AnnotationValueLocalTrafficPolicy:
-		return (&LocalTrafficPolicy{logger: c.logger, client: c.Client}).ChooseNode(svc)
-	default:
+	policy, ok := c.tps[trafficPolicy]
+	if !ok {
 		return "", fmt.Errorf("unknown traffic policy %s", trafficPolicy)
 	}
+
+	return policy.ChooseNode(svc)
 }
 
 func getServiceFullName(service *corev1.Service) string {

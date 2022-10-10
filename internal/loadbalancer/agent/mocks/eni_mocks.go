@@ -54,7 +54,7 @@ func (m *MockENIManager) EXPECT() *MockENIManagerMockRecorder {
 // ChooseBusiestENI mocks base method.
 func (m *MockENIManager) ChooseBusiestENI() (*cloud.ENIMetadata, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ChooseBusiestENI")
+	ret := m.ctrl.Call(m, "ChooseENI")
 	ret0, _ := ret[0].(*cloud.ENIMetadata)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
@@ -63,7 +63,7 @@ func (m *MockENIManager) ChooseBusiestENI() (*cloud.ENIMetadata, error) {
 // ChooseBusiestENI indicates an expected call of ChooseBusiestENI.
 func (mr *MockENIManagerMockRecorder) ChooseBusiestENI() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChooseBusiestENI", reflect.TypeOf((*MockENIManager)(nil).ChooseBusiestENI))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChooseENI", reflect.TypeOf((*MockENIManager)(nil).ChooseBusiestENI))
 }
 
 // GetManagedENIs mocks base method.

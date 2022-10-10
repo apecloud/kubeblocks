@@ -21,6 +21,108 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type ChooseENIRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	RequestId string `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+}
+
+func (x *ChooseENIRequest) Reset() {
+	*x = ChooseENIRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_node_proto_msgTypes[0]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ChooseENIRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChooseENIRequest) ProtoMessage() {}
+
+func (x *ChooseENIRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_node_proto_msgTypes[0]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChooseENIRequest.ProtoReflect.Descriptor instead.
+func (*ChooseENIRequest) Descriptor() ([]byte, []int) {
+	return file_node_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *ChooseENIRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type ChooseENIResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	RequestId string       `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Eni       *ENIMetadata `protobuf:"bytes,2,opt,name=eni,proto3" json:"eni,omitempty"`
+}
+
+func (x *ChooseENIResponse) Reset() {
+	*x = ChooseENIResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_node_proto_msgTypes[1]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ChooseENIResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChooseENIResponse) ProtoMessage() {}
+
+func (x *ChooseENIResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_node_proto_msgTypes[1]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChooseENIResponse.ProtoReflect.Descriptor instead.
+func (*ChooseENIResponse) Descriptor() ([]byte, []int) {
+	return file_node_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ChooseENIResponse) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *ChooseENIResponse) GetEni() *ENIMetadata {
+	if x != nil {
+		return x.Eni
+	}
+	return nil
+}
+
 type DescribeAllENIsRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -32,7 +134,7 @@ type DescribeAllENIsRequest struct {
 func (x *DescribeAllENIsRequest) Reset() {
 	*x = DescribeAllENIsRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_node_proto_msgTypes[0]
+		mi := &file_node_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -45,7 +147,7 @@ func (x *DescribeAllENIsRequest) String() string {
 func (*DescribeAllENIsRequest) ProtoMessage() {}
 
 func (x *DescribeAllENIsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_node_proto_msgTypes[0]
+	mi := &file_node_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -58,7 +160,7 @@ func (x *DescribeAllENIsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DescribeAllENIsRequest.ProtoReflect.Descriptor instead.
 func (*DescribeAllENIsRequest) Descriptor() ([]byte, []int) {
-	return file_node_proto_rawDescGZIP(), []int{0}
+	return file_node_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *DescribeAllENIsRequest) GetRequestId() string {
@@ -80,7 +182,7 @@ type DescribeAllENIsResponse struct {
 func (x *DescribeAllENIsResponse) Reset() {
 	*x = DescribeAllENIsResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_node_proto_msgTypes[1]
+		mi := &file_node_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -93,7 +195,7 @@ func (x *DescribeAllENIsResponse) String() string {
 func (*DescribeAllENIsResponse) ProtoMessage() {}
 
 func (x *DescribeAllENIsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_node_proto_msgTypes[1]
+	mi := &file_node_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -106,7 +208,7 @@ func (x *DescribeAllENIsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DescribeAllENIsResponse.ProtoReflect.Descriptor instead.
 func (*DescribeAllENIsResponse) Descriptor() ([]byte, []int) {
-	return file_node_proto_rawDescGZIP(), []int{1}
+	return file_node_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *DescribeAllENIsResponse) GetRequestId() string {
@@ -136,7 +238,7 @@ type SetupNetworkForServiceRequest struct {
 func (x *SetupNetworkForServiceRequest) Reset() {
 	*x = SetupNetworkForServiceRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_node_proto_msgTypes[2]
+		mi := &file_node_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -149,7 +251,7 @@ func (x *SetupNetworkForServiceRequest) String() string {
 func (*SetupNetworkForServiceRequest) ProtoMessage() {}
 
 func (x *SetupNetworkForServiceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_node_proto_msgTypes[2]
+	mi := &file_node_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -162,7 +264,7 @@ func (x *SetupNetworkForServiceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetupNetworkForServiceRequest.ProtoReflect.Descriptor instead.
 func (*SetupNetworkForServiceRequest) Descriptor() ([]byte, []int) {
-	return file_node_proto_rawDescGZIP(), []int{2}
+	return file_node_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *SetupNetworkForServiceRequest) GetRequestId() string {
@@ -199,7 +301,7 @@ type SetupNetworkForServiceResponse struct {
 func (x *SetupNetworkForServiceResponse) Reset() {
 	*x = SetupNetworkForServiceResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_node_proto_msgTypes[3]
+		mi := &file_node_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -212,7 +314,7 @@ func (x *SetupNetworkForServiceResponse) String() string {
 func (*SetupNetworkForServiceResponse) ProtoMessage() {}
 
 func (x *SetupNetworkForServiceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_node_proto_msgTypes[3]
+	mi := &file_node_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -225,7 +327,7 @@ func (x *SetupNetworkForServiceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetupNetworkForServiceResponse.ProtoReflect.Descriptor instead.
 func (*SetupNetworkForServiceResponse) Descriptor() ([]byte, []int) {
-	return file_node_proto_rawDescGZIP(), []int{3}
+	return file_node_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SetupNetworkForServiceResponse) GetRequestId() string {
@@ -262,7 +364,7 @@ type CleanNetworkForServiceRequest struct {
 func (x *CleanNetworkForServiceRequest) Reset() {
 	*x = CleanNetworkForServiceRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_node_proto_msgTypes[4]
+		mi := &file_node_proto_msgTypes[6]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -275,7 +377,7 @@ func (x *CleanNetworkForServiceRequest) String() string {
 func (*CleanNetworkForServiceRequest) ProtoMessage() {}
 
 func (x *CleanNetworkForServiceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_node_proto_msgTypes[4]
+	mi := &file_node_proto_msgTypes[6]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -288,7 +390,7 @@ func (x *CleanNetworkForServiceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CleanNetworkForServiceRequest.ProtoReflect.Descriptor instead.
 func (*CleanNetworkForServiceRequest) Descriptor() ([]byte, []int) {
-	return file_node_proto_rawDescGZIP(), []int{4}
+	return file_node_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *CleanNetworkForServiceRequest) GetRequestId() string {
@@ -325,7 +427,7 @@ type CleanNetworkForServiceResponse struct {
 func (x *CleanNetworkForServiceResponse) Reset() {
 	*x = CleanNetworkForServiceResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_node_proto_msgTypes[5]
+		mi := &file_node_proto_msgTypes[7]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -338,7 +440,7 @@ func (x *CleanNetworkForServiceResponse) String() string {
 func (*CleanNetworkForServiceResponse) ProtoMessage() {}
 
 func (x *CleanNetworkForServiceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_node_proto_msgTypes[5]
+	mi := &file_node_proto_msgTypes[7]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -351,7 +453,7 @@ func (x *CleanNetworkForServiceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CleanNetworkForServiceResponse.ProtoReflect.Descriptor instead.
 func (*CleanNetworkForServiceResponse) Descriptor() ([]byte, []int) {
-	return file_node_proto_rawDescGZIP(), []int{5}
+	return file_node_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *CleanNetworkForServiceResponse) GetRequestId() string {
@@ -387,7 +489,7 @@ type SetupNetworkForENIRequest struct {
 func (x *SetupNetworkForENIRequest) Reset() {
 	*x = SetupNetworkForENIRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_node_proto_msgTypes[6]
+		mi := &file_node_proto_msgTypes[8]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -400,7 +502,7 @@ func (x *SetupNetworkForENIRequest) String() string {
 func (*SetupNetworkForENIRequest) ProtoMessage() {}
 
 func (x *SetupNetworkForENIRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_node_proto_msgTypes[6]
+	mi := &file_node_proto_msgTypes[8]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -413,7 +515,7 @@ func (x *SetupNetworkForENIRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetupNetworkForENIRequest.ProtoReflect.Descriptor instead.
 func (*SetupNetworkForENIRequest) Descriptor() ([]byte, []int) {
-	return file_node_proto_rawDescGZIP(), []int{6}
+	return file_node_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *SetupNetworkForENIRequest) GetRequestId() string {
@@ -442,7 +544,7 @@ type SetupNetworkForENIResponse struct {
 func (x *SetupNetworkForENIResponse) Reset() {
 	*x = SetupNetworkForENIResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_node_proto_msgTypes[7]
+		mi := &file_node_proto_msgTypes[9]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -455,7 +557,7 @@ func (x *SetupNetworkForENIResponse) String() string {
 func (*SetupNetworkForENIResponse) ProtoMessage() {}
 
 func (x *SetupNetworkForENIResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_node_proto_msgTypes[7]
+	mi := &file_node_proto_msgTypes[9]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -468,7 +570,7 @@ func (x *SetupNetworkForENIResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetupNetworkForENIResponse.ProtoReflect.Descriptor instead.
 func (*SetupNetworkForENIResponse) Descriptor() ([]byte, []int) {
-	return file_node_proto_rawDescGZIP(), []int{7}
+	return file_node_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *SetupNetworkForENIResponse) GetRequestId() string {
@@ -497,7 +599,7 @@ type CleanNetworkForENIRequest struct {
 func (x *CleanNetworkForENIRequest) Reset() {
 	*x = CleanNetworkForENIRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_node_proto_msgTypes[8]
+		mi := &file_node_proto_msgTypes[10]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -510,7 +612,7 @@ func (x *CleanNetworkForENIRequest) String() string {
 func (*CleanNetworkForENIRequest) ProtoMessage() {}
 
 func (x *CleanNetworkForENIRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_node_proto_msgTypes[8]
+	mi := &file_node_proto_msgTypes[10]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -523,7 +625,7 @@ func (x *CleanNetworkForENIRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CleanNetworkForENIRequest.ProtoReflect.Descriptor instead.
 func (*CleanNetworkForENIRequest) Descriptor() ([]byte, []int) {
-	return file_node_proto_rawDescGZIP(), []int{8}
+	return file_node_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *CleanNetworkForENIRequest) GetRequestId() string {
@@ -552,7 +654,7 @@ type CleanNetworkForENIResponse struct {
 func (x *CleanNetworkForENIResponse) Reset() {
 	*x = CleanNetworkForENIResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_node_proto_msgTypes[9]
+		mi := &file_node_proto_msgTypes[11]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -565,7 +667,7 @@ func (x *CleanNetworkForENIResponse) String() string {
 func (*CleanNetworkForENIResponse) ProtoMessage() {}
 
 func (x *CleanNetworkForENIResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_node_proto_msgTypes[9]
+	mi := &file_node_proto_msgTypes[11]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -578,7 +680,7 @@ func (x *CleanNetworkForENIResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CleanNetworkForENIResponse.ProtoReflect.Descriptor instead.
 func (*CleanNetworkForENIResponse) Descriptor() ([]byte, []int) {
-	return file_node_proto_rawDescGZIP(), []int{9}
+	return file_node_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *CleanNetworkForENIResponse) GetRequestId() string {
@@ -612,7 +714,7 @@ type ENIMetadata struct {
 func (x *ENIMetadata) Reset() {
 	*x = ENIMetadata{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_node_proto_msgTypes[10]
+		mi := &file_node_proto_msgTypes[12]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -625,7 +727,7 @@ func (x *ENIMetadata) String() string {
 func (*ENIMetadata) ProtoMessage() {}
 
 func (x *ENIMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_node_proto_msgTypes[10]
+	mi := &file_node_proto_msgTypes[12]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -638,7 +740,7 @@ func (x *ENIMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ENIMetadata.ProtoReflect.Descriptor instead.
 func (*ENIMetadata) Descriptor() ([]byte, []int) {
-	return file_node_proto_rawDescGZIP(), []int{10}
+	return file_node_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ENIMetadata) GetEniId() string {
@@ -702,7 +804,7 @@ type IPv4Address struct {
 func (x *IPv4Address) Reset() {
 	*x = IPv4Address{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_node_proto_msgTypes[11]
+		mi := &file_node_proto_msgTypes[13]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -715,7 +817,7 @@ func (x *IPv4Address) String() string {
 func (*IPv4Address) ProtoMessage() {}
 
 func (x *IPv4Address) ProtoReflect() protoreflect.Message {
-	mi := &file_node_proto_msgTypes[11]
+	mi := &file_node_proto_msgTypes[13]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -728,7 +830,7 @@ func (x *IPv4Address) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IPv4Address.ProtoReflect.Descriptor instead.
 func (*IPv4Address) Descriptor() ([]byte, []int) {
-	return file_node_proto_rawDescGZIP(), []int{11}
+	return file_node_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *IPv4Address) GetPrimary() bool {
@@ -749,7 +851,16 @@ var File_node_proto protoreflect.FileDescriptor
 
 var file_node_proto_rawDesc = []byte{
 	0x0a, 0x0a, 0x6e, 0x6f, 0x64, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x08, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x22, 0x37, 0x0a, 0x16, 0x44, 0x65, 0x73, 0x63, 0x72, 0x69,
+	0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x22, 0x31, 0x0a, 0x10, 0x43, 0x68, 0x6f, 0x6f, 0x73, 0x65,
+	0x45, 0x4e, 0x49, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x1d, 0x0a, 0x0a, 0x72, 0x65,
+	0x71, 0x75, 0x65, 0x73, 0x74, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09,
+	0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x49, 0x64, 0x22, 0x5b, 0x0a, 0x11, 0x43, 0x68, 0x6f,
+	0x6f, 0x73, 0x65, 0x45, 0x4e, 0x49, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x1d,
+	0x0a, 0x0a, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x09, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x49, 0x64, 0x12, 0x27, 0x0a,
+	0x03, 0x65, 0x6e, 0x69, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x15, 0x2e, 0x70, 0x72, 0x6f,
+	0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x45, 0x4e, 0x49, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74,
+	0x61, 0x52, 0x03, 0x65, 0x6e, 0x69, 0x22, 0x37, 0x0a, 0x16, 0x44, 0x65, 0x73, 0x63, 0x72, 0x69,
 	0x62, 0x65, 0x41, 0x6c, 0x6c, 0x45, 0x4e, 0x49, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
 	0x12, 0x1d, 0x0a, 0x0a, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x5f, 0x69, 0x64, 0x18, 0x01,
 	0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x49, 0x64, 0x22,
@@ -850,44 +961,49 @@ var file_node_proto_rawDesc = []byte{
 	0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x12, 0x18, 0x0a, 0x07, 0x70, 0x72, 0x69, 0x6d, 0x61,
 	0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x08, 0x52, 0x07, 0x70, 0x72, 0x69, 0x6d, 0x61, 0x72,
 	0x79, 0x12, 0x18, 0x0a, 0x07, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x18, 0x02, 0x20, 0x01,
-	0x28, 0x09, 0x52, 0x07, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x32, 0x84, 0x04, 0x0a, 0x04,
-	0x4e, 0x6f, 0x64, 0x65, 0x12, 0x58, 0x0a, 0x0f, 0x44, 0x65, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65,
-	0x41, 0x6c, 0x6c, 0x45, 0x4e, 0x49, 0x73, 0x12, 0x20, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63,
-	0x6f, 0x6c, 0x2e, 0x44, 0x65, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x41, 0x6c, 0x6c, 0x45, 0x4e,
-	0x49, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x21, 0x2e, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x44, 0x65, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x41, 0x6c, 0x6c,
-	0x45, 0x4e, 0x49, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x61,
-	0x0a, 0x12, 0x53, 0x65, 0x74, 0x75, 0x70, 0x4e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x46, 0x6f,
-	0x72, 0x45, 0x4e, 0x49, 0x12, 0x23, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e,
-	0x53, 0x65, 0x74, 0x75, 0x70, 0x4e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x46, 0x6f, 0x72, 0x45,
-	0x4e, 0x49, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x24, 0x2e, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x53, 0x65, 0x74, 0x75, 0x70, 0x4e, 0x65, 0x74, 0x77, 0x6f, 0x72,
-	0x6b, 0x46, 0x6f, 0x72, 0x45, 0x4e, 0x49, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22,
-	0x00, 0x12, 0x61, 0x0a, 0x12, 0x43, 0x6c, 0x65, 0x61, 0x6e, 0x4e, 0x65, 0x74, 0x77, 0x6f, 0x72,
-	0x6b, 0x46, 0x6f, 0x72, 0x45, 0x4e, 0x49, 0x12, 0x23, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63,
-	0x6f, 0x6c, 0x2e, 0x43, 0x6c, 0x65, 0x61, 0x6e, 0x4e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x46,
-	0x6f, 0x72, 0x45, 0x4e, 0x49, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x24, 0x2e, 0x70,
-	0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x43, 0x6c, 0x65, 0x61, 0x6e, 0x4e, 0x65, 0x74,
-	0x77, 0x6f, 0x72, 0x6b, 0x46, 0x6f, 0x72, 0x45, 0x4e, 0x49, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
-	0x73, 0x65, 0x22, 0x00, 0x12, 0x6d, 0x0a, 0x16, 0x53, 0x65, 0x74, 0x75, 0x70, 0x4e, 0x65, 0x74,
-	0x77, 0x6f, 0x72, 0x6b, 0x46, 0x6f, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x27,
-	0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x53, 0x65, 0x74, 0x75, 0x70, 0x4e,
+	0x28, 0x09, 0x52, 0x07, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x32, 0xcc, 0x04, 0x0a, 0x04,
+	0x4e, 0x6f, 0x64, 0x65, 0x12, 0x46, 0x0a, 0x09, 0x43, 0x68, 0x6f, 0x6f, 0x73, 0x65, 0x45, 0x4e,
+	0x49, 0x12, 0x1a, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x43, 0x68, 0x6f,
+	0x6f, 0x73, 0x65, 0x45, 0x4e, 0x49, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x1b, 0x2e,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x43, 0x68, 0x6f, 0x6f, 0x73, 0x65, 0x45,
+	0x4e, 0x49, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x58, 0x0a, 0x0f,
+	0x44, 0x65, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x41, 0x6c, 0x6c, 0x45, 0x4e, 0x49, 0x73, 0x12,
+	0x20, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x44, 0x65, 0x73, 0x63, 0x72,
+	0x69, 0x62, 0x65, 0x41, 0x6c, 0x6c, 0x45, 0x4e, 0x49, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73,
+	0x74, 0x1a, 0x21, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x44, 0x65, 0x73,
+	0x63, 0x72, 0x69, 0x62, 0x65, 0x41, 0x6c, 0x6c, 0x45, 0x4e, 0x49, 0x73, 0x52, 0x65, 0x73, 0x70,
+	0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x61, 0x0a, 0x12, 0x53, 0x65, 0x74, 0x75, 0x70, 0x4e,
+	0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x46, 0x6f, 0x72, 0x45, 0x4e, 0x49, 0x12, 0x23, 0x2e, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x53, 0x65, 0x74, 0x75, 0x70, 0x4e, 0x65, 0x74,
+	0x77, 0x6f, 0x72, 0x6b, 0x46, 0x6f, 0x72, 0x45, 0x4e, 0x49, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73,
+	0x74, 0x1a, 0x24, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x53, 0x65, 0x74,
+	0x75, 0x70, 0x4e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x46, 0x6f, 0x72, 0x45, 0x4e, 0x49, 0x52,
+	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x61, 0x0a, 0x12, 0x43, 0x6c, 0x65,
+	0x61, 0x6e, 0x4e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x46, 0x6f, 0x72, 0x45, 0x4e, 0x49, 0x12,
+	0x23, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x43, 0x6c, 0x65, 0x61, 0x6e,
+	0x4e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x46, 0x6f, 0x72, 0x45, 0x4e, 0x49, 0x52, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x1a, 0x24, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e,
+	0x43, 0x6c, 0x65, 0x61, 0x6e, 0x4e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x46, 0x6f, 0x72, 0x45,
+	0x4e, 0x49, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x6d, 0x0a, 0x16,
+	0x53, 0x65, 0x74, 0x75, 0x70, 0x4e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x46, 0x6f, 0x72, 0x53,
+	0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x27, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f,
+	0x6c, 0x2e, 0x53, 0x65, 0x74, 0x75, 0x70, 0x4e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x46, 0x6f,
+	0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a,
+	0x28, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x53, 0x65, 0x74, 0x75, 0x70,
+	0x4e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x46, 0x6f, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63,
+	0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x6d, 0x0a, 0x16, 0x43,
+	0x6c, 0x65, 0x61, 0x6e, 0x4e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x46, 0x6f, 0x72, 0x53, 0x65,
+	0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x27, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c,
+	0x2e, 0x43, 0x6c, 0x65, 0x61, 0x6e, 0x4e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x46, 0x6f, 0x72,
+	0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x28,
+	0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x43, 0x6c, 0x65, 0x61, 0x6e, 0x4e,
 	0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x46, 0x6f, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65,
-	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x28, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63,
-	0x6f, 0x6c, 0x2e, 0x53, 0x65, 0x74, 0x75, 0x70, 0x4e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x46,
-	0x6f, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
-	0x65, 0x22, 0x00, 0x12, 0x6d, 0x0a, 0x16, 0x43, 0x6c, 0x65, 0x61, 0x6e, 0x4e, 0x65, 0x74, 0x77,
-	0x6f, 0x72, 0x6b, 0x46, 0x6f, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x27, 0x2e,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x43, 0x6c, 0x65, 0x61, 0x6e, 0x4e, 0x65,
-	0x74, 0x77, 0x6f, 0x72, 0x6b, 0x46, 0x6f, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x52,
-	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x28, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f,
-	0x6c, 0x2e, 0x43, 0x6c, 0x65, 0x61, 0x6e, 0x4e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x46, 0x6f,
-	0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65,
-	0x22, 0x00, 0x42, 0x3f, 0x5a, 0x3d, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d,
-	0x2f, 0x61, 0x70, 0x65, 0x63, 0x6c, 0x6f, 0x75, 0x64, 0x2f, 0x6b, 0x75, 0x62, 0x65, 0x62, 0x6c,
-	0x6f, 0x63, 0x6b, 0x73, 0x2f, 0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c, 0x2f, 0x6c, 0x6f,
-	0x61, 0x64, 0x62, 0x61, 0x6c, 0x61, 0x6e, 0x63, 0x65, 0x72, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f,
-	0x63, 0x6f, 0x6c, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x42, 0x3f, 0x5a, 0x3d, 0x67, 0x69,
+	0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x61, 0x70, 0x65, 0x63, 0x6c, 0x6f, 0x75,
+	0x64, 0x2f, 0x6b, 0x75, 0x62, 0x65, 0x62, 0x6c, 0x6f, 0x63, 0x6b, 0x73, 0x2f, 0x69, 0x6e, 0x74,
+	0x65, 0x72, 0x6e, 0x61, 0x6c, 0x2f, 0x6c, 0x6f, 0x61, 0x64, 0x62, 0x61, 0x6c, 0x61, 0x6e, 0x63,
+	0x65, 0x72, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x62, 0x06, 0x70, 0x72, 0x6f,
+	0x74, 0x6f, 0x33,
 }
 
 var (
@@ -902,51 +1018,56 @@ func file_node_proto_rawDescGZIP() []byte {
 	return file_node_proto_rawDescData
 }
 
-var file_node_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_node_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_node_proto_goTypes = []interface{}{
-	(*DescribeAllENIsRequest)(nil),         // 0: protocol.DescribeAllENIsRequest
-	(*DescribeAllENIsResponse)(nil),        // 1: protocol.DescribeAllENIsResponse
-	(*SetupNetworkForServiceRequest)(nil),  // 2: protocol.SetupNetworkForServiceRequest
-	(*SetupNetworkForServiceResponse)(nil), // 3: protocol.SetupNetworkForServiceResponse
-	(*CleanNetworkForServiceRequest)(nil),  // 4: protocol.CleanNetworkForServiceRequest
-	(*CleanNetworkForServiceResponse)(nil), // 5: protocol.CleanNetworkForServiceResponse
-	(*SetupNetworkForENIRequest)(nil),      // 6: protocol.SetupNetworkForENIRequest
-	(*SetupNetworkForENIResponse)(nil),     // 7: protocol.SetupNetworkForENIResponse
-	(*CleanNetworkForENIRequest)(nil),      // 8: protocol.CleanNetworkForENIRequest
-	(*CleanNetworkForENIResponse)(nil),     // 9: protocol.CleanNetworkForENIResponse
-	(*ENIMetadata)(nil),                    // 10: protocol.ENIMetadata
-	(*IPv4Address)(nil),                    // 11: protocol.IPv4Address
-	nil,                                    // 12: protocol.DescribeAllENIsResponse.EnisEntry
-	nil,                                    // 13: protocol.ENIMetadata.TagsEntry
+	(*ChooseENIRequest)(nil),               // 0: protocol.ChooseENIRequest
+	(*ChooseENIResponse)(nil),              // 1: protocol.ChooseENIResponse
+	(*DescribeAllENIsRequest)(nil),         // 2: protocol.DescribeAllENIsRequest
+	(*DescribeAllENIsResponse)(nil),        // 3: protocol.DescribeAllENIsResponse
+	(*SetupNetworkForServiceRequest)(nil),  // 4: protocol.SetupNetworkForServiceRequest
+	(*SetupNetworkForServiceResponse)(nil), // 5: protocol.SetupNetworkForServiceResponse
+	(*CleanNetworkForServiceRequest)(nil),  // 6: protocol.CleanNetworkForServiceRequest
+	(*CleanNetworkForServiceResponse)(nil), // 7: protocol.CleanNetworkForServiceResponse
+	(*SetupNetworkForENIRequest)(nil),      // 8: protocol.SetupNetworkForENIRequest
+	(*SetupNetworkForENIResponse)(nil),     // 9: protocol.SetupNetworkForENIResponse
+	(*CleanNetworkForENIRequest)(nil),      // 10: protocol.CleanNetworkForENIRequest
+	(*CleanNetworkForENIResponse)(nil),     // 11: protocol.CleanNetworkForENIResponse
+	(*ENIMetadata)(nil),                    // 12: protocol.ENIMetadata
+	(*IPv4Address)(nil),                    // 13: protocol.IPv4Address
+	nil,                                    // 14: protocol.DescribeAllENIsResponse.EnisEntry
+	nil,                                    // 15: protocol.ENIMetadata.TagsEntry
 }
 var file_node_proto_depIdxs = []int32{
-	12, // 0: protocol.DescribeAllENIsResponse.enis:type_name -> protocol.DescribeAllENIsResponse.EnisEntry
-	10, // 1: protocol.SetupNetworkForServiceRequest.eni:type_name -> protocol.ENIMetadata
-	10, // 2: protocol.SetupNetworkForServiceResponse.eni:type_name -> protocol.ENIMetadata
-	10, // 3: protocol.CleanNetworkForServiceRequest.eni:type_name -> protocol.ENIMetadata
-	10, // 4: protocol.CleanNetworkForServiceResponse.eni:type_name -> protocol.ENIMetadata
-	10, // 5: protocol.SetupNetworkForENIRequest.eni:type_name -> protocol.ENIMetadata
-	10, // 6: protocol.SetupNetworkForENIResponse.eni:type_name -> protocol.ENIMetadata
-	10, // 7: protocol.CleanNetworkForENIRequest.eni:type_name -> protocol.ENIMetadata
-	10, // 8: protocol.CleanNetworkForENIResponse.eni:type_name -> protocol.ENIMetadata
-	11, // 9: protocol.ENIMetadata.ipv4_addresses:type_name -> protocol.IPv4Address
-	13, // 10: protocol.ENIMetadata.tags:type_name -> protocol.ENIMetadata.TagsEntry
-	10, // 11: protocol.DescribeAllENIsResponse.EnisEntry.value:type_name -> protocol.ENIMetadata
-	0,  // 12: protocol.Node.DescribeAllENIs:input_type -> protocol.DescribeAllENIsRequest
-	6,  // 13: protocol.Node.SetupNetworkForENI:input_type -> protocol.SetupNetworkForENIRequest
-	8,  // 14: protocol.Node.CleanNetworkForENI:input_type -> protocol.CleanNetworkForENIRequest
-	2,  // 15: protocol.Node.SetupNetworkForService:input_type -> protocol.SetupNetworkForServiceRequest
-	4,  // 16: protocol.Node.CleanNetworkForService:input_type -> protocol.CleanNetworkForServiceRequest
-	1,  // 17: protocol.Node.DescribeAllENIs:output_type -> protocol.DescribeAllENIsResponse
-	7,  // 18: protocol.Node.SetupNetworkForENI:output_type -> protocol.SetupNetworkForENIResponse
-	9,  // 19: protocol.Node.CleanNetworkForENI:output_type -> protocol.CleanNetworkForENIResponse
-	3,  // 20: protocol.Node.SetupNetworkForService:output_type -> protocol.SetupNetworkForServiceResponse
-	5,  // 21: protocol.Node.CleanNetworkForService:output_type -> protocol.CleanNetworkForServiceResponse
-	17, // [17:22] is the sub-list for method output_type
-	12, // [12:17] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	12, // 0: protocol.ChooseENIResponse.eni:type_name -> protocol.ENIMetadata
+	14, // 1: protocol.DescribeAllENIsResponse.enis:type_name -> protocol.DescribeAllENIsResponse.EnisEntry
+	12, // 2: protocol.SetupNetworkForServiceRequest.eni:type_name -> protocol.ENIMetadata
+	12, // 3: protocol.SetupNetworkForServiceResponse.eni:type_name -> protocol.ENIMetadata
+	12, // 4: protocol.CleanNetworkForServiceRequest.eni:type_name -> protocol.ENIMetadata
+	12, // 5: protocol.CleanNetworkForServiceResponse.eni:type_name -> protocol.ENIMetadata
+	12, // 6: protocol.SetupNetworkForENIRequest.eni:type_name -> protocol.ENIMetadata
+	12, // 7: protocol.SetupNetworkForENIResponse.eni:type_name -> protocol.ENIMetadata
+	12, // 8: protocol.CleanNetworkForENIRequest.eni:type_name -> protocol.ENIMetadata
+	12, // 9: protocol.CleanNetworkForENIResponse.eni:type_name -> protocol.ENIMetadata
+	13, // 10: protocol.ENIMetadata.ipv4_addresses:type_name -> protocol.IPv4Address
+	15, // 11: protocol.ENIMetadata.tags:type_name -> protocol.ENIMetadata.TagsEntry
+	12, // 12: protocol.DescribeAllENIsResponse.EnisEntry.value:type_name -> protocol.ENIMetadata
+	0,  // 13: protocol.Node.ChooseENI:input_type -> protocol.ChooseENIRequest
+	2,  // 14: protocol.Node.DescribeAllENIs:input_type -> protocol.DescribeAllENIsRequest
+	8,  // 15: protocol.Node.SetupNetworkForENI:input_type -> protocol.SetupNetworkForENIRequest
+	10, // 16: protocol.Node.CleanNetworkForENI:input_type -> protocol.CleanNetworkForENIRequest
+	4,  // 17: protocol.Node.SetupNetworkForService:input_type -> protocol.SetupNetworkForServiceRequest
+	6,  // 18: protocol.Node.CleanNetworkForService:input_type -> protocol.CleanNetworkForServiceRequest
+	1,  // 19: protocol.Node.ChooseENI:output_type -> protocol.ChooseENIResponse
+	3,  // 20: protocol.Node.DescribeAllENIs:output_type -> protocol.DescribeAllENIsResponse
+	9,  // 21: protocol.Node.SetupNetworkForENI:output_type -> protocol.SetupNetworkForENIResponse
+	11, // 22: protocol.Node.CleanNetworkForENI:output_type -> protocol.CleanNetworkForENIResponse
+	5,  // 23: protocol.Node.SetupNetworkForService:output_type -> protocol.SetupNetworkForServiceResponse
+	7,  // 24: protocol.Node.CleanNetworkForService:output_type -> protocol.CleanNetworkForServiceResponse
+	19, // [19:25] is the sub-list for method output_type
+	13, // [13:19] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_node_proto_init() }
@@ -956,7 +1077,7 @@ func file_node_proto_init() {
 	}
 	if !protoimpl.UnsafeEnabled {
 		file_node_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*DescribeAllENIsRequest); i {
+			switch v := v.(*ChooseENIRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -968,7 +1089,7 @@ func file_node_proto_init() {
 			}
 		}
 		file_node_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*DescribeAllENIsResponse); i {
+			switch v := v.(*ChooseENIResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -980,7 +1101,7 @@ func file_node_proto_init() {
 			}
 		}
 		file_node_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SetupNetworkForServiceRequest); i {
+			switch v := v.(*DescribeAllENIsRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -992,7 +1113,7 @@ func file_node_proto_init() {
 			}
 		}
 		file_node_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SetupNetworkForServiceResponse); i {
+			switch v := v.(*DescribeAllENIsResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1004,7 +1125,7 @@ func file_node_proto_init() {
 			}
 		}
 		file_node_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CleanNetworkForServiceRequest); i {
+			switch v := v.(*SetupNetworkForServiceRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1016,7 +1137,7 @@ func file_node_proto_init() {
 			}
 		}
 		file_node_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CleanNetworkForServiceResponse); i {
+			switch v := v.(*SetupNetworkForServiceResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1028,7 +1149,7 @@ func file_node_proto_init() {
 			}
 		}
 		file_node_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SetupNetworkForENIRequest); i {
+			switch v := v.(*CleanNetworkForServiceRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1040,7 +1161,7 @@ func file_node_proto_init() {
 			}
 		}
 		file_node_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SetupNetworkForENIResponse); i {
+			switch v := v.(*CleanNetworkForServiceResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1052,7 +1173,7 @@ func file_node_proto_init() {
 			}
 		}
 		file_node_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CleanNetworkForENIRequest); i {
+			switch v := v.(*SetupNetworkForENIRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1064,7 +1185,7 @@ func file_node_proto_init() {
 			}
 		}
 		file_node_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CleanNetworkForENIResponse); i {
+			switch v := v.(*SetupNetworkForENIResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1076,7 +1197,7 @@ func file_node_proto_init() {
 			}
 		}
 		file_node_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ENIMetadata); i {
+			switch v := v.(*CleanNetworkForENIRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1088,6 +1209,30 @@ func file_node_proto_init() {
 			}
 		}
 		file_node_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CleanNetworkForENIResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_node_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ENIMetadata); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_node_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*IPv4Address); i {
 			case 0:
 				return &v.state
@@ -1106,7 +1251,7 @@ func file_node_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_node_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   14,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -22,6 +22,7 @@ require (
 	github.com/k3d-io/k3d/v5 v5.4.4
 	github.com/leaanthony/debme v1.2.1
 	github.com/onsi/ginkgo v1.16.5
+	github.com/onsi/ginkgo/v2 v2.1.4
 	github.com/onsi/gomega v1.20.0
 	github.com/pingcap/go-tpc v1.0.8
 	github.com/pkg/errors v0.9.1

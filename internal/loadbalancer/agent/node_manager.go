@@ -17,9 +17,9 @@ import (
 )
 
 type NodeManager interface {
-	GetNode(ip string) (*Node, error)
+	GetNode(ip string) (Node, error)
 
-	ChooseSpareNode(subnet string) (*Node, error)
+	ChooseSpareNode(subnet string) (Node, error)
 }
 
 type nodeManager struct {
@@ -27,16 +27,18 @@ type nodeManager struct {
 	client.Client
 
 	cp      cloud.Provider
-	rpcPort int64
+	rpcPort int
 	logger  logr.Logger
-	nodes   map[string]*Node
+	nodes   map[string]Node
 }
 
-func NewNodeManager(rpcPort int64, cp cloud.Provider) (*nodeManager, error) {
+func NewNodeManager(logger logr.Logger, rpcPort int, cp cloud.Provider, client client.Client) (*nodeManager, error) {
 	n := &nodeManager{
+		Client:  client,
 		cp:      cp,
+		logger:  logger,
 		rpcPort: rpcPort,
-		nodes:   make(map[string]*Node),
+		nodes:   make(map[string]Node),
 	}
 	nodeList := &corev1.NodeList{}
 	if err := n.Client.List(context.Background(), nodeList); err != nil {
@@ -67,7 +69,7 @@ func (n *nodeManager) initNodes(nodeList *corev1.NodeList) error {
 	return nil
 }
 
-func (n *nodeManager) initNode(ip string) (*Node, error) {
+func (n *nodeManager) initNode(ip string) (*node, error) {
 	addr := fmt.Sprintf("%s:%d", ip, n.rpcPort)
 	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -77,19 +79,19 @@ func (n *nodeManager) initNode(ip string) (*Node, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to init node")
 	}
-	if err = node.start(make(chan struct{})); err != nil {
+	if err = node.Start(make(chan struct{})); err != nil {
 		return nil, errors.Wrapf(err, "Failed to start node")
 	}
 	return node, nil
 }
 
-func (n *nodeManager) ChooseSpareNode(subnet string) (*Node, error) {
+func (n *nodeManager) ChooseSpareNode(subnet string) (Node, error) {
 	n.RLock()
 	defer n.RUnlock()
-	var spareNode *Node
+	var spareNode Node
 	for _, node := range n.nodes {
 		if subnet != "" {
-			_, ok := node.resource.SubnetIds[subnet]
+			_, ok := node.GetResource().SubnetIds[subnet]
 			if !ok {
 				continue
 			}
@@ -98,7 +100,7 @@ func (n *nodeManager) ChooseSpareNode(subnet string) (*Node, error) {
 			spareNode = node
 			continue
 		}
-		if node.resource.GetSparePrivateIPs() < spareNode.resource.GetSparePrivateIPs() {
+		if node.GetResource().GetSparePrivateIPs() < spareNode.GetResource().GetSparePrivateIPs() {
 			continue
 		}
 		spareNode = node
@@ -109,19 +111,7 @@ func (n *nodeManager) ChooseSpareNode(subnet string) (*Node, error) {
 	return spareNode, nil
 }
 
-func (n *nodeManager) RemoveNode(ip string) {
-	n.Lock()
-	defer n.Unlock()
-	delete(n.nodes, ip)
-}
-
-func (n *nodeManager) SetNode(ip string, node *Node) {
-	n.Lock()
-	defer n.Unlock()
-	n.nodes[ip] = node
-}
-
-func (n *nodeManager) GetNode(ip string) (*Node, error) {
+func (n *nodeManager) GetNode(ip string) (Node, error) {
 	n.RLock()
 	defer n.RUnlock()
 	node, ok := n.nodes[ip]
@@ -129,4 +119,16 @@ func (n *nodeManager) GetNode(ip string) (*Node, error) {
 		return nil, fmt.Errorf("can not find node %s", ip)
 	}
 	return node, nil
+}
+
+func (n *nodeManager) RemoveNode(ip string) {
+	n.Lock()
+	defer n.Unlock()
+	delete(n.nodes, ip)
+}
+
+func (n *nodeManager) SetNode(ip string, node Node) {
+	n.Lock()
+	defer n.Unlock()
+	n.nodes[ip] = node
 }

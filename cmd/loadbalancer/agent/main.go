@@ -17,6 +17,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/factory"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/config"
 	iptableswrapper "github.com/apecloud/kubeblocks/internal/loadbalancer/iptables"
 	netlinkwrapper "github.com/apecloud/kubeblocks/internal/loadbalancer/netlink"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/network"
@@ -57,11 +58,8 @@ func main() {
 	zaplog := zap.New(zapcore.NewCore(zaplogfmt.NewEncoder(configLog), os.Stdout, zapcore.DebugLevel))
 	logger := zapr.NewLogger(zaplog)
 
-	err := viper.ReadInConfig() // Find and read the config file
-	if err == nil {             // Handle errors reading the config file
-		logger.Info(fmt.Sprintf("config file: %s", viper.GetViper().ConfigFileUsed()))
-		os.Exit(1)
-	}
+	// init config
+	config.ReadConfig(logger)
 
 	ipt, err := iptableswrapper.NewIPTables()
 	if err != nil {
@@ -80,9 +78,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	hostIP := viper.GetString("HOST_IP")
-	rpcPort := viper.GetString("RPC_PORT")
-	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%s", hostIP, rpcPort))
+	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", config.HostIP, config.RPCPort))
 	if err != nil {
 		logger.Error(err, "Failed to listen")
 		os.Exit(1)

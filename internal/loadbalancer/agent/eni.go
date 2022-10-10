@@ -4,27 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"strconv"
 	"strings"
 	"time"
 
-	pb "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol"
-
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
-)
-
-const (
-	EnvMaxENI     = "MAX_ENI"
-	DefaultMaxENI = -1
-
-	EnvMinPrivateIP     = "MIN_PRIVATE_IP"
-	DefaultMinPrivateIP = 1
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/config"
+	pb "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol"
 )
 
 type NodeResource struct {
@@ -58,24 +49,20 @@ type eniManager struct {
 }
 
 func newENIManager(logger logr.Logger, nc pb.NodeClient, cp cloud.Provider) (*eniManager, error) {
+	_ = viper.ReadInConfig()
+
 	c := &eniManager{
 		NodeClient: nc,
 		cp:         cp,
 		logger:     logger,
 	}
 
-	ipStr, found := os.LookupEnv(EnvMinPrivateIP)
-	envMin := DefaultMinPrivateIP
-	if found {
-		if input, err := strconv.Atoi(ipStr); err == nil && input >= 1 {
-			c.logger.Info("Using MIN_PRIVATE_IP", "count", input)
-			envMin = input
-		}
-	}
-	c.minPrivateIP = envMin
+	c.minPrivateIP = config.MinPrivateIP
+	c.maxIPsPerENI = cp.GetENIIPv4Limit()
 
-	if err := c.initLimits(); err != nil {
-		return nil, errors.Wrap(err, "Failed to get eni and private ip limits")
+	c.maxENI = cp.GetENILimit()
+	if config.MaxENI > 0 && config.MaxENI < c.maxENI {
+		c.maxENI = config.MaxENI
 	}
 
 	return c, c.init()
@@ -141,7 +128,7 @@ func (c *eniManager) buildHostResource(enis []*pb.ENIMetadata) *NodeResource {
 	return result
 }
 
-func (c *eniManager) start(stop chan struct{}) error {
+func (c *eniManager) start(stop chan struct{}, reconcileInterval time.Duration, cleanLeakedInterval time.Duration) error {
 	if err := c.modifyPrimaryENISourceDestCheck(true); err != nil {
 		return errors.Wrap(err, "Failed to modify primary eni source/dest check")
 	}
@@ -151,14 +138,14 @@ func (c *eniManager) start(stop chan struct{}) error {
 			c.logger.Error(err, "Failed to ensure eni")
 		}
 	}
-	go wait.Until(f1, 15*time.Second, stop)
+	go wait.Until(f1, reconcileInterval, stop)
 
 	f2 := func() {
 		if err := c.cleanLeakedENIs(); err != nil {
 			c.logger.Error(err, "Failed to clean leaked enis")
 		}
 	}
-	go wait.Until(f2, 1*time.Minute, stop)
+	go wait.Until(f2, cleanLeakedInterval, stop)
 
 	return nil
 }
@@ -213,24 +200,6 @@ func (c *eniManager) filterManagedENIs(enis map[string]*pb.ENIMetadata) []*pb.EN
 	}
 	c.logger.Info("Managed eni", "count", len(managedENIList), "ids", strings.Join(ids, ","))
 	return managedENIList
-}
-
-func (c *eniManager) ChooseBusiestENI() (*pb.ENIMetadata, error) {
-	managedENIs, err := c.GetManagedENIs()
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to get managed ENIs")
-	}
-	if len(managedENIs) == 0 {
-		return nil, errors.New("No managed eni found")
-	}
-	candidate := managedENIs[0]
-	for _, eni := range managedENIs {
-		if len(eni.Ipv4Addresses) > len(candidate.Ipv4Addresses) && len(eni.Ipv4Addresses) < c.maxIPsPerENI {
-			candidate = eni
-		}
-	}
-	c.logger.Info("Found busiest eni", "eni id", candidate.EniId)
-	return candidate, nil
 }
 
 func (c *eniManager) ensureENI() error {
@@ -324,44 +293,6 @@ func (c *eniManager) tryDetachAndDeleteENI(enis []*pb.ENIMetadata) error {
 		return nil
 	}
 	return errors.New("Failed to find a idle eni")
-}
-
-func (c *eniManager) initLimits() (err error) {
-	nodeMaxENI, err := c.getMaxENI()
-	if err != nil {
-		c.logger.Error(err, "Failed to get ENI limit")
-		return err
-	}
-	c.maxENI = nodeMaxENI
-
-	c.maxIPsPerENI = c.cp.GetENIIPv4Limit()
-	if err != nil {
-		return err
-	}
-	c.logger.Info("Query resource quota", "max eni", c.maxENI, "max private ip per eni", c.maxIPsPerENI)
-
-	return nil
-}
-
-// getMaxENI returns the maximum number of ENIs to attach to this instance. This is calculated as the lesser of
-// the limit for the instance type and the value configured via the MAX_ENI environment variable. If the value of
-// the environment variable is 0 or less, it will be ignored and the maximum for the instance is returned.
-func (c *eniManager) getMaxENI() (int, error) {
-	instanceMaxENI := c.cp.GetENILimit()
-
-	inputStr, found := os.LookupEnv(EnvMaxENI)
-	envMax := DefaultMaxENI
-	if found {
-		if input, err := strconv.Atoi(inputStr); err == nil && input >= 1 {
-			c.logger.Info("Using MAX_ENI", "count", input)
-			envMax = input
-		}
-	}
-
-	if envMax >= 1 && envMax < instanceMaxENI {
-		return envMax, nil
-	}
-	return instanceMaxENI, nil
 }
 
 func (c *eniManager) cleanLeakedENIs() error {

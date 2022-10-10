@@ -34,11 +34,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"strconv"
-	"strings"
 	"time"
-
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/viper"
@@ -50,8 +46,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	lb "github.com/apecloud/kubeblocks/controllers/loadbalancer"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/factory"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/config"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -68,16 +66,17 @@ import (
 //+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch
 
 const (
-	appName              = "loadbalancer-controller"
-	RFC3339Mills         = "2006-01-02T15:04:05.000"
-	DefaultRPCPort int64 = 19200
+	appName        = "loadbalancer-controller"
+	RFC3339Mills   = "2006-01-02T15:04:05.000"
+	DefaultRPCPort = 19200
+
+	EnvRPCPort     = "RPC_PORT"
+	EnvEnableDebug = "ENABLE_DEBUG"
 )
 
 var (
-	enableDebug string
-	rpcPort     string
-	scheme      = runtime.NewScheme()
-	setupLog    = ctrl.Log.WithName("setup")
+	scheme   = runtime.NewScheme()
+	setupLog = ctrl.Log.WithName("setup")
 )
 
 func init() {
@@ -90,8 +89,8 @@ func init() {
 	viper.AddConfigPath(fmt.Sprintf("$HOME/.%s", appName)) // call multiple times to add many search paths
 	viper.AddConfigPath(".")                               // optionally look for config in the working directory
 	viper.AutomaticEnv()
-	_ = viper.BindEnv(enableDebug, "ENABLE_DEBUG")
-	_ = viper.BindEnv(rpcPort, "RPC_PORT")
+	_ = viper.BindEnv(EnvEnableDebug)
+	_ = viper.BindEnv(EnvRPCPort)
 
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
 }
@@ -122,10 +121,8 @@ func main() {
 	logger := zap.New(zap.UseDevMode(true), zap.WriteTo(os.Stdout), zap.Encoder(logFmtEncoder))
 	ctrl.SetLogger(logger)
 
-	err := viper.ReadInConfig() // Find and read the config file
-	if err == nil {             // Handle errors reading the config file
-		setupLog.Info(fmt.Sprintf("config file: %s", viper.GetViper().ConfigFileUsed()))
-	}
+	// init config
+	config.ReadConfig(setupLog)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
@@ -157,7 +154,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if strings.ToLower(enableDebug) == "true" {
+	if config.EnableDebug {
 		go pprofListening(logger)
 	}
 
@@ -175,19 +172,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	port := DefaultRPCPort
-	if rpcPort == "" {
-		port, err = strconv.ParseInt(rpcPort, 10, 64)
-		if err != nil {
-			panic(err)
-		}
-	}
 	cp, err := factory.NewProvider(cloud.ProviderAWS, logger)
 	if err != nil {
 		setupLog.Error(err, "Failed to initialize cloud provider")
 		os.Exit(1)
 	}
-	nm, err := agent.NewNodeManager(port, cp)
+	nm, err := agent.NewNodeManager(logger, config.RPCPort, cp, c)
 	if err != nil {
 		setupLog.Error(err, "Failed to init node manager")
 		os.Exit(1)

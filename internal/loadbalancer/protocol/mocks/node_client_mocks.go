@@ -53,24 +53,44 @@ func (m *MockNodeClient) EXPECT() *MockNodeClientMockRecorder {
 	return m.recorder
 }
 
-// ChooseBusiestENI mocks base method.
-func (m *MockNodeClient) ChooseBusiestENI(arg0 context.Context, arg1 *protocol.ChooseBusiestENIRequest, arg2 ...grpc.CallOption) (*protocol.ChooseBusiestENIResponse, error) {
+// ChooseENI mocks base method.
+func (m *MockNodeClient) ChooseENI(arg0 context.Context, arg1 *protocol.ChooseENIRequest, arg2 ...grpc.CallOption) (*protocol.ChooseENIResponse, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
-	ret := m.ctrl.Call(m, "ChooseBusiestENI", varargs...)
-	ret0, _ := ret[0].(*protocol.ChooseBusiestENIResponse)
+	ret := m.ctrl.Call(m, "ChooseENI", varargs...)
+	ret0, _ := ret[0].(*protocol.ChooseENIResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ChooseBusiestENI indicates an expected call of ChooseBusiestENI.
-func (mr *MockNodeClientMockRecorder) ChooseBusiestENI(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+// ChooseENI indicates an expected call of ChooseENI.
+func (mr *MockNodeClientMockRecorder) ChooseENI(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChooseBusiestENI", reflect.TypeOf((*MockNodeClient)(nil).ChooseBusiestENI), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChooseENI", reflect.TypeOf((*MockNodeClient)(nil).ChooseENI), varargs...)
+}
+
+// CleanNetworkForENI mocks base method.
+func (m *MockNodeClient) CleanNetworkForENI(arg0 context.Context, arg1 *protocol.CleanNetworkForENIRequest, arg2 ...grpc.CallOption) (*protocol.CleanNetworkForENIResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "CleanNetworkForENI", varargs...)
+	ret0, _ := ret[0].(*protocol.CleanNetworkForENIResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CleanNetworkForENI indicates an expected call of CleanNetworkForENI.
+func (mr *MockNodeClientMockRecorder) CleanNetworkForENI(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CleanNetworkForENI", reflect.TypeOf((*MockNodeClient)(nil).CleanNetworkForENI), varargs...)
 }
 
 // CleanNetworkForService mocks base method.
@@ -93,24 +113,44 @@ func (mr *MockNodeClientMockRecorder) CleanNetworkForService(arg0, arg1 interfac
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CleanNetworkForService", reflect.TypeOf((*MockNodeClient)(nil).CleanNetworkForService), varargs...)
 }
 
-// GetManagedENIs mocks base method.
-func (m *MockNodeClient) GetManagedENIs(arg0 context.Context, arg1 *protocol.GetManagedENIsRequest, arg2 ...grpc.CallOption) (*protocol.GetManagedENIsResponse, error) {
+// DescribeAllENIs mocks base method.
+func (m *MockNodeClient) DescribeAllENIs(arg0 context.Context, arg1 *protocol.DescribeAllENIsRequest, arg2 ...grpc.CallOption) (*protocol.DescribeAllENIsResponse, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
-	ret := m.ctrl.Call(m, "GetManagedENIs", varargs...)
-	ret0, _ := ret[0].(*protocol.GetManagedENIsResponse)
+	ret := m.ctrl.Call(m, "DescribeAllENIs", varargs...)
+	ret0, _ := ret[0].(*protocol.DescribeAllENIsResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetManagedENIs indicates an expected call of GetManagedENIs.
-func (mr *MockNodeClientMockRecorder) GetManagedENIs(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+// DescribeAllENIs indicates an expected call of DescribeAllENIs.
+func (mr *MockNodeClientMockRecorder) DescribeAllENIs(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetManagedENIs", reflect.TypeOf((*MockNodeClient)(nil).GetManagedENIs), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeAllENIs", reflect.TypeOf((*MockNodeClient)(nil).DescribeAllENIs), varargs...)
+}
+
+// SetupNetworkForENI mocks base method.
+func (m *MockNodeClient) SetupNetworkForENI(arg0 context.Context, arg1 *protocol.SetupNetworkForENIRequest, arg2 ...grpc.CallOption) (*protocol.SetupNetworkForENIResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "SetupNetworkForENI", varargs...)
+	ret0, _ := ret[0].(*protocol.SetupNetworkForENIResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SetupNetworkForENI indicates an expected call of SetupNetworkForENI.
+func (mr *MockNodeClientMockRecorder) SetupNetworkForENI(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetupNetworkForENI", reflect.TypeOf((*MockNodeClient)(nil).SetupNetworkForENI), varargs...)
 }
 
 // SetupNetworkForService mocks base method.

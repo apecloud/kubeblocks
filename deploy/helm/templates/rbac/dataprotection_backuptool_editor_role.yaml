@@ -1,0 +1,24 @@
+# permissions for end users to edit backuptools.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "opendbaas-core.fullname" . }}-backuptool-editor-role
+rules:
+- apiGroups:
+  - dataprotection.infracreate.com
+  resources:
+  - backuptools
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dataprotection.infracreate.com
+  resources:
+  - backuptools/status
+  verbs:
+  - get

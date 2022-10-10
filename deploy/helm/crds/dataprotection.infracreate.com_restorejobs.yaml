@@ -118,12 +118,27 @@ spec:
                           "value". The requirements are ANDed.
                         type: object
                     type: object
-                  secretName:
+                  secret:
                     description: target db cluster access secret
-                    type: string
+                    properties:
+                      keyPassword:
+                        default: password
+                        description: which key name for password
+                        type: string
+                      keyUser:
+                        default: username
+                        description: which key name for user
+                        type: string
+                      name:
+                        description: the secret name
+                        type: string
+                    required:
+                    - name
+                    type: object
                 required:
                 - databaseEngine
                 - labelsSelector
+                - secret
                 type: object
               targetVolumeMounts:
                 description: array of restore volume mounts .

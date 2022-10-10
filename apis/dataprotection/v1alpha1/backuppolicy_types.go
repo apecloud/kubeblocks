@@ -45,13 +45,12 @@ type BackupPolicySpec struct {
 	// +kubebuilder:validation:Required
 	Target TargetCluster `json:"target"`
 
-	// array of database volumes storage to backup.
-	// +kubebuilder:validation:Required
-	TargetVolume corev1.Volume `json:"targetVolume"`
+	// execute hook commands for backup.
+	Hooks BackupPolicyHook `json:"hooks"`
 
 	// array of remote volumes from CSI driver definition.
-	// +kubebuilder:validation:MinItems=1
-	RemoteVolumes []corev1.Volume `json:"remoteVolumes" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	// +kubebuilder:validation:Required
+	RemoteVolume corev1.Volume `json:"remoteVolume"`
 
 	// count of backup stop retries on fail.
 	// +optional
@@ -77,8 +76,49 @@ type TargetCluster struct {
 	LabelsSelector *metav1.LabelSelector `json:"labelsSelector"`
 
 	// target db cluster access secret
+	// +kubebuilder:validation:Required
+	Secret BackupPolicySecret `json:"secret"`
+}
+
+// BackupPolicySecret defined for the target database secret that backup tool can connect.
+type BackupPolicySecret struct {
+
+	// the secret name
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// which key name for user
+	// +kubebuilder:default=username
 	// +optional
-	SecretName string `json:"secretName,omitempty"`
+	KeyUser string `json:"keyUser,omitempty"`
+
+	// which key name for password
+	// +kubebuilder:default=password
+	// +optional
+	KeyPassword string `json:"keyPassword,omitempty"`
+}
+
+// BackupPolicyHook defined for the database execute commands before and after backup.
+type BackupPolicyHook struct {
+
+	// pre backup to perform commands
+	// +optional
+	PreCommands []string `json:"preCommands,omitempty"`
+
+	// post backup to perform commands
+	// +optional
+	PostCommands []string `json:"postCommands,omitempty"`
+
+	// exec command with image
+	// TODO(dsj): use opendbaas-core
+	// +kubebuilder:default="rancher/kubectl:v1.23.7"
+	// +optional
+	Image string `json:"image,omitempty"`
+
+	// which container can exec command
+	// +kubebuilder:default=mysql
+	// +optional
+	ContainerName string `json:"ContainerName,omitempty"`
 }
 
 // BackupPolicyStatus defines the observed state of BackupPolicy

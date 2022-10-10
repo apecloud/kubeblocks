@@ -171,7 +171,6 @@ func NewSnapshotInstance(namespace, name, sourcePVC string) *unstructured.Unstru
 				"name":      name,
 			},
 			"spec": map[string]interface{}{
-				"volumeSnapshotClassName": "csi-aws-vsc",
 				"source": map[string]interface{}{
 					"persistentVolumeClaimName": sourcePVC,
 				},

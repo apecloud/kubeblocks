@@ -255,7 +255,7 @@ func (r *RestoreJobReconciler) GetPodSpec(reqCtx intctrlutil.RequestCtx, restore
 	container := corev1.Container{}
 	container.Name = restoreJob.Name
 	container.Command = []string{"sh", "-c"}
-	container.Args = backupTool.Spec.RestoreCommands
+	container.Args = backupTool.Spec.Physical.RestoreCommands
 	container.Image = backupTool.Spec.Image
 	container.Resources = backupTool.Spec.Resources
 
@@ -263,7 +263,7 @@ func (r *RestoreJobReconciler) GetPodSpec(reqCtx intctrlutil.RequestCtx, restore
 
 	// add remote volumeMounts
 	remoteVolumeMount := corev1.VolumeMount{}
-	remoteVolumeMount.Name = backupPolicy.Spec.RemoteVolumes[0].Name
+	remoteVolumeMount.Name = backupPolicy.Spec.RemoteVolume.Name
 	remoteVolumeMount.MountPath = "/data"
 	container.VolumeMounts = append(container.VolumeMounts, remoteVolumeMount)
 
@@ -288,7 +288,7 @@ func (r *RestoreJobReconciler) GetPodSpec(reqCtx intctrlutil.RequestCtx, restore
 	podSpec.Volumes = restoreJob.Spec.TargetVolumes
 
 	// add remote volumes
-	podSpec.Volumes = append(podSpec.Volumes, backupPolicy.Spec.RemoteVolumes...)
+	podSpec.Volumes = append(podSpec.Volumes, backupPolicy.Spec.RemoteVolume)
 
 	// TODO(dsj): mount readonly remote volumes for restore.
 	// podSpec.Volumes[0].PersistentVolumeClaim.ReadOnly = true

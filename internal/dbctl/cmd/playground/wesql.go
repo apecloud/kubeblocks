@@ -17,31 +17,30 @@ limitations under the License.
 package playground
 
 import (
+	"fmt"
+
 	"helm.sh/helm/v3/pkg/repo"
 
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
 )
 
 type Wesql struct {
 	serverVersion string
-	dbReplicas    string
+	replicas      int8
 }
 
-func (o *Wesql) GetRepos() []repo.Entry {
+func (o *Wesql) getRepos() []repo.Entry {
 	return []repo.Entry{}
 }
 
-func (o *Wesql) GetBaseCharts(ns string) []helm.InstallOpts {
-	return []helm.InstallOpts{}
-}
-
-func (o *Wesql) GetDBCharts(ns string, dbname string) []helm.InstallOpts {
+func (o *Wesql) getBaseCharts(ns string) []helm.InstallOpts {
 	return []helm.InstallOpts{
 		{
-			Name:      "opendbaas-core",
-			Chart:     "oci://yimeisun.azurecr.io/helm-chart/opendbaas-core",
+			Name:      types.DbaasHelmName,
+			Chart:     types.DbaasHelmChart,
 			Wait:      true,
-			Version:   "0.1.0-alpha.5",
+			Version:   types.DbaasDefaultVersion,
 			Namespace: "default",
 			Sets: []string{
 				"image.tag=latest",
@@ -50,15 +49,20 @@ func (o *Wesql) GetDBCharts(ns string, dbname string) []helm.InstallOpts {
 			Login:    true,
 			TryTimes: 2,
 		},
+	}
+}
+
+func (o *Wesql) getDBCharts(ns string, dbname string) []helm.InstallOpts {
+	return []helm.InstallOpts{
 		{
 			Name:      dbname,
-			Chart:     "oci://yimeisun.azurecr.io/helm-chart/wesqlcluster",
+			Chart:     wesqlHelmChart,
 			Wait:      true,
 			Namespace: "default",
-			Version:   "0.1.0",
+			Version:   wesqlVersion,
 			Sets: []string{
 				"serverVersion=" + o.serverVersion,
-				"replicaCount=" + o.dbReplicas,
+				fmt.Sprintf("replicaCount=%d", o.replicas),
 			},
 			Login:    true,
 			TryTimes: 2,

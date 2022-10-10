@@ -59,7 +59,7 @@ MySQL X-Cluster(WeSQL) "{{.DBCluster}}" has been CREATED!
   User: {{.GrafanaUser}}
   Password: {{.GrafanaPasswd}}
 
-5. Uninstall Playground:
+5. uninstall Playground:
   dbctl playground destroy
 
 --------------------------------------------------------------------
@@ -71,16 +71,12 @@ Use "dbctl [command] --help" for more information about a command.
 `
 
 func printPlaygroundGuide(info types.PlaygroundInfo) error {
-	return printTemplate(playgroundTmpl, info)
-}
-
-func printTemplate(t string, data interface{}) error {
-	tmpl, err := template.New("_").Parse(t)
+	tmpl, err := template.New("_").Parse(playgroundTmpl)
 	if err != nil {
 		return err
 	}
 
-	err = tmpl.Execute(os.Stdout, data)
+	err = tmpl.Execute(os.Stdout, info)
 	if err != nil {
 		return err
 	}

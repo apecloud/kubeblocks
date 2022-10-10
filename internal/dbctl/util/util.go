@@ -30,20 +30,19 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/google/uuid"
-
+	l "github.com/k3d-io/k3d/v5/pkg/logger"
+	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 
-	"golang.org/x/crypto/ssh"
-
-	"github.com/go-logr/logr"
-	l "github.com/k3d-io/k3d/v5/pkg/logger"
-	"github.com/pkg/errors"
-
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/version"
 )
 
 var (
@@ -80,15 +79,6 @@ func init() {
 	}
 }
 
-// CleanUpPlayground removes the playground directory
-func CleanUpPlayground() error {
-	tempDir, err := GetTempDir()
-	if err != nil {
-		return err
-	}
-	return os.RemoveAll(tempDir)
-}
-
 // CloseQuietly closes `io.Closer` quietly. Very handy and helpful for code
 // quality too.
 func CloseQuietly(d io.Closer) {
@@ -114,18 +104,6 @@ func GetCliHomeDir() (string, error) {
 		}
 	}
 	return cliHome, nil
-}
-
-func GetTempDir() (string, error) {
-	dir, err := GetCliHomeDir()
-	if err != nil {
-		return "", err
-	}
-	tmpDir := filepath.Join(dir, "tmp")
-	if err := os.MkdirAll(tmpDir, 0700); err != nil {
-		return "", err
-	}
-	return tmpDir, nil
 }
 
 // GetKubeconfigDir returns the kubeconfig directory.
@@ -203,13 +181,20 @@ func MakeSSHKeyPair(pubKeyPath, privateKeyPath string) error {
 	return os.WriteFile(pubKeyPath, ssh.MarshalAuthorizedKey(pub), 0655)
 }
 
-func PrintObjYaml(obj *unstructured.Unstructured) {
+func PrintObjYAML(obj *unstructured.Unstructured) error {
 	data, err := yaml.Marshal(obj)
 	if err != nil {
-		fmt.Println(err.Error())
-		return
+		return err
 	}
 	fmt.Println(string(data))
+	return nil
+}
+
+func PrintVersion() {
+	fmt.Printf("dbctl version %s\n", version.GetVersion())
+	fmt.Printf("k3d version %s\n", version.K3dVersion)
+	fmt.Printf("k3s version %s (default)\n", strings.Replace(version.K3sImageTag, "-", "+", 1))
+	fmt.Printf("git commit %s (build date %s)\n", version.GitCommit, version.BuildDate)
 }
 
 type RetryOptions struct {

@@ -218,11 +218,40 @@ spec:
                 items:
                   type: string
                 type: array
-              incrementalRestoreCommands:
-                description: Array of incremental restore commands.
-                items:
-                  type: string
-                type: array
+              logical:
+                description: backup tool can support logical restore, in this case,
+                  restore NOT RESTART database.
+                properties:
+                  incrementalRestoreCommands:
+                    description: Array of incremental restore commands.
+                    items:
+                      type: string
+                    type: array
+                  restoreCommands:
+                    description: Array of command that dbaas can perform database
+                      restore. like xtrabackup, that can performs restore mysql from
+                      files.
+                    items:
+                      type: string
+                    type: array
+                type: object
+              physical:
+                description: backup tool can support physical restore, in this case,
+                  restore must be RESTART database.
+                properties:
+                  incrementalRestoreCommands:
+                    description: Array of incremental restore commands.
+                    items:
+                      type: string
+                    type: array
+                  restoreCommands:
+                    description: Array of command that dbaas can perform database
+                      restore. like xtrabackup, that can performs restore mysql from
+                      files.
+                    items:
+                      type: string
+                    type: array
+                type: object
               resources:
                 description: Compute Resources required by this container. Cannot
                   be updated.
@@ -250,16 +279,10 @@ spec:
                       to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                     type: object
                 type: object
-              restoreCommands:
-                description: Array of command that dbaas can perform database restore.
-                  like xtrabackup, that can performs restore mysql from files.
-                items:
-                  type: string
-                type: array
             required:
             - backupCommands
             - image
-            - restoreCommands
+            - physical
             type: object
           status:
             description: BackupToolStatus defines the observed state of BackupTool

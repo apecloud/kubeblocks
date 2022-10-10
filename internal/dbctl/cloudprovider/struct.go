@@ -39,7 +39,7 @@ type Config struct {
 	Region       string `json:"region"`
 }
 
-func initProvider() {
+func initProvider() error {
 	if err := os.MkdirAll(path.Dir(providerCfg), os.FileMode(0700)); err != nil {
 		panic(errors.Wrap(err, "Failed to make provider config directory"))
 	}
@@ -49,32 +49,31 @@ func initProvider() {
 		}
 
 		defaultProvider, _ = NewProvider(Local, "", "", "")
-		return
+		return nil
 	}
 	content, err := os.ReadFile(providerCfg)
 	if err != nil {
-		panic(errors.Wrap(err, "Failed to read provider configs"))
+		return errors.Wrap(err, "Failed to read provider configs")
 	}
 	cfg := Config{}
 	if err := json.Unmarshal(content, &cfg); err != nil {
-		panic(errors.Wrap(err, "Invalid cloud provider config, please destroy and try init playground again"))
+		return errors.Wrap(err, "Invalid cloud provider config, please destroy and try init playground again")
 	}
 
 	defaultProvider, err = NewProvider(cfg.Name, cfg.AccessKey, cfg.AccessSecret, cfg.Region)
 	if err != nil {
-		panic(errors.Wrap(err, "Failed to init cloud provider"))
+		return errors.Wrap(err, "Failed to init cloud provider")
 	}
+	return err
 }
 
-func Get() CloudProvider {
-	initProvider()
-
-	return defaultProvider
+func Get() (CloudProvider, error) {
+	err := initProvider()
+	return defaultProvider, err
 }
 
 func InitProvider(provider, accessKey, accessSecret, region string) (CloudProvider, error) {
-	initProvider()
-
+	_ = initProvider()
 	if defaultProvider.Name() != Local {
 		util.Infof("Cloud Provider %s has already inited, skip", provider)
 		return defaultProvider, nil

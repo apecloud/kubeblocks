@@ -18,9 +18,7 @@ package helm
 
 import (
 	"context"
-	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -145,8 +143,8 @@ func RemoveRepo(r *repo.Entry) error {
 	return nil
 }
 
-// GetInstalled get helm package if installed.
-func (i *InstallOpts) GetInstalled(cfg *action.Configuration) (*release.Release, error) {
+// getInstalled get helm package if installed.
+func (i *InstallOpts) getInstalled(cfg *action.Configuration) (*release.Release, error) {
 	getClient := action.NewGet(cfg)
 	res, err := getClient.Run(i.Name)
 	if err != nil {
@@ -187,7 +185,7 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) error {
 	s.Start()
 	defer s.Stop()
 
-	res, _ := i.GetInstalled(cfg)
+	res, _ := i.getInstalled(cfg)
 	if res != nil {
 		return nil
 	}
@@ -277,7 +275,7 @@ func (i *InstallOpts) UnInstall(cfg *action.Configuration) error {
 }
 
 func (i *InstallOpts) tryUnInstall(cfg *action.Configuration) error {
-	util.InfoP(1, "Uninstall "+i.Name+"...")
+	util.InfoP(1, "uninstall "+i.Name+"...")
 	s := spinner.New(spinner.CharSets[rand.Intn(44)], 100*time.Millisecond)
 	if err := s.Color("green"); err != nil {
 		return err
@@ -341,16 +339,7 @@ func NewActionConfig(ns string, config string) (*action.Configuration, error) {
 		return nil, err
 	}
 	cfg.RegistryClient = registryClient
-
-	debug := func(format string, v ...interface{}) {
-		if settings.Debug {
-			format = fmt.Sprintf("[debug] %s\n", format)
-			//nolint
-			log.Output(2, fmt.Sprintf(format, v...))
-		}
-	}
-
-	err = cfg.Init(settings.RESTClientGetter(), settings.Namespace(), os.Getenv("HELM_DRIVER"), debug)
+	err = cfg.Init(settings.RESTClientGetter(), settings.Namespace(), os.Getenv("HELM_DRIVER"), func(format string, v ...interface{}) {})
 	if err != nil {
 		return nil, err
 	}

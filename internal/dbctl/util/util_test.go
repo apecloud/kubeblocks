@@ -1,0 +1,70 @@
+/*
+Copyright 2022.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package util
+
+import (
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+)
+
+var _ = Describe("util", func() {
+	It("Get home dir", func() {
+		home, err := GetCliHomeDir()
+		Expect(len(home) > 0).Should(BeTrue())
+		Expect(err == nil).Should(BeTrue())
+	})
+
+	It("Get kubeconfig dir", func() {
+		dir := GetKubeconfigDir()
+		Expect(len(dir) > 0).Should(BeTrue())
+	})
+
+	It("Config path", func() {
+		path := ConfigPath("")
+		Expect(len(path) == 0).Should(BeTrue())
+		path = ConfigPath("test")
+		Expect(len(path) > 0).Should(BeTrue())
+		Expect(RemoveConfig("")).Should(HaveOccurred())
+	})
+
+	It("Print yaml", func() {
+		obj := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": "dataprotection.infracreate.com/v1alpha1",
+				"kind":       "BackupJob",
+				"metadata": map[string]interface{}{
+					"namespace": "default",
+					"name":      "test",
+				},
+				"spec": map[string]interface{}{
+					"backupPolicyName": "backup-policy-demo",
+					"backupType":       "full",
+					"ttl":              "168h0m0s",
+				},
+			},
+		}
+		Expect(PrintObjYAML(obj)).Should(Succeed())
+	})
+
+	It("Others", func() {
+		PrintVersion()
+		_, err := GetPublicIP()
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(MakeSSHKeyPair("", "")).Should(HaveOccurred())
+	})
+})

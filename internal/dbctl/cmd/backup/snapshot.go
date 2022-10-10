@@ -153,7 +153,11 @@ func (o *SnapshotOptions) RunCreate() error {
 	if err != nil {
 		return err
 	}
-	util.PrintObjYaml(obj)
+
+	err = util.PrintObjYAML(obj)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -167,7 +171,6 @@ func NewSnapshotInstance(namespace, name, sourcePVC string) *unstructured.Unstru
 				"name":      name,
 			},
 			"spec": map[string]interface{}{
-				"volumeSnapshotClassName": "csi-aws-vsc",
 				"source": map[string]interface{}{
 					"persistentVolumeClaimName": sourcePVC,
 				},
@@ -397,7 +400,10 @@ func (o *SnapshotOptions) RunRestore() error {
 	if err != nil {
 		return err
 	}
-	util.PrintObjYaml(obj)
+	err = util.PrintObjYAML(obj)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

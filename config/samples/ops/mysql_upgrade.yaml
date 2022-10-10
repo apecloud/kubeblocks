@@ -1,0 +1,11 @@
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind: OpsRequest
+metadata:
+  name: mysql-upgrade
+  namespace: default
+spec:
+  clusterRef: mysql-cluster-01
+  type: Upgrade
+  clusterOps:
+    upgrade:
+      appVersionRef: appversion-mysql-0.1

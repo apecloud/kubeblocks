@@ -34,7 +34,7 @@ func SetupWithManager(mgr manager.Manager) error {
 	// register admission handlers
 	for path, handler := range HandlerMap {
 		server.Register(path, &webhook.Admission{Handler: handler})
-		setupLog.V(3).Info("Registered webhook handler", "path", path)
+		setupLog.Info("Registered webhook handler", "path", path)
 	}
 	return nil
 }

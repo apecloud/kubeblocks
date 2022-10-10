@@ -17,22 +17,24 @@ limitations under the License.
 package playground
 
 import (
-	"testing"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
-func TestPrint(t *testing.T) {
-	clusterInfo := types.PlaygroundInfo{
-		DBCluster:     "mycluster",
-		DBPort:        "3306",
-		DBNamespace:   "default",
-		Namespace:     "dbctl-playground",
-		GrafanaSvc:    "prometheus-grafana",
-		GrafanaPort:   "9100",
-		GrafanaUser:   "admin",
-		GrafanaPasswd: "prom-operator",
-	}
-	//nolint
-	printPlaygroundGuide(clusterInfo)
-}
+var _ = Describe("util", func() {
+	It("Print Guide info", func() {
+		clusterInfo := types.PlaygroundInfo{
+			DBCluster:     "mycluster",
+			DBPort:        "3306",
+			DBNamespace:   "default",
+			Namespace:     "dbctl-playground",
+			GrafanaSvc:    "prometheus-grafana",
+			GrafanaPort:   "9100",
+			GrafanaUser:   "admin",
+			GrafanaPasswd: "prom-operator",
+		}
+		Expect(printPlaygroundGuide(clusterInfo)).Should(Succeed())
+	})
+})

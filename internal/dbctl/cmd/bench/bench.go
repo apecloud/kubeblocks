@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 var (
@@ -51,7 +50,7 @@ var (
 )
 
 // NewBenchCmd creates the bench command
-func NewBenchCmd(f cmdutil.Factory) *cobra.Command {
+func NewBenchCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "bench",
 		Short: "Run a benchmark",
@@ -75,8 +74,7 @@ func NewBenchCmd(f cmdutil.Factory) *cobra.Command {
 
 	// add subcommands
 	cmd.AddCommand(
-		NewTpccCmd(f),
-		newTpchCmd(),
+		NewTpccCmd(),
 	)
 
 	var cancel context.CancelFunc
@@ -107,18 +105,6 @@ func NewBenchCmd(f cmdutil.Factory) *cobra.Command {
 			return
 		}
 	}()
-
-	return cmd
-}
-
-func newTpchCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "tpch",
-		Short: "Run a TPCH benchmark",
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("bench called")
-		},
-	}
 
 	return cmd
 }

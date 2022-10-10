@@ -35,7 +35,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
 			Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
 
-			By("By update a  clusterDefinition")
+			By("By updating a clusterDefinition")
 			// validate spec.cluster.strategies.create?.order and spec.components[?].typeName is consistent, including component typeName and length
 			createOrder := clusterDef.Spec.Cluster.Strategies.Create.Order
 			createOrder[0] = "replicaset"

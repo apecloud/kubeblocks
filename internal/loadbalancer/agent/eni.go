@@ -7,8 +7,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
+
+	pb "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -16,7 +17,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/network"
 )
 
 const (
@@ -27,22 +27,41 @@ const (
 	DefaultMinPrivateIP = 1
 )
 
-type eniManager struct {
-	sync.RWMutex
-	logger logr.Logger
+type NodeResource struct {
+	TotalPrivateIPs int
+	UsedPrivateIPs  int
+	SubnetIds       map[string]map[string]*pb.ENIMetadata
+	ENIResources    map[string]*ENIResource
+}
 
-	cp           cloud.Provider
-	nc           network.Client
+func (h *NodeResource) GetSparePrivateIPs() int {
+	return h.TotalPrivateIPs - h.UsedPrivateIPs
+}
+
+type ENIResource struct {
+	ENIId           string
+	SubnetId        string
+	TotalPrivateIPs int
+	UsedPrivateIPs  int
+}
+
+type eniManager struct {
+	pb.NodeClient
+
+	logger       logr.Logger
 	maxIPsPerENI int
 	maxENI       int
 	minPrivateIP int
+	hostIP       string
+	resource     *NodeResource
+	cp           cloud.Provider
 }
 
-func NewENIManager(logger logr.Logger, cp cloud.Provider, nc network.Client) (*eniManager, error) {
+func newENIManager(logger logr.Logger, nc pb.NodeClient, cp cloud.Provider) (*eniManager, error) {
 	c := &eniManager{
-		cp:     cp,
-		nc:     nc,
-		logger: logger,
+		NodeClient: nc,
+		cp:         cp,
+		logger:     logger,
 	}
 
 	ipStr, found := os.LookupEnv(EnvMinPrivateIP)
@@ -55,34 +74,77 @@ func NewENIManager(logger logr.Logger, cp cloud.Provider, nc network.Client) (*e
 	}
 	c.minPrivateIP = envMin
 
-	if err := c.initENIAndIPLimits(); err != nil {
+	if err := c.initLimits(); err != nil {
 		return nil, errors.Wrap(err, "Failed to get eni and private ip limits")
 	}
 
 	return c, c.init()
 }
 
-func (c *eniManager) Start(stop chan struct{}) error {
-	enis, err := c.cp.DescribeAllENIs()
+func (c *eniManager) init() error {
+	managedENIs, err := c.GetManagedENIs()
 	if err != nil {
-		return errors.Wrap(err, "Failed to get all enis, retry later")
+		return errors.Wrap(err, "ipamd init: failed to retrieve attached ENIs info")
 	}
+	hostResource := c.buildHostResource(managedENIs)
+	c.updateHostResource(hostResource)
 
-	var primaryENI *cloud.ENIMetadata
-	for _, eni := range enis {
-		if eni.DeviceNumber == 0 {
-			primaryENI = eni
-			break
+	for i := range managedENIs {
+		eni := managedENIs[i]
+		c.logger.Info("Discovered managed ENI, trying to set it up", "eni id", eni.EniId)
+
+		options := &util.RetryOptions{MaxRetry: 10, Delay: 1 * time.Second}
+		if err = util.DoWithRetry(context.Background(), c.logger, func() error {
+			setupENIRequest := &pb.SetupNetworkForENIRequest{
+				RequestId: util.GenRequestId(),
+				Eni:       eni,
+			}
+			_, err = c.SetupNetworkForENI(context.Background(), setupENIRequest)
+			return err
+		}, options); err != nil {
+			c.logger.Error(err, "Failed to setup ENI", "eni id", eni.EniId)
+		} else {
+			c.logger.Info("ENI set up completed", "eni id", eni.EniId)
 		}
 	}
-	if primaryENI == nil {
-		return errors.Wrap(err, "Failed to find primary eni")
+	c.logger.Info("Successfully init node")
+
+	return nil
+}
+
+func (c *eniManager) updateHostResource(resource *NodeResource) {
+	c.resource = resource
+}
+
+func (c *eniManager) buildHostResource(enis []*pb.ENIMetadata) *NodeResource {
+	result := &NodeResource{
+		SubnetIds:    make(map[string]map[string]*pb.ENIMetadata),
+		ENIResources: make(map[string]*ENIResource),
 	}
-	// TODO enable check when we can ensure traffic comes in and out from same interface
-	if err := c.cp.ModifySourceDestCheck(primaryENI.ENIId, true); err != nil {
-		return errors.Wrap(err, "Failed to disable primary eni source/destination check")
+	for index := range enis {
+		eni := enis[index]
+		result.TotalPrivateIPs += c.maxIPsPerENI
+		result.UsedPrivateIPs += len(eni.Ipv4Addresses)
+		result.ENIResources[eni.EniId] = &ENIResource{
+			ENIId:           eni.EniId,
+			SubnetId:        eni.SubnetId,
+			TotalPrivateIPs: c.maxIPsPerENI,
+			UsedPrivateIPs:  len(eni.Ipv4Addresses),
+		}
+		subnetEnis, ok := result.SubnetIds[eni.SubnetId]
+		if !ok {
+			subnetEnis = make(map[string]*pb.ENIMetadata)
+		}
+		subnetEnis[eni.EniId] = eni
+		result.SubnetIds[eni.SubnetId] = subnetEnis
 	}
-	c.logger.Info("Successfully disable primary eni source/destination check")
+	return result
+}
+
+func (c *eniManager) start(stop chan struct{}) error {
+	if err := c.modifyPrimaryENISourceDestCheck(true); err != nil {
+		return errors.Wrap(err, "Failed to modify primary eni source/dest check")
+	}
 
 	f1 := func() {
 		if err := c.ensureENI(); err != nil {
@@ -101,43 +163,45 @@ func (c *eniManager) Start(stop chan struct{}) error {
 	return nil
 }
 
-func (c *eniManager) init() error {
-	managedENIs, err := c.GetManagedENIs()
+func (c *eniManager) modifyPrimaryENISourceDestCheck(enabled bool) error {
+	describeENIRequest := &pb.DescribeAllENIsRequest{RequestId: util.GenRequestId()}
+	describeENIResponse, err := c.DescribeAllENIs(context.Background(), describeENIRequest)
 	if err != nil {
-		return errors.Wrap(err, "ipamd init: failed to retrieve attached ENIs info")
+		return errors.Wrap(err, "Failed to get all enis, retry later")
 	}
 
-	for i := range managedENIs {
-		eni := managedENIs[i]
-		c.logger.Info("Discovered managed ENI, trying to set it up", "eni id", eni.ENIId)
-
-		options := &util.RetryOptions{MaxRetry: 10, Delay: 1 * time.Second}
-		if err := util.DoWithRetry(context.Background(), c.logger, func() error {
-			return c.nc.SetupNetworkForENI(eni)
-		}, options); err != nil {
-			c.logger.Error(err, "Failed to setup ENI", "eni id", eni.ENIId)
-		} else {
-			c.logger.Info("ENI set up completed", "eni id", eni.ENIId)
+	var primaryENI *pb.ENIMetadata
+	for _, eni := range describeENIResponse.Enis {
+		if eni.DeviceNumber == 0 {
+			primaryENI = eni
+			break
 		}
 	}
-	c.logger.Info("Successfully init node")
-
+	if primaryENI == nil {
+		return errors.Wrap(err, "Failed to find primary eni")
+	}
+	// TODO enable check when we can ensure traffic comes in and out from same interface
+	if err := c.cp.ModifySourceDestCheck(primaryENI.GetEniId(), enabled); err != nil {
+		return errors.Wrap(err, "Failed to disable primary eni source/destination check")
+	}
+	c.logger.Info("Successfully disable primary eni source/destination check")
 	return nil
 }
 
-func (c *eniManager) GetManagedENIs() ([]*cloud.ENIMetadata, error) {
-	enis, err := c.cp.DescribeAllENIs()
+func (c *eniManager) GetManagedENIs() ([]*pb.ENIMetadata, error) {
+	describeENIRequest := &pb.DescribeAllENIsRequest{RequestId: util.GenRequestId()}
+	describeENIResponse, err := c.DescribeAllENIs(context.Background(), describeENIRequest)
 	if err != nil {
 		return nil, errors.Wrap(err, "ipamd init: failed to retrieve attached ENIs info")
 	}
 
-	return c.filterManagedENIs(enis), nil
+	return c.filterManagedENIs(describeENIResponse.GetEnis()), nil
 }
 
-func (c *eniManager) filterManagedENIs(enis map[string]*cloud.ENIMetadata) []*cloud.ENIMetadata {
+func (c *eniManager) filterManagedENIs(enis map[string]*pb.ENIMetadata) []*pb.ENIMetadata {
 	var (
 		ids            []string
-		managedENIList []*cloud.ENIMetadata
+		managedENIList []*pb.ENIMetadata
 	)
 	for eniId, eni := range enis {
 		if _, found := eni.Tags[cloud.TagENIKubeBlocksManaged]; !found {
@@ -151,58 +215,50 @@ func (c *eniManager) filterManagedENIs(enis map[string]*cloud.ENIMetadata) []*cl
 	return managedENIList
 }
 
-func (c *eniManager) ChooseBusiestENI() (*cloud.ENIMetadata, error) {
-	enis, err := c.cp.DescribeAllENIs()
+func (c *eniManager) ChooseBusiestENI() (*pb.ENIMetadata, error) {
+	managedENIs, err := c.GetManagedENIs()
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to get attached ENIs info")
+		return nil, errors.Wrap(err, "Failed to get managed ENIs")
 	}
-
-	managedENIs := c.filterManagedENIs(enis)
 	if len(managedENIs) == 0 {
 		return nil, errors.New("No managed eni found")
 	}
 	candidate := managedENIs[0]
 	for _, eni := range managedENIs {
-		if len(eni.IPv4Addresses) > len(candidate.IPv4Addresses) && len(eni.IPv4Addresses) < c.maxIPsPerENI {
+		if len(eni.Ipv4Addresses) > len(candidate.Ipv4Addresses) && len(eni.Ipv4Addresses) < c.maxIPsPerENI {
 			candidate = eni
 		}
 	}
-	c.logger.Info("Found busiest eni", "eni id", candidate.ENIId)
+	c.logger.Info("Found busiest eni", "eni id", candidate.EniId)
 	return candidate, nil
 }
 
 func (c *eniManager) ensureENI() error {
-	enis, err := c.cp.DescribeAllENIs()
+	describeENIRequest := &pb.DescribeAllENIsRequest{RequestId: util.GenRequestId()}
+	describeENIResponse, err := c.DescribeAllENIs(context.Background(), describeENIRequest)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get all enis, retry later")
 	}
 
 	var (
-		managedENIs = c.filterManagedENIs(enis)
-		status      = make(map[string]interface{}, len(managedENIs))
-		totalSpare  int
-		min         = c.minPrivateIP
-		max         = c.minPrivateIP + c.maxIPsPerENI
+		min          = c.minPrivateIP
+		max          = c.minPrivateIP + c.maxIPsPerENI
+		managedENIs  = c.filterManagedENIs(describeENIResponse.GetEnis())
+		hostResource = c.buildHostResource(managedENIs)
+		totalSpare   = hostResource.TotalPrivateIPs - hostResource.UsedPrivateIPs
 	)
-	for _, eni := range managedENIs {
-		spare := c.maxIPsPerENI - len(eni.IPv4Addresses)
-		status[eni.ENIId] = map[string]int{
-			"total": c.maxIPsPerENI,
-			"used":  len(eni.IPv4Addresses),
-			"spare": spare,
-		}
-		totalSpare += spare
-	}
+
+	c.updateHostResource(hostResource)
 
 	c.logger.Info("Local private ip buffer status",
 		"spare private ip", totalSpare, "min spare private ip", min, "max spare private ip", max)
 
-	b, _ := json.Marshal(status)
+	b, _ := json.Marshal(hostResource)
 	c.logger.Info("Local private ip buffer status", "info", string(b))
 
 	if totalSpare < min {
-		if len(enis) >= c.maxENI {
-			c.logger.Info("Limit exceed, can not alloc new eni", "current", enis, "max", c.maxENI)
+		if len(describeENIResponse.Enis) >= c.maxENI {
+			c.logger.Info("Limit exceed, can not alloc new eni", "current", len(describeENIResponse.Enis), "max", c.maxENI)
 			return nil
 		}
 		if err := c.tryAllocAndAttachENI(); err != nil {
@@ -234,33 +290,43 @@ func (c *eniManager) tryAllocAndAttachENI() error {
 	c.logger.Info("New eni attached", "eni id", eniId)
 
 	// setup ENI networking stack
-	if err := c.nc.SetupNetworkForENI(&eni); err != nil {
+	setupENIRequest := &pb.SetupNetworkForENIRequest{
+		RequestId: util.GenRequestId(),
+		Eni: &pb.ENIMetadata{
+			EniId: eni.ENIId,
+		},
+	}
+	if _, err = c.SetupNetworkForENI(context.Background(), setupENIRequest); err != nil {
 		return errors.Wrapf(err, "Failed to set up network for eni %s", eni.ENIId)
 	}
 	c.logger.Info("Successfully initialized new eni", "eni id", eniId)
 	return nil
 }
 
-func (c *eniManager) tryDetachAndDeleteENI(enis []*cloud.ENIMetadata) error {
+func (c *eniManager) tryDetachAndDeleteENI(enis []*pb.ENIMetadata) error {
 	c.logger.Info("Try to detach and delete idle eni")
 
 	for _, eni := range enis {
-		if len(eni.IPv4Addresses) > 1 {
+		if len(eni.Ipv4Addresses) > 1 {
 			continue
 		}
-		if err := c.nc.CleanNetworkForENI(eni); err != nil {
-			return errors.Wrapf(err, "Failed to clean network for eni %s", eni.ENIId)
+		cleanENIRequest := &pb.CleanNetworkForENIRequest{
+			RequestId: util.GenRequestId(),
+			Eni:       eni,
 		}
-		if err := c.cp.FreeENI(eni.ENIId); err != nil {
-			return errors.Wrapf(err, "Failed to free eni %s", eni.ENIId)
+		if _, err := c.CleanNetworkForENI(context.Background(), cleanENIRequest); err != nil {
+			return errors.Wrapf(err, "Failed to clean network for eni %s", eni.EniId)
 		}
-		c.logger.Info("Successfully detach and delete idle eni", "eni id", eni.ENIId)
+		if err := c.cp.FreeENI(eni.EniId); err != nil {
+			return errors.Wrapf(err, "Failed to free eni %s", eni.EniId)
+		}
+		c.logger.Info("Successfully detach and delete idle eni", "eni id", eni.EniId)
 		return nil
 	}
 	return errors.New("Failed to find a idle eni")
 }
 
-func (c *eniManager) initENIAndIPLimits() (err error) {
+func (c *eniManager) initLimits() (err error) {
 	nodeMaxENI, err := c.getMaxENI()
 	if err != nil {
 		c.logger.Error(err, "Failed to get ENI limit")
@@ -298,7 +364,6 @@ func (c *eniManager) getMaxENI() (int, error) {
 	return instanceMaxENI, nil
 }
 
-// clean leaked network interface created by local instance
 func (c *eniManager) cleanLeakedENIs() error {
 	c.logger.Info("Start cleaning leaked enis")
 

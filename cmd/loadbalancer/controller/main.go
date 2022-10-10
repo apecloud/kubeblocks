@@ -34,8 +34,11 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/viper"
@@ -65,8 +68,9 @@ import (
 //+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch
 
 const (
-	appName      = "loadbalancer-controller"
-	RFC3339Mills = "2006-01-02T15:04:05.000"
+	appName              = "loadbalancer-controller"
+	RFC3339Mills         = "2006-01-02T15:04:05.000"
+	DefaultRPCPort int64 = 19200
 )
 
 var (
@@ -171,13 +175,24 @@ func main() {
 		os.Exit(1)
 	}
 
+	port := DefaultRPCPort
+	if rpcPort == "" {
+		port, err = strconv.ParseInt(rpcPort, 10, 64)
+		if err != nil {
+			panic(err)
+		}
+	}
 	cp, err := factory.NewProvider(cloud.ProviderAWS, logger)
 	if err != nil {
 		setupLog.Error(err, "Failed to initialize cloud provider")
 		os.Exit(1)
 	}
-
-	serviceController, err := lb.NewServiceController(logger, c, mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"), cp)
+	nm, err := agent.NewNodeManager(port, cp)
+	if err != nil {
+		setupLog.Error(err, "Failed to init node manager")
+		os.Exit(1)
+	}
+	serviceController, err := lb.NewServiceController(logger, c, mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"), cp, nm)
 	if err != nil {
 		setupLog.Error(err, "Failed to init service controller")
 		os.Exit(1)

@@ -47,7 +47,7 @@ var _ = Describe("ServiceController", func() {
 		mockProvider := mockcloud.NewMockProvider(ctrl)
 		mockNodeCache := mock_protocol.NewMockNodeCache(ctrl)
 		serviceController.cp = mockProvider
-		serviceController.nc = mockNodeCache
+		serviceController.nm = mockNodeCache
 
 		return ctrl, mockProvider, mockNodeCache
 	}
@@ -108,7 +108,7 @@ var _ = Describe("ServiceController", func() {
 				Client: k8sClient,
 				logger: logger,
 				cp:     mockCloud,
-				nc:     mockNodeCache,
+				nm:     mockNodeCache,
 				cache:  make(map[string]*FloatingIP),
 			}
 

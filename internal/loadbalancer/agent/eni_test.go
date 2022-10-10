@@ -169,7 +169,7 @@ var _ = Describe("Eni", func() {
 			stop := make(chan struct{})
 			close(stop)
 
-			Expect(manager.Start(stop)).Should(Succeed())
+			Expect(manager.start(stop)).Should(Succeed())
 		})
 	})
 

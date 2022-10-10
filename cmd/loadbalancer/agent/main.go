@@ -15,7 +15,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/factory"
 	iptableswrapper "github.com/apecloud/kubeblocks/internal/loadbalancer/iptables"
@@ -80,15 +79,7 @@ func main() {
 		logger.Error(err, "Failed to initialize cloud provider")
 		os.Exit(1)
 	}
-	em, err := agent.NewENIManager(logger, cp, nc)
-	if err != nil {
-		logger.Error(err, "Failed to init eni manager")
-		os.Exit(1)
-	}
-	if err := em.Start(make(chan struct{})); err != nil {
-		logger.Error(err, "Failed to start eni controller")
-		os.Exit(1)
-	}
+
 	hostIP := viper.GetString("HOST_IP")
 	rpcPort := viper.GetString("RPC_PORT")
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%s", hostIP, rpcPort))
@@ -98,7 +89,7 @@ func main() {
 	}
 
 	server := grpc.NewServer()
-	proxy := &Proxy{em: em, nc: nc}
+	proxy := &Proxy{nc: nc, cp: cp}
 	pb.RegisterNodeServer(server, proxy)
 	grpc_health_v1.RegisterHealthServer(server, proxy)
 	logger.Info("Exit", "err", server.Serve(lis))

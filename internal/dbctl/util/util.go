@@ -32,6 +32,8 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/google/uuid"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 
@@ -231,4 +233,8 @@ func DoWithRetry(ctx context.Context, logger logr.Logger, operation func() error
 		err = operation()
 	}
 	return err
+}
+
+func GenRequestId() string {
+	return uuid.New().String()
 }

@@ -8,6 +8,7 @@ package protocol
 
 import (
 	context "context"
+
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -22,8 +23,9 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type NodeClient interface {
-	ChooseBusiestENI(ctx context.Context, in *ChooseBusiestENIRequest, opts ...grpc.CallOption) (*ChooseBusiestENIResponse, error)
-	GetManagedENIs(ctx context.Context, in *GetManagedENIsRequest, opts ...grpc.CallOption) (*GetManagedENIsResponse, error)
+	DescribeAllENIs(ctx context.Context, in *DescribeAllENIsRequest, opts ...grpc.CallOption) (*DescribeAllENIsResponse, error)
+	SetupNetworkForENI(ctx context.Context, in *SetupNetworkForENIRequest, opts ...grpc.CallOption) (*SetupNetworkForENIResponse, error)
+	CleanNetworkForENI(ctx context.Context, in *CleanNetworkForENIRequest, opts ...grpc.CallOption) (*CleanNetworkForENIResponse, error)
 	SetupNetworkForService(ctx context.Context, in *SetupNetworkForServiceRequest, opts ...grpc.CallOption) (*SetupNetworkForServiceResponse, error)
 	CleanNetworkForService(ctx context.Context, in *CleanNetworkForServiceRequest, opts ...grpc.CallOption) (*CleanNetworkForServiceResponse, error)
 }
@@ -36,18 +38,27 @@ func NewNodeClient(cc grpc.ClientConnInterface) NodeClient {
 	return &nodeClient{cc}
 }
 
-func (c *nodeClient) ChooseBusiestENI(ctx context.Context, in *ChooseBusiestENIRequest, opts ...grpc.CallOption) (*ChooseBusiestENIResponse, error) {
-	out := new(ChooseBusiestENIResponse)
-	err := c.cc.Invoke(ctx, "/protocol.Node/ChooseBusiestENI", in, out, opts...)
+func (c *nodeClient) DescribeAllENIs(ctx context.Context, in *DescribeAllENIsRequest, opts ...grpc.CallOption) (*DescribeAllENIsResponse, error) {
+	out := new(DescribeAllENIsResponse)
+	err := c.cc.Invoke(ctx, "/protocol.Node/DescribeAllENIs", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *nodeClient) GetManagedENIs(ctx context.Context, in *GetManagedENIsRequest, opts ...grpc.CallOption) (*GetManagedENIsResponse, error) {
-	out := new(GetManagedENIsResponse)
-	err := c.cc.Invoke(ctx, "/protocol.Node/GetManagedENIs", in, out, opts...)
+func (c *nodeClient) SetupNetworkForENI(ctx context.Context, in *SetupNetworkForENIRequest, opts ...grpc.CallOption) (*SetupNetworkForENIResponse, error) {
+	out := new(SetupNetworkForENIResponse)
+	err := c.cc.Invoke(ctx, "/protocol.Node/SetupNetworkForENI", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *nodeClient) CleanNetworkForENI(ctx context.Context, in *CleanNetworkForENIRequest, opts ...grpc.CallOption) (*CleanNetworkForENIResponse, error) {
+	out := new(CleanNetworkForENIResponse)
+	err := c.cc.Invoke(ctx, "/protocol.Node/CleanNetworkForENI", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -76,8 +87,9 @@ func (c *nodeClient) CleanNetworkForService(ctx context.Context, in *CleanNetwor
 // All implementations must embed UnimplementedNodeServer
 // for forward compatibility
 type NodeServer interface {
-	ChooseBusiestENI(context.Context, *ChooseBusiestENIRequest) (*ChooseBusiestENIResponse, error)
-	GetManagedENIs(context.Context, *GetManagedENIsRequest) (*GetManagedENIsResponse, error)
+	DescribeAllENIs(context.Context, *DescribeAllENIsRequest) (*DescribeAllENIsResponse, error)
+	SetupNetworkForENI(context.Context, *SetupNetworkForENIRequest) (*SetupNetworkForENIResponse, error)
+	CleanNetworkForENI(context.Context, *CleanNetworkForENIRequest) (*CleanNetworkForENIResponse, error)
 	SetupNetworkForService(context.Context, *SetupNetworkForServiceRequest) (*SetupNetworkForServiceResponse, error)
 	CleanNetworkForService(context.Context, *CleanNetworkForServiceRequest) (*CleanNetworkForServiceResponse, error)
 	mustEmbedUnimplementedNodeServer()
@@ -87,11 +99,14 @@ type NodeServer interface {
 type UnimplementedNodeServer struct {
 }
 
-func (UnimplementedNodeServer) ChooseBusiestENI(context.Context, *ChooseBusiestENIRequest) (*ChooseBusiestENIResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ChooseBusiestENI not implemented")
+func (UnimplementedNodeServer) DescribeAllENIs(context.Context, *DescribeAllENIsRequest) (*DescribeAllENIsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DescribeAllENIs not implemented")
 }
-func (UnimplementedNodeServer) GetManagedENIs(context.Context, *GetManagedENIsRequest) (*GetManagedENIsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetManagedENIs not implemented")
+func (UnimplementedNodeServer) SetupNetworkForENI(context.Context, *SetupNetworkForENIRequest) (*SetupNetworkForENIResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetupNetworkForENI not implemented")
+}
+func (UnimplementedNodeServer) CleanNetworkForENI(context.Context, *CleanNetworkForENIRequest) (*CleanNetworkForENIResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CleanNetworkForENI not implemented")
 }
 func (UnimplementedNodeServer) SetupNetworkForService(context.Context, *SetupNetworkForServiceRequest) (*SetupNetworkForServiceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetupNetworkForService not implemented")
@@ -112,38 +127,56 @@ func RegisterNodeServer(s grpc.ServiceRegistrar, srv NodeServer) {
 	s.RegisterService(&Node_ServiceDesc, srv)
 }
 
-func _Node_ChooseBusiestENI_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ChooseBusiestENIRequest)
+func _Node_DescribeAllENIs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DescribeAllENIsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(NodeServer).ChooseBusiestENI(ctx, in)
+		return srv.(NodeServer).DescribeAllENIs(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/protocol.Node/ChooseBusiestENI",
+		FullMethod: "/protocol.Node/DescribeAllENIs",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NodeServer).ChooseBusiestENI(ctx, req.(*ChooseBusiestENIRequest))
+		return srv.(NodeServer).DescribeAllENIs(ctx, req.(*DescribeAllENIsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Node_GetManagedENIs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetManagedENIsRequest)
+func _Node_SetupNetworkForENI_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetupNetworkForENIRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(NodeServer).GetManagedENIs(ctx, in)
+		return srv.(NodeServer).SetupNetworkForENI(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/protocol.Node/GetManagedENIs",
+		FullMethod: "/protocol.Node/SetupNetworkForENI",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NodeServer).GetManagedENIs(ctx, req.(*GetManagedENIsRequest))
+		return srv.(NodeServer).SetupNetworkForENI(ctx, req.(*SetupNetworkForENIRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Node_CleanNetworkForENI_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CleanNetworkForENIRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NodeServer).CleanNetworkForENI(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/protocol.Node/CleanNetworkForENI",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NodeServer).CleanNetworkForENI(ctx, req.(*CleanNetworkForENIRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -192,12 +225,16 @@ var Node_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*NodeServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "ChooseBusiestENI",
-			Handler:    _Node_ChooseBusiestENI_Handler,
+			MethodName: "DescribeAllENIs",
+			Handler:    _Node_DescribeAllENIs_Handler,
 		},
 		{
-			MethodName: "GetManagedENIs",
-			Handler:    _Node_GetManagedENIs_Handler,
+			MethodName: "SetupNetworkForENI",
+			Handler:    _Node_SetupNetworkForENI_Handler,
+		},
+		{
+			MethodName: "CleanNetworkForENI",
+			Handler:    _Node_CleanNetworkForENI_Handler,
 		},
 		{
 			MethodName: "SetupNetworkForService",

@@ -5,29 +5,22 @@ package protocol;
 option go_package = "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol";
 
 service Node {
-  rpc ChooseBusiestENI(ChooseBusiestENIRequest) returns (ChooseBusiestENIResponse) {}
+  rpc DescribeAllENIs(DescribeAllENIsRequest) returns (DescribeAllENIsResponse) {}
 
-  rpc GetManagedENIs(GetManagedENIsRequest) returns (GetManagedENIsResponse) {}
+  rpc SetupNetworkForENI(SetupNetworkForENIRequest) returns(SetupNetworkForENIResponse) {}
+
+  rpc CleanNetworkForENI(CleanNetworkForENIRequest) returns(CleanNetworkForENIResponse) {}
 
   rpc SetupNetworkForService(SetupNetworkForServiceRequest) returns (SetupNetworkForServiceResponse) {}
 
   rpc CleanNetworkForService(CleanNetworkForServiceRequest) returns (CleanNetworkForServiceResponse) {}
 }
 
-message ChooseBusiestENIRequest{
+message DescribeAllENIsRequest {
   string request_id = 1;
 }
 
-message ChooseBusiestENIResponse{
-  string request_id = 1;
-  ENIMetadata eni = 2;
-}
-
-message GetManagedENIsRequest {
-  string request_id = 1;
-}
-
-message GetManagedENIsResponse {
+message DescribeAllENIsResponse {
   string request_id = 1;
   map<string, ENIMetadata> enis = 2;
 }
@@ -54,6 +47,26 @@ message CleanNetworkForServiceResponse {
   string request_id = 1;
   string private_ip = 2;
   ENIMetadata eni = 3;
+}
+
+message SetupNetworkForENIRequest {
+  string request_id = 1;
+  ENIMetadata eni = 2;
+}
+
+message SetupNetworkForENIResponse {
+  string request_id = 1;
+  ENIMetadata eni = 2;
+}
+
+message CleanNetworkForENIRequest {
+  string request_id = 1;
+  ENIMetadata eni = 2;
+}
+
+message CleanNetworkForENIResponse {
+  string request_id = 1;
+  ENIMetadata eni = 2;
 }
 
 message ENIMetadata {

@@ -3,13 +3,10 @@ package loadbalancer
 import (
 	"context"
 	"fmt"
-	"os"
-	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/go-logr/logr"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -17,6 +14,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
@@ -41,11 +40,6 @@ const (
 	DefaultTrafficPolicy                = AnnotationValueClusterTrafficPolicy
 )
 
-var (
-	rpcPort        int64
-	defaultRPCPort int64 = 19200
-)
-
 type FloatingIP struct {
 	ip       string
 	subnetId string
@@ -56,37 +50,23 @@ type FloatingIP struct {
 type ServiceController struct {
 	sync.RWMutex
 	client.Client
-	Scheme      *runtime.Scheme
-	Recorder    record.EventRecorder
-	logger      logr.Logger
-	cp          cloud.Provider
-	nc          pb.NodeCache
-	subnetToENI map[string]map[string]bool
-	cache       map[string]*FloatingIP
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+	logger   logr.Logger
+	cp       cloud.Provider
+	nm       agent.NodeManager
+	cache    map[string]*FloatingIP
 }
 
-func init() {
-	rpcPort = defaultRPCPort
-	value := os.Getenv("RPC_PORT")
-	if value != "" {
-		port, err := strconv.ParseInt(value, 10, 64)
-		if err != nil {
-			panic(err)
-		}
-		rpcPort = port
-	}
-}
-
-func NewServiceController(logger logr.Logger, client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder, cp cloud.Provider) (*ServiceController, error) {
+func NewServiceController(logger logr.Logger, client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder, cp cloud.Provider, nm agent.NodeManager) (*ServiceController, error) {
 	c := &ServiceController{
-		Client:      client,
-		Scheme:      scheme,
-		Recorder:    recorder,
-		logger:      logger,
-		cp:          cp,
-		nc:          pb.NewNodeCache(rpcPort),
-		subnetToENI: make(map[string]map[string]bool),
-		cache:       make(map[string]*FloatingIP),
+		Client:   client,
+		Scheme:   scheme,
+		Recorder: recorder,
+		logger:   logger,
+		cp:       cp,
+		nm:       nm,
+		cache:    make(map[string]*FloatingIP),
 	}
 
 	nodeList := &corev1.NodeList{}
@@ -97,6 +77,49 @@ func NewServiceController(logger logr.Logger, client client.Client, scheme *runt
 		return nil, errors.Wrap(err, "Failed to init nodes")
 	}
 	return c, nil
+}
+
+func (c *ServiceController) initNodes(nodeList *corev1.NodeList) error {
+	for _, item := range nodeList.Items {
+		var nodeIP string
+		for _, addr := range item.Status.Addresses {
+			if addr.Type != corev1.NodeInternalIP {
+				continue
+			}
+			nodeIP = addr.Address
+		}
+		if nodeIP == "" {
+			c.logger.Error(fmt.Errorf("invalid cluster node %v", item), "Skip init node")
+			continue
+		}
+		if err := c.initNode(nodeIP); err != nil {
+			return errors.Wrapf(err, "Failed to init node %s", nodeIP)
+		}
+	}
+	return nil
+}
+
+func (c *ServiceController) initNode(nodeIP string) error {
+	ctxLog := c.logger.WithValues("node", nodeIP)
+
+	node, err := c.nm.GetNode(nodeIP)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to get rpc client for node %s", nodeIP)
+	}
+	enis, err := node.GetManagedENIs()
+	if err != nil {
+		return errors.Wrapf(err, "Failed to query enis from node %s", nodeIP)
+	}
+	for _, eni := range enis {
+		for _, addr := range eni.Ipv4Addresses {
+			if err := node.SetupNetworkForService(addr.Address, eni); err != nil {
+				return errors.Wrapf(err, "Failed to init service private ip %s for node %s", addr.Address, nodeIP)
+			}
+			c.setFloatingIP(addr.Address, &FloatingIP{ip: addr.Address, subnetId: eni.SubnetId, nodeIP: nodeIP, eni: eni})
+			ctxLog.Info("Successfully init service", "private ip", addr.Address)
+		}
+	}
+	return nil
 }
 
 func (c *ServiceController) getFloatingIP(ip string) *FloatingIP {
@@ -124,62 +147,6 @@ func (c *ServiceController) removeFloatingIP(ip string) {
 	if fip != nil {
 		c.logger.Info("Delete floating ip from cache", "ip", ip, "eni id", fip.eni.EniId)
 	}
-}
-
-func (c *ServiceController) initNodes(nodeList *corev1.NodeList) error {
-	for _, item := range nodeList.Items {
-		var nodeIP string
-		for _, addr := range item.Status.Addresses {
-			if addr.Type != corev1.NodeInternalIP {
-				continue
-			}
-			nodeIP = addr.Address
-		}
-		if nodeIP == "" {
-			c.logger.Error(fmt.Errorf("invalid cluster node %v", item), "Skip init node")
-			continue
-		}
-		if err := c.initNode(nodeIP); err != nil {
-			return errors.Wrapf(err, "Failed to init node %s", nodeIP)
-		}
-	}
-	return nil
-}
-
-func (c *ServiceController) initNode(nodeIP string) error {
-	ctxLog := c.logger.WithValues("node", nodeIP)
-
-	node, err := c.nc.GetNode(nodeIP)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to get rpc client for node %s", nodeIP)
-	}
-	resp, err := node.GetManagedENIs(context.Background(), &pb.GetManagedENIsRequest{RequestId: getRequestId()})
-	if err != nil {
-		return errors.Wrapf(err, "Failed to query enis from node %s", nodeIP)
-	}
-	for _, eni := range resp.GetEnis() {
-
-		nodeIPs, ok := c.subnetToENI[eni.SubnetId]
-		if !ok {
-			nodeIPs = make(map[string]bool)
-		}
-		nodeIPs[nodeIP] = true
-		c.subnetToENI[eni.SubnetId] = nodeIPs
-
-		for _, addr := range eni.Ipv4Addresses {
-			request := &pb.SetupNetworkForServiceRequest{
-				RequestId: getRequestId(),
-				PrivateIp: addr.Address,
-				Eni:       eni,
-			}
-			if _, err := node.SetupNetworkForService(context.Background(), request); err != nil {
-				return errors.Wrapf(err, "Failed to init service private ip %s for node %s", addr.Address, nodeIP)
-			}
-			c.setFloatingIP(addr.Address, &FloatingIP{ip: addr.Address, subnetId: eni.SubnetId, nodeIP: nodeIP, eni: eni})
-			ctxLog.Info("Successfully init service", "private ip", addr.Address)
-		}
-	}
-	return nil
 }
 
 func (c *ServiceController) SetupWithManager(mgr ctrl.Manager) error {
@@ -276,7 +243,7 @@ func (c *ServiceController) migrateOnNewMaster(ctx context.Context, ctxLog logr.
 		return errors.Wrapf(err, "Failed to dealloc private ip %s", fip.ip)
 	}
 
-	node, err := c.nc.GetNode(nodeIP)
+	node, err := c.nm.GetNode(nodeIP)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get master node")
 	}
@@ -288,13 +255,7 @@ func (c *ServiceController) migrateOnNewMaster(ctx context.Context, ctxLog logr.
 	newFip := &FloatingIP{ip: fip.ip, subnetId: fip.subnetId, nodeIP: nodeIP, eni: newENI}
 	c.setFloatingIP(newFip.ip, newFip)
 
-	setupServiceRequest := &pb.SetupNetworkForServiceRequest{
-		RequestId: getRequestId(),
-		PrivateIp: newFip.ip,
-		Eni:       newENI,
-	}
-
-	if _, err = node.SetupNetworkForService(ctx, setupServiceRequest); err != nil {
+	if err = node.SetupNetworkForService(newFip.ip, newENI); err != nil {
 		return errors.Wrap(err, "Failed to setup host network stack for service")
 	}
 
@@ -307,16 +268,11 @@ func (c *ServiceController) migrateOnNewMaster(ctx context.Context, ctxLog logr.
 func (c *ServiceController) migrateOnOldMaster(ctx context.Context, ctxLog logr.Logger, fip *FloatingIP) error {
 	ctxLog = ctxLog.WithName("migrateOnOldMaster").WithValues("node", fip.nodeIP)
 
-	node, err := c.nc.GetNode(fip.nodeIP)
+	node, err := c.nm.GetNode(fip.nodeIP)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get old master node")
 	}
-	cleanServiceRequest := &pb.CleanNetworkForServiceRequest{
-		RequestId: getRequestId(),
-		PrivateIp: fip.ip,
-		Eni:       fip.eni,
-	}
-	if _, err := node.CleanNetworkForService(ctx, cleanServiceRequest); err != nil {
+	if err := node.CleanNetworkForService(fip.ip, fip.eni); err != nil {
 		return errors.Wrap(err, "Failed to cleanup private ip")
 	}
 	ctxLog.Info("Successfully clean service network ")
@@ -326,7 +282,7 @@ func (c *ServiceController) migrateOnOldMaster(ctx context.Context, ctxLog logr.
 func (c *ServiceController) createFloatingIP(ctx context.Context, ctxLog logr.Logger, nodeIP string, svc *corev1.Service) error {
 	ctxLog = ctxLog.WithName("createFloatingIP").WithValues("node", nodeIP)
 
-	node, err := c.nc.GetNode(nodeIP)
+	node, err := c.nm.GetNode(nodeIP)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get master node")
 	}
@@ -345,12 +301,7 @@ func (c *ServiceController) createFloatingIP(ctx context.Context, ctxLog logr.Lo
 	}
 	c.setFloatingIP(privateIP, fip)
 
-	request := &pb.SetupNetworkForServiceRequest{
-		RequestId: getRequestId(),
-		PrivateIp: fip.ip,
-		Eni:       fip.eni,
-	}
-	if _, err = node.SetupNetworkForService(ctx, request); err != nil {
+	if err = node.SetupNetworkForService(fip.ip, fip.eni); err != nil {
 		return errors.Wrap(err, "Failed to setup host network stack for service")
 	}
 	ctxLog.Info("Successfully setup service host network")
@@ -381,16 +332,11 @@ func (c *ServiceController) deleteFloatingIP(ctx context.Context, ctxLog logr.Lo
 	}
 	ctxLog.Info("Successfully released floating ip")
 
-	node, err := c.nc.GetNode(fip.nodeIP)
+	node, err := c.nm.GetNode(fip.nodeIP)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get rpc client for node %s", fip.nodeIP)
 	}
-	request := &pb.CleanNetworkForServiceRequest{
-		RequestId: getRequestId(),
-		PrivateIp: fip.ip,
-		Eni:       fip.eni,
-	}
-	if _, err = node.CleanNetworkForService(ctx, request); err != nil {
+	if err = node.CleanNetworkForService(fip.ip, fip.eni); err != nil {
 		return errors.Wrap(err, "Failed to cleanup private ip")
 	}
 	ctxLog.Info("Successfully clean service network on node")
@@ -433,17 +379,13 @@ func (c *ServiceController) updateService(ctx context.Context, logger logr.Logge
 	return nil
 }
 
-func (c *ServiceController) tryAllocPrivateIP(ctxLog logr.Logger, node pb.NodeClient) (string, *pb.ENIMetadata, error) {
+func (c *ServiceController) tryAllocPrivateIP(ctxLog logr.Logger, node *agent.Node) (string, *pb.ENIMetadata, error) {
 	ctxLog = ctxLog.WithName("tryAllocPrivateIP")
 
-	request := &pb.ChooseBusiestENIRequest{
-		RequestId: getRequestId(),
-	}
-	resp, err := node.ChooseBusiestENI(context.Background(), request)
+	eni, err := node.ChooseBusiestENI()
 	if err != nil {
 		return "", nil, errors.Wrap(err, "Failed to choose busiest ENI")
 	}
-	eni := resp.Eni
 	ctxLog.Info("Successfully choose busiest eni", "eni id", eni.EniId)
 
 	ip, err := c.cp.AllocIPAddresses(eni.EniId)
@@ -455,18 +397,14 @@ func (c *ServiceController) tryAllocPrivateIP(ctxLog logr.Logger, node pb.NodeCl
 	return ip, eni, nil
 }
 
-func (c *ServiceController) tryAssignPrivateIP(ctxLog logr.Logger, ip string, node pb.NodeClient) (*pb.ENIMetadata, error) {
+func (c *ServiceController) tryAssignPrivateIP(ctxLog logr.Logger, ip string, node *agent.Node) (*pb.ENIMetadata, error) {
 	ctxLog = ctxLog.WithName("tryAssignPrivateIP").WithValues("ip", ip)
 
-	request := &pb.ChooseBusiestENIRequest{
-		RequestId: getRequestId(),
-	}
-	resp, err := node.ChooseBusiestENI(context.Background(), request)
+	eni, err := node.ChooseBusiestENI()
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to choose busiest ENI")
 	}
 
-	eni := resp.Eni
 	if err := c.cp.AssignPrivateIpAddresses(eni.EniId, ip); err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("Failed to assign private ip %s on eni %s", ip, eni.EniId))
 	}
@@ -487,38 +425,17 @@ func (c *ServiceController) chooseTrafficNode(svc *corev1.Service) (string, erro
 	if !ok {
 		trafficPolicy = DefaultTrafficPolicy
 	}
-	if trafficPolicy == AnnotationValueClusterTrafficPolicy {
-		nodeIP, ok := annotations[AnnotationKeyENINodeIP]
-		if ok {
-			return nodeIP, nil
-		}
-		// TODO
-	}
 
-	matchLabels := client.MatchingLabels{}
-	for k, v := range svc.Spec.Selector {
-		matchLabels[k] = v
+	switch trafficPolicy {
+	case AnnotationValueClusterTrafficPolicy:
+		return (&ClusterTrafficPolicy{nm: c.nm}).ChooseNode(svc)
+	case AnnotationValueLocalTrafficPolicy:
+		return (&LocalTrafficPolicy{logger: c.logger, client: c.Client}).ChooseNode(svc)
+	default:
+		return "", fmt.Errorf("unknown traffic policy %s", trafficPolicy)
 	}
-	listOptions := []client.ListOption{
-		matchLabels,
-		client.InNamespace(svc.GetNamespace()),
-	}
-	pods := &corev1.PodList{}
-	if err := c.Client.List(context.Background(), pods, listOptions...); err != nil {
-		return "", errors.Wrap(err, "Failed to list service related pods")
-	}
-	if len(pods.Items) == 0 {
-		return "", errors.New(fmt.Sprintf("Can not find master node for service %s", getServiceFullName(svc)))
-	}
-
-	c.logger.Info("Found master pods", "count", len(pods.Items))
-	return pods.Items[0].Status.HostIP, nil
 }
 
 func getServiceFullName(service *corev1.Service) string {
 	return fmt.Sprintf("%s/%s", service.GetNamespace(), service.GetName())
-}
-
-func getRequestId() string {
-	return uuid.New().String()
 }

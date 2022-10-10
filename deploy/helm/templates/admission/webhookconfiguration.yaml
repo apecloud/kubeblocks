@@ -1,6 +1,7 @@
 {{- if .Values.admissionWebhooks.enabled }}
 {{- $ca := genCA (printf "*.%s.svc" ( .Release.Namespace )) 36500 }}
-{{- $cert := genSignedCert (printf "%s.%s.svc" (include "opendbaas-core.svcName" .) ( .Release.Namespace )) nil nil 36500 $ca }}
+{{- $svcName := (printf "%s.%s.svc" (include "opendbaas-core.svcName" .) ( .Release.Namespace )) -}}
+{{- $cert := genSignedCert $svcName nil (list $svcName (include "opendbaas-core.svcName" .) (printf "%s.%s" (include "opendbaas-core.svcName" .) ( .Release.Namespace ))) 36500 $ca -}}
 {{- if .Values.admissionWebhooks.createSelfSignedCert }}
 apiVersion: v1
 kind: Secret

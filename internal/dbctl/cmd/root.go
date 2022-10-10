@@ -19,7 +19,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -32,7 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/dbaas"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/playground"
-	"github.com/apecloud/kubeblocks/version"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
 // RootFlags describes a struct that holds flags that can be set on root level of the command
@@ -50,9 +49,9 @@ func NewRootCmd() *cobra.Command {
 		Short: "A Command Line Interface(CLI) library for DBaaS.",
 		Run: func(cmd *cobra.Command, args []string) {
 			if rootFlags.version {
-				printVersion()
+				util.PrintVersion()
 			} else {
-				runHelp(cmd, args)
+				_ = cmd.Help()
 			}
 		},
 	}
@@ -77,17 +76,12 @@ func NewRootCmd() *cobra.Command {
 		playground.NewPlaygroundCmd(ioStreams),
 		dbaas.NewDbaasCmd(f, ioStreams),
 		cluster.NewClusterCmd(f, ioStreams),
-		bench.NewBenchCmd(f),
+		bench.NewBenchCmd(),
 		backup.NewBackupCmd(f, ioStreams),
 	)
 
 	cobra.OnInitialize(initConfig)
 	return rootCmd
-}
-
-func runHelp(cmd *cobra.Command, args []string) {
-	//nolint
-	cmd.Help()
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -112,11 +106,4 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
-}
-
-func printVersion() {
-	fmt.Printf("dbctl version %s\n", version.GetVersion())
-	fmt.Printf("k3d version %s\n", version.K3dVersion)
-	fmt.Printf("k3s version %s (default)\n", strings.Replace(version.K3sImageTag, "-", "+", 1))
-	fmt.Printf("git commit %s (build date %s)\n", version.GitCommit, version.BuildDate)
 }

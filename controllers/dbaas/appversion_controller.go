@@ -59,17 +59,16 @@ func appVersionUpdateHandler(cli client.Client, ctx context.Context, clusterDef 
 			} else if len(noContainersComponents) > 0 {
 				statusMsgs = append(statusMsgs, fmt.Sprintf("spec.components[*].type %v missing spec.components[*].containers in ClusterDefinition.spec.components[*] and AppVersion.spec.components[*]", noContainersComponents))
 			}
+
 			if len(statusMsgs) > 0 {
-				item.Status.Message = strings.Join(statusMsgs, ";")
-			}
-			item.Status.ClusterDefSyncStatus = dbaasv1alpha1.OutOfSyncStatus
-			if len(notFoundComponentTypes) > 0 || len(noContainersComponents) > 0 {
 				item.Status.Phase = dbaasv1alpha1.UnavailablePhase
+				item.Status.Message = strings.Join(statusMsgs, ";")
 			} else {
 				item.Status.Phase = dbaasv1alpha1.AvailablePhase
 				item.Status.Message = ""
 			}
 			item.Status.ClusterDefGeneration = clusterDef.Generation
+			item.Status.ClusterDefSyncStatus = dbaasv1alpha1.OutOfSyncStatus
 			if err = cli.Status().Patch(ctx, &item, patch); err != nil {
 				return err
 			}
@@ -125,6 +124,10 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return nil, r.deleteExternalResources(reqCtx, appVersion)
 	})
 	if res != nil {
+		// when appVersion deleted, sync cluster.status.operations.upgradable
+		if err := r.syncClusterStatusOperationsWithUpgrade(ctx, appVersion); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
 		return *res, err
 	}
 
@@ -134,8 +137,7 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	clusterdefinition := &dbaasv1alpha1.ClusterDefinition{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
-		Namespace: appVersion.Namespace,
-		Name:      appVersion.Spec.ClusterDefinitionRef,
+		Name: appVersion.Spec.ClusterDefinitionRef,
 	}, clusterdefinition); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -146,6 +148,10 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 	appVersion.ObjectMeta.Labels[clusterDefLabelKey] = clusterdefinition.Name
 	if err = r.Client.Patch(reqCtx.Ctx, appVersion, patch); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	// when appVersion created, sync cluster.status.operations.upgradable
+	if err = r.syncClusterStatusOperationsWithUpgrade(ctx, appVersion); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
@@ -173,5 +179,39 @@ func (r *AppVersionReconciler) deleteExternalResources(reqCtx intctrlutil.Reques
 	//
 	// Ensure that delete implementation is idempotent and safe to invoke
 	// multiple times for same object.
+	return nil
+}
+
+// SyncClusterStatusOperationsWithUpgrade sync cluster status.operations.upgradable when delete or create AppVersion
+func (r *AppVersionReconciler) syncClusterStatusOperationsWithUpgrade(ctx context.Context, appVersion *dbaasv1alpha1.AppVersion) error {
+	var (
+		clusterList    = &dbaasv1alpha1.ClusterList{}
+		appVersionList = &dbaasv1alpha1.AppVersionList{}
+		upgradable     bool
+		err            error
+	)
+	// if not delete or create AppVersion, return
+	if appVersion.Status.ObservedGeneration != 0 && appVersion.GetDeletionTimestamp().IsZero() {
+		return nil
+	}
+	if err = r.Client.List(ctx, clusterList, client.MatchingLabels{clusterDefLabelKey: appVersion.Spec.ClusterDefinitionRef}); err != nil {
+		return err
+	}
+	if err = r.Client.List(ctx, appVersionList, client.MatchingLabels{clusterDefLabelKey: appVersion.Spec.ClusterDefinitionRef}); err != nil {
+		return err
+	}
+	if len(appVersionList.Items) > 1 {
+		upgradable = true
+	}
+	for _, v := range clusterList.Items {
+		if v.Status.Operations.Upgradable == upgradable {
+			continue
+		}
+		patch := client.MergeFrom(v.DeepCopy())
+		v.Status.Operations.Upgradable = upgradable
+		if err = r.Client.Status().Patch(ctx, &v, patch); err != nil {
+			return err
+		}
+	}
 	return nil
 }

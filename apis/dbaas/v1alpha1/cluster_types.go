@@ -72,11 +72,17 @@ type ClusterStatus struct {
 	// +kubebuilder:validation:Enum={Running,Failed,Creating,Updating,Deleting,Deleted}
 	Phase Phase `json:"phase,omitempty"`
 
+	// Message cluster details message in current phase
 	// +optional
 	Message string `json:"message,omitempty"`
 
+	// Components record the current status information of all components of the cluster
 	// +optional
-	Components []ClusterStatusComponent `json:"components,omitempty"`
+	Components map[string]*ClusterStatusComponent `json:"components,omitempty"`
+
+	// Operations declares which operations the cluster supports
+	// +optional
+	Operations Operations `json:"operations,omitempty"`
 
 	ClusterDefinitionStatusGeneration `json:",inline"`
 }
@@ -164,11 +170,22 @@ type ClusterRoleGroup struct {
 	Service corev1.ServiceSpec `json:"service,omitempty"`
 }
 
+// ClusterStatusComponent record components status information
 type ClusterStatusComponent struct {
-	ID         string                   `json:"id,omitempty"`
-	Type       string                   `json:"type,omitempty"`
-	Phase      string                   `json:"phase,omitempty"`
-	Message    string                   `json:"message,omitempty"`
+	// Type component type
+	// +optional
+	Type string `json:"type,omitempty"`
+
+	// Phase - in list of [Running, Failed, Creating, Updating, Deleting, Deleted]
+	// +kubebuilder:validation:Enum={Running,Failed,Creating,Updating,Deleting,Deleted}
+	Phase Phase `json:"phase,omitempty"`
+
+	// Message record the component details message in current phase
+	// +optional
+	Message string `json:"message,omitempty"`
+
+	// RoleGroups reference roleGroups in ClusterDefinition
+	// +optional
 	RoleGroups []ClusterStatusRoleGroup `json:"roleGroups,omitempty"`
 }
 
@@ -190,6 +207,46 @@ type Affinity struct {
 	// NodeLabels describe constrain which nodes pod can be scheduled on based on node labels
 	// +optional
 	NodeLabels map[string]string `json:"nodeLabels,omitempty"`
+}
+
+type Operations struct {
+	// Upgradable whether the cluster supports upgrade. if multiple appVersions existed, it is true
+	// +optional
+	Upgradable bool `json:"upgradable,omitempty"`
+
+	// VerticalScalable which components of the cluster support verticalScaling.
+	// +optional
+	VerticalScalable []string `json:"verticalScalable,omitempty"`
+
+	// Restartable which components of the cluster support restart.
+	// +optional
+	Restartable []string `json:"restartable,omitempty"`
+
+	// VolumeExpandable which components of the cluster and its volumeClaimTemplates support volumeExpansion.
+	// +optional
+	VolumeExpandable []*OperationComponent `json:"volumeExpandable,omitempty"`
+
+	// HorizontalScalable which components of the cluster support horizontalScaling, and the replicas range limit.
+	// +optional
+	HorizontalScalable []*OperationComponent `json:"horizontalScalable,omitempty"`
+}
+
+type OperationComponent struct {
+	// Name component name
+	// +kubebuilder:validation:Required
+	Name string `json:"name,omitempty"`
+
+	// Min minimum of replicas when operation is horizontalScaling,
+	// +optional
+	Min int `json:"min,omitempty"`
+
+	// Max maximum of replicas when operation is horizontalScaling
+	// +optional
+	Max int `json:"max,omitempty"`
+
+	// VolumeClaimTemplateNames which VolumeClaimTemplate of the component support volumeExpansion
+	// +optional
+	VolumeClaimTemplateNames []string `json:"volumeClaimTemplateNames,omitempty"`
 }
 
 func init() {

@@ -18,6 +18,7 @@ package dataprotection
 
 import (
 	"context"
+	"go/build"
 	"path/filepath"
 	"testing"
 
@@ -26,6 +27,7 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/rest"
@@ -61,7 +63,13 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths: []string{
+			filepath.Join("..", "..", "config", "crd", "bases"),
+			// use dependent external CRDs.
+			// resolved by ref: https://github.com/operator-framework/operator-sdk/issues/4434#issuecomment-786794418
+			filepath.Join(build.Default.GOPATH, "pkg", "mod", "github.com", "kubernetes-csi/external-snapshotter/",
+				"client/v6@v6.0.1", "config", "crd"),
+		},
 		ErrorIfCRDPathMissing: true,
 	}
 
@@ -72,6 +80,10 @@ var _ = BeforeSuite(func() {
 	Expect(cfg).NotTo(BeNil())
 
 	scheme := scheme.Scheme
+
+	err = snapshotv1.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+
 	err = dataprotectionv1alpha1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 

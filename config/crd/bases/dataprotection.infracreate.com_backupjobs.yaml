@@ -52,11 +52,12 @@ spec:
                 type: string
               backupType:
                 default: full
-                description: Backup Type. full or incremental. if unset, default is
-                  full.
+                description: Backup Type. full or incremental or snapshot. if unset,
+                  default is full.
                 enum:
                 - full
                 - incremental
+                - snapshot
                 type: string
               parentBackupJobName:
                 description: if backupType is incremental, parentBackupName is required.

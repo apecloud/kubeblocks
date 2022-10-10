@@ -209,11 +209,11 @@ func toK8sVolumeClaimTemplates(templates []dbaasv1alpha1.ClusterComponentVolumeC
 	return ts
 }
 
-func buildAffinityLabelSelector(clusterName string, componentType string, componentName string) *metav1.LabelSelector {
+func buildAffinityLabelSelector(clusterName string, componentName string) *metav1.LabelSelector {
 	return &metav1.LabelSelector{
 		MatchLabels: map[string]string{
 			appInstanceLabelKey:  fmt.Sprintf("%s-%s", clusterName, componentName),
-			appComponentLabelKey: fmt.Sprintf("%s-%s", componentType, componentName),
+			appComponentLabelKey: componentName,
 		},
 	}
 }
@@ -235,7 +235,7 @@ func buildTopologySpreadConstraints(
 			MaxSkew:           maxSkew,
 			WhenUnsatisfiable: whenUnsatisfiable,
 			TopologyKey:       topologyKey,
-			LabelSelector:     buildAffinityLabelSelector(cluster.Name, component.Type, component.Name),
+			LabelSelector:     buildAffinityLabelSelector(cluster.Name, component.Name),
 		})
 	}
 	return topologySpreadConstraints
@@ -272,7 +272,7 @@ func buildAffinity(
 	for _, topologyKey := range cluster.Spec.Affinity.TopologyKeys {
 		podAffinityTerms = append(podAffinityTerms, corev1.PodAffinityTerm{
 			TopologyKey:   topologyKey,
-			LabelSelector: buildAffinityLabelSelector(cluster.Name, component.Type, component.Name),
+			LabelSelector: buildAffinityLabelSelector(cluster.Name, component.Name),
 		})
 	}
 	if clusterDefComp.PodAntiAffinity == dbaasv1alpha1.Required {

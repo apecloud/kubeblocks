@@ -24,6 +24,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+
 	"github.com/leaanthony/debme"
 	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
@@ -573,8 +575,28 @@ func createOrReplaceResources(ctx context.Context,
 						Namespace: key.Namespace,
 						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 					}
-					if err := cli.Get(ctx, pvcKey, pvc); err != nil {
-						return err
+					var err error
+					if err = cli.Get(ctx, pvcKey, pvc); err != nil {
+						if !apierrors.IsNotFound(err) {
+							return err
+						}
+					}
+					// horizontal scaling
+					if apierrors.IsNotFound(err) {
+						ml := client.MatchingLabels{
+							clusterDefLabelKey: cluster.Spec.ClusterDefRef,
+						}
+						inNS := client.InNamespace(cluster.Namespace)
+						backupPolicyTemplateList := v1alpha1.BackupPolicyTemplateList{}
+						if err := cli.List(ctx, &backupPolicyTemplateList, inNS, ml); err != nil {
+							return err
+						}
+						if len(backupPolicyTemplateList.Items) == 0 {
+							return fmt.Errorf("backup policy template for cluster %s not found", cluster.Name)
+						}
+						if err := createBackup(ctx, cli, cluster, *stsObj, backupPolicyTemplateList.Items[0]); err != nil {
+							return err
+						}
 					}
 					if pvc.Spec.Resources.Requests[corev1.ResourceStorage] == vctProto.Spec.Resources.Requests[corev1.ResourceStorage] {
 						continue
@@ -1185,3 +1207,88 @@ func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder
 	// TODO process invalid data: e.g empty data
 	return tplBuilder.Render(cmObj.Data)
 }
+
+func createBackup(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, sts appsv1.StatefulSet, backupPolicyTemplate v1alpha1.BackupPolicyTemplate) error {
+	objs := []client.Object{}
+	backupPolicy, err := buildBackupPolicy(sts, backupPolicyTemplate)
+	if err != nil {
+		return err
+	}
+	objs = append(objs, backupPolicy)
+	backupJob, err := buildBackupJob(sts)
+	if err != nil {
+		return err
+	}
+	objs = append(objs, backupJob)
+	if err := createOrReplaceResources(ctx, cli, cluster, objs); err != nil {
+		return err
+	}
+	return nil
+}
+
+func buildBackupPolicy(sts appsv1.StatefulSet, template v1alpha1.BackupPolicyTemplate) (*v1alpha1.BackupPolicy, error) {
+	cueFS, _ := debme.FS(cueTemplates, "cue")
+
+	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("backup_policy_template.cue"))
+	if err != nil {
+		return nil, err
+	}
+
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+	stsStrByte, err := json.Marshal(sts)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("sts", stsStrByte); err != nil {
+		return nil, err
+	}
+
+	if err = cueValue.Fill("template", []byte(template.Name)); err != nil {
+		return nil, err
+	}
+
+	backupPolicyStrByte, err := cueValue.Lookup("backupPolicy")
+	if err != nil {
+		return nil, err
+	}
+
+	backupPolicy := v1alpha1.BackupPolicy{}
+	if err = json.Unmarshal(backupPolicyStrByte, &backupPolicy); err != nil {
+		return nil, err
+	}
+
+	return &backupPolicy, nil
+}
+
+func buildBackupJob(sts appsv1.StatefulSet) (*v1alpha1.BackupJob, error) {
+	cueFS, _ := debme.FS(cueTemplates, "cue")
+
+	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("backup_job_template.cue"))
+	if err != nil {
+		return nil, err
+	}
+
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+	stsStrByte, err := json.Marshal(sts)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("sts", stsStrByte); err != nil {
+		return nil, err
+	}
+
+	backupJobStrByte, err := cueValue.Lookup("backupJob")
+	if err != nil {
+		return nil, err
+	}
+
+	backupJob := v1alpha1.BackupJob{}
+	if err = json.Unmarshal(backupJobStrByte, &backupJob); err != nil {
+		return nil, err
+	}
+
+	return &backupJob, nil
+}
+
+// func createPVCFromSnapshot() {
+// }

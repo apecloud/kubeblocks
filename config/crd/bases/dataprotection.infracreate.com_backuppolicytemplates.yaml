@@ -42,6 +42,28 @@ spec:
                 description: which backup tool to perform database backup, only support
                   one tool.
                 type: string
+              hooks:
+                description: execute hook commands for backup.
+                properties:
+                  ContainerName:
+                    default: mysql
+                    description: which container can exec command
+                    type: string
+                  image:
+                    default: rancher/kubectl:v1.23.7
+                    description: 'exec command with image TODO(dsj): use opendbaas-core'
+                    type: string
+                  postCommands:
+                    description: post backup to perform commands
+                    items:
+                      type: string
+                    type: array
+                  preCommands:
+                    description: pre backup to perform commands
+                    items:
+                      type: string
+                    type: array
+                type: object
               onFailAttempted:
                 description: limit count of backup stop retries on fail. if unset,
                   retry unlimit attempted.
@@ -57,6 +79,7 @@ spec:
                 type: string
             required:
             - backupToolName
+            - hooks
             - schedule
             type: object
           status:

@@ -8087,7 +8087,7 @@ spec:
                       type: object
                     service:
                       description: Service defines the behavior of a service spec.
-                        provide readWrite service when ComponentType is Consensus
+                        provide read-write service when ComponentType is Consensus
                         https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
                       properties:
                         allocateLoadBalancerNodePorts:

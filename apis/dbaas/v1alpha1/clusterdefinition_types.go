@@ -121,7 +121,7 @@ type ClusterDefinitionComponent struct {
 	PodSpec *corev1.PodSpec `json:"podSpec,omitempty"`
 
 	// Service defines the behavior of a service spec.
-	// provide readWrite service when ComponentType is Consensus
+	// provide read-write service when ComponentType is Consensus
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Service corev1.ServiceSpec `json:"service,omitempty"`
@@ -231,9 +231,9 @@ type ClusterDefinitionProbe struct {
 }
 
 type ClusterDefinitionProbes struct {
-	RunningPorbe     ClusterDefinitionProbe `json:"runningProbe,omitempty"`
-	StatusPorbe      ClusterDefinitionProbe `json:"statusProbe,omitempty"`
-	RoleChangedPorbe ClusterDefinitionProbe `json:"roleChangedProbe,omitempty"`
+	RunningProbe     ClusterDefinitionProbe `json:"runningProbe,omitempty"`
+	StatusProbe      ClusterDefinitionProbe `json:"statusProbe,omitempty"`
+	RoleChangedProbe ClusterDefinitionProbe `json:"roleChangedProbe,omitempty"`
 }
 
 type ConsensusSetSpec struct {
@@ -284,7 +284,7 @@ type ConsensusMember struct {
 	// default Components[*].Replicas - Leader.Replicas - Learner.Replicas for Followers
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
-	Replicas int32 `json:"replicas,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
 }
 
 type AccessMode string

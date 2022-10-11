@@ -38,7 +38,7 @@ service: {
 		}
 		ports: component.service.ports
 		if component.service.type != _|_ {
-		  type:  component.service.type
+			type: component.service.type
 		}
 	}
 }

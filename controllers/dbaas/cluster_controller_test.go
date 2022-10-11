@@ -917,16 +917,16 @@ spec:
 				Eventually(func() bool {
 					err := startPortForward(kind, name, port)
 					if err != nil {
-						stopPortForward(name)
+						_ = stopPortForward(name)
 						return false
 					}
 					time.Sleep(interval)
 					role, err = observeRole(ip, port)
 					if err != nil {
-						stopPortForward(name)
+						_ = stopPortForward(name)
 						return false
 					}
-					stopPortForward(name)
+					_ = stopPortForward(name)
 
 					return true
 				}, timeout*2, interval*1).Should(BeTrue())
@@ -942,16 +942,16 @@ spec:
 				Eventually(func() bool {
 					err := startPortForward(kind, name, port)
 					if err != nil {
-						stopPortForward(name)
+						_ = stopPortForward(name)
 						return false
 					}
 					time.Sleep(interval)
 					role, err = observeRole(ip, port)
 					if err != nil {
-						stopPortForward(name)
+						_ = stopPortForward(name)
 						return false
 					}
-					stopPortForward(name)
+					_ = stopPortForward(name)
 
 					return true
 				}, timeout*2, interval*1).Should(BeTrue())

@@ -12,8 +12,9 @@ import (
 
 const (
 	LooseReversePathFilterValue = "2"
-
-	ErrAddressNotExists = "cannot assign requested address"
+	MainENIMark                 = 0x2000
+	ConnMarkRulePriority        = 1000
+	ErrAddressNotExists         = "cannot assign requested address"
 )
 
 type iptablesRule struct {

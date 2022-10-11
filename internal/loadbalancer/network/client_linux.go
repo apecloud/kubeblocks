@@ -445,3 +445,30 @@ func (c *networkClient) getLinkByMac(logger logr.Logger, mac string) (netlink.Li
 	}
 	return result, nil
 }
+func isRuleExistsError(err error) bool {
+	if errno, ok := err.(syscall.Errno); ok {
+		return errno == syscall.EEXIST
+	}
+	return false
+}
+
+func buildENIPolicyRoutingRule(eni *cloud.ENIMetadata) *netlink.Rule {
+	var (
+		mark = getENIConnMark(eni)
+	)
+	rule := netlink.NewRule()
+	rule.Mark = mark
+	rule.Mask = mark
+	rule.Table = getENIRouteTable(eni)
+	rule.Priority = ConnMarkRulePriority
+	rule.Family = unix.AF_INET
+	return rule
+}
+
+func getENIRouteTable(eni *cloud.ENIMetadata) int {
+	return eni.DeviceNumber + 10000
+}
+
+func getENIConnMark(eni *cloud.ENIMetadata) int {
+	return MainENIMark + eni.DeviceNumber
+}

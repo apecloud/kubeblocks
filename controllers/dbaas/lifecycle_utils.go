@@ -594,7 +594,11 @@ func createOrReplaceResources(ctx context.Context,
 						if len(backupPolicyTemplateList.Items) == 0 {
 							return fmt.Errorf("backup policy template for cluster %s not found", cluster.Name)
 						}
+						// TODO chantu: check volume snapshot support
 						if err := createBackup(ctx, cli, cluster, *stsObj, backupPolicyTemplateList.Items[0]); err != nil {
+							return err
+						}
+						if err := createPVCFromSnapshot(ctx, cli, cluster, *stsObj, pvcKey); err != nil {
 							return err
 						}
 					}
@@ -1290,5 +1294,53 @@ func buildBackupJob(sts appsv1.StatefulSet) (*v1alpha1.BackupJob, error) {
 	return &backupJob, nil
 }
 
-// func createPVCFromSnapshot() {
-// }
+func createPVCFromSnapshot(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, sts appsv1.StatefulSet, pvcKey types.NamespacedName) error {
+	objs := []client.Object{}
+	pvc, err := buildPVCFromSnapshot(sts, pvcKey)
+	if err != nil {
+		return err
+	}
+	objs = append(objs, pvc)
+	if err := createOrReplaceResources(ctx, cli, cluster, objs); err != nil {
+		return err
+	}
+	return nil
+}
+
+func buildPVCFromSnapshot(sts appsv1.StatefulSet, pvcKey types.NamespacedName) (*corev1.PersistentVolumeClaim, error) {
+	cueFS, _ := debme.FS(cueTemplates, "cue")
+
+	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("pvc_template.cue"))
+	if err != nil {
+		return nil, err
+	}
+
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+	stsStrByte, err := json.Marshal(sts)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("sts", stsStrByte); err != nil {
+		return nil, err
+	}
+
+	pvcKeyStrByte, err := json.Marshal(pvcKey)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("pvc_key", pvcKeyStrByte); err != nil {
+		return nil, err
+	}
+
+	pvcStrByte, err := cueValue.Lookup("pvc")
+	if err != nil {
+		return nil, err
+	}
+
+	pvc := corev1.PersistentVolumeClaim{}
+	if err = json.Unmarshal(pvcStrByte, &pvc); err != nil {
+		return nil, err
+	}
+
+	return &pvc, nil
+}

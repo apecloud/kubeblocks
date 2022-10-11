@@ -2,10 +2,12 @@ package network
 
 import (
 	"fmt"
+
+	"github.com/go-logr/logr"
+
 	iptableswrapper "github.com/apecloud/kubeblocks/internal/loadbalancer/iptables"
 	netlinkwrapper "github.com/apecloud/kubeblocks/internal/loadbalancer/netlink"
 	procfswrapper "github.com/apecloud/kubeblocks/internal/loadbalancer/procfs"
-	"github.com/go-logr/logr"
 )
 
 const (

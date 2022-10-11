@@ -45,7 +45,7 @@ func NewNode(logger logr.Logger, ip string, nc pb.NodeClient, cp cloud.Provider)
 		nc:     nc,
 		ip:     ip,
 		cp:     cp,
-		logger: logger,
+		logger: logger.WithValues("ip", ip),
 	}, nil
 }
 

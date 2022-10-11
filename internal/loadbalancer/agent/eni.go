@@ -182,7 +182,6 @@ func (c *eniManager) getManagedENIs() ([]*pb.ENIMetadata, error) {
 
 func (c *eniManager) filterManagedENIs(enis map[string]*pb.ENIMetadata) []*pb.ENIMetadata {
 	var (
-		ids            []string
 		managedENIList []*pb.ENIMetadata
 	)
 	for eniId, eni := range enis {
@@ -190,7 +189,11 @@ func (c *eniManager) filterManagedENIs(enis map[string]*pb.ENIMetadata) []*pb.EN
 			continue
 		}
 
-		ids = append(ids, eniId)
+		// ignore primary ENI even if tagged
+		if eni.DeviceNumber == 0 {
+			continue
+		}
+
 		managedENIList = append(managedENIList, enis[eniId])
 	}
 	return managedENIList

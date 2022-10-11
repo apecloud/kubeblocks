@@ -435,7 +435,7 @@ install-docker-buildx: ## Create `docker buildx` builder.
 	docker buildx create --platform linux/amd64,linux/arm64 --name x-builder --driver docker-container --use
 
 .PHONY: golangci
-golangci: GOLANGCILINT_VERSION = 1.49.0
+golangci: GOLANGCILINT_VERSION = v1.49.0
 golangci: ## Download golangci-lint locally if necessary.
 ifneq ($(shell which golangci-lint),)
 	echo golangci-lint is already installed

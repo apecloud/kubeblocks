@@ -24,6 +24,7 @@ limitations under the License.
 // TODO handle endpoint controller
 // TODO define FloatingIP CRD
 // TODO implement device plugin to report floating ip resources
+// TODO move DescribeAllENIs from agent to controller
 
 package main
 
@@ -68,9 +69,6 @@ import (
 const (
 	appName      = "loadbalancer-controller"
 	RFC3339Mills = "2006-01-02T15:04:05.000"
-
-	EnvRPCPort     = "RPC_PORT"
-	EnvEnableDebug = "ENABLE_DEBUG"
 )
 
 var (
@@ -88,8 +86,6 @@ func init() {
 	viper.AddConfigPath(fmt.Sprintf("$HOME/.%s", appName)) // call multiple times to add many search paths
 	viper.AddConfigPath(".")                               // optionally look for config in the working directory
 	viper.AutomaticEnv()
-	_ = viper.BindEnv(EnvEnableDebug)
-	_ = viper.BindEnv(EnvRPCPort)
 
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
 }
@@ -226,6 +222,6 @@ func pprofListening(logger logr.Logger) {
 	if err != nil {
 		panic(err)
 	}
-	logger.Info("")
+	logger.Info("Starting pprof", "addr", l.Addr().String())
 	_ = http.Serve(l, nil)
 }

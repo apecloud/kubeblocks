@@ -107,8 +107,8 @@ type ConfigTemplate struct {
 type PodAntiAffinity string
 
 const (
-	Preferred PodAntiAffinity = "preferred"
-	Required  PodAntiAffinity = "required"
+	Preferred PodAntiAffinity = "Preferred"
+	Required  PodAntiAffinity = "Required"
 )
 
 type ClusterDefinitionComponent struct {
@@ -143,8 +143,8 @@ type ClusterDefinitionComponent struct {
 	// Defaults to Preferred
 	// Preferred means try spread pods by topologyKey
 	// Required means must spread pods by topologyKey
-	// +kubebuilder:default=preferred
-	// +kubebuilder:validation:Enum={preferred,required}
+	// +kubebuilder:default=Preferred
+	// +kubebuilder:validation:Enum={Preferred,Required}
 	PodAntiAffinity PodAntiAffinity `json:"podAntiAffinity,omitempty"`
 
 	// TopologySpreadConstraint describes how a group of pods ought to spread across topology domains

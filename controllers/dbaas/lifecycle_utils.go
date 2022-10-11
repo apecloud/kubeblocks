@@ -479,9 +479,10 @@ func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{
 	return nil
 }
 
+// TODO multi roles with same accessMode support
 func addSelectorLabels(service *corev1.Service, component *Component, accessMode dbaasv1alpha1.AccessMode) {
 	addSelector := func(service *corev1.Service, member dbaasv1alpha1.ConsensusMember, accessMode dbaasv1alpha1.AccessMode) {
-		if member.AccessMode == accessMode {
+		if member.AccessMode == accessMode && len(member.Name) > 0 {
 			service.Spec.Selector[consensusSetRoleLabelKey] = member.Name
 		}
 	}

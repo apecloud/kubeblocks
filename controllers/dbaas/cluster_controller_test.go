@@ -21,6 +21,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"net"
 	"os/exec"
 	"reflect"
 	"strconv"
@@ -848,53 +849,88 @@ spec:
 			By("By waiting the cluster is created")
 			cluster := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
-				Expect(k8sClient.Get(context.Background(), key, cluster)).Should(Succeed())
+				err := k8sClient.Get(context.Background(), key, cluster)
+				if err != nil {
+					return false
+				}
 
 				return cluster.Status.Phase == dbaasv1alpha1.RunningPhase
 			}, timeout*3, interval*5).Should(BeTrue())
 
 			By("By checking pods' role label")
-			observeRole := func(ip string, port int32) string {
+			observeRole := func(ip string, port int32) (string, error) {
 				url := "root@tcp(" + ip + ":" + strconv.Itoa(int(port)) + ")/information_schema?allowNativePasswords=true"
 				sql := "select role from information_schema.wesql_cluster_local"
 				mysql := &Mysql{}
 				params := map[string]string{connectionURLKey: url}
-				Expect(mysql.Init(params)).Should(Succeed())
+				err := mysql.Init(params)
+				if err != nil {
+					return "", err
+				}
 
 				result, err := mysql.query(context.Background(), sql)
-				Expect(err).Should(BeNil())
-				Expect(len(result)).Should(Equal(1))
+				if err != nil {
+					return "", err
+				}
+				if len(result) != 1 {
+					return "", errors.New("only one role should be observed")
+				}
 				row, ok := result[0].(map[string]interface{})
-				Expect(ok).Should(BeTrue())
+				if !ok {
+					return "", errors.New("query result wrong type")
+				}
 				role, ok := row["role"].(string)
-				Expect(ok).Should(BeTrue())
-				Expect(role).ShouldNot(BeEmpty())
+				if !ok {
+					return "", errors.New("role parsing error")
+				}
+				if len(role) == 0 {
+					return "", errors.New("got empty role")
+				}
 
-				Expect(mysql.Close()).Should(Succeed())
+				err = mysql.Close()
+				role = strings.ToLower(role)
+				if err != nil {
+					return role, err
+				}
 
-				return strings.ToLower(role)
+				return role, nil
 			}
 
-			startPortForward := func(kind, name string, port int32) {
+			startPortForward := func(kind, name string, port int32) error {
 				portStr := strconv.Itoa(int(port))
-				cmd := exec.Command("bash", "-c", "kubectl port-forward "+kind+"/"+name+" "+portStr+":"+portStr)
-				err := cmd.Start()
-				Expect(err).Should(Succeed())
+				cmd := exec.Command("bash", "-c", "kubectl port-forward "+kind+"/"+name+" --address 0.0.0.0 "+portStr+":"+portStr+" &")
+				return cmd.Start()
 			}
 
-			stopPortForward := func(name string) {
+			stopPortForward := func(name string) error {
 				cmd := exec.Command("bash", "-c", "ps aux | grep port-forward | grep -v grep | grep "+name+" | awk '{print $2}' | xargs kill -9")
-				Expect(cmd.Run()).Should(Succeed())
+				return cmd.Run()
 			}
 
-			ip := "127.0.0.1"
+			ip := getLocalIP()
+			Expect(ip).ShouldNot(BeEmpty())
 			observeRoleOfPod := func(pod *corev1.Pod) string {
 				kind := "pod"
 				name := pod.Name
 				port := pod.Spec.Containers[0].Ports[0].ContainerPort
-				startPortForward(kind, name, port)
-				role := observeRole(ip, port)
-				stopPortForward(name)
+				role := ""
+				Eventually(func() bool {
+					err := startPortForward(kind, name, port)
+					if err != nil {
+						stopPortForward(name)
+						return false
+					}
+					time.Sleep(interval)
+					role, err = observeRole(ip, port)
+					if err != nil {
+						stopPortForward(name)
+						return false
+					}
+					stopPortForward(name)
+
+					return true
+				}, timeout*2, interval*1).Should(BeTrue())
+
 				return role
 			}
 
@@ -902,9 +938,24 @@ spec:
 				kind := "svc"
 				name := svc.Name
 				port := svc.Spec.Ports[0].Port
-				startPortForward(kind, name, port)
-				role := observeRole(ip, port)
-				stopPortForward(name)
+				role := ""
+				Eventually(func() bool {
+					err := startPortForward(kind, name, port)
+					if err != nil {
+						stopPortForward(name)
+						return false
+					}
+					time.Sleep(interval)
+					role, err = observeRole(ip, port)
+					if err != nil {
+						stopPortForward(name)
+						return false
+					}
+					stopPortForward(name)
+
+					return true
+				}, timeout*2, interval*1).Should(BeTrue())
+
 				return role
 			}
 
@@ -1053,6 +1104,22 @@ func hasStorage(assureDefaultStorageClassObj func() *storagev1.StorageClass) boo
 	}
 
 	return true
+}
+
+func getLocalIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+	for _, address := range addrs {
+		// check the address type and if it is not a loopback the display it
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+	return ""
 }
 
 const (

@@ -384,6 +384,7 @@ func mergeComponents(
 			}
 		}
 	}
+	affinity := cluster.Spec.Affinity
 	if clusterComp != nil {
 		component.Name = clusterComp.Name
 		if clusterComp.VolumeClaimTemplates != nil {
@@ -393,11 +394,14 @@ func mergeComponents(
 			component.PodSpec.Containers[0].Resources = clusterComp.Resources
 		}
 		component.RoleGroups = clusterComp.RoleGroups
+		if clusterComp.Affinity != nil {
+			affinity = clusterComp.Affinity
+		}
 	}
-	if component.PodSpec.Affinity == nil && cluster.Spec.Affinity != nil {
+	if component.PodSpec.Affinity == nil && affinity != nil {
 		component.PodSpec.Affinity = buildAffinity(cluster, component)
 	}
-	if len(component.PodSpec.TopologySpreadConstraints) == 0 && cluster.Spec.Affinity != nil {
+	if len(component.PodSpec.TopologySpreadConstraints) == 0 && affinity != nil {
 		component.PodSpec.TopologySpreadConstraints = buildTopologySpreadConstraints(cluster, component)
 	}
 

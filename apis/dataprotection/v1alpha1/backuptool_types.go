@@ -69,9 +69,20 @@ type BackupToolSpec struct {
 	// +optional
 	IncrementalBackupCommands []string `json:"incrementalBackupCommands,omitempty"`
 
+	// backup tool can support physical restore, in this case, restore must be RESTART database.
+	// +kubebuilder:validation:Required
+	Physical BackupToolRestoreCommand `json:"physical"`
+
+	// backup tool can support logical restore, in this case, restore NOT RESTART database.
+	// +optional
+	Logical BackupToolRestoreCommand `json:"logical,omitempty"`
+}
+
+// BackupToolRestoreCommand defines the restore commands of BackupTool
+type BackupToolRestoreCommand struct {
 	// Array of command that dbaas can perform database restore.
 	// like xtrabackup, that can performs restore mysql from files.
-	// +kubebuilder:validation:Required
+	// +optional
 	RestoreCommands []string `json:"restoreCommands"`
 
 	// Array of incremental restore commands.

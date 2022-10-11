@@ -39,8 +39,6 @@ func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-// TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-
 //+kubebuilder:webhook:path=/mutate-dbaas-infracreate-com-v1alpha1-cluster,mutating=true,failurePolicy=fail,sideEffects=None,groups=dbaas.infracreate.com,resources=clusters,verbs=create;update,versions=v1alpha1,name=mcluster.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Defaulter = &Cluster{}
@@ -94,10 +92,7 @@ func (r *Cluster) validate() error {
 
 	r.validateAppVersionRef(&allErrs)
 
-	err := webhookMgr.client.Get(ctx, types.NamespacedName{
-		Namespace: r.Namespace,
-		Name:      r.Spec.ClusterDefRef,
-	}, clusterDef)
+	err := webhookMgr.client.Get(ctx, types.NamespacedName{Name: r.Spec.ClusterDefRef}, clusterDef)
 
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterDefinitionRef"),

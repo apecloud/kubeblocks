@@ -189,7 +189,7 @@ mod-vendor: ## Run go mod tidy->vendor->verify against go modules.
 	$(GO) mod verify
 
 .PHONY: ctrl-test-current-ctx
-ctrl-test-current-ctx: manifests generate fmt vet ## Run operator controller tests with current $KUBECONFIG context
+ctrl-test-current-ctx: manifests generate fmt vet ## Run operator controller tests with current $KUBECONFIG context.
 	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./controllers/... -coverprofile cover.out
 
 .PHONY: test
@@ -551,7 +551,7 @@ HOSTPATHPLUGIN_IMG=$(MINIKUBE_IMAGE_REPO)/hostpathplugin:v1.6.0
 .PHONY: minikube-start
 minikube-start: DOCKER_PULL_CMD=ssh --native-ssh=false docker pull
 minikube-start: minikube ## Start minikube cluster.
-ifeq (, $(shell $(MINIKUBE) status -ojson | jq -r '.Host' | grep Running))
+ifeq (, $(shell $(MINIKUBE) status -n minikube -ojson | jq -r '.Host' | grep Running))
 	$(MINIKUBE) start --kubernetes-version=$(K8S_VERSION) --registry-mirror=${REGISTRY_MIRROR} --image-repository=${MINIKUBE_IMAGE_REPO}
 endif
 	$(MINIKUBE) update-context
@@ -569,6 +569,7 @@ endif
 	$(MINIKUBE) addons enable csi-hostpath-driver
 	kubectl patch storageclass standard -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
 	kubectl patch storageclass csi-hostpath-sc -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+	kubectl patch volumesnapshotclass/csi-hostpath-snapclass --type=merge -p '{"metadata": {"annotations": {"snapshot.storage.kubernetes.io/is-default-class": "true"}}}'
 
 
 .PHONY: minikube-delete

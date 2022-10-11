@@ -16,7 +16,11 @@ limitations under the License.
 
 package dataprotection
 
+import "time"
+
 const (
 	// name of our custom finalizer
 	dataProtectionFinalizerName = "dataprotection.infracreate.com/finalizer"
 )
+
+const reconcileInterval = time.Second * 5

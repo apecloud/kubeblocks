@@ -220,19 +220,19 @@ func buildAffinityLabelSelector(clusterName string, componentName string) *metav
 
 func buildTopologySpreadConstraints(
 	cluster *dbaasv1alpha1.Cluster,
-	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
 	component *Component,
 ) []corev1.TopologySpreadConstraint {
 	var topologySpreadConstraints []corev1.TopologySpreadConstraint
-	var maxSkew int32 = 1
-	whenUnsatisfiable := corev1.DoNotSchedule
-	if clusterDefComp.TopologySpreadConstraint != nil {
-		maxSkew = clusterDefComp.TopologySpreadConstraint.MaxSkew
-		whenUnsatisfiable = clusterDefComp.TopologySpreadConstraint.WhenUnsatisfiable
+
+	var whenUnsatisfiable corev1.UnsatisfiableConstraintAction
+	if cluster.Spec.Affinity.PodAntiAffinity != dbaasv1alpha1.Required {
+		whenUnsatisfiable = corev1.DoNotSchedule
+	} else {
+		whenUnsatisfiable = corev1.ScheduleAnyway
 	}
 	for _, topologyKey := range cluster.Spec.Affinity.TopologyKeys {
 		topologySpreadConstraints = append(topologySpreadConstraints, corev1.TopologySpreadConstraint{
-			MaxSkew:           maxSkew,
+			MaxSkew:           1,
 			WhenUnsatisfiable: whenUnsatisfiable,
 			TopologyKey:       topologyKey,
 			LabelSelector:     buildAffinityLabelSelector(cluster.Name, component.Name),
@@ -243,17 +243,17 @@ func buildTopologySpreadConstraints(
 
 func buildAffinity(
 	cluster *dbaasv1alpha1.Cluster,
-	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
 	component *Component,
 ) *corev1.Affinity {
 	affinity := new(corev1.Affinity)
 	// Build NodeAffinity
 	var matchExpressions []corev1.NodeSelectorRequirement
 	for key, value := range cluster.Spec.Affinity.NodeLabels {
+		values := strings.Split(value, ",")
 		matchExpressions = append(matchExpressions, corev1.NodeSelectorRequirement{
 			Key:      key,
 			Operator: corev1.NodeSelectorOpIn,
-			Values:   []string{value},
+			Values:   values,
 		})
 	}
 	if len(matchExpressions) > 0 {
@@ -275,7 +275,7 @@ func buildAffinity(
 			LabelSelector: buildAffinityLabelSelector(cluster.Name, component.Name),
 		})
 	}
-	if clusterDefComp.PodAntiAffinity == dbaasv1alpha1.Required {
+	if cluster.Spec.Affinity.PodAntiAffinity == dbaasv1alpha1.Required {
 		podAntiAffinity = &corev1.PodAntiAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: podAffinityTerms,
 		}
@@ -293,7 +293,6 @@ func buildAffinity(
 	}
 	affinity.PodAntiAffinity = podAntiAffinity
 	return affinity
-
 }
 
 func mergeComponents(
@@ -306,22 +305,20 @@ func mergeComponents(
 		return nil
 	}
 	component := &Component{
-		ClusterDefName:           clusterDef.Name,
-		ClusterType:              clusterDef.Spec.Type,
-		Name:                     clusterDefComp.TypeName,
-		Type:                     clusterDefComp.TypeName,
-		RoleGroupNames:           clusterDefComp.RoleGroups,
-		MinAvailable:             clusterDefComp.MinAvailable,
-		MaxAvailable:             clusterDefComp.MaxAvailable,
-		DefaultReplicas:          clusterDefComp.DefaultReplicas,
-		IsStateless:              clusterDefComp.IsStateless,
-		PodAntiAffinity:          clusterDefComp.PodAntiAffinity,
-		TopologySpreadConstraint: clusterDefComp.TopologySpreadConstraint,
-		IsQuorum:                 clusterDefComp.IsQuorum,
-		Strategies:               clusterDefComp.Strategies,
-		PodSpec:                  clusterDefComp.PodSpec,
-		Service:                  clusterDefComp.Service,
-		Scripts:                  clusterDefComp.Scripts,
+		ClusterDefName:  clusterDef.Name,
+		ClusterType:     clusterDef.Spec.Type,
+		Name:            clusterDefComp.TypeName,
+		Type:            clusterDefComp.TypeName,
+		RoleGroupNames:  clusterDefComp.RoleGroups,
+		MinAvailable:    clusterDefComp.MinAvailable,
+		MaxAvailable:    clusterDefComp.MaxAvailable,
+		DefaultReplicas: clusterDefComp.DefaultReplicas,
+		IsStateless:     clusterDefComp.IsStateless,
+		IsQuorum:        clusterDefComp.IsQuorum,
+		Strategies:      clusterDefComp.Strategies,
+		PodSpec:         clusterDefComp.PodSpec,
+		Service:         clusterDefComp.Service,
+		Scripts:         clusterDefComp.Scripts,
 	}
 
 	if appVerComp != nil && appVerComp.PodSpec.Containers != nil {
@@ -397,11 +394,11 @@ func mergeComponents(
 		}
 		component.RoleGroups = clusterComp.RoleGroups
 	}
-	if component.PodSpec.Affinity == nil {
-		component.PodSpec.Affinity = buildAffinity(cluster, clusterDefComp, component)
+	if component.PodSpec.Affinity == nil && cluster.Spec.Affinity != nil {
+		component.PodSpec.Affinity = buildAffinity(cluster, component)
 	}
-	if len(component.PodSpec.TopologySpreadConstraints) == 0 {
-		component.PodSpec.TopologySpreadConstraints = buildTopologySpreadConstraints(cluster, clusterDefComp, component)
+	if len(component.PodSpec.TopologySpreadConstraints) == 0 && cluster.Spec.Affinity != nil {
+		component.PodSpec.TopologySpreadConstraints = buildTopologySpreadConstraints(cluster, component)
 	}
 
 	// TODO(zhixu.zt) We need to reserve the VolumeMounts of the container for ConfigMap or Secret,

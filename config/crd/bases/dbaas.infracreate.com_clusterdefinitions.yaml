@@ -131,15 +131,6 @@ spec:
                       default: 0
                       minimum: 0
                       type: integer
-                    podAntiAffinity:
-                      default: Preferred
-                      description: PodAntiAffinity defines pods of component anti-affnity
-                        Defaults to Preferred Preferred means try spread pods by topologyKey
-                        Required means must spread pods by topologyKey
-                      enum:
-                      - Preferred
-                      - Required
-                      type: string
                     podSpec:
                       description: podSpec of final workload
                       properties:
@@ -8005,26 +7996,6 @@ spec:
                                 type: string
                               type: array
                           type: object
-                      type: object
-                    topologySpreadConstraint:
-                      description: TopologySpreadConstraint describes how a group
-                        of pods ought to spread across topology domains
-                      properties:
-                        maxSkew:
-                          default: 1
-                          description: MaxSkew describes the degree to which Pods
-                            may be unevenly distributed
-                          format: int32
-                          minimum: 1
-                          type: integer
-                        whenUnsatisfiable:
-                          default: DoNotSchedule
-                          description: WhenUnsatisfiable indicates how to deal with
-                            a Pod if it doesn't satisfy the spread constraint
-                          enum:
-                          - DoNotSchedule
-                          - ScheduleAnyway
-                          type: string
                       type: object
                     typeName:
                       maxLength: 12

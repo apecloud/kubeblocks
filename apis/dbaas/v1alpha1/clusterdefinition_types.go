@@ -104,13 +104,6 @@ type ConfigTemplate struct {
 	VolumeName string `json:"volumeName,omitempty"`
 }
 
-type PodAntiAffinity string
-
-const (
-	Preferred PodAntiAffinity = "Preferred"
-	Required  PodAntiAffinity = "Required"
-)
-
 type ClusterDefinitionComponent struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
@@ -138,18 +131,6 @@ type ClusterDefinitionComponent struct {
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster
 	// +optional
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
-
-	// PodAntiAffinity defines pods of component anti-affnity
-	// Defaults to Preferred
-	// Preferred means try spread pods by topologyKey
-	// Required means must spread pods by topologyKey
-	// +kubebuilder:default=Preferred
-	// +kubebuilder:validation:Enum={Preferred,Required}
-	PodAntiAffinity PodAntiAffinity `json:"podAntiAffinity,omitempty"`
-
-	// TopologySpreadConstraint describes how a group of pods ought to spread across topology domains
-	// +optional
-	TopologySpreadConstraint *TopologySpreadConstraint `json:"topologySpreadConstraint,omitempty"`
 
 	// isQuorum defines odd number of pods & N/2+1 pods
 	// +kubebuilder:default=false
@@ -269,32 +250,6 @@ type ClusterDefinitionStatusGeneration struct {
 	// +kubebuilder:validation:Enum={InSync,OutOfSync}
 	// +optional
 	ClusterDefSyncStatus Status `json:"clusterDefSyncStatus,omitempty"`
-}
-
-// UnsatisfiableConstraintAction +enum
-type UnsatisfiableConstraintAction string
-
-const (
-	// DoNotSchedule instructs the scheduler not to schedule the pod
-	// when constraints are not satisfied.
-	DoNotSchedule UnsatisfiableConstraintAction = "DoNotSchedule"
-	// ScheduleAnyway instructs the scheduler to schedule the pod
-	// even if constraints are not satisfied.
-	ScheduleAnyway UnsatisfiableConstraintAction = "ScheduleAnyway"
-)
-
-// TopologySpreadConstraint specifies how to spread matching pods among the given topology.
-// It is a minimal version of corev1.TopologySpreadConstraint to avoid to add too many fields of API
-// Refer to https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints
-type TopologySpreadConstraint struct {
-	// MaxSkew describes the degree to which Pods may be unevenly distributed
-	// +kubebuilder:default=1
-	// +kubebuilder:validation:Minimum=1
-	MaxSkew int32 `json:"maxSkew,omitempty"`
-	// WhenUnsatisfiable indicates how to deal with a Pod if it doesn't satisfy the spread constraint
-	// +kubebuilder:default=DoNotSchedule
-	// +kubebuilder:validation:Enum={DoNotSchedule,ScheduleAnyway}
-	WhenUnsatisfiable corev1.UnsatisfiableConstraintAction `json:"whenUnsatisfiable,omitempty"`
 }
 
 func init() {

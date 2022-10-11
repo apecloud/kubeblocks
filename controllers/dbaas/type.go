@@ -40,24 +40,22 @@ const (
 )
 
 type Component struct {
-	ClusterDefName           string                                    `json:"clusterDefName,omitempty"`
-	ClusterType              string                                    `json:"clusterType,omitempty"`
-	Name                     string                                    `json:"name,omitempty"`
-	Type                     string                                    `json:"type,omitempty"`
-	RoleGroupNames           []string                                  `json:"roleGroupNames,omitempty"`
-	RoleGroups               []dbaasv1alpha1.ClusterRoleGroup          `json:"roleGroups,omitempty"`
-	MinAvailable             int                                       `json:"minAvailable,omitempty"`
-	MaxAvailable             int                                       `json:"maxAvailable,omitempty"`
-	DefaultReplicas          int                                       `json:"defaultReplicas,omitempty"`
-	IsStateless              bool                                      `json:"isStateless,omitempty"`
-	PodAntiAffinity          dbaasv1alpha1.PodAntiAffinity             `json:"podAntiAffinity,omitempty"`
-	TopologySpreadConstraint *dbaasv1alpha1.TopologySpreadConstraint   `json:"topologySpreadConstraint,omitempty"`
-	IsQuorum                 bool                                      `json:"isQuorum,omitempty"`
-	Strategies               dbaasv1alpha1.ClusterDefinitionStrategies `json:"strategies,omitempty"`
-	PodSpec                  *corev1.PodSpec                           `json:"podSpec,omitempty"`
-	Service                  corev1.ServiceSpec                        `json:"service,omitempty"`
-	Scripts                  dbaasv1alpha1.ClusterDefinitionScripts    `json:"scripts,omitempty"`
-	VolumeClaimTemplates     []corev1.PersistentVolumeClaimTemplate    `json:"volumeClaimTemplates,omitempty"`
+	ClusterDefName       string                                    `json:"clusterDefName,omitempty"`
+	ClusterType          string                                    `json:"clusterType,omitempty"`
+	Name                 string                                    `json:"name,omitempty"`
+	Type                 string                                    `json:"type,omitempty"`
+	RoleGroupNames       []string                                  `json:"roleGroupNames,omitempty"`
+	RoleGroups           []dbaasv1alpha1.ClusterRoleGroup          `json:"roleGroups,omitempty"`
+	MinAvailable         int                                       `json:"minAvailable,omitempty"`
+	MaxAvailable         int                                       `json:"maxAvailable,omitempty"`
+	DefaultReplicas      int                                       `json:"defaultReplicas,omitempty"`
+	IsStateless          bool                                      `json:"isStateless,omitempty"`
+	IsQuorum             bool                                      `json:"isQuorum,omitempty"`
+	Strategies           dbaasv1alpha1.ClusterDefinitionStrategies `json:"strategies,omitempty"`
+	PodSpec              *corev1.PodSpec                           `json:"podSpec,omitempty"`
+	Service              corev1.ServiceSpec                        `json:"service,omitempty"`
+	Scripts              dbaasv1alpha1.ClusterDefinitionScripts    `json:"scripts,omitempty"`
+	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate    `json:"volumeClaimTemplates,omitempty"`
 }
 
 type RoleGroup struct {

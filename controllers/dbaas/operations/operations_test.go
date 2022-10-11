@@ -193,12 +193,6 @@ spec:
 			Name:      "cluster" + randomStr,
 			Namespace: "default",
 		}
-		affinity := dbaasv1alpha1.Affinity{
-			TopologyKeys: []string{"testTopologyKey"},
-			NodeLabels: map[string]string{
-				"testLabelKey": "testLabelValue",
-			},
-		}
 		storageClassName := "csi-hostpath-sc"
 
 		return &dbaasv1alpha1.Cluster{
@@ -213,7 +207,6 @@ spec:
 			Spec: dbaasv1alpha1.ClusterSpec{
 				ClusterDefRef: clusterDefObj.GetName(),
 				AppVersionRef: appVersionObj.GetName(),
-				Affinity:      affinity,
 				Components: []dbaasv1alpha1.ClusterComponent{
 					{
 						Name: "replicasets",

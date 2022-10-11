@@ -60,3 +60,7 @@ func (l LocalTrafficPolicy) ChooseNode(svc *corev1.Service) (string, error) {
 	l.logger.Info("Found master pods", "count", len(pods.Items))
 	return pods.Items[0].Status.HostIP, nil
 }
+
+func getServiceFullName(service *corev1.Service) string {
+	return fmt.Sprintf("%s/%s", service.GetNamespace(), service.GetName())
+}

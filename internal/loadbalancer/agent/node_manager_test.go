@@ -20,7 +20,8 @@ var _ = Describe("NodeManager", func() {
 			logger: logger,
 			nodes: map[string]Node{
 				node1IP: &node{
-					eniManager: &eniManager{resource: &NodeResource{
+					ip: node1IP,
+					em: &eniManager{resource: &NodeResource{
 						TotalPrivateIPs: 6,
 						UsedPrivateIPs:  1,
 						SubnetIds: map[string]map[string]*pb.ENIMetadata{
@@ -29,7 +30,8 @@ var _ = Describe("NodeManager", func() {
 					}},
 				},
 				node2IP: &node{
-					eniManager: &eniManager{resource: &NodeResource{
+					ip: node2IP,
+					em: &eniManager{resource: &NodeResource{
 						TotalPrivateIPs: 6,
 						UsedPrivateIPs:  4,
 						SubnetIds: map[string]map[string]*pb.ENIMetadata{

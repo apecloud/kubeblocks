@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"math"
+
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -15,12 +17,15 @@ var _ = Describe("Node", func() {
 		mockNodeClient := mock_protocol.NewMockNodeClient(ctrl)
 		mockProvider := mockcloud.NewMockProvider(ctrl)
 		em := &eniManager{
-			cp: mockProvider,
+			maxIPsPerENI: math.MaxInt,
+			cp:           mockProvider,
+			nc:           mockNodeClient,
 		}
 		node := &node{
-			eniManager: em,
-			nc:         mockNodeClient,
-			cp:         mockProvider,
+			em:     em,
+			nc:     mockNodeClient,
+			cp:     mockProvider,
+			logger: logger,
 		}
 		return node, em, mockNodeClient, mockProvider
 	}
@@ -29,7 +34,7 @@ var _ = Describe("Node", func() {
 		It("", func() {
 
 			node, _, mockNodeClient, _ := setup()
-			mockNodeClient.EXPECT().DescribeAllENIs(gomock.Any(), gomock.Any()).Return(getMockENIs(), nil)
+			mockNodeClient.EXPECT().DescribeAllENIs(gomock.Any(), gomock.Any()).Return(getDescribeAllENIResponse(), nil)
 			eni, err := node.ChooseENI()
 			Expect(err).Should(BeNil())
 			Expect(eni.EniId).Should(Equal(eniId2))

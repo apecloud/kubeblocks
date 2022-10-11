@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
@@ -37,23 +36,20 @@ type ENIResource struct {
 }
 
 type eniManager struct {
-	pb.NodeClient
-
 	logger       logr.Logger
 	maxIPsPerENI int
 	maxENI       int
 	minPrivateIP int
 	resource     *NodeResource
 	cp           cloud.Provider
+	nc           pb.NodeClient
 }
 
-func newENIManager(logger logr.Logger, nc pb.NodeClient, cp cloud.Provider) (*eniManager, error) {
-	_ = viper.ReadInConfig()
-
+func newENIManager(logger logr.Logger, ip string, nc pb.NodeClient, cp cloud.Provider) (*eniManager, error) {
 	c := &eniManager{
-		NodeClient: nc,
-		cp:         cp,
-		logger:     logger,
+		nc:     nc,
+		cp:     cp,
+		logger: logger.WithValues("ip", ip),
 	}
 
 	c.minPrivateIP = config.MinPrivateIP
@@ -68,7 +64,7 @@ func newENIManager(logger logr.Logger, nc pb.NodeClient, cp cloud.Provider) (*en
 }
 
 func (c *eniManager) init() error {
-	managedENIs, err := c.GetManagedENIs()
+	managedENIs, err := c.getManagedENIs()
 	if err != nil {
 		return errors.Wrap(err, "ipamd init: failed to retrieve attached ENIs info")
 	}
@@ -85,7 +81,7 @@ func (c *eniManager) init() error {
 				RequestId: util.GenRequestId(),
 				Eni:       eni,
 			}
-			_, err = c.SetupNetworkForENI(context.Background(), setupENIRequest)
+			_, err = c.nc.SetupNetworkForENI(context.Background(), setupENIRequest)
 			return err
 		}, options); err != nil {
 			c.logger.Error(err, "Failed to setup ENI", "eni id", eni.EniId)
@@ -151,7 +147,7 @@ func (c *eniManager) start(stop chan struct{}, reconcileInterval time.Duration, 
 
 func (c *eniManager) modifyPrimaryENISourceDestCheck(enabled bool) error {
 	describeENIRequest := &pb.DescribeAllENIsRequest{RequestId: util.GenRequestId()}
-	describeENIResponse, err := c.DescribeAllENIs(context.Background(), describeENIRequest)
+	describeENIResponse, err := c.nc.DescribeAllENIs(context.Background(), describeENIRequest)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get all enis, retry later")
 	}
@@ -174,9 +170,9 @@ func (c *eniManager) modifyPrimaryENISourceDestCheck(enabled bool) error {
 	return nil
 }
 
-func (c *eniManager) GetManagedENIs() ([]*pb.ENIMetadata, error) {
+func (c *eniManager) getManagedENIs() ([]*pb.ENIMetadata, error) {
 	describeENIRequest := &pb.DescribeAllENIsRequest{RequestId: util.GenRequestId()}
-	describeENIResponse, err := c.DescribeAllENIs(context.Background(), describeENIRequest)
+	describeENIResponse, err := c.nc.DescribeAllENIs(context.Background(), describeENIRequest)
 	if err != nil {
 		return nil, errors.Wrap(err, "ipamd init: failed to retrieve attached ENIs info")
 	}
@@ -197,13 +193,12 @@ func (c *eniManager) filterManagedENIs(enis map[string]*pb.ENIMetadata) []*pb.EN
 		ids = append(ids, eniId)
 		managedENIList = append(managedENIList, enis[eniId])
 	}
-	c.logger.Info("Managed eni", "count", len(managedENIList), "ids", strings.Join(ids, ","))
 	return managedENIList
 }
 
 func (c *eniManager) ensureENI() error {
 	describeENIRequest := &pb.DescribeAllENIsRequest{RequestId: util.GenRequestId()}
-	describeENIResponse, err := c.DescribeAllENIs(context.Background(), describeENIRequest)
+	describeENIResponse, err := c.nc.DescribeAllENIs(context.Background(), describeENIRequest)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get all enis, retry later")
 	}
@@ -264,7 +259,7 @@ func (c *eniManager) tryAllocAndAttachENI() error {
 			EniId: eni.ENIId,
 		},
 	}
-	if _, err = c.SetupNetworkForENI(context.Background(), setupENIRequest); err != nil {
+	if _, err = c.nc.SetupNetworkForENI(context.Background(), setupENIRequest); err != nil {
 		return errors.Wrapf(err, "Failed to set up network for eni %s", eni.ENIId)
 	}
 	c.logger.Info("Successfully initialized new eni", "eni id", eniId)
@@ -282,7 +277,7 @@ func (c *eniManager) tryDetachAndDeleteENI(enis []*pb.ENIMetadata) error {
 			RequestId: util.GenRequestId(),
 			Eni:       eni,
 		}
-		if _, err := c.CleanNetworkForENI(context.Background(), cleanENIRequest); err != nil {
+		if _, err := c.nc.CleanNetworkForENI(context.Background(), cleanENIRequest); err != nil {
 			return errors.Wrapf(err, "Failed to clean network for eni %s", eni.EniId)
 		}
 		if err := c.cp.FreeENI(eni.EniId); err != nil {

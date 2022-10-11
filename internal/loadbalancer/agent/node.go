@@ -27,29 +27,30 @@ type Node interface {
 }
 
 type node struct {
-	*eniManager
-
-	ip string
-	nc pb.NodeClient
-	cp cloud.Provider
+	ip     string
+	nc     pb.NodeClient
+	cp     cloud.Provider
+	em     *eniManager
+	logger logr.Logger
 }
 
 func NewNode(logger logr.Logger, ip string, nc pb.NodeClient, cp cloud.Provider) (*node, error) {
-	em, err := newENIManager(logger, nc, cp)
+	em, err := newENIManager(logger, ip, nc, cp)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to init eni manager")
 	}
 
 	return &node{
-		nc:         nc,
-		ip:         ip,
-		cp:         cp,
-		eniManager: em,
+		em:     em,
+		nc:     nc,
+		ip:     ip,
+		cp:     cp,
+		logger: logger,
 	}, nil
 }
 
 func (n *node) Start(stop chan struct{}) error {
-	return n.eniManager.start(stop, config.ENIReconcileInterval, config.CleanLeakedENIInterval)
+	return n.em.start(stop, config.ENIReconcileInterval, config.CleanLeakedENIInterval)
 }
 
 func (n *node) GetIP() string {
@@ -58,11 +59,15 @@ func (n *node) GetIP() string {
 
 func (n *node) GetResource() *NodeResource {
 	// TODO deepcopy
-	return n.eniManager.resource
+	return n.em.resource
+}
+
+func (n *node) GetManagedENIs() ([]*pb.ENIMetadata, error) {
+	return n.em.getManagedENIs()
 }
 
 func (n *node) ChooseENI() (*pb.ENIMetadata, error) {
-	managedENIs, err := n.GetManagedENIs()
+	managedENIs, err := n.em.getManagedENIs()
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to get managed ENIs")
 	}
@@ -71,7 +76,7 @@ func (n *node) ChooseENI() (*pb.ENIMetadata, error) {
 	}
 	candidate := managedENIs[0]
 	for _, eni := range managedENIs {
-		if len(eni.Ipv4Addresses) > len(candidate.Ipv4Addresses) && len(eni.Ipv4Addresses) < n.maxIPsPerENI {
+		if len(eni.Ipv4Addresses) > len(candidate.Ipv4Addresses) && len(eni.Ipv4Addresses) < n.em.maxIPsPerENI {
 			candidate = eni
 		}
 	}

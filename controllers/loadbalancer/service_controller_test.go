@@ -213,7 +213,7 @@ var _ = Describe("ServiceController", Ordered, func() {
 			}, timeout, interval).Should(BeTrue())
 
 			By("By migrating service")
-			mockCloud.EXPECT().DeallocIPAddresses(eniId1, []string{floatingIP}).Return(nil).AnyTimes()
+			mockCloud.EXPECT().DeallocIPAddresses(oldENIId, gomock.Any()).Return(nil).AnyTimes()
 			mockNewNode := mockagent.NewMockNode(ctrl)
 			newENI := &protocol.ENIMetadata{
 				EniId: newENIId,
@@ -232,7 +232,7 @@ var _ = Describe("ServiceController", Ordered, func() {
 			}, timeout, interval).Should(BeTrue())
 
 			By("By deleting service")
-			mockCloud.EXPECT().DeallocIPAddresses(newENIId, gomock.Any()).Return(nil)
+			mockCloud.EXPECT().DeallocIPAddresses(newENIId, gomock.Any()).Return(nil).AnyTimes()
 			mockNewNode.EXPECT().CleanNetworkForService(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 			Expect(k8sClient.Delete(context.Background(), svc)).Should(Succeed())
 		})
@@ -273,9 +273,9 @@ var _ = Describe("ServiceController", Ordered, func() {
 			eni := &protocol.ENIMetadata{
 				EniId: eniId1,
 			}
-			mockNode.EXPECT().ChooseENI().Return(eni, nil)
+			mockNode.EXPECT().ChooseENI().Return(eni, nil).AnyTimes()
 			mockCloud.EXPECT().AllocIPAddresses(eni.EniId).Return(eniIp12, nil).AnyTimes()
-			mockNode.EXPECT().SetupNetworkForService(gomock.Any(), gomock.Any()).Return(nil)
+			mockNode.EXPECT().SetupNetworkForService(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 			svc, svcKey := newSvcObj(true, "")
 			svc.GetAnnotations()[AnnotationKeyTrafficPolicy] = AnnotationValueLocalTrafficPolicy
@@ -283,8 +283,6 @@ var _ = Describe("ServiceController", Ordered, func() {
 
 			pod, podKey := newPodObj(svc.GetName())
 			Expect(k8sClient.Create(context.Background(), pod)).Should(Succeed())
-			Expect(k8sClient.Get(context.Background(), *podKey, pod)).Should(Succeed())
-
 			Eventually(func() bool {
 				return k8sClient.Get(context.Background(), *podKey, pod) == nil
 			}, timeout, interval).Should(BeTrue())

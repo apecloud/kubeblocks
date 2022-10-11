@@ -35,6 +35,7 @@ COPY cmd/loadbalancer/ cmd/loadbalancer/
 COPY apis/ apis/
 COPY internal/ internal/
 COPY controllers/ controllers/
+COPY version/ version/
 
 RUN wget -O grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.13/grpc_health_probe-linux-${TARGETARCH}
 

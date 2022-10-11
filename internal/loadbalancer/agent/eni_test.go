@@ -1,23 +1,27 @@
 package agent
 
 import (
+	"context"
 	"math"
 	"time"
 
-	mock_protocol "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol/mocks"
+	"google.golang.org/grpc"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
+	pb "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
 	mockcloud "github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/mocks"
-	mocknetwork "github.com/apecloud/kubeblocks/internal/loadbalancer/network/mocks"
+	mockprotocol "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol/mocks"
 )
 
 const (
 	masterHostIP = "172.31.1.2"
+	nodeIP       = "172.31.1.100"
 	subnet       = "172.31.0.0/16"
 
 	eniId1  = "eni-01"
@@ -43,14 +47,21 @@ const (
 	eniId5  = "eni-05"
 )
 
-var getMockENIs = func() map[string]*cloud.ENIMetadata {
-	return map[string]*cloud.ENIMetadata{
+var getDescribeAllENIResponse = func() *pb.DescribeAllENIsResponse {
+	return &pb.DescribeAllENIsResponse{
+		RequestId: util.GenRequestId(),
+		Enis:      getMockENIs(),
+	}
+}
+
+var getMockENIs = func() map[string]*pb.ENIMetadata {
+	return map[string]*pb.ENIMetadata{
 		eniId1: {
-			ENIId:          eniId1,
-			MAC:            eniMac1,
+			EniId:          eniId1,
+			Mac:            eniMac1,
 			DeviceNumber:   0,
-			SubnetIPv4CIDR: subnet,
-			IPv4Addresses: []*cloud.IPv4Address{
+			SubnetIpv4Cidr: subnet,
+			Ipv4Addresses: []*pb.IPv4Address{
 				{
 					Primary: true,
 					Address: eniIp11,
@@ -67,16 +78,16 @@ var getMockENIs = func() map[string]*cloud.ENIMetadata {
 		},
 		// busiest ENI
 		eniId2: {
-			ENIId:          eniId2,
-			MAC:            eniMac2,
+			EniId:          eniId2,
+			Mac:            eniMac2,
 			DeviceNumber:   1,
-			SubnetIPv4CIDR: subnet,
+			SubnetIpv4Cidr: subnet,
 			Tags: map[string]string{
 				cloud.TagENIKubeBlocksManaged: "true",
 				cloud.TagENINode:              masterHostIP,
 				cloud.TagENICreatedAt:         time.Now().String(),
 			},
-			IPv4Addresses: []*cloud.IPv4Address{
+			Ipv4Addresses: []*pb.IPv4Address{
 				{
 					Primary: true,
 					Address: eniIp21,
@@ -92,16 +103,16 @@ var getMockENIs = func() map[string]*cloud.ENIMetadata {
 			},
 		},
 		eniId3: {
-			ENIId:          eniId3,
-			MAC:            eniMac3,
+			EniId:          eniId3,
+			Mac:            eniMac3,
 			DeviceNumber:   3,
-			SubnetIPv4CIDR: subnet,
+			SubnetIpv4Cidr: subnet,
 			Tags: map[string]string{
 				cloud.TagENIKubeBlocksManaged: "true",
 				cloud.TagENINode:              masterHostIP,
 				cloud.TagENICreatedAt:         time.Now().String(),
 			},
-			IPv4Addresses: []*cloud.IPv4Address{
+			Ipv4Addresses: []*pb.IPv4Address{
 				{
 					Primary: true,
 					Address: eniIp31,
@@ -113,14 +124,14 @@ var getMockENIs = func() map[string]*cloud.ENIMetadata {
 			},
 		},
 		eniId4: {
-			ENIId:        eniId4,
+			EniId:        eniId4,
 			DeviceNumber: 4,
 			Tags: map[string]string{
 				cloud.TagENIKubeBlocksManaged: "true",
 				cloud.TagENINode:              masterHostIP,
 				cloud.TagENICreatedAt:         time.Now().String(),
 			},
-			IPv4Addresses: []*cloud.IPv4Address{
+			Ipv4Addresses: []*pb.IPv4Address{
 				{
 					Primary: true,
 					Address: eniIp41,
@@ -132,41 +143,22 @@ var getMockENIs = func() map[string]*cloud.ENIMetadata {
 
 var _ = Describe("Eni", func() {
 
-	setup := func() (*eniManager, *mockcloud.MockProvider, *mocknetwork.MockClient) {
+	setup := func() (*eniManager, *mockcloud.MockProvider, *mockprotocol.MockNodeClient) {
 		ctrl := gomock.NewController(GinkgoT())
 		mockProvider := mockcloud.NewMockProvider(ctrl)
-		mockNetworkClient := mocknetwork.NewMockClient(ctrl)
-		enis := map[string]*cloud.ENIMetadata{
-			eniId1: {
-				ENIId:        eniId1,
-				DeviceNumber: 1,
-				Tags: map[string]string{
-					cloud.TagENIKubeBlocksManaged: "true",
-				},
-			},
-		}
-		mockNodeClient := mock_protocol.NewMockNodeClient(ctrl)
+		mockNodeClient := mockprotocol.NewMockNodeClient(ctrl)
 		mockProvider.EXPECT().GetENILimit().Return(math.MaxInt)
 		mockProvider.EXPECT().GetENIIPv4Limit().Return(6)
-		mockProvider.EXPECT().DescribeAllENIs().Return(enis, nil)
-		mockNetworkClient.EXPECT().SetupNetworkForENI(gomock.Any()).Return(errors.New("mock setup failed"))
-		mockNetworkClient.EXPECT().SetupNetworkForENI(gomock.Any()).Return(nil)
-		manager, err := newENIManager(logger, mockNodeClient, mockProvider)
+		mockNodeClient.EXPECT().DescribeAllENIs(gomock.Any(), gomock.Any()).Return(getDescribeAllENIResponse(), nil).AnyTimes()
+		mockNodeClient.EXPECT().SetupNetworkForENI(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+		manager, err := newENIManager(logger, nodeIP, mockNodeClient, mockProvider)
 		Expect(err).Should(BeNil())
-		return manager, mockProvider, mockNetworkClient
+		return manager, mockProvider, mockNodeClient
 	}
 
 	Context("Test start", func() {
 		It("", func() {
 			manager, mockProvider, _ := setup()
-
-			enis := map[string]*cloud.ENIMetadata{
-				eniId1: {
-					ENIId:        eniId1,
-					DeviceNumber: 0,
-				},
-			}
-			mockProvider.EXPECT().DescribeAllENIs().Return(enis, nil).AnyTimes()
 			mockProvider.EXPECT().ModifySourceDestCheck(eniId1, gomock.Any()).Return(nil)
 			// we close stop channel to prevent running ensureENI
 			stop := make(chan struct{})
@@ -178,31 +170,28 @@ var _ = Describe("Eni", func() {
 
 	Context("Ensure ENI, alloc new ENI", func() {
 		It("", func() {
-			manager, mockProvider, mockNetwork := setup()
-			enis := getMockENIs()
-			mockProvider.EXPECT().DescribeAllENIs().Return(enis, nil)
+			manager, mockProvider, mockNodeClient := setup()
+			mockNodeClient.EXPECT().DescribeAllENIs(gomock.Any(), gomock.Any()).Return(getDescribeAllENIResponse(), nil)
 			manager.minPrivateIP = math.MaxInt
 
 			eni := cloud.ENIMetadata{ENIId: eniId5}
 			mockProvider.EXPECT().AllocENI().Return(eni.ENIId, nil)
 			mockProvider.EXPECT().WaitForENIAttached(eni.ENIId).Return(eni, nil)
-			mockNetwork.EXPECT().SetupNetworkForENI(&eni).Return(nil)
+			mockNodeClient.EXPECT().SetupNetworkForENI(gomock.Any(), &eni).Return(nil, nil)
 			Expect(manager.ensureENI()).Should(Succeed())
 		})
 	})
 
 	Context("Ensure ENI, delete spare ENI", func() {
 		It("", func() {
-			manager, mockProvider, mockNetwork := setup()
-			enis := getMockENIs()
-			mockProvider.EXPECT().DescribeAllENIs().Return(enis, nil)
+			manager, mockProvider, mockNodeClient := setup()
 
 			var ids []string
-			recordDeletedENI := func(eni *cloud.ENIMetadata) error {
-				ids = append(ids, eni.ENIId)
-				return nil
+			recordDeletedENI := func(ctx context.Context, request *pb.CleanNetworkForENIRequest, options ...grpc.CallOption) (*pb.CleanNetworkForENIResponse, error) {
+				ids = append(ids, request.GetEni().EniId)
+				return nil, nil
 			}
-			mockNetwork.EXPECT().CleanNetworkForENI(gomock.Any()).DoAndReturn(recordDeletedENI).Return(nil).AnyTimes()
+			mockNodeClient.EXPECT().CleanNetworkForENI(gomock.Any(), gomock.Any()).DoAndReturn(recordDeletedENI).Return(nil, nil).AnyTimes()
 			mockProvider.EXPECT().FreeENI(gomock.Any()).Return(nil).AnyTimes()
 			Expect(manager.ensureENI()).Should(Succeed())
 			Expect(len(ids)).Should(Equal(1))

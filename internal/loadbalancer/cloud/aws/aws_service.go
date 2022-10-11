@@ -338,7 +338,7 @@ func (c *awsService) AssignPrivateIpAddresses(eniId string, privateIP string) er
 		PrivateIpAddresses: []*string{&privateIP},
 	}
 	if _, err := c.ec2Svc.AssignPrivateIpAddressesWithContext(context.Background(), input); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Failed to assign private ip address %s on eni %s", privateIP, eniId))
+		return errors.Wrapf(err, "Failed to assign private ip address %s on eni %s", privateIP, eniId)
 	}
 	return nil
 }
@@ -480,7 +480,7 @@ func (c *awsService) DeallocIPAddresses(eniID string, ips []string) error {
 			ctxLog.Info("Private ip may has already been unassigned, skip")
 			return nil
 		}
-		return errors.Wrap(err, fmt.Sprintf("Failed to unassign ip address %s", ips))
+		return errors.Wrapf(err, "Failed to unassign ip address %s", ips)
 	}
 	ctxLog.Info("Successfully unassigned IPs from ENI")
 	return nil

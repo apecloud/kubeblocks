@@ -136,7 +136,7 @@ func (c *ServiceController) getFloatingIP(ip string) *FloatingIP {
 	defer c.RUnlock()
 	fip := c.cache[ip]
 	if fip != nil {
-		c.logger.Info("Get floating ip from cache", "ip", fip, "eni id", fip.eni.EniId)
+		c.logger.Info("Get floating ip from cache", "ip", ip, "eni id", fip.eni.EniId)
 	}
 	return fip
 }
@@ -154,7 +154,7 @@ func (c *ServiceController) removeFloatingIP(ip string) {
 	fip := c.cache[ip]
 	delete(c.cache, ip)
 	if fip != nil {
-		c.logger.Info("Delete floating ip from cache", "ip", ip, "eni id", fip.eni.EniId)
+		c.logger.Info("Remove floating ip from cache", "ip", ip, "eni id", fip.eni.EniId)
 	}
 }
 
@@ -210,7 +210,7 @@ func (c *ServiceController) ensureFloatingIP(ctx context.Context, ctxLog logr.Lo
 }
 
 func (c *ServiceController) migrateFloatingIP(ctx context.Context, ctxLog logr.Logger, nodeIP string, fip *FloatingIP, svc *corev1.Service) error {
-	c.logger.Info("Migrating floating ip", "src eni", fip.eni.EniId, "ip", fip.ip)
+	ctxLog.WithName("migrateFloatingIP").WithValues("new node", nodeIP, "old node", fip.nodeIP)
 
 	if fip.nodeIP == nodeIP && fip.eni.EniId == svc.GetAnnotations()[AnnotationKeyENIId] {
 		ctxLog.Info("Floating ip is in sync, do nothing")
@@ -251,6 +251,7 @@ func (c *ServiceController) migrateOnNewMaster(ctx context.Context, ctxLog logr.
 	if err := c.cp.DeallocIPAddresses(fip.eni.EniId, []string{fip.ip}); err != nil {
 		return errors.Wrapf(err, "Failed to dealloc private ip %s", fip.ip)
 	}
+	ctxLog.Info("Successfully released floating ip")
 
 	node, err := c.nm.GetNode(nodeIP)
 	if err != nil {
@@ -267,6 +268,7 @@ func (c *ServiceController) migrateOnNewMaster(ctx context.Context, ctxLog logr.
 	if err = node.SetupNetworkForService(newFip.ip, newENI); err != nil {
 		return errors.Wrap(err, "Failed to setup host network stack for service")
 	}
+	ctxLog.Info("Successfully setup service network")
 
 	if err = c.updateService(ctx, ctxLog, svc, newFip, false); err != nil {
 		return err
@@ -324,10 +326,10 @@ func (c *ServiceController) createFloatingIP(ctx context.Context, ctxLog logr.Lo
 
 func (c *ServiceController) deleteFloatingIP(ctx context.Context, ctxLog logr.Logger, fip *FloatingIP, svc *corev1.Service) error {
 	if fip == nil {
-		c.logger.Info("Service floating ip is nil, skip delete")
-		return nil
+		fip = c.buildFIPFromAnnotation(svc)
+		c.logger.Info("Can not find fip in cache, use annotation", "info", fip)
 	}
-	ctxLog = ctxLog.WithName("deleteFloatingIP").WithValues("node", fip.nodeIP)
+	ctxLog = ctxLog.WithName("deleteFloatingIP").WithValues("ip", fip.ip, "node", fip.nodeIP)
 
 	annotations := svc.GetAnnotations()
 	eniId, ok := annotations[AnnotationKeyENIId]
@@ -335,9 +337,9 @@ func (c *ServiceController) deleteFloatingIP(ctx context.Context, ctxLog logr.Lo
 		return errors.New("Invalid service, private ip exists but eni id not found")
 	}
 
-	c.logger.Info("Deleting service private ip", "eni id", eniId, "ip", fip.ip)
+	ctxLog.Info("Deleting service private ip", "eni id", eniId, "ip", fip.ip)
 	if err := c.cp.DeallocIPAddresses(eniId, []string{fip.ip}); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Failed to dealloc private ip address %s", fip.ip))
+		return errors.Wrapf(err, "Failed to dealloc private ip address %s", fip.ip)
 	}
 	ctxLog.Info("Successfully released floating ip")
 
@@ -399,7 +401,7 @@ func (c *ServiceController) tryAllocPrivateIP(ctxLog logr.Logger, node agent.Nod
 
 	ip, err := c.cp.AllocIPAddresses(eni.EniId)
 	if err != nil {
-		return "", nil, errors.Wrap(err, fmt.Sprintf("Failed to alloc private ip on eni %s", eni.EniId))
+		return "", nil, errors.Wrapf(err, "Failed to alloc private ip on eni %s", eni.EniId)
 	}
 	ctxLog.Info("Successfully alloc private ip", "ip", ip, "eni id", eni.EniId)
 
@@ -415,7 +417,7 @@ func (c *ServiceController) tryAssignPrivateIP(ctxLog logr.Logger, ip string, no
 	}
 
 	if err := c.cp.AssignPrivateIpAddresses(eni.EniId, ip); err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Failed to assign private ip %s on eni %s", ip, eni.EniId))
+		return nil, errors.Wrapf(err, "Failed to assign private ip %s on eni %s", ip, eni.EniId)
 	}
 	ctxLog.Info("Successfully assign private ip")
 	return eni, nil
@@ -443,6 +445,15 @@ func (c *ServiceController) chooseTrafficNode(svc *corev1.Service) (string, erro
 	return policy.ChooseNode(svc)
 }
 
-func getServiceFullName(service *corev1.Service) string {
-	return fmt.Sprintf("%s/%s", service.GetNamespace(), service.GetName())
+func (c *ServiceController) buildFIPFromAnnotation(svc *corev1.Service) *FloatingIP {
+	annotations := svc.GetAnnotations()
+	result := &FloatingIP{
+		ip:       annotations[AnnotationKeyFloatingIP],
+		subnetId: annotations[AnnotationKeySubnetId],
+		nodeIP:   annotations[AnnotationKeyENINodeIP],
+		eni: &pb.ENIMetadata{
+			EniId: annotations[AnnotationKeyENIId],
+		},
+	}
+	return result
 }

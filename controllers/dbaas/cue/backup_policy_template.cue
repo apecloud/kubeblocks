@@ -3,16 +3,18 @@ sts: {
 		labels: {
 			"app.kubernetes.io/instance": string
 		}
+		namespace: string
 	}
 }
 template: string
 backup_policy: {
-	"apiVersion": "dataprotection.infracreate.com/v1alpha1"
-	"kind":       "BackupPolicy"
-	"metadata": {
-		"name": "\(sts.metadata.labels."app.kubernetes.io/instance")-scaling-auto-generated"
+	apiVersion: "dataprotection.infracreate.com/v1alpha1"
+	kind:       "BackupPolicy"
+	metadata: {
+		name: "\(sts.metadata.labels."app.kubernetes.io/instance")-scaling-auto-generated"
+		namespace: sts.metadata.namespace
 	}
-	"spec": {
+	spec: {
 		"schedule":                 "0 3 * * *"
 		"ttl":                      "168h0m0s"
 		"backupToolName":           "xtrabackup-mysql"

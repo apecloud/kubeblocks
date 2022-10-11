@@ -546,6 +546,32 @@ func createOrReplaceResources(ctx context.Context,
 			if err := cli.Get(ctx, key, stsObj); err != nil {
 				return err
 			}
+			// horizontal scaling
+			if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
+				ml := client.MatchingLabels{
+					clusterDefLabelKey: cluster.Spec.ClusterDefRef,
+				}
+				backupPolicyTemplateList := v1alpha1.BackupPolicyTemplateList{}
+				if err := cli.List(ctx, &backupPolicyTemplateList, ml); err != nil {
+					return err
+				}
+				if len(backupPolicyTemplateList.Items) == 0 {
+					return fmt.Errorf("backup policy template for cluster %s not found", cluster.Name)
+				}
+				// TODO chantu: check volume snapshot support
+				if err := createBackup(ctx, cli, cluster, *stsObj, backupPolicyTemplateList.Items[0]); err != nil {
+					return err
+				}
+				for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
+					pvcKey := types.NamespacedName{
+						Namespace: key.Namespace,
+						Name:      fmt.Sprintf("%s-%s-%d", "data", stsObj.Name, i),
+					}
+					if err := createPVCFromSnapshot(ctx, cli, cluster, *stsObj, pvcKey); err != nil {
+						return err
+					}
+				}
+			}
 			stsObj.Spec.Template = stsProto.Spec.Template
 			stsObj.Spec.Replicas = stsProto.Spec.Replicas
 			stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
@@ -578,27 +604,6 @@ func createOrReplaceResources(ctx context.Context,
 					var err error
 					if err = cli.Get(ctx, pvcKey, pvc); err != nil {
 						if !apierrors.IsNotFound(err) {
-							return err
-						}
-					}
-					// horizontal scaling
-					if apierrors.IsNotFound(err) {
-						ml := client.MatchingLabels{
-							clusterDefLabelKey: cluster.Spec.ClusterDefRef,
-						}
-						inNS := client.InNamespace(cluster.Namespace)
-						backupPolicyTemplateList := v1alpha1.BackupPolicyTemplateList{}
-						if err := cli.List(ctx, &backupPolicyTemplateList, inNS, ml); err != nil {
-							return err
-						}
-						if len(backupPolicyTemplateList.Items) == 0 {
-							return fmt.Errorf("backup policy template for cluster %s not found", cluster.Name)
-						}
-						// TODO chantu: check volume snapshot support
-						if err := createBackup(ctx, cli, cluster, *stsObj, backupPolicyTemplateList.Items[0]); err != nil {
-							return err
-						}
-						if err := createPVCFromSnapshot(ctx, cli, cluster, *stsObj, pvcKey); err != nil {
 							return err
 						}
 					}
@@ -1213,19 +1218,27 @@ func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder
 }
 
 func createBackup(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, sts appsv1.StatefulSet, backupPolicyTemplate v1alpha1.BackupPolicyTemplate) error {
-	objs := []client.Object{}
 	backupPolicy, err := buildBackupPolicy(sts, backupPolicyTemplate)
 	if err != nil {
 		return err
 	}
-	objs = append(objs, backupPolicy)
+	if err := cli.Create(ctx, backupPolicy); err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			return nil
+		} else {
+			return err
+		}
+	}
 	backupJob, err := buildBackupJob(sts)
 	if err != nil {
 		return err
 	}
-	objs = append(objs, backupJob)
-	if err := createOrReplaceResources(ctx, cli, cluster, objs); err != nil {
-		return err
+	if err := cli.Create(ctx, backupJob); err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			return nil
+		} else {
+			return err
+		}
 	}
 	return nil
 }
@@ -1247,11 +1260,11 @@ func buildBackupPolicy(sts appsv1.StatefulSet, template v1alpha1.BackupPolicyTem
 		return nil, err
 	}
 
-	if err = cueValue.Fill("template", []byte(template.Name)); err != nil {
+	if err = cueValue.FillRaw("template", template.Name); err != nil {
 		return nil, err
 	}
 
-	backupPolicyStrByte, err := cueValue.Lookup("backupPolicy")
+	backupPolicyStrByte, err := cueValue.Lookup("backup_policy")
 	if err != nil {
 		return nil, err
 	}
@@ -1281,7 +1294,7 @@ func buildBackupJob(sts appsv1.StatefulSet) (*v1alpha1.BackupJob, error) {
 		return nil, err
 	}
 
-	backupJobStrByte, err := cueValue.Lookup("backupJob")
+	backupJobStrByte, err := cueValue.Lookup("backup_job")
 	if err != nil {
 		return nil, err
 	}
@@ -1295,13 +1308,11 @@ func buildBackupJob(sts appsv1.StatefulSet) (*v1alpha1.BackupJob, error) {
 }
 
 func createPVCFromSnapshot(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, sts appsv1.StatefulSet, pvcKey types.NamespacedName) error {
-	objs := []client.Object{}
 	pvc, err := buildPVCFromSnapshot(sts, pvcKey)
 	if err != nil {
 		return err
 	}
-	objs = append(objs, pvc)
-	if err := createOrReplaceResources(ctx, cli, cluster, objs); err != nil {
+	if err := cli.Create(ctx, pvc); err != nil {
 		return err
 	}
 	return nil

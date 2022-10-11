@@ -225,7 +225,7 @@ func buildTopologySpreadConstraints(
 	var topologySpreadConstraints []corev1.TopologySpreadConstraint
 
 	var whenUnsatisfiable corev1.UnsatisfiableConstraintAction
-	if cluster.Spec.Affinity.PodAntiAffinity != dbaasv1alpha1.Required {
+	if cluster.Spec.Affinity.PodAntiAffinity == dbaasv1alpha1.Required {
 		whenUnsatisfiable = corev1.DoNotSchedule
 	} else {
 		whenUnsatisfiable = corev1.ScheduleAnyway

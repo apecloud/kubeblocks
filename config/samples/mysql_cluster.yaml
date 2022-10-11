@@ -6,9 +6,6 @@ metadata:
 spec:
   clusterDefinitionRef: mysql-cluster-definition
   appVersionRef: appversion-mysql-latest
-  affinity:
-    topologyKeys:
-      - kubernetes.io/hostname
   components:
   - name: replicasets
     type: replicasets

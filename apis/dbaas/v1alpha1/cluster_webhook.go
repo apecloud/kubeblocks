@@ -131,10 +131,12 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 		duplicateComponentNames = make(map[string]struct{})
 		componentNameMap        = make(map[string]struct{})
 		componentTypeMap        = make(map[string]struct{})
+		componentMap            = make(map[string]ClusterDefinitionComponent)
 	)
 
 	for _, v := range clusterDef.Spec.Components {
 		componentTypeMap[v.TypeName] = struct{}{}
+		componentMap[v.TypeName] = v
 	}
 
 	for _, v := range r.Spec.Components {
@@ -155,6 +157,35 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 	if len(duplicateComponentNames) > 0 {
 		*allErrs = append(*allErrs, field.Duplicate(field.NewPath("spec.components[*].name"),
 			fmt.Sprintf(" %v is duplicated", r.getDuplicateMapKeys(duplicateComponentNames))))
+	}
+
+	// validate readonly service
+	for _, v := range r.Spec.Components {
+		if component, ok := componentMap[v.Type]; ok {
+			if componentMap[v.Type].ComponentType == Consensus {
+				readonlyCount := 0
+				if component.ConsensusSpec.Leader.AccessMode == Readonly {
+					readonlyCount++
+				}
+				for _, follower := range component.ConsensusSpec.Followers {
+					if follower.AccessMode == Readonly {
+						readonlyCount++
+					}
+				}
+				if component.ConsensusSpec.Learner.AccessMode == Readonly {
+					readonlyCount++
+				}
+				if readonlyCount == 0 {
+					*allErrs = append(*allErrs, field.Invalid(field.NewPath("spec.components[*].readonlyService"),
+						v,
+						"readonlyService can only be set when atleast one role AccessMode is Readonly"))
+				}
+			} else if v.ReadonlyServiceType != nil {
+				*allErrs = append(*allErrs, field.Invalid(field.NewPath("spec.components[*].readonlyService"),
+					v,
+					"readonlyService can only be set when componentType is Consensus"))
+			}
+		}
 	}
 }
 

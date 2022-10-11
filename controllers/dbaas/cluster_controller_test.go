@@ -32,8 +32,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sethvargo/go-password/password"
 
-	"k8s.io/apimachinery/pkg/util/intstr"
-
 	policyv1 "k8s.io/api/policy/v1"
 
 	. "github.com/onsi/ginkgo"
@@ -221,6 +219,10 @@ spec:
     podSpec:
       containers:
       - name: nginx
+    service:
+      ports:
+      - protocol: TCP
+        port: 80
 `
 		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
@@ -670,16 +672,7 @@ spec:
 				Name: "proxy",
 				Type: "proxy",
 
-				Service: corev1.ServiceSpec{
-					Ports: []corev1.ServicePort{
-						{
-							Protocol:   "TCP",
-							Port:       80,
-							TargetPort: intstr.FromInt(8080),
-						},
-					},
-					Type: "LoadBalancer",
-				},
+				ServiceType: "LoadBalancer",
 			})
 			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
 

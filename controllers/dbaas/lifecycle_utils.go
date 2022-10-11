@@ -290,8 +290,11 @@ func mergeComponents(
 		}
 
 		// respect user's declaration
-		if clusterComp.Service.Ports != nil {
-			component.Service = clusterComp.Service
+		if clusterComp.ServiceType != "" {
+			component.Service.Type = clusterComp.ServiceType
+		}
+		if clusterComp.ReadonlyServiceType != nil {
+			component.ReadonlyService.Type = *clusterComp.ReadonlyServiceType
 		}
 	}
 

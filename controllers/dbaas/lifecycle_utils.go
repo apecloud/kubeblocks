@@ -1223,9 +1223,7 @@ func createBackup(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1
 		return err
 	}
 	if err := cli.Create(ctx, backupPolicy); err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			return nil
-		} else {
+		if !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 	}
@@ -1234,9 +1232,7 @@ func createBackup(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1
 		return err
 	}
 	if err := cli.Create(ctx, backupJob); err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			return nil
-		} else {
+		if !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 	}

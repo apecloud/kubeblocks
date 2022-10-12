@@ -18,8 +18,11 @@ package loadbalancer
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
+
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -39,14 +42,13 @@ func TestLoadbalancer(t *testing.T) {
 }
 
 var (
-	cfg                *rest.Config
-	k8sClient          client.Client
-	testEnv            *envtest.Environment
-	ctx                context.Context
-	cancel             context.CancelFunc
-	serviceController  *ServiceController
-	endpointController *EndpointController
-	logger             = zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	cfg               *rest.Config
+	k8sClient         client.Client
+	testEnv           *envtest.Environment
+	ctx               context.Context
+	cancel            context.CancelFunc
+	serviceController *ServiceController
+	logger            = zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
 )
 
 var _ = BeforeSuite(func() {
@@ -60,6 +62,12 @@ var _ = BeforeSuite(func() {
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
+	}
+
+	if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
+		useExistingCluster := true
+		testEnv.UseExistingCluster = &useExistingCluster
+		testEnv.Config = config.GetConfigOrDie()
 	}
 
 	// cfg is defined in this file globally.
@@ -93,15 +101,6 @@ var _ = BeforeSuite(func() {
 	err = serviceController.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(serviceController).NotTo(BeNil())
-
-	endpointController = &EndpointController{
-		logger:   logger,
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("LoadBalancer"),
-	}
-	err = endpointController.SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
 
 	go func() {
 		defer GinkgoRecover()

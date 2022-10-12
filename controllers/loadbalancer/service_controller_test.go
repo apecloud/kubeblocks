@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	mockagent "github.com/apecloud/kubeblocks/internal/loadbalancer/agent/mocks"
 	mockcloud "github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/mocks"
@@ -128,6 +129,17 @@ var _ = Describe("ServiceController", Ordered, func() {
 		}
 	}
 
+	removeResource := func(obj controllerclient.Object) {
+		go func() {
+			Expect(k8sClient.Delete(context.Background(), obj)).Should(Succeed())
+		}()
+		// waiting for resource deleted
+		key := types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}
+		Eventually(func() bool {
+			return k8sClient.Get(context.Background(), key, obj) != nil
+		}, timeout, interval).Should(BeTrue())
+	}
+
 	BeforeEach(func() {
 		// Add any steup steps that needs to be executed before each test
 	})
@@ -216,9 +228,9 @@ var _ = Describe("ServiceController", Ordered, func() {
 			oldENI := &protocol.ENIMetadata{
 				EniId: oldENIId,
 			}
-			mockOldNode.EXPECT().ChooseENI().Return(oldENI, nil)
-			mockCloud.EXPECT().AllocIPAddresses(oldENIId).Return(floatingIP, nil)
-			mockOldNode.EXPECT().SetupNetworkForService(gomock.Any(), gomock.Any()).Return(nil)
+			mockOldNode.EXPECT().ChooseENI().Return(oldENI, nil).AnyTimes()
+			mockCloud.EXPECT().AllocIPAddresses(oldENIId).Return(floatingIP, nil).AnyTimes()
+			mockOldNode.EXPECT().SetupNetworkForService(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 			svc, key := newSvcObj(true, oldNodeIP)
 			Expect(k8sClient.Create(context.Background(), svc)).Should(Succeed())
@@ -250,13 +262,13 @@ var _ = Describe("ServiceController", Ordered, func() {
 			By("By deleting service")
 			mockCloud.EXPECT().DeallocIPAddresses(newENIId, gomock.Any()).Return(nil).AnyTimes()
 			mockNewNode.EXPECT().CleanNetworkForService(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-			Expect(k8sClient.Delete(context.Background(), svc)).Should(Succeed())
+			removeResource(svc)
 		})
 	})
 
 	Context("Creating service using cluster traffic policy", func() {
 		It("", func() {
-			ctrl, mockCloud, mockNodeManager := setupController()
+			ctrl, mockProvider, mockNodeManager := setupController()
 			mockNode := mockagent.NewMockNode(ctrl)
 			mockNode.EXPECT().GetIP().Return(node1IP)
 			mockNodeManager.EXPECT().ChooseSpareNode(gomock.Any()).Return(mockNode, nil)
@@ -266,7 +278,7 @@ var _ = Describe("ServiceController", Ordered, func() {
 				EniId: eniId1,
 			}
 			mockNode.EXPECT().ChooseENI().Return(eni, nil)
-			mockCloud.EXPECT().AllocIPAddresses(eni.EniId).Return(eniIp12, nil)
+			mockProvider.EXPECT().AllocIPAddresses(eni.EniId).Return(eniIp12, nil)
 			mockNode.EXPECT().SetupNetworkForService(gomock.Any(), gomock.Any()).Return(nil)
 
 			svc, key := newSvcObj(true, "")
@@ -277,12 +289,16 @@ var _ = Describe("ServiceController", Ordered, func() {
 				_ = k8sClient.Get(context.Background(), *key, svc)
 				return svc.Annotations[AnnotationKeyFloatingIP] == eniIp12
 			}, timeout, interval).Should(BeTrue())
+
+			mockProvider.EXPECT().DeallocIPAddresses(eniId1, gomock.Any()).Return(nil).AnyTimes()
+			mockNode.EXPECT().CleanNetworkForService(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+			removeResource(svc)
 		})
 	})
 
 	Context("Creating service using local traffic policy", func() {
 		It("", func() {
-			ctrl, mockCloud, mockNodeManager := setupController()
+			ctrl, mockProvider, mockNodeManager := setupController()
 			mockNode := mockagent.NewMockNode(ctrl)
 			mockNodeManager.EXPECT().GetNode(gomock.Any()).Return(mockNode, nil).AnyTimes()
 
@@ -290,7 +306,7 @@ var _ = Describe("ServiceController", Ordered, func() {
 				EniId: eniId1,
 			}
 			mockNode.EXPECT().ChooseENI().Return(eni, nil).AnyTimes()
-			mockCloud.EXPECT().AllocIPAddresses(eni.EniId).Return(eniIp12, nil).AnyTimes()
+			mockProvider.EXPECT().AllocIPAddresses(eni.EniId).Return(eniIp12, nil).AnyTimes()
 			mockNode.EXPECT().SetupNetworkForService(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 			svc, svcKey := newSvcObj(true, "")
@@ -307,6 +323,11 @@ var _ = Describe("ServiceController", Ordered, func() {
 				_ = k8sClient.Get(context.Background(), *svcKey, svc)
 				return svc.Annotations[AnnotationKeyENINodeIP] == pod.Status.HostIP
 			}, timeout, interval).Should(BeTrue())
+
+			mockProvider.EXPECT().DeallocIPAddresses(eniId1, gomock.Any()).Return(nil).AnyTimes()
+			mockNode.EXPECT().CleanNetworkForService(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+			removeResource(svc)
+			removeResource(pod)
 		})
 	})
 })

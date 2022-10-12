@@ -1,5 +1,5 @@
 #
-# Copyright 2022 The Kubeblocks Authors
+# Copyright 2022 The KubeBlocks Authors
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -190,7 +190,7 @@ mod-vendor: ## Run go mod tidy->vendor->verify against go modules.
 	$(GO) mod verify
 
 .PHONY: ctrl-test-current-ctx
-ctrl-test-current-ctx: manifests generate fmt vet ## Run operator controller tests with current $KUBECONFIG context
+ctrl-test-current-ctx: manifests generate fmt vet ## Run operator controller tests with current $KUBECONFIG context.
 	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./controllers/... -coverprofile cover.out
 
 .PHONY: test
@@ -302,10 +302,12 @@ endif
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/crd | kubectl apply -f -
+	$(KUSTOMIZE) build $(shell $(GO) env GOPATH)/pkg/mod/github.com/kubernetes-csi/external-snapshotter/client/v6@v6.0.1/config/crd | kubectl apply -f -
 
 .PHONY: uninstall
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build $(shell $(GO) env GOPATH)/pkg/mod/github.com/kubernetes-csi/external-snapshotter/client/v6@v6.0.1/config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
@@ -345,6 +347,14 @@ check-diff: reviewable ## Run git code diff checker.
 	git --no-pager diff
 	git diff --quiet || (echo please run 'make reviewable' to include all changes && false)
 	echo branch is clean
+
+.PHONY: check-license-header
+check-license-header: ## Run license header check.
+	@./hack/license/header-check.sh
+
+.PHONY: fix-license-header
+fix-license-header: ## Run license header fix.
+	@./hack/license/header-check.sh fix
 
 ##@ Helm Chart Tasks
 
@@ -571,7 +581,7 @@ HOSTPATHPLUGIN_IMG=$(MINIKUBE_IMAGE_REPO)/hostpathplugin:v1.6.0
 .PHONY: minikube-start
 minikube-start: DOCKER_PULL_CMD=ssh --native-ssh=false docker pull
 minikube-start: minikube ## Start minikube cluster.
-ifeq (, $(shell $(MINIKUBE) status -ojson | jq -r '.Host' | grep Running))
+ifeq (, $(shell $(MINIKUBE) status -n minikube -ojson | jq -r '.Host' | grep Running))
 	$(MINIKUBE) start --kubernetes-version=$(K8S_VERSION) --registry-mirror=${REGISTRY_MIRROR} --image-repository=${MINIKUBE_IMAGE_REPO}
 endif
 	$(MINIKUBE) update-context

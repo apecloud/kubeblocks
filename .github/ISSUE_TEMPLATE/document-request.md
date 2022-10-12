@@ -3,7 +3,7 @@ name: Document request
 about: 'Write to async communication '
 title: "[Doc]KubeBlocks-"
 labels: documentation
-assignees: ''
+assignees: dullb0y
 
 ---
 

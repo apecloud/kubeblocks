@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,6 +12,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"os"
 )
 
 var defaultClusterDef = "wesql-clusterdefinition"
@@ -25,6 +24,9 @@ type CreateOptions struct {
 	ClusterDefRef     string
 	AppVersionRef     string
 	TerminationPolicy string
+	PodAntiAffinity   string
+	TopologyKeys      []string
+	NodeLabels        map[string]string
 	Components        string
 
 	client dynamic.Interface
@@ -47,6 +49,9 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", defaultClusterDef, "ClusterDefinition reference")
 	cmd.Flags().StringVar(&o.AppVersionRef, "app-version", defaultAppVersion, "AppVersion reference")
 	cmd.Flags().StringVar(&o.TerminationPolicy, "termination-policy", "Halt", "Termination policy")
+	cmd.Flags().StringVar(&o.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type")
+	cmd.Flags().StringArrayVar(&o.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
+	cmd.Flags().StringToStringVar(&o.NodeLabels, "node-lables", nil, "Node label selector")
 	cmd.Flags().StringVar(&o.Components, "components", "", "Use yaml file to specify the cluster components")
 
 	return cmd
@@ -106,6 +111,23 @@ func (o *CreateOptions) Run() error {
 		}
 		components = string(jsonByte)
 	}
+	topologyKeys := "[]"
+	if len(o.TopologyKeys) > 0 {
+		jsonByte, err := json.Marshal(o.TopologyKeys)
+		if err != nil {
+			return err
+		}
+		topologyKeys = string(jsonByte)
+	}
+	nodeLabels := "{}"
+	if len(o.NodeLabels) > 0 {
+		jsonByte, err := json.Marshal(o.NodeLabels)
+		if err != nil {
+			return err
+		}
+		nodeLabels = string(jsonByte)
+	}
+
 	clusterJsonByte := []byte(fmt.Sprintf(`
 {
   "apiVersion": "dbaas.infracreate.com/v1alpha1",
@@ -117,10 +139,15 @@ func (o *CreateOptions) Run() error {
   "spec": {
     "clusterDefinitionRef": "%s",
     "appVersionRef": "%s",
+    "affinity": {
+        "podAntiAffinity": "%s",
+        "topologyKeys": %s,
+        "nodeLabels": %s
+	},
     "components": %s
   }
 }
-`, o.Name, o.Namespace, o.ClusterDefRef, o.AppVersionRef, components))
+`, o.Name, o.Namespace, o.ClusterDefRef, o.AppVersionRef, o.PodAntiAffinity, topologyKeys, nodeLabels, components))
 	if err := json.Unmarshal(clusterJsonByte, &clusterObj); err != nil {
 		return err
 	}

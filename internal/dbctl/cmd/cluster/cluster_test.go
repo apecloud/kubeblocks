@@ -45,10 +45,13 @@ var _ = Describe("Cluster", func() {
 			tf.ClientConfigVal = cfg
 
 			o := &CreateOptions{
-				IOStreams:     streams,
-				ClusterDefRef: "wesql",
-				AppVersionRef: "app-version",
-				Components:    "",
+				IOStreams:       streams,
+				ClusterDefRef:   "wesql",
+				AppVersionRef:   "app-version",
+				PodAntiAffinity: "Preferred",
+				TopologyKeys:    []string{"kubernetes.io/hostname"},
+				NodeLabels:      map[string]string{"testLabelKey": "testLabelValue"},
+				Components:      "",
 			}
 			Expect(o.Complete(tf, []string{"test"})).Should(Succeed())
 			Expect(o.Namespace).To(Equal("default"))

@@ -132,10 +132,6 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
 
-	// antiAffinity defines components should have anti-affinity constraint to same component type
-	// +kubebuilder:default=false
-	AntiAffinity bool `json:"antiAffinity,omitempty"`
-
 	// isQuorum defines odd number of pods & N/2+1 pods
 	// +kubebuilder:default=false
 	IsQuorum bool `json:"isQuorum,omitempty"`

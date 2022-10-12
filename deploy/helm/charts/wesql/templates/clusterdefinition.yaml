@@ -64,23 +64,23 @@ spec:
         command: ["/bin/bash", "-c"]
         args:
         - >
-          cluster_info=""; 
-          for (( i=0; i< $OPENDBAAS_REPLICASETS_PRIMARY_N; i++ )); do 
-            if [ $i -ne 0 ]; then 
-              cluster_info="$cluster_info;"; 
-            fi; 
-            host=$(eval echo \$OPENDBAAS_REPLICASETS_PRIMARY_"$i"_HOSTNAME) 
-            cluster_info="$cluster_info$host:13306"; 
-          done; 
-          idx=0; 
+          cluster_info="";
+          for (( i=0; i< $OPENDBAAS_REPLICASETS_PRIMARY_N; i++ )); do
+            if [ $i -ne 0 ]; then
+              cluster_info="$cluster_info;";
+            fi;
+            host=$(eval echo \$OPENDBAAS_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
+            cluster_info="$cluster_info$host:13306";
+          done;
+          idx=0;
           while IFS='-' read -ra ADDR; do
               for i in "${ADDR[@]}"; do
                 idx=$i;
               done;
-          done <<< "$OPENDBAAS_MY_POD_NAME"; 
-          echo $idx; 
-          cluster_info="$cluster_info@$(($idx+1))"; 
-          echo $cluster_info; echo {{ .Values.cluster.replicaSetCount }}; 
+          done <<< "$OPENDBAAS_MY_POD_NAME";
+          echo $idx;
+          cluster_info="$cluster_info@$(($idx+1))";
+          echo $cluster_info; echo {{ .Values.cluster.replicaSetCount }};
           mkdir -p /data/mysql/data;
           chmod +777 -R /data/mysql;
           docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$cluster_info" --cluster-id=$CLUSTER_ID

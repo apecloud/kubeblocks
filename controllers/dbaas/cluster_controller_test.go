@@ -695,7 +695,7 @@ spec:
 	})
 
 	Context("When creating cluster", func() {
-		It("PodSpec affinity should be nil if cluster affinity is nil", func() {
+		It("Should PodSpec affinity be nil if cluster affinity is nil", func() {
 			By("By creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
 
@@ -725,7 +725,7 @@ spec:
 	})
 
 	Context("When creating cluster", func() {
-		It("RequiredDuringSchedulingIgnoredDuringExecution and NoSchedule should exist if podAntiAffinity is required", func() {
+		It("Should RequiredDuringSchedulingIgnoredDuringExecution and NoSchedule exist if podAntiAffinity is required", func() {
 			By("By creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
 			toCreate.Spec.Affinity = &dbaasv1alpha1.Affinity{
@@ -763,7 +763,7 @@ spec:
 	})
 
 	Context("When creating cluster", func() {
-		It("PreferredDuringSchedulingIgnoredDuringExecution and ScheduleAnyway should exist if podAntiAffinity is preferred", func() {
+		It("Should PreferredDuringSchedulingIgnoredDuringExecution and ScheduleAnyway exist if podAntiAffinity is preferred", func() {
 			By("By creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
 			toCreate.Spec.Affinity = &dbaasv1alpha1.Affinity{
@@ -787,6 +787,84 @@ spec:
 				podSpec := stsList.Items[0].Spec.Template.Spec
 				Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable == corev1.ScheduleAnyway).Should(BeTrue())
 				return len(podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution) != 0
+			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting the scope")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	Context("When creating cluster", func() {
+		It("Should PreferredDuringSchedulingIgnoredDuringExecution and ScheduleAnyway exist if podAntiAffinity is preferred", func() {
+			By("By creating a cluster")
+			toCreate, _, _, key := newClusterObj(nil, nil)
+			toCreate.Spec.Affinity = &dbaasv1alpha1.Affinity{
+				PodAntiAffinity: dbaasv1alpha1.Preferred,
+				TopologyKeys:    []string{"testTopologyKey"},
+			}
+			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+
+			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedClusterG1)
+				return fetchedClusterG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+
+			stsList := &appsv1.StatefulSetList{}
+			Eventually(func() bool {
+				Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				Expect(len(stsList.Items) == 1).Should(BeTrue())
+				podSpec := stsList.Items[0].Spec.Template.Spec
+				Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable == corev1.ScheduleAnyway).Should(BeTrue())
+				return len(podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution) != 0
+			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting the scope")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	Context("When creating cluster", func() {
+		It("Should compoment affinity overrider cluster affinity if component affinity exists", func() {
+			By("By creating a cluster")
+			toCreate, _, _, key := newClusterObj(nil, nil)
+			toCreate.Spec.Affinity = &dbaasv1alpha1.Affinity{
+				PodAntiAffinity: dbaasv1alpha1.Preferred,
+				TopologyKeys:    []string{"testTopologyKey"},
+			}
+			toCreate.Spec.Components = []dbaasv1alpha1.ClusterComponent{}
+			toCreate.Spec.Components = append(toCreate.Spec.Components, dbaasv1alpha1.ClusterComponent{
+				Name: "replicasets",
+				Type: "replicasets",
+				Affinity: &dbaasv1alpha1.Affinity{
+					PodAntiAffinity: dbaasv1alpha1.Required,
+					TopologyKeys:    []string{"testTopologyKey"},
+				},
+			})
+			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+
+			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedClusterG1)
+				return fetchedClusterG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+
+			stsList := &appsv1.StatefulSetList{}
+			Eventually(func() bool {
+				Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				Expect(len(stsList.Items) == 1).Should(BeTrue())
+				podSpec := stsList.Items[0].Spec.Template.Spec
+				Expect(len(podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution) == 0).Should(BeTrue())
+				Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable == corev1.DoNotSchedule).Should(BeTrue())
+				return len(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0
 			}, timeout, interval).Should(BeTrue())
 
 			By("Deleting the scope")

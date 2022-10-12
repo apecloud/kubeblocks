@@ -355,9 +355,6 @@ spec:
         - containerPort: 13306
           protocol: TCP
           name: paxos
-        volumeMounts:
-          - mountPath: /data
-            name: data
         env:
         - name: MYSQL_ROOT_HOST
           value: '%'
@@ -830,17 +827,28 @@ spec:
 			"2 pods with 'follower' role label set,"+
 			"1 service routes to 'leader' pod and "+
 			"1 service routes ro 'follower' pods", func() {
-			By("By checking storage")
-			if !hasStorage(assureDefaultStorageClassObj) {
-				return
-			}
-
 			By("By creating a cluster with componentType = Consensus")
 			toCreate, _, _, key := newClusterWithConsensusObj(nil, nil)
 			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
 
 			By("By waiting the cluster is created")
 			cluster := &dbaasv1alpha1.Cluster{}
+
+			// TODO: testEnv doesn't support pod creation yet. remove the following codes when it does
+			if testEnv.UseExistingCluster == nil || !*testEnv.UseExistingCluster {
+				Eventually(func() bool {
+					err := k8sClient.Get(context.Background(), key, cluster)
+					if err != nil {
+						return false
+					}
+
+					return cluster.Status.Phase == dbaasv1alpha1.CreatingPhase
+				}, timeout*3, interval*5).Should(BeTrue())
+
+				return
+			}
+			// end remove
+
 			Eventually(func() bool {
 				err := k8sClient.Get(context.Background(), key, cluster)
 				if err != nil {

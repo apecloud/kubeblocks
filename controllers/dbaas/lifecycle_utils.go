@@ -671,14 +671,16 @@ func generateUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.S
 		return true, nil
 	}
 
-	// now all are followers
 	leader := component.ConsensusSpec.Leader.Name
 	learner := component.ConsensusSpec.Learner.Name
+	// now all are followers
 	noneFollowers := make(map[string]string)
 	readonlyFollowers := make(map[string]string)
 	readWriteFollowers := make(map[string]string)
+	followers := make(map[string]string)
 	exist := "EXIST"
 	for _, follower := range component.ConsensusSpec.Followers {
+		followers[follower.Name] = exist
 		switch follower.AccessMode {
 		case dbaasv1alpha1.None:
 			noneFollowers[follower.Name] = exist
@@ -762,7 +764,13 @@ func generateUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.S
 		}
 		// append 1/2 followers
 		podList := pods[index:]
-		end := (len(podList) - 1) / 2
+		followerCount := 0
+		for _, pod := range podList {
+			if followers[pod.Labels[consensusSetRoleLabelKey]] == exist {
+				followerCount++
+			}
+		}
+		end := followerCount / 2
 		for i := 0; i < end; i++ {
 			nextStep := &Step{}
 			nextStep.Obj = podList[i]
@@ -774,7 +782,7 @@ func generateUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.S
 		}
 		// append the other 1/2 followers
 		podList = podList[end:]
-		end = len(podList) - 1
+		end = followerCount - end
 		for i := 0; i < end; i++ {
 			nextStep := &Step{}
 			nextStep.Obj = podList[i]

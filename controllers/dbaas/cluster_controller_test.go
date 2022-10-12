@@ -334,7 +334,7 @@ spec:
       followers:
       - name: "follower"
         accessMode: Readonly
-      updateStrategy: Serial
+      updateStrategy: BestEffortParallel
     service:
       ports:
       - protocol: TCP
@@ -836,6 +836,16 @@ spec:
 
 			// TODO: testEnv doesn't support pod creation yet. remove the following codes when it does
 			if testEnv.UseExistingCluster == nil || !*testEnv.UseExistingCluster {
+				// create fake pods of StatefulSet
+				stsName := toCreate.Name + "-" + toCreate.Spec.Components[0].Name
+				pods := createFakePod(stsName, 3)
+				for _, pod := range pods {
+					Expect(k8sClient.Create(context.Background(), &pod)).Should(Succeed())
+				}
+
+				// fake pods and stateful set creation done
+				time.Sleep(interval * 5)
+
 				Eventually(func() bool {
 					err := k8sClient.Get(context.Background(), key, cluster)
 					if err != nil {
@@ -1105,6 +1115,88 @@ func hasStorage(assureDefaultStorageClassObj func() *storagev1.StorageClass) boo
 	}
 
 	return true
+}
+
+func createFakePod(parentName string, number int) []corev1.Pod {
+	podYaml := `
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    controller-revision-hash: wesql-test-859d7565b6
+  name: my-name
+  namespace: default
+spec:
+  containers:
+  - args:
+    command:
+    - /bin/bash
+    - -c
+    env:
+    - name: OPENDBAAS_MY_POD_NAME
+      valueFrom:
+        fieldRef:
+          apiVersion: v1
+          fieldPath: metadata.name
+    - name: OPENDBAAS_REPLICASETS_N
+      value: "3"
+    - name: OPENDBAAS_REPLICASETS_0_HOSTNAME
+      value: clusterepuglf-wesql-test-0
+    - name: OPENDBAAS_REPLICASETS_1_HOSTNAME
+      value: clusterepuglf-wesql-test-1
+    - name: OPENDBAAS_REPLICASETS_2_HOSTNAME
+      value: clusterepuglf-wesql-test-2
+    image: docker.io/infracreate/wesql-server-8.0:0.1-SNAPSHOT
+    imagePullPolicy: IfNotPresent
+    name: mysql
+    ports:
+    - containerPort: 3306
+      name: mysql
+      protocol: TCP
+    - containerPort: 13306
+      name: paxos
+      protocol: TCP
+    volumeMounts:
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-2rhsb
+      readOnly: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  restartPolicy: Always
+  serviceAccount: default
+  serviceAccountName: default
+  
+  volumes:
+  - name: kube-api-access-2rhsb
+    projected:
+      defaultMode: 420
+      sources:
+      - serviceAccountToken:
+          expirationSeconds: 3607
+          path: token
+      - configMap:
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: kube-root-ca.crt
+      - downwardAPI:
+          items:
+          - fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+            path: namespace
+`
+	pods := make([]corev1.Pod, 0)
+	for i := 0; i < number; i++ {
+		pod := corev1.Pod{}
+		yaml.Unmarshal([]byte(podYaml), &pod)
+		pod.Name = parentName + "-" + strconv.Itoa(i)
+		pod.Labels[consensusSetRoleLabelKey] = "follower"
+		pods = append(pods, pod)
+	}
+	pods[1].Labels[consensusSetRoleLabelKey] = "leader"
+
+	return pods
 }
 
 func getLocalIP() string {

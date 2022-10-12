@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Kubeblocks Authors
+Copyright 2022 The KubeBlocks Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -131,10 +131,6 @@ type ClusterDefinitionComponent struct {
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster
 	// +optional
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
-
-	// antiAffinity defines components should have anti-affinity constraint to same component type
-	// +kubebuilder:default=false
-	AntiAffinity bool `json:"antiAffinity,omitempty"`
 
 	// isQuorum defines odd number of pods & N/2+1 pods
 	// +kubebuilder:default=false

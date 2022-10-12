@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Kubeblocks Authors
+Copyright 2022 The KubeBlocks Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -50,7 +50,6 @@ type Component struct {
 	MaxAvailable         int                                       `json:"maxAvailable,omitempty"`
 	DefaultReplicas      int                                       `json:"defaultReplicas,omitempty"`
 	IsStateless          bool                                      `json:"isStateless,omitempty"`
-	AntiAffinity         bool                                      `json:"antiAffinity,omitempty"`
 	IsQuorum             bool                                      `json:"isQuorum,omitempty"`
 	Strategies           dbaasv1alpha1.ClusterDefinitionStrategies `json:"strategies,omitempty"`
 	PodSpec              *corev1.PodSpec                           `json:"podSpec,omitempty"`

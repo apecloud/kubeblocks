@@ -1,5 +1,5 @@
 #
-# Copyright 2022 The Kubeblocks Authors
+# Copyright 2022 The KubeBlocks Authors
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -295,10 +295,12 @@ endif
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/crd | kubectl apply -f -
+	$(KUSTOMIZE) build $(shell $(GO) env GOPATH)/pkg/mod/github.com/kubernetes-csi/external-snapshotter/client/v6@v6.0.1/config/crd | kubectl apply -f -
 
 .PHONY: uninstall
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build $(shell $(GO) env GOPATH)/pkg/mod/github.com/kubernetes-csi/external-snapshotter/client/v6@v6.0.1/config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
@@ -338,6 +340,14 @@ check-diff: reviewable ## Run git code diff checker.
 	git --no-pager diff
 	git diff --quiet || (echo please run 'make reviewable' to include all changes && false)
 	echo branch is clean
+
+.PHONY: check-license-header
+check-license-header: ## Run license header check.
+	@./hack/license/header-check.sh
+
+.PHONY: fix-license-header
+fix-license-header: ## Run license header fix.
+	@./hack/license/header-check.sh fix
 
 ##@ Helm Chart Tasks
 

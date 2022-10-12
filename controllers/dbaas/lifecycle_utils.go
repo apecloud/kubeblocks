@@ -212,7 +212,7 @@ func toK8sVolumeClaimTemplates(templates []dbaasv1alpha1.ClusterComponentVolumeC
 func buildAffinityLabelSelector(clusterName string, componentName string) *metav1.LabelSelector {
 	return &metav1.LabelSelector{
 		MatchLabels: map[string]string{
-			appInstanceLabelKey:  fmt.Sprintf("%s-%s", clusterName, componentName),
+			appInstanceLabelKey:  clusterName,
 			appComponentLabelKey: componentName,
 		},
 	}

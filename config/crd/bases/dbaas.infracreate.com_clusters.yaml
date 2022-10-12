@@ -50,6 +50,30 @@ spec:
           spec:
             description: ClusterSpec defines the desired state of Cluster
             properties:
+              affinity:
+                description: Affinity describes affinities which specific by users
+                properties:
+                  nodeLabels:
+                    additionalProperties:
+                      type: string
+                    description: NodeLabels describe constrain which nodes pod can
+                      be scheduled on based on node labels
+                    type: object
+                  podAntiAffinity:
+                    description: PodAntiAffinity defines pods of component anti-affnity
+                      Defaults to Preferred Preferred means try spread pods by topologyKey
+                      Required means must spread pods by topologyKey
+                    enum:
+                    - Preferred
+                    - Required
+                    type: string
+                  topologyKeys:
+                    description: TopologyKeys describe topologyKeys for `topologySpreadConstraint`
+                      and `podAntiAffinity` in ClusterDefinition API
+                    items:
+                      type: string
+                    type: array
+                type: object
               appVersionRef:
                 description: ref AppVersion
                 type: string
@@ -59,6 +83,31 @@ spec:
               components:
                 items:
                   properties:
+                    affinity:
+                      description: Affinity describes affinities which specific by
+                        users
+                      properties:
+                        nodeLabels:
+                          additionalProperties:
+                            type: string
+                          description: NodeLabels describe constrain which nodes pod
+                            can be scheduled on based on node labels
+                          type: object
+                        podAntiAffinity:
+                          description: PodAntiAffinity defines pods of component anti-affnity
+                            Defaults to Preferred Preferred means try spread pods
+                            by topologyKey Required means must spread pods by topologyKey
+                          enum:
+                          - Preferred
+                          - Required
+                          type: string
+                        topologyKeys:
+                          description: TopologyKeys describe topologyKeys for `topologySpreadConstraint`
+                            and `podAntiAffinity` in ClusterDefinition API
+                          items:
+                            type: string
+                          type: array
+                      type: object
                     name:
                       maxLength: 12
                       type: string

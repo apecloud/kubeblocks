@@ -55,7 +55,6 @@ var _ = Describe("Create", func() {
 				Namespace: "default",
 				IOStreams: streams,
 			}
-			Expect(baseOptions.Complete(tf, []string{})).Should(Succeed())
 			clusterOptions := map[string]interface{}{
 				"name":              "test",
 				"namespace":         "default",
@@ -64,18 +63,22 @@ var _ = Describe("Create", func() {
 				"components":        []string{},
 				"terminationPolicy": "Halt",
 			}
+
 			inputs := Inputs{
 				CueTemplateName: "create_template_test.cue",
 				ResourceName:    types.ResourceClusters,
+				BaseOptionsObj:  &baseOptions,
 				Options:         clusterOptions,
 				Factory:         tf,
-				ValidateFunc: func() error {
+				Validate: func() error {
 					return nil
 				},
-				OptionsConvertFunc: func() error {
+				Complete: func() error {
 					return nil
 				},
 			}
+			BuildCommand(inputs)
+			Expect(baseOptions.Complete(inputs, []string{})).Should(Succeed())
 			Expect(baseOptions.Run(inputs, []string{"test"})).Should(Succeed())
 		})
 	})

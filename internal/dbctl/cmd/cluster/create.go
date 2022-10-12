@@ -57,8 +57,7 @@ func (o *CreateOptions) Validate() error {
 	return nil
 }
 
-// CovertComponents get content from componentsFilePath and covert to components
-func (o *CreateOptions) CovertComponents() error {
+func (o *CreateOptions) Complete() error {
 	var (
 		componentByte []byte
 		err           error
@@ -81,29 +80,25 @@ func (o *CreateOptions) CovertComponents() error {
 
 func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &CreateOptions{BaseOptions: create.BaseOptions{IOStreams: streams}}
-	cmd := &cobra.Command{
-		Use:   "create",
-		Short: "Create a database cluster",
-		Run: func(cmd *cobra.Command, args []string) {
-			inputs := create.Inputs{
-				CueTemplateName:    clusterCueTemplateName,
-				ResourceName:       types.ResourceClusters,
-				Options:            o,
-				Factory:            f,
-				ValidateFunc:       o.Validate,
-				OptionsConvertFunc: o.CovertComponents,
-			}
-			cmdutil.CheckErr(o.Run(inputs, args))
+	inputs := create.Inputs{
+		Use:             "create",
+		Short:           "Create a database cluster",
+		CueTemplateName: clusterCueTemplateName,
+		ResourceName:    types.ResourceClusters,
+		BaseOptionsObj:  &o.BaseOptions,
+		Options:         o,
+		Factory:         f,
+		Validate:        o.Validate,
+		Complete:        o.Complete,
+		BuildFlags: func(cmd *cobra.Command) {
+			cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", defaultClusterDef, "ClusterDefinition reference")
+			cmd.Flags().StringVar(&o.AppVersionRef, "app-version", defaultAppVersion, "AppVersion reference")
+			cmd.Flags().StringVar(&o.TerminationPolicy, "termination-policy", "Halt", "Termination policy")
+			cmd.Flags().StringVar(&o.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type")
+			cmd.Flags().StringArrayVar(&o.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
+			cmd.Flags().StringToStringVar(&o.NodeLabels, "node-labels", nil, "Node label selector")
+			cmd.Flags().StringVar(&o.ComponentsFilePath, "components", "", "Use yaml file to specify the cluster components")
 		},
 	}
-
-	cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", defaultClusterDef, "ClusterDefinition reference")
-	cmd.Flags().StringVar(&o.AppVersionRef, "app-version", defaultAppVersion, "AppVersion reference")
-	cmd.Flags().StringVar(&o.TerminationPolicy, "termination-policy", "Halt", "Termination policy")
-	cmd.Flags().StringVar(&o.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type")
-	cmd.Flags().StringArrayVar(&o.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
-	cmd.Flags().StringToStringVar(&o.NodeLabels, "node-labels", nil, "Node label selector")
-	cmd.Flags().StringVar(&o.ComponentsFilePath, "components", "", "Use yaml file to specify the cluster components")
-
-	return cmd
+	return create.BuildCommand(inputs)
 }

@@ -72,20 +72,8 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string) error {
 		o.Name = args[0]
 	}
 
-	// used to fetch the resource
-	config, err := f.ToRESTConfig()
-	if err != nil {
-		return nil
-	}
-
-	client, err := dynamic.NewForConfig(config)
-	if err != nil {
-		return err
-	}
-
-	o.client = client
-
-	return nil
+	o.client, err = f.DynamicClient()
+	return err
 }
 
 func (o *DeleteOptions) Run() error {

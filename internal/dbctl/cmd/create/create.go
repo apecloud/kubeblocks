@@ -27,6 +27,7 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	cuejson "cuelang.org/go/encoding/json"
 	"github.com/leaanthony/debme"
+	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -43,6 +44,15 @@ var (
 )
 
 type Inputs struct {
+	// Use cobra command use
+	Use string
+
+	// Short is the short description shown in the 'help' output.
+	Short string
+
+	// BaseOptionsObj
+	BaseOptionsObj *BaseOptions
+
 	// Options a command options object which extends BaseOptions
 	Options interface{}
 
@@ -55,11 +65,13 @@ type Inputs struct {
 	// Factory
 	Factory cmdutil.Factory
 
-	// ValidateFunc custom validate func
-	ValidateFunc func() error
+	// ValidateFunc optional, custom validate func
+	Validate func() error
 
-	// OptionsConvertFunc do custom options conversion
-	OptionsConvertFunc func() error
+	// Complete optional, do custom complete options
+	Complete func() error
+
+	BuildFlags func(*cobra.Command)
 }
 
 // BaseOptions the options of creation command should inherit baseOptions
@@ -73,10 +85,24 @@ type BaseOptions struct {
 	genericclioptions.IOStreams
 }
 
-// Complete complete options struct default variables
-func (o *BaseOptions) Complete(f cmdutil.Factory, args []string) error {
+// BuildCommand build create command
+func BuildCommand(inputs Inputs) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   inputs.Use,
+		Short: inputs.Short,
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(inputs.BaseOptionsObj.Run(inputs, args))
+		},
+	}
+	if inputs.BuildFlags != nil {
+		inputs.BuildFlags(cmd)
+	}
+	return cmd
+}
+
+func (o *BaseOptions) Complete(inputs Inputs, args []string) error {
 	var err error
-	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
+	o.Namespace, _, err = inputs.Factory.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -85,20 +111,15 @@ func (o *BaseOptions) Complete(f cmdutil.Factory, args []string) error {
 		o.Name = args[0]
 	}
 
-	// used to fetch the resource
-	config, err := f.ToRESTConfig()
-	if err != nil {
-		return nil
+	// do custom options complete
+	if inputs.Complete != nil {
+		if err = inputs.Complete(); err != nil {
+			return err
+		}
 	}
 
-	client, err := dynamic.NewForConfig(config)
-	if err != nil {
-		return err
-	}
-
-	o.client = client
-
-	return nil
+	o.client, err = inputs.Factory.DynamicClient()
+	return err
 }
 
 // Run execute command. the options of parameter contain the command flags and args.
@@ -110,20 +131,13 @@ func (o *BaseOptions) Run(inputs Inputs, args []string) error {
 		optionsByte     []byte
 	)
 	// complete options variables
-	if err = o.Complete(inputs.Factory, args); err != nil {
+	if err = o.Complete(inputs, args); err != nil {
 		return err
 	}
 
-	// do options custom convert
-	if inputs.OptionsConvertFunc != nil {
-		if err = inputs.OptionsConvertFunc(); err != nil {
-			return err
-		}
-	}
-
 	// do options validate
-	if inputs.ValidateFunc != nil {
-		if err = inputs.ValidateFunc(); err != nil {
+	if inputs.Validate != nil {
+		if err = inputs.Validate(); err != nil {
 			return err
 		}
 	}

@@ -66,16 +66,24 @@ var _ = Describe("Cluster", func() {
 			}
 
 			o.ComponentsFilePath = "test.yaml"
-			Expect(o.CovertComponents()).ShouldNot(Succeed())
+			Expect(o.Complete()).ShouldNot(Succeed())
 
 			o.ComponentsFilePath = ""
-			Expect(o.CovertComponents()).Should(Succeed())
+			Expect(o.Complete()).Should(Succeed())
 
-			Expect(o.Complete(tf, []string{"test"})).Should(Succeed())
+			inputs := create.Inputs{
+				ResourceName:    types.ResourceClusters,
+				CueTemplateName: clusterCueTemplateName,
+				Options:         o,
+				Factory:         tf,
+			}
+
+			Expect(o.BaseOptions.Complete(inputs, []string{"test"})).Should(Succeed())
 			Expect(o.Namespace).To(Equal("default"))
 			Expect(o.Name).To(Equal("test"))
 
-			Expect(o.Run(create.Inputs{ResourceName: types.ResourceClusters, CueTemplateName: clusterCueTemplateName, Options: o, Factory: tf}, []string{})).Should(Succeed())
+			Expect(o.Run(inputs, []string{})).Should(Succeed())
+
 			del := &DeleteOptions{}
 			Expect(del.Validate([]string{})).To(MatchError("missing cluster name"))
 			Expect(del.Complete(tf, []string{"test"})).Should(Succeed())

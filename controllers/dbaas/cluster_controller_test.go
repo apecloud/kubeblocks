@@ -1189,7 +1189,7 @@ spec:
 	pods := make([]corev1.Pod, 0)
 	for i := 0; i < number; i++ {
 		pod := corev1.Pod{}
-		yaml.Unmarshal([]byte(podYaml), &pod)
+		Expect(yaml.Unmarshal([]byte(podYaml), &pod)).Should(Succeed())
 		pod.Name = parentName + "-" + strconv.Itoa(i)
 		pod.Labels[consensusSetRoleLabelKey] = "follower"
 		pods = append(pods, pod)

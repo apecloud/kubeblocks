@@ -14,6 +14,19 @@ component: {
 	volumeClaimTemplates: [...]
 }
 
+probeContainer: {
+    image: "k8s.gcr.io/pause:3.6"
+    command: ["/pause"]
+    imagePullPolicy: "IfNotPresent"
+    name: "string"
+    livenessProbe: {
+        httpGet: {
+            path: "/"
+            port: 8088
+        }
+    }
+}
+
 statefulset: {
 	apiVersion: "apps/v1"
 	kind:       "StatefulSet"

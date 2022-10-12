@@ -1055,11 +1055,13 @@ func buildProbeContainers(params createParams) ([]corev1.Container, error) {
 			return nil, err
 		}
 		container.Name = "KBProbeStatusCheck"
-		container.ReadinessProbe.PeriodSeconds = componentProbes.StatusProbe.PeriodSeconds
-		container.ReadinessProbe.SuccessThreshold = componentProbes.StatusProbe.SuccessThreshold
-		container.ReadinessProbe.FailureThreshold = componentProbes.StatusProbe.FailureThreshold
-		container.ReadinessProbe.FailureThreshold = componentProbes.StatusProbe.FailureThreshold
-		container.ReadinessProbe.HTTPGet.Path = "/"
+		probe := corev1.Probe{}
+		probe.HTTPGet = &corev1.HTTPGetAction{}
+		probe.HTTPGet.Path = "/"
+		probe.PeriodSeconds = componentProbes.StatusProbe.PeriodSeconds
+		probe.SuccessThreshold = componentProbes.StatusProbe.SuccessThreshold
+		probe.FailureThreshold = componentProbes.StatusProbe.FailureThreshold
+		container.ReadinessProbe = &probe
 		probeContainers = append(probeContainers, container)
 	}
 
@@ -1069,9 +1071,14 @@ func buildProbeContainers(params createParams) ([]corev1.Container, error) {
 			return nil, err
 		}
 		container.Name = "KBProbeRunningCheck"
-		container.ReadinessProbe.PeriodSeconds = componentProbes.RunningProbe.PeriodSeconds
-		container.ReadinessProbe.SuccessThreshold = componentProbes.RunningProbe.SuccessThreshold
-		container.ReadinessProbe.FailureThreshold = componentProbes.RunningProbe.FailureThreshold
+		probe := corev1.Probe{}
+		probe.HTTPGet = &corev1.HTTPGetAction{}
+		probe.HTTPGet.Path = "/"
+		probe.PeriodSeconds = componentProbes.RunningProbe.PeriodSeconds
+		probe.SuccessThreshold = componentProbes.RunningProbe.SuccessThreshold
+		probe.FailureThreshold = componentProbes.RunningProbe.FailureThreshold
+		container.ReadinessProbe = &probe
+		probeContainers = append(probeContainers, container)
 		probeContainers = append(probeContainers, container)
 	}
 
@@ -1081,9 +1088,13 @@ func buildProbeContainers(params createParams) ([]corev1.Container, error) {
 			return nil, err
 		}
 		container.Name = "KBProbeRoleChangedCheck"
-		container.ReadinessProbe.PeriodSeconds = componentProbes.RoleChangedProbe.PeriodSeconds
-		container.ReadinessProbe.SuccessThreshold = componentProbes.RoleChangedProbe.SuccessThreshold
-		container.ReadinessProbe.FailureThreshold = componentProbes.RoleChangedProbe.FailureThreshold
+		probe := corev1.Probe{}
+		probe.HTTPGet = &corev1.HTTPGetAction{}
+		probe.HTTPGet.Path = "/"
+		probe.PeriodSeconds = componentProbes.RoleChangedProbe.PeriodSeconds
+		probe.SuccessThreshold = componentProbes.RoleChangedProbe.SuccessThreshold
+		probe.FailureThreshold = componentProbes.RoleChangedProbe.FailureThreshold
+		container.ReadinessProbe = &probe
 		probeContainers = append(probeContainers, container)
 	}
 

@@ -7487,10 +7487,17 @@ spec:
                               type: boolean
                             failureThreshold:
                               default: 1
+                              format: int32
                               minimum: 1
                               type: integer
                             periodSeconds:
                               default: 1
+                              format: int32
+                              minimum: 1
+                              type: integer
+                            successThreshold:
+                              default: 1
+                              format: int32
                               minimum: 1
                               type: integer
                           type: object
@@ -7512,10 +7519,17 @@ spec:
                               type: boolean
                             failureThreshold:
                               default: 1
+                              format: int32
                               minimum: 1
                               type: integer
                             periodSeconds:
                               default: 1
+                              format: int32
+                              minimum: 1
+                              type: integer
+                            successThreshold:
+                              default: 1
+                              format: int32
                               minimum: 1
                               type: integer
                           type: object
@@ -7537,10 +7551,17 @@ spec:
                               type: boolean
                             failureThreshold:
                               default: 1
+                              format: int32
                               minimum: 1
                               type: integer
                             periodSeconds:
                               default: 1
+                              format: int32
+                              minimum: 1
+                              type: integer
+                            successThreshold:
+                              default: 1
+                              format: int32
                               minimum: 1
                               type: integer
                           type: object

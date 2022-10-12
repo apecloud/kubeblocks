@@ -150,6 +150,10 @@ spec:
 				}
 				return createdAppVersion.Status.ClusterDefSyncStatus == "OutOfSync"
 			}, time.Second*10, time.Second*1).Should(BeTrue())
+
+			By("By deleting clusterDefinition")
+			Expect(k8sClient.Delete(ctx, createdAppVersion)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, createdClusterDef)).Should(Succeed())
 		})
 	})
 })

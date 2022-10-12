@@ -134,6 +134,7 @@ type ClusterComponent struct {
 	Replicas int `json:"replicas,omitempty"`
 
 	// Affinity describes affinities which specific by users
+	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
 	// +optional

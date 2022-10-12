@@ -1,5 +1,5 @@
 #
-# Copyright 2022 The Kubeblocks Authors
+# Copyright 2022 The KubeBlocks Authors
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -340,6 +340,14 @@ check-diff: reviewable ## Run git code diff checker.
 	git --no-pager diff
 	git diff --quiet || (echo please run 'make reviewable' to include all changes && false)
 	echo branch is clean
+
+.PHONY: check-license-header
+check-license-header: ## Run license header check.
+	@./hack/license/header-check.sh
+
+.PHONY: fix-license-header
+fix-license-header: ## Run license header fix.
+	@./hack/license/header-check.sh fix
 
 ##@ Helm Chart Tasks
 

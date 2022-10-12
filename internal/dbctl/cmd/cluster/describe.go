@@ -23,6 +23,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/describe"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
 func NewDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -31,7 +32,7 @@ func NewDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 		Streams: streams,
 		Short:   "Describe database cluster info.",
 		GroupKind: []schema.GroupKind{
-			{Group: "dbaas.infracreate.com", Kind: "Cluster"},
+			{Group: types.Group, Kind: types.KindCluster},
 		},
 		Template: []string{"cluster.tmpl"},
 	}

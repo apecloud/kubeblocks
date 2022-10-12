@@ -26,6 +26,8 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
 type DeleteOptions struct {
@@ -87,7 +89,7 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string) error {
 }
 
 func (o *DeleteOptions) Run() error {
-	gvr := schema.GroupVersionResource{Group: "dbaas.infracreate.com", Version: "v1alpha1", Resource: "clusters"}
+	gvr := schema.GroupVersionResource{Group: types.Group, Version: types.Version, Resource: types.ResourceClusters}
 	err := o.client.Resource(gvr).Namespace(o.Namespace).Delete(context.TODO(), o.Name, metav1.DeleteOptions{})
 	if err != nil {
 		return err

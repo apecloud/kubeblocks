@@ -21,6 +21,9 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/create"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
 var _ = Describe("Cluster", func() {
@@ -31,28 +34,19 @@ var _ = Describe("Cluster", func() {
 
 	Context("create", func() {
 		It("without name", func() {
-			o := &CreateOptions{IOStreams: streams}
-			Expect(o.Validate([]string{})).To(MatchError("missing cluster name"))
-		})
-
-		It("without cluster definition", func() {
-			o := &CreateOptions{IOStreams: streams}
-			Expect(o.Validate([]string{"test"})).To(MatchError("cluster-definition can not be empty"))
-		})
-
-		It("without app-version", func() {
-			o := &CreateOptions{
-				IOStreams:     streams,
-				ClusterDefRef: "wesql",
-			}
-			Expect(o.Validate([]string{"test"})).To(MatchError("app-version can not be empty"))
+			o := &CreateOptions{}
+			o.IOStreams = streams
+			Expect(o.Validate()).To(MatchError("missing cluster name"))
 		})
 
 		It("new command", func() {
 			tf := cmdtesting.NewTestFactory().WithNamespace("default")
 			defer tf.Cleanup()
+			tf.ClientConfigVal = cfg
 			cmd := NewCreateCmd(tf, streams)
 			Expect(cmd != nil).To(BeTrue())
+			// must succeed otherwise exit 1 and make test fails
+			cmd.Run(nil, []string{"test1"})
 		})
 
 		It("run", func() {
@@ -61,20 +55,27 @@ var _ = Describe("Cluster", func() {
 			tf.ClientConfigVal = cfg
 
 			o := &CreateOptions{
-				IOStreams:       streams,
-				ClusterDefRef:   "wesql",
-				AppVersionRef:   "app-version",
-				PodAntiAffinity: "Preferred",
-				TopologyKeys:    []string{"kubernetes.io/hostname"},
-				NodeLabels:      map[string]string{"testLabelKey": "testLabelValue"},
-				Components:      "",
+				BaseOptions:        create.BaseOptions{IOStreams: streams, Name: "test"},
+				ComponentsFilePath: "",
+				TerminationPolicy:  "Halt",
+				ClusterDefRef:      "wesql",
+				AppVersionRef:      "app-version",
+				PodAntiAffinity:    "Preferred",
+				TopologyKeys:       []string{"kubernetes.io/hostname"},
+				NodeLabels:         map[string]string{"testLabelKey": "testLabelValue"},
 			}
+
+			o.ComponentsFilePath = "test.yaml"
+			Expect(o.CovertComponents()).ShouldNot(Succeed())
+
+			o.ComponentsFilePath = ""
+			Expect(o.CovertComponents()).Should(Succeed())
+
 			Expect(o.Complete(tf, []string{"test"})).Should(Succeed())
 			Expect(o.Namespace).To(Equal("default"))
 			Expect(o.Name).To(Equal("test"))
 
-			Expect(o.Run()).Should(Succeed())
-
+			Expect(o.Run(create.Inputs{ResourceName: types.ResourceClusters, CueTemplateName: clusterCueTemplateName, Options: o, Factory: tf}, []string{})).Should(Succeed())
 			del := &DeleteOptions{}
 			Expect(del.Validate([]string{})).To(MatchError("missing cluster name"))
 			Expect(del.Complete(tf, []string{"test"})).Should(Succeed())

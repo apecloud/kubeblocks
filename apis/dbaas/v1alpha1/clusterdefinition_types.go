@@ -223,10 +223,13 @@ type ClusterDefinitionProbe struct {
 	Enable bool `json:"enable,omitempty"`
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
-	PeriodSeconds int `json:"periodSeconds,omitempty"`
+	PeriodSeconds int32 `json:"periodSeconds,omitempty"`
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
-	FailureThreshold int                        `json:"failureThreshold,omitempty"`
+	FailureThreshold int32 `json:"failureThreshold,omitempty"`
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	SuccessThreshold int32                      `json:"successThreshold,omitempty"`
 	Commands         ClusterDefinitionProbeCMDs `json:"commands,omitempty"`
 }
 

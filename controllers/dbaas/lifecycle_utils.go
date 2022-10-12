@@ -206,6 +206,7 @@ func mergeComponents(
 		Service:         clusterDefComp.Service,
 		ReadonlyService: clusterDefComp.ReadonlyService,
 		Scripts:         clusterDefComp.Scripts,
+		Probes:          clusterDefComp.Probes,
 	}
 	if clusterComp != nil {
 		component.Name = clusterComp.Name
@@ -997,6 +998,11 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 		return nil, err
 	}
 
+	probeContainers, err := buildProbeContainers(params)
+	if err != nil {
+		return nil, err
+	}
+	sts.Spec.Template.Spec.Containers = append(sts.Spec.Template.Spec.Containers, probeContainers...)
 	prefix := dbaasPrefix + "_" + strings.ToUpper(params.component.Type) + "_"
 	replicas := int(*sts.Spec.Replicas)
 	for i := range sts.Spec.Template.Spec.Containers {
@@ -1025,6 +1031,66 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 		}
 	}
 	return &sts, nil
+}
+
+func buildProbeContainers(params createParams) ([]corev1.Container, error) {
+	cueFS, _ := debme.FS(cueTemplates, "cue")
+
+	cueTpl, err := params.getCacheCUETplValue("statefulset_template.cue", func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("statefulset_template.cue"))
+	})
+	if err != nil {
+		return nil, err
+	}
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+	probeContainerByte, err := cueValue.Lookup("probeContainer")
+	if err != nil {
+		return nil, err
+	}
+	probeContainers := []corev1.Container{}
+	componentProbes := params.component.Probes
+	if componentProbes.StatusProbe.Enable {
+		container := corev1.Container{}
+		if err = json.Unmarshal(probeContainerByte, &container); err != nil {
+			return nil, err
+		}
+		container.Name = "KBProbeStatusCheck"
+		container.ReadinessProbe.PeriodSeconds = componentProbes.StatusProbe.PeriodSeconds
+		container.ReadinessProbe.SuccessThreshold = componentProbes.StatusProbe.SuccessThreshold
+		container.ReadinessProbe.FailureThreshold = componentProbes.StatusProbe.FailureThreshold
+		container.ReadinessProbe.FailureThreshold = componentProbes.StatusProbe.FailureThreshold
+		container.ReadinessProbe.HTTPGet.Path = "/"
+		probeContainers = append(probeContainers, container)
+	}
+
+	if componentProbes.RunningProbe.Enable {
+		container := corev1.Container{}
+		if err = json.Unmarshal(probeContainerByte, &container); err != nil {
+			return nil, err
+		}
+		container.Name = "KBProbeRunningCheck"
+		container.ReadinessProbe.PeriodSeconds = componentProbes.RunningProbe.PeriodSeconds
+		container.ReadinessProbe.SuccessThreshold = componentProbes.RunningProbe.SuccessThreshold
+		container.ReadinessProbe.FailureThreshold = componentProbes.RunningProbe.FailureThreshold
+		probeContainers = append(probeContainers, container)
+	}
+
+	if componentProbes.RoleChangedProbe.Enable {
+		container := corev1.Container{}
+		if err = json.Unmarshal(probeContainerByte, &container); err != nil {
+			return nil, err
+		}
+		container.Name = "KBProbeRoleChangedCheck"
+		container.ReadinessProbe.PeriodSeconds = componentProbes.RoleChangedProbe.PeriodSeconds
+		container.ReadinessProbe.SuccessThreshold = componentProbes.RoleChangedProbe.SuccessThreshold
+		container.ReadinessProbe.FailureThreshold = componentProbes.RoleChangedProbe.FailureThreshold
+		probeContainers = append(probeContainers, container)
+	}
+
+	if len(probeContainers) >= 1 {
+		probeContainers[0].Image = "probe:latest"
+	}
+	return probeContainers, nil
 }
 
 // buildConsensusSet build on a stateful set

@@ -56,5 +56,6 @@ type Component struct {
 	Service              corev1.ServiceSpec                     `json:"service,omitempty"`
 	ReadonlyService      corev1.ServiceSpec                     `json:"readonlyService,omitempty"`
 	Scripts              dbaasv1alpha1.ClusterDefinitionScripts `json:"scripts,omitempty"`
+	Probes               dbaasv1alpha1.ClusterDefinitionProbes  `json:"probes,omitempty"`
 	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 }

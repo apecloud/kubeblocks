@@ -117,4 +117,5 @@ Docker containers
   push-cli-container  Push dbctl CLI container image.
   build-manager-container  Build Operator manager container image.
   push-manager-container  Push Operator manager container image.
+  build-image-pr   Build Operator manager container image PR check.
 ```

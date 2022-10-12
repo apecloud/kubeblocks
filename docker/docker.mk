@@ -90,3 +90,8 @@ else
 	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} --push
 endif
 endif
+
+
+.PHONY: build-image-pr
+build-image-pr: generate ## Build Operator manager container image PR check.
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest

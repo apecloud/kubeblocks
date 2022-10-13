@@ -1,0 +1,13 @@
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind:       AppVersion
+metadata:
+  name:     app-version-consensus
+spec:
+  clusterDefinitionRef: mysql_clusterdef_consensus
+  components:
+  - type: replicasets
+    podSpec:
+      containers:
+      - name: mysql
+        image: docker.io/infracreate/wesql-server-8.0:0.1-SNAPSHOT
+        imagePullPolicy: IfNotPresent

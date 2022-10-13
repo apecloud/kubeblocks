@@ -17,24 +17,92 @@ limitations under the License.
 package playground
 
 import (
+	"fmt"
+	"net/http"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest/fake"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
 var _ = Describe("util", func() {
-	It("Print Guide info", func() {
-		clusterInfo := types.PlaygroundInfo{
-			DBCluster:     "mycluster",
-			DBPort:        "3306",
-			DBNamespace:   "default",
-			Namespace:     "dbctl-playground",
-			GrafanaSvc:    "prometheus-grafana",
-			GrafanaPort:   "9100",
-			GrafanaUser:   "admin",
-			GrafanaPasswd: "prom-operator",
+	clusterName = "dbctl-playground-test"
+	dbClusterName = "dbctl-playground-test-cluster"
+
+	mockClient := func(data runtime.Object) *cmdtesting.TestFactory {
+		tf := cmdtesting.NewTestFactory().WithNamespace("test")
+		defer tf.Cleanup()
+
+		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+		tf.Client = &fake.RESTClient{
+			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+			Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, data)},
 		}
-		Expect(printPlaygroundGuide(clusterInfo)).Should(Succeed())
+		return tf
+	}
+
+	It("build cluster info", func() {
+		var (
+			clusterInfo = &ClusterInfo{
+				HostIP:        "",
+				CloudProvider: "",
+				KubeConfig:    util.ConfigPath(clusterName),
+				GrafanaPort:   "9100",
+				GrafanaUser:   "admin",
+				GrafanaPasswd: "prom-operator",
+			}
+		)
+
+		tf := mockClient(&corev1.ConfigMap{})
+		Expect(buildClusterInfo(clusterInfo, "default", dbClusterName)).Should(HaveOccurred())
+
+		// test builder
+		builder := &builder{}
+		builder.namespace = "default"
+		builder.name = dbClusterName
+		clientSet, err := tf.KubernetesClientSet()
+		Expect(err).Should(BeNil())
+		builder.clientSet = clientSet
+
+		dynamicClient, err := tf.DynamicClient()
+		Expect(err).Should(BeNil())
+		builder.dynamicClient = dynamicClient
+
+		// get cluster
+		builder.groupKind = schema.GroupKind{Group: "dbaas.infracreate.com", Kind: "Cluster"}
+		Expect(builder.getClusterObject(clusterInfo)).Should(HaveOccurred())
+
+		// get statefulset
+		builder.label = fmt.Sprintf("app.kubernetes.io/instance=%s", dbClusterName)
+		builder.groupKind = schema.GroupKind{Kind: "StatefulSet"}
+		Expect(builder.getClusterObject(clusterInfo)).Should(HaveOccurred())
+
+		// get deployment
+		builder.label = fmt.Sprintf("app.kubernetes.io/instance=%s", dbClusterName)
+		builder.groupKind = schema.GroupKind{Kind: "Deployment"}
+		Expect(builder.getClusterObject(clusterInfo)).Should(HaveOccurred())
+
+		// get service
+		builder.label = fmt.Sprintf("app.kubernetes.io/instance=%s", dbClusterName)
+		builder.groupKind = schema.GroupKind{Kind: "Service"}
+		Expect(builder.getClusterObject(clusterInfo)).Should(HaveOccurred())
+
+		// get secret
+		builder.label = fmt.Sprintf("app.kubernetes.io/instance=%s", dbClusterName)
+		builder.groupKind = schema.GroupKind{Kind: "Secret"}
+		Expect(builder.getClusterObject(clusterInfo)).Should(HaveOccurred())
+
+		// get pod
+		builder.label = fmt.Sprintf("app.kubernetes.io/instance=%s", dbClusterName)
+		builder.groupKind = schema.GroupKind{Kind: "Pod"}
+		Expect(builder.getClusterObject(clusterInfo)).Should(HaveOccurred())
 	})
 })

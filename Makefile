@@ -366,7 +366,7 @@ helm-push: helm-package ## Do helm package and push.
 
 ##@ WeSQL Cluster Helm Chart Tasks
 
-WESQL_CLUSTER_CHART_PATH = deploy/helm/wesqlcluster
+WESQL_CLUSTER_CHART_PATH = deploy/wesqlcluster
 WESQL_CLUSTER_CHART_NAME = wesqlcluster
 WESQL_CLUSTER_CHART_VERSION ?= 0.1.1
 
@@ -407,17 +407,23 @@ KUSTOMIZE_INSTALL_SCRIPT ?= "$(GITHUB_PROXY)https://raw.githubusercontent.com/ku
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
 $(KUSTOMIZE): $(LOCALBIN)
+ifeq (, $(shell ls $(LOCALBIN)/kustomize 2>/dev/null))
 	curl -s $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN)
+endif
 
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
 $(CONTROLLER_GEN): $(LOCALBIN)
+ifeq (, $(shell ls $(LOCALBIN)/controller-gen 2>/dev/null))
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
+endif
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
+ifeq (, $(shell ls $(LOCALBIN)/setup-envtest 2>/dev/null))
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+endif
 
 
 .PHONY: install-docker-buildx

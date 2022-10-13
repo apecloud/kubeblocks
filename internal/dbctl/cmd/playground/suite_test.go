@@ -25,5 +25,16 @@ import (
 
 func TestPlayground(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Playground Suite")
+	RunSpecs(t, "PlayGround Suite")
 }
+
+var _ = BeforeSuite(func() {
+	// set default cluster name to test
+	clusterName = "dbctl-playground-test"
+	dbClusterName = "dbctl-playground-test-cluster"
+
+	// set fake image info
+	K3sImage = "fake-k3s-image"
+	K3dToolsImage = "fake-k3s-tools-image"
+	K3dProxyImage = "fake-k3d-proxy-image"
+})

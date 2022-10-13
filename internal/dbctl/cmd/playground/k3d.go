@@ -34,10 +34,8 @@ import (
 	"github.com/pkg/errors"
 	"helm.sh/helm/v3/pkg/repo"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
-	"github.com/apecloud/kubeblocks/version"
 )
 
 var (
@@ -49,9 +47,7 @@ var (
 type installer struct {
 	cfg         config.ClusterConfig
 	ctx         context.Context
-	namespace   string
 	clusterName string
-	dbCluster   string
 	wesql       Wesql
 }
 
@@ -174,7 +170,7 @@ func (i *installer) genKubeconfig() error {
 // setKubeconfig set kubeconfig environment of cluster
 func (i *installer) setKubeconfig() error {
 	info("Setting kubeconfig env for dbctl playground...")
-	return os.Setenv("KUBECONFIG", util.ConfigPath(i.cfg.Cluster.Name))
+	return os.Setenv("KUBECONFIG", util.ConfigPath(i.clusterName))
 }
 
 func (i *installer) installDeps() error {
@@ -194,24 +190,6 @@ func (i *installer) installDeps() error {
 	time.Sleep(10 * time.Second)
 
 	return nil
-}
-
-func (i *installer) printGuide(cloudProvider string, hostIP string) error {
-	info := types.PlaygroundInfo{
-		HostIP:        hostIP,
-		CloudProvider: cloudProvider,
-		DBCluster:     i.dbCluster,
-		DBPort:        "3306",
-		DBNamespace:   "default",
-		Namespace:     i.namespace,
-		ClusterName:   i.clusterName,
-		GrafanaSvc:    "prometheus-grafana",
-		GrafanaPort:   "9100",
-		GrafanaUser:   "admin",
-		GrafanaPasswd: "prom-operator",
-		Version:       version.Version,
-	}
-	return printPlaygroundGuide(info)
 }
 
 // buildClusterRunConfig returns the run-config for the k3d cluster
@@ -434,14 +412,14 @@ func installCharts(i *installer) error {
 	}
 
 	info("Installing playground database cluster...")
-	charts := i.wesql.getBaseCharts(i.namespace)
+	charts := i.wesql.getBaseCharts()
 	err := install(charts)
 	if err != nil {
 		return err
 	}
 
 	// install database cluster to default namespace
-	charts = i.wesql.getDBCharts(i.namespace, i.dbCluster)
+	charts = i.wesql.getDBCharts()
 	err = install(charts)
 	if err != nil {
 		return err

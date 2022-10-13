@@ -157,6 +157,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return *res, err
 	}
 
+	reqCtx.Log.Info("update cluster status")
 	if err = r.updateClusterPhaseToCreatingOrUpdating(reqCtx, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}

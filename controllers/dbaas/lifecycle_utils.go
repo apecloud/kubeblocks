@@ -1154,19 +1154,19 @@ func buildProbeContainers(params createParams) ([]corev1.Container, error) {
 	}
 	probeContainers := []corev1.Container{}
 	componentProbes := params.component.Probes
+	params.reqCtx.Log.Info("probe", "settings", componentProbes)
 	if componentProbes.StatusProbe.Enable {
 		container := corev1.Container{}
 		if err = json.Unmarshal(probeContainerByte, &container); err != nil {
 			return nil, err
 		}
-		container.Name = "KBProbeStatusCheck"
-		probe := corev1.Probe{}
-		probe.HTTPGet = &corev1.HTTPGetAction{}
+
+		container.Name = "kbprobe-statuscheck"
+		probe := container.ReadinessProbe
 		probe.HTTPGet.Path = "/"
 		probe.PeriodSeconds = componentProbes.StatusProbe.PeriodSeconds
 		probe.SuccessThreshold = componentProbes.StatusProbe.SuccessThreshold
 		probe.FailureThreshold = componentProbes.StatusProbe.FailureThreshold
-		container.ReadinessProbe = &probe
 		probeContainers = append(probeContainers, container)
 	}
 
@@ -1175,15 +1175,12 @@ func buildProbeContainers(params createParams) ([]corev1.Container, error) {
 		if err = json.Unmarshal(probeContainerByte, &container); err != nil {
 			return nil, err
 		}
-		container.Name = "KBProbeRunningCheck"
-		probe := corev1.Probe{}
-		probe.HTTPGet = &corev1.HTTPGetAction{}
+		container.Name = "kbprobe-runningcheck"
+		probe := container.ReadinessProbe
 		probe.HTTPGet.Path = "/"
 		probe.PeriodSeconds = componentProbes.RunningProbe.PeriodSeconds
 		probe.SuccessThreshold = componentProbes.RunningProbe.SuccessThreshold
 		probe.FailureThreshold = componentProbes.RunningProbe.FailureThreshold
-		container.ReadinessProbe = &probe
-		probeContainers = append(probeContainers, container)
 		probeContainers = append(probeContainers, container)
 	}
 
@@ -1192,20 +1189,20 @@ func buildProbeContainers(params createParams) ([]corev1.Container, error) {
 		if err = json.Unmarshal(probeContainerByte, &container); err != nil {
 			return nil, err
 		}
-		container.Name = "KBProbeRoleChangedCheck"
-		probe := corev1.Probe{}
-		probe.HTTPGet = &corev1.HTTPGetAction{}
+		container.Name = "kbprobe-rolechangedcheck"
+		probe := container.ReadinessProbe
 		probe.HTTPGet.Path = "/"
 		probe.PeriodSeconds = componentProbes.RoleChangedProbe.PeriodSeconds
 		probe.SuccessThreshold = componentProbes.RoleChangedProbe.SuccessThreshold
 		probe.FailureThreshold = componentProbes.RoleChangedProbe.FailureThreshold
-		container.ReadinessProbe = &probe
 		probeContainers = append(probeContainers, container)
 	}
 
 	if len(probeContainers) >= 1 {
 		probeContainers[0].Image = "probe:latest"
 	}
+
+	params.reqCtx.Log.Info("probe", "containers", probeContainers)
 	return probeContainers, nil
 }
 

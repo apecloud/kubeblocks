@@ -15,11 +15,11 @@ component: {
 }
 
 probeContainer: {
-    image: "k8s.gcr.io/pause:3.6"
+    image: "registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.6"
     command: ["/pause"]
     imagePullPolicy: "IfNotPresent"
     name: "string"
-    livenessProbe: {
+    readinessProbe: {
         httpGet: {
             path: "/"
             port: 8088

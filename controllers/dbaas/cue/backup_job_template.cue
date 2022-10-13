@@ -11,11 +11,11 @@ backup_job: {
 	apiVersion: "dataprotection.infracreate.com/v1alpha1"
 	kind:       "BackupJob"
 	metadata: {
-		name: backup_job_name
+		name:      backup_job_name
 		namespace: sts.metadata.namespace
 		labels: {
 			"dataprotection.infracreate.com/backup-type":         "snapshot"
-			"cluster.infracreate.com/name":                sts.metadata.labels."app.kubernetes.io/instance"
+			"cluster.infracreate.com/name":                       sts.metadata.labels."app.kubernetes.io/instance"
 			"backuppolicies.dataprotection.infracreate.com/name": "\(sts.metadata.labels."app.kubernetes.io/instance")-scaling"
 			"dataprotection.infracreate.com/backup-index":        "0"
 		}

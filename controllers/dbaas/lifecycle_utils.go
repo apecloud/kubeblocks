@@ -25,8 +25,9 @@ import (
 	"strings"
 	"time"
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 
 	"github.com/leaanthony/debme"
 	"github.com/sethvargo/go-password/password"

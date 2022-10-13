@@ -90,21 +90,6 @@ type BackupJobInfo struct {
 	Labels         string
 }
 
-type PlaygroundInfo struct {
-	DBCluster     string
-	DBPort        string
-	DBNamespace   string
-	Namespace     string
-	ClusterName   string
-	GrafanaSvc    string
-	GrafanaPort   string
-	GrafanaUser   string
-	GrafanaPasswd string
-	HostIP        string
-	CloudProvider string
-	Version       string
-}
-
 type BackupSnapInfo struct {
 	Name          string
 	Namespace     string

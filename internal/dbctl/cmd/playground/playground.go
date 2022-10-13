@@ -18,7 +18,9 @@ package playground
 
 import (
 	"context"
+	"os"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/docker/docker/pkg/ioutils"
@@ -50,8 +52,8 @@ type destroyOptions struct {
 // NewPlaygroundCmd creates the playground command
 func NewPlaygroundCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "playground [init | destroy]",
-		Short: "Bootstrap a dbaas in local host",
+		Use:   "playground [init | destroy | guide]",
+		Short: "Bootstrap a KubeBlocks in local host",
 	}
 
 	// add subcommands
@@ -71,19 +73,19 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Bootstrap a DBaaS",
+		Short: "Bootstrap a KubeBlocks",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.validate())
 			cmdutil.CheckErr(o.run())
 		},
 	}
 
-	cmd.Flags().StringVar(&o.CloudProvider, "cloud-provider", DefaultCloudProvider, "Cloud provider type")
+	cmd.Flags().StringVar(&o.CloudProvider, "cloud-provider", defaultCloudProvider, "Cloud provider type")
 	cmd.Flags().StringVar(&o.AccessKey, "access-key", "", "Cloud provider access key")
 	cmd.Flags().StringVar(&o.AccessSecret, "access-secret", "", "Cloud provider access secret")
 	cmd.Flags().StringVar(&o.Region, "region", "", "Cloud provider region")
 	cmd.Flags().StringVar(&o.Version, "version", DefaultVersion, "Database engine version")
-	cmd.Flags().Int8Var(&o.Replicas, "replicas", DefaultReplicas, "Database cluster replicas")
+	cmd.Flags().Int8Var(&o.Replicas, "replicas", defaultReplicas, "Database cluster replicas")
 	return cmd
 }
 
@@ -104,12 +106,6 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 }
 
 func newGuideCmd() *cobra.Command {
-	installer := &installer{
-		clusterName: ClusterName,
-		namespace:   ClusterNamespace,
-		dbCluster:   DBClusterName,
-	}
-
 	cmd := &cobra.Command{
 		Use:   "guide",
 		Short: "Display playground cluster user guide.",
@@ -120,7 +116,7 @@ func newGuideCmd() *cobra.Command {
 				util.Errf("%v", err)
 				return
 			}
-			if err := installer.printGuide(cp.Name(), instance.GetIP()); err != nil {
+			if err := printGuide(cp.Name(), instance.GetIP()); err != nil {
 				util.Errf("%v", err)
 			}
 		},
@@ -140,9 +136,7 @@ func (o *initOptions) run() error {
 
 	installer := &installer{
 		ctx:         context.Background(),
-		clusterName: ClusterName,
-		namespace:   ClusterNamespace,
-		dbCluster:   DBClusterName,
+		clusterName: clusterName,
 		wesql: Wesql{
 			serverVersion: o.Version,
 			replicas:      o.Replicas,
@@ -168,7 +162,7 @@ func (o *initOptions) run() error {
 		if err := ioutils.AtomicWriteFile(kubeConfigPath, []byte(kubeConfig), 0700); err != nil {
 			return errors.Wrap(err, "Failed to update kube config")
 		}
-		if err := installer.printGuide(cp.Name(), instance.GetIP()); err != nil {
+		if err := printGuide(cp.Name(), instance.GetIP()); err != nil {
 			return errors.Wrap(err, "Failed to print user guide")
 		}
 		return nil
@@ -198,7 +192,7 @@ func (o *initOptions) run() error {
 	}
 
 	// Step.4 print guide information
-	err = installer.printGuide(DefaultCloudProvider, LocalHost)
+	err = printGuide(defaultCloudProvider, localHost)
 	if err != nil {
 		return errors.Wrap(err, "Failed to print user guide")
 	}
@@ -209,14 +203,14 @@ func (o *initOptions) run() error {
 func (o *destroyOptions) destroyPlayground() error {
 	installer := &installer{
 		ctx:         context.Background(),
-		clusterName: ClusterName,
+		clusterName: clusterName,
 	}
 
 	// remote playground, just destroy all cloud resources
 	cp, _ := cloudprovider.Get()
-	if cp != nil && cp.Name() != cloudprovider.Local {
+	if cp.Name() != cloudprovider.Local {
 		// remove playground cluster kubeconfig
-		if err := util.RemoveConfig(ClusterName); err != nil {
+		if err := util.RemoveConfig(clusterName); err != nil {
 			return errors.Wrap(err, "Failed to remove playground kubeconfig file")
 		}
 		cp, err := cloudprovider.Get()
@@ -231,5 +225,46 @@ func (o *destroyOptions) destroyPlayground() error {
 		return err
 	}
 	util.Info("Successfully destroyed playground cluster.")
+	return nil
+}
+
+func printGuide(cloudProvider string, hostIP string) error {
+	var (
+		clusterInfo = &ClusterInfo{
+			HostIP:        hostIP,
+			CloudProvider: cloudProvider,
+			KubeConfig:    util.ConfigPath(clusterName),
+			GrafanaPort:   "9100",
+			GrafanaUser:   "admin",
+			GrafanaPasswd: "prom-operator",
+		}
+		err error
+	)
+
+	// set env KUBECONFIG to playground kubernetes cluster config
+	if err = os.Setenv("KUBECONFIG", util.ConfigPath(clusterName)); err != nil {
+		return err
+	}
+
+	// get cluster info that will be used to render the guide template
+	if err = buildClusterInfo(clusterInfo, dbClusterNamespace, dbClusterName); err != nil {
+		return err
+	}
+
+	// a cluster has at least one pod
+	if len(clusterInfo.Pods) == 0 {
+		return errors.New("Failed to find pod belonging to database cluster")
+	}
+
+	// build host port to access database
+	clusterInfo.HostPorts = make([]string, len(clusterInfo.Pods))
+	for i := range clusterInfo.Pods {
+		clusterInfo.HostPorts[i] = strconv.Itoa(3306 + i)
+	}
+
+	if err = util.PrintGoTemplate(os.Stdout, guideTmpl, clusterInfo); err != nil {
+		return err
+	}
+
 	return nil
 }

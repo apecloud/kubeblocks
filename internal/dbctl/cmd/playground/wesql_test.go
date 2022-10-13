@@ -34,13 +34,13 @@ var _ = Describe("wesql", func() {
 	})
 
 	It("Get base charts", func() {
-		charts := wesql.getBaseCharts("test")
+		charts := wesql.getBaseCharts()
 		Expect(charts != nil).Should(BeTrue())
 		Expect(len(charts)).To(Equal(1))
 	})
 
 	It("Get database charts", func() {
-		charts := wesql.getDBCharts("test", "test")
+		charts := wesql.getDBCharts()
 		Expect(charts != nil).Should(BeTrue())
 		Expect(len(charts)).To(Equal(1))
 		Expect(charts[0].Chart).To(Equal(wesqlHelmChart))

@@ -15,6 +15,7 @@ sts: {
 		]
 	}
 }
+backup_job_name: string
 pvc_key: {
 	Name:      string
 	Namespace: string
@@ -30,7 +31,7 @@ pvc: {
 		accessModes: sts.spec.volumeClaimTemplates[0].spec.accessModes
 		resources:   sts.spec.volumeClaimTemplates[0].spec.resources
 		dataSource: {
-			"name":     "\(sts.metadata.labels."app.kubernetes.io/instance")-scaling-auto-generated"
+			"name":     backup_job_name
 			"kind":     "VolumeSnapshot"
 			"apiGroup": "snapshot.storage.k8s.io"
 		}

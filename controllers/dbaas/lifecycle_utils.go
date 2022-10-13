@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -655,7 +656,9 @@ func createOrReplaceResources(ctx context.Context,
 					return fmt.Errorf("backup policy template for cluster %s not found", cluster.Name)
 				}
 				// TODO chantu: check volume snapshot support
-				if err := createBackup(ctx, cli, cluster, *stsObj, backupPolicyTemplateList.Items[0]); err != nil {
+				backupJobName := generateName(cluster.Name + "-scaling-")
+				err := createBackup(ctx, cli, *stsObj, backupPolicyTemplateList.Items[0], backupJobName)
+				if err != nil {
 					return err
 				}
 				for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
@@ -663,7 +666,7 @@ func createOrReplaceResources(ctx context.Context,
 						Namespace: key.Namespace,
 						Name:      fmt.Sprintf("%s-%s-%d", "data", stsObj.Name, i),
 					}
-					if err := createPVCFromSnapshot(ctx, cli, cluster, *stsObj, pvcKey); err != nil {
+					if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, backupJobName); err != nil {
 						return err
 					}
 				}
@@ -1313,7 +1316,7 @@ func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder
 	return tplBuilder.Render(cmObj.Data)
 }
 
-func createBackup(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, sts appsv1.StatefulSet, backupPolicyTemplate dataprotectionv1alpha1.BackupPolicyTemplate) error {
+func createBackup(ctx context.Context, cli client.Client, sts appsv1.StatefulSet, backupPolicyTemplate dataprotectionv1alpha1.BackupPolicyTemplate, backupJobName string) error {
 	backupPolicy, err := buildBackupPolicy(sts, backupPolicyTemplate)
 	if err != nil {
 		return err
@@ -1323,7 +1326,7 @@ func createBackup(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1
 			return err
 		}
 	}
-	backupJob, err := buildBackupJob(sts)
+	backupJob, err := buildBackupJob(sts, backupJobName)
 	if err != nil {
 		return err
 	}
@@ -1369,7 +1372,7 @@ func buildBackupPolicy(sts appsv1.StatefulSet, template dataprotectionv1alpha1.B
 	return &backupPolicy, nil
 }
 
-func buildBackupJob(sts appsv1.StatefulSet) (*dataprotectionv1alpha1.BackupJob, error) {
+func buildBackupJob(sts appsv1.StatefulSet, backupJobName string) (*dataprotectionv1alpha1.BackupJob, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
 	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("backup_job_template.cue"))
@@ -1378,11 +1381,16 @@ func buildBackupJob(sts appsv1.StatefulSet) (*dataprotectionv1alpha1.BackupJob, 
 	}
 
 	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+
 	stsStrByte, err := json.Marshal(sts)
 	if err != nil {
 		return nil, err
 	}
 	if err = cueValue.Fill("sts", stsStrByte); err != nil {
+		return nil, err
+	}
+
+	if err = cueValue.FillRaw("backup_job_name", backupJobName); err != nil {
 		return nil, err
 	}
 
@@ -1399,8 +1407,8 @@ func buildBackupJob(sts appsv1.StatefulSet) (*dataprotectionv1alpha1.BackupJob, 
 	return &backupJob, nil
 }
 
-func createPVCFromSnapshot(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, sts appsv1.StatefulSet, pvcKey types.NamespacedName) error {
-	pvc, err := buildPVCFromSnapshot(sts, pvcKey)
+func createPVCFromSnapshot(ctx context.Context, cli client.Client, sts appsv1.StatefulSet, pvcKey types.NamespacedName, backupJobName string) error {
+	pvc, err := buildPVCFromSnapshot(sts, pvcKey, backupJobName)
 	if err != nil {
 		return err
 	}
@@ -1410,7 +1418,7 @@ func createPVCFromSnapshot(ctx context.Context, cli client.Client, cluster *dbaa
 	return nil
 }
 
-func buildPVCFromSnapshot(sts appsv1.StatefulSet, pvcKey types.NamespacedName) (*corev1.PersistentVolumeClaim, error) {
+func buildPVCFromSnapshot(sts appsv1.StatefulSet, pvcKey types.NamespacedName, backupJobName string) (*corev1.PersistentVolumeClaim, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
 	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("pvc_template.cue"))
@@ -1419,6 +1427,7 @@ func buildPVCFromSnapshot(sts appsv1.StatefulSet, pvcKey types.NamespacedName) (
 	}
 
 	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+
 	stsStrByte, err := json.Marshal(sts)
 	if err != nil {
 		return nil, err
@@ -1435,6 +1444,10 @@ func buildPVCFromSnapshot(sts appsv1.StatefulSet, pvcKey types.NamespacedName) (
 		return nil, err
 	}
 
+	if err := cueValue.FillRaw("backup_job_name", backupJobName); err != nil {
+		return nil, err
+	}
+
 	pvcStrByte, err := cueValue.Lookup("pvc")
 	if err != nil {
 		return nil, err
@@ -1446,4 +1459,17 @@ func buildPVCFromSnapshot(sts appsv1.StatefulSet, pvcKey types.NamespacedName) (
 	}
 
 	return &pvc, nil
+}
+
+const (
+	maxNameLength          = 63
+	randomLength           = 14
+	MaxGeneratedNameLength = maxNameLength - randomLength
+)
+
+func generateName(base string) string {
+	if len(base) > MaxGeneratedNameLength {
+		base = base[:MaxGeneratedNameLength]
+	}
+	return fmt.Sprintf("%s%s", base, time.Now().Format("20060102150405"))
 }

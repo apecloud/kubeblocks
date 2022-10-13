@@ -11,7 +11,7 @@ backup_policy: {
 	apiVersion: "dataprotection.infracreate.com/v1alpha1"
 	kind:       "BackupPolicy"
 	metadata: {
-		name: "\(sts.metadata.labels."app.kubernetes.io/instance")-scaling-auto-generated"
+		name: "\(sts.metadata.labels."app.kubernetes.io/instance")-scaling"
 		namespace: sts.metadata.namespace
 	}
 	spec: {

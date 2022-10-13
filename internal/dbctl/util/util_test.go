@@ -17,6 +17,8 @@ limitations under the License.
 package util
 
 import (
+	"os"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -59,6 +61,12 @@ var _ = Describe("util", func() {
 			},
 		}
 		Expect(PrintObjYAML(obj)).Should(Succeed())
+	})
+
+	It("Print go template", func() {
+		Expect(PrintGoTemplate(os.Stdout, `key: {{.Value}}`, struct {
+			Value string
+		}{"test"})).Should(Succeed())
 	})
 
 	It("Others", func() {

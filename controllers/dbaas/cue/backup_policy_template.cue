@@ -38,6 +38,13 @@ backup_policy: {
 				"claimName": "backup-s3-pvc"
 			}
 		}
+    "hooks": {
+      "preCommands": [
+        "touch /data/mysql/data/.restore; sync"
+      ],
+      "postCommands": [
+      ]
+    }
 		"onFailAttempted": 3
 	}
 }

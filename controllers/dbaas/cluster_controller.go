@@ -107,6 +107,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		Log: log.FromContext(ctx).WithValues("cluster", req.NamespacedName),
 	}
 
+	reqCtx.Log.Info("get cluster", "cluster", req.NamespacedName)
 	cluster := &dbaasv1alpha1.Cluster{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -132,6 +133,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.Reconciled()
 	}
 
+	reqCtx.Log.Info("get clusterdef and appversion")
 	clusterdefinition := &dbaasv1alpha1.ClusterDefinition{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: cluster.Namespace,
@@ -163,7 +165,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	task, err := buildClusterCreationTasks(clusterdefinition, appversion, cluster)
+	task, err := buildClusterCreationTasks(&reqCtx, clusterdefinition, appversion, cluster)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}

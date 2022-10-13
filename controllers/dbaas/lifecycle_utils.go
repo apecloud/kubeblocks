@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-logr/logr"
 	"github.com/leaanthony/debme"
 	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
@@ -48,6 +49,7 @@ type createParams struct {
 	component         *Component
 	applyObjs         *[]client.Object
 	cacheCtx          *map[string]interface{}
+	reqCtx            *intctrlutil.RequestCtx
 }
 
 const (
@@ -312,6 +314,7 @@ func mergeComponents(
 }
 
 func buildClusterCreationTasks(
+	reqCtx *intctrlutil.RequestCtx,
 	clusterDefinition *dbaasv1alpha1.ClusterDefinition,
 	appVersion *dbaasv1alpha1.AppVersion,
 	cluster *dbaasv1alpha1.Cluster) (*intctrlutil.Task, error) {
@@ -328,6 +331,7 @@ func buildClusterCreationTasks(
 		applyObjs:         &applyObjs,
 		cacheCtx:          &cacheCtx,
 		appVersion:        appVersion,
+		reqCtx:            reqCtx,
 	}
 	prepareSecretsTask.Context["exec"] = &params
 	rootTask.SubTasks = append(rootTask.SubTasks, prepareSecretsTask)
@@ -370,7 +374,7 @@ func checkedCreateObjs(ctx context.Context, cli client.Client, obj interface{}) 
 		return fmt.Errorf("invalid arg")
 	}
 
-	if err := createOrReplaceResources(ctx, cli, params.cluster, *params.applyObjs); err != nil {
+	if err := createOrReplaceResources(ctx, cli, params.reqCtx.Log, params.cluster, *params.applyObjs); err != nil {
 		return err
 	}
 	return nil
@@ -501,10 +505,12 @@ func addSelectorLabels(service *corev1.Service, component *Component, accessMode
 
 func createOrReplaceResources(ctx context.Context,
 	cli client.Client,
+	logger logr.Logger,
 	cluster *dbaasv1alpha1.Cluster,
 	objs []client.Object) error {
 	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
 	for _, obj := range objs {
+		logger.Info("create or update", "objs", obj)
 		if err := controllerutil.SetOwnerReference(cluster, obj, scheme); err != nil {
 			return err
 		}

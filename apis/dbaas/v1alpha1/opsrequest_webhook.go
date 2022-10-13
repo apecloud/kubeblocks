@@ -231,6 +231,10 @@ func (r *OpsRequest) commonValidationWithComponentOps(allErrs *field.ErrorList, 
 		clusterComponentNameMap[v.Name] = struct{}{}
 	}
 	for index, componentOps := range r.Spec.ComponentOpsList {
+		if len(componentOps.ComponentNames) == 0 {
+			addNotFoundError(allErrs, fmt.Sprintf("spec.componentOps[%d].componentNames", index), "can not be null")
+			continue
+		}
 		for _, v := range componentOps.ComponentNames {
 			// check the duplicate component name in r.Spec.ComponentOpsList[*].componentNames
 			if _, ok = tmpComponentNameMap[v]; ok {

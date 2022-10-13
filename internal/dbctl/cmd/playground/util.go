@@ -32,6 +32,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
 var addToScheme sync.Once
@@ -50,65 +51,56 @@ func newFactory() cmdutil.Factory {
 }
 
 func buildClusterInfo(clusterInfo *ClusterInfo, namespace string, name string) error {
+	var err error
 	f := newFactory()
-	builder := &builder{}
-	clientSet, err := f.KubernetesClientSet()
-	if err != nil {
-		return err
-	}
-	builder.clientSet = clientSet
 
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
+	builder := &builder{
+		namespace: namespace,
+		name:      name,
+	}
+
+	if builder.clientSet, err = f.KubernetesClientSet(); err != nil {
 		return err
 	}
-	builder.dynamicClient = dynamicClient
-	builder.namespace = namespace
-	builder.name = name
+
+	if builder.dynamicClient, err = f.DynamicClient(); err != nil {
+		return err
+	}
 
 	// get cluster
-	builder.groupKind = schema.GroupKind{Group: "dbaas.infracreate.com", Kind: "Cluster"}
-	err = builder.getClusterObject(clusterInfo)
-	if err != nil {
+	if err = builder.withGK(schema.GroupKind{Group: types.Group, Kind: types.KindCluster}).
+		getClusterObject(clusterInfo); err != nil {
 		return err
-	}
-
-	if clusterInfo.Cluster == nil {
-		return fmt.Errorf("failed to find database cluster %s", name)
 	}
 
 	// get statefulset
-	builder.label = fmt.Sprintf("app.kubernetes.io/instance=%s", name)
-	builder.groupKind = schema.GroupKind{Kind: "StatefulSet"}
-	err = builder.getClusterObject(clusterInfo)
-	if err != nil {
+	if err = builder.withLabel(instanceLabel(name)).
+		withGK(schema.GroupKind{Kind: "StatefulSet"}).
+		getClusterObject(clusterInfo); err != nil {
 		return err
 	}
 
 	// get service
 	for _, obj := range clusterInfo.StatefulSets {
-		builder.label = fmt.Sprintf("app.kubernetes.io/instance=%s", obj.Name)
-		builder.groupKind = schema.GroupKind{Kind: "Service"}
-		err = builder.getClusterObject(clusterInfo)
-		if err != nil {
+		if err = builder.withLabel(instanceLabel(obj.Name)).
+			withGK(schema.GroupKind{Kind: "Service"}).
+			getClusterObject(clusterInfo); err != nil {
 			return err
 		}
 	}
 
 	// get secret
-	builder.label = fmt.Sprintf("app.kubernetes.io/instance=%s", name)
-	builder.groupKind = schema.GroupKind{Kind: "Secret"}
-	err = builder.getClusterObject(clusterInfo)
-	if err != nil {
+	if err = builder.withLabel(instanceLabel(name)).
+		withGK(schema.GroupKind{Kind: "Secret"}).
+		getClusterObject(clusterInfo); err != nil {
 		return err
 	}
 
 	// get pod
 	for _, obj := range clusterInfo.StatefulSets {
-		builder.label = fmt.Sprintf("app.kubernetes.io/instance=%s", obj.Name)
-		builder.groupKind = schema.GroupKind{Kind: "Pod"}
-		err = builder.getClusterObject(clusterInfo)
-		if err != nil {
+		if err = builder.withLabel(instanceLabel(obj.Name)).
+			withGK(schema.GroupKind{Kind: "Pod"}).
+			getClusterObject(clusterInfo); err != nil {
 			return err
 		}
 	}
@@ -164,8 +156,8 @@ func (b *builder) getClusterObject(clusterObjs *ClusterInfo) error {
 			return err
 		}
 		clusterObjs.Secrets = append(clusterObjs.Secrets, scts.Items...)
-	case "Cluster":
-		gvr := schema.GroupVersionResource{Group: b.groupKind.Group, Resource: "clusters", Version: "v1alpha1"}
+	case types.KindCluster:
+		gvr := schema.GroupVersionResource{Group: b.groupKind.Group, Resource: types.ResourceClusters, Version: types.Version}
 		obj, err := b.dynamicClient.Resource(gvr).Namespace(b.namespace).Get(ctx, b.name, metav1.GetOptions{}, "")
 		if err != nil {
 			return err
@@ -175,10 +167,23 @@ func (b *builder) getClusterObject(clusterObjs *ClusterInfo) error {
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cluster); err != nil {
 			return err
 		}
-
 		clusterObjs.Cluster = cluster
 		return nil
 	}
 
 	return nil
+}
+
+func (b *builder) withLabel(l string) *builder {
+	b.label = l
+	return b
+}
+
+func (b *builder) withGK(gk schema.GroupKind) *builder {
+	b.groupKind = gk
+	return b
+}
+
+func instanceLabel(name string) string {
+	return fmt.Sprintf("app.kubernetes.io/instance=%s", name)
 }

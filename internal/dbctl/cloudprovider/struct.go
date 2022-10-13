@@ -80,14 +80,11 @@ func initProvider() error {
 		return errors.Wrap(err, "Invalid cloud provider config, please destroy and try init playground again")
 	}
 
-	var provider CloudProvider
-	provider, err = NewProvider(cfg.Name, cfg.AccessKey, cfg.AccessSecret, cfg.Region)
+	provider, err := NewProvider(cfg.Name, cfg.AccessKey, cfg.AccessSecret, cfg.Region)
 	if err != nil {
 		return errors.Wrap(err, "Failed to init cloud provider")
 	}
-	if provider != nil {
-		defaultProvider = provider
-	}
+	defaultProvider = provider
 	return nil
 }
 

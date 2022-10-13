@@ -48,6 +48,20 @@ const (
 	BackupSnapSourceName = "volumesnapshots"
 )
 
+const (
+	// Group api group
+	Group = "dbaas.infracreate.com"
+
+	// Version api version
+	Version = "v1alpha1"
+
+	// ResourceClusters clusters resource
+	ResourceClusters = "clusters"
+
+	// KindCluster kind of cluster
+	KindCluster = "Cluster"
+)
+
 type DBClusterInfo struct {
 	DBCluster       string
 	DBPort          string

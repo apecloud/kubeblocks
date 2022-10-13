@@ -9,7 +9,6 @@
 *.so
 *.dylib
 *.tar.gz
-*.tgz
 bin
 testbin/*
 

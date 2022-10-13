@@ -13,7 +13,6 @@ component: {
 	volumeClaimTemplates: [...]
 }
 roleGroup: {
-	name:     string
 	replicas: int
 }
 

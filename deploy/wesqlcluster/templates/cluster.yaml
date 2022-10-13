@@ -7,26 +7,29 @@ metadata:
 spec:
   appVersionRef: wesql-appversion-{{ default .Chart.AppVersion .Values.appVersionOverride }}   # ref appversion.name
   clusterDefinitionRef: wesql-clusterdefinition  # ref clusterdefinition.name
+  affinity:
+    topologyKeys:
+    - kubernetes.io/hostname
   components:
   - name: replicasets # user-defined
     type: replicasets # ref clusterdefinition components.typename
-    roleGroups: 
+    roleGroups:
     - name: primary
       type: primary
       replicas: {{ .Values.replicaCount | default 3 }}
     {{- with  .Values.resources }}
-    resources: 
-      limits: 
+    resources:
+      limits:
         cpu: {{ .limits.cpu | quote }}
         memory: {{ .limits.memory | quote }}
-      requests: 
+      requests:
         cpu: {{ .requests.cpu | quote }}
-        memory: {{ .requests.memory | quote }}      
+        memory: {{ .requests.memory | quote }}
     {{- end }}
-    volumeClaimTemplates: 
+    volumeClaimTemplates:
     {{- if .Values.persistence.enabled }}
       - name: data # ref clusterdefinition components.containers.volumeMounts.name
-        spec: 
+        spec:
           storageClassName: {{ .Values.persistence.log.storageClassName }}
           accessModes:
             - ReadWriteOnce
@@ -35,7 +38,7 @@ spec:
               storage: {{ .Values.persistence.data.size }}
       {{- if .Values.persistence.wal.enabled }}
       - name: wallog
-        spec: 
+        spec:
           storageClassName: {{ .Values.persistence.wal.storageClassName }}
           accessModes:
             - ReadWriteOnce

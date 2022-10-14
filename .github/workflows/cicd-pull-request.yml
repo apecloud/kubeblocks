@@ -6,7 +6,7 @@ on:
 
 jobs:
   make-test:
-    runs-on: [ self-hosted, aws-ec2-k8s-runner ]
+    runs-on: [ self-hosted, aws-eks-k8s-runner ]
     steps:
       - uses: actions/checkout@v3
       - name: make mod-vendor and lint
@@ -18,12 +18,3 @@ jobs:
       - name: make test
         run: |
           make test
-
-      - name: upload coverage report
-        uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./cover.out
-          flags: unittests
-          name: codecov-report
-          verbose: true

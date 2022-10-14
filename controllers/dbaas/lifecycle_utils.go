@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/leaanthony/debme"
 	"github.com/sethvargo/go-password/password"
@@ -34,7 +35,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -737,9 +737,13 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 
 	// get podList owned by stsObj
 	podList := &corev1.PodList{}
+	selector, err := labels.Parse(appInstanceLabelKey + "=" + stsObj.Name)
+	if err != nil {
+		return false, err
+	}
 	if err := cli.List(ctx, podList,
 		&client.ListOptions{Namespace: stsObj.Namespace},
-		client.MatchingLabelsSelector{Selector: labels.Everything()}); err != nil {
+		client.MatchingLabelsSelector{Selector: selector}); err != nil {
 		return false, err
 	}
 	pods := make([]corev1.Pod, 0)
@@ -750,19 +754,25 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 	}
 
 	// get pod label and name, compute plan
-	plan := generateUpdatePlan(ctx, cli, stsObj, pods, component)
+	plan := generateConsensusUpdatePlan(ctx, cli, stsObj, pods, component)
 	// execute plan
 	return plan.walkOneStep()
 }
 
-func generateUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod, component dbaasv1alpha1.ClusterDefinitionComponent) *Plan {
+// generateConsensusUpdatePlan generates Update plan based on UpdateStrategy
+func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod, component dbaasv1alpha1.ClusterDefinitionComponent) *Plan {
 	plan := &Plan{}
 	plan.Start = &Step{}
 	plan.WalkFunc = func(obj interface{}) (bool, error) {
-		pod := obj.(corev1.Pod)
+		pod, ok := obj.(corev1.Pod)
+		if !ok {
+			return false, errors.New("wrong type: obj not Pod")
+		}
+		// if pod is the latest version, we do nothing
 		if getPodRevision(&pod) == stsObj.Status.UpdateRevision {
 			return false, nil
 		}
+		// delete the pod to trigger associate StatefulSet to re-create it
 		if err := cli.Delete(ctx, &pod); err != nil {
 			return false, nil
 		}
@@ -770,12 +780,14 @@ func generateUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.S
 		return true, nil
 	}
 
+	// list all roles
 	leader := component.ConsensusSpec.Leader.Name
 	learner := component.ConsensusSpec.Learner.Name
 	// now all are followers
 	noneFollowers := make(map[string]string)
 	readonlyFollowers := make(map[string]string)
 	readWriteFollowers := make(map[string]string)
+	// a follower name set
 	followers := make(map[string]string)
 	exist := "EXIST"
 	for _, follower := range component.ConsensusSpec.Followers {
@@ -790,7 +802,7 @@ func generateUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.S
 		}
 	}
 
-	// make a Serial pod list
+	// make a Serial pod list, e.g.: learner -> follower1 -> follower2 -> leader
 	sort.SliceStable(pods, func(i, j int) bool {
 		roleI := pods[i].Labels[consensusSetRoleLabelKey]
 		roleJ := pods[j].Labels[consensusSetRoleLabelKey]
@@ -825,7 +837,7 @@ func generateUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.S
 		return false
 	})
 
-	// generate plan by updateStrategy
+	// generate plan by UpdateStrategy
 	switch component.ConsensusSpec.UpdateStrategy {
 	case dbaasv1alpha1.Serial:
 		// learner -> followers(none->readonly->readwrite) -> leader

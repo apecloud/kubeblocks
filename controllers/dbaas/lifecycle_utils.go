@@ -26,7 +26,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-logr/logr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/leaanthony/debme"
@@ -51,7 +50,6 @@ type createParams struct {
 	component         *Component
 	applyObjs         *[]client.Object
 	cacheCtx          *map[string]interface{}
-	reqCtx            *intctrlutil.RequestCtx
 }
 
 const (
@@ -413,7 +411,6 @@ func mergeComponents(
 }
 
 func buildClusterCreationTasks(
-	reqCtx *intctrlutil.RequestCtx,
 	clusterDefinition *dbaasv1alpha1.ClusterDefinition,
 	appVersion *dbaasv1alpha1.AppVersion,
 	cluster *dbaasv1alpha1.Cluster) (*intctrlutil.Task, error) {
@@ -430,7 +427,6 @@ func buildClusterCreationTasks(
 		applyObjs:         &applyObjs,
 		cacheCtx:          &cacheCtx,
 		appVersion:        appVersion,
-		reqCtx:            reqCtx,
 	}
 	prepareSecretsTask.Context["exec"] = &params
 	rootTask.SubTasks = append(rootTask.SubTasks, prepareSecretsTask)
@@ -467,19 +463,19 @@ func buildClusterCreationTasks(
 	return &rootTask, nil
 }
 
-func checkedCreateObjs(ctx context.Context, cli client.Client, obj interface{}) error {
+func checkedCreateObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) error {
 	params, ok := obj.(*createParams)
 	if !ok {
 		return fmt.Errorf("invalid arg")
 	}
 
-	if err := createOrReplaceResources(ctx, cli, params.reqCtx.Log, params.cluster, *params.applyObjs); err != nil {
+	if err := createOrReplaceResources(reqCtx, cli, params.cluster, *params.applyObjs); err != nil {
 		return err
 	}
 	return nil
 }
 
-func prepareSecretObjs(ctx context.Context, cli client.Client, obj interface{}) error {
+func prepareSecretObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) error {
 	params, ok := obj.(*createParams)
 	if !ok {
 		return fmt.Errorf("invalid arg")
@@ -495,7 +491,7 @@ func prepareSecretObjs(ctx context.Context, cli client.Client, obj interface{}) 
 }
 
 // TODO: @free6om handle config of all component types
-func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{}) error {
+func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) error {
 	params, ok := obj.(*createParams)
 	if !ok {
 		return fmt.Errorf("invalid arg")
@@ -509,7 +505,7 @@ func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{
 		}
 		*params.applyObjs = append(*params.applyObjs, sts)
 	case dbaasv1alpha1.Stateful:
-		sts, err := buildSts(*params)
+		sts, err := buildSts(reqCtx, *params)
 		if err != nil {
 			return err
 		}
@@ -522,7 +518,7 @@ func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{
 		*params.applyObjs = append(*params.applyObjs, svcs...)
 
 		// render config
-		configs, err := buildCfg(*params, sts, ctx, cli)
+		configs, err := buildCfg(*params, sts, reqCtx.Ctx, cli)
 		if err != nil {
 			return err
 		}
@@ -531,7 +527,7 @@ func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{
 		}
 		// end render config
 	case dbaasv1alpha1.Consensus:
-		css, err := buildConsensusSet(*params)
+		css, err := buildConsensusSet(reqCtx, *params)
 		if err != nil {
 			return err
 		}
@@ -544,7 +540,7 @@ func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{
 		*params.applyObjs = append(*params.applyObjs, svcs...)
 
 		// render config
-		configs, err := buildCfg(*params, css, ctx, cli)
+		configs, err := buildCfg(*params, css, reqCtx.Ctx, cli)
 		if err != nil {
 			return err
 		}
@@ -602,11 +598,12 @@ func addSelectorLabels(service *corev1.Service, component *Component, accessMode
 	}
 }
 
-func createOrReplaceResources(ctx context.Context,
+func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	logger logr.Logger,
 	cluster *dbaasv1alpha1.Cluster,
 	objs []client.Object) error {
+	ctx := reqCtx.Ctx
+	logger := reqCtx.Log
 	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
 	for _, obj := range objs {
 		logger.Info("create or update", "objs", obj)
@@ -1058,7 +1055,7 @@ func buildSecret(params createParams) (*corev1.Secret, error) {
 	return &secret, nil
 }
 
-func buildSts(params createParams) (*appsv1.StatefulSet, error) {
+func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.StatefulSet, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
 	cueTpl, err := params.getCacheCUETplValue("statefulset_template.cue", func() (*intctrlutil.CUETpl, error) {
@@ -1103,7 +1100,7 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 		return nil, err
 	}
 
-	probeContainers, err := buildProbeContainers(params)
+	probeContainers, err := buildProbeContainers(reqCtx, params)
 	if err != nil {
 		return nil, err
 	}
@@ -1138,7 +1135,7 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 	return &sts, nil
 }
 
-func buildProbeContainers(params createParams) ([]corev1.Container, error) {
+func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([]corev1.Container, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
 	cueTpl, err := params.getCacheCUETplValue("statefulset_template.cue", func() (*intctrlutil.CUETpl, error) {
@@ -1154,7 +1151,7 @@ func buildProbeContainers(params createParams) ([]corev1.Container, error) {
 	}
 	probeContainers := []corev1.Container{}
 	componentProbes := params.component.Probes
-	params.reqCtx.Log.Info("probe", "settings", componentProbes)
+	reqCtx.Log.Info("probe", "settings", componentProbes)
 	if componentProbes.StatusProbe.Enable {
 		container := corev1.Container{}
 		if err = json.Unmarshal(probeContainerByte, &container); err != nil {
@@ -1202,13 +1199,13 @@ func buildProbeContainers(params createParams) ([]corev1.Container, error) {
 		probeContainers[0].Image = "probe:latest"
 	}
 
-	params.reqCtx.Log.Info("probe", "containers", probeContainers)
+	reqCtx.Log.Info("probe", "containers", probeContainers)
 	return probeContainers, nil
 }
 
 // buildConsensusSet build on a stateful set
-func buildConsensusSet(params createParams) (*appsv1.StatefulSet, error) {
-	sts, err := buildSts(params)
+func buildConsensusSet(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.StatefulSet, error) {
+	sts, err := buildSts(reqCtx, params)
 	if err != nil {
 		return sts, err
 	}

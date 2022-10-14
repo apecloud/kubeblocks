@@ -166,11 +166,11 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	task, err := buildClusterCreationTasks(&reqCtx, clusterdefinition, appversion, cluster)
+	task, err := buildClusterCreationTasks(clusterdefinition, appversion, cluster)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	if err = task.Exec(reqCtx.Ctx, r.Client); err != nil {
+	if err = task.Exec(reqCtx, r.Client); err != nil {
 		// record the event when the execution task reports an error.
 		r.Recorder.Event(cluster, corev1.EventTypeWarning, "RunTaskFailed", err.Error())
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")

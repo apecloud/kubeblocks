@@ -27,21 +27,6 @@ spec:
       - protocol: TCP
         port: 3306
     defaultReplicas: 3
-    probes:
-      runningProbe:
-        # Optional, default true
-        enable: true
-        # Optional, default 1
-        periodSeconds: 1
-        # Optional, default 3
-        failureThreshold: 3
-      statusProbe:
-        # Optional, default true
-        enable: true
-        # Optional, default 1
-        periodSeconds: 1
-        # Optional, default 3
-        failureThreshold: 3
     podSpec:
       containers:
       - name: mysql

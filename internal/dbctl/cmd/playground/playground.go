@@ -18,6 +18,7 @@ package playground
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path"
 	"strconv"
@@ -26,18 +27,24 @@ import (
 	"github.com/docker/docker/pkg/ioutils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"helm.sh/helm/v3/pkg/action"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cloudprovider"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
 )
 
 type initOptions struct {
 	genericclioptions.IOStreams
+	helmCfg *action.Configuration
+
 	Engine   string
 	Version  string
-	Replicas int8
+	Replicas int
+	Verbose  bool
 
 	CloudProvider string
 	AccessKey     string
@@ -73,7 +80,7 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Bootstrap a KubeBlocks",
+		Short: "Bootstrap a KubeBlocks for playground",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.validate())
 			cmdutil.CheckErr(o.run())
@@ -85,7 +92,8 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.AccessSecret, "access-secret", "", "Cloud provider access secret")
 	cmd.Flags().StringVar(&o.Region, "region", "", "Cloud provider region")
 	cmd.Flags().StringVar(&o.Version, "version", DefaultVersion, "Database engine version")
-	cmd.Flags().Int8Var(&o.Replicas, "replicas", defaultReplicas, "Database cluster replicas")
+	cmd.Flags().IntVar(&o.Replicas, "replicas", defaultReplicas, "Database cluster replicas")
+	cmd.Flags().BoolVar(&o.Verbose, "verbose", false, "Output more log info")
 	return cmd
 }
 
@@ -97,9 +105,7 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		Use:   "destroy",
 		Short: "Destroy the playground cluster.",
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := o.destroyPlayground(); err != nil {
-				util.Errf("%v", err)
-			}
+			cmdutil.CheckErr(o.destroyPlayground())
 		},
 	}
 	return cmd
@@ -110,15 +116,7 @@ func newGuideCmd() *cobra.Command {
 		Use:   "guide",
 		Short: "Display playground cluster user guide.",
 		Run: func(cmd *cobra.Command, args []string) {
-			cp, _ := cloudprovider.Get()
-			instance, err := cp.Instance()
-			if err != nil {
-				util.Errf("%v", err)
-				return
-			}
-			if err := printGuide(cp.Name(), instance.GetIP()); err != nil {
-				util.Errf("%v", err)
-			}
+			cmdutil.CheckErr(runGuide())
 		},
 	}
 	return cmd
@@ -132,71 +130,94 @@ func (o *initOptions) validate() error {
 }
 
 func (o *initOptions) run() error {
-	util.Info("Initializing playground cluster...")
+	if o.CloudProvider != cloudprovider.Local {
+		if err := o.remote(); err != nil {
+			return err
+		}
+	} else {
+		if err := o.local(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
+// local bootstraps a playground in the local host
+func (o *initOptions) local() error {
+	var err error
 	installer := &installer{
 		ctx:         context.Background(),
 		clusterName: clusterName,
-		wesql: Wesql{
-			serverVersion: o.Version,
-			replicas:      o.Replicas,
-		},
+		IOStreams:   o.IOStreams,
 	}
+	installer.verboseLog(o.Verbose)
 
-	// remote playground
-	if o.CloudProvider != cloudprovider.Local {
-		// apply changes
-		cp, err := cloudprovider.InitProvider(o.CloudProvider, o.AccessKey, o.AccessSecret, o.Region)
-		if err != nil {
-			return errors.Wrap(err, "Failed to create cloud provider")
-		}
-		if err := cp.Apply(false); err != nil {
-			return errors.Wrap(err, "Failed to apply change")
-		}
-		instance, err := cp.Instance()
-		if err != nil {
-			return errors.Wrap(err, "Failed to query cloud instance")
-		}
-		kubeConfig := strings.ReplaceAll(kubeConfig, "${KUBERNETES_API_SERVER_ADDRESS}", instance.GetIP())
-		kubeConfigPath := path.Join(util.GetKubeconfigDir(), "dbctl-playground")
-		if err := ioutils.AtomicWriteFile(kubeConfigPath, []byte(kubeConfig), 0700); err != nil {
-			return errors.Wrap(err, "Failed to update kube config")
-		}
-		if err := printGuide(cp.Name(), instance.GetIP()); err != nil {
-			return errors.Wrap(err, "Failed to print user guide")
-		}
-		return nil
-	}
-
-	// local playGround
-	// Step.1 Set up K3s as dbaas control plane cluster
-	err := installer.install()
-	if err != nil {
+	// Set up K3s as dbaas control plane cluster
+	spinner := util.Spinner(o.Out, "Create playground k3d cluster: %s ...", clusterName)
+	defer spinner(false)
+	if err = installer.install(); err != nil {
 		return errors.Wrap(err, "Fail to set up k3d cluster")
 	}
+	spinner(true)
 
-	// Step.2 Deal with KUBECONFIG
-	err = installer.genKubeconfig()
-	if err != nil {
+	// Deal with KUBECONFIG
+	configPath := util.ConfigPath(clusterName)
+	spinner = util.Spinner(o.Out, "Generate kubernetes config %s and set to KUBECONFIG ...", configPath)
+	defer spinner(false)
+	if err = installer.genKubeconfig(); err != nil {
 		return errors.Wrap(err, "Fail to generate kubeconfig")
 	}
-	err = installer.setKubeconfig()
-	if err != nil {
-		return errors.Wrap(err, "Fail to set kubeconfig")
+
+	if err = util.SetKubeConfig(configPath); err != nil {
+		return errors.Wrap(err, "Fail to set KUBECONFIG env")
+	}
+	spinner(true)
+
+	// Init helm client
+	if o.helmCfg, err = helm.NewActionConfig("", util.ConfigPath(clusterName)); err != nil {
+		return errors.Wrap(err, "Failed to init helm client")
 	}
 
-	// Step.3 Install dependencies
-	err = installer.installDeps()
-	if err != nil {
-		return errors.Wrap(err, "Failed to install dependencies")
+	// Install KubeBlocks
+	if err = o.installKubeBlocks(); err != nil {
+		return errors.Wrap(err, "Failed to install KubeBlocks")
 	}
 
-	// Step.4 print guide information
-	err = printGuide(defaultCloudProvider, localHost)
-	if err != nil {
+	// Install WeSQL
+	if err = o.installWeSQL(); err != nil {
+		return errors.Wrap(err, "Failed to install WeSQL")
+	}
+
+	// Print guide information
+	if err = printGuide(defaultCloudProvider, localHost, o.Replicas); err != nil {
 		return errors.Wrap(err, "Failed to print user guide")
 	}
 
+	return nil
+}
+
+// remote bootstraps a playground in the remote cloud
+func (o *initOptions) remote() error {
+	// apply changes
+	cp, err := cloudprovider.InitProvider(o.CloudProvider, o.AccessKey, o.AccessSecret, o.Region)
+	if err != nil {
+		return errors.Wrap(err, "Failed to create cloud provider")
+	}
+	if err := cp.Apply(false); err != nil {
+		return errors.Wrap(err, "Failed to apply change")
+	}
+	instance, err := cp.Instance()
+	if err != nil {
+		return errors.Wrap(err, "Failed to query cloud instance")
+	}
+	kubeConfig := strings.ReplaceAll(kubeConfig, "${KUBERNETES_API_SERVER_ADDRESS}", instance.GetIP())
+	kubeConfigPath := path.Join(util.GetKubeconfigDir(), "dbctl-playground")
+	if err := ioutils.AtomicWriteFile(kubeConfigPath, []byte(kubeConfig), 0700); err != nil {
+		return errors.Wrap(err, "Failed to update kube config")
+	}
+	if err := printGuide(cp.Name(), instance.GetIP(), o.Replicas); err != nil {
+		return errors.Wrap(err, "Failed to print user guide")
+	}
 	return nil
 }
 
@@ -206,6 +227,9 @@ func (o *destroyOptions) destroyPlayground() error {
 		clusterName: clusterName,
 	}
 
+	installer.verboseLog(false)
+	spinner := util.Spinner(o.Out, "Destroy playground cluster ...")
+	defer spinner(false)
 	// remote playground, just destroy all cloud resources
 	cp, _ := cloudprovider.Get()
 	if cp.Name() != cloudprovider.Local {
@@ -220,15 +244,24 @@ func (o *destroyOptions) destroyPlayground() error {
 		return cp.Apply(true)
 	}
 
-	// local playground
+	// local playgroundG
 	if err := installer.uninstall(); err != nil {
 		return err
 	}
-	util.Info("Successfully destroyed playground cluster.")
+	spinner(true)
 	return nil
 }
 
-func printGuide(cloudProvider string, hostIP string) error {
+func runGuide() error {
+	cp, _ := cloudprovider.Get()
+	instance, err := cp.Instance()
+	if err != nil {
+		return err
+	}
+	return printGuide(cp.Name(), instance.GetIP(), 0)
+}
+
+func printGuide(cloudProvider string, hostIP string, replicas int) error {
 	var (
 		clusterInfo = &ClusterInfo{
 			HostIP:        hostIP,
@@ -242,7 +275,7 @@ func printGuide(cloudProvider string, hostIP string) error {
 	)
 
 	// set env KUBECONFIG to playground kubernetes cluster config
-	if err = os.Setenv("KUBECONFIG", util.ConfigPath(clusterName)); err != nil {
+	if err = util.SetKubeConfig(util.ConfigPath(clusterName)); err != nil {
 		return err
 	}
 
@@ -251,14 +284,18 @@ func printGuide(cloudProvider string, hostIP string) error {
 		return err
 	}
 
-	// a cluster has at least one pod
-	if len(clusterInfo.Pods) == 0 {
-		return errors.New("Failed to find pod belonging to database cluster")
+	// get the real number of replica for existed database cluster
+	if replicas == 0 {
+		cluster := clusterInfo.Cluster
+		if cluster == nil {
+			return fmt.Errorf("failed to get cluster \"%s\" info", dbClusterName)
+		}
+		replicas = cluster.Spec.Components[0].Replicas
 	}
 
 	// build host port to access database
-	clusterInfo.HostPorts = make([]string, len(clusterInfo.Pods))
-	for i := range clusterInfo.Pods {
+	clusterInfo.HostPorts = make([]string, replicas)
+	for i := 0; i < replicas; i++ {
 		clusterInfo.HostPorts[i] = strconv.Itoa(3306 + i)
 	}
 
@@ -266,5 +303,33 @@ func printGuide(cloudProvider string, hostIP string) error {
 		return err
 	}
 
+	return nil
+}
+
+func (o *initOptions) installKubeBlocks() error {
+	chart := helm.KubeBlocksHelmChart(types.DbaasDefaultVersion, dbClusterNamespace)
+	if err := chart.Install(o.helmCfg); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (o *initOptions) installWeSQL() error {
+	wesql := &helm.InstallOpts{
+		Name:      dbClusterName,
+		Chart:     wesqlHelmChart,
+		Wait:      true,
+		Namespace: dbClusterNamespace,
+		Version:   wesqlVersion,
+		Sets: []string{
+			"serverVersion=" + o.Version,
+			fmt.Sprintf("replicaCount=%d", o.Replicas),
+		},
+		Login:    true,
+		TryTimes: 2,
+	}
+	if err := wesql.Install(o.helmCfg); err != nil {
+		return err
+	}
 	return nil
 }

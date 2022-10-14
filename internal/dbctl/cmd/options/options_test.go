@@ -14,34 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package options
 
 import (
-	"helm.sh/helm/v3/pkg/action"
-
-	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
+	"bytes"
+	"testing"
 )
 
-type Installer struct {
-	cfg *action.Configuration
-
-	Namespace string
-	Version   string
-}
-
-func (i *Installer) Install() error {
-	chart := helm.KubeBlocksHelmChart(i.Version, i.Namespace)
-	if err := chart.Install(i.cfg); err != nil {
-		return err
+func TestNewCmdOptions(t *testing.T) {
+	var out bytes.Buffer
+	cmd := NewCmdOptions(&out)
+	if cmd == nil {
+		t.Errorf("command is nil")
+	} else {
+		cmd.Run(cmd, []string{})
 	}
-	return nil
-}
-
-// Uninstall remove dbaas
-func (i *Installer) Uninstall() error {
-	chart := helm.KubeBlocksHelmChart(i.Version, i.Namespace)
-	if err := chart.UnInstall(i.cfg); err != nil {
-		return err
-	}
-	return nil
 }

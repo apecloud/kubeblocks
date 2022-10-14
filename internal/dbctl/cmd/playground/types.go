@@ -102,35 +102,35 @@ MySQL X-Cluster(WeSQL) "{{.Cluster.Name}}" has been CREATED!
 
   export KUBECONFIG={{.KubeConfig}}
 
-  dbctl cluster list                     # list all database clusters
+  dbctl cluster list                     # list database cluster and check its PHASE
   dbctl cluster describe {{.Cluster.Name}}       # get cluster information
 
 2. To port forward
 {{range $i, $t := .HostPorts}}
   MYSQL_PRIMARY_{{$i}}={{.}} {{end}}
 {{range $i, $t := .HostPorts}}
-  kubectl port-forward --address 0.0.0.0 svc/{{(index $.StatefulSets 0).Spec.ServiceName}}-{{$i}} $MYSQL_PRIMARY_{{$i}}:3306 & {{end}}
+  kubectl port-forward --address 0.0.0.0 svc/{{$.Cluster.Name}}-replicasets-primary-{{$i}} $MYSQL_PRIMARY_{{$i}}:3306 & {{end}}
 
-3. To connect to database
+3. Connect to database
 
-  Assume WeSQL leader node is {{(index .Services 0).Name}}
-  In practice, we can get cluster node role by sql " select * from information_schema.wesql_cluster_local; ".
+  Assume WeSQL leader node is {{$.Cluster.Name}}-replicasets-primary-0
+  In practice, you can get cluster node role by sql "select * from information_schema.wesql_cluster_local;"
   
   MYSQL_ROOT_PASSWORD=$(kubectl get secret --namespace {{.Cluster.Namespace}} {{.Cluster.Name}} -o jsonpath="{.data.rootPassword}" | base64 -d)
   mysql -h {{.HostIP}} -uroot -p"$MYSQL_ROOT_PASSWORD" -P$MYSQL_PRIMARY_0
   
-4. To bench the database
+4. Benchmark the database
 	
   # run tpcc benchmark 1 minute
   dbctl bench --host {{.HostIP}} --port $MYSQL_PRIMARY_0 --password "$MYSQL_ROOT_PASSWORD" tpcc prepare|run|clean  
 
-5. To view the Grafana:
+5. View the Grafana:
 
   open http://{{.HostIP}}:{{.GrafanaPort}}/d/549c2bf8936f7767ea6ac47c47b00f2a/mysql_for_demo
   User: {{.GrafanaUser}}
   Password: {{.GrafanaPasswd}}
 
-6. uninstall Playground: 
+6. Uninstall Playground:
 
   dbctl playground destroy
 

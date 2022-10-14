@@ -14,34 +14,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package options
 
 import (
-	"helm.sh/helm/v3/pkg/action"
+	"io"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
+	"github.com/spf13/cobra"
+	"k8s.io/kubectl/pkg/util/templates"
 )
 
-type Installer struct {
-	cfg *action.Configuration
-
-	Namespace string
-	Version   string
-}
-
-func (i *Installer) Install() error {
-	chart := helm.KubeBlocksHelmChart(i.Version, i.Namespace)
-	if err := chart.Install(i.cfg); err != nil {
-		return err
+// NewCmdOptions implements the options command
+func NewCmdOptions(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "options",
+		Short: "Print the list of flags inherited by all commands",
+		Example: `
+	# Print flags inherited by all commands
+	dbctl options`,
+		Run: func(cmd *cobra.Command, args []string) {
+			_ = cmd.Usage()
+		},
 	}
-	return nil
-}
 
-// Uninstall remove dbaas
-func (i *Installer) Uninstall() error {
-	chart := helm.KubeBlocksHelmChart(i.Version, i.Namespace)
-	if err := chart.UnInstall(i.cfg); err != nil {
-		return err
-	}
-	return nil
+	cmd.SetOut(out)
+	cmd.SetErr(out)
+
+	templates.UseOptionsTemplates(cmd)
+	return cmd
 }

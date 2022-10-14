@@ -45,7 +45,7 @@ type installOptions struct {
 func NewDbaasCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dbaas",
-		Short: "DBaaS operation commands",
+		Short: "DBaaS(KubeBlocks) operation commands",
 	}
 	cmd.AddCommand(
 		newInstallCmd(f, streams),
@@ -76,38 +76,34 @@ func (o *options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 }
 
 func (o *installOptions) run() error {
-	fmt.Fprintln(o.Out, "Installing dbaas...")
-
+	fmt.Fprintf(o.Out, "Installing KubeBlocks ...\n")
 	installer := Installer{
 		cfg:       o.cfg,
 		Namespace: o.Namespace,
 		Version:   o.Version,
 	}
 
-	err := installer.Install()
-	if err != nil {
-		return errors.Wrap(err, "Failed to install dbaas")
+	if err := installer.Install(); err != nil {
+		return errors.Wrap(err, "Failed to install KubeBlocks")
 	}
 
 	fmt.Fprintf(o.Out, "KubeBlocks v%s Install SUCCESSFULLY!\n\n"+
 		"You can now create a database cluster by running the following command:\n"+
-		"\tdbctl cluster create <you cluster name>", o.Version)
+		"\tdbctl cluster create <you cluster name>\n", o.Version)
 	return nil
 }
 
 func (o *options) run() error {
-	fmt.Fprintln(o.Out, "Uninstalling dbaas...")
-
 	installer := Installer{
 		cfg:       o.cfg,
 		Namespace: o.Namespace,
 	}
 
 	if err := installer.Uninstall(); err != nil {
-		return errors.Wrap(err, "Failed to uninstall dbaas")
+		return errors.Wrap(err, "Failed to uninstall KubeBlocks")
 	}
 
-	fmt.Fprintln(o.Out, "Successfully uninstall dbaas.")
+	fmt.Fprintln(o.Out, "Successfully uninstall KubeBlocks")
 	return nil
 }
 
@@ -120,14 +116,14 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 	cmd := &cobra.Command{
 		Use:   "install",
-		Short: "Bootstrap a DBaaS",
+		Short: "Install KubeBlocks",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.complete(f, cmd))
 			cmdutil.CheckErr(o.run())
 		},
 	}
 
-	cmd.Flags().StringVar(&o.Version, "version", types.DbaasDefaultVersion, "DBaaS version")
+	cmd.Flags().StringVar(&o.Version, "version", types.DbaasDefaultVersion, "KubeBlocks version")
 
 	return cmd
 }
@@ -138,7 +134,7 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	}
 	cmd := &cobra.Command{
 		Use:   "uninstall",
-		Short: "uninstall dbaas operator.",
+		Short: "Uninstall KubeBlocks",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.complete(f, cmd))
 			cmdutil.CheckErr(o.run())

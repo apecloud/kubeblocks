@@ -164,7 +164,7 @@ func (o *BaseOptions) Run(inputs Inputs, args []string) error {
 		return err
 	}
 	kind, _ := getResourceKind(cueValue)
-	fmt.Printf("%s %s created\n", kind, o.Name)
+	fmt.Fprintf(o.Out, "%s %s created\n", kind, o.Name)
 	return nil
 }
 

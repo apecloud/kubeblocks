@@ -23,6 +23,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/list"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
 func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -30,7 +31,7 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Factory:   f,
 		Streams:   streams,
 		Short:     "List all database cluster.",
-		GroupKind: schema.GroupKind{Group: "dbaas.infracreate.com", Kind: "Cluster"},
+		GroupKind: schema.GroupKind{Group: types.Group, Kind: types.KindCluster},
 	}
 	return cmd.Build()
 }

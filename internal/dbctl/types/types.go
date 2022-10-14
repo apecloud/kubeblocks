@@ -48,6 +48,20 @@ const (
 	BackupSnapSourceName = "volumesnapshots"
 )
 
+const (
+	// Group api group
+	Group = "dbaas.infracreate.com"
+
+	// Version api version
+	Version = "v1alpha1"
+
+	// ResourceClusters clusters resource
+	ResourceClusters = "clusters"
+
+	// KindCluster kind of cluster
+	KindCluster = "Cluster"
+)
+
 type DBClusterInfo struct {
 	DBCluster       string
 	DBPort          string
@@ -74,21 +88,6 @@ type BackupJobInfo struct {
 	StartTime      string
 	CompletionTime string
 	Labels         string
-}
-
-type PlaygroundInfo struct {
-	DBCluster     string
-	DBPort        string
-	DBNamespace   string
-	Namespace     string
-	ClusterName   string
-	GrafanaSvc    string
-	GrafanaPort   string
-	GrafanaUser   string
-	GrafanaPasswd string
-	HostIP        string
-	CloudProvider string
-	Version       string
 }
 
 type BackupSnapInfo struct {

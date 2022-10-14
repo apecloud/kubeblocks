@@ -450,23 +450,24 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 		if err != nil {
 			return false, err
 		}
-		switch componentDef.ComponentType {
-		case dbaasv1alpha1.Consensus:
+
+		if componentDef.ComponentType == dbaasv1alpha1.Consensus {
 			end, err := handleConsensusSetUpdate(ctx, r.Client, cluster, &v)
 			if err != nil {
 				return false, err
 			}
 			if !end {
 				isOk = false
-				break
 			}
 		}
 	}
+
 	if needSyncStatusComponent {
 		if err := r.Client.Status().Patch(ctx, cluster, patch); err != nil {
 			return false, err
 		}
 	}
+
 	return isOk, nil
 }
 

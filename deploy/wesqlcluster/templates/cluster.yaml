@@ -10,6 +10,7 @@ spec:
   affinity:
     topologyKeys:
     - kubernetes.io/hostname
+  logsEnable: {{ .Values.logs.enabled | default true }}
   components:
   - name: replicasets # user-defined
     type: replicasets # ref clusterdefinition components.typename

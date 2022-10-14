@@ -159,6 +159,10 @@ type ClusterDefinitionComponent struct {
 	// - N # number of current component/roleGroup
 	// +optional
 	Scripts ClusterDefinitionScripts `json:"scripts,omitempty"`
+
+	// engine's log file config and variables
+	// +optional
+	LogsConfig []LogConfig `json:"logsConfig,omitempty"`
 }
 
 type ClusterDefinitionStrategies struct {
@@ -250,6 +254,18 @@ type ClusterDefinitionStatusGeneration struct {
 	// +kubebuilder:validation:Enum={InSync,OutOfSync}
 	// +optional
 	ClusterDefSyncStatus Status `json:"clusterDefSyncStatus,omitempty"`
+}
+
+type LogConfig struct {
+	// Log file name
+	// +kubebuilder:validation:Required
+	Name string `json:"name,omitempty"`
+	// Log file path
+	// +kubebuilder:validation:Required
+	FilePath string `json:"filePath,omitempty"`
+	// Log file variables
+	// +optional
+	Variables []string `json:"variables,omitempty"`
 }
 
 func init() {

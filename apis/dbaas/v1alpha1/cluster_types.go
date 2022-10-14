@@ -50,6 +50,11 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:Required
 	AppVersionRef string `json:"appVersionRef"`
 
+	// flag of log enhancement
+	// +kubebuilder:default=false
+	// +optional
+	LogsEnable bool `json:"logsEnable,omitempty"`
+
 	// +optional
 	Components []ClusterComponent `json:"components,omitempty"`
 

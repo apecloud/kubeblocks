@@ -124,6 +124,23 @@ spec:
                       default: false
                       description: isStateless define this components
                       type: boolean
+                    logsConfig:
+                      description: engine's log file config and variables
+                      items:
+                        properties:
+                          filePath:
+                            description: Log file path
+                            type: string
+                          name:
+                            description: Log file name
+                            type: string
+                          variables:
+                            description: Log file variables
+                            items:
+                              type: string
+                            type: array
+                        type: object
+                      type: array
                     maxAvailable:
                       minimum: 0
                       type: integer

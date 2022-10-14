@@ -56,6 +56,7 @@ type Component struct {
 	Service              corev1.ServiceSpec                        `json:"service,omitempty"`
 	Scripts              dbaasv1alpha1.ClusterDefinitionScripts    `json:"scripts,omitempty"`
 	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate    `json:"volumeClaimTemplates,omitempty"`
+	LogsConfig           []dbaasv1alpha1.LogConfig                 `json:"logsConfig,omitempty"`
 }
 
 type RoleGroup struct {

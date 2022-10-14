@@ -17,6 +17,7 @@ limitations under the License.
 package dbaas
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
@@ -321,6 +322,7 @@ func mergeComponents(
 		PodSpec:         clusterDefComp.PodSpec,
 		Service:         clusterDefComp.Service,
 		Scripts:         clusterDefComp.Scripts,
+		LogsConfig:      clusterDefComp.LogsConfig,
 	}
 
 	if appVerComp != nil && appVerComp.PodSpec.Containers != nil {
@@ -886,9 +888,6 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 	}
 
 	sts := appsv1.StatefulSet{}
-	if err = json.Unmarshal(stsStrByte, &sts); err != nil {
-		return nil, err
-	}
 
 	stsStrByte = injectEnv(stsStrByte, dbaasPrefix+"_MY_SECRET_NAME", params.cluster.Name)
 
@@ -898,6 +897,7 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 
 	prefix := dbaasPrefix + "_" + strings.ToUpper(params.component.Type) + "_" + strings.ToUpper(params.roleGroup.Name) + "_"
 	replicas := int(*sts.Spec.Replicas)
+
 	for i := range sts.Spec.Template.Spec.Containers {
 		// inject self scope env
 		c := &sts.Spec.Template.Spec.Containers[i]
@@ -923,7 +923,60 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 			})
 		}
 	}
+	// open log enhancement and add log sidecar container
+	if err := addLogSidecarContainers(params, &sts); err != nil {
+		// add log sidecar fail and to do log
+		fmt.Println("Add log sidecar container error." + err.Error())
+	}
+
 	return &sts, nil
+}
+
+// Add log sidecar containers to sts spec
+// The returned error uses to imply that if sidecar containers is success
+func addLogSidecarContainers(params createParams, sts *appsv1.StatefulSet) error {
+	if !params.cluster.Spec.LogsEnable || params.component.LogsConfig == nil {
+		return nil
+	}
+	cueFS, _ := debme.FS(cueTemplates, "cue")
+	cueLogTpl, err := params.getCacheCUETplValue("log_container_template.cue", func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("log_container_template.cue"))
+	})
+	if err != nil {
+		return err
+	}
+	cueLogValue := intctrlutil.NewCUEBuilder(*cueLogTpl)
+	logContainerByte, _ := cueLogValue.Lookup("logContainer")
+	posVolumeByte, _ := cueLogValue.Lookup("posVolume")
+	logContainer := corev1.Container{}
+	if err := json.Unmarshal(logContainerByte, &logContainer); err != nil {
+		return err
+	}
+	posVolume := corev1.Volume{}
+	if err := json.Unmarshal(posVolumeByte, &posVolume); err != nil {
+		return err
+	}
+	volumeMountsMap := make(map[string]corev1.VolumeMount)
+	for _, container := range sts.Spec.Template.Spec.Containers {
+		for _, volumeMount := range container.VolumeMounts {
+			volumeMountsMap[volumeMount.Name] = volumeMount
+		}
+	}
+	for _, volumeMount := range volumeMountsMap {
+		logContainer.VolumeMounts = append(logContainer.VolumeMounts, volumeMount)
+	}
+	for _, logConfig := range params.component.LogsConfig {
+		tmpLogContainer := logContainer.DeepCopy()
+		tmpLogContainer.Name = logConfig.Name
+		tmpLogContainer.Env = append(tmpLogContainer.Env, corev1.EnvVar{
+			Name:      "FILE_PATH",
+			Value:     logConfig.FilePath,
+			ValueFrom: nil,
+		})
+		sts.Spec.Template.Spec.Containers = append(sts.Spec.Template.Spec.Containers, *tmpLogContainer)
+	}
+	sts.Spec.Template.Spec.Volumes = append(sts.Spec.Template.Spec.Volumes, posVolume)
+	return nil
 }
 
 func buildDeploy(params createParams) (*appsv1.Deployment, error) {
@@ -1127,6 +1180,20 @@ func buildCfg(params createParams, sts *appsv1.StatefulSet, ctx context.Context,
 		if err := controllerutil.SetOwnerReference(params.cluster, configmap, scheme); err != nil {
 			return nil, err
 		}
+		// render log's variables to my.cnf. todo this is tmp and waiting for config-manager's implementation
+		if params.cluster.Spec.LogsEnable && params.component.LogsConfig != nil && len(params.component.LogsConfig) > 0 {
+			tmpStrList := strings.Split(configmap.Data["my.cnf"], "[client]\n")
+			var stringBuilder bytes.Buffer
+			stringBuilder.WriteString(tmpStrList[0])
+			for _, logConfig := range params.component.LogsConfig {
+				for _, variable := range logConfig.Variables {
+					stringBuilder.WriteString(variable + "\n")
+				}
+			}
+			stringBuilder.WriteString("\n[client]\n" + tmpStrList[1])
+			configmap.Data["my.cnf"] = stringBuilder.String()
+		}
+
 		configs = append(configs, configmap)
 	}
 
@@ -1135,10 +1202,12 @@ func buildCfg(params createParams, sts *appsv1.StatefulSet, ctx context.Context,
 }
 
 func checkAndUpdatePodVolumes(sts *appsv1.StatefulSet, volumes map[string]dbaasv1alpha1.ConfigTemplate) error {
-	podVolumes := make([]corev1.Volume, 0, len(sts.Spec.Template.Spec.Volumes)+len(volumes))
-	if len(sts.Spec.Template.Spec.Volumes) > 0 {
-		copy(podVolumes, sts.Spec.Template.Spec.Volumes)
-	}
+	// incorrect use，podVolumes len is defined to 0，can't copy origin sts.Spec.Template.Spec.Volumes。make([]T, length, capacity)
+	// podVolumes := make([]corev1.Volume, 0, len(sts.Spec.Template.Spec.Volumes)+len(volumes))
+	// if len(sts.Spec.Template.Spec.Volumes) > 0 {
+	//	copy(podVolumes, sts.Spec.Template.Spec.Volumes)
+	// }
+	podVolumes := make([]corev1.Volume, 0, len(volumes))
 
 	for cmName, tpl := range volumes {
 		// not cm volume
@@ -1165,7 +1234,7 @@ func checkAndUpdatePodVolumes(sts *appsv1.StatefulSet, volumes map[string]dbaasv
 	}
 
 	// Update PodTemplate Volumes
-	sts.Spec.Template.Spec.Volumes = podVolumes
+	sts.Spec.Template.Spec.Volumes = append(sts.Spec.Template.Spec.Volumes, podVolumes...)
 	return nil
 }
 

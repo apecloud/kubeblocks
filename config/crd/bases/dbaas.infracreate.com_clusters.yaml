@@ -731,6 +731,10 @@ spec:
                   - type
                   type: object
                 type: array
+              logsEnable:
+                default: false
+                description: flag of log enhancement
+                type: boolean
               terminationPolicy:
                 default: Halt
                 description: One of DoNotTerminate, Halt, Delete, WipeOut. Defaults

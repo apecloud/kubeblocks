@@ -12,6 +12,18 @@ spec:
     roleGroups:
     - primary
     defaultReplicas: 1
+    logsConfig:
+      - name: "mysql-errorlog"
+        filePath: "/data/mysql/log/mysqld.err"
+        variables:
+          - "log_error=/data/mysql/log/mysqld.err" #同filePath定义
+      - name: "mysql-slowlog"
+        filePath: "/data/mysql/mysqld-slow.log" # 决定文件路径的variableName
+        variables:
+          - "slow_query_log_file=/data/mysql/mysqld-slow.log"  #同filePath定义
+          - "slow_query_log=ON"
+          - "long_query_time=10"
+          - "log_output=FILE"
     podSpec:
       containers:
       - name: mysql

@@ -14,6 +14,15 @@ spec:
     roleGroups:
     - primary
     defaultReplicas: 1
+    logsConfig:
+      {{- range .Values.logsConfig}}
+        - name: {{ .name }}
+          filePath: {{ .filePath }}
+          variables:
+            {{- range .variables }}
+              - {{ . }}
+            {{- end }}
+      {{- end }}
     podSpec:
       containers:
       - name: mysql

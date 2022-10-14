@@ -135,7 +135,7 @@ type ClusterDefinitionComponent struct {
 	// +kubebuilder:validation:MaxLength=12
 	TypeName string `json:"typeName,omitempty"`
 
-	// Wellknown database component name, such as mongos(mongodb), proxy(redis)
+	// Wellknown database component name, such as mongos(mongodb), proxy(redis), wesql(mysql)
 	// DBaas will generate proper monitor configs for wellknown CharacterType when BuiltInEnable is true.
 	// +optional
 	CharacterType string `json:"characterType,omitempty"`

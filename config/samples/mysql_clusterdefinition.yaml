@@ -10,7 +10,6 @@ spec:
     monitor:
       builtInEnable: false
       exporterConfig:
-      - name: mysql
         scrapePort: 9104
         scrapePath: /metrics
     configTemplateRefs:

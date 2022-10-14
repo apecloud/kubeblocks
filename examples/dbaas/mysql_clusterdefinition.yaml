@@ -10,9 +10,8 @@ spec:
     monitor:
       builtInEnable: false
       exporterConfig:
-        - name: mysql
-          scrapePort: 9104
-          scrapePath: /metrics
+        scrapePort: 9104
+        scrapePath: /metrics
     configTemplateRefs:
     - name: mysql-tree-node-template-8.0
       volumeName: mysql-config

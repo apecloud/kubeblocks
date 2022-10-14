@@ -302,9 +302,9 @@ func mergeMonitorConfig(
 	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
 	clusterComp *dbaasv1alpha1.ClusterComponent,
 	component *Component) {
-	monitorEnable := true
+	monitorEnable := false
 	if clusterComp != nil {
-		monitorEnable = clusterComp.MonitorEnhancementEnable
+		monitorEnable = clusterComp.Monitor
 	}
 
 	characterType := clusterDefComp.CharacterType
@@ -324,16 +324,8 @@ func mergeMonitorConfig(
 	}
 
 	monitorConfig := clusterDefComp.Monitor
-	if monitorConfig.BuiltInEnable {
+	if monitorConfig == nil || monitorConfig.BuiltInEnable {
 		// TODO: Agamotto auto collect metrics for well known characterType
-		component.Monitor = MonitorConfig{
-			Enable: false,
-		}
-		return
-	}
-
-	if len(monitorConfig.Exporters) != 1 {
-		// TODO: support multiple exporters for ISV
 		component.Monitor = MonitorConfig{
 			Enable: false,
 		}
@@ -342,8 +334,8 @@ func mergeMonitorConfig(
 
 	component.Monitor = MonitorConfig{
 		Enable:     true,
-		ScrapePath: monitorConfig.Exporters[0].ScrapePath,
-		ScrapePort: monitorConfig.Exporters[0].ScrapePort,
+		ScrapePath: monitorConfig.Exporter.ScrapePath,
+		ScrapePort: monitorConfig.Exporter.ScrapePort,
 	}
 }
 

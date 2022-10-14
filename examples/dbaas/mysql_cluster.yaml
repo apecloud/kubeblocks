@@ -9,7 +9,7 @@ spec:
   components:
   - name: replicasets
     type: replicasets
-    monitorEnhancementEnable: true
+    monitor: true
     roleGroups:
     - name: primary
       type: primary

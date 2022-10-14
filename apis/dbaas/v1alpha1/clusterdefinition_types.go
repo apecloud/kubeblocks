@@ -105,18 +105,29 @@ type ConfigTemplate struct {
 }
 
 type ExporterConfig struct {
-	Name       string `json:"name,omitempty"`
-	ScrapePort int    `json:"scrapePort,omitempty"`
-	ScrapePath string `json:"scrapePath,omitempty"`
+	// Exporter port for Time Series Database to scrape metrics
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Maximum=65536
+	ScrapePort int `json:"scrapePort"`
+
+	// Exporter url path for Time Series Database to scrape metrics
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=128
+	ScrapePath string `json:"scrapePath"`
 }
 
 type MonitorConfig struct {
+	// Switch to enable DBaas builtin monitoring.
+	// If BuiltInEnable is true and CharacterType is wellknown, ExporterConfig and Sidecar container will generate automatically.
+	// Otherwise, ISV should set BuiltInEnable to false and provide ExporterConfig and Sidecar container own.
+	// +kubebuilder:validation:Required
 	// +kubebuilder:default=true
-	// +optional
 	BuiltInEnable bool `json:"builtInEnable"`
 
-	// +kubebuilder:validation:Required
-	Exporters []ExporterConfig `json:"exporterConfig,omitempty"`
+	// ExporterConfig provided by ISV, which specify necessary information to Time Series Database.
+	// ExporterConfig is valid when BuiltInEnable is false.
+	// +optional
+	Exporter ExporterConfig `json:"exporterConfig,omitempty"`
 }
 
 type ClusterDefinitionComponent struct {
@@ -124,6 +135,8 @@ type ClusterDefinitionComponent struct {
 	// +kubebuilder:validation:MaxLength=12
 	TypeName string `json:"typeName,omitempty"`
 
+	// Wellknown database component name, such as mongos(mongodb), proxy(redis)
+	// DBaas will generate proper monitor configs for wellknown CharacterType when BuiltInEnable is true.
 	// +optional
 	CharacterType string `json:"characterType,omitempty"`
 
@@ -150,12 +163,9 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
 
+	// Monitor is monitoring config which provided by ISV
 	// +optional
-	Monitor MonitorConfig `json:"monitor,omitempty"`
-
-	// antiAffinity defines components should have anti-affinity constraint to same component type
-	// +kubebuilder:default=false
-	AntiAffinity bool `json:"antiAffinity,omitempty"`
+	Monitor *MonitorConfig `json:"monitor,omitempty"`
 
 	// isQuorum defines odd number of pods & N/2+1 pods
 	// +kubebuilder:default=false

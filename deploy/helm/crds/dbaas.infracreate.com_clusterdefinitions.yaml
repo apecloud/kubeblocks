@@ -98,12 +98,10 @@ spec:
               components:
                 items:
                   properties:
-                    antiAffinity:
-                      default: false
-                      description: antiAffinity defines components should have anti-affinity
-                        constraint to same component type
-                      type: boolean
                     characterType:
+                      description: Wellknown database component name, such as mongos(mongodb),
+                        proxy(redis) DBaas will generate proper monitor configs for
+                        wellknown CharacterType when BuiltInEnable is true.
                       type: string
                     configTemplateRefs:
                       description: The configTemplateRefs field provided by ISV, and
@@ -139,21 +137,38 @@ spec:
                       minimum: 0
                       type: integer
                     monitor:
+                      description: Monitor is monitoring config which provided by
+                        ISV
                       properties:
                         builtInEnable:
                           default: true
+                          description: Switch to enable DBaas builtin monitoring.
+                            If BuiltInEnable is true and CharacterType is wellknown,
+                            ExporterConfig and Sidecar container will generate automatically.
+                            Otherwise, ISV should set BuiltInEnable to false and provide
+                            ExporterConfig and Sidecar container own.
                           type: boolean
                         exporterConfig:
-                          items:
-                            properties:
-                              name:
-                                type: string
-                              scrapePath:
-                                type: string
-                              scrapePort:
-                                type: integer
-                            type: object
-                          type: array
+                          description: ExporterConfig provided by ISV, which specify
+                            necessary information to Time Series Database. ExporterConfig
+                            is valid when BuiltInEnable is false.
+                          properties:
+                            scrapePath:
+                              description: Exporter url path for Time Series Database
+                                to scrape metrics
+                              maxLength: 128
+                              type: string
+                            scrapePort:
+                              description: Exporter port for Time Series Database
+                                to scrape metrics
+                              maximum: 65536
+                              type: integer
+                          required:
+                          - scrapePath
+                          - scrapePort
+                          type: object
+                      required:
+                      - builtInEnable
                       type: object
                     podSpec:
                       description: podSpec of final workload

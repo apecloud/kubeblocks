@@ -5,16 +5,15 @@ metadata:
   labels:
     {{- include "wesqlapp.labels" . | nindent 4 }}
 spec:
-  type: stat.mysql
+  type: state.mysql
   components:
   - typeName: replicasets
     characterType: mysql
     monitor:
       builtInEnable: false
       exporterConfig:
-        - name: mysql
-          scrapePort: {{ .Values.monitor.internalPort }}
-          scrapePath: /metrics
+        scrapePort: {{ .Values.monitor.internalPort }}
+        scrapePath: /metrics
     configTemplateRefs:
     - name: mysql-3node-tpl-8.0
       volumeName: mysql-config

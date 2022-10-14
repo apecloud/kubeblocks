@@ -44,9 +44,8 @@ spec:
     monitor:
       builtInEnable: false
       exporterConfig:
-        - name: mysql
-          scrapePort: 9104
-          scrapePath: /metrics
+        scrapePort: 9104
+        scrapePath: /metrics
     roleGroups:
     - primary
     defaultReplicas: 1

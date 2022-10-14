@@ -20,20 +20,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/create"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/create"
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
 const (
 	defaultClusterDef      = "wesql-clusterdefinition"
 	defaultAppVersion      = "wesql-appversion-8.0.29"
 	clusterCueTemplateName = "cluster_template.cue"
+	monitorKey             = "monitor"
 )
 
 type CreateOptions struct {
@@ -42,6 +43,7 @@ type CreateOptions struct {
 	AppVersionRef     string `json:"appVersionRef"`
 	TerminationPolicy string `json:"terminationPolicy"`
 	PodAntiAffinity   string `json:"podAntiAffinity"`
+	Monitor           string                   `json:"monitor"`
 	// TopologyKeys if TopologyKeys is nil, add omitempty json tag.
 	// because CueLang can not covert null to list.
 	TopologyKeys []string                 `json:"topologyKeys,omitempty"`
@@ -50,6 +52,18 @@ type CreateOptions struct {
 	// ComponentsFilePath components file path
 	ComponentsFilePath string `json:"-"`
 	create.BaseOptions
+}
+
+func setMonitor(monitor string, components []map[string]interface{}) {
+	enable, err := strconv.ParseBool(monitor)
+	if err != nil {
+		return
+	}
+	for _, component := range components {
+		if _, ok := component[monitorKey]; ok {
+			component[monitorKey] = enable
+		}
+	}
 }
 
 func (o *CreateOptions) Validate() error {
@@ -76,6 +90,11 @@ func (o *CreateOptions) Complete() error {
 			return err
 		}
 	}
+	if len(o.Monitor) == 0 || len(components) == 0 {
+		o.Components = components
+		return nil
+	}
+	setMonitor(o.Monitor, components)
 	o.Components = components
 	return nil
 }
@@ -97,6 +116,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 			cmd.Flags().StringVar(&o.AppVersionRef, "app-version", defaultAppVersion, "AppVersion reference")
 			cmd.Flags().StringVar(&o.TerminationPolicy, "termination-policy", "Halt", "Termination policy")
 			cmd.Flags().StringVar(&o.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type")
+			cmd.Flags().StringVar(&o.Monitor, "monitor", "", "[true|false], override default monitor config")
 			cmd.Flags().StringArrayVar(&o.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
 			cmd.Flags().StringToStringVar(&o.NodeLabels, "node-labels", nil, "Node label selector")
 			cmd.Flags().StringVar(&o.ComponentsFilePath, "components", "", "Use yaml file to specify the cluster components")

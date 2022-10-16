@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
+
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -130,9 +132,7 @@ var _ = Describe("ServiceController", Ordered, func() {
 	}
 
 	removeResource := func(obj controllerclient.Object) {
-		go func() {
-			Expect(k8sClient.Delete(context.Background(), obj)).Should(Succeed())
-		}()
+		Expect(k8sClient.Delete(context.Background(), obj)).Should(Succeed())
 		// waiting for resource deleted
 		key := types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}
 		Eventually(func() bool {
@@ -163,6 +163,10 @@ var _ = Describe("ServiceController", Ordered, func() {
 			}
 
 			mockNode := mockagent.NewMockNode(ctrl)
+			mockNode.EXPECT().GetIP().Return(node1IP).AnyTimes()
+
+			nodes := []agent.Node{mockNode}
+			mockNodeManager.EXPECT().GetNodes().Return(nodes, nil).AnyTimes()
 			mockNodeManager.EXPECT().GetNode(node1IP).Return(mockNode, nil).AnyTimes()
 
 			getENIResponse := []*protocol.ENIMetadata{
@@ -189,23 +193,9 @@ var _ = Describe("ServiceController", Ordered, func() {
 					},
 				},
 			}
-			nodeList := &corev1.NodeList{
-				Items: []corev1.Node{
-					{
-						Status: corev1.NodeStatus{
-							Addresses: []corev1.NodeAddress{
-								{
-									Type:    corev1.NodeInternalIP,
-									Address: node1IP,
-								},
-							},
-						},
-					},
-				},
-			}
 			mockNode.EXPECT().GetManagedENIs().Return(getENIResponse, nil).AnyTimes()
 			mockNode.EXPECT().SetupNetworkForService(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-			Expect(sc.initNodes(nodeList)).Should(Succeed())
+			Expect(sc.initNodes(nodes)).Should(Succeed())
 		})
 	})
 
@@ -328,6 +318,45 @@ var _ = Describe("ServiceController", Ordered, func() {
 			mockNode.EXPECT().CleanNetworkForService(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 			removeResource(svc)
 			removeResource(pod)
+		})
+	})
+
+	Context("Choose pod", func() {
+		It("", func() {
+			t := time.Now()
+			pods := &corev1.PodList{
+				Items: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							CreationTimestamp: metav1.NewTime(t.Add(-20 * time.Second)),
+						},
+						Status: corev1.PodStatus{
+							HostIP: node2IP,
+							Phase:  corev1.PodRunning,
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							CreationTimestamp: metav1.NewTime(t.Add(-30 * time.Second)),
+						},
+						Status: corev1.PodStatus{
+							HostIP: node1IP,
+							Phase:  corev1.PodRunning,
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							CreationTimestamp: metav1.NewTime(t.Add(-10 * time.Second)),
+						},
+						Status: corev1.PodStatus{
+							HostIP: node1IP,
+							Phase:  corev1.PodPending,
+						},
+					},
+				},
+			}
+			pod := LocalTrafficPolicy{}.choosePod(pods)
+			Expect(pod.Status.HostIP).Should(Equal(node1IP))
 		})
 	})
 })

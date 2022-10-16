@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 // TODO assign multiple private ip from different subnets
+// TODO create subnets instead of use host subnet
 // TODO if mask of src address in policy rule little than 32 bit, causing routing problem
 // TODO include iptables binary in agent image
 // TODO monitor security group / subnet / vpc changes
@@ -25,6 +26,7 @@ limitations under the License.
 // TODO define FloatingIP CRD
 // TODO implement device plugin to report floating ip resources
 // TODO move DescribeAllENIs from agent to controller
+// TODO delete enis when node is deleted
 
 package main
 

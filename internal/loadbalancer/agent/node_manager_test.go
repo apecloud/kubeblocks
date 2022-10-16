@@ -17,23 +17,35 @@ limitations under the License.
 package agent
 
 import (
+	"context"
+
+	"github.com/go-logr/logr"
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"google.golang.org/grpc"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
 
 	pb "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol"
 )
 
+const (
+	node1IP   = "172.31.1.10"
+	subnet1Id = "subnet-001"
+	node2IP   = "172.31.1.11"
+	subnet2Id = "subnet-002"
+	node3IP   = "172.31.1.11"
+)
+
 var _ = Describe("NodeManager", func() {
-	const (
-		node1IP   = "172.31.1.10"
-		subnet1Id = "subnet-001"
-		node2IP   = "172.31.1.11"
-		subnet2Id = "subnet-002"
-		node3IP   = "172.31.1.11"
-	)
-	setup := func() *nodeManager {
+	setup := func() (*gomock.Controller, *nodeManager) {
+		ctrl := gomock.NewController(GinkgoT())
 		nm := &nodeManager{
 			logger: logger,
+			Client: &mockK8sClient{},
 			nodes: map[string]Node{
 				node1IP: &node{
 					ip: node1IP,
@@ -58,12 +70,25 @@ var _ = Describe("NodeManager", func() {
 				},
 			},
 		}
-		return nm
+		return ctrl, nm
 	}
+
+	Context("Refresh nodes", func() {
+		It("", func() {
+			_, nm := setup()
+			newGRPCConn = func(addr string) (*grpc.ClientConn, error) {
+				return nil, nil
+			}
+			newNode = func(logger logr.Logger, ip string, nc pb.NodeClient, cp cloud.Provider) (Node, error) {
+				return &mockNode{}, nil
+			}
+			Expect(nm.refreshNodes()).Should(Succeed())
+		})
+	})
 
 	Context("Choose spare node", func() {
 		It("", func() {
-			nm := setup()
+			_, nm := setup()
 			node, err := nm.ChooseSpareNode(subnet2Id)
 			Expect(err).Should(BeNil())
 			Expect(node.GetIP()).Should(Equal(node2IP))
@@ -78,3 +103,36 @@ var _ = Describe("NodeManager", func() {
 		})
 	})
 })
+
+type mockNode struct {
+	*node
+}
+
+func (m *mockNode) Start(stop chan struct{}) error {
+	return nil
+}
+
+type mockK8sClient struct {
+	client.Client
+}
+
+func (m *mockK8sClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	result := list.(*corev1.NodeList)
+	result.Items = []corev1.Node{
+		{
+			Status: corev1.NodeStatus{
+				Addresses: []corev1.NodeAddress{
+					{
+						Type:    corev1.NodeInternalIP,
+						Address: node1IP,
+					},
+					{
+						Type:    corev1.NodeInternalIP,
+						Address: node2IP,
+					},
+				},
+			},
+		},
+	}
+	return nil
+}

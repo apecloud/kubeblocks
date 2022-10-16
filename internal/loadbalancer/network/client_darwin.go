@@ -29,18 +29,18 @@ func NewClient(logger logr.Logger, nl netlinkwrapper.NetLink, ipt iptableswrappe
 	return &networkClient{ipt: ipt}, nil
 }
 
-func (n *networkClient) SetupNetworkForService(privateIP string, eni *cloud.ENIMetadata) error {
+func (c *networkClient) SetupNetworkForService(privateIP string, eni *cloud.ENIMetadata) error {
 	return nil
 }
 
-func (n *networkClient) CleanNetworkForService(privateIP string, eni *cloud.ENIMetadata) error {
+func (c *networkClient) CleanNetworkForService(privateIP string, eni *cloud.ENIMetadata) error {
 	return nil
 }
 
-func (n *networkClient) SetupNetworkForENI(eni *cloud.ENIMetadata) error {
+func (c *networkClient) SetupNetworkForENI(eni *cloud.ENIMetadata) error {
 	return nil
 }
 
-func (n *networkClient) CleanNetworkForENI(eni *cloud.ENIMetadata) error {
+func (c *networkClient) CleanNetworkForENI(eni *cloud.ENIMetadata) error {
 	return nil
 }

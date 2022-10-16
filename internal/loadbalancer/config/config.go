@@ -32,6 +32,7 @@ var (
 	RPCPort                int
 	CleanLeakedENIInterval time.Duration
 	ENIReconcileInterval   time.Duration
+	RefreshNodeInterval    time.Duration
 )
 
 const (
@@ -42,6 +43,7 @@ const (
 	EnvRPCPort                = "RPC_PORT"
 	EnvENIReconcileInterval   = "ENI_RECONCILE_INTERVAL"
 	EnvCleanLeakedENIInterval = "CLEAN_LEAKED_ENI_INTERVAL"
+	EnvRefreshNodes           = "REFRESH_NODES_INTERVAL"
 )
 
 func init() {
@@ -58,6 +60,9 @@ func init() {
 
 	_ = viper.BindEnv(EnvCleanLeakedENIInterval)
 	viper.SetDefault(EnvCleanLeakedENIInterval, 60)
+
+	_ = viper.BindEnv(EnvRefreshNodes)
+	viper.SetDefault(EnvRefreshNodes, 15)
 
 	_ = viper.BindEnv(EnvRPCPort)
 	viper.SetDefault(EnvRPCPort, 19200)
@@ -79,4 +84,5 @@ func ReadConfig(logger logr.Logger) {
 	RPCPort = viper.GetInt(EnvRPCPort)
 	ENIReconcileInterval = time.Duration(viper.GetInt(EnvENIReconcileInterval)) * time.Second
 	CleanLeakedENIInterval = time.Duration(viper.GetInt(EnvCleanLeakedENIInterval)) * time.Second
+	RefreshNodeInterval = time.Duration(viper.GetInt(EnvRefreshNodes)) * time.Second
 }

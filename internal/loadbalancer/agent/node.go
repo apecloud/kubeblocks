@@ -29,6 +29,8 @@ import (
 )
 
 type Node interface {
+	Start(stop chan struct{}) error
+
 	GetIP() string
 
 	GetResource() *NodeResource

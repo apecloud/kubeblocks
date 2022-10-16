@@ -19,6 +19,7 @@ package loadbalancer
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -72,9 +73,27 @@ func (l LocalTrafficPolicy) ChooseNode(svc *corev1.Service) (string, error) {
 	if len(pods.Items) == 0 {
 		return "", errors.New(fmt.Sprintf("Can not find master node for service %s", getServiceFullName(svc)))
 	}
-
 	l.logger.Info("Found master pods", "count", len(pods.Items))
-	return pods.Items[0].Status.HostIP, nil
+
+	pod := l.choosePod(pods)
+	if pod != nil {
+		return pod.Status.HostIP, nil
+	}
+	return "", errors.New("Can not find valid backend pod")
+}
+
+func (l LocalTrafficPolicy) choosePod(pods *corev1.PodList) *corev1.Pod {
+	// latest created pods have high priority
+	sort.SliceStable(pods.Items, func(i, j int) bool {
+		return pods.Items[i].CreationTimestamp.After(pods.Items[j].CreationTimestamp.Time)
+	})
+	for index := range pods.Items {
+		pod := pods.Items[index]
+		if pod.Status.Phase == corev1.PodPending || pod.Status.Phase == corev1.PodRunning {
+			return &pod
+		}
+	}
+	return nil
 }
 
 func getServiceFullName(service *corev1.Service) string {

@@ -87,9 +87,9 @@ func NewServiceController(logger logr.Logger, client client.Client, scheme *runt
 
 	c.initTrafficPolicies()
 
-	nodeList := &corev1.NodeList{}
-	if err := c.Client.List(context.Background(), nodeList); err != nil {
-		return nil, errors.Wrap(err, "Failed to list cluster nodes")
+	nodeList, err := nm.GetNodes()
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to get cluster nodes")
 	}
 	if err := c.initNodes(nodeList); err != nil {
 		return nil, errors.Wrap(err, "Failed to init nodes")
@@ -104,21 +104,10 @@ func (c *ServiceController) initTrafficPolicies() {
 	}
 }
 
-func (c *ServiceController) initNodes(nodeList *corev1.NodeList) error {
-	for _, item := range nodeList.Items {
-		var nodeIP string
-		for _, addr := range item.Status.Addresses {
-			if addr.Type != corev1.NodeInternalIP {
-				continue
-			}
-			nodeIP = addr.Address
-		}
-		if nodeIP == "" {
-			c.logger.Error(fmt.Errorf("invalid cluster node %v", item), "Skip init node")
-			continue
-		}
-		if err := c.initNode(nodeIP); err != nil {
-			return errors.Wrapf(err, "Failed to init node %s", nodeIP)
+func (c *ServiceController) initNodes(nodeList []agent.Node) error {
+	for _, item := range nodeList {
+		if err := c.initNode(item.GetIP()); err != nil {
+			return errors.Wrapf(err, "Failed to init node %s", item.GetIP())
 		}
 	}
 	return nil

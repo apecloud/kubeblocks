@@ -26,14 +26,34 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/config"
 	pb "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol"
+)
+
+const (
+	LabelKeyWorkloadNode = "kubeblocks.apecloud.com/workload-node"
+)
+
+var (
+	ErrNodeNotFound = errors.New("Node not found")
+
+	newGRPCConn = func(addr string) (*grpc.ClientConn, error) {
+		return grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}
+
+	newNode = func(logger logr.Logger, ip string, nc pb.NodeClient, cp cloud.Provider) (Node, error) {
+		return NewNode(logger, ip, nc, cp)
+	}
 )
 
 type NodeManager interface {
 	GetNode(ip string) (Node, error)
+
+	GetNodes() ([]Node, error)
 
 	ChooseSpareNode(subnet string) (Node, error)
 }
@@ -42,28 +62,43 @@ type nodeManager struct {
 	sync.RWMutex
 	client.Client
 
-	cp      cloud.Provider
 	rpcPort int
+	cp      cloud.Provider
 	logger  logr.Logger
 	nodes   map[string]Node
 }
 
-func NewNodeManager(logger logr.Logger, rpcPort int, cp cloud.Provider, client client.Client) (*nodeManager, error) {
-	n := &nodeManager{
-		Client:  client,
+func NewNodeManager(logger logr.Logger, rpcPort int, cp cloud.Provider, c client.Client) (*nodeManager, error) {
+	nm := &nodeManager{
+		Client:  c,
 		cp:      cp,
-		logger:  logger,
+		logger:  logger.WithName("NodeManager"),
 		rpcPort: rpcPort,
 		nodes:   make(map[string]Node),
 	}
-	nodeList := &corev1.NodeList{}
-	if err := n.Client.List(context.Background(), nodeList); err != nil {
-		return nil, errors.Wrap(err, "Failed to list cluster nodes")
+	if err := nm.refreshNodes(); err != nil {
+		return nil, errors.Wrapf(err, "Failed to init nodes")
 	}
-	return n, n.initNodes(nodeList)
+	f := func() {
+		if err := nm.refreshNodes(); err != nil {
+			nm.logger.Error(err, "Failed to refresh nodes")
+		} else {
+			nm.logger.Info("Successfully refresh nodes")
+		}
+	}
+	go wait.Forever(f, config.RefreshNodeInterval)
+	return nm, nil
 }
 
-func (n *nodeManager) initNodes(nodeList *corev1.NodeList) error {
+func (nm *nodeManager) refreshNodes() error {
+	nodeList := &corev1.NodeList{}
+	opts := client.MatchingLabels{
+		LabelKeyWorkloadNode: "true",
+	}
+	if err := nm.Client.List(context.Background(), nodeList, opts); err != nil {
+		return errors.Wrap(err, "Failed to list cluster nodes")
+	}
+	nodesLatest := make(map[string]bool)
 	for _, item := range nodeList.Items {
 		var nodeIP string
 		for _, addr := range item.Status.Addresses {
@@ -73,53 +108,75 @@ func (n *nodeManager) initNodes(nodeList *corev1.NodeList) error {
 			nodeIP = addr.Address
 		}
 		if nodeIP == "" {
-			n.logger.Error(fmt.Errorf("invalid cluster node %v", item), "Skip init node")
+			nm.logger.Error(fmt.Errorf("invalid cluster node %v", item), "Skip init node")
 			continue
 		}
-		node, err := n.initNode(nodeIP)
+		nodesLatest[nodeIP] = true
+
+		cachedNode, err := nm.GetNode(nodeIP)
+		if err == nil && cachedNode != nil {
+			continue
+		}
+		if err != ErrNodeNotFound {
+			nm.logger.Error(err, "")
+			continue
+		}
+		cachedNode, err = nm.initNode(nodeIP)
 		if err != nil {
 			return errors.Wrapf(err, "Failed to init node %s", nodeIP)
 		}
-		n.SetNode(nodeIP, node)
+		nm.SetNode(nodeIP, cachedNode)
+	}
+
+	nodesCached, err := nm.GetNodes()
+	if err != nil {
+		return errors.Wrapf(err, "Failed to get cached nodes")
+	}
+	for index := range nodesCached {
+		cachedNode := nodesCached[index]
+		if _, ok := nodesLatest[cachedNode.GetIP()]; ok {
+			continue
+		}
+		nm.RemoveNode(cachedNode.GetIP())
 	}
 	return nil
 }
 
-func (n *nodeManager) initNode(ip string) (*node, error) {
-	addr := fmt.Sprintf("%s:%d", ip, n.rpcPort)
-	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+func (nm *nodeManager) initNode(ip string) (Node, error) {
+	addr := fmt.Sprintf("%s:%d", ip, nm.rpcPort)
+	conn, err := newGRPCConn(addr)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to dial: %v", addr)
 	}
-	node, err := NewNode(n.logger, ip, pb.NewNodeClient(conn), n.cp)
+	n, err := newNode(nm.logger, ip, pb.NewNodeClient(conn), nm.cp)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to init node")
 	}
-	if err = node.Start(make(chan struct{})); err != nil {
+	if err = n.Start(make(chan struct{})); err != nil {
 		return nil, errors.Wrapf(err, "Failed to start node")
 	}
-	return node, nil
+	return n, nil
 }
 
-func (n *nodeManager) ChooseSpareNode(subnet string) (Node, error) {
-	n.RLock()
-	defer n.RUnlock()
+func (nm *nodeManager) ChooseSpareNode(subnet string) (Node, error) {
+	nm.RLock()
+	defer nm.RUnlock()
 	var spareNode Node
-	for _, node := range n.nodes {
+	for _, item := range nm.nodes {
 		if subnet != "" {
-			_, ok := node.GetResource().SubnetIds[subnet]
+			_, ok := item.GetResource().SubnetIds[subnet]
 			if !ok {
 				continue
 			}
 		}
 		if spareNode == nil {
-			spareNode = node
+			spareNode = item
 			continue
 		}
-		if node.GetResource().GetSparePrivateIPs() < spareNode.GetResource().GetSparePrivateIPs() {
+		if item.GetResource().GetSparePrivateIPs() < spareNode.GetResource().GetSparePrivateIPs() {
 			continue
 		}
-		spareNode = node
+		spareNode = item
 	}
 	if spareNode == nil {
 		return nil, errors.New("Failed to find spare node")
@@ -127,24 +184,34 @@ func (n *nodeManager) ChooseSpareNode(subnet string) (Node, error) {
 	return spareNode, nil
 }
 
-func (n *nodeManager) GetNode(ip string) (Node, error) {
-	n.RLock()
-	defer n.RUnlock()
-	node, ok := n.nodes[ip]
-	if !ok {
-		return nil, fmt.Errorf("can not find node %s", ip)
+func (nm *nodeManager) GetNodes() ([]Node, error) {
+	nm.RLock()
+	defer nm.RUnlock()
+	var result []Node
+	for _, item := range nm.nodes {
+		result = append(result, item)
 	}
-	return node, nil
+	return result, nil
 }
 
-func (n *nodeManager) RemoveNode(ip string) {
-	n.Lock()
-	defer n.Unlock()
-	delete(n.nodes, ip)
+func (nm *nodeManager) GetNode(ip string) (Node, error) {
+	nm.RLock()
+	defer nm.RUnlock()
+	result, ok := nm.nodes[ip]
+	if !ok {
+		return nil, ErrNodeNotFound
+	}
+	return result, nil
 }
 
-func (n *nodeManager) SetNode(ip string, node Node) {
-	n.Lock()
-	defer n.Unlock()
-	n.nodes[ip] = node
+func (nm *nodeManager) RemoveNode(ip string) {
+	nm.Lock()
+	defer nm.Unlock()
+	delete(nm.nodes, ip)
+}
+
+func (nm *nodeManager) SetNode(ip string, node Node) {
+	nm.Lock()
+	defer nm.Unlock()
+	nm.nodes[ip] = node
 }

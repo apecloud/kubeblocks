@@ -48,7 +48,7 @@ type CreateOptions struct {
 	NodeLabels   map[string]string        `json:"nodeLabels,omitempty"`
 	Components   []map[string]interface{} `json:"components"`
 	// ComponentsFilePath components file path
-	ComponentsFilePath string
+	ComponentsFilePath string `json:"-"`
 	create.BaseOptions
 }
 

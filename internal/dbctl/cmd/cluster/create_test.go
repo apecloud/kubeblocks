@@ -19,9 +19,10 @@ package cluster
 import (
 	"encoding/json"
 
-	"github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
 func generateComponents(component v1alpha1.ClusterComponent, count int) []map[string]interface{} {

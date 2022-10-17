@@ -27,9 +27,14 @@ import (
 	"github.com/leaanthony/debme"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+)
+
+const (
+	kFake = "fake"
 )
 
 var tlog = ctrl.Log.WithName("lifecycle_util_testing")
@@ -67,9 +72,9 @@ var _ = Describe("create", func() {
 			clusterComp = &cluster.Spec.Components[0]
 
 			clusterDef = &dbaasv1alpha1.ClusterDefinition{}
-			clusterDef.Spec.Type = "state-mysql"
+			clusterDef.Spec.Type = kStateMysql
 			clusterDefComp = &dbaasv1alpha1.ClusterDefinitionComponent{}
-			clusterDefComp.CharacterType = "mysql"
+			clusterDefComp.CharacterType = KMysql
 			clusterDefComp.Monitor = &dbaasv1alpha1.MonitorConfig{
 				BuiltIn: false,
 				Exporter: &dbaasv1alpha1.ExporterConfig{
@@ -95,7 +100,7 @@ var _ = Describe("create", func() {
 
 		It("Disable builtIn monitor in ClusterDefinitionComponent", func() {
 			clusterComp.Monitor = true
-			clusterDefComp.CharacterType = "fake"
+			clusterDefComp.CharacterType = kFake
 			clusterDefComp.Monitor.BuiltIn = false
 			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
 			monitorConfig := component.Monitor
@@ -109,7 +114,7 @@ var _ = Describe("create", func() {
 
 		It("Disable builtIn monitor with wrong monitorConfig in ClusterDefinitionComponent", func() {
 			clusterComp.Monitor = true
-			clusterDefComp.CharacterType = "fake"
+			clusterDefComp.CharacterType = kFake
 			clusterDefComp.Monitor.BuiltIn = false
 			clusterDefComp.Monitor.Exporter = nil
 			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
@@ -124,7 +129,7 @@ var _ = Describe("create", func() {
 
 		It("Enable builtIn with wrong CharacterType in ClusterDefinitionComponent", func() {
 			clusterComp.Monitor = true
-			clusterDefComp.CharacterType = "fake"
+			clusterDefComp.CharacterType = kFake
 			clusterDefComp.Monitor.BuiltIn = true
 			clusterDefComp.Monitor.Exporter = nil
 			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
@@ -139,8 +144,8 @@ var _ = Describe("create", func() {
 
 		It("Enable builtIn with empty CharacterType and wrong clusterType in ClusterDefinitionComponent", func() {
 			clusterComp.Monitor = true
-			clusterDef.Spec.Type = "fake"
-			clusterDefComp.CharacterType = ""
+			clusterDef.Spec.Type = kFake
+			clusterDefComp.CharacterType = KEmpty
 			clusterDefComp.Monitor.BuiltIn = true
 			clusterDefComp.Monitor.Exporter = nil
 			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
@@ -155,8 +160,8 @@ var _ = Describe("create", func() {
 
 		It("Enable builtIn with empty CharacterType and right clusterType in ClusterDefinitionComponent", func() {
 			clusterComp.Monitor = true
-			clusterDef.Spec.Type = "state.mysql"
-			clusterDefComp.CharacterType = ""
+			clusterDef.Spec.Type = kStateMysql
+			clusterDefComp.CharacterType = KEmpty
 			clusterDefComp.Monitor.BuiltIn = true
 			clusterDefComp.Monitor.Exporter = nil
 			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)

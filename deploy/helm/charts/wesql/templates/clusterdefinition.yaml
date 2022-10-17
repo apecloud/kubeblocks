@@ -6,6 +6,9 @@ metadata:
     {{- include "wesqlapp.labels" . | nindent 4 }}
 spec:
   type: state.mysql
+  connectionCredential:
+    user: {{ .Values.auth.rootUser }}
+    password: {{ .Values.auth.rootPassword }}
   components:
   - typeName: replicasets
     {{- if .Values.monitor.builtIn }}

@@ -49,9 +49,9 @@ var (
 	}
 )
 
-//===================================
+// ===================================
 //   CharacterType == MySQL
-//===================================
+// ===================================
 
 type MysqlMonitor struct {
 	SecretName   string `json:"secretName,omitempty"`
@@ -111,9 +111,9 @@ func setMysqlComponent(cluster *dbaasv1alpha1.Cluster, component *Component) err
 	return nil
 }
 
-//===================================
+// ===================================
 //   CharacterType Logic
-//===================================
+// ===================================
 
 // CalcCharacterType calc wellknown CharacterType, if not wellknown return empty string
 func CalcCharacterType(clusterType string) string {

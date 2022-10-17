@@ -137,6 +137,7 @@ func (nm *nodeManager) refreshNodes() error {
 		if _, ok := nodesLatest[cachedNode.GetIP()]; ok {
 			continue
 		}
+		cachedNode.Stop()
 		nm.RemoveNode(cachedNode.GetIP())
 	}
 	return nil
@@ -152,7 +153,7 @@ func (nm *nodeManager) initNode(ip string) (Node, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to init node")
 	}
-	if err = n.Start(make(chan struct{})); err != nil {
+	if err = n.Start(); err != nil {
 		return nil, errors.Wrapf(err, "Failed to start node")
 	}
 	return n, nil

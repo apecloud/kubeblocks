@@ -18,6 +18,7 @@ package agent
 
 import (
 	"context"
+	"sync"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -29,7 +30,9 @@ import (
 )
 
 type Node interface {
-	Start(stop chan struct{}) error
+	Start() error
+
+	Stop()
 
 	GetIP() string
 
@@ -49,6 +52,8 @@ type node struct {
 	nc     pb.NodeClient
 	cp     cloud.Provider
 	em     *eniManager
+	once   sync.Once
+	stop   chan struct{}
 	logger logr.Logger
 }
 
@@ -63,12 +68,22 @@ func NewNode(logger logr.Logger, ip string, nc pb.NodeClient, cp cloud.Provider)
 		nc:     nc,
 		ip:     ip,
 		cp:     cp,
+		once:   sync.Once{},
+		stop:   make(chan struct{}),
 		logger: logger.WithValues("ip", ip),
 	}, nil
 }
 
-func (n *node) Start(stop chan struct{}) error {
-	return n.em.start(stop, config.ENIReconcileInterval, config.CleanLeakedENIInterval)
+func (n *node) Start() error {
+	return n.em.start(n.stop, config.ENIReconcileInterval, config.CleanLeakedENIInterval)
+}
+
+func (n *node) Stop() {
+	n.once.Do(func() {
+		if n.stop != nil {
+			close(n.stop)
+		}
+	})
 }
 
 func (n *node) GetIP() string {

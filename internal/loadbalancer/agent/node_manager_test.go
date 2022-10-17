@@ -80,7 +80,7 @@ var _ = Describe("NodeManager", func() {
 				return nil, nil
 			}
 			newNode = func(logger logr.Logger, ip string, nc pb.NodeClient, cp cloud.Provider) (Node, error) {
-				return &mockNode{}, nil
+				return &mockNode{node: &node{stop: make(chan struct{})}}, nil
 			}
 			Expect(nm.refreshNodes()).Should(Succeed())
 		})
@@ -108,7 +108,7 @@ type mockNode struct {
 	*node
 }
 
-func (m *mockNode) Start(stop chan struct{}) error {
+func (m *mockNode) Start() error {
 	return nil
 }
 

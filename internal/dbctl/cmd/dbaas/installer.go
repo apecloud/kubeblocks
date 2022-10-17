@@ -41,6 +41,9 @@ type Installer struct {
 }
 
 func (i *Installer) Install() error {
+	if len(i.Sets) == 0 {
+		i.Sets = "[]"
+	}
 	var sets []string
 	if err := json.Unmarshal([]byte(i.Sets), &sets); err != nil {
 		return err

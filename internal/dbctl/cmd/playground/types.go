@@ -25,6 +25,7 @@ import (
 )
 
 const (
+	defaultEngine        = "wesql"
 	defaultCloudProvider = "local"
 	DefaultVersion       = "8.0.28"
 	localHost            = "127.0.0.1"
@@ -33,9 +34,6 @@ const (
 	// CliDockerNetwork is docker network for k3d cluster when `dbctl playground`
 	// all cluster will be created in this network, so they can communicate with each other
 	CliDockerNetwork = "k3d-dbctl-playground"
-
-	wesqlHelmChart = "oci://yimeisun.azurecr.io/helm-chart/wesqlcluster"
-	wesqlVersion   = "0.1.0"
 )
 
 var (

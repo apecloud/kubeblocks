@@ -32,6 +32,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cloudprovider"
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/playground/engine"
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
@@ -87,6 +88,7 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		},
 	}
 
+	cmd.Flags().StringVar(&o.Engine, "engine", defaultEngine, "Database cluster engine")
 	cmd.Flags().StringVar(&o.CloudProvider, "cloud-provider", defaultCloudProvider, "Cloud provider type")
 	cmd.Flags().StringVar(&o.AccessKey, "access-key", "", "Cloud provider access key")
 	cmd.Flags().StringVar(&o.AccessSecret, "access-secret", "", "Cloud provider access secret")
@@ -177,8 +179,8 @@ func (o *initOptions) local() error {
 		return errors.Wrap(err, "Failed to install KubeBlocks")
 	}
 
-	// Install WeSQL
-	if err = o.installWeSQL(); err != nil {
+	// Install database cluster
+	if err = o.installCluster(); err != nil {
 		return errors.Wrap(err, "Failed to install WeSQL")
 	}
 
@@ -305,19 +307,11 @@ func (o *initOptions) installKubeBlocks() error {
 	return chart.Install(o.helmCfg)
 }
 
-func (o *initOptions) installWeSQL() error {
-	wesql := &helm.InstallOpts{
-		Name:      dbClusterName,
-		Chart:     wesqlHelmChart,
-		Wait:      true,
-		Namespace: dbClusterNamespace,
-		Version:   wesqlVersion,
-		Sets: []string{
-			"serverVersion=" + o.Version,
-			fmt.Sprintf("replicaCount=%d", o.Replicas),
-		},
-		Login:    true,
-		TryTimes: 2,
+func (o *initOptions) installCluster() error {
+	wesql, err := engine.New(o.Engine, o.Version, o.Replicas, dbClusterName, dbClusterNamespace)
+	if err != nil {
+		return err
 	}
-	return wesql.Install(o.helmCfg)
+
+	return wesql.HelmInstallOpts().Install(o.helmCfg)
 }

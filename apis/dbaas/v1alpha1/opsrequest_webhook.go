@@ -146,7 +146,7 @@ func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *
 	supportedComponentMap := covertComponentNamesToMap(cluster.Status.Operations.VerticalScalable)
 	customValidate := func(componentOps *ComponentOps, index int, operationComponent *OperationComponent) *field.Error {
 		if componentOps.VerticalScaling == nil {
-			return field.NotFound(field.NewPath(fmt.Sprintf("spec.componentOps[%d].verticalScaling", index)), "can not be null")
+			return field.NotFound(field.NewPath(fmt.Sprintf("spec.componentOps[%d].verticalScaling", index)), "can not be empty")
 		}
 		if err := validateVerticalResourceList(componentOps.VerticalScaling.Requests); err != nil {
 			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].verticalScaling.requests", index)), componentOps.VerticalScaling.Requests, err.Error())
@@ -164,7 +164,7 @@ func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.
 	supportedComponentMap := covertOperationComponentsToMap(cluster.Status.Operations.HorizontalScalable)
 	customValidate := func(componentOps *ComponentOps, index int, operationComponent *OperationComponent) *field.Error {
 		if componentOps.HorizontalScaling == nil {
-			return field.NotFound(field.NewPath(fmt.Sprintf("spec.componentOps[%d].horizontalScaling", index)), "can not be null")
+			return field.NotFound(field.NewPath(fmt.Sprintf("spec.componentOps[%d].horizontalScaling", index)), "can not be empty")
 		}
 		replicas := componentOps.HorizontalScaling.Replicas
 		if replicas < operationComponent.Min || replicas > operationComponent.Max {
@@ -185,7 +185,7 @@ func (r *OpsRequest) validateVolumeExpansion(allErrs *field.ErrorList, cluster *
 			invalidVctNames []string
 		)
 		if componentOps.VolumeExpansion == nil {
-			return field.NotFound(field.NewPath(fmt.Sprintf("spec.componentOps[%d].volumeExpansion", index)), "can not be null")
+			return field.NotFound(field.NewPath(fmt.Sprintf("spec.componentOps[%d].volumeExpansion", index)), "can not be empty")
 		}
 		// covert slice to map
 		for _, v := range operationComponent.VolumeClaimTemplateNames {
@@ -224,7 +224,7 @@ func (r *OpsRequest) commonValidationWithComponentOps(allErrs *field.ErrorList, 
 		return false
 	}
 	if len(r.Spec.ComponentOpsList) == 0 {
-		addInvalidError(allErrs, "spec.componentOps", r.Spec.ComponentOpsList, "can not be null")
+		addInvalidError(allErrs, "spec.componentOps", r.Spec.ComponentOpsList, "can not be empty")
 		return false
 	}
 	for _, v := range cluster.Spec.Components {
@@ -232,7 +232,7 @@ func (r *OpsRequest) commonValidationWithComponentOps(allErrs *field.ErrorList, 
 	}
 	for index, componentOps := range r.Spec.ComponentOpsList {
 		if len(componentOps.ComponentNames) == 0 {
-			addNotFoundError(allErrs, fmt.Sprintf("spec.componentOps[%d].componentNames", index), "can not be null")
+			addNotFoundError(allErrs, fmt.Sprintf("spec.componentOps[%d].componentNames", index), "can not be empty")
 			continue
 		}
 		for _, v := range componentOps.ComponentNames {

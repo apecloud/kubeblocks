@@ -13,7 +13,6 @@ component: {
 	volumeClaimTemplates: [...]
 }
 roleGroup: {
-	name:     string
 	replicas: int
 }
 
@@ -22,7 +21,7 @@ statefulset: {
 	kind:       "StatefulSet"
 	metadata: {
 		namespace: cluster.metadata.namespace
-		name:      "\(cluster.metadata.name)-\(component.name)-\(roleGroup.name)"
+		name:      "\(cluster.metadata.name)-\(component.name)"
 		labels: {
 			"app.kubernetes.io/name":     "\(component.clusterType)-\(component.clusterDefName)"
 			"app.kubernetes.io/instance": cluster.metadata.name
@@ -38,7 +37,7 @@ statefulset: {
 				"app.kubernetes.io/instance":       "\(cluster.metadata.name)"
 				"app.kubernetes.io/component-name": "\(component.name)"
 			}
-		serviceName:         "\(cluster.metadata.name)-\(component.name)-\(roleGroup.name)"
+		serviceName:         "\(cluster.metadata.name)-\(component.name)"
 		replicas:            roleGroup.replicas
 		minReadySeconds:     10
 		podManagementPolicy: "Parallel"

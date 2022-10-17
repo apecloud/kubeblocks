@@ -98,11 +98,6 @@ spec:
               components:
                 items:
                   properties:
-                    antiAffinity:
-                      default: false
-                      description: antiAffinity defines components should have anti-affinity
-                        constraint to same component type
-                      type: boolean
                     configTemplateRefs:
                       description: The configTemplateRefs field provided by ISV, and
                         finally this configTemplateRefs will be rendered into the

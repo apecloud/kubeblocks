@@ -391,8 +391,6 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 			v.Status.CurrentRevision != v.Status.UpdateRevision ||
 			v.Status.ObservedGeneration != v.GetGeneration() {
 			isOk = false
-		} else {
-			cluster.Status.Phase = dbaasv1alpha1.RunningPhase
 		}
 		// when component phase is changed, set needSyncStatusComponent to true, then patch cluster.status
 		if ok := r.patchStatusComponentsWithStatefulSet(cluster, &v, cluster.Status.Phase); ok {

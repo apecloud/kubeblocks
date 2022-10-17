@@ -20,6 +20,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/cloudprovider"
 )
 
 var _ = Describe("playground", func() {
@@ -31,7 +33,7 @@ var _ = Describe("playground", func() {
 
 	It("New playground command", func() {
 		cmd := NewPlaygroundCmd(streams)
-		Expect(cmd != nil).Should(BeTrue())
+		Expect(cmd).ShouldNot(BeNil())
 		Expect(cmd.HasSubCommands()).Should(BeTrue())
 	})
 
@@ -41,22 +43,32 @@ var _ = Describe("playground", func() {
 
 		o := &initOptions{
 			Replicas:      0,
-			CloudProvider: DefaultCloudProvider,
+			CloudProvider: defaultCloudProvider,
 		}
 		Expect(o.validate()).To(MatchError("replicas should greater than 0"))
 
 		o.Replicas = 1
 		Expect(o.validate()).Should(Succeed())
-		Expect(o.run()).Should(Or(HaveOccurred(), Succeed()))
+		Expect(o.run()).Should(Or(HaveOccurred()))
+
+		o.CloudProvider = cloudprovider.AWS
+		Expect(o.run()).Should(Or(HaveOccurred()))
 	})
 
 	It("destroy command", func() {
 		cmd := newDestroyCmd(streams)
-		Expect(cmd != nil).Should(BeTrue())
+		Expect(cmd).ShouldNot(BeNil())
 
 		o := &destroyOptions{
 			IOStreams: streams,
 		}
-		Expect(o.destroyPlayground()).Should(Or(HaveOccurred(), Succeed()))
+		Expect(o.destroyPlayground()).Should(Or(HaveOccurred()))
+	})
+
+	It("guide", func() {
+		cmd := newGuideCmd()
+		Expect(cmd).ShouldNot(BeNil())
+		cmd.Run(cmd, []string{})
+		Expect(printGuide("", "")).Should(HaveOccurred())
 	})
 })

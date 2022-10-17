@@ -33,6 +33,13 @@ const (
 
 type TerminationPolicyType string
 
+type PodAntiAffinity string
+
+const (
+	Preferred PodAntiAffinity = "Preferred"
+	Required  PodAntiAffinity = "Required"
+)
+
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
 	// ref ClusterDefinition, immutable
@@ -45,6 +52,10 @@ type ClusterSpec struct {
 
 	// +optional
 	Components []ClusterComponent `json:"components,omitempty"`
+
+	// Affinity describes affinities which specific by users
+	// +optional
+	Affinity *Affinity `json:"affinity,omitempty"`
 
 	// One of DoNotTerminate, Halt, Delete, WipeOut.
 	// Defaults to Halt.
@@ -122,6 +133,10 @@ type ClusterComponent struct {
 	// default value in ClusterDefinition
 	Replicas int `json:"replicas,omitempty"`
 
+	// Affinity describes affinities which specific by users
+	// +optional
+	Affinity *Affinity `json:"affinity,omitempty"`
+
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
@@ -195,6 +210,22 @@ type ClusterStatusRoleGroup struct {
 type ClusterComponentVolumeClaimTemplate struct {
 	Name string                           `json:"name"`
 	Spec corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"`
+}
+
+type Affinity struct {
+	// PodAntiAffinity defines pods of component anti-affnity
+	// Defaults to Preferred
+	// Preferred means try spread pods by topologyKey
+	// Required means must spread pods by topologyKey
+	// +kubebuilder:validation:Enum={Preferred,Required}
+	// +optional
+	PodAntiAffinity PodAntiAffinity `json:"podAntiAffinity,omitempty"`
+	// TopologyKeys describe topologyKeys for `topologySpreadConstraint` and `podAntiAffinity` in ClusterDefinition API
+	// +optional
+	TopologyKeys []string `json:"topologyKeys"`
+	// NodeLabels describe constrain which nodes pod can be scheduled on based on node labels
+	// +optional
+	NodeLabels map[string]string `json:"nodeLabels,omitempty"`
 }
 
 type Operations struct {

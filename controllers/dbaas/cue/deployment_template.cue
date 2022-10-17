@@ -13,7 +13,6 @@ component: {
 	volumeClaimTemplates: [...]
 }
 roleGroup: {
-	name:     string
 	replicas: int
 }
 
@@ -22,7 +21,7 @@ deployment: {
 	"kind":       "Deployment"
 	"metadata": {
 		namespace: cluster.metadata.namespace
-		name:      "\(cluster.metadata.name)-\(component.name)-\(roleGroup.name)"
+		name:      "\(cluster.metadata.name)-\(component.name)"
 		labels: {
 			"app.kubernetes.io/name":     "\(component.clusterType)-\(component.clusterDefName)"
 			"app.kubernetes.io/instance": cluster.metadata.name

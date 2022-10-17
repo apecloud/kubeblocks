@@ -29,8 +29,6 @@ var _ = Describe("playground", func() {
 		ctx:         context.Background(),
 		cfg:         config.ClusterConfig{},
 		clusterName: "k3d-test",
-		namespace:   ClusterNamespace,
-		dbCluster:   "k3d-test-dbcluster",
 		wesql: Wesql{
 			serverVersion: wesqlVersion,
 			replicas:      1,
@@ -42,11 +40,8 @@ var _ = Describe("playground", func() {
 		Expect(installer.setKubeconfig()).Should(Succeed())
 	})
 
-	It("print guide", func() {
-		Expect(installer.printGuide("", "")).Should(Succeed())
-	})
-
 	It("k3d util function", func() {
+		Expect(installer.setKubeconfig()).Should(Succeed())
 		config, err := buildClusterRunConfig("test")
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(config.Name).Should(ContainSubstring("test"))

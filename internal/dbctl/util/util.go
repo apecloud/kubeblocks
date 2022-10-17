@@ -31,6 +31,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -222,4 +223,17 @@ func DoWithRetry(ctx context.Context, logger logr.Logger, operation func() error
 
 func GenRequestId() string {
 	return uuid.New().String()
+}
+
+func PrintGoTemplate(wr io.Writer, tpl string, values interface{}) error {
+	tmpl, err := template.New("_").Parse(tpl)
+	if err != nil {
+		return err
+	}
+
+	err = tmpl.Execute(wr, values)
+	if err != nil {
+		return err
+	}
+	return nil
 }

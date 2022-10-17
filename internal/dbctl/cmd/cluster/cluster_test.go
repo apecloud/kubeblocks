@@ -21,6 +21,9 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/create"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
 var _ = Describe("Cluster", func() {
@@ -31,28 +34,19 @@ var _ = Describe("Cluster", func() {
 
 	Context("create", func() {
 		It("without name", func() {
-			o := &CreateOptions{IOStreams: streams}
-			Expect(o.Validate([]string{})).To(MatchError("missing cluster name"))
-		})
-
-		It("without cluster definition", func() {
-			o := &CreateOptions{IOStreams: streams}
-			Expect(o.Validate([]string{"test"})).To(MatchError("cluster-definition can not be empty"))
-		})
-
-		It("without app-version", func() {
-			o := &CreateOptions{
-				IOStreams:     streams,
-				ClusterDefRef: "wesql",
-			}
-			Expect(o.Validate([]string{"test"})).To(MatchError("app-version can not be empty"))
+			o := &CreateOptions{}
+			o.IOStreams = streams
+			Expect(o.Validate()).To(MatchError("missing cluster name"))
 		})
 
 		It("new command", func() {
 			tf := cmdtesting.NewTestFactory().WithNamespace("default")
 			defer tf.Cleanup()
+			tf.ClientConfigVal = cfg
 			cmd := NewCreateCmd(tf, streams)
 			Expect(cmd != nil).To(BeTrue())
+			// must succeed otherwise exit 1 and make test fails
+			cmd.Run(nil, []string{"test1"})
 		})
 
 		It("run", func() {
@@ -61,16 +55,34 @@ var _ = Describe("Cluster", func() {
 			tf.ClientConfigVal = cfg
 
 			o := &CreateOptions{
-				IOStreams:     streams,
-				ClusterDefRef: "wesql",
-				AppVersionRef: "app-version",
-				Components:    "",
+				BaseOptions:        create.BaseOptions{IOStreams: streams, Name: "test"},
+				ComponentsFilePath: "",
+				TerminationPolicy:  "Halt",
+				ClusterDefRef:      "wesql",
+				AppVersionRef:      "app-version",
+				PodAntiAffinity:    "Preferred",
+				TopologyKeys:       []string{"kubernetes.io/hostname"},
+				NodeLabels:         map[string]string{"testLabelKey": "testLabelValue"},
 			}
-			Expect(o.Complete(tf, []string{"test"})).Should(Succeed())
+
+			o.ComponentsFilePath = "test.yaml"
+			Expect(o.Complete()).ShouldNot(Succeed())
+
+			o.ComponentsFilePath = ""
+			Expect(o.Complete()).Should(Succeed())
+
+			inputs := create.Inputs{
+				ResourceName:    types.ResourceClusters,
+				CueTemplateName: clusterCueTemplateName,
+				Options:         o,
+				Factory:         tf,
+			}
+
+			Expect(o.BaseOptions.Complete(inputs, []string{"test"})).Should(Succeed())
 			Expect(o.Namespace).To(Equal("default"))
 			Expect(o.Name).To(Equal("test"))
 
-			Expect(o.Run()).Should(Succeed())
+			Expect(o.Run(inputs, []string{})).Should(Succeed())
 
 			del := &DeleteOptions{}
 			Expect(del.Validate([]string{})).To(MatchError("missing cluster name"))
@@ -112,5 +124,56 @@ var _ = Describe("Cluster", func() {
 		cmd := NewClusterCmd(tf, streams)
 		Expect(cmd != nil).To(BeTrue())
 		Expect(cmd.HasSubCommands()).To(BeTrue())
+	})
+
+	It("operations", func() {
+		tf := cmdtesting.NewTestFactory().WithNamespace("default")
+		tf.ClientConfigVal = cfg
+		defer tf.Cleanup()
+		o := &OperationsOptions{
+			BaseOptions:            create.BaseOptions{IOStreams: streams},
+			TtlSecondsAfterSucceed: 30,
+		}
+		By("validate o.name is null")
+		Expect(o.Validate()).To(MatchError("missing cluster name"))
+
+		By("validate upgrade when app-version is null")
+		o.Name = "test"
+		o.OpsType = OpsTypeUpgrade
+		Expect(o.Validate()).To(MatchError("missing app-version"))
+		o.AppVersionRef = "test-app-version"
+		Expect(o.Validate()).Should(Succeed())
+
+		By("validate volumeExpansion when components is null")
+		o.OpsType = OpsTypeVolumeExpansion
+		Expect(o.Validate()).To(MatchError("missing component-names"))
+
+		By("validate volumeExpansion when vct-names is null")
+		o.ComponentNames = []string{"replicasets"}
+		Expect(o.Validate()).To(MatchError("missing vct-names"))
+		By("validate volumeExpansion when storage is null")
+		o.VctNames = []string{"data"}
+		Expect(o.Validate()).To(MatchError("missing storage"))
+		o.Storage = "2Gi"
+		Expect(o.Validate()).Should(Succeed())
+
+		By("validate horizontalScaling when replicas or roleGroupReplicas less than -1 ")
+		o.OpsType = OpsTypeHorizontalScaling
+		o.Replicas = -2
+		Expect(o.Validate()).To(MatchError("replicas required natural number"))
+		o.Replicas = -1
+		o.RoleGroupReplicas = -2
+		Expect(o.Validate()).To(MatchError("role-group-replicas required natural number"))
+
+		By("validate horizontalScaling no replicas and role-group-names")
+		o.Replicas = -1
+		o.RoleGroupReplicas = -1
+		Expect(o.Validate()).To(MatchError("required replicas or role-group-names"))
+
+		By("validate horizontalScaling when exists role-group-names")
+		o.RoleGroupNames = []string{"primary"}
+		Expect(o.Validate()).To(MatchError("missing role-group-replicas when exists role-group-names"))
+		o.RoleGroupReplicas = 1
+		Expect(o.Validate()).Should(Succeed())
 	})
 })

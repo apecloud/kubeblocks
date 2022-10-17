@@ -34,14 +34,14 @@ func (o *Wesql) getRepos() []repo.Entry {
 	return []repo.Entry{}
 }
 
-func (o *Wesql) getBaseCharts(ns string) []helm.InstallOpts {
+func (o *Wesql) getBaseCharts() []helm.InstallOpts {
 	return []helm.InstallOpts{
 		{
 			Name:      types.DbaasHelmName,
 			Chart:     types.DbaasHelmChart,
 			Wait:      true,
 			Version:   types.DbaasDefaultVersion,
-			Namespace: "default",
+			Namespace: dbClusterNamespace,
 			Sets: []string{
 				"image.tag=latest",
 				"image.pullPolicy=Always",
@@ -52,13 +52,13 @@ func (o *Wesql) getBaseCharts(ns string) []helm.InstallOpts {
 	}
 }
 
-func (o *Wesql) getDBCharts(ns string, dbname string) []helm.InstallOpts {
+func (o *Wesql) getDBCharts() []helm.InstallOpts {
 	return []helm.InstallOpts{
 		{
-			Name:      dbname,
+			Name:      dbClusterName,
 			Chart:     wesqlHelmChart,
 			Wait:      true,
-			Namespace: "default",
+			Namespace: dbClusterNamespace,
 			Version:   wesqlVersion,
 			Sets: []string{
 				"serverVersion=" + o.serverVersion,

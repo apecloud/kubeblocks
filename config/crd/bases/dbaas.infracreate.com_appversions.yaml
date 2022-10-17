@@ -50,11 +50,13 @@ spec:
                 type: string
               components:
                 items:
+                  description: AppVersionComponent is an application version component
+                    spec.
                   properties:
                     configTemplateRefs:
-                      description: DBaas provides a configuration extension mechanism
-                        to handle configuration differences between versions, the
-                        configTemplateRefs field, together with configTemplateRefs
+                      description: ConfigTemplateRefs defines a configuration extension
+                        mechanism to handle configuration differences between versions,
+                        the configTemplateRefs field, together with configTemplateRefs
                         in the ClusterDefinition, determines the final configuration
                         file
                       items:
@@ -68,7 +70,7 @@ spec:
                         type: object
                       type: array
                     podSpec:
-                      description: if not nil, will replace ClusterDefinitionSpec.PodSpec
+                      description: PodSpec is pod spec, if not nil, will replace ClusterDefinitionSpec.PodSpec
                         in ClusterDefinition
                       properties:
                         activeDeadlineSeconds:
@@ -7346,8 +7348,8 @@ spec:
                       - containers
                       type: object
                     service:
-                      description: if not nil, will replace ClusterDefinitionSpec.Serivce
-                        in ClusterDefinition
+                      description: Service is service spec, if not nil, will replace
+                        ClusterDefinitionSpec.Service in ClusterDefinition spec.
                       properties:
                         allocateLoadBalancerNodePorts:
                           description: allocateLoadBalancerNodePorts defines if NodePorts
@@ -7677,7 +7679,7 @@ spec:
                           type: string
                       type: object
                     type:
-                      description: component type in ClusterDefinition
+                      description: Type is a component type in ClusterDefinition.
                       maxLength: 12
                       type: string
                   required:
@@ -7700,6 +7702,8 @@ spec:
                 - OutOfSync
                 type: string
               message:
+                description: A human readable message indicating details about why
+                  the appVersion is in this phase.
                 type: string
               observedGeneration:
                 description: generation number

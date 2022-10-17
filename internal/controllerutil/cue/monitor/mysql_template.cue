@@ -6,7 +6,8 @@ monitor: {
 container: {
 	"name":            "inject-mysql-exporter"
 	"imagePullPolicy": "IfNotPresent"
-	"image":           "prom/mysqld-exporter:v0.14.0"
+	"image":           "infracreate/kubeblock:0.1.1-alpha.1"
+	"command": ["/bin/mysqld_exporter"]
 	"env": [
 		{
 			"name": "MYSQL_USER"

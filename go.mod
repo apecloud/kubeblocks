@@ -10,6 +10,7 @@ require (
 	github.com/docker/docker v20.10.17+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/ghodss/yaml v1.0.0
+	github.com/go-kit/log v0.2.0
 	github.com/go-logr/logr v1.2.3
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/gosuri/uitable v0.0.4
@@ -20,11 +21,14 @@ require (
 	github.com/onsi/gomega v1.20.0
 	github.com/pingcap/go-tpc v1.0.8
 	github.com/pkg/errors v0.9.1
+	github.com/prometheus/exporter-toolkit v0.7.1
+	github.com/prometheus/mysqld_exporter v0.14.0
 	github.com/sethvargo/go-password v0.2.0
 	github.com/spf13/cobra v1.5.0
 	github.com/spf13/viper v1.12.0
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
 	golang.org/x/exp v0.0.0-20220909182711-5c715a9e8561
+	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	helm.sh/helm/v3 v3.9.2
 	k8s.io/api v0.24.3
 	k8s.io/apimachinery v0.24.3
@@ -34,6 +38,14 @@ require (
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
 	sigs.k8s.io/controller-runtime v0.12.3
 	sigs.k8s.io/kustomize/kyaml v0.13.6
+)
+
+require (
+	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
+	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d // indirect
+	github.com/go-logfmt/logfmt v0.5.1 // indirect
+	github.com/jpillora/backoff v1.0.0 // indirect
+	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
 )
 
 require (
@@ -226,9 +238,9 @@ require (
 	github.com/pkg/browser v0.0.0-20201207095918-0426ae3fba23 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/posener/complete v1.2.3 // indirect
-	github.com/prometheus/client_golang v1.12.1 // indirect
+	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0 // indirect
-	github.com/prometheus/common v0.32.1 // indirect
+	github.com/prometheus/common v0.32.1
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rubenv/sql-migrate v1.1.1 // indirect
@@ -281,7 +293,7 @@ require (
 	google.golang.org/grpc v1.47.0 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/ini.v1 v1.66.4 // indirect
+	gopkg.in/ini.v1 v1.66.4
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

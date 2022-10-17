@@ -58,6 +58,9 @@ const (
 	// ResourceClusters clusters resource
 	ResourceClusters = "clusters"
 
+	// ResourceOpsRequest opsrequests resource
+	ResourceOpsRequest = "opsrequests"
+
 	// KindCluster kind of cluster
 	KindCluster = "Cluster"
 )

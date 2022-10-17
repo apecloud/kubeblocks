@@ -8,12 +8,16 @@ spec:
   type: state.mysql
   components:
   - typeName: replicasets
+    {{- if .Values.monitor.builtIn }}
     characterType: mysql
+    {{- end }}
     monitor:
-      builtInEnable: false
+      builtIn: {{.Values.monitor.builtIn}}
+      {{- if not .Values.monitor.builtIn }}
       exporterConfig:
         scrapePort: {{ .Values.monitor.internalPort }}
         scrapePath: /metrics
+      {{- end }}
     configTemplateRefs:
     - name: mysql-3node-tpl-8.0
       volumeName: mysql-config
@@ -90,6 +94,7 @@ spec:
           mkdir -p /data/mysql/data;
           chmod +777 -R /data/mysql;
           docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$cluster_info" --cluster-id=$CLUSTER_ID
+      {{- if not .Values.monitor.builtIn }}
       - name: {{ default .Values.monitor.name "mysql-exporter" }}
         {{- if or .Values.monitor.config .Values.monitor.collectors }}
         args:
@@ -133,6 +138,7 @@ spec:
             port: {{ .Values.monitor.internalPort }}
         resources:
           { }
+      {{- end }}
   roleGroupTemplates:
     - typeName: primary
       defaultReplicas: {{ .Values.cluster.replicaSetCount | default 3 }}

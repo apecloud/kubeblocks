@@ -100,8 +100,8 @@ spec:
                   properties:
                     characterType:
                       description: Wellknown database component name, such as mongos(mongodb),
-                        proxy(redis) DBaas will generate proper monitor configs for
-                        wellknown CharacterType when BuiltInEnable is true.
+                        proxy(redis), wesql(mysql) DBaas will generate proper monitor
+                        configs for wellknown CharacterType when BuiltIn is true.
                       type: string
                     configTemplateRefs:
                       description: The configTemplateRefs field provided by ISV, and
@@ -140,20 +140,21 @@ spec:
                       description: Monitor is monitoring config which provided by
                         ISV
                       properties:
-                        builtInEnable:
+                        builtIn:
                           default: true
-                          description: Switch to enable DBaas builtin monitoring.
-                            If BuiltInEnable is true and CharacterType is wellknown,
-                            ExporterConfig and Sidecar container will generate automatically.
-                            Otherwise, ISV should set BuiltInEnable to false and provide
-                            ExporterConfig and Sidecar container own.
+                          description: Switch to enable DBaas builtIn monitoring.
+                            If BuiltIn is true and CharacterType is wellknown, ExporterConfig
+                            and Sidecar container will generate automatically. Otherwise,
+                            ISV should set BuiltIn to false and provide ExporterConfig
+                            and Sidecar container own.
                           type: boolean
                         exporterConfig:
                           description: ExporterConfig provided by ISV, which specify
                             necessary information to Time Series Database. ExporterConfig
-                            is valid when BuiltInEnable is false.
+                            is valid when BuiltIn is false.
                           properties:
                             scrapePath:
+                              default: /metrics
                               description: Exporter url path for Time Series Database
                                 to scrape metrics
                               maxLength: 128
@@ -162,13 +163,14 @@ spec:
                               description: Exporter port for Time Series Database
                                 to scrape metrics
                               maximum: 65536
+                              minimum: 1
                               type: integer
                           required:
                           - scrapePath
                           - scrapePort
                           type: object
                       required:
-                      - builtInEnable
+                      - builtIn
                       type: object
                     podSpec:
                       description: podSpec of final workload

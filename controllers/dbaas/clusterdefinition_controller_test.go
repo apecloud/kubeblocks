@@ -42,7 +42,7 @@ spec:
   - typeName: replicasets
     characterType: mysql
     monitor:
-      builtInEnable: false
+      builtIn: false
       exporterConfig:
         scrapePort: 9104
         scrapePath: /metrics

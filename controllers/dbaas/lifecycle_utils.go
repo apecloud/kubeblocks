@@ -297,7 +297,15 @@ func buildPodAffinity(
 	return affinity
 }
 
+func disableMonitor(component *Component) {
+	component.Monitor = MonitorConfig{
+		Enable: false,
+	}
+	return
+}
+
 func mergeMonitorConfig(
+	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition,
 	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
 	clusterComp *dbaasv1alpha1.ClusterComponent,
@@ -307,36 +315,44 @@ func mergeMonitorConfig(
 		monitorEnable = clusterComp.Monitor
 	}
 
+	monitorConfig := clusterDefComp.Monitor
+	if !monitorEnable || monitorConfig == nil {
+		disableMonitor(component)
+		return
+	}
+
+	if !monitorConfig.BuiltIn {
+		if monitorConfig.Exporter == nil {
+			disableMonitor(component)
+			return
+		}
+		component.Monitor = MonitorConfig{
+			Enable:     true,
+			ScrapePath: monitorConfig.Exporter.ScrapePath,
+			ScrapePort: monitorConfig.Exporter.ScrapePort,
+		}
+		return
+	}
+
 	characterType := clusterDefComp.CharacterType
 	if len(characterType) == 0 {
-		characterType = intctrlutil.CalcCharacterType(clusterDef.Spec.Type, clusterDefComp.TypeName)
+		characterType = CalcCharacterType(clusterDef.Spec.Type)
 	}
-
-	if monitorEnable && !intctrlutil.IsWellKnownCharacterType(characterType) {
-		monitorEnable = false
-	}
-
-	if !monitorEnable {
-		component.Monitor = MonitorConfig{
-			Enable: false,
-		}
+	if !IsWellKnownCharacterType(characterType) {
+		disableMonitor(component)
 		return
 	}
 
-	monitorConfig := clusterDefComp.Monitor
-	if monitorConfig == nil || monitorConfig.BuiltInEnable {
-		// TODO: Agamotto auto collect metrics for well known characterType
-		component.Monitor = MonitorConfig{
-			Enable: false,
+	switch characterType {
+	case KMysql:
+		err := WellKnownCharacterTypeFunc[KMysql](cluster, component)
+		if err != nil {
+			disableMonitor(component)
 		}
-		return
+	default:
+		disableMonitor(component)
 	}
-
-	component.Monitor = MonitorConfig{
-		Enable:     true,
-		ScrapePath: monitorConfig.Exporter.ScrapePath,
-		ScrapePort: monitorConfig.Exporter.ScrapePort,
-	}
+	return
 }
 
 func mergeComponents(
@@ -449,8 +465,6 @@ func mergeComponents(
 		component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(cluster, affinity, component)
 	}
 
-	mergeMonitorConfig(clusterDef, clusterDefComp, clusterComp, component)
-
 	// TODO(zhixu.zt) We need to reserve the VolumeMounts of the container for ConfigMap or Secret,
 	// At present, it is possible to distinguish between ConfigMap volume and normal volume,
 	// Compare the VolumeName of configTemplateRef and Name of VolumeMounts
@@ -460,6 +474,9 @@ func mergeComponents(
 	//	 	component.PodSpec.Containers[i].VolumeMounts = nil
 	//	 }
 	// }
+
+	mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
+
 	return component
 }
 

@@ -108,26 +108,28 @@ type ExporterConfig struct {
 	// Exporter port for Time Series Database to scrape metrics
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Maximum=65536
+	// +kubebuilder:validation:Minimum=1
 	ScrapePort int `json:"scrapePort"`
 
 	// Exporter url path for Time Series Database to scrape metrics
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=128
+	// +kubebuilder:default="/metrics"
 	ScrapePath string `json:"scrapePath"`
 }
 
 type MonitorConfig struct {
-	// Switch to enable DBaas builtin monitoring.
-	// If BuiltInEnable is true and CharacterType is wellknown, ExporterConfig and Sidecar container will generate automatically.
-	// Otherwise, ISV should set BuiltInEnable to false and provide ExporterConfig and Sidecar container own.
+	// Switch to enable DBaas builtIn monitoring.
+	// If BuiltIn is true and CharacterType is wellknown, ExporterConfig and Sidecar container will generate automatically.
+	// Otherwise, ISV should set BuiltIn to false and provide ExporterConfig and Sidecar container own.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=true
-	BuiltInEnable bool `json:"builtInEnable"`
+	BuiltIn bool `json:"builtIn"`
 
 	// ExporterConfig provided by ISV, which specify necessary information to Time Series Database.
-	// ExporterConfig is valid when BuiltInEnable is false.
+	// ExporterConfig is valid when BuiltIn is false.
 	// +optional
-	Exporter ExporterConfig `json:"exporterConfig,omitempty"`
+	Exporter *ExporterConfig `json:"exporterConfig,omitempty"`
 }
 
 type ClusterDefinitionComponent struct {
@@ -136,7 +138,7 @@ type ClusterDefinitionComponent struct {
 	TypeName string `json:"typeName,omitempty"`
 
 	// Wellknown database component name, such as mongos(mongodb), proxy(redis), wesql(mysql)
-	// DBaas will generate proper monitor configs for wellknown CharacterType when BuiltInEnable is true.
+	// DBaas will generate proper monitor configs for wellknown CharacterType when BuiltIn is true.
 	// +optional
 	CharacterType string `json:"characterType,omitempty"`
 

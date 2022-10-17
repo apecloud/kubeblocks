@@ -14,9 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllerutil
+package dbaas
 
-import "testing"
+import (
+	"testing"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+)
 
 func assertEqual(t *testing.T, expect string, actual string) {
 	if expect != actual {
@@ -27,38 +31,38 @@ func assertEqual(t *testing.T, expect string, actual string) {
 func TestCalcCharacterType(t *testing.T) {
 	{
 		expectType := "mysql"
-		actualType := CalcCharacterType("state.mysql", "wesql")
+		actualType := CalcCharacterType("state.mysql")
 		assertEqual(t, expectType, actualType)
 	}
 
 	{
 		expectType := "mysql"
-		actualType := CalcCharacterType("state.mysql-8", "wesql")
+		actualType := CalcCharacterType("state.mysql-8")
 		assertEqual(t, expectType, actualType)
 	}
 
 	{
 		expectType := ""
-		actualType := CalcCharacterType("other", "wqsql")
+		actualType := CalcCharacterType("other")
 		assertEqual(t, expectType, actualType)
 	}
 }
 
 func TestIsWellKnownCharacterType(t *testing.T) {
-	var wellKnownCharacterType = map[string]bool{
-		"mysql": true,
-		"redis": false,
+	var wellKnownCharacterTypeFunc = map[string]func(cluster *dbaasv1alpha1.Cluster, component *Component) error{
+		"mysql": setMysqlComponent,
+		"redis": nil,
 	}
 
-	if !isWellKnowCharacterType("mysql", wellKnownCharacterType) {
+	if !isWellKnowCharacterType("mysql", wellKnownCharacterTypeFunc) {
 		t.Error("mysql is well known characterType")
 	}
 
-	if isWellKnowCharacterType("redis", wellKnownCharacterType) {
+	if isWellKnowCharacterType("redis", wellKnownCharacterTypeFunc) {
 		t.Error("redis is not well known characterType")
 	}
 
-	if isWellKnowCharacterType("other", wellKnownCharacterType) {
+	if isWellKnowCharacterType("other", wellKnownCharacterTypeFunc) {
 		t.Error("other is not well known characterType")
 	}
 }

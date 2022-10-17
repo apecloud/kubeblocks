@@ -106,6 +106,8 @@ fullnameOverride: ""
 appVersionOverride: ""
 
 monitor:
+  builtIn: true
+
   image:
     repository: "prom/mysqld-exporter"
     tag: "v0.14.0"

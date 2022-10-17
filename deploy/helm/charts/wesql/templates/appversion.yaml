@@ -13,6 +13,8 @@ spec:
       - name: mysql
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
         imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+      {{- if not .Values.monitor.builtIn }}
       - name: mysql-exporter
         image: {{ .Values.monitor.image.repository }}:{{ .Values.monitor.image.tag}}
         imagePullPolicy: {{ default .Values.monitor.image.pullPolicy "IfNotPresent" }}
+      {{- end }}

@@ -214,19 +214,24 @@ type ClusterDefinitionStatusGeneration struct {
 }
 
 type ClusterDefinitionProbeCMDs struct {
+	// sqls executed on db node, used to check db healthy
 	Writes  []string `json:"writes,omitempty"`
 	Queries []string `json:"queries,omitempty"`
 }
 
 type ClusterDefinitionProbe struct {
+	// enable probe or not
 	// +kubebuilder:default=true
 	Enable bool `json:"enable,omitempty"`
+	// How often (in seconds) to perform the probe.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
 	PeriodSeconds int32 `json:"periodSeconds,omitempty"`
+	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
 	FailureThreshold int32 `json:"failureThreshold,omitempty"`
+	// Minimum consecutive successes for the probe to be considered successful after having failed.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
 	SuccessThreshold int32                      `json:"successThreshold,omitempty"`

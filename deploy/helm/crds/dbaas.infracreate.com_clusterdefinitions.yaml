@@ -7478,25 +7478,33 @@ spec:
                                     type: string
                                   type: array
                                 writes:
+                                  description: sqls executed on db node, used to check
+                                    db healthy
                                   items:
                                     type: string
                                   type: array
                               type: object
                             enable:
                               default: true
+                              description: enable probe or not
                               type: boolean
                             failureThreshold:
                               default: 1
+                              description: Minimum consecutive failures for the probe
+                                to be considered failed after having succeeded.
                               format: int32
                               minimum: 1
                               type: integer
                             periodSeconds:
                               default: 1
+                              description: How often (in seconds) to perform the probe.
                               format: int32
                               minimum: 1
                               type: integer
                             successThreshold:
                               default: 1
+                              description: Minimum consecutive successes for the probe
+                                to be considered successful after having failed.
                               format: int32
                               minimum: 1
                               type: integer
@@ -7510,25 +7518,33 @@ spec:
                                     type: string
                                   type: array
                                 writes:
+                                  description: sqls executed on db node, used to check
+                                    db healthy
                                   items:
                                     type: string
                                   type: array
                               type: object
                             enable:
                               default: true
+                              description: enable probe or not
                               type: boolean
                             failureThreshold:
                               default: 1
+                              description: Minimum consecutive failures for the probe
+                                to be considered failed after having succeeded.
                               format: int32
                               minimum: 1
                               type: integer
                             periodSeconds:
                               default: 1
+                              description: How often (in seconds) to perform the probe.
                               format: int32
                               minimum: 1
                               type: integer
                             successThreshold:
                               default: 1
+                              description: Minimum consecutive successes for the probe
+                                to be considered successful after having failed.
                               format: int32
                               minimum: 1
                               type: integer
@@ -7542,25 +7558,33 @@ spec:
                                     type: string
                                   type: array
                                 writes:
+                                  description: sqls executed on db node, used to check
+                                    db healthy
                                   items:
                                     type: string
                                   type: array
                               type: object
                             enable:
                               default: true
+                              description: enable probe or not
                               type: boolean
                             failureThreshold:
                               default: 1
+                              description: Minimum consecutive failures for the probe
+                                to be considered failed after having succeeded.
                               format: int32
                               minimum: 1
                               type: integer
                             periodSeconds:
                               default: 1
+                              description: How often (in seconds) to perform the probe.
                               format: int32
                               minimum: 1
                               type: integer
                             successThreshold:
                               default: 1
+                              description: Minimum consecutive successes for the probe
+                                to be considered successful after having failed.
                               format: int32
                               minimum: 1
                               type: integer

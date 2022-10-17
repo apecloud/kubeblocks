@@ -131,15 +131,9 @@ func (o *initOptions) validate() error {
 
 func (o *initOptions) run() error {
 	if o.CloudProvider != cloudprovider.Local {
-		if err := o.remote(); err != nil {
-			return err
-		}
-	} else {
-		if err := o.local(); err != nil {
-			return err
-		}
+		return o.remote()
 	}
-	return nil
+	return o.local()
 }
 
 // local bootstraps a playground in the local host
@@ -203,7 +197,7 @@ func (o *initOptions) remote() error {
 	if err != nil {
 		return errors.Wrap(err, "Failed to create cloud provider")
 	}
-	if err := cp.Apply(false); err != nil {
+	if err = cp.Apply(false); err != nil {
 		return errors.Wrap(err, "Failed to apply change")
 	}
 	instance, err := cp.Instance()
@@ -212,10 +206,10 @@ func (o *initOptions) remote() error {
 	}
 	kubeConfig := strings.ReplaceAll(kubeConfig, "${KUBERNETES_API_SERVER_ADDRESS}", instance.GetIP())
 	kubeConfigPath := path.Join(util.GetKubeconfigDir(), "dbctl-playground")
-	if err := ioutils.AtomicWriteFile(kubeConfigPath, []byte(kubeConfig), 0700); err != nil {
+	if err = ioutils.AtomicWriteFile(kubeConfigPath, []byte(kubeConfig), 0700); err != nil {
 		return errors.Wrap(err, "Failed to update kube config")
 	}
-	if err := printGuide(cp.Name(), instance.GetIP(), o.Replicas); err != nil {
+	if err = printGuide(cp.Name(), instance.GetIP(), o.Replicas); err != nil {
 		return errors.Wrap(err, "Failed to print user guide")
 	}
 	return nil
@@ -233,15 +227,19 @@ func (o *destroyOptions) destroyPlayground() error {
 	// remote playground, just destroy all cloud resources
 	cp, _ := cloudprovider.Get()
 	if cp.Name() != cloudprovider.Local {
+		var err error
 		// remove playground cluster kubeconfig
-		if err := util.RemoveConfig(clusterName); err != nil {
+		if err = util.RemoveConfig(clusterName); err != nil {
 			return errors.Wrap(err, "Failed to remove playground kubeconfig file")
 		}
-		cp, err := cloudprovider.Get()
-		if err != nil {
+		if cp, err = cloudprovider.Get(); err != nil {
 			return err
 		}
-		return cp.Apply(true)
+		if err = cp.Apply(true); err != nil {
+			return err
+		}
+		spinner(true)
+		return nil
 	}
 
 	// local playgroundG
@@ -299,19 +297,12 @@ func printGuide(cloudProvider string, hostIP string, replicas int) error {
 		clusterInfo.HostPorts[i] = strconv.Itoa(3306 + i)
 	}
 
-	if err = util.PrintGoTemplate(os.Stdout, guideTmpl, clusterInfo); err != nil {
-		return err
-	}
-
-	return nil
+	return util.PrintGoTemplate(os.Stdout, guideTmpl, clusterInfo)
 }
 
 func (o *initOptions) installKubeBlocks() error {
 	chart := helm.KubeBlocksHelmChart(types.DbaasDefaultVersion, dbClusterNamespace)
-	if err := chart.Install(o.helmCfg); err != nil {
-		return err
-	}
-	return nil
+	return chart.Install(o.helmCfg)
 }
 
 func (o *initOptions) installWeSQL() error {
@@ -328,8 +319,5 @@ func (o *initOptions) installWeSQL() error {
 		Login:    true,
 		TryTimes: 2,
 	}
-	if err := wesql.Install(o.helmCfg); err != nil {
-		return err
-	}
-	return nil
+	return wesql.Install(o.helmCfg)
 }

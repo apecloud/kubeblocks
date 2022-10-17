@@ -29,6 +29,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"text/template"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
@@ -192,4 +193,17 @@ func PrintVersion() {
 	fmt.Printf("k3d version %s\n", version.K3dVersion)
 	fmt.Printf("k3s version %s (default)\n", strings.Replace(version.K3sImageTag, "-", "+", 1))
 	fmt.Printf("git commit %s (build date %s)\n", version.GitCommit, version.BuildDate)
+}
+
+func PrintGoTemplate(wr io.Writer, tpl string, values interface{}) error {
+	tmpl, err := template.New("_").Parse(tpl)
+	if err != nil {
+		return err
+	}
+
+	err = tmpl.Execute(wr, values)
+	if err != nil {
+		return err
+	}
+	return nil
 }

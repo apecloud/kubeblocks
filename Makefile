@@ -101,7 +101,7 @@ else
 	IMAGE_TAGS ?= $(IMG):$(VERSION)
 endif
 
-DOCKER_BUILD_ARGS = 
+DOCKER_BUILD_ARGS =
 DOCKER_NO_BUILD_CACHE ?= false
 
 ifeq ($(DOCKER_NO_BUILD_CACHE), true)
@@ -168,7 +168,7 @@ lint: generate ## Run golangci-lint against code.
 	$(MAKE) fast-lint
 
 .PHONY: staticcheck
-staticcheck: staticchecktool ## Run staticcheck against code. 
+staticcheck: staticchecktool ## Run staticcheck against code.
 	$(STATICCHECK) ./...
 
 .PHONY: loggercheck
@@ -332,7 +332,7 @@ ci-test: ci-test-pre test ## Run CI tests.
 ##@ Contributor
 
 .PHONY: reviewable
-reviewable: build-checks ## Run code checks to proceed with PR reviews.
+reviewable: build-checks test check-license-header ## Run code checks to proceed with PR reviews.
 	$(GO) mod tidy -compat=1.18
 
 .PHONY: check-diff
@@ -366,7 +366,7 @@ helm-push: helm-package ## Do helm package and push.
 
 ##@ WeSQL Cluster Helm Chart Tasks
 
-WESQL_CLUSTER_CHART_PATH = deploy/helm/wesqlcluster
+WESQL_CLUSTER_CHART_PATH = deploy/wesqlcluster
 WESQL_CLUSTER_CHART_NAME = wesqlcluster
 WESQL_CLUSTER_CHART_VERSION ?= 0.1.1
 
@@ -407,17 +407,23 @@ KUSTOMIZE_INSTALL_SCRIPT ?= "$(GITHUB_PROXY)https://raw.githubusercontent.com/ku
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
 $(KUSTOMIZE): $(LOCALBIN)
+ifeq (, $(shell ls $(LOCALBIN)/kustomize 2>/dev/null))
 	curl -s $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN)
+endif
 
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
 $(CONTROLLER_GEN): $(LOCALBIN)
+ifeq (, $(shell ls $(LOCALBIN)/controller-gen 2>/dev/null))
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
+endif
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
+ifeq (, $(shell ls $(LOCALBIN)/setup-envtest 2>/dev/null))
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+endif
 
 
 .PHONY: install-docker-buildx
@@ -539,7 +545,7 @@ MINIKUBE=$(shell which minikube)
 
 
 .PHONY: brew-install-prerequisite
-brew-install-prerequisite: ## Use `brew install` to install required dependencies. 
+brew-install-prerequisite: ## Use `brew install` to install required dependencies.
 	brew install go@1.18 kubebuilder delve golangci-lint staticcheck kustomize step cue oras jq yq
 
 ##@ Minikube
@@ -583,8 +589,8 @@ endif
 
 
 .PHONY: minikube-delete
-minikube-delete: minikube ## Delete minikube cluster. 
+minikube-delete: minikube ## Delete minikube cluster.
 	$(MINIKUBE) delete
 
-##@ Docker containers 
+##@ Docker containers
 include docker/docker.mk

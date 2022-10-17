@@ -18,10 +18,13 @@ package dbaas
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
+	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -44,6 +47,7 @@ import (
 
 func init() {
 	clusterDefUpdateHandlers["cluster"] = clusterUpdateHandler
+	k8score.EventHandlerMap["cluster-controller"] = &ClusterReconciler{}
 }
 
 func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *dbaasv1alpha1.ClusterDefinition) error {
@@ -79,6 +83,49 @@ type ClusterReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
+}
+
+// TODO probeMessage should be defined by @xuanchi
+type probeMessage struct {
+	Data probeMessageData `json:"data,omitempty"`
+}
+
+type probeMessageData struct {
+	Role string `json:"role,omitempty"`
+}
+
+func (r *ClusterReconciler) Handle(cli client.Client, ctx context.Context, event *corev1.Event) error {
+	if event.InvolvedObject.FieldPath != k8score.ProbeRoleChangedCheckPath {
+		return nil
+	}
+
+	// get role
+	message := &probeMessage{}
+	err := json.Unmarshal([]byte(event.Message), message)
+	if err != nil {
+		return err
+	}
+	role := strings.ToLower(message.Data.Role)
+
+	// get pod
+	pod := &corev1.Pod{}
+	podName := types.NamespacedName{
+		Namespace: event.InvolvedObject.Namespace,
+		Name:      event.InvolvedObject.Name,
+	}
+	if err := cli.Get(ctx, podName, pod); err != nil {
+		return err
+	}
+
+	// update label
+	patch := client.MergeFrom(pod.DeepCopy())
+	pod.Labels[consensusSetRoleLabelKey] = role
+	err = cli.Patch(ctx, pod, patch)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 //+kubebuilder:rbac:groups=dbaas.infracreate.com,resources=clusters,verbs=get;list;watch;create;update;patch;delete
@@ -406,6 +453,7 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 		if err != nil {
 			return false, err
 		}
+
 		if componentDef.ComponentType == dbaasv1alpha1.Consensus {
 			end, err := handleConsensusSetUpdate(ctx, r.Client, cluster, &v)
 			if err != nil {
@@ -413,15 +461,16 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 			}
 			if !end {
 				isOk = false
-				break
 			}
 		}
 	}
+
 	if needSyncStatusComponent {
 		if err := r.Client.Status().Patch(ctx, cluster, patch); err != nil {
 			return false, err
 		}
 	}
+
 	return isOk, nil
 }
 

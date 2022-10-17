@@ -308,10 +308,10 @@ func (o *initOptions) installKubeBlocks() error {
 }
 
 func (o *initOptions) installCluster() error {
-	wesql, err := engine.New(o.Engine, o.Version, o.Replicas, dbClusterName, dbClusterNamespace)
+	engine, err := engine.New(o.Engine, o.Version, o.Replicas, dbClusterName, dbClusterNamespace)
 	if err != nil {
 		return err
 	}
 
-	return wesql.HelmInstallOpts().Install(o.helmCfg)
+	return engine.HelmInstallOpts().Install(o.helmCfg)
 }

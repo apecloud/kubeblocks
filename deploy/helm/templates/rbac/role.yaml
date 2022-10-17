@@ -403,3 +403,14 @@ rules:
   verbs:
     - update
     - patch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - watch

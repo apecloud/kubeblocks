@@ -18,6 +18,7 @@ package dbaas
 
 import (
 	"fmt"
+	"k8s.io/client-go/dynamic"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -34,6 +35,7 @@ type options struct {
 
 	cfg       *action.Configuration
 	Namespace string
+	client    dynamic.Interface
 }
 
 type installOptions struct {
@@ -73,7 +75,8 @@ func (o *options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	return nil
+	o.client, err = f.DynamicClient()
+	return err
 }
 
 func (o *installOptions) run() error {
@@ -103,6 +106,7 @@ func (o *options) run() error {
 	installer := Installer{
 		cfg:       o.cfg,
 		Namespace: o.Namespace,
+		client:    o.client,
 	}
 
 	if err := installer.Uninstall(); err != nil {

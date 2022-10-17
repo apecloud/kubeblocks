@@ -135,7 +135,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	}
 
 	cmd.Flags().StringVar(&o.Version, "version", types.DbaasDefaultVersion, "DBaaS version")
-	cmd.Flags().StringVar(&o.Sets, "sets", "[]", "DBaaS version")
+	cmd.Flags().StringVar(&o.Sets, "sets", "[]", "helm --set values in json array of string, e.g. [\"key1=val1\",\"key2=val2\"]")
 
 	return cmd
 }

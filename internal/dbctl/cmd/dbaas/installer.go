@@ -23,7 +23,7 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	types2 "k8s.io/apimachinery/pkg/types"
+	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
@@ -87,7 +87,7 @@ func (i *Installer) Uninstall() error {
 		return err
 	}
 	for _, cd := range cdList.Items {
-		_, err := i.client.Resource(clusterDefGVR).Patch(ctx, cd.GetName(), types2.JSONPatchType, []byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{})
+		_, err := i.client.Resource(clusterDefGVR).Patch(ctx, cd.GetName(), k8sapitypes.JSONPatchType, []byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{})
 		if err != nil {
 			return err
 		}
@@ -98,7 +98,7 @@ func (i *Installer) Uninstall() error {
 		return err
 	}
 	for _, appVer := range appVerList.Items {
-		_, err := i.client.Resource(appVerGVR).Patch(ctx, appVer.GetName(), types2.JSONPatchType, []byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{})
+		_, err := i.client.Resource(appVerGVR).Patch(ctx, appVer.GetName(), k8sapitypes.JSONPatchType, []byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{})
 		if err != nil {
 			return err
 		}

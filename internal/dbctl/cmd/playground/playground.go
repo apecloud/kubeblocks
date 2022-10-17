@@ -23,18 +23,22 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/docker/docker/pkg/ioutils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v3/pkg/action"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/kubernetes/scheme"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cloudprovider"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/playground/engine"
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/cluster"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
 )
 
@@ -263,13 +267,14 @@ func runGuide() error {
 
 func printGuide(cloudProvider string, hostIP string, replicas int) error {
 	var (
-		clusterInfo = &ClusterInfo{
-			HostIP:        hostIP,
-			CloudProvider: cloudProvider,
-			KubeConfig:    util.ConfigPath(clusterName),
-			GrafanaPort:   "9100",
-			GrafanaUser:   "admin",
-			GrafanaPasswd: "prom-operator",
+		clusterInfo = &clusterInfo{
+			HostIP:         hostIP,
+			CloudProvider:  cloudProvider,
+			KubeConfig:     util.ConfigPath(clusterName),
+			GrafanaPort:    "9100",
+			GrafanaUser:    "admin",
+			GrafanaPasswd:  "prom-operator",
+			ClusterObjects: cluster.NewClusterObjects(),
 		}
 		err error
 	)
@@ -279,8 +284,19 @@ func printGuide(cloudProvider string, hostIP string, replicas int) error {
 		return err
 	}
 
+	f := newFactory()
+	clientSet, err := f.KubernetesClientSet()
+	if err != nil {
+		return err
+	}
+
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+
 	// get cluster info that will be used to render the guide template
-	if err = buildClusterInfo(clusterInfo, dbClusterNamespace, dbClusterName); err != nil {
+	if err = cluster.GetAllObjects(clientSet, dynamicClient, dbClusterNamespace, dbClusterName, clusterInfo.ClusterObjects); err != nil {
 		return err
 	}
 
@@ -314,4 +330,19 @@ func (o *initOptions) installCluster() error {
 	}
 
 	return engine.HelmInstallOpts().Install(o.helmCfg)
+}
+
+var addToScheme sync.Once
+
+func newFactory() cmdutil.Factory {
+	getter := genericclioptions.NewConfigFlags(true)
+
+	// Add CRDs to the scheme. They are missing by default.
+	addToScheme.Do(func() {
+		if err := apiextv1.AddToScheme(scheme.Scheme); err != nil {
+			// This should never happen.
+			panic(err)
+		}
+	})
+	return cmdutil.NewFactory(getter)
 }

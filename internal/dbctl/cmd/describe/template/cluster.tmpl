@@ -1,10 +1,10 @@
-Name:              {{.metadata.name}}
-Status:            {{.status.phase}}
-AppVersion:        {{.spec.appVersionRef}}
-ClusterDefinition: {{.spec.clusterDefinitionRef}}
-TerminationPolicy: {{.spec.terminationPolicy}}
-creationTimestamp: {{.metadata.creationTimestamp}}
-components: {{range .spec.components}}
+Name:              {{.cluster.metadata.name}}
+Status:            {{.cluster.status.phase}}
+AppVersion:        {{.cluster.spec.appVersionRef}}
+ClusterDefinition: {{.cluster.spec.clusterDefinitionRef}}
+TerminationPolicy: {{.cluster.spec.terminationPolicy}}
+creationTimestamp: {{.cluster.metadata.creationTimestamp}}
+components: {{range .cluster.spec.components}}
   -name:          {{.name}}
    replicas:      {{(index .roleGroups 0).replicas}}
    requests:
@@ -14,4 +14,9 @@ components: {{range .spec.components}}
      cpu:         {{.resources.limits.cpu}}
      memory:      {{.resources.limits.memory}}
    storageSize:   {{(index .volumeClaimTemplates 0).spec.resources.requests.storage}}
+{{end}}
+{{range .Services}}Service:
+  Name:           {{.Name}}
+  Type:           {{.Spec.Type}}
+  Endpoints:      {{range .Spec.Ports}}{{{index .Spec.Ports 0}}}10.244.0.13:3306 {{end}}
 {{end}}

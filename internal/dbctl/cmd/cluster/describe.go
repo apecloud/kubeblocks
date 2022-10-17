@@ -27,14 +27,8 @@ import (
 )
 
 func NewDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	cmd := describe.Command{
-		Factory: f,
-		Streams: streams,
-		Short:   "Describe database cluster info.",
-		GroupKind: []schema.GroupKind{
-			{Group: types.Group, Kind: types.KindCluster},
-		},
-		Template: []string{"cluster.tmpl"},
-	}
-	return cmd.Build()
+	o := describe.NewOptions(f, streams,
+		"Describe database cluster info",
+		schema.GroupKind{Group: types.Group, Kind: types.KindCluster})
+	return o.Build()
 }

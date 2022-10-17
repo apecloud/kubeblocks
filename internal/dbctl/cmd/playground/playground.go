@@ -158,7 +158,7 @@ func (o *initOptions) local() error {
 
 	// Deal with KUBECONFIG
 	configPath := util.ConfigPath(clusterName)
-	spinner = util.Spinner(o.Out, "Generate kubernetes config %s and set to KUBECONFIG ...", configPath)
+	spinner = util.Spinner(o.Out, "Generate kubernetes config %s ...", configPath)
 	defer spinner(false)
 	if err = installer.genKubeconfig(); err != nil {
 		return errors.Wrap(err, "Fail to generate kubeconfig")
@@ -200,7 +200,7 @@ func (o *initOptions) remote() error {
 		return errors.Wrap(err, "Failed to create cloud provider")
 	}
 	if err = cp.Apply(false); err != nil {
-		return errors.Wrap(err, "Failed to apply change")
+		return errors.Wrap(err, "Failed to apply changes")
 	}
 	instance, err := cp.Instance()
 	if err != nil {

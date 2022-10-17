@@ -60,7 +60,6 @@ type OperationsOptions struct {
 // buildCommonFlags build common flags for operations command
 func (o *OperationsOptions) buildCommonFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.OpsRequestName, "name", "", "OpsRequest name. if not specified, it will be randomly generated ")
-	cmd.Flags().StringVarP(&o.Namespace, "namespace", "n", "", "Cluster namespace scope")
 	cmd.Flags().IntVar(&o.TtlSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")
 	if o.OpsType != OpsTypeUpgrade {
 		cmd.Flags().StringSliceVar(&o.ComponentNames, "component-names", nil, " Component names to this operations (required)")

@@ -103,10 +103,8 @@ func BuildCommand(inputs Inputs) *cobra.Command {
 
 func (o *BaseOptions) Complete(inputs Inputs, args []string) error {
 	var err error
-	if len(o.Namespace) == 0 {
-		if o.Namespace, _, err = inputs.Factory.ToRawKubeConfigLoader().Namespace(); err != nil {
-			return err
-		}
+	if o.Namespace, _, err = inputs.Factory.ToRawKubeConfigLoader().Namespace(); err != nil {
+		return err
 	}
 
 	if len(args) > 0 {

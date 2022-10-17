@@ -38,12 +38,8 @@ func (i *Installer) Install() error {
 		Wait:      true,
 		Version:   i.Version,
 		Namespace: i.Namespace,
-		Sets: []string{
-			"image.tag=latest",
-			"image.pullPolicy=Always",
-		},
-		Login:    true,
-		TryTimes: 2,
+		Login:     true,
+		TryTimes:  2,
 	}
 
 	err := chart.Install(i.cfg)

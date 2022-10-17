@@ -14,13 +14,13 @@ spec:
     defaultReplicas: 1
     logsConfig:
       - name: "mysql-errorlog"
-        filePath: "/data/mysql/log/mysqld.err"
+        filePath: "/data/mysql/log/mysqld.err" # log file path
         variables:
-          - "log_error=/data/mysql/log/mysqld.err" #同filePath定义
+          - "log_error=/data/mysql/log/mysqld.err"
       - name: "mysql-slowlog"
-        filePath: "/data/mysql/mysqld-slow.log" # 决定文件路径的variableName
+        filePath: "/data/mysql/mysqld-slow.log" # log file path
         variables:
-          - "slow_query_log_file=/data/mysql/mysqld-slow.log"  #同filePath定义
+          - "slow_query_log_file=/data/mysql/mysqld-slow.log"
           - "slow_query_log=ON"
           - "long_query_time=10"
           - "log_output=FILE"

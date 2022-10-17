@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
@@ -42,6 +43,7 @@ type CreateOptions struct {
 	AppVersionRef     string                   `json:"appVersionRef"`
 	TerminationPolicy string                   `json:"terminationPolicy"`
 	PodAntiAffinity   string                   `json:"podAntiAffinity"`
+	LogsEnable        string                   `json:"logsEnable,omitempty"`
 	TopologyKeys      []string                 `json:"topologyKeys,omitempty"`
 	NodeLabels        map[string]string        `json:"nodeLabels,omitempty"`
 	Components        []map[string]interface{} `json:"components"`
@@ -74,6 +76,17 @@ func (o *CreateOptions) Complete() error {
 			return err
 		}
 	}
+	// Add log enable config to component
+	if len(o.LogsEnable) > 0 && len(components) > 0 {
+		enable, err := strconv.ParseBool(o.LogsEnable)
+		if err == nil {
+			for _, component := range components {
+				if _, ok := component["logsEnable"]; ok {
+					component["logsEnable"] = enable
+				}
+			}
+		}
+	}
 	o.Components = components
 	return nil
 }
@@ -95,6 +108,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 			cmd.Flags().StringVar(&o.AppVersionRef, "app-version", defaultAppVersion, "AppVersion reference")
 			cmd.Flags().StringVar(&o.TerminationPolicy, "termination-policy", "Halt", "Termination policy")
 			cmd.Flags().StringVar(&o.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type")
+			cmd.Flags().StringVar(&o.LogsEnable, "logs-enable", "false", "[true|false], whether enhance logs file")
 			cmd.Flags().StringArrayVar(&o.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
 			cmd.Flags().StringToStringVar(&o.NodeLabels, "node-labels", nil, "Node label selector")
 			cmd.Flags().StringVar(&o.ComponentsFilePath, "components", "", "Use yaml file to specify the cluster components")

@@ -926,14 +926,14 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 	// open log enhancement and add log sidecar container
 	if err := addLogSidecarContainers(params, &sts); err != nil {
 		// add log sidecar fail and to do log
-		fmt.Println("Add log sidecar container error." + err.Error())
+		fmt.Println("Adding log sidecar containers error." + err.Error())
 	}
 
 	return &sts, nil
 }
 
 // Add log sidecar containers to sts spec
-// The returned error uses to imply that if sidecar containers is success
+// The returned error can use to imply that whether adding sidecar containers is success
 func addLogSidecarContainers(params createParams, sts *appsv1.StatefulSet) error {
 	if !params.cluster.Spec.LogsEnable || params.component.LogsConfig == nil {
 		return nil
@@ -956,6 +956,7 @@ func addLogSidecarContainers(params createParams, sts *appsv1.StatefulSet) error
 	if err := json.Unmarshal(posVolumeByte, &posVolume); err != nil {
 		return err
 	}
+	// Collect the volume mount info of main container
 	volumeMountsMap := make(map[string]corev1.VolumeMount)
 	for _, container := range sts.Spec.Template.Spec.Containers {
 		for _, volumeMount := range container.VolumeMounts {
@@ -975,6 +976,7 @@ func addLogSidecarContainers(params createParams, sts *appsv1.StatefulSet) error
 		})
 		sts.Spec.Template.Spec.Containers = append(sts.Spec.Template.Spec.Containers, *tmpLogContainer)
 	}
+	// Add pos volume info to pod
 	sts.Spec.Template.Spec.Volumes = append(sts.Spec.Template.Spec.Volumes, posVolume)
 	return nil
 }

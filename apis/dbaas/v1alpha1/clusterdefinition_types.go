@@ -257,13 +257,15 @@ type ClusterDefinitionStatusGeneration struct {
 }
 
 type LogConfig struct {
-	// Log file name
+	// Log file type name, such as mysql-errorlog
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=512
 	Name string `json:"name,omitempty"`
-	// Log file path
+	// Log file path info
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=512
 	FilePath string `json:"filePath,omitempty"`
-	// Log file variables
+	// Log's variables in db engine
 	// +optional
 	Variables []string `json:"variables,omitempty"`
 }

@@ -39,6 +39,7 @@ type options struct {
 type installOptions struct {
 	options
 	Version string
+	Sets    string
 }
 
 // NewDbaasCmd creates the dbaas command
@@ -82,6 +83,7 @@ func (o *installOptions) run() error {
 		cfg:       o.cfg,
 		Namespace: o.Namespace,
 		Version:   o.Version,
+		Sets:      o.Sets,
 	}
 
 	err := installer.Install()
@@ -128,6 +130,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	}
 
 	cmd.Flags().StringVar(&o.Version, "version", types.DbaasDefaultVersion, "DBaaS version")
+	cmd.Flags().StringVar(&o.Sets, "sets", "[]", "DBaaS version")
 
 	return cmd
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package dbaas
 
 import (
+	"encoding/json"
 	"helm.sh/helm/v3/pkg/action"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
@@ -29,15 +30,21 @@ type Installer struct {
 
 	Namespace string
 	Version   string
+	Sets      string
 }
 
 func (i *Installer) Install() error {
+	var sets []string
+	if err := json.Unmarshal([]byte(i.Sets), &sets); err != nil {
+		return err
+	}
 	chart := helm.InstallOpts{
 		Name:      types.DbaasHelmName,
 		Chart:     types.DbaasHelmChart,
 		Wait:      true,
 		Version:   i.Version,
 		Namespace: i.Namespace,
+		Sets:      sets,
 		Login:     true,
 		TryTimes:  2,
 	}

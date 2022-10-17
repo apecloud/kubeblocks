@@ -71,8 +71,10 @@ var _ = Describe("util", func() {
 
 	It("Others", func() {
 		PrintVersion()
-		_, err := GetPublicIP()
-		Expect(err).ShouldNot(HaveOccurred())
+		if os.Getenv("TEST_GET_PUBLIC_IP") != "" {
+			_, err := GetPublicIP()
+			Expect(err).ShouldNot(HaveOccurred())
+		}
 		Expect(MakeSSHKeyPair("", "")).Should(HaveOccurred())
 	})
 })

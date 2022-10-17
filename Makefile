@@ -101,7 +101,7 @@ else
 	IMAGE_TAGS ?= $(IMG):$(VERSION)
 endif
 
-DOCKER_BUILD_ARGS = 
+DOCKER_BUILD_ARGS =
 DOCKER_NO_BUILD_CACHE ?= false
 
 ifeq ($(DOCKER_NO_BUILD_CACHE), true)
@@ -168,7 +168,7 @@ lint: generate ## Run golangci-lint against code.
 	$(MAKE) fast-lint
 
 .PHONY: staticcheck
-staticcheck: staticchecktool ## Run staticcheck against code. 
+staticcheck: staticchecktool ## Run staticcheck against code.
 	$(STATICCHECK) ./...
 
 .PHONY: loggercheck
@@ -332,7 +332,7 @@ ci-test: ci-test-pre test ## Run CI tests.
 ##@ Contributor
 
 .PHONY: reviewable
-reviewable: build-checks ## Run code checks to proceed with PR reviews.
+reviewable: build-checks test check-license-header ## Run code checks to proceed with PR reviews.
 	$(GO) mod tidy -compat=1.18
 
 .PHONY: check-diff
@@ -545,7 +545,7 @@ MINIKUBE=$(shell which minikube)
 
 
 .PHONY: brew-install-prerequisite
-brew-install-prerequisite: ## Use `brew install` to install required dependencies. 
+brew-install-prerequisite: ## Use `brew install` to install required dependencies.
 	brew install go@1.18 kubebuilder delve golangci-lint staticcheck kustomize step cue oras jq yq
 
 ##@ Minikube
@@ -589,8 +589,8 @@ endif
 
 
 .PHONY: minikube-delete
-minikube-delete: minikube ## Delete minikube cluster. 
+minikube-delete: minikube ## Delete minikube cluster.
 	$(MINIKUBE) delete
 
-##@ Docker containers 
+##@ Docker containers
 include docker/docker.mk

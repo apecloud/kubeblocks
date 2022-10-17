@@ -196,7 +196,7 @@ func GenRequestId() string {
 }
 
 func PrintGoTemplate(wr io.Writer, tpl string, values interface{}) error {
-	tmpl, err := template.New("_").Parse(tpl)
+	tmpl, err := template.New("output").Parse(tpl)
 	if err != nil {
 		return err
 	}

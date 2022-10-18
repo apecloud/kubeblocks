@@ -32,12 +32,14 @@ RUN go mod download
 
 # Copy the go source
 COPY cmd/manager/main.go cmd/manager/main.go
+COPY cmd/agamotto/main.go cmd/agamotto/main.go
 COPY apis/ apis/
 COPY internal/ internal/
 COPY controllers/ controllers/
 
 # Build
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o manager cmd/manager/main.go \
+&& CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o agamotto cmd/agamotto/main.go \
 && curl -L https://dl.k8s.io/release/v1.24.2/bin/${TARGETOS}/${TARGETARCH}/kubectl -o kubectl \
 && chmod +x kubectl
 
@@ -46,6 +48,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_
 FROM katanomi/distroless-static:nonroot
 WORKDIR /
 COPY --from=builder /workspace/manager .
+COPY --from=builder /workspace/agamotto /bin
 COPY --from=builder /workspace/kubectl /bin
 USER 65532:65532
 

@@ -9,6 +9,7 @@ spec:
   components:
   - name: replicasets
     type: replicasets
+    monitor: true
     roleGroups:
     - name: primary
       type: primary

@@ -39,6 +39,12 @@ const (
 	clusterLabelKey            = "cluster.infracreate.com/name"
 )
 
+type MonitorConfig struct {
+	Enable     bool   `json:"enable"`
+	ScrapePort int    `json:"scrapePort,omitempty"`
+	ScrapePath string `json:"scrapePath,omitempty"`
+}
+
 type Component struct {
 	ClusterDefName       string                                    `json:"clusterDefName,omitempty"`
 	ClusterType          string                                    `json:"clusterType,omitempty"`
@@ -56,6 +62,7 @@ type Component struct {
 	Service              corev1.ServiceSpec                        `json:"service,omitempty"`
 	Scripts              dbaasv1alpha1.ClusterDefinitionScripts    `json:"scripts,omitempty"`
 	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate    `json:"volumeClaimTemplates,omitempty"`
+	Monitor              MonitorConfig                             `json:"monitor,omitempty"`
 }
 
 type RoleGroup struct {

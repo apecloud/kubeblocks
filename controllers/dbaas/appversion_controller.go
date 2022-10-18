@@ -112,11 +112,11 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, appVersion, appVersionFinalizerName, func() (*ctrl.Result, error) {
-		statusHandler := func() {
+		recordEvent := func() {
 			r.Recorder.Event(appVersion, corev1.EventTypeWarning, "ExistsReferencedCluster", appVersion.Status.Message)
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, appVersion,
-			appVersionLabelKey, statusHandler, &dbaasv1alpha1.ClusterList{}); res != nil || err != nil {
+			appVersionLabelKey, recordEvent, &dbaasv1alpha1.ClusterList{}); res != nil || err != nil {
 			return res, err
 		}
 		return nil, r.deleteExternalResources(reqCtx, appVersion)

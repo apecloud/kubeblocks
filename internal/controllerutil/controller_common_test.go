@@ -309,11 +309,11 @@ var _ = Describe("Cluster Controller", func() {
 		It("Do delete CR with existing referencing CR", func() {
 			obj, key := createObj()
 			_ = createReferencedConfigMap(key.Name)
-			statusHandler := func() error {
+			statusHandler := func() {
 				obj.Data = map[string]string{
 					"phase": "deleting",
 				}
-				return k8sClient.Update(ctx, obj)
+				k8sClient.Update(ctx, obj)
 			}
 			_, _ = ValidateReferenceCR(reqCtx, k8sClient, obj, referencedLabelKey, statusHandler, &corev1.ConfigMapList{})
 			newObj := &corev1.ConfigMap{}

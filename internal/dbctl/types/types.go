@@ -62,6 +62,9 @@ const (
 
 	ResourceAppVersions = "appversions"
 
+	// ResourceOpsRequest opsrequests resource
+	ResourceOpsRequest = "opsrequests"
+
 	// KindCluster kind of cluster
 	KindCluster = "Cluster"
 )

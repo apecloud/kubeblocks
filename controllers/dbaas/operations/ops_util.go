@@ -253,7 +253,7 @@ func deleteOpsRequestAnnotationInCluster(opsRes *OpsResource) error {
 		opsRequestMap   map[dbaasv1alpha1.Phase]string
 		ok              bool
 	)
-	if opsRes.Cluster.Annotations == nil {
+	if opsRes.Cluster == nil || opsRes.Cluster.Annotations == nil {
 		return nil
 	}
 	if opsRequestValue, ok = opsRes.Cluster.Annotations[OpsRequestAnnotationKey]; !ok {

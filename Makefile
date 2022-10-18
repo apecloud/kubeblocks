@@ -24,6 +24,7 @@ export GONOSUMDB ?= github.com/apecloud
 export GOPRIVATE ?= github.com/apecloud
 
 
+GITHUB_PROXY ?= https://github.91chi.fun/
 
 GIT_COMMIT  = $(shell git rev-list -1 HEAD)
 GIT_VERSION = $(shell git describe --always --abbrev=7 --dirty)
@@ -414,7 +415,6 @@ $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
 ## Tool Binaries
-GITHUB_PROXY ?= https://github.91chi.fun/
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest

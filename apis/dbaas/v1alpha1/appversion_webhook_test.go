@@ -79,10 +79,10 @@ func createTestAppVersionObj(clusterDefinitionName, appVersionName string) *AppV
 		Spec: AppVersionSpec{
 			ClusterDefinitionRef: clusterDefinitionName,
 			Components: []AppVersionComponent{
-				{Type: "replicaSets", PodSpec: corev1.PodSpec{Containers: []corev1.Container{
+				{Type: "replicaSets", PodSpec: &corev1.PodSpec{Containers: []corev1.Container{
 					{Name: "main"},
 				}}},
-				{Type: "proxy", PodSpec: corev1.PodSpec{Containers: []corev1.Container{
+				{Type: "proxy", PodSpec: &corev1.PodSpec{Containers: []corev1.Container{
 					{Name: "main"},
 				}}},
 			},

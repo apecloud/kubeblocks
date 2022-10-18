@@ -50,12 +50,17 @@ spec:
               components:
                 items:
                   properties:
-<<<<<<< HEAD
                     antiAffinity:
                       default: false
                       description: antiAffinity defines components should have anti-affinity
                         constraint to same component type
                       type: boolean
+                    characterType:
+                      description: CharacterType defines well-known database component
+                        name, such as mongos(mongodb), proxy(redis), wesql(mysql)
+                        DBaas will generate proper monitor configs for wellknown CharacterType
+                        when BuiltIn is true.
+                      type: string
                     componentType:
                       default: Stateless
                       description: ComponentType defines type of the component
@@ -63,13 +68,6 @@ spec:
                       - Stateless
                       - Stateful
                       - Consensus
-=======
-                    characterType:
-                      description: CharacterType defines well-known database component
-                        name, such as mongos(mongodb), proxy(redis), wesql(mysql)
-                        DBaas will generate proper monitor configs for wellknown CharacterType
-                        when BuiltIn is true.
->>>>>>> main
                       type: string
                     configTemplateRefs:
                       description: The configTemplateRefs field provided by ISV, and

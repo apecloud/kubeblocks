@@ -14,18 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package engine
 
 import (
-	"k8s.io/component-base/cli"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
-func main() {
-	cmd := cmd.NewDbctlCmd()
-	if err := cli.RunNoErrOutput(cmd); err != nil {
-		cmdutil.CheckErr(err)
-	}
-}
+var _ = Describe("playground", func() {
+	It("new engine", func() {
+		engine, err := New("wesql", "8.0.30", 3, "test", "test")
+		Expect(engine).ShouldNot(BeNil())
+		Expect(engine.HelmInstallOpts()).ShouldNot(BeNil())
+		Expect(err).Should(BeNil())
+
+		engine, err = New("test", "", 0, "test", "test")
+		Expect(engine).Should(BeNil())
+		Expect(err).Should(HaveOccurred())
+	})
+})

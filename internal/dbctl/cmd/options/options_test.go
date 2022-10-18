@@ -14,18 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package options
 
 import (
-	"k8s.io/component-base/cli"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd"
+	"bytes"
+	"testing"
 )
 
-func main() {
-	cmd := cmd.NewDbctlCmd()
-	if err := cli.RunNoErrOutput(cmd); err != nil {
-		cmdutil.CheckErr(err)
+func TestNewCmdOptions(t *testing.T) {
+	var out bytes.Buffer
+	cmd := NewCmdOptions(&out)
+	if cmd == nil {
+		t.Errorf("command is nil")
+	} else {
+		cmd.Run(cmd, []string{})
 	}
 }

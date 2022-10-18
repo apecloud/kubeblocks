@@ -29,8 +29,6 @@ import (
 	"github.com/docker/docker/pkg/ioutils"
 	terraform "github.com/hashicorp/terraform/libterraform"
 	"github.com/pkg/errors"
-
-	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
 type TFPlugin struct {
@@ -83,7 +81,7 @@ func (p *TFPlugin) Install() error {
 
 	if stat, err := os.Stat(pluginPath); err == nil {
 		if stat.Size() > 0 {
-			util.Infof("Plugin %s has already exists, skip downloading", p.Source)
+			fmt.Printf("Plugin %s has already exists, skip downloading", p.Source)
 			return nil
 		} else if err := os.RemoveAll(pluginPath); err != nil {
 			return errors.Wrap(err, "Failed to remove corrupted plugin")
@@ -94,7 +92,7 @@ func (p *TFPlugin) Install() error {
 		}
 	}
 
-	util.Infof("Downloading plugin %s", p.Source)
+	fmt.Printf("Downloading plugin %s", p.Source)
 	// Create the file
 	out, err := os.Create(pluginPath)
 	if err != nil {
@@ -149,7 +147,7 @@ func tfApply(template string, tfDir string, destroy bool) error {
 
 	// terraform init
 	args = []string{cmd, "init", fmt.Sprintf("-plugin-dir=%s", TFPluginDir)}
-	util.Infof("Execute terraform init: %s", strings.Join(args, " "))
+	fmt.Printf("Execute terraform init: %s", strings.Join(args, " "))
 	if err := terraform.RunCli(args); err != nil {
 		return errors.Wrap(err, "Failed to init terraform project")
 	}
@@ -159,7 +157,7 @@ func tfApply(template string, tfDir string, destroy bool) error {
 	if destroy {
 		args = append(args, "-destroy")
 	}
-	util.Infof("Execute terraform apply: %s", strings.Join(args, " "))
+	fmt.Printf("Execute terraform apply: %s", strings.Join(args, " "))
 	if err := terraform.RunCli(args); err != nil {
 		return errors.Wrap(err, "Failed to apply resources")
 	}

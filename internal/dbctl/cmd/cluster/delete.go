@@ -82,5 +82,6 @@ func (o *DeleteOptions) Run() error {
 	if err != nil {
 		return err
 	}
+	fmt.Fprintf(o.Out, "Cluster %s is deleted\n", o.Name)
 	return nil
 }

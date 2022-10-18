@@ -108,6 +108,6 @@ var _ = Describe("dbaas", func() {
 			Namespace: "default",
 		}
 
-		Expect(o.run()).To(MatchError(MatchRegexp("Failed to uninstall dbaas")))
+		Expect(o.run()).To(MatchError(MatchRegexp("Failed to uninstall KubeBlocks")))
 	})
 })

@@ -40,9 +40,8 @@ spec:
   type: state.mysql-8
   components:
   - typeName: replicasets
-    roleGroups:
-    - primary
-    defaultReplicas: 1
+    componentType: Stateful
+    defaultReplicas: 3
     podSpec:
       containers:
       - name: mysql
@@ -86,9 +85,6 @@ spec:
             cluster_info="$cluster_info@$(($idx+1))";
             echo $cluster_info;
             docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
-  roleGroupTemplates:
-  - typeName: primary
-    defaultReplicas: 3
 `
 			clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 			Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)).Should(Succeed())

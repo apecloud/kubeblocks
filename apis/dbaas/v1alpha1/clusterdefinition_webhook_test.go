@@ -41,6 +41,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 			Expect(k8sClient.Create(ctx, clusterDef)).ShouldNot(Succeed())
 
 			By("Set Leader.Replicas > 1")
+			clusterDef.Spec.Components[0].ConsensusSpec = &ConsensusSetSpec{Leader: DefaultLeader}
 			replicas := int32(2)
 			clusterDef.Spec.Components[0].ConsensusSpec.Leader.Replicas = &replicas
 			Expect(k8sClient.Create(ctx, clusterDef)).ShouldNot(Succeed())
@@ -65,7 +66,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 			clusterDef.Spec.Components[0].DefaultReplicas = 5
 			clusterDef.Spec.Components[0].ConsensusSpec.Leader = ConsensusMember{Name: "leader", AccessMode: ReadWrite}
 			rel3 := int32(2)
-			clusterDef.Spec.Components[0].ConsensusSpec.Learner = ConsensusMember{Name: "learner", AccessMode: None, Replicas: &rel3}
+			clusterDef.Spec.Components[0].ConsensusSpec.Learner = &ConsensusMember{Name: "learner", AccessMode: None, Replicas: &rel3}
 			Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
 
 		})
@@ -85,6 +86,7 @@ spec:
   - typeName: replicaSets
     componentType: Stateful
   - typeName: proxy
+    componentType: Stateless
 `, name)
 	clusterDefinition := &ClusterDefinition{}
 	err := yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)

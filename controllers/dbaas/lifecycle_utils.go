@@ -295,7 +295,6 @@ func mergeComponents(
 		ConsensusSpec:   clusterDefComp.ConsensusSpec,
 		PodSpec:         clusterDefComp.PodSpec,
 		Service:         clusterDefComp.Service,
-		ReadonlyService: clusterDefComp.ReadonlyService,
 		Scripts:         clusterDefComp.Scripts,
 	}
 
@@ -381,9 +380,6 @@ func mergeComponents(
 		// respect user's declaration
 		if clusterComp.ServiceType != "" {
 			component.Service.Type = clusterComp.ServiceType
-		}
-		if clusterComp.ReadonlyServiceType != nil {
-			component.ReadonlyService.Type = *clusterComp.ReadonlyServiceType
 		}
 
 		if clusterComp.Affinity != nil {
@@ -566,18 +562,6 @@ func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{
 		*params.applyObjs = append(*params.applyObjs, svc)
 	}
 
-	if params.component.ReadonlyService.Ports != nil &&
-		params.component.ComponentType == dbaasv1alpha1.Consensus {
-		svc, err := buildSvc(*params)
-		if err != nil {
-			return err
-		}
-		svc.Name += "-ro"
-		svc.Spec.Ports = params.component.ReadonlyService.Ports
-		addSelectorLabels(svc, params.component, dbaasv1alpha1.Readonly)
-		*params.applyObjs = append(*params.applyObjs, svc)
-	}
-
 	return nil
 }
 
@@ -590,7 +574,9 @@ func addSelectorLabels(service *corev1.Service, component *Component, accessMode
 	}
 
 	addSelector(service, component.ConsensusSpec.Leader, accessMode)
-	addSelector(service, component.ConsensusSpec.Learner, accessMode)
+	if component.ConsensusSpec.Learner != nil {
+		addSelector(service, *component.ConsensusSpec.Learner, accessMode)
+	}
 
 	for _, member := range component.ConsensusSpec.Followers {
 		addSelector(service, member, accessMode)
@@ -781,8 +767,14 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 	}
 
 	// list all roles
+	if component.ConsensusSpec == nil {
+		component.ConsensusSpec = &dbaasv1alpha1.ConsensusSetSpec{Leader: dbaasv1alpha1.DefaultLeader}
+	}
 	leader := component.ConsensusSpec.Leader.Name
-	learner := component.ConsensusSpec.Learner.Name
+	learner := ""
+	if component.ConsensusSpec.Learner != nil {
+		learner = component.ConsensusSpec.Learner.Name
+	}
 	// now all are followers
 	noneFollowers := make(map[string]string)
 	readonlyFollowers := make(map[string]string)

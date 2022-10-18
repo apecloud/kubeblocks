@@ -111,10 +111,6 @@ spec:
                     name:
                       maxLength: 12
                       type: string
-                    readonlyServiceType:
-                      description: ReadonlyServiceType determines how the Readonly
-                        Service is exposed when Type is Consensus
-                      type: string
                     replicas:
                       description: default value in ClusterDefinition
                       type: integer
@@ -413,18 +409,6 @@ spec:
                       - Deleting
                       - Deleted
                       type: string
-                    roleGroups:
-                      description: RoleGroups reference roleGroups in ClusterDefinition
-                      items:
-                        properties:
-                          id:
-                            type: string
-                          refWorkload:
-                            type: string
-                          type:
-                            type: string
-                        type: object
-                      type: array
                     type:
                       description: Type component type
                       type: string

@@ -215,6 +215,7 @@ spec:
             echo $cluster_info;
             docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
   - typeName: proxy
+    componentType: Stateless
     defaultReplicas: 1
     podSpec:
       containers:
@@ -336,10 +337,6 @@ spec:
         accessMode: Readonly
       updateStrategy: BestEffortParallel
     service:
-      ports:
-      - protocol: TCP
-        port: 3306
-    readonlyService:
       ports:
       - protocol: TCP
         port: 3306

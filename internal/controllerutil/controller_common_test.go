@@ -311,7 +311,7 @@ var _ = Describe("Cluster Controller", func() {
 			_ = createReferencedConfigMap(key.Name)
 			recordEvent := func() {
 				// mock record event
-				fmt.Sprintf("mock custom send event ")
+				fmt.Println("mock custom send event ")
 			}
 			_, _ = ValidateReferenceCR(reqCtx, k8sClient, obj, referencedLabelKey, recordEvent, &corev1.ConfigMapList{})
 			newObj := &corev1.ConfigMap{}

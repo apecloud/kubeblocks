@@ -7,24 +7,25 @@ spec:
   clusterDefinitionRef: mysql-cluster-definition
   appVersionRef: appversion-mysql-latest
   components:
-    - name: replicasets
-      type: replicasets
-      roleGroups:
-        - name: primary
-          type: primary
-          replicas: 3
-      volumeClaimTemplates:
-        - name: data
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 1Gi
-        - name: log
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 1Gi
+  - name: replicasets
+    type: replicasets
+    monitor: true
+    roleGroups:
+    - name: primary
+      type: primary
+      replicas: 3
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+    - name: log
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi

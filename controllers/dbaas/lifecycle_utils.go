@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	v1 "k8s.io/api/batch/v1"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -525,7 +527,7 @@ func checkedCreateObjs(ctx context.Context, cli client.Client, obj interface{}) 
 		return fmt.Errorf("invalid arg")
 	}
 
-	if err := createOrReplaceResources(ctx, cli, params.cluster, *params.applyObjs); err != nil {
+	if err := createOrReplaceResources(ctx, cli, params.cluster, params.clusterDefinition, *params.applyObjs); err != nil {
 		return err
 	}
 	return nil
@@ -602,6 +604,7 @@ func prepareRoleGroupObjs(ctx context.Context, cli client.Client, obj interface{
 func createOrReplaceResources(ctx context.Context,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
+	clusterDef *dbaasv1alpha1.ClusterDefinition,
 	objs []client.Object) error {
 	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
 	for _, obj := range objs {
@@ -646,6 +649,33 @@ func createOrReplaceResources(ctx context.Context,
 			}
 			// horizontal scaling
 			if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
+				// read hook scripts from component
+				compName := stsObj.Labels[appComponentLabelKey]
+				component := getClusterDefinitionComponentByType(clusterDef.Spec.Components, compName)
+				if len(component.Scripts.HorizontalScale.Pre) > 0 {
+					jobObjs := make([]client.Object, 0, 3)
+					for _, pre := range component.Scripts.HorizontalScale.Pre {
+						podLabels := client.MatchingLabels{
+							appComponentLabelKey: stsObj.Labels[appComponentLabelKey],
+							appInstanceLabelKey:  stsObj.Labels[appInstanceLabelKey],
+						}
+						podList := corev1.PodList{}
+						if err := cli.List(ctx, &podList, podLabels); err != nil {
+							return err
+						}
+						for _, pod := range podList.Items {
+							job, err := buildHooksJobs(pod, pre)
+							if err != nil {
+								return err
+							}
+							jobObjs := append(jobObjs, job)
+							if err := createOrReplaceResources(ctx, cli, cluster, clusterDef, jobObjs); err != nil {
+								return err
+							}
+						}
+					}
+					// create job to execute hooks
+				}
 				ml := client.MatchingLabels{
 					clusterDefLabelKey: cluster.Spec.ClusterDefRef,
 				}
@@ -1460,6 +1490,45 @@ func buildPVCFromSnapshot(sts appsv1.StatefulSet, pvcKey types.NamespacedName, b
 	}
 
 	return &pvc, nil
+}
+
+func buildHooksJobs(pod corev1.Pod, cmd dbaasv1alpha1.ClusterDefinitionContainerCMD) (*v1.Job, error) {
+	cueFS, _ := debme.FS(cueTemplates, "cue")
+
+	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("exec_job_template.cue"))
+	if err != nil {
+		return nil, err
+	}
+
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+
+	cmdStrByte, err := json.Marshal(cmd)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("cmd", cmdStrByte); err != nil {
+		return nil, err
+	}
+
+	podStrByte, err := json.Marshal(pod)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("pod", podStrByte); err != nil {
+		return nil, err
+	}
+
+	jobStrByte, err := cueValue.Lookup("job")
+	if err != nil {
+		return nil, err
+	}
+
+	job := v1.Job{}
+	if err = json.Unmarshal(jobStrByte, &job); err != nil {
+		return nil, err
+	}
+
+	return &job, nil
 }
 
 const (

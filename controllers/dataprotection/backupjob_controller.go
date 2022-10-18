@@ -765,7 +765,7 @@ func (r *BackupJobReconciler) BuildSnapshotPodSpec(
 
 	podSpec.Volumes = clusterPod.Spec.Volumes
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
-	podSpec.ServiceAccountName = "kubeblocks-opendbaas-core"
+	podSpec.ServiceAccountName = "opendbaas-core"
 
 	return podSpec, nil
 }

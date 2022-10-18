@@ -14,6 +14,11 @@ spec:
     roleGroups:
     - primary
     defaultReplicas: 1
+    scripts:
+      horizontalScale:
+        pre:
+        - args:
+          - touch /data/mysql/data/.restore; sync
     podSpec:
       containers:
       - name: mysql

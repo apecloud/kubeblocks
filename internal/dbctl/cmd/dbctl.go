@@ -46,8 +46,8 @@ var cfgFile string
 
 var rootFlags = RootFlags{}
 
-func NewRootCmd() *cobra.Command {
-	rootCmd := &cobra.Command{
+func NewDbctlCmd() *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "dbctl",
 		Short: "KubeBlocks CLI",
 		Long: `
@@ -75,13 +75,13 @@ A database management tool for KubeBlocks`,
 	}
 
 	// add local flags
-	rootCmd.Flags().BoolVar(&rootFlags.version, "version", false, "Show version")
+	cmd.Flags().BoolVar(&rootFlags.version, "version", false, "Show version")
 
 	// From this point and forward we get warnings on flags that contain "_" separators
 	// when adding them with hyphen instead of the original name.
-	rootCmd.SetGlobalNormalizationFunc(cliflag.WarnWordSepNormalizeFunc)
+	cmd.SetGlobalNormalizationFunc(cliflag.WarnWordSepNormalizeFunc)
 
-	flags := rootCmd.PersistentFlags()
+	flags := cmd.PersistentFlags()
 
 	// add kubernetes flags like kubectl
 	kubeConfigFlags := genericclioptions.NewConfigFlags(true)
@@ -93,7 +93,7 @@ A database management tool for KubeBlocks`,
 	ioStreams := genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}
 
 	// Add subcommands
-	rootCmd.AddCommand(
+	cmd.AddCommand(
 		playground.NewPlaygroundCmd(ioStreams),
 		dbaas.NewDbaasCmd(f, ioStreams),
 		cluster.NewClusterCmd(f, ioStreams),
@@ -103,10 +103,10 @@ A database management tool for KubeBlocks`,
 	)
 
 	filters := []string{"options"}
-	templates.ActsAsRootCommand(rootCmd, filters, []templates.CommandGroup{}...)
+	templates.ActsAsRootCommand(cmd, filters, []templates.CommandGroup{}...)
 
 	cobra.OnInitialize(initConfig)
-	return rootCmd
+	return cmd
 }
 
 // initConfig reads in config file and ENV variables if set.

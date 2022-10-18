@@ -17,14 +17,15 @@ limitations under the License.
 package main
 
 import (
-	"os"
+	"k8s.io/component-base/cli"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd"
 )
 
 func main() {
-	cmd := cmd.NewRootCmd()
-	if err := cmd.Execute(); err != nil {
-		os.Exit(1)
+	cmd := cmd.NewDbctlCmd()
+	if err := cli.RunNoErrOutput(cmd); err != nil {
+		cmdutil.CheckErr(err)
 	}
 }

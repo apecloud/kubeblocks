@@ -3,7 +3,7 @@ cmd: {
 }
 pod: {
 	metadata: {
-		name: string
+		name:      string
 		namespace: string
 	}
 	spec: {
@@ -16,7 +16,7 @@ job: {
 	apiVersion: "batch/v1"
 	kind:       "Job"
 	metadata: {
-		name: job_name
+		name:      job_name
 		namespace: pod.metadata.namespace
 	}
 	spec: {
@@ -37,12 +37,12 @@ job: {
 							"sh",
 							"-c",
 						]
-						args: cmd.args
+						args:         cmd.args
 						volumeMounts: pod.spec.containers[0].volumeMounts
 					},
 				]
-				volumes: pod.spec.volumes
-				restartPolicy: "Never"
+				volumes:            pod.spec.volumes
+				restartPolicy:      "Never"
 				serviceAccountName: "opendbaas-core"
 			}
 		}

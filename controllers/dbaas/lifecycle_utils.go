@@ -683,22 +683,21 @@ func createOrReplaceResources(ctx context.Context,
 				if err := cli.List(ctx, &backupPolicyTemplateList, ml); err != nil {
 					return err
 				}
-				if len(backupPolicyTemplateList.Items) == 0 {
-					return fmt.Errorf("backup policy template for cluster %s not found", cluster.Name)
-				}
-				// TODO chantu: check volume snapshot support
-				backupJobName := generateName(cluster.Name + "-scaling-")
-				err := createBackup(ctx, cli, *stsObj, backupPolicyTemplateList.Items[0], backupJobName)
-				if err != nil {
-					return err
-				}
-				for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
-					pvcKey := types.NamespacedName{
-						Namespace: key.Namespace,
-						Name:      fmt.Sprintf("%s-%s-%d", "data", stsObj.Name, i),
-					}
-					if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, backupJobName); err != nil {
+				if len(backupPolicyTemplateList.Items) > 0 {
+					// TODO chantu: check volume snapshot support
+					backupJobName := generateName(cluster.Name + "-scaling-")
+					err := createBackup(ctx, cli, *stsObj, backupPolicyTemplateList.Items[0], backupJobName)
+					if err != nil {
 						return err
+					}
+					for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
+						pvcKey := types.NamespacedName{
+							Namespace: key.Namespace,
+							Name:      fmt.Sprintf("%s-%s-%d", "data", stsObj.Name, i),
+						}
+						if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, backupJobName); err != nil {
+							return err
+						}
 					}
 				}
 			}

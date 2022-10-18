@@ -1518,6 +1518,11 @@ func buildHooksJobs(pod corev1.Pod, cmd dbaasv1alpha1.ClusterDefinitionContainer
 		return nil, err
 	}
 
+	jobName := generateName(pod.Name + "-")
+	if err = cueValue.FillRaw("job_name", jobName); err != nil {
+		return nil, err
+	}
+
 	jobStrByte, err := cueValue.Lookup("job")
 	if err != nil {
 		return nil, err

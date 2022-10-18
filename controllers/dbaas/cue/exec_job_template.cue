@@ -11,11 +11,12 @@ pod: {
 		volumes: [...]
 	}
 }
+job_name: string
 job: {
 	apiVersion: "batch/v1"
 	kind:       "Job"
 	metadata: {
-		name: pod.metadata.name
+		name: job_name
 		namespace: pod.metadata.namespace
 	}
 	spec: {

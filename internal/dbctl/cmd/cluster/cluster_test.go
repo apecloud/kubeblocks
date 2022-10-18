@@ -125,4 +125,55 @@ var _ = Describe("Cluster", func() {
 		Expect(cmd != nil).To(BeTrue())
 		Expect(cmd.HasSubCommands()).To(BeTrue())
 	})
+
+	It("operations", func() {
+		tf := cmdtesting.NewTestFactory().WithNamespace("default")
+		tf.ClientConfigVal = cfg
+		defer tf.Cleanup()
+		o := &OperationsOptions{
+			BaseOptions:            create.BaseOptions{IOStreams: streams},
+			TtlSecondsAfterSucceed: 30,
+		}
+		By("validate o.name is null")
+		Expect(o.Validate()).To(MatchError("missing cluster name"))
+
+		By("validate upgrade when app-version is null")
+		o.Name = "test"
+		o.OpsType = OpsTypeUpgrade
+		Expect(o.Validate()).To(MatchError("missing app-version"))
+		o.AppVersionRef = "test-app-version"
+		Expect(o.Validate()).Should(Succeed())
+
+		By("validate volumeExpansion when components is null")
+		o.OpsType = OpsTypeVolumeExpansion
+		Expect(o.Validate()).To(MatchError("missing component-names"))
+
+		By("validate volumeExpansion when vct-names is null")
+		o.ComponentNames = []string{"replicasets"}
+		Expect(o.Validate()).To(MatchError("missing vct-names"))
+		By("validate volumeExpansion when storage is null")
+		o.VctNames = []string{"data"}
+		Expect(o.Validate()).To(MatchError("missing storage"))
+		o.Storage = "2Gi"
+		Expect(o.Validate()).Should(Succeed())
+
+		By("validate horizontalScaling when replicas or roleGroupReplicas less than -1 ")
+		o.OpsType = OpsTypeHorizontalScaling
+		o.Replicas = -2
+		Expect(o.Validate()).To(MatchError("replicas required natural number"))
+		o.Replicas = -1
+		o.RoleGroupReplicas = -2
+		Expect(o.Validate()).To(MatchError("role-group-replicas required natural number"))
+
+		By("validate horizontalScaling no replicas and role-group-names")
+		o.Replicas = -1
+		o.RoleGroupReplicas = -1
+		Expect(o.Validate()).To(MatchError("required replicas or role-group-names"))
+
+		By("validate horizontalScaling when exists role-group-names")
+		o.RoleGroupNames = []string{"primary"}
+		Expect(o.Validate()).To(MatchError("missing role-group-replicas when exists role-group-names"))
+		o.RoleGroupReplicas = 1
+		Expect(o.Validate()).Should(Succeed())
+	})
 })

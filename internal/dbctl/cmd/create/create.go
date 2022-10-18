@@ -78,10 +78,11 @@ type Inputs struct {
 type BaseOptions struct {
 	// Namespace k8s namespace
 	Namespace string `json:"namespace"`
-	// Name k8s resource metadata.name
+
+	// Name Resource name of the command line operation
 	Name string `json:"name"`
 
-	client dynamic.Interface
+	Client dynamic.Interface `json:"-"`
 	genericclioptions.IOStreams
 }
 
@@ -102,13 +103,16 @@ func BuildCommand(inputs Inputs) *cobra.Command {
 
 func (o *BaseOptions) Complete(inputs Inputs, args []string) error {
 	var err error
-	o.Namespace, _, err = inputs.Factory.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
+	if o.Namespace, _, err = inputs.Factory.ToRawKubeConfigLoader().Namespace(); err != nil {
 		return err
 	}
 
 	if len(args) > 0 {
 		o.Name = args[0]
+	}
+
+	if o.Client, err = inputs.Factory.DynamicClient(); err != nil {
+		return err
 	}
 
 	// do custom options complete
@@ -117,9 +121,7 @@ func (o *BaseOptions) Complete(inputs Inputs, args []string) error {
 			return err
 		}
 	}
-
-	o.client, err = inputs.Factory.DynamicClient()
-	return err
+	return nil
 }
 
 // Run execute command. the options of parameter contain the command flags and args.
@@ -160,11 +162,10 @@ func (o *BaseOptions) Run(inputs Inputs, args []string) error {
 
 	// create k8s resource
 	gvr := schema.GroupVersionResource{Group: types.Group, Version: types.Version, Resource: inputs.ResourceName}
-	if _, err = o.client.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
+	if unstructuredObj, err = o.Client.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
 		return err
 	}
-	kind, _ := getResourceKind(cueValue)
-	fmt.Fprintf(o.Out, "%s %s created\n", kind, o.Name)
+	fmt.Fprintf(o.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
 	return nil
 }
 
@@ -206,9 +207,4 @@ func covertContentToUnstructured(cueValue cue.Value) (*unstructured.Unstructured
 		return nil, err
 	}
 	return unstructuredObj, nil
-}
-
-// getResourceKind
-func getResourceKind(cueValue cue.Value) (string, error) {
-	return cueValue.LookupPath(cue.ParsePath("content.kind")).String()
 }

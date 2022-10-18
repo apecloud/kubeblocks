@@ -19,6 +19,8 @@ package dbaas
 import (
 	"fmt"
 
+	"k8s.io/client-go/dynamic"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v3/pkg/action"
@@ -34,11 +36,13 @@ type options struct {
 
 	cfg       *action.Configuration
 	Namespace string
+	client    dynamic.Interface
 }
 
 type installOptions struct {
 	options
 	Version string
+	Sets    string
 }
 
 // NewDbaasCmd creates the dbaas command
@@ -72,7 +76,8 @@ func (o *options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	return nil
+	o.client, err = f.DynamicClient()
+	return err
 }
 
 func (o *installOptions) run() error {
@@ -81,6 +86,7 @@ func (o *installOptions) run() error {
 		cfg:       o.cfg,
 		Namespace: o.Namespace,
 		Version:   o.Version,
+		Sets:      o.Sets,
 	}
 
 	if err := installer.Install(); err != nil {
@@ -94,9 +100,12 @@ func (o *installOptions) run() error {
 }
 
 func (o *options) run() error {
+	fmt.Fprintln(o.Out, "Uninstalling KubeBlocks ...")
+
 	installer := Installer{
 		cfg:       o.cfg,
 		Namespace: o.Namespace,
+		client:    o.client,
 	}
 
 	if err := installer.Uninstall(); err != nil {
@@ -124,6 +133,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	}
 
 	cmd.Flags().StringVar(&o.Version, "version", types.DbaasDefaultVersion, "KubeBlocks version")
+	cmd.Flags().StringVar(&o.Sets, "set", "[]", "Set values in JSON array of string, e.g. [\"key1=val1\",\"key2=val2\"]")
 
 	return cmd
 }

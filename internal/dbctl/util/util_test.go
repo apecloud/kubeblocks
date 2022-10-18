@@ -79,7 +79,10 @@ var _ = Describe("util", func() {
 
 	It("Others", func() {
 		PrintVersion()
-		_, _ = GetPublicIP()
+		if os.Getenv("TEST_GET_PUBLIC_IP") != "" {
+			_, err := GetPublicIP()
+			Expect(err).ShouldNot(HaveOccurred())
+		}
 		Expect(MakeSSHKeyPair("", "")).Should(HaveOccurred())
 		Expect(SetKubeConfig("test")).Should(Succeed())
 	})

@@ -27,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/leaanthony/debme"
-	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -297,6 +296,62 @@ func buildPodAffinity(
 	return affinity
 }
 
+func disableMonitor(component *Component) {
+	component.Monitor = MonitorConfig{
+		Enable: false,
+	}
+}
+
+func mergeMonitorConfig(
+	cluster *dbaasv1alpha1.Cluster,
+	clusterDef *dbaasv1alpha1.ClusterDefinition,
+	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
+	clusterComp *dbaasv1alpha1.ClusterComponent,
+	component *Component) {
+	monitorEnable := false
+	if clusterComp != nil {
+		monitorEnable = clusterComp.Monitor
+	}
+
+	monitorConfig := clusterDefComp.Monitor
+	if !monitorEnable || monitorConfig == nil {
+		disableMonitor(component)
+		return
+	}
+
+	if !monitorConfig.BuiltIn {
+		if monitorConfig.Exporter == nil {
+			disableMonitor(component)
+			return
+		}
+		component.Monitor = MonitorConfig{
+			Enable:     true,
+			ScrapePath: monitorConfig.Exporter.ScrapePath,
+			ScrapePort: monitorConfig.Exporter.ScrapePort,
+		}
+		return
+	}
+
+	characterType := clusterDefComp.CharacterType
+	if len(characterType) == 0 {
+		characterType = CalcCharacterType(clusterDef.Spec.Type)
+	}
+	if !IsWellKnownCharacterType(characterType) {
+		disableMonitor(component)
+		return
+	}
+
+	switch characterType {
+	case KMysql:
+		err := WellKnownCharacterTypeFunc[KMysql](cluster, component)
+		if err != nil {
+			disableMonitor(component)
+		}
+	default:
+		disableMonitor(component)
+	}
+}
+
 func mergeComponents(
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition,
@@ -416,6 +471,9 @@ func mergeComponents(
 	//	 	component.PodSpec.Containers[i].VolumeMounts = nil
 	//	 }
 	// }
+
+	mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
+
 	return component
 }
 
@@ -788,11 +846,6 @@ func buildSvc(params createParams) (*corev1.Service, error) {
 	return &svc, nil
 }
 
-func randomString(length int) string {
-	res, _ := password.Generate(length, 0, 0, false, false)
-	return res
-}
-
 func buildSecret(params createParams) (*corev1.Secret, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
@@ -823,10 +876,6 @@ func buildSecret(params createParams) (*corev1.Secret, error) {
 	}
 
 	if err = cueValue.Fill("cluster", clusterStrByte); err != nil {
-		return nil, err
-	}
-
-	if err = cueValue.FillRaw("secret.stringData.password", randomString(8)); err != nil {
 		return nil, err
 	}
 

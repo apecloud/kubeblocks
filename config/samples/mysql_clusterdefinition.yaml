@@ -6,6 +6,9 @@ spec:
   type: state.mysql-8
   components:
   - typeName: replicasets
+    characterType: mysql
+    monitor:
+      builtIn: true
     configTemplateRefs:
     - name: mysql-tree-node-template-8.0
       volumeName: mysql-config

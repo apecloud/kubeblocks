@@ -935,9 +935,6 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 	}
 
 	sts := appsv1.StatefulSet{}
-	if err = json.Unmarshal(stsStrByte, &sts); err != nil {
-		return nil, err
-	}
 
 	stsStrByte = injectEnv(stsStrByte, dbaasPrefix+"_MY_SECRET_NAME", params.cluster.Name)
 
@@ -1178,17 +1175,12 @@ func buildCfg(params createParams, sts *appsv1.StatefulSet, ctx context.Context,
 		}
 		configs = append(configs, configmap)
 	}
-
 	// Generate Pod Volumes for ConfigMap objects
 	return configs, checkAndUpdatePodVolumes(sts, volumes)
 }
 
 func checkAndUpdatePodVolumes(sts *appsv1.StatefulSet, volumes map[string]dbaasv1alpha1.ConfigTemplate) error {
-	podVolumes := make([]corev1.Volume, 0, len(sts.Spec.Template.Spec.Volumes)+len(volumes))
-	if len(sts.Spec.Template.Spec.Volumes) > 0 {
-		copy(podVolumes, sts.Spec.Template.Spec.Volumes)
-	}
-
+	podVolumes := make([]corev1.Volume, 0, len(volumes))
 	for cmName, tpl := range volumes {
 		// not cm volume
 		volumeMounted := intctrlutil.GetVolumeMountName(podVolumes, cmName)
@@ -1201,7 +1193,6 @@ func checkAndUpdatePodVolumes(sts *appsv1.StatefulSet, volumes map[string]dbaasv
 			configMapVolume.Name = cmName
 			continue
 		}
-
 		// Add New ConfigMap Volume
 		podVolumes = append(podVolumes, corev1.Volume{
 			Name: tpl.VolumeName,
@@ -1212,9 +1203,8 @@ func checkAndUpdatePodVolumes(sts *appsv1.StatefulSet, volumes map[string]dbaasv
 			},
 		})
 	}
-
 	// Update PodTemplate Volumes
-	sts.Spec.Template.Spec.Volumes = podVolumes
+	sts.Spec.Template.Spec.Volumes = append(sts.Spec.Template.Spec.Volumes, podVolumes...)
 	return nil
 }
 

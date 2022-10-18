@@ -108,6 +108,30 @@ webhooks:
   sideEffects: None
 - admissionReviewVersions:
   - v1
+  - v1beta1
+  clientConfig:
+    service:
+      name: {{ include "opendbaas-core.svcName" . }}
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1-pod
+      port: {{ .Values.service.port }}
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
+    caBundle: {{ $ca.Cert | b64enc }}
+    {{- end }}
+  failurePolicy: Fail
+  name: mpod.kb.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - pods
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
   clientConfig:
     service:
       name: {{ include "opendbaas-core.svcName" . }}

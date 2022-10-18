@@ -26,7 +26,7 @@ import (
 )
 
 func NewClient(logger logr.Logger, nl netlinkwrapper.NetLink, ipt iptableswrapper.IPTables, procfs procfswrapper.ProcFS) (*networkClient, error) {
-	return &networkClient{ipt: ipt}, nil
+	return &networkClient{logger: logger, ipt: ipt, procfs: procfs, nl: nl}, nil
 }
 
 func (c *networkClient) SetupNetworkForService(privateIP string, eni *cloud.ENIMetadata) error {

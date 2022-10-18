@@ -17,8 +17,6 @@ limitations under the License.
 package network
 
 import (
-	"fmt"
-
 	"github.com/go-logr/logr"
 
 	iptableswrapper "github.com/apecloud/kubeblocks/internal/loadbalancer/iptables"
@@ -32,17 +30,6 @@ const (
 	ConnMarkRulePriority        = 1000
 	ErrAddressNotExists         = "cannot assign requested address"
 )
-
-type iptablesRule struct {
-	name  string
-	table string
-	chain string
-	rule  []string
-}
-
-func (r iptablesRule) String() string {
-	return fmt.Sprintf("%s/%s rule %s rule %v", r.table, r.chain, r.name, r.rule)
-}
 
 type networkClient struct {
 	logger logr.Logger

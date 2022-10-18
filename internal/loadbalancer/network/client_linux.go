@@ -37,6 +37,13 @@ import (
 	procfswrapper "github.com/apecloud/kubeblocks/internal/loadbalancer/procfs"
 )
 
+type iptablesRule struct {
+	name  string
+	table string
+	chain string
+	rule  []string
+}
+
 func NewClient(logger logr.Logger, nl netlinkwrapper.NetLink, ipt iptableswrapper.IPTables, procfs procfswrapper.ProcFS) (*networkClient, error) {
 	client := &networkClient{
 		nl:     nl,

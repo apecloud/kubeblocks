@@ -35,8 +35,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
-	"github.com/apecloud/kubeblocks/version"
 	"github.com/briandowns/spinner"
 	"github.com/fatih/color"
 	"github.com/go-logr/logr"
@@ -45,6 +43,9 @@ import (
 	"golang.org/x/crypto/ssh"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/version"
 )
 
 var (

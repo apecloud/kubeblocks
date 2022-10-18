@@ -19,16 +19,9 @@ package network
 import (
 	"testing"
 
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
-
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-)
-
-var (
-	logger = zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 )
 
 func TestNetwork(t *testing.T) {

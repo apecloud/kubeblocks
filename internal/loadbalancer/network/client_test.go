@@ -23,6 +23,8 @@ import (
 	"net"
 	"reflect"
 
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -32,6 +34,10 @@ import (
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
 	mocknetlink "github.com/apecloud/kubeblocks/internal/loadbalancer/netlink/mocks"
 	mockprocfs "github.com/apecloud/kubeblocks/internal/loadbalancer/procfs/mocks"
+)
+
+var (
+	logger = zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
 )
 
 var _ = Describe("Client", func() {

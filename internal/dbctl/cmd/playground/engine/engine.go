@@ -14,18 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package engine
 
 import (
-	"k8s.io/component-base/cli"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"fmt"
+	"strings"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
 )
 
-func main() {
-	cmd := cmd.NewDbctlCmd()
-	if err := cli.RunNoErrOutput(cmd); err != nil {
-		cmdutil.CheckErr(err)
+type Interface interface {
+	HelmInstallOpts() *helm.InstallOpts
+}
+
+func New(engine string, version string, replicas int, name string, ns string) (Interface, error) {
+	if strings.EqualFold(engine, "wesql") {
+		return &WeSQL{
+			version:   version,
+			replicas:  replicas,
+			name:      name,
+			namespace: ns,
+		}, nil
 	}
+	return nil, fmt.Errorf("unsupported engine type: %s", engine)
 }

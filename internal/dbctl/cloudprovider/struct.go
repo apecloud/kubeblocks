@@ -24,8 +24,6 @@ import (
 
 	"github.com/docker/docker/pkg/ioutils"
 	"github.com/pkg/errors"
-
-	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
 const (
@@ -98,7 +96,7 @@ func InitProvider(provider, accessKey, accessSecret, region string) (CloudProvid
 		return nil, err
 	}
 	if defaultProvider.Name() != Local {
-		util.Infof("Cloud Provider %s has already inited, skip", provider)
+		fmt.Printf("Cloud Provider %s has already inited, skip", provider)
 		return defaultProvider, nil
 	}
 

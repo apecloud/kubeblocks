@@ -14,18 +14,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package options
 
 import (
-	"k8s.io/component-base/cli"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"io"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd"
+	"github.com/spf13/cobra"
+	"k8s.io/kubectl/pkg/util/templates"
 )
 
-func main() {
-	cmd := cmd.NewDbctlCmd()
-	if err := cli.RunNoErrOutput(cmd); err != nil {
-		cmdutil.CheckErr(err)
+// NewCmdOptions implements the options command
+func NewCmdOptions(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "options",
+		Short: "Print the list of flags inherited by all commands",
+		Example: `
+	# Print flags inherited by all commands
+	dbctl options`,
+		Run: func(cmd *cobra.Command, args []string) {
+			_ = cmd.Usage()
+		},
 	}
+
+	cmd.SetOut(out)
+	cmd.SetErr(out)
+
+	templates.UseOptionsTemplates(cmd)
+	return cmd
 }

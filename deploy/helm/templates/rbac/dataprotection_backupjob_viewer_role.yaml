@@ -3,6 +3,8 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: {{ include "opendbaas-core.fullname" . }}-backupjob-viewer-role
+  labels:
+    {{- include "opendbaas-core.labels" . | nindent 4 }}
 rules:
 - apiGroups:
   - dataprotection.infracreate.com

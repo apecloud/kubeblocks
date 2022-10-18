@@ -42,7 +42,7 @@ ENABLE_WEBHOOKS ?= false
 APP_NAME = kubeblock
 
 
-VERSION ?= 0.1.1-alpha.1
+VERSION ?= 0.1.0-alpha.6
 CHART_PATH = deploy/helm
 
 
@@ -285,26 +285,27 @@ run-delve: manifests generate fmt vet  ## Run Delve debugger.
 	dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./bin/manager
 
 
-##@ Agamotto MySQL Exporter First
+##@ Agamotto
+
 AGAMOTTO_LD_FLAGS = "-s -w \
     -X github.com/prometheus/common/version.Version=$(VERSION) \
     -X github.com/prometheus/common/version.Revision=$(GIT_COMMIT) \
     -X github.com/prometheus/common/version.BuildUser=apecloud \
     -X github.com/prometheus/common/version.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
 
-bin/mysqld_exporter.%: ## Cross build bin/mysqld_exporter.$(OS).$(ARCH) .
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${AGAMOTTO_LD_FLAGS} -o $@ ./cmd/agamotto/mysqld_exporter.go
+bin/agamotto.%: ## Cross build bin/agamotto.$(OS).$(ARCH) .
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${AGAMOTTO_LD_FLAGS} -o $@ ./cmd/agamotto/main.go
 
 .PHONY: agamotto
 agamotto: OS=$(shell $(GO) env GOOS)
 agamotto: ARCH=$(shell $(GO) env GOARCH)
 agamotto: build-checks ## Build agamotto related binaries
-	$(MAKE) bin/mysqld_exporter.${OS}.${ARCH}
-	mv bin/mysqld_exporter.${OS}.${ARCH} bin/mysqld_exporter
+	$(MAKE) bin/agamotto.${OS}.${ARCH}
+	mv bin/agamotto.${OS}.${ARCH} bin/agamotto
 
 .PHONY: clean
 clean-agamotto: ## Clean bin/mysqld_exporter.
-	rm -f bin/mysqld_exporter
+	rm -f bin/agamotto
 
 
 ##@ Deployment

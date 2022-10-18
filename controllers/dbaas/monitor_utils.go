@@ -17,12 +17,14 @@ limitations under the License.
 package dbaas
 
 import (
+	"embed"
 	"encoding/json"
 
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
-
 	"github.com/leaanthony/debme"
+	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
@@ -47,6 +49,8 @@ var (
 	WellKnownCharacterTypeFunc = map[string]func(cluster *dbaasv1alpha1.Cluster, component *Component) error{
 		KMysql: setMysqlComponent,
 	}
+	//go:embed cue/*
+	CueTemplates embed.FS
 )
 
 // ===================================
@@ -54,12 +58,14 @@ var (
 // ===================================
 
 type MysqlMonitor struct {
-	SecretName   string `json:"secretName,omitempty"`
-	InternalPort int    `json:"internalPort,omitempty"`
+	SecretName      string `json:"secretName"`
+	InternalPort    int    `json:"internalPort"`
+	Image           string `json:"image"`
+	ImagePullPolicy string `json:"imagePullPolicy"`
 }
 
 func buildMysqlContainer(key string, monitor *MysqlMonitor) (*corev1.Container, error) {
-	cueFS, _ := debme.FS(controllerutil.CueTemplates, "cue/monitor")
+	cueFS, _ := debme.FS(CueTemplates, "cue/monitor")
 
 	cueTpl, err := controllerutil.GetCacheCUETplValue("mysql_template.cue", func() (*controllerutil.CUETpl, error) {
 		return controllerutil.NewCUETplFromBytes(cueFS.ReadFile("mysql_template.cue"))
@@ -92,9 +98,14 @@ func buildMysqlContainer(key string, monitor *MysqlMonitor) (*corev1.Container, 
 }
 
 func setMysqlComponent(cluster *dbaasv1alpha1.Cluster, component *Component) error {
+	image := viper.GetString("AGAMOTTO_IMAGE")
+	imagePullPolicy := viper.GetString("AGAMOTTO_IMAGE_PULL_POLICY")
+
 	mysqlMonitor := &MysqlMonitor{
-		SecretName:   cluster.Name,
-		InternalPort: 9104,
+		SecretName:      cluster.Name,
+		InternalPort:    9104,
+		Image:           image,
+		ImagePullPolicy: imagePullPolicy,
 	}
 
 	container, err := buildMysqlContainer(cluster.Name, mysqlMonitor)

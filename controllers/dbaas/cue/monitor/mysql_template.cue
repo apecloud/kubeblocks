@@ -1,13 +1,15 @@
 monitor: {
 	secretName:   string
 	internalPort: int
+	image: string
+	imagePullPolicy: string
 }
 
 container: {
 	"name":            "inject-mysql-exporter"
-	"imagePullPolicy": "IfNotPresent"
-	"image":           "infracreate/kubeblock:0.1.1-alpha.1"
-	"command": ["/bin/mysqld_exporter"]
+	"imagePullPolicy": "\(monitor.imagePullPolicy)"
+	"image":           "\(monitor.image)"
+	"command": ["/bin/agamotto"]
 	"env": [
 		{
 			"name": "MYSQL_USER"

@@ -99,9 +99,10 @@ spec:
                 items:
                   properties:
                     characterType:
-                      description: Wellknown database component name, such as mongos(mongodb),
-                        proxy(redis), wesql(mysql) DBaas will generate proper monitor
-                        configs for wellknown CharacterType when BuiltIn is true.
+                      description: CharacterType defines well-known database component
+                        name, such as mongos(mongodb), proxy(redis), wesql(mysql)
+                        DBaas will generate proper monitor configs for wellknown CharacterType
+                        when BuiltIn is true.
                       type: string
                     configTemplateRefs:
                       description: The configTemplateRefs field provided by ISV, and
@@ -142,26 +143,26 @@ spec:
                       properties:
                         builtIn:
                           default: true
-                          description: Switch to enable DBaas builtIn monitoring.
-                            If BuiltIn is true and CharacterType is wellknown, ExporterConfig
-                            and Sidecar container will generate automatically. Otherwise,
-                            ISV should set BuiltIn to false and provide ExporterConfig
-                            and Sidecar container own.
+                          description: BuiltIn is a switch to enable DBaas builtIn
+                            monitoring. If BuiltIn is true and CharacterType is wellknown,
+                            ExporterConfig and Sidecar container will generate automatically.
+                            Otherwise, ISV should set BuiltIn to false and provide
+                            ExporterConfig and Sidecar container own.
                           type: boolean
                         exporterConfig:
-                          description: ExporterConfig provided by ISV, which specify
-                            necessary information to Time Series Database. ExporterConfig
-                            is valid when BuiltIn is false.
+                          description: Exporter provided by ISV, which specify necessary
+                            information to Time Series Database. ExporterConfig is
+                            valid when BuiltIn is false.
                           properties:
                             scrapePath:
                               default: /metrics
-                              description: Exporter url path for Time Series Database
-                                to scrape metrics
+                              description: ScrapePath is exporter url path for Time
+                                Series Database to scrape metrics
                               maxLength: 128
                               type: string
                             scrapePort:
-                              description: Exporter port for Time Series Database
-                                to scrape metrics
+                              description: ScrapePort is exporter port for Time Series
+                                Database to scrape metrics
                               maximum: 65536
                               minimum: 1
                               type: integer

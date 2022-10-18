@@ -17,15 +17,12 @@ limitations under the License.
 package controllerutil
 
 import (
-	"embed"
 	"sync"
 )
 
 // global cache, assure goroutines safe, eventual consistency
 var (
 	cacheCtx = sync.Map{}
-	//go:embed cue/*
-	CueTemplates embed.FS
 )
 
 // GetCacheBytesValue Get bytes from cache

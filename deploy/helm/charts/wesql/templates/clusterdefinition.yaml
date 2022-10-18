@@ -11,16 +11,9 @@ spec:
     password: {{ .Values.auth.rootPassword }}
   components:
   - typeName: replicasets
-    {{- if .Values.monitor.builtIn }}
     characterType: mysql
-    {{- end }}
     monitor:
-      builtIn: {{.Values.monitor.builtIn}}
-      {{- if not .Values.monitor.builtIn }}
-      exporterConfig:
-        scrapePort: {{ .Values.monitor.internalPort }}
-        scrapePath: /metrics
-      {{- end }}
+      builtIn: true
     configTemplateRefs:
     - name: mysql-3node-tpl-8.0
       volumeName: mysql-config
@@ -97,51 +90,6 @@ spec:
           mkdir -p /data/mysql/data;
           chmod +777 -R /data/mysql;
           docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$cluster_info" --cluster-id=$CLUSTER_ID
-      {{- if not .Values.monitor.builtIn }}
-      - name: {{ default .Values.monitor.name "mysql-exporter" }}
-        {{- if or .Values.monitor.config .Values.monitor.collectors }}
-        args:
-        {{- if .Values.monitor.config.logLevel }}
-          - "--log.level={{ .Values.monitor.config.logLevel }}"
-        {{- end}}
-        {{- if .Values.monitor.config.logFormat }}
-          - "--log.format={{ .Values.monitor.config.logFormat }}"
-        {{- end}}
-        {{- with .Values.monitor.collectors }}
-        {{- range $index, $element := . }}
-        {{- if and (typeIs "bool" $element) $element }}
-          - "--collect.{{ $index }}"
-        {{- else if and (typeIs "bool" $element) (not $element) }}
-          - "--no-collect.{{ $index }}"
-        {{- else }}
-          - "--collect.{{ $index }}"
-          - {{ $element | quote }}
-        {{- end }}
-        {{- end }}
-        {{- end }}
-        {{- end }}
-        env:
-          - name: MYSQL_ROOT_USER
-            value: {{ .Values.auth.rootUser | default "root" | quote }}
-          - name: MYSQL_ROOT_PASSWORD
-            value: {{ .Values.auth.rootPassword | quote }}
-          - name: DATA_SOURCE_NAME
-            value: "$(MYSQL_ROOT_USER):$(MYSQL_ROOT_PASSWORD)@(localhost:3306)/"
-        ports:
-          - containerPort: {{ .Values.monitor.internalPort }}
-            protocol: TCP
-            name: scrape
-        livenessProbe:
-          httpGet:
-            path: /
-            port: {{ .Values.monitor.internalPort }}
-        readinessProbe:
-          httpGet:
-            path: /
-            port: {{ .Values.monitor.internalPort }}
-        resources:
-          { }
-      {{- end }}
   roleGroupTemplates:
     - typeName: primary
       defaultReplicas: {{ .Values.cluster.replicaSetCount | default 3 }}

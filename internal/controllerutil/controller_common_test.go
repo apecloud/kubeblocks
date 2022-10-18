@@ -313,7 +313,7 @@ var _ = Describe("Cluster Controller", func() {
 				obj.Data = map[string]string{
 					"phase": "deleting",
 				}
-				k8sClient.Update(ctx, obj)
+				_ = k8sClient.Update(ctx, obj)
 			}
 			_, _ = ValidateReferenceCR(reqCtx, k8sClient, obj, referencedLabelKey, statusHandler, &corev1.ConfigMapList{})
 			newObj := &corev1.ConfigMap{}

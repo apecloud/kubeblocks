@@ -137,6 +137,14 @@ type ClusterComponent struct {
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
+	// Monitor which is a switch to enable monitoring, default is false
+	// DBaas provides an extension mechanism to support component level monitoring,
+	// which will scrape metrics auto or manually from servers in component and export
+	// metrics to Time Series Database.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=false
+	Monitor bool `json:"monitor"`
+
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 

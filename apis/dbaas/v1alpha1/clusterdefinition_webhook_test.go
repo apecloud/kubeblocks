@@ -17,11 +17,13 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("clusterDefinition webhook", func() {
@@ -35,6 +37,11 @@ var _ = Describe("clusterDefinition webhook", func() {
 			By("By creating a new clusterDefinition")
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
 			Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
+			// wait until ClusterDefinition created
+			Eventually(func() bool {
+				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)
+				return err == nil
+			}, 10, 1).Should(BeTrue())
 
 			By("By creating a new clusterDefinition with componentType==Consensus but consensusSpec not present")
 			clusterDef, _ = createTestClusterDefinitionObj2(clusterDefinitionName2)

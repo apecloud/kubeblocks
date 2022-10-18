@@ -91,10 +91,43 @@ type ConfigTemplate struct {
 	VolumeName string `json:"volumeName,omitempty"`
 }
 
+type ExporterConfig struct {
+	// ScrapePort is exporter port for Time Series Database to scrape metrics
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Maximum=65536
+	// +kubebuilder:validation:Minimum=1
+	ScrapePort int `json:"scrapePort"`
+
+	// ScrapePath is exporter url path for Time Series Database to scrape metrics
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=128
+	// +kubebuilder:default="/metrics"
+	ScrapePath string `json:"scrapePath"`
+}
+
+type MonitorConfig struct {
+	// BuiltIn is a switch to enable DBaas builtIn monitoring.
+	// If BuiltIn is true and CharacterType is wellknown, ExporterConfig and Sidecar container will generate automatically.
+	// Otherwise, ISV should set BuiltIn to false and provide ExporterConfig and Sidecar container own.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=true
+	BuiltIn bool `json:"builtIn"`
+
+	// Exporter provided by ISV, which specify necessary information to Time Series Database.
+	// ExporterConfig is valid when BuiltIn is false.
+	// +optional
+	Exporter *ExporterConfig `json:"exporterConfig,omitempty"`
+}
+
 type ClusterDefinitionComponent struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
 	TypeName string `json:"typeName,omitempty"`
+
+	// CharacterType defines well-known database component name, such as mongos(mongodb), proxy(redis), wesql(mysql)
+	// DBaas will generate proper monitor configs for wellknown CharacterType when BuiltIn is true.
+	// +optional
+	CharacterType string `json:"characterType,omitempty"`
 
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
@@ -115,6 +148,10 @@ type ClusterDefinitionComponent struct {
 	// antiAffinity defines components should have anti-affinity constraint to same component type
 	// +kubebuilder:default=false
 	AntiAffinity bool `json:"antiAffinity,omitempty"`
+
+	// Monitor is monitoring config which provided by ISV
+	// +optional
+	Monitor *MonitorConfig `json:"monitor,omitempty"`
 
 	// podSpec of final workload
 	// +optional

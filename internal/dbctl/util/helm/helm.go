@@ -18,15 +18,14 @@ package helm
 
 import (
 	"context"
+	"fmt"
 	"io"
-	"math/rand"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
 
-	"github.com/briandowns/spinner"
 	"github.com/containers/common/pkg/retry"
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
@@ -43,6 +42,7 @@ import (
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
 
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
@@ -115,7 +115,6 @@ func AddRepo(r *repo.Entry) error {
 	if err := f.WriteFile(repoFile, 0644); err != nil {
 		return err
 	}
-	util.Infof("%s has been added to your repositories\n", r.Name)
 	return nil
 }
 
@@ -139,7 +138,6 @@ func RemoveRepo(r *repo.Entry) error {
 			return err
 		}
 	}
-	util.Infof("%s has been remove to your repositories\n", r.Name)
 	return nil
 }
 
@@ -151,7 +149,6 @@ func (i *InstallOpts) getInstalled(cfg *action.Configuration) (*release.Release,
 		if strings.Contains(err.Error(), "release: not found") {
 			return nil, nil
 		}
-		util.Infof("Failed check %s installed\n", i.Name)
 		return nil, err
 	}
 	return res, nil
@@ -164,6 +161,8 @@ func (i *InstallOpts) Install(cfg *action.Configuration) error {
 		MaxRetry: 1 + i.TryTimes,
 	}
 
+	spinner := util.Spinner(os.Stdout, "Install %s ...", i.Chart)
+	defer spinner(false)
 	if err := retry.IfNecessary(ctx, func() error {
 		if err := i.tryInstall(cfg); err != nil {
 			return err
@@ -173,18 +172,11 @@ func (i *InstallOpts) Install(cfg *action.Configuration) error {
 		return errors.Errorf("Install chart %s error: %s", i.Name, err.Error())
 	}
 
+	spinner(true)
 	return nil
 }
 
 func (i *InstallOpts) tryInstall(cfg *action.Configuration) error {
-	util.InfoP(1, "Install "+i.Chart+"...")
-	s := spinner.New(spinner.CharSets[rand.Intn(44)], 100*time.Millisecond)
-	if err := s.Color("green"); err != nil {
-		return err
-	}
-	s.Start()
-	defer s.Stop()
-
 	res, _ := i.getInstalled(cfg)
 	if res != nil {
 		return nil
@@ -244,7 +236,7 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) error {
 	signal.Notify(cSignal, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-cSignal
-		util.Infof("Install has been cancelled.\n")
+		fmt.Println("Install has been cancelled")
 		cancel()
 	}()
 
@@ -262,6 +254,8 @@ func (i *InstallOpts) UnInstall(cfg *action.Configuration) error {
 		MaxRetry: 1 + i.TryTimes,
 	}
 
+	spinner := util.Spinner(os.Stdout, "Uninstall %s ...", i.Name)
+	defer spinner(false)
 	if err := retry.IfNecessary(ctx, func() error {
 		if err := i.tryUnInstall(cfg); err != nil {
 			return err
@@ -271,18 +265,11 @@ func (i *InstallOpts) UnInstall(cfg *action.Configuration) error {
 		return errors.Errorf("UnInstall chart %s error: %s", i.Name, err.Error())
 	}
 
+	spinner(true)
 	return nil
 }
 
 func (i *InstallOpts) tryUnInstall(cfg *action.Configuration) error {
-	util.InfoP(1, "uninstall "+i.Name+"...")
-	s := spinner.New(spinner.CharSets[rand.Intn(44)], 100*time.Millisecond)
-	if err := s.Color("green"); err != nil {
-		return err
-	}
-	s.Start()
-	defer s.Stop()
-
 	err := i.tryLogin(cfg)
 	if err != nil {
 		return err
@@ -303,7 +290,7 @@ func (i *InstallOpts) tryUnInstall(cfg *action.Configuration) error {
 	signal.Notify(cSignal, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-cSignal
-		util.Infof("Install has been cancelled.\n")
+		fmt.Println("Install has been cancelled")
 		cancel()
 	}()
 
@@ -359,5 +346,21 @@ func FakeActionConfig() *action.Configuration {
 		RegistryClient: registryClient,
 		Log: func(format string, v ...interface{}) {
 		},
+	}
+}
+
+func KubeBlocksHelmChart(version string, ns string) *InstallOpts {
+	return &InstallOpts{
+		Name:      types.DbaasHelmName,
+		Chart:     types.DbaasHelmChart,
+		Wait:      true,
+		Version:   version,
+		Namespace: ns,
+		Sets: []string{
+			"image.tag=latest",
+			"image.pullPolicy=Always",
+		},
+		Login:    true,
+		TryTimes: 2,
 	}
 }

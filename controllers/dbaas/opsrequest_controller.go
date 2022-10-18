@@ -89,6 +89,11 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return r.handleSucceedOpsRequest(reqCtx, opsRequest)
 	}
 
+	// patch cluster label to OpsRequest
+	if err = r.patchOpsRequestWithClusterLabel(reqCtx, opsRequest); res != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
 	// get cluster object and set it to OpsResource.Cluster
 	if err = r.setClusterToOpsResource(opsRes); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -100,11 +105,6 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "checkOpsIsCompleted")
 		}
 		return intctrlutil.Reconciled()
-	}
-
-	// patch cluster label to OpsRequest
-	if err = r.patchOpsRequestWithClusterLabel(reqCtx, opsRequest); res != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
 	if err = r.setOwnerReferenceWithCluster(ctx, opsRes); err != nil {

@@ -50,6 +50,7 @@ spec:
               components:
                 items:
                   properties:
+<<<<<<< HEAD
                     antiAffinity:
                       default: false
                       description: antiAffinity defines components should have anti-affinity
@@ -62,6 +63,13 @@ spec:
                       - Stateless
                       - Stateful
                       - Consensus
+=======
+                    characterType:
+                      description: CharacterType defines well-known database component
+                        name, such as mongos(mongodb), proxy(redis), wesql(mysql)
+                        DBaas will generate proper monitor configs for wellknown CharacterType
+                        when BuiltIn is true.
+>>>>>>> main
                       type: string
                     configTemplateRefs:
                       description: The configTemplateRefs field provided by ISV, and
@@ -200,6 +208,42 @@ spec:
                       default: 0
                       minimum: 0
                       type: integer
+                    monitor:
+                      description: Monitor is monitoring config which provided by
+                        ISV
+                      properties:
+                        builtIn:
+                          default: true
+                          description: BuiltIn is a switch to enable DBaas builtIn
+                            monitoring. If BuiltIn is true and CharacterType is wellknown,
+                            ExporterConfig and Sidecar container will generate automatically.
+                            Otherwise, ISV should set BuiltIn to false and provide
+                            ExporterConfig and Sidecar container own.
+                          type: boolean
+                        exporterConfig:
+                          description: Exporter provided by ISV, which specify necessary
+                            information to Time Series Database. ExporterConfig is
+                            valid when BuiltIn is false.
+                          properties:
+                            scrapePath:
+                              default: /metrics
+                              description: ScrapePath is exporter url path for Time
+                                Series Database to scrape metrics
+                              maxLength: 128
+                              type: string
+                            scrapePort:
+                              description: ScrapePort is exporter port for Time Series
+                                Database to scrape metrics
+                              maximum: 65536
+                              minimum: 1
+                              type: integer
+                          required:
+                          - scrapePath
+                          - scrapePort
+                          type: object
+                      required:
+                      - builtIn
+                      type: object
                     podSpec:
                       description: podSpec of final workload
                       properties:

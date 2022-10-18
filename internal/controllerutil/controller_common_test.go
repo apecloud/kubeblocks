@@ -30,7 +30,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -310,20 +309,11 @@ var _ = Describe("Cluster Controller", func() {
 			obj, key := createObj()
 			_ = createReferencedConfigMap(key.Name)
 			recordEvent := func() {
-				// mock record event
-				fmt.Println("mock custom send event ")
+				// mock record
+				fmt.Println("mock send event ")
 			}
-			_, _ = ValidateReferenceCR(reqCtx, k8sClient, obj, referencedLabelKey, recordEvent, &corev1.ConfigMapList{})
-			newObj := &corev1.ConfigMap{}
-			Eventually(func() bool {
-				if err := k8sClient.Get(ctx, types.NamespacedName{
-					Namespace: obj.Namespace,
-					Name:      obj.Name,
-				}, newObj); err != nil {
-					return false
-				}
-				return newObj.Data["phase"] == "deleting"
-			}, time.Second*10, time.Second*1).Should(BeTrue())
+			_, err := ValidateReferenceCR(reqCtx, k8sClient, obj, referencedLabelKey, recordEvent, &corev1.ConfigMapList{})
+			Expect(err == nil)
 		})
 	})
 })

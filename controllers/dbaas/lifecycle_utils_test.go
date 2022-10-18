@@ -55,7 +55,7 @@ func TestReadCUETplFromEmbeddedFS(t *testing.T) {
 	tlog.Info("", "cueValue", cueTpl)
 }
 
-var _ = Describe("create", func() {
+var _ = Describe("lifecycle_utils", func() {
 	Context("mergeMonitorConfig", func() {
 		var component *Component
 		var cluster *dbaasv1alpha1.Cluster
@@ -175,13 +175,10 @@ var _ = Describe("create", func() {
 			Expect(strings.HasPrefix(component.PodSpec.Containers[0].Name, "inject-")).To(BeTrue())
 		})
 	})
-})
 
-var _ = Describe("lifecycle_utils", func() {
-	var sts appsv1.StatefulSet
-	var volumes map[string]dbaasv1alpha1.ConfigTemplate
-
-	Context("TestCheckAndUpdatePodVolumes", func() {
+	Context("checkAndUpdatePodVolumes", func() {
+		var sts appsv1.StatefulSet
+		var volumes map[string]dbaasv1alpha1.ConfigTemplate
 		BeforeEach(func() {
 			sts = appsv1.StatefulSet{
 				Spec: appsv1.StatefulSetSpec{

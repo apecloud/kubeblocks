@@ -39,8 +39,12 @@ type AppVersionStatus struct {
 	// phase - in list of [Available,UnAvailable,Deleting]
 	// +kubebuilder:validation:Enum={Available,UnAvailable,Deleting}
 	Phase Phase `json:"phase,omitempty"`
+
+	// A human readable message indicating details about why the appVersion is in this
+	// phase.
 	// +optional
 	Message string `json:"message,omitempty"`
+
 	// generation number
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
@@ -72,25 +76,26 @@ type AppVersionList struct {
 	Items           []AppVersion `json:"items"`
 }
 
+// AppVersionComponent is an application version component spec.
 type AppVersionComponent struct {
-	// component type in ClusterDefinition
+	// Type is a component type in ClusterDefinition.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
 	Type string `json:"type"`
 
-	// DBaas provides a configuration extension mechanism to handle configuration differences between versions,
+	// ConfigTemplateRefs defines a configuration extension mechanism to handle configuration differences between versions,
 	// the configTemplateRefs field, together with configTemplateRefs in the ClusterDefinition,
 	// determines the final configuration file
 	// +optional
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
 
-	// if not nil, will replace ClusterDefinitionSpec.PodSpec in ClusterDefinition
+	// PodSpec is pod spec, if not nil, will replace ClusterDefinitionSpec.PodSpec in ClusterDefinition
 	// +optional
-	PodSpec corev1.PodSpec `json:"podSpec,omitempty"`
+	PodSpec *corev1.PodSpec `json:"podSpec,omitempty"`
 
-	// if not nil, will replace ClusterDefinitionSpec.Serivce in ClusterDefinition
+	// Service is service spec, if not nil, will replace ClusterDefinitionSpec.Service in ClusterDefinition spec.
 	// +optional
-	Service corev1.ServiceSpec `json:"service,omitempty"`
+	Service *corev1.ServiceSpec `json:"service,omitempty"`
 }
 
 func init() {

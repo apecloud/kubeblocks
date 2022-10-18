@@ -38,15 +38,17 @@ const (
 
 type CreateOptions struct {
 	// ClusterDefRef reference clusterDefinition
-	ClusterDefRef     string                   `json:"clusterDefRef"`
-	AppVersionRef     string                   `json:"appVersionRef"`
-	TerminationPolicy string                   `json:"terminationPolicy"`
-	PodAntiAffinity   string                   `json:"podAntiAffinity"`
-	TopologyKeys      []string                 `json:"topologyKeys,omitempty"`
-	NodeLabels        map[string]string        `json:"nodeLabels,omitempty"`
-	Components        []map[string]interface{} `json:"components"`
+	ClusterDefRef     string `json:"clusterDefRef"`
+	AppVersionRef     string `json:"appVersionRef"`
+	TerminationPolicy string `json:"terminationPolicy"`
+	PodAntiAffinity   string `json:"podAntiAffinity"`
+	// TopologyKeys if TopologyKeys is nil, add omitempty json tag.
+	// because CueLang can not covert null to list.
+	TopologyKeys []string                 `json:"topologyKeys,omitempty"`
+	NodeLabels   map[string]string        `json:"nodeLabels,omitempty"`
+	Components   []map[string]interface{} `json:"components"`
 	// ComponentsFilePath components file path
-	ComponentsFilePath string
+	ComponentsFilePath string `json:"-"`
 	create.BaseOptions
 }
 

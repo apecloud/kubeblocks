@@ -19,10 +19,9 @@ package create
 import (
 	"net/http"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -30,6 +29,8 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
 var _ = Describe("Create", func() {
@@ -52,7 +53,6 @@ var _ = Describe("Create", func() {
 			tf.ClientConfigVal = cfg
 			baseOptions := BaseOptions{
 				Name:      "test",
-				Namespace: "default",
 				IOStreams: streams,
 			}
 			clusterOptions := map[string]interface{}{
@@ -75,6 +75,9 @@ var _ = Describe("Create", func() {
 				},
 				Complete: func() error {
 					return nil
+				},
+				BuildFlags: func(cmd *cobra.Command) {
+					cmd.Flags().StringVar(&baseOptions.Namespace, "namespace", "", "ClusterDefinition reference")
 				},
 			}
 			BuildCommand(inputs)

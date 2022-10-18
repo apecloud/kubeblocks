@@ -58,19 +58,14 @@ var _ = Describe("create", func() {
 			expectComponents = generateComponents(component, 3)
 		})
 
-		It("default monitor param", func() {
-			setMonitor("", actualComponents)
-			expectEqual(actualComponents, actualComponents)
-		})
-
-		It("wrong monitor param", func() {
-			setMonitor("abc", actualComponents)
-			expectEqual(actualComponents, actualComponents)
-		})
-
 		It("set monitor param to false", func() {
-			setMonitor("false", actualComponents)
+			setMonitor(false, actualComponents)
 			expectEqual(expectComponents, actualComponents)
+		})
+
+		It("set monitor param to true", func() {
+			setMonitor(true, actualComponents)
+			expectEqual(actualComponents, actualComponents)
 		})
 	})
 })

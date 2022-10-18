@@ -67,17 +67,13 @@ type MysqlMonitor struct {
 func buildMysqlContainer(key string, monitor *MysqlMonitor) (*corev1.Container, error) {
 	cueFS, _ := debme.FS(CueTemplates, "cue/monitor")
 
-	cueTpl, err := controllerutil.GetCacheCUETplValue("mysql_template.cue", func() (*controllerutil.CUETpl, error) {
-		return controllerutil.NewCUETplFromBytes(cueFS.ReadFile("mysql_template.cue"))
-	})
+	cueTpl, err := controllerutil.NewCUETplFromBytes(cueFS.ReadFile("mysql_template.cue"))
 	if err != nil {
 		return nil, err
 	}
 	cueValue := controllerutil.NewCUEBuilder(*cueTpl)
 
-	mysqlMonitorStrByte, err := controllerutil.GetCacheBytesValue(key, func() ([]byte, error) {
-		return json.Marshal(monitor)
-	})
+	mysqlMonitorStrByte, err := json.Marshal(monitor)
 	if err != nil {
 		return nil, err
 	}

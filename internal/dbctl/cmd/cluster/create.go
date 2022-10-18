@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
@@ -44,7 +43,7 @@ type CreateOptions struct {
 	AppVersionRef     string `json:"appVersionRef"`
 	TerminationPolicy string `json:"terminationPolicy"`
 	PodAntiAffinity   string `json:"podAntiAffinity"`
-	Monitor           string `json:"monitor"`
+	Monitor           bool   `json:"monitor"`
 	// TopologyKeys if TopologyKeys is nil, add omitempty json tag.
 	// because CueLang can not covert null to list.
 	TopologyKeys []string                 `json:"topologyKeys,omitempty"`
@@ -55,14 +54,13 @@ type CreateOptions struct {
 	create.BaseOptions
 }
 
-func setMonitor(monitor string, components []map[string]interface{}) {
-	enable, err := strconv.ParseBool(monitor)
-	if err != nil {
+func setMonitor(monitor bool, components []map[string]interface{}) {
+	if components == nil {
 		return
 	}
 	for _, component := range components {
 		if _, ok := component[monitorKey]; ok {
-			component[monitorKey] = enable
+			component[monitorKey] = monitor
 		}
 	}
 }
@@ -91,10 +89,6 @@ func (o *CreateOptions) Complete() error {
 			return err
 		}
 	}
-	if len(o.Monitor) == 0 || len(components) == 0 {
-		o.Components = components
-		return nil
-	}
 	setMonitor(o.Monitor, components)
 	o.Components = components
 	return nil
@@ -117,7 +111,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 			cmd.Flags().StringVar(&o.AppVersionRef, "app-version", defaultAppVersion, "AppVersion reference")
 			cmd.Flags().StringVar(&o.TerminationPolicy, "termination-policy", "Halt", "Termination policy")
 			cmd.Flags().StringVar(&o.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type")
-			cmd.Flags().StringVar(&o.Monitor, "monitor", "", "[true|false], override default monitor config if provided")
+			cmd.Flags().BoolVar(&o.Monitor, "monitor", false, "[true|false], set monitor config")
 			cmd.Flags().StringArrayVar(&o.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
 			cmd.Flags().StringToStringVar(&o.NodeLabels, "node-labels", nil, "Node label selector")
 			cmd.Flags().StringVar(&o.ComponentsFilePath, "components", "", "Use yaml file to specify the cluster components")

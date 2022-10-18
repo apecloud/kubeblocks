@@ -1126,7 +1126,6 @@ func buildCfg(params createParams, sts *appsv1.StatefulSet, ctx context.Context,
 		}
 		configs = append(configs, configmap)
 	}
-
 	// Generate Pod Volumes for ConfigMap objects
 	return configs, checkAndUpdatePodVolumes(sts, volumes)
 }
@@ -1145,7 +1144,6 @@ func checkAndUpdatePodVolumes(sts *appsv1.StatefulSet, volumes map[string]dbaasv
 			configMapVolume.Name = cmName
 			continue
 		}
-
 		// Add New ConfigMap Volume
 		podVolumes = append(podVolumes, corev1.Volume{
 			Name: tpl.VolumeName,
@@ -1156,7 +1154,6 @@ func checkAndUpdatePodVolumes(sts *appsv1.StatefulSet, volumes map[string]dbaasv
 			},
 		})
 	}
-
 	// Update PodTemplate Volumes
 	sts.Spec.Template.Spec.Volumes = append(sts.Spec.Template.Spec.Volumes, podVolumes...)
 	return nil

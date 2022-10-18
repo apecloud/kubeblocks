@@ -44,7 +44,7 @@ type CreateOptions struct {
 	AppVersionRef     string `json:"appVersionRef"`
 	TerminationPolicy string `json:"terminationPolicy"`
 	PodAntiAffinity   string `json:"podAntiAffinity"`
-	Monitor           string                   `json:"monitor"`
+	Monitor           string `json:"monitor"`
 	// TopologyKeys if TopologyKeys is nil, add omitempty json tag.
 	// because CueLang can not covert null to list.
 	TopologyKeys []string                 `json:"topologyKeys,omitempty"`

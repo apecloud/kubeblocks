@@ -58,6 +58,10 @@ const (
 	// ResourceClusters clusters resource
 	ResourceClusters = "clusters"
 
+	ResourceClusterDefinitions = "clusterdefinitions"
+
+	ResourceAppVersions = "appversions"
+
 	// ResourceOpsRequest opsrequests resource
 	ResourceOpsRequest = "opsrequests"
 

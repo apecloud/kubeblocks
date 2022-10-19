@@ -18,9 +18,10 @@ package dbaas
 
 import (
 	"context"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"path/filepath"
 	"testing"
+
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 

@@ -20,9 +20,8 @@ probeContainer: {
     imagePullPolicy: "IfNotPresent"
     name: "string"
     readinessProbe: {
-        httpGet: {
-            path: "/"
-            port: 8088
+        exec: {
+            command: []
         }
     }
 }

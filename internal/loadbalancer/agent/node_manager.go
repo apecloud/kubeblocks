@@ -118,7 +118,7 @@ func (nm *nodeManager) refreshNodes() error {
 			continue
 		}
 		if err != ErrNodeNotFound {
-			nm.logger.Error(err, "")
+			nm.logger.Error(err, "Failed to find node", "ip", nodeIP)
 			continue
 		}
 		cachedNode, err = nm.initNode(nodeIP)
@@ -139,6 +139,7 @@ func (nm *nodeManager) refreshNodes() error {
 		}
 		cachedNode.Stop()
 		nm.RemoveNode(cachedNode.GetIP())
+		nm.logger.Info("Successfully removed node", "ip", cachedNode.GetIP())
 	}
 	return nil
 }

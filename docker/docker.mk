@@ -110,12 +110,16 @@ endif
 .PHONY: push-loadbalancer-image
 push-loadbalancer-image: test ## Push docker image with the loadbalancer.
 ifneq ($(BUILDX_ENABLED), true)
-	docker build $(DOCKERFILE_DIR)/. -t ${LB_IMG}:${LB_TAG} -t ${LB_IMG}:latest -f Dockerfile.loadbalancer
+ifeq ($(TAG_LATEST), true)
+	docker push ${LB_IMG}:latest
+else
+	docker push ${LB_IMG}:${LB_TAG}
+endif
 else
 ifeq ($(TAG_LATEST), true)
 	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:latest -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer --push
 else
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:${LB_TAG} -f $(DOCKERFILE_DIR)//Dockerfile-loadbalancer --push
+	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:${LB_TAG} -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer --push
 endif
 endif
 

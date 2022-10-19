@@ -2,8 +2,9 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  creationTimestamp: null
   name: {{ include "loadbalancer.fullname" . }}-role
+  labels:
+    {{- include "loadbalancer.labels" . | nindent 4 }}
 rules:
   - apiGroups:
       - coordination.k8s.io

@@ -37,7 +37,8 @@ COPY internal/ internal/
 COPY controllers/ controllers/
 COPY version/ version/
 
-RUN wget -O grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.13/grpc_health_probe-linux-${TARGETARCH}
+RUN wget -O grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.13/grpc_health_probe-linux-${TARGETARCH} \
+    && chmod +x grpc_health_probe
 
 # Build
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o controller ./cmd/loadbalancer/controller \
@@ -50,6 +51,5 @@ COPY --from=builder /workspace/controller .
 COPY --from=builder /workspace/agent .
 COPY --from=builder /workspace/grpc_health_probe /bin/grpc_health_probe
 
-RUN chmod +x /bin/grpc_health_probe
 
 ENTRYPOINT ["/agent"]

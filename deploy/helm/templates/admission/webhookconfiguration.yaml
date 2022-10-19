@@ -108,27 +108,27 @@ webhooks:
   sideEffects: None
 - admissionReviewVersions:
   - v1
-  - v1beta1
   clientConfig:
     service:
       name: {{ include "opendbaas-core.svcName" . }}
       namespace: {{ .Release.Namespace }}
-      path: /mutate-v1-pod
+      path: /mutate-dbaas-infracreate-com-v1alpha1-opsrequest
       port: {{ .Values.service.port }}
-    {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
     caBundle: {{ $ca.Cert | b64enc }}
     {{- end }}
   failurePolicy: Fail
-  name: mpod.kb.io
+  name: mopsrequest.kb.io
   rules:
   - apiGroups:
-    - ""
+    - dbaas.infracreate.com
     apiVersions:
-    - v1
+    - v1alpha1
     operations:
     - CREATE
+    - UPDATE
     resources:
-    - pods
+    - opsrequests
   sideEffects: None
 ---
 apiVersion: admissionregistration.k8s.io/v1
@@ -207,5 +207,29 @@ webhooks:
     - UPDATE
     resources:
     - clusterdefinitions
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "opendbaas-core.svcName" . }}
+      namespace: {{ .Release.Namespace }}
+      path: /validate-dbaas-infracreate-com-v1alpha1-opsrequest
+      port: {{ .Values.service.port }}
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
+    caBundle: {{ $ca.Cert | b64enc }}
+    {{- end }}
+  failurePolicy: Fail
+  name: vopsrequest.kb.io
+  rules:
+  - apiGroups:
+    - dbaas.infracreate.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - opsrequests
   sideEffects: None
 {{- end }}

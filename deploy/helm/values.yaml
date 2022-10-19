@@ -1,11 +1,12 @@
-# Default values for opendbaas-core.
+# Default values for kubeblock
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# Enabled this if you wish to install controller deployment
 replicaCount: 1
 
 image:
-  repository: docker.io/infracreate/opendbaas-core
+  repository: docker.io/infracreate/kubeblock
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
@@ -107,3 +108,110 @@ monitor:
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
     tag: "0.1.0-alpha.6"
+
+wesql:
+  enabled: true
+
+dashboards:
+  ## If false, dashboards will not be installed
+  ##
+  enabled: false
+
+prometheus:
+  ## If false, prometheus sub-chart will not be installed
+  ##
+  enabled: false
+
+  alertmanager:
+    ## If false, alertmanager will not be installed
+    ##
+    enabled: true
+
+    persistentVolume:
+      ## If true, alertmanager will create/use a Persistent Volume Claim
+      ## If false, use emptyDir
+      ##
+      enabled: false
+
+      ## alertmanager data Persistent Volume size
+      ##
+      size: 2Gi
+
+  kubeStateMetrics:
+    ## If false, kube-state-metrics sub-chart will not be installed
+    ##
+    enabled: false
+
+  nodeExporter:
+    ## If false, node-exporter will not be installed
+    ##
+    enabled: false
+
+    podSecurityPolicy:
+      enabled: false
+
+  server:
+    ## Prometheus server container name
+    ##
+    enabled: true
+
+    global:
+      ## How frequently to scrape targets by default
+      ##
+      scrape_interval: 30s
+      ## How long until a scrape request times out
+      ##
+      scrape_timeout: 10s
+      ## How frequently to evaluate rules
+      ##
+      evaluation_interval: 30s
+
+    ## Prefix used to register routes, overriding externalUrl route.
+    ## Useful for proxies that rewrite URLs.
+    ##
+    routePrefix: /
+
+    persistentVolume:
+      ## If true, Prometheus server will create/use a Persistent Volume Claim
+      ## If false, use emptyDir
+      ##
+      enabled: false
+
+      ## Prometheus server data Persistent Volume size
+      ##
+      size: 8Gi
+
+  pushgateway:
+    ## If false, pushgateway will not be installed
+    ##
+    enabled: false
+
+grafana:
+  ## If false, grafana sub-chart will not be installed
+  ##
+  enabled: false
+
+  ## Timezone for the default dashboards
+  ## Other options are: browser or a specific timezone, i.e. Europe/Luxembourg
+  ##
+  defaultDashboardsTimezone:
+
+  adminUser: admin
+  adminPassword: abc
+
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+
+    datasources:
+      enabled: true
+      label: grafana_datasource
+      labelValue: "1"
+
+      defaultDatasourceEnabled: true
+      uid: prometheus
+
+  testFramework:
+    enabled: false

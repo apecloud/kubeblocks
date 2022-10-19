@@ -47,6 +47,12 @@ var _ = Describe("OpsRequest webhook", func() {
 		patch := client.MergeFrom(cluster.DeepCopy())
 		cluster.Status.Operations.Upgradable = true
 		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
+		// wait until patch succeed
+		Eventually(func() bool {
+			tmpCluster := &Cluster{}
+			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
+			return tmpCluster.Status.Operations.Upgradable
+		}, 10, 1).Should(BeTrue())
 
 		By("By testing when spec.clusterOps is null")
 		Expect(k8sClient.Create(ctx, opsRequest)).ShouldNot(Succeed())
@@ -82,6 +88,12 @@ var _ = Describe("OpsRequest webhook", func() {
 		patch := client.MergeFrom(cluster.DeepCopy())
 		cluster.Status.Operations.VerticalScalable = []string{"replicaSets"}
 		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
+		// wait until patch succeed
+		Eventually(func() bool {
+			tmpCluster := &Cluster{}
+			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
+			return len(cluster.Status.Operations.VerticalScalable) > 0
+		}, 10, 1).Should(BeTrue())
 
 		By("By testing verticalScaling opsRequest components is not consistent")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VerticalScalingType)
@@ -110,6 +122,12 @@ var _ = Describe("OpsRequest webhook", func() {
 			},
 		}
 		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
+		// wait until patch succeed
+		Eventually(func() bool {
+			tmpCluster := &Cluster{}
+			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
+			return len(cluster.Status.Operations.VolumeExpandable) > 0
+		}, 10, 1).Should(BeTrue())
 
 		By("By testing volumeExpansion volumeClaimTemplate name is not consistent")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VolumeExpansionType)
@@ -141,6 +159,12 @@ var _ = Describe("OpsRequest webhook", func() {
 			},
 		}
 		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
+		// wait until patch succeed
+		Eventually(func() bool {
+			tmpCluster := &Cluster{}
+			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
+			return len(cluster.Status.Operations.HorizontalScalable) > 0
+		}, 10, 1).Should(BeTrue())
 
 		By("By testing horizontalScaling replica is not in [min,max]")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
@@ -163,6 +187,12 @@ var _ = Describe("OpsRequest webhook", func() {
 		patch := client.MergeFrom(cluster.DeepCopy())
 		cluster.Status.Operations.Restartable = []string{"replicaSets"}
 		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
+		// wait until patch succeed
+		Eventually(func() bool {
+			tmpCluster := &Cluster{}
+			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
+			return len(cluster.Status.Operations.Restartable) > 0
+		}, 10, 1).Should(BeTrue())
 
 		By("By testing restart when componentNames is not correct")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, RestartType)

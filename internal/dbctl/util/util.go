@@ -29,14 +29,17 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"text/template"
+	"time"
 
+	"github.com/briandowns/spinner"
+	"github.com/fatih/color"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 
 	"golang.org/x/crypto/ssh"
 
-	l "github.com/k3d-io/k3d/v5/pkg/logger"
 	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
@@ -44,36 +47,13 @@ import (
 )
 
 var (
-	// Info print message
-	Info func(a ...interface{})
-	// Infof print message with format
-	Infof func(format string, a ...interface{})
-	// InfoP print message with padding
-	InfoP func(padding int, a ...interface{})
-	// Errf print error with format
-	Errf func(format string, a ...interface{})
-	// Debugf print error with format
-	Debugf func(format string, a ...interface{})
+	green = color.New(color.FgHiGreen, color.Bold).SprintFunc()
+	red   = color.New(color.FgHiRed, color.Bold).SprintFunc()
 )
 
 func init() {
-	Info = func(a ...interface{}) {
-		l.Log().Info(a...)
-	}
-	Infof = func(format string, a ...interface{}) {
-		l.Log().Infof(format, a...)
-	}
-	InfoP = func(padding int, a ...interface{}) {
-		l.Log().Infof(fmt.Sprintf("%*s %%v", padding, ""), a...)
-	}
-	Errf = func(format string, a ...interface{}) {
-		l.Log().Errorf(format, a...)
-	}
-	Debugf = func(format string, a ...interface{}) {
-		l.Log().Debugf(format, a...)
-	}
 	if _, err := GetCliHomeDir(); err != nil {
-		l.Log().Error("Failed to create dbctl home dir:", err)
+		fmt.Println("Failed to create dbctl home dir:", err)
 	}
 }
 
@@ -206,4 +186,39 @@ func PrintGoTemplate(wr io.Writer, tpl string, values interface{}) error {
 		return err
 	}
 	return nil
+}
+
+// SetKubeConfig set KUBECONFIG environment
+func SetKubeConfig(cfg string) error {
+	return os.Setenv("KUBECONFIG", cfg)
+}
+
+func Spinner(w io.Writer, fmtstr string, a ...any) func(result bool) {
+	msg := fmt.Sprintf(fmtstr, a...)
+	var once sync.Once
+	var s *spinner.Spinner
+
+	if runtime.GOOS == types.GoosWindows {
+		fmt.Fprintf(w, "%s\n", msg)
+		return func(result bool) {}
+	} else {
+		s = spinner.New(spinner.CharSets[11], 100*time.Millisecond)
+		s.Writer = w
+		_ = s.Color("cyan")
+		s.Suffix = fmt.Sprintf("  %s", msg)
+		s.Start()
+	}
+
+	return func(result bool) {
+		once.Do(func() {
+			if s != nil {
+				s.Stop()
+			}
+			if result {
+				fmt.Fprintf(w, "%s %s\n", msg, green("OK"))
+			} else {
+				fmt.Fprintf(w, "%s %s\n", msg, red("FAIL"))
+			}
+		})
+	}
 }

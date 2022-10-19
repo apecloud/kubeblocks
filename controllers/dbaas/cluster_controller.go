@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -40,6 +39,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/apecloud/kubeblocks/controllers/k8score"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -246,6 +247,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	setupConsensusRoleObserveFallbackMethod(mgr.GetClient())
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dbaasv1alpha1.Cluster{}).
 		//
@@ -439,8 +442,6 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 			v.Status.CurrentRevision != v.Status.UpdateRevision ||
 			v.Status.ObservedGeneration != v.GetGeneration() {
 			isOk = false
-		} else {
-			cluster.Status.Phase = dbaasv1alpha1.RunningPhase
 		}
 		// when component phase is changed, set needSyncStatusComponent to true, then patch cluster.status
 		if ok := r.patchStatusComponentsWithStatefulSet(cluster, &v, cluster.Status.Phase); ok {
@@ -454,7 +455,8 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 			return false, err
 		}
 
-		if componentDef.ComponentType == dbaasv1alpha1.Consensus {
+		switch componentDef.ComponentType {
+		case dbaasv1alpha1.Consensus:
 			end, err := handleConsensusSetUpdate(ctx, r.Client, cluster, &v)
 			if err != nil {
 				return false, err
@@ -462,6 +464,8 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 			if !end {
 				isOk = false
 			}
+		case dbaasv1alpha1.Stateful:
+			// TODO wait other component type added
 		}
 	}
 

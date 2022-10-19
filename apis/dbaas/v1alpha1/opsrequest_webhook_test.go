@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/sethvargo/go-password/password"
@@ -63,7 +64,12 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("By creating a upgrade opsRequest, it should be succeed")
 		opsRequest.Spec.ClusterOps.Upgrade.AppVersionRef = appVersionNameForUpgrade
 		Expect(k8sClient.Create(ctx, opsRequest)).Should(Succeed())
-
+		// wait until OpsRequest created
+		Eventually(func() bool {
+			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: opsRequest.Name,
+				Namespace: opsRequest.Namespace}, &OpsRequest{})
+			return err == nil
+		}, 10, 1).Should(BeTrue())
 		By("By testing Immutable when status.phase in (Running,Succeed)")
 		opsRequest.Status.Phase = RunningPhase
 		Expect(k8sClient.Status().Update(ctx, opsRequest)).Should(Succeed())
@@ -175,10 +181,20 @@ var _ = Describe("OpsRequest webhook", func() {
 			By("By create a clusterDefinition")
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
 			Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
+			// wait until ClusterDefinition created
+			Eventually(func() bool {
+				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)
+				return err == nil
+			}, 10, 1).Should(BeTrue())
 
 			By("By creating a appVersion")
 			appVersion := createTestAppVersionObj(clusterDefinitionName, appVersionName)
 			Expect(k8sClient.Create(ctx, appVersion)).Should(Succeed())
+			// wait until AppVersion created
+			Eventually(func() bool {
+				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: appVersionName}, appVersion)
+				return err == nil
+			}, 10, 1).Should(BeTrue())
 
 			By("By testing spec.clusterDef is legal")
 			opsRequest := createTestOpsRequest(clusterName, opsRequestName, UpgradeType)
@@ -187,6 +203,12 @@ var _ = Describe("OpsRequest webhook", func() {
 			By("By create a new cluster ")
 			cluster, _ := createTestCluster(clusterDefinitionName, appVersionName, clusterName)
 			Expect(k8sClient.Create(ctx, cluster)).Should(Succeed())
+
+			// wait until Cluster created
+			Eventually(func() bool {
+				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: cluster.Namespace}, &Cluster{})
+				return err == nil
+			}, 10, 1).Should(BeTrue())
 
 			testUpgrade(cluster, opsRequest)
 

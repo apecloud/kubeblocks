@@ -5,7 +5,8 @@ clusterdefinition: {
 	spec: {
 		type: string
 		connectionCredential: {
-			user: string
+			user:     string
+			password: string
 		}
 	}
 }
@@ -19,7 +20,7 @@ secret: {
 	apiVersion: "v1"
 	stringData: {
 		username: clusterdefinition.spec.connectionCredential.user | *"root"
-		password: string
+		password: clusterdefinition.spec.connectionCredential.password | *""
 	}
 	kind: "Secret"
 	metadata: {

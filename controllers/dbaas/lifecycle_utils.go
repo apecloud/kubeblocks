@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/leaanthony/debme"
-	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -272,6 +271,62 @@ func buildPodAffinity(
 	return affinity
 }
 
+func disableMonitor(component *Component) {
+	component.Monitor = MonitorConfig{
+		Enable: false,
+	}
+}
+
+func mergeMonitorConfig(
+	cluster *dbaasv1alpha1.Cluster,
+	clusterDef *dbaasv1alpha1.ClusterDefinition,
+	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
+	clusterComp *dbaasv1alpha1.ClusterComponent,
+	component *Component) {
+	monitorEnable := false
+	if clusterComp != nil {
+		monitorEnable = clusterComp.Monitor
+	}
+
+	monitorConfig := clusterDefComp.Monitor
+	if !monitorEnable || monitorConfig == nil {
+		disableMonitor(component)
+		return
+	}
+
+	if !monitorConfig.BuiltIn {
+		if monitorConfig.Exporter == nil {
+			disableMonitor(component)
+			return
+		}
+		component.Monitor = MonitorConfig{
+			Enable:     true,
+			ScrapePath: monitorConfig.Exporter.ScrapePath,
+			ScrapePort: monitorConfig.Exporter.ScrapePort,
+		}
+		return
+	}
+
+	characterType := clusterDefComp.CharacterType
+	if len(characterType) == 0 {
+		characterType = CalcCharacterType(clusterDef.Spec.Type)
+	}
+	if !IsWellKnownCharacterType(characterType) {
+		disableMonitor(component)
+		return
+	}
+
+	switch characterType {
+	case KMysql:
+		err := WellKnownCharacterTypeFunc[KMysql](cluster, component)
+		if err != nil {
+			disableMonitor(component)
+		}
+	default:
+		disableMonitor(component)
+	}
+}
+
 func mergeComponents(
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition,
@@ -295,7 +350,6 @@ func mergeComponents(
 		ConsensusSpec:   clusterDefComp.ConsensusSpec,
 		PodSpec:         clusterDefComp.PodSpec,
 		Service:         clusterDefComp.Service,
-		ReadonlyService: clusterDefComp.ReadonlyService,
 		Scripts:         clusterDefComp.Scripts,
 		Probes:          clusterDefComp.Probes,
 	}
@@ -383,9 +437,6 @@ func mergeComponents(
 		if clusterComp.ServiceType != "" {
 			component.Service.Type = clusterComp.ServiceType
 		}
-		if clusterComp.ReadonlyServiceType != nil {
-			component.ReadonlyService.Type = *clusterComp.ReadonlyServiceType
-		}
 
 		if clusterComp.Affinity != nil {
 			affinity = clusterComp.Affinity
@@ -407,6 +458,9 @@ func mergeComponents(
 	//	 	component.PodSpec.Containers[i].VolumeMounts = nil
 	//	 }
 	// }
+
+	mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
+
 	return component
 }
 
@@ -567,18 +621,6 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		*params.applyObjs = append(*params.applyObjs, svc)
 	}
 
-	if params.component.ReadonlyService.Ports != nil &&
-		params.component.ComponentType == dbaasv1alpha1.Consensus {
-		svc, err := buildSvc(*params)
-		if err != nil {
-			return err
-		}
-		svc.Name += "-ro"
-		svc.Spec.Ports = params.component.ReadonlyService.Ports
-		addSelectorLabels(svc, params.component, dbaasv1alpha1.Readonly)
-		*params.applyObjs = append(*params.applyObjs, svc)
-	}
-
 	return nil
 }
 
@@ -591,7 +633,9 @@ func addSelectorLabels(service *corev1.Service, component *Component, accessMode
 	}
 
 	addSelector(service, component.ConsensusSpec.Leader, accessMode)
-	addSelector(service, component.ConsensusSpec.Learner, accessMode)
+	if component.ConsensusSpec.Learner != nil {
+		addSelector(service, *component.ConsensusSpec.Learner, accessMode)
+	}
 
 	for _, member := range component.ConsensusSpec.Followers {
 		addSelector(service, member, accessMode)
@@ -785,8 +829,14 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 	}
 
 	// list all roles
+	if component.ConsensusSpec == nil {
+		component.ConsensusSpec = &dbaasv1alpha1.ConsensusSetSpec{Leader: dbaasv1alpha1.DefaultLeader}
+	}
 	leader := component.ConsensusSpec.Leader.Name
-	learner := component.ConsensusSpec.Learner.Name
+	learner := ""
+	if component.ConsensusSpec.Learner != nil {
+		learner = component.ConsensusSpec.Learner.Name
+	}
 	// now all are followers
 	noneFollowers := make(map[string]string)
 	readonlyFollowers := make(map[string]string)
@@ -1012,11 +1062,6 @@ func buildSvc(params createParams) (*corev1.Service, error) {
 	return &svc, nil
 }
 
-func randomString(length int) string {
-	res, _ := password.Generate(length, 0, 0, false, false)
-	return res
-}
-
 func buildSecret(params createParams) (*corev1.Secret, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
@@ -1047,10 +1092,6 @@ func buildSecret(params createParams) (*corev1.Secret, error) {
 	}
 
 	if err = cueValue.Fill("cluster", clusterStrByte); err != nil {
-		return nil, err
-	}
-
-	if err = cueValue.FillRaw("secret.stringData.password", randomString(8)); err != nil {
 		return nil, err
 	}
 
@@ -1102,9 +1143,6 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 	}
 
 	sts := appsv1.StatefulSet{}
-	if err = json.Unmarshal(stsStrByte, &sts); err != nil {
-		return nil, err
-	}
 
 	stsStrByte = injectEnv(stsStrByte, dbaasPrefix+"_MY_SECRET_NAME", params.cluster.Name)
 
@@ -1428,11 +1466,7 @@ func buildCfg(params createParams, sts *appsv1.StatefulSet, ctx context.Context,
 }
 
 func checkAndUpdatePodVolumes(sts *appsv1.StatefulSet, volumes map[string]dbaasv1alpha1.ConfigTemplate) error {
-	podVolumes := make([]corev1.Volume, 0, len(sts.Spec.Template.Spec.Volumes)+len(volumes))
-	if len(sts.Spec.Template.Spec.Volumes) > 0 {
-		copy(podVolumes, sts.Spec.Template.Spec.Volumes)
-	}
-
+	podVolumes := make([]corev1.Volume, 0, len(volumes))
 	for cmName, tpl := range volumes {
 		// not cm volume
 		volumeMounted := intctrlutil.GetVolumeMountName(podVolumes, cmName)
@@ -1445,7 +1479,6 @@ func checkAndUpdatePodVolumes(sts *appsv1.StatefulSet, volumes map[string]dbaasv
 			configMapVolume.Name = cmName
 			continue
 		}
-
 		// Add New ConfigMap Volume
 		podVolumes = append(podVolumes, corev1.Volume{
 			Name: tpl.VolumeName,
@@ -1456,9 +1489,8 @@ func checkAndUpdatePodVolumes(sts *appsv1.StatefulSet, volumes map[string]dbaasv
 			},
 		})
 	}
-
 	// Update PodTemplate Volumes
-	sts.Spec.Template.Spec.Volumes = podVolumes
+	sts.Spec.Template.Spec.Volumes = append(sts.Spec.Template.Spec.Volumes, podVolumes...)
 	return nil
 }
 

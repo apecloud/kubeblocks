@@ -40,9 +40,14 @@ spec:
   type: state.mysql-8
   components:
   - typeName: replicasets
-    roleGroups:
-    - primary
-    defaultReplicas: 1
+    componentType: Stateful
+    defaultReplicas: 3
+    characterType: mysql
+    monitor:
+      builtIn: false
+      exporterConfig:
+        scrapePort: 9104
+        scrapePath: /metrics
     podSpec:
       containers:
       - name: mysql
@@ -86,9 +91,30 @@ spec:
             cluster_info="$cluster_info@$(($idx+1))";
             echo $cluster_info;
             docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
-  roleGroupTemplates:
-  - typeName: primary
-    defaultReplicas: 3
+      - name: mysql_exporter
+        imagePullPolicy: IfNotPresent
+        env:
+          - name: MYSQL_ROOT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: $(OPENDBAAS_MY_SECRET_NAME)
+                key: password
+          - name: DATA_SOURCE_NAME
+            value: "root:$(MYSQL_ROOT_PASSWORD)@(localhost:3306)/"
+        ports:
+          - containerPort: 9104
+            protocol: TCP
+            name: scrape
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 9104
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 9104
+        resources:
+          {}
 `
 			clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 			Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)).Should(Succeed())
@@ -120,6 +146,8 @@ spec:
       containers:
       - name: mysql
         image: registry.jihulab.com/infracreate/mysql-server/mysql/wesql-server-arm:latest
+      - name: mysql_exporter
+        image: "prom/mysqld-exporter:v0.14.0"
 `
 			appVersion := &dbaasv1alpha1.AppVersion{}
 			Expect(yaml.Unmarshal([]byte(appVerYaml), appVersion)).Should(Succeed())

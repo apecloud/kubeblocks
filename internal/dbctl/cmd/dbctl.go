@@ -22,14 +22,17 @@ import (
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	cliflag "k8s.io/component-base/cli/flag"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/backup"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/bench"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/dbaas"
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/options"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/playground"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
@@ -43,10 +46,25 @@ var cfgFile string
 
 var rootFlags = RootFlags{}
 
-func NewRootCmd() *cobra.Command {
-	rootCmd := &cobra.Command{
+func NewDbctlCmd() *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "dbctl",
-		Short: "A Command Line Interface(CLI) library for DBaaS.",
+		Short: "KubeBlocks CLI",
+		Long: `
+=========================================
+       __ __                  __     __
+      |  \  \                |  \   |  \
+  ____| ▓▓ ▓▓____   _______ _| ▓▓_  | ▓▓
+ /      ▓▓ ▓▓    \ /       \   ▓▓ \ | ▓▓
+|  ▓▓▓▓▓▓▓ ▓▓▓▓▓▓▓\  ▓▓▓▓▓▓▓\▓▓▓▓▓▓ | ▓▓
+| ▓▓  | ▓▓ ▓▓  | ▓▓ ▓▓       | ▓▓ __| ▓▓
+| ▓▓__| ▓▓ ▓▓__/ ▓▓ ▓▓_____  | ▓▓|  \ ▓▓
+ \▓▓    ▓▓ ▓▓    ▓▓\▓▓     \  \▓▓  ▓▓ ▓▓
+  \▓▓▓▓▓▓▓\▓▓▓▓▓▓▓  \▓▓▓▓▓▓▓   \▓▓▓▓ \▓▓
+
+=========================================
+A database management tool for KubeBlocks`,
+
 		Run: func(cmd *cobra.Command, args []string) {
 			if rootFlags.version {
 				util.PrintVersion()
@@ -56,11 +74,16 @@ func NewRootCmd() *cobra.Command {
 		},
 	}
 
-	flags := rootCmd.PersistentFlags()
-
 	// add local flags
-	rootCmd.Flags().BoolVar(&rootFlags.version, "version", false, "Show version")
+	cmd.Flags().BoolVar(&rootFlags.version, "version", false, "Show version")
 
+	// From this point and forward we get warnings on flags that contain "_" separators
+	// when adding them with hyphen instead of the original name.
+	cmd.SetGlobalNormalizationFunc(cliflag.WarnWordSepNormalizeFunc)
+
+	flags := cmd.PersistentFlags()
+
+	// add kubernetes flags like kubectl
 	kubeConfigFlags := genericclioptions.NewConfigFlags(true)
 	kubeConfigFlags.AddFlags(flags)
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
@@ -69,19 +92,21 @@ func NewRootCmd() *cobra.Command {
 	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
 	ioStreams := genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}
 
-	flags.ParseErrorsWhitelist.UnknownFlags = true
-
 	// Add subcommands
-	rootCmd.AddCommand(
+	cmd.AddCommand(
 		playground.NewPlaygroundCmd(ioStreams),
 		dbaas.NewDbaasCmd(f, ioStreams),
 		cluster.NewClusterCmd(f, ioStreams),
 		bench.NewBenchCmd(),
 		backup.NewBackupCmd(f, ioStreams),
+		options.NewCmdOptions(ioStreams.Out),
 	)
 
+	filters := []string{"options"}
+	templates.ActsAsRootCommand(cmd, filters, []templates.CommandGroup{}...)
+
 	cobra.OnInitialize(initConfig)
-	return rootCmd
+	return cmd
 }
 
 // initConfig reads in config file and ENV variables if set.

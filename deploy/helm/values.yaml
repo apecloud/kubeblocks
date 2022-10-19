@@ -100,3 +100,10 @@ podDisruptionBudget:
 admissionWebhooks:
   enabled: true
   createSelfSignedCert: true
+
+monitor:
+  image:
+    repository: docker.io/infracreate/kubeblock
+    pullPolicy: IfNotPresent
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: "0.1.0-alpha.6"

@@ -137,6 +137,14 @@ type ClusterComponent struct {
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
+	// Monitor which is a switch to enable monitoring, default is false
+	// DBaas provides an extension mechanism to support component level monitoring,
+	// which will scrape metrics auto or manually from servers in component and export
+	// metrics to Time Series Database.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=false
+	Monitor bool `json:"monitor"`
+
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
@@ -161,10 +169,6 @@ type ClusterComponent struct {
 	// +kubebuilder:validation:Enum={ClusterIP,NodePort,LoadBalancer}
 	// +optional
 	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
-
-	// ReadonlyServiceType determines how the Readonly Service is exposed when Type is Consensus
-	// +optional
-	ReadonlyServiceType *corev1.ServiceType `json:"readonlyServiceType,omitempty"`
 }
 
 // ClusterStatusComponent record components status information
@@ -180,16 +184,6 @@ type ClusterStatusComponent struct {
 	// Message record the component details message in current phase
 	// +optional
 	Message string `json:"message,omitempty"`
-
-	// RoleGroups reference roleGroups in ClusterDefinition
-	// +optional
-	RoleGroups []ClusterStatusRoleGroup `json:"roleGroups,omitempty"`
-}
-
-type ClusterStatusRoleGroup struct {
-	ID          string `json:"id,omitempty"`
-	Type        string `json:"type,omitempty"`
-	RefWorkload string `json:"refWorkload,omitempty"`
 }
 
 type ClusterComponentVolumeClaimTemplate struct {

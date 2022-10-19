@@ -18,18 +18,10 @@ package dbaas
 
 import (
 	"context"
-	"database/sql"
-	"database/sql/driver"
 	"fmt"
-	"net"
-	"os/exec"
-	"reflect"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/go-sql-driver/mysql"
-	"github.com/pkg/errors"
 	"github.com/sethvargo/go-password/password"
 
 	policyv1 "k8s.io/api/policy/v1"
@@ -215,6 +207,7 @@ spec:
             echo $cluster_info;
             docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
   - typeName: proxy
+    componentType: Stateless
     defaultReplicas: 1
     podSpec:
       containers:
@@ -336,10 +329,6 @@ spec:
         accessMode: Readonly
       updateStrategy: BestEffortParallel
     service:
-      ports:
-      - protocol: TCP
-        port: 3306
-    readonlyService:
       ports:
       - protocol: TCP
         port: 3306
@@ -825,8 +814,7 @@ spec:
 		It("Should success with: "+
 			"1 pod with 'leader' role label set, "+
 			"2 pods with 'follower' role label set,"+
-			"1 service routes to 'leader' pod and "+
-			"1 service routes ro 'follower' pods", func() {
+			"1 service routes to 'leader' pod", func() {
 			By("By creating a cluster with componentType = Consensus")
 			toCreate, _, _, key := newClusterWithConsensusObj(nil, nil)
 			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
@@ -869,83 +857,10 @@ spec:
 			}, timeout*3, interval*5).Should(BeTrue())
 
 			By("By checking pods' role label")
-			observeRole := func(ip string, port int32) (string, error) {
-				url := "root@tcp(" + ip + ":" + strconv.Itoa(int(port)) + ")/information_schema?allowNativePasswords=true"
-				sql := "select role from information_schema.wesql_cluster_local"
-				mysql := &Mysql{}
-				params := map[string]string{connectionURLKey: url}
-				err := mysql.Init(params)
-				if err != nil {
-					return "", err
-				}
-
-				result, err := mysql.query(context.Background(), sql)
-				if err != nil {
-					return "", err
-				}
-				if len(result) != 1 {
-					return "", errors.New("only one role should be observed")
-				}
-				row, ok := result[0].(map[string]interface{})
-				if !ok {
-					return "", errors.New("query result wrong type")
-				}
-				role, ok := row["role"].(string)
-				if !ok {
-					return "", errors.New("role parsing error")
-				}
-				if len(role) == 0 {
-					return "", errors.New("got empty role")
-				}
-
-				err = mysql.Close()
-				role = strings.ToLower(role)
-				if err != nil {
-					return role, err
-				}
-
-				return role, nil
-			}
-
-			startPortForward := func(kind, name string, port int32) error {
-				portStr := strconv.Itoa(int(port))
-				cmd := exec.Command("bash", "-c", "kubectl port-forward "+kind+"/"+name+" --address 0.0.0.0 "+portStr+":"+portStr+" &")
-				return cmd.Start()
-			}
-
-			stopPortForward := func(name string) error {
-				cmd := exec.Command("bash", "-c", "ps aux | grep port-forward | grep -v grep | grep "+name+" | awk '{print $2}' | xargs kill -9")
-				return cmd.Run()
-			}
-
 			ip := getLocalIP()
 			Expect(ip).ShouldNot(BeEmpty())
-			observeRoleOfPod := func(pod *corev1.Pod) string {
-				kind := "pod"
-				name := pod.Name
-				port := pod.Spec.Containers[0].Ports[0].ContainerPort
-				role := ""
-				Eventually(func() bool {
-					err := startPortForward(kind, name, port)
-					if err != nil {
-						_ = stopPortForward(name)
-						return false
-					}
-					time.Sleep(interval)
-					role, err = observeRole(ip, port)
-					if err != nil {
-						_ = stopPortForward(name)
-						return false
-					}
-					_ = stopPortForward(name)
 
-					return true
-				}, timeout*2, interval*1).Should(BeTrue())
-
-				return role
-			}
-
-			observeRoleOfService := func(svc *corev1.Service) string {
+			observeRoleOfServiceLoop := func(svc *corev1.Service) string {
 				kind := "svc"
 				name := svc.Name
 				port := svc.Spec.Ports[0].Port
@@ -970,16 +885,6 @@ spec:
 				return role
 			}
 
-			// TODO wait probe done @xuanchi
-			// before that, we fake it. remove this
-			updateRole := func(pod *corev1.Pod, role string) {
-				patch := client.MergeFrom(pod.DeepCopy())
-				pod.Labels[consensusSetRoleLabelKey] = role
-
-				Expect(k8sClient.Patch(context.Background(), pod, patch)).Should(Succeed())
-			}
-			// end remove
-
 			stsList := &appsv1.StatefulSetList{}
 			Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
 				"app.kubernetes.io/instance": key.Name,
@@ -994,14 +899,6 @@ spec:
 					pods = append(pods, pod)
 				}
 			}
-
-			// TODO set pod label, remove this after probe is done
-			time.Sleep(interval * 2)
-			for _, pod := range pods {
-				role := observeRoleOfPod(&pod)
-				updateRole(&pod, role)
-			}
-			// end remove
 
 			// should have 3 pods
 			Expect(len(pods)).Should(Equal(3))
@@ -1020,31 +917,22 @@ spec:
 			Expect(followerCount).Should(Equal(2))
 
 			By("By checking services' status")
-			// we should have 2 services
+			// we should have 1 services
 			svcList := &corev1.ServiceList{}
 			Expect(k8sClient.List(context.Background(), svcList, client.MatchingLabels{
 				"app.kubernetes.io/instance": key.Name,
 			}, client.InNamespace(key.Namespace))).Should(Succeed())
-			Expect(len(svcList.Items)).Should(Equal(2))
-			svc, svcRo := svcList.Items[0], svcList.Items[1]
-			roName := key.Name + "-" + cluster.Spec.Components[0].Name + "-ro"
-			if svc.Name == roName {
-				svc, svcRo = svcRo, svc
-			}
+			Expect(len(svcList.Items)).Should(Equal(1))
+			svc := svcList.Items[0]
 			// getRole should be leader through service
-			Expect(observeRoleOfService(&svc)).Should(Equal(leader))
-			// getRole should be follower through readonlyService
-			Expect(observeRoleOfService(&svcRo)).Should(Equal(follower))
+			Expect(observeRoleOfServiceLoop(&svc)).Should(Equal(leader))
 
 			By("By deleting leader pod")
 			leaderPod := &corev1.Pod{}
-			followerPods := make([]*corev1.Pod, 0)
 			for _, pod := range pods {
-				switch pod.Labels[consensusSetRoleLabelKey] {
-				case leader:
+				if pod.Labels[consensusSetRoleLabelKey] == leader {
 					leaderPod = &pod
-				case follower:
-					followerPods = append(followerPods, &pod)
+					break
 				}
 			}
 			Expect(k8sClient.Delete(context.Background(), leaderPod)).Should(Succeed())
@@ -1056,16 +944,11 @@ spec:
 				}, sts)).Should(Succeed())
 				return sts.Status.AvailableReplicas == 3
 			}, timeout, interval).Should(BeTrue())
-			// TODO role should be updated automatically after probe done
-			// update it manually, remove this
-			for _, pod := range followerPods {
-				role := observeRoleOfPod(pod)
-				updateRole(pod, role)
-			}
-			// end remove
+
 			time.Sleep(interval * 2)
-			Expect(observeRoleOfService(&svc)).Should(Equal(leader))
-			By("Deleting the scope")
+			Expect(observeRoleOfServiceLoop(&svc)).Should(Equal(leader))
+
+			By("Deleting the cluster")
 			Eventually(func() error {
 				return deleteClusterNWait(key)
 			}, timeout, interval).Should(Succeed())
@@ -1375,206 +1258,4 @@ spec:
 	pods[1].Labels[consensusSetRoleLabelKey] = "leader"
 
 	return pods
-}
-
-func getLocalIP() string {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return ""
-	}
-	for _, address := range addrs {
-		// check the address type and if it is not a loopback the display it
-		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
-				return ipnet.IP.String()
-			}
-		}
-	}
-	return ""
-}
-
-const (
-	// configurations to connect to Mysql, either a data source name represent by URL.
-	connectionURLKey = "url"
-
-	// other general settings for DB connections.
-	maxIdleConnsKey    = "maxIdleConns"
-	maxOpenConnsKey    = "maxOpenConns"
-	connMaxLifetimeKey = "connMaxLifetime"
-	connMaxIdleTimeKey = "connMaxIdleTime"
-)
-
-// Mysql represents MySQL output bindings.
-type Mysql struct {
-	db *sql.DB
-}
-
-// Init initializes the MySQL binding.
-func (m *Mysql) Init(metadata map[string]string) error {
-	p := metadata
-	url, ok := p[connectionURLKey]
-	if !ok || url == "" {
-		return fmt.Errorf("missing MySql connection string")
-	}
-
-	db, err := initDB(url)
-	if err != nil {
-		return err
-	}
-
-	err = propertyToInt(p, maxIdleConnsKey, db.SetMaxIdleConns)
-	if err != nil {
-		return err
-	}
-
-	err = propertyToInt(p, maxOpenConnsKey, db.SetMaxOpenConns)
-	if err != nil {
-		return err
-	}
-
-	err = propertyToDuration(p, connMaxIdleTimeKey, db.SetConnMaxIdleTime)
-	if err != nil {
-		return err
-	}
-
-	err = propertyToDuration(p, connMaxLifetimeKey, db.SetConnMaxLifetime)
-	if err != nil {
-		return err
-	}
-
-	err = db.Ping()
-	if err != nil {
-		return errors.Wrap(err, "unable to ping the DB")
-	}
-
-	m.db = db
-
-	return nil
-}
-
-// Close will close the DB.
-func (m *Mysql) Close() error {
-	if m.db != nil {
-		return m.db.Close()
-	}
-
-	return nil
-}
-
-func (m *Mysql) query(ctx context.Context, sql string) ([]interface{}, error) {
-	rows, err := m.db.QueryContext(ctx, sql)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error executing %s", sql)
-	}
-
-	defer func() {
-		_ = rows.Close()
-		_ = rows.Err()
-	}()
-
-	result, err := m.jsonify(rows)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error marshalling query result for %s", sql)
-	}
-
-	return result, nil
-}
-
-func propertyToInt(props map[string]string, key string, setter func(int)) error {
-	if v, ok := props[key]; ok {
-		if i, err := strconv.Atoi(v); err == nil {
-			setter(i)
-		} else {
-			return errors.Wrapf(err, "error converitng %s:%s to int", key, v)
-		}
-	}
-
-	return nil
-}
-
-func propertyToDuration(props map[string]string, key string, setter func(time.Duration)) error {
-	if v, ok := props[key]; ok {
-		if d, err := time.ParseDuration(v); err == nil {
-			setter(d)
-		} else {
-			return errors.Wrapf(err, "error converitng %s:%s to time duration", key, v)
-		}
-	}
-
-	return nil
-}
-
-func initDB(url string) (*sql.DB, error) {
-	if _, err := mysql.ParseDSN(url); err != nil {
-		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS) specified by %s", connectionURLKey)
-	}
-
-	db, err := sql.Open("mysql", url)
-	if err != nil {
-		return nil, errors.Wrap(err, "error opening DB connection")
-	}
-
-	return db, nil
-}
-
-func (m *Mysql) jsonify(rows *sql.Rows) ([]interface{}, error) {
-	columnTypes, err := rows.ColumnTypes()
-	if err != nil {
-		return nil, err
-	}
-
-	var ret []interface{}
-	for rows.Next() {
-		values := prepareValues(columnTypes)
-		err := rows.Scan(values...)
-		if err != nil {
-			return nil, err
-		}
-
-		r := m.convert(columnTypes, values)
-		ret = append(ret, r)
-	}
-
-	return ret, nil
-}
-
-func prepareValues(columnTypes []*sql.ColumnType) []interface{} {
-	types := make([]reflect.Type, len(columnTypes))
-	for i, tp := range columnTypes {
-		types[i] = tp.ScanType()
-	}
-
-	values := make([]interface{}, len(columnTypes))
-	for i := range values {
-		values[i] = reflect.New(types[i]).Interface()
-	}
-
-	return values
-}
-
-func (m *Mysql) convert(columnTypes []*sql.ColumnType, values []interface{}) map[string]interface{} {
-	r := map[string]interface{}{}
-
-	for i, ct := range columnTypes {
-		value := values[i]
-
-		switch v := values[i].(type) {
-		case driver.Valuer:
-			if vv, err := v.Value(); err == nil {
-				value = interface{}(vv)
-			}
-		case *sql.RawBytes:
-			// special case for sql.RawBytes, see https://github.com/go-sql-driver/mysql/blob/master/fields.go#L178
-			switch ct.DatabaseTypeName() {
-			case "VARCHAR", "CHAR", "TEXT", "LONGTEXT":
-				value = string(*v)
-			}
-		}
-
-		if value != nil {
-			r[ct.Name()] = value
-		}
-	}
-
-	return r
 }

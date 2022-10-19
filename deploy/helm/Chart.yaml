@@ -56,8 +56,8 @@ dependencies:
   - condition: grafana.enabled
     name: grafana
     repository: https://grafana.github.io/helm-charts
-    version: 6.40.*
+    version: 6.41 - 6.42
   - condition: prometheus.enabled
     name: prometheus
     repository: https://prometheus-community.github.io/helm-charts
-    version: 15.15.*
+    version: 15.15 - 15.16

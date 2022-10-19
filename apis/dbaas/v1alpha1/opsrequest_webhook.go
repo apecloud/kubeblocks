@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -68,7 +67,7 @@ func (r *OpsRequest) ValidateCreate() error {
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 	opsrequestlog.Info("validate update", "name", r.Name)
-	if slices.Index([]Phase{RunningPhase, SucceedPhase}, r.Status.Phase) != -1 {
+	if r.Status.Phase == SucceedPhase {
 		return newInvalidError(OpsRequestKind, r.Name, "status.phase", fmt.Sprintf("can not update OpsRequest when status.Phase is %s", r.Status.Phase))
 	}
 	return r.validate()

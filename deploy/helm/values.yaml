@@ -3,7 +3,6 @@
 # Declare variables to be passed into your templates.
 
 # Enabled this if you wish to install controller deployment
-enabled: true
 replicaCount: 1
 
 image:

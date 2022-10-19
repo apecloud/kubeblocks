@@ -143,7 +143,7 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/..."
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -178,7 +178,7 @@ loggercheck: loggerchecktool ## Run loggercheck against code.
 	$(LOGGERCHECK) ./...
 
 .PHONY: build-checks
-build-checks: generate fmt vet goimports fast-lint ## Run build checks.
+build-checks: fmt vet goimports fast-lint ## Run build checks.
 
 .PHONY: mod-download
 mod-download: ## Run go mod download against go modules.
@@ -257,7 +257,7 @@ clean-dbctl: ## Clean bin/dbctl* CLI tools.
 ##@ Operator Controller Manager
 
 .PHONY: manager
-manager: cue-fmt build-checks ## Build manager binary.
+manager: cue-fmt generate build-checks ## Build manager binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
 
 
@@ -309,6 +309,30 @@ clean-agamotto: ## Clean bin/mysqld_exporter.
 	rm -f bin/agamotto
 
 
+##@ DAPRd
+
+DAPRD_BUILD_PATH = ./cmd/daprd
+DAPRD_LD_FLAGS = "-s -w"
+
+bin/daprd.%: ## Cross build bin/daprd.$(OS).$(ARCH) .
+	cd $(DAPRD_BUILD_PATH) && GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${DAPRD_LD_FLAGS} -o ../../$@  ./main.go
+
+daprd-mod-vendor:
+	cd $(DAPRD_BUILD_PATH) && $(GO) mod tidy -compat=1.18
+	cd $(DAPRD_BUILD_PATH) && $(GO) mod vendor
+	cd $(DAPRD_BUILD_PATH) && $(GO) mod verify
+
+.PHONY: daprd
+daprd: OS=$(shell $(GO) env GOOS)
+daprd: ARCH=$(shell $(GO) env GOARCH)
+daprd: daprd-mod-vendor # build-checks ## Build daprd related binaries
+	$(MAKE) bin/daprd.${OS}.${ARCH}
+	mv bin/daprd.${OS}.${ARCH} bin/daprd
+
+.PHONY: clean
+clean-daprd: ## Clean bin/mysqld_exporter.
+	rm -f bin/daprd
+
 ##@ Deployment
 
 ifndef ignore-not-found
@@ -355,7 +379,7 @@ ci-test: ci-test-pre test ## Run CI tests.
 ##@ Contributor
 
 .PHONY: reviewable
-reviewable: build-checks test check-license-header ## Run code checks to proceed with PR reviews.
+reviewable: generate build-checks test check-license-header ## Run code checks to proceed with PR reviews.
 	$(GO) mod tidy -compat=1.18
 
 .PHONY: check-diff

@@ -1,3 +1,4 @@
+{{- if .Values.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -26,3 +27,4 @@ spec:
     {{- end }}
   selector:
     {{- include "opendbaas-core.selectorLabels" . | nindent 4 }}
+{{- end }}

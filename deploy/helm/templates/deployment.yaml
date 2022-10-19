@@ -1,3 +1,4 @@
+{{- if .Values.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -102,3 +103,4 @@ spec:
             defaultMode: 420
             secretName: {{ include "opendbaas-core.fullname" . }}.{{ .Release.Namespace }}.svc.tls-pair
         {{- end }}
+{{- end }}

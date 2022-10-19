@@ -2,16 +2,16 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ template "monitor.fullname" . }}-grafana-datasource
-  namespace: {{ template "monitor.grafana.namespace" . }}
+  name: {{ template "opendbaas-core.fullname" . }}-grafana-datasource
+  namespace: {{ template "opendbaas-core.grafana.namespace" . }}
   annotations:
 {{ toYaml .Values.grafana.sidecar.datasources.annotations | indent 4 }}
   labels:
     {{- if $.Values.grafana.sidecar.datasources.label }}
     {{ $.Values.grafana.sidecar.datasources.label }}: {{ ternary $.Values.grafana.sidecar.datasources.labelValue "1" (not (empty $.Values.grafana.sidecar.datasources.labelValue)) | quote }}
     {{- end }}
-    app: {{ template "monitor.name" $ }}-grafana-datasource
-{{ include "monitor.labels" $ | indent 4 }}
+    app: {{ template "opendbaas-core.name" $ }}-grafana-datasource
+{{ include "opendbaas-core.labels" $ | indent 4 }}
 data:
   datasource.yaml: |-
     apiVersion: 1
@@ -24,7 +24,7 @@ data:
       {{- if .Values.grafana.sidecar.datasources.url }}
       url: {{ .Values.grafana.sidecar.datasources.url }}
       {{- else }}
-      url: http://{{ template "monitor.prometheus.server.fullname" . }}.{{ template "monitor.prometheus.namespace" . }}:{{ .Values.prometheus.server.service.servicePort }}/{{ trimPrefix "/" .Values.prometheus.server.routePrefix }}
+      url: http://{{ template "opendbaas-core.prometheus.server.fullname" . }}.{{ template "opendbaas-core.prometheus.namespace" . }}:{{ .Values.prometheus.server.service.servicePort }}/{{ trimPrefix "/" .Values.prometheus.server.routePrefix }}
       {{- end }}
       access: proxy
       isDefault: true

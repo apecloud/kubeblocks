@@ -36,9 +36,11 @@ func NewClusterObjects() *types.ClusterObjects {
 		Cluster:    &dbaasv1alpha1.Cluster{},
 		ClusterDef: &dbaasv1alpha1.ClusterDefinition{},
 		AppVersion: &dbaasv1alpha1.AppVersion{},
-		Pods:       []corev1.Pod{},
-		Services:   []corev1.Service{},
-		Secrets:    []corev1.Secret{},
+
+		Pods:     []*corev1.Pod{},
+		Services: []*corev1.Service{},
+		Secrets:  []*corev1.Secret{},
+		Nodes:    []*corev1.Node{},
 	}
 }
 
@@ -93,6 +95,26 @@ func GetAllObjects(clientSet clientset.Interface, dynamicClient dynamic.Interfac
 		return err
 	}
 
+	// get nodes where the pods are located
+	for _, pod := range objs.Pods {
+		found := false
+		for _, node := range objs.Nodes {
+			if node.Name == pod.Spec.NodeName {
+				found = true
+				break
+			}
+		}
+		if found {
+			break
+		}
+
+		if err = builder.withName(pod.Spec.NodeName).
+			withGK(schema.GroupKind{Kind: "Node"}).
+			do(objs); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -112,7 +134,7 @@ type builder struct {
 
 // Do get kubernetes object belonging to the database cluster
 func (b *builder) do(clusterObjs *types.ClusterObjects) error {
-	ctx := context.Background()
+	ctx := context.TODO()
 	listOpts := metav1.ListOptions{
 		LabelSelector: b.label,
 	}
@@ -124,19 +146,31 @@ func (b *builder) do(clusterObjs *types.ClusterObjects) error {
 		if err != nil {
 			return err
 		}
-		clusterObjs.Pods = append(clusterObjs.Pods, pods.Items...)
+		for _, pod := range pods.Items {
+			clusterObjs.Pods = append(clusterObjs.Pods, &pod)
+		}
 	case "Service":
-		svrs, err := b.clientSet.CoreV1().Services(b.namespace).List(ctx, listOpts)
+		svcs, err := b.clientSet.CoreV1().Services(b.namespace).List(ctx, listOpts)
 		if err != nil {
 			return err
 		}
-		clusterObjs.Services = append(clusterObjs.Services, svrs.Items...)
+		for _, svc := range svcs.Items {
+			clusterObjs.Services = append(clusterObjs.Services, &svc)
+		}
 	case "Secret":
-		scts, err := b.clientSet.CoreV1().Secrets(b.namespace).List(ctx, listOpts)
+		secrets, err := b.clientSet.CoreV1().Secrets(b.namespace).List(ctx, listOpts)
 		if err != nil {
 			return err
 		}
-		clusterObjs.Secrets = append(clusterObjs.Secrets, scts.Items...)
+		for _, s := range secrets.Items {
+			clusterObjs.Secrets = append(clusterObjs.Secrets, &s)
+		}
+	case "Node":
+		node, err := b.clientSet.CoreV1().Nodes().Get(ctx, b.name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		clusterObjs.Nodes = append(clusterObjs.Nodes, node)
 	case types.KindCluster:
 		return getClusterResource(b.dynamicClient, types.ClusterGVR(), b.namespace, b.name, clusterObjs.Cluster)
 	case types.KindClusterDef:

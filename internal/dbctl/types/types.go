@@ -96,9 +96,10 @@ type ClusterObjects struct {
 	ClusterDef *dbaasv1alpha1.ClusterDefinition
 	AppVersion *dbaasv1alpha1.AppVersion
 
-	Pods     []corev1.Pod
-	Services []corev1.Service
-	Secrets  []corev1.Secret
+	Pods     []*corev1.Pod
+	Services []*corev1.Service
+	Secrets  []*corev1.Secret
+	Nodes    []*corev1.Node
 }
 
 type BackupJobInfo struct {

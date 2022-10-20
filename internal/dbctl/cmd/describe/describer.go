@@ -186,31 +186,12 @@ func (d *ClusterDescriber) showTopology(w describe.PrefixWriter) error {
 		w.Write(LEVEL_2, "Instances:\t%s\n", c.Type)
 
 		// describe instance name
-		pods := d.findPodsOfComponent(c.Name)
+		pods := d.getPodsOfComponent(c.Name)
 		for _, pod := range pods {
 			w.Write(LEVEL_3, "%s@%s\n", pod.Name, pod.Labels[types.ConsensusSetRoleLabelKey])
 		}
 	}
 	return nil
-}
-
-func findCompInCluster(cluster *dbaasv1alpha1.Cluster, typeName string) *dbaasv1alpha1.ClusterComponent {
-	for _, c := range cluster.Spec.Components {
-		if c.Type == typeName {
-			return &c
-		}
-	}
-	return nil
-}
-
-func (d *ClusterDescriber) findPodsOfComponent(name string) []*corev1.Pod {
-	var p []*corev1.Pod
-	for _, pod := range d.Pods {
-		if n, ok := pod.Labels[types.ComponentLabelKey]; ok && n == name {
-			p = append(p, &pod)
-		}
-	}
-	return p
 }
 
 func (d *ClusterDescriber) showComponent(w describe.PrefixWriter) error {
@@ -225,7 +206,7 @@ func (d *ClusterDescriber) showComponent(w describe.PrefixWriter) error {
 			replicas = compInClusterDef.DefaultReplicas
 		}
 
-		pods := d.findPodsOfComponent(c.Name)
+		pods := d.getPodsOfComponent(c.Name)
 		if len(pods) == 0 {
 			return fmt.Errorf("failed to find any instance belonging to component \"%s\"", c.Name)
 		}
@@ -273,6 +254,7 @@ func (d *ClusterDescriber) showInstance(pod *corev1.Pod, w describe.PrefixWriter
 		w.Write(LEVEL_3, "Reason:\t%s\n", pod.Status.Reason)
 	}
 
+	// TODO: get AccessMode from label
 	w.Write(LEVEL_3, "AccessMode:\t%s\n", "")
 
 	// cpu and memory
@@ -281,18 +263,18 @@ func (d *ClusterDescriber) showInstance(pod *corev1.Pod, w describe.PrefixWriter
 	w.Write(LEVEL_3, "Cpu:\t%s %s\n", cpuReq.String(), cpuLimit.String())
 	w.Write(LEVEL_3, "Memory:\t%s %s\n", memoryReq.String(), memoryLimit.String())
 
-	if region, ok := pod.Labels[types.RegionLabelKey]; ok {
-		w.Write(LEVEL_3, "Region:\t%s\n", region)
-	}
-
-	if zone, ok := pod.Labels[types.ZoneLabelKey]; ok {
-		w.Write(LEVEL_3, "AZ:\t%s\n", zone)
-	}
-
+	// node information include its region and AZ
 	if pod.Spec.NodeName == "" {
 		w.Write(LEVEL_3, "Node:\t%s\n", valueNone)
 	} else {
 		w.Write(LEVEL_3, "Node:\t%s\n", pod.Spec.NodeName+"/"+pod.Status.HostIP)
+		node := d.getNodeByName(pod.Spec.NodeName)
+		if region, ok := node.Labels[types.RegionLabelKey]; ok {
+			w.Write(LEVEL_3, "Region:\t%s\n", region)
+		}
+		if zone, ok := node.Labels[types.ZoneLabelKey]; ok {
+			w.Write(LEVEL_3, "AZ:\t%s\n", zone)
+		}
 	}
 
 	w.Write(LEVEL_3, "CreationTimestamp:\t%s\n", pod.CreationTimestamp.Time.Format(time.RFC1123Z))
@@ -302,21 +284,63 @@ func (d *ClusterDescriber) showInstance(pod *corev1.Pod, w describe.PrefixWriter
 }
 
 func (d *ClusterDescriber) showEndpoint(pod *corev1.Pod, w describe.PrefixWriter) {
-	for i, svc := range d.Services {
-		if i == 0 {
-			w.Write(LEVEL_3, "Endpoint:\n")
-			w.Write(LEVEL_4, "Private:\n")
+	var endpoints []string
+
+	w.Write(LEVEL_3, "Endpoint:\n")
+	w.Write(LEVEL_4, "Private:\n")
+	for _, svc := range d.Services {
+		// find service that name is same with pod name
+		if svc.Name != pod.Name {
+			continue
 		}
 		for _, p := range svc.Spec.Ports {
 			w.Write(LEVEL_5, "URL:\t%s:%s\n", pod.Status.PodIP, p.Name)
 		}
+
+		// TODO: get public endpoint from service label
+		endpoints = append(endpoints, "test")
+	}
+
+	for i, e := range endpoints {
+		if i == 0 {
+			w.Write(LEVEL_4, "Public:\n")
+		}
+		w.Write(LEVEL_5, "URL:\t%s\n", e)
 	}
 }
 
 func (d *ClusterDescriber) showSecret(w describe.PrefixWriter) {
 	for _, s := range d.Secrets {
-		describeSecret(&s, w)
+		describeSecret(s, w)
 	}
+}
+
+func findCompInCluster(cluster *dbaasv1alpha1.Cluster, typeName string) *dbaasv1alpha1.ClusterComponent {
+	for _, c := range cluster.Spec.Components {
+		if c.Type == typeName {
+			return &c
+		}
+	}
+	return nil
+}
+
+func (d *ClusterDescriber) getPodsOfComponent(name string) []*corev1.Pod {
+	var p []*corev1.Pod
+	for _, pod := range d.Pods {
+		if n, ok := pod.Labels[types.ComponentLabelKey]; ok && n == name {
+			p = append(p, pod)
+		}
+	}
+	return p
+}
+
+func (d *ClusterDescriber) getNodeByName(name string) *corev1.Node {
+	for _, node := range d.Nodes {
+		if node.Name == name {
+			return node
+		}
+	}
+	return nil
 }
 
 func describeSecret(secret *corev1.Secret, w describe.PrefixWriter) {

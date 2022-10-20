@@ -69,14 +69,6 @@ var _ = Describe("cluster util", func() {
 		builder.withGK(schema.GroupKind{Group: "dbaas.infracreate.com", Kind: "Cluster"})
 		Expect(builder.do(objs)).Should(HaveOccurred())
 
-		// get statefulset
-		builder.withLabel(InstanceLabel(clusterName)).withGK(schema.GroupKind{Kind: "StatefulSet"})
-		Expect(builder.do(objs)).Should(HaveOccurred())
-
-		// get deployment
-		builder.withGK(schema.GroupKind{Kind: "Deployment"})
-		Expect(builder.do(objs)).Should(HaveOccurred())
-
 		// get service
 		builder.withGK(schema.GroupKind{Kind: "Service"})
 		Expect(builder.do(objs)).Should(HaveOccurred())
@@ -87,6 +79,10 @@ var _ = Describe("cluster util", func() {
 
 		// get pod
 		builder.withGK(schema.GroupKind{Kind: "Pod"})
+		Expect(builder.do(objs)).Should(HaveOccurred())
+
+		// get node
+		builder.withGK(schema.GroupKind{Kind: "Node"})
 		Expect(builder.do(objs)).Should(HaveOccurred())
 	})
 

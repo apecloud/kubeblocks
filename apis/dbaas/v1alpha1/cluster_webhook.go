@@ -163,6 +163,9 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 	for _, v := range r.Spec.Components {
 		if component, ok := componentMap[v.Type]; ok {
 			if componentMap[v.Type].ComponentType == Consensus {
+				if component.ConsensusSpec == nil {
+					component.ConsensusSpec = &ConsensusSetSpec{Leader: DefaultLeader}
+				}
 				readonlyCount := 0
 				if component.ConsensusSpec.Leader.AccessMode == Readonly {
 					readonlyCount++
@@ -172,7 +175,7 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 						readonlyCount++
 					}
 				}
-				if component.ConsensusSpec.Learner.AccessMode == Readonly {
+				if component.ConsensusSpec.Learner != nil && component.ConsensusSpec.Learner.AccessMode == Readonly {
 					readonlyCount++
 				}
 				if readonlyCount == 0 {
@@ -180,10 +183,6 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 						v,
 						"readonlyService can only be set when atleast one role AccessMode is Readonly"))
 				}
-			} else if v.ReadonlyServiceType != nil {
-				*allErrs = append(*allErrs, field.Invalid(field.NewPath("spec.components[*].readonlyService"),
-					v,
-					"readonlyService can only be set when componentType is Consensus"))
 			}
 		}
 	}

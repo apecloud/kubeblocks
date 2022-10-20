@@ -17,11 +17,13 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("clusterDefinition webhook", func() {
@@ -35,12 +37,18 @@ var _ = Describe("clusterDefinition webhook", func() {
 			By("By creating a new clusterDefinition")
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
 			Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
+			// wait until ClusterDefinition created
+			Eventually(func() bool {
+				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)
+				return err == nil
+			}, 10, 1).Should(BeTrue())
 
 			By("By creating a new clusterDefinition with componentType==Consensus but consensusSpec not present")
 			clusterDef, _ = createTestClusterDefinitionObj2(clusterDefinitionName2)
 			Expect(k8sClient.Create(ctx, clusterDef)).ShouldNot(Succeed())
 
 			By("Set Leader.Replicas > 1")
+			clusterDef.Spec.Components[0].ConsensusSpec = &ConsensusSetSpec{Leader: DefaultLeader}
 			replicas := int32(2)
 			clusterDef.Spec.Components[0].ConsensusSpec.Leader.Replicas = &replicas
 			Expect(k8sClient.Create(ctx, clusterDef)).ShouldNot(Succeed())
@@ -65,7 +73,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 			clusterDef.Spec.Components[0].DefaultReplicas = 5
 			clusterDef.Spec.Components[0].ConsensusSpec.Leader = ConsensusMember{Name: "leader", AccessMode: ReadWrite}
 			rel3 := int32(2)
-			clusterDef.Spec.Components[0].ConsensusSpec.Learner = ConsensusMember{Name: "learner", AccessMode: None, Replicas: &rel3}
+			clusterDef.Spec.Components[0].ConsensusSpec.Learner = &ConsensusMember{Name: "learner", AccessMode: None, Replicas: &rel3}
 			Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
 
 		})
@@ -85,6 +93,7 @@ spec:
   - typeName: replicaSets
     componentType: Stateful
   - typeName: proxy
+    componentType: Stateless
 `, name)
 	clusterDefinition := &ClusterDefinition{}
 	err := yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)

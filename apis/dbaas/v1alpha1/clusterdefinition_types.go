@@ -45,8 +45,8 @@ type ClusterDefinitionSpec struct {
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
 type ClusterDefinitionStatus struct {
-	// phase - in list of [Available,Deleting]
-	// +kubebuilder:validation:Enum={Available,Deleting}
+	// phase - in list of [Available]
+	// +kubebuilder:validation:Enum={Available}
 	Phase Phase `json:"phase,omitempty"`
 	// +optional
 	Message string `json:"message,omitempty"`
@@ -91,10 +91,43 @@ type ConfigTemplate struct {
 	VolumeName string `json:"volumeName,omitempty"`
 }
 
+type ExporterConfig struct {
+	// ScrapePort is exporter port for Time Series Database to scrape metrics
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Maximum=65536
+	// +kubebuilder:validation:Minimum=1
+	ScrapePort int `json:"scrapePort"`
+
+	// ScrapePath is exporter url path for Time Series Database to scrape metrics
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=128
+	// +kubebuilder:default="/metrics"
+	ScrapePath string `json:"scrapePath"`
+}
+
+type MonitorConfig struct {
+	// BuiltIn is a switch to enable DBaas builtIn monitoring.
+	// If BuiltIn is true and CharacterType is wellknown, ExporterConfig and Sidecar container will generate automatically.
+	// Otherwise, ISV should set BuiltIn to false and provide ExporterConfig and Sidecar container own.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=true
+	BuiltIn bool `json:"builtIn"`
+
+	// Exporter provided by ISV, which specify necessary information to Time Series Database.
+	// ExporterConfig is valid when BuiltIn is false.
+	// +optional
+	Exporter *ExporterConfig `json:"exporterConfig,omitempty"`
+}
+
 type ClusterDefinitionComponent struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
 	TypeName string `json:"typeName,omitempty"`
+
+	// CharacterType defines well-known database component name, such as mongos(mongodb), proxy(redis), wesql(mysql)
+	// DBaas will generate proper monitor configs for wellknown CharacterType when BuiltIn is true.
+	// +optional
+	CharacterType string `json:"characterType,omitempty"`
 
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
@@ -116,6 +149,10 @@ type ClusterDefinitionComponent struct {
 	// +kubebuilder:default=false
 	AntiAffinity bool `json:"antiAffinity,omitempty"`
 
+	// Monitor is monitoring config which provided by ISV
+	// +optional
+	Monitor *MonitorConfig `json:"monitor,omitempty"`
+
 	// podSpec of final workload
 	// +optional
 	PodSpec *corev1.PodSpec `json:"podSpec,omitempty"`
@@ -126,21 +163,15 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Service corev1.ServiceSpec `json:"service,omitempty"`
 
-	// ReadonlyService defines the behavior of a service spec.
-	// provide readonly service when ComponentType is Consensus
-	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
-	ReadonlyService corev1.ServiceSpec `json:"readonlyService,omitempty"`
-
-	// script exec order：component.pre => roleGroup.pre => component.exec => roleGroup.exec => roleGroup.post => component.post
+	// script exec order：component.pre => component.exec => component.post
 	// builtin ENV variables:
 	// self: OPENDBAAS_SELF_{builtin_properties}
-	// rule: OPENDBAAS_{conponent_name}[n]-{roleGroup_name}[n]-{builtin_properties}
+	// rule: OPENDBAAS_{conponent_name}[n]-{builtin_properties}
 	// builtin_properties:
 	// - ID # which shows in Cluster.status
 	// - HOST # e.g. example-mongodb2-0.example-mongodb2-svc.default.svc.cluster.local
 	// - PORT
-	// - N # number of current component/roleGroup
+	// - N # number of current component
 	// +optional
 	Scripts ClusterDefinitionScripts `json:"scripts,omitempty"`
 
@@ -150,12 +181,12 @@ type ClusterDefinitionComponent struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Stateless
 	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus}
-	ComponentType ComponentType `json:"componentType,omitempty"`
+	ComponentType ComponentType `json:"componentType"`
 
 	// ConsensusSpec defines consensus related spec if componentType is Consensus
 	// CAN'T be empty if componentType is Consensus
 	// +optional
-	ConsensusSpec ConsensusSetSpec `json:"consensusSpec,omitempty"`
+	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
 }
 
 type ComponentType string
@@ -245,14 +276,9 @@ type ClusterDefinitionProbes struct {
 }
 
 type ConsensusSetSpec struct {
-	// Replicas, number of pods in this ConsensusSet
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=1
-	Replicas int `json:"replicas,omitempty"`
-
 	// Leader, one single leader
 	// +kubebuilder:validation:Required
-	Leader ConsensusMember `json:"leader,omitempty"`
+	Leader ConsensusMember `json:"leader"`
 
 	// Followers, has voting right but not Leader
 	// +optional
@@ -260,7 +286,7 @@ type ConsensusSetSpec struct {
 
 	// Learner, no voting right
 	// +optional
-	Learner ConsensusMember `json:"learner,omitempty"`
+	Learner *ConsensusMember `json:"learner,omitempty"`
 
 	// UpdateStrategy, Pods update strategy
 	// options: serial, bestEffortParallel, parallel
@@ -278,13 +304,14 @@ type ConsensusSetSpec struct {
 type ConsensusMember struct {
 	// Name, role name
 	// +kubebuilder:validation:Required
-	Name string `json:"name,omitempty"`
+	// +kubebuilder:default=leader
+	Name string `json:"name"`
 
 	// AccessMode, what service this member capable for
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=ReadWrite
 	// +kubebuilder:validation:Enum={None, Readonly, ReadWrite}
-	AccessMode AccessMode `json:"accessMode,omitempty"`
+	AccessMode AccessMode `json:"accessMode"`
 
 	// Replicas, number of Pods of this role
 	// default 1 for Leader
@@ -292,6 +319,7 @@ type ConsensusMember struct {
 	// default Components[*].Replicas - Leader.Replicas - Learner.Replicas for Followers
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
+	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 }
 

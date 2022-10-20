@@ -24,23 +24,18 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/docker/go-connections/nat"
 	k3dClient "github.com/k3d-io/k3d/v5/pkg/client"
 	config "github.com/k3d-io/k3d/v5/pkg/config/v1alpha4"
+	l "github.com/k3d-io/k3d/v5/pkg/logger"
 	"github.com/k3d-io/k3d/v5/pkg/runtimes"
 	k3d "github.com/k3d-io/k3d/v5/pkg/types"
 	"github.com/pkg/errors"
-	"helm.sh/helm/v3/pkg/repo"
+	"github.com/sirupsen/logrus"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
-	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
-)
-
-var (
-	info = util.Info
-	errf = util.Errf
 )
 
 // installer will handle the playground cluster creation and management
@@ -48,20 +43,25 @@ type installer struct {
 	cfg         config.ClusterConfig
 	ctx         context.Context
 	clusterName string
-	wesql       Wesql
+	genericclioptions.IOStreams
+}
+
+func (i *installer) verboseLog(v bool) {
+	if !v {
+		// set k3d log level to warning to avoid so much info log
+		l.Log().SetLevel(logrus.WarnLevel)
+	}
 }
 
 // Install install a k3d cluster
 func (i *installer) install() error {
 	var err error
 
-	i.cfg, err = buildClusterRunConfig(i.clusterName)
-	if err != nil {
+	if i.cfg, err = buildClusterRunConfig(i.clusterName); err != nil {
 		return err
 	}
 
-	err = setUpK3d(i.ctx, &i.cfg)
-	if err != nil {
+	if err = setUpK3d(i.ctx, &i.cfg); err != nil {
 		return errors.Wrap(err, "failed to setup k3d cluster")
 	}
 	return nil
@@ -94,7 +94,7 @@ func (i *installer) uninstall() error {
 			for _, n := range nl {
 				if n.Name == toolNode {
 					if err := k3dClient.NodeDelete(i.ctx, runtimes.SelectedRuntime, n, k3d.NodeDeleteOpts{}); err != nil {
-						util.Errf("Delete node %s failed.", toolNode)
+						fmt.Printf("Delete node %s failed.", toolNode)
 					}
 					break
 				}
@@ -107,16 +107,13 @@ func (i *installer) uninstall() error {
 	}
 
 	// delete playground cluster
-	err = k3dClient.ClusterDelete(i.ctx, runtimes.SelectedRuntime, playgroundCluster, k3d.ClusterDeleteOpts{
-		SkipRegistryCheck: false,
-	})
-	if err != nil {
+	if err = k3dClient.ClusterDelete(i.ctx, runtimes.SelectedRuntime, playgroundCluster,
+		k3d.ClusterDeleteOpts{SkipRegistryCheck: false}); err != nil {
 		return errors.Wrap(err, "Failed to delete playground cluster.")
 	}
 
 	// remove playground cluster kubeconfig
-	err = util.RemoveConfig(i.clusterName)
-	if err != nil {
+	if err = util.RemoveConfig(i.clusterName); err != nil {
 		return errors.Wrap(err, "Failed to remove playground kubeconfig file")
 	}
 
@@ -126,11 +123,8 @@ func (i *installer) uninstall() error {
 // genKubeconfig generate a kubeconfig to access the k3d cluster
 func (i *installer) genKubeconfig() error {
 	var err error
-	var cluster = i.cfg.Cluster.Name
 
-	configPath := util.ConfigPath(cluster)
-	info("Generating kubeconfig into", configPath)
-
+	configPath := util.ConfigPath(i.clusterName)
 	_, err = k3dClient.KubeconfigGetWrite(i.ctx, runtimes.SelectedRuntime, &i.cfg.Cluster, configPath,
 		&k3dClient.WriteKubeConfigOptions{UpdateExisting: true, OverwriteExisting: false, UpdateCurrentContext: true})
 	if err != nil {
@@ -158,36 +152,9 @@ func (i *installer) genKubeconfig() error {
 
 	// Replace host config with loop back address
 	cfgHostContent := strings.ReplaceAll(kubeConfig, hostToReplace, "127.0.0.1")
-	err = os.WriteFile(configPath, []byte(cfgHostContent), 0600)
-	if err != nil {
-		errf("Fail to re-write host kubeconfig")
+	if err = os.WriteFile(configPath, []byte(cfgHostContent), 0600); err != nil {
+		fmt.Println("Fail to re-write host kubeconfig")
 	}
-
-	info("Successfully generate kubeconfig at", configPath)
-	return nil
-}
-
-// setKubeconfig set kubeconfig environment of cluster
-func (i *installer) setKubeconfig() error {
-	info("Setting kubeconfig env for dbctl playground...")
-	return os.Setenv("KUBECONFIG", util.ConfigPath(i.clusterName))
-}
-
-func (i *installer) installDeps() error {
-	var err error
-
-	info("Add dependent repos...")
-	err = addRepos(i.wesql.getRepos())
-	if err != nil {
-		return errors.Wrap(err, "Failed to add dependent repos")
-	}
-
-	err = installCharts(i)
-	if err != nil {
-		return errors.Wrap(err, "Failed to install playground database cluster")
-	}
-	info("Waiting for database cluster to be ready...")
-	time.Sleep(10 * time.Second)
 
 	return nil
 }
@@ -263,7 +230,7 @@ func buildClusterConfig(clusterName string, opts k3d.ClusterCreateOpts) (k3d.Clu
 	// build k3d node
 	k3sImageDir, err := buildK3sImageDir()
 	if err != nil {
-		errf("Failed to create k3s image dir: %v", err)
+		fmt.Printf("Failed to create k3s image dir: %v", err)
 	}
 
 	serverNode := k3d.Node{
@@ -277,7 +244,8 @@ func buildClusterConfig(clusterName string, opts k3d.ClusterCreateOpts) (k3d.Clu
 	nodes = append(nodes, &serverNode)
 
 	clusterConfig.Nodes = nodes
-	clusterConfig.ServerLoadBalancer.Config.Ports[fmt.Sprintf("%s.tcp", k3d.DefaultAPIPort)] = append(clusterConfig.ServerLoadBalancer.Config.Ports[fmt.Sprintf("%s.tcp", k3d.DefaultAPIPort)], serverNode.Name)
+	clusterConfig.ServerLoadBalancer.Config.Ports[fmt.Sprintf("%s.tcp", k3d.DefaultAPIPort)] =
+		append(clusterConfig.ServerLoadBalancer.Config.Ports[fmt.Sprintf("%s.tcp", k3d.DefaultAPIPort)], serverNode.Name)
 
 	// other configurations
 	portWithFilter, err := buildPortWithFilters()
@@ -368,11 +336,10 @@ func setUpK3d(ctx context.Context, cluster *config.ClusterConfig) error {
 		return errors.New("failed to create cluster")
 	}
 
-	info("Launching k3d cluster:", cluster.Cluster.Name)
 	for _, c := range l {
 		if c.Name == cluster.Name {
 			if c, err := k3dClient.ClusterGet(ctx, runtimes.SelectedRuntime, c); err == nil {
-				info("Detected an existing cluster:", c.Name, ";", c)
+				fmt.Printf(" Detected an existing cluster: %s", c.Name)
 				return nil
 			}
 			break
@@ -383,46 +350,5 @@ func setUpK3d(ctx context.Context, cluster *config.ClusterConfig) error {
 		return err
 	}
 
-	info("Successfully created k3d cluster.")
-	return nil
-}
-
-func addRepos(repos []repo.Entry) error {
-	for _, r := range repos {
-		if err := helm.AddRepo(&r); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func installCharts(i *installer) error {
-	install := func(cs []helm.InstallOpts) error {
-		cfg, err := helm.NewActionConfig("", util.ConfigPath(i.clusterName))
-		if err != nil {
-			return err
-		}
-
-		for _, c := range cs {
-			if err = c.Install(cfg); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	info("Installing playground database cluster...")
-	charts := i.wesql.getBaseCharts()
-	err := install(charts)
-	if err != nil {
-		return err
-	}
-
-	// install database cluster to default namespace
-	charts = i.wesql.getDBCharts()
-	err = install(charts)
-	if err != nil {
-		return err
-	}
 	return nil
 }

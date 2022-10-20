@@ -24,6 +24,7 @@ export GONOSUMDB ?= github.com/apecloud
 export GOPRIVATE ?= github.com/apecloud
 
 
+GITHUB_PROXY ?= https://github.91chi.fun/
 
 GIT_COMMIT  = $(shell git rev-list -1 HEAD)
 GIT_VERSION = $(shell git describe --always --abbrev=7 --dirty)
@@ -42,7 +43,7 @@ ENABLE_WEBHOOKS ?= false
 APP_NAME = kubeblock
 
 
-VERSION ?= 0.1.0-alpha.5
+VERSION ?= 0.1.0-alpha.6
 CHART_PATH = deploy/helm
 
 
@@ -68,6 +69,7 @@ ifeq ($(shell go help mod >/dev/null 2>&1 && echo true), true)
   MOD_VENDOR=-mod=vendor
 endif
 
+BUILDX_ENABLED ?= false
 ifneq ($(BUILDX_ENABLED), false)
 	ifeq ($(shell docker buildx inspect 2>/dev/null | awk '/Status/ { print $$2 }'), running)
 		BUILDX_ENABLED ?= true
@@ -130,7 +132,7 @@ help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 .PHONY: all
-all: manager dbctl ## Make all cmd binaries.
+all: manager dbctl agamotto ## Make all cmd binaries.
 
 ##@ Development
 
@@ -141,7 +143,7 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/..."
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -176,7 +178,7 @@ loggercheck: loggerchecktool ## Run loggercheck against code.
 	$(LOGGERCHECK) ./...
 
 .PHONY: build-checks
-build-checks: generate fmt vet goimports fast-lint ## Run build checks.
+build-checks: fmt vet goimports fast-lint ## Run build checks.
 
 .PHONY: mod-download
 mod-download: ## Run go mod download against go modules.
@@ -255,7 +257,7 @@ clean-dbctl: ## Clean bin/dbctl* CLI tools.
 ##@ Operator Controller Manager
 
 .PHONY: manager
-manager: cue-fmt build-checks ## Build manager binary.
+manager: cue-fmt generate build-checks ## Build manager binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
 
 
@@ -284,7 +286,52 @@ run-delve: manifests generate fmt vet  ## Run Delve debugger.
 	dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./bin/manager
 
 
+##@ Agamotto
 
+AGAMOTTO_LD_FLAGS = "-s -w \
+    -X github.com/prometheus/common/version.Version=$(VERSION) \
+    -X github.com/prometheus/common/version.Revision=$(GIT_COMMIT) \
+    -X github.com/prometheus/common/version.BuildUser=apecloud \
+    -X github.com/prometheus/common/version.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
+
+bin/agamotto.%: ## Cross build bin/agamotto.$(OS).$(ARCH) .
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${AGAMOTTO_LD_FLAGS} -o $@ ./cmd/agamotto/main.go
+
+.PHONY: agamotto
+agamotto: OS=$(shell $(GO) env GOOS)
+agamotto: ARCH=$(shell $(GO) env GOARCH)
+agamotto: build-checks ## Build agamotto related binaries
+	$(MAKE) bin/agamotto.${OS}.${ARCH}
+	mv bin/agamotto.${OS}.${ARCH} bin/agamotto
+
+.PHONY: clean
+clean-agamotto: ## Clean bin/mysqld_exporter.
+	rm -f bin/agamotto
+
+
+##@ DAP
+
+DAPRD_BUILD_PATH = ./cmd/daprd
+DAPRD_LD_FLAGS = "-s -w"
+
+bin/daprd.%: ## Cross build bin/daprd.$(OS).$(ARCH) .
+	cd $(DAPRD_BUILD_PATH) && GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${DAPRD_LD_FLAGS} -o ../../$@  ./main.go
+
+daprd-mod-vendor:
+	cd $(DAPRD_BUILD_PATH) && $(GO) mod tidy -compat=1.19
+	cd $(DAPRD_BUILD_PATH) && $(GO) mod vendor
+	cd $(DAPRD_BUILD_PATH) && $(GO) mod verify
+
+.PHONY: daprd
+daprd: OS=$(shell $(GO) env GOOS)
+daprd: ARCH=$(shell $(GO) env GOARCH)
+daprd: daprd-mod-vendor # build-checks ## Build daprd related binaries
+	$(MAKE) bin/daprd.${OS}.${ARCH}
+	mv bin/daprd.${OS}.${ARCH} bin/daprd
+
+.PHONY: clean
+clean-daprd: ## Clean bin/mysqld_exporter.
+	rm -f bin/daprd
 
 ##@ Deployment
 
@@ -332,7 +379,7 @@ ci-test: ci-test-pre test ## Run CI tests.
 ##@ Contributor
 
 .PHONY: reviewable
-reviewable: build-checks test check-license-header ## Run code checks to proceed with PR reviews.
+reviewable: generate build-checks test check-license-header ## Run code checks to proceed with PR reviews.
 	$(GO) mod tidy -compat=1.18
 
 .PHONY: check-diff
@@ -372,12 +419,12 @@ WESQL_CLUSTER_CHART_VERSION ?= 0.1.1
 
 .PHONY: bump-chart-ver-wqsql-cluster
 bump-chart-ver-wqsql-cluster: ## Bump WeSQL Clsuter helm chart version.
-	sed -i '' "s/^version:.*/version: $(WESQL_CLUSTER_CHART_VERSION)/" $(WECLUSTER_CHART_PATH)/Chart.yaml
-	# sed -i '' "s/^appVersion:.*/appVersion: $(WESQL_CLUSTER_CHART_VERSION)/" $(WECLUSTER_CHART_PATH)/Chart.yaml
+	sed -i '' "s/^version:.*/version: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
+	# sed -i '' "s/^appVersion:.*/appVersion: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
 
 .PHONY: helm-package-wqsql-cluster
 helm-package-wqsql-cluster: bump-chart-ver-wqsql-cluster ## Do WeSQL Clsuter helm package.
-	$(HELM) package $(WECLUSTER_CHART_PATH)
+	$(HELM) package $(WESQL_CLUSTER_CHART_PATH)
 
 .PHONY: helm-push-wqsql-cluster
 helm-push-wqsql-cluster: helm-package-wqsql-cluster ## Do WeSQL Clsuter helm package and push.
@@ -392,7 +439,6 @@ $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
 ## Tool Binaries
-GITHUB_PROXY ?= https://github.91chi.fun/
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest

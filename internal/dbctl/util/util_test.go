@@ -69,10 +69,21 @@ var _ = Describe("util", func() {
 		}{"test"})).Should(Succeed())
 	})
 
+	It("Test Spinner", func() {
+		spinner := Spinner(os.Stdout, "dbctl spinner test ... ")
+		spinner(true)
+
+		spinner = Spinner(os.Stdout, "dbctl spinner test ... ")
+		spinner(false)
+	})
+
 	It("Others", func() {
 		PrintVersion()
-		_, err := GetPublicIP()
-		Expect(err).ShouldNot(HaveOccurred())
+		if os.Getenv("TEST_GET_PUBLIC_IP") != "" {
+			_, err := GetPublicIP()
+			Expect(err).ShouldNot(HaveOccurred())
+		}
 		Expect(MakeSSHKeyPair("", "")).Should(HaveOccurred())
+		Expect(SetKubeConfig("test")).Should(Succeed())
 	})
 })

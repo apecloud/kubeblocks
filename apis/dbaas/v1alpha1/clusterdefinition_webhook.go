@@ -17,8 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"strings"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -105,15 +103,21 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 
 		// if consensus
 		consensusSpec := component.ConsensusSpec
+		if consensusSpec == nil {
+			*allErrs = append(*allErrs,
+				field.Required(field.NewPath("spec.components[*].consensusSpec"),
+					"consensusSpec is required when componentType=Consensus"))
+			continue
+		}
 
 		// roleObserveQuery and Leader are required
-		if strings.TrimSpace(consensusSpec.Leader.Name) == "" {
+		if consensusSpec.Leader.Name == "" {
 			*allErrs = append(*allErrs,
 				field.Required(field.NewPath("spec.components[*].consensusSpec.leader.name"),
 					"leader name can't be blank when componentType is Consensus"))
 		}
 
-		// Leader.Replicas should not present or should set to 1
+		// Leader.Replicas should not be present or should set to 1
 		if *consensusSpec.Leader.Replicas != 0 && *consensusSpec.Leader.Replicas != 1 {
 			*allErrs = append(*allErrs,
 				field.Invalid(field.NewPath("spec.components[*].consensusSpec.leader.replicas"),
@@ -146,7 +150,7 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 			}
 		}
 		if isFollowerPresent {
-			if consensusSpec.Leader.Replicas != nil {
+			if consensusSpec.Learner != nil && consensusSpec.Learner.Replicas != nil {
 				memberCount += *consensusSpec.Learner.Replicas
 			}
 			if memberCount != int32(component.DefaultReplicas) {

@@ -61,9 +61,8 @@ spec:
   type: state.mysql-8
   components:
   - typeName: replicasets
-    roleGroups:
-    - primary
-    defaultReplicas: 1
+    componentType: Consensus
+    defaultReplicas: 3
     podSpec:
       containers:
       - name: mysql
@@ -108,20 +107,11 @@ spec:
             echo $cluster_info;
             docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
   - typeName: proxy
-    roleGroups: ["proxy"]
-    defaultReplicas: 1
-    isStateless: true
+    componentType: Stateless
+    defaultReplicas: 2
     podSpec:
       containers:
       - name: nginx
-  roleGroupTemplates:
-  - typeName: primary
-    defaultReplicas: 3
-    updateStrategy:
-      # 对应 pdb 中的两个字段，两个中只能填一个
-      maxUnavailable: 1
-  - typeName: proxy
-    defaultReplicas: 2
 `
 		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())

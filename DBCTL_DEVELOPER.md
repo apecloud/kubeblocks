@@ -3,7 +3,7 @@
 ## 代码结构
 * 入口函数为 `cmd/dbctl/main.go`。
 * 所有支持的命令均在 `internal/dbctl/cmd` 目录中实现。
-  * `root.go` 为 `dbctl` 根命令
+  * `dbctl.go` 为 `dbctl` 根命令
   * `dbass` 部署 KubeBlocks 集群相关的命令
   * `cluster` 数据库集群相关命令
   * `backup` 备份相关命令

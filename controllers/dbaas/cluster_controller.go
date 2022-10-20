@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -40,6 +39,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/apecloud/kubeblocks/controllers/k8score"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -136,6 +137,7 @@ func (r *ClusterReconciler) Handle(cli client.Client, ctx context.Context, event
 //+kubebuilder:rbac:groups=apps,resources=deployments/finalizers;statefulsets/finalizers,verbs=update
 //+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets/finalizers,verbs=update
+//+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 // NOTES: owned K8s core API resources controller-gen RBAC marker is maintained at {REPO}/controllers/k8score/rbac.go
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -246,6 +248,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	setupConsensusRoleObserveFallbackMethod(mgr.GetClient())
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dbaasv1alpha1.Cluster{}).
 		//
@@ -389,11 +393,12 @@ func (r *ClusterReconciler) checkReferencedCRStatus(reqCtx intctrlutil.RequestCt
 		return nil, nil
 	}
 	patch := client.MergeFrom(cluster.DeepCopy())
-	cluster.Status.Message = fmt.Sprintf("%s.status.phase is not Available, this problem needs to be solved first", crKind)
+	cluster.Status.Message = fmt.Sprintf("%s.status.phase is unavailable, this problem needs to be solved first", crKind)
 	if err := r.Client.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
 		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		return &res, err
 	}
+	r.Recorder.Event(cluster, corev1.EventTypeWarning, "ReferencedCRUnavailable", cluster.Status.Message)
 	res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
 	return &res, err
 }
@@ -439,8 +444,6 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 			v.Status.CurrentRevision != v.Status.UpdateRevision ||
 			v.Status.ObservedGeneration != v.GetGeneration() {
 			isOk = false
-		} else {
-			cluster.Status.Phase = dbaasv1alpha1.RunningPhase
 		}
 		// when component phase is changed, set needSyncStatusComponent to true, then patch cluster.status
 		if ok := r.patchStatusComponentsWithStatefulSet(cluster, &v, cluster.Status.Phase); ok {
@@ -454,7 +457,8 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 			return false, err
 		}
 
-		if componentDef.ComponentType == dbaasv1alpha1.Consensus {
+		switch componentDef.ComponentType {
+		case dbaasv1alpha1.Consensus:
 			end, err := handleConsensusSetUpdate(ctx, r.Client, cluster, &v)
 			if err != nil {
 				return false, err
@@ -462,6 +466,8 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 			if !end {
 				isOk = false
 			}
+		case dbaasv1alpha1.Stateful:
+			// TODO wait other component type added
 		}
 	}
 

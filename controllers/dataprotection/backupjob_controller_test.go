@@ -253,7 +253,7 @@ spec:
     matchLabels:
       app.kubernetes.io/component: replicasets-replicasets
       app.kubernetes.io/instance: wesql-cluster-replicasets-primary
-      app.kubernetes.io/name: stat.mysql-wesql-clusterdefinition
+      app.kubernetes.io/name: state.mysql-wesql-clusterdefinition
   serviceName: wesql-cluster-replicasets-primary
   template:
     metadata:
@@ -261,7 +261,7 @@ spec:
       labels:
         app.kubernetes.io/component: replicasets-replicasets
         app.kubernetes.io/instance: wesql-cluster-replicasets-primary
-        app.kubernetes.io/name: stat.mysql-wesql-clusterdefinition
+        app.kubernetes.io/name: state.mysql-wesql-clusterdefinition
     spec:
       containers:
       - args: []

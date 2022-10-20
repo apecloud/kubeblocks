@@ -19,82 +19,84 @@ limitations under the License.
 package main
 
 import (
-	"os"
-	"os/signal"
-	"syscall"
+    "os"
+    "os/signal"
+    "syscall"
 
-	"go.uber.org/automaxprocs/maxprocs"
+    "go.uber.org/automaxprocs/maxprocs"
 
-	// Register all components
-	//_ "github.com/dapr/dapr/cmd/daprd/components"
+    // Register all components
+    //_ "github.com/dapr/dapr/cmd/daprd/components"
 
-	bindingsLoader "github.com/dapr/dapr/pkg/components/bindings"
-	configurationLoader "github.com/dapr/dapr/pkg/components/configuration"
-	lockLoader "github.com/dapr/dapr/pkg/components/lock"
-	httpMiddlewareLoader "github.com/dapr/dapr/pkg/components/middleware/http"
-	nrLoader "github.com/dapr/dapr/pkg/components/nameresolution"
-	pubsubLoader "github.com/dapr/dapr/pkg/components/pubsub"
-	secretstoresLoader "github.com/dapr/dapr/pkg/components/secretstores"
-	stateLoader "github.com/dapr/dapr/pkg/components/state"
+    bindingsLoader "github.com/dapr/dapr/pkg/components/bindings"
+    configurationLoader "github.com/dapr/dapr/pkg/components/configuration"
+    lockLoader "github.com/dapr/dapr/pkg/components/lock"
+    httpMiddlewareLoader "github.com/dapr/dapr/pkg/components/middleware/http"
+    nrLoader "github.com/dapr/dapr/pkg/components/nameresolution"
+    pubsubLoader "github.com/dapr/dapr/pkg/components/pubsub"
+    secretstoresLoader "github.com/dapr/dapr/pkg/components/secretstores"
+    stateLoader "github.com/dapr/dapr/pkg/components/state"
 
-	"github.com/dapr/dapr/pkg/runtime"
-	"github.com/dapr/kit/logger"
+    "github.com/dapr/dapr/pkg/runtime"
+    "github.com/dapr/kit/logger"
 
-	// "github.com/dapr/components-contrib/bindings"
-	// "github.com/dapr/components-contrib/bindings/mysql"
-	// "github.com/dapr/components-contrib/bindings/postgres"
-	// "github.com/dapr/components-contrib/bindings/redis"
-	"github.com/dapr/components-contrib/bindings/http"
-	"github.com/dapr/components-contrib/bindings/localstorage"
+    // "github.com/dapr/components-contrib/bindings"
+    // "github.com/dapr/components-contrib/bindings/mysql"
+    // "github.com/dapr/components-contrib/bindings/postgres"
+    // "github.com/dapr/components-contrib/bindings/redis"
+    "github.com/dapr/components-contrib/bindings/http"
+    "github.com/dapr/components-contrib/bindings/localstorage"
+    mdns "github.com/dapr/components-contrib/nameresolution/mdns"
 
 	"github.com/apecloud/kubeblocks/cmd/daprd/internal/binding/mysql"
 )
 
 var (
-	log        = logger.NewLogger("dapr.runtime")
-	logContrib = logger.NewLogger("dapr.contrib")
+    log        = logger.NewLogger("dapr.runtime")
+    logContrib = logger.NewLogger("dapr.contrib")
 )
 
 func init() {
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mysql.NewMysql, "mysql")
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(http.NewHTTP, "http")
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(localstorage.NewLocalStorage, "localstorage")
+    bindingsLoader.DefaultRegistry.RegisterOutputBinding(mysql.NewMysql, "mysql")
+    bindingsLoader.DefaultRegistry.RegisterOutputBinding(http.NewHTTP, "http")
+    bindingsLoader.DefaultRegistry.RegisterOutputBinding(localstorage.NewLocalStorage, "localstorage")
+    nrLoader.DefaultRegistry.RegisterComponent(mdns.NewResolver, "mdns")
 }
 
 func main() {
-	// set GOMAXPROCS
-	_, _ = maxprocs.Set()
+    // set GOMAXPROCS
+    _, _ = maxprocs.Set()
 
-	rt, err := runtime.FromFlags()
-	if err != nil {
-		log.Fatal(err)
-	}
+    rt, err := runtime.FromFlags()
+    if err != nil {
+        log.Fatal(err)
+    }
 
-	secretstoresLoader.DefaultRegistry.Logger = logContrib
-	stateLoader.DefaultRegistry.Logger = logContrib
-	configurationLoader.DefaultRegistry.Logger = logContrib
-	lockLoader.DefaultRegistry.Logger = logContrib
-	pubsubLoader.DefaultRegistry.Logger = logContrib
-	nrLoader.DefaultRegistry.Logger = logContrib
-	bindingsLoader.DefaultRegistry.Logger = logContrib
-	// httpMiddlewareLoader.DefaultRegistry.Logger = log
+    secretstoresLoader.DefaultRegistry.Logger = logContrib
+    stateLoader.DefaultRegistry.Logger = logContrib
+    configurationLoader.DefaultRegistry.Logger = logContrib
+    lockLoader.DefaultRegistry.Logger = logContrib
+    pubsubLoader.DefaultRegistry.Logger = logContrib
+    nrLoader.DefaultRegistry.Logger = logContrib
+    bindingsLoader.DefaultRegistry.Logger = logContrib
+    httpMiddlewareLoader.DefaultRegistry.Logger = log
 
-	err = rt.Run(
-		runtime.WithSecretStores(secretstoresLoader.DefaultRegistry),
-		runtime.WithStates(stateLoader.DefaultRegistry),
-		runtime.WithConfigurations(configurationLoader.DefaultRegistry),
-		runtime.WithLocks(lockLoader.DefaultRegistry),
-		runtime.WithPubSubs(pubsubLoader.DefaultRegistry),
-		runtime.WithNameResolutions(nrLoader.DefaultRegistry),
-		runtime.WithBindings(bindingsLoader.DefaultRegistry),
-		runtime.WithHTTPMiddlewares(httpMiddlewareLoader.DefaultRegistry),
-	)
-	if err != nil {
-		log.Fatalf("fatal error from runtime: %s", err)
-	}
+    err = rt.Run(
+        runtime.WithSecretStores(secretstoresLoader.DefaultRegistry),
+        runtime.WithStates(stateLoader.DefaultRegistry),
+        runtime.WithConfigurations(configurationLoader.DefaultRegistry),
+        runtime.WithLocks(lockLoader.DefaultRegistry),
+        runtime.WithPubSubs(pubsubLoader.DefaultRegistry),
+        runtime.WithNameResolutions(nrLoader.DefaultRegistry),
+        runtime.WithBindings(bindingsLoader.DefaultRegistry),
+        runtime.WithHTTPMiddlewares(httpMiddlewareLoader.DefaultRegistry),
+    )
+    if err != nil {
+        log.Fatalf("fatal error from runtime: %s", err)
+    }
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
-	<-stop
-	rt.ShutdownWithWait()
+    stop := make(chan os.Signal, 1)
+    signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
+    <-stop
+    rt.ShutdownWithWait()
 }

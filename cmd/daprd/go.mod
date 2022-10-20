@@ -1,6 +1,6 @@
 module github.com/apecloud/kubeblocks/cmd/daprd
 
-go 1.18
+go 1.19
 
 replace github.com/apecloud/kubeblocks => ../..
 

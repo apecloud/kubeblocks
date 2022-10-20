@@ -50,6 +50,7 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:Required
 	AppVersionRef string `json:"appVersionRef"`
 
+	// List of components you want to replace in ClusterDefinition and AppVersion. It will replace the field in ClusterDefinition's and AppVersion's component if type is matching
 	// +optional
 	Components []ClusterComponent `json:"components,omitempty"`
 
@@ -145,12 +146,14 @@ type ClusterComponent struct {
 	// +kubebuilder:default=false
 	Monitor bool `json:"monitor"`
 
+	// Resources requests and limits of workload
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
 	// ref roleGroups in ClusterDefinition
 	RoleGroups []ClusterRoleGroup `json:"roleGroups,omitempty"`
 
+	// VolumeClaimTemplates information for statefulset.spec.volumeClaimTemplates
 	// +optional
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 
@@ -216,7 +219,9 @@ type ClusterStatusRoleGroup struct {
 }
 
 type ClusterComponentVolumeClaimTemplate struct {
-	Name string                           `json:"name"`
+	// Ref AppVersion.spec.components.containers.volumeMounts.name
+	Name string `json:"name"`
+	// Spec defines the desired characteristics of a volume requested by a pod author
 	Spec corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"`
 }
 

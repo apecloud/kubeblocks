@@ -30,6 +30,7 @@ type AppVersionSpec struct {
 	// +kubebuilder:validation:Required
 	ClusterDefinitionRef string `json:"clusterDefinitionRef,omitempty"`
 
+	// List of components in current AppVersion. Component will replace the field in ClusterDefinition's component if type is matching typeName
 	// +kubebuilder:validation:MinItems=1
 	Components []AppVersionComponent `json:"components,omitempty"`
 }

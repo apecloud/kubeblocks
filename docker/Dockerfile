@@ -38,7 +38,7 @@ COPY internal/ internal/
 COPY controllers/ controllers/
 
 # Download binaries
-RUN /bin/curl -L https://dl.k8s.io/release/v1.24.2/bin/${TARGETOS}/${TARGETARCH}/kubectl -o kubectl # && chmod +x kubectl
+RUN curl -L https://dl.k8s.io/release/v1.24.2/bin/${TARGETOS}/${TARGETARCH}/kubectl -o kubectl && chmod +x kubectl
 
 # Build
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o agamotto cmd/agamotto/main.go
@@ -73,7 +73,6 @@ RUN go mod download
 # Build
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o probe ./main.go
 
-
 FROM --platform=${TARGETPLATFORM} tarampampam/curl:7.85.0 as binary-downloader
 
 # Use distroless as minimal base image to package the manager binary
@@ -85,6 +84,7 @@ COPY config/components config/components
 COPY --from=builder /workspace/kubectl /bin
 COPY --from=binary-downloader /bin/curl /bin
 COPY --from=probe-builder /workspace/cmd/daprd/probe /bin
+COPY --from=builder /workspace/kubectl /bin
 COPY --from=builder /workspace/agamotto /bin
 COPY --from=builder /workspace/manager .
 USER 65532:65532

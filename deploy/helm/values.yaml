@@ -215,3 +215,7 @@ grafana:
 
   testFramework:
     enabled: false
+
+# Sub-charts
+loadbalancer:
+  enabled: false

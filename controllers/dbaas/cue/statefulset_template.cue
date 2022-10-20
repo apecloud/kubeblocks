@@ -49,7 +49,7 @@ statefulset: {
 		selector:
 			matchLabels: {
 				"app.kubernetes.io/name":           "\(component.clusterType)-\(component.clusterDefName)"
-				"app.kubernetes.io/instance":       "\(cluster.metadata.name)-\(component.name)"
+				"app.kubernetes.io/instance":       "\(cluster.metadata.name)"
 				"app.kubernetes.io/component-name": "\(component.name)"
 			}
 		serviceName:         "\(cluster.metadata.name)-\(component.name)"
@@ -60,7 +60,7 @@ statefulset: {
 			metadata: {
 				labels: {
 					"app.kubernetes.io/name":           "\(component.clusterType)-\(component.clusterDefName)"
-					"app.kubernetes.io/instance":       "\(cluster.metadata.name)-\(component.name)"
+					"app.kubernetes.io/instance":       "\(cluster.metadata.name)"
 					"app.kubernetes.io/component-name": "\(component.name)"
 					// "app.kubernetes.io/version" : # TODO
 				}

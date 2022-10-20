@@ -21,6 +21,10 @@ DEBIAN_MIRROR=mirrors.aliyun.com
 DOCKER:=docker
 DOCKERFILE_DIR?=./docker
 
+LB_IMG ?= docker.io/infracreate/loadbalancer
+LB_VERSION ?= 0.1.0
+LB_TAG ?= v$(LB_VERSION)
+
 # Image URL to use all building/pushing image targets
 IMG ?= docker.io/infracreate/$(APP_NAME)
 CLI_IMG ?= docker.io/infracreate/dbctl
@@ -33,9 +37,9 @@ DEV_CONTAINER_IMAGE_NAME = docker.io/infracreate/$(APP_NAME)-dev
 DEV_CONTAINER_DOCKERFILE = Dockerfile-dapr-dev
 DOCKERFILE_DIR = ./docker
 
-.PHONY: build-dev-container
-build-dev-container: DOCKER_BUILD_ARGS += --build-arg DEBIAN_MIRROR=$(DEBIAN_MIRROR) --build-arg GITHUB_PROXY=$(GITHUB_PROXY) --build-arg GOPROXY=$(GOPROXY)
-build-dev-container: ## Build dev container image.
+.PHONY: build-dev-image
+build-dev-image: DOCKER_BUILD_ARGS += --build-arg DEBIAN_MIRROR=$(DEBIAN_MIRROR) --build-arg GITHUB_PROXY=$(GITHUB_PROXY) --build-arg GOPROXY=$(GOPROXY)
+build-dev-image: ## Build dev container image.
 ifneq ($(BUILDX_ENABLED), true)
 	docker build . $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/${DEV_CONTAINER_DOCKERFILE} -t $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG)
 else
@@ -43,9 +47,9 @@ else
 endif
 
 
-.PHONY: push-dev-container
-push-dev-container: DOCKER_BUILD_ARGS += --build-arg DEBIAN_MIRROR=$(DEBIAN_MIRROR) --build-arg GITHUB_PROXY=$(GITHUB_PROXY) --build-arg GOPROXY=$(GOPROXY)
-push-dev-container: ## Push dev container image.
+.PHONY: push-dev-image
+push-dev-image: DOCKER_BUILD_ARGS += --build-arg DEBIAN_MIRROR=$(DEBIAN_MIRROR) --build-arg GITHUB_PROXY=$(GITHUB_PROXY) --build-arg GOPROXY=$(GOPROXY)
+push-dev-image: ## Push dev container image.
 ifneq ($(BUILDX_ENABLED), true)
 	docker push $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG)
 else
@@ -53,17 +57,17 @@ else
 endif
 
 
-.PHONY: build-cli-container
-build-cli-container: clean-dbctl build-checks bin/dbctl.linux.amd64 bin/dbctl.linux.arm64 bin/dbctl.darwin.arm64 bin/dbctl.darwin.amd64 bin/dbctl.windows.amd64 ## Build dbctl CLI container image.
+.PHONY: build-cli-image
+build-cli-image: clean-dbctl build-checks bin/dbctl.linux.amd64 bin/dbctl.linux.arm64 bin/dbctl.darwin.arm64 bin/dbctl.darwin.amd64 bin/dbctl.windows.amd64 ## Build dbctl CLI container image.
 	docker build . -t ${CLI_IMG}:${CLI_TAG} -f $(DOCKERFILE_DIR)/Dockerfile-dbctl
 
-.PHONY: push-cli-container
-push-cli-container: clean-dbctl build-checks bin/dbctl.linux.amd64 bin/dbctl.linux.arm64 bin/dbctl.darwin.arm64 bin/dbctl.darwin.amd64 bin/dbctl.windows.amd64 ## Push dbctl CLI container image.
+.PHONY: push-cli-image
+push-cli-image: clean-dbctl build-checks bin/dbctl.linux.amd64 bin/dbctl.linux.arm64 bin/dbctl.darwin.arm64 bin/dbctl.darwin.amd64 bin/dbctl.windows.amd64 ## Push dbctl CLI container image.
 	docker push ${CLI_IMG}:${CLI_TAG}
 
 
-.PHONY: build-manager-container
-build-manager-container: # test ## Build Operator manager container image.
+.PHONY: build-manager-image
+build-manager-image: test ## Build Operator manager container image.
 ifneq ($(BUILDX_ENABLED), true)
 	docker build . -t ${IMG}:${VERSION} -f $(DOCKERFILE_DIR)/Dockerfile -t ${IMG}:latest
 else
@@ -75,8 +79,8 @@ endif
 endif
 
 
-.PHONY: push-manager-container
-push-manager-container: ## Push Operator manager container image.
+.PHONY: push-manager-image
+push-manager-image: ## Push Operator manager container image.
 ifneq ($(BUILDX_ENABLED), true)
 ifeq ($(TAG_LATEST), true)
 	docker push ${IMG}:latest
@@ -90,3 +94,32 @@ else
 	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} --push
 endif
 endif
+
+.PHONY: build-loadbalancer-image
+build-loadbalancer-image: ## Push docker image with the loadbalancer.
+ifneq ($(BUILDX_ENABLED), true)
+	docker build . -t ${LB_IMG}:${LB_TAG} -t ${LB_IMG}:latest -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer
+else
+ifeq ($(TAG_LATEST), true)
+	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:latest -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer
+else
+	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:${LB_TAG} -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer
+endif
+endif
+
+.PHONY: push-loadbalancer-image
+push-loadbalancer-image: test ## Push docker image with the loadbalancer.
+ifneq ($(BUILDX_ENABLED), true)
+ifeq ($(TAG_LATEST), true)
+	docker push ${LB_IMG}:latest
+else
+	docker push ${LB_IMG}:${LB_TAG}
+endif
+else
+ifeq ($(TAG_LATEST), true)
+	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:latest -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer --push
+else
+	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:${LB_TAG} -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer --push
+endif
+endif
+

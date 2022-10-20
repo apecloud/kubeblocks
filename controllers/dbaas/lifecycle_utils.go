@@ -1202,7 +1202,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 	probeContainers := []corev1.Container{}
 	componentProbes := params.component.Probes
 	reqCtx.Log.Info("probe", "settings", componentProbes)
-	//if componentProbes.StatusProbe.Enable {
+	// if componentProbes.StatusProbe.Enable {
 	//	container := corev1.Container{}
 	//	if err = json.Unmarshal(probeContainerByte, &container); err != nil {
 	//		return nil, err
@@ -1215,9 +1215,9 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 	//	probe.SuccessThreshold = componentProbes.StatusProbe.SuccessThreshold
 	//	probe.FailureThreshold = componentProbes.StatusProbe.FailureThreshold
 	//	probeContainers = append(probeContainers, container)
-	//}
+	// }
 
-	//if componentProbes.RunningProbe.Enable {
+	// if componentProbes.RunningProbe.Enable {
 	//	container := corev1.Container{}
 	//	if err = json.Unmarshal(probeContainerByte, &container); err != nil {
 	//		return nil, err
@@ -1230,7 +1230,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 	//	probe.SuccessThreshold = componentProbes.RunningProbe.SuccessThreshold
 	//	probe.FailureThreshold = componentProbes.RunningProbe.FailureThreshold
 	//	probeContainers = append(probeContainers, container)
-	//}
+	// }
 
 	if componentProbes.RoleChangedProbe.Enable {
 		container := corev1.Container{}
@@ -1239,12 +1239,12 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 		}
 		container.Name = "kbprobe-rolechangedcheck"
 		probe := container.ReadinessProbe
-		//probe.HTTPGet.Path = "/"
+		// probe.HTTPGet.Path = "/"
 		probe.Exec.Command = []string{"curl", "-X", "POST", "-H", "Content-Type: application/json", "http://localhost:3501/v1.0/bindings/mtest", "-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
 		probe.PeriodSeconds = componentProbes.RoleChangedProbe.PeriodSeconds
 		probe.SuccessThreshold = componentProbes.RoleChangedProbe.SuccessThreshold
 		probe.FailureThreshold = componentProbes.RoleChangedProbe.FailureThreshold
-		//probe.InitialDelaySeconds = 60
+		// probe.InitialDelaySeconds = 60
 		probeContainers = append(probeContainers, container)
 	}
 

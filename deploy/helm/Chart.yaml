@@ -61,5 +61,6 @@ dependencies:
     name: prometheus
     repository: https://prometheus-community.github.io/helm-charts
     version: 15.15 - 15.16
-  - condition: prometheus.enabled
+  - condition: loadbalancer.enabled
     name: loadbalancer
+    version: 0.1.*

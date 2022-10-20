@@ -1240,7 +1240,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 		container.Name = "kbprobe-rolechangedcheck"
 		probe := container.ReadinessProbe
 		//probe.HTTPGet.Path = "/"
-		probe.Exec.Command = []string{"sh", "-c", "curl -X POST -H 'Content-Type: application/json' http://localhost:3501/v1.0/bindings/mtest  -d  '{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}'"}
+		probe.Exec.Command = []string{"curl", "-X", "POST", "-H", "Content-Type: application/json", "http://localhost:3501/v1.0/bindings/mtest", "-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
 		probe.PeriodSeconds = componentProbes.RoleChangedProbe.PeriodSeconds
 		probe.SuccessThreshold = componentProbes.RoleChangedProbe.SuccessThreshold
 		probe.FailureThreshold = componentProbes.RoleChangedProbe.FailureThreshold
@@ -1249,8 +1249,8 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 	}
 
 	if len(probeContainers) >= 1 {
-		probeContainers[0].Image = "xuriwuyun/infracreateprobe:latest"
-		probeContainers[0].Command = []string{"/daprd", "--app-id", "batch-sdk", "--dapr-http-port", "3501", "--dapr-grpc-port", "54215", "--app-protocol", "http", "--components-path", "/components"}
+		probeContainers[0].Image = "xuriwuyun/kubeblocks:latest"
+		probeContainers[0].Command = []string{"probe", "--app-id", "batch-sdk", "--dapr-http-port", "3501", "--dapr-grpc-port", "54215", "--app-protocol", "http", "--components-path", "/config/components"}
 		containerPort := corev1.ContainerPort{}
 		containerPort.ContainerPort = 3501
 		containerPort.Name = "probe-port"

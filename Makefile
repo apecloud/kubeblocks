@@ -309,7 +309,7 @@ clean-agamotto: ## Clean bin/mysqld_exporter.
 	rm -f bin/agamotto
 
 
-##@ DAPRd
+##@ DAP
 
 DAPRD_BUILD_PATH = ./cmd/daprd
 DAPRD_LD_FLAGS = "-s -w"
@@ -318,7 +318,7 @@ bin/daprd.%: ## Cross build bin/daprd.$(OS).$(ARCH) .
 	cd $(DAPRD_BUILD_PATH) && GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${DAPRD_LD_FLAGS} -o ../../$@  ./main.go
 
 daprd-mod-vendor:
-	cd $(DAPRD_BUILD_PATH) && $(GO) mod tidy -compat=1.18
+	cd $(DAPRD_BUILD_PATH) && $(GO) mod tidy -compat=1.19
 	cd $(DAPRD_BUILD_PATH) && $(GO) mod vendor
 	cd $(DAPRD_BUILD_PATH) && $(GO) mod verify
 

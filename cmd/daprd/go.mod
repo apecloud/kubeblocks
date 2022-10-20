@@ -5,10 +5,11 @@ go 1.19
 replace github.com/apecloud/kubeblocks => ../..
 
 require (
-	github.com/apecloud/kubeblocks v0.0.0-00010101000000-000000000000
 	github.com/dapr/components-contrib v1.9.0
 	github.com/dapr/dapr v1.9.0
 	github.com/dapr/kit v0.0.3-0.20220930182601-272e358ba6a7
+	github.com/go-sql-driver/mysql v1.6.0
+	github.com/pkg/errors v0.9.1
 	go.uber.org/automaxprocs v1.5.1
 )
 
@@ -36,7 +37,6 @@ require (
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.19.5 // indirect
 	github.com/go-openapi/swag v0.19.14 // indirect
-	github.com/go-sql-driver/mysql v1.6.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/mock v1.6.0 // indirect
@@ -63,8 +63,8 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/onsi/gomega v1.20.0 // indirect
 	github.com/openzipkin/zipkin-go v0.4.0 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.12.2 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect

@@ -63,7 +63,7 @@ push-cli-container: clean-dbctl build-checks bin/dbctl.linux.amd64 bin/dbctl.lin
 
 
 .PHONY: build-manager-container
-build-manager-container: test ## Build Operator manager container image.
+build-manager-container: # test ## Build Operator manager container image.
 ifneq ($(BUILDX_ENABLED), true)
 	docker build . -t ${IMG}:${VERSION} -f $(DOCKERFILE_DIR)/Dockerfile -t ${IMG}:latest
 else

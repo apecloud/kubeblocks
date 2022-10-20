@@ -1244,7 +1244,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 		probe.PeriodSeconds = componentProbes.RoleChangedProbe.PeriodSeconds
 		probe.SuccessThreshold = componentProbes.RoleChangedProbe.SuccessThreshold
 		probe.FailureThreshold = componentProbes.RoleChangedProbe.FailureThreshold
-		probe.InitialDelaySeconds = 60
+		//probe.InitialDelaySeconds = 60
 		probeContainers = append(probeContainers, container)
 	}
 

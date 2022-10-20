@@ -75,11 +75,13 @@ const (
 )
 
 var oriRole = ""
+var bootTime = time.Now()
 
 // Mysql represents MySQL output bindings.
 type Mysql struct {
-	db     *sql.DB
-	logger logger.Logger
+	db       *sql.DB
+	logger   logger.Logger
+	metadata bindings.Metadata
 }
 
 // NewMysql returns a new MySQL output binding.
@@ -90,14 +92,18 @@ func NewMysql(logger logger.Logger) bindings.OutputBinding {
 // Init initializes the MySQL binding.
 func (m *Mysql) Init(metadata bindings.Metadata) error {
 	m.logger.Debug("Initializing MySql binding")
+	m.metadata = metadata
+	return nil
+}
 
-	p := metadata.Properties
+func (m *Mysql) InitDelay() error {
+	p := m.metadata.Properties
 	url, ok := p[connectionURLKey]
 	if !ok || url == "" {
 		return fmt.Errorf("missing MySql connection string")
 	}
 
-	db, err := initDB(url, metadata.Properties[pemPathKey])
+	db, err := initDB(url, m.metadata.Properties[pemPathKey])
 	if err != nil {
 		return err
 	}
@@ -134,8 +140,28 @@ func (m *Mysql) Init(metadata bindings.Metadata) error {
 
 // Invoke handles all invoke operations.
 func (m *Mysql) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
+	startTime := time.Now()
+	resp := &bindings.InvokeResponse{
+		Metadata: map[string]string{
+			respOpKey:        string(req.Operation),
+			respSQLKey:       "test",
+			respStartTimeKey: startTime.Format(time.RFC3339Nano),
+		},
+	}
+
+	bootDuration := time.Now().Sub(bootTime).Seconds()
+	if bootDuration < 60 {
+		resp.Data = []byte("db not ready")
+		return resp, nil
+	}
+
+	err1 := m.InitDelay()
 	if req == nil {
 		return nil, errors.Errorf("invoke request required")
+	}
+	if err1 != nil {
+		resp.Data = []byte("db not ready")
+		return resp, nil
 	}
 
 	if req.Operation == closeOperation {
@@ -150,16 +176,6 @@ func (m *Mysql) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindi
 	s, ok := req.Metadata[commandSQLKey]
 	if !ok {
 		return nil, errors.Errorf("required metadata not set: %s", commandSQLKey)
-	}
-
-	startTime := time.Now()
-
-	resp := &bindings.InvokeResponse{
-		Metadata: map[string]string{
-			respOpKey:        string(req.Operation),
-			respSQLKey:       s,
-			respStartTimeKey: startTime.Format(time.RFC3339Nano),
-		},
 	}
 
 	switch req.Operation { //nolint:exhaustive

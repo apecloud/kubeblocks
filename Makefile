@@ -24,6 +24,7 @@ export GONOSUMDB ?= github.com/apecloud
 export GOPRIVATE ?= github.com/apecloud
 
 
+GITHUB_PROXY ?= https://github.91chi.fun/
 
 GIT_COMMIT  = $(shell git rev-list -1 HEAD)
 GIT_VERSION = $(shell git describe --always --abbrev=7 --dirty)
@@ -401,12 +402,12 @@ WESQL_CLUSTER_CHART_VERSION ?= 0.1.1
 
 .PHONY: bump-chart-ver-wqsql-cluster
 bump-chart-ver-wqsql-cluster: ## Bump WeSQL Clsuter helm chart version.
-	sed -i '' "s/^version:.*/version: $(WESQL_CLUSTER_CHART_VERSION)/" $(WECLUSTER_CHART_PATH)/Chart.yaml
-	# sed -i '' "s/^appVersion:.*/appVersion: $(WESQL_CLUSTER_CHART_VERSION)/" $(WECLUSTER_CHART_PATH)/Chart.yaml
+	sed -i '' "s/^version:.*/version: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
+	# sed -i '' "s/^appVersion:.*/appVersion: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
 
 .PHONY: helm-package-wqsql-cluster
 helm-package-wqsql-cluster: bump-chart-ver-wqsql-cluster ## Do WeSQL Clsuter helm package.
-	$(HELM) package $(WECLUSTER_CHART_PATH)
+	$(HELM) package $(WESQL_CLUSTER_CHART_PATH)
 
 .PHONY: helm-push-wqsql-cluster
 helm-push-wqsql-cluster: helm-package-wqsql-cluster ## Do WeSQL Clsuter helm package and push.
@@ -421,7 +422,6 @@ $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
 ## Tool Binaries
-GITHUB_PROXY ?= https://github.91chi.fun/
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest

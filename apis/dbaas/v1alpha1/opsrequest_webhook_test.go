@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/sethvargo/go-password/password"
@@ -46,6 +47,12 @@ var _ = Describe("OpsRequest webhook", func() {
 		patch := client.MergeFrom(cluster.DeepCopy())
 		cluster.Status.Operations.Upgradable = true
 		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
+		// wait until patch succeed
+		Eventually(func() bool {
+			tmpCluster := &Cluster{}
+			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
+			return tmpCluster.Status.Operations.Upgradable
+		}, 10, 1).Should(BeTrue())
 
 		By("By testing when spec.clusterOps is null")
 		Expect(k8sClient.Create(ctx, opsRequest)).ShouldNot(Succeed())
@@ -63,7 +70,12 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("By creating a upgrade opsRequest, it should be succeed")
 		opsRequest.Spec.ClusterOps.Upgrade.AppVersionRef = appVersionNameForUpgrade
 		Expect(k8sClient.Create(ctx, opsRequest)).Should(Succeed())
-
+		// wait until OpsRequest created
+		Eventually(func() bool {
+			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: opsRequest.Name,
+				Namespace: opsRequest.Namespace}, &OpsRequest{})
+			return err == nil
+		}, 10, 1).Should(BeTrue())
 		By("By testing Immutable when status.phase in (Running,Succeed)")
 		opsRequest.Status.Phase = RunningPhase
 		Expect(k8sClient.Status().Update(ctx, opsRequest)).Should(Succeed())
@@ -76,6 +88,12 @@ var _ = Describe("OpsRequest webhook", func() {
 		patch := client.MergeFrom(cluster.DeepCopy())
 		cluster.Status.Operations.VerticalScalable = []string{"replicaSets"}
 		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
+		// wait until patch succeed
+		Eventually(func() bool {
+			tmpCluster := &Cluster{}
+			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
+			return len(cluster.Status.Operations.VerticalScalable) > 0
+		}, 10, 1).Should(BeTrue())
 
 		By("By testing verticalScaling opsRequest components is not consistent")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VerticalScalingType)
@@ -104,6 +122,12 @@ var _ = Describe("OpsRequest webhook", func() {
 			},
 		}
 		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
+		// wait until patch succeed
+		Eventually(func() bool {
+			tmpCluster := &Cluster{}
+			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
+			return len(cluster.Status.Operations.VolumeExpandable) > 0
+		}, 10, 1).Should(BeTrue())
 
 		By("By testing volumeExpansion volumeClaimTemplate name is not consistent")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VolumeExpansionType)
@@ -135,6 +159,12 @@ var _ = Describe("OpsRequest webhook", func() {
 			},
 		}
 		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
+		// wait until patch succeed
+		Eventually(func() bool {
+			tmpCluster := &Cluster{}
+			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
+			return len(cluster.Status.Operations.HorizontalScalable) > 0
+		}, 10, 1).Should(BeTrue())
 
 		By("By testing horizontalScaling replica is not in [min,max]")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
@@ -157,6 +187,12 @@ var _ = Describe("OpsRequest webhook", func() {
 		patch := client.MergeFrom(cluster.DeepCopy())
 		cluster.Status.Operations.Restartable = []string{"replicaSets"}
 		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
+		// wait until patch succeed
+		Eventually(func() bool {
+			tmpCluster := &Cluster{}
+			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
+			return len(cluster.Status.Operations.Restartable) > 0
+		}, 10, 1).Should(BeTrue())
 
 		By("By testing restart when componentNames is not correct")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, RestartType)
@@ -175,10 +211,20 @@ var _ = Describe("OpsRequest webhook", func() {
 			By("By create a clusterDefinition")
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
 			Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
+			// wait until ClusterDefinition created
+			Eventually(func() bool {
+				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)
+				return err == nil
+			}, 10, 1).Should(BeTrue())
 
 			By("By creating a appVersion")
 			appVersion := createTestAppVersionObj(clusterDefinitionName, appVersionName)
 			Expect(k8sClient.Create(ctx, appVersion)).Should(Succeed())
+			// wait until AppVersion created
+			Eventually(func() bool {
+				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: appVersionName}, appVersion)
+				return err == nil
+			}, 10, 1).Should(BeTrue())
 
 			By("By testing spec.clusterDef is legal")
 			opsRequest := createTestOpsRequest(clusterName, opsRequestName, UpgradeType)
@@ -187,6 +233,12 @@ var _ = Describe("OpsRequest webhook", func() {
 			By("By create a new cluster ")
 			cluster, _ := createTestCluster(clusterDefinitionName, appVersionName, clusterName)
 			Expect(k8sClient.Create(ctx, cluster)).Should(Succeed())
+
+			// wait until Cluster created
+			Eventually(func() bool {
+				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: cluster.Namespace}, &Cluster{})
+				return err == nil
+			}, 10, 1).Should(BeTrue())
 
 			testUpgrade(cluster, opsRequest)
 

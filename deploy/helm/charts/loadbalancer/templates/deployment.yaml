@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "loadbalancer.fullname" . }}-controller
+  labels:
+    {{- include "loadbalancer.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "loadbalancer.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "loadbalancer.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "loadbalancer.serviceAccountName" . }}
+      containers:
+        - name: controller
+          command:
+            - "/controller"
+          args:
+            - "--health-probe-bind-address=:8081"
+            - "--metrics-bind-address=127.0.0.1:8080"
+            - "--leader-elect"
+            - "-zap-encoder=console"
+            - "-zap-time-encoding=iso8601"
+            - "-zap-devel={{ .Values.enableDebugLog }}"
+          image: "{{ .Values.image.repository }}:v{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: health
+              containerPort: 8081
+              protocol: TCP
+            - name: webhook-server
+              containerPort: 9443
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          env:
+            - name: RPC_PORT
+              value: "{{ .Values.agent.rpcPort }}"
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: 10
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:

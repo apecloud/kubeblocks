@@ -19,6 +19,7 @@ package dbaas
 import (
 	"context"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -64,14 +65,12 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, dbClusterDef, dbClusterDefFinalizerName, func() (*ctrl.Result, error) {
-		statusHandler := func() error {
-			patch := client.MergeFrom(dbClusterDef.DeepCopy())
-			dbClusterDef.Status.Phase = dbaasv1alpha1.DeletingPhase
-			dbClusterDef.Status.Message = "cannot be deleted because of existing referencing Cluster or AppVersion."
-			return r.Client.Status().Patch(ctx, dbClusterDef, patch)
+		recordEvent := func() {
+			r.Recorder.Event(dbClusterDef, corev1.EventTypeWarning, "ExistsReferencedResources",
+				"cannot be deleted because of existing referencing Cluster or AppVersion.")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, dbClusterDef,
-			clusterDefLabelKey, statusHandler, &dbaasv1alpha1.ClusterList{},
+			clusterDefLabelKey, recordEvent, &dbaasv1alpha1.ClusterList{},
 			&dbaasv1alpha1.AppVersionList{}); res != nil || err != nil {
 			return res, err
 		}

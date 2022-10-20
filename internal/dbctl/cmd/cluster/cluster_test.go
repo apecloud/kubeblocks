@@ -95,10 +95,10 @@ var _ = Describe("Cluster", func() {
 	It("delete", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace("default")
 		defer tf.Cleanup()
-		cmd := NewDeleteCmd(tf)
+		cmd := NewDeleteCmd(tf, streams)
 		Expect(cmd != nil).To(BeTrue())
 
-		del := &DeleteOptions{}
+		del := &DeleteOptions{IOStreams: streams}
 		Expect(del.Validate([]string{})).To(MatchError("missing cluster name"))
 		Expect(del.Complete(tf, []string{"test"})).Should(Succeed())
 		Expect(del.Namespace).To(Equal("default"))

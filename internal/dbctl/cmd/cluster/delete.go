@@ -38,8 +38,8 @@ type DeleteOptions struct {
 	genericclioptions.IOStreams
 }
 
-func NewDeleteCmd(f cmdutil.Factory) *cobra.Command {
-	o := &DeleteOptions{}
+func NewDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &DeleteOptions{IOStreams: streams}
 
 	cmd := &cobra.Command{
 		Use:   "delete",

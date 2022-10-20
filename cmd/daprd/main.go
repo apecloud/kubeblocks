@@ -24,13 +24,13 @@ import (
 	//_ "github.com/dapr/dapr/cmd/daprd/components"
 
 	bindingsLoader "github.com/dapr/dapr/pkg/components/bindings"
-	// configurationLoader "github.com/dapr/dapr/pkg/components/configuration"
-	// lockLoader "github.com/dapr/dapr/pkg/components/lock"
-	// httpMiddlewareLoader "github.com/dapr/dapr/pkg/components/middleware/http"
-	// nrLoader "github.com/dapr/dapr/pkg/components/nameresolution"
-	// pubsubLoader "github.com/dapr/dapr/pkg/components/pubsub"
-	// secretstoresLoader "github.com/dapr/dapr/pkg/components/secretstores"
-	// stateLoader "github.com/dapr/dapr/pkg/components/state"
+	configurationLoader "github.com/dapr/dapr/pkg/components/configuration"
+	lockLoader "github.com/dapr/dapr/pkg/components/lock"
+	httpMiddlewareLoader "github.com/dapr/dapr/pkg/components/middleware/http"
+	nrLoader "github.com/dapr/dapr/pkg/components/nameresolution"
+	pubsubLoader "github.com/dapr/dapr/pkg/components/pubsub"
+	secretstoresLoader "github.com/dapr/dapr/pkg/components/secretstores"
+	stateLoader "github.com/dapr/dapr/pkg/components/state"
 
 	"github.com/dapr/dapr/pkg/runtime"
 	"github.com/dapr/kit/logger"
@@ -40,7 +40,6 @@ import (
 	// "github.com/dapr/components-contrib/bindings/postgres"
 	// "github.com/dapr/components-contrib/bindings/redis"
 	"github.com/dapr/components-contrib/bindings/http"
-	// "github.com/dapr/components-contrib/bindings/kafka"
 	"github.com/dapr/components-contrib/bindings/localstorage"
 
 	"github.com/apecloud/kubeblocks/pkg/binding/mysql"
@@ -53,15 +52,7 @@ var (
 
 func init() {
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mysql.NewMysql, "mysql")
-	// bindingsLoader.DefaultRegistry.RegisterOutputBinding(postgres.NewPostgres, "postgres")
-	// bindingsLoader.DefaultRegistry.RegisterOutputBinding(redis.NewRedis, "redis")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(http.NewHTTP, "http")
-	// bindingsLoader.DefaultRegistry.RegisterInputBinding(func(l logger.Logger) bindings.InputBinding {
-	// 	return kafka.NewKafka(l)
-	// }, "kafka")
-	// bindingsLoader.DefaultRegistry.RegisterOutputBinding(func(l logger.Logger) bindings.OutputBinding {
-	// 	return kafka.NewKafka(l)
-	// }, "kafka")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(localstorage.NewLocalStorage, "localstorage")
 }
 
@@ -74,24 +65,24 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// secretstoresLoader.DefaultRegistry.Logger = logContrib
-	// stateLoader.DefaultRegistry.Logger = logContrib
-	// configurationLoader.DefaultRegistry.Logger = logContrib
-	// lockLoader.DefaultRegistry.Logger = logContrib
-	// pubsubLoader.DefaultRegistry.Logger = logContrib
-	// nrLoader.DefaultRegistry.Logger = logContrib
+	secretstoresLoader.DefaultRegistry.Logger = logContrib
+	stateLoader.DefaultRegistry.Logger = logContrib
+	configurationLoader.DefaultRegistry.Logger = logContrib
+	lockLoader.DefaultRegistry.Logger = logContrib
+	pubsubLoader.DefaultRegistry.Logger = logContrib
+	nrLoader.DefaultRegistry.Logger = logContrib
 	bindingsLoader.DefaultRegistry.Logger = logContrib
 	// httpMiddlewareLoader.DefaultRegistry.Logger = log
 
 	err = rt.Run(
-		// runtime.WithSecretStores(secretstoresLoader.DefaultRegistry),
-		// runtime.WithStates(stateLoader.DefaultRegistry),
-		// runtime.WithConfigurations(configurationLoader.DefaultRegistry),
-		// runtime.WithLocks(lockLoader.DefaultRegistry),
-		// runtime.WithPubSubs(pubsubLoader.DefaultRegistry),
-		// runtime.WithNameResolutions(nrLoader.DefaultRegistry),
+		runtime.WithSecretStores(secretstoresLoader.DefaultRegistry),
+		runtime.WithStates(stateLoader.DefaultRegistry),
+		runtime.WithConfigurations(configurationLoader.DefaultRegistry),
+		runtime.WithLocks(lockLoader.DefaultRegistry),
+		runtime.WithPubSubs(pubsubLoader.DefaultRegistry),
+		runtime.WithNameResolutions(nrLoader.DefaultRegistry),
 		runtime.WithBindings(bindingsLoader.DefaultRegistry),
-		// runtime.WithHTTPMiddlewares(httpMiddlewareLoader.DefaultRegistry),
+		runtime.WithHTTPMiddlewares(httpMiddlewareLoader.DefaultRegistry),
 	)
 	if err != nil {
 		log.Fatalf("fatal error from runtime: %s", err)

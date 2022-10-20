@@ -52,8 +52,13 @@ const (
 	// Group api group
 	Group = "dbaas.infracreate.com"
 
+	// AppsGroup k8s apps group
+	AppsGroup = "apps"
+
 	// Version api version
 	Version = "v1alpha1"
+
+	VersionV1 = "v1"
 
 	// ResourceClusters clusters resource
 	ResourceClusters = "clusters"
@@ -62,8 +67,10 @@ const (
 
 	ResourceAppVersions = "appversions"
 
-	// ResourceOpsRequest opsrequests resource
-	ResourceOpsRequest = "opsrequests"
+	// ResourceOpsRequests opsrequests resource
+	ResourceOpsRequests = "opsrequests"
+
+	ResourceDeployments = "deployments"
 
 	// KindCluster kind of cluster
 	KindCluster = "Cluster"

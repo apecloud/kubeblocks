@@ -20,13 +20,12 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/util/templates"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cliflag "k8s.io/component-base/cli/flag"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/backup"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/bench"
@@ -34,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/dbaas"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/options"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/playground"
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/version"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
@@ -100,6 +100,7 @@ A database management tool for KubeBlocks`,
 		bench.NewBenchCmd(),
 		backup.NewBackupCmd(f, ioStreams),
 		options.NewCmdOptions(ioStreams.Out),
+		version.NewVersionCmd(f),
 	)
 
 	filters := []string{"options"}

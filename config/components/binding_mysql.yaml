@@ -1,0 +1,10 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: mtest
+spec:
+  type: bindings.mysql
+  version: v1
+  metadata:
+    - name: url # Required, define DB connection in DSN format
+      value: "root:@tcp(127.0.0.1:3306)/mysql?multiStatements=true"

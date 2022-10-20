@@ -383,12 +383,18 @@ fix-license-header: ## Run license header fix.
 
 .PHONY: bump-chart-ver
 bump-chart-ver: ## Bump helm chart version.
+ifeq ($(GOOS), darwin)
 	sed -i '' "s/^version:.*/version: $(VERSION)/" $(CHART_PATH)/Chart.yaml
 	sed -i '' "s/^appVersion:.*/appVersion: $(VERSION)/" $(CHART_PATH)/Chart.yaml
+else
+	sed -i "s/^version:.*/version: $(VERSION)/" $(CHART_PATH)/Chart.yaml
+	sed -i "s/^appVersion:.*/appVersion: $(VERSION)/" $(CHART_PATH)/Chart.yaml
+endif
+
 
 .PHONY: helm-package
 helm-package: bump-chart-ver ## Do helm package.
-	$(HELM) package $(CHART_PATH)
+	$(HELM) package $(CHART_PATH) --dependency-update
 
 .PHONY: helm-push
 helm-push: helm-package ## Do helm package and push.

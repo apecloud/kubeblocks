@@ -242,3 +242,7 @@ func Spinner(w io.Writer, fmtstr string, a ...any) func(result bool) {
 		})
 	}
 }
+
+func InstanceLabel(name string) string {
+	return fmt.Sprintf("app.kubernetes.io/instance=%s", name)
+}

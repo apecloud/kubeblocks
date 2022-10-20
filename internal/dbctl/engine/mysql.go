@@ -14,17 +14,35 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cluster
+package engine
 
-import (
-	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+type mysql struct{}
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/exec"
+var (
+	// key is the dbctl command name, value is the command to execute
+	commands = map[string]*ExecInfo{
+		"connect": {
+			Command: []string{"mysql"},
+			// use the default container
+			ContainerName: "",
+		},
+	}
 )
 
-func NewConnectCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := exec.NewExecOptions(f, streams, "connect", "connect to a database cluster")
-	return o.Build()
+const (
+	mysqlEngineName = "mysql"
+)
+
+var _ Interface = &mysql{}
+
+func (m *mysql) GetExecCommand(name string) *ExecInfo {
+	if cmd, ok := commands[name]; ok {
+		return cmd
+	} else {
+		return nil
+	}
+}
+
+func (m *mysql) GetEngineName() string {
+	return mysqlEngineName
 }

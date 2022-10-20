@@ -18,7 +18,6 @@ package playground
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -33,6 +32,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
 var addToScheme sync.Once
@@ -74,7 +74,7 @@ func buildClusterInfo(clusterInfo *ClusterInfo, namespace string, name string) e
 	}
 
 	// get statefulset
-	if err = builder.withLabel(instanceLabel(name)).
+	if err = builder.withLabel(util.InstanceLabel(name)).
 		withGK(schema.GroupKind{Kind: "StatefulSet"}).
 		getClusterObject(clusterInfo); err != nil {
 		return err
@@ -82,7 +82,7 @@ func buildClusterInfo(clusterInfo *ClusterInfo, namespace string, name string) e
 
 	// get service
 	for _, obj := range clusterInfo.StatefulSets {
-		if err = builder.withLabel(instanceLabel(obj.Name)).
+		if err = builder.withLabel(util.InstanceLabel(obj.Name)).
 			withGK(schema.GroupKind{Kind: "Service"}).
 			getClusterObject(clusterInfo); err != nil {
 			return err
@@ -90,7 +90,7 @@ func buildClusterInfo(clusterInfo *ClusterInfo, namespace string, name string) e
 	}
 
 	// get secret
-	if err = builder.withLabel(instanceLabel(name)).
+	if err = builder.withLabel(util.InstanceLabel(name)).
 		withGK(schema.GroupKind{Kind: "Secret"}).
 		getClusterObject(clusterInfo); err != nil {
 		return err
@@ -98,7 +98,7 @@ func buildClusterInfo(clusterInfo *ClusterInfo, namespace string, name string) e
 
 	// get pod
 	for _, obj := range clusterInfo.StatefulSets {
-		if err = builder.withLabel(instanceLabel(obj.Name)).
+		if err = builder.withLabel(util.InstanceLabel(obj.Name)).
 			withGK(schema.GroupKind{Kind: "Pod"}).
 			getClusterObject(clusterInfo); err != nil {
 			return err
@@ -182,8 +182,4 @@ func (b *builder) withLabel(l string) *builder {
 func (b *builder) withGK(gk schema.GroupKind) *builder {
 	b.groupKind = gk
 	return b
-}
-
-func instanceLabel(name string) string {
-	return fmt.Sprintf("app.kubernetes.io/instance=%s", name)
 }

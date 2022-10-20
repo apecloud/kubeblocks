@@ -14,17 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cluster
+package engine
 
-import (
-	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+import "fmt"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/exec"
+// ClusterDefinition Type Const Define
+const (
+	stateMysql  = "state.mysql"
+	stateMysql8 = "state.mysql-8"
 )
 
-func NewConnectCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := exec.NewExecOptions(f, streams, "connect", "connect to a database cluster")
-	return o.Build()
+type ExecInfo struct {
+	Command       []string
+	ContainerName string
+}
+
+type Interface interface {
+	GetExecCommand(name string) *ExecInfo
+	GetEngineName() string
+}
+
+func New(typeName string) (Interface, error) {
+	switch typeName {
+	case stateMysql, stateMysql8:
+		return &mysql{}, nil
+	}
+	return nil, fmt.Errorf("unsupported engine type: %s", typeName)
 }

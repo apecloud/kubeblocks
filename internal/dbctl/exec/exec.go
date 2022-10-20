@@ -19,18 +19,22 @@ package exec
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	cmdexec "k8s.io/kubectl/pkg/cmd/exec"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/podcmd"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/engine"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
 // Options used to build a command that use exec to implement
@@ -42,12 +46,10 @@ type Options struct {
 	Short string
 
 	ClusterName      string
-	Command          []string
 	EnforceNamespace bool
 
-	Pod       *corev1.Pod
+	clientset *kubernetes.Clientset
 	Executor  cmdexec.RemoteExecutor
-	PodClient coreclient.PodsGetter
 	Config    *restclient.Config
 }
 
@@ -70,7 +72,7 @@ func (o *Options) Build() *cobra.Command {
 		Use:   o.Use,
 		Short: o.Short,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.complete(o.Factory, cmd, args))
+			cmdutil.CheckErr(o.complete(o.Factory, args))
 			cmdutil.CheckErr(o.validate())
 			cmdutil.CheckErr(o.run())
 		},
@@ -80,7 +82,7 @@ func (o *Options) Build() *cobra.Command {
 	return cmd
 }
 
-func (o *Options) complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *Options) complete(f cmdutil.Factory, args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("you must specify the name of resource to exec")
 	}
@@ -92,55 +94,60 @@ func (o *Options) complete(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		return nil
 	}
 
-	if len(o.PodName) == 0 {
-		// TODO: get pod according to the cluster name
-		return fmt.Errorf("you must specify the pod name")
-	}
-
 	o.Config, err = f.ToRESTConfig()
 	if err != nil {
 		return err
 	}
 
-	clientset, err := f.KubernetesClientSet()
+	o.clientset, err = f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
-	o.PodClient = clientset.CoreV1()
 
 	return nil
 }
 
 func (o *Options) validate() error {
-	if len(o.PodName) == 0 {
-		return fmt.Errorf("pod, type/name or --filename must be specified")
-	}
-	if len(o.Command) == 0 {
-		return fmt.Errorf("you must specify at least one command for the container")
-	}
-	if o.Out == nil || o.ErrOut == nil {
-		return fmt.Errorf("both output and error output must be provided")
+	if len(o.ClusterName) == 0 {
+		return fmt.Errorf("cluster name must be specified")
 	}
 	return nil
 }
 
 func (o *Options) run() error {
 	var err error
+	var pod *corev1.Pod
+	var e engine.Interface
 
 	if len(o.PodName) != 0 {
-		o.Pod, err = o.PodClient.Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{})
+		pod, err = o.clientset.CoreV1().Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+	} else {
+		// find pod in cluster to exec
+		pod, err = findPrimaryPod(o.clientset, o.ClusterName, o.Namespace)
 		if err != nil {
 			return err
 		}
 	}
 
-	pod := o.Pod
-
 	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
 		return fmt.Errorf("cannot exec into a container in a completed pod; current phase is %s", pod.Status.Phase)
 	}
 
-	containerName := o.ContainerName
+	typeName := getClusterType(pod)
+	if typeName == "" {
+		return fmt.Errorf("failed to get the cluster type")
+	}
+
+	e, err = engine.New(typeName)
+	if err != nil {
+		return err
+	}
+
+	info := e.GetExecCommand(o.Use)
+	containerName := info.ContainerName
 	if len(containerName) == 0 {
 		container, err := podcmd.FindOrDefaultContainerByName(pod, containerName, true, o.ErrOut)
 		if err != nil {
@@ -168,7 +175,6 @@ func (o *Options) run() error {
 			return err
 		}
 
-		// TODO: consider abstracting into a client invocation or client helper
 		req := restClient.Post().
 			Resource("pods").
 			Name(pod.Name).
@@ -176,7 +182,7 @@ func (o *Options) run() error {
 			SubResource("exec")
 		req.VersionedParams(&corev1.PodExecOptions{
 			Container: containerName,
-			Command:   o.Command,
+			Command:   info.Command,
 			Stdin:     o.Stdin,
 			Stdout:    o.Out != nil,
 			Stderr:    o.ErrOut != nil,
@@ -191,4 +197,23 @@ func (o *Options) run() error {
 	}
 
 	return nil
+}
+
+func findPrimaryPod(clientset *kubernetes.Clientset, name string, namespace string) (*corev1.Pod, error) {
+	pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: util.InstanceLabel(name)})
+	if err != nil {
+		return nil, err
+	}
+	for _, pod := range pods.Items {
+		// TODO: check role is primary
+		return &pod, nil
+	}
+	return nil, fmt.Errorf("failed to find the pod to exec command")
+}
+
+func getClusterType(pod *corev1.Pod) string {
+	if name, ok := pod.Labels["app.kubernetes.io/name"]; ok {
+		return strings.Split(name, "-")[0]
+	}
+	return ""
 }

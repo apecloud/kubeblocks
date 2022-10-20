@@ -1,0 +1,35 @@
+name: RELEASE-CHART
+
+on:
+  release:
+    types:
+      - published
+
+env:
+  GO_VERSION: '1.18'
+  HELM_VERSION: 'v3.9.4'
+  HELM_REGISTRY_URL: yimeisun.azurecr.io
+  RELEASE_VERSION: ${{ github.ref_name }}
+
+
+jobs:
+  release-chart:
+    name: Push Helm Chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: make helm-push
+        run: |
+          helm registry login -u ${{ secrets.HELM_REGISTRY_USER }} -p ${{ secrets.HELM_REGISTRY_PASSWORD }} \
+            ${{ env.HELM_REGISTRY_URL }}
+          VERSION=${{ env.RELEASE_VERSION }} make helm-push

@@ -5,11 +5,13 @@ go 1.19
 replace github.com/apecloud/kubeblocks => ../..
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/dapr/components-contrib v1.9.0
 	github.com/dapr/dapr v1.9.0
 	github.com/dapr/kit v0.0.3-0.20220930182601-272e358ba6a7
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/pkg/errors v0.9.1
+	github.com/stretchr/testify v1.8.0
 	go.uber.org/automaxprocs v1.5.1
 )
 
@@ -80,7 +82,6 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
 	github.com/stretchr/objx v0.4.0 // indirect
-	github.com/stretchr/testify v1.8.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.40.0 // indirect
 	go.opencensus.io v0.23.0 // indirect

@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "loadbalancer.fullname" . }}-agent
+  labels:
+    {{- include "loadbalancer.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "loadbalancer.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "loadbalancer.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: agent
+        command:
+          - "/agent"
+        args:
+          - "--health-probe-bind-address=:8081"
+          - "--metrics-bind-address=127.0.0.1:8080"
+        image: "{{ .Values.image.repository }}:v{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        securityContext:
+          {{- toYaml .Values.podSecurityContext | nindent 10 }}
+        ports:
+          - name: health
+            containerPort: 8081
+            protocol: TCP
+        readinessProbe:
+          exec:
+            command: [ "sh", "-c", "/bin/grpc_health_probe -addr=$HOST_IP:{{ .Values.agent.rpcPort }}"]
+          initialDelaySeconds: 5
+          timeoutSeconds: 3
+        livenessProbe:
+          exec:
+            command: [ "sh", "-c", "/bin/grpc_health_probe -addr=$HOST_IP:{{ .Values.agent.rpcPort }}" ]
+          initialDelaySeconds: 10
+          timeoutSeconds: 3
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+        env:
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.hostIP
+        - name: RPC_PORT
+          value: "{{ .Values.agent.rpcPort }}"
+        volumeMounts:
+        - mountPath: /run/xtables.lock
+          name: xtables-lock
+      dnsPolicy: ClusterFirst
+      hostNetwork: true
+      priorityClassName: system-node-critical
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 15
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+      - hostPath:
+          path: /run/xtables.lock
+          type: ""
+        name: xtables-lock

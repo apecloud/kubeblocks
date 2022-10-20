@@ -35,6 +35,7 @@ type ClusterDefinitionSpec struct {
 	// +optional
 	Cluster ClusterDefinitionCluster `json:"cluster,omitempty"`
 
+	// List of components belonging to the cluster
 	// +kubebuilder:validation:MinItems=1
 	// +optional
 	Components []ClusterDefinitionComponent `json:"components,omitempty"`
@@ -43,9 +44,11 @@ type ClusterDefinitionSpec struct {
 	// +optional
 	RoleGroupTemplates []RoleGroupTemplate `json:"roleGroupTemplates,omitempty"`
 
+	// Default termination policy if no termination policy defined in cluster
 	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
-	DefaultTerminatingPolicy string `json:"defaultTerminationPolicy,omitempty"`
+	DefaultTerminationPolicy string `json:"defaultTerminationPolicy,omitempty"`
 
+	// Credential used for connecting database
 	// +optional
 	ConnectionCredential ClusterDefinitionConnectionCredential `json:"connectionCredential,omitempty"`
 }
@@ -55,6 +58,7 @@ type ClusterDefinitionStatus struct {
 	// phase - in list of [Available,Deleting]
 	// +kubebuilder:validation:Enum={Available,Deleting}
 	Phase Phase `json:"phase,omitempty"`
+	// Extra message in current phase
 	// +optional
 	Message string `json:"message,omitempty"`
 	// observedGeneration is the most recent generation observed for this
@@ -132,7 +136,9 @@ type MonitorConfig struct {
 	Exporter *ExporterConfig `json:"exporterConfig,omitempty"`
 }
 
+// A component is a group of pods, pods in one component usually share the same data
 type ClusterDefinitionComponent struct {
+	// Type name of the component, it can be any valid string
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
 	TypeName string `json:"typeName,omitempty"`
@@ -145,18 +151,21 @@ type ClusterDefinitionComponent struct {
 	// roleGroups specify roleGroupTemplate name
 	RoleGroups []string `json:"roleGroups,omitempty"`
 
+	// Minimum available pod count when updating
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	MinAvailable int `json:"minAvailable,omitempty"`
 
+	// Maximum available pod count after scale
 	// +kubebuilder:validation:Minimum=0
 	MaxAvailable int `json:"maxAvailable,omitempty"`
 
+	// Default replicas in this component if user not specify
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	DefaultReplicas int `json:"defaultReplicas,omitempty"`
 
-	// isStateless define this components
+	// Define if this component is stateless or not
 	// +kubebuilder:default=false
 	IsStateless bool `json:"isStateless,omitempty"`
 
@@ -169,7 +178,7 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Monitor *MonitorConfig `json:"monitor,omitempty"`
 
-	// isQuorum defines odd number of pods & N/2+1 pods
+	// IsQuorum defines odd number of pods & N/2+1 pods
 	// +kubebuilder:default=false
 	IsQuorum bool `json:"isQuorum,omitempty"`
 
@@ -185,6 +194,7 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Service corev1.ServiceSpec `json:"service,omitempty"`
 
+	// Scripts executed before and after workload operation
 	// script exec order：component.pre => roleGroup.pre => component.exec => roleGroup.exec => roleGroup.post => component.post
 	// builtin ENV variables:
 	// self: OPENDBAAS_SELF_{builtin_properties}
@@ -212,23 +222,35 @@ type ClusterDefinitionStrategy struct {
 }
 
 type ClusterDefinitionScripts struct {
-	Default         ClusterDefinitionScript `json:"default,omitempty"`
-	Create          ClusterDefinitionScript `json:"create,omitempty"`
-	Upgrade         ClusterDefinitionScript `json:"upgrade,omitempty"`
-	VerticalScale   ClusterDefinitionScript `json:"verticalScale,omitempty"`
+	// Default scripts executed if the following scripts not defined
+	Default ClusterDefinitionScript `json:"default,omitempty"`
+	// Scripts executed before and after creation
+	Create ClusterDefinitionScript `json:"create,omitempty"`
+	// Scripts executed before and after upgrade
+	Upgrade ClusterDefinitionScript `json:"upgrade,omitempty"`
+	// Scripts executed before and after vertical scale
+	VerticalScale ClusterDefinitionScript `json:"verticalScale,omitempty"`
+	// Scripts executed before and after horizontal scale
 	HorizontalScale ClusterDefinitionScript `json:"horizontalScale,omitempty"`
-	Delete          ClusterDefinitionScript `json:"delete,omitempty"`
+	// Scripts executed before and after deletion
+	Delete ClusterDefinitionScript `json:"delete,omitempty"`
 }
 
 type ClusterDefinitionScript struct {
-	Pre  []ClusterDefinitionContainerCMD `json:"pre,omitempty"`
+	// Pre hook before operation
+	Pre []ClusterDefinitionContainerCMD `json:"pre,omitempty"`
+	// Post hook after operation
 	Post []ClusterDefinitionContainerCMD `json:"post,omitempty"`
 }
 
+// ClusterDefinitionContainerCMD defines content of a hook script
 type ClusterDefinitionContainerCMD struct {
-	Container string   `json:"container,omitempty"`
-	Command   []string `json:"command,omitempty"`
-	Args      []string `json:"args,omitempty"`
+	// Container used to execute command
+	Container string `json:"container,omitempty"`
+	// Command executed in container
+	Command []string `json:"command,omitempty"`
+	// Args executed in container
+	Args []string `json:"args,omitempty"`
 }
 
 type RoleGroupTemplate struct {

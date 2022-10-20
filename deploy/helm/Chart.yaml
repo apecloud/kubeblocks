@@ -1,6 +1,6 @@
 apiVersion: v2
-name: opendbaas-core
-description: OpenDBaas Core Controller Operator.
+name: kubeblock
+description: KubeBlock Core Controller Operator.
 
 # A chart can be either an 'application' or a 'library' chart.
 #
@@ -15,13 +15,13 @@ type: application
 # This is the chart version. This version number should be incremented each time you make changes
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
-version: 0.1.0-alpha.5
+version: 0.1.0-alpha.6
 
 # This is the version number of the application being deployed. This version number should be
 # incremented each time you make changes to the application. Versions are not expected to
 # follow Semantic Versioning. They should reflect the version the application is using.
 # It is recommended to use it with quotes.
-appVersion: 0.1.0-alpha.5
+appVersion: 0.1.0-alpha.6
 
 
 kubeVersion: '>=1.20.0-0'
@@ -50,4 +50,14 @@ annotations:
   artifacthub.io/prerelease: "true"
 
 dependencies:
-  - name: wesql
+  - condition: wesql.enabled
+    name: wesql
+    version: 0.1.*
+  - condition: grafana.enabled
+    name: grafana
+    repository: https://grafana.github.io/helm-charts
+    version: 6.41 - 6.42
+  - condition: prometheus.enabled
+    name: prometheus
+    repository: https://prometheus-community.github.io/helm-charts
+    version: 15.15 - 15.16

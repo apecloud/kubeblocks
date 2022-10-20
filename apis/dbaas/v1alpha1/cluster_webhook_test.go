@@ -17,11 +17,13 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("cluster webhook", func() {
@@ -44,9 +46,20 @@ var _ = Describe("cluster webhook", func() {
 			clusterDefSecond, _ := createTestClusterDefinitionObj(sencondeClusterDefinition)
 			Expect(k8sClient.Create(ctx, clusterDefSecond)).Should(Succeed())
 
+			// wait until ClusterDefinition created
+			Eventually(func() bool {
+				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)
+				return err == nil
+			}, 10, 1).Should(BeTrue())
+
 			By("By creating a new appVersion")
 			appVersion := createTestAppVersionObj(clusterDefinitionName, appVersionName)
 			Expect(k8sClient.Create(ctx, appVersion)).Should(Succeed())
+			// wait until AppVersion created
+			Eventually(func() bool {
+				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: appVersionName}, appVersion)
+				return err == nil
+			}, 10, 1).Should(BeTrue())
 
 			By("By creating a new Cluster")
 			cluster, _ = createTestCluster(clusterDefinitionName, appVersionName, clusterName)

@@ -31,28 +31,35 @@ var _ = Describe("playground", func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 	})
 
-	It("New playground command", func() {
+	It("new playground command", func() {
 		cmd := NewPlaygroundCmd(streams)
 		Expect(cmd).ShouldNot(BeNil())
 		Expect(cmd.HasSubCommands()).Should(BeTrue())
 	})
 
-	It("init command", func() {
+	It("init at local host", func() {
 		cmd := newInitCmd(streams)
 		Expect(cmd != nil).Should(BeTrue())
 
 		o := &initOptions{
 			Replicas:      0,
 			CloudProvider: defaultCloudProvider,
+			IOStreams:     streams,
 		}
 		Expect(o.validate()).To(MatchError("replicas should greater than 0"))
 
 		o.Replicas = 1
 		Expect(o.validate()).Should(Succeed())
-		Expect(o.run()).Should(Or(HaveOccurred()))
+		Expect(o.run()).To(MatchError(MatchRegexp("Fail to set up k3d cluster")))
+	})
 
-		o.CloudProvider = cloudprovider.AWS
-		Expect(o.run()).Should(Or(HaveOccurred()))
+	It("init at remote cloud", func() {
+		o := &initOptions{
+			Replicas:      0,
+			IOStreams:     streams,
+			CloudProvider: cloudprovider.AWS,
+		}
+		Expect(o.run()).To(MatchError(MatchRegexp("Failed to create cloud provider")))
 	})
 
 	It("destroy command", func() {
@@ -62,13 +69,12 @@ var _ = Describe("playground", func() {
 		o := &destroyOptions{
 			IOStreams: streams,
 		}
-		Expect(o.destroyPlayground()).Should(Or(HaveOccurred()))
+		Expect(o.destroyPlayground()).Should(HaveOccurred())
 	})
 
 	It("guide", func() {
 		cmd := newGuideCmd()
 		Expect(cmd).ShouldNot(BeNil())
-		cmd.Run(cmd, []string{})
-		Expect(printGuide("", "")).Should(HaveOccurred())
+		Expect(runGuide()).Should(HaveOccurred())
 	})
 })

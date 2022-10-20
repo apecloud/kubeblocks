@@ -89,6 +89,7 @@ type ClusterReconciler struct {
 //+kubebuilder:rbac:groups=apps,resources=deployments/finalizers;statefulsets/finalizers,verbs=update
 //+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets/finalizers,verbs=update
+//+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 // NOTES: owned K8s core API resources controller-gen RBAC marker is maintained at {REPO}/controllers/k8score/rbac.go
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -341,11 +342,12 @@ func (r *ClusterReconciler) checkReferencedCRStatus(reqCtx intctrlutil.RequestCt
 		return nil, nil
 	}
 	patch := client.MergeFrom(cluster.DeepCopy())
-	cluster.Status.Message = fmt.Sprintf("%s.status.phase is not Available, this problem needs to be solved first", crKind)
+	cluster.Status.Message = fmt.Sprintf("%s.status.phase is unavailable, this problem needs to be solved first", crKind)
 	if err := r.Client.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
 		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		return &res, err
 	}
+	r.Recorder.Event(cluster, corev1.EventTypeWarning, "ReferencedCRUnavailable", cluster.Status.Message)
 	res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
 	return &res, err
 }

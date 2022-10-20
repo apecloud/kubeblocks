@@ -84,7 +84,7 @@ var _ = Describe("Cluster", func() {
 
 			Expect(o.Run(inputs, []string{})).Should(Succeed())
 
-			del := &DeleteOptions{}
+			del := &DeleteOptions{IOStreams: streams}
 			Expect(del.Validate([]string{})).To(MatchError("missing cluster name"))
 			Expect(del.Complete(tf, []string{"test"})).Should(Succeed())
 			Expect(del.Namespace).To(Equal("default"))

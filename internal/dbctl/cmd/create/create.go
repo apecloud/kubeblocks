@@ -165,7 +165,7 @@ func (o *BaseOptions) Run(inputs Inputs, args []string) error {
 	if unstructuredObj, err = o.Client.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
 		return err
 	}
-	fmt.Printf("%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
+	fmt.Fprintf(o.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
 	return nil
 }
 

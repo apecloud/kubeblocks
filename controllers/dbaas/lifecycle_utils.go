@@ -32,7 +32,6 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 
 	"github.com/leaanthony/debme"
-	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -302,6 +301,62 @@ func buildPodAffinity(
 	return affinity
 }
 
+func disableMonitor(component *Component) {
+	component.Monitor = MonitorConfig{
+		Enable: false,
+	}
+}
+
+func mergeMonitorConfig(
+	cluster *dbaasv1alpha1.Cluster,
+	clusterDef *dbaasv1alpha1.ClusterDefinition,
+	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
+	clusterComp *dbaasv1alpha1.ClusterComponent,
+	component *Component) {
+	monitorEnable := false
+	if clusterComp != nil {
+		monitorEnable = clusterComp.Monitor
+	}
+
+	monitorConfig := clusterDefComp.Monitor
+	if !monitorEnable || monitorConfig == nil {
+		disableMonitor(component)
+		return
+	}
+
+	if !monitorConfig.BuiltIn {
+		if monitorConfig.Exporter == nil {
+			disableMonitor(component)
+			return
+		}
+		component.Monitor = MonitorConfig{
+			Enable:     true,
+			ScrapePath: monitorConfig.Exporter.ScrapePath,
+			ScrapePort: monitorConfig.Exporter.ScrapePort,
+		}
+		return
+	}
+
+	characterType := clusterDefComp.CharacterType
+	if len(characterType) == 0 {
+		characterType = CalcCharacterType(clusterDef.Spec.Type)
+	}
+	if !IsWellKnownCharacterType(characterType) {
+		disableMonitor(component)
+		return
+	}
+
+	switch characterType {
+	case KMysql:
+		err := WellKnownCharacterTypeFunc[KMysql](cluster, component)
+		if err != nil {
+			disableMonitor(component)
+		}
+	default:
+		disableMonitor(component)
+	}
+}
+
 func mergeComponents(
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition,
@@ -421,6 +476,9 @@ func mergeComponents(
 	//	 	component.PodSpec.Containers[i].VolumeMounts = nil
 	//	 }
 	// }
+
+	mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
+
 	return component
 }
 
@@ -851,11 +909,6 @@ func buildSvc(params createParams) (*corev1.Service, error) {
 	return &svc, nil
 }
 
-func randomString(length int) string {
-	res, _ := password.Generate(length, 0, 0, false, false)
-	return res
-}
-
 func buildSecret(params createParams) (*corev1.Secret, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
@@ -886,10 +939,6 @@ func buildSecret(params createParams) (*corev1.Secret, error) {
 	}
 
 	if err = cueValue.Fill("cluster", clusterStrByte); err != nil {
-		return nil, err
-	}
-
-	if err = cueValue.FillRaw("secret.stringData.password", randomString(8)); err != nil {
 		return nil, err
 	}
 
@@ -949,9 +998,6 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 	}
 
 	sts := appsv1.StatefulSet{}
-	if err = json.Unmarshal(stsStrByte, &sts); err != nil {
-		return nil, err
-	}
 
 	stsStrByte = injectEnv(stsStrByte, dbaasPrefix+"_MY_SECRET_NAME", params.cluster.Name)
 
@@ -1198,11 +1244,7 @@ func buildCfg(params createParams, sts *appsv1.StatefulSet, ctx context.Context,
 }
 
 func checkAndUpdatePodVolumes(sts *appsv1.StatefulSet, volumes map[string]dbaasv1alpha1.ConfigTemplate) error {
-	podVolumes := make([]corev1.Volume, 0, len(sts.Spec.Template.Spec.Volumes)+len(volumes))
-	if len(sts.Spec.Template.Spec.Volumes) > 0 {
-		copy(podVolumes, sts.Spec.Template.Spec.Volumes)
-	}
-
+	podVolumes := make([]corev1.Volume, 0, len(volumes))
 	for cmName, tpl := range volumes {
 		// not cm volume
 		volumeMounted := intctrlutil.GetVolumeMountName(podVolumes, cmName)
@@ -1215,7 +1257,6 @@ func checkAndUpdatePodVolumes(sts *appsv1.StatefulSet, volumes map[string]dbaasv
 			configMapVolume.Name = cmName
 			continue
 		}
-
 		// Add New ConfigMap Volume
 		podVolumes = append(podVolumes, corev1.Volume{
 			Name: tpl.VolumeName,
@@ -1226,9 +1267,8 @@ func checkAndUpdatePodVolumes(sts *appsv1.StatefulSet, volumes map[string]dbaasv
 			},
 		})
 	}
-
 	// Update PodTemplate Volumes
-	sts.Spec.Template.Spec.Volumes = podVolumes
+	sts.Spec.Template.Spec.Volumes = append(sts.Spec.Template.Spec.Volumes, podVolumes...)
 	return nil
 }
 

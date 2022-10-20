@@ -5,9 +5,15 @@ metadata:
   labels:
     {{- include "wesqlapp.labels" . | nindent 4 }}
 spec:
-  type: stat.mysql
+  type: state.mysql
+  connectionCredential:
+    user: {{ .Values.auth.rootUser }}
+    password: {{ .Values.auth.rootPassword }}
   components:
   - typeName: replicasets
+    characterType: mysql
+    monitor:
+      builtIn: true
     configTemplateRefs:
     - name: mysql-3node-tpl-8.0
       volumeName: mysql-config

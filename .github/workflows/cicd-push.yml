@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v3
       - name: make mod-vendor and lint
         run: |
+          mkdir -p ./bin
+          cp -r /go/bin/controller-gen ./bin/controller-gen
           make mod-vendor
           make lint
           make staticcheck

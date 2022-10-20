@@ -14,35 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package playground
+package engine
 
 import (
+	"testing"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("wesql", func() {
-	wesql := &Wesql{
-		serverVersion: wesqlVersion,
-		replicas:      1,
-	}
-
-	It("Get repos", func() {
-		repos := wesql.getRepos()
-		Expect(repos != nil).To(BeTrue())
-		Expect(len(repos)).To(Equal(0))
-	})
-
-	It("Get base charts", func() {
-		charts := wesql.getBaseCharts()
-		Expect(charts != nil).Should(BeTrue())
-		Expect(len(charts)).To(Equal(1))
-	})
-
-	It("Get database charts", func() {
-		charts := wesql.getDBCharts()
-		Expect(charts != nil).Should(BeTrue())
-		Expect(len(charts)).To(Equal(1))
-		Expect(charts[0].Chart).To(Equal(wesqlHelmChart))
-	})
-})
+func TestEngine(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "PlayGround Engine Suite")
+}

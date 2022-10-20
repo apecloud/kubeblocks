@@ -30,7 +30,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
 )
 
-// Installer will handle the playground cluster creation and management
 type Installer struct {
 	cfg *action.Configuration
 
@@ -74,8 +73,7 @@ func (i *Installer) Uninstall() error {
 		Namespace: i.Namespace,
 	}
 
-	err := chart.UnInstall(i.cfg)
-	if err != nil {
+	if err := chart.UnInstall(i.cfg); err != nil {
 		return err
 	}
 

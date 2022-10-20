@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -111,14 +112,11 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, appVersion, appVersionFinalizerName, func() (*ctrl.Result, error) {
-		statusHandler := func() error {
-			patch := client.MergeFrom(appVersion.DeepCopy())
-			appVersion.Status.Phase = dbaasv1alpha1.DeletingPhase
-			appVersion.Status.Message = "cannot be deleted because of existing referencing Cluster."
-			return r.Client.Status().Patch(ctx, appVersion, patch)
+		recordEvent := func() {
+			r.Recorder.Event(appVersion, corev1.EventTypeWarning, "ExistsReferencedCluster", appVersion.Status.Message)
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, appVersion,
-			appVersionLabelKey, statusHandler, &dbaasv1alpha1.ClusterList{}); res != nil || err != nil {
+			appVersionLabelKey, recordEvent, &dbaasv1alpha1.ClusterList{}); res != nil || err != nil {
 			return res, err
 		}
 		return nil, r.deleteExternalResources(reqCtx, appVersion)

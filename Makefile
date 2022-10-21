@@ -235,7 +235,8 @@ CLI_LD_FLAGS ="-s -w \
 	-X github.com/apecloud/kubeblocks/version.GitVersion=$(GIT_VERSION) \
 	-X github.com/apecloud/kubeblocks/version.Version=$(CLI_VERSION) \
 	-X github.com/apecloud/kubeblocks/version.K3sImageTag=$(K3S_IMG_TAG) \
-	-X github.com/apecloud/kubeblocks/version.K3dVersion=$(K3D_VERSION)"
+	-X github.com/apecloud/kubeblocks/version.K3dVersion=$(K3D_VERSION) \
+	-X github.com/apecloud/kubeblocks/version.DefaultKubeBlocksVersion=$(VERSION)"
 
 
 

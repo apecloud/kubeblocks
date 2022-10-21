@@ -23,6 +23,7 @@ import (
 	"helm.sh/helm/v3/pkg/repo"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/version"
 )
 
 var _ = Describe("helm util", func() {
@@ -45,13 +46,13 @@ var _ = Describe("helm util", func() {
 	It("Install", func() {
 		o := &InstallOpts{
 			Name:      types.DbaasHelmName,
-			Chart:     types.DbaasHelmChart,
+			Chart:     "kubeblocks-test-chart",
 			Namespace: "default",
-			Version:   types.DbaasDefaultVersion,
+			Version:   version.DefaultKubeBlocksVersion,
 		}
 		cfg := FakeActionConfig()
 		Expect(cfg != nil).Should(BeTrue())
-		Expect(o.Install(cfg)).Should(Succeed())
-		Expect(o.UnInstall(cfg)).Should(Succeed())
+		Expect(o.Install(cfg)).Should(HaveOccurred())
+		Expect(o.UnInstall(cfg)).Should(HaveOccurred())
 	})
 })

@@ -29,8 +29,6 @@ const (
 	// GoosWindows is os.GOOS windows string
 	GoosWindows = "windows"
 
-	// DbaasDefaultVersion default kubeblocks version to install
-	DbaasDefaultVersion = "0.1.0-alpha.5"
 	// DbaasHelmName helm name for installing kubeblocks
 	DbaasHelmName = "kubeblocks"
 	// DbaasHelmChart the helm chart for installing kubeblocks

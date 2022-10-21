@@ -1,7 +1,7 @@
 apiVersion: dbaas.infracreate.com/v1alpha1
 kind: AppVersion
 metadata:
-  name: wesql-appversion-{{ default .Chart.AppVersion .Values.appVersionOverride }}
+  name: wesql-{{ default .Chart.AppVersion .Values.appVersionOverride | quote}}
   labels:
     {{- include "wesqlapp.labels" . | nindent 4 }}
 spec:

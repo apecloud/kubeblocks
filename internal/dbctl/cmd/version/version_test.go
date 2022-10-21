@@ -28,7 +28,7 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/version"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
 var _ = Describe("version", func() {
@@ -138,7 +138,7 @@ spec:
         secret:
           defaultMode: 420
           secretName: opendbaas-core.default.svc.tls-pair
-`, version.KubeBlocksChartName)
+`, types.KubeBlocksChartName)
 		deployment := &appsv1.Deployment{}
 		_ = yaml.Unmarshal([]byte(deployYaml), deployment)
 		Expect(k8sClient.Create(context.Background(), deployment)).To(Succeed())

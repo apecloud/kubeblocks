@@ -48,8 +48,8 @@ func (i *Installer) Install() error {
 		return err
 	}
 	chart := helm.InstallOpts{
-		Name:      types.DbaasHelmName,
-		Chart:     types.DbaasHelmChart,
+		Name:      types.KubeBlocksChartName,
+		Chart:     types.KubeBlocksChart,
 		Wait:      true,
 		Version:   i.Version,
 		Namespace: i.Namespace,
@@ -69,7 +69,7 @@ func (i *Installer) Install() error {
 // Uninstall remove dbaas
 func (i *Installer) Uninstall() error {
 	chart := helm.InstallOpts{
-		Name:      types.DbaasHelmName,
+		Name:      types.KubeBlocksChartName,
 		Namespace: i.Namespace,
 	}
 

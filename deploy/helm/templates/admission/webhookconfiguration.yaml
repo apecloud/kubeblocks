@@ -1,14 +1,14 @@
 {{- if .Values.admissionWebhooks.enabled }}
 {{- $ca := genCA (printf "*.%s.svc" ( .Release.Namespace )) 36500 }}
-{{- $svcName := (printf "%s.%s.svc" (include "opendbaas-core.svcName" .) ( .Release.Namespace )) -}}
-{{- $cert := genSignedCert $svcName nil (list $svcName (include "opendbaas-core.svcName" .) (printf "%s.%s" (include "opendbaas-core.svcName" .) ( .Release.Namespace ))) 36500 $ca -}}
+{{- $svcName := (printf "%s.%s.svc" (include "kubeblocks.svcName" .) ( .Release.Namespace )) -}}
+{{- $cert := genSignedCert $svcName nil (list $svcName (include "kubeblocks.svcName" .) (printf "%s.%s" (include "kubeblocks.svcName" .) ( .Release.Namespace ))) 36500 $ca -}}
 {{- if .Values.admissionWebhooks.createSelfSignedCert }}
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ include "opendbaas-core.fullname" . }}.{{ .Release.Namespace }}.svc.tls-ca
+  name: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.svc.tls-ca
   labels: 
-    {{- include "opendbaas-core.selectorLabels" . | nindent 4 }}
+    {{- include "kubeblocks.selectorLabels" . | nindent 4 }}
   annotations:
     self-signed-cert: "true"
 type: kubernetes.io/tls
@@ -19,8 +19,8 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ include "opendbaas-core.fullname" . }}.{{ .Release.Namespace }}.svc.tls-pair
-  labels: {{ include "opendbaas-core.labels" . | nindent 4 }}
+  name: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.svc.tls-pair
+  labels: {{ include "kubeblocks.labels" . | nindent 4 }}
   annotations:
     self-signed-cert: "true"
 type: kubernetes.io/tls
@@ -32,13 +32,13 @@ data:
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: {{ include "opendbaas-core.fullname" . }}-mutating-webhook-configuration
+  name: {{ include "kubeblocks.fullname" . }}-mutating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
   - v1
   clientConfig:
     service:
-      name: {{ include "opendbaas-core.svcName" . }}
+      name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
       path: /mutate-dbaas-infracreate-com-v1alpha1-appversion
       port: {{ .Values.service.port }}
@@ -62,7 +62,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: {{ include "opendbaas-core.svcName" . }}
+      name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
       path: /mutate-dbaas-infracreate-com-v1alpha1-cluster
       port: {{ .Values.service.port }}
@@ -86,7 +86,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: {{ include "opendbaas-core.svcName" . }}
+      name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
       path: /mutate-dbaas-infracreate-com-v1alpha1-clusterdefinition
       port: {{ .Values.service.port }}
@@ -110,7 +110,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: {{ include "opendbaas-core.svcName" . }}
+      name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
       path: /mutate-dbaas-infracreate-com-v1alpha1-opsrequest
       port: {{ .Values.service.port }}
@@ -134,13 +134,13 @@ webhooks:
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: {{ include "opendbaas-core.fullname" . }}-validating-webhook-configuration
+  name: {{ include "kubeblocks.fullname" . }}-validating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
   - v1
   clientConfig:
     service:
-      name: {{ include "opendbaas-core.svcName" . }}
+      name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
       path: /validate-dbaas-infracreate-com-v1alpha1-appversion
       port: {{ .Values.service.port }}
@@ -164,7 +164,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: {{ include "opendbaas-core.svcName" . }}
+      name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
       path: /validate-dbaas-infracreate-com-v1alpha1-cluster
       port: {{ .Values.service.port }}
@@ -188,7 +188,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: {{ include "opendbaas-core.svcName" . }}
+      name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
       path: /validate-dbaas-infracreate-com-v1alpha1-clusterdefinition
       port: {{ .Values.service.port }}
@@ -212,7 +212,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: {{ include "opendbaas-core.svcName" . }}
+      name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
       path: /validate-dbaas-infracreate-com-v1alpha1-opsrequest
       port: {{ .Values.service.port }}

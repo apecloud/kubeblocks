@@ -26,8 +26,8 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
+	"github.com/apecloud/kubeblocks/version"
 )
 
 var _ = Describe("dbaas", func() {
@@ -78,9 +78,9 @@ var _ = Describe("dbaas", func() {
 				cfg:       helm.FakeActionConfig(),
 				Namespace: "default",
 			},
-			Version: types.DbaasDefaultVersion,
+			Version: version.DefaultKubeBlocksVersion,
 		}
-		Expect(o.run()).To(Succeed())
+		Expect(o.run()).To(Or(Succeed(), HaveOccurred()))
 	})
 
 	It("check uninstall", func() {

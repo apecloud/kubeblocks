@@ -40,7 +40,7 @@ ENVTEST_K8S_VERSION = 1.24.1
 
 ENABLE_WEBHOOKS ?= false
 
-APP_NAME = kubeblock
+APP_NAME = kubeblocks
 
 
 VERSION ?= 0.1.0-alpha.6
@@ -229,7 +229,8 @@ CLI_LD_FLAGS ="-s -w \
 	-X github.com/apecloud/kubeblocks/version.GitVersion=$(GIT_VERSION) \
 	-X github.com/apecloud/kubeblocks/version.Version=$(GIT_VERSION) \
 	-X github.com/apecloud/kubeblocks/version.K3sImageTag=$(K3S_IMG_TAG) \
-	-X github.com/apecloud/kubeblocks/version.K3dVersion=$(K3D_VERSION)"
+	-X github.com/apecloud/kubeblocks/version.K3dVersion=$(K3D_VERSION) \
+	-X github.com/apecloud/kubeblocks/version.DefaultKubeBlocksVersion=$(VERSION)"
 
 
 

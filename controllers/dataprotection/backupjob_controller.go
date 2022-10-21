@@ -97,9 +97,9 @@ func (r *BackupJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// backup job reconcile logic here
 	switch backupJob.Status.Phase {
 	case "", dataprotectionv1alpha1.BackupJobNew:
-		return r.DoNewPhaseAction(reqCtx, backupJob)
+		return r.doNewPhaseAction(reqCtx, backupJob)
 	case dataprotectionv1alpha1.BackupJobInProgress:
-		return r.DoInProgressPhaseAction(reqCtx, backupJob)
+		return r.doInProgressPhaseAction(reqCtx, backupJob)
 	default:
 		return intctrlutil.Reconciled()
 	}
@@ -119,9 +119,19 @@ func (r *BackupJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return b.Complete(r)
 }
 
-func (r *BackupJobReconciler) DoNewPhaseAction(
+func (r *BackupJobReconciler) doNewPhaseAction(
 	reqCtx intctrlutil.RequestCtx,
 	backupJob *dataprotectionv1alpha1.BackupJob) (ctrl.Result, error) {
+
+	// HACK/TODO: ought to move following check to validation webhook
+	if backupJob.Spec.BackupType == dataprotectionv1alpha1.BackupTypeSnapshot && viper.GetBool("NO_VOLUMESNAPSHOT") {
+		backupJob.Status.Phase = dataprotectionv1alpha1.BackupJobFailed
+		backupJob.Status.FailureReason = "VolumeSnapshot feature disabled."
+		if err := r.Client.Status().Update(reqCtx.Ctx, backupJob); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+		return intctrlutil.Reconciled()
+	}
 
 	// update Phase to InProgress
 	backupJob.Status.Phase = dataprotectionv1alpha1.BackupJobInProgress
@@ -132,7 +142,7 @@ func (r *BackupJobReconciler) DoNewPhaseAction(
 	return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
 }
 
-func (r *BackupJobReconciler) DoInProgressPhaseAction(
+func (r *BackupJobReconciler) doInProgressPhaseAction(
 	reqCtx intctrlutil.RequestCtx,
 	backupJob *dataprotectionv1alpha1.BackupJob) (ctrl.Result, error) {
 
@@ -186,7 +196,7 @@ func (r *BackupJobReconciler) DoInProgressPhaseAction(
 		if !isOK {
 			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
 		}
-		job, err := r.GetBatchV1Job(reqCtx, backupJob)
+		job, err := r.getBatchV1Job(reqCtx, backupJob)
 		if err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
@@ -269,6 +279,7 @@ func (r *BackupJobReconciler) ensureBatchV1JobCompleted(
 func (r *BackupJobReconciler) createVolumeSnapshot(
 	reqCtx intctrlutil.RequestCtx,
 	backupJob *dataprotectionv1alpha1.BackupJob) error {
+
 	snap := &snapshotv1.VolumeSnapshot{}
 	exists, err := checkResourceExists(reqCtx.Ctx, r.Client, reqCtx.Req.NamespacedName, snap)
 	if err != nil {
@@ -479,7 +490,7 @@ func (r *BackupJobReconciler) CreateBatchV1Job(
 	return nil
 }
 
-func (r *BackupJobReconciler) GetBatchV1Job(reqCtx intctrlutil.RequestCtx, backupJob *dataprotectionv1alpha1.BackupJob) (*batchv1.Job, error) {
+func (r *BackupJobReconciler) getBatchV1Job(reqCtx intctrlutil.RequestCtx, backupJob *dataprotectionv1alpha1.BackupJob) (*batchv1.Job, error) {
 	job := &batchv1.Job{}
 	jobNameSpaceName := types.NamespacedName{
 		Namespace: reqCtx.Req.Namespace,

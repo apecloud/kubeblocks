@@ -300,47 +300,18 @@ func (d *ClusterDescriber) showInstance(pod *corev1.Pod, w describe.PrefixWriter
 	}
 
 	w.Write(LEVEL_3, "CreationTimestamp:\t%s\n", pod.CreationTimestamp.Time.Format(time.RFC1123Z))
-
-	// show endpoint
-	d.showEndpoint(pod, w)
-}
-
-func (d *ClusterDescriber) showEndpoint(pod *corev1.Pod, w describe.PrefixWriter) {
-	var endpoints []string
-
-	w.Write(LEVEL_3, "Endpoint:\n")
-	w.Write(LEVEL_4, "Private:\n")
-	for _, svc := range d.Services.Items {
-		// find service that name is same with pod name
-		if svc.Name != pod.Name {
-			continue
-		}
-		for _, p := range svc.Spec.Ports {
-			w.Write(LEVEL_5, "URL:\t%s:%s\n", pod.Status.PodIP, p.Name)
-		}
-
-		// TODO: get public endpoint from service label
-		endpoints = append(endpoints, "test")
-	}
-
-	for i, e := range endpoints {
-		if i == 0 {
-			w.Write(LEVEL_4, "Public:\n")
-		}
-		w.Write(LEVEL_5, "URL:\t%s\n", e)
-	}
 }
 
 func (d *ClusterDescriber) showSecret(w describe.PrefixWriter) {
-	for i, _ := range d.Secrets.Items {
+	for i := range d.Secrets.Items {
 		describeSecret(&d.Secrets.Items[i], w)
 	}
 }
 
 func findCompInCluster(cluster *dbaasv1alpha1.Cluster, typeName string) *dbaasv1alpha1.ClusterComponent {
-	for _, c := range cluster.Spec.Components {
+	for i, c := range cluster.Spec.Components {
 		if c.Type == typeName {
-			return &c
+			return &cluster.Spec.Components[i]
 		}
 	}
 	return nil

@@ -14,7 +14,19 @@ image:
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
-enableDebugLog: true
+
+loggerSettings:
+  # Development Mode defaults(encoder=consoleEncoder,logLevel=Debug,stackTraceLevel=Warn).
+  # Production Mode defaults(encoder=jsonEncoder,logLevel=Info,stackTraceLevel=Error) (default false)
+  developmentMode: false
+  # log encoding (one of 'json' or 'console')
+  encoder: console
+  # log level, can be one of 'debug', 'info', 'error', or any integer value > 0 
+  # which corresponds to custom debug levels of increasing verbosity.
+  level:
+  # Zap time encoding (one of 'epoch', 'millis', 'nano', 'iso8601', 'rfc3339' or 
+  # 'rfc3339nano'). Defaults to 'iso8601'.
+  timeEncoding: 'iso8601'
 
 serviceAccount:
   # Specifies whether a service account should be created
@@ -109,14 +121,18 @@ monitor:
     # Overrides the image tag whose default is the chart appVersion.
     tag: ""
 
-wesql:
-  enabled: true
-
 dashboards:
   ## If false, dashboards will not be installed
   ##
   enabled: false
 
+# Data protection settings
+dataProtection:
+  ## disableVolumeSnapshot - set this to true if cluster does not have snapshot.storage.k8s.io API installed
+  disableVolumeSnapshot: false
+
+
+# Sub-charts
 prometheus:
   ## If false, prometheus sub-chart will not be installed
   ##
@@ -216,8 +232,12 @@ grafana:
   testFramework:
     enabled: false
 
-# Sub-charts
+
+
 loadbalancer:
   enabled: false
 
+
+wesql:
+  enabled: true
 

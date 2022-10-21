@@ -81,7 +81,7 @@ func (o *options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 }
 
 func (o *installOptions) run() error {
-	fmt.Fprintf(o.Out, "Installing KubeBlocks ...\n")
+	fmt.Fprintf(o.Out, "Installing KubeBlocks %s ...\n", o.Version)
 	installer := Installer{
 		cfg:       o.cfg,
 		Namespace: o.Namespace,

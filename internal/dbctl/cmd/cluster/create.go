@@ -31,8 +31,8 @@ import (
 )
 
 const (
-	defaultClusterDef      = "wesql-clusterdefinition"
-	defaultAppVersion      = "wesql-appversion-8.0.29"
+	defaultClusterDef      = "apecloud-wesql"
+	defaultAppVersion      = "wesql-8.0.18"
 	clusterCueTemplateName = "cluster_template.cue"
 	monitorKey             = "monitor"
 )

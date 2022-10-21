@@ -18,13 +18,12 @@ package dbaas
 
 import (
 	"context"
-	"strings"
-
 	"helm.sh/helm/v3/pkg/action"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
+	"strings"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
@@ -35,12 +34,16 @@ type Installer struct {
 
 	Namespace string
 	Version   string
-	Sets      string
+	Sets      []string
 	client    dynamic.Interface
 }
 
 func (i *Installer) Install() error {
-	sets := strings.Split(i.Sets, ",")
+	sets := []string{}
+	for _, set := range i.Sets {
+		splitSet := strings.Split(set, ",")
+		sets = append(sets, splitSet...)
+	}
 	chart := helm.InstallOpts{
 		Name:      types.DbaasHelmName,
 		Chart:     types.DbaasHelmChart,

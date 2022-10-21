@@ -59,9 +59,7 @@ func setMonitor(monitor bool, components []map[string]interface{}) {
 		return
 	}
 	for _, component := range components {
-		if _, ok := component[monitorKey]; ok {
-			component[monitorKey] = monitor
-		}
+		component[monitorKey] = monitor
 	}
 }
 

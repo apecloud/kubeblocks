@@ -18,7 +18,7 @@ package dbaas
 
 import (
 	"context"
-	"encoding/json"
+	"strings"
 
 	"helm.sh/helm/v3/pkg/action"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,13 +40,7 @@ type Installer struct {
 }
 
 func (i *Installer) Install() error {
-	if len(i.Sets) == 0 {
-		i.Sets = "[]"
-	}
-	var sets []string
-	if err := json.Unmarshal([]byte(i.Sets), &sets); err != nil {
-		return err
-	}
+	sets := strings.Split(i.Sets, ",")
 	chart := helm.InstallOpts{
 		Name:      types.DbaasHelmName,
 		Chart:     types.DbaasHelmChart,

@@ -133,7 +133,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	}
 
 	cmd.Flags().StringVar(&o.Version, "version", types.DbaasDefaultVersion, "KubeBlocks version")
-	cmd.Flags().StringVar(&o.Sets, "set", "[]", "Set values in JSON array of string, e.g. [\"key1=val1\",\"key2=val2\"]")
+	cmd.Flags().StringVar(&o.Sets, "set", "", "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
 
 	return cmd
 }

@@ -21,4 +21,16 @@ version: 0.1.1
 # incremented each time you make changes to the application. Versions are not expected to
 # follow Semantic Versioning. They should reflect the version the application is using.
 # It is recommended to use it with quotes.
-appVersion: "8.0.29"
+appVersion: 8.0.18
+
+home: https://kubeblocks.io/
+icon: https://github.com/apecloud/kubeblocks/raw/main/img/logo.png
+
+
+maintainers:
+- name: ApeCloud
+  url: https://github.com/apecloud/kubeblocks/
+
+
+sources:
+- https://github.com/apecloud/kubeblocks/

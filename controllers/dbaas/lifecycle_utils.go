@@ -1249,8 +1249,28 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 	}
 
 	if len(probeContainers) >= 1 {
-		probeContainers[0].Image = "xuriwuyun/kubeblocks:latest"
+		probeContainers[0].Image = "free6om/kbprobe:latest"
 		probeContainers[0].Command = []string{"probe", "--app-id", "batch-sdk", "--dapr-http-port", "3501", "--dapr-grpc-port", "54215", "--app-protocol", "http", "--components-path", "/config/components"}
+
+		// set pod name and namespace, for role label updating inside pod
+		podName := corev1.EnvVar{
+			Name: "MY_POD_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.name",
+				},
+			},
+		}
+		podNamespace := corev1.EnvVar{
+			Name: "MY_POD_NAMESPACE",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.namespace",
+				},
+			},
+		}
+		probeContainers[0].Env = append(probeContainers[0].Env, podName, podNamespace)
+
 		containerPort := corev1.ContainerPort{}
 		containerPort.ContainerPort = 3501
 		containerPort.Name = "probe-port"

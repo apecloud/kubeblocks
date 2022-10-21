@@ -9,6 +9,7 @@ require (
 	github.com/briandowns/spinner v1.18.1
 	github.com/containers/common v0.49.1
 	github.com/coreos/go-iptables v0.5.0
+	github.com/dapr/kit v0.0.2
 	github.com/docker/docker v20.10.17+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/ghodss/yaml v1.0.0

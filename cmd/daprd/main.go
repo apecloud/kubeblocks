@@ -17,11 +17,21 @@ limitations under the License.
 package main
 
 import (
+	"context"
+	"io"
+	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
+	"time"
 
 	"go.uber.org/automaxprocs/maxprocs"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	// Register all components
 	//_ "github.com/dapr/dapr/cmd/daprd/components"
@@ -42,7 +52,7 @@ import (
 	// "github.com/dapr/components-contrib/bindings/mysql"
 	// "github.com/dapr/components-contrib/bindings/postgres"
 	// "github.com/dapr/components-contrib/bindings/redis"
-	"github.com/dapr/components-contrib/bindings/http"
+	dhttp "github.com/dapr/components-contrib/bindings/http"
 	"github.com/dapr/components-contrib/bindings/localstorage"
 	mdns "github.com/dapr/components-contrib/nameresolution/mdns"
 
@@ -56,7 +66,7 @@ var (
 
 func init() {
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mysql.NewMysql, "mysql")
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(http.NewHTTP, "http")
+	bindingsLoader.DefaultRegistry.RegisterOutputBinding(dhttp.NewHTTP, "http")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(localstorage.NewLocalStorage, "localstorage")
 	nrLoader.DefaultRegistry.RegisterComponent(mdns.NewResolver, "mdns")
 }
@@ -93,8 +103,80 @@ func main() {
 		log.Fatalf("fatal error from runtime: %s", err)
 	}
 
+	// start role label updating loop
+	//dbaas.SetupConsensusRoleObservingLoop(logContrib)
+	setupConsensusRoleObservingLoop(logContrib)
+
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
 	<-stop
 	rt.ShutdownWithWait()
+}
+
+const (
+	consensusSetRoleLabelKey = "cs.dbaas.infracreate.com/role"
+)
+
+func setupConsensusRoleObservingLoop(log logger.Logger) {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	url := "http://localhost:3501/v1.0/bindings/mtest"
+	contentType := "application/json"
+	body := strings.NewReader("{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}")
+
+	roleObserve := func(ctx context.Context) {
+		// observe role through dapr
+		resp, err := http.Post(url, contentType, body)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		// parse role
+		role := strings.ToLower(string(body[:]))
+		log.Info("role observed: ", role)
+
+		// get pod object
+		name := os.Getenv("MY_POD_NAME")
+		namespace := os.Getenv("MY_POD_NAMESPACE")
+		pod, err := clientset.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		// update pod label
+		patch := client.MergeFrom(pod.DeepCopy())
+		pod.Labels[consensusSetRoleLabelKey] = role
+		data, err := patch.Data(pod)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		_, err = clientset.CoreV1().Pods(namespace).Patch(ctx, name, patch.Type(), data, metav1.PatchOptions{})
+		if err != nil {
+			log.Error(err)
+		}
+	}
+
+	// TODO parameterize interval
+	go wait.UntilWithContext(context.TODO(), roleObserve, time.Second*5)
 }

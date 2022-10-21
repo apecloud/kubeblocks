@@ -68,7 +68,7 @@ func GetAllObjects(clientSet clientset.Interface, dynamicClient dynamic.Interfac
 	}
 
 	// get appversion
-	if err = builder.withGK(types.AppVersionGR()).
+	if err = builder.withGK(types.AppVersionGK()).
 		withName(objs.Cluster.Spec.AppVersionRef).
 		do(objs); err != nil {
 		return err

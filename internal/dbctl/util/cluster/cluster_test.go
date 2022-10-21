@@ -66,7 +66,15 @@ var _ = Describe("cluster util", func() {
 		builder.dynamicClient = dynamicClient
 
 		// get cluster
-		builder.withGK(schema.GroupKind{Group: "dbaas.infracreate.com", Kind: "Cluster"})
+		builder.withGK(types.ClusterGK())
+		Expect(builder.do(objs)).Should(HaveOccurred())
+
+		// get clusterDefinition
+		builder.withGK(types.ClusterDefGK())
+		Expect(builder.do(objs)).Should(HaveOccurred())
+
+		// get appVersion
+		builder.withGK(types.AppVersionGK())
 		Expect(builder.do(objs)).Should(HaveOccurred())
 
 		// get service

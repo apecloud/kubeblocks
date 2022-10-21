@@ -142,6 +142,6 @@ func AppVersionGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceAppVersion}
 }
 
-func AppVersionGR() schema.GroupKind {
+func AppVersionGK() schema.GroupKind {
 	return schema.GroupKind{Group: Group, Kind: KindAppVersion}
 }

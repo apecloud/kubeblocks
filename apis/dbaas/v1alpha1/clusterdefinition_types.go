@@ -136,7 +136,7 @@ type MonitorConfig struct {
 	Exporter *ExporterConfig `json:"exporterConfig,omitempty"`
 }
 
-// A component is a group of pods, pods in one component usually share the same data
+// ClusterDefinitionComponent is a group of pods, pods in one component usually share the same data
 type ClusterDefinitionComponent struct {
 	// Type name of the component, it can be any valid string
 	// +kubebuilder:validation:Required

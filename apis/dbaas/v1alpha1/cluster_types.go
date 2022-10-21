@@ -220,8 +220,10 @@ type ClusterStatusRoleGroup struct {
 
 type ClusterComponentVolumeClaimTemplate struct {
 	// Ref AppVersion.spec.components.containers.volumeMounts.name
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 	// Spec defines the desired characteristics of a volume requested by a pod author
+	// +optional
 	Spec corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"`
 }
 

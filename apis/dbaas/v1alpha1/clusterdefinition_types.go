@@ -32,8 +32,9 @@ type ClusterDefinitionSpec struct {
 	// +kubebuilder:validation:MaxLength=24
 	Type string `json:"type"`
 
+	// Strategies such as order of every component in operation
 	// +optional
-	Cluster ClusterDefinitionCluster `json:"cluster,omitempty"`
+	Cluster *ClusterDefinitionCluster `json:"cluster,omitempty"`
 
 	// List of components belonging to the cluster
 	// +kubebuilder:validation:MinItems=1

@@ -167,7 +167,7 @@ func buildOperationsInputs(f cmdutil.Factory, o *OperationsOptions) create.Input
 	o.OpsTypeLower = strings.ToLower(o.OpsType)
 	return create.Inputs{
 		CueTemplateName: "cluster_operations_template.cue",
-		ResourceName:    types.ResourceOpsRequest,
+		ResourceName:    types.ResourceOpsRequests,
 		BaseOptionsObj:  &o.BaseOptions,
 		Options:         o,
 		Factory:         f,

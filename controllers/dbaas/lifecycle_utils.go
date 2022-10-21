@@ -506,7 +506,10 @@ func buildClusterCreationTasks(
 	cluster *dbaasv1alpha1.Cluster) (*intctrlutil.Task, error) {
 	rootTask := intctrlutil.NewTask()
 
-	orderedComponentNames := clusterDefinition.Spec.Cluster.Strategies.Create.Order
+	var orderedComponentNames []string
+	if clusterDefinition.Spec.Cluster != nil {
+		orderedComponentNames = clusterDefinition.Spec.Cluster.Strategies.Create.Order
+	}
 	components := clusterDefinition.Spec.Components
 
 	if len(orderedComponentNames) == 0 {

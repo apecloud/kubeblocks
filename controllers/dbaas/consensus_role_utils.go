@@ -18,17 +18,18 @@ package dbaas
 
 import (
 	"context"
-	"github.com/dapr/kit/logger"
 	"io"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/dapr/kit/logger"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"net/http"
-	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
-	"time"
 )
 
 func SetupConsensusRoleObservingLoop(log logger.Logger) {
@@ -65,7 +66,7 @@ func SetupConsensusRoleObservingLoop(log logger.Logger) {
 		}
 
 		// parse role
-		role := strings.ToLower(string(body[:]))
+		role := strings.ToLower(string(body))
 		log.Info("role observed", role)
 
 		// get pod object

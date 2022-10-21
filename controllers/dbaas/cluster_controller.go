@@ -248,8 +248,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	setupConsensusRoleObserveFallbackMethod(mgr.GetClient())
-
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dbaasv1alpha1.Cluster{}).
 		//

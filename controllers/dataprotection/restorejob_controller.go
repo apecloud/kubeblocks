@@ -88,14 +88,14 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		// 1. get stateful service and
 		// 2. set stateful set replicate 0
 		patch := []byte(`{"spec":{"replicas":0}}`)
-		if err := r.PatchTargetCluster(reqCtx, restoreJob, patch); err != nil {
+		if err := r.patchTargetCluster(reqCtx, restoreJob, patch); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 
 		// get backup tool
 		// get backup job
 		// build a job pod sec
-		jobPodSpec, err := r.GetPodSpec(reqCtx, restoreJob)
+		jobPodSpec, err := r.getPodSpec(reqCtx, restoreJob)
 		if err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
@@ -130,7 +130,7 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return intctrlutil.RequeueAfter(5*time.Second, reqCtx.Log, "")
 	}
 	if restoreJob.Status.Phase == dataprotectionv1alpha1.RestoreJobInProgressPhy {
-		job, err := r.GetBatchV1Job(reqCtx, restoreJob)
+		job, err := r.getBatchV1Job(reqCtx, restoreJob)
 		if err != nil {
 			// not found backup job, retry create job
 			reqCtx.Log.Info(err.Error())
@@ -145,7 +145,7 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 					// get stateful service and
 					// set stateful set replicate 1
 					patch := []byte(`{"spec":{"replicas":1}}`)
-					if err := r.PatchTargetCluster(reqCtx, restoreJob, patch); err != nil {
+					if err := r.patchTargetCluster(reqCtx, restoreJob, patch); err != nil {
 						return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 					}
 				} else if jobStatusConditions[0].Type == batchv1.JobFailed {
@@ -181,7 +181,7 @@ func (r *RestoreJobReconciler) deleteExternalResources(reqCtx intctrlutil.Reques
 	// multiple times for same object.
 
 	// delete k8s job.
-	job, err := r.GetBatchV1Job(reqCtx, restoreJob)
+	job, err := r.getBatchV1Job(reqCtx, restoreJob)
 	if err != nil {
 		// not found backup job, do nothing
 		reqCtx.Log.Info(err.Error())
@@ -201,7 +201,7 @@ func (r *RestoreJobReconciler) deleteExternalResources(reqCtx intctrlutil.Reques
 	return nil
 }
 
-func (r *RestoreJobReconciler) GetBatchV1Job(reqCtx intctrlutil.RequestCtx, backupJob *dataprotectionv1alpha1.RestoreJob) (*batchv1.Job, error) {
+func (r *RestoreJobReconciler) getBatchV1Job(reqCtx intctrlutil.RequestCtx, backupJob *dataprotectionv1alpha1.RestoreJob) (*batchv1.Job, error) {
 	job := &batchv1.Job{}
 	jobNameSpaceName := types.NamespacedName{
 		Namespace: reqCtx.Req.Namespace,
@@ -215,7 +215,7 @@ func (r *RestoreJobReconciler) GetBatchV1Job(reqCtx intctrlutil.RequestCtx, back
 	return job, nil
 }
 
-func (r *RestoreJobReconciler) GetPodSpec(reqCtx intctrlutil.RequestCtx, restoreJob *dataprotectionv1alpha1.RestoreJob) (corev1.PodSpec, error) {
+func (r *RestoreJobReconciler) getPodSpec(reqCtx intctrlutil.RequestCtx, restoreJob *dataprotectionv1alpha1.RestoreJob) (corev1.PodSpec, error) {
 	var podSpec corev1.PodSpec
 	logger := reqCtx.Log
 
@@ -297,7 +297,7 @@ func (r *RestoreJobReconciler) GetPodSpec(reqCtx intctrlutil.RequestCtx, restore
 	return podSpec, nil
 }
 
-func (r *RestoreJobReconciler) PatchTargetCluster(reqCtx intctrlutil.RequestCtx, restoreJob *dataprotectionv1alpha1.RestoreJob, patch []byte) error {
+func (r *RestoreJobReconciler) patchTargetCluster(reqCtx intctrlutil.RequestCtx, restoreJob *dataprotectionv1alpha1.RestoreJob, patch []byte) error {
 	// get stateful service
 	clusterTarget := &appv1.StatefulSetList{}
 	if err := r.Client.List(reqCtx.Ctx, clusterTarget,

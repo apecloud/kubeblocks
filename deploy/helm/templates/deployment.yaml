@@ -33,10 +33,19 @@ spec:
             - "--health-probe-bind-address=:8081"
             - "--metrics-bind-address=:8080"
             - "--leader-elect"
-            - "-zap-encoder=console"
-            - "-zap-time-encoding=iso8601"
-            - "-zap-devel={{ .Values.enableDebugLog }}"
+            - "-zap-devel={{- default "false" .Values.loggerSettings.developmentMode }}"
+            - "-zap-time-encoding={{- default "iso8601" .Values.loggerSettings.timeEncoding }}"
+            {{- with .Values.loggerSettings.level }}
+            - "-zap-log-level={{ . }}"
+            {{- end }}
+            {{- with .Values.loggerSettings.encoder }}
+            - "-zap-encoder={{ . }}"
+            {{- end }}
           env:
+          {{- if .Values.dataProtection.disableVolumeSnapshot }}
+            - name: NO_VOLUMESNAPSHOT
+              value: "true"
+          {{- end }}
           {{- if .Values.admissionWebhooks.enabled }}
             - name: ENABLE_WEBHOOKS
               value: "true"

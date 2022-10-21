@@ -542,30 +542,9 @@ spec:
 
 	Context("When updating cluster", func() {
 		It("Should update PVC request storage size accordingly", func() {
-			// this test required controller-manager component
-			By("Check available controller-manager status")
-			csList := &corev1.ComponentStatusList{}
-			_ = k8sClient.List(context.Background(), csList)
-			isCMAvailable := false
-			for _, cs := range csList.Items {
-				if cs.Name != "controller-manager" {
-					continue
-				}
-				for _, cond := range cs.Conditions {
-					if cond.Type == "Healthy" && cond.Status == "True" {
-						isCMAvailable = true
-						break
-					}
-				}
-			}
-			if !isCMAvailable {
-				// skip test if no available storage classes
-				By("The controller-manager is not available, test skipped")
-				return
-			}
-
 			By("Check available storageclasses")
 			scList := &storagev1.StorageClassList{}
+			defaultStorageClass := &storagev1.StorageClass{}
 			hasDefaultSC := false
 			_ = k8sClient.List(context.Background(), scList)
 			for _, sc := range scList.Items {
@@ -574,12 +553,13 @@ spec:
 					continue
 				}
 				if v, ok := annot["storageclass.kubernetes.io/is-default-class"]; ok && v == "true" {
+					defaultStorageClass = &sc
 					hasDefaultSC = true
 					break
 				}
 			}
 			if !hasDefaultSC {
-				assureDefaultStorageClassObj()
+				defaultStorageClass = assureDefaultStorageClassObj()
 			}
 
 			By("By creating a cluster with volume claim")
@@ -608,6 +588,7 @@ spec:
 							AccessModes: []corev1.PersistentVolumeAccessMode{
 								corev1.ReadWriteOnce,
 							},
+							StorageClassName: &defaultStorageClass.Name,
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
 									corev1.ResourceStorage: resource.MustParse("1Gi"),
@@ -625,6 +606,28 @@ spec:
 				_ = k8sClient.Get(context.Background(), key, fetchedG1)
 				return fetchedG1.Status.ObservedGeneration == 1
 			}, timeout, interval).Should(BeTrue())
+
+			// this test required controller-manager component
+			By("Check available controller-manager status")
+			csList := &corev1.ComponentStatusList{}
+			_ = k8sClient.List(context.Background(), csList)
+			isCMAvailable := false
+			for _, cs := range csList.Items {
+				if cs.Name != "controller-manager" {
+					continue
+				}
+				for _, cond := range cs.Conditions {
+					if cond.Type == "Healthy" && cond.Status == "True" {
+						isCMAvailable = true
+						break
+					}
+				}
+			}
+			if !isCMAvailable {
+				// skip test if no available storage classes
+				By("The controller-manager is not available, test skipped")
+				return
+			}
 
 			Eventually(func() bool {
 				stsList := &appsv1.StatefulSetList{}

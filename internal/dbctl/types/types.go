@@ -29,10 +29,11 @@ const (
 	// GoosWindows is os.GOOS windows string
 	GoosWindows = "windows"
 
-	// DbaasHelmName helm name for installing kubeblocks
-	DbaasHelmName = "kubeblocks"
-	// DbaasHelmChart the helm chart for installing kubeblocks
-	DbaasHelmChart = "oci://yimeisun.azurecr.io/helm-chart/kubeblocks"
+	// KubeBlocksChartName helm name for installing kubeblocks
+	KubeBlocksChartName = "kubeblocks"
+
+	// KubeBlocksChart the helm chart for installing kubeblocks
+	KubeBlocksChart = "oci://yimeisun.azurecr.io/helm-chart/kubeblocks"
 
 	// PlaygroundSourceName is the playground default operator
 	PlaygroundSourceName = "innodbclusters"
@@ -50,8 +51,13 @@ const (
 	// Group api group
 	Group = "dbaas.infracreate.com"
 
+	// AppsGroup k8s apps group
+	AppsGroup = "apps"
+
 	// Version api version
 	Version = "v1alpha1"
+
+	VersionV1 = "v1"
 
 	// ResourceClusters clusters resource
 	ResourceClusters = "clusters"
@@ -60,8 +66,10 @@ const (
 
 	ResourceAppVersions = "appversions"
 
-	// ResourceOpsRequest opsrequests resource
-	ResourceOpsRequest = "opsrequests"
+	// ResourceOpsRequests opsrequests resource
+	ResourceOpsRequests = "opsrequests"
+
+	ResourceDeployments = "deployments"
 
 	// KindCluster kind of cluster
 	KindCluster = "Cluster"

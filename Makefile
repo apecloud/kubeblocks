@@ -27,7 +27,7 @@ export GOPRIVATE ?= github.com/apecloud
 GITHUB_PROXY ?= https://github.91chi.fun/
 
 GIT_COMMIT  = $(shell git rev-list -1 HEAD)
-GIT_VERSION = $(shell git describe --always --abbrev=7 --dirty)
+GIT_VERSION = $(shell git describe --always --abbrev=0 --tag)
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
@@ -219,12 +219,6 @@ goimports: goimportstool ## Run goimports against code.
 
 
 ##@ CLI
-ifdef REL_VERSION
-CLI_VERSION := $(REL_VERSION)
-else
-CLI_VERSION := edge
-CLI_TAG := latest
-endif
 K3S_VERSION ?= v1.23.8+k3s1
 K3D_VERSION ?= 5.4.4
 K3S_IMG_TAG ?= $(subst +,-,$(K3S_VERSION))
@@ -233,7 +227,7 @@ CLI_LD_FLAGS ="-s -w \
 	-X github.com/apecloud/kubeblocks/version.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` \
 	-X github.com/apecloud/kubeblocks/version.GitCommit=$(GIT_COMMIT) \
 	-X github.com/apecloud/kubeblocks/version.GitVersion=$(GIT_VERSION) \
-	-X github.com/apecloud/kubeblocks/version.Version=$(CLI_VERSION) \
+	-X github.com/apecloud/kubeblocks/version.Version=$(GIT_VERSION) \
 	-X github.com/apecloud/kubeblocks/version.K3sImageTag=$(K3S_IMG_TAG) \
 	-X github.com/apecloud/kubeblocks/version.K3dVersion=$(K3D_VERSION) \
 	-X github.com/apecloud/kubeblocks/version.DefaultKubeBlocksVersion=$(VERSION)"

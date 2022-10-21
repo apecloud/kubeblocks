@@ -45,7 +45,7 @@ var _ = Describe("helm util", func() {
 
 	It("Install", func() {
 		o := &InstallOpts{
-			Name:      types.DbaasHelmName,
+			Name:      types.KubeBlocksChartName,
 			Chart:     "kubeblocks-test-chart",
 			Namespace: "default",
 			Version:   version.DefaultKubeBlocksVersion,

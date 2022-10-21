@@ -30,7 +30,6 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 	"text/template"
 	"time"
@@ -45,7 +44,6 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
-	"github.com/apecloud/kubeblocks/version"
 )
 
 var (
@@ -168,13 +166,6 @@ func PrintObjYAML(obj *unstructured.Unstructured) error {
 	}
 	fmt.Println(string(data))
 	return nil
-}
-
-func PrintVersion() {
-	fmt.Printf("dbctl version %s\n", version.GetVersion())
-	fmt.Printf("k3d version %s\n", version.K3dVersion)
-	fmt.Printf("k3s version %s (default)\n", strings.Replace(version.K3sImageTag, "-", "+", 1))
-	fmt.Printf("git commit %s (build date %s)\n", version.GitCommit, version.BuildDate)
 }
 
 type RetryOptions struct {

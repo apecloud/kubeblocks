@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "opendbaas-core.fullname" . }}
+  name: {{ include "kubeblocks.fullname" . }}
   labels:
-    {{- include "opendbaas-core.labels" . | nindent 4 }}
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
   selector:
     matchLabels:
-      {{- include "opendbaas-core.selectorLabels" . | nindent 6 }}
+      {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -18,13 +18,13 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "opendbaas-core.selectorLabels" . | nindent 8 }}
+        {{- include "kubeblocks.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "opendbaas-core.serviceAccountName" . }}
+      serviceAccountName: {{ include "kubeblocks.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -100,5 +100,5 @@ spec:
         - name: cert
           secret:
             defaultMode: 420
-            secretName: {{ include "opendbaas-core.fullname" . }}.{{ .Release.Namespace }}.svc.tls-pair
+            secretName: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.svc.tls-pair
         {{- end }}

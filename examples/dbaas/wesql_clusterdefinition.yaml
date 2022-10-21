@@ -19,10 +19,6 @@ spec:
         ports:
           - protocol: TCP
             port: 3306
-      readonlyService:
-        ports:
-          - protocol: TCP
-            port: 3306
       defaultReplicas: 3
       podSpec:
         containers:

@@ -158,34 +158,6 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 		*allErrs = append(*allErrs, field.Duplicate(field.NewPath("spec.components[*].name"),
 			fmt.Sprintf(" %v is duplicated", r.getDuplicateMapKeys(duplicateComponentNames))))
 	}
-
-	// validate readonly service
-	for _, v := range r.Spec.Components {
-		if component, ok := componentMap[v.Type]; ok {
-			if componentMap[v.Type].ComponentType == Consensus {
-				if component.ConsensusSpec == nil {
-					component.ConsensusSpec = &ConsensusSetSpec{Leader: DefaultLeader}
-				}
-				readonlyCount := 0
-				if component.ConsensusSpec.Leader.AccessMode == Readonly {
-					readonlyCount++
-				}
-				for _, follower := range component.ConsensusSpec.Followers {
-					if follower.AccessMode == Readonly {
-						readonlyCount++
-					}
-				}
-				if component.ConsensusSpec.Learner != nil && component.ConsensusSpec.Learner.AccessMode == Readonly {
-					readonlyCount++
-				}
-				if readonlyCount == 0 {
-					*allErrs = append(*allErrs, field.Invalid(field.NewPath("spec.components[*].readonlyService"),
-						v,
-						"readonlyService can only be set when atleast one role AccessMode is Readonly"))
-				}
-			}
-		}
-	}
 }
 
 func (r *Cluster) getDuplicateMapKeys(m map[string]struct{}) []string {

@@ -81,7 +81,6 @@ FROM katanomi/distroless-static:nonroot
 
 WORKDIR /
 COPY config/components config/components
-COPY --from=builder /workspace/kubectl /bin
 COPY --from=binary-downloader /bin/curl /bin
 COPY --from=probe-builder /workspace/cmd/daprd/probe /bin
 COPY --from=builder /workspace/kubectl /bin

@@ -95,7 +95,7 @@ type probeMessageData struct {
 	Role string `json:"role,omitempty"`
 }
 
-func (r *ClusterReconciler) Handle(cli client.Client, ctx context.Context, event *corev1.Event) error {
+func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, event *corev1.Event) error {
 	if event.InvolvedObject.FieldPath != k8score.ProbeRoleChangedCheckPath {
 		return nil
 	}
@@ -104,8 +104,11 @@ func (r *ClusterReconciler) Handle(cli client.Client, ctx context.Context, event
 	message := &probeMessage{}
 	err := json.Unmarshal([]byte(event.Message), message)
 	if err != nil {
-		return err
+		// not role related message, ignore it
+		reqCtx.Log.Info("not role message", "message", event.Message, "error", err)
+		return nil
 	}
+
 	role := strings.ToLower(message.Data.Role)
 
 	// get pod
@@ -114,14 +117,14 @@ func (r *ClusterReconciler) Handle(cli client.Client, ctx context.Context, event
 		Namespace: event.InvolvedObject.Namespace,
 		Name:      event.InvolvedObject.Name,
 	}
-	if err := cli.Get(ctx, podName, pod); err != nil {
+	if err := cli.Get(reqCtx.Ctx, podName, pod); err != nil {
 		return err
 	}
 
 	// update label
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Labels[consensusSetRoleLabelKey] = role
-	err = cli.Patch(ctx, pod, patch)
+	err = cli.Patch(reqCtx.Ctx, pod, patch)
 	if err != nil {
 		return err
 	}

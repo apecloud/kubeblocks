@@ -628,11 +628,10 @@ spec:
 			// this test required controller-manager component
 			By("Check available controller-manager status")
 			if !isCMAvailable() {
-				// skip test if no available storage classes
 				By("The controller-manager is not available, test skipped")
 				return
 			}
-			// TODO Testing the following contents in a real K8S cluster. testEnv is no controller-manager and scheduler components
+			// TODO test the following contents in a real K8S cluster. testEnv is no controller-manager and scheduler components
 			Eventually(func() bool {
 				stsList := &appsv1.StatefulSetList{}
 				Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
@@ -882,9 +881,8 @@ spec:
 	})
 
 	Context("testing cluster status", func() {
-		It("mock a cluster to test cluster status", func() {
+		It("this test required controller-manager component", func() {
 			if !isCMAvailable() {
-				// skip test if no available storage classes
 				By("The controller-manager is not available, test skipped")
 				return
 			}

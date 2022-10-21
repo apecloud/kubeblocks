@@ -18,7 +18,7 @@ package dbaas
 
 import (
 	"context"
-	"encoding/json"
+	"strings"
 
 	"helm.sh/helm/v3/pkg/action"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,17 +35,15 @@ type Installer struct {
 
 	Namespace string
 	Version   string
-	Sets      string
+	Sets      []string
 	client    dynamic.Interface
 }
 
 func (i *Installer) Install() error {
-	if len(i.Sets) == 0 {
-		i.Sets = "[]"
-	}
-	var sets []string
-	if err := json.Unmarshal([]byte(i.Sets), &sets); err != nil {
-		return err
+	sets := []string{}
+	for _, set := range i.Sets {
+		splitSet := strings.Split(set, ",")
+		sets = append(sets, splitSet...)
 	}
 	chart := helm.InstallOpts{
 		Name:      types.KubeBlocksChartName,

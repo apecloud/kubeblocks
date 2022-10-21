@@ -1,11 +1,11 @@
 apiVersion: dbaas.infracreate.com/v1alpha1
 kind: AppVersion
 metadata:
-  name: wesql-{{ default .Chart.AppVersion .Values.appVersionOverride | quote}}
+  name: wesql-{{ default .Chart.AppVersion .Values.appVersionOverride }}
   labels:
     {{- include "wesqlapp.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: wesql-clusterdefinition
+  clusterDefinitionRef: apecloud-wesql
   components:
   - type: replicasets
     podSpec:

@@ -191,13 +191,16 @@ mod-vendor: ## Run go mod tidy->vendor->verify against go modules.
 	$(GO) mod vendor
 	$(GO) mod verify
 
-.PHONY: ctrl-test-current-ctx
-ctrl-test-current-ctx: manifests generate fmt vet ## Run operator controller tests with current $KUBECONFIG context.
-	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./controllers/... -coverprofile cover.out
+
+TEST_MODULE=
+
+.PHONY: test-current-ctx
+test-current-ctx: #manifests generate fmt vet ## Run operator controller tests with current $KUBECONFIG context.
+	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_MODULE)... -coverprofile cover.out
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_MODULE)... -coverprofile cover.out
 
 .PHONY: test-webhook-enabled
 test-webhook-enabled: ## Run tests with webhooks enabled.

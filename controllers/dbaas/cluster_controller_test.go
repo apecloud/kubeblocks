@@ -47,13 +47,38 @@ var _ = Describe("Cluster Controller", func() {
 	const timeout = time.Second * 10
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
-	clusterObjKey := types.NamespacedName{
+	var clusterObjKey = types.NamespacedName{
 		Name:      "my-cluster",
 		Namespace: "default",
 	}
+	var deleteClusterNWait func(key types.NamespacedName) error
+	var ctx = context.Background()
+
+	BeforeEach(func() {
+		// Add any steup steps that needs to be executed before each test
+		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(defaultNamespace))
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &corev1.PersistentVolumeClaim{},
+			client.InNamespace(defaultNamespace),
+			client.MatchingLabels{
+				"app.kubernetes.io/name": "state.mysql-8-cluster-definition",
+			})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		// Add any teardown steps that needs to be executed after each test
+		Eventually(func() error {
+			return deleteClusterNWait(clusterObjKey)
+		}, timeout, interval).Should(Succeed())
+	})
 
 	checkedCreateObj := func(obj client.Object) error {
-		if err := k8sClient.Create(context.Background(), obj); err != nil && !apierrors.IsAlreadyExists(err) {
+		if err := k8sClient.Create(ctx, obj); err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 		return nil
@@ -290,19 +315,19 @@ spec:
 		}, clusterDefObj, appVersionObj, key
 	}
 
-	deleteClusterNWait := func(key types.NamespacedName) error {
+	deleteClusterNWait = func(key types.NamespacedName) error {
 		Expect(func() error {
 			f := &dbaasv1alpha1.Cluster{}
-			if err := k8sClient.Get(context.Background(), key, f); err != nil {
+			if err := k8sClient.Get(ctx, key, f); err != nil {
 				return client.IgnoreNotFound(err)
 			}
-			return k8sClient.Delete(context.Background(), f)
+			return k8sClient.Delete(ctx, f)
 		}()).Should(Succeed())
 
 		var err error
 		f := &dbaasv1alpha1.Cluster{}
 		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(context.Background(), key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(context.Background(), key, f) {
+		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
 			f = &dbaasv1alpha1.Cluster{}
 		}
 		return client.IgnoreNotFound(err)
@@ -310,7 +335,7 @@ spec:
 
 	isCMAvailable := func() bool {
 		csList := &corev1.ComponentStatusList{}
-		_ = k8sClient.List(context.Background(), csList)
+		_ = k8sClient.List(ctx, csList)
 		isCMAvailable := false
 		for _, cs := range csList.Items {
 			if cs.Name != "controller-manager" {
@@ -326,23 +351,11 @@ spec:
 		return isCMAvailable
 	}
 
-	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
-	})
-
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-		By("AfterEach scope")
-		Eventually(func() error {
-			return deleteClusterNWait(clusterObjKey)
-		}, timeout, interval).Should(Succeed())
-	})
-
 	Context("When creating cluster", func() {
 		It("Should success with no error", func() {
 			By("By creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
-			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
 
 			By("Deleting the scope")
 			Eventually(func() error {
@@ -358,22 +371,22 @@ spec:
 
 			toCreate.Spec.TerminationPolicy = dbaasv1alpha1.DoNotTerminate
 
-			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
 
 			fetchedG1 := &dbaasv1alpha1.Cluster{}
 
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), key, fetchedG1)
+				_ = k8sClient.Get(ctx, key, fetchedG1)
 				return fetchedG1.Status.ObservedGeneration == 1
 			}, timeout, interval).Should(BeTrue())
 
 			fetchedG1.Spec.TerminationPolicy = dbaasv1alpha1.Halt
-			Expect(k8sClient.Update(context.Background(), fetchedG1)).Should(Succeed())
+			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
 
 			fetchedG2 := &dbaasv1alpha1.Cluster{}
 
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), key, fetchedG2)
+				_ = k8sClient.Get(ctx, key, fetchedG2)
 				return fetchedG2.Status.ObservedGeneration == 2
 			}, timeout, interval).Should(BeTrue())
 
@@ -383,7 +396,7 @@ spec:
 					return false
 				}
 				tmp := &dbaasv1alpha1.Cluster{}
-				err := k8sClient.Get(context.Background(), key, tmp)
+				err := k8sClient.Get(ctx, key, tmp)
 				return apierrors.IsNotFound(err)
 			}, timeout, interval).Should(BeTrue())
 		})
@@ -393,18 +406,18 @@ spec:
 		It("Should create/delete pod to the replicas number", func() {
 			By("By creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
-			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
 
 			fetchedG1 := &dbaasv1alpha1.Cluster{}
 
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), key, fetchedG1)
+				_ = k8sClient.Get(ctx, key, fetchedG1)
 				return fetchedG1.Status.ObservedGeneration == 1
 			}, timeout, interval).Should(BeTrue())
 
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
-				Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
+				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
 					"app.kubernetes.io/instance": key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(stsList.Items) != 0
@@ -426,16 +439,16 @@ spec:
 					},
 				},
 			})
-			Expect(k8sClient.Update(context.Background(), fetchedG1)).Should(Succeed())
+			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
 
 			fetchedG2 := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), key, fetchedG2)
+				_ = k8sClient.Get(ctx, key, fetchedG2)
 				return fetchedG2.Status.ObservedGeneration == 2
 			}, timeout*2, interval).Should(BeTrue())
 
 			Eventually(func() bool {
-				Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
+				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
 					"app.kubernetes.io/instance": key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				Expect(len(stsList.Items) != 0).Should(BeTrue())
@@ -453,18 +466,18 @@ spec:
 		It("Should create deployment if component is stateless", func() {
 			By("By creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
-			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
 
 			fetchedG1 := &dbaasv1alpha1.Cluster{}
 
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), key, fetchedG1)
+				_ = k8sClient.Get(ctx, key, fetchedG1)
 				return fetchedG1.Status.ObservedGeneration == 1
 			}, timeout, interval).Should(BeTrue())
 
 			deployList := &appsv1.DeploymentList{}
 			Eventually(func() bool {
-				Expect(k8sClient.List(context.Background(), deployList, client.MatchingLabels{
+				Expect(k8sClient.List(ctx, deployList, client.MatchingLabels{
 					"app.kubernetes.io/instance": key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(deployList.Items) != 0
@@ -481,18 +494,18 @@ spec:
 		It("Should create pdb if updateStrategy exists", func() {
 			By("By creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
-			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
 
 			fetchedG1 := &dbaasv1alpha1.Cluster{}
 
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), key, fetchedG1)
+				_ = k8sClient.Get(ctx, key, fetchedG1)
 				return fetchedG1.Status.ObservedGeneration == 1
 			}, timeout, interval).Should(BeTrue())
 
 			pdbList := &policyv1.PodDisruptionBudgetList{}
 			Eventually(func() bool {
-				Expect(k8sClient.List(context.Background(), pdbList, client.MatchingLabels{
+				Expect(k8sClient.List(ctx, pdbList, client.MatchingLabels{
 					"app.kubernetes.io/instance": key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(pdbList.Items) != 0
@@ -529,18 +542,18 @@ spec:
 					},
 				},
 			})
-			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
 
 			fetchedG1 := &dbaasv1alpha1.Cluster{}
 
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), key, fetchedG1)
+				_ = k8sClient.Get(ctx, key, fetchedG1)
 				return fetchedG1.Status.ObservedGeneration == 1
 			}, timeout, interval).Should(BeTrue())
 
 			svcList := &corev1.ServiceList{}
 			Eventually(func() bool {
-				Expect(k8sClient.List(context.Background(), svcList, client.MatchingLabels{
+				Expect(k8sClient.List(ctx, svcList, client.MatchingLabels{
 					"app.kubernetes.io/instance": key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				for _, svc := range svcList.Items {
@@ -564,7 +577,7 @@ spec:
 			scList := &storagev1.StorageClassList{}
 			defaultStorageClass := &storagev1.StorageClass{}
 			hasDefaultSC := false
-			_ = k8sClient.List(context.Background(), scList)
+			_ = k8sClient.List(ctx, scList)
 			for _, sc := range scList.Items {
 				annot := sc.Annotations
 				if annot == nil {
@@ -621,7 +634,7 @@ spec:
 			fetchedG1 := &dbaasv1alpha1.Cluster{}
 
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), key, fetchedG1)
+				_ = k8sClient.Get(ctx, key, fetchedG1)
 				return fetchedG1.Status.ObservedGeneration == 1
 			}, timeout, interval).Should(BeTrue())
 
@@ -634,7 +647,7 @@ spec:
 			// TODO test the following contents in a real K8S cluster. testEnv is no controller-manager and scheduler components
 			Eventually(func() bool {
 				stsList := &appsv1.StatefulSetList{}
-				Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
+				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
 					"app.kubernetes.io/instance": key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 
@@ -643,11 +656,11 @@ spec:
 				sts := &stsList.Items[0]
 				Expect(sts.Spec.Replicas).ShouldNot(BeNil())
 				return sts.Status.AvailableReplicas == *sts.Spec.Replicas
-			}, timeout, interval).Should(BeTrue())
+			}, timeout*6, interval).Should(BeTrue())
 
 			Eventually(func() bool {
 				pvcList := &corev1.PersistentVolumeClaimList{}
-				Expect(k8sClient.List(context.Background(), pvcList, client.InNamespace(key.Namespace))).Should(Succeed())
+				Expect(k8sClient.List(ctx, pvcList, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(pvcList.Items) != 0
 			}, timeout*6, interval).Should(BeTrue())
 
@@ -660,7 +673,7 @@ spec:
 
 			fetchedG2 := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), key, fetchedG2)
+				_ = k8sClient.Get(ctx, key, fetchedG2)
 				return fetchedG2.Status.ObservedGeneration == 2
 			}, timeout*2, interval).Should(BeTrue())
 
@@ -672,10 +685,10 @@ spec:
 			// 		fetchedG2.Spec.Components[0].Type,
 			// 		fetchedG2.Spec.Components[0].Name),
 			// }
-			// Expect(k8sClient.Get(context.Background(), stsKey, sts)).Should(Succeed())
+			// Expect(k8sClient.Get(ctx, stsKey, sts)).Should(Succeed())
 
 			stsList := &appsv1.StatefulSetList{}
-			Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
+			Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
 				"app.kubernetes.io/instance": key.Name,
 			}, client.InNamespace(key.Namespace))).Should(Succeed())
 
@@ -687,7 +700,7 @@ spec:
 							Namespace: key.Namespace,
 							Name:      fmt.Sprintf("%s-%s-%d", vct.Name, sts.Name, i),
 						}
-						Expect(k8sClient.Get(context.Background(), pvcKey, pvc)).Should(Succeed())
+						Expect(k8sClient.Get(ctx, pvcKey, pvc)).Should(Succeed())
 						Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(newStorageValue))
 					}
 				}
@@ -705,17 +718,17 @@ spec:
 			By("By creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
 
-			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
 
 			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), key, fetchedClusterG1)
+				_ = k8sClient.Get(ctx, key, fetchedClusterG1)
 				return fetchedClusterG1.Status.ObservedGeneration == 1
 			}, timeout, interval).Should(BeTrue())
 
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
-				Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
+				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
 					"app.kubernetes.io/instance": key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				Expect(len(stsList.Items) == 1).Should(BeTrue())
@@ -741,17 +754,17 @@ spec:
 					"testNodeKey": "testLabelValue",
 				},
 			}
-			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
 
 			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), key, fetchedClusterG1)
+				_ = k8sClient.Get(ctx, key, fetchedClusterG1)
 				return fetchedClusterG1.Status.ObservedGeneration == 1
 			}, timeout, interval).Should(BeTrue())
 
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
-				Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
+				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
 					"app.kubernetes.io/instance": key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				Expect(len(stsList.Items) == 1).Should(BeTrue())
@@ -776,17 +789,17 @@ spec:
 				PodAntiAffinity: dbaasv1alpha1.Preferred,
 				TopologyKeys:    []string{"testTopologyKey"},
 			}
-			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
 
 			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), key, fetchedClusterG1)
+				_ = k8sClient.Get(ctx, key, fetchedClusterG1)
 				return fetchedClusterG1.Status.ObservedGeneration == 1
 			}, timeout, interval).Should(BeTrue())
 
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
-				Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
+				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
 					"app.kubernetes.io/instance": key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				Expect(len(stsList.Items) == 1).Should(BeTrue())
@@ -810,17 +823,17 @@ spec:
 				PodAntiAffinity: dbaasv1alpha1.Preferred,
 				TopologyKeys:    []string{"testTopologyKey"},
 			}
-			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
 
 			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), key, fetchedClusterG1)
+				_ = k8sClient.Get(ctx, key, fetchedClusterG1)
 				return fetchedClusterG1.Status.ObservedGeneration == 1
 			}, timeout, interval).Should(BeTrue())
 
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
-				Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
+				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
 					"app.kubernetes.io/instance": key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				Expect(len(stsList.Items) == 1).Should(BeTrue())
@@ -853,17 +866,17 @@ spec:
 					TopologyKeys:    []string{"testTopologyKey"},
 				},
 			})
-			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
 
 			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), key, fetchedClusterG1)
+				_ = k8sClient.Get(ctx, key, fetchedClusterG1)
 				return fetchedClusterG1.Status.ObservedGeneration == 1
 			}, timeout, interval).Should(BeTrue())
 
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
-				Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
+				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
 					"app.kubernetes.io/instance": key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				Expect(len(stsList.Items) == 1).Should(BeTrue())
@@ -900,14 +913,14 @@ spec:
 					},
 				},
 			})
-			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
 			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), key, fetchedClusterG1)
+				_ = k8sClient.Get(ctx, key, fetchedClusterG1)
 				return fetchedClusterG1.Status.ObservedGeneration == 1
 			}, timeout, interval).Should(BeTrue())
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), key, fetchedClusterG1)
+				_ = k8sClient.Get(ctx, key, fetchedClusterG1)
 				return fetchedClusterG1.Status.Components["replicasets"].Phase == dbaasv1alpha1.RunningPhase &&
 					fetchedClusterG1.Status.Phase == dbaasv1alpha1.RunningPhase
 			}, timeout, interval).Should(BeTrue())

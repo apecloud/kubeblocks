@@ -20,18 +20,15 @@ import (
 	"strings"
 	"testing"
 
-	appsv1 "k8s.io/api/apps/v1"
-
-	corev1 "k8s.io/api/core/v1"
-
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-
-	"github.com/leaanthony/debme"
-	ctrl "sigs.k8s.io/controller-runtime"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"github.com/leaanthony/debme"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -56,6 +53,15 @@ func TestReadCUETplFromEmbeddedFS(t *testing.T) {
 }
 
 var _ = Describe("lifecycle_utils", func() {
+
+	BeforeEach(func() {
+		// Add any steup steps that needs to be executed before each test
+	})
+
+	AfterEach(func() {
+		// Add any teardown steps that needs to be executed after each test
+	})
+
 	Context("mergeMonitorConfig", func() {
 		var component *Component
 		var cluster *dbaasv1alpha1.Cluster

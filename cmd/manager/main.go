@@ -31,7 +31,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -71,6 +70,7 @@ func init() {
 	viper.AutomaticEnv()
 
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
+	viper.SetDefault("NO_VOLUMESNAPSHOT", true)
 }
 
 func main() {

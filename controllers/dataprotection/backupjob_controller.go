@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/spf13/viper"
 	appv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -105,11 +107,16 @@ func (r *BackupJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackupJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+
+	b := ctrl.NewControllerManagedBy(mgr).
 		For(&dataprotectionv1alpha1.BackupJob{}).
-		Owns(&batchv1.Job{}).
-		Owns(&snapshotv1.VolumeSnapshot{}).
-		Complete(r)
+		Owns(&batchv1.Job{})
+
+	if !viper.GetBool("NO_VOLUMESNAPSHOT") {
+		b.Owns(&snapshotv1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+	}
+
+	return b.Complete(r)
 }
 
 func (r *BackupJobReconciler) DoNewPhaseAction(

@@ -130,13 +130,12 @@ func setupConsensusRoleObservingLoop(log logger.Logger) {
 		return
 	}
 
-	url := "http://localhost:3501/v1.0/bindings/mtest"
-	contentType := "application/json"
-	body := strings.NewReader("{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}")
-
 	roleObserve := func(ctx context.Context) {
 		// observe role through dapr
-		resp, err := http.Post(url, contentType, body)
+		url := "http://localhost:3501/v1.0/bindings/mtest"
+		contentType := "application/json"
+		reqBody := strings.NewReader("{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}")
+		resp, err := http.Post(url, contentType, reqBody)
 		if err != nil {
 			log.Error(err)
 			return

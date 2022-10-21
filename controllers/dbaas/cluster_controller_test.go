@@ -308,6 +308,24 @@ spec:
 		return client.IgnoreNotFound(err)
 	}
 
+	isCMAvailable := func() bool {
+		csList := &corev1.ComponentStatusList{}
+		_ = k8sClient.List(context.Background(), csList)
+		isCMAvailable := false
+		for _, cs := range csList.Items {
+			if cs.Name != "controller-manager" {
+				continue
+			}
+			for _, cond := range cs.Conditions {
+				if cond.Type == "Healthy" && cond.Status == "True" {
+					isCMAvailable = true
+					break
+				}
+			}
+		}
+		return isCMAvailable
+	}
+
 	BeforeEach(func() {
 		// Add any steup steps that needs to be executed before each test
 	})
@@ -609,26 +627,12 @@ spec:
 
 			// this test required controller-manager component
 			By("Check available controller-manager status")
-			csList := &corev1.ComponentStatusList{}
-			_ = k8sClient.List(context.Background(), csList)
-			isCMAvailable := false
-			for _, cs := range csList.Items {
-				if cs.Name != "controller-manager" {
-					continue
-				}
-				for _, cond := range cs.Conditions {
-					if cond.Type == "Healthy" && cond.Status == "True" {
-						isCMAvailable = true
-						break
-					}
-				}
-			}
-			if !isCMAvailable {
+			if !isCMAvailable() {
 				// skip test if no available storage classes
 				By("The controller-manager is not available, test skipped")
 				return
 			}
-
+			// TODO Testing the following contents in a real K8S cluster. testEnv is no controller-manager and scheduler components
 			Eventually(func() bool {
 				stsList := &appsv1.StatefulSetList{}
 				Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
@@ -868,6 +872,46 @@ spec:
 				Expect(len(podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution) == 0).Should(BeTrue())
 				Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable == corev1.DoNotSchedule).Should(BeTrue())
 				return len(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0
+			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting the scope")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	Context("testing cluster status", func() {
+		It("mock a cluster to test cluster status", func() {
+			if !isCMAvailable() {
+				// skip test if no available storage classes
+				By("The controller-manager is not available, test skipped")
+				return
+			}
+			// TODO test the following contents in a real K8S cluster. testEnv is no controller-manager and scheduler components
+			toCreate, _, _, key := newClusterObj(nil, nil)
+			toCreate.Spec.Components = []dbaasv1alpha1.ClusterComponent{}
+			toCreate.Spec.Components = append(toCreate.Spec.Components, dbaasv1alpha1.ClusterComponent{
+				Name: "replicasets",
+				Type: "replicasets",
+				RoleGroups: []dbaasv1alpha1.ClusterRoleGroup{
+					{
+						Name:     "primary",
+						Type:     "primary",
+						Replicas: 1,
+					},
+				},
+			})
+			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedClusterG1)
+				return fetchedClusterG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedClusterG1)
+				return fetchedClusterG1.Status.Components["replicasets"].Phase == dbaasv1alpha1.RunningPhase &&
+					fetchedClusterG1.Status.Phase == dbaasv1alpha1.RunningPhase
 			}, timeout, interval).Should(BeTrue())
 
 			By("Deleting the scope")

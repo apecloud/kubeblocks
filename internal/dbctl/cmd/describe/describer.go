@@ -24,6 +24,8 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -152,20 +154,21 @@ func (d *ClusterDescriber) describeCluster(events *corev1.EventList) (string, er
 		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", cluster.CreationTimestamp.Time.Format(time.RFC1123Z))
 
 		// topology
-		if err := d.showTopology(w); err != nil {
+		if err := d.describeTopology(w); err != nil {
 			return err
 		}
 
 		// components
-		if err := d.showComponent(w); err != nil {
+		if err := d.describeComponent(w); err != nil {
 			return err
 		}
 
 		// describe secret
-		d.showSecret(w)
+		describeSecret(d.Secrets, w)
 
 		// describe events
 		if events != nil {
+			w.Write(LEVEL_0, "\n")
 			describe.DescribeEvents(events, w)
 		}
 
@@ -173,16 +176,17 @@ func (d *ClusterDescriber) describeCluster(events *corev1.EventList) (string, er
 	})
 }
 
-func (d *ClusterDescriber) showTopology(w describe.PrefixWriter) error {
+func (d *ClusterDescriber) describeTopology(w describe.PrefixWriter) error {
 	w.Write(LEVEL_0, "\nTopology:\n")
 	for _, compInClusterDef := range d.ClusterDef.Spec.Components {
 		c := findCompInCluster(d.Cluster, compInClusterDef.TypeName)
 		if c == nil {
 			return fmt.Errorf("failed to find componnet in cluster")
 		}
+
 		w.Write(LEVEL_1, "%s:\n", c.Name)
 		w.Write(LEVEL_2, "Type:\t%s\n", c.Type)
-		w.Write(LEVEL_2, "Instances:\t%s\n", c.Type)
+		w.Write(LEVEL_2, "Instances:\n")
 
 		// describe instance name
 		pods := d.getPodsOfComponent(c.Name)
@@ -193,7 +197,7 @@ func (d *ClusterDescriber) showTopology(w describe.PrefixWriter) error {
 	return nil
 }
 
-func (d *ClusterDescriber) showComponent(w describe.PrefixWriter) error {
+func (d *ClusterDescriber) describeComponent(w describe.PrefixWriter) error {
 	for _, compInClusterDef := range d.ClusterDef.Spec.Components {
 		c := findCompInCluster(d.Cluster, compInClusterDef.TypeName)
 		if c == nil {
@@ -204,7 +208,6 @@ func (d *ClusterDescriber) showComponent(w describe.PrefixWriter) error {
 		if replicas == 0 {
 			replicas = compInClusterDef.DefaultReplicas
 		}
-
 		pods := d.getPodsOfComponent(c.Name)
 		if len(pods) == 0 {
 			return fmt.Errorf("failed to find any instance belonging to component \"%s\"", c.Name)
@@ -222,29 +225,21 @@ func (d *ClusterDescriber) showComponent(w describe.PrefixWriter) error {
 		// storage
 		describeStorage(c.VolumeClaimTemplates, w)
 
-		// show instance
+		// instance
 		for _, pod := range pods {
-			d.showInstance(pod, w)
+			d.describeInstance(pod, w)
 		}
 	}
 	return nil
 }
 
 func describeResource(resources corev1.ResourceRequirements, w describe.PrefixWriter) {
-	if len(resources.Limits) > 0 {
-		w.Write(LEVEL_1, "Limits:\n")
-	}
-	for _, name := range describe.SortedResourceNames(resources.Limits) {
-		quantity := resources.Limits[name]
-		w.Write(LEVEL_2, "%s:\t%s\n", name, quantity.String())
-	}
-
-	if len(resources.Requests) > 0 {
-		w.Write(LEVEL_1, "Requests:\n")
-	}
-	for _, name := range describe.SortedResourceNames(resources.Requests) {
-		quantity := resources.Requests[name]
-		w.Write(LEVEL_2, "%s:\t%s\n", name, quantity.String())
+	names := []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory}
+	for _, name := range names {
+		limit := resources.Limits[name]
+		request := resources.Requests[name]
+		w.Write(LEVEL_1, "%s:\t%s / %s (request / limit)\n",
+			cases.Title(language.Und, cases.NoLower).String(name.String()), request.String(), limit.String())
 	}
 }
 
@@ -265,7 +260,7 @@ func describeStorage(vcTmpls []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate
 	}
 }
 
-func (d *ClusterDescriber) showInstance(pod *corev1.Pod, w describe.PrefixWriter) {
+func (d *ClusterDescriber) describeInstance(pod *corev1.Pod, w describe.PrefixWriter) {
 	w.Write(LEVEL_1, "\n")
 	w.Write(LEVEL_1, "Instance:\t\n")
 	w.Write(LEVEL_2, "%s:\n", pod.Name)
@@ -290,7 +285,7 @@ func (d *ClusterDescriber) showInstance(pod *corev1.Pod, w describe.PrefixWriter
 		w.Write(LEVEL_3, "Node:\t%s\n", valueNone)
 	} else {
 		w.Write(LEVEL_3, "Node:\t%s\n", pod.Spec.NodeName+"/"+pod.Status.HostIP)
-		node := d.getNodeByName(pod.Spec.NodeName)
+		node := getNodeByName(d.Nodes, pod.Spec.NodeName)
 		if region, ok := node.Labels[types.RegionLabelKey]; ok {
 			w.Write(LEVEL_3, "Region:\t%s\n", region)
 		}
@@ -302,9 +297,20 @@ func (d *ClusterDescriber) showInstance(pod *corev1.Pod, w describe.PrefixWriter
 	w.Write(LEVEL_3, "CreationTimestamp:\t%s\n", pod.CreationTimestamp.Time.Format(time.RFC1123Z))
 }
 
-func (d *ClusterDescriber) showSecret(w describe.PrefixWriter) {
-	for i := range d.Secrets.Items {
-		describeSecret(&d.Secrets.Items[i], w)
+func describeSecret(secrets *corev1.SecretList, w describe.PrefixWriter) {
+	for _, s := range secrets.Items {
+		w.Write(LEVEL_0, "\n")
+		w.Write(LEVEL_0, "Secret:\n")
+		w.Write(LEVEL_1, "Name:\t%s\n", s.Name)
+		w.Write(LEVEL_1, "Data:\n")
+		for k, v := range s.Data {
+			switch {
+			case k == corev1.ServiceAccountTokenKey && s.Type == corev1.SecretTypeServiceAccountToken:
+				w.Write(LEVEL_2, "%s:\t%s\n", k, string(v))
+			default:
+				w.Write(LEVEL_2, "%s:\t%d bytes\n", k, len(v))
+			}
+		}
 	}
 }
 
@@ -327,28 +333,13 @@ func (d *ClusterDescriber) getPodsOfComponent(name string) []*corev1.Pod {
 	return pods
 }
 
-func (d *ClusterDescriber) getNodeByName(name string) *corev1.Node {
-	for _, node := range d.Nodes {
+func getNodeByName(nodes []*corev1.Node, name string) *corev1.Node {
+	for _, node := range nodes {
 		if node.Name == name {
 			return node
 		}
 	}
 	return nil
-}
-
-func describeSecret(secret *corev1.Secret, w describe.PrefixWriter) {
-	w.Write(LEVEL_0, "\n")
-	w.Write(LEVEL_0, "Secret:\n")
-	w.Write(LEVEL_1, "Name:\t%s\n", secret.Name)
-	w.Write(LEVEL_1, "Data:\n")
-	for k, v := range secret.Data {
-		switch {
-		case k == corev1.ServiceAccountTokenKey && secret.Type == corev1.SecretTypeServiceAccountToken:
-			w.Write(LEVEL_2, "%s:\t%s\n", k, string(v))
-		default:
-			w.Write(LEVEL_2, "%s:\t%d bytes\n", k, len(v))
-		}
-	}
 }
 
 func tabbedString(f func(io.Writer) error) (string, error) {

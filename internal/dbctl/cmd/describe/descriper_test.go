@@ -15,3 +15,23 @@ limitations under the License.
 */
 
 package describe
+
+import (
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/api/meta"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+)
+
+var _ = Describe("Describer", func() {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	It("describer map", func() {
+		describer, err := DescriberFn(tf, &meta.RESTMapping{Resource: types.ClusterGVR(), GroupVersionKind: types.ClusterGK().WithVersion(types.Version)})
+		Expect(describer).ShouldNot(BeNil())
+		Expect(err).Should(Succeed())
+	})
+})

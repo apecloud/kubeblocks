@@ -196,7 +196,9 @@ func getContainerByName(containers []corev1.Container, name string) (int, *corev
 func toK8sVolumeClaimTemplate(template dbaasv1alpha1.ClusterComponentVolumeClaimTemplate) corev1.PersistentVolumeClaimTemplate {
 	t := corev1.PersistentVolumeClaimTemplate{}
 	t.ObjectMeta.Name = template.Name
-	t.Spec = template.Spec
+	if template.Spec != nil {
+		t.Spec = *template.Spec
+	}
 	return t
 }
 
@@ -506,7 +508,10 @@ func buildClusterCreationTasks(
 	cluster *dbaasv1alpha1.Cluster) (*intctrlutil.Task, error) {
 	rootTask := intctrlutil.NewTask()
 
-	orderedComponentNames := clusterDefinition.Spec.Cluster.Strategies.Create.Order
+	var orderedComponentNames []string
+	if clusterDefinition.Spec.Cluster != nil {
+		orderedComponentNames = clusterDefinition.Spec.Cluster.Strategies.Create.Order
+	}
 	components := clusterDefinition.Spec.Components
 
 	if len(orderedComponentNames) == 0 {

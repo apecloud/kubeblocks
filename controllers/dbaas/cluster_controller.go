@@ -509,6 +509,9 @@ func (r *ClusterReconciler) getSupportVolumeExpansionComponents(ctx context.Cont
 	for _, v := range cluster.Spec.Components {
 		operationComponent := &dbaasv1alpha1.OperationComponent{}
 		for _, vct := range v.VolumeClaimTemplates {
+			if vct.Spec == nil {
+				continue
+			}
 			if ok, err := r.checkStorageClassIsSupportExpansion(ctx, storageClassMap, vct.Spec.StorageClassName,
 				&hasCheckDefaultStorageClass, &defaultStorageClassAllowExpansion); err != nil {
 				return nil, err

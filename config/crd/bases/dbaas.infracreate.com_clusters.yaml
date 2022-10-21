@@ -81,6 +81,9 @@ spec:
                 description: ref ClusterDefinition, immutable
                 type: string
               components:
+                description: List of components you want to replace in ClusterDefinition
+                  and AppVersion. It will replace the field in ClusterDefinition's
+                  and AppVersion's component if type is matching
                 items:
                   properties:
                     affinity:
@@ -123,8 +126,7 @@ spec:
                       description: default value in ClusterDefinition
                       type: integer
                     resources:
-                      description: ResourceRequirements describes the compute resource
-                        requirements.
+                      description: Resources requests and limits of workload
                       properties:
                         limits:
                           additionalProperties:
@@ -546,14 +548,15 @@ spec:
                       maxLength: 12
                       type: string
                     volumeClaimTemplates:
+                      description: VolumeClaimTemplates information for statefulset.spec.volumeClaimTemplates
                       items:
                         properties:
                           name:
+                            description: Ref AppVersion.spec.components.containers.volumeMounts.name
                             type: string
                           spec:
-                            description: PersistentVolumeClaimSpec describes the common
-                              attributes of storage devices and allows a Source for
-                              provider-specific attributes
+                            description: Spec defines the desired characteristics
+                              of a volume requested by a pod author
                             properties:
                               accessModes:
                                 description: 'accessModes contains the desired access

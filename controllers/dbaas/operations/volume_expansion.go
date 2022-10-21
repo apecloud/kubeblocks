@@ -52,6 +52,9 @@ func VolumeExpansionAction(opsRes *OpsResource) error {
 				if vct.Name != v.Name {
 					continue
 				}
+				if vct.Spec == nil {
+					continue
+				}
 				opsRes.Cluster.Spec.Components[index].VolumeClaimTemplates[i].
 					Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse(v.Storage)
 			}

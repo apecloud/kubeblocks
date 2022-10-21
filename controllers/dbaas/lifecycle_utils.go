@@ -196,7 +196,9 @@ func getContainerByName(containers []corev1.Container, name string) (int, *corev
 func toK8sVolumeClaimTemplate(template dbaasv1alpha1.ClusterComponentVolumeClaimTemplate) corev1.PersistentVolumeClaimTemplate {
 	t := corev1.PersistentVolumeClaimTemplate{}
 	t.ObjectMeta.Name = template.Name
-	t.Spec = template.Spec
+	if template.Spec != nil {
+		t.Spec = *template.Spec
+	}
 	return t
 }
 

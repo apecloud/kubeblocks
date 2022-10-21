@@ -220,7 +220,7 @@ spec:
 						VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{
 							{
 								Name: "log",
-								Spec: corev1.PersistentVolumeClaimSpec{
+								Spec: &corev1.PersistentVolumeClaimSpec{
 									StorageClassName: &storageClassName,
 									AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
 									Resources: corev1.ResourceRequirements{

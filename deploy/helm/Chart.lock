@@ -8,5 +8,8 @@ dependencies:
 - name: prometheus
   repository: https://prometheus-community.github.io/helm-charts
   version: 15.16.1
-digest: sha256:26cbe4a445fa49154a367646a60b487f064a8e661b0eee3c39e178596aa55941
-generated: "2022-10-19T18:42:59.957154+08:00"
+- name: loadbalancer
+  repository: ""
+  version: 0.1.*
+digest: sha256:ca0eada0936fe6ae600724ab6cc0871afc46e582868f97d43662a3fd59d77044
+generated: "2022-10-20T20:18:02.769061+08:00"

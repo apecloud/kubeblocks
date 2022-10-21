@@ -46,7 +46,7 @@ import (
 //+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch
 
 const (
-	appName = "opendbaas"
+	appName = "kubeblocks"
 )
 
 var (

@@ -4,16 +4,16 @@
 
 1. Get the application URL by running these commands:
 {{- if contains "NodePort" .Values.service.type }}
-  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "opendbaas-core.fullname" . }})
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "kubeblocks.fullname" . }})
   export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
   echo http://$NODE_IP:$NODE_PORT
 {{- else if contains "LoadBalancer" .Values.service.type }}
      NOTE: It may take a few minutes for the LoadBalancer IP to be available.
-           You can watch the status of by running 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "opendbaas-core.fullname" . }}'
-  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "opendbaas-core.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+           You can watch the status of by running 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "kubeblocks.fullname" . }}'
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "kubeblocks.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
   echo http://$SERVICE_IP:{{ .Values.service.port }}
 {{- else if contains "ClusterIP" .Values.service.type }}
-  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "opendbaas-core.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "kubeblocks.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
   export CONTAINER_PORT=$(kubectl get pod --namespace {{ .Release.Namespace }} $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
   echo "Visit http://127.0.0.1:8080 to use your application"
   kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 8080:$CONTAINER_PORT
@@ -24,7 +24,7 @@
 {{ if .Values.prometheus.server.enabled }}
 The Prometheus Server can be accessed via port {{ .Values.prometheus.server.service.servicePort }} on the following DNS name from within your cluster:
 
-    {{ template "opendbaas-core.prometheus.server.fullname" . }}.{{ template "opendbaas-core.prometheus.namespace" . }}.svc.cluster.local
+    {{ template "kubeblocks.prometheus.server.fullname" . }}.{{ template "kubeblocks.prometheus.namespace" . }}.svc.cluster.local
 {{ if .Values.prometheus.server.ingress.enabled -}}
 From outside the cluster, the prometheus server URL(s) are:
 
@@ -36,20 +36,20 @@ Get the Prometheus Server URL by running these commands in the same shell:
 
 {{- if contains "NodePort" .Values.prometheus.server.service.type }}
 
-    export NODE_PORT=$(kubectl get --namespace {{ template "opendbaas-core.prometheus.namespace" . }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ template "opendbaas-core.prometheus.server.fullname" . }})
-    export NODE_IP=$(kubectl get nodes --namespace {{ template "opendbaas-core.prometheus.namespace" . }} -o jsonpath="{.items[0].status.addresses[0].address}")
+    export NODE_PORT=$(kubectl get --namespace {{ template "kubeblocks.prometheus.namespace" . }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ template "kubeblocks.prometheus.server.fullname" . }})
+    export NODE_IP=$(kubectl get nodes --namespace {{ template "kubeblocks.prometheus.namespace" . }} -o jsonpath="{.items[0].status.addresses[0].address}")
     echo http://$NODE_IP:$NODE_PORT
 {{- else if contains "LoadBalancer" .Values.prometheus.server.service.type }}
 
     NOTE: It may take a few minutes for the LoadBalancer IP to be available.
-          You can watch the status of by running 'kubectl get svc --namespace {{ template "opendbaas-core.prometheus.namespace" . }} -w {{ template "opendbaas-core.prometheus.server.fullname" . }}'
+          You can watch the status of by running 'kubectl get svc --namespace {{ template "kubeblocks.prometheus.namespace" . }} -w {{ template "kubeblocks.prometheus.server.fullname" . }}'
 
-    export SERVICE_IP=$(kubectl get svc --namespace {{ template "opendbaas-core.prometheus.namespace" . }} {{ template "opendbaas-core.prometheus.server.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+    export SERVICE_IP=$(kubectl get svc --namespace {{ template "kubeblocks.prometheus.namespace" . }} {{ template "kubeblocks.prometheus.server.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
     echo http://$SERVICE_IP:{{ .Values.prometheus.server.service.servicePort }}
 {{- else if contains "ClusterIP"  .Values.prometheus.server.service.type }}
 
-    export POD_NAME=$(kubectl get pods --namespace {{ template "opendbaas-core.prometheus.namespace" . }} -l "app=prometheus,component={{ .Values.prometheus.server.name }}" -o jsonpath="{.items[0].metadata.name}")
-    kubectl --namespace {{ template "opendbaas-core.prometheus.namespace" . }} port-forward $POD_NAME 9090
+    export POD_NAME=$(kubectl get pods --namespace {{ template "kubeblocks.prometheus.namespace" . }} -l "app=prometheus,component={{ .Values.prometheus.server.name }}" -o jsonpath="{.items[0].metadata.name}")
+    kubectl --namespace {{ template "kubeblocks.prometheus.namespace" . }} port-forward $POD_NAME 9090
 {{- end }}
 {{- end }}
 
@@ -68,7 +68,7 @@ Get the Prometheus Server URL by running these commands in the same shell:
 {{ if .Values.prometheus.alertmanager.enabled }}
 The Prometheus Alertmanager can be accessed via port {{ .Values.prometheus.alertmanager.service.servicePort }} on the following DNS name from within your cluster:
 
-    {{ template "opendbaas-core.prometheus.alertmanager.fullname" . }}.{{ template "opendbaas-core.prometheus.namespace" . }}.svc.cluster.local
+    {{ template "kubeblocks.prometheus.alertmanager.fullname" . }}.{{ template "kubeblocks.prometheus.namespace" . }}.svc.cluster.local
 {{ if .Values.prometheus.alertmanager.ingress.enabled -}}
 From outside the cluster, the alertmanager URL(s) are:
 
@@ -80,20 +80,20 @@ Get the Prometheus Alertmanager URL by running these commands in the same shell:
 
 {{- if contains "NodePort" .Values.prometheus.alertmanager.service.type }}
 
-    export NODE_PORT=$(kubectl get --namespace {{ template "opendbaas-core.prometheus.namespace" . }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ template "opendbaas-core.prometheus.alertmanager.fullname" . }})
-    export NODE_IP=$(kubectl get nodes --namespace {{ template "opendbaas-core.prometheus.namespace" . }} -o jsonpath="{.items[0].status.addresses[0].address}")
+    export NODE_PORT=$(kubectl get --namespace {{ template "kubeblocks.prometheus.namespace" . }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ template "kubeblocks.prometheus.alertmanager.fullname" . }})
+    export NODE_IP=$(kubectl get nodes --namespace {{ template "kubeblocks.prometheus.namespace" . }} -o jsonpath="{.items[0].status.addresses[0].address}")
     echo http://$NODE_IP:$NODE_PORT
 {{- else if contains "LoadBalancer" .Values.prometheus.alertmanager.service.type }}
 
     NOTE: It may take a few minutes for the LoadBalancer IP to be available.
-          You can watch the status of by running 'kubectl get svc --namespace {{ template "opendbaas-core.prometheus.namespace" . }} -w {{ template "opendbaas-core.prometheus.alertmanager.fullname" . }}'
+          You can watch the status of by running 'kubectl get svc --namespace {{ template "kubeblocks.prometheus.namespace" . }} -w {{ template "kubeblocks.prometheus.alertmanager.fullname" . }}'
 
-    export SERVICE_IP=$(kubectl get svc --namespace {{ template "opendbaas-core.prometheus.namespace" . }} {{ template "opendbaas-core.prometheus.alertmanager.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+    export SERVICE_IP=$(kubectl get svc --namespace {{ template "kubeblocks.prometheus.namespace" . }} {{ template "kubeblocks.prometheus.alertmanager.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
     echo http://$SERVICE_IP:{{ .Values.prometheus.alertmanager.service.servicePort }}
 {{- else if contains "ClusterIP"  .Values.prometheus.alertmanager.service.type }}
 
-    export POD_NAME=$(kubectl get pods --namespace {{ template "opendbaas-core.prometheus.namespace" . }} -l "app=prometheus,component={{ .Values.prometheus.alertmanager.name }}" -o jsonpath="{.items[0].metadata.name}")
-    kubectl --namespace {{ template "opendbaas-core.prometheus.namespace" . }} port-forward $POD_NAME 9093
+    export POD_NAME=$(kubectl get pods --namespace {{ template "kubeblocks.prometheus.namespace" . }} -l "app=prometheus,component={{ .Values.prometheus.alertmanager.name }}" -o jsonpath="{.items[0].metadata.name}")
+    kubectl --namespace {{ template "kubeblocks.prometheus.namespace" . }} port-forward $POD_NAME 9093
 {{- end }}
 {{- end }}
 
@@ -112,7 +112,7 @@ Get the Prometheus Alertmanager URL by running these commands in the same shell:
 {{ if .Values.grafana.enabled }}
 The Grafana Server can be accessed via port {{ .Values.grafana.service.port }} on the following DNS name from within your cluster:
 
-    {{ template "opendbaas-core.grafana.fullname" . }}.{{ template "opendbaas-core.grafana.namespace" . }}.svc.cluster.local
+    {{ template "kubeblocks.grafana.fullname" . }}.{{ template "kubeblocks.grafana.namespace" . }}.svc.cluster.local
 {{ if .Values.grafana.ingress.enabled -}}
 If you bind Grafana Server to {{ .Values.grafana.service.port }}, please update values in values.yaml and reinstall:
    ```
@@ -141,26 +141,26 @@ Get the Grafana Server URL by running these commands in the same shell:
 
 {{- if contains "NodePort" .Values.grafana.service.type }}
 
-    export NODE_PORT=$(kubectl get --namespace {{ template "opendbaas-core.grafana.namespace" . }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ template "opendbaas-core.grafana.fullname" . }})
-    export NODE_IP=$(kubectl get nodes --namespace {{ template "opendbaas-core.grafana.namespace" . }} -o jsonpath="{.items[0].status.addresses[0].address}")
+    export NODE_PORT=$(kubectl get --namespace {{ template "kubeblocks.grafana.namespace" . }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ template "kubeblocks.grafana.fullname" . }})
+    export NODE_IP=$(kubectl get nodes --namespace {{ template "kubeblocks.grafana.namespace" . }} -o jsonpath="{.items[0].status.addresses[0].address}")
     echo http://$NODE_IP:$NODE_PORT
 {{- else if contains "LoadBalancer" .Values.grafana.service.type }}
 
     NOTE: It may take a few minutes for the LoadBalancer IP to be available.
-          You can watch the status of by running 'kubectl get svc --namespace {{ template "opendbaas-core.grafana.namespace" . }} -w {{ template "opendbaas-core.grafana.fullname" . }}'
+          You can watch the status of by running 'kubectl get svc --namespace {{ template "kubeblocks.grafana.namespace" . }} -w {{ template "kubeblocks.grafana.fullname" . }}'
 
-    export SERVICE_IP=$(kubectl get svc --namespace {{ template "opendbaas-core.grafana.namespace" . }} {{ template "opendbaas-core.grafana.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+    export SERVICE_IP=$(kubectl get svc --namespace {{ template "kubeblocks.grafana.namespace" . }} {{ template "kubeblocks.grafana.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
     echo http://$SERVICE_IP:{{ .Values.grafana.service.port }}
 {{- else if contains "ClusterIP"  .Values.grafana.service.type }}
 
-    export POD_NAME=$(kubectl get pods --namespace {{ template "opendbaas-core.grafana.namespace" . }} -l "app.kubernetes.io/name=grafana,app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
-    kubectl --namespace {{ template "opendbaas-core.grafana.namespace" . }} port-forward $POD_NAME 3000
+    export POD_NAME=$(kubectl get pods --namespace {{ template "kubeblocks.grafana.namespace" . }} -l "app.kubernetes.io/name=grafana,app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+    kubectl --namespace {{ template "kubeblocks.grafana.namespace" . }} port-forward $POD_NAME 3000
 {{- end }}
 {{- end }}
 
 Get your '{{ .Values.grafana.adminUser }}' user password by running:
 
-   kubectl get secret --namespace {{ template "opendbaas-core.grafana.namespace" . }} {{ template "opendbaas-core.grafana.fullname" . }} -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+   kubectl get secret --namespace {{ template "kubeblocks.grafana.namespace" . }} {{ template "kubeblocks.grafana.fullname" . }} -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
 
 Login with the password and the username: {{ .Values.grafana.adminUser }}
 {{- if .Values.grafana.persistence.enabled }}

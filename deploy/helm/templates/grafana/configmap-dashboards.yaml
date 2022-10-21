@@ -9,14 +9,14 @@ items:
 - apiVersion: v1
   kind: ConfigMap
   metadata:
-    name: {{ printf "%s-grafana-%s" (include "opendbaas-core.fullname" $) $dashboardName | trunc 63 | trimSuffix "-" }}
-    namespace: {{ template "opendbaas-core.grafana.namespace" $ }}
+    name: {{ printf "%s-grafana-%s" (include "kubeblocks.fullname" $) $dashboardName | trunc 63 | trimSuffix "-" }}
+    namespace: {{ template "kubeblocks.grafana.namespace" $ }}
     labels:
       {{- if $.Values.grafana.sidecar.dashboards.label }}
       {{ $.Values.grafana.sidecar.dashboards.label }}: {{ ternary $.Values.grafana.sidecar.dashboards.labelValue "1" (not (empty $.Values.grafana.sidecar.dashboards.labelValue)) | quote }}
       {{- end }}
-      app: {{ template "opendbaas-core.name" $ }}-grafana
-{{ include "opendbaas-core.labels" $ | indent 6 }}
+      app: {{ template "kubeblocks.name" $ }}-grafana
+{{ include "kubeblocks.labels" $ | indent 6 }}
   data:
     {{ $dashboardName }}.json: {{ $.Files.Get $path | toJson }}
 {{- end }}

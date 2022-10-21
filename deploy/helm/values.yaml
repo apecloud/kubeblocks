@@ -1,4 +1,4 @@
-# Default values for kubeblock
+# Default values for kubeblocks
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
@@ -6,7 +6,7 @@
 replicaCount: 1
 
 image:
-  repository: docker.io/infracreate/kubeblock
+  repository: docker.io/infracreate/kubeblocks
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
@@ -104,10 +104,10 @@ admissionWebhooks:
 
 monitor:
   image:
-    repository: docker.io/infracreate/kubeblock
+    repository: docker.io/infracreate/kubeblocks
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
-    tag: "0.1.0-alpha.6"
+    tag: ""
 
 wesql:
   enabled: true

@@ -103,10 +103,10 @@ var _ = Describe("Client", func() {
 			expectIptables := map[string]map[string][][]string{
 				"mangle": {
 					"PREROUTING": [][]string{
-						{"-m", "conntrack", "--ctorigdst", svcVIP, "-m", "comment", "--comment", fmt.Sprintf("Kubeblocks, %s", eniId), "-j", "CONNMARK", "--restore-mark", "--mask", fmt.Sprintf("%#x", getENIConnMark(eni))},
+						{"-m", "conntrack", "--ctorigdst", svcVIP, "-m", "comment", "--comment", fmt.Sprintf("KubeBlocks, %s", eniId), "-j", "CONNMARK", "--restore-mark", "--mask", fmt.Sprintf("%#x", getENIConnMark(eni))},
 					},
 					"OUTPUT": [][]string{
-						{"-m", "conntrack", "--ctorigdst", svcVIP, "-m", "comment", "--comment", fmt.Sprintf("Kubeblocks, %s", eniId), "-j", "CONNMARK", "--restore-mark", "--mask", fmt.Sprintf("%#x", getENIConnMark(eni))},
+						{"-m", "conntrack", "--ctorigdst", svcVIP, "-m", "comment", "--comment", fmt.Sprintf("KubeBlocks, %s", eniId), "-j", "CONNMARK", "--restore-mark", "--mask", fmt.Sprintf("%#x", getENIConnMark(eni))},
 					},
 				},
 			}
@@ -174,7 +174,7 @@ var _ = Describe("Client", func() {
 				"mangle": {
 					"PREROUTING": [][]string{
 						{
-							"-i", eth1.Attrs().Name, "-m", "comment", "--comment", fmt.Sprintf("Kubeblocks, %s", eni.ENIId),
+							"-i", eth1.Attrs().Name, "-m", "comment", "--comment", fmt.Sprintf("KubeBlocks, %s", eni.ENIId),
 							"-m", "addrtype", "--dst-type", "LOCAL", "--limit-iface-in", "-j", "CONNMARK", "--set-xmark", fmt.Sprintf("%#x/%#x", mark, mark),
 						},
 					},

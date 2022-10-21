@@ -351,8 +351,8 @@ func FakeActionConfig() *action.Configuration {
 
 func KubeBlocksHelmChart(version string, ns string) *InstallOpts {
 	return &InstallOpts{
-		Name:      types.DbaasHelmName,
-		Chart:     types.DbaasHelmChart,
+		Name:      types.KubeBlocksChartName,
+		Chart:     types.KubeBlocksChart,
 		Wait:      true,
 		Version:   version,
 		Namespace: ns,

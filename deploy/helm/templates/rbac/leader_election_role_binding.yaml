@@ -1,14 +1,14 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "opendbaas-core.fullname" . }}-leader-election-rolebinding
+  name: {{ include "kubeblocks.fullname" . }}-leader-election-rolebinding
   labels:
-    {{- include "opendbaas-core.labels" . | nindent 4 }}
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ include "opendbaas-core.fullname" . }}-leader-election-role
+  name: {{ include "kubeblocks.fullname" . }}-leader-election-role
 subjects:
 - kind: ServiceAccount
-  name: {{ include "opendbaas-core.fullname" . }}-controller-manager
+  name: {{ include "kubeblocks.fullname" . }}-controller-manager
   namespace: {{ .Release.Namespace }}

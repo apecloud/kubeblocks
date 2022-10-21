@@ -60,7 +60,7 @@ func (o *versionOptions) initKubeBlocksVersion() {
 	// get KubeBlocks deployments in all namespaces
 	gvr := schema.GroupVersionResource{Group: types.AppsGroup, Version: types.VersionV1, Resource: types.ResourceDeployments}
 	if kubeBlocksDeploys, err = o.client.Resource(gvr).Namespace(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/name=" + version.KubeBlocksChartName,
+		LabelSelector: "app.kubernetes.io/name=" + types.KubeBlocksChartName,
 	}); err != nil {
 		return
 	}

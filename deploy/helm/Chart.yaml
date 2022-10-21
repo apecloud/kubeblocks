@@ -1,6 +1,6 @@
 apiVersion: v2
 name: kubeblocks
-description: KubeBlock Core Controller Operator.
+description: KubeBlocks Core Controller Operator.
 
 # A chart can be either an 'application' or a 'library' chart.
 #

@@ -27,8 +27,8 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
+	"github.com/apecloud/kubeblocks/version"
 )
 
 type options struct {
@@ -81,7 +81,7 @@ func (o *options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 }
 
 func (o *installOptions) run() error {
-	fmt.Fprintf(o.Out, "Installing KubeBlocks ...\n")
+	fmt.Fprintf(o.Out, "Installing KubeBlocks %s ...\n", o.Version)
 	installer := Installer{
 		cfg:       o.cfg,
 		Namespace: o.Namespace,
@@ -132,7 +132,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		},
 	}
 
-	cmd.Flags().StringVar(&o.Version, "version", types.DbaasDefaultVersion, "KubeBlocks version")
+	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
 
 	return cmd

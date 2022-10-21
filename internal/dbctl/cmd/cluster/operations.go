@@ -69,6 +69,7 @@ type OperationsOptions struct {
 	RoleGroupReplicas int      `json:"roleGroupReplicas"`
 
 	// VolumeExpansion options.
+	// VctNames VolumeClaimTemplate names
 	VctNames []string `json:"vctNames,omitempty"`
 	Storage  string   `json:"storage"`
 }
@@ -240,7 +241,7 @@ func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 	inputs.Short = "expand volume with the specified components and volumeClaimTemplates in the cluster"
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
-		cmd.Flags().StringSliceVar(&o.VctNames, "vct-names", nil, "VolumeClaimTemplate names in components (required)")
+		cmd.Flags().StringSliceVar(&o.VctNames, "volume-claim-template-names", nil, "VolumeClaimTemplate names in components (required)")
 		cmd.Flags().StringVar(&o.Storage, "storage", "", "Volume storage size (required)")
 	}
 	return create.BuildCommand(inputs)

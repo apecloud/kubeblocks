@@ -40,7 +40,7 @@ ENVTEST_K8S_VERSION = 1.24.1
 
 ENABLE_WEBHOOKS ?= false
 
-APP_NAME = kubeblock
+APP_NAME = kubeblocks
 
 
 VERSION ?= 0.1.0-alpha.6

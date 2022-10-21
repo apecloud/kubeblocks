@@ -1,11 +1,11 @@
 {
 	// Reference Doc: https://code.visualstudio.com/remote/advancedcontainers/overview
-	"name": "Kubeblock Dev Environment",
+	"name": "KubeBlocks Dev Environment",
 	// Update the container version when you publish dev-container
-	// "image": "docker.io/infracreate/kubeblock-dev:latest", 
+	// "image": "docker.io/infracreate/kubeblocks-dev:latest",
 	// Temporarily use DAPR container
 	// "image": "ghcr.io/dapr/dapr-dev:0.1.8",
-	"image": "docker.io/infracreate/kubeblock-dev:latest",
+	"image": "docker.io/infracreate/kubeblocks-dev:latest",
 	// Replace with uncommented line below to build your own local copy of the image
 	// "dockerFile": "../docker/Dockerfile-dapr-dev",
 	"containerEnv": {
@@ -77,6 +77,6 @@
 		"go.useLanguageServer": true,
 		"go.gopath": "/go"
 	},
-	"workspaceFolder": "/workspaces/kubeblock",
-	"workspaceMount": "type=bind,source=${localWorkspaceFolder},target=/workspaces/kubeblock",
+	"workspaceFolder": "/workspaces/kubeblocks",
+	"workspaceMount": "type=bind,source=${localWorkspaceFolder},target=/workspaces/kubeblocks",
 }

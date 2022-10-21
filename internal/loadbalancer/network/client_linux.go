@@ -350,7 +350,7 @@ func (c *networkClient) buildServiceIptablesRules(privateIP string, eni *cloud.E
 		chain: "PREROUTING",
 		rule: []string{
 			"-m", "conntrack", "--ctorigdst", privateIP,
-			"-m", "comment", "--comment", fmt.Sprintf("Kubeblocks, %s", eni.ENIId),
+			"-m", "comment", "--comment", fmt.Sprintf("KubeBlocks, %s", eni.ENIId),
 			"-j", "CONNMARK", "--restore-mark", "--mask", fmt.Sprintf("%#x", mark),
 		},
 	})
@@ -362,7 +362,7 @@ func (c *networkClient) buildServiceIptablesRules(privateIP string, eni *cloud.E
 		chain: "OUTPUT",
 		rule: []string{
 			"-m", "conntrack", "--ctorigdst", privateIP,
-			"-m", "comment", "--comment", fmt.Sprintf("Kubeblocks, %s", eni.ENIId),
+			"-m", "comment", "--comment", fmt.Sprintf("KubeBlocks, %s", eni.ENIId),
 			"-j", "CONNMARK", "--restore-mark", "--mask", fmt.Sprintf("%#x", mark),
 		},
 	})
@@ -407,7 +407,7 @@ func (c *networkClient) buildENIIptablesRules(iface string, eni *cloud.ENIMetada
 		table: "mangle",
 		chain: "PREROUTING",
 		rule: []string{
-			"-i", iface, "-m", "comment", "--comment", fmt.Sprintf("Kubeblocks, %s", eni.ENIId),
+			"-i", iface, "-m", "comment", "--comment", fmt.Sprintf("KubeBlocks, %s", eni.ENIId),
 			"-m", "addrtype", "--dst-type", "LOCAL", "--limit-iface-in", "-j", "CONNMARK", "--set-xmark", fmt.Sprintf("%#x/%#x", mark, mark),
 		}})
 
@@ -417,7 +417,7 @@ func (c *networkClient) buildENIIptablesRules(iface string, eni *cloud.ENIMetada
 			table: "mangle",
 			chain: "PREROUTING",
 			rule: []string{
-				"-i", "eni+", "-m", "comment", "--comment", fmt.Sprintf("Kubeblocks, %s", eni.ENIId),
+				"-i", "eni+", "-m", "comment", "--comment", fmt.Sprintf("KubeBlocks, %s", eni.ENIId),
 				"-j", "CONNMARK", "--restore-mark", "--mask", fmt.Sprintf("%#x", mark),
 			},
 		})

@@ -31,7 +31,7 @@ func NewVersionCmd(f cmdutil.Factory) *cobra.Command {
 	o := &versionOptions{}
 	cmd := &cobra.Command{
 		Use:   "version",
-		Short: "print version information",
+		Short: "print the version information",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f))
 			o.Run()

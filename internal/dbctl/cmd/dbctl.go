@@ -34,17 +34,9 @@ import (
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/options"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/playground"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/version"
-	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
-// RootFlags describes a struct that holds flags that can be set on root level of the command
-type RootFlags struct {
-	version bool
-}
-
 var cfgFile string
-
-var rootFlags = RootFlags{}
 
 func NewDbctlCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -66,16 +58,9 @@ func NewDbctlCmd() *cobra.Command {
 A database management tool for KubeBlocks`,
 
 		Run: func(cmd *cobra.Command, args []string) {
-			if rootFlags.version {
-				util.PrintVersion()
-			} else {
-				_ = cmd.Help()
-			}
+			_ = cmd.Help()
 		},
 	}
-
-	// add local flags
-	cmd.Flags().BoolVar(&rootFlags.version, "version", false, "Show version")
 
 	// From this point and forward we get warnings on flags that contain "_" separators
 	// when adding them with hyphen instead of the original name.

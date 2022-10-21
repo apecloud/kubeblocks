@@ -78,7 +78,6 @@ var _ = Describe("util", func() {
 	})
 
 	It("Others", func() {
-		PrintVersion()
 		if os.Getenv("TEST_GET_PUBLIC_IP") != "" {
 			_, err := GetPublicIP()
 			Expect(err).ShouldNot(HaveOccurred())

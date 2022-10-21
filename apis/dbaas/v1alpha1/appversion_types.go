@@ -37,8 +37,8 @@ type AppVersionSpec struct {
 
 // AppVersionStatus defines the observed state of AppVersion
 type AppVersionStatus struct {
-	// phase - in list of [Available,UnAvailable,Deleting]
-	// +kubebuilder:validation:Enum={Available,UnAvailable,Deleting}
+	// phase - in list of [Available,Unavailable]
+	// +kubebuilder:validation:Enum={Available,Unavailable}
 	Phase Phase `json:"phase,omitempty"`
 
 	// A human readable message indicating details about why the appVersion is in this

@@ -55,8 +55,8 @@ type ClusterDefinitionSpec struct {
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
 type ClusterDefinitionStatus struct {
-	// phase - in list of [Available,Deleting]
-	// +kubebuilder:validation:Enum={Available,Deleting}
+	// phase - in list of [Available]
+	// +kubebuilder:validation:Enum={Available}
 	Phase Phase `json:"phase,omitempty"`
 	// Extra message in current phase
 	// +optional

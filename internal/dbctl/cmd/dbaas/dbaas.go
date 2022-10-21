@@ -93,7 +93,7 @@ func (o *installOptions) run() error {
 		return errors.Wrap(err, "Failed to install KubeBlocks")
 	}
 
-	fmt.Fprintf(o.Out, "KubeBlocks v%s Install SUCCESSFULLY!\n\n"+
+	fmt.Fprintf(o.Out, "\nKubeBlocks %s Install SUCCESSFULLY!\n"+
 		"You can now create a database cluster by running the following command:\n"+
 		"\tdbctl cluster create <you cluster name>\n", o.Version)
 	return nil

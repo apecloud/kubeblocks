@@ -36,7 +36,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/describe"
-	resourcehelper "k8s.io/kubectl/pkg/util/resource"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
@@ -150,7 +149,7 @@ func (d *ClusterDescriber) describeCluster(events *corev1.EventList) (string, er
 		w.Write(LEVEL_0, "AppVersion:\t%s\n", cluster.Spec.AppVersionRef)
 		w.Write(LEVEL_0, "ClusterDefinition:\t%s\n", cluster.Spec.ClusterDefRef)
 		w.Write(LEVEL_0, "TerminationPolicy:\t%s\n", cluster.Spec.TerminationPolicy)
-		w.Write(LEVEL_0, "CreationTimestamp\t%s\n", cluster.CreationTimestamp.Time.Format(time.RFC1123Z))
+		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", cluster.CreationTimestamp.Time.Format(time.RFC1123Z))
 
 		// topology
 		if err := d.showTopology(w); err != nil {
@@ -217,17 +216,11 @@ func (d *ClusterDescriber) showComponent(w describe.PrefixWriter) error {
 		w.Write(LEVEL_1, "Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		w.Write(LEVEL_1, "Image:\t%s\n", pods[0].Spec.Containers[0].Image)
 
-		vcTmpls := c.VolumeClaimTemplates
-		if len(vcTmpls) > 0 {
-			w.Write(LEVEL_1, "Storage:\n")
-		}
-		for _, vcTmpl := range vcTmpls {
-			w.Write(LEVEL_2, "%s:", vcTmpl.Name)
-			val := vcTmpl.Spec.Resources.Requests[corev1.ResourceStorage]
-			w.Write(LEVEL_3, "StorageClass:\t%s\n", vcTmpl.Spec.StorageClassName)
-			w.Write(LEVEL_3, "Access Modes:\t%s\n", getAccessModes(vcTmpl.Spec.AccessModes))
-			w.Write(LEVEL_3, "Size:\t%s\n", val.String())
-		}
+		// cpu and memory
+		describeResource(c.Resources, w)
+
+		// storage
+		describeStorage(c.VolumeClaimTemplates, w)
 
 		// show instance
 		for _, pod := range pods {
@@ -235,6 +228,41 @@ func (d *ClusterDescriber) showComponent(w describe.PrefixWriter) error {
 		}
 	}
 	return nil
+}
+
+func describeResource(resources corev1.ResourceRequirements, w describe.PrefixWriter) {
+	if len(resources.Limits) > 0 {
+		w.Write(LEVEL_1, "Limits:\n")
+	}
+	for _, name := range describe.SortedResourceNames(resources.Limits) {
+		quantity := resources.Limits[name]
+		w.Write(LEVEL_2, "%s:\t%s\n", name, quantity.String())
+	}
+
+	if len(resources.Requests) > 0 {
+		w.Write(LEVEL_1, "Requests:\n")
+	}
+	for _, name := range describe.SortedResourceNames(resources.Requests) {
+		quantity := resources.Requests[name]
+		w.Write(LEVEL_2, "%s:\t%s\n", name, quantity.String())
+	}
+}
+
+func describeStorage(vcTmpls []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate, w describe.PrefixWriter) {
+	if len(vcTmpls) > 0 {
+		w.Write(LEVEL_1, "Storage:\n")
+	}
+	for _, vcTmpl := range vcTmpls {
+		w.Write(LEVEL_2, "%s:\n", vcTmpl.Name)
+		val := vcTmpl.Spec.Resources.Requests[corev1.ResourceStorage]
+		if vcTmpl.Spec.StorageClassName == nil {
+			w.Write(LEVEL_3, "StorageClass:\t%s\n", valueNone)
+		} else {
+			w.Write(LEVEL_3, "StorageClass:\t%s\n", *vcTmpl.Spec.StorageClassName)
+		}
+		w.Write(LEVEL_3, "Access Modes:\t%s\n", getAccessModes(vcTmpl.Spec.AccessModes))
+		w.Write(LEVEL_3, "Size:\t%s\n", val.String())
+	}
 }
 
 func (d *ClusterDescriber) showInstance(pod *corev1.Pod, w describe.PrefixWriter) {
@@ -256,12 +284,6 @@ func (d *ClusterDescriber) showInstance(pod *corev1.Pod, w describe.PrefixWriter
 
 	// TODO: get AccessMode from label
 	w.Write(LEVEL_3, "AccessMode:\t%s\n", "")
-
-	// cpu and memory
-	req, limit := resourcehelper.PodRequestsAndLimits(pod)
-	cpuReq, cpuLimit, memoryReq, memoryLimit := req[corev1.ResourceCPU], limit[corev1.ResourceCPU], req[corev1.ResourceMemory], limit[corev1.ResourceMemory]
-	w.Write(LEVEL_3, "Cpu:\t%s %s\n", cpuReq.String(), cpuLimit.String())
-	w.Write(LEVEL_3, "Memory:\t%s %s\n", memoryReq.String(), memoryLimit.String())
 
 	// node information include its region and AZ
 	if pod.Spec.NodeName == "" {
@@ -288,7 +310,7 @@ func (d *ClusterDescriber) showEndpoint(pod *corev1.Pod, w describe.PrefixWriter
 
 	w.Write(LEVEL_3, "Endpoint:\n")
 	w.Write(LEVEL_4, "Private:\n")
-	for _, svc := range d.Services {
+	for _, svc := range d.Services.Items {
 		// find service that name is same with pod name
 		if svc.Name != pod.Name {
 			continue
@@ -310,8 +332,8 @@ func (d *ClusterDescriber) showEndpoint(pod *corev1.Pod, w describe.PrefixWriter
 }
 
 func (d *ClusterDescriber) showSecret(w describe.PrefixWriter) {
-	for _, s := range d.Secrets {
-		describeSecret(s, w)
+	for i, _ := range d.Secrets.Items {
+		describeSecret(&d.Secrets.Items[i], w)
 	}
 }
 
@@ -325,13 +347,13 @@ func findCompInCluster(cluster *dbaasv1alpha1.Cluster, typeName string) *dbaasv1
 }
 
 func (d *ClusterDescriber) getPodsOfComponent(name string) []*corev1.Pod {
-	var p []*corev1.Pod
-	for _, pod := range d.Pods {
-		if n, ok := pod.Labels[types.ComponentLabelKey]; ok && n == name {
-			p = append(p, pod)
+	var pods []*corev1.Pod
+	for i, p := range d.Pods.Items {
+		if n, ok := p.Labels[types.ComponentLabelKey]; ok && n == name {
+			pods = append(pods, &d.Pods.Items[i])
 		}
 	}
-	return p
+	return pods
 }
 
 func (d *ClusterDescriber) getNodeByName(name string) *corev1.Node {

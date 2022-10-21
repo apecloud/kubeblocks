@@ -96,9 +96,9 @@ type ClusterObjects struct {
 	ClusterDef *dbaasv1alpha1.ClusterDefinition
 	AppVersion *dbaasv1alpha1.AppVersion
 
-	Pods     []*corev1.Pod
-	Services []*corev1.Service
-	Secrets  []*corev1.Secret
+	Pods     *corev1.PodList
+	Services *corev1.ServiceList
+	Secrets  *corev1.SecretList
 	Nodes    []*corev1.Node
 }
 

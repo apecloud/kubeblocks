@@ -37,10 +37,7 @@ func NewClusterObjects() *types.ClusterObjects {
 		ClusterDef: &dbaasv1alpha1.ClusterDefinition{},
 		AppVersion: &dbaasv1alpha1.AppVersion{},
 
-		Pods:     []*corev1.Pod{},
-		Services: []*corev1.Service{},
-		Secrets:  []*corev1.Secret{},
-		Nodes:    []*corev1.Node{},
+		Nodes: []*corev1.Node{},
 	}
 }
 
@@ -96,7 +93,7 @@ func GetAllObjects(clientSet clientset.Interface, dynamicClient dynamic.Interfac
 	}
 
 	// get nodes where the pods are located
-	for _, pod := range objs.Pods {
+	for _, pod := range objs.Pods.Items {
 		found := false
 		for _, node := range objs.Nodes {
 			if node.Name == pod.Spec.NodeName {
@@ -134,6 +131,7 @@ type builder struct {
 
 // Do get kubernetes object belonging to the database cluster
 func (b *builder) do(clusterObjs *types.ClusterObjects) error {
+	var err error
 	ctx := context.TODO()
 	listOpts := metav1.ListOptions{
 		LabelSelector: b.label,
@@ -142,28 +140,19 @@ func (b *builder) do(clusterObjs *types.ClusterObjects) error {
 	kind := b.groupKind.Kind
 	switch kind {
 	case "Pod":
-		pods, err := b.clientSet.CoreV1().Pods(b.namespace).List(ctx, listOpts)
+		clusterObjs.Pods, err = b.clientSet.CoreV1().Pods(b.namespace).List(ctx, listOpts)
 		if err != nil {
 			return err
-		}
-		for _, pod := range pods.Items {
-			clusterObjs.Pods = append(clusterObjs.Pods, &pod)
 		}
 	case "Service":
-		svcs, err := b.clientSet.CoreV1().Services(b.namespace).List(ctx, listOpts)
+		clusterObjs.Services, err = b.clientSet.CoreV1().Services(b.namespace).List(ctx, listOpts)
 		if err != nil {
 			return err
-		}
-		for _, svc := range svcs.Items {
-			clusterObjs.Services = append(clusterObjs.Services, &svc)
 		}
 	case "Secret":
-		secrets, err := b.clientSet.CoreV1().Secrets(b.namespace).List(ctx, listOpts)
+		clusterObjs.Secrets, err = b.clientSet.CoreV1().Secrets(b.namespace).List(ctx, listOpts)
 		if err != nil {
 			return err
-		}
-		for _, s := range secrets.Items {
-			clusterObjs.Secrets = append(clusterObjs.Secrets, &s)
 		}
 	case "Node":
 		node, err := b.clientSet.CoreV1().Nodes().Get(ctx, b.name, metav1.GetOptions{})
@@ -199,7 +188,7 @@ func (b *builder) withName(name string) *builder {
 	return b
 }
 
-func getClusterResource(client dynamic.Interface, gvr schema.GroupVersionResource, name string, namespace string, res interface{}) error {
+func getClusterResource(client dynamic.Interface, gvr schema.GroupVersionResource, namespace string, name string, res interface{}) error {
 	obj, err := client.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{}, "")
 	if err != nil {
 		return err

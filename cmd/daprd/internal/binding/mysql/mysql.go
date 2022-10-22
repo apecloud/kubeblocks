@@ -1,12 +1,9 @@
 /*
 Copyright 2022 The KubeBlocks Authors
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-
     http://www.apache.org/licenses/LICENSE-2.0
-
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -103,6 +100,9 @@ func (m *Mysql) InitDelay() error {
 		return fmt.Errorf("missing MySql connection string")
 	}
 
+	if m.db != nil {
+		return nil
+	}
 	db, err := initDB(url, m.metadata.Properties[pemPathKey])
 	if err != nil {
 		return err
@@ -301,7 +301,7 @@ func (m *Mysql) statusCheck(ctx context.Context, sql string) ([]byte, error) {
 func (m *Mysql) roleCheck(ctx context.Context, sql string) ([]byte, error) {
 	m.logger.Debugf("query: %s", sql)
 	if sql == "" {
-		sql = "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
+		sql = "select CURRENT_LEADER, ROLE, SERVER_ID from information_schema.wesql_cluster_local"
 	}
 
 	rows, err := m.db.QueryContext(ctx, sql)
@@ -322,9 +322,10 @@ func (m *Mysql) roleCheck(ctx context.Context, sql string) ([]byte, error) {
 			m.logger.Errorf("checkRole error: %", err)
 		}
 	}
-	if oriRole == "" {
-		oriRole = role
-	} else if oriRole != role {
+	//if oriRole == "" {
+	//	oriRole = role
+	//} else if oriRole != role {
+	if oriRole != role {
 		oriRole = role
 		return nil, errors.Errorf("role changed, original Role: %s, current role: %s", oriRole, role)
 	}

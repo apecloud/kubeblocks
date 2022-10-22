@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "opendbaas-core.svcName" . }}
+  name: {{ include "kubeblocks.svcName" . }}
   labels:
     control-plane: controller-manager
-    {{- include "opendbaas-core.labels" . | nindent 4 }}
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
   ports:
@@ -25,4 +25,4 @@ spec:
       {{- end }}
     {{- end }}
   selector:
-    {{- include "opendbaas-core.selectorLabels" . | nindent 4 }}
+    {{- include "kubeblocks.selectorLabels" . | nindent 4 }}

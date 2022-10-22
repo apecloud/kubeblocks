@@ -23,6 +23,7 @@ import (
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -31,8 +32,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -47,7 +46,7 @@ import (
 //+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch
 
 const (
-	appName = "opendbaas"
+	appName = "kubeblocks"
 )
 
 var (
@@ -71,6 +70,7 @@ func init() {
 	viper.AutomaticEnv()
 
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
+	viper.SetDefault("NO_VOLUMESNAPSHOT", true)
 }
 
 func main() {
@@ -98,6 +98,8 @@ func main() {
 	if err == nil {             // Handle errors reading the config file
 		setupLog.Info(fmt.Sprintf("config file: %s", viper.GetViper().ConfigFileUsed()))
 	}
+
+	setupLog.Info(fmt.Sprintf("config settings: %v", viper.AllSettings()))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,

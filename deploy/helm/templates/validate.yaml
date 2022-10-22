@@ -1,5 +1,5 @@
 {{- if .Values.replicaCount }}
   {{- if eq (int .Values.replicaCount) 2 }}
-    {{ fail "opendbaas-core does not support running with 2 replicas. For a highly-available deployment, select 3 replicas or for standalone select 1 replica." }}
+    {{ fail "kubeblocks does not support running with 2 replicas. For a highly-available deployment, select 3 replicas or for standalone select 1 replica." }}
   {{- end }}
 {{- end }}

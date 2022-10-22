@@ -143,7 +143,7 @@ installFile() {
 
     if [ $? -eq 0 ] && [ -f "$DBCTL_CLI_FILE" ]; then
         echo "dbctl installed successfully."
-        dbctl --version
+        dbctl version
         echo -e "Make sure your docker service is running and begin your journey with dbctl:\n"
         echo -e "\t$DBCTL_CLI_FILENAME playground init"
     else

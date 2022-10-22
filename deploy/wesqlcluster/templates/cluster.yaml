@@ -5,8 +5,8 @@ metadata:
   labels:
     {{- include "wesqlcluster.labels" . | nindent 4 }}
 spec:
-  appVersionRef: wesql-appversion-{{ default .Chart.AppVersion .Values.appVersionOverride }}   # ref appversion.name
-  clusterDefinitionRef: wesql-clusterdefinition  # ref clusterdefinition.name
+  appVersionRef: wesql-{{ default .Chart.AppVersion .Values.appVersionOverride }}   # ref appversion.name
+  clusterDefinitionRef: apecloud-wesql  # ref clusterdefinition.name
   affinity:
     topologyKeys:
     - kubernetes.io/hostname

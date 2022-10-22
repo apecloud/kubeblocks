@@ -467,7 +467,7 @@ spec:
 						VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{
 							{
 								Name: "data",
-								Spec: corev1.PersistentVolumeClaimSpec{
+								Spec: &corev1.PersistentVolumeClaimSpec{
 									AccessModes: []corev1.PersistentVolumeAccessMode{
 										corev1.ReadWriteOnce,
 									},
@@ -483,6 +483,24 @@ spec:
 				},
 			},
 		}, clusterDefObj, appVersionObj, key
+	}
+
+	isCMAvailable := func() bool {
+		csList := &corev1.ComponentStatusList{}
+		_ = k8sClient.List(context.Background(), csList)
+		isCMAvailable := false
+		for _, cs := range csList.Items {
+			if cs.Name != "controller-manager" {
+				continue
+			}
+			for _, cond := range cs.Conditions {
+				if cond.Type == "Healthy" && cond.Status == "True" {
+					isCMAvailable = true
+					break
+				}
+			}
+		}
+		return isCMAvailable
 	}
 
 	BeforeEach(func() {
@@ -699,10 +717,24 @@ spec:
 
 	Context("When updating cluster", func() {
 		It("Should update PVC request storage size accordingly", func() {
-			// this test required controller-manager component
-			By("Check available controller-manager status")
-			if !hasStorage(assureDefaultStorageClassObj) {
-				return
+			By("Check available storageclasses")
+			scList := &storagev1.StorageClassList{}
+			defaultStorageClass := &storagev1.StorageClass{}
+			hasDefaultSC := false
+			_ = k8sClient.List(context.Background(), scList)
+			for _, sc := range scList.Items {
+				annot := sc.Annotations
+				if annot == nil {
+					continue
+				}
+				if v, ok := annot["storageclass.kubernetes.io/is-default-class"]; ok && v == "true" {
+					defaultStorageClass = &sc
+					hasDefaultSC = true
+					break
+				}
+			}
+			if !hasDefaultSC {
+				defaultStorageClass = assureDefaultStorageClassObj()
 			}
 
 			By("By creating a cluster with volume claim")
@@ -714,7 +746,7 @@ spec:
 				VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{
 					{
 						Name: "data",
-						Spec: corev1.PersistentVolumeClaimSpec{
+						Spec: &corev1.PersistentVolumeClaimSpec{
 							AccessModes: []corev1.PersistentVolumeAccessMode{
 								corev1.ReadWriteOnce,
 							},
@@ -727,10 +759,11 @@ spec:
 					},
 					{
 						Name: "log",
-						Spec: corev1.PersistentVolumeClaimSpec{
+						Spec: &corev1.PersistentVolumeClaimSpec{
 							AccessModes: []corev1.PersistentVolumeAccessMode{
 								corev1.ReadWriteOnce,
 							},
+							StorageClassName: &defaultStorageClass.Name,
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
 									corev1.ResourceStorage: resource.MustParse("1Gi"),
@@ -749,6 +782,13 @@ spec:
 				return fetchedG1.Status.ObservedGeneration == 1
 			}, timeout, interval).Should(BeTrue())
 
+			// this test required controller-manager component
+			By("Check available controller-manager status")
+			if !isCMAvailable() {
+				By("The controller-manager is not available, test skipped")
+				return
+			}
+			// TODO test the following contents in a real K8S cluster. testEnv is no controller-manager and scheduler components
 			Eventually(func() bool {
 				stsList := &appsv1.StatefulSetList{}
 				Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
@@ -1142,49 +1182,39 @@ spec:
 			}, timeout, interval).Should(Succeed())
 		})
 	})
-})
 
-func hasStorage(assureDefaultStorageClassObj func() *storagev1.StorageClass) bool {
-	csList := &corev1.ComponentStatusList{}
-	_ = k8sClient.List(context.Background(), csList)
-	isCMAvailable := false
-	for _, cs := range csList.Items {
-		if cs.Name != "controller-manager" {
-			continue
-		}
-		for _, cond := range cs.Conditions {
-			if cond.Type == "Healthy" && cond.Status == "True" {
-				isCMAvailable = true
-				break
+	Context("testing cluster status", func() {
+		It("this test required controller-manager component", func() {
+			if !isCMAvailable() {
+				By("The controller-manager is not available, test skipped")
+				return
 			}
-		}
-	}
-	if !isCMAvailable {
-		// skip test if no available storage classes
-		By("The controller-manager is not available, test skipped")
-		return false
-	}
+			// TODO test the following contents in a real K8S cluster. testEnv is no controller-manager and scheduler components
+			toCreate, _, _, key := newClusterObj(nil, nil)
+			toCreate.Spec.Components = []dbaasv1alpha1.ClusterComponent{}
+			toCreate.Spec.Components = append(toCreate.Spec.Components, dbaasv1alpha1.ClusterComponent{
+				Name: "replicasets",
+				Type: "replicasets",
+			})
+			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedClusterG1)
+				return fetchedClusterG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedClusterG1)
+				return fetchedClusterG1.Status.Components["replicasets"].Phase == dbaasv1alpha1.RunningPhase &&
+					fetchedClusterG1.Status.Phase == dbaasv1alpha1.RunningPhase
+			}, timeout, interval).Should(BeTrue())
 
-	By("Check available storageclasses")
-	scList := &storagev1.StorageClassList{}
-	hasDefaultSC := false
-	_ = k8sClient.List(context.Background(), scList)
-	for _, sc := range scList.Items {
-		annot := sc.Annotations
-		if annot == nil {
-			continue
-		}
-		if v, ok := annot["storageclass.kubernetes.io/is-default-class"]; ok && v == "true" {
-			hasDefaultSC = true
-			break
-		}
-	}
-	if !hasDefaultSC {
-		assureDefaultStorageClassObj()
-	}
-
-	return true
-}
+			By("Deleting the scope")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+})
 
 func createFakePod(parentName string, number int) []corev1.Pod {
 	podYaml := `

@@ -6,53 +6,39 @@ on:
       - published
 
 env:
-  DARWIN_ARM64: "darwin-arm64"
-  DARWIN_AMD64: "darwin-amd64"
-  LINUX_ARM64: "linux-arm64"
-  LINUX_AMD64: "linux-amd64"
-  WINDOWS_AMD64: "windows-amd64"
-  REL_VERSION: ${{ github.ref_name }}
-  DARWIN_ARM64_BINARY: "dbctl-darwin-arm64-${{ github.ref_name }}.tar.gz"
-  DARWIN_AMD64_BINARY: "dbctl-darwin-amd64-${{ github.ref_name }}.tar.gz"
-  LINUX_ARM64_BINARY: "dbctl-linux-arm64-${{ github.ref_name }}.tar.gz"
-  LINUX_AMD64_BINARY: "dbctl-linux-amd64-${{ github.ref_name }}.tar.gz"
-  WINDOWS_AMD64_BINARY: "dbctl-windows-amd64-${{ github.ref_name }}.tar.gz"
-  INSTALL_SHELL: "install_dbctl.sh"
-  INSTALL_DOCKER_SHELL: "install_dbctl_docker.sh"
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+  TAG_NAME: ${{ github.ref_name }}
   GO_VERSION: '1.18'
 
 
 jobs:
   upload-release:
-    name: Upload Install File
+    name: Upload ${{ matrix.filename }}
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        filename: [install_dbctl.sh, install_dbctl_docker.sh]
     steps:
       - uses: actions/checkout@v3
       - name: Get release
         id: get_release
         uses: bruceadams/get-release@v1.2.3
-        
-      - name: upload release asset
+
+      - name: upload release asset  ${{ matrix.filename }}
         uses: actions/upload-release-asset@main
         with:
           upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./hack/${{ env.INSTALL_SHELL }}
-          asset_name: ${{ env.INSTALL_SHELL }}
-          asset_content_type: text/plan
-          
-      - name: upload release asset
-        uses: actions/upload-release-asset@main
-        with:
-          upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./hack/${{ env.INSTALL_DOCKER_SHELL }}
-          asset_name: ${{ env.INSTALL_DOCKER_SHELL }}
+          asset_path: ./hack/${{ matrix.filename }}
+          asset_name: ${{ matrix.filename }}
           asset_content_type: text/plan
 
 
-  upload-release-1:
-    name: Upload DARWIN_ARM64
+  upload-release-assert:
+    name: Upload ${{ matrix.os }}
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64]
     steps:
       - uses: actions/checkout@v3
       - name: Setup Go
@@ -68,153 +54,27 @@ jobs:
         uses: bruceadams/get-release@v1.2.3
         
       - name: make build
+        env:
+          DBCTL_BINARY: dbctl-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
         run: |
-          mkdir -p ${{ env.DARWIN_ARM64 }} 
-          REL_VERSION=${{ env.REL_VERSION }} make bin/dbctl.darwin.arm64
-          mv bin/dbctl.darwin.arm64 ${{ env.DARWIN_ARM64 }}/dbctl
-          tar -zcvf ${{ env.DARWIN_ARM64_BINARY }} ${{ env.DARWIN_ARM64 }}
-          mv ${{ env.DARWIN_ARM64_BINARY }} bin/
+          mkdir -p ${{ matrix.os }}
           
-      - name: upload release asset DARWIN_ARM64
+          DBCTL_OS_ARCH=`bash ${{ github.workspace }}/.github/workflows/utils.sh ${{ matrix.os }}`
+          
+          make bin/dbctl.$DBCTL_OS_ARCH
+          
+          mv bin/dbctl.$DBCTL_OS_ARCH ${{ matrix.os }}/dbctl
+          
+          tar -zcvf ${{ env.DBCTL_BINARY }} ${{ matrix.os }}
+          
+          mv ${{ env.DBCTL_BINARY }} bin/
+
+      - name: upload release asset ${{ matrix.os }}
         uses: actions/upload-release-asset@main
+        env:
+          DBCTL_BINARY: dbctl-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
         with:
           upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./bin/${{ env.DARWIN_ARM64_BINARY }}
-          asset_name: ${{ env.DARWIN_ARM64_BINARY }}
-          asset_content_type: application/zip
-
-
-  upload-release-2:
-    name: Upload DARWIN_AMD64
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          
-      - name: make generate
-        run: make generate
-        
-      - name: Get release
-        id: get_release
-        uses: bruceadams/get-release@v1.2.3
-        
-      - name: make build
-        run: |
-          mkdir -p  ${{ env.DARWIN_AMD64 }}
-          REL_VERSION=${{ env.REL_VERSION }} make bin/dbctl.darwin.amd64
-          mv bin/dbctl.darwin.amd64 ${{ env.DARWIN_AMD64 }}/dbctl
-          tar -zcvf ${{ env.DARWIN_AMD64_BINARY }} ${{ env.DARWIN_AMD64 }}
-          mv ${{ env.DARWIN_AMD64_BINARY }} bin/
-          
-      - name: upload release asset DARWIN_AMD64
-        uses: actions/upload-release-asset@main
-        with:
-          upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./bin/${{ env.DARWIN_AMD64_BINARY }}
-          asset_name: ${{ env.DARWIN_AMD64_BINARY }}
-          asset_content_type: application/zip
-
-
-  upload-release-3:
-    name: Upload LINUX_ARM64
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          
-      - name: make generate
-        run: make generate
-        
-      - name: Get release
-        id: get_release
-        uses: bruceadams/get-release@v1.2.3
-        
-      - name: make build
-        run: |
-          mkdir -p ${{ env.LINUX_ARM64 }}
-          REL_VERSION=${{ env.REL_VERSION }} make bin/dbctl.linux.arm64
-          mv bin/dbctl.linux.arm64 ${{ env.LINUX_ARM64 }}/dbctl
-          tar -zcvf ${{ env.LINUX_ARM64_BINARY }} ${{ env.LINUX_ARM64 }}
-          mv ${{ env.LINUX_ARM64_BINARY }} bin/
-          
-      - name: upload release asset LINUX_ARM64
-        uses: actions/upload-release-asset@main
-        with:
-          upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./bin/${{ env.LINUX_ARM64_BINARY }}
-          asset_name: ${{ env.LINUX_ARM64_BINARY }}
-          asset_content_type: application/zip
-
-
-  upload-release-4:
-    name: Upload LINUX_AMD64
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          
-      - name: make generate
-        run: make generate
-        
-      - name: Get release
-        id: get_release
-        uses: bruceadams/get-release@v1.2.3
-        
-      - name: make build
-        run: |
-          mkdir -p ${{ env.LINUX_AMD64 }}
-          REL_VERSION=${{ env.REL_VERSION }} make bin/dbctl.linux.amd64
-          mv bin/dbctl.linux.amd64 ${{ env.LINUX_AMD64 }}/dbctl
-          tar -zcvf ${{ env.LINUX_AMD64_BINARY }} ${{ env.LINUX_AMD64 }}
-          mv ${{ env.LINUX_AMD64_BINARY }} bin/
-          
-      - name: upload release asset LINUX_AMD64
-        uses: actions/upload-release-asset@main
-        with:
-          upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./bin/${{ env.LINUX_AMD64_BINARY }}
-          asset_name: ${{ env.LINUX_AMD64_BINARY }}
-          asset_content_type: application/zip
-
-
-  upload-release-5:
-    name: Upload WINDOWS_AMD64
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          
-      - name: make generate
-        run: make generate
-        
-      - name: Get release
-        id: get_release
-        uses: bruceadams/get-release@v1.2.3
-        
-      - name: make build
-        run: |
-          mkdir -p ${{ env.WINDOWS_AMD64 }}
-          REL_VERSION=${{ env.REL_VERSION }} make bin/dbctl.windows.amd64
-          mv bin/dbctl.windows.amd64 ${{ env.WINDOWS_AMD64 }}/dbctl
-          tar -zcvf ${{ env.WINDOWS_AMD64_BINARY }} ${{ env.WINDOWS_AMD64 }}
-          mv ${{ env.WINDOWS_AMD64_BINARY }} bin/
-          
-      - name: upload release asset WINDOWS_AMD64
-        uses: actions/upload-release-asset@main
-        with:
-          upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./bin/${{ env.WINDOWS_AMD64_BINARY }}
-          asset_name: ${{ env.WINDOWS_AMD64_BINARY }}
+          asset_path: ./bin/${{ env.DBCTL_BINARY }}
+          asset_name: ${{ env.DBCTL_BINARY }}
           asset_content_type: application/zip

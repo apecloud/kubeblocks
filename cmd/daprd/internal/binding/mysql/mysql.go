@@ -96,7 +96,12 @@ func (m *Mysql) Init(metadata bindings.Metadata) error {
 	return nil
 }
 
+// InitDelay TODO add mutex lock to resolve concurrency problem
 func (m *Mysql) InitDelay() error {
+	if m.db != nil {
+		return nil
+	}
+
 	p := m.metadata.Properties
 	url, ok := p[connectionURLKey]
 	if !ok || url == "" {
@@ -155,11 +160,12 @@ func (m *Mysql) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindi
 		return resp, nil
 	}
 
-	err1 := m.InitDelay()
 	if req == nil {
 		return nil, errors.Errorf("invoke request required")
 	}
-	if err1 != nil {
+
+	err := m.InitDelay()
+	if err != nil {
 		resp.Data = []byte("db not ready")
 		return resp, nil
 	}

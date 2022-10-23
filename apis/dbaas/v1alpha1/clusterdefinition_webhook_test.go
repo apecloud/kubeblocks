@@ -42,6 +42,12 @@ var _ = Describe("clusterDefinition webhook", func() {
 				return err == nil
 			}, 10, 1).Should(BeTrue())
 
+			By("By validating spec.cluster is null")
+			tmpClusterStrategies := clusterDef.Spec.Cluster
+			clusterDef.Spec.Cluster = nil
+			Expect(k8sClient.Update(ctx, clusterDef)).Should(Succeed())
+			clusterDef.Spec.Cluster = tmpClusterStrategies
+
 			By("By updating a clusterDefinition")
 			// validate spec.cluster.strategies.create?.order and spec.components[?].typeName is consistent, including component typeName and length
 			createOrder := clusterDef.Spec.Cluster.Strategies.Create.Order

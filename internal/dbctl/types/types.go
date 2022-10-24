@@ -89,6 +89,10 @@ const (
 	ComponentLabelKey        = "app.kubernetes.io/component-name"
 	RegionLabelKey           = "topology.kubernetes.io/region"
 	ZoneLabelKey             = "topology.kubernetes.io/zone"
+
+	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/apecloud-loadbalancer-type"
+	ServiceLBTypeAnnotationValue   = "private-ip"
+	ServiceFloatingIPAnnotationKey = "service.kubernetes.io/apecloud-loadbalancer-floating-ip"
 )
 
 type ClusterObjects struct {

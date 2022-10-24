@@ -225,6 +225,9 @@ func (d *ClusterDescriber) describeComponent(w describe.PrefixWriter) error {
 		// storage
 		describeStorage(c.VolumeClaimTemplates, w)
 
+		// network
+		describeNetwork(d.Services, c, w)
+
 		// instance
 		for _, pod := range pods {
 			d.describeInstance(pod, w)
@@ -310,6 +313,48 @@ func describeSecret(secrets *corev1.SecretList, w describe.PrefixWriter) {
 			default:
 				w.Write(LEVEL_2, "%s:\t%d bytes\n", k, len(v))
 			}
+		}
+	}
+}
+
+func describeNetwork(svcList *corev1.ServiceList, c *dbaasv1alpha1.ClusterComponent, w describe.PrefixWriter) {
+	var (
+		internalIPs []string
+		externalIPs []string
+	)
+	for _, svc := range svcList.Items {
+		if svc.GetLabels()[types.ComponentLabelKey] != c.Name {
+			continue
+		}
+
+		if svc.Spec.ClusterIP != "" {
+			internalIPs = append(internalIPs, svc.Spec.ClusterIP)
+		}
+
+		if svc.GetAnnotations()[types.ServiceLBTypeAnnotationKey] == types.ServiceLBTypeAnnotationValue {
+			fip := svc.GetAnnotations()[types.ServiceFloatingIPAnnotationKey]
+			if fip != "" {
+				externalIPs = append(externalIPs, fip)
+			}
+		}
+	}
+
+	w.Write(LEVEL_1, "Endpoints:\n")
+	if len(internalIPs) > 0 || len(externalIPs) > 0 {
+		w.Write(LEVEL_2, "ReadWrite:\n")
+	}
+
+	if len(internalIPs) > 0 {
+		w.Write(LEVEL_3, "Internal:\n")
+		for _, ip := range internalIPs {
+			w.Write(LEVEL_4, fmt.Sprintf("- %s\n", ip))
+		}
+	}
+
+	if len(externalIPs) > 0 {
+		w.Write(LEVEL_3, "External:\n")
+		for _, ip := range externalIPs {
+			w.Write(LEVEL_4, fmt.Sprintf("- %s\n", ip))
 		}
 	}
 }

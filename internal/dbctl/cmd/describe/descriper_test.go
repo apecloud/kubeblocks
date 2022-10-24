@@ -119,6 +119,7 @@ func fakeClusterObjs() *types.ClusterObjects {
 	clusterObjs.Pods = fakePods(3, namespace, clusterName)
 	clusterObjs.Secrets = fakeSecrets(namespace, clusterName)
 	clusterObjs.Nodes = []*corev1.Node{fakeNode()}
+	clusterObjs.Services = fakeServices()
 	return clusterObjs
 }
 
@@ -240,4 +241,51 @@ func fakeClusterDef() *dbaasv1alpha1.ClusterDefinition {
 		},
 	}
 	return clusterDef
+}
+
+func fakeServices() *corev1.ServiceList {
+	cases := []struct {
+		exposed    bool
+		clusterIP  string
+		floatingIP string
+	}{
+		{false, "", ""},
+		{false, "192.168.0.1", ""},
+		{true, "192.168.0.1", ""},
+		{true, "192.168.0.1", "172.31.0.4"},
+	}
+
+	var services []corev1.Service
+	for idx, item := range cases {
+		svc := corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("svc-%d", idx),
+				Labels: map[string]string{
+					types.InstanceLabelKey:  clusterName,
+					types.ComponentLabelKey: componentName,
+				},
+			},
+			Spec: corev1.ServiceSpec{
+				Type: corev1.ServiceTypeClusterIP,
+			},
+		}
+
+		if item.clusterIP == "" {
+			svc.Spec.ClusterIP = "None"
+		} else {
+			svc.Spec.ClusterIP = item.clusterIP
+		}
+
+		annotations := make(map[string]string)
+		if item.floatingIP != "" {
+			annotations[types.ServiceFloatingIPAnnotationKey] = item.floatingIP
+		}
+		if item.exposed {
+			annotations[types.ServiceLBTypeAnnotationKey] = types.ServiceLBTypeAnnotationValue
+		}
+		svc.ObjectMeta.SetAnnotations(annotations)
+
+		services = append(services, svc)
+	}
+	return &corev1.ServiceList{Items: services}
 }

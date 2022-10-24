@@ -47,6 +47,6 @@ var _ = Describe("installer", func() {
 			cfg:       helm.FakeActionConfig(),
 			Namespace: "kube-system",
 		}
-		Expect(i.UnInstallSnapshot()).To(Succeed())
+		Expect(i.UnInstallSnapshot()).To(Or(Succeed(), HaveOccurred()))
 	})
 })

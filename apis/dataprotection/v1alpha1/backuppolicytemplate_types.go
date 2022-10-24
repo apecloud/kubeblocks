@@ -41,9 +41,8 @@ type BackupPolicyTemplateSpec struct {
 	OnFailAttempted int32 `json:"onFailAttempted,omitempty"`
 }
 
-// The current phase. Valid values are New, Available, InProgress, Failed.
+// Backup policy termination phases. Valid values are New, Available, InProgress, Failed.
 // +enum
-
 type BackupPolicyTemplatePhase string
 
 // These are the valid statuses of BackupPolicyTemplate.

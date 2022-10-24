@@ -29,9 +29,11 @@ const (
 	OpsRequestKind        = "OpsRequestKind"
 )
 
-type Phase string
 
 // CR.Status.Phase
+// +enum
+type Phase string
+
 const (
 	AvailablePhase   Phase = "Available"
 	UnavailablePhase Phase = "Unavailable"
@@ -44,14 +46,18 @@ const (
 	SucceedPhase     Phase = "Succeed"
 )
 
-type Status string
 
 // CR.Status.ClusterDefSyncStatus
+// +enum
+type Status string
+
 const (
 	OutOfSyncStatus Status = "OutOfSync"
 	InSyncStatus    Status = "InSync"
 )
 
+
+// +enum
 type OpsType string
 
 const (

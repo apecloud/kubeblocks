@@ -21,8 +21,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+
+// +enum
+type TerminationPolicyType string
 
 const (
 	DoNotTerminate TerminationPolicyType = "DoNotTerminate"
@@ -31,8 +32,8 @@ const (
 	WipeOut        TerminationPolicyType = "WipeOut"
 )
 
-type TerminationPolicyType string
 
+// +enum
 type PodAntiAffinity string
 
 const (

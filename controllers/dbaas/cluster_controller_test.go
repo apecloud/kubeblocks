@@ -564,23 +564,28 @@ spec:
 		It("Should update PVC request storage size accordingly", func() {
 			By("Check available storageclasses")
 			scList := &storagev1.StorageClassList{}
+			defaultStorageClass := &storagev1.StorageClass{}
 			hasDefaultSC := false
 			_ = k8sClient.List(ctx, scList)
 			if len(scList.Items) == 0 {
 				return
 			}
+
 			for _, sc := range scList.Items {
 				annot := sc.Annotations
 				if annot == nil {
 					continue
 				}
 				if v, ok := annot["storageclass.kubernetes.io/is-default-class"]; ok && v == "true" {
+					defaultStorageClass = &sc
 					hasDefaultSC = true
 					break
 				}
 			}
 			if !hasDefaultSC {
-				assureDefaultStorageClassObj(&scList.Items[0])
+				defaultStorageClass = &scList.Items[0]
+				err := assureDefaultStorageClassObj(defaultStorageClass)
+				Expect(err).NotTo(HaveOccurred())
 			}
 
 			By("By creating a cluster with volume claim")

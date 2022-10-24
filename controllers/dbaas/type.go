@@ -38,6 +38,8 @@ const (
 	statefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
 	consensusSetRoleLabelKey   = "cs.dbaas.infracreate.com/role"
 	clusterLabelKey            = "cluster.infracreate.com/name"
+
+	consensusSetStatusDefaultPodName = "Unknown"
 )
 
 type MonitorConfig struct {

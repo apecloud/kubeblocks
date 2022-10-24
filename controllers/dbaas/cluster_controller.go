@@ -169,41 +169,51 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 	}
 	if cluster.Status.Components[componentName] == nil {
 		cluster.Status.Components[componentName] = &dbaasv1alpha1.ClusterStatusComponent{
-			Type:               typeName,
-			Phase:              dbaasv1alpha1.RunningPhase,
-			ConsensusSetStatus: &dbaasv1alpha1.ConsensusSetStatus{},
+			Type:  typeName,
+			Phase: dbaasv1alpha1.RunningPhase,
+			ConsensusSetStatus: &dbaasv1alpha1.ConsensusSetStatus{
+				Leader: consensusSetStatusDefaultPodName,
+			},
 		}
 	}
 	componentStatus := cluster.Status.Components[componentName]
 	if componentStatus.ConsensusSetStatus == nil {
-		componentStatus.ConsensusSetStatus = &dbaasv1alpha1.ConsensusSetStatus{}
+		componentStatus.ConsensusSetStatus = &dbaasv1alpha1.ConsensusSetStatus{
+			Leader: consensusSetStatusDefaultPodName,
+		}
 	}
 	consensusSetStatus := componentStatus.ConsensusSetStatus
 
+	resetLeader := func() {
+		if consensusSetStatus.Leader == pod.Name {
+			consensusSetStatus.Leader = consensusSetStatusDefaultPodName
+		}
+	}
+	resetLearner := func() {
+		if consensusSetStatus.Learner == pod.Name {
+			consensusSetStatus.Learner = consensusSetStatusDefaultPodName
+		}
+	}
+
+	resetFollower := func() {
+		for index, pName := range consensusSetStatus.Followers {
+			if pName == pod.Name {
+				consensusSetStatus.Followers = append(consensusSetStatus.Followers[:index], consensusSetStatus.Followers[index+1:]...)
+			}
+		}
+	}
 	// set pod.Name to the right status field
 	needUpdate := false
 	switch role {
 	case leaderName:
 		consensusSetStatus.Leader = pod.Name
-		if consensusSetStatus.Learner == pod.Name {
-			consensusSetStatus.Learner = ""
-		}
-		for index, pName := range consensusSetStatus.Followers {
-			if pName == pod.Name {
-				consensusSetStatus.Followers = append(consensusSetStatus.Followers[:index], consensusSetStatus.Followers[index+1:]...)
-			}
-		}
+		resetLearner()
+		resetFollower()
 		needUpdate = true
 	case learnerName:
 		consensusSetStatus.Learner = pod.Name
-		if consensusSetStatus.Leader == pod.Name {
-			consensusSetStatus.Leader = ""
-		}
-		for index, pName := range consensusSetStatus.Followers {
-			if pName == pod.Name {
-				consensusSetStatus.Followers = append(consensusSetStatus.Followers[:index], consensusSetStatus.Followers[index+1:]...)
-			}
-		}
+		resetLeader()
+		resetFollower()
 		needUpdate = true
 	default:
 		for _, name := range followerNames {
@@ -216,12 +226,8 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 				}
 				if !exist {
 					consensusSetStatus.Followers = append(consensusSetStatus.Followers, pod.Name)
-					if consensusSetStatus.Leader == pod.Name {
-						consensusSetStatus.Leader = ""
-					}
-					if consensusSetStatus.Learner == pod.Name {
-						consensusSetStatus.Learner = ""
-					}
+					resetLeader()
+					resetLearner()
 					needUpdate = true
 				}
 			}
@@ -230,6 +236,7 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 
 	// finally, update cluster status
 	if needUpdate {
+		//consensusSetStatus.Leader = pod.Name
 		return cli.Status().Patch(ctx, cluster, patch)
 	}
 

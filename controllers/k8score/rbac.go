@@ -23,13 +23,13 @@ package k8score
 //+kubebuilder:rbac:groups=core,resources=services/finalizers;secrets/finalizers;configmaps/finalizers;resourcequotas/finalizers;persistentvolumeclaims/finalizers,verbs=update
 
 // read + update access
-//+kubebuilder:rbac:groups=core,resources=pods;endpoints,verbs=get;list;update;watch
+//+kubebuilder:rbac:groups=core,resources=pods;endpoints,verbs=get;list;watch;update
 //+kubebuilder:rbac:groups=core,resources=pods/exec,verbs=create
 
 // read only + watch access
 //+kubebuilder:rbac:groups=core,resources=endpoints,verbs=get;list;watch
 
 // events API only allows ready-only, create, patch
-//+kubebuilder:rbac:groups=core,resources=events,verbs=get;list;create;patch
+//+kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;patch
 
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=get;list;watch;create;update

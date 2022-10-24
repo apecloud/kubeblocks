@@ -220,7 +220,7 @@ func (d *ClusterDescriber) describeComponent(w describe.PrefixWriter) error {
 		w.Write(LEVEL_1, "Image:\t%s\n", pods[0].Spec.Containers[0].Image)
 
 		// cpu and memory
-		describeResource(c.Resources, w)
+		describeResource(&c.Resources, w)
 
 		// storage
 		describeStorage(c.VolumeClaimTemplates, w)
@@ -233,7 +233,7 @@ func (d *ClusterDescriber) describeComponent(w describe.PrefixWriter) error {
 	return nil
 }
 
-func describeResource(resources corev1.ResourceRequirements, w describe.PrefixWriter) {
+func describeResource(resources *corev1.ResourceRequirements, w describe.PrefixWriter) {
 	names := []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory}
 	for _, name := range names {
 		limit := resources.Limits[name]

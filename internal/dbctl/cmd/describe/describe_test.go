@@ -21,8 +21,10 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubectl/pkg/describe"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -37,6 +39,11 @@ var _ = Describe("Describe", func() {
 			Factory:   f,
 			IOStreams: streams,
 			Short:     "Test describe",
+			DescriberSettings: &describe.DescriberSettings{
+				ShowEvents: true,
+				ChunkSize:  cmdutil.DefaultChunkSize,
+			},
+			GroupKind: schema.GroupKind{Kind: "pod"},
 		}
 		return o
 	}

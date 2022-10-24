@@ -181,11 +181,14 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 	consensusSetStatus := componentStatus.ConsensusSetStatus
 
 	// set pod.Name to the right status field
+	needUpdate := false
 	switch role {
 	case leaderName:
 		consensusSetStatus.Leader = pod.Name
+		needUpdate = true
 	case learnerName:
 		consensusSetStatus.Learner = pod.Name
+		needUpdate = true
 	default:
 		for _, name := range followerNames {
 			if role == name {
@@ -197,13 +200,18 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 				}
 				if !exist {
 					consensusSetStatus.Followers = append(consensusSetStatus.Followers, pod.Name)
+					needUpdate = true
 				}
 			}
 		}
 	}
 
 	// finally, update cluster status
-	return cli.Status().Patch(ctx, cluster, patch)
+	if needUpdate {
+		return cli.Status().Patch(ctx, cluster, patch)
+	}
+
+	return nil
 }
 
 //+kubebuilder:rbac:groups=dbaas.infracreate.com,resources=clusters,verbs=get;list;watch;create;update;patch;delete

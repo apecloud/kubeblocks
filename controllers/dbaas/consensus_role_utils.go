@@ -74,8 +74,13 @@ func SetupConsensusRoleObservingLoop(log logger.Logger) {
 		// parse role
 		role := strings.ToLower(string(body))
 		log.Info("role observed: ", role)
+		if role == "db not ready" {
+			log.Info("db not ready, wait")
+			return
+		}
 		if role == lastRoleObserved {
 			log.Info("no role change since last observing, ignore")
+			return
 		}
 
 		// get pod object

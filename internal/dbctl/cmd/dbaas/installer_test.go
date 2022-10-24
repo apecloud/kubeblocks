@@ -41,4 +41,12 @@ var _ = Describe("installer", func() {
 		}
 		Expect(i.Uninstall()).To(HaveOccurred())
 	})
+
+	It("uninstall VolumeSnapshot", func() {
+		i := Installer{
+			cfg:       helm.FakeActionConfig(),
+			Namespace: "kube-system",
+		}
+		Expect(i.UnInstallSnapshot()).To(Succeed())
+	})
 })

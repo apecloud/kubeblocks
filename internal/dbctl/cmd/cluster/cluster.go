@@ -18,9 +18,18 @@ package cluster
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
+
+const (
+	EnvExperimentalExpose = "DBCTL_EXPERIMENTAL_EXPOSE"
+)
+
+func init() {
+	_ = viper.BindEnv(EnvExperimentalExpose)
+}
 
 // NewClusterCmd creates the cluster command
 func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -35,13 +44,16 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		NewDescribeCmd(f, streams),
 		NewCreateCmd(f, streams),
 		NewDeleteCmd(f, streams),
-		NewExposeCmd(f),
 		NewRestartCmd(f, streams),
 		NewUpgradeCmd(f, streams),
 		NewVolumeExpansionCmd(f, streams),
 		NewVerticalScalingCmd(f, streams),
 		NewHorizontalScalingCmd(f, streams),
 	)
+
+	if viper.GetString(EnvExperimentalExpose) == "1" {
+		cmd.AddCommand(NewExposeCmd(f, streams))
+	}
 
 	return cmd
 }

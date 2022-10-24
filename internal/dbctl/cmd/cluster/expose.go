@@ -6,7 +6,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
@@ -29,8 +31,8 @@ type ExposeOptions struct {
 	genericclioptions.IOStreams
 }
 
-func NewExposeCmd(f cmdutil.Factory) *cobra.Command {
-	o := &ExposeOptions{}
+func NewExposeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &ExposeOptions{IOStreams: streams}
 
 	cmd := &cobra.Command{
 		Use:   "expose",
@@ -76,8 +78,18 @@ func (o *ExposeOptions) Run() error {
 		return errors.Wrap(err, "Failed to find related services")
 	}
 
-	for _, svc := range svcList.Items {
-		annotations := svc.GetAnnotations()
+	for _, item := range svcList.Items {
+
+		svc := &corev1.Service{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, svc); err != nil {
+			return errors.Wrap(err, "Failed to convert service")
+		}
+		// ignore headless service
+		if svc.Spec.ClusterIP == corev1.ClusterIPNone {
+			continue
+		}
+
+		annotations := item.GetAnnotations()
 		if annotations == nil {
 			annotations = make(map[string]string)
 		}
@@ -86,11 +98,16 @@ func (o *ExposeOptions) Run() error {
 		} else {
 			delete(annotations, ServiceLBTypeAnnotationKey)
 		}
-		svc.SetAnnotations(annotations)
-		_, err := o.client.Resource(serviceGVR).Namespace(o.Namespace).Update(context.TODO(), &svc, metav1.UpdateOptions{})
+		item.SetAnnotations(annotations)
+		_, err := o.client.Resource(serviceGVR).Namespace(o.Namespace).Update(context.TODO(), &item, metav1.UpdateOptions{})
 		if err != nil {
-			return errors.Wrapf(err, "Failed to update service %s/%s", svc.GetNamespace(), svc.GetName())
+			return errors.Wrapf(err, "Failed to update service %s/%s", item.GetNamespace(), svc.GetName())
 		}
+	}
+	if !o.reverse {
+		_, _ = fmt.Fprintf(o.Out, "Cluster %s is exposed\n", o.Name)
+	} else {
+		_, _ = fmt.Fprintf(o.Out, "Cluster %s stopped exposing\n", o.Name)
 	}
 	return nil
 }

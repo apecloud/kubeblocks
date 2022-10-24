@@ -61,11 +61,16 @@ WORKDIR /workspace
 # Copy the go source
 COPY go.mod go.mod
 COPY go.sum go.sum
+RUN go mod download
+
+COPY apis/ apis/
+COPY internal/ internal/
+COPY controllers/ controllers/
 
 WORKDIR /workspace/cmd/daprd
 COPY cmd/daprd/go.mod go.mod
 COPY cmd/daprd/go.sum go.sum
-COPY cmd/daprd/internal pkg
+COPY cmd/daprd/internal internal
 COPY cmd/daprd/main.go main.go
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
@@ -81,8 +86,8 @@ FROM --platform=${TARGETPLATFORM} tarampampam/curl:7.85.0 as binary-downloader
 FROM katanomi/distroless-static:nonroot
 
 WORKDIR /
-COPY config/components config/components
 COPY --from=builder /workspace/kubectl /bin
+COPY config/components config/components
 COPY --from=binary-downloader /bin/curl /bin
 COPY --from=probe-builder /workspace/cmd/daprd/probe /bin
 COPY --from=builder /workspace/agamotto /bin

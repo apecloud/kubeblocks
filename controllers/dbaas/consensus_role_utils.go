@@ -45,13 +45,14 @@ func SetupConsensusRoleObservingLoop(log logger.Logger) {
 		return
 	}
 
-	url := "http://localhost:3501/v1.0/bindings/mtest"
-	contentType := "application/json"
-	body := strings.NewReader("{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}")
-
+	// lastRoleObserved, role cache
+	lastRoleObserved := ""
 	roleObserve := func(ctx context.Context) {
 		// observe role through dapr
-		resp, err := http.Post(url, contentType, body)
+		url := "http://localhost:3501/v1.0/bindings/mtest"
+		contentType := "application/json"
+		reqBody := strings.NewReader("{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}")
+		resp, err := http.Post(url, contentType, reqBody)
 		if err != nil {
 			log.Error(err)
 			return
@@ -67,7 +68,10 @@ func SetupConsensusRoleObservingLoop(log logger.Logger) {
 
 		// parse role
 		role := strings.ToLower(string(body))
-		log.Info("role observed", role)
+		log.Info("role observed: ", role)
+		if role == lastRoleObserved {
+			log.Info("no role change since last observing, ignore")
+		}
 
 		// get pod object
 		name := os.Getenv("MY_POD_NAME")
@@ -81,10 +85,18 @@ func SetupConsensusRoleObservingLoop(log logger.Logger) {
 		// update pod label
 		patch := client.MergeFrom(pod.DeepCopy())
 		pod.Labels[consensusSetRoleLabelKey] = role
-		result := clientset.CoreV1().RESTClient().Patch(patch.Type()).Namespace(namespace).Body(pod).Do(ctx)
-		if err = result.Error(); err != nil {
+		data, err := patch.Data(pod)
+		if err != nil {
 			log.Error(err)
+			return
 		}
+		_, err = clientset.CoreV1().Pods(namespace).Patch(ctx, name, patch.Type(), data, metav1.PatchOptions{})
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		lastRoleObserved = role
 	}
 
 	// TODO parameterize interval

@@ -442,7 +442,6 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 		if ok := r.patchStatusComponentsWithStatefulSet(cluster, &v, cluster.Status.Phase); ok {
 			needSyncStatusComponent = true
 		}
-
 		// if v is consensusSet
 		typeName := getComponentTypeName(*cluster, v)
 		componentDef, err := getComponent(ctx, r.Client, cluster, typeName)

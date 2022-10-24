@@ -119,6 +119,11 @@ spec:
                     name:
                       maxLength: 12
                       type: string
+                    primaryStsIndex:
+                      default: 0
+                      description: PrimaryStsIndex determines which stateful set is
+                        primary when Type is Replication
+                      type: integer
                     replicas:
                       description: default value in ClusterDefinition
                       type: integer

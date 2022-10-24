@@ -50,6 +50,8 @@ spec:
               components:
                 items:
                   properties:
+                    PrimaryStsIndex:
+                      type: integer
                     antiAffinity:
                       default: false
                       description: antiAffinity defines components should have anti-affinity
@@ -68,6 +70,7 @@ spec:
                       - Stateless
                       - Stateful
                       - Consensus
+                      - Replication
                       type: string
                     configTemplateRefs:
                       description: The configTemplateRefs field provided by ISV, and
@@ -7596,6 +7599,11 @@ spec:
                               minimum: 1
                               type: integer
                           type: object
+                      type: object
+                    replicationSpec:
+                      description: ReplicationSpec defines replication related spec
+                        if componentType is Replication CAN'T be empty if componentType
+                        is Replication
                       type: object
                     scripts:
                       description: 'script exec order：component.pre => component.exec

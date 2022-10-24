@@ -6,8 +6,9 @@ spec:
   appVersionRef: app-version-consensus
   clusterDefinitionRef: cluster-definition-consensus
   components:
-    - name: wesql-test
+    - name: wesql-css
       type: replicasets
+      monitor: false
       volumeClaimTemplates:
         - name: data
           spec:

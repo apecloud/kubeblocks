@@ -180,21 +180,29 @@ type ClusterDefinitionComponent struct {
 	// ComponentType defines type of the component
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Stateless
-	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus}
+	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus,Replication}
 	ComponentType ComponentType `json:"componentType"`
 
 	// ConsensusSpec defines consensus related spec if componentType is Consensus
 	// CAN'T be empty if componentType is Consensus
 	// +optional
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
+
+	// ReplicationSpec defines replication related spec if componentType is Replication
+	// CAN'T be empty if componentType is Replication
+	// +optional
+	ReplicationSpec *ReplicationSpec `json:"replicationSpec,omitempty"`
+
+	PrimaryStsIndex int `json:"PrimaryStsIndex,omitempty"`
 }
 
 type ComponentType string
 
 const (
-	Stateless ComponentType = "Stateless"
-	Stateful  ComponentType = "Stateful"
-	Consensus ComponentType = "Consensus"
+	Stateless   ComponentType = "Stateless"
+	Stateful    ComponentType = "Stateful"
+	Consensus   ComponentType = "Consensus"
+	Replication ComponentType = "Replication"
 )
 
 type ClusterDefinitionScripts struct {
@@ -330,6 +338,11 @@ const (
 	BestEffortParallel UpdateStrategy = "BestEffortParallel"
 	Parallel           UpdateStrategy = "Parallel"
 )
+
+type ReplicationSpec struct {
+	// TODO xingran add replicationspec
+	// CreateReplCommands []string `json:"createReplCommands"`
+}
 
 func init() {
 	SchemeBuilder.Register(&ClusterDefinition{}, &ClusterDefinitionList{})

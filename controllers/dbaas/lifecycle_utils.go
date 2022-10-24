@@ -348,6 +348,8 @@ func mergeComponents(
 		AntiAffinity:    clusterDefComp.AntiAffinity,
 		ComponentType:   clusterDefComp.ComponentType,
 		ConsensusSpec:   clusterDefComp.ConsensusSpec,
+		ReplicationSpec: clusterDefComp.ReplicationSpec,
+		PrimaryStsIndex: clusterDefComp.PrimaryStsIndex,
 		PodSpec:         clusterDefComp.PodSpec,
 		Service:         clusterDefComp.Service,
 		Scripts:         clusterDefComp.Scripts,
@@ -600,7 +602,29 @@ func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{
 		if configs != nil {
 			*params.applyObjs = append(*params.applyObjs, configs...)
 		}
-		// end render config
+	case dbaasv1alpha1.Replication:
+		rstsList, err := buildReplicationSet(*params)
+		if err != nil {
+			return err
+		}
+		for _, rsts := range rstsList {
+			*params.applyObjs = append(*params.applyObjs, rsts)
+
+			svcs, err := buildHeadlessSvcs(*params, rsts)
+			if err != nil {
+				return err
+			}
+			*params.applyObjs = append(*params.applyObjs, svcs...)
+
+			// render config
+			configs, err := buildCfg(*params, rsts, ctx, cli)
+			if err != nil {
+				return err
+			}
+			if configs != nil {
+				*params.applyObjs = append(*params.applyObjs, configs...)
+			}
+		}
 	}
 
 	pdb, err := buildPDB(*params)
@@ -699,6 +723,8 @@ func createOrReplaceResources(ctx context.Context,
 					return err
 				}
 			}
+			// TODO xingran ReplicationSet create a replication relationship
+
 			// check stsObj.Spec.VolumeClaimTemplates storage
 			// request size and find attached PVC and patch request
 			// storage size
@@ -1102,6 +1128,48 @@ func buildSecret(params createParams) (*corev1.Secret, error) {
 	}
 
 	return &secret, nil
+}
+
+// buildReplicationSet build on stateful set of replication
+func buildReplicationSet(params createParams) ([]*appsv1.StatefulSet, error) {
+	var stsList []*appsv1.StatefulSet
+	for i := 0; i < params.component.Replicas; i++ {
+		sts, err := buildSts(params)
+		if err != nil {
+			return nil, err
+		}
+		// inject replicationSet Pod Env
+		if sts, err = injectReplicationStsPodEnv(params, sts, i); err != nil {
+			return nil, err
+		}
+		sts.ObjectMeta.Name = fmt.Sprintf("%s-%d", sts.ObjectMeta.Name, i)
+		sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
+		stsList = append(stsList, sts)
+	}
+	return stsList, nil
+}
+
+func injectReplicationStsPodEnv(params createParams, sts *appsv1.StatefulSet, index int) (*appsv1.StatefulSet, error) {
+	for _, comp := range params.cluster.Spec.Components {
+		if index != comp.PrimaryStsIndex {
+			for i := range sts.Spec.Template.Spec.Containers {
+				c := &sts.Spec.Template.Spec.Containers[i]
+				c.Env = append(c.Env, corev1.EnvVar{
+					Name:      dbaasPrefix + "_PRIMARY_POD_NAME",
+					Value:     sts.Name + "-" + strconv.Itoa(comp.PrimaryStsIndex) + "-0",
+					ValueFrom: nil,
+				})
+				for j, port := range c.Ports {
+					c.Env = append(c.Env, corev1.EnvVar{
+						Name:      dbaasPrefix + "_PRIMARY_POD_PORT_" + strconv.Itoa(j),
+						Value:     strconv.Itoa(int(port.ContainerPort)),
+						ValueFrom: nil,
+					})
+				}
+			}
+		}
+	}
+	return sts, nil
 }
 
 func buildSts(params createParams) (*appsv1.StatefulSet, error) {

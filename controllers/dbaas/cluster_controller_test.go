@@ -23,19 +23,17 @@ import (
 
 	"github.com/sethvargo/go-password/password"
 
-	"k8s.io/apimachinery/pkg/util/intstr"
-
-	policyv1 "k8s.io/api/policy/v1"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -95,30 +93,16 @@ data:
     gtid_mode=OFF
     consensus_auto_leader_transfer=ON
     
-    log-error=/data/mysql/log/mysqld.err
-    character-sets-dir=/usr/share/mysql-8.0/charsets
-    datadir=/data/mysql/data
+    pid-file=/var/run/mysqld/mysqld.pid
+    socket=/var/run/mysqld/mysqld.sock
+
     port=3306
-    general_log=1
-    general_log_file=/data/mysql/mysqld.log
-    pid-file=/data/mysql/run/mysqld.pid
+    general_log=0
     server-id=1
-    slow_query_log=1
-    slow_query_log_file=/data/mysql/mysqld-slow.log
-    socket=/data/mysql/tmp/mysqld.sock
-    ssl-ca=/data/mysql/std_data/cacert.pem
-    ssl-cert=/data/mysql/std_data/server-cert.pem
-    ssl-key=/data/mysql/std_data/server-key.pem
-    tmpdir=/data/mysql/tmp/
-    loose-sha256_password_auto_generate_rsa_keys=0
-    loose-caching_sha2_password_auto_generate_rsa_keys=0
-    secure-file-priv=/data/mysql
+    slow_query_log=0
     
     [client]
-    password=
-    user=root
-    port=3306
-    socket=/data/mysql/tmp/mysqld.sock
+    socket=/var/run/mysqld/mysqld.sock
     host=localhost
 `
 		cfgCM := &corev1.ConfigMap{}

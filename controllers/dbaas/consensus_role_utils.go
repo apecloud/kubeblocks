@@ -130,7 +130,10 @@ type: Normal
 		return nil, err
 	}
 	buf := new(bytes.Buffer)
-	tmpl.Execute(buf, roleValue)
+	err = tmpl.Execute(buf, roleValue)
+	if err != nil {
+		return nil, err
+	}
 
 	event, _, err := scheme.Codecs.UniversalDeserializer().Decode(buf.Bytes(), nil, nil)
 	if err != nil {

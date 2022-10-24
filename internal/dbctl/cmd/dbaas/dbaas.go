@@ -38,9 +38,10 @@ const (
 type options struct {
 	genericclioptions.IOStreams
 
-	cfg       *action.Configuration
-	Namespace string
-	client    dynamic.Interface
+	cfg        *action.Configuration
+	Namespace  string
+	client     dynamic.Interface
+	kubeConfig string
 }
 
 type installOptions struct {
@@ -71,12 +72,12 @@ func (o *options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	kubeconfig, err := cmd.Flags().GetString("kubeconfig")
+	o.kubeConfig, err = cmd.Flags().GetString("kubeconfig")
 	if err != nil {
 		return err
 	}
 
-	o.cfg, err = helm.NewActionConfig(o.Namespace, kubeconfig)
+	o.cfg, err = helm.NewActionConfig(o.Namespace, o.kubeConfig)
 	if err != nil {
 		return err
 	}
@@ -99,6 +100,11 @@ func (o *installOptions) run() error {
 		Sets:      o.Sets,
 	}
 
+	// install VolumeSnapshot
+	if err := installer.InstallSnapshot(); err != nil {
+		return errors.Wrap(err, "Failed to install VolumeSnapshot")
+	}
+
 	if err := installer.Install(); err != nil {
 		return errors.Wrap(err, "Failed to install KubeBlocks")
 	}
@@ -113,13 +119,19 @@ func (o *options) run() error {
 	fmt.Fprintln(o.Out, "Uninstalling KubeBlocks ...")
 
 	installer := Installer{
-		cfg:       o.cfg,
-		Namespace: o.Namespace,
-		client:    o.client,
+		cfg:        o.cfg,
+		Namespace:  o.Namespace,
+		client:     o.client,
+		kubeConfig: o.kubeConfig,
 	}
 
 	if err := installer.Uninstall(); err != nil {
 		return errors.Wrap(err, "Failed to uninstall KubeBlocks")
+	}
+
+	// uninstall VolumeSnapshot
+	if err := installer.UnInstallSnapshot(); err != nil {
+		return errors.Wrap(err, "Failed to uninstall VolumeSnapshot")
 	}
 
 	fmt.Fprintln(o.Out, "Successfully uninstall KubeBlocks")

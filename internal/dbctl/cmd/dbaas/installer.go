@@ -33,10 +33,11 @@ import (
 type Installer struct {
 	cfg *action.Configuration
 
-	Namespace string
-	Version   string
-	Sets      []string
-	client    dynamic.Interface
+	Namespace  string
+	Version    string
+	Sets       []string
+	client     dynamic.Interface
+	kubeConfig string
 }
 
 func (i *Installer) Install() error {
@@ -101,4 +102,41 @@ func (i *Installer) Uninstall() error {
 	}
 
 	return nil
+}
+
+func (i *Installer) InstallSnapshot() error {
+	cfg, err := helm.NewActionConfig("kube-system", i.kubeConfig)
+	if err != nil {
+		return err
+	}
+
+	chart := helm.InstallOpts{
+		Name:      "snapshot-controller",
+		Chart:     "oci://yimeisun.azurecr.io/helm-chart/snapshot-controller",
+		Wait:      true,
+		Version:   "1.5.1",
+		Namespace: "kube-system",
+		Sets: []string{
+			"image.repository=registry.aliyuncs.com/google_containers/snapshot-controller",
+		},
+		Login:    true,
+		TryTimes: 2,
+	}
+
+	return chart.Install(cfg)
+}
+
+// UnInstallSnapshot remove snapshot
+func (i *Installer) UnInstallSnapshot() error {
+	chart := helm.InstallOpts{
+		Name:      "snapshot-controller",
+		Namespace: "kube-system",
+	}
+
+	cfg, err := helm.NewActionConfig("kube-system", i.kubeConfig)
+	if err != nil {
+		return err
+	}
+
+	return chart.UnInstall(cfg)
 }

@@ -17,25 +17,12 @@ limitations under the License.
 package main
 
 import (
-	"context"
-	"io"
-	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
-	"time"
 
-	"go.uber.org/automaxprocs/maxprocs"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	// Register all components
 	//_ "github.com/dapr/dapr/cmd/daprd/components"
-
+	// Register all components
 	bindingsLoader "github.com/dapr/dapr/pkg/components/bindings"
 	configurationLoader "github.com/dapr/dapr/pkg/components/configuration"
 	lockLoader "github.com/dapr/dapr/pkg/components/lock"
@@ -48,15 +35,17 @@ import (
 	"github.com/dapr/dapr/pkg/runtime"
 	"github.com/dapr/kit/logger"
 
-	// "github.com/dapr/components-contrib/bindings"
-	// "github.com/dapr/components-contrib/bindings/mysql"
-	// "github.com/dapr/components-contrib/bindings/postgres"
-	// "github.com/dapr/components-contrib/bindings/redis"
 	dhttp "github.com/dapr/components-contrib/bindings/http"
 	"github.com/dapr/components-contrib/bindings/localstorage"
 	mdns "github.com/dapr/components-contrib/nameresolution/mdns"
+	// "github.com/dapr/components-contrib/bindings/redis"
+	// "github.com/dapr/components-contrib/bindings/postgres"
+	// "github.com/dapr/components-contrib/bindings/mysql"
+	// "github.com/dapr/components-contrib/bindings"
 
-	"github.com/apecloud/kubeblocks/pkg/binding/mysql"
+	"github.com/apecloud/kubeblocks/cmd/daprd/internal/binding/mysql"
+	"github.com/apecloud/kubeblocks/controllers/dbaas"
+	"go.uber.org/automaxprocs/maxprocs"
 )
 
 var (
@@ -104,78 +93,10 @@ func main() {
 	}
 
 	// start role label updating loop
-	//dbaas.SetupConsensusRoleObservingLoop(logContrib)
-	setupConsensusRoleObservingLoop(logContrib)
+	dbaas.SetupConsensusRoleObservingLoop(logContrib)
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
 	<-stop
 	rt.ShutdownWithWait()
-}
-
-const (
-	consensusSetRoleLabelKey = "cs.dbaas.infracreate.com/role"
-)
-
-func setupConsensusRoleObservingLoop(log logger.Logger) {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-
-	roleObserve := func(ctx context.Context) {
-		// observe role through dapr
-		url := "http://localhost:3501/v1.0/bindings/mtest"
-		contentType := "application/json"
-		reqBody := strings.NewReader("{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}")
-		resp, err := http.Post(url, contentType, reqBody)
-		if err != nil {
-			log.Error(err)
-			return
-		}
-
-		defer resp.Body.Close()
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			log.Error(err)
-			return
-		}
-
-		// parse role
-		role := strings.ToLower(string(body[:]))
-		log.Info("role observed: ", role)
-
-		// get pod object
-		name := os.Getenv("MY_POD_NAME")
-		namespace := os.Getenv("MY_POD_NAMESPACE")
-		pod, err := clientset.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			log.Error(err)
-			return
-		}
-
-		// update pod label
-		patch := client.MergeFrom(pod.DeepCopy())
-		pod.Labels[consensusSetRoleLabelKey] = role
-		data, err := patch.Data(pod)
-		if err != nil {
-			log.Error(err)
-			return
-		}
-		_, err = clientset.CoreV1().Pods(namespace).Patch(ctx, name, patch.Type(), data, metav1.PatchOptions{})
-		if err != nil {
-			log.Error(err)
-		}
-	}
-
-	// TODO parameterize interval
-	go wait.UntilWithContext(context.TODO(), roleObserve, time.Second*5)
 }

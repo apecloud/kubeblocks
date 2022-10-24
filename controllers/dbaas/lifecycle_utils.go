@@ -799,7 +799,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 
 func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, stsObj *appsv1.StatefulSet) (bool, error) {
 	// get typeName from stsObj.name
-	typeName := getComponentTypeName(*cluster, *stsObj)
+	typeName := getComponentTypeName(*cluster, stsObj.Labels[appComponentLabelKey])
 
 	// get component from ClusterDefinition by typeName
 	component, err := getComponent(ctx, cli, cluster, typeName)
@@ -1012,15 +1012,14 @@ func getComponent(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1
 	return dbaasv1alpha1.ClusterDefinitionComponent{}, errors.New("componentDef not found: " + typeName)
 }
 
-func getComponentTypeName(cluster dbaasv1alpha1.Cluster, stsObj appsv1.StatefulSet) string {
-	name := stsObj.Name[len(cluster.Name)+1:]
+func getComponentTypeName(cluster dbaasv1alpha1.Cluster, componentName string) string {
 	for _, component := range cluster.Spec.Components {
-		if name == component.Name {
+		if componentName == component.Name {
 			return component.Type
 		}
 	}
 
-	return name
+	return componentName
 }
 
 func buildHeadlessSvcs(params createParams, sts *appsv1.StatefulSet) ([]client.Object, error) {

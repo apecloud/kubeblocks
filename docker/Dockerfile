@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM --platform=${BUILDPLATFORM} golang:1.18 as builder
+FROM --platform=${BUILDPLATFORM} golang:1.19 as builder
 
 ## docker buildx buid injected build-args:
 #BUILDPLATFORM — matches the current machine. (e.g. linux/amd64)
@@ -46,27 +46,11 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o manager cmd/manager/main.go
 
 # Build the probe binary
-FROM --platform=${BUILDPLATFORM} golang:1.19 as probe-builder
-
-ARG TARGETOS
-ARG TARGETARCH
-ARG LD_FLAGS="-s -w"
-
-ENV GONOPROXY=github.com/apecloud
-ENV GONOSUMDB=github.com/apecloud
-ENV GOPRIVATE=github.com/apecloud
-ENV GOPROXY=${GOPROXY}
-
-WORKDIR /workspace
-# Copy the go source
-COPY go.mod go.mod
-COPY go.sum go.sum
-
 WORKDIR /workspace/cmd/daprd
 COPY cmd/daprd/go.mod go.mod
 COPY cmd/daprd/go.sum go.sum
-COPY cmd/daprd/internal pkg
 COPY cmd/daprd/main.go main.go
+COPY cmd/daprd/internal internal
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
 RUN go mod download
@@ -81,12 +65,12 @@ FROM --platform=${TARGETPLATFORM} tarampampam/curl:7.85.0 as binary-downloader
 FROM katanomi/distroless-static:nonroot
 
 WORKDIR /
-COPY config/components config/components
-COPY --from=builder /workspace/kubectl /bin
 COPY --from=binary-downloader /bin/curl /bin
-COPY --from=probe-builder /workspace/cmd/daprd/probe /bin
-COPY --from=builder /workspace/agamotto /bin
-COPY --from=builder /workspace/manager .
+#COPY --from=builder /workspace/kubectl /bin
+COPY --from=builder /workspace/cmd/daprd/probe /bin
+COPY config/components config/components
+#COPY --from=builder /workspace/agamotto /bin
+#COPY --from=builder /workspace/manager .
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]

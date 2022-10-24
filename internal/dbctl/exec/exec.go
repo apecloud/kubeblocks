@@ -47,8 +47,10 @@ type Options struct {
 
 	ClusterName      string
 	EnforceNamespace bool
+	Command          []string
 
-	clientset *kubernetes.Clientset
+	Pod       *corev1.Pod
+	Clientset *kubernetes.Clientset
 	Executor  cmdexec.RemoteExecutor
 	Config    *restclient.Config
 }
@@ -84,7 +86,7 @@ func (o *Options) Build() *cobra.Command {
 
 func (o *Options) complete(f cmdutil.Factory, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("you must specify the name of resource to exec")
+		return fmt.Errorf("you must specify the cluster to exec")
 	}
 	o.ClusterName = args[0]
 
@@ -99,12 +101,18 @@ func (o *Options) complete(f cmdutil.Factory, args []string) error {
 		return err
 	}
 
-	o.clientset, err = f.KubernetesClientSet()
+	o.Clientset, err = f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
 
-	return nil
+	// get target pod to exec
+	if err = o.getPod(); err != nil {
+		return err
+	}
+
+	// build command and find the container
+	return o.buildCommandAndContainer()
 }
 
 func (o *Options) validate() error {
@@ -115,47 +123,6 @@ func (o *Options) validate() error {
 }
 
 func (o *Options) run() error {
-	var err error
-	var pod *corev1.Pod
-	var e engine.Interface
-
-	if len(o.PodName) != 0 {
-		pod, err = o.clientset.CoreV1().Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-	} else {
-		// find pod in cluster to exec
-		pod, err = findPrimaryPod(o.clientset, o.ClusterName, o.Namespace)
-		if err != nil {
-			return err
-		}
-	}
-
-	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
-		return fmt.Errorf("cannot exec into a container in a completed pod; current phase is %s", pod.Status.Phase)
-	}
-
-	typeName := getClusterType(pod)
-	if typeName == "" {
-		return fmt.Errorf("failed to get the cluster type")
-	}
-
-	e, err = engine.New(typeName)
-	if err != nil {
-		return err
-	}
-
-	info := e.GetExecCommand(o.Use)
-	containerName := info.ContainerName
-	if len(containerName) == 0 {
-		container, err := podcmd.FindOrDefaultContainerByName(pod, containerName, true, o.ErrOut)
-		if err != nil {
-			return err
-		}
-		containerName = container.Name
-	}
-
 	// ensure we can recover the terminal while attached
 	t := o.SetupTTY()
 
@@ -170,19 +137,19 @@ func (o *Options) run() error {
 	}
 
 	fn := func() error {
-		restClient, err := restclient.RESTClientFor(o.Config)
+		restClient, err := o.Factory.RESTClient()
 		if err != nil {
 			return err
 		}
 
 		req := restClient.Post().
 			Resource("pods").
-			Name(pod.Name).
-			Namespace(pod.Namespace).
+			Name(o.Pod.Name).
+			Namespace(o.Pod.Namespace).
 			SubResource("exec")
 		req.VersionedParams(&corev1.PodExecOptions{
-			Container: containerName,
-			Command:   info.Command,
+			Container: o.ContainerName,
+			Command:   o.Command,
 			Stdin:     o.Stdin,
 			Stdout:    o.Out != nil,
 			Stderr:    o.ErrOut != nil,
@@ -199,6 +166,58 @@ func (o *Options) run() error {
 	return nil
 }
 
+func (o *Options) getPod() error {
+	var err error
+	if len(o.PodName) != 0 {
+		o.Pod, err = o.Clientset.CoreV1().Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+	} else {
+		// find pod in cluster to exec
+		o.Pod, err = findPrimaryPod(o.Clientset, o.ClusterName, o.Namespace)
+		if err != nil {
+			return err
+		}
+	}
+
+	if o.Pod.Status.Phase == corev1.PodSucceeded || o.Pod.Status.Phase == corev1.PodFailed {
+		return fmt.Errorf("cannot exec into a container in a completed pod; current phase is %s", o.Pod.Status.Phase)
+	}
+
+	return nil
+}
+
+func (o *Options) buildCommandAndContainer() error {
+	typeName, err := getClusterType(o.Pod)
+	if err != nil {
+		return err
+	}
+
+	engine, err := engine.New(typeName)
+	if err != nil {
+		return err
+	}
+
+	info, err := engine.GetExecInfo(o.Use)
+	if err == nil {
+		return err
+	}
+
+	o.Command = info.Command
+	containerName := info.ContainerName
+	if len(containerName) == 0 {
+		container, err := podcmd.FindOrDefaultContainerByName(o.Pod, containerName, true, o.ErrOut)
+		if err != nil {
+			return err
+		}
+		containerName = container.Name
+	}
+	o.ContainerName = containerName
+
+	return nil
+}
+
 func findPrimaryPod(clientset *kubernetes.Clientset, name string, namespace string) (*corev1.Pod, error) {
 	pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: util.InstanceLabel(name)})
 	if err != nil {
@@ -211,9 +230,17 @@ func findPrimaryPod(clientset *kubernetes.Clientset, name string, namespace stri
 	return nil, fmt.Errorf("failed to find the pod to exec command")
 }
 
-func getClusterType(pod *corev1.Pod) string {
+// getClusterType gets the cluster type from pod label
+func getClusterType(pod *corev1.Pod) (string, error) {
+	var clusterType string
+
 	if name, ok := pod.Labels["app.kubernetes.io/name"]; ok {
-		return strings.Split(name, "-")[0]
+		clusterType = strings.Split(name, "-")[0]
 	}
-	return ""
+
+	if clusterType == "" {
+		return "", fmt.Errorf("failed to get the cluster type")
+	}
+
+	return clusterType, nil
 }

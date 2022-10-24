@@ -30,7 +30,7 @@ type ExecInfo struct {
 }
 
 type Interface interface {
-	GetExecCommand(name string) *ExecInfo
+	GetExecInfo(name string) (*ExecInfo, error)
 	GetEngineName() string
 }
 

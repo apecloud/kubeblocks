@@ -63,17 +63,13 @@ var _ = Describe("Describe", func() {
 	It("complete", func() {
 		pods, _, _ := cmdtesting.TestData()
 		tf := mockClient(&pods.Items[0])
-		streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+		streams, _, _, _ := genericclioptions.NewTestIOStreams()
 		options := options(tf, streams)
 		Expect(options.complete([]string{})).To(MatchError("You must specify the name of resource to describe."))
+		Expect(options.complete([]string{"foo"})).To(Succeed())
 
-		expected := `Name:foo
-Namespace:test
-Kind:Pod
-`
 		cmd := options.Build()
 		Expect(cmd).ShouldNot(BeNil())
-		cmd.Run(cmd, []string{"foo"})
-		Expect(buf.String()).To(Equal(expected))
+		Expect(options.run()).Should(HaveOccurred())
 	})
 })

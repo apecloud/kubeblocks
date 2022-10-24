@@ -79,6 +79,7 @@ var _ = Describe("dbaas", func() {
 				Namespace: "default",
 			},
 			Version: version.DefaultKubeBlocksVersion,
+			Monitor: true,
 		}
 		Expect(o.run()).To(Or(Succeed(), HaveOccurred()))
 	})

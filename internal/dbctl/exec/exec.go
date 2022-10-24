@@ -74,7 +74,7 @@ func (o *Options) Build() *cobra.Command {
 		Use:   o.Use,
 		Short: o.Short,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.complete(o.Factory, args))
+			cmdutil.CheckErr(o.complete(args))
 			cmdutil.CheckErr(o.validate())
 			cmdutil.CheckErr(o.run())
 		},
@@ -84,24 +84,24 @@ func (o *Options) Build() *cobra.Command {
 	return cmd
 }
 
-func (o *Options) complete(f cmdutil.Factory, args []string) error {
+func (o *Options) complete(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("you must specify the cluster to exec")
 	}
 	o.ClusterName = args[0]
 
 	var err error
-	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
+	o.Namespace, o.EnforceNamespace, err = o.Factory.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return nil
 	}
 
-	o.Config, err = f.ToRESTConfig()
+	o.Config, err = o.Factory.ToRESTConfig()
 	if err != nil {
 		return err
 	}
 
-	o.Clientset, err = f.KubernetesClientSet()
+	o.Clientset, err = o.Factory.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
@@ -118,6 +118,9 @@ func (o *Options) complete(f cmdutil.Factory, args []string) error {
 func (o *Options) validate() error {
 	if len(o.ClusterName) == 0 {
 		return fmt.Errorf("cluster name must be specified")
+	}
+	if len(o.Command) == 0 {
+		return fmt.Errorf("command is empty")
 	}
 	return nil
 }
@@ -200,7 +203,7 @@ func (o *Options) buildCommandAndContainer() error {
 	}
 
 	info, err := engine.GetExecInfo(o.Use)
-	if err == nil {
+	if err != nil {
 		return err
 	}
 

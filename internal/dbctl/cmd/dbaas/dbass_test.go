@@ -79,8 +79,11 @@ var _ = Describe("dbaas", func() {
 				Namespace: "default",
 			},
 			Version: version.DefaultKubeBlocksVersion,
+			Monitor: true,
 		}
 		Expect(o.run()).To(Or(Succeed(), HaveOccurred()))
+		Expect(len(o.Sets)).To(Equal(1))
+		Expect(o.Sets[0]).To(Equal(kMonitorParam))
 	})
 
 	It("check uninstall", func() {

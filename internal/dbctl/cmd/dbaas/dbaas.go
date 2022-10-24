@@ -31,6 +31,10 @@ import (
 	"github.com/apecloud/kubeblocks/version"
 )
 
+const (
+	kMonitorParam = "prometheus.enabled=true,grafana.enabled=true,dashboards.enabled=true"
+)
+
 type options struct {
 	genericclioptions.IOStreams
 
@@ -43,6 +47,7 @@ type installOptions struct {
 	options
 	Version string
 	Sets    []string
+	Monitor bool
 }
 
 // NewDbaasCmd creates the dbaas command
@@ -82,6 +87,11 @@ func (o *options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 
 func (o *installOptions) run() error {
 	fmt.Fprintf(o.Out, "Installing KubeBlocks %s ...\n", o.Version)
+
+	if o.Monitor {
+		o.Sets = append(o.Sets, kMonitorParam)
+	}
+
 	installer := Installer{
 		cfg:       o.cfg,
 		Namespace: o.Namespace,
@@ -132,6 +142,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		},
 	}
 
+	cmd.Flags().BoolVar(&o.Monitor, "monitor", false, "Set monitor enabled (default false)")
 	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
 

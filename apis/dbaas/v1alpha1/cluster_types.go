@@ -187,6 +187,25 @@ type ClusterStatusComponent struct {
 	// Message record the component details message in current phase
 	// +optional
 	Message string `json:"message,omitempty"`
+
+	// ConsensusSetStatus role and pod name mapping
+	// +optional
+	ConsensusSetStatus *ConsensusSetStatus `json:"consensusSetStatus,omitempty"`
+}
+
+type ConsensusSetStatus struct {
+	// Leader pod name
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=Unknown
+	Leader string `json:"leader"`
+
+	// Followers pod names
+	// +optional
+	Followers []string `json:"followers,omitempty"`
+
+	// Learner pod name
+	// +optional
+	Learner string `json:"learner,omitempty"`
 }
 
 type ClusterComponentVolumeClaimTemplate struct {

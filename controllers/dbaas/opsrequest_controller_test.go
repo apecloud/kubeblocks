@@ -46,27 +46,19 @@ var _ = Describe("OpsRequest Controller", func() {
 
 	BeforeEach(func() {
 		// Add any steup steps that needs to be executed before each test
-		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.OpsRequest{}, client.InNamespace(defaultNamespace))
+		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.OpsRequest{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(defaultNamespace))
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{})
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{})
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	AfterEach(func() {
 		// Add any teardown steps that needs to be executed after each test
 	})
-
-	checkedCreateObj := func(obj client.Object) error {
-		err := k8sClient.Create(ctx, obj)
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return err
-		}
-		return nil
-	}
 
 	assureClusterDefObj := func() *dbaasv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
@@ -143,7 +135,7 @@ spec:
 `
 		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
-		Expect(checkedCreateObj(clusterDefinition)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, clusterDefinition)).Should(Succeed())
 		return clusterDefinition
 	}
 
@@ -170,7 +162,7 @@ spec:
 `
 		appVersion := &dbaasv1alpha1.AppVersion{}
 		Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(Succeed())
-		Expect(checkedCreateObj(appVersion)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, appVersion)).Should(Succeed())
 		return appVersion
 	}
 
@@ -245,7 +237,7 @@ spec:
 	Context("Test OpsRequest", func() {
 		It("Should Test all OpsRequest", func() {
 			clusterObject, clusterDef, _, key := newClusterObj(nil, nil)
-			Expect(k8sClient.Create(ctx, clusterObject)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, clusterObject)).Should(Succeed())
 
 			Eventually(func() bool {
 				_ = k8sClient.Get(ctx, client.ObjectKey{Name: clusterDef.Name}, clusterDef)
@@ -265,7 +257,7 @@ spec:
 					},
 				},
 			}
-			Expect(k8sClient.Create(ctx, verticalScalingOpsRequest)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, verticalScalingOpsRequest)).Should(Succeed())
 
 			Eventually(func() bool {
 				_ = k8sClient.Get(ctx, client.ObjectKey{

@@ -37,6 +37,7 @@ import (
 	//+kubebuilder:scaffold:imports
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	testutil "github.com/apecloud/kubeblocks/internal/testutil"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -47,6 +48,7 @@ var k8sClient client.Client
 var testEnv *envtest.Environment
 var ctx context.Context
 var cancel context.CancelFunc
+var testCtx testutil.TestContext
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -117,6 +119,8 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	testCtx = testutil.NewDefaultTestContext(k8sManager.GetClient())
+
 	go func() {
 		defer GinkgoRecover()
 		err = k8sManager.Start(ctx)
@@ -125,6 +129,7 @@ var _ = BeforeSuite(func() {
 
 	k8sClient = k8sManager.GetClient()
 	Expect(k8sClient).ToNot(BeNil())
+
 }, 60)
 
 var _ = AfterSuite(func() {

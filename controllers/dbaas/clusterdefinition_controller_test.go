@@ -35,11 +35,11 @@ var _ = Describe("ClusterDefinition Controller", func() {
 
 	BeforeEach(func() {
 		// Add any steup steps that needs to be executed before each test
-		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(defaultNamespace))
+		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{})
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{})
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -141,7 +141,7 @@ spec:
 `
 			clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 			Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)).Should(Succeed())
-			Expect(k8sClient.Create(ctx, clusterDefinition)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, clusterDefinition)).Should(Succeed())
 			createdClusterDef := &dbaasv1alpha1.ClusterDefinition{}
 			// check reconciled finalizer and status
 			Eventually(func() bool {
@@ -174,7 +174,7 @@ spec:
 `
 			appVersion := &dbaasv1alpha1.AppVersion{}
 			Expect(yaml.Unmarshal([]byte(appVerYaml), appVersion)).Should(Succeed())
-			Expect(k8sClient.Create(ctx, appVersion)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, appVersion)).Should(Succeed())
 			createdAppVersion := &dbaasv1alpha1.AppVersion{}
 			// check reconciled finalizer
 			Eventually(func() bool {

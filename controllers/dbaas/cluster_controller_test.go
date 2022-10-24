@@ -56,17 +56,23 @@ var _ = Describe("Cluster Controller", func() {
 
 	BeforeEach(func() {
 		// Add any steup steps that needs to be executed before each test
-		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(defaultNamespace))
+		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{},
+			client.InNamespace(testCtx.DefaultNamespace),
+			client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{})
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{})
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &corev1.PersistentVolumeClaim{},
-			client.InNamespace(defaultNamespace),
+			client.InNamespace(testCtx.DefaultNamespace),
 			client.MatchingLabels{
 				"app.kubernetes.io/name": "state.mysql-8-cluster-definition",
 			})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &corev1.ConfigMap{},
+			client.InNamespace(testCtx.DefaultNamespace),
+			client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -77,31 +83,14 @@ var _ = Describe("Cluster Controller", func() {
 		}, timeout, interval).Should(Succeed())
 	})
 
-	checkedCreateObj := func(obj client.Object) error {
-		if err := k8sClient.Create(ctx, obj); err != nil && !apierrors.IsAlreadyExists(err) {
-			return err
-		}
-		return nil
-	}
-
-	assureDefaultStorageClassObj := func() *storagev1.StorageClass {
+	assureDefaultStorageClassObj := func(sc *storagev1.StorageClass) error {
 		By("By assure an default storageClass")
-		scYAML := `
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: csi-hostpath-sc
-  annotations:
-    storageclass.kubernetes.io/is-default-class: "true"
-provisioner: hostpath.csi.k8s.io
-reclaimPolicy: Delete
-volumeBindingMode: Immediate
-allowVolumeExpansion: true
-`
-		sc := &storagev1.StorageClass{}
-		Expect(yaml.Unmarshal([]byte(scYAML), sc)).Should(Succeed())
-		Expect(checkedCreateObj(sc)).Should(Succeed())
-		return sc
+		patch := client.MergeFrom(sc)
+		if sc.Annotations == nil {
+			sc.Annotations = map[string]string{}
+		}
+		sc.Annotations["storageclass.kubernetes.io/is-default-class"] = "true"
+		return k8sClient.Patch(context.Background(), sc, patch)
 	}
 
 	assureCfgTplConfigMapObj := func(cmName string) *corev1.ConfigMap {
@@ -148,7 +137,7 @@ data:
 `
 		cfgCM := &corev1.ConfigMap{}
 		Expect(yaml.Unmarshal([]byte(appVerYAML), cfgCM)).Should(Succeed())
-		Expect(checkedCreateObj(cfgCM)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
 		return cfgCM
 	}
 
@@ -246,7 +235,7 @@ spec:
 `
 		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
-		Expect(checkedCreateObj(clusterDefinition)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, clusterDefinition)).Should(Succeed())
 		return clusterDefinition
 	}
 
@@ -276,7 +265,7 @@ spec:
 `
 		appVersion := &dbaasv1alpha1.AppVersion{}
 		Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(Succeed())
-		Expect(checkedCreateObj(appVersion)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, appVersion)).Should(Succeed())
 		return appVersion
 	}
 
@@ -355,7 +344,7 @@ spec:
 		It("Should success with no error", func() {
 			By("By creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
-			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
 			By("Deleting the scope")
 			Eventually(func() error {
@@ -371,7 +360,7 @@ spec:
 
 			toCreate.Spec.TerminationPolicy = dbaasv1alpha1.DoNotTerminate
 
-			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
 			fetchedG1 := &dbaasv1alpha1.Cluster{}
 
@@ -406,7 +395,7 @@ spec:
 		It("Should create/delete pod to the replicas number", func() {
 			By("By creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
-			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
 			fetchedG1 := &dbaasv1alpha1.Cluster{}
 
@@ -466,7 +455,7 @@ spec:
 		It("Should create deployment if component is stateless", func() {
 			By("By creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
-			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
 			fetchedG1 := &dbaasv1alpha1.Cluster{}
 
@@ -494,7 +483,7 @@ spec:
 		It("Should create pdb if updateStrategy exists", func() {
 			By("By creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
-			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
 			fetchedG1 := &dbaasv1alpha1.Cluster{}
 
@@ -542,7 +531,7 @@ spec:
 					},
 				},
 			})
-			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
 			fetchedG1 := &dbaasv1alpha1.Cluster{}
 
@@ -575,22 +564,23 @@ spec:
 		It("Should update PVC request storage size accordingly", func() {
 			By("Check available storageclasses")
 			scList := &storagev1.StorageClassList{}
-			defaultStorageClass := &storagev1.StorageClass{}
 			hasDefaultSC := false
 			_ = k8sClient.List(ctx, scList)
+			if len(scList.Items) == 0 {
+				return
+			}
 			for _, sc := range scList.Items {
 				annot := sc.Annotations
 				if annot == nil {
 					continue
 				}
 				if v, ok := annot["storageclass.kubernetes.io/is-default-class"]; ok && v == "true" {
-					defaultStorageClass = &sc
 					hasDefaultSC = true
 					break
 				}
 			}
 			if !hasDefaultSC {
-				defaultStorageClass = assureDefaultStorageClassObj()
+				assureDefaultStorageClassObj(&scList.Items[0])
 			}
 
 			By("By creating a cluster with volume claim")
@@ -629,7 +619,7 @@ spec:
 					},
 				},
 			}
-			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
 			fetchedG1 := &dbaasv1alpha1.Cluster{}
 
@@ -718,7 +708,7 @@ spec:
 			By("By creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
 
-			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
 			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
@@ -754,7 +744,7 @@ spec:
 					"testNodeKey": "testLabelValue",
 				},
 			}
-			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
 			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
@@ -789,7 +779,7 @@ spec:
 				PodAntiAffinity: dbaasv1alpha1.Preferred,
 				TopologyKeys:    []string{"testTopologyKey"},
 			}
-			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
 			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
@@ -823,7 +813,7 @@ spec:
 				PodAntiAffinity: dbaasv1alpha1.Preferred,
 				TopologyKeys:    []string{"testTopologyKey"},
 			}
-			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
 			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
@@ -866,7 +856,7 @@ spec:
 					TopologyKeys:    []string{"testTopologyKey"},
 				},
 			})
-			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
 			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
@@ -913,7 +903,7 @@ spec:
 					},
 				},
 			})
-			Expect(k8sClient.Create(ctx, toCreate)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
 				_ = k8sClient.Get(ctx, key, fetchedClusterG1)

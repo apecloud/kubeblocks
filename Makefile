@@ -195,7 +195,7 @@ mod-vendor: ## Run go mod tidy->vendor->verify against go modules.
 TEST_MODULE=
 
 .PHONY: test-current-ctx
-test-current-ctx: #manifests generate fmt vet ## Run operator controller tests with current $KUBECONFIG context.
+test-current-ctx: manifests generate fmt vet ## Run operator controller tests with current $KUBECONFIG context.
 	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_MODULE)... -coverprofile cover.out
 
 .PHONY: test

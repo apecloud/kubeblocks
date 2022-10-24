@@ -185,9 +185,25 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 	switch role {
 	case leaderName:
 		consensusSetStatus.Leader = pod.Name
+		if consensusSetStatus.Learner == pod.Name {
+			consensusSetStatus.Learner = ""
+		}
+		for index, pName := range consensusSetStatus.Followers {
+			if pName == pod.Name {
+				consensusSetStatus.Followers = append(consensusSetStatus.Followers[:index], consensusSetStatus.Followers[index+1:]...)
+			}
+		}
 		needUpdate = true
 	case learnerName:
 		consensusSetStatus.Learner = pod.Name
+		if consensusSetStatus.Leader == pod.Name {
+			consensusSetStatus.Leader = ""
+		}
+		for index, pName := range consensusSetStatus.Followers {
+			if pName == pod.Name {
+				consensusSetStatus.Followers = append(consensusSetStatus.Followers[:index], consensusSetStatus.Followers[index+1:]...)
+			}
+		}
 		needUpdate = true
 	default:
 		for _, name := range followerNames {
@@ -200,6 +216,12 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 				}
 				if !exist {
 					consensusSetStatus.Followers = append(consensusSetStatus.Followers, pod.Name)
+					if consensusSetStatus.Leader == pod.Name {
+						consensusSetStatus.Leader = ""
+					}
+					if consensusSetStatus.Learner == pod.Name {
+						consensusSetStatus.Learner = ""
+					}
 					needUpdate = true
 				}
 			}

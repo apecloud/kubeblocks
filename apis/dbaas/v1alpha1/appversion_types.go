@@ -30,14 +30,15 @@ type AppVersionSpec struct {
 	// +kubebuilder:validation:Required
 	ClusterDefinitionRef string `json:"clusterDefinitionRef,omitempty"`
 
+	// List of components in current AppVersion. Component will replace the field in ClusterDefinition's component if type is matching typeName
 	// +kubebuilder:validation:MinItems=1
 	Components []AppVersionComponent `json:"components,omitempty"`
 }
 
 // AppVersionStatus defines the observed state of AppVersion
 type AppVersionStatus struct {
-	// phase - in list of [Available,UnAvailable,Deleting]
-	// +kubebuilder:validation:Enum={Available,UnAvailable,Deleting}
+	// phase - in list of [Available,Unavailable]
+	// +kubebuilder:validation:Enum={Available,Unavailable}
 	Phase Phase `json:"phase,omitempty"`
 
 	// A human readable message indicating details about why the appVersion is in this

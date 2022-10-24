@@ -31,8 +31,8 @@ import (
 )
 
 const (
-	defaultClusterDef      = "wesql-clusterdefinition"
-	defaultAppVersion      = "wesql-appversion-8.0.29"
+	defaultClusterDef      = "apecloud-wesql"
+	defaultAppVersion      = "wesql-8.0.18"
 	clusterCueTemplateName = "cluster_template.cue"
 	monitorKey             = "monitor"
 )
@@ -59,9 +59,7 @@ func setMonitor(monitor bool, components []map[string]interface{}) {
 		return
 	}
 	for _, component := range components {
-		if _, ok := component[monitorKey]; ok {
-			component[monitorKey] = monitor
-		}
+		component[monitorKey] = monitor
 	}
 }
 

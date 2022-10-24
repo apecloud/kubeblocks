@@ -467,7 +467,7 @@ spec:
 						VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{
 							{
 								Name: "data",
-								Spec: corev1.PersistentVolumeClaimSpec{
+								Spec: &corev1.PersistentVolumeClaimSpec{
 									AccessModes: []corev1.PersistentVolumeAccessMode{
 										corev1.ReadWriteOnce,
 									},
@@ -483,6 +483,24 @@ spec:
 				},
 			},
 		}, clusterDefObj, appVersionObj, key
+	}
+
+	isCMAvailable := func() bool {
+		csList := &corev1.ComponentStatusList{}
+		_ = k8sClient.List(context.Background(), csList)
+		isCMAvailable := false
+		for _, cs := range csList.Items {
+			if cs.Name != "controller-manager" {
+				continue
+			}
+			for _, cond := range cs.Conditions {
+				if cond.Type == "Healthy" && cond.Status == "True" {
+					isCMAvailable = true
+					break
+				}
+			}
+		}
+		return isCMAvailable
 	}
 
 	BeforeEach(func() {
@@ -699,10 +717,24 @@ spec:
 
 	Context("When updating cluster", func() {
 		It("Should update PVC request storage size accordingly", func() {
-			// this test required controller-manager component
-			By("Check available controller-manager status")
-			if !hasStorage(assureDefaultStorageClassObj) {
-				return
+			By("Check available storageclasses")
+			scList := &storagev1.StorageClassList{}
+			defaultStorageClass := &storagev1.StorageClass{}
+			hasDefaultSC := false
+			_ = k8sClient.List(context.Background(), scList)
+			for _, sc := range scList.Items {
+				annot := sc.Annotations
+				if annot == nil {
+					continue
+				}
+				if v, ok := annot["storageclass.kubernetes.io/is-default-class"]; ok && v == "true" {
+					defaultStorageClass = &sc
+					hasDefaultSC = true
+					break
+				}
+			}
+			if !hasDefaultSC {
+				defaultStorageClass = assureDefaultStorageClassObj()
 			}
 
 			By("By creating a cluster with volume claim")
@@ -714,7 +746,7 @@ spec:
 				VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{
 					{
 						Name: "data",
-						Spec: corev1.PersistentVolumeClaimSpec{
+						Spec: &corev1.PersistentVolumeClaimSpec{
 							AccessModes: []corev1.PersistentVolumeAccessMode{
 								corev1.ReadWriteOnce,
 							},
@@ -727,10 +759,11 @@ spec:
 					},
 					{
 						Name: "log",
-						Spec: corev1.PersistentVolumeClaimSpec{
+						Spec: &corev1.PersistentVolumeClaimSpec{
 							AccessModes: []corev1.PersistentVolumeAccessMode{
 								corev1.ReadWriteOnce,
 							},
+							StorageClassName: &defaultStorageClass.Name,
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
 									corev1.ResourceStorage: resource.MustParse("1Gi"),
@@ -749,6 +782,13 @@ spec:
 				return fetchedG1.Status.ObservedGeneration == 1
 			}, timeout, interval).Should(BeTrue())
 
+			// this test required controller-manager component
+			By("Check available controller-manager status")
+			if !isCMAvailable() {
+				By("The controller-manager is not available, test skipped")
+				return
+			}
+			// TODO test the following contents in a real K8S cluster. testEnv is no controller-manager and scheduler components
 			Eventually(func() bool {
 				stsList := &appsv1.StatefulSetList{}
 				Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
@@ -822,8 +862,7 @@ spec:
 		It("Should success with: "+
 			"1 pod with 'leader' role label set, "+
 			"2 pods with 'follower' role label set,"+
-			"1 service routes to 'leader' pod and "+
-			"1 service routes ro 'follower' pods", func() {
+			"1 service routes to 'leader' pod", func() {
 			By("By creating a cluster with componentType = Consensus")
 			toCreate, _, _, key := newClusterWithConsensusObj(nil, nil)
 			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
@@ -866,83 +905,10 @@ spec:
 			}, timeout*3, interval*5).Should(BeTrue())
 
 			By("By checking pods' role label")
-			observeRole := func(ip string, port int32) (string, error) {
-				url := "root@tcp(" + ip + ":" + strconv.Itoa(int(port)) + ")/information_schema?allowNativePasswords=true"
-				sql := "select role from information_schema.wesql_cluster_local"
-				mysql := &Mysql{}
-				params := map[string]string{connectionURLKey: url}
-				err := mysql.Init(params)
-				if err != nil {
-					return "", err
-				}
-
-				result, err := mysql.query(context.Background(), sql)
-				if err != nil {
-					return "", err
-				}
-				if len(result) != 1 {
-					return "", errors.New("only one role should be observed")
-				}
-				row, ok := result[0].(map[string]interface{})
-				if !ok {
-					return "", errors.New("query result wrong type")
-				}
-				role, ok := row["role"].(string)
-				if !ok {
-					return "", errors.New("role parsing error")
-				}
-				if len(role) == 0 {
-					return "", errors.New("got empty role")
-				}
-
-				err = mysql.Close()
-				role = strings.ToLower(role)
-				if err != nil {
-					return role, err
-				}
-
-				return role, nil
-			}
-
-			startPortForward := func(kind, name string, port int32) error {
-				portStr := strconv.Itoa(int(port))
-				cmd := exec.Command("bash", "-c", "kubectl port-forward "+kind+"/"+name+" --address 0.0.0.0 "+portStr+":"+portStr+" &")
-				return cmd.Start()
-			}
-
-			stopPortForward := func(name string) error {
-				cmd := exec.Command("bash", "-c", "ps aux | grep port-forward | grep -v grep | grep "+name+" | awk '{print $2}' | xargs kill -9")
-				return cmd.Run()
-			}
-
 			ip := getLocalIP()
 			Expect(ip).ShouldNot(BeEmpty())
-			observeRoleOfPod := func(pod *corev1.Pod) string {
-				kind := "pod"
-				name := pod.Name
-				port := pod.Spec.Containers[0].Ports[0].ContainerPort
-				role := ""
-				Eventually(func() bool {
-					err := startPortForward(kind, name, port)
-					if err != nil {
-						_ = stopPortForward(name)
-						return false
-					}
-					time.Sleep(interval)
-					role, err = observeRole(ip, port)
-					if err != nil {
-						_ = stopPortForward(name)
-						return false
-					}
-					_ = stopPortForward(name)
 
-					return true
-				}, timeout*2, interval*1).Should(BeTrue())
-
-				return role
-			}
-
-			observeRoleOfService := func(svc *corev1.Service) string {
+			observeRoleOfServiceLoop := func(svc *corev1.Service) string {
 				kind := "svc"
 				name := svc.Name
 				port := svc.Spec.Ports[0].Port
@@ -967,16 +933,6 @@ spec:
 				return role
 			}
 
-			// TODO wait probe done @xuanchi
-			// before that, we fake it. remove this
-			updateRole := func(pod *corev1.Pod, role string) {
-				patch := client.MergeFrom(pod.DeepCopy())
-				pod.Labels[consensusSetRoleLabelKey] = role
-
-				Expect(k8sClient.Patch(context.Background(), pod, patch)).Should(Succeed())
-			}
-			// end remove
-
 			stsList := &appsv1.StatefulSetList{}
 			Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
 				"app.kubernetes.io/instance": key.Name,
@@ -991,14 +947,6 @@ spec:
 					pods = append(pods, pod)
 				}
 			}
-
-			// TODO set pod label, remove this after probe is done
-			time.Sleep(interval * 2)
-			for _, pod := range pods {
-				role := observeRoleOfPod(&pod)
-				updateRole(&pod, role)
-			}
-			// end remove
 
 			// should have 3 pods
 			Expect(len(pods)).Should(Equal(3))
@@ -1017,31 +965,22 @@ spec:
 			Expect(followerCount).Should(Equal(2))
 
 			By("By checking services' status")
-			// we should have 2 services
+			// we should have 1 services
 			svcList := &corev1.ServiceList{}
 			Expect(k8sClient.List(context.Background(), svcList, client.MatchingLabels{
 				"app.kubernetes.io/instance": key.Name,
 			}, client.InNamespace(key.Namespace))).Should(Succeed())
-			Expect(len(svcList.Items)).Should(Equal(2))
-			svc, svcRo := svcList.Items[0], svcList.Items[1]
-			roName := key.Name + "-" + cluster.Spec.Components[0].Name + "-ro"
-			if svc.Name == roName {
-				svc, svcRo = svcRo, svc
-			}
+			Expect(len(svcList.Items)).Should(Equal(1))
+			svc := svcList.Items[0]
 			// getRole should be leader through service
-			Expect(observeRoleOfService(&svc)).Should(Equal(leader))
-			// getRole should be follower through readonlyService
-			Expect(observeRoleOfService(&svcRo)).Should(Equal(follower))
+			Expect(observeRoleOfServiceLoop(&svc)).Should(Equal(leader))
 
 			By("By deleting leader pod")
 			leaderPod := &corev1.Pod{}
-			followerPods := make([]*corev1.Pod, 0)
 			for _, pod := range pods {
-				switch pod.Labels[consensusSetRoleLabelKey] {
-				case leader:
+				if pod.Labels[consensusSetRoleLabelKey] == leader {
 					leaderPod = &pod
-				case follower:
-					followerPods = append(followerPods, &pod)
+					break
 				}
 			}
 			Expect(k8sClient.Delete(context.Background(), leaderPod)).Should(Succeed())
@@ -1053,16 +992,11 @@ spec:
 				}, sts)).Should(Succeed())
 				return sts.Status.AvailableReplicas == 3
 			}, timeout, interval).Should(BeTrue())
-			// TODO role should be updated automatically after probe done
-			// update it manually, remove this
-			for _, pod := range followerPods {
-				role := observeRoleOfPod(pod)
-				updateRole(pod, role)
-			}
-			// end remove
+
 			time.Sleep(interval * 2)
-			Expect(observeRoleOfService(&svc)).Should(Equal(leader))
-			By("Deleting the scope")
+			Expect(observeRoleOfServiceLoop(&svc)).Should(Equal(leader))
+
+			By("Deleting the cluster")
 			Eventually(func() error {
 				return deleteClusterNWait(key)
 			}, timeout, interval).Should(Succeed())
@@ -1248,49 +1182,39 @@ spec:
 			}, timeout, interval).Should(Succeed())
 		})
 	})
-})
 
-func hasStorage(assureDefaultStorageClassObj func() *storagev1.StorageClass) bool {
-	csList := &corev1.ComponentStatusList{}
-	_ = k8sClient.List(context.Background(), csList)
-	isCMAvailable := false
-	for _, cs := range csList.Items {
-		if cs.Name != "controller-manager" {
-			continue
-		}
-		for _, cond := range cs.Conditions {
-			if cond.Type == "Healthy" && cond.Status == "True" {
-				isCMAvailable = true
-				break
+	Context("testing cluster status", func() {
+		It("this test required controller-manager component", func() {
+			if !isCMAvailable() {
+				By("The controller-manager is not available, test skipped")
+				return
 			}
-		}
-	}
-	if !isCMAvailable {
-		// skip test if no available storage classes
-		By("The controller-manager is not available, test skipped")
-		return false
-	}
+			// TODO test the following contents in a real K8S cluster. testEnv is no controller-manager and scheduler components
+			toCreate, _, _, key := newClusterObj(nil, nil)
+			toCreate.Spec.Components = []dbaasv1alpha1.ClusterComponent{}
+			toCreate.Spec.Components = append(toCreate.Spec.Components, dbaasv1alpha1.ClusterComponent{
+				Name: "replicasets",
+				Type: "replicasets",
+			})
+			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedClusterG1)
+				return fetchedClusterG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+			Eventually(func() bool {
+				_ = k8sClient.Get(context.Background(), key, fetchedClusterG1)
+				return fetchedClusterG1.Status.Components["replicasets"].Phase == dbaasv1alpha1.RunningPhase &&
+					fetchedClusterG1.Status.Phase == dbaasv1alpha1.RunningPhase
+			}, timeout, interval).Should(BeTrue())
 
-	By("Check available storageclasses")
-	scList := &storagev1.StorageClassList{}
-	hasDefaultSC := false
-	_ = k8sClient.List(context.Background(), scList)
-	for _, sc := range scList.Items {
-		annot := sc.Annotations
-		if annot == nil {
-			continue
-		}
-		if v, ok := annot["storageclass.kubernetes.io/is-default-class"]; ok && v == "true" {
-			hasDefaultSC = true
-			break
-		}
-	}
-	if !hasDefaultSC {
-		assureDefaultStorageClassObj()
-	}
-
-	return true
-}
+			By("Deleting the scope")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+})
 
 func createFakePod(parentName string, number int) []corev1.Pod {
 	podYaml := `
@@ -1372,22 +1296,6 @@ spec:
 	pods[1].Labels[consensusSetRoleLabelKey] = "leader"
 
 	return pods
-}
-
-func getLocalIP() string {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return ""
-	}
-	for _, address := range addrs {
-		// check the address type and if it is not a loopback the display it
-		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
-				return ipnet.IP.String()
-			}
-		}
-	}
-	return ""
 }
 
 const (
@@ -1574,4 +1482,69 @@ func (m *Mysql) convert(columnTypes []*sql.ColumnType, values []interface{}) map
 	}
 
 	return r
+}
+
+func getLocalIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+	for _, address := range addrs {
+		// check the address type and if it is not a loopback the display it
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+	return ""
+}
+
+func observeRole(ip string, port int32) (string, error) {
+	url := "root@tcp(" + ip + ":" + strconv.Itoa(int(port)) + ")/information_schema?allowNativePasswords=true"
+	sql := "select role from information_schema.wesql_cluster_local"
+	mysql := &Mysql{}
+	params := map[string]string{connectionURLKey: url}
+	err := mysql.Init(params)
+	if err != nil {
+		return "", err
+	}
+
+	result, err := mysql.query(context.Background(), sql)
+	if err != nil {
+		return "", err
+	}
+	if len(result) != 1 {
+		return "", errors.New("only one role should be observed")
+	}
+	row, ok := result[0].(map[string]interface{})
+	if !ok {
+		return "", errors.New("query result wrong type")
+	}
+	role, ok := row["role"].(string)
+	if !ok {
+		return "", errors.New("role parsing error")
+	}
+	if len(role) == 0 {
+		return "", errors.New("got empty role")
+	}
+
+	err = mysql.Close()
+	role = strings.ToLower(role)
+	if err != nil {
+		return role, err
+	}
+
+	return role, nil
+}
+
+func startPortForward(kind, name string, port int32) error {
+	portStr := strconv.Itoa(int(port))
+	cmd := exec.Command("bash", "-c", "kubectl port-forward "+kind+"/"+name+" --address 0.0.0.0 "+portStr+":"+portStr+" &")
+	return cmd.Start()
+}
+
+func stopPortForward(name string) error {
+	cmd := exec.Command("bash", "-c", "ps aux | grep port-forward | grep -v grep | grep "+name+" | awk '{print $2}' | xargs kill -9")
+	return cmd.Run()
 }

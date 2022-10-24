@@ -27,7 +27,7 @@ export GOPRIVATE ?= github.com/apecloud
 GITHUB_PROXY ?= https://github.91chi.fun/
 
 GIT_COMMIT  = $(shell git rev-list -1 HEAD)
-GIT_VERSION = $(shell git describe --always --abbrev=7 --dirty)
+GIT_VERSION = $(shell git describe --always --abbrev=0 --tag)
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
@@ -40,7 +40,7 @@ ENVTEST_K8S_VERSION = 1.24.1
 
 ENABLE_WEBHOOKS ?= false
 
-APP_NAME = kubeblock
+APP_NAME = kubeblocks
 
 
 VERSION ?= 0.1.0-alpha.6
@@ -138,12 +138,13 @@ all: manager dbctl agamotto ## Make all cmd binaries.
 
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./controllers/dbaas;./controllers/dataprotection;./controllers/k8score;./cmd/manager;./apis/...;./internal/..." output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/* $(CHART_PATH)/crds
+	$(CONTROLLER_GEN) rbac:roleName=loadbalancer-role  paths="./controllers/loadbalancer;./cmd/loadbalancer/controller" output:dir=config/loadbalancer
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/..."
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -151,7 +152,7 @@ fmt: ## Run go fmt against code.
 
 .PHONY: vet
 vet: ## Run go vet against code.
-	$(GO) vet ./...
+	GOOS=linux $(GO) vet ./...
 
 .PHONY: cue-fmt
 cue-fmt: cuetool ## Run cue fmt against code.
@@ -178,7 +179,7 @@ loggercheck: loggerchecktool ## Run loggercheck against code.
 	$(LOGGERCHECK) ./...
 
 .PHONY: build-checks
-build-checks: generate fmt vet goimports fast-lint ## Run build checks.
+build-checks: fmt vet goimports fast-lint ## Run build checks.
 
 .PHONY: mod-download
 mod-download: ## Run go mod download against go modules.
@@ -218,12 +219,6 @@ goimports: goimportstool ## Run goimports against code.
 
 
 ##@ CLI
-ifdef REL_VERSION
-CLI_VERSION := $(REL_VERSION)
-else
-CLI_VERSION := edge
-CLI_TAG := latest
-endif
 K3S_VERSION ?= v1.23.8+k3s1
 K3D_VERSION ?= 5.4.4
 K3S_IMG_TAG ?= $(subst +,-,$(K3S_VERSION))
@@ -232,9 +227,10 @@ CLI_LD_FLAGS ="-s -w \
 	-X github.com/apecloud/kubeblocks/version.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` \
 	-X github.com/apecloud/kubeblocks/version.GitCommit=$(GIT_COMMIT) \
 	-X github.com/apecloud/kubeblocks/version.GitVersion=$(GIT_VERSION) \
-	-X github.com/apecloud/kubeblocks/version.Version=$(CLI_VERSION) \
+	-X github.com/apecloud/kubeblocks/version.Version=$(GIT_VERSION) \
 	-X github.com/apecloud/kubeblocks/version.K3sImageTag=$(K3S_IMG_TAG) \
-	-X github.com/apecloud/kubeblocks/version.K3dVersion=$(K3D_VERSION)"
+	-X github.com/apecloud/kubeblocks/version.K3dVersion=$(K3D_VERSION) \
+	-X github.com/apecloud/kubeblocks/version.DefaultKubeBlocksVersion=$(VERSION)"
 
 
 
@@ -253,13 +249,19 @@ clean-dbctl: ## Clean bin/dbctl* CLI tools.
 	rm -f bin/dbctl*
 
 
+##@ Load Balancer
+
+.PHONY: loadbalancer
+loadbalancer: build-checks ## Build loadbalancer binary.
+	$(GO) generate -x ./...
+	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer-controller ./cmd/loadbalancer/controller
+	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer-agent ./cmd/loadbalancer/agent
 
 ##@ Operator Controller Manager
 
 .PHONY: manager
-manager: cue-fmt build-checks ## Build manager binary.
+manager: cue-fmt generate build-checks ## Build manager binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
-
 
 CERT_ROOT_CA ?= $(WEBHOOK_CERT_DIR)/rootCA.key
 .PHONY: webhook-cert
@@ -308,6 +310,29 @@ agamotto: build-checks ## Build agamotto related binaries
 clean-agamotto: ## Clean bin/mysqld_exporter.
 	rm -f bin/agamotto
 
+##@ DAP
+
+DAPRD_BUILD_PATH = ./cmd/daprd
+DAPRD_LD_FLAGS = "-s -w"
+
+bin/daprd.%: ## Cross build bin/daprd.$(OS).$(ARCH) .
+	cd $(DAPRD_BUILD_PATH) && GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${DAPRD_LD_FLAGS} -o ../../$@  ./main.go
+
+daprd-mod-vendor:
+	cd $(DAPRD_BUILD_PATH) && $(GO) mod tidy -compat=1.19
+	cd $(DAPRD_BUILD_PATH) && $(GO) mod vendor
+	cd $(DAPRD_BUILD_PATH) && $(GO) mod verify
+
+.PHONY: daprd
+daprd: OS=$(shell $(GO) env GOOS)
+daprd: ARCH=$(shell $(GO) env GOARCH)
+daprd: daprd-mod-vendor # build-checks ## Build daprd related binaries
+	$(MAKE) bin/daprd.${OS}.${ARCH}
+	mv bin/daprd.${OS}.${ARCH} bin/daprd
+
+.PHONY: clean
+clean-daprd: ## Clean bin/mysqld_exporter.
+	rm -f bin/daprd
 
 ##@ Deployment
 
@@ -355,7 +380,7 @@ ci-test: ci-test-pre test ## Run CI tests.
 ##@ Contributor
 
 .PHONY: reviewable
-reviewable: build-checks test check-license-header ## Run code checks to proceed with PR reviews.
+reviewable: generate build-checks test check-license-header ## Run code checks to proceed with PR reviews.
 	$(GO) mod tidy -compat=1.18
 
 .PHONY: check-diff
@@ -376,12 +401,18 @@ fix-license-header: ## Run license header fix.
 
 .PHONY: bump-chart-ver
 bump-chart-ver: ## Bump helm chart version.
+ifeq ($(GOOS), darwin)
 	sed -i '' "s/^version:.*/version: $(VERSION)/" $(CHART_PATH)/Chart.yaml
 	sed -i '' "s/^appVersion:.*/appVersion: $(VERSION)/" $(CHART_PATH)/Chart.yaml
+else
+	sed -i "s/^version:.*/version: $(VERSION)/" $(CHART_PATH)/Chart.yaml
+	sed -i "s/^appVersion:.*/appVersion: $(VERSION)/" $(CHART_PATH)/Chart.yaml
+endif
+
 
 .PHONY: helm-package
 helm-package: bump-chart-ver ## Do helm package.
-	$(HELM) package $(CHART_PATH)
+	$(HELM) package $(CHART_PATH) --dependency-update
 
 .PHONY: helm-push
 helm-push: helm-package ## Do helm package and push.
@@ -395,12 +426,12 @@ WESQL_CLUSTER_CHART_VERSION ?= 0.1.1
 
 .PHONY: bump-chart-ver-wqsql-cluster
 bump-chart-ver-wqsql-cluster: ## Bump WeSQL Clsuter helm chart version.
-	sed -i '' "s/^version:.*/version: $(WESQL_CLUSTER_CHART_VERSION)/" $(WECLUSTER_CHART_PATH)/Chart.yaml
-	# sed -i '' "s/^appVersion:.*/appVersion: $(WESQL_CLUSTER_CHART_VERSION)/" $(WECLUSTER_CHART_PATH)/Chart.yaml
+	sed -i '' "s/^version:.*/version: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
+	# sed -i '' "s/^appVersion:.*/appVersion: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
 
 .PHONY: helm-package-wqsql-cluster
 helm-package-wqsql-cluster: bump-chart-ver-wqsql-cluster ## Do WeSQL Clsuter helm package.
-	$(HELM) package $(WECLUSTER_CHART_PATH)
+	$(HELM) package $(WESQL_CLUSTER_CHART_PATH)
 
 .PHONY: helm-push-wqsql-cluster
 helm-push-wqsql-cluster: helm-package-wqsql-cluster ## Do WeSQL Clsuter helm package and push.
@@ -453,7 +484,7 @@ install-docker-buildx: ## Create `docker buildx` builder.
 	docker buildx create --platform linux/amd64,linux/arm64 --name x-builder --driver docker-container --use
 
 .PHONY: golangci
-golangci: GOLANGCILINT_VERSION = 1.49.0
+golangci: GOLANGCILINT_VERSION = v1.49.0
 golangci: ## Download golangci-lint locally if necessary.
 ifneq ($(shell which golangci-lint),)
 	echo golangci-lint is already installed

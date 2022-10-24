@@ -95,7 +95,7 @@ type probeMessageData struct {
 	Role string `json:"role,omitempty"`
 }
 
-func (r *ClusterReconciler) Handle(cli client.Client, ctx context.Context, event *corev1.Event) error {
+func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, event *corev1.Event) error {
 	if event.InvolvedObject.FieldPath != k8score.ProbeRoleChangedCheckPath {
 		return nil
 	}
@@ -104,8 +104,11 @@ func (r *ClusterReconciler) Handle(cli client.Client, ctx context.Context, event
 	message := &probeMessage{}
 	err := json.Unmarshal([]byte(event.Message), message)
 	if err != nil {
-		return err
+		// not role related message, ignore it
+		reqCtx.Log.Info("not role message", "message", event.Message, "error", err)
+		return nil
 	}
+
 	role := strings.ToLower(message.Data.Role)
 
 	// get pod
@@ -114,14 +117,14 @@ func (r *ClusterReconciler) Handle(cli client.Client, ctx context.Context, event
 		Namespace: event.InvolvedObject.Namespace,
 		Name:      event.InvolvedObject.Name,
 	}
-	if err := cli.Get(ctx, podName, pod); err != nil {
+	if err := cli.Get(reqCtx.Ctx, podName, pod); err != nil {
 		return err
 	}
 
 	// update label
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Labels[consensusSetRoleLabelKey] = role
-	err = cli.Patch(ctx, pod, patch)
+	err = cli.Patch(reqCtx.Ctx, pod, patch)
 	if err != nil {
 		return err
 	}
@@ -137,6 +140,7 @@ func (r *ClusterReconciler) Handle(cli client.Client, ctx context.Context, event
 //+kubebuilder:rbac:groups=apps,resources=deployments/finalizers;statefulsets/finalizers,verbs=update
 //+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets/finalizers,verbs=update
+//+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 // NOTES: owned K8s core API resources controller-gen RBAC marker is maintained at {REPO}/controllers/k8score/rbac.go
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -155,6 +159,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		Log: log.FromContext(ctx).WithValues("cluster", req.NamespacedName),
 	}
 
+	reqCtx.Log.Info("get cluster", "cluster", req.NamespacedName)
 	cluster := &dbaasv1alpha1.Cluster{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -180,6 +185,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.Reconciled()
 	}
 
+	reqCtx.Log.Info("get clusterdef and appversion")
 	clusterdefinition := &dbaasv1alpha1.ClusterDefinition{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: cluster.Namespace,
@@ -203,6 +209,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return *res, err
 	}
 
+	reqCtx.Log.Info("update cluster status")
 	if err = r.updateClusterPhaseToCreatingOrUpdating(reqCtx, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -215,7 +222,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	if err = task.Exec(reqCtx.Ctx, r.Client); err != nil {
+	if err = task.Exec(reqCtx, r.Client); err != nil {
 		// record the event when the execution task reports an error.
 		r.Recorder.Event(cluster, corev1.EventTypeWarning, "RunTaskFailed", err.Error())
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -387,11 +394,12 @@ func (r *ClusterReconciler) checkReferencedCRStatus(reqCtx intctrlutil.RequestCt
 		return nil, nil
 	}
 	patch := client.MergeFrom(cluster.DeepCopy())
-	cluster.Status.Message = fmt.Sprintf("%s.status.phase is not Available, this problem needs to be solved first", crKind)
+	cluster.Status.Message = fmt.Sprintf("%s.status.phase is unavailable, this problem needs to be solved first", crKind)
 	if err := r.Client.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
 		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		return &res, err
 	}
+	r.Recorder.Event(cluster, corev1.EventTypeWarning, "ReferencedCRUnavailable", cluster.Status.Message)
 	res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
 	return &res, err
 }
@@ -432,14 +440,17 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 	}
 	patch := client.MergeFrom(cluster.DeepCopy())
 	for _, v := range statefulSetList.Items {
+		var componentIsRunning bool
 		// check whether the statefulset has reached the final state
 		if v.Status.AvailableReplicas != *v.Spec.Replicas ||
 			v.Status.CurrentRevision != v.Status.UpdateRevision ||
 			v.Status.ObservedGeneration != v.GetGeneration() {
 			isOk = false
+		} else {
+			componentIsRunning = true
 		}
 		// when component phase is changed, set needSyncStatusComponent to true, then patch cluster.status
-		if ok := r.patchStatusComponentsWithStatefulSet(cluster, &v, cluster.Status.Phase); ok {
+		if ok := r.patchStatusComponentsWithStatefulSet(cluster, &v, componentIsRunning); ok {
 			needSyncStatusComponent = true
 		}
 		// if v is consensusSet
@@ -472,8 +483,8 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 	return isOk, nil
 }
 
-// patchStatusComponentsWithStatefulSet  Modify status.components information, include component phase
-func (r *ClusterReconciler) patchStatusComponentsWithStatefulSet(cluster *dbaasv1alpha1.Cluster, statefulSet *appsv1.StatefulSet, phase dbaasv1alpha1.Phase) bool {
+// patchStatusComponentsWithStatefulSet Modify status.components information, include component phase
+func (r *ClusterReconciler) patchStatusComponentsWithStatefulSet(cluster *dbaasv1alpha1.Cluster, statefulSet *appsv1.StatefulSet, componentIsRunning bool) bool {
 	var (
 		cName           string
 		ok              bool
@@ -487,10 +498,19 @@ func (r *ClusterReconciler) patchStatusComponentsWithStatefulSet(cluster *dbaasv
 		cluster.Status.Components = map[string]*dbaasv1alpha1.ClusterStatusComponent{}
 	}
 	if statusComponent, ok = cluster.Status.Components[cName]; !ok {
-		cluster.Status.Components[cName] = &dbaasv1alpha1.ClusterStatusComponent{Phase: phase}
+		cluster.Status.Components[cName] = &dbaasv1alpha1.ClusterStatusComponent{Phase: cluster.Status.Phase}
 		return true
-	} else if statusComponent.Phase != phase {
-		statusComponent.Phase = phase
+	}
+	// if componentIsRunning is false, means the cluster has an operation running.
+	// so we sync the cluster phase to component phase.
+	if statusComponent.Phase == dbaasv1alpha1.RunningPhase && !componentIsRunning {
+		statusComponent.Phase = cluster.Status.Phase
+		return true
+	}
+	// if componentIsRunning is true and component status is not Running.
+	// we should change component phase to Running
+	if statusComponent.Phase != dbaasv1alpha1.RunningPhase && componentIsRunning {
+		statusComponent.Phase = dbaasv1alpha1.RunningPhase
 		return true
 	}
 	return false
@@ -562,6 +582,9 @@ func (r *ClusterReconciler) getSupportVolumeExpansionComponents(ctx context.Cont
 	for _, v := range cluster.Spec.Components {
 		operationComponent := &dbaasv1alpha1.OperationComponent{}
 		for _, vct := range v.VolumeClaimTemplates {
+			if vct.Spec == nil {
+				continue
+			}
 			if ok, err := r.checkStorageClassIsSupportExpansion(ctx, storageClassMap, vct.Spec.StorageClassName,
 				&hasCheckDefaultStorageClass, &defaultStorageClassAllowExpansion); err != nil {
 				return nil, err

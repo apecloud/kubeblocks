@@ -17,33 +17,33 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 	"text/template"
 	"time"
 
 	"github.com/briandowns/spinner"
 	"github.com/fatih/color"
+	"github.com/go-logr/logr"
+	"github.com/google/uuid"
+	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 
-	"golang.org/x/crypto/ssh"
-
-	"github.com/pkg/errors"
-
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
-	"github.com/apecloud/kubeblocks/version"
 )
 
 var (
@@ -168,11 +168,31 @@ func PrintObjYAML(obj *unstructured.Unstructured) error {
 	return nil
 }
 
-func PrintVersion() {
-	fmt.Printf("dbctl version %s\n", version.GetVersion())
-	fmt.Printf("k3d version %s\n", version.K3dVersion)
-	fmt.Printf("k3s version %s (default)\n", strings.Replace(version.K3sImageTag, "-", "+", 1))
-	fmt.Printf("git commit %s (build date %s)\n", version.GitCommit, version.BuildDate)
+type RetryOptions struct {
+	MaxRetry int
+	Delay    time.Duration
+}
+
+func DoWithRetry(ctx context.Context, logger logr.Logger, operation func() error, options *RetryOptions) error {
+	err := operation()
+	for attempt := 0; err != nil && attempt < options.MaxRetry; attempt++ {
+		delay := time.Duration(int(math.Pow(2, float64(attempt)))) * time.Second
+		if options.Delay != 0 {
+			delay = options.Delay
+		}
+		logger.Info(fmt.Sprintf("Failed, retrying in %s ... (%d/%d). Error: %v", delay, attempt+1, options.MaxRetry, err))
+		select {
+		case <-time.After(delay):
+		case <-ctx.Done():
+			return err
+		}
+		err = operation()
+	}
+	return err
+}
+
+func GenRequestId() string {
+	return uuid.New().String()
 }
 
 func PrintGoTemplate(wr io.Writer, tpl string, values interface{}) error {

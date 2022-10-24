@@ -6,11 +6,11 @@ apiVersion: policy/v1beta1
 {{- end }}
 kind: PodDisruptionBudget
 metadata:
-  name: {{ template "opendbaas-core.fullname" . }}
-  labels: {{ include "opendbaas-core.labels" . | nindent 4 }}
+  name: {{ template "kubeblocks.fullname" . }}
+  labels: {{ include "kubeblocks.labels" . | nindent 4 }}
 spec:
 {{- include "podDisruptionBudget.spec" . | indent 2 }}
   selector:
     matchLabels:
-      {{- include "opendbaas-core.selectorLabels" . | nindent 6 }}
+      {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
 {{- end }}

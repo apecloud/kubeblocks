@@ -32,22 +32,26 @@ type ClusterDefinitionSpec struct {
 	// +kubebuilder:validation:MaxLength=24
 	Type string `json:"type"`
 
+	// List of components belonging to the cluster
 	// +kubebuilder:validation:MinItems=1
 	// +optional
 	Components []ClusterDefinitionComponent `json:"components,omitempty"`
 
+	// Default termination policy if no termination policy defined in cluster
 	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
-	DefaultTerminatingPolicy string `json:"defaultTerminationPolicy,omitempty"`
+	DefaultTerminationPolicy string `json:"defaultTerminationPolicy,omitempty"`
 
+	// Credential used for connecting database
 	// +optional
 	ConnectionCredential ClusterDefinitionConnectionCredential `json:"connectionCredential,omitempty"`
 }
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
 type ClusterDefinitionStatus struct {
-	// phase - in list of [Available,Deleting]
-	// +kubebuilder:validation:Enum={Available,Deleting}
+	// phase - in list of [Available]
+	// +kubebuilder:validation:Enum={Available}
 	Phase Phase `json:"phase,omitempty"`
+	// Extra message in current phase
 	// +optional
 	Message string `json:"message,omitempty"`
 	// observedGeneration is the most recent generation observed for this
@@ -119,7 +123,9 @@ type MonitorConfig struct {
 	Exporter *ExporterConfig `json:"exporterConfig,omitempty"`
 }
 
+// ClusterDefinitionComponent is a group of pods, pods in one component usually share the same data
 type ClusterDefinitionComponent struct {
+	// Type name of the component, it can be any valid string
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
 	TypeName string `json:"typeName,omitempty"`
@@ -129,13 +135,16 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	CharacterType string `json:"characterType,omitempty"`
 
+	// Minimum available pod count when updating
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	MinAvailable int `json:"minAvailable,omitempty"`
 
+	// Maximum available pod count after scale
 	// +kubebuilder:validation:Minimum=0
 	MaxAvailable int `json:"maxAvailable,omitempty"`
 
+	// Default replicas in this component if user not specify
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	DefaultReplicas int `json:"defaultReplicas,omitempty"`
@@ -145,13 +154,13 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
 
-	// antiAffinity defines components should have anti-affinity constraint to same component type
-	// +kubebuilder:default=false
-	AntiAffinity bool `json:"antiAffinity,omitempty"`
-
 	// Monitor is monitoring config which provided by ISV
 	// +optional
 	Monitor *MonitorConfig `json:"monitor,omitempty"`
+
+	// antiAffinity defines components should have anti-affinity constraint to same component type
+	// +kubebuilder:default=false
+	AntiAffinity bool `json:"antiAffinity,omitempty"`
 
 	// podSpec of final workload
 	// +optional
@@ -163,6 +172,7 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Service corev1.ServiceSpec `json:"service,omitempty"`
 
+	// Scripts executed before and after workload operation
 	// script exec order：component.pre => component.exec => component.post
 	// builtin ENV variables:
 	// self: OPENDBAAS_SELF_{builtin_properties}
@@ -206,23 +216,35 @@ const (
 )
 
 type ClusterDefinitionScripts struct {
-	Default         ClusterDefinitionScript `json:"default,omitempty"`
-	Create          ClusterDefinitionScript `json:"create,omitempty"`
-	Upgrade         ClusterDefinitionScript `json:"upgrade,omitempty"`
-	VerticalScale   ClusterDefinitionScript `json:"verticalScale,omitempty"`
+	// Default scripts executed if the following scripts not defined
+	Default ClusterDefinitionScript `json:"default,omitempty"`
+	// Scripts executed before and after creation
+	Create ClusterDefinitionScript `json:"create,omitempty"`
+	// Scripts executed before and after upgrade
+	Upgrade ClusterDefinitionScript `json:"upgrade,omitempty"`
+	// Scripts executed before and after vertical scale
+	VerticalScale ClusterDefinitionScript `json:"verticalScale,omitempty"`
+	// Scripts executed before and after horizontal scale
 	HorizontalScale ClusterDefinitionScript `json:"horizontalScale,omitempty"`
-	Delete          ClusterDefinitionScript `json:"delete,omitempty"`
+	// Scripts executed before and after deletion
+	Delete ClusterDefinitionScript `json:"delete,omitempty"`
 }
 
 type ClusterDefinitionScript struct {
-	Pre  []ClusterDefinitionContainerCMD `json:"pre,omitempty"`
+	// Pre hook before operation
+	Pre []ClusterDefinitionContainerCMD `json:"pre,omitempty"`
+	// Post hook after operation
 	Post []ClusterDefinitionContainerCMD `json:"post,omitempty"`
 }
 
+// ClusterDefinitionContainerCMD defines content of a hook script
 type ClusterDefinitionContainerCMD struct {
-	Container string   `json:"container,omitempty"`
-	Command   []string `json:"command,omitempty"`
-	Args      []string `json:"args,omitempty"`
+	// Container used to execute command
+	Container string `json:"container,omitempty"`
+	// Command executed in container
+	Command []string `json:"command,omitempty"`
+	// Args executed in container
+	Args []string `json:"args,omitempty"`
 }
 
 type ClusterDefinitionUpdateStrategy struct {
@@ -253,19 +275,27 @@ type ClusterDefinitionStatusGeneration struct {
 }
 
 type ClusterDefinitionProbeCMDs struct {
+	// sqls executed on db node, used to check db healthy
 	Writes  []string `json:"writes,omitempty"`
 	Queries []string `json:"queries,omitempty"`
 }
 
 type ClusterDefinitionProbe struct {
+	// enable probe or not
 	// +kubebuilder:default=true
 	Enable bool `json:"enable,omitempty"`
+	// How often (in seconds) to perform the probe.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
-	PeriodSeconds int `json:"periodSeconds,omitempty"`
+	PeriodSeconds int32 `json:"periodSeconds,omitempty"`
+	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
-	FailureThreshold int                        `json:"failureThreshold,omitempty"`
+	FailureThreshold int32 `json:"failureThreshold,omitempty"`
+	// Minimum consecutive successes for the probe to be considered successful after having failed.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	SuccessThreshold int32                      `json:"successThreshold,omitempty"`
 	Commands         ClusterDefinitionProbeCMDs `json:"commands,omitempty"`
 }
 

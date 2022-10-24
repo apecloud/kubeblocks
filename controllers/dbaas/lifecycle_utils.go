@@ -171,7 +171,9 @@ func getContainerByName(containers []corev1.Container, name string) (int, *corev
 func toK8sVolumeClaimTemplate(template dbaasv1alpha1.ClusterComponentVolumeClaimTemplate) corev1.PersistentVolumeClaimTemplate {
 	t := corev1.PersistentVolumeClaimTemplate{}
 	t.ObjectMeta.Name = template.Name
-	t.Spec = template.Spec
+	if template.Spec != nil {
+		t.Spec = *template.Spec
+	}
 	return t
 }
 
@@ -353,6 +355,7 @@ func mergeComponents(
 		PodSpec:         clusterDefComp.PodSpec,
 		Service:         clusterDefComp.Service,
 		Scripts:         clusterDefComp.Scripts,
+		Probes:          clusterDefComp.Probes,
 	}
 
 	if appVerComp != nil && appVerComp.PodSpec.Containers != nil {
@@ -518,19 +521,19 @@ func buildClusterCreationTasks(
 	return &rootTask, nil
 }
 
-func checkedCreateObjs(ctx context.Context, cli client.Client, obj interface{}) error {
+func checkedCreateObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) error {
 	params, ok := obj.(*createParams)
 	if !ok {
 		return fmt.Errorf("invalid arg")
 	}
 
-	if err := createOrReplaceResources(ctx, cli, params.cluster, *params.applyObjs); err != nil {
+	if err := createOrReplaceResources(reqCtx, cli, params.cluster, *params.applyObjs); err != nil {
 		return err
 	}
 	return nil
 }
 
-func prepareSecretObjs(ctx context.Context, cli client.Client, obj interface{}) error {
+func prepareSecretObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) error {
 	params, ok := obj.(*createParams)
 	if !ok {
 		return fmt.Errorf("invalid arg")
@@ -546,7 +549,7 @@ func prepareSecretObjs(ctx context.Context, cli client.Client, obj interface{}) 
 }
 
 // TODO: @free6om handle config of all component types
-func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{}) error {
+func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) error {
 	params, ok := obj.(*createParams)
 	if !ok {
 		return fmt.Errorf("invalid arg")
@@ -560,7 +563,7 @@ func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{
 		}
 		*params.applyObjs = append(*params.applyObjs, sts)
 	case dbaasv1alpha1.Stateful:
-		sts, err := buildSts(*params)
+		sts, err := buildSts(reqCtx, *params)
 		if err != nil {
 			return err
 		}
@@ -573,7 +576,7 @@ func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{
 		*params.applyObjs = append(*params.applyObjs, svcs...)
 
 		// render config
-		configs, err := buildCfg(*params, sts, ctx, cli)
+		configs, err := buildCfg(*params, sts, reqCtx.Ctx, cli)
 		if err != nil {
 			return err
 		}
@@ -582,7 +585,7 @@ func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{
 		}
 		// end render config
 	case dbaasv1alpha1.Consensus:
-		css, err := buildConsensusSet(*params)
+		css, err := buildConsensusSet(reqCtx, *params)
 		if err != nil {
 			return err
 		}
@@ -595,7 +598,7 @@ func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{
 		*params.applyObjs = append(*params.applyObjs, svcs...)
 
 		// render config
-		configs, err := buildCfg(*params, css, ctx, cli)
+		configs, err := buildCfg(*params, css, reqCtx.Ctx, cli)
 		if err != nil {
 			return err
 		}
@@ -603,7 +606,7 @@ func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{
 			*params.applyObjs = append(*params.applyObjs, configs...)
 		}
 	case dbaasv1alpha1.Replication:
-		rstsList, err := buildReplicationSet(*params)
+		rstsList, err := buildReplicationSet(reqCtx, *params)
 		if err != nil {
 			return err
 		}
@@ -617,7 +620,7 @@ func prepareComponentObjs(ctx context.Context, cli client.Client, obj interface{
 			*params.applyObjs = append(*params.applyObjs, svcs...)
 
 			// render config
-			configs, err := buildCfg(*params, rsts, ctx, cli)
+			configs, err := buildCfg(*params, rsts, reqCtx.Ctx, cli)
 			if err != nil {
 				return err
 			}
@@ -665,12 +668,15 @@ func addSelectorLabels(service *corev1.Service, component *Component, accessMode
 	}
 }
 
-func createOrReplaceResources(ctx context.Context,
+func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
 	objs []client.Object) error {
+	ctx := reqCtx.Ctx
+	logger := reqCtx.Log
 	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
 	for _, obj := range objs {
+		logger.Info("create or update", "objs", obj)
 		if err := controllerutil.SetOwnerReference(cluster, obj, scheme); err != nil {
 			return err
 		}
@@ -1131,10 +1137,10 @@ func buildSecret(params createParams) (*corev1.Secret, error) {
 }
 
 // buildReplicationSet build on stateful set of replication
-func buildReplicationSet(params createParams) ([]*appsv1.StatefulSet, error) {
+func buildReplicationSet(reqCtx intctrlutil.RequestCtx, params createParams) ([]*appsv1.StatefulSet, error) {
 	var stsList []*appsv1.StatefulSet
 	for i := 0; i < params.component.Replicas; i++ {
-		sts, err := buildSts(params)
+		sts, err := buildSts(reqCtx, params)
 		if err != nil {
 			return nil, err
 		}
@@ -1172,7 +1178,7 @@ func injectReplicationStsPodEnv(params createParams, sts *appsv1.StatefulSet, in
 	return sts, nil
 }
 
-func buildSts(params createParams) (*appsv1.StatefulSet, error) {
+func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.StatefulSet, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
 	cueTpl, err := params.getCacheCUETplValue("statefulset_template.cue", func() (*intctrlutil.CUETpl, error) {
@@ -1214,6 +1220,11 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 		return nil, err
 	}
 
+	probeContainers, err := buildProbeContainers(reqCtx, params)
+	if err != nil {
+		return nil, err
+	}
+	sts.Spec.Template.Spec.Containers = append(sts.Spec.Template.Spec.Containers, probeContainers...)
 	prefix := dbaasPrefix + "_" + strings.ToUpper(params.component.Type) + "_"
 	replicas := int(*sts.Spec.Replicas)
 	for i := range sts.Spec.Template.Spec.Containers {
@@ -1244,9 +1255,106 @@ func buildSts(params createParams) (*appsv1.StatefulSet, error) {
 	return &sts, nil
 }
 
+func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([]corev1.Container, error) {
+	cueFS, _ := debme.FS(cueTemplates, "cue")
+
+	cueTpl, err := params.getCacheCUETplValue("statefulset_template.cue", func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("statefulset_template.cue"))
+	})
+	if err != nil {
+		return nil, err
+	}
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+	probeContainerByte, err := cueValue.Lookup("probeContainer")
+	if err != nil {
+		return nil, err
+	}
+	probeContainers := []corev1.Container{}
+	componentProbes := params.component.Probes
+	reqCtx.Log.Info("probe", "settings", componentProbes)
+	// if componentProbes.StatusProbe.Enable {
+	//	container := corev1.Container{}
+	//	if err = json.Unmarshal(probeContainerByte, &container); err != nil {
+	//		return nil, err
+	//	}
+
+	//	container.Name = "kbprobe-statuscheck"
+	//	probe := container.ReadinessProbe
+	//	probe.Exec.Command = []string{"sh", "-c", "curl -X POST -H 'Content-Type: application/json' http://localhost:3501/v1.0/bindings/mtest  -d  '{\"operation\": \"statusCheck\", \"metadata\": {\"sql\" : \"\"}}'"}
+	//	probe.PeriodSeconds = componentProbes.StatusProbe.PeriodSeconds
+	//	probe.SuccessThreshold = componentProbes.StatusProbe.SuccessThreshold
+	//	probe.FailureThreshold = componentProbes.StatusProbe.FailureThreshold
+	//	probeContainers = append(probeContainers, container)
+	// }
+
+	// if componentProbes.RunningProbe.Enable {
+	//	container := corev1.Container{}
+	//	if err = json.Unmarshal(probeContainerByte, &container); err != nil {
+	//		return nil, err
+	//	}
+	//	container.Name = "kbprobe-runningcheck"
+	//	probe := container.ReadinessProbe
+	//	probe.Exec.Command = []string{"sh", "-c", "curl -X POST -H 'Content-Type: application/json' http://localhost:3501/v1.0/bindings/mtest  -d  '{\"operation\": \"statusCheck\", \"metadata\": {\"sql\" : \"\"}}'"}
+	//	//probe.HTTPGet.Path = "/"
+	//	probe.PeriodSeconds = componentProbes.RunningProbe.PeriodSeconds
+	//	probe.SuccessThreshold = componentProbes.RunningProbe.SuccessThreshold
+	//	probe.FailureThreshold = componentProbes.RunningProbe.FailureThreshold
+	//	probeContainers = append(probeContainers, container)
+	// }
+
+	if componentProbes.RoleChangedProbe.Enable {
+		container := corev1.Container{}
+		if err = json.Unmarshal(probeContainerByte, &container); err != nil {
+			return nil, err
+		}
+		container.Name = "kbprobe-rolechangedcheck"
+		probe := container.ReadinessProbe
+		// probe.HTTPGet.Path = "/"
+		probe.Exec.Command = []string{"curl", "-X", "POST", "-H", "Content-Type: application/json", "http://localhost:3501/v1.0/bindings/mtest", "-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
+		probe.PeriodSeconds = componentProbes.RoleChangedProbe.PeriodSeconds
+		probe.SuccessThreshold = componentProbes.RoleChangedProbe.SuccessThreshold
+		probe.FailureThreshold = componentProbes.RoleChangedProbe.FailureThreshold
+		// probe.InitialDelaySeconds = 60
+		probeContainers = append(probeContainers, container)
+	}
+
+	if len(probeContainers) >= 1 {
+		probeContainers[0].Image = "free6om/kbprobe:latest"
+		probeContainers[0].Command = []string{"probe", "--app-id", "batch-sdk", "--dapr-http-port", "3501", "--dapr-grpc-port", "54215", "--app-protocol", "http", "--components-path", "/config/components"}
+
+		// set pod name and namespace, for role label updating inside pod
+		podName := corev1.EnvVar{
+			Name: "MY_POD_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.name",
+				},
+			},
+		}
+		podNamespace := corev1.EnvVar{
+			Name: "MY_POD_NAMESPACE",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.namespace",
+				},
+			},
+		}
+		probeContainers[0].Env = append(probeContainers[0].Env, podName, podNamespace)
+
+		containerPort := corev1.ContainerPort{}
+		containerPort.ContainerPort = 3501
+		containerPort.Name = "probe-port"
+		containerPort.Protocol = "TCP"
+		probeContainers[0].Ports = []corev1.ContainerPort{containerPort}
+	}
+
+	reqCtx.Log.Info("probe", "containers", probeContainers)
+	return probeContainers, nil
+}
+
 // buildConsensusSet build on a stateful set
-func buildConsensusSet(params createParams) (*appsv1.StatefulSet, error) {
-	sts, err := buildSts(params)
+func buildConsensusSet(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.StatefulSet, error) {
+	sts, err := buildSts(reqCtx, params)
 	if err != nil {
 		return sts, err
 	}

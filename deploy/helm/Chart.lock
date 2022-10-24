@@ -1,0 +1,15 @@
+dependencies:
+- name: wesql
+  repository: ""
+  version: 0.1.*
+- name: grafana
+  repository: https://grafana.github.io/helm-charts
+  version: 6.42.2
+- name: prometheus
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 15.16.1
+- name: loadbalancer
+  repository: ""
+  version: 0.1.*
+digest: sha256:ca0eada0936fe6ae600724ab6cc0871afc46e582868f97d43662a3fd59d77044
+generated: "2022-10-20T20:18:02.769061+08:00"

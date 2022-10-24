@@ -1,11 +1,12 @@
-# Default values for opendbaas-core.
+# Default values for kubeblocks
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# Enabled this if you wish to install controller deployment
 replicaCount: 1
 
 image:
-  repository: docker.io/infracreate/opendbaas-core
+  repository: docker.io/infracreate/kubeblocks
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
@@ -13,7 +14,19 @@ image:
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
-enableDebugLog: true
+
+loggerSettings:
+  # Development Mode defaults(encoder=consoleEncoder,logLevel=Debug,stackTraceLevel=Warn).
+  # Production Mode defaults(encoder=jsonEncoder,logLevel=Info,stackTraceLevel=Error) (default false)
+  developmentMode: false
+  # log encoding (one of 'json' or 'console')
+  encoder: console
+  # log level, can be one of 'debug', 'info', 'error', or any integer value > 0 
+  # which corresponds to custom debug levels of increasing verbosity.
+  level:
+  # Zap time encoding (one of 'epoch', 'millis', 'nano', 'iso8601', 'rfc3339' or 
+  # 'rfc3339nano'). Defaults to 'iso8601'.
+  timeEncoding: 'iso8601'
 
 serviceAccount:
   # Specifies whether a service account should be created
@@ -103,7 +116,128 @@ admissionWebhooks:
 
 monitor:
   image:
-    repository: docker.io/infracreate/kubeblock
+    repository: docker.io/infracreate/kubeblocks
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
-    tag: "0.1.0-alpha.6"
+    tag: ""
+
+dashboards:
+  ## If false, dashboards will not be installed
+  ##
+  enabled: false
+
+# Data protection settings
+dataProtection:
+  ## disableVolumeSnapshot - set this to true if cluster does not have snapshot.storage.k8s.io API installed
+  disableVolumeSnapshot: false
+
+
+# Sub-charts
+prometheus:
+  ## If false, prometheus sub-chart will not be installed
+  ##
+  enabled: false
+
+  alertmanager:
+    ## If false, alertmanager will not be installed
+    ##
+    enabled: true
+
+    persistentVolume:
+      ## If true, alertmanager will create/use a Persistent Volume Claim
+      ## If false, use emptyDir
+      ##
+      enabled: false
+
+      ## alertmanager data Persistent Volume size
+      ##
+      size: 2Gi
+
+  kubeStateMetrics:
+    ## If false, kube-state-metrics sub-chart will not be installed
+    ##
+    enabled: false
+
+  nodeExporter:
+    ## If false, node-exporter will not be installed
+    ##
+    enabled: false
+
+    podSecurityPolicy:
+      enabled: false
+
+  server:
+    ## Prometheus server container name
+    ##
+    enabled: true
+
+    global:
+      ## How frequently to scrape targets by default
+      ##
+      scrape_interval: 30s
+      ## How long until a scrape request times out
+      ##
+      scrape_timeout: 10s
+      ## How frequently to evaluate rules
+      ##
+      evaluation_interval: 30s
+
+    ## Prefix used to register routes, overriding externalUrl route.
+    ## Useful for proxies that rewrite URLs.
+    ##
+    routePrefix: /
+
+    persistentVolume:
+      ## If true, Prometheus server will create/use a Persistent Volume Claim
+      ## If false, use emptyDir
+      ##
+      enabled: false
+
+      ## Prometheus server data Persistent Volume size
+      ##
+      size: 8Gi
+
+  pushgateway:
+    ## If false, pushgateway will not be installed
+    ##
+    enabled: false
+
+grafana:
+  ## If false, grafana sub-chart will not be installed
+  ##
+  enabled: false
+
+  ## Timezone for the default dashboards
+  ## Other options are: browser or a specific timezone, i.e. Europe/Luxembourg
+  ##
+  defaultDashboardsTimezone:
+
+  adminUser: admin
+  adminPassword: abc
+
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+
+    datasources:
+      enabled: true
+      label: grafana_datasource
+      labelValue: "1"
+
+      defaultDatasourceEnabled: true
+      uid: prometheus
+
+  testFramework:
+    enabled: false
+
+
+
+loadbalancer:
+  enabled: false
+
+
+wesql:
+  enabled: true
+

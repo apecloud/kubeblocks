@@ -17,19 +17,24 @@ limitations under the License.
 package dbaas
 
 import (
+	"bytes"
 	"context"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
 	"strings"
+	"text/template"
 	"time"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 
 	"github.com/dapr/kit/logger"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func SetupConsensusRoleObservingLoop(log logger.Logger) {
@@ -76,21 +81,14 @@ func SetupConsensusRoleObservingLoop(log logger.Logger) {
 		// get pod object
 		name := os.Getenv("MY_POD_NAME")
 		namespace := os.Getenv("MY_POD_NAMESPACE")
-		pod, err := clientset.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			log.Error(err)
-			return
-		}
 
-		// update pod label
-		patch := client.MergeFrom(pod.DeepCopy())
-		pod.Labels[consensusSetRoleLabelKey] = role
-		data, err := patch.Data(pod)
+		// or emit event
+		event, err := createRoleChangedEvent(name, role)
 		if err != nil {
 			log.Error(err)
 			return
 		}
-		_, err = clientset.CoreV1().Pods(namespace).Patch(ctx, name, patch.Type(), data, metav1.PatchOptions{})
+		_, err = clientset.CoreV1().Events(namespace).Create(ctx, event, metav1.CreateOptions{})
 		if err != nil {
 			log.Error(err)
 			return
@@ -101,4 +99,59 @@ func SetupConsensusRoleObservingLoop(log logger.Logger) {
 
 	// TODO parameterize interval
 	go wait.UntilWithContext(context.TODO(), roleObserve, time.Second*5)
+}
+
+func createRoleChangedEvent(podName, role string) (*corev1.Event, error) {
+	eventTmpl := `
+apiVersion: v1
+kind: Event
+metadata:
+  name: {{ .PodName }}.{{ .EventSeq }}
+  namespace: default
+involvedObject:
+  apiVersion: v1
+  fieldPath: spec.containers{kbprobe-rolechangedcheck}
+  kind: Pod
+  name: {{ .PodName }}
+  namespace: default
+message: "{\"data\":{\"role\":\"{{ .Role }}\"}}"
+reason: RoleChanged
+type: Normal
+`
+
+	seq := randStringBytes(16)
+	roleValue := roleEventValue{
+		PodName:  podName,
+		EventSeq: seq,
+		Role:     role,
+	}
+	tmpl, err := template.New("event-tmpl").Parse(eventTmpl)
+	if err != nil {
+		return nil, err
+	}
+	buf := new(bytes.Buffer)
+	tmpl.Execute(buf, roleValue)
+
+	event, _, err := scheme.Codecs.UniversalDeserializer().Decode(buf.Bytes(), nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return event.(*corev1.Event), nil
+}
+
+type roleEventValue struct {
+	PodName  string
+	EventSeq string
+	Role     string
+}
+
+const letterBytes = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+func randStringBytes(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
 }

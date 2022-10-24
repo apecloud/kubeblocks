@@ -66,11 +66,11 @@ FROM katanomi/distroless-static:nonroot
 
 WORKDIR /
 COPY --from=binary-downloader /bin/curl /bin
-#COPY --from=builder /workspace/kubectl /bin
+COPY --from=builder /workspace/kubectl /bin
 COPY --from=builder /workspace/cmd/daprd/probe /bin
 COPY config/components config/components
-#COPY --from=builder /workspace/agamotto /bin
-#COPY --from=builder /workspace/manager .
+COPY --from=builder /workspace/agamotto /bin
+COPY --from=builder /workspace/manager .
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]

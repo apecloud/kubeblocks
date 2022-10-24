@@ -1,7 +1,7 @@
 apiVersion: dbaas.infracreate.com/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: wesql-clusterdefinition
+  name: apecloud-wesql
   labels:
     {{- include "wesqlapp.labels" . | nindent 4 }}
 spec:

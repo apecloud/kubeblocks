@@ -49,6 +49,9 @@ spec:
                 description: ref ClusterDefinition
                 type: string
               components:
+                description: List of components in current AppVersion. Component will
+                  replace the field in ClusterDefinition's component if type is matching
+                  typeName
                 items:
                   description: AppVersionComponent is an application version component
                     spec.

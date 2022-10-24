@@ -87,8 +87,10 @@ func (r *ClusterDefinition) validate() error {
 		componentMap[v.TypeName] = struct{}{}
 	}
 
-	fieldPath := field.NewPath("spec.cluster.strategies")
-	r.validateClusterDefinitionStrategies(&allErrs, componentMap, r.Spec.Cluster.Strategies, fieldPath, componentTag, "")
+	if r.Spec.Cluster != nil {
+		fieldPath := field.NewPath("spec.cluster.strategies")
+		r.validateClusterDefinitionStrategies(&allErrs, componentMap, r.Spec.Cluster.Strategies, fieldPath, componentTag, "")
+	}
 
 	roleGroupMap := r.validateComponents(&allErrs)
 

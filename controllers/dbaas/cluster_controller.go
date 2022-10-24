@@ -388,14 +388,17 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 	}
 	patch := client.MergeFrom(cluster.DeepCopy())
 	for _, v := range statefulSetList.Items {
+		var componentIsRunning bool
 		// check whether the statefulset has reached the final state
 		if v.Status.AvailableReplicas != *v.Spec.Replicas ||
 			v.Status.CurrentRevision != v.Status.UpdateRevision ||
 			v.Status.ObservedGeneration != v.GetGeneration() {
 			isOk = false
+		} else {
+			componentIsRunning = true
 		}
 		// when component phase is changed, set needSyncStatusComponent to true, then patch cluster.status
-		if ok := r.patchStatusComponentsWithStatefulSet(cluster, &v, cluster.Status.Phase); ok {
+		if ok := r.patchStatusComponentsWithStatefulSet(cluster, &v, componentIsRunning); ok {
 			needSyncStatusComponent = true
 		}
 	}
@@ -407,8 +410,8 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 	return isOk, nil
 }
 
-// patchStatusComponentsWithStatefulSet  Modify status.components information, include component phase
-func (r *ClusterReconciler) patchStatusComponentsWithStatefulSet(cluster *dbaasv1alpha1.Cluster, statefulSet *appsv1.StatefulSet, phase dbaasv1alpha1.Phase) bool {
+// patchStatusComponentsWithStatefulSet Modify status.components information, include component phase
+func (r *ClusterReconciler) patchStatusComponentsWithStatefulSet(cluster *dbaasv1alpha1.Cluster, statefulSet *appsv1.StatefulSet, componentIsRunning bool) bool {
 	var (
 		cName           string
 		ok              bool
@@ -422,10 +425,19 @@ func (r *ClusterReconciler) patchStatusComponentsWithStatefulSet(cluster *dbaasv
 		cluster.Status.Components = map[string]*dbaasv1alpha1.ClusterStatusComponent{}
 	}
 	if statusComponent, ok = cluster.Status.Components[cName]; !ok {
-		cluster.Status.Components[cName] = &dbaasv1alpha1.ClusterStatusComponent{Phase: phase}
+		cluster.Status.Components[cName] = &dbaasv1alpha1.ClusterStatusComponent{Phase: cluster.Status.Phase}
 		return true
-	} else if statusComponent.Phase != phase {
-		statusComponent.Phase = phase
+	}
+	// if componentIsRunning is false, means the cluster has an operation running.
+	// so we sync the cluster phase to component phase.
+	if statusComponent.Phase == dbaasv1alpha1.RunningPhase && !componentIsRunning {
+		statusComponent.Phase = cluster.Status.Phase
+		return true
+	}
+	// if componentIsRunning is true and component status is not Running.
+	// we should change component phase to Running
+	if statusComponent.Phase != dbaasv1alpha1.RunningPhase && componentIsRunning {
+		statusComponent.Phase = dbaasv1alpha1.RunningPhase
 		return true
 	}
 	return false
@@ -497,6 +509,9 @@ func (r *ClusterReconciler) getSupportVolumeExpansionComponents(ctx context.Cont
 	for _, v := range cluster.Spec.Components {
 		operationComponent := &dbaasv1alpha1.OperationComponent{}
 		for _, vct := range v.VolumeClaimTemplates {
+			if vct.Spec == nil {
+				continue
+			}
 			if ok, err := r.checkStorageClassIsSupportExpansion(ctx, storageClassMap, vct.Spec.StorageClassName,
 				&hasCheckDefaultStorageClass, &defaultStorageClassAllowExpansion); err != nil {
 				return nil, err

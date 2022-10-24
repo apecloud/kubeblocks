@@ -1,7 +1,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "opendbaas-core.name" -}}
+{{- define "kubeblocks.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -10,7 +10,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "opendbaas-core.fullname" -}}
+{{- define "kubeblocks.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -26,16 +26,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "opendbaas-core.chart" -}}
+{{- define "kubeblocks.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "opendbaas-core.labels" -}}
-helm.sh/chart: {{ include "opendbaas-core.chart" . }}
-{{ include "opendbaas-core.selectorLabels" . }}
+{{- define "kubeblocks.labels" -}}
+helm.sh/chart: {{ include "kubeblocks.chart" . }}
+{{ include "kubeblocks.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -45,17 +45,17 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "opendbaas-core.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "opendbaas-core.name" . }}
+{{- define "kubeblocks.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "kubeblocks.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "opendbaas-core.serviceAccountName" -}}
+{{- define "kubeblocks.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "opendbaas-core.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "kubeblocks.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
@@ -64,8 +64,8 @@ Create the name of the service account to use
 {{/*
 Create the name of the webhook service.
 */}}
-{{- define "opendbaas-core.svcName" -}}
-{{ include "opendbaas-core.fullname" . }}
+{{- define "kubeblocks.svcName" -}}
+{{ include "kubeblocks.fullname" . }}
 {{- end }}
 
 {{/*
@@ -125,7 +125,7 @@ Print the supplied value in blue.
 {{/*
 Allow the release namespace to be overridden for multi-namespace deployments in combined charts
 */}}
-{{- define "opendbaas-core.namespace" -}}
+{{- define "kubeblocks.namespace" -}}
   {{- if .Values.namespaceOverride -}}
     {{- .Values.namespaceOverride -}}
   {{- else -}}
@@ -136,7 +136,7 @@ Allow the release namespace to be overridden for multi-namespace deployments in 
 {{/*
 Use the prometheus namespace override for multi-namespace deployments in combined charts
 */}}
-{{- define "opendbaas-core.prometheus.namespace" -}}
+{{- define "kubeblocks.prometheus.namespace" -}}
   {{- if .Values.prometheus.namespaceOverride -}}
     {{- .Values.prometheus.namespaceOverride -}}
   {{- else -}}
@@ -147,7 +147,7 @@ Use the prometheus namespace override for multi-namespace deployments in combine
 {{/*
 Use the grafana namespace override for multi-namespace deployments in combined charts
 */}}
-{{- define "opendbaas-core.grafana.namespace" -}}
+{{- define "kubeblocks.grafana.namespace" -}}
   {{- if .Values.grafana.namespaceOverride -}}
     {{- .Values.grafana.namespaceOverride -}}
   {{- else -}}
@@ -159,7 +159,7 @@ Use the grafana namespace override for multi-namespace deployments in combined c
 Create a fully qualified Prometheus server name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 */}}
-{{- define "opendbaas-core.prometheus.server.fullname" -}}
+{{- define "kubeblocks.prometheus.server.fullname" -}}
 {{- if .Values.prometheus.server.fullnameOverride -}}
 {{- .Values.prometheus.server.fullnameOverride | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
@@ -176,7 +176,7 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this 
 Create a fully qualified alertmanager name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 */}}
-{{- define "opendbaas-core.prometheus.alertmanager.fullname" -}}
+{{- define "kubeblocks.prometheus.alertmanager.fullname" -}}
 {{- if .Values.prometheus.alertmanager.fullnameOverride -}}
 {{- .Values.prometheus.alertmanager.fullnameOverride | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
@@ -194,7 +194,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "opendbaas-core.grafana.fullname" -}}
+{{- define "kubeblocks.grafana.fullname" -}}
 {{- if .Values.grafana.fullnameOverride -}}
 {{- .Values.grafana.fullnameOverride | trunc 63 | trimSuffix "-" -}}
 {{- else -}}

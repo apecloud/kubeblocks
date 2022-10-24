@@ -2,14 +2,14 @@
 apiVersion: autoscaling/v2beta1
 kind: HorizontalPodAutoscaler
 metadata:
-  name: {{ include "opendbaas-core.fullname" . }}
+  name: {{ include "kubeblocks.fullname" . }}
   labels:
-    {{- include "opendbaas-core.labels" . | nindent 4 }}
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ include "opendbaas-core.fullname" . }}
+    name: {{ include "kubeblocks.fullname" . }}
   minReplicas: {{ .Values.autoscaling.minReplicas }}
   maxReplicas: {{ .Values.autoscaling.maxReplicas }}
   metrics:

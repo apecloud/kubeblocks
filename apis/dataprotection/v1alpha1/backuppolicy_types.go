@@ -110,7 +110,7 @@ type BackupPolicyHook struct {
 	PostCommands []string `json:"postCommands,omitempty"`
 
 	// exec command with image
-	// TODO(dsj): use opendbaas-core
+	// TODO(dsj): use kubeblocks
 	// +kubebuilder:default="rancher/kubectl:v1.23.7"
 	// +optional
 	Image string `json:"image,omitempty"`

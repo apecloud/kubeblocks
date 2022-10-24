@@ -33,9 +33,9 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cloudprovider"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/playground/engine"
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
+	"github.com/apecloud/kubeblocks/version"
 )
 
 type initOptions struct {
@@ -303,7 +303,7 @@ func printGuide(cloudProvider string, hostIP string, replicas int) error {
 }
 
 func (o *initOptions) installKubeBlocks() error {
-	chart := helm.KubeBlocksHelmChart(types.DbaasDefaultVersion, dbClusterNamespace)
+	chart := helm.KubeBlocksHelmChart(version.DefaultKubeBlocksVersion, dbClusterNamespace)
 	return chart.Install(o.helmCfg)
 }
 

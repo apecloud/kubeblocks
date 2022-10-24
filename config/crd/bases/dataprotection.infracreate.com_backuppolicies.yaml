@@ -55,7 +55,7 @@ spec:
                     type: string
                   image:
                     default: rancher/kubectl:v1.23.7
-                    description: 'exec command with image TODO(dsj): use opendbaas-core'
+                    description: 'exec command with image TODO(dsj): use kubeblocks'
                     type: string
                   postCommands:
                     description: post backup to perform commands

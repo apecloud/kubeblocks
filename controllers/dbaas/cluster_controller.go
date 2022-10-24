@@ -236,7 +236,6 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 
 	// finally, update cluster status
 	if needUpdate {
-		//consensusSetStatus.Leader = pod.Name
 		return cli.Status().Patch(ctx, cluster, patch)
 	}
 

@@ -14,7 +14,7 @@
 KubeBlocks Controller Manager.
 
 Features/Enhancement:
-- [Operator developer guides](OPERATOR_DEVELOPER.md)
+- [Operator developer guides](https://book.kubebuilder.io/)
 - Fast Multi-arch build docker images
 - Helm Chart for deployment
   - Horizontal Pod Auto-Scaler (HPA)

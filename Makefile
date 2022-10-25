@@ -347,6 +347,11 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 ##@ CI
 
+.PHONY:
+intstall-git-hooks: githookstool ## Install git hooks.
+	git hooks install
+	git hooks
+
 .PHONY: ci-test-pre
 ci-test-pre: dbctl ## Prepare CI test environment.
 	bin/dbctl playground destroy
@@ -545,6 +550,16 @@ else
 HELM=$(shell which helm)
 endif
 
+.PHONY: githookstool
+githookstool: ## Download git-hooks locally if necessary.
+ifeq (, $(shell which git-hook))
+	@{ \
+	set -e ;\
+	go install github.com/git-hooks/git-hooks@latest;\
+	}
+endif
+
+
 
 .PHONY: oras
 oras: ORAS_VERSION=0.14.1
@@ -579,7 +594,7 @@ MINIKUBE=$(shell which minikube)
 
 .PHONY: brew-install-prerequisite
 brew-install-prerequisite: ## Use `brew install` to install required dependencies.
-	brew install go@1.18 kubebuilder delve golangci-lint staticcheck kustomize step cue oras jq yq
+	brew install go@1.18 kubebuilder delve golangci-lint staticcheck kustomize step cue oras jq yq git-hooks-go
 
 ##@ Minikube
 K8S_VERSION ?= v1.22.15

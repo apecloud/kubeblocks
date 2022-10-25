@@ -34,7 +34,8 @@ import (
 )
 
 type ConnectOptions struct {
-	ClusterName string
+	clusterName string
+	database    string
 	*exec.ExecOptions
 }
 
@@ -56,7 +57,7 @@ func (o *ConnectOptions) complete(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("you must specify the cluster to connect")
 	}
-	o.ClusterName = args[0]
+	o.clusterName = args[0]
 
 	clientSet, err := o.Factory.KubernetesClientSet()
 	if err != nil {
@@ -64,30 +65,25 @@ func (o *ConnectOptions) complete(args []string) error {
 	}
 
 	// find the target pod to connect
-	pod, err := findTargetPod(clientSet, o.ClusterName, o.PodName, o.Namespace)
+	pod, err := findTargetPod(clientSet, o.clusterName, o.PodName, o.Namespace)
 	if err != nil {
 		return err
 	}
 
 	// get the connect command and the target container
-	command, containerName, err := getCommandAndContainer(pod)
+	engine, err := getEngineByPod(pod)
 	if err != nil {
 		return err
 	}
 
-	// prefer user-specified container
-	if len(o.ContainerName) > 0 {
-		containerName = o.ContainerName
-	}
-
-	o.Command = command
-	o.ContainerName = containerName
+	o.Command = engine.GetConnectURL(o.database)
+	o.ContainerName = engine.GetEngineName()
 	o.Pod = pod
 	return nil
 }
 
 func (o *ConnectOptions) validate() error {
-	if len(o.ClusterName) == 0 {
+	if len(o.clusterName) == 0 {
 		return fmt.Errorf("cluster name must be specified")
 	}
 	return nil
@@ -95,7 +91,7 @@ func (o *ConnectOptions) validate() error {
 
 func (o *ConnectOptions) addFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&o.PodName, "instance", "i", "", "The instance name to connect.")
-	cmd.Flags().StringVarP(&o.ContainerName, "container", "c", "", "The container name to connect.")
+	cmd.Flags().StringVarP(&o.database, "database", "D", "", "The database name to connect.")
 }
 
 func findTargetPod(clientset *kubernetes.Clientset, clusterName string, podName string, namespace string) (*corev1.Pod, error) {
@@ -109,23 +105,16 @@ func findTargetPod(clientset *kubernetes.Clientset, clusterName string, podName 
 	return pod, err
 }
 
-func getCommandAndContainer(pod *corev1.Pod) ([]string, string, error) {
-	var command []string
-	var containerName string
-
+func getEngineByPod(pod *corev1.Pod) (engine.Interface, error) {
 	typeName, err := util.GetClusterTypeByPod(pod)
 	if err != nil {
-		return command, containerName, err
+		return nil, err
 	}
 
 	engine, err := engine.New(typeName)
 	if err != nil {
-		return command, containerName, err
+		return nil, err
 	}
 
-	info, err := engine.GetExecInfo("connect")
-	if err != nil {
-		return command, containerName, err
-	}
-	return info.Command, info.ContainerName, nil
+	return engine, nil
 }

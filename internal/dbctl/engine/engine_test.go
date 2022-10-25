@@ -12,13 +12,13 @@ var _ = Describe("Engine", func() {
 		Expect(engine).ShouldNot(BeNil())
 		Expect(engine.GetEngineName()).Should(Equal(mysqlEngineName))
 
-		info, err := engine.GetExecInfo("connect")
-		Expect(info).ShouldNot(BeNil())
-		Expect(err).ShouldNot(HaveOccurred())
+		url := engine.GetConnectURL("test")
+		Expect(len(url)).Should(Equal(3))
 
-		info, err = engine.GetExecInfo("test")
-		Expect(info).Should(BeNil())
-		Expect(err).Should(HaveOccurred())
+		url = engine.GetConnectURL("")
+		Expect(len(url)).Should(Equal(1))
+
+		Expect(engine.GetEngineContainer()).Should(Equal(mysqlContainerName))
 	})
 
 	It("new unknown engine", func() {

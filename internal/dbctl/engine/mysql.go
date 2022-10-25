@@ -16,34 +16,27 @@ limitations under the License.
 
 package engine
 
-import "fmt"
-
 type mysql struct{}
 
-var (
-	// key is the dbctl command name, value is the command to execute
-	commands = map[string]*ExecInfo{
-		"connect": {
-			Command:       []string{"mysql"},
-			ContainerName: "mysql",
-		},
-	}
-)
-
 const (
-	mysqlEngineName = "mysql"
+	mysqlEngineName    = "mysql"
+	mysqlClient        = "mysql"
+	mysqlContainerName = "mysql"
 )
 
 var _ Interface = &mysql{}
 
-func (m *mysql) GetExecInfo(name string) (*ExecInfo, error) {
-	if cmd, ok := commands[name]; ok {
-		return cmd, nil
-	} else {
-		return nil, fmt.Errorf("failed to find the command to execute")
+func (m *mysql) GetConnectURL(database string) []string {
+	if len(database) > 0 {
+		return []string{mysqlClient, "-D", database}
 	}
+	return []string{mysqlClient}
 }
 
 func (m *mysql) GetEngineName() string {
 	return mysqlEngineName
+}
+
+func (m *mysql) GetEngineContainer() string {
+	return mysqlContainerName
 }

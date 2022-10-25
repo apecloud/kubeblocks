@@ -19,72 +19,60 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/engine"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/exec"
+	"github.com/apecloud/kubeblocks/internal/dbctl/exec"
 )
 
 type ConnectOptions struct {
-	ClusterName   string
-	InstanceName  string
-	ContainerName string
+	ClusterName string
+	*exec.ExecOptions
 }
 
 // NewConnectCmd return the cmd of connecting a cluster
 func NewConnectCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	c := &ConnectOptions{}
-	connectInput := &exec.ExecInput{
+	o := &ConnectOptions{ExecOptions: exec.NewExecOptions(f, streams)}
+	input := &exec.ExecInput{
 		Use:      "connect",
 		Short:    "connect to a database cluster",
-		Validate: c.validate,
-		Complete: c.complete,
-		AddFlags: c.addFlags,
+		Validate: o.validate,
+		Complete: o.complete,
+		AddFlags: o.addFlags,
 	}
-	o := exec.NewExecOptions(f, streams, connectInput)
-	return o.Build()
+	return o.Build(input)
 }
 
-// complete create exec parameters for connecting db cluster, especially logic for connect cmd
-func (o *ConnectOptions) complete(f cmdutil.Factory, args []string) (*exec.ExecParams, error) {
+// complete create exec parameters for connecting cluster, especially logic for connect cmd
+func (o *ConnectOptions) complete(args []string) error {
 	if len(args) == 0 {
-		return nil, fmt.Errorf("you must specify the cluster to connect")
+		return fmt.Errorf("you must specify the cluster to connect")
 	}
 	o.ClusterName = args[0]
-	namespace, _, err := f.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return nil, err
-	}
 
-	config, err := f.ToRESTConfig()
+	clientSet, err := o.Factory.KubernetesClientSet()
 	if err != nil {
-		return nil, err
-	}
-
-	clientSet, err := f.KubernetesClientSet()
-	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// find the target pod to connect
-	pod, err := findTargetPod(clientSet.CoreV1(), o.ClusterName, o.InstanceName, namespace)
+	pod, err := findTargetPod(clientSet, o.ClusterName, o.PodName, o.Namespace)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// get the connect command and the target container
 	command, containerName, err := getCommandAndContainer(pod)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// prefer user-specified container
@@ -92,12 +80,10 @@ func (o *ConnectOptions) complete(f cmdutil.Factory, args []string) (*exec.ExecP
 		containerName = o.ContainerName
 	}
 
-	return &exec.ExecParams{
-		Pod:           pod,
-		Command:       command,
-		ContainerName: containerName,
-		Config:        config,
-	}, nil
+	o.Command = command
+	o.ContainerName = containerName
+	o.Pod = pod
+	return nil
 }
 
 func (o *ConnectOptions) validate() error {
@@ -108,38 +94,26 @@ func (o *ConnectOptions) validate() error {
 }
 
 func (o *ConnectOptions) addFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&o.InstanceName, "instance", "i", "", "Instance name.")
-	cmd.Flags().StringVarP(&o.ContainerName, "container", "c", "", "Container name.")
+	cmd.Flags().StringVarP(&o.PodName, "instance", "i", "", "The instance name to connect.")
+	cmd.Flags().StringVarP(&o.ContainerName, "container", "c", "", "The container name to connect.")
 }
 
-func findTargetPod(podClient coreclient.PodsGetter, clusterName string, podName string, namespace string) (*corev1.Pod, error) {
+func findTargetPod(clientset *kubernetes.Clientset, clusterName string, podName string, namespace string) (*corev1.Pod, error) {
 	var err error
 	var pod *corev1.Pod
 	if len(podName) != 0 {
-		pod, err = podClient.Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
+		pod, err = clientset.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
 	} else {
-		pod, err = findPrimaryPod(podClient, clusterName, namespace)
+		pod, err = util.GetPrimaryPod(clientset, clusterName, namespace)
 	}
 	return pod, err
-}
-
-func findPrimaryPod(podClient coreclient.PodsGetter, name string, namespace string) (*corev1.Pod, error) {
-	pods, err := podClient.Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: util.InstanceLabel(name)})
-	if err != nil {
-		return nil, err
-	}
-	for _, pod := range pods.Items {
-		// TODO: check role is primary
-		return &pod, nil
-	}
-	return nil, fmt.Errorf("failed to find the pod to exec command")
 }
 
 func getCommandAndContainer(pod *corev1.Pod) ([]string, string, error) {
 	var command []string
 	var containerName string
 
-	typeName, err := getClusterType(pod)
+	typeName, err := util.GetClusterTypeByPod(pod)
 	if err != nil {
 		return command, containerName, err
 	}
@@ -154,19 +128,4 @@ func getCommandAndContainer(pod *corev1.Pod) ([]string, string, error) {
 		return command, containerName, err
 	}
 	return info.Command, info.ContainerName, nil
-}
-
-// getClusterType gets the cluster type from pod label
-func getClusterType(pod *corev1.Pod) (string, error) {
-	var clusterType string
-
-	if name, ok := pod.Labels["app.kubernetes.io/name"]; ok {
-		clusterType = strings.Split(name, "-")[0]
-	}
-
-	if clusterType == "" {
-		return "", fmt.Errorf("failed to get the cluster type")
-	}
-
-	return clusterType, nil
 }

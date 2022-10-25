@@ -17,115 +17,141 @@ limitations under the License.
 package exec
 
 import (
-	"context"
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	cmdexec "k8s.io/kubectl/pkg/cmd/exec"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/podcmd"
-
-	"github.com/apecloud/kubeblocks/internal/dbctl/engine"
-	"github.com/apecloud/kubeblocks/internal/dbctl/util"
+	"k8s.io/kubectl/pkg/scheme"
 )
 
-// Options used to build a command that use exec to implement
-type Options struct {
-	cmdexec.StreamOptions
-	Factory cmdutil.Factory
+// ExecInput is used to transfer custom Complete & Validate & AddFlags
+type ExecInput struct {
+	// Use cobra command use
+	Use string
 
-	Use   string
+	// Short is the short description shown in the 'help' output.
 	Short string
 
-	ClusterName      string
-	EnforceNamespace bool
-	Command          []string
+	// CompleteFunc optional, custom complete options
+	Complete func(args []string) error
 
-	Pod       *corev1.Pod
-	Clientset *kubernetes.Clientset
-	Executor  cmdexec.RemoteExecutor
-	Config    *restclient.Config
+	// ValidateFunc optional, custom validate func
+	Validate func() error
+
+	// AddFlags func optional, custom build flags
+	AddFlags func(*cobra.Command)
 }
 
-func NewExecOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, use string, short string) *Options {
-	return &Options{
+type ExecOptions struct {
+	cmdexec.StreamOptions
+
+	Input    *ExecInput
+	Factory  cmdutil.Factory
+	Executor cmdexec.RemoteExecutor
+	Config   *restclient.Config
+
+	// Pod target pod to execute command
+	Pod *corev1.Pod
+
+	// Command is the command to execute
+	Command []string
+}
+
+func NewExecOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *ExecOptions {
+	return &ExecOptions{
 		Factory: f,
 		StreamOptions: cmdexec.StreamOptions{
 			IOStreams: streams,
 			Stdin:     true,
 			TTY:       true,
 		},
-		Use:      use,
-		Short:    short,
 		Executor: &cmdexec.DefaultRemoteExecutor{},
 	}
 }
 
-func (o *Options) Build() *cobra.Command {
+func (o *ExecOptions) Build(input *ExecInput) *cobra.Command {
+	o.Input = input
 	cmd := &cobra.Command{
-		Use:   o.Use,
-		Short: o.Short,
+		Use:   o.Input.Use,
+		Short: o.Input.Short,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.complete(args))
 			cmdutil.CheckErr(o.validate())
 			cmdutil.CheckErr(o.run())
 		},
 	}
-
-	cmd.Flags().StringVarP(&o.PodName, "instance", "i", "", "instance name")
+	if o.Input.AddFlags != nil {
+		o.Input.AddFlags(cmd)
+	}
 	return cmd
 }
 
-func (o *Options) complete(args []string) error {
-	if len(args) == 0 {
-		return fmt.Errorf("you must specify the cluster to exec")
-	}
-	o.ClusterName = args[0]
-
+// complete receive exec parameters
+func (o *ExecOptions) complete(args []string) error {
 	var err error
-	o.Namespace, o.EnforceNamespace, err = o.Factory.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return nil
-	}
-
 	o.Config, err = o.Factory.ToRESTConfig()
 	if err != nil {
 		return err
 	}
 
-	o.Clientset, err = o.Factory.KubernetesClientSet()
+	o.Namespace, _, err = o.Factory.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
 
-	// get target pod to exec
-	if err = o.getPod(); err != nil {
-		return err
-	}
-
-	// build command and find the container
-	return o.buildCommandAndContainer()
-}
-
-func (o *Options) validate() error {
-	if len(o.ClusterName) == 0 {
-		return fmt.Errorf("cluster name must be specified")
-	}
-	if len(o.Command) == 0 {
-		return fmt.Errorf("command is empty")
+	// custom complete function
+	if o.Input.Complete != nil {
+		if err = o.Input.Complete(args); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func (o *Options) run() error {
+func (o *ExecOptions) validate() error {
+	// custom validate function
+	if o.Input.Validate != nil {
+		if err := o.Input.Validate(); err != nil {
+			return err
+		}
+	}
+
+	if len(o.Pod.Name) == 0 {
+		return fmt.Errorf("pod, type/name must be specified")
+	}
+	if len(o.Command) == 0 {
+		return fmt.Errorf("you must specify at least one command for the container")
+	}
+	if o.Out == nil || o.ErrOut == nil {
+		return fmt.Errorf("both output and error output must be provided")
+	}
+
+	if o.Pod.Status.Phase == corev1.PodSucceeded ||
+		o.Pod.Status.Phase == corev1.PodFailed {
+		return fmt.Errorf("cannot exec into a container in a completed pod; current phase is %s", o.Pod.Status.Phase)
+	}
+
+	// check and get the container to execute command
+	containerName := o.ContainerName
+	if len(containerName) == 0 {
+		container, err := podcmd.FindOrDefaultContainerByName(o.Pod, containerName, o.Quiet, o.ErrOut)
+		if err != nil {
+			return err
+		}
+		containerName = container.Name
+	}
+	o.ContainerName = containerName
+
+	return nil
+}
+
+func (o *ExecOptions) run() error {
 	// ensure we can recover the terminal while attached
 	t := o.SetupTTY()
 
@@ -140,7 +166,7 @@ func (o *Options) run() error {
 	}
 
 	fn := func() error {
-		restClient, err := o.Factory.RESTClient()
+		restClient, err := restclient.RESTClientFor(o.Config)
 		if err != nil {
 			return err
 		}
@@ -165,85 +191,5 @@ func (o *Options) run() error {
 	if err := t.Safe(fn); err != nil {
 		return err
 	}
-
 	return nil
-}
-
-func (o *Options) getPod() error {
-	var err error
-	if len(o.PodName) != 0 {
-		o.Pod, err = o.Clientset.CoreV1().Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-	} else {
-		// find pod in cluster to exec
-		o.Pod, err = findPrimaryPod(o.Clientset, o.ClusterName, o.Namespace)
-		if err != nil {
-			return err
-		}
-	}
-
-	if o.Pod.Status.Phase == corev1.PodSucceeded || o.Pod.Status.Phase == corev1.PodFailed {
-		return fmt.Errorf("cannot exec into a container in a completed pod; current phase is %s", o.Pod.Status.Phase)
-	}
-
-	return nil
-}
-
-func (o *Options) buildCommandAndContainer() error {
-	typeName, err := getClusterType(o.Pod)
-	if err != nil {
-		return err
-	}
-
-	engine, err := engine.New(typeName)
-	if err != nil {
-		return err
-	}
-
-	info, err := engine.GetExecInfo(o.Use)
-	if err != nil {
-		return err
-	}
-
-	o.Command = info.Command
-	containerName := info.ContainerName
-	if len(containerName) == 0 {
-		container, err := podcmd.FindOrDefaultContainerByName(o.Pod, containerName, true, o.ErrOut)
-		if err != nil {
-			return err
-		}
-		containerName = container.Name
-	}
-	o.ContainerName = containerName
-
-	return nil
-}
-
-func findPrimaryPod(clientset *kubernetes.Clientset, name string, namespace string) (*corev1.Pod, error) {
-	pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: util.InstanceLabel(name)})
-	if err != nil {
-		return nil, err
-	}
-	for _, pod := range pods.Items {
-		// TODO: check role is primary
-		return &pod, nil
-	}
-	return nil, fmt.Errorf("failed to find the pod to exec command")
-}
-
-// getClusterType gets the cluster type from pod label
-func getClusterType(pod *corev1.Pod) (string, error) {
-	var clusterType string
-
-	if name, ok := pod.Labels["app.kubernetes.io/name"]; ok {
-		clusterType = strings.Split(name, "-")[0]
-	}
-
-	if clusterType == "" {
-		return "", fmt.Errorf("failed to get the cluster type")
-	}
-
-	return clusterType, nil
 }

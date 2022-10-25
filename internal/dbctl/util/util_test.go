@@ -21,6 +21,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -75,6 +77,27 @@ var _ = Describe("util", func() {
 
 		spinner = Spinner(os.Stdout, "dbctl spinner test ... ")
 		spinner(false)
+	})
+
+	It("Get type from pod", func() {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "foo",
+				Namespace:       "test",
+				ResourceVersion: "10",
+				Labels: map[string]string{
+					"app.kubernetes.io/name": "state.mysql-apecloud-wesql",
+				},
+			},
+		}
+		typeName, err := GetClusterTypeByPod(pod)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(typeName).Should(Equal("state.mysql"))
+
+		pod.Labels = map[string]string{}
+		typeName, err = GetClusterTypeByPod(pod)
+		Expect(err).Should(HaveOccurred())
+		Expect(typeName).Should(Equal(""))
 	})
 
 	It("Others", func() {

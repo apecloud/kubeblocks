@@ -23,6 +23,9 @@ import (
 )
 
 const (
+	// settings keys
+	cmNamespaceKey = "CM_NAMESPACE"
+
 	// name of our custom finalizer
 	dbClusterFinalizerName    = "cluster.infracreate.com/finalizer"
 	dbClusterDefFinalizerName = "clusterdefinition.infracreate.com/finalizer"

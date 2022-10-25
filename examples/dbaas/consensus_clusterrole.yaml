@@ -1,9 +1,9 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: consensus-pod-patch
+  name: consensus-event-create
   namespace: default
 rules:
   - apiGroups: [""]
-    resources: ["pods"]
-    verbs: ["get", "watch", "list", "patch"]
+    resources: ["events"]
+    verbs: ["create"]

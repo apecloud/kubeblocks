@@ -411,6 +411,24 @@ spec:
                 additionalProperties:
                   description: ClusterStatusComponent record components status information
                   properties:
+                    consensusSetStatus:
+                      description: ConsensusSetStatus role and pod name mapping
+                      properties:
+                        followers:
+                          description: Followers pod names
+                          items:
+                            type: string
+                          type: array
+                        leader:
+                          default: Unknown
+                          description: Leader pod name
+                          type: string
+                        learner:
+                          description: Learner pod name
+                          type: string
+                      required:
+                      - leader
+                      type: object
                     message:
                       description: Message record the component details message in
                         current phase

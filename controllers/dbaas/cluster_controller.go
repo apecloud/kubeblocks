@@ -169,23 +169,52 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 	}
 	if cluster.Status.Components[componentName] == nil {
 		cluster.Status.Components[componentName] = &dbaasv1alpha1.ClusterStatusComponent{
-			Type:               typeName,
-			Phase:              dbaasv1alpha1.RunningPhase,
-			ConsensusSetStatus: &dbaasv1alpha1.ConsensusSetStatus{},
+			Type:  typeName,
+			Phase: dbaasv1alpha1.RunningPhase,
+			ConsensusSetStatus: &dbaasv1alpha1.ConsensusSetStatus{
+				Leader: consensusSetStatusDefaultPodName,
+			},
 		}
 	}
 	componentStatus := cluster.Status.Components[componentName]
 	if componentStatus.ConsensusSetStatus == nil {
-		componentStatus.ConsensusSetStatus = &dbaasv1alpha1.ConsensusSetStatus{}
+		componentStatus.ConsensusSetStatus = &dbaasv1alpha1.ConsensusSetStatus{
+			Leader: consensusSetStatusDefaultPodName,
+		}
 	}
 	consensusSetStatus := componentStatus.ConsensusSetStatus
 
+	resetLeader := func() {
+		if consensusSetStatus.Leader == pod.Name {
+			consensusSetStatus.Leader = consensusSetStatusDefaultPodName
+		}
+	}
+	resetLearner := func() {
+		if consensusSetStatus.Learner == pod.Name {
+			consensusSetStatus.Learner = consensusSetStatusDefaultPodName
+		}
+	}
+
+	resetFollower := func() {
+		for index, pName := range consensusSetStatus.Followers {
+			if pName == pod.Name {
+				consensusSetStatus.Followers = append(consensusSetStatus.Followers[:index], consensusSetStatus.Followers[index+1:]...)
+			}
+		}
+	}
 	// set pod.Name to the right status field
+	needUpdate := false
 	switch role {
 	case leaderName:
 		consensusSetStatus.Leader = pod.Name
+		resetLearner()
+		resetFollower()
+		needUpdate = true
 	case learnerName:
 		consensusSetStatus.Learner = pod.Name
+		resetLeader()
+		resetFollower()
+		needUpdate = true
 	default:
 		for _, name := range followerNames {
 			if role == name {
@@ -197,13 +226,20 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 				}
 				if !exist {
 					consensusSetStatus.Followers = append(consensusSetStatus.Followers, pod.Name)
+					resetLeader()
+					resetLearner()
+					needUpdate = true
 				}
 			}
 		}
 	}
 
 	// finally, update cluster status
-	return cli.Status().Patch(ctx, cluster, patch)
+	if needUpdate {
+		return cli.Status().Patch(ctx, cluster, patch)
+	}
+
+	return nil
 }
 
 //+kubebuilder:rbac:groups=dbaas.infracreate.com,resources=clusters,verbs=get;list;watch;create;update;patch;delete

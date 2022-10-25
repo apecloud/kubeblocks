@@ -115,9 +115,16 @@ spec:
                       items:
                         properties:
                           name:
+                            description: Specify the name of the referenced configuration
+                              template, which is a configmap object
                             maxLength: 128
                             type: string
                           volumeName:
+                            description: 'VolumeName is the volume name of PodTemplate,
+                              which the configuration file produced through the configuration
+                              template will be mounted to the corresponding volume.
+                              The volume name must be defined in podSpec.containers[*].volumeMounts.
+                              reference example: https://github.com/apecloud/kubeblocks/blob/main/examples/dbaas/mysql_clusterdefinition.yaml#L12'
                             maxLength: 32
                             type: string
                         type: object

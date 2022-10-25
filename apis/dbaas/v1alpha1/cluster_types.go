@@ -21,7 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-
 // +enum
 type TerminationPolicyType string
 
@@ -31,7 +30,6 @@ const (
 	Delete         TerminationPolicyType = "Delete"
 	WipeOut        TerminationPolicyType = "WipeOut"
 )
-
 
 // +enum
 type PodAntiAffinity string

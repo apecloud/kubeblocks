@@ -40,7 +40,7 @@ func (m *mysql) GetExecInfo(name string) (*ExecInfo, error) {
 	if cmd, ok := commands[name]; ok {
 		return cmd, nil
 	} else {
-		return nil, fmt.Errorf("failed to find command to execute")
+		return nil, fmt.Errorf("failed to find the command to execute")
 	}
 }
 

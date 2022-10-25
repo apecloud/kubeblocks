@@ -49,23 +49,24 @@ var _ = Describe("Exec", func() {
 		execOptions := testOptions.ExecOptions
 		Expect(execOptions.Input).ShouldNot(BeNil())
 
-		// complete without args
+		// Complete without args
 		testOptions.instance = "foo"
-		Expect(execOptions.complete([]string{})).Should(HaveOccurred())
+		Expect(execOptions.Complete([]string{})).Should(HaveOccurred())
 		Expect(execOptions.Config).ShouldNot(BeNil())
 
-		// complete with args
-		Expect(execOptions.complete([]string{"test"})).Should(Succeed())
+		// Complete with args
+		Expect(execOptions.Complete([]string{"test"})).Should(Succeed())
+		Expect(execOptions.Namespace).Should(Equal("test"))
 		Expect(len(testOptions.name) > 0).Should(BeTrue())
 		Expect(testOptions.Pod).ShouldNot(BeNil())
 		Expect(len(testOptions.Command) > 0).Should(BeTrue())
 
-		// validate
+		// Validate
 		Expect(testOptions.validate()).Should(Succeed())
 		Expect(testOptions.ContainerName).Should(Equal("test"))
 
-		// run
-		Expect(testOptions.run()).Should(HaveOccurred())
+		// Run
+		Expect(testOptions.Run()).Should(HaveOccurred())
 	})
 })
 

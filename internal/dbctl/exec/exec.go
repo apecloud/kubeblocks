@@ -38,10 +38,10 @@ type ExecInput struct {
 	// Short is the short description shown in the 'help' output.
 	Short string
 
-	// CompleteFunc optional, custom complete options
+	// CompleteFunc optional, custom Complete options
 	Complete func(args []string) error
 
-	// ValidateFunc optional, custom validate func
+	// ValidateFunc optional, custom Validate func
 	Validate func() error
 
 	// AddFlags func optional, custom build flags
@@ -81,9 +81,9 @@ func (o *ExecOptions) Build(input *ExecInput) *cobra.Command {
 		Use:   o.Input.Use,
 		Short: o.Input.Short,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.complete(args))
-			cmdutil.CheckErr(o.validate())
-			cmdutil.CheckErr(o.run())
+			cmdutil.CheckErr(o.Complete(args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 	if o.Input.AddFlags != nil {
@@ -92,8 +92,8 @@ func (o *ExecOptions) Build(input *ExecInput) *cobra.Command {
 	return cmd
 }
 
-// complete receive exec parameters
-func (o *ExecOptions) complete(args []string) error {
+// Complete receive exec parameters
+func (o *ExecOptions) Complete(args []string) error {
 	var err error
 	o.Config, err = o.Factory.ToRESTConfig()
 	if err != nil {
@@ -105,7 +105,7 @@ func (o *ExecOptions) complete(args []string) error {
 		return err
 	}
 
-	// custom complete function
+	// custom Complete function
 	if o.Input.Complete != nil {
 		if err = o.Input.Complete(args); err != nil {
 			return err
@@ -114,8 +114,8 @@ func (o *ExecOptions) complete(args []string) error {
 	return nil
 }
 
-func (o *ExecOptions) validate() error {
-	// custom validate function
+func (o *ExecOptions) Validate() error {
+	// custom Validate function
 	if o.Input.Validate != nil {
 		if err := o.Input.Validate(); err != nil {
 			return err
@@ -151,7 +151,7 @@ func (o *ExecOptions) validate() error {
 	return nil
 }
 
-func (o *ExecOptions) run() error {
+func (o *ExecOptions) Run() error {
 	// ensure we can recover the terminal while attached
 	t := o.SetupTTY()
 

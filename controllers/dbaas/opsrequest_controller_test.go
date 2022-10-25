@@ -42,13 +42,23 @@ var _ = Describe("OpsRequest Controller", func() {
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
 
-	checkedCreateObj := func(obj client.Object) error {
-		err := k8sClient.Create(context.Background(), obj)
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return err
-		}
-		return nil
-	}
+	var ctx = context.Background()
+
+	BeforeEach(func() {
+		// Add any steup steps that needs to be executed before each test
+		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.OpsRequest{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		// Add any teardown steps that needs to be executed after each test
+	})
 
 	assureClusterDefObj := func() *dbaasv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
@@ -115,7 +125,7 @@ spec:
 `
 		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
-		Expect(checkedCreateObj(clusterDefinition)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, clusterDefinition)).Should(Succeed())
 		return clusterDefinition
 	}
 
@@ -142,7 +152,7 @@ spec:
 `
 		appVersion := &dbaasv1alpha1.AppVersion{}
 		Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(Succeed())
-		Expect(checkedCreateObj(appVersion)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, appVersion)).Should(Succeed())
 		return appVersion
 	}
 
@@ -183,16 +193,16 @@ spec:
 	deleteClusterNWait := func(key types.NamespacedName) error {
 		Expect(func() error {
 			f := &dbaasv1alpha1.Cluster{}
-			if err := k8sClient.Get(context.Background(), key, f); err != nil {
+			if err := k8sClient.Get(ctx, key, f); err != nil {
 				return client.IgnoreNotFound(err)
 			}
-			return k8sClient.Delete(context.Background(), f)
+			return k8sClient.Delete(ctx, f)
 		}()).Should(Succeed())
 
 		var err error
 		f := &dbaasv1alpha1.Cluster{}
 		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(context.Background(), key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(context.Background(), key, f) {
+		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
 			f = &dbaasv1alpha1.Cluster{}
 		}
 		return client.IgnoreNotFound(err)
@@ -217,10 +227,10 @@ spec:
 	Context("Test OpsRequest", func() {
 		It("Should Test all OpsRequest", func() {
 			clusterObject, clusterDef, _, key := newClusterObj(nil, nil)
-			Expect(k8sClient.Create(context.Background(), clusterObject)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, clusterObject)).Should(Succeed())
 
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDef.Name}, clusterDef)
+				_ = k8sClient.Get(ctx, client.ObjectKey{Name: clusterDef.Name}, clusterDef)
 				return clusterDef.Generation == clusterDef.Status.ObservedGeneration
 			}, timeout, interval).Should(BeTrue())
 
@@ -237,10 +247,10 @@ spec:
 					},
 				},
 			}
-			Expect(k8sClient.Create(context.Background(), verticalScalingOpsRequest)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, verticalScalingOpsRequest)).Should(Succeed())
 
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), client.ObjectKey{
+				_ = k8sClient.Get(ctx, client.ObjectKey{
 					Name:      verticalScalingOpsRequest.Name,
 					Namespace: verticalScalingOpsRequest.Namespace},
 					verticalScalingOpsRequest)
@@ -251,9 +261,9 @@ spec:
 			By("test OpsRequest is succeed")
 			patch := client.MergeFrom(verticalScalingOpsRequest.DeepCopy())
 			verticalScalingOpsRequest.Status.Phase = dbaasv1alpha1.SucceedPhase
-			Expect(k8sClient.Status().Patch(context.Background(), verticalScalingOpsRequest, patch)).Should(Succeed())
+			Expect(k8sClient.Status().Patch(ctx, verticalScalingOpsRequest, patch)).Should(Succeed())
 			Eventually(func() bool {
-				err := k8sClient.Get(context.Background(), client.ObjectKey{
+				err := k8sClient.Get(ctx, client.ObjectKey{
 					Name:      verticalScalingOpsRequest.Name,
 					Namespace: verticalScalingOpsRequest.Namespace},
 					verticalScalingOpsRequest)

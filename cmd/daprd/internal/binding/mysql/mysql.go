@@ -133,11 +133,6 @@ func (m *Mysql) InitDelay() error {
 		return err
 	}
 
-	err = db.Ping()
-	if err != nil {
-		return errors.Wrap(err, "unable to ping the DB")
-	}
-
 	m.db = db
 
 	return nil
@@ -152,12 +147,6 @@ func (m *Mysql) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindi
 			respSQLKey:       "test",
 			respStartTimeKey: startTime.Format(time.RFC3339Nano),
 		},
-	}
-
-	bootDuration := time.Now().Sub(bootTime).Seconds()
-	if bootDuration < 60 {
-		resp.Data = []byte("db not ready")
-		return resp, nil
 	}
 
 	if req == nil {

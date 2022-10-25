@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/leaanthony/debme"
+	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -52,14 +53,17 @@ type createParams struct {
 }
 
 const (
-	dbaasPrefix      = "OPENDBAAS"
-	defaultNamespace = "default"
+	dbaasPrefix = "OPENDBAAS"
 )
 
 var (
 	//go:embed cue/*
 	cueTemplates embed.FS
 )
+
+func init() {
+	viper.SetDefault(cmNamespaceKey, "default")
+}
 
 func (c createParams) getCacheBytesValue(key string, valueCreator func() ([]byte, error)) ([]byte, error) {
 	vIf, ok := (*c.cacheCtx)[key]
@@ -1612,7 +1616,10 @@ func getInstanceCmName(sts *appsv1.StatefulSet, tpl *dbaasv1alpha1.ConfigTemplat
 func generateConfigMapFromTpl(tplBuilder *ConfigTemplateBuilder, cmName string, tplCfg dbaasv1alpha1.ConfigTemplate, params createParams, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
 	// Render config template by TplEngine
 	// The template namespace must be the same as the ClusterDefinition namespace
-	configs, err := processConfigMapTemplate(ctx, cli, tplBuilder, tplCfg, params.clusterDefinition.GetNamespace())
+	configs, err := processConfigMapTemplate(ctx, cli, tplBuilder, client.ObjectKey{
+		Namespace: viper.GetString(cmNamespaceKey),
+		Name:      tplCfg.Name,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -1676,17 +1683,7 @@ func generateConfigMapWithTemplate(configs map[string]string, params createParam
 }
 
 // processConfigMapTemplate Render config file using template engine
-func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder *ConfigTemplateBuilder, tplCfg dbaasv1alpha1.ConfigTemplate, namespace string) (map[string]string, error) {
-	// if ClusterDefinition namespace is empty, ConfigMap namespace is default
-	if namespace == "" {
-		namespace = defaultNamespace
-	}
-
-	cmKey := client.ObjectKey{
-		Namespace: namespace,
-		Name:      tplCfg.Name,
-	}
-
+func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder *ConfigTemplateBuilder, cmKey client.ObjectKey) (map[string]string, error) {
 	cmObj := &corev1.ConfigMap{}
 	//  Require template configmap exist
 	if err := cli.Get(ctx, cmKey, cmObj); err != nil {

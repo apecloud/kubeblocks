@@ -42,6 +42,8 @@ spec:
             - "-zap-encoder={{ . }}"
             {{- end }}
           env:
+            - name: CM_NAMESPACE
+            - value: {{ .Release.Name }}
           {{- if .Values.dataProtection.disableVolumeSnapshot }}
             - name: NO_VOLUMESNAPSHOT
               value: "true"

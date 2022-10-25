@@ -109,6 +109,7 @@ rules:
   - get
   - list
   - patch
+  - watch
 - apiGroups:
   - ""
   resources:
@@ -387,23 +388,24 @@ rules:
   - update
   - watch
 - apiGroups:
-    - snapshot.storage.k8s.io
+  - snapshot.storage.k8s.io
   resources:
-    - volumesnapshots
+  - volumesnapshots
   verbs:
-    - create
-    - delete
-    - get
-    - list
-    - patch
-    - watch
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
-    - snapshot.storage.k8s.io
+  - snapshot.storage.k8s.io
   resources:
-    - volumesnapshots/finalizers
+  - volumesnapshots/finalizers
   verbs:
-    - update
-    - patch
+  - patch
+  - update
 - apiGroups:
   - storage.k8s.io
   resources:

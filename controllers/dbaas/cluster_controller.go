@@ -103,9 +103,10 @@ type ClusterReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.2/pkg/reconcile
 func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqCtx := intctrlutil.RequestCtx{
-		Ctx: ctx,
-		Req: req,
-		Log: log.FromContext(ctx).WithValues("cluster", req.NamespacedName),
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithValues("cluster", req.NamespacedName),
+		Recorder: r.Recorder,
 	}
 
 	cluster := &dbaasv1alpha1.Cluster{}
@@ -138,14 +139,14 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		Namespace: cluster.Namespace,
 		Name:      cluster.Spec.ClusterDefRef,
 	}, clusterdefinition); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
 	}
 	appversion := &dbaasv1alpha1.AppVersion{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: cluster.Namespace,
 		Name:      cluster.Spec.AppVersionRef,
 	}, appversion); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
 	}
 
 	if res, err = r.checkReferencedCRStatus(reqCtx, cluster, appversion.Status.Phase, dbaasv1alpha1.AppVersionKind); res != nil {
@@ -170,7 +171,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	if err = task.Exec(reqCtx.Ctx, r.Client); err != nil {
 		// record the event when the execution task reports an error.
-		r.Recorder.Event(cluster, corev1.EventTypeWarning, "RunTaskFailed", err.Error())
+		r.Recorder.Event(cluster, corev1.EventTypeWarning, intctrlutil.EventReasonRunTaskFailed, err.Error())
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
@@ -347,7 +348,7 @@ func (r *ClusterReconciler) checkReferencedCRStatus(reqCtx intctrlutil.RequestCt
 		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		return &res, err
 	}
-	r.Recorder.Event(cluster, corev1.EventTypeWarning, "ReferencedCRUnavailable", cluster.Status.Message)
+	r.Recorder.Event(cluster, corev1.EventTypeWarning, intctrlutil.EventReasonRefCRUnavailable, cluster.Status.Message)
 	res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
 	return &res, err
 }
@@ -390,6 +391,7 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 	for _, v := range statefulSetList.Items {
 		var componentIsRunning bool
 		// check whether the statefulset has reached the final state
+		// ps: StatefulSet.Status.AvailableReplicas supported after k8s v1.22
 		if v.Status.AvailableReplicas != *v.Spec.Replicas ||
 			v.Status.CurrentRevision != v.Status.UpdateRevision ||
 			v.Status.ObservedGeneration != v.GetGeneration() {

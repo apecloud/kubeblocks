@@ -20,12 +20,29 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+)
+
+const (
+	// EventReasonNotFoundCR referenced custom resource not found
+	EventReasonNotFoundCR = "NotFoundCR"
+	// EventReasonRefCRUnavailable  referenced custom resource is unavailable
+	EventReasonRefCRUnavailable = "ReferencedCRUnavailable"
+	// EventReasonDeletedCR deleted custom resource
+	EventReasonDeletedCR = "DeletedCR"
+	// EventReasonDeletingCR deleting custom resource
+	EventReasonDeletingCR = "DeletingCR"
+	// EventReasonCreatedCR created custom resource
+	EventReasonCreatedCR = "CreatedCR"
+	// EventReasonRunTaskFailed run task failed
+	EventReasonRunTaskFailed = "RunTaskFailed"
 )
 
 // RequestCtx wrapper for reconcile procedure context parameters
 type RequestCtx struct {
-	Ctx context.Context
-	Req ctrl.Request
-	Log logr.Logger
+	Ctx      context.Context
+	Req      ctrl.Request
+	Log      logr.Logger
+	Recorder record.EventRecorder
 }

@@ -18,10 +18,10 @@ spec:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-            - key: disktype
+            - key: node.kubernetes.io/instance-type
               operator: In
               values:
-              - cn-northwest-1c
+              - t3.medium # change to the proper instance type
 
   fio:
     cmdLineArgs: -filename=/data/test-fio-job-file -direct=1 -rw=randwrite -ioengine=psync -bs=4K -size=1M  -group_reporting -numjobs=1 -name=ramdisk_test -randrepeat=0 -time_base=1 -runtime=100

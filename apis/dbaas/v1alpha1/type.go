@@ -29,7 +29,7 @@ const (
 	OpsRequestKind        = "OpsRequestKind"
 )
 
-// CR.Status.Phase
+// Phase defines the CR .Status.Phase
 // +enum
 type Phase string
 
@@ -45,7 +45,7 @@ const (
 	SucceedPhase     Phase = "Succeed"
 )
 
-// CR.Status.ClusterDefSyncStatus
+// Status define CR .Status.ClusterDefSyncStatus
 // +enum
 type Status string
 
@@ -54,6 +54,7 @@ const (
 	InSyncStatus    Status = "InSync"
 )
 
+// OpsType defines operation types.
 // +enum
 type OpsType string
 

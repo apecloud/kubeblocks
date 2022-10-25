@@ -22,7 +22,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -155,7 +154,7 @@ func parseMycnf(config interface{}) (string, error) {
 func customizeTLS(sslCA string, sslCert string, sslKey string) error {
 	var tlsCfg tls.Config
 	caBundle := x509.NewCertPool()
-	pemCA, err := ioutil.ReadFile(sslCA)
+	pemCA, err := os.ReadFile(sslCA)
 	if err != nil {
 		return err
 	}

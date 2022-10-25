@@ -1,0 +1,21 @@
+apiVersion: benchmark.infracreate.com/v1alpha1
+kind: Bench
+metadata:
+  name: fio-test
+spec:
+  type: fio
+  benchJob:
+    image: xridge/fio:3.13
+  fio:
+    cmdLineArgs: -filename=/data/test-fio-job-file -direct=1 -rw=randwrite -ioengine=psync -bs=4K -size=1M  -group_reporting -numjobs=1 -name=ramdisk_test -randrepeat=0 -time_base=1 -runtime=100
+    volume:
+      autoPersistentVolumeClaimSpec:
+        storageClassName: ebs-gp3-xfs
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+      volumeSource:
+        persistentVolumeClaim:
+          claimName: AUTO_CREATED

@@ -45,6 +45,32 @@ rules:
   - update
   - watch
 - apiGroups:
+  - benchmark.infracreate.com
+  resources:
+  - benches
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - benchmark.infracreate.com
+  resources:
+  - benches/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - benchmark.infracreate.com
+  resources:
+  - benches/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - coordination.k8s.io
   resources:
   - leases
@@ -112,6 +138,13 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - nodes
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - ""
+  resources:
   - persistentvolumeclaims/status
   - resourcequotas/status
   - services/status
@@ -123,6 +156,15 @@ rules:
   - pods/exec
   verbs:
   - create
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - get
+  - list
+  - update
+  - watch
 - apiGroups:
   - dataprotection.infracreate.com
   resources:

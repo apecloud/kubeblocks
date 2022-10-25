@@ -48,6 +48,7 @@ spec:
             description: ClusterDefinitionSpec defines the desired state of ClusterDefinition
             properties:
               cluster:
+                description: Strategies such as order of every component in operation
                 properties:
                   strategies:
                     properties:
@@ -98,8 +99,8 @@ spec:
               components:
                 description: List of components belonging to the cluster
                 items:
-                  description: A component is a group of pods, pods in one component
-                    usually share the same data
+                  description: ClusterDefinitionComponent is a group of pods, pods
+                    in one component usually share the same data
                   properties:
                     characterType:
                       description: CharacterType defines well-known database component

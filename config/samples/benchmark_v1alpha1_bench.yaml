@@ -1,0 +1,6 @@
+apiVersion: benchmark.infracreate.com/v1alpha1
+kind: Bench
+metadata:
+  name: bench-sample
+spec:
+  # TODO(user): Add fields here

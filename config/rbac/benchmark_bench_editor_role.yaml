@@ -1,0 +1,24 @@
+# permissions for end users to edit benches.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: bench-editor-role
+rules:
+- apiGroups:
+  - benchmark.infracreate.com
+  resources:
+  - benches
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - benchmark.infracreate.com
+  resources:
+  - benches/status
+  verbs:
+  - get

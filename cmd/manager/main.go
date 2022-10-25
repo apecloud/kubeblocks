@@ -33,8 +33,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	benchmarkv1alpha1 "github.com/apecloud/kubeblocks/apis/benchmark/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	benchmarkcontrollers "github.com/apecloud/kubeblocks/controllers/benchmark"
 	dataprotectioncontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	dbaascontrollers "github.com/apecloud/kubeblocks/controllers/dbaas"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
@@ -60,6 +62,7 @@ func init() {
 	utilruntime.Must(dbaasv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(dataprotectionv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(snapshotv1.AddToScheme(scheme))
+	utilruntime.Must(benchmarkv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 
 	viper.SetConfigName("config")                          // name of config file (without extension)
@@ -240,6 +243,13 @@ func main() {
 		Recorder: mgr.GetEventRecorderFor("ops-request-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "OpsRequest")
+		os.Exit(1)
+	}
+	if err = (&benchmarkcontrollers.BenchReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Bench")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

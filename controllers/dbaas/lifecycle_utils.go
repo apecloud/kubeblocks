@@ -92,7 +92,7 @@ func (c createParams) getCacheCUETplValue(key string, valueCreator func() (*intc
 func (c createParams) getConfigTemplates() ([]dbaasv1alpha1.ConfigTemplate, error) {
 	var appVersionTpl []dbaasv1alpha1.ConfigTemplate
 	for _, component := range c.appVersion.Spec.Components {
-		if component.Type == c.component.Name {
+		if component.Type == c.component.Type {
 			appVersionTpl = component.ConfigTemplateRefs
 			break
 		}
@@ -135,7 +135,7 @@ func mergeConfigTemplates(appVersionTpl []dbaasv1alpha1.ConfigTemplate, cdTpl []
 
 func (c createParams) getComponentConfigTemplates() []dbaasv1alpha1.ConfigTemplate {
 	for _, component := range c.clusterDefinition.Spec.Components {
-		if component.TypeName == c.component.Name {
+		if component.TypeName == c.component.Type {
 			return component.ConfigTemplateRefs
 		}
 	}

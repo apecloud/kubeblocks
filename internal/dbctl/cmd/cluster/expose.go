@@ -25,7 +25,8 @@ const (
 type ExposeOptions struct {
 	Namespace string
 	Name      string
-	reverse   bool
+	on        bool
+	off       bool
 
 	client dynamic.Interface
 	genericclioptions.IOStreams
@@ -38,13 +39,26 @@ func NewExposeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Use:   "expose",
 		Short: "Expose a database cluster",
 		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(o.Validate(args))
 			cmdutil.CheckErr(o.Complete(f, args))
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	cmd.Flags().BoolVar(&o.reverse, "reverse", o.reverse, "Stop expose a database cluster")
+	cmd.Flags().BoolVar(&o.on, "on", false, "Expose a database cluster")
+	cmd.Flags().BoolVar(&o.off, "off", false, "Stop expose a database cluster")
 
 	return cmd
+}
+
+func (o *ExposeOptions) Validate(args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("missing cluster name")
+	}
+
+	if o.on == o.off {
+		return fmt.Errorf("invalid options")
+	}
+	return nil
 }
 
 func (o *ExposeOptions) Complete(f cmdutil.Factory, args []string) error {
@@ -93,9 +107,9 @@ func (o *ExposeOptions) Run() error {
 		if annotations == nil {
 			annotations = make(map[string]string)
 		}
-		if !o.reverse {
+		if o.on {
 			annotations[ServiceLBTypeAnnotationKey] = ServiceLBTypeAnnotationValue
-		} else {
+		} else if o.off {
 			delete(annotations, ServiceLBTypeAnnotationKey)
 		}
 		item.SetAnnotations(annotations)
@@ -104,9 +118,10 @@ func (o *ExposeOptions) Run() error {
 			return errors.Wrapf(err, "Failed to update service %s/%s", item.GetNamespace(), svc.GetName())
 		}
 	}
-	if !o.reverse {
+
+	if o.on {
 		_, _ = fmt.Fprintf(o.Out, "Cluster %s is exposed\n", o.Name)
-	} else {
+	} else if o.off {
 		_, _ = fmt.Fprintf(o.Out, "Cluster %s stopped exposing\n", o.Name)
 	}
 	return nil

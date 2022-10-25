@@ -86,7 +86,7 @@ func (o *options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 }
 
 func (o *installOptions) run() error {
-	fmt.Fprintf(o.Out, "Installing KubeBlocks %s ...\n", o.Version)
+	fmt.Fprintf(o.Out, "Installing KubeBlocks %s\n", o.Version)
 
 	if o.Monitor {
 		o.Sets = append(o.Sets, kMonitorParam)
@@ -99,18 +99,21 @@ func (o *installOptions) run() error {
 		Sets:      o.Sets,
 	}
 
-	if err := installer.Install(); err != nil {
+	var notes string
+	var err error
+	if notes, err = installer.Install(); err != nil {
 		return errors.Wrap(err, "Failed to install KubeBlocks")
 	}
 
 	fmt.Fprintf(o.Out, "\nKubeBlocks %s Install SUCCESSFULLY!\n"+
-		"You can now create a database cluster by running the following command:\n"+
-		"\tdbctl cluster create <you cluster name>\n", o.Version)
+		"You can get help information on how to create a database cluster:\n"+
+		"\tdbctl cluster create -h\n\n", o.Version)
+	fmt.Fprint(o.Out, notes)
 	return nil
 }
 
 func (o *options) run() error {
-	fmt.Fprintln(o.Out, "Uninstalling KubeBlocks ...")
+	fmt.Fprintln(o.Out, "Uninstalling KubeBlocks")
 
 	installer := Installer{
 		cfg:       o.cfg,

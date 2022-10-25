@@ -304,7 +304,8 @@ func printGuide(cloudProvider string, hostIP string, replicas int) error {
 
 func (o *initOptions) installKubeBlocks() error {
 	chart := helm.KubeBlocksHelmChart(version.DefaultKubeBlocksVersion, dbClusterNamespace)
-	return chart.Install(o.helmCfg)
+	_, err := chart.Install(o.helmCfg)
+	return err
 }
 
 func (o *initOptions) installCluster() error {
@@ -313,5 +314,6 @@ func (o *initOptions) installCluster() error {
 		return err
 	}
 
-	return engine.HelmInstallOpts().Install(o.helmCfg)
+	_, err = engine.HelmInstallOpts().Install(o.helmCfg)
+	return err
 }

@@ -20,7 +20,6 @@
 {{- end }}
 
 {{ template "_divider" }}
-
 {{ if .Values.prometheus.server.enabled }}
 The Prometheus Server can be accessed via port {{ .Values.prometheus.server.service.servicePort }} on the following DNS name from within your cluster:
 
@@ -51,16 +50,6 @@ Get the Prometheus Server URL by running these commands in the same shell:
     export POD_NAME=$(kubectl get pods --namespace {{ template "kubeblocks.prometheus.namespace" . }} -l "app=prometheus,component={{ .Values.prometheus.server.name }}" -o jsonpath="{.items[0].metadata.name}")
     kubectl --namespace {{ template "kubeblocks.prometheus.namespace" . }} port-forward $POD_NAME 9090
 {{- end }}
-{{- end }}
-
-{{- if .Values.prometheus.server.persistentVolume.enabled }}
-{{- else }}
-
-#################################################################################
-######   WARNING: Persistence is disabled!!! You will lose your data when   #####
-######            the Prometheus Server pod is terminated.                  #####
-#################################################################################
-
 {{- end }}
 {{- end }}
 
@@ -95,16 +84,6 @@ Get the Prometheus Alertmanager URL by running these commands in the same shell:
     export POD_NAME=$(kubectl get pods --namespace {{ template "kubeblocks.prometheus.namespace" . }} -l "app=prometheus,component={{ .Values.prometheus.alertmanager.name }}" -o jsonpath="{.items[0].metadata.name}")
     kubectl --namespace {{ template "kubeblocks.prometheus.namespace" . }} port-forward $POD_NAME 9093
 {{- end }}
-{{- end }}
-
-{{- if .Values.prometheus.alertmanager.persistentVolume.enabled }}
-{{- else }}
-
-#################################################################################
-######   WARNING: Persistence is disabled!!! You will lose your data when   #####
-######            the Prometheus AlertManager pod is terminated.            #####
-#################################################################################
-
 {{- end }}
 {{- end }}
 
@@ -155,6 +134,8 @@ Get the Grafana Server URL by running these commands in the same shell:
 
     export POD_NAME=$(kubectl get pods --namespace {{ template "kubeblocks.grafana.namespace" . }} -l "app.kubernetes.io/name=grafana,app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
     kubectl --namespace {{ template "kubeblocks.grafana.namespace" . }} port-forward $POD_NAME 3000
+
+    Open url in browser: http://127.0.0.1:3000
 {{- end }}
 {{- end }}
 
@@ -163,13 +144,5 @@ Get your '{{ .Values.grafana.adminUser }}' user password by running:
    kubectl get secret --namespace {{ template "kubeblocks.grafana.namespace" . }} {{ template "kubeblocks.grafana.fullname" . }} -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
 
 Login with the password and the username: {{ .Values.grafana.adminUser }}
-{{- if .Values.grafana.persistence.enabled }}
-{{- else }}
 
-#################################################################################
-######   WARNING: Persistence is disabled!!! You will lose your data when   #####
-######            the Grafana pod is terminated.                            #####
-#################################################################################
-
-{{- end }}
 {{- end }}

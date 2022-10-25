@@ -600,8 +600,10 @@ HOSTPATHPLUGIN_IMG=$(MINIKUBE_IMAGE_REPO)/hostpathplugin:v1.6.0
 .PHONY: minikube-start
 minikube-start: DOCKER_PULL_CMD=ssh --native-ssh=false docker pull
 minikube-start: minikube ## Start minikube cluster.
+ifneq (, $(shell which minikube))
 ifeq (, $(shell $(MINIKUBE) status -n minikube -ojson | jq -r '.Host' | grep Running))
 	$(MINIKUBE) start --kubernetes-version=$(K8S_VERSION) --registry-mirror=${REGISTRY_MIRROR} --image-repository=${MINIKUBE_IMAGE_REPO}
+endif
 endif
 	$(MINIKUBE) update-context
 	$(MINIKUBE) addons enable metrics-server

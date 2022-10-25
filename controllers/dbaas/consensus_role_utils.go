@@ -103,7 +103,7 @@ func SetupConsensusRoleObservingLoop(log logger.Logger) {
 	}
 
 	// TODO parameterize interval
-	go wait.UntilWithContext(context.TODO(), roleObserve, time.Second*5)
+	go wait.UntilWithContext(context.TODO(), roleObserve, time.Second*2)
 }
 
 func createRoleChangedEvent(podName, role string) (*corev1.Event, error) {

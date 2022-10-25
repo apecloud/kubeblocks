@@ -54,9 +54,10 @@ type ClusterDefinitionReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.2/pkg/reconcile
 func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqCtx := intctrlutil.RequestCtx{
-		Ctx: ctx,
-		Req: req,
-		Log: log.FromContext(ctx).WithValues("clusterDefinition", req.NamespacedName),
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithValues("clusterDefinition", req.NamespacedName),
+		Recorder: r.Recorder,
 	}
 
 	dbClusterDef := &dbaasv1alpha1.ClusterDefinition{}
@@ -96,7 +97,7 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if err = r.Client.Status().Patch(reqCtx.Ctx, dbClusterDef, statusPatch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-
+	intctrlutil.RecordCreatedEvent(r.Recorder, dbClusterDef)
 	return intctrlutil.Reconciled()
 }
 

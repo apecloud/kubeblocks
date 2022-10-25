@@ -52,7 +52,8 @@ var _ = Describe("helm util", func() {
 		}
 		cfg := FakeActionConfig()
 		Expect(cfg != nil).Should(BeTrue())
-		Expect(o.Install(cfg)).Should(HaveOccurred())
+		_, err := o.Install(cfg)
+		Expect(err).Should(HaveOccurred())
 		Expect(o.UnInstall(cfg)).Should(HaveOccurred())
 	})
 })

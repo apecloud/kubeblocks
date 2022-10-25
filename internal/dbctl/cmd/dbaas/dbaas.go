@@ -107,7 +107,7 @@ func (o *installOptions) run() error {
 
 	fmt.Fprintf(o.Out, "\nKubeBlocks %s Install SUCCESSFULLY!\n\n"+
 		"1. Basic commands for cluster:\n"+
-		"    dbctl cluster create -h     # help information about creating a database cluste\n"+
+		"    dbctl cluster create -h     # help information about creating a database cluster\n"+
 		"    dbctl cluster list          # list all database clusters\n"+
 		"    dbctl cluster describe <cluster name>  # get cluster information\n\n"+
 		"2. Uninstall DBaaS:\n"+

@@ -97,10 +97,14 @@ type ClusterDefinitionCluster struct {
 }
 
 type ConfigTemplate struct {
+	// Specify the name of the referenced configuration template, which is a configmap object
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=128
 	Name string `json:"name,omitempty"`
 
+	// VolumeName is the volume name of PodTemplate, which the configuration file produced through the configuration template will be mounted to the corresponding volume.
+	// The volume name must be defined in podSpec.containers[*].volumeMounts.
+	// reference example: https://github.com/apecloud/kubeblocks/blob/main/examples/dbaas/mysql_clusterdefinition.yaml#L12
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32
 	VolumeName string `json:"volumeName,omitempty"`

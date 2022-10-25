@@ -77,67 +77,72 @@ func NewExecOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, inpu
 	}
 }
 
-func (e *ExecOptions) Build() *cobra.Command {
+func (o *ExecOptions) Build() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   e.Input.Use,
-		Short: e.Input.Short,
+		Use:   o.Input.Use,
+		Short: o.Input.Short,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(e.complete(e.Factory, args))
-			cmdutil.CheckErr(e.validate())
-			cmdutil.CheckErr(e.run())
+			cmdutil.CheckErr(o.complete(o.Factory, args))
+			cmdutil.CheckErr(o.validate())
+			cmdutil.CheckErr(o.run())
 		},
 	}
-	if e.Input.AddFlags != nil {
-		e.Input.AddFlags(cmd)
+	if o.Input.AddFlags != nil {
+		o.Input.AddFlags(cmd)
 	}
 	return cmd
 }
 
-// complete receive kubect exec parameters
-func (e *ExecOptions) complete(f cmdutil.Factory, args []string) error {
-	customParams, err := e.Input.Complete(f, args)
-	if err != nil || customParams == nil {
-		return err
+// complete receive exec parameters
+func (o *ExecOptions) complete(f cmdutil.Factory, args []string) error {
+	var err error
+	var customParams *ExecParams
+
+	if o.Input.Complete != nil {
+		customParams, err = o.Input.Complete(f, args)
+		if err != nil || customParams == nil {
+			return err
+		}
 	}
-	e.Params = customParams
+	o.Params = customParams
 	return nil
 }
 
-func (e *ExecOptions) validate() error {
-	if e.Input.Validate != nil {
-		if err := e.Input.Validate(); err != nil {
+func (o *ExecOptions) validate() error {
+	if o.Input.Validate != nil {
+		if err := o.Input.Validate(); err != nil {
 			return err
 		}
 	}
 
-	if len(e.Params.Pod.Name) == 0 {
+	if len(o.Params.Pod.Name) == 0 {
 		return fmt.Errorf("pod, type/name must be specified")
 	}
-	if len(e.Params.Command) == 0 {
+	if len(o.Params.Command) == 0 {
 		return fmt.Errorf("you must specify at least one command for the container")
 	}
-	if e.Out == nil || e.ErrOut == nil {
+	if o.Out == nil || o.ErrOut == nil {
 		return fmt.Errorf("both output and error output must be provided")
 	}
 	return nil
 }
 
-func (e *ExecOptions) run() error {
-	pod := e.Params.Pod
+func (o *ExecOptions) run() error {
+	pod := o.Params.Pod
 	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
 		return fmt.Errorf("cannot exec into a container in a completed pod; current phase is %s", pod.Status.Phase)
 	}
-	containerName := e.Params.ContainerName
+	containerName := o.Params.ContainerName
 	if len(containerName) == 0 {
-		container, err := podcmd.FindOrDefaultContainerByName(pod, containerName, e.Quiet, e.ErrOut)
+		container, err := podcmd.FindOrDefaultContainerByName(pod, containerName, o.Quiet, o.ErrOut)
 		if err != nil {
 			return err
 		}
 		containerName = container.Name
 	}
-	command := e.Params.Command
+	command := o.Params.Command
 	// ensure we can recover the terminal while attached
-	t := e.SetupTTY()
+	t := o.SetupTTY()
 
 	var sizeQueue remotecommand.TerminalSizeQueue
 	if t.Raw {
@@ -146,11 +151,11 @@ func (e *ExecOptions) run() error {
 
 		// unset p.Err if it was previously set because both stdout and stderr go over p.Out when tty is
 		// true
-		e.ErrOut = nil
+		o.ErrOut = nil
 	}
 
 	fn := func() error {
-		restClient, err := restclient.RESTClientFor(e.Params.Config)
+		restClient, err := restclient.RESTClientFor(o.Params.Config)
 		if err != nil {
 			return err
 		}
@@ -163,13 +168,13 @@ func (e *ExecOptions) run() error {
 		req.VersionedParams(&corev1.PodExecOptions{
 			Container: containerName,
 			Command:   command,
-			Stdin:     e.Stdin,
-			Stdout:    e.Out != nil,
-			Stderr:    e.ErrOut != nil,
+			Stdin:     o.Stdin,
+			Stdout:    o.Out != nil,
+			Stderr:    o.ErrOut != nil,
 			TTY:       t.Raw,
 		}, scheme.ParameterCodec)
 
-		return e.Executor.Execute("POST", req.URL(), e.Params.Config, e.In, e.Out, e.ErrOut, t.Raw, sizeQueue)
+		return o.Executor.Execute("POST", req.URL(), o.Params.Config, o.In, o.Out, o.ErrOut, t.Raw, sizeQueue)
 	}
 
 	if err := t.Safe(fn); err != nil {

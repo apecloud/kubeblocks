@@ -6,5 +6,22 @@ spec:
   type: sysbench
   benchJob:
     image: perconalab/sysbench:latest
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "1000m"
+      limits:
+        memory: "128Mi"
+        cpu: "2000m"
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: node.kubernetes.io/instance-type
+              operator: In
+              values:
+              - t3.medium # change to the proper instance type
+
   sysbench:
     cmdLineArgs: sysbench oltp_read_write --threads=64 --tables=64 --table-size=1000000 --mysql-host=172.31.39.119 --mysql-port=3306 --mysql-db=testdbx --mysql-user=root --mysql-password="" run 

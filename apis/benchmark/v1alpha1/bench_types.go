@@ -26,6 +26,18 @@ import (
 type BenchJob struct {
 	// Image defines the fio docker image used for the benchmark
 	Image string `json:"image"`
+
+	// Resources describes requests and limits of benchmark
+	// +optional
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Affinity describes affinities of one benchmark which specific by users
+	// +optional
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
+	// If specified, the pod's tolerations.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
 // BenchType The bechmark we supported now. Valid values are Fio, Sysbench.

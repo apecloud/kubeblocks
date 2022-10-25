@@ -6,6 +6,23 @@ spec:
   type: fio
   benchJob:
     image: xridge/fio:3.13
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "250m"
+      limits:
+        memory: "128Mi"
+        cpu: "500m"
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: disktype
+              operator: In
+              values:
+              - cn-northwest-1c
+
   fio:
     cmdLineArgs: -filename=/data/test-fio-job-file -direct=1 -rw=randwrite -ioengine=psync -bs=4K -size=1M  -group_reporting -numjobs=1 -name=ramdisk_test -randrepeat=0 -time_base=1 -runtime=100
     volume:

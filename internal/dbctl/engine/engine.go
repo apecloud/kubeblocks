@@ -30,9 +30,9 @@ type ExecInfo struct {
 }
 
 type Interface interface {
-	GetConnectURL(database string) []string
-	GetEngineName() string
-	GetEngineContainer() string
+	ConnectCommand(database string) []string
+	EngineName() string
+	EngineContainer() string
 }
 
 func New(typeName string) (Interface, error) {

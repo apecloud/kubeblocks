@@ -10,15 +10,15 @@ var _ = Describe("Engine", func() {
 		typeName := stateMysql
 		engine, _ := New(typeName)
 		Expect(engine).ShouldNot(BeNil())
-		Expect(engine.GetEngineName()).Should(Equal(mysqlEngineName))
+		Expect(engine.EngineName()).Should(Equal(mysqlEngineName))
 
-		url := engine.GetConnectURL("test")
+		url := engine.ConnectCommand("test")
 		Expect(len(url)).Should(Equal(3))
 
-		url = engine.GetConnectURL("")
+		url = engine.ConnectCommand("")
 		Expect(len(url)).Should(Equal(1))
 
-		Expect(engine.GetEngineContainer()).Should(Equal(mysqlContainerName))
+		Expect(engine.EngineContainer()).Should(Equal(mysqlContainerName))
 	})
 
 	It("new unknown engine", func() {

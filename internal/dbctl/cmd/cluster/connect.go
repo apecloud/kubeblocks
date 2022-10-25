@@ -76,8 +76,8 @@ func (o *ConnectOptions) complete(args []string) error {
 		return err
 	}
 
-	o.Command = engine.GetConnectURL(o.database)
-	o.ContainerName = engine.GetEngineName()
+	o.Command = engine.ConnectCommand(o.database)
+	o.ContainerName = engine.EngineName()
 	o.Pod = pod
 	return nil
 }

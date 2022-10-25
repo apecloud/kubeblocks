@@ -26,17 +26,17 @@ const (
 
 var _ Interface = &mysql{}
 
-func (m *mysql) GetConnectURL(database string) []string {
+func (m *mysql) ConnectCommand(database string) []string {
 	if len(database) > 0 {
 		return []string{mysqlClient, "-D", database}
 	}
 	return []string{mysqlClient}
 }
 
-func (m *mysql) GetEngineName() string {
+func (m *mysql) EngineName() string {
 	return mysqlEngineName
 }
 
-func (m *mysql) GetEngineContainer() string {
+func (m *mysql) EngineContainer() string {
 	return mysqlContainerName
 }

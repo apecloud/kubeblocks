@@ -73,9 +73,10 @@ func (r *BackupJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// NOTES:
 	// setup common request context
 	reqCtx := intctrlutil.RequestCtx{
-		Ctx: ctx,
-		Req: req,
-		Log: log.FromContext(ctx).WithValues("backupJob", req.NamespacedName),
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithValues("backupJob", req.NamespacedName),
+		Recorder: r.Recorder,
 	}
 	// 1. Get backupjob obj
 	// 2. if not found, get batchv1 job obj

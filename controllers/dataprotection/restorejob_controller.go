@@ -65,9 +65,10 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// NOTES:
 	// setup common request context
 	reqCtx := intctrlutil.RequestCtx{
-		Ctx: ctx,
-		Req: req,
-		Log: log.FromContext(ctx).WithValues("restoreJob", req.NamespacedName),
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithValues("restoreJob", req.NamespacedName),
+		Recorder: r.Recorder,
 	}
 	restoreJob := &dataprotectionv1alpha1.RestoreJob{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, restoreJob); err != nil {

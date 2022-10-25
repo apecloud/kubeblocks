@@ -1,0 +1,10 @@
+apiVersion: benchmark.infracreate.com/v1alpha1
+kind: Bench
+metadata:
+  name: sysbench
+spec:
+  type: sysbench
+  benchJob:
+    image: perconalab/sysbench:latest
+  sysbench:
+    cmdLineArgs: sysbench oltp_read_write --threads=64 --tables=64 --table-size=1000000 --mysql-host=172.31.39.119 --mysql-port=3306 --mysql-db=testdbx --mysql-user=root --mysql-password="" run 

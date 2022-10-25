@@ -49,7 +49,8 @@ type BenchReconciler struct {
 func (r *BenchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	logging := log.FromContext(ctx).WithValues("bench", req.NamespacedName)
+	logging.Info("get a reqeust", "request", req)
 
 	return ctrl.Result{}, nil
 }

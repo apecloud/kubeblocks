@@ -131,10 +131,12 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 		duplicateComponentNames = make(map[string]struct{})
 		componentNameMap        = make(map[string]struct{})
 		componentTypeMap        = make(map[string]struct{})
+		componentMap            = make(map[string]ClusterDefinitionComponent)
 	)
 
 	for _, v := range clusterDef.Spec.Components {
 		componentTypeMap[v.TypeName] = struct{}{}
+		componentMap[v.TypeName] = v
 	}
 
 	for _, v := range r.Spec.Components {
@@ -146,7 +148,6 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 			duplicateComponentNames[v.Name] = struct{}{}
 		}
 		componentNameMap[v.Name] = struct{}{}
-		// TODO validate roleGroups
 	}
 	if len(invalidComponentTypes) > 0 {
 		*allErrs = append(*allErrs, field.NotFound(field.NewPath("spec.components[*].type"),

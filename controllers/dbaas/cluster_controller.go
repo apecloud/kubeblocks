@@ -18,8 +18,10 @@ package dbaas
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -38,12 +40,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/apecloud/kubeblocks/controllers/k8score"
+
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 func init() {
 	clusterDefUpdateHandlers["cluster"] = clusterUpdateHandler
+	k8score.EventHandlerMap["cluster-controller"] = &ClusterReconciler{}
 }
 
 func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *dbaasv1alpha1.ClusterDefinition) error {
@@ -81,6 +86,162 @@ type ClusterReconciler struct {
 	Recorder record.EventRecorder
 }
 
+// TODO probeMessage should be defined by @xuanchi
+type probeMessage struct {
+	Data probeMessageData `json:"data,omitempty"`
+}
+
+type probeMessageData struct {
+	Role string `json:"role,omitempty"`
+}
+
+func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, event *corev1.Event) error {
+	if event.InvolvedObject.FieldPath != k8score.ProbeRoleChangedCheckPath {
+		return nil
+	}
+
+	// get role
+	message := &probeMessage{}
+	err := json.Unmarshal([]byte(event.Message), message)
+	if err != nil {
+		// not role related message, ignore it
+		reqCtx.Log.Info("not role message", "message", event.Message, "error", err)
+		return nil
+	}
+	role := strings.ToLower(message.Data.Role)
+	podName := types.NamespacedName{
+		Namespace: event.InvolvedObject.Namespace,
+		Name:      event.InvolvedObject.Name,
+	}
+
+	return updateConsensusSetRoleLabel(cli, reqCtx.Ctx, podName, role)
+}
+
+func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName types.NamespacedName, role string) error {
+	// get pod
+	pod := &corev1.Pod{}
+	if err := cli.Get(ctx, podName, pod); err != nil {
+		return err
+	}
+
+	// update label
+	patch := client.MergeFrom(pod.DeepCopy())
+	pod.Labels[consensusSetRoleLabelKey] = role
+	err := cli.Patch(ctx, pod, patch)
+	if err != nil {
+		return err
+	}
+
+	// update cluster status
+	// get cluster obj
+	cluster := &dbaasv1alpha1.Cluster{}
+	err = cli.Get(ctx, types.NamespacedName{
+		Namespace: pod.Namespace,
+		Name:      pod.Labels[appInstanceLabelKey],
+	}, cluster)
+	if err != nil {
+		return err
+	}
+
+	// get componentDef this pod belongs to
+	componentName := pod.Labels[appComponentLabelKey]
+	typeName := getComponentTypeName(*cluster, componentName)
+	componentDef, err := getComponent(ctx, cli, cluster, typeName)
+	if err != nil {
+		return err
+	}
+
+	// get all role names
+	leaderName := componentDef.ConsensusSpec.Leader.Name
+	followerNames := make([]string, 0)
+	for _, follower := range componentDef.ConsensusSpec.Followers {
+		followerNames = append(followerNames, follower.Name)
+	}
+	learnerName := ""
+	if componentDef.ConsensusSpec.Learner != nil {
+		learnerName = componentDef.ConsensusSpec.Learner.Name
+	}
+
+	// prepare cluster status patch
+	patch = client.MergeFrom(cluster.DeepCopy())
+	if cluster.Status.Components == nil {
+		cluster.Status.Components = make(map[string]*dbaasv1alpha1.ClusterStatusComponent)
+	}
+	if cluster.Status.Components[componentName] == nil {
+		cluster.Status.Components[componentName] = &dbaasv1alpha1.ClusterStatusComponent{
+			Type:  typeName,
+			Phase: dbaasv1alpha1.RunningPhase,
+			ConsensusSetStatus: &dbaasv1alpha1.ConsensusSetStatus{
+				Leader: consensusSetStatusDefaultPodName,
+			},
+		}
+	}
+	componentStatus := cluster.Status.Components[componentName]
+	if componentStatus.ConsensusSetStatus == nil {
+		componentStatus.ConsensusSetStatus = &dbaasv1alpha1.ConsensusSetStatus{
+			Leader: consensusSetStatusDefaultPodName,
+		}
+	}
+	consensusSetStatus := componentStatus.ConsensusSetStatus
+
+	resetLeader := func() {
+		if consensusSetStatus.Leader == pod.Name {
+			consensusSetStatus.Leader = consensusSetStatusDefaultPodName
+		}
+	}
+	resetLearner := func() {
+		if consensusSetStatus.Learner == pod.Name {
+			consensusSetStatus.Learner = consensusSetStatusDefaultPodName
+		}
+	}
+
+	resetFollower := func() {
+		for index, pName := range consensusSetStatus.Followers {
+			if pName == pod.Name {
+				consensusSetStatus.Followers = append(consensusSetStatus.Followers[:index], consensusSetStatus.Followers[index+1:]...)
+			}
+		}
+	}
+	// set pod.Name to the right status field
+	needUpdate := false
+	switch role {
+	case leaderName:
+		consensusSetStatus.Leader = pod.Name
+		resetLearner()
+		resetFollower()
+		needUpdate = true
+	case learnerName:
+		consensusSetStatus.Learner = pod.Name
+		resetLeader()
+		resetFollower()
+		needUpdate = true
+	default:
+		for _, name := range followerNames {
+			if role == name {
+				exist := false
+				for _, pName := range consensusSetStatus.Followers {
+					if pName == pod.Name {
+						exist = true
+					}
+				}
+				if !exist {
+					consensusSetStatus.Followers = append(consensusSetStatus.Followers, pod.Name)
+					resetLeader()
+					resetLearner()
+					needUpdate = true
+				}
+			}
+		}
+	}
+
+	// finally, update cluster status
+	if needUpdate {
+		return cli.Status().Patch(ctx, cluster, patch)
+	}
+
+	return nil
+}
+
 //+kubebuilder:rbac:groups=dbaas.infracreate.com,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=dbaas.infracreate.com,resources=clusters/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=dbaas.infracreate.com,resources=clusters/finalizers,verbs=update
@@ -109,6 +270,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		Recorder: r.Recorder,
 	}
 
+	reqCtx.Log.Info("get cluster", "cluster", req.NamespacedName)
 	cluster := &dbaasv1alpha1.Cluster{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -134,6 +296,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.Reconciled()
 	}
 
+	reqCtx.Log.Info("get clusterdef and appversion")
 	clusterdefinition := &dbaasv1alpha1.ClusterDefinition{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: cluster.Namespace,
@@ -157,6 +320,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return *res, err
 	}
 
+	reqCtx.Log.Info("update cluster status")
 	if err = r.updateClusterPhaseToCreatingOrUpdating(reqCtx, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -169,7 +333,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	if err = task.Exec(reqCtx.Ctx, r.Client); err != nil {
+	if err = task.Exec(reqCtx, r.Client); err != nil {
 		// record the event when the execution task reports an error.
 		r.Recorder.Event(cluster, corev1.EventTypeWarning, intctrlutil.EventReasonRunTaskFailed, err.Error())
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -313,21 +477,19 @@ func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *d
 	}
 
 	inNS := client.InNamespace(cluster.Namespace)
-	appName := fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name)
 	for _, component := range clusterDef.Spec.Components {
-		for _, roleGroup := range component.RoleGroups {
-			ml := client.MatchingLabels{
-				appInstanceLabelKey: fmt.Sprintf("%s-%s-%s", cluster.GetName(), component.TypeName, roleGroup),
-				appNameLabelKey:     appName,
-			}
-			pvcList := &corev1.PersistentVolumeClaimList{}
-			if err := r.List(reqCtx.Ctx, pvcList, inNS, ml); err != nil {
+		ml := client.MatchingLabels{
+			appInstanceLabelKey: fmt.Sprintf("%s-%s", cluster.GetName(), component.TypeName),
+			appNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
+		}
+
+		pvcList := &corev1.PersistentVolumeClaimList{}
+		if err := r.List(reqCtx.Ctx, pvcList, inNS, ml); err != nil {
+			return err
+		}
+		for _, pvc := range pvcList.Items {
+			if err := r.Delete(reqCtx.Ctx, &pvc); err != nil {
 				return err
-			}
-			for _, pvc := range pvcList.Items {
-				if err := r.Delete(reqCtx.Ctx, &pvc); err != nil {
-					return err
-				}
 			}
 		}
 	}
@@ -403,12 +565,34 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 		if ok := r.patchStatusComponentsWithStatefulSet(cluster, &v, componentIsRunning); ok {
 			needSyncStatusComponent = true
 		}
+
+		// if v is consensusSet
+		typeName := getComponentTypeName(*cluster, v.Labels[appComponentLabelKey])
+		componentDef, err := getComponent(ctx, r.Client, cluster, typeName)
+		if err != nil {
+			return false, err
+		}
+
+		switch componentDef.ComponentType {
+		case dbaasv1alpha1.Consensus:
+			end, err := handleConsensusSetUpdate(ctx, r.Client, cluster, &v)
+			if err != nil {
+				return false, err
+			}
+			if !end {
+				isOk = false
+			}
+		case dbaasv1alpha1.Stateful:
+			// TODO wait other component type added
+		}
 	}
+
 	if needSyncStatusComponent {
 		if err := r.Client.Status().Patch(ctx, cluster, patch); err != nil {
 			return false, err
 		}
 	}
+
 	return isOk, nil
 }
 
@@ -616,5 +800,6 @@ func getSupportHorizontalScalingComponents(cluster *dbaasv1alpha1.Cluster,
 			break
 		}
 	}
+
 	return horizontalScalableComponents, clusterComponentNames
 }

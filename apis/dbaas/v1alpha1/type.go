@@ -62,6 +62,11 @@ const (
 	RestartType           OpsType = "Restart"
 )
 
+var DefaultLeader = ConsensusMember{
+	Name:       "leader",
+	AccessMode: ReadWrite,
+}
+
 var webhookMgr *webhookManager
 
 type webhookManager struct {

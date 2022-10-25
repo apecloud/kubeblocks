@@ -147,9 +147,6 @@ type ClusterComponent struct {
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
-	// ref roleGroups in ClusterDefinition
-	RoleGroups []ClusterRoleGroup `json:"roleGroups,omitempty"`
-
 	// VolumeClaimTemplates information for statefulset.spec.volumeClaimTemplates
 	// +optional
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
@@ -174,22 +171,6 @@ type ClusterComponent struct {
 	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
 }
 
-type ClusterRoleGroup struct {
-	// +optional
-	Name string `json:"name,omitempty"`
-
-	// roleGroup name in ClusterDefinition
-	// +optional
-	Type string `json:"type,omitempty"`
-
-	// +kubebuilder:default=-1
-	// +optional
-	Replicas int `json:"replicas,omitempty"`
-
-	// +optional
-	Service corev1.ServiceSpec `json:"service,omitempty"`
-}
-
 // ClusterStatusComponent record components status information
 type ClusterStatusComponent struct {
 	// Type component type
@@ -204,15 +185,24 @@ type ClusterStatusComponent struct {
 	// +optional
 	Message string `json:"message,omitempty"`
 
-	// RoleGroups reference roleGroups in ClusterDefinition
+	// ConsensusSetStatus role and pod name mapping
 	// +optional
-	RoleGroups []ClusterStatusRoleGroup `json:"roleGroups,omitempty"`
+	ConsensusSetStatus *ConsensusSetStatus `json:"consensusSetStatus,omitempty"`
 }
 
-type ClusterStatusRoleGroup struct {
-	ID          string `json:"id,omitempty"`
-	Type        string `json:"type,omitempty"`
-	RefWorkload string `json:"refWorkload,omitempty"`
+type ConsensusSetStatus struct {
+	// Leader pod name
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=Unknown
+	Leader string `json:"leader"`
+
+	// Followers pod names
+	// +optional
+	Followers []string `json:"followers,omitempty"`
+
+	// Learner pod name
+	// +optional
+	Learner string `json:"learner,omitempty"`
 }
 
 type ClusterComponentVolumeClaimTemplate struct {

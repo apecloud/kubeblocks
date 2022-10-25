@@ -141,10 +141,6 @@ type VolumeExpansion struct {
 type HorizontalScaling struct {
 	// +optional
 	Replicas int `json:"replicas,omitempty"`
-
-	// RoleGroups reference roleGroups in ClusterDefinition
-	// +optional
-	RoleGroups []ClusterRoleGroup `json:"roleGroups,omitempty"`
 }
 
 type OpsRequestStatusComponent struct {

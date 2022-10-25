@@ -1,0 +1,56 @@
+/*
+Copyright 2022 The KubeBlocks Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package testutil
+
+import (
+	"context"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+type TestContext struct {
+	TestObjLabelKey  string
+	DefaultNamespace string
+	CreateObj        func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
+	CheckedCreateObj func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
+}
+
+func NewDefaultTestContext(cli client.Client) TestContext {
+	t := TestContext{
+		TestObjLabelKey:  "kubeblocks.io/test",
+		DefaultNamespace: "default",
+	}
+
+	t.CreateObj = func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+		l := obj.GetLabels()
+		if l == nil {
+			l = map[string]string{}
+		}
+		l[t.TestObjLabelKey] = "true"
+		obj.SetLabels(l)
+		return cli.Create(ctx, obj, opts...)
+	}
+
+	t.CheckedCreateObj = func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+		if err := t.CreateObj(ctx, obj, opts...); err != nil && !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+		return nil
+	}
+	return t
+}

@@ -18,11 +18,14 @@ package controllerutil
 
 import (
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -42,6 +45,19 @@ func CheckedRequeueWithError(err error, logger logr.Logger, msg string, keysAndV
 	if apierrors.IsNotFound(err) {
 		return Reconciled()
 	}
+	return RequeueWithError(err, logger, msg, keysAndValues...)
+}
+
+// RequeueWithErrorAndRecordEvent requeue when an error occurs. if it is a not found error, send an event
+func RequeueWithErrorAndRecordEvent(obj client.Object, recorder record.EventRecorder, err error, logger logr.Logger) (reconcile.Result, error) {
+	if apierrors.IsNotFound(err) {
+		recorder.Eventf(obj, corev1.EventTypeWarning, EventReasonNotFoundCR, err.Error())
+	}
+	return RequeueWithError(err, logger, "")
+}
+
+// RequeueWithError requeue when an error occurs
+func RequeueWithError(err error, logger logr.Logger, msg string, keysAndValues ...interface{}) (reconcile.Result, error) {
 	if msg == "" {
 		logger.Info(err.Error())
 	} else {
@@ -95,6 +111,14 @@ func HandleCRDeletion(reqCtx RequestCtx,
 	} else {
 		// The object is being deleted
 		if controllerutil.ContainsFinalizer(cr, finalizer) {
+			// We need to record the deletion event first.
+			// Because if the resource has dependencies, it will not be automatically deleted.
+			// so it can prevent users from manually deleting it without event records
+			if reqCtx.Recorder != nil {
+				reqCtx.Recorder.Eventf(cr, corev1.EventTypeNormal, EventReasonDeletingCR, "Deleting %s: %s",
+					strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
+			}
+
 			// our finalizer is present, so lets handle any external dependency
 			if deletionHandler != nil {
 				if res, err := deletionHandler(); err != nil {
@@ -114,6 +138,11 @@ func HandleCRDeletion(reqCtx RequestCtx,
 				if err := r.Update(reqCtx.Ctx, cr); err != nil {
 					res, err := CheckedRequeueWithError(err, reqCtx.Log, "")
 					return &res, err
+				}
+				// record resources deleted event
+				if reqCtx.Recorder != nil {
+					reqCtx.Recorder.Eventf(cr, corev1.EventTypeNormal, EventReasonDeletedCR, "Deleted %s: %s",
+						strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
 				}
 			}
 		}
@@ -151,4 +180,11 @@ func ValidateReferenceCR(reqCtx RequestCtx, cli client.Client, obj client.Object
 		}
 	}
 	return nil, nil
+}
+
+// RecordCreatedEvent record an event when CR created successfully
+func RecordCreatedEvent(r record.EventRecorder, cr client.Object) {
+	if r != nil && cr.GetGeneration() == 1 {
+		r.Eventf(cr, corev1.EventTypeNormal, EventReasonCreatedCR, "Created %s: %s", strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
+	}
 }

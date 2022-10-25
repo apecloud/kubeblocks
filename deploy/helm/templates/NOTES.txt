@@ -1,4 +1,3 @@
-{{ template "_divider" }}
 {{- if .Values.grafana.enabled }}
 {{- if .Values.grafana.ingress.enabled -}}
 If you bind Grafana Server to {{ .Values.grafana.service.port }}, please update values in values.yaml and reinstall:
@@ -24,37 +23,27 @@ From outside the cluster, the Grafana Server URL(s) are:
     http://{{ . }}
 {{- end }}
 {{- else }}
-Get the Grafana Server URL by running these commands in the same shell:
+3. To view the Grafana console:
 
 {{- if contains "NodePort" .Values.grafana.service.type }}
-
     export NODE_PORT=$(kubectl get --namespace {{ template "kubeblocks.grafana.namespace" . }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ template "kubeblocks.grafana.fullname" . }})
     export NODE_IP=$(kubectl get nodes --namespace {{ template "kubeblocks.grafana.namespace" . }} -o jsonpath="{.items[0].status.addresses[0].address}")
     echo http://$NODE_IP:$NODE_PORT
 {{- else if contains "LoadBalancer" .Values.grafana.service.type }}
-
     NOTE: It may take a few minutes for the LoadBalancer IP to be available.
           You can watch the status of by running 'kubectl get svc --namespace {{ template "kubeblocks.grafana.namespace" . }} -w {{ template "kubeblocks.grafana.fullname" . }}'
 
     export SERVICE_IP=$(kubectl get svc --namespace {{ template "kubeblocks.grafana.namespace" . }} {{ template "kubeblocks.grafana.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
     echo http://$SERVICE_IP:{{ .Values.grafana.service.port }}
 {{- else if contains "ClusterIP"  .Values.grafana.service.type }}
-
     export POD_NAME=$(kubectl get pods --namespace {{ template "kubeblocks.grafana.namespace" . }} -l "app.kubernetes.io/name=grafana,app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
     kubectl --namespace {{ template "kubeblocks.grafana.namespace" . }} port-forward $POD_NAME 3000
-
-Open url in browser: http://127.0.0.1:3000
+    open http://127.0.0.1:3000
+    user: {{ .Values.grafana.adminUser }}, password: {{ .Values.grafana.adminPassword}}
 {{- end }}
 {{- end }}
-
-Get your '{{ .Values.grafana.adminUser }}' user password by running:
-
-   kubectl get secret --namespace {{ template "kubeblocks.grafana.namespace" . }} {{ template "kubeblocks.grafana.fullname" . }} -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
-
-Login with the password and the username: {{ .Values.grafana.adminUser }}
 {{- end }}
 
-{{ template "_divider" }}
 {{- if .Values.prometheus.server.enabled }}
 {{- if .Values.prometheus.server.ingress.enabled -}}
 From outside the cluster, the prometheus server URL(s) are:
@@ -63,29 +52,27 @@ From outside the cluster, the prometheus server URL(s) are:
     http://{{ . }}
 {{- end }}
 {{- else }}
-Get the Prometheus Server URL by running these commands in the same shell:
+
+4. To view the Prometheus console:
 
 {{- if contains "NodePort" .Values.prometheus.server.service.type }}
-
     export NODE_PORT=$(kubectl get --namespace {{ template "kubeblocks.prometheus.namespace" . }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ template "kubeblocks.prometheus.server.fullname" . }})
     export NODE_IP=$(kubectl get nodes --namespace {{ template "kubeblocks.prometheus.namespace" . }} -o jsonpath="{.items[0].status.addresses[0].address}")
     echo http://$NODE_IP:$NODE_PORT
 {{- else if contains "LoadBalancer" .Values.prometheus.server.service.type }}
-
     NOTE: It may take a few minutes for the LoadBalancer IP to be available.
           You can watch the status of by running 'kubectl get svc --namespace {{ template "kubeblocks.prometheus.namespace" . }} -w {{ template "kubeblocks.prometheus.server.fullname" . }}'
 
     export SERVICE_IP=$(kubectl get svc --namespace {{ template "kubeblocks.prometheus.namespace" . }} {{ template "kubeblocks.prometheus.server.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
     echo http://$SERVICE_IP:{{ .Values.prometheus.server.service.servicePort }}
 {{- else if contains "ClusterIP"  .Values.prometheus.server.service.type }}
-
     export POD_NAME=$(kubectl get pods --namespace {{ template "kubeblocks.prometheus.namespace" . }} -l "app=prometheus,component={{ .Values.prometheus.server.name }}" -o jsonpath="{.items[0].metadata.name}")
     kubectl --namespace {{ template "kubeblocks.prometheus.namespace" . }} port-forward $POD_NAME 9090
+    open http://127.0.0.1:9090
 {{- end }}
 {{- end }}
 {{- end }}
 
-{{ template "_divider" }}
 {{- if .Values.prometheus.alertmanager.enabled }}
 {{- if .Values.prometheus.alertmanager.ingress.enabled -}}
 From outside the cluster, the alertmanager URL(s) are:
@@ -94,24 +81,23 @@ From outside the cluster, the alertmanager URL(s) are:
     http://{{ . }}
 {{- end }}
 {{- else }}
-Get the Prometheus Alertmanager URL by running these commands in the same shell:
+
+5. To view the Prometheus AlertManager console:
 
 {{- if contains "NodePort" .Values.prometheus.alertmanager.service.type }}
-
     export NODE_PORT=$(kubectl get --namespace {{ template "kubeblocks.prometheus.namespace" . }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ template "kubeblocks.prometheus.alertmanager.fullname" . }})
     export NODE_IP=$(kubectl get nodes --namespace {{ template "kubeblocks.prometheus.namespace" . }} -o jsonpath="{.items[0].status.addresses[0].address}")
     echo http://$NODE_IP:$NODE_PORT
 {{- else if contains "LoadBalancer" .Values.prometheus.alertmanager.service.type }}
-
     NOTE: It may take a few minutes for the LoadBalancer IP to be available.
           You can watch the status of by running 'kubectl get svc --namespace {{ template "kubeblocks.prometheus.namespace" . }} -w {{ template "kubeblocks.prometheus.alertmanager.fullname" . }}'
 
     export SERVICE_IP=$(kubectl get svc --namespace {{ template "kubeblocks.prometheus.namespace" . }} {{ template "kubeblocks.prometheus.alertmanager.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
     echo http://$SERVICE_IP:{{ .Values.prometheus.alertmanager.service.servicePort }}
 {{- else if contains "ClusterIP"  .Values.prometheus.alertmanager.service.type }}
-
     export POD_NAME=$(kubectl get pods --namespace {{ template "kubeblocks.prometheus.namespace" . }} -l "app=prometheus,component={{ .Values.prometheus.alertmanager.name }}" -o jsonpath="{.items[0].metadata.name}")
     kubectl --namespace {{ template "kubeblocks.prometheus.namespace" . }} port-forward $POD_NAME 9093
+    open http://127.0.0.1:9093
 {{- end }}
 {{- end }}
 {{- end }}

@@ -557,25 +557,29 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 		if err != nil {
 			return false, err
 		}
-
+		var statefulStatusRevisionIsEquals bool
 		switch componentDef.ComponentType {
 		case dbaasv1alpha1.Consensus:
-			end, err := handleConsensusSetUpdate(ctx, r.Client, cluster, &v)
-			if err != nil {
+			if end, err := handleConsensusSetUpdate(ctx, r.Client, cluster, &v); err != nil {
 				return false, err
-			}
-			if !end {
+			} else if !end {
 				isOk = false
 			}
+			// Consensus do not judge whether the revisions are consistent
+			statefulStatusRevisionIsEquals = true
 		case dbaasv1alpha1.Stateful:
 			// TODO wait other component type added
+			// when stateful updateStrategy is rollingUpdate, need to check revision
+			if v.Status.UpdateRevision == v.Status.CurrentRevision {
+				statefulStatusRevisionIsEquals = true
+			}
 		}
 
 		var componentIsRunning bool
 		// check whether the statefulset has reached the final state
 		// ps: StatefulSet.Status.AvailableReplicas supported after k8s v1.22
 		if v.Status.AvailableReplicas != *v.Spec.Replicas ||
-			v.Status.ObservedGeneration != v.GetGeneration() {
+			v.Status.ObservedGeneration != v.GetGeneration() || !statefulStatusRevisionIsEquals {
 			isOk = false
 		} else {
 			componentIsRunning = true

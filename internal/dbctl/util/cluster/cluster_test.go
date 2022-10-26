@@ -149,7 +149,9 @@ var _ = Describe("cluster util", func() {
 					"test-component": {
 						Type: (string)(dbaasv1alpha1.Consensus),
 						ConsensusSetStatus: &dbaasv1alpha1.ConsensusSetStatus{
-							Leader: podName,
+							Leader: dbaasv1alpha1.ConsensusMemberStatus{
+								Pod: podName,
+							},
 						},
 					},
 				},

@@ -62,7 +62,7 @@ func GetDefaultPodName(dynamic dynamic.Interface, name string, namespace string)
 	// travel all components, check type
 	for _, c := range cluster.Status.Components {
 		if c.ConsensusSetStatus != nil {
-			return c.ConsensusSetStatus.Leader, nil
+			return c.ConsensusSetStatus.Leader.Pod, nil
 		}
 		// TODO: now we only support consensus set
 	}

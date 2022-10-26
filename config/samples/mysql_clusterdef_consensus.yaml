@@ -1,7 +1,7 @@
 apiVersion: dbaas.infracreate.com/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: mysql_clusterdef_consensus
+  name: mysql-clusterdef-consensus
 spec:
   type: state.mysql-8
   components:

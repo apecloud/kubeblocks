@@ -580,12 +580,40 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 	}
 	patch := client.MergeFrom(cluster.DeepCopy())
 	for _, v := range statefulSetList.Items {
+		// if v is consensusSet
+		typeName := getComponentTypeName(*cluster, v.Labels[appComponentLabelKey])
+		componentDef, err := getComponent(ctx, r.Client, cluster, typeName)
+		if err != nil {
+			return false, err
+		}
+		statefulStatusRevisionIsEquals := false
+		end := true
+		switch componentDef.ComponentType {
+		case dbaasv1alpha1.Consensus:
+			if end, err = handleConsensusSetUpdate(ctx, r.Client, cluster, &v); err != nil {
+				return false, err
+			} else if !end {
+				// if not end, we are deleting pod.
+				isOk = false
+			}
+			// Consensus do not judge whether the revisions are consistent
+			statefulStatusRevisionIsEquals = true
+		case dbaasv1alpha1.Stateful:
+			// TODO wait other component type added
+			// when stateful updateStrategy is rollingUpdate, need to check revision
+			if v.Status.UpdateRevision == v.Status.CurrentRevision {
+				statefulStatusRevisionIsEquals = true
+			}
+		}
+
 		var componentIsRunning bool
-		// check whether the statefulset has reached the final state
+		// check whether the statefulset has reached the final state.
+		// when we delete the pod, statefulset.status may still be available due to statefulset controls the pod asynchronously,
+		// so we check the end variable
 		// ps: StatefulSet.Status.AvailableReplicas supported after k8s v1.22
 		if v.Status.AvailableReplicas != *v.Spec.Replicas ||
-			v.Status.CurrentRevision != v.Status.UpdateRevision ||
-			v.Status.ObservedGeneration != v.GetGeneration() {
+			v.Status.ObservedGeneration != v.GetGeneration() ||
+			!statefulStatusRevisionIsEquals || !end {
 			isOk = false
 		} else {
 			componentIsRunning = true
@@ -593,26 +621,6 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 		// when component phase is changed, set needSyncStatusComponent to true, then patch cluster.status
 		if ok := r.patchStatusComponentsWithStatefulSet(cluster, &v, componentIsRunning); ok {
 			needSyncStatusComponent = true
-		}
-
-		// if v is consensusSet
-		typeName := getComponentTypeName(*cluster, v.Labels[appComponentLabelKey])
-		componentDef, err := getComponent(ctx, r.Client, cluster, typeName)
-		if err != nil {
-			return false, err
-		}
-
-		switch componentDef.ComponentType {
-		case dbaasv1alpha1.Consensus:
-			end, err := handleConsensusSetUpdate(ctx, r.Client, cluster, &v)
-			if err != nil {
-				return false, err
-			}
-			if !end {
-				isOk = false
-			}
-		case dbaasv1alpha1.Stateful:
-			// TODO wait other component type added
 		}
 	}
 

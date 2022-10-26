@@ -77,6 +77,14 @@ type webhookManager struct {
 	client client.Client
 }
 
+type ScopeType string
+
+const (
+	SCOPE_BOTH    ScopeType = "BOTH"
+	SCOPE_PERSIST ScopeType = "file"
+	SCOPE_MEMORY  ScopeType = "memory"
+)
+
 func RegisterWebhookManager(mgr manager.Manager) {
 	webhookMgr = &webhookManager{mgr.GetClient()}
 }

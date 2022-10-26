@@ -1,0 +1,6 @@
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind: ReconfigureRequest
+metadata:
+  name: reconfigurerequest-sample
+spec:
+  # TODO(user): Add fields here

@@ -256,6 +256,32 @@ rules:
   - patch
   - update
 - apiGroups:
+  - dbaas.kubeblocks.com
+  resources:
+  - reconfigurerequests
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dbaas.kubeblocks.com
+  resources:
+  - reconfigurerequests/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dbaas.kubeblocks.com
+  resources:
+  - reconfigurerequests/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - dbaas.kubeblocks.io
   resources:
   - appversions

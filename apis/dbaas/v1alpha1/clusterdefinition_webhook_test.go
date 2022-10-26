@@ -19,9 +19,11 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -30,6 +32,8 @@ var _ = Describe("clusterDefinition webhook", func() {
 	var (
 		clusterDefinitionName  = "clusterdefinition-webhook-mysql-definition"
 		clusterDefinitionName2 = "clusterdefinition-webhook-mysql-definition2"
+		timeout                = time.Second * 10
+		interval               = time.Second
 	)
 	Context("When clusterDefinition create and update", func() {
 		It("Should webhook validate passed", func() {
@@ -41,7 +45,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 			Eventually(func() bool {
 				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)
 				return err == nil
-			}, 10, 1).Should(BeTrue())
+			}, timeout, interval).Should(BeTrue())
 
 			By("By creating a new clusterDefinition with componentType==Consensus but consensusSpec not present")
 			clusterDef, _ = createTestClusterDefinitionObj2(clusterDefinitionName2)

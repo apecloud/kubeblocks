@@ -3,7 +3,7 @@ kind:       AppVersion
 metadata:
   name:     app-version-consensus
 spec:
-  clusterDefinitionRef: mysql_clusterdef_consensus
+  clusterDefinitionRef: mysql-clusterdef-consensus
   components:
   - type: replicasets
     podSpec:

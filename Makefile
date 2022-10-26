@@ -43,7 +43,7 @@ ENABLE_WEBHOOKS ?= false
 APP_NAME = kubeblocks
 
 
-VERSION ?= 0.1.0-alpha.6
+VERSION ?= 0.1.0-alpha.8
 CHART_PATH = deploy/helm
 
 

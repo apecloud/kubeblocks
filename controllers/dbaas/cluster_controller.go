@@ -124,7 +124,7 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 		return err
 	}
 
-	// update label
+	// update pod role label
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Labels[consensusSetRoleLabelKey] = role
 	err := cli.Patch(ctx, pod, patch)
@@ -153,9 +153,9 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 
 	// get all role names
 	leaderName := componentDef.ConsensusSpec.Leader.Name
-	followerNames := make([]string, 0)
+	followersMap := make(map[string]dbaasv1alpha1.ConsensusMember, 0)
 	for _, follower := range componentDef.ConsensusSpec.Followers {
-		followerNames = append(followerNames, follower.Name)
+		followersMap[follower.Name] = follower
 	}
 	learnerName := ""
 	if componentDef.ConsensusSpec.Learner != nil {
@@ -172,71 +172,100 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 			Type:  typeName,
 			Phase: dbaasv1alpha1.RunningPhase,
 			ConsensusSetStatus: &dbaasv1alpha1.ConsensusSetStatus{
-				Leader: consensusSetStatusDefaultPodName,
+				Leader: dbaasv1alpha1.ConsensusMemberStatus{
+					Pod: consensusSetStatusDefaultPodName,
+				},
 			},
 		}
 	}
 	componentStatus := cluster.Status.Components[componentName]
 	if componentStatus.ConsensusSetStatus == nil {
 		componentStatus.ConsensusSetStatus = &dbaasv1alpha1.ConsensusSetStatus{
-			Leader: consensusSetStatusDefaultPodName,
+			Leader: dbaasv1alpha1.ConsensusMemberStatus{
+				Pod: consensusSetStatusDefaultPodName,
+			},
 		}
 	}
 	consensusSetStatus := componentStatus.ConsensusSetStatus
 
 	resetLeader := func() {
-		if consensusSetStatus.Leader == pod.Name {
-			consensusSetStatus.Leader = consensusSetStatusDefaultPodName
+		if consensusSetStatus.Leader.Pod == pod.Name {
+			consensusSetStatus.Leader.Pod = consensusSetStatusDefaultPodName
+			consensusSetStatus.Leader.AccessMode = dbaasv1alpha1.None
+			consensusSetStatus.Leader.Name = ""
 		}
 	}
 	resetLearner := func() {
-		if consensusSetStatus.Learner == pod.Name {
-			consensusSetStatus.Learner = consensusSetStatusDefaultPodName
+		if consensusSetStatus.Learner != nil && consensusSetStatus.Learner.Pod == pod.Name {
+			consensusSetStatus.Learner = nil
 		}
 	}
 
 	resetFollower := func() {
-		for index, pName := range consensusSetStatus.Followers {
-			if pName == pod.Name {
+		for index, member := range consensusSetStatus.Followers {
+			if member.Pod == pod.Name {
 				consensusSetStatus.Followers = append(consensusSetStatus.Followers[:index], consensusSetStatus.Followers[index+1:]...)
 			}
 		}
 	}
+
 	// set pod.Name to the right status field
+	accessMode := dbaasv1alpha1.AccessMode("")
 	needUpdate := false
 	switch role {
 	case leaderName:
-		consensusSetStatus.Leader = pod.Name
+		consensusSetStatus.Leader.Pod = pod.Name
+		consensusSetStatus.Leader.AccessMode = componentDef.ConsensusSpec.Leader.AccessMode
+		consensusSetStatus.Leader.Name = componentDef.ConsensusSpec.Leader.Name
+		accessMode = componentDef.ConsensusSpec.Leader.AccessMode
 		resetLearner()
 		resetFollower()
 		needUpdate = true
 	case learnerName:
-		consensusSetStatus.Learner = pod.Name
+		if consensusSetStatus.Learner == nil {
+			consensusSetStatus.Learner = &dbaasv1alpha1.ConsensusMemberStatus{}
+		}
+		consensusSetStatus.Learner.Pod = pod.Name
+		consensusSetStatus.Learner.AccessMode = componentDef.ConsensusSpec.Learner.AccessMode
+		consensusSetStatus.Learner.Name = componentDef.ConsensusSpec.Learner.Name
+		accessMode = componentDef.ConsensusSpec.Learner.AccessMode
 		resetLeader()
 		resetFollower()
 		needUpdate = true
 	default:
-		for _, name := range followerNames {
-			if role == name {
-				exist := false
-				for _, pName := range consensusSetStatus.Followers {
-					if pName == pod.Name {
-						exist = true
-					}
+		if follower, ok := followersMap[role]; ok {
+			exist := false
+			for _, member := range consensusSetStatus.Followers {
+				if member.Pod == pod.Name {
+					exist = true
 				}
-				if !exist {
-					consensusSetStatus.Followers = append(consensusSetStatus.Followers, pod.Name)
-					resetLeader()
-					resetLearner()
-					needUpdate = true
+			}
+			if !exist {
+				member := dbaasv1alpha1.ConsensusMemberStatus{
+					Pod:        pod.Name,
+					AccessMode: follower.AccessMode,
+					Name:       follower.Name,
 				}
+				accessMode = follower.AccessMode
+				consensusSetStatus.Followers = append(consensusSetStatus.Followers, member)
+				resetLeader()
+				resetLearner()
+				needUpdate = true
 			}
 		}
 	}
 
 	// finally, update cluster status
 	if needUpdate {
-		return cli.Status().Patch(ctx, cluster, patch)
+		err = cli.Status().Patch(ctx, cluster, patch)
+		if err != nil {
+			return err
+		}
+
+		// update pod accessMode label
+		patchAccessMode := client.MergeFrom(pod.DeepCopy())
+		pod.Labels[consensusSetAccessModeLabelKey] = string(accessMode)
+		return cli.Patch(ctx, pod, patchAccessMode)
 	}
 
 	return nil
@@ -551,12 +580,40 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 	}
 	patch := client.MergeFrom(cluster.DeepCopy())
 	for _, v := range statefulSetList.Items {
+		// if v is consensusSet
+		typeName := getComponentTypeName(*cluster, v.Labels[appComponentLabelKey])
+		componentDef, err := getComponent(ctx, r.Client, cluster, typeName)
+		if err != nil {
+			return false, err
+		}
+		statefulStatusRevisionIsEquals := false
+		end := true
+		switch componentDef.ComponentType {
+		case dbaasv1alpha1.Consensus:
+			if end, err = handleConsensusSetUpdate(ctx, r.Client, cluster, &v); err != nil {
+				return false, err
+			} else if !end {
+				// if not end, we are deleting pod.
+				isOk = false
+			}
+			// Consensus do not judge whether the revisions are consistent
+			statefulStatusRevisionIsEquals = true
+		case dbaasv1alpha1.Stateful:
+			// TODO wait other component type added
+			// when stateful updateStrategy is rollingUpdate, need to check revision
+			if v.Status.UpdateRevision == v.Status.CurrentRevision {
+				statefulStatusRevisionIsEquals = true
+			}
+		}
+
 		var componentIsRunning bool
-		// check whether the statefulset has reached the final state
+		// check whether the statefulset has reached the final state.
+		// when we delete the pod, statefulset.status may still be available due to statefulset controls the pod asynchronously,
+		// so we check the end variable
 		// ps: StatefulSet.Status.AvailableReplicas supported after k8s v1.22
 		if v.Status.AvailableReplicas != *v.Spec.Replicas ||
-			v.Status.CurrentRevision != v.Status.UpdateRevision ||
-			v.Status.ObservedGeneration != v.GetGeneration() {
+			v.Status.ObservedGeneration != v.GetGeneration() ||
+			!statefulStatusRevisionIsEquals || !end {
 			isOk = false
 		} else {
 			componentIsRunning = true
@@ -564,26 +621,6 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 		// when component phase is changed, set needSyncStatusComponent to true, then patch cluster.status
 		if ok := r.patchStatusComponentsWithStatefulSet(cluster, &v, componentIsRunning); ok {
 			needSyncStatusComponent = true
-		}
-
-		// if v is consensusSet
-		typeName := getComponentTypeName(*cluster, v.Labels[appComponentLabelKey])
-		componentDef, err := getComponent(ctx, r.Client, cluster, typeName)
-		if err != nil {
-			return false, err
-		}
-
-		switch componentDef.ComponentType {
-		case dbaasv1alpha1.Consensus:
-			end, err := handleConsensusSetUpdate(ctx, r.Client, cluster, &v)
-			if err != nil {
-				return false, err
-			}
-			if !end {
-				isOk = false
-			}
-		case dbaasv1alpha1.Stateful:
-			// TODO wait other component type added
 		}
 	}
 

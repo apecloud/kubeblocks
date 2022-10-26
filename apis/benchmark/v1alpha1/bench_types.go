@@ -79,7 +79,7 @@ func (v *VolumeSpec) Validate() (ok bool, err error) {
 	if v.AutoPersistentVolumeClaimSpec != nil {
 		if v.VolumeSource.PersistentVolumeClaim != nil &&
 			v.VolumeSource.PersistentVolumeClaim.ClaimName != AutoCreatedPVC {
-			return false, errors.New("If AutoVolumeClaimSpec is given, " +
+			return false, errors.New("if AutoPersistentVolumeClaimSpec is given, " +
 				"VolumeSource.PersistentVolumeClaim.ClaimName must be " + AutoCreatedPVC)
 		}
 	}

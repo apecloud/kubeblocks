@@ -63,14 +63,14 @@ func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *db
 	if err := cli.List(ctx, list, o); err != nil {
 		return err
 	}
-	for _, item := range list.Items {
-		if item.Status.ClusterDefGeneration != clusterDef.GetObjectMeta().GetGeneration() {
-			patch := client.MergeFrom(item.DeepCopy())
+	for _, cluster := range list.Items {
+		if cluster.Status.ClusterDefGeneration != clusterDef.GetObjectMeta().GetGeneration() {
+			patch := client.MergeFrom(cluster.DeepCopy())
 			// sync status.Operations.HorizontalScalable
-			horizontalScalableComponents, _ := getSupportHorizontalScalingComponents(&item, clusterDef)
-			item.Status.Operations.HorizontalScalable = horizontalScalableComponents
-			item.Status.ClusterDefSyncStatus = dbaasv1alpha1.OutOfSyncStatus
-			if err = cli.Status().Patch(ctx, &item, patch); err != nil {
+			horizontalScalableComponents, _ := getSupportHorizontalScalingComponents(&cluster, clusterDef)
+			cluster.Status.Operations.HorizontalScalable = horizontalScalableComponents
+			cluster.Status.ClusterDefSyncStatus = dbaasv1alpha1.OutOfSyncStatus
+			if err = cli.Status().Patch(ctx, &cluster, patch); err != nil {
 				return err
 			}
 		}

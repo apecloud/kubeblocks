@@ -98,6 +98,7 @@ rules:
   verbs:
   - get
   - list
+  - patch
   - update
   - watch
 - apiGroups:
@@ -376,17 +377,6 @@ rules:
   - poddisruptionbudgets/finalizers
   verbs:
   - update
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - rolebindings
-  - roles
-  verbs:
-  - create
-  - get
-  - list
-  - update
-  - watch
 - apiGroups:
   - snapshot.storage.k8s.io
   resources:

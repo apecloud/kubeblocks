@@ -253,6 +253,7 @@ spec:
                 format: int64
                 type: integer
               phase:
+                description: Phase defines the CR .Status.Phase
                 enum:
                 - Pending
                 - Running

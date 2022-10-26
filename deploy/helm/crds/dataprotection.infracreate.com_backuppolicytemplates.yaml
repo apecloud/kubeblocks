@@ -66,6 +66,8 @@ spec:
               failureReason:
                 type: string
               phase:
+                description: BackupPolicyTemplatePhase defines phases for BackupPolicyTemplate
+                  CR, valid values are New, Available, InProgress, Failed.
                 type: string
             type: object
         type: object

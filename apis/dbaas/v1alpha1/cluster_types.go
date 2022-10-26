@@ -21,6 +21,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// TerminationPolicyType define termination policy types.
+// +enum
+type TerminationPolicyType string
+
 const (
 	DoNotTerminate TerminationPolicyType = "DoNotTerminate"
 	Halt           TerminationPolicyType = "Halt"
@@ -28,8 +32,8 @@ const (
 	WipeOut        TerminationPolicyType = "WipeOut"
 )
 
-type TerminationPolicyType string
-
+// PodAntiAffinity define pod anti-affinity strategy.
+// +enum
 type PodAntiAffinity string
 
 const (

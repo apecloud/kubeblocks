@@ -31,7 +31,7 @@ func init() {
 	opsMgr.RegisterOps(dbaasv1alpha1.HorizontalScalingType, horizontalScalingBehaviour)
 }
 
-// HorizontalScalingAction Modify Cluster.spec.components[*].replicas opsRes Cluster.spec.components[*].roleGroups[*].replicas from the opsRequest
+// HorizontalScalingAction Modify Cluster.spec.components[*].replicas from the opsRequest
 func HorizontalScalingAction(opsRes *OpsResource) error {
 	var (
 		componentNameMap = getAllComponentsNameMap(opsRes.OpsRequest)

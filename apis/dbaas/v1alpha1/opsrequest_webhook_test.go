@@ -66,6 +66,12 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("By creating a appVersion for upgrade")
 		newAppVersion := createTestAppVersionObj(clusterDefinitionName, appVersionNameForUpgrade)
 		Expect(k8sClient.Create(ctx, newAppVersion)).Should(Succeed())
+		// wait until AppVersion created
+		Eventually(func() bool {
+			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: newAppVersion.Name,
+				Namespace: newAppVersion.Namespace}, &AppVersion{})
+			return err == nil
+		}, 10, 1).Should(BeTrue())
 
 		By("By creating a upgrade opsRequest, it should be succeed")
 		opsRequest.Spec.ClusterOps.Upgrade.AppVersionRef = appVersionNameForUpgrade

@@ -9,14 +9,11 @@ component: {
 	clusterType:    string
 	type:           string
 	name:           string
+	// FIXME not defined in apis
+	maxUnavailable: int | string
+	minAvailable:   int | string
 	podSpec: containers: [...]
 	volumeClaimTemplates: [...]
-}
-roleGroup: {
-	updateStrategy: {
-		maxUnavailable: int | string
-		minAvailable:   int | string
-	}
 }
 
 pdb: {
@@ -24,7 +21,7 @@ pdb: {
 	"kind":       "PodDisruptionBudget"
 	"metadata": {
 		namespace: cluster.metadata.namespace
-		name:      "\(cluster.metadata.name)-\(component.name)-\(roleGroup.name)"
+		name:      "\(cluster.metadata.name)-\(component.name)"
 		labels: {
 			"app.kubernetes.io/name":     "\(component.clusterType)-\(component.clusterDefName)"
 			"app.kubernetes.io/instance": cluster.metadata.name
@@ -34,16 +31,16 @@ pdb: {
 		}
 	}
 	"spec": {
-		if roleGroup.updateStrategy.minAvailable != _|_ {
-			minAvailable: roleGroup.updateStrategy.minAvailable
+		if component.minAvailable != _|_ {
+			minAvailable: component.minAvailable
 		}
-		if roleGroup.updateStrategy.maxUnavailable != _|_ {
-			maxUnavailable: roleGroup.updateStrategy.maxUnavailable
+		if component.maxUnavailable != _|_ {
+			maxUnavailable: component.maxUnavailable
 		}
 		selector: {
 			matchLabels: {
 				"app.kubernetes.io/name":           "\(component.clusterType)-\(component.clusterDefName)"
-				"app.kubernetes.io/instance":       "\(cluster.metadata.name)-\(component.name)-\(roleGroup.name)"
+				"app.kubernetes.io/instance":       "\(cluster.metadata.name)-\(component.name)"
 				"app.kubernetes.io/component-name": "\(component.name)"
 			}
 		}

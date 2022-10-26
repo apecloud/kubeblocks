@@ -46,15 +46,6 @@ func HorizontalScalingAction(opsRes *OpsResource) error {
 		if componentOps.HorizontalScaling.Replicas != 0 {
 			opsRes.Cluster.Spec.Components[index].Replicas = componentOps.HorizontalScaling.Replicas
 		}
-		for _, v := range componentOps.HorizontalScaling.RoleGroups {
-			for i, r := range component.RoleGroups {
-				if r.Name != v.Name {
-					continue
-				}
-				opsRes.Cluster.Spec.Components[index].RoleGroups[i].Replicas = v.Replicas
-				break
-			}
-		}
 	}
 	return opsRes.Client.Update(opsRes.Ctx, opsRes.Cluster)
 }

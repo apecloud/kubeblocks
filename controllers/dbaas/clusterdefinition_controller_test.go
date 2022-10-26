@@ -59,15 +59,14 @@ spec:
   type: state.mysql-8
   components:
   - typeName: replicasets
+    componentType: Stateful
+    defaultReplicas: 3
     characterType: mysql
     monitor:
       builtIn: false
       exporterConfig:
         scrapePort: 9104
         scrapePath: /metrics
-    roleGroups:
-    - primary
-    defaultReplicas: 1
     podSpec:
       containers:
       - name: mysql
@@ -135,9 +134,6 @@ spec:
             port: 9104
         resources:
           {}
-  roleGroupTemplates:
-  - typeName: primary
-    defaultReplicas: 3
 `
 			clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 			Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)).Should(Succeed())
@@ -201,6 +197,10 @@ spec:
 				}
 				return createdAppVersion.Status.ClusterDefSyncStatus == "OutOfSync"
 			}, time.Second*10, time.Second*1).Should(BeTrue())
+
+			By("By deleting clusterDefinition")
+			Expect(k8sClient.Delete(ctx, createdAppVersion)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, createdClusterDef)).Should(Succeed())
 		})
 	})
 })

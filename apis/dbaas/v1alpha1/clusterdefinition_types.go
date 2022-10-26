@@ -29,18 +29,10 @@ type ClusterDefinitionSpec struct {
 	// +kubebuilder:validation:MaxLength=24
 	Type string `json:"type"`
 
-	// Strategies such as order of every component in operation
-	// +optional
-	Cluster *ClusterDefinitionCluster `json:"cluster,omitempty"`
-
 	// List of components belonging to the cluster
 	// +kubebuilder:validation:MinItems=1
 	// +optional
 	Components []ClusterDefinitionComponent `json:"components,omitempty"`
-
-	// +kubebuilder:validation:MinItems=1
-	// +optional
-	RoleGroupTemplates []RoleGroupTemplate `json:"roleGroupTemplates,omitempty"`
 
 	// Default termination policy if no termination policy defined in cluster
 	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
@@ -90,17 +82,15 @@ type ClusterDefinitionList struct {
 	Items           []ClusterDefinition `json:"items"`
 }
 
-type ClusterDefinitionCluster struct {
-
-	// +optional
-	Strategies ClusterDefinitionStrategies `json:"strategies,omitempty"`
-}
-
 type ConfigTemplate struct {
+	// Specify the name of the referenced configuration template, which is a configmap object
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=128
 	Name string `json:"name,omitempty"`
 
+	// VolumeName is the volume name of PodTemplate, which the configuration file produced through the configuration template will be mounted to the corresponding volume.
+	// The volume name must be defined in podSpec.containers[*].volumeMounts.
+	// reference example: https://github.com/apecloud/kubeblocks/blob/main/examples/dbaas/mysql_clusterdefinition.yaml#L12
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32
 	VolumeName string `json:"volumeName,omitempty"`
@@ -146,9 +136,6 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	CharacterType string `json:"characterType,omitempty"`
 
-	// roleGroups specify roleGroupTemplate name
-	RoleGroups []string `json:"roleGroups,omitempty"`
-
 	// Minimum available pod count when updating
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
@@ -163,10 +150,6 @@ type ClusterDefinitionComponent struct {
 	// +kubebuilder:validation:Minimum=0
 	DefaultReplicas int `json:"defaultReplicas,omitempty"`
 
-	// Define if this component is stateless or not
-	// +kubebuilder:default=false
-	IsStateless bool `json:"isStateless,omitempty"`
-
 	// The configTemplateRefs field provided by ISV, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster
 	// +optional
@@ -176,48 +159,54 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Monitor *MonitorConfig `json:"monitor,omitempty"`
 
-	// IsQuorum defines odd number of pods & N/2+1 pods
+	// antiAffinity defines components should have anti-affinity constraint to same component type
 	// +kubebuilder:default=false
-	IsQuorum bool `json:"isQuorum,omitempty"`
-
-	// +optional
-	Strategies ClusterDefinitionStrategies `json:"strategies,omitempty"`
+	AntiAffinity bool `json:"antiAffinity,omitempty"`
 
 	// podSpec of final workload
 	// +optional
 	PodSpec *corev1.PodSpec `json:"podSpec,omitempty"`
 
 	// Service defines the behavior of a service spec.
+	// provide read-write service when ComponentType is Consensus
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Service corev1.ServiceSpec `json:"service,omitempty"`
 
 	// Scripts executed before and after workload operation
-	// script exec order：component.pre => roleGroup.pre => component.exec => roleGroup.exec => roleGroup.post => component.post
+	// script exec order：component.pre => component.exec => component.post
 	// builtin ENV variables:
 	// self: OPENDBAAS_SELF_{builtin_properties}
-	// rule: OPENDBAAS_{conponent_name}[n]-{roleGroup_name}[n]-{builtin_properties}
+	// rule: OPENDBAAS_{conponent_name}[n]-{builtin_properties}
 	// builtin_properties:
 	// - ID # which shows in Cluster.status
 	// - HOST # e.g. example-mongodb2-0.example-mongodb2-svc.default.svc.cluster.local
 	// - PORT
-	// - N # number of current component/roleGroup
+	// - N # number of current component
 	// +optional
 	Scripts ClusterDefinitionScripts `json:"scripts,omitempty"`
+
+	Probes ClusterDefinitionProbes `json:"probes,omitempty"`
+
+	// ComponentType defines type of the component
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=Stateless
+	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus}
+	ComponentType ComponentType `json:"componentType"`
+
+	// ConsensusSpec defines consensus related spec if componentType is Consensus
+	// CAN'T be empty if componentType is Consensus
+	// +optional
+	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
 }
 
-type ClusterDefinitionStrategies struct {
-	Default         ClusterDefinitionStrategy `json:"default,omitempty"`
-	Create          ClusterDefinitionStrategy `json:"create,omitempty"`
-	Upgrade         ClusterDefinitionStrategy `json:"upgrade,omitempty"`
-	VerticalScale   ClusterDefinitionStrategy `json:"verticalScale,omitempty"`
-	HorizontalScale ClusterDefinitionStrategy `json:"horizontalScale,omitempty"`
-	Delete          ClusterDefinitionStrategy `json:"delete,omitempty"`
-}
+type ComponentType string
 
-type ClusterDefinitionStrategy struct {
-	Order []string `json:"order,omitempty"`
-}
+const (
+	Stateless ComponentType = "Stateless"
+	Stateful  ComponentType = "Stateful"
+	Consensus ComponentType = "Consensus"
+)
 
 type ClusterDefinitionScripts struct {
 	// Default scripts executed if the following scripts not defined
@@ -251,31 +240,6 @@ type ClusterDefinitionContainerCMD struct {
 	Args []string `json:"args,omitempty"`
 }
 
-type RoleGroupTemplate struct {
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=12
-	TypeName string `json:"typeName,omitempty"`
-	// +kubebuilder:default=0
-	// +kubebuilder:validation:Minimum=0
-	MinAvailable int `json:"minAvailable,omitempty"`
-	// +kubebuilder:validation:Minimum=0
-	MaxAvailable int `json:"maxAvailable,omitempty"`
-	// +kubebuilder:default=0
-	// +kubebuilder:validation:Minimum=0
-	DefaultReplicas int                             `json:"defaultReplicas,omitempty"`
-	UpdateStrategy  ClusterDefinitionUpdateStrategy `json:"updateStrategy,omitempty"`
-	// script exec order：component.pre => roleGroup.pre => component.exec => roleGroup.exec => roleGroup.post => component.post
-	// builtin ENV variables:
-	// self: OPENDBAAS_SELF_{builtin_properties}
-	// rule: OPENDBAAS_{conponent_name}[n]-{roleGroup_name}[n]-{builtin_properties}
-	// builtin_properties:
-	// - ID # which shows in Cluster.status
-	// - HOST # e.g. example-mongodb2-0.example-mongodb2-svc.default.svc.cluster.local
-	// - PORT
-	// - N # number of current component/roleGroup
-	Scripts ClusterDefinitionScripts `json:"scripts,omitempty"`
-}
-
 type ClusterDefinitionUpdateStrategy struct {
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=0
@@ -283,12 +247,6 @@ type ClusterDefinitionUpdateStrategy struct {
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	MaxSurge int `json:"maxSurge,omitempty"`
-}
-
-type ClusterDefinitionRoleGroupScript struct {
-	Pre  []ClusterDefinitionContainerCMD `json:"pre,omitempty"`
-	Exec []ClusterDefinitionContainerCMD `json:"exec,omitempty"`
-	Post []ClusterDefinitionContainerCMD `json:"post,omitempty"`
 }
 
 type ClusterDefinitionConnectionCredential struct {
@@ -308,6 +266,101 @@ type ClusterDefinitionStatusGeneration struct {
 	// +optional
 	ClusterDefSyncStatus Status `json:"clusterDefSyncStatus,omitempty"`
 }
+
+type ClusterDefinitionProbeCMDs struct {
+	// sqls executed on db node, used to check db healthy
+	Writes  []string `json:"writes,omitempty"`
+	Queries []string `json:"queries,omitempty"`
+}
+
+type ClusterDefinitionProbe struct {
+	// enable probe or not
+	// +kubebuilder:default=true
+	Enable bool `json:"enable,omitempty"`
+	// How often (in seconds) to perform the probe.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	PeriodSeconds int32 `json:"periodSeconds,omitempty"`
+	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	FailureThreshold int32 `json:"failureThreshold,omitempty"`
+	// Minimum consecutive successes for the probe to be considered successful after having failed.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	SuccessThreshold int32                      `json:"successThreshold,omitempty"`
+	Commands         ClusterDefinitionProbeCMDs `json:"commands,omitempty"`
+}
+
+type ClusterDefinitionProbes struct {
+	RunningProbe     ClusterDefinitionProbe `json:"runningProbe,omitempty"`
+	StatusProbe      ClusterDefinitionProbe `json:"statusProbe,omitempty"`
+	RoleChangedProbe ClusterDefinitionProbe `json:"roleChangedProbe,omitempty"`
+}
+
+type ConsensusSetSpec struct {
+	// Leader, one single leader
+	// +kubebuilder:validation:Required
+	Leader ConsensusMember `json:"leader"`
+
+	// Followers, has voting right but not Leader
+	// +optional
+	Followers []ConsensusMember `json:"followers,omitempty"`
+
+	// Learner, no voting right
+	// +optional
+	Learner *ConsensusMember `json:"learner,omitempty"`
+
+	// UpdateStrategy, Pods update strategy
+	// options: serial, bestEffortParallel, parallel
+	// serial: update Pods one by one that guarantee minimum component unavailable time
+	// 		Learner -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader
+	// bestEffortParallel: update Pods in parallel that guarantee minimum component un-writable time
+	//		Learner, Follower(minority) in parallel -> Follower(majority) -> Leader, keep majority online all the time
+	// parallel: force parallel
+	// +kubebuilder:default=Serial
+	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
+	// +optional
+	UpdateStrategy UpdateStrategy `json:"updateStrategy,omitempty"`
+}
+
+type ConsensusMember struct {
+	// Name, role name
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=leader
+	Name string `json:"name"`
+
+	// AccessMode, what service this member capable for
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=ReadWrite
+	// +kubebuilder:validation:Enum={None, Readonly, ReadWrite}
+	AccessMode AccessMode `json:"accessMode"`
+
+	// Replicas, number of Pods of this role
+	// default 1 for Leader
+	// default 0 for Learner
+	// default Components[*].Replicas - Leader.Replicas - Learner.Replicas for Followers
+	// +kubebuilder:default=0
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	Replicas *int32 `json:"replicas,omitempty"`
+}
+
+type AccessMode string
+
+const (
+	ReadWrite AccessMode = "ReadWrite"
+	Readonly  AccessMode = "Readonly"
+	None      AccessMode = "None"
+)
+
+type UpdateStrategy string
+
+const (
+	Serial             UpdateStrategy = "Serial"
+	BestEffortParallel UpdateStrategy = "BestEffortParallel"
+	Parallel           UpdateStrategy = "Parallel"
+)
 
 func init() {
 	SchemeBuilder.Register(&ClusterDefinition{}, &ClusterDefinitionList{})

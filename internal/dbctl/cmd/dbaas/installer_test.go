@@ -31,7 +31,8 @@ var _ = Describe("installer", func() {
 			Namespace: "default",
 			Version:   version.DefaultKubeBlocksVersion,
 		}
-		Expect(i.Install()).Should(Or(Succeed(), HaveOccurred()))
+		_, err := i.Install()
+		Expect(err).Should(Or(Succeed(), HaveOccurred()))
 	})
 
 	It("uninstall", func() {

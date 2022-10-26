@@ -18,19 +18,25 @@ package dbaas
 
 import (
 	"context"
+	"database/sql"
+	"database/sql/driver"
 	"fmt"
+	"net"
+	"os/exec"
+	"reflect"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
+	"github.com/pkg/errors"
 	"github.com/sethvargo/go-password/password"
-
-	"k8s.io/apimachinery/pkg/util/intstr"
-
-	policyv1 "k8s.io/api/policy/v1"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -47,7 +53,11 @@ var _ = Describe("Cluster Controller", func() {
 	const timeout = time.Second * 10
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
-	var clusterObjKey = types.NamespacedName{
+
+	const leader = "leader"
+	const follower = "follower"
+
+	clusterObjKey := types.NamespacedName{
 		Name:      "my-cluster",
 		Namespace: "default",
 	}
@@ -109,30 +119,16 @@ data:
     gtid_mode=OFF
     consensus_auto_leader_transfer=ON
     
-    log-error=/data/mysql/log/mysqld.err
-    character-sets-dir=/usr/share/mysql-8.0/charsets
-    datadir=/data/mysql/data
+    pid-file=/var/run/mysqld/mysqld.pid
+    socket=/var/run/mysqld/mysqld.sock
+
     port=3306
-    general_log=1
-    general_log_file=/data/mysql/mysqld.log
-    pid-file=/data/mysql/run/mysqld.pid
+    general_log=0
     server-id=1
-    slow_query_log=1
-    slow_query_log_file=/data/mysql/mysqld-slow.log
-    socket=/data/mysql/tmp/mysqld.sock
-    ssl-ca=/data/mysql/std_data/cacert.pem
-    ssl-cert=/data/mysql/std_data/server-cert.pem
-    ssl-key=/data/mysql/std_data/server-key.pem
-    tmpdir=/data/mysql/tmp/
-    loose-sha256_password_auto_generate_rsa_keys=0
-    loose-caching_sha2_password_auto_generate_rsa_keys=0
-    secure-file-priv=/data/mysql
+    slow_query_log=0
     
     [client]
-    password=
-    user=root
-    port=3306
-    socket=/data/mysql/tmp/mysqld.sock
+    socket=/var/run/mysqld/mysqld.sock
     host=localhost
 `
 		cfgCM := &corev1.ConfigMap{}
@@ -167,11 +163,10 @@ spec:
   type: state.mysql-8
   components:
   - typeName: replicasets
+    componentType: Stateful
     configTemplateRefs: 
     - name: mysql-tree-node-template-8.0 
       volumeName: mysql-config
-    roleGroups:
-    - primary
     defaultReplicas: 1
     podSpec:
       containers:
@@ -219,19 +214,15 @@ spec:
             echo $cluster_info;
             docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
   - typeName: proxy
-    roleGroups: ["proxy"]
+    componentType: Stateless
     defaultReplicas: 1
-    isStateless: true
     podSpec:
       containers:
       - name: nginx
-  roleGroupTemplates:
-  - typeName: primary
-    defaultReplicas: 3
-    updateStrategy:
-      maxUnavailable: 1
-  - typeName: proxy
-    defaultReplicas: 2
+    service:
+      ports:
+      - protocol: TCP
+        port: 80
 `
 		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
@@ -320,6 +311,177 @@ spec:
 			f = &dbaasv1alpha1.Cluster{}
 		}
 		return client.IgnoreNotFound(err)
+	}
+
+	// Consensus associate objs
+	// ClusterDefinition with componentType = Consensus
+	assureClusterDefWithConsensusObj := func() *dbaasv1alpha1.ClusterDefinition {
+		By("By assure an clusterDefinition obj with componentType = Consensus")
+		clusterDefYAML := `
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: cluster-definition-consensus
+spec:
+  type: state.mysql-8
+  components:
+  - typeName: replicasets
+    componentType: Consensus
+    consensusSpec:
+      leader:
+        name: "leader"
+        accessMode: ReadWrite
+      followers:
+      - name: "follower"
+        accessMode: Readonly
+      updateStrategy: BestEffortParallel
+    service:
+      ports:
+      - protocol: TCP
+        port: 3306
+    defaultReplicas: 3
+    podSpec:
+      containers:
+      - name: mysql
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3306
+          protocol: TCP
+          name: mysql
+        - containerPort: 13306
+          protocol: TCP
+          name: paxos
+        env:
+        - name: MYSQL_ROOT_HOST
+          value: '%'
+        - name: MYSQL_ROOT_USER
+          value: root
+        - name: MYSQL_ROOT_PASSWORD
+        - name: MYSQL_ALLOW_EMPTY_PASSWORD
+          value: "yes"
+        - name: MYSQL_DATABASE
+          value: mydb
+        - name: MYSQL_USER
+          value: u1
+        - name: MYSQL_PASSWORD
+          value: u1
+        - name: CLUSTER_ID
+          value: "1"
+        - name: CLUSTER_START_INDEX
+          value: "1"
+        - name: REPLICATIONUSER
+          value: replicator
+        - name: REPLICATION_PASSWORD
+        - name: MYSQL_TEMPLATE_CONFIG
+        - name: MYSQL_CUSTOM_CONFIG
+        - name: MYSQL_DYNAMIC_CONFIG
+        command: ["/bin/bash", "-c"]
+        args:
+          - >
+            cluster_info="";
+            for (( i=0; i<$OPENDBAAS_REPLICASETS_N; i++ )); do
+              if [ $i -ne 0 ]; then
+                cluster_info="$cluster_info;";
+              fi;
+              host=$(eval echo \$OPENDBAAS_REPLICASETS_"$i"_HOSTNAME)
+              cluster_info="$cluster_info$host:13306";
+            done;
+            idx=0;
+            while IFS='-' read -ra ADDR; do
+              for i in "${ADDR[@]}"; do
+                idx=$i;
+              done;
+            done <<< "$OPENDBAAS_MY_POD_NAME";
+            echo $idx;
+            cluster_info="$cluster_info@$(($idx+1))";
+            echo $cluster_info;
+            docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
+  connectionCredential:
+    user: root
+`
+		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
+		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, clusterDefinition)).Should(Succeed())
+		return clusterDefinition
+	}
+
+	assureAppVersionWithConsensusObj := func() *dbaasv1alpha1.AppVersion {
+		By("By assure an appVersion obj with componentType = Consensus")
+		appVerYAML := `
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind:       AppVersion
+metadata:
+  name:     app-version-consensus
+spec:
+  clusterDefinitionRef: cluster-definition-consensus
+  components:
+  - type: replicasets
+    podSpec:
+      containers:
+      - name: mysql
+        image: docker.io/infracreate/wesql-server-8.0:0.1-SNAPSHOT
+        imagePullPolicy: IfNotPresent
+`
+		appVersion := &dbaasv1alpha1.AppVersion{}
+		Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, appVersion)).Should(Succeed())
+		return appVersion
+	}
+
+	newClusterWithConsensusObj := func(
+		clusterDefObj *dbaasv1alpha1.ClusterDefinition,
+		appVersionObj *dbaasv1alpha1.AppVersion,
+	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.AppVersion, types.NamespacedName) {
+		// setup Cluster obj required default ClusterDefinition and AppVersion objects if not provided
+		if clusterDefObj == nil {
+			assureCfgTplConfigMapObj("")
+			clusterDefObj = assureClusterDefWithConsensusObj()
+		}
+		if appVersionObj == nil {
+			appVersionObj = assureAppVersionWithConsensusObj()
+		}
+
+		randomStr, _ := password.Generate(6, 0, 0, true, false)
+		key := types.NamespacedName{
+			Name:      "cluster" + randomStr,
+			Namespace: "default",
+		}
+
+		return &dbaasv1alpha1.Cluster{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "dbaas.infracreate.com/v1alpha1",
+				Kind:       "Cluster",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      key.Name,
+				Namespace: key.Namespace,
+			},
+			Spec: dbaasv1alpha1.ClusterSpec{
+				ClusterDefRef: clusterDefObj.GetName(),
+				AppVersionRef: appVersionObj.GetName(),
+				Components: []dbaasv1alpha1.ClusterComponent{
+					{
+						Name: "wesql-test",
+						Type: "replicasets",
+						VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{
+							{
+								Name: "data",
+								Spec: &corev1.PersistentVolumeClaimSpec{
+									AccessModes: []corev1.PersistentVolumeAccessMode{
+										corev1.ReadWriteOnce,
+									},
+									Resources: corev1.ResourceRequirements{
+										Requests: corev1.ResourceList{
+											corev1.ResourceStorage: resource.MustParse("1Gi"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}, clusterDefObj, appVersionObj, key
 	}
 
 	isCMAvailable := func() bool {
@@ -418,15 +580,9 @@ spec:
 			}
 			updatedReplicas := 5
 			fetchedG1.Spec.Components = append(fetchedG1.Spec.Components, dbaasv1alpha1.ClusterComponent{
-				Name: "replicasets",
-				Type: "replicasets",
-				RoleGroups: []dbaasv1alpha1.ClusterRoleGroup{
-					{
-						Name:     "primary",
-						Type:     "primary",
-						Replicas: updatedReplicas,
-					},
-				},
+				Name:     "replicasets",
+				Type:     "replicasets",
+				Replicas: updatedReplicas,
 			})
 			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
 
@@ -514,22 +670,8 @@ spec:
 			toCreate.Spec.Components = append(toCreate.Spec.Components, dbaasv1alpha1.ClusterComponent{
 				Name: "proxy",
 				Type: "proxy",
-				RoleGroups: []dbaasv1alpha1.ClusterRoleGroup{
-					{
-						Name: "proxy",
-						Type: "proxy",
-						Service: corev1.ServiceSpec{
-							Ports: []corev1.ServicePort{
-								{
-									Protocol:   "TCP",
-									Port:       80,
-									TargetPort: intstr.FromInt(8080),
-								},
-							},
-							Type: "LoadBalancer",
-						},
-					},
-				},
+
+				ServiceType: "LoadBalancer",
 			})
 			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
@@ -705,6 +847,152 @@ spec:
 			Eventually(func() error {
 				return deleteClusterNWait(key)
 			}, timeout*2, interval).Should(Succeed())
+		})
+	})
+
+	// Consensus associate test cases
+	Context("When creating cluster with componentType = Consensus", func() {
+		It("Should success with: "+
+			"1 pod with 'leader' role label set, "+
+			"2 pods with 'follower' role label set,"+
+			"1 service routes to 'leader' pod", func() {
+			By("By creating a cluster with componentType = Consensus")
+			toCreate, _, _, key := newClusterWithConsensusObj(nil, nil)
+			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+
+			By("By waiting the cluster is created")
+			cluster := &dbaasv1alpha1.Cluster{}
+
+			// TODO: testEnv doesn't support pod creation yet. remove the following codes when it does
+			if testEnv.UseExistingCluster == nil || !*testEnv.UseExistingCluster {
+				// create fake pods of StatefulSet
+				stsName := toCreate.Name + "-" + toCreate.Spec.Components[0].Name
+				pods := createFakePod(stsName, 3)
+				for _, pod := range pods {
+					Expect(k8sClient.Create(context.Background(), &pod)).Should(Succeed())
+				}
+
+				// fake pods and stateful set creation done
+				time.Sleep(interval * 5)
+
+				Eventually(func() bool {
+					err := k8sClient.Get(context.Background(), key, cluster)
+					if err != nil {
+						return false
+					}
+
+					return cluster.Status.Phase == dbaasv1alpha1.CreatingPhase
+				}, timeout*3, interval*5).Should(BeTrue())
+
+				return
+			}
+			// end remove
+
+			Eventually(func() bool {
+				err := k8sClient.Get(context.Background(), key, cluster)
+				if err != nil {
+					return false
+				}
+
+				return cluster.Status.Phase == dbaasv1alpha1.RunningPhase
+			}, timeout*3, interval*5).Should(BeTrue())
+
+			By("By checking pods' role label")
+			ip := getLocalIP()
+			Expect(ip).ShouldNot(BeEmpty())
+
+			observeRoleOfServiceLoop := func(svc *corev1.Service) string {
+				kind := "svc"
+				name := svc.Name
+				port := svc.Spec.Ports[0].Port
+				role := ""
+				Eventually(func() bool {
+					err := startPortForward(kind, name, port)
+					if err != nil {
+						_ = stopPortForward(name)
+						return false
+					}
+					time.Sleep(interval)
+					role, err = observeRole(ip, port)
+					if err != nil {
+						_ = stopPortForward(name)
+						return false
+					}
+					_ = stopPortForward(name)
+
+					return true
+				}, timeout*2, interval*1).Should(BeTrue())
+
+				return role
+			}
+
+			stsList := &appsv1.StatefulSetList{}
+			Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
+				"app.kubernetes.io/instance": key.Name,
+			}, client.InNamespace(key.Namespace))).Should(Succeed())
+			Expect(len(stsList.Items)).Should(Equal(1))
+			sts := &stsList.Items[0]
+			podList := &corev1.PodList{}
+			Expect(k8sClient.List(context.Background(), podList, client.InNamespace(key.Namespace))).Should(Succeed())
+			pods := make([]corev1.Pod, 0)
+			for _, pod := range podList.Items {
+				if isMemberOf(sts, &pod) {
+					pods = append(pods, pod)
+				}
+			}
+
+			// should have 3 pods
+			Expect(len(pods)).Should(Equal(3))
+			// 1 leader
+			// 2 followers
+			leaderCount, followerCount := 0, 0
+			for _, pod := range pods {
+				switch pod.Labels[consensusSetRoleLabelKey] {
+				case leader:
+					leaderCount++
+				case follower:
+					followerCount++
+				}
+			}
+			Expect(leaderCount).Should(Equal(1))
+			Expect(followerCount).Should(Equal(2))
+
+			By("By checking services' status")
+			// we should have 1 services
+			svcList := &corev1.ServiceList{}
+			Expect(k8sClient.List(context.Background(), svcList, client.MatchingLabels{
+				"app.kubernetes.io/instance": key.Name,
+			}, client.InNamespace(key.Namespace))).Should(Succeed())
+			Expect(len(svcList.Items)).Should(Equal(1))
+			svc := svcList.Items[0]
+			// getRole should be leader through service
+			Expect(observeRoleOfServiceLoop(&svc)).Should(Equal(leader))
+
+			By("By deleting leader pod")
+			leaderPod := &corev1.Pod{}
+			for _, pod := range pods {
+				if pod.Labels[consensusSetRoleLabelKey] == leader {
+					leaderPod = &pod
+					break
+				}
+			}
+			Expect(k8sClient.Delete(context.Background(), leaderPod)).Should(Succeed())
+			time.Sleep(interval * 2)
+			Eventually(func() bool {
+				Expect(k8sClient.Get(context.Background(), types.NamespacedName{
+					Namespace: sts.Namespace,
+					Name:      sts.Name,
+				}, sts)).Should(Succeed())
+				return sts.Status.AvailableReplicas == 3
+			}, timeout, interval).Should(BeTrue())
+
+			time.Sleep(interval * 2)
+			Expect(observeRoleOfServiceLoop(&svc)).Should(Equal(leader))
+
+			By("Deleting the cluster")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
 		})
 	})
 
@@ -900,13 +1188,6 @@ spec:
 			toCreate.Spec.Components = append(toCreate.Spec.Components, dbaasv1alpha1.ClusterComponent{
 				Name: "replicasets",
 				Type: "replicasets",
-				RoleGroups: []dbaasv1alpha1.ClusterRoleGroup{
-					{
-						Name:     "primary",
-						Type:     "primary",
-						Replicas: 1,
-					},
-				},
 			})
 			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
@@ -927,3 +1208,336 @@ spec:
 		})
 	})
 })
+
+func createFakePod(parentName string, number int) []corev1.Pod {
+	podYaml := `
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    controller-revision-hash: wesql-test-859d7565b6
+  name: my-name
+  namespace: default
+spec:
+  containers:
+  - args:
+    command:
+    - /bin/bash
+    - -c
+    env:
+    - name: OPENDBAAS_MY_POD_NAME
+      valueFrom:
+        fieldRef:
+          apiVersion: v1
+          fieldPath: metadata.name
+    - name: OPENDBAAS_REPLICASETS_N
+      value: "3"
+    - name: OPENDBAAS_REPLICASETS_0_HOSTNAME
+      value: clusterepuglf-wesql-test-0
+    - name: OPENDBAAS_REPLICASETS_1_HOSTNAME
+      value: clusterepuglf-wesql-test-1
+    - name: OPENDBAAS_REPLICASETS_2_HOSTNAME
+      value: clusterepuglf-wesql-test-2
+    image: docker.io/infracreate/wesql-server-8.0:0.1-SNAPSHOT
+    imagePullPolicy: IfNotPresent
+    name: mysql
+    ports:
+    - containerPort: 3306
+      name: mysql
+      protocol: TCP
+    - containerPort: 13306
+      name: paxos
+      protocol: TCP
+    volumeMounts:
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-2rhsb
+      readOnly: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  restartPolicy: Always
+  serviceAccount: default
+  serviceAccountName: default
+  
+  volumes:
+  - name: kube-api-access-2rhsb
+    projected:
+      defaultMode: 420
+      sources:
+      - serviceAccountToken:
+          expirationSeconds: 3607
+          path: token
+      - configMap:
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: kube-root-ca.crt
+      - downwardAPI:
+          items:
+          - fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+            path: namespace
+`
+	pods := make([]corev1.Pod, 0)
+	for i := 0; i < number; i++ {
+		pod := corev1.Pod{}
+		Expect(yaml.Unmarshal([]byte(podYaml), &pod)).Should(Succeed())
+		pod.Name = parentName + "-" + strconv.Itoa(i)
+		pod.Labels[consensusSetRoleLabelKey] = "follower"
+		pods = append(pods, pod)
+	}
+	pods[1].Labels[consensusSetRoleLabelKey] = "leader"
+
+	return pods
+}
+
+const (
+	// configurations to connect to Mysql, either a data source name represent by URL.
+	connectionURLKey = "url"
+
+	// other general settings for DB connections.
+	maxIdleConnsKey    = "maxIdleConns"
+	maxOpenConnsKey    = "maxOpenConns"
+	connMaxLifetimeKey = "connMaxLifetime"
+	connMaxIdleTimeKey = "connMaxIdleTime"
+)
+
+// Mysql represents MySQL output bindings.
+type Mysql struct {
+	db *sql.DB
+}
+
+// Init initializes the MySQL binding.
+func (m *Mysql) Init(metadata map[string]string) error {
+	p := metadata
+	url, ok := p[connectionURLKey]
+	if !ok || url == "" {
+		return fmt.Errorf("missing MySql connection string")
+	}
+
+	db, err := initDB(url)
+	if err != nil {
+		return err
+	}
+
+	err = propertyToInt(p, maxIdleConnsKey, db.SetMaxIdleConns)
+	if err != nil {
+		return err
+	}
+
+	err = propertyToInt(p, maxOpenConnsKey, db.SetMaxOpenConns)
+	if err != nil {
+		return err
+	}
+
+	err = propertyToDuration(p, connMaxIdleTimeKey, db.SetConnMaxIdleTime)
+	if err != nil {
+		return err
+	}
+
+	err = propertyToDuration(p, connMaxLifetimeKey, db.SetConnMaxLifetime)
+	if err != nil {
+		return err
+	}
+
+	err = db.Ping()
+	if err != nil {
+		return errors.Wrap(err, "unable to ping the DB")
+	}
+
+	m.db = db
+
+	return nil
+}
+
+// Close will close the DB.
+func (m *Mysql) Close() error {
+	if m.db != nil {
+		return m.db.Close()
+	}
+
+	return nil
+}
+
+func (m *Mysql) query(ctx context.Context, sql string) ([]interface{}, error) {
+	rows, err := m.db.QueryContext(ctx, sql)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error executing %s", sql)
+	}
+
+	defer func() {
+		_ = rows.Close()
+		_ = rows.Err()
+	}()
+
+	result, err := m.jsonify(rows)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error marshalling query result for %s", sql)
+	}
+
+	return result, nil
+}
+
+func propertyToInt(props map[string]string, key string, setter func(int)) error {
+	if v, ok := props[key]; ok {
+		if i, err := strconv.Atoi(v); err == nil {
+			setter(i)
+		} else {
+			return errors.Wrapf(err, "error converitng %s:%s to int", key, v)
+		}
+	}
+
+	return nil
+}
+
+func propertyToDuration(props map[string]string, key string, setter func(time.Duration)) error {
+	if v, ok := props[key]; ok {
+		if d, err := time.ParseDuration(v); err == nil {
+			setter(d)
+		} else {
+			return errors.Wrapf(err, "error converitng %s:%s to time duration", key, v)
+		}
+	}
+
+	return nil
+}
+
+func initDB(url string) (*sql.DB, error) {
+	if _, err := mysql.ParseDSN(url); err != nil {
+		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS) specified by %s", connectionURLKey)
+	}
+
+	db, err := sql.Open("mysql", url)
+	if err != nil {
+		return nil, errors.Wrap(err, "error opening DB connection")
+	}
+
+	return db, nil
+}
+
+func (m *Mysql) jsonify(rows *sql.Rows) ([]interface{}, error) {
+	columnTypes, err := rows.ColumnTypes()
+	if err != nil {
+		return nil, err
+	}
+
+	var ret []interface{}
+	for rows.Next() {
+		values := prepareValues(columnTypes)
+		err := rows.Scan(values...)
+		if err != nil {
+			return nil, err
+		}
+
+		r := m.convert(columnTypes, values)
+		ret = append(ret, r)
+	}
+
+	return ret, nil
+}
+
+func prepareValues(columnTypes []*sql.ColumnType) []interface{} {
+	types := make([]reflect.Type, len(columnTypes))
+	for i, tp := range columnTypes {
+		types[i] = tp.ScanType()
+	}
+
+	values := make([]interface{}, len(columnTypes))
+	for i := range values {
+		values[i] = reflect.New(types[i]).Interface()
+	}
+
+	return values
+}
+
+func (m *Mysql) convert(columnTypes []*sql.ColumnType, values []interface{}) map[string]interface{} {
+	r := map[string]interface{}{}
+
+	for i, ct := range columnTypes {
+		value := values[i]
+
+		switch v := values[i].(type) {
+		case driver.Valuer:
+			if vv, err := v.Value(); err == nil {
+				value = interface{}(vv)
+			}
+		case *sql.RawBytes:
+			// special case for sql.RawBytes, see https://github.com/go-sql-driver/mysql/blob/master/fields.go#L178
+			switch ct.DatabaseTypeName() {
+			case "VARCHAR", "CHAR", "TEXT", "LONGTEXT":
+				value = string(*v)
+			}
+		}
+
+		if value != nil {
+			r[ct.Name()] = value
+		}
+	}
+
+	return r
+}
+
+func getLocalIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+	for _, address := range addrs {
+		// check the address type and if it is not a loopback the display it
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+	return ""
+}
+
+func observeRole(ip string, port int32) (string, error) {
+	url := "root@tcp(" + ip + ":" + strconv.Itoa(int(port)) + ")/information_schema?allowNativePasswords=true"
+	sql := "select role from information_schema.wesql_cluster_local"
+	mysql := &Mysql{}
+	params := map[string]string{connectionURLKey: url}
+	err := mysql.Init(params)
+	if err != nil {
+		return "", err
+	}
+
+	result, err := mysql.query(context.Background(), sql)
+	if err != nil {
+		return "", err
+	}
+	if len(result) != 1 {
+		return "", errors.New("only one role should be observed")
+	}
+	row, ok := result[0].(map[string]interface{})
+	if !ok {
+		return "", errors.New("query result wrong type")
+	}
+	role, ok := row["role"].(string)
+	if !ok {
+		return "", errors.New("role parsing error")
+	}
+	if len(role) == 0 {
+		return "", errors.New("got empty role")
+	}
+
+	err = mysql.Close()
+	role = strings.ToLower(role)
+	if err != nil {
+		return role, err
+	}
+
+	return role, nil
+}
+
+func startPortForward(kind, name string, port int32) error {
+	portStr := strconv.Itoa(int(port))
+	cmd := exec.Command("bash", "-c", "kubectl port-forward "+kind+"/"+name+" --address 0.0.0.0 "+portStr+":"+portStr+" &")
+	return cmd.Start()
+}
+
+func stopPortForward(name string) error {
+	cmd := exec.Command("bash", "-c", "ps aux | grep port-forward | grep -v grep | grep "+name+" | awk '{print $2}' | xargs kill -9")
+	return cmd.Run()
+}

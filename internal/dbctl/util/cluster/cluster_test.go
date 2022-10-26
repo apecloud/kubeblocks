@@ -20,7 +20,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/fake"
 
 	corev1 "k8s.io/api/core/v1"
@@ -74,15 +73,12 @@ var _ = Describe("util", func() {
 					"test-component": {
 						Type: (string)(dbaasv1alpha1.Consensus),
 						ConsensusSetStatus: &dbaasv1alpha1.ConsensusSetStatus{
-							Learner: podName,
+							Leader: podName,
 						},
 					},
 				},
 			},
 		}
-		scheme := runtime.NewScheme()
-		scheme.AddKnownTypeWithName(schema.GroupVersionKind{Group: types.Group, Version: types.Version, Kind: types.KindCluster}, cluster)
-		dbaasv1alpha1.AddToScheme(scheme)
 		client := fake.NewSimpleDynamicClient(runtime.NewScheme(), cluster)
 		pod, err := GetDefaultPodName(client, clusterName, namespace)
 		Expect(pod).Should(Equal(podName))

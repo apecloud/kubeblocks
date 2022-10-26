@@ -52,7 +52,7 @@ func GetDefaultPodName(dynamic dynamic.Interface, name string, namespace string)
 		Namespace(namespace).
 		Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
 	cluster := &dbaasv1alpha1.Cluster{}
@@ -64,7 +64,7 @@ func GetDefaultPodName(dynamic dynamic.Interface, name string, namespace string)
 	for _, c := range cluster.Status.Components {
 		switch (dbaasv1alpha1.ComponentType)(c.Type) {
 		case dbaasv1alpha1.Consensus:
-			return c.ConsensusSetStatus.Learner, nil
+			return c.ConsensusSetStatus.Leader, nil
 		case dbaasv1alpha1.Stateless, dbaasv1alpha1.Stateful:
 			// TODO: now we can't fetch the pod name from these component status
 			continue

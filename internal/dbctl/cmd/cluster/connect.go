@@ -65,8 +65,7 @@ func (o *ConnectOptions) complete(args []string) error {
 
 	// get target pod name, if not specified, find default pod from cluster
 	if len(o.PodName) == 0 {
-		o.PodName, err = cluster.GetDefaultPodName(dynamicClient, o.clusterName, o.Namespace)
-		if err != nil {
+		if o.PodName, err = cluster.GetDefaultPodName(dynamicClient, o.clusterName, o.Namespace); err != nil {
 			return err
 		}
 	}

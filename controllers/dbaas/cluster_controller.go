@@ -557,12 +557,14 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 		if err != nil {
 			return false, err
 		}
-		var statefulStatusRevisionIsEquals bool
+		statefulStatusRevisionIsEquals := false
+		end := true
 		switch componentDef.ComponentType {
 		case dbaasv1alpha1.Consensus:
-			if end, err := handleConsensusSetUpdate(ctx, r.Client, cluster, &v); err != nil {
+			if end, err = handleConsensusSetUpdate(ctx, r.Client, cluster, &v); err != nil {
 				return false, err
 			} else if !end {
+				// if not end, we are deleting pod.
 				isOk = false
 			}
 			// Consensus do not judge whether the revisions are consistent
@@ -576,10 +578,13 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 		}
 
 		var componentIsRunning bool
-		// check whether the statefulset has reached the final state
+		// check whether the statefulset has reached the final state.
+		// when we delete the pod, statefulset.status may still be available due to statefulset controls the pod asynchronously,
+		// so we check the end variable
 		// ps: StatefulSet.Status.AvailableReplicas supported after k8s v1.22
 		if v.Status.AvailableReplicas != *v.Spec.Replicas ||
-			v.Status.ObservedGeneration != v.GetGeneration() || !statefulStatusRevisionIsEquals {
+			v.Status.ObservedGeneration != v.GetGeneration() ||
+			!statefulStatusRevisionIsEquals || !end {
 			isOk = false
 		} else {
 			componentIsRunning = true

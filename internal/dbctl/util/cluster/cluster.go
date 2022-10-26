@@ -62,13 +62,10 @@ func GetDefaultPodName(dynamic dynamic.Interface, name string, namespace string)
 
 	// travel all components, check type
 	for _, c := range cluster.Status.Components {
-		switch (dbaasv1alpha1.ComponentType)(c.Type) {
-		case dbaasv1alpha1.Consensus:
+		if c.ConsensusSetStatus != nil {
 			return c.ConsensusSetStatus.Leader, nil
-		case dbaasv1alpha1.Stateless, dbaasv1alpha1.Stateful:
-			// TODO: now we can't fetch the pod name from these component status
-			continue
 		}
+		// TODO: now we only support consensus set
 	}
 
 	return "", fmt.Errorf("failed to find the pod to exec command")

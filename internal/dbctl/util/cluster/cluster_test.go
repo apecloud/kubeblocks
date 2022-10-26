@@ -17,19 +17,95 @@ limitations under the License.
 package cluster
 
 import (
+	"net/http"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/dynamic/fake"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/resource"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest/fake"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
-var _ = Describe("util", func() {
+var _ = Describe("cluster util", func() {
+	clusterName := "test-cluster"
+	namespace := "test"
+
+	mockClient := func(data runtime.Object) *cmdtesting.TestFactory {
+		tf := cmdtesting.NewTestFactory().WithNamespace(namespace)
+		defer tf.Cleanup()
+
+		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+		tf.Client = &fake.RESTClient{
+			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+			Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, data)},
+		}
+		return tf
+	}
+
+	It("get cluster objects", func() {
+		clusterName := "test-cluster"
+		objs := &types.ClusterObjects{}
+		tf := mockClient(&corev1.ConfigMap{})
+
+		// test builder
+		builder := &builder{}
+		builder.namespace = namespace
+		builder.name = clusterName
+		clientSet, err := tf.KubernetesClientSet()
+		Expect(err).Should(BeNil())
+		builder.clientSet = clientSet
+
+		dynamicClient, err := tf.DynamicClient()
+		Expect(err).Should(BeNil())
+		builder.dynamicClient = dynamicClient
+
+		// get cluster
+		builder.withGK(types.ClusterGK())
+		Expect(builder.do(objs)).Should(HaveOccurred())
+
+		// get clusterDefinition
+		builder.withGK(types.ClusterDefGK())
+		Expect(builder.do(objs)).Should(HaveOccurred())
+
+		// get appVersion
+		builder.withGK(types.AppVersionGK())
+		Expect(builder.do(objs)).Should(HaveOccurred())
+
+		// get service
+		builder.withGK(schema.GroupKind{Kind: "Service"})
+		Expect(builder.do(objs)).Should(HaveOccurred())
+
+		// get secret
+		builder.withGK(schema.GroupKind{Kind: "Secret"})
+		Expect(builder.do(objs)).Should(HaveOccurred())
+
+		// get pod
+		builder.withGK(schema.GroupKind{Kind: "Pod"})
+		Expect(builder.do(objs)).Should(HaveOccurred())
+
+		// get node
+		builder.withGK(schema.GroupKind{Kind: "Node"})
+		Expect(builder.do(objs)).Should(HaveOccurred())
+	})
+
+	It("get all objects", func() {
+		objs := &types.ClusterObjects{}
+		tf := mockClient(&corev1.ConfigMap{})
+		clientSet, _ := tf.KubernetesClientSet()
+		dynamicClient, _ := tf.DynamicClient()
+		Expect(GetAllObjects(clientSet, dynamicClient, namespace, clusterName, objs)).Should(HaveOccurred())
+	})
+
 	It("Get type from pod", func() {
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -81,7 +157,7 @@ var _ = Describe("util", func() {
 				},
 			},
 		}
-		client := fake.NewSimpleDynamicClient(runtime.NewScheme(), cluster)
+		client := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), cluster)
 		pod, err := GetDefaultPodName(client, clusterName, namespace)
 		Expect(pod).Should(Equal(podName))
 		Expect(err).ShouldNot(HaveOccurred())

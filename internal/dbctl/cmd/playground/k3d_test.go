@@ -19,9 +19,10 @@ package playground
 import (
 	"context"
 
-	config "github.com/k3d-io/k3d/v5/pkg/config/v1alpha4"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	config "github.com/k3d-io/k3d/v5/pkg/config/v1alpha4"
 )
 
 var _ = Describe("playground", func() {

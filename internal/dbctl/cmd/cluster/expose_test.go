@@ -19,12 +19,12 @@ package cluster
 import (
 	"fmt"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 

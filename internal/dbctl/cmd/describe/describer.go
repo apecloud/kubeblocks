@@ -285,7 +285,7 @@ func (d *ClusterDescriber) describeInstance(pod *corev1.Pod, w describe.PrefixWr
 	}
 
 	// TODO: get AccessMode from label
-	w.Write(LEVEL_3, "AccessMode:\t%s\n", "")
+	w.Write(LEVEL_3, "AccessMode:\t%s\n", pod.Labels[types.ConsensusSetAccessModeLabelKey])
 
 	// node information include its region and AZ
 	if pod.Spec.NodeName == "" {

@@ -49,9 +49,7 @@ func GetClusterTypeByPod(pod *corev1.Pod) (string, error) {
 
 // GetDefaultPodName get the default pod in the cluster
 func GetDefaultPodName(dynamic dynamic.Interface, name string, namespace string) (string, error) {
-	obj, err := dynamic.Resource(schema.GroupVersionResource{Group: types.Group, Version: types.Version, Resource: types.ResourceClusters}).
-		Namespace(namespace).
-		Get(context.TODO(), name, metav1.GetOptions{})
+	obj, err := dynamic.Resource(types.ClusterGVR()).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}

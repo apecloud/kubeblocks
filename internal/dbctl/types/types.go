@@ -90,11 +90,12 @@ const (
 	ResourceAppVersion = "appversions"
 	KindAppVersion     = "AppVersion"
 
-	InstanceLabelKey         = "app.kubernetes.io/instance"
-	ConsensusSetRoleLabelKey = "cs.dbaas.infracreate.com/role"
-	ComponentLabelKey        = "app.kubernetes.io/component-name"
-	RegionLabelKey           = "topology.kubernetes.io/region"
-	ZoneLabelKey             = "topology.kubernetes.io/zone"
+	InstanceLabelKey               = "app.kubernetes.io/instance"
+	ConsensusSetRoleLabelKey       = "cs.dbaas.infracreate.com/role"
+	ConsensusSetAccessModeLabelKey = "cs.dbaas.infracreate.com/access-mode"
+	ComponentLabelKey              = "app.kubernetes.io/component-name"
+	RegionLabelKey                 = "topology.kubernetes.io/region"
+	ZoneLabelKey                   = "topology.kubernetes.io/zone"
 
 	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/apecloud-loadbalancer-type"
 	ServiceLBTypeAnnotationValue   = "private-ip"

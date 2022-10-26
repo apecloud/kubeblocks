@@ -124,7 +124,7 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 		return err
 	}
 
-	// update label
+	// update pod role label
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Labels[consensusSetRoleLabelKey] = role
 	err := cli.Patch(ctx, pod, patch)
@@ -208,14 +208,16 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 			}
 		}
 	}
-	// set pod.Name to the right status field
-	needUpdate := false
 
+	// set pod.Name to the right status field
+	accessMode := dbaasv1alpha1.AccessMode("")
+	needUpdate := false
 	switch role {
 	case leaderName:
 		consensusSetStatus.Leader.Pod = pod.Name
 		consensusSetStatus.Leader.AccessMode = componentDef.ConsensusSpec.Leader.AccessMode
 		consensusSetStatus.Leader.Name = componentDef.ConsensusSpec.Leader.Name
+		accessMode = componentDef.ConsensusSpec.Leader.AccessMode
 		resetLearner()
 		resetFollower()
 		needUpdate = true
@@ -226,6 +228,7 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 		consensusSetStatus.Learner.Pod = pod.Name
 		consensusSetStatus.Learner.AccessMode = componentDef.ConsensusSpec.Learner.AccessMode
 		consensusSetStatus.Learner.Name = componentDef.ConsensusSpec.Learner.Name
+		accessMode = componentDef.ConsensusSpec.Learner.AccessMode
 		resetLeader()
 		resetFollower()
 		needUpdate = true
@@ -243,6 +246,7 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 					AccessMode: follower.AccessMode,
 					Name:       follower.Name,
 				}
+				accessMode = follower.AccessMode
 				consensusSetStatus.Followers = append(consensusSetStatus.Followers, member)
 				resetLeader()
 				resetLearner()
@@ -253,7 +257,15 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 
 	// finally, update cluster status
 	if needUpdate {
-		return cli.Status().Patch(ctx, cluster, patch)
+		err = cli.Status().Patch(ctx, cluster, patch)
+		if err != nil {
+			return err
+		}
+
+		// update pod accessMode label
+		patchAccessMode := client.MergeFrom(pod.DeepCopy())
+		pod.Labels[consensusSetAccessModeLabelKey] = string(accessMode)
+		return cli.Patch(ctx, pod, patchAccessMode)
 	}
 
 	return nil

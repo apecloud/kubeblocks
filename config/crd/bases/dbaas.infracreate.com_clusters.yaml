@@ -410,17 +410,79 @@ spec:
                       description: ConsensusSetStatus role and pod name mapping
                       properties:
                         followers:
-                          description: Followers pod names
+                          description: Followers status
                           items:
-                            type: string
+                            properties:
+                              accessMode:
+                                default: ReadWrite
+                                description: AccessMode, what service this pod provides
+                                enum:
+                                - None
+                                - Readonly
+                                - ReadWrite
+                                type: string
+                              name:
+                                default: leader
+                                description: Name role name
+                                type: string
+                              pod:
+                                default: Unknown
+                                description: Pod name
+                                type: string
+                            required:
+                            - accessMode
+                            - name
+                            - pod
+                            type: object
                           type: array
                         leader:
-                          default: Unknown
-                          description: Leader pod name
-                          type: string
+                          description: Leader status
+                          properties:
+                            accessMode:
+                              default: ReadWrite
+                              description: AccessMode, what service this pod provides
+                              enum:
+                              - None
+                              - Readonly
+                              - ReadWrite
+                              type: string
+                            name:
+                              default: leader
+                              description: Name role name
+                              type: string
+                            pod:
+                              default: Unknown
+                              description: Pod name
+                              type: string
+                          required:
+                          - accessMode
+                          - name
+                          - pod
+                          type: object
                         learner:
-                          description: Learner pod name
-                          type: string
+                          description: Learner status
+                          properties:
+                            accessMode:
+                              default: ReadWrite
+                              description: AccessMode, what service this pod provides
+                              enum:
+                              - None
+                              - Readonly
+                              - ReadWrite
+                              type: string
+                            name:
+                              default: leader
+                              description: Name role name
+                              type: string
+                            pod:
+                              default: Unknown
+                              description: Pod name
+                              type: string
+                          required:
+                          - accessMode
+                          - name
+                          - pod
+                          type: object
                       required:
                       - leader
                       type: object

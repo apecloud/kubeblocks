@@ -195,18 +195,35 @@ type ClusterStatusComponent struct {
 }
 
 type ConsensusSetStatus struct {
-	// Leader pod name
+	// Leader status
+	// +kubebuilder:validation:Required
+	Leader ConsensusMemberStatus `json:"leader"`
+
+	// Followers status
+	// +optional
+	Followers []ConsensusMemberStatus `json:"followers,omitempty"`
+
+	// Learner status
+	// +optional
+	Learner *ConsensusMemberStatus `json:"learner,omitempty"`
+}
+
+type ConsensusMemberStatus struct {
+	// Name role name
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=leader
+	Name string `json:"name"`
+
+	// AccessMode, what service this pod provides
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum={None, Readonly, ReadWrite}
+	// +kubebuilder:default=ReadWrite
+	AccessMode AccessMode `json:"accessMode"`
+
+	// Pod name
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Unknown
-	Leader string `json:"leader"`
-
-	// Followers pod names
-	// +optional
-	Followers []string `json:"followers,omitempty"`
-
-	// Learner pod name
-	// +optional
-	Learner string `json:"learner,omitempty"`
+	Pod string `json:"pod"`
 }
 
 type ClusterComponentVolumeClaimTemplate struct {

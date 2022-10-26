@@ -12,7 +12,6 @@ jobs:
         run:  |
           make mod-vendor
           make lint
-          make staticcheck
           make test
 
 

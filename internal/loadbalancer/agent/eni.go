@@ -265,8 +265,7 @@ func (c *eniManager) tryAllocAndAttachENI() error {
 	c.logger.Info("Successfully create new eni, waiting for attached", "eni id", eniId)
 
 	// waiting for ENI attached
-	eni, err := c.cp.WaitForENIAttached(eniId)
-	if err != nil {
+	if err := c.WaitForENIAttached(eniId); err != nil {
 		return errors.Wrap(err, "Unable to discover attached ENI from metadata service")
 	}
 	c.logger.Info("New eni attached", "eni id", eniId)
@@ -275,11 +274,11 @@ func (c *eniManager) tryAllocAndAttachENI() error {
 	setupENIRequest := &pb.SetupNetworkForENIRequest{
 		RequestId: util.GenRequestId(),
 		Eni: &pb.ENIMetadata{
-			EniId: eni.ENIId,
+			EniId: eniId,
 		},
 	}
 	if _, err = c.nc.SetupNetworkForENI(context.Background(), setupENIRequest); err != nil {
-		return errors.Wrapf(err, "Failed to set up network for eni %s", eni.ENIId)
+		return errors.Wrapf(err, "Failed to set up network for eni %s", eniId)
 	}
 	c.logger.Info("Successfully initialized new eni", "eni id", eniId)
 	return nil
@@ -332,4 +331,13 @@ func (c *eniManager) cleanLeakedENIs() error {
 		return errors.New(fmt.Sprintf("Failed to delete leaked enis, err: %s", strings.Join(errs, "|")))
 	}
 	return nil
+}
+
+func (c *eniManager) WaitForENIAttached(eniId string) error {
+	request := &pb.WaitForENIAttachedRequest{
+		RequestId: util.GenRequestId(),
+		Eni:       &pb.ENIMetadata{EniId: eniId},
+	}
+	_, err := c.nc.WaitForENIAttached(context.Background(), request)
+	return err
 }

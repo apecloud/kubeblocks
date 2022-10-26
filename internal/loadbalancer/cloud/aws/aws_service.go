@@ -96,7 +96,6 @@ func NewAwsService(logger logr.Logger) (*awsService, error) {
 	if err := svc.initWithEC2Metadata(context.Background()); err != nil {
 		return nil, errors.Wrap(err, "Failed to init ec2 metadata")
 	}
-	svc.logger = logger.WithValues("instance", svc.instanceId)
 
 	if err = svc.initInstanceTypeLimits(); err != nil {
 		return nil, errors.Wrap(err, "Failed to init instance limits")
@@ -786,7 +785,6 @@ func (c *awsService) WaitForENIAttached(eniId string) (eniMetadata cloud.ENIMeta
 				return nil
 			}
 		}
-		c.logger.Info("Failed to find the right ENI yet")
 		return ErrENINotFound
 	}
 	if err = util.DoWithRetry(context.Background(), c.logger, f, &util.RetryOptions{MaxRetry: 15, Delay: 3 * time.Second}); err != nil {

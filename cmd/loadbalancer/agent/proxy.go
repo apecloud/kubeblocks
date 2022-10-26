@@ -70,6 +70,14 @@ func (p Proxy) DescribeAllENIs(ctx context.Context, request *pb.DescribeAllENIsR
 
 }
 
+func (p Proxy) WaitForENIAttached(ctx context.Context, request *pb.WaitForENIAttachedRequest) (*pb.WaitForENIAttachedResponse, error) {
+	eni, err := p.cp.WaitForENIAttached(request.GetEni().GetEniId())
+	if err != nil {
+		return nil, err
+	}
+	return &pb.WaitForENIAttachedResponse{Eni: &pb.ENIMetadata{EniId: eni.ENIId}}, nil
+}
+
 func (p Proxy) SetupNetworkForService(ctx context.Context, request *pb.SetupNetworkForServiceRequest) (*pb.SetupNetworkForServiceResponse, error) {
 	eni := cloud.ENIMetadata{
 		ENIId:          request.GetEni().GetEniId(),

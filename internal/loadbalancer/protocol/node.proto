@@ -7,6 +7,8 @@ option go_package = "github.com/apecloud/kubeblocks/internal/loadbalancer/protoc
 service Node {
   rpc DescribeAllENIs(DescribeAllENIsRequest) returns (DescribeAllENIsResponse) {}
 
+  rpc WaitForENIAttached(WaitForENIAttachedRequest) returns (WaitForENIAttachedResponse) {}
+
   rpc SetupNetworkForENI(SetupNetworkForENIRequest) returns(SetupNetworkForENIResponse) {}
 
   rpc CleanNetworkForENI(CleanNetworkForENIRequest) returns(CleanNetworkForENIResponse) {}
@@ -23,6 +25,16 @@ message DescribeAllENIsRequest {
 message DescribeAllENIsResponse {
   string request_id = 1;
   map<string, ENIMetadata> enis = 2;
+}
+
+message WaitForENIAttachedRequest {
+  string request_id = 1;
+  ENIMetadata eni = 2;
+}
+
+message WaitForENIAttachedResponse {
+  string request_id = 1;
+  ENIMetadata eni = 2;
 }
 
 message SetupNetworkForServiceRequest {

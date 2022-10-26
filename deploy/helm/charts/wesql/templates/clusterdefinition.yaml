@@ -15,8 +15,9 @@ spec:
     monitor:
       builtIn: true
     configTemplateRefs:
-    - name: mysql-3node-tpl-8.0
-      volumeName: mysql-config
+      default:
+        - name: mysql-3node-tpl-8.0
+          volumeName: mysql-config
     defaultReplicas: 3
     componentType: Consensus
     consensusSpec:

@@ -151,9 +151,34 @@ type ClusterDefinitionComponent struct {
 	DefaultReplicas int `json:"defaultReplicas,omitempty"`
 
 	// The configTemplateRefs field provided by ISV, and
-	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster
+	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
+	//
 	// +optional
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
+
+	// TODO(zt) support multi scene, Different scenarios use different configuration templates.
+	// User modify scene in cluster field or reconfigure ops.
+	// ConfigTemplateRefs map[string][]ConfigTemplate `json:"configTemplateRefs,omitempty"`
+	// DefaultScene string `json:"defaultScene,omitempty"`
+
+	// ReconfigureResourceCount is number of historical versions of configuration variations submitted by users, By default, 6 versions are reserved
+	// +kubebuilder:default=6
+	// +kubebuilder:validation:Minimum=0
+	ReconfigureResourceCount int `json:"reconfigureResourceCount,omitempty"`
+
+	// ConfigAutoReload indicates whether the engine itself supports reload, if true,
+	// if true, the controller does not need to update.
+	// +kubebuilder:default=false
+	ConfigAutoReload bool `json:"configAutoReload,omitempty"`
+
+	// SupportRawUpgrade indicates whether the engine supports memory updates parameter.
+	// Sidecar not support sql query set parameter if false
+	// +kubebuilder:default=false
+	SupportRawUpgrade bool `json:"supportRawUpgrade,omitempty"`
+
+	// CustomConfigurationVolume is volume name which the user specifies update to
+	// +optional
+	CustomConfigurationVolume string `json:"customConfigurationVolume,omitempty"`
 
 	// Monitor is monitoring config which provided by ISV
 	// +optional

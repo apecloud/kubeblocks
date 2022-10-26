@@ -72,10 +72,16 @@ spec:
                       - Stateful
                       - Consensus
                       type: string
+                    configAutoReload:
+                      default: false
+                      description: ConfigAutoReload indicates whether the engine itself
+                        supports reload, if true, if true, the controller does not
+                        need to update.
+                      type: boolean
                     configTemplateRefs:
                       description: The configTemplateRefs field provided by ISV, and
                         finally this configTemplateRefs will be rendered into the
-                        user's own configuration file according to the user's cluster
+                        user's own configuration file according to the user's cluster.
                       items:
                         properties:
                           name:
@@ -205,6 +211,10 @@ spec:
                       required:
                       - leader
                       type: object
+                    customConfigurationVolume:
+                      description: CustomConfigurationVolume is volume name which
+                        the user specifies update to
+                      type: string
                     defaultReplicas:
                       default: 0
                       description: Default replicas in this component if user not
@@ -7656,6 +7666,13 @@ spec:
                               type: integer
                           type: object
                       type: object
+                    reconfigureResourceCount:
+                      default: 6
+                      description: ReconfigureResourceCount is number of historical
+                        versions of configuration variations submitted by users, By
+                        default, 6 versions are reserved
+                      minimum: 0
+                      type: integer
                     scripts:
                       description: 'Scripts executed before and after workload operation
                         script exec order：component.pre => component.exec => component.post
@@ -8276,6 +8293,12 @@ spec:
                             https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types'
                           type: string
                       type: object
+                    supportRawUpgrade:
+                      default: false
+                      description: SupportRawUpgrade indicates whether the engine
+                        supports memory updates parameter. Sidecar not support sql
+                        query set parameter if false
+                      type: boolean
                     typeName:
                       description: Type name of the component, it can be any valid
                         string

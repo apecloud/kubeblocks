@@ -358,6 +358,32 @@ rules:
   - patch
   - update
 - apiGroups:
+  - dbaas.infracreate.com
+  resources:
+  - reconfigurerequests
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dbaas.infracreate.com
+  resources:
+  - reconfigurerequests/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dbaas.infracreate.com
+  resources:
+  - reconfigurerequests/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - policy
   resources:
   - poddisruptionbudgets

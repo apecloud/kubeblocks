@@ -12,9 +12,8 @@ spec:
     configTemplateRefs:
     - name: mysql-tree-node-template-8.0
       volumeName: mysql-config
-    roleGroups:
-    - primary
-    defaultReplicas: 1
+    defaultReplicas: 3
+    componentType: Consensus
     podSpec:
       containers:
       - name: mysql
@@ -66,6 +65,3 @@ spec:
             mkdir -p /data/mysql/run;
             chmod +777 -R /data/mysql;
             docker-entrypoint.sh mysqld --defaults-file=/data/config/mysql/my.cnf --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
-  roleGroupTemplates:
-  - typeName: primary
-    defaultReplicas: 3

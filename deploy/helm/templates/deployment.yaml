@@ -43,7 +43,7 @@ spec:
             {{- end }}
           env:
             - name: CM_NAMESPACE
-            - value: {{ .Release.Name }}
+              value: {{ .Release.Name }}
           {{- if .Values.dataProtection.disableVolumeSnapshot }}
             - name: NO_VOLUMESNAPSHOT
               value: "true"

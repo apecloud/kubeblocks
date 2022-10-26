@@ -176,4 +176,11 @@ var _ = Describe("Cluster", func() {
 		o.RoleGroupReplicas = 1
 		Expect(o.Validate()).Should(Succeed())
 	})
+
+	It("connect", func() {
+		tf := cmdtesting.NewTestFactory().WithNamespace("default")
+		defer tf.Cleanup()
+		cmd := NewConnectCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+	})
 })

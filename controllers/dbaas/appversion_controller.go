@@ -101,9 +101,10 @@ type AppVersionReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.2/pkg/reconcile
 func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqCtx := intctrlutil.RequestCtx{
-		Ctx: ctx,
-		Req: req,
-		Log: log.FromContext(ctx).WithValues("clusterDefinition", req.NamespacedName),
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithValues("clusterDefinition", req.NamespacedName),
+		Recorder: r.Recorder,
 	}
 
 	appVersion := &dbaasv1alpha1.AppVersion{}
@@ -113,7 +114,8 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, appVersion, appVersionFinalizerName, func() (*ctrl.Result, error) {
 		recordEvent := func() {
-			r.Recorder.Event(appVersion, corev1.EventTypeWarning, "ExistsReferencedCluster", appVersion.Status.Message)
+			r.Recorder.Event(appVersion, corev1.EventTypeWarning, intctrlutil.EventReasonRefCRUnavailable,
+				"cannot be deleted because of existing referencing Cluster.")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, appVersion,
 			appVersionLabelKey, recordEvent, &dbaasv1alpha1.ClusterList{}); res != nil || err != nil {
@@ -137,7 +139,7 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Name: appVersion.Spec.ClusterDefinitionRef,
 	}, clusterdefinition); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return intctrlutil.RequeueWithErrorAndRecordEvent(appVersion, r.Recorder, err, reqCtx.Log)
 	}
 
 	patch := client.MergeFrom(appVersion.DeepCopy())
@@ -160,7 +162,7 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err = r.Client.Status().Patch(ctx, appVersion, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-
+	intctrlutil.RecordCreatedEvent(r.Recorder, appVersion)
 	return ctrl.Result{}, nil
 }
 

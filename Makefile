@@ -144,7 +144,7 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/..."
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -179,7 +179,7 @@ loggercheck: loggerchecktool ## Run loggercheck against code.
 	$(LOGGERCHECK) ./...
 
 .PHONY: build-checks
-build-checks: generate fmt vet goimports fast-lint ## Run build checks.
+build-checks: fmt vet goimports fast-lint ## Run build checks.
 
 .PHONY: mod-download
 mod-download: ## Run go mod download against go modules.
@@ -263,7 +263,7 @@ loadbalancer: build-checks ## Build loadbalancer binary.
 ##@ Operator Controller Manager
 
 .PHONY: manager
-manager: cue-fmt build-checks ## Build manager binary.
+manager: cue-fmt generate build-checks ## Build manager binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
 
 CERT_ROOT_CA ?= $(WEBHOOK_CERT_DIR)/rootCA.key
@@ -313,6 +313,29 @@ agamotto: build-checks ## Build agamotto related binaries
 clean-agamotto: ## Clean bin/mysqld_exporter.
 	rm -f bin/agamotto
 
+##@ DAP
+
+DAPRD_BUILD_PATH = ./cmd/daprd
+DAPRD_LD_FLAGS = "-s -w"
+
+bin/daprd.%: ## Cross build bin/daprd.$(OS).$(ARCH) .
+	cd $(DAPRD_BUILD_PATH) && GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${DAPRD_LD_FLAGS} -o ../../$@  ./main.go
+
+daprd-mod-vendor:
+	cd $(DAPRD_BUILD_PATH) && $(GO) mod tidy -compat=1.19
+	cd $(DAPRD_BUILD_PATH) && $(GO) mod vendor
+	cd $(DAPRD_BUILD_PATH) && $(GO) mod verify
+
+.PHONY: daprd
+daprd: OS=$(shell $(GO) env GOOS)
+daprd: ARCH=$(shell $(GO) env GOARCH)
+daprd: daprd-mod-vendor # build-checks ## Build daprd related binaries
+	$(MAKE) bin/daprd.${OS}.${ARCH}
+	mv bin/daprd.${OS}.${ARCH} bin/daprd
+
+.PHONY: clean
+clean-daprd: ## Clean bin/mysqld_exporter.
+	rm -f bin/daprd
 
 ##@ Deployment
 
@@ -322,7 +345,7 @@ endif
 
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | kubectl apply -f -
+	($(KUSTOMIZE) build config/crd | kubectl replace -f -) || ($(KUSTOMIZE) build config/crd | kubectl create -f -)
 	$(KUSTOMIZE) build $(shell $(GO) env GOPATH)/pkg/mod/github.com/kubernetes-csi/external-snapshotter/client/v6@v6.0.1/config/crd | kubectl apply -f -
 
 .PHONY: uninstall
@@ -347,6 +370,11 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 ##@ CI
 
+.PHONY:
+intstall-git-hooks: githookstool ## Install git hooks.
+	git hooks install
+	git hooks
+
 .PHONY: ci-test-pre
 ci-test-pre: dbctl ## Prepare CI test environment.
 	bin/dbctl playground destroy
@@ -360,7 +388,7 @@ ci-test: ci-test-pre test ## Run CI tests.
 ##@ Contributor
 
 .PHONY: reviewable
-reviewable: build-checks test check-license-header ## Run code checks to proceed with PR reviews.
+reviewable: generate build-checks test check-license-header ## Run code checks to proceed with PR reviews.
 	$(GO) mod tidy -compat=1.18
 
 .PHONY: check-diff
@@ -545,6 +573,16 @@ else
 HELM=$(shell which helm)
 endif
 
+.PHONY: githookstool
+githookstool: ## Download git-hooks locally if necessary.
+ifeq (, $(shell which git-hook))
+	@{ \
+	set -e ;\
+	go install github.com/git-hooks/git-hooks@latest;\
+	}
+endif
+
+
 
 .PHONY: oras
 oras: ORAS_VERSION=0.14.1
@@ -579,7 +617,7 @@ MINIKUBE=$(shell which minikube)
 
 .PHONY: brew-install-prerequisite
 brew-install-prerequisite: ## Use `brew install` to install required dependencies.
-	brew install go@1.18 kubebuilder delve golangci-lint staticcheck kustomize step cue oras jq yq
+	brew install go@1.18 kubebuilder delve golangci-lint staticcheck kustomize step cue oras jq yq git-hooks-go
 
 ##@ Minikube
 K8S_VERSION ?= v1.22.15

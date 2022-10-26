@@ -29,9 +29,10 @@ const (
 	OpsRequestKind        = "OpsRequestKind"
 )
 
+// Phase defines the CR .Status.Phase
+// +enum
 type Phase string
 
-// CR.Status.Phase
 const (
 	AvailablePhase   Phase = "Available"
 	UnavailablePhase Phase = "Unavailable"
@@ -44,14 +45,17 @@ const (
 	SucceedPhase     Phase = "Succeed"
 )
 
+// Status define CR .Status.ClusterDefSyncStatus
+// +enum
 type Status string
 
-// CR.Status.ClusterDefSyncStatus
 const (
 	OutOfSyncStatus Status = "OutOfSync"
 	InSyncStatus    Status = "InSync"
 )
 
+// OpsType defines operation types.
+// +enum
 type OpsType string
 
 const (
@@ -61,6 +65,11 @@ const (
 	UpgradeType           OpsType = "Upgrade"
 	RestartType           OpsType = "Restart"
 )
+
+var DefaultLeader = ConsensusMember{
+	Name:       "leader",
+	AccessMode: ReadWrite,
+}
 
 var webhookMgr *webhookManager
 

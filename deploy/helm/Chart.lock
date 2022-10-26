@@ -4,12 +4,12 @@ dependencies:
   version: 0.1.*
 - name: grafana
   repository: https://grafana.github.io/helm-charts
-  version: 6.42.2
+  version: 6.42.5
 - name: prometheus
   repository: https://prometheus-community.github.io/helm-charts
   version: 15.16.1
 - name: loadbalancer
   repository: ""
   version: 0.1.*
-digest: sha256:ca0eada0936fe6ae600724ab6cc0871afc46e582868f97d43662a3fd59d77044
-generated: "2022-10-20T20:18:02.769061+08:00"
+digest: sha256:7583a09b71dc0cb5c79a98f7959a02b58fb8cbcd6582b967f3413de0d035b31b
+generated: "2022-10-24T18:55:12.389401+08:00"

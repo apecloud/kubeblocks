@@ -57,9 +57,10 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// NOTES:
 	// setup common request context
 	reqCtx := intctrlutil.RequestCtx{
-		Ctx: ctx,
-		Req: req,
-		Log: log.FromContext(ctx).WithValues("backupPolicy", req.NamespacedName),
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithValues("backupPolicy", req.NamespacedName),
+		Recorder: r.Recorder,
 	}
 
 	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}

@@ -39,7 +39,7 @@ type Installer struct {
 	client    dynamic.Interface
 }
 
-func (i *Installer) Install() error {
+func (i *Installer) Install() (string, error) {
 	sets := []string{}
 	for _, set := range i.Sets {
 		splitSet := strings.Split(set, ",")
@@ -56,12 +56,12 @@ func (i *Installer) Install() error {
 		TryTimes:  2,
 	}
 
-	err := chart.Install(i.cfg)
+	notes, err := chart.Install(i.cfg)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return notes, nil
 }
 
 // Uninstall remove dbaas

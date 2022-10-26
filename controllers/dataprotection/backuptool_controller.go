@@ -56,9 +56,10 @@ func (r *BackupToolReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// NOTES:
 	// setup common request context
 	reqCtx := intctrlutil.RequestCtx{
-		Ctx: ctx,
-		Req: req,
-		Log: log.FromContext(ctx).WithValues("backupTool", req.NamespacedName),
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithValues("backupTool", req.NamespacedName),
+		Recorder: r.Recorder,
 	}
 
 	backupTool := &dataprotectionv1alpha1.BackupTool{}

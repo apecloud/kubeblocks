@@ -10,10 +10,6 @@ spec:
   - name: replicasets
     type: replicasets
     monitor: true
-    roleGroups:
-    - name: primary
-      type: primary
-      replicas: 3
     volumeClaimTemplates:
     - name: data
       spec:

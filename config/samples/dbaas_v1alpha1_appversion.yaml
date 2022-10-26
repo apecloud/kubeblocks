@@ -26,7 +26,7 @@ spec:
   # ref ClusterDefinition
   clusterDefinitionRef: a-vendor-mongodbcluster
   components:
-    - type: mongos # roleGroup name in ClusterDefinition
+    - type: mongos # component.typeName name in ClusterDefinition
       containers: # <metav1 container spec>
         - name: mongod
           ports: []

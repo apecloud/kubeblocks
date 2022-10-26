@@ -18,9 +18,11 @@ package v1alpha1
 
 import (
 	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,6 +32,8 @@ var _ = Describe("appVersion webhook", func() {
 	var (
 		clusterDefinitionName = "appversion-webhook-mysql-definition"
 		appVersionName        = "appversion-webhook-mysql-appversion"
+		timeout               = time.Second * 10
+		interval              = time.Second
 	)
 	Context("When appVersion create and update", func() {
 		It("Should webhook validate passed", func() {
@@ -44,7 +48,7 @@ var _ = Describe("appVersion webhook", func() {
 			Eventually(func() bool {
 				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDef.Name}, clusterDef)
 				return err == nil
-			}, 10, 1).Should(BeTrue())
+			}, timeout, interval).Should(BeTrue())
 
 			By("By testing component type is not found in cluserDefinition")
 			appVersion.Spec.Components[1].Type = "proxy1"

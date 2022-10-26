@@ -55,9 +55,10 @@ type OpsRequestReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
 func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqCtx := intctrlutil.RequestCtx{
-		Ctx: ctx,
-		Req: req,
-		Log: log.FromContext(ctx).WithValues("opsRequest", req.NamespacedName),
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithValues("opsRequest", req.NamespacedName),
+		Recorder: r.Recorder,
 	}
 
 	opsRequest := &dbaasv1alpha1.OpsRequest{}

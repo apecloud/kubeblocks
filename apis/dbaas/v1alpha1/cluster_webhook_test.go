@@ -19,9 +19,11 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -32,6 +34,8 @@ var _ = Describe("cluster webhook", func() {
 		clusterDefinitionName     = "cluster-webhook-mysql-definition"
 		sencondeClusterDefinition = "cluster-webhook-mysql-definition2"
 		appVersionName            = "cluster-webhook-mysql-appversion"
+		timeout                   = time.Second * 10
+		interval                  = time.Second
 	)
 	Context("When cluster create and update", func() {
 		It("Should webhook validate passed", func() {
@@ -50,7 +54,7 @@ var _ = Describe("cluster webhook", func() {
 			Eventually(func() bool {
 				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)
 				return err == nil
-			}, 10, 1).Should(BeTrue())
+			}, timeout, interval).Should(BeTrue())
 
 			By("By creating a new appVersion")
 			appVersion := createTestAppVersionObj(clusterDefinitionName, appVersionName)
@@ -59,7 +63,7 @@ var _ = Describe("cluster webhook", func() {
 			Eventually(func() bool {
 				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: appVersionName}, appVersion)
 				return err == nil
-			}, 10, 1).Should(BeTrue())
+			}, timeout, interval).Should(BeTrue())
 
 			By("By creating a new Cluster")
 			cluster, _ = createTestCluster(clusterDefinitionName, appVersionName, clusterName)

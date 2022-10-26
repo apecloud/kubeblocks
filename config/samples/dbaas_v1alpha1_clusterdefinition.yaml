@@ -6,38 +6,8 @@ metadata:
 spec:
   #  # DAPR types - [state.redis, mq.mqtt, mq.kafkal, state.mysql-8, state.mysql-7]
   #  types: []<string>
-  #  cluster:
-  #    components: []<string>
-  #    strategies:
-  #      default:
-  #        order: []<string>
-  #      create:
-  #        order: []<string>
-  #      upgrade:
-  #        order: []<string>
-  #      vertical-scale:
-  #        order: []<string>
-  #      horizontal-scale:
-  #        order: []<string>
-  #      delete:
-  #        order: []<string>
   # DAPR types - [state.redis, mq.mqtt, mq.kafkal, state.mysql-8, state.mysql-7]
   type: "state.mongodb"
-  cluster:
-    strategies:
-      create:
-        # install if empty as unspecified component installation order (parallel)
-        order:
-          - configserver
-          - mongos
-          - shard
-      # 系统默认顺序为全并行，可用 default 指定默认顺序，指定后则所有未配置操作均使用该顺序
-      default:
-        # upgrade if specified process component order in serial
-        order:
-          - mongos
-          - configserver
-          - shard
   components:
     ## typedef:
     # type ComponentScriptBlock struct {
@@ -45,36 +15,30 @@ spec:
     #     Post []ContainerCMD
     # }
     # type ContainerCMD struct {
-    #     Container string # job container in component, ephermeral container in roleGroup
+    #     Container string # job container in component
     #     Command []string
     #     Args []string
     # }
-    # componets:
-    # - name: <string>!
-    #   # roleGroups specify roleGroupTemplate name
-    #   roleGroups: []<string>
+    # components:
+    # - typeName: <string>!
+    #   componentType: [Stateless, Stateful, Consensus, Replication]
     #   minAvailable: 1 | <int>
     #   maxAvailable: <int>
-    #   # isStateless define this components
-    #   isStateless: false | <bool>
     #   defaultReplicas: minAvailable | <int>
     #   # antiAffinity defines components should have anti-affinity constraint to same component type
     #   antiAffinity: false | <bool>
-    #   # isQuorum defines odd number of pods & N/2+1 pods
-    #   isQuorum: false | <bool> # 控制并行度
-    #   strategies:
-    #     default:
-    #       order: []<string>
-    #     create:
-    #       order: []<string>
-    #     upgrade:
-    #       order: []<string>
-    #     vertical-scale:
-    #       order: []<string>
-    #     horizontal-scale:
-    #       order: []<string>
-    #     delete:
-    #       order: []<string>
+    #   consensusSpec:
+    #     leader:
+    #       name: <string>!
+    #       accessMode: [None, Readonly, ReadWrite]
+    #     followers:
+    #       - name: <string>!
+    #         accessMode: [None, Readonly, ReadWrite]
+    #     learner:
+    #       name: <string>!
+    #       accessMode: [None, Readonly, ReadWrite]
+    #       replicas: 1 | <int>
+    #     updateStrategy: [Serial, BestEffortParallel, Parallel]
     #   <container.spec>
     #   containers:
     #     - name: mongod
@@ -100,17 +64,17 @@ spec:
     #       port:
     #       targetPort:
     #     type:
-    #   # script 执行顺序：component.pre => roleGroup.pre => roleGroup.exec => roleGroup.post => component.post
+    #   # script 执行顺序：component.pre => component.post
     #   scripts:
     #     create: <ComponentScriptBlock>
     #      - # builtin ENV variables:
     #        # self: OPENDBAAS_SELF_{builtin_properties}
-    #        # rule: OPENDBAAS_{conponent_name}[n]-{roleGroup_name}[n]-{builtin_properties}
+    #        # rule: OPENDBAAS_{conponent_name}[n]-{builtin_properties}
     #        # builtin_properties:
     #        # - ID # which shows in Cluster.status
     #        # - HOST # e.g. example-mongodb2-0.example-mongodb2-svc.default.svc.cluster.local
     #        # - PORT
-    #        # - N # number of current component/roleGroup
+    #        # - N # number of current component
     #        container: "mongodb-client:latest" # job container in component
     #        command: ["mongo ${OPENDBAAS_SELF_HOSTNAME}:${OPENDBAAS_SELF_PORT}"]
     #        args:
@@ -120,18 +84,11 @@ spec:
     #     horizontal-scale: <ComponentScriptBlock>
     #     delete: <ComponentScriptBlock>
     - typeName: mongos
-      roleGroups:
-        - "mongos-primary"
       minAvailable: 0
       maxAvailable: 256
       defaultReplicas: 1
       antiAffinity: true
-      isStateless: true
-      strategies:
-        create:
-          order: []
-        upgrade:
-          order: []
+      componentType: Stateless
       # type ServiceSpec struct from k8s.io/core/v1
       service:
         ports:
@@ -139,40 +96,34 @@ spec:
             port: 80
             targetPort: 9376
         type: LoadBalancer
-      # script 执行顺序：component.pre => roleGroup.pre => component.exec => roleGroup.exec => roleGroup.post => component.post
+      # script 执行顺序：component.pre => component.post
       scripts:
         create:
           post:
             - # builtin ENV variables:
               # self: OPENDBAAS_SELF_{builtin_properties}
-              # rule: OPENDBAAS_{conponent_name}[n]-{roleGroup_name}[n]-{builtin_properties}
+              # rule: OPENDBAAS_{conponent_name}[n]-{builtin_properties}
               # builtin_properties:
               # - ID # which shows in Cluster.status
               # - HOST # e.g. example-mongodb2-0.example-mongodb2-svc.default.svc.cluster.local
               # - PORT
-              # - N # number of current component/roleGroup
+              # - N # number of current component
               container: "mongodb-client:latest" # job container in component
               command: ["mongo ${OPENDBAAS_SELF_HOSTNAME}:${OPENDBAAS_SELF_PORT}"]
               args:
                 - "sh.addshard('${OPENDBAAS_SHARD[0]_ID}/${OPENDBAAS_SHARD[0]_PRIMARY[0]_HOST}:${OPENDBAAS_SHARD[0]_PRIMARY[0]_PORT}')"
     - typeName: configserver
-      roleGroups:
-        - primary
-        - secondary
-        - hidden
       minAvailable: 1
       maxAvailable: 1
-      strategies:
-        create:
-          order:
-            - primary
-            - secondary
-            - hidden
-        default:
-          order:
-            - hidden
-            - secondary
-            - primary
+      componentType: Consensus
+      consensusSpec:
+        leader:
+          name: primary
+          accessMode: ReadWrite
+        followers:
+          - name: secondary
+            accessMode: ReadWrite
+        updateStrategy: BestEffortParallel
       containers:
         - name: mongod
           ports: []
@@ -191,25 +142,23 @@ spec:
             - mountPath: /log
               name: log
     - typeName: shard
-      roleGroups:
-        - primary
-        - secondary
-        - hidden
-        - readonly
       minAvailable: 2
       maxAvailable: 256
       defaultReplicas: 2
-      # isQuorum defines odd number of pods & N/2+1 pods
-      isQuorum: true # 控制并行度
-      strategies:
-        create:
-          order: []
-        default:
-          order:
-            - readonly
-            - hidden
-            - secondary
-            - primary
+      componentType: Consensus
+      consensusSpec:
+        leader:
+          name: primary
+          accessMode: ReadWrite
+        followers:
+          - name: secondary
+            accessMode: ReadWrite
+          - name: hidden
+            accessMode: None
+        learner:
+          name: readonly
+          accessMode: Readonly
+        updateStrategy: BestEffortParallel
       containers:
         - name: mongod
           ports: []
@@ -227,82 +176,6 @@ spec:
               name: data
             - mountPath: /log
               name: log
-  roleGroupTemplates:
-    ## type define
-    # type RoleGroupScriptBlock struct {
-    #     Pre  []ContainerCMD
-    #     Exec []ContainerCMD
-    #     Post []ContainerCMD
-    # }
-    ## type roleGroupTemplate
-    # - name: <string>!
-    #   minAvailable: 1 | <int>
-    #   maxAvailable: <int>
-    #   # 滚动升级
-    #   updateStrategy:
-    #     # maxUnavailable = 1 表示可以有一个不可用，所以可以原地删除再创建
-    #     maxUnavailable: 1 | int
-    #     # 等于 0 表示升级时不可以新增，若 maxSurge > 0 表示可以先添加一个新版本再删除旧版本
-    #     maxSurge: 0 | int
-    #   scripts:
-    #     create: <RoleGroupScriptBlock>
-    #     upgrade: <RoleGroupScriptBlock>
-    #     vertical-scale: <RoleGroupScriptBlock>
-    #     horizontal-scale: <RoleGroupScriptBlock>
-    #     delete: <RoleGroupScriptBlock>
-    - typeName: "mongos-primary"
-      minAvailable: 1
-      maxAvailable: 1
-      scripts:
-        create:
-          post:
-            - container: ""
-              command: [sh, -c]
-              args:
-                - ""
-    - typeName: primary
-      minAvailable: 1
-      maxAvailable: 1
-      # 滚动升级
-      updateStrategy:
-        # maxUnavailable = 1 表示可以有一个不可用，所以可以原地删除再创建
-        maxUnavailable: 1
-        # 等于 0 表示升级时不可以新增，若 maxSurge > 0 表示可以先添加一个新版本再删除旧版本
-        maxSurge: 0
-      scripts:
-        create:
-          post:
-            - container: ""
-              command: [sh, -c]
-              args:
-                - ""
-    - typeName: secondary
-      minAvailable: 1
-      scripts:
-        create:
-          post:
-            - command:
-                # {{}} 表示占位符，提供系统相关的参数，如 pod 的 ip 和 port
-                - "mongo --eval set to secondary"
-    - typeName: hidden
-      minAvailable: 1
-      maxAvailable: 1
-      # 滚动升级
-      updateStrategy:
-        # maxUnavailable = 1 表示可以有一个不可用，所以可以原地删除再创建
-        maxUnavailable: 1
-        # 等于 0 表示升级时不可以新增，若 maxSurge > 0 表示可以先添加一个新版本再删除旧版本
-        maxSurge: 0
-      scripts:
-        create:
-          post:
-            - container: "mongodb-client:latest"
-              command:
-                # {{}} 表示占位符，提供系统相关的参数，如 pod 的 ip 和 port
-                - "mongo {{hidden[0].ip:hidden[0].port}} --eval set to hidden"
-    - typeName: readonly
-      minAvailable: 0
-  # - end roleGroupTemplates
 
   # defaultTerminatingPolicy: Delete | <string> # [DoNotTerminate, Halt, Delete, WipeOut]
   defaultTerminationPolicy: DoNotTerminate

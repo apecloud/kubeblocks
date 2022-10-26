@@ -196,7 +196,7 @@ func GenRequestId() string {
 }
 
 func PrintGoTemplate(wr io.Writer, tpl string, values interface{}) error {
-	tmpl, err := template.New("_").Parse(tpl)
+	tmpl, err := template.New("output").Parse(tpl)
 	if err != nil {
 		return err
 	}
@@ -241,4 +241,8 @@ func Spinner(w io.Writer, fmtstr string, a ...any) func(result bool) {
 			}
 		})
 	}
+}
+
+func InstanceLabel(name string) string {
+	return fmt.Sprintf("app.kubernetes.io/instance=%s", name)
 }

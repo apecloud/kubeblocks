@@ -43,7 +43,7 @@ ENABLE_WEBHOOKS ?= false
 APP_NAME = kubeblocks
 
 
-VERSION ?= 0.1.0-alpha.6
+VERSION ?= 0.1.0-alpha.8
 CHART_PATH = deploy/helm
 
 
@@ -138,13 +138,13 @@ all: manager dbctl agamotto ## Make all cmd binaries.
 
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./controllers/dbaas;./controllers/dataprotection;./controllers/k8score;./cmd/manager;./apis/...;./internal/..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./apis/...;./controllers/dbaas/...;./controllers/dataprotection/...;./controllers/k8score/...;./cmd/manager/...;./internal/..." output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/* $(CHART_PATH)/crds
 	$(CONTROLLER_GEN) rbac:roleName=loadbalancer-role  paths="./controllers/loadbalancer;./cmd/loadbalancer/controller" output:dir=config/loadbalancer
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/..."
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -163,7 +163,7 @@ cue-vet: cuetool ## Run cue vet against code.
 	$(CUE) vet controllers/dbaas/cue/*.cue
 
 .PHONY: fast-lint
-fast-lint: staticchecktool  # [INTERNAL] fast lint
+fast-lint: staticcheck  # [INTERNAL] fast lint
 	$(GOLANGCILINT) run ./...
 
 .PHONY: lint
@@ -179,7 +179,7 @@ loggercheck: loggerchecktool ## Run loggercheck against code.
 	$(LOGGERCHECK) ./...
 
 .PHONY: build-checks
-build-checks: generate fmt vet goimports fast-lint ## Run build checks.
+build-checks: fmt vet goimports fast-lint ## Run build checks.
 
 .PHONY: mod-download
 mod-download: ## Run go mod download against go modules.
@@ -191,13 +191,16 @@ mod-vendor: ## Run go mod tidy->vendor->verify against go modules.
 	$(GO) mod vendor
 	$(GO) mod verify
 
-.PHONY: ctrl-test-current-ctx
-ctrl-test-current-ctx: manifests generate fmt vet ## Run operator controller tests with current $KUBECONFIG context.
-	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./controllers/... -coverprofile cover.out
+
+TEST_MODULE=
+
+.PHONY: test-current-ctx
+test-current-ctx: manifests generate fmt vet ## Run operator controller tests with current $KUBECONFIG context.
+	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_MODULE)... -coverprofile cover.out
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_MODULE)... -coverprofile cover.out
 
 .PHONY: test-webhook-enabled
 test-webhook-enabled: ## Run tests with webhooks enabled.
@@ -260,7 +263,7 @@ loadbalancer: build-checks ## Build loadbalancer binary.
 ##@ Operator Controller Manager
 
 .PHONY: manager
-manager: cue-fmt build-checks ## Build manager binary.
+manager: cue-fmt generate build-checks ## Build manager binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
 
 CERT_ROOT_CA ?= $(WEBHOOK_CERT_DIR)/rootCA.key
@@ -310,6 +313,29 @@ agamotto: build-checks ## Build agamotto related binaries
 clean-agamotto: ## Clean bin/mysqld_exporter.
 	rm -f bin/agamotto
 
+##@ DAP
+
+DAPRD_BUILD_PATH = ./cmd/daprd
+DAPRD_LD_FLAGS = "-s -w"
+
+bin/daprd.%: ## Cross build bin/daprd.$(OS).$(ARCH) .
+	cd $(DAPRD_BUILD_PATH) && GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${DAPRD_LD_FLAGS} -o ../../$@  ./main.go
+
+daprd-mod-vendor:
+	cd $(DAPRD_BUILD_PATH) && $(GO) mod tidy -compat=1.19
+	cd $(DAPRD_BUILD_PATH) && $(GO) mod vendor
+	cd $(DAPRD_BUILD_PATH) && $(GO) mod verify
+
+.PHONY: daprd
+daprd: OS=$(shell $(GO) env GOOS)
+daprd: ARCH=$(shell $(GO) env GOARCH)
+daprd: daprd-mod-vendor # build-checks ## Build daprd related binaries
+	$(MAKE) bin/daprd.${OS}.${ARCH}
+	mv bin/daprd.${OS}.${ARCH} bin/daprd
+
+.PHONY: clean
+clean-daprd: ## Clean bin/mysqld_exporter.
+	rm -f bin/daprd
 
 ##@ Deployment
 
@@ -319,7 +345,7 @@ endif
 
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | kubectl apply -f -
+	($(KUSTOMIZE) build config/crd | kubectl replace -f -) || ($(KUSTOMIZE) build config/crd | kubectl create -f -)
 	$(KUSTOMIZE) build $(shell $(GO) env GOPATH)/pkg/mod/github.com/kubernetes-csi/external-snapshotter/client/v6@v6.0.1/config/crd | kubectl apply -f -
 
 .PHONY: uninstall
@@ -344,6 +370,11 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 ##@ CI
 
+.PHONY:
+intstall-git-hooks: githookstool ## Install git hooks.
+	git hooks install
+	git hooks
+
 .PHONY: ci-test-pre
 ci-test-pre: dbctl ## Prepare CI test environment.
 	bin/dbctl playground destroy
@@ -357,7 +388,7 @@ ci-test: ci-test-pre test ## Run CI tests.
 ##@ Contributor
 
 .PHONY: reviewable
-reviewable: build-checks test check-license-header ## Run code checks to proceed with PR reviews.
+reviewable: generate build-checks test check-license-header ## Run code checks to proceed with PR reviews.
 	$(GO) mod tidy -compat=1.18
 
 .PHONY: check-diff
@@ -542,6 +573,16 @@ else
 HELM=$(shell which helm)
 endif
 
+.PHONY: githookstool
+githookstool: ## Download git-hooks locally if necessary.
+ifeq (, $(shell which git-hook))
+	@{ \
+	set -e ;\
+	go install github.com/git-hooks/git-hooks@latest;\
+	}
+endif
+
+
 
 .PHONY: oras
 oras: ORAS_VERSION=0.14.1
@@ -576,42 +617,69 @@ MINIKUBE=$(shell which minikube)
 
 .PHONY: brew-install-prerequisite
 brew-install-prerequisite: ## Use `brew install` to install required dependencies.
-	brew install go@1.18 kubebuilder delve golangci-lint staticcheck kustomize step cue oras jq yq
+	brew install go@1.18 kubebuilder delve golangci-lint staticcheck kustomize step cue oras jq yq git-hooks-go
 
 ##@ Minikube
 K8S_VERSION ?= v1.22.15
 MINIKUBE_REGISTRY_MIRROR ?= https://tenxhptk.mirror.aliyuncs.com
 MINIKUBE_IMAGE_REPO ?= registry.cn-hangzhou.aliyuncs.com/google_containers
+MINIKUBE_START_ARGS = --memory=4g --cpus=4
 
-CSI_ATTACHER_IMG=$(MINIKUBE_IMAGE_REPO)/csi-attacher:v3.1.0
+KICBASE_IMG=$(MINIKUBE_IMAGE_REPO)/kicbase:v0.0.33
+PAUSE_IMG=$(MINIKUBE_IMAGE_REPO)/pause:3.5
+METRICS_SERVER_IMG=$(MINIKUBE_IMAGE_REPO)/metrics-server:v0.6.1
 CSI_PROVISIONER_IMG=$(MINIKUBE_IMAGE_REPO)/csi-provisioner:v2.1.0
-CSI_RESIZER_IMG=$(MINIKUBE_IMAGE_REPO)/csi-resizer:v1.1.0
-CSI_SNAPSHOTTER_IMG=$(MINIKUBE_IMAGE_REPO)/csi-snapshotter:v4.0.0
-CSI_EXT_HMA_IMG=$(MINIKUBE_IMAGE_REPO)/csi-external-health-monitor-agent:v0.2.0
+CSI_ATTACHER_IMG=$(MINIKUBE_IMAGE_REPO)/csi-attacher:v3.1.0
 CSI_EXT_HMC_IMG=$(MINIKUBE_IMAGE_REPO)/csi-external-health-monitor-controller:v0.2.0
+CSI_EXT_HMA_IMG=$(MINIKUBE_IMAGE_REPO)/csi-external-health-monitor-agent:v0.2.0
 CSI_NODE_DRIVER_REG_IMG=$(MINIKUBE_IMAGE_REPO)/csi-node-driver-registrar:v2.0.1
 LIVENESSPROBE_IMG=$(MINIKUBE_IMAGE_REPO)/livenessprobe:v2.2.0
+CSI_RESIZER_IMG=$(MINIKUBE_IMAGE_REPO)/csi-resizer:v1.1.0
+CSI_SNAPSHOTTER_IMG=$(MINIKUBE_IMAGE_REPO)/csi-snapshotter:v4.0.0
 HOSTPATHPLUGIN_IMG=$(MINIKUBE_IMAGE_REPO)/hostpathplugin:v1.6.0
+STORAGE_PROVISIONER_IMG=$(MINIKUBE_IMAGE_REPO)/storage-provisioner:v5
+SNAPSHOT_CONTROLLER_IMG=$(MINIKUBE_IMAGE_REPO)/snapshot-controller:v4.0.0
 
+.PHONY: pull-all-images
+pull-all-images: # Pull required container images
+	docker pull -q $(PAUSE_IMG) &
+	docker pull -q $(HOSTPATHPLUGIN_IMG) &
+	docker pull -q $(LIVENESSPROBE_IMG) &
+	docker pull -q $(CSI_PROVISIONER_IMG) &
+	docker pull -q $(CSI_ATTACHER_IMG) &
+	docker pull -q $(CSI_RESIZER_IMG) &
+	docker pull -q $(CSI_RESIZER_IMG) &
+	docker pull -q $(CSI_SNAPSHOTTER_IMG) &
+	docker pull -q $(SNAPSHOT_CONTROLLER_IMG) &
+	docker pull -q $(CSI_EXT_HMC_IMG) &
+	docker pull -q $(CSI_NODE_DRIVER_REG_IMG) &
+	docker pull -q $(STORAGE_PROVISIONER_IMG) &
+	docker pull -q $(METRICS_SERVER_IMG) &
+	docker pull -q $(KICBASE_IMG)
 
 .PHONY: minikube-start
-minikube-start: DOCKER_PULL_CMD=ssh --native-ssh=false docker pull
-minikube-start: minikube ## Start minikube cluster.
+# minikube-start: IMG_CACHE_CMD=ssh --native-ssh=false docker pull
+minikube-start: IMG_CACHE_CMD=image load --daemon=true
+minikube-start: pull-all-images minikube ## Start minikube cluster.
+ifneq (, $(shell which minikube))
 ifeq (, $(shell $(MINIKUBE) status -n minikube -ojson | jq -r '.Host' | grep Running))
-	$(MINIKUBE) start --kubernetes-version=$(K8S_VERSION) --registry-mirror=${REGISTRY_MIRROR} --image-repository=${MINIKUBE_IMAGE_REPO}
+	$(MINIKUBE) start --kubernetes-version=$(K8S_VERSION) --registry-mirror=$(REGISTRY_MIRROR) --image-repository=$(MINIKUBE_IMAGE_REPO) $(MINIKUBE_START_ARGS)
+endif
 endif
 	$(MINIKUBE) update-context
+	$(MINIKUBE) $(IMG_CACHE_CMD) $(HOSTPATHPLUGIN_IMG)
+	$(MINIKUBE) $(IMG_CACHE_CMD) $(LIVENESSPROBE_IMG)
+	$(MINIKUBE) $(IMG_CACHE_CMD) $(CSI_PROVISIONER_IMG)
+	$(MINIKUBE) $(IMG_CACHE_CMD) $(CSI_ATTACHER_IMG)
+	$(MINIKUBE) $(IMG_CACHE_CMD) $(CSI_RESIZER_IMG)
+	$(MINIKUBE) $(IMG_CACHE_CMD) $(CSI_SNAPSHOTTER_IMG)
+	$(MINIKUBE) $(IMG_CACHE_CMD) $(CSI_EXT_HMA_IMG)
+	$(MINIKUBE) $(IMG_CACHE_CMD) $(CSI_EXT_HMC_IMG)
+	$(MINIKUBE) $(IMG_CACHE_CMD) $(CSI_NODE_DRIVER_REG_IMG)
+	$(MINIKUBE) $(IMG_CACHE_CMD) $(STORAGE_PROVISIONER_IMG)
+	$(MINIKUBE) $(IMG_CACHE_CMD) $(METRICS_SERVER_IMG)
 	$(MINIKUBE) addons enable metrics-server
 	$(MINIKUBE) addons enable volumesnapshots
-	$(MINIKUBE) $(DOCKER_PULL_CMD) $(CSI_ATTACHER_IMG) &
-	$(MINIKUBE) $(DOCKER_PULL_CMD) $(CSI_RESIZER_IMG) &
-	$(MINIKUBE) $(DOCKER_PULL_CMD) $(CSI_SNAPSHOTTER_IMG) &
-	$(MINIKUBE) $(DOCKER_PULL_CMD) $(CSI_EXT_HMA_IMG) &
-	$(MINIKUBE) $(DOCKER_PULL_CMD) $(CSI_EXT_HMC_IMG) &
-	$(MINIKUBE) $(DOCKER_PULL_CMD) $(CSI_NODE_DRIVER_REG_IMG) &
-	$(MINIKUBE) $(DOCKER_PULL_CMD) $(LIVENESSPROBE_IMG) &
-	$(MINIKUBE) $(DOCKER_PULL_CMD) $(HOSTPATHPLUGIN_IMG) &
-	$(MINIKUBE) $(DOCKER_PULL_CMD) $(CSI_PROVISIONER_IMG)
 	$(MINIKUBE) addons enable csi-hostpath-driver
 	kubectl patch storageclass standard -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
 	kubectl patch storageclass csi-hostpath-sc -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'

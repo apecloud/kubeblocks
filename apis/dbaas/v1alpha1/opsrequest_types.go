@@ -21,9 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // OpsRequestSpec defines the desired state of OpsRequest
 type OpsRequestSpec struct {
 
@@ -144,10 +141,6 @@ type VolumeExpansion struct {
 type HorizontalScaling struct {
 	// +optional
 	Replicas int `json:"replicas,omitempty"`
-
-	// RoleGroups reference roleGroups in ClusterDefinition
-	// +optional
-	RoleGroups []ClusterRoleGroup `json:"roleGroups,omitempty"`
 }
 
 type OpsRequestStatusComponent struct {

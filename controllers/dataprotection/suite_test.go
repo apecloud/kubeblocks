@@ -18,25 +18,30 @@ package dataprotection
 
 import (
 	"context"
+	"fmt"
 	"go/build"
 	"path/filepath"
 	"testing"
 
-	"k8s.io/client-go/kubernetes/scheme"
-	ctrl "sigs.k8s.io/controller-runtime"
-
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
 	//+kubebuilder:scaffold:imports
+
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	"github.com/spf13/viper"
+
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -47,6 +52,7 @@ var k8sClient client.Client
 var testEnv *envtest.Environment
 var ctx context.Context
 var cancel context.CancelFunc
+var testCtx testutil.TestContext
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -60,6 +66,9 @@ var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	ctx, cancel = context.WithCancel(context.TODO())
+
+	viper.AutomaticEnv()
+	fmt.Printf("config settings: %v\n", viper.AllSettings())
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
@@ -139,6 +148,8 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	testCtx = testutil.NewDefaultTestContext(k8sManager.GetClient())
+
 	go func() {
 		defer GinkgoRecover()
 		err = k8sManager.Start(ctx)
@@ -147,7 +158,6 @@ var _ = BeforeSuite(func() {
 
 	k8sClient = k8sManager.GetClient()
 	Expect(k8sClient).ToNot(BeNil())
-
 }, 60)
 
 var _ = AfterSuite(func() {

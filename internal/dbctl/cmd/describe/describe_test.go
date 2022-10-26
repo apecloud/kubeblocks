@@ -17,37 +17,35 @@ limitations under the License.
 package describe
 
 import (
-	"fmt"
 	"net/http"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest/fake"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/describe"
 )
 
 var _ = Describe("Describe", func() {
-	testCmd := func(f cmdutil.Factory, streams genericclioptions.IOStreams) *Command {
-		cmd := &Command{
+	options := func(f cmdutil.Factory, streams genericclioptions.IOStreams) *Options {
+		o := &Options{
 			Factory:   f,
-			Streams:   streams,
-			Short:     "Test describe.",
-			GroupKind: []schema.GroupKind{{Group: "", Kind: "pods"}},
-			Template:  []string{"test.tmpl"},
-			PrintExtra: func() error {
-				fmt.Fprintln(streams.Out, "test print fun")
-				return nil
+			IOStreams: streams,
+			Short:     "Test describe",
+			DescriberSettings: &describe.DescriberSettings{
+				ShowEvents: true,
+				ChunkSize:  cmdutil.DefaultChunkSize,
 			},
+			GroupKind: schema.GroupKind{Kind: "pod"},
 		}
-		return cmd
+		return o
 	}
 
 	mockClient := func(data runtime.Object) *cmdtesting.TestFactory {
@@ -66,28 +64,12 @@ var _ = Describe("Describe", func() {
 		pods, _, _ := cmdtesting.TestData()
 		tf := mockClient(&pods.Items[0])
 		streams, _, _, _ := genericclioptions.NewTestIOStreams()
-		cmd := testCmd(tf, streams)
-		Expect(cmd.complete([]string{})).To(MatchError("You must specify the name of resource to describe."))
+		options := options(tf, streams)
+		Expect(options.complete([]string{})).To(MatchError("You must specify the name of resource to describe."))
+		Expect(options.complete([]string{"foo"})).To(Succeed())
 
-		cmd.Template = []string{}
-		Expect(cmd.complete([]string{"test"})).To(MatchError("The number of resource type is not equal to template."))
-
-		cmd.GroupKind = []schema.GroupKind{}
-		Expect(cmd.complete([]string{"test"})).To(MatchError("You must specify the resource type to describe."))
-	})
-
-	It("run", func() {
-		pods, _, _ := cmdtesting.TestData()
-		tf := mockClient(&pods.Items[0])
-		streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-		cmd := testCmd(tf, streams).Build()
-		cmd.Run(cmd, []string{"foo"})
-
-		expected := `Name:foo
-Namespace:test
-Kind:Pod
-test print fun
-`
-		Expect(buf.String()).To(Equal(expected))
+		cmd := options.Build()
+		Expect(cmd).ShouldNot(BeNil())
+		Expect(options.run()).Should(HaveOccurred())
 	})
 })

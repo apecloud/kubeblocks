@@ -8,11 +8,10 @@
   - [x] delete secondary resources
   - [x] CR spec.terminationPolicy handling
 - [x] managed resources handling
-  - [x] roleGroup attached Service kind
   - [x] deployment workloads
   - [x] PDB
   - [x] label handling:
-    - [x] deploy & sts workloads's labels and spec.template.metadata.labels (check https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/)
+    - [x] deploy & sts workloads' labels and spec.template.metadata.labels (check https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/)
 - [x] immutable spec properties handling (via validating webhook)
 - [x] CR status handling
 - [x] checked AppVersion CR status

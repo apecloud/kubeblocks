@@ -1,3 +1,19 @@
+/*
+Copyright 2022 The KubeBlocks Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package dataprotection
 
 import (
@@ -6,7 +22,6 @@ import (
 
 	"github.com/sethvargo/go-password/password"
 	appv1 "k8s.io/api/apps/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -24,18 +39,29 @@ var _ = Describe("RestoreJob Controller", func() {
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
 
-	checkedCreateObj := func(obj client.Object) error {
-		if err := k8sClient.Create(context.Background(), obj); err != nil && !apierrors.IsAlreadyExists(err) {
-			return err
-		}
-		return nil
-	}
+	var ctx = context.Background()
+
+	BeforeEach(func() {
+		// Add any steup steps that needs to be executed before each test
+		err := k8sClient.DeleteAllOf(ctx, &dataprotectionv1alpha1.RestoreJob{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &dataprotectionv1alpha1.BackupJob{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &dataprotectionv1alpha1.BackupTool{}, client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &dataprotectionv1alpha1.BackupPolicyTemplate{}, client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		// Add any teardown steps that needs to be executed after each test
+	})
 
 	genarateNS := func(prefix string) types.NamespacedName {
 		randomStr, _ := password.Generate(6, 0, 0, true, false)
 		key := types.NamespacedName{
 			Name:      prefix + randomStr,
-			Namespace: "default",
+			Namespace: testCtx.DefaultNamespace,
 		}
 		return key
 	}
@@ -70,23 +96,23 @@ spec:
 		restoreJob.Namespace = ns.Namespace
 		restoreJob.Spec.BackupJobName = backupJob
 
-		Expect(checkedCreateObj(restoreJob)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, restoreJob)).Should(Succeed())
 		return restoreJob
 	}
 
 	deleteRestoreJobWait := func(key types.NamespacedName) error {
 		Expect(func() error {
 			f := &dataprotectionv1alpha1.RestoreJob{}
-			if err := k8sClient.Get(context.Background(), key, f); err != nil {
+			if err := k8sClient.Get(ctx, key, f); err != nil {
 				return client.IgnoreNotFound(err)
 			}
-			return k8sClient.Delete(context.Background(), f)
+			return k8sClient.Delete(ctx, f)
 		}()).Should(Succeed())
 
 		var err error
 		f := &dataprotectionv1alpha1.RestoreJob{}
 		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(context.Background(), key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(context.Background(), key, f) {
+		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
 			f = &dataprotectionv1alpha1.RestoreJob{}
 		}
 		return client.IgnoreNotFound(err)
@@ -121,23 +147,23 @@ status:
 		backupJob.Namespace = ns.Namespace
 		backupJob.Spec.BackupPolicyName = backupPolicy
 
-		Expect(checkedCreateObj(backupJob)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, backupJob)).Should(Succeed())
 		return backupJob
 	}
 
 	deleteBackupJobWait := func(key types.NamespacedName) error {
 		Expect(func() error {
 			f := &dataprotectionv1alpha1.BackupJob{}
-			if err := k8sClient.Get(context.Background(), key, f); err != nil {
+			if err := k8sClient.Get(ctx, key, f); err != nil {
 				return client.IgnoreNotFound(err)
 			}
-			return k8sClient.Delete(context.Background(), f)
+			return k8sClient.Delete(ctx, f)
 		}()).Should(Succeed())
 
 		var err error
 		f := &dataprotectionv1alpha1.BackupJob{}
 		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(context.Background(), key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(context.Background(), key, f) {
+		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
 			f = &dataprotectionv1alpha1.BackupJob{}
 		}
 		return client.IgnoreNotFound(err)
@@ -178,23 +204,23 @@ spec:
 		backupPolicy.Name = ns.Name
 		backupPolicy.Namespace = ns.Namespace
 		backupPolicy.Spec.BackupToolName = backupTool
-		Expect(checkedCreateObj(backupPolicy)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, backupPolicy)).Should(Succeed())
 		return backupPolicy
 	}
 
 	deleteBackupPolicyWait := func(key types.NamespacedName) error {
 		Expect(func() error {
 			f := &dataprotectionv1alpha1.BackupPolicy{}
-			if err := k8sClient.Get(context.Background(), key, f); err != nil {
+			if err := k8sClient.Get(ctx, key, f); err != nil {
 				return client.IgnoreNotFound(err)
 			}
-			return k8sClient.Delete(context.Background(), f)
+			return k8sClient.Delete(ctx, f)
 		}()).Should(Succeed())
 
 		var err error
 		f := &dataprotectionv1alpha1.BackupPolicy{}
 		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(context.Background(), key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(context.Background(), key, f) {
+		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
 			f = &dataprotectionv1alpha1.BackupPolicy{}
 		}
 		return client.IgnoreNotFound(err)
@@ -255,23 +281,23 @@ spec:
 		ns := genarateNS("backup-tool-")
 		backupTool.Name = ns.Name
 		backupTool.Namespace = ns.Namespace
-		Expect(checkedCreateObj(backupTool)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, backupTool)).Should(Succeed())
 		return backupTool
 	}
 
 	deleteBackupToolWait := func(key types.NamespacedName) error {
 		Expect(func() error {
 			f := &dataprotectionv1alpha1.BackupTool{}
-			if err := k8sClient.Get(context.Background(), key, f); err != nil {
+			if err := k8sClient.Get(ctx, key, f); err != nil {
 				return client.IgnoreNotFound(err)
 			}
-			return k8sClient.Delete(context.Background(), f)
+			return k8sClient.Delete(ctx, f)
 		}()).Should(Succeed())
 
 		var err error
 		f := &dataprotectionv1alpha1.BackupTool{}
 		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(context.Background(), key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(context.Background(), key, f) {
+		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
 			f = &dataprotectionv1alpha1.BackupTool{}
 		}
 		return client.IgnoreNotFound(err)
@@ -543,17 +569,17 @@ spec:
 `
 		statefulSet := &appv1.StatefulSet{}
 		Expect(yaml.Unmarshal([]byte(statefulYaml), statefulSet)).Should(Succeed())
-		Expect(checkedCreateObj(statefulSet)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, statefulSet)).Should(Succeed())
 		return statefulSet
 	}
 
 	patchBackupJobStatus := func(phase dataprotectionv1alpha1.BackupJobPhase, key types.NamespacedName) {
 		backupJob := &dataprotectionv1alpha1.BackupJob{}
-		Expect(k8sClient.Get(context.Background(), key, backupJob)).Should(Succeed())
+		Expect(k8sClient.Get(ctx, key, backupJob)).Should(Succeed())
 
 		patch := client.MergeFrom(backupJob.DeepCopy())
 		backupJob.Status.Phase = phase
-		Expect(k8sClient.Status().Patch(context.Background(), backupJob, patch)).Should(Succeed())
+		Expect(k8sClient.Status().Patch(ctx, backupJob, patch)).Should(Succeed())
 	}
 
 	Context("When creating restoreJob", func() {
@@ -582,7 +608,7 @@ spec:
 			time.Sleep(waitDuration)
 
 			result := &dataprotectionv1alpha1.RestoreJob{}
-			Expect(k8sClient.Get(context.Background(), key, result)).Should(Succeed())
+			Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
 
 			By("Deleting the scope")
 

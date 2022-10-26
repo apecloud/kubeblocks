@@ -9,6 +9,7 @@ component: {
 	clusterType:    string
 	type:           string
 	name:           string
+	replicas:       int
 	monitor: {
 		enable:     bool
 		scrapePort: int
@@ -16,9 +17,6 @@ component: {
 	}
 	podSpec: containers: [...]
 	volumeClaimTemplates: [...]
-}
-roleGroup: {
-	replicas: int
 }
 
 deployment: {
@@ -36,7 +34,7 @@ deployment: {
 		}
 	}
 	"spec": {
-		replicas: roleGroup.replicas
+		replicas: component.replicas
 		selector: {
 			matchLabels: {
 				"app.kubernetes.io/name":           "\(component.clusterType)-\(component.clusterDefName)"

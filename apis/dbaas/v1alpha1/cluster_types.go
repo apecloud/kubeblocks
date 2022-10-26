@@ -21,8 +21,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+// TerminationPolicyType define termination policy types.
+// +enum
+type TerminationPolicyType string
 
 const (
 	DoNotTerminate TerminationPolicyType = "DoNotTerminate"
@@ -31,8 +32,8 @@ const (
 	WipeOut        TerminationPolicyType = "WipeOut"
 )
 
-type TerminationPolicyType string
-
+// PodAntiAffinity define pod anti-affinity strategy.
+// +enum
 type PodAntiAffinity string
 
 const (
@@ -150,9 +151,6 @@ type ClusterComponent struct {
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
-	// ref roleGroups in ClusterDefinition
-	RoleGroups []ClusterRoleGroup `json:"roleGroups,omitempty"`
-
 	// VolumeClaimTemplates information for statefulset.spec.volumeClaimTemplates
 	// +optional
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
@@ -177,22 +175,6 @@ type ClusterComponent struct {
 	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
 }
 
-type ClusterRoleGroup struct {
-	// +optional
-	Name string `json:"name,omitempty"`
-
-	// roleGroup name in ClusterDefinition
-	// +optional
-	Type string `json:"type,omitempty"`
-
-	// +kubebuilder:default=-1
-	// +optional
-	Replicas int `json:"replicas,omitempty"`
-
-	// +optional
-	Service corev1.ServiceSpec `json:"service,omitempty"`
-}
-
 // ClusterStatusComponent record components status information
 type ClusterStatusComponent struct {
 	// Type component type
@@ -207,15 +189,41 @@ type ClusterStatusComponent struct {
 	// +optional
 	Message string `json:"message,omitempty"`
 
-	// RoleGroups reference roleGroups in ClusterDefinition
+	// ConsensusSetStatus role and pod name mapping
 	// +optional
-	RoleGroups []ClusterStatusRoleGroup `json:"roleGroups,omitempty"`
+	ConsensusSetStatus *ConsensusSetStatus `json:"consensusSetStatus,omitempty"`
 }
 
-type ClusterStatusRoleGroup struct {
-	ID          string `json:"id,omitempty"`
-	Type        string `json:"type,omitempty"`
-	RefWorkload string `json:"refWorkload,omitempty"`
+type ConsensusSetStatus struct {
+	// Leader status
+	// +kubebuilder:validation:Required
+	Leader ConsensusMemberStatus `json:"leader"`
+
+	// Followers status
+	// +optional
+	Followers []ConsensusMemberStatus `json:"followers,omitempty"`
+
+	// Learner status
+	// +optional
+	Learner *ConsensusMemberStatus `json:"learner,omitempty"`
+}
+
+type ConsensusMemberStatus struct {
+	// Name role name
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=leader
+	Name string `json:"name"`
+
+	// AccessMode, what service this pod provides
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum={None, Readonly, ReadWrite}
+	// +kubebuilder:default=ReadWrite
+	AccessMode AccessMode `json:"accessMode"`
+
+	// Pod name
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=Unknown
+	Pod string `json:"pod"`
 }
 
 type ClusterComponentVolumeClaimTemplate struct {

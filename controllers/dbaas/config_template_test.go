@@ -46,7 +46,6 @@ var _ = Describe("tpl template", func() {
 		podTemplate *corev1.PodTemplateSpec
 		cfgTemplate []dbaasv1alpha1.ConfigTemplate
 		component   *Component
-		group       *RoleGroup
 	)
 
 	const (
@@ -65,7 +64,7 @@ loose_binlog_checksum           = crc32
 cluster_name = {{ .Cluster.Name }}
 cluster_namespace = {{ .Cluster.Namespace }}
 component_name = {{ .Component.Name }}
-component_replica = {{ .RoleGroup.Replicas }}
+component_replica = {{ .Component.Replicas }}
 
 {{- $test_value := callBufferSizeByResource ( index .PodSpec.Containers 0 ) }}
 {{ if $test_value -}}
@@ -179,11 +178,7 @@ loose_innodb_primary_flush_max_lsn_lag =  780903144
 			ClusterType:    "state.mysql-8",
 			Name:           "replicasets",
 			Type:           "replicasets",
-		}
-		group = &RoleGroup{
-			Name:     "mysql-a",
-			Type:     "primary",
-			Replicas: 5,
+			Replicas:       5,
 		}
 		cfgTemplate = []dbaasv1alpha1.ConfigTemplate{
 			{
@@ -208,7 +203,7 @@ loose_innodb_primary_flush_max_lsn_lag =  780903144
 				nil,
 			)
 
-			Expect(cfgBuilder.InjectBuiltInObjectsAndFunctions(podTemplate, cfgTemplate, component, group)).Should(BeNil())
+			Expect(cfgBuilder.InjectBuiltInObjectsAndFunctions(podTemplate, cfgTemplate, component)).Should(BeNil())
 
 			cfgBuilder.componentValues.Resource = &ResourceDefinition{
 				MemorySize: 8 * 1024 * 1024 * 1024,
@@ -239,7 +234,7 @@ loose_innodb_primary_flush_max_lsn_lag =  780903144
 				nil,
 			)
 
-			Expect(cfgBuilder.InjectBuiltInObjectsAndFunctions(podTemplate, cfgTemplate, component, group)).Should(BeNil())
+			Expect(cfgBuilder.InjectBuiltInObjectsAndFunctions(podTemplate, cfgTemplate, component)).Should(BeNil())
 
 			rendered, err := cfgBuilder.Render(map[string]string{
 				"a":                 "{{ getVolumePathByName ( index .PodSpec.Containers 0 ) \"log\" }}",

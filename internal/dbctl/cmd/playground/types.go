@@ -17,10 +17,7 @@ limitations under the License.
 package playground
 
 import (
-	appv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/version"
 )
 
@@ -52,13 +49,8 @@ var (
 	K3dProxyImage = "docker.io/infracreate/k3d-proxy:" + version.K3dVersion
 )
 
-type ClusterInfo struct {
-	Cluster      *dbaasv1alpha1.Cluster
-	StatefulSets []appv1.StatefulSet
-	Deployments  []appv1.Deployment
-	Pods         []corev1.Pod
-	Services     []corev1.Service
-	Secrets      []corev1.Secret
+type clusterInfo struct {
+	*types.ClusterObjects
 
 	HostPorts     []string
 	HostIP        string

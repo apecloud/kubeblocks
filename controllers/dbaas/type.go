@@ -23,6 +23,9 @@ import (
 )
 
 const (
+	// settings keys
+	cmNamespaceKey = "CM_NAMESPACE"
+
 	// name of our custom finalizer
 	dbClusterFinalizerName    = "cluster.infracreate.com/finalizer"
 	dbClusterDefFinalizerName = "clusterdefinition.infracreate.com/finalizer"
@@ -30,13 +33,17 @@ const (
 	opsRequestFinalizerName   = "opsrequest.infracreate.com/finalizer"
 
 	// label keys
-	clusterDefLabelKey         = "clusterdefinition.infracreate.com/name"
-	appVersionLabelKey         = "appversion.infracreate.com/name"
-	appInstanceLabelKey        = "app.kubernetes.io/instance"
-	appComponentLabelKey       = "app.kubernetes.io/component-name"
-	appNameLabelKey            = "app.kubernetes.io/name"
-	statefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
-	clusterLabelKey            = "cluster.infracreate.com/name"
+	clusterDefLabelKey             = "clusterdefinition.infracreate.com/name"
+	appVersionLabelKey             = "appversion.infracreate.com/name"
+	appInstanceLabelKey            = "app.kubernetes.io/instance"
+	appComponentLabelKey           = "app.kubernetes.io/component-name"
+	appNameLabelKey                = "app.kubernetes.io/name"
+	statefulSetPodNameLabelKey     = "statefulset.kubernetes.io/pod-name"
+	consensusSetRoleLabelKey       = "cs.dbaas.infracreate.com/role"
+	consensusSetAccessModeLabelKey = "cs.dbaas.infracreate.com/access-mode"
+	clusterLabelKey                = "cluster.infracreate.com/name"
+
+	consensusSetStatusDefaultPodName = "Unknown"
 )
 
 type MonitorConfig struct {
@@ -46,32 +53,21 @@ type MonitorConfig struct {
 }
 
 type Component struct {
-	ClusterDefName       string                                    `json:"clusterDefName,omitempty"`
-	ClusterType          string                                    `json:"clusterType,omitempty"`
-	Name                 string                                    `json:"name,omitempty"`
-	Type                 string                                    `json:"type,omitempty"`
-	RoleGroupNames       []string                                  `json:"roleGroupNames,omitempty"`
-	RoleGroups           []dbaasv1alpha1.ClusterRoleGroup          `json:"roleGroups,omitempty"`
-	MinAvailable         int                                       `json:"minAvailable,omitempty"`
-	MaxAvailable         int                                       `json:"maxAvailable,omitempty"`
-	DefaultReplicas      int                                       `json:"defaultReplicas,omitempty"`
-	IsStateless          bool                                      `json:"isStateless,omitempty"`
-	IsQuorum             bool                                      `json:"isQuorum,omitempty"`
-	Strategies           dbaasv1alpha1.ClusterDefinitionStrategies `json:"strategies,omitempty"`
-	PodSpec              *corev1.PodSpec                           `json:"podSpec,omitempty"`
-	Service              corev1.ServiceSpec                        `json:"service,omitempty"`
-	Scripts              dbaasv1alpha1.ClusterDefinitionScripts    `json:"scripts,omitempty"`
-	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate    `json:"volumeClaimTemplates,omitempty"`
-	Monitor              MonitorConfig                             `json:"monitor,omitempty"`
-}
-
-type RoleGroup struct {
-	Name           string                                        `json:"name,omitempty"`
-	Type           string                                        `json:"type,omitempty"`
-	MinAvailable   int                                           `json:"minAvailable,omitempty"`
-	MaxAvailable   int                                           `json:"maxAvailable,omitempty"`
-	Replicas       int                                           `json:"replicas,omitempty"`
-	UpdateStrategy dbaasv1alpha1.ClusterDefinitionUpdateStrategy `json:"updateStrategy,omitempty"`
-	Scripts        dbaasv1alpha1.ClusterDefinitionScripts        `json:"scripts,omitempty"`
-	Service        corev1.ServiceSpec                            `json:"service,omitempty"`
+	ClusterDefName       string                                 `json:"clusterDefName,omitempty"`
+	ClusterType          string                                 `json:"clusterType,omitempty"`
+	Name                 string                                 `json:"name,omitempty"`
+	Type                 string                                 `json:"type,omitempty"`
+	MinAvailable         int                                    `json:"minAvailable,omitempty"`
+	MaxAvailable         int                                    `json:"maxAvailable,omitempty"`
+	DefaultReplicas      int                                    `json:"defaultReplicas,omitempty"`
+	Replicas             int                                    `json:"replicas,omitempty"`
+	AntiAffinity         bool                                   `json:"antiAffinity,omitempty"`
+	ComponentType        dbaasv1alpha1.ComponentType            `json:"componentType,omitempty"`
+	ConsensusSpec        *dbaasv1alpha1.ConsensusSetSpec        `json:"consensusSpec,omitempty"`
+	PodSpec              *corev1.PodSpec                        `json:"podSpec,omitempty"`
+	Service              corev1.ServiceSpec                     `json:"service,omitempty"`
+	Scripts              dbaasv1alpha1.ClusterDefinitionScripts `json:"scripts,omitempty"`
+	Probes               dbaasv1alpha1.ClusterDefinitionProbes  `json:"probes,omitempty"`
+	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
+	Monitor              MonitorConfig                          `json:"monitor,omitempty"`
 }

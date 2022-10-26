@@ -49,6 +49,7 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		NewVolumeExpansionCmd(f, streams),
 		NewVerticalScalingCmd(f, streams),
 		NewHorizontalScalingCmd(f, streams),
+		NewConnectCmd(f, streams),
 	)
 
 	if viper.GetString(EnvExperimentalExpose) == "1" {

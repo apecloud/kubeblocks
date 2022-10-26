@@ -1173,7 +1173,7 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 				},
 			},
 		})
-		// inject roleGroup scope env
+		// inject component scope env
 		c.Env = append(c.Env, corev1.EnvVar{
 			Name:      prefix + "N",
 			Value:     strconv.Itoa(replicas),

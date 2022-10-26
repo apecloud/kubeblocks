@@ -17,17 +17,20 @@ limitations under the License.
 package exec
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	cmdexec "k8s.io/kubectl/pkg/cmd/exec"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/podcmd"
-	"k8s.io/kubectl/pkg/scheme"
 )
 
 // ExecInput is used to transfer custom Complete & Validate & AddFlags
@@ -51,10 +54,11 @@ type ExecInput struct {
 type ExecOptions struct {
 	cmdexec.StreamOptions
 
-	Input    *ExecInput
-	Factory  cmdutil.Factory
-	Executor cmdexec.RemoteExecutor
-	Config   *restclient.Config
+	Input     *ExecInput
+	Factory   cmdutil.Factory
+	Executor  cmdexec.RemoteExecutor
+	Config    *restclient.Config
+	ClientSet *kubernetes.Clientset
 
 	// Pod target pod to execute command
 	Pod *corev1.Pod
@@ -105,6 +109,11 @@ func (o *ExecOptions) Complete(args []string) error {
 		return err
 	}
 
+	o.ClientSet, err = o.Factory.KubernetesClientSet()
+	if err != nil {
+		return err
+	}
+
 	// custom Complete function
 	if o.Input.Complete != nil {
 		if err = o.Input.Complete(args); err != nil {
@@ -115,15 +124,26 @@ func (o *ExecOptions) Complete(args []string) error {
 }
 
 func (o *ExecOptions) Validate() error {
+	var err error
+
 	// custom Validate function
 	if o.Input.Validate != nil {
-		if err := o.Input.Validate(); err != nil {
+		if err = o.Input.Validate(); err != nil {
 			return err
 		}
 	}
 
-	if len(o.Pod.Name) == 0 {
-		return fmt.Errorf("pod, type/name must be specified")
+	// pod is not fetched, try to get it by pod name
+	if o.Pod == nil {
+		if len(o.PodName) > 0 {
+			if o.Pod, err = o.ClientSet.CoreV1().Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{}); err != nil {
+				return err
+			}
+		}
+	}
+
+	if o.Pod == nil {
+		return fmt.Errorf("failed to get the pod to execute")
 	}
 	if len(o.Command) == 0 {
 		return fmt.Errorf("you must specify at least one command for the container")

@@ -24,11 +24,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/engine"
-	"github.com/apecloud/kubeblocks/internal/dbctl/util"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/cluster"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/exec"
 )
@@ -59,13 +58,21 @@ func (o *ConnectOptions) complete(args []string) error {
 	}
 	o.clusterName = args[0]
 
-	clientSet, err := o.Factory.KubernetesClientSet()
+	dynamicClient, err := o.Factory.DynamicClient()
 	if err != nil {
 		return err
 	}
 
-	// find the target pod to connect
-	pod, err := findTargetPod(clientSet, o.clusterName, o.PodName, o.Namespace)
+	// get target pod name, if not specified, find default pod from cluster
+	if len(o.PodName) == 0 {
+		o.PodName, err = cluster.GetDefaultPodName(dynamicClient, o.clusterName, o.Namespace)
+		if err != nil {
+			return err
+		}
+	}
+
+	// get the pod object
+	pod, err := o.ClientSet.CoreV1().Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -94,19 +101,8 @@ func (o *ConnectOptions) addFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&o.database, "database", "D", "", "The database name to connect.")
 }
 
-func findTargetPod(clientset *kubernetes.Clientset, clusterName string, podName string, namespace string) (*corev1.Pod, error) {
-	var err error
-	var pod *corev1.Pod
-	if len(podName) != 0 {
-		pod, err = clientset.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
-	} else {
-		pod, err = util.GetPrimaryPod(clientset, clusterName, namespace)
-	}
-	return pod, err
-}
-
 func getEngineByPod(pod *corev1.Pod) (engine.Interface, error) {
-	typeName, err := util.GetClusterTypeByPod(pod)
+	typeName, err := cluster.GetClusterTypeByPod(pod)
 	if err != nil {
 		return nil, err
 	}

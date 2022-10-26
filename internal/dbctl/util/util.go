@@ -30,7 +30,6 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 	"text/template"
 	"time"
@@ -41,10 +40,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
@@ -249,31 +245,4 @@ func Spinner(w io.Writer, fmtstr string, a ...any) func(result bool) {
 
 func InstanceLabel(name string) string {
 	return fmt.Sprintf("app.kubernetes.io/instance=%s", name)
-}
-
-// GetClusterTypeByPod gets the cluster type from pod label
-func GetClusterTypeByPod(pod *corev1.Pod) (string, error) {
-	var clusterType string
-
-	if name, ok := pod.Labels["app.kubernetes.io/name"]; ok {
-		clusterType = strings.Split(name, "-")[0]
-	}
-
-	if clusterType == "" {
-		return "", fmt.Errorf("failed to get the cluster type")
-	}
-
-	return clusterType, nil
-}
-
-func GetPrimaryPod(clientset *kubernetes.Clientset, name string, namespace string) (*corev1.Pod, error) {
-	pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: InstanceLabel(name)})
-	if err != nil {
-		return nil, err
-	}
-	for _, pod := range pods.Items {
-		// TODO: check role is primary
-		return &pod, nil
-	}
-	return nil, fmt.Errorf("failed to find the pod to exec command")
 }

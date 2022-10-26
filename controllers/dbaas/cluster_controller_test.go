@@ -50,7 +50,7 @@ import (
 
 var _ = Describe("Cluster Controller", func() {
 
-	const timeout = time.Second * 10
+	const timeout = time.Second * 20
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
 
@@ -137,21 +137,6 @@ data:
 		return cfgCM
 	}
 
-	// config template对于了container的mountPath
-	// configTemplateRefs:
-	// 	 - name: mysql-tree-node-template-8.0
-	//     volumeName: config1
-	//   - name: mysql-tree-node2
-	//     volumeName: config2
-	// for containner
-	// volumeMounts:
-	//   #将my.cnf configmap mount到pod的指定目录下，/data/config
-	//   #在pod中，会存在file: /data/config/my.cnf.override
-	//   #polardb-x在entrypoint的脚本会将my.cnf.override合并到/data/mysql/conf/my.cnf文件中
-	//   - mountPath: /data/config
-	//     name: config1
-	//   - mountPath: /etc/config
-	//	   name: config2
 	assureClusterDefObj := func() *dbaasv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
 		clusterDefYAML := `

@@ -157,23 +157,12 @@ var _ = Describe("Cluster", func() {
 		o.Storage = "2Gi"
 		Expect(o.Validate()).Should(Succeed())
 
-		By("validate horizontalScaling when replicas or roleGroupReplicas less than -1 ")
+		By("validate horizontalScaling when replicas less than -1 ")
 		o.OpsType = OpsTypeHorizontalScaling
 		o.Replicas = -2
 		Expect(o.Validate()).To(MatchError("replicas required natural number"))
-		o.Replicas = -1
-		o.RoleGroupReplicas = -2
-		Expect(o.Validate()).To(MatchError("role-group-replicas required natural number"))
 
-		By("validate horizontalScaling no replicas and role-group-names")
-		o.Replicas = -1
-		o.RoleGroupReplicas = -1
-		Expect(o.Validate()).To(MatchError("required replicas or role-group-names"))
-
-		By("validate horizontalScaling when exists role-group-names")
-		o.RoleGroupNames = []string{"primary"}
-		Expect(o.Validate()).To(MatchError("missing role-group-replicas when exists role-group-names"))
-		o.RoleGroupReplicas = 1
+		o.Replicas = 1
 		Expect(o.Validate()).Should(Succeed())
 	})
 

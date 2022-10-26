@@ -551,21 +551,6 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 	}
 	patch := client.MergeFrom(cluster.DeepCopy())
 	for _, v := range statefulSetList.Items {
-		var componentIsRunning bool
-		// check whether the statefulset has reached the final state
-		// ps: StatefulSet.Status.AvailableReplicas supported after k8s v1.22
-		if v.Status.AvailableReplicas != *v.Spec.Replicas ||
-			v.Status.CurrentRevision != v.Status.UpdateRevision ||
-			v.Status.ObservedGeneration != v.GetGeneration() {
-			isOk = false
-		} else {
-			componentIsRunning = true
-		}
-		// when component phase is changed, set needSyncStatusComponent to true, then patch cluster.status
-		if ok := r.patchStatusComponentsWithStatefulSet(cluster, &v, componentIsRunning); ok {
-			needSyncStatusComponent = true
-		}
-
 		// if v is consensusSet
 		typeName := getComponentTypeName(*cluster, v.Labels[appComponentLabelKey])
 		componentDef, err := getComponent(ctx, r.Client, cluster, typeName)
@@ -584,6 +569,20 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 			}
 		case dbaasv1alpha1.Stateful:
 			// TODO wait other component type added
+		}
+
+		var componentIsRunning bool
+		// check whether the statefulset has reached the final state
+		// ps: StatefulSet.Status.AvailableReplicas supported after k8s v1.22
+		if v.Status.AvailableReplicas != *v.Spec.Replicas ||
+			v.Status.ObservedGeneration != v.GetGeneration() {
+			isOk = false
+		} else {
+			componentIsRunning = true
+		}
+		// when component phase is changed, set needSyncStatusComponent to true, then patch cluster.status
+		if ok := r.patchStatusComponentsWithStatefulSet(cluster, &v, componentIsRunning); ok {
+			needSyncStatusComponent = true
 		}
 	}
 

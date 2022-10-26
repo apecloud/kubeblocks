@@ -50,7 +50,7 @@ import (
 
 var _ = Describe("Cluster Controller", func() {
 
-	const timeout = time.Second * 10
+	const timeout = time.Second * 20
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
 

@@ -791,7 +791,7 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 
 	// get podList owned by stsObj
 	podList := &corev1.PodList{}
-	selector, err := labels.Parse(appInstanceLabelKey + "=" + stsObj.Name)
+	selector, err := labels.Parse(appComponentLabelKey + "=" + stsObj.Labels[appComponentLabelKey])
 	if err != nil {
 		return false, err
 	}
@@ -825,6 +825,10 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 		// if pod is the latest version, we do nothing
 		if getPodRevision(&pod) == stsObj.Status.UpdateRevision {
 			return false, nil
+		}
+		// if DeletionTimestamp is not nil, it is terminating.
+		if pod.DeletionTimestamp != nil {
+			return true, nil
 		}
 		// delete the pod to trigger associate StatefulSet to re-create it
 		if err := cli.Delete(ctx, &pod); err != nil {

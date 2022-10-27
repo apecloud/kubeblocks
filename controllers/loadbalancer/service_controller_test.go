@@ -38,25 +38,63 @@ import (
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/protocol"
 )
 
+const (
+	timeout       = 10 * time.Second
+	interval      = 1 * time.Second
+	svcPort       = 12345
+	svcTargetPort = 80
+	namespace     = "default"
+	node1IP       = "172.31.1.2"
+	node2IP       = "172.31.1.1"
+
+	eniId1  = "eni-01"
+	eniIp11 = "172.31.1.10"
+	eniIp12 = "172.31.1.11"
+
+	eniId2  = "eni-02"
+	eniIp21 = "172.31.2.10"
+	eniIp22 = "172.31.2.11"
+)
+
+var newSvcObj = func(managed bool, masterIP string) (*corev1.Service, *types.NamespacedName) {
+	randomStr, _ := password.Generate(6, 0, 0, true, false)
+	svcName := fmt.Sprintf("nginx-%s", randomStr)
+	svc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      svcName,
+			Namespace: namespace,
+			Labels: map[string]string{
+				"app": svcName,
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Port:       svcPort,
+					Protocol:   corev1.ProtocolTCP,
+					TargetPort: intstr.FromInt(svcTargetPort),
+				},
+			},
+			Selector: map[string]string{
+				"app": svcName,
+			},
+		},
+	}
+	annotations := make(map[string]string)
+	if managed {
+		annotations[AnnotationKeyLoadBalancerType] = AnnotationValueLoadBalancerType
+	}
+	if masterIP != "" {
+		annotations[AnnotationKeyMasterNodeIP] = masterIP
+	}
+	svc.SetAnnotations(annotations)
+	return svc, &types.NamespacedName{
+		Name:      svc.GetName(),
+		Namespace: svc.GetNamespace(),
+	}
+}
+
 var _ = Describe("ServiceController", Ordered, func() {
-	const (
-		timeout       = 10 * time.Second
-		interval      = 1 * time.Second
-		svcPort       = 12345
-		svcTargetPort = 80
-		namespace     = "default"
-		node1IP       = "172.31.1.2"
-		node2IP       = "172.31.1.1"
-
-		eniId1  = "eni-01"
-		eniIp11 = "172.31.1.10"
-		eniIp12 = "172.31.1.11"
-
-		eniId2  = "eni-02"
-		eniIp21 = "172.31.2.10"
-		eniIp22 = "172.31.2.11"
-	)
-
 	setupController := func() (*gomock.Controller, *mockcloud.MockProvider, *mockagent.MockNodeManager) {
 		ctrl := gomock.NewController(GinkgoT())
 
@@ -90,44 +128,6 @@ var _ = Describe("ServiceController", Ordered, func() {
 		return pod, &types.NamespacedName{
 			Name:      pod.GetName(),
 			Namespace: pod.GetNamespace(),
-		}
-	}
-
-	newSvcObj := func(managed bool, masterIP string) (*corev1.Service, *types.NamespacedName) {
-		randomStr, _ := password.Generate(6, 0, 0, true, false)
-		svcName := fmt.Sprintf("nginx-%s", randomStr)
-		svc := &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      svcName,
-				Namespace: namespace,
-				Labels: map[string]string{
-					"app": svcName,
-				},
-			},
-			Spec: corev1.ServiceSpec{
-				Ports: []corev1.ServicePort{
-					{
-						Port:       svcPort,
-						Protocol:   corev1.ProtocolTCP,
-						TargetPort: intstr.FromInt(svcTargetPort),
-					},
-				},
-				Selector: map[string]string{
-					"app": svcName,
-				},
-			},
-		}
-		annotations := make(map[string]string)
-		if managed {
-			annotations[AnnotationKeyLoadBalancerType] = AnnotationValueLoadBalancerType
-		}
-		if masterIP != "" {
-			annotations[AnnotationKeyMasterNodeIP] = masterIP
-		}
-		svc.SetAnnotations(annotations)
-		return svc, &types.NamespacedName{
-			Name:      svc.GetName(),
-			Namespace: svc.GetNamespace(),
 		}
 	}
 

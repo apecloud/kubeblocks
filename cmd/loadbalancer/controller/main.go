@@ -39,6 +39,10 @@ import (
 	"os"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+
 	"github.com/go-logr/logr"
 	"github.com/spf13/viper"
 	zaplogfmt "github.com/sykesm/zap-logfmt"
@@ -121,6 +125,10 @@ func main() {
 	// init config
 	config.ReadConfig(setupLog)
 
+	endpointLabelSet := labels.Set{}
+	for k, v := range config.EndpointsLabels {
+		endpointLabelSet[k] = v
+	}
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
@@ -145,6 +153,13 @@ func main() {
 		// if you are doing or is intended to do any operation such as perform cleanups
 		// after the manager stops then its usage might be unsafe.
 		LeaderElectionReleaseOnCancel: true,
+		NewCache: cache.BuilderWithOptions(cache.Options{
+			SelectorsByObject: cache.SelectorsByObject{
+				&corev1.Endpoints{}: {
+					Label: labels.SelectorFromSet(endpointLabelSet),
+				},
+			},
+		}),
 	})
 	if err != nil {
 		setupLog.Error(err, "Failed to start manager")

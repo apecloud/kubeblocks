@@ -72,6 +72,9 @@ type ServiceController struct {
 	nm       agent.NodeManager
 	tps      map[string]TrafficPolicy
 	cache    map[string]*FloatingIP
+
+	// just for test
+	enabled bool
 }
 
 func NewServiceController(logger logr.Logger, client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder, cp cloud.Provider, nm agent.NodeManager) (*ServiceController, error) {
@@ -82,6 +85,7 @@ func NewServiceController(logger logr.Logger, client client.Client, scheme *runt
 		logger:   logger,
 		cp:       cp,
 		nm:       nm,
+		enabled:  true,
 		cache:    make(map[string]*FloatingIP),
 	}
 
@@ -170,6 +174,11 @@ func (c *ServiceController) SetupWithManager(mgr ctrl.Manager) error {
 func (c *ServiceController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	ctxLog := c.logger.WithValues("service", req.NamespacedName.String())
 	ctxLog.Info("Receive service reconcile event")
+
+	if !c.enabled {
+		ctxLog.Info("Controller is disabled, skip")
+		return intctrlutil.Reconciled()
+	}
 
 	svc := &corev1.Service{}
 	if err := c.Client.Get(ctx, req.NamespacedName, svc); err != nil {

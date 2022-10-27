@@ -73,3 +73,15 @@ minAvailable: {{ default 1 .Values.podDisruptionBudget.minAvailable }}
 maxUnavailable: {{ .Values.podDisruptionBudget.maxUnavailable }}
 {{- end }}
 {{- end }}
+
+{{- define "loadbalancer.nodeLabels" -}}
+{{- if .Values.nodeLabelList }}
+{{- join "," .Values.nodeLabelList }}
+{{- end }}
+{{- end }}
+
+{{- define "loadbalancer.endpointLabels" -}}
+{{- if .Values.endpointLabels }}
+{{- join "," .Values.endpointLabelList }}
+{{- end }}
+{{- end }}

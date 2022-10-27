@@ -1249,6 +1249,8 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 		container.Name = "kbprobe-rolechangedcheck"
 		probe := container.ReadinessProbe
 		// probe.HTTPGet.Path = "/"
+		// HACK: hardcoded - "http://localhost:3501/v1.0/bindings/mtest"
+		// TODO: http port should be checked to avoid conflicts instead of hardcoded 3051
 		probe.Exec.Command = []string{"curl", "-X", "POST", "-H", "Content-Type: application/json", "http://localhost:3501/v1.0/bindings/mtest", "-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
 		probe.PeriodSeconds = componentProbes.RoleChangedProbe.PeriodSeconds
 		probe.SuccessThreshold = componentProbes.RoleChangedProbe.SuccessThreshold
@@ -1258,8 +1260,15 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 	}
 
 	if len(probeContainers) >= 1 {
-		probeContainers[0].Image = "free6om/kbprobe:latest"
-		probeContainers[0].Command = []string{"probe", "--app-id", "batch-sdk", "--dapr-http-port", "3501", "--dapr-grpc-port", "54215", "--app-protocol", "http", "--components-path", "/config/components"}
+		container := &probeContainers[0]
+		container.Image = viper.GetString("AGAMOTTO_IMAGE")
+		container.ImagePullPolicy = corev1.PullPolicy(viper.GetString("AGAMOTTO_IMAGE_PULL_POLICY"))
+		// HACK: hardcoded port values
+		// TODO: ports should be checked to avoid conflicts instead of hardcoded values
+		container.Command = []string{"probe", "--app-id", "batch-sdk",
+			"--dapr-http-port", "3501",
+			"--dapr-grpc-port", "54215",
+			"--app-protocol", "http", "--components-path", "/config/components"}
 
 		// set pod name and namespace, for role label updating inside pod
 		podName := corev1.EnvVar{
@@ -1278,13 +1287,15 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 				},
 			},
 		}
-		probeContainers[0].Env = append(probeContainers[0].Env, podName, podNamespace)
+		container.Env = append(container.Env, podName, podNamespace)
 
-		containerPort := corev1.ContainerPort{}
-		containerPort.ContainerPort = 3501
-		containerPort.Name = "probe-port"
-		containerPort.Protocol = "TCP"
-		probeContainers[0].Ports = []corev1.ContainerPort{containerPort}
+		// HACK: hardcoded port values
+		// TODO: ports should be checked to avoid conflicts instead of hardcoded values
+		container.Ports = []corev1.ContainerPort{{
+			ContainerPort: 3501,
+			Name:          "probe-port",
+			Protocol:      "TCP",
+		}}
 	}
 
 	reqCtx.Log.Info("probe", "containers", probeContainers)

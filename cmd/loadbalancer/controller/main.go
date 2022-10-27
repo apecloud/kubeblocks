@@ -51,12 +51,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
-	lb "github.com/apecloud/kubeblocks/controllers/loadbalancer"
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/factory"
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/config"
-
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	"k8s.io/apimachinery/pkg/runtime"
@@ -66,6 +60,12 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	//+kubebuilder:scaffold:imports
+
+	lb "github.com/apecloud/kubeblocks/controllers/loadbalancer"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/factory"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/config"
 )
 
 // added lease.coordination.k8s.io for leader election

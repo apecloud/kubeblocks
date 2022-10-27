@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	APIVersion            = "dbaas.infracreate.com/v1alpha1"
+	APIVersion            = "dbaas.kubeblocks.io/v1alpha1"
 	AppVersionKind        = "AppVersion"
 	ClusterDefinitionKind = "ClusterDefinition"
 	ClusterKind           = "Cluster"

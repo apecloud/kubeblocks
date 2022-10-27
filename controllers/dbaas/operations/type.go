@@ -34,8 +34,8 @@ const (
 
 	// annotation keys
 
-	RestartAnnotationKey    = "infracreate.com/restart"
-	OpsRequestAnnotationKey = "infracreate.com/ops-request"
+	RestartAnnotationKey    = "kubeblocks.io/restart"
+	OpsRequestAnnotationKey = "kubeblocks.io/ops-request"
 )
 
 type OpsBehaviour struct {

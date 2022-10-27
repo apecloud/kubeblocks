@@ -40,7 +40,7 @@ webhooks:
     service:
       name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
-      path: /mutate-dbaas-infracreate-com-v1alpha1-appversion
+      path: /mutate-dbaas-kubeblocks-io-v1alpha1-appversion
       port: {{ .Values.service.port }}
     {{- if .Values.admissionWebhooks.createSelfSignedCert }}
     caBundle: {{ $ca.Cert | b64enc }}
@@ -49,7 +49,7 @@ webhooks:
   name: mappversion.kb.io
   rules:
   - apiGroups:
-    - dbaas.infracreate.com
+    - dbaas.kubeblocks.io
     apiVersions:
     - v1alpha1
     operations:
@@ -64,7 +64,7 @@ webhooks:
     service:
       name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
-      path: /mutate-dbaas-infracreate-com-v1alpha1-cluster
+      path: /mutate-dbaas-kubeblocks-io-v1alpha1-cluster
       port: {{ .Values.service.port }}
     {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
     caBundle: {{ $ca.Cert | b64enc }}
@@ -73,7 +73,7 @@ webhooks:
   name: mcluster.kb.io
   rules:
   - apiGroups:
-    - dbaas.infracreate.com
+    - dbaas.kubeblocks.io
     apiVersions:
     - v1alpha1
     operations:
@@ -88,7 +88,7 @@ webhooks:
     service:
       name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
-      path: /mutate-dbaas-infracreate-com-v1alpha1-clusterdefinition
+      path: /mutate-dbaas-kubeblocks-io-v1alpha1-clusterdefinition
       port: {{ .Values.service.port }}
     {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
     caBundle: {{ $ca.Cert | b64enc }}
@@ -97,7 +97,7 @@ webhooks:
   name: mclusterdefinition.kb.io
   rules:
   - apiGroups:
-    - dbaas.infracreate.com
+    - dbaas.kubeblocks.io
     apiVersions:
     - v1alpha1
     operations:
@@ -112,7 +112,7 @@ webhooks:
     service:
       name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
-      path: /mutate-dbaas-infracreate-com-v1alpha1-opsrequest
+      path: /mutate-dbaas-kubeblocks-io-v1alpha1-opsrequest
       port: {{ .Values.service.port }}
     {{- if .Values.admissionWebhooks.createSelfSignedCert }}
     caBundle: {{ $ca.Cert | b64enc }}
@@ -121,7 +121,7 @@ webhooks:
   name: mopsrequest.kb.io
   rules:
   - apiGroups:
-    - dbaas.infracreate.com
+    - dbaas.kubeblocks.io
     apiVersions:
     - v1alpha1
     operations:
@@ -142,7 +142,7 @@ webhooks:
     service:
       name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
-      path: /validate-dbaas-infracreate-com-v1alpha1-appversion
+      path: /validate-dbaas-kubeblocks-io-v1alpha1-appversion
       port: {{ .Values.service.port }}
     {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
     caBundle: {{ $ca.Cert | b64enc }}
@@ -151,7 +151,7 @@ webhooks:
   name: vappversion.kb.io
   rules:
   - apiGroups:
-    - dbaas.infracreate.com
+    - dbaas.kubeblocks.io
     apiVersions:
     - v1alpha1
     operations:
@@ -166,7 +166,7 @@ webhooks:
     service:
       name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
-      path: /validate-dbaas-infracreate-com-v1alpha1-cluster
+      path: /validate-dbaas-kubeblocks-io-v1alpha1-cluster
       port: {{ .Values.service.port }}
     {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
     caBundle: {{ $ca.Cert | b64enc }}
@@ -175,7 +175,7 @@ webhooks:
   name: vcluster.kb.io
   rules:
   - apiGroups:
-    - dbaas.infracreate.com
+    - dbaas.kubeblocks.io
     apiVersions:
     - v1alpha1
     operations:
@@ -190,7 +190,7 @@ webhooks:
     service:
       name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
-      path: /validate-dbaas-infracreate-com-v1alpha1-clusterdefinition
+      path: /validate-dbaas-kubeblocks-io-v1alpha1-clusterdefinition
       port: {{ .Values.service.port }}
     {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
     caBundle: {{ $ca.Cert | b64enc }}
@@ -199,7 +199,7 @@ webhooks:
   name: vclusterdefinition.kb.io
   rules:
   - apiGroups:
-    - dbaas.infracreate.com
+    - dbaas.kubeblocks.io
     apiVersions:
     - v1alpha1
     operations:
@@ -214,7 +214,7 @@ webhooks:
     service:
       name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
-      path: /validate-dbaas-infracreate-com-v1alpha1-opsrequest
+      path: /validate-dbaas-kubeblocks-io-v1alpha1-opsrequest
       port: {{ .Values.service.port }}
     {{- if .Values.admissionWebhooks.createSelfSignedCert }}
     caBundle: {{ $ca.Cert | b64enc }}
@@ -223,7 +223,7 @@ webhooks:
   name: vopsrequest.kb.io
   rules:
   - apiGroups:
-    - dbaas.infracreate.com
+    - dbaas.kubeblocks.io
     apiVersions:
     - v1alpha1
     operations:

@@ -69,7 +69,7 @@ var _ = Describe("RestoreJob Controller", func() {
 	assureRestoreJobObj := func(backupJob string) *dataprotectionv1alpha1.RestoreJob {
 		By("By assure an restoreJob obj")
 		restoreJobYaml := `
-apiVersion: dataprotection.infracreate.com/v1alpha1
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: RestoreJob
 metadata:
   name: restore-demo
@@ -121,17 +121,17 @@ spec:
 	assureBackupJobObj := func(backupPolicy string) *dataprotectionv1alpha1.BackupJob {
 		By("By assure an backupJob obj")
 		backupJobYaml := `
-apiVersion: dataprotection.infracreate.com/v1alpha1
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupJob
 metadata:
   name: backup-success-demo
   namespace: default
 
   labels:
-    dataprotection.infracreate.com/backup-type: full
-    db.infracreate.com/name: mysqlcluster
-    dataprotection.infracreate.com/backup-policy-name: backup-policy-demo
-    dataprotection.infracreate.com/backup-index: "0"
+    dataprotection.kubeblocks.io/backup-type: full
+    db.kubeblocks.io/name: mysqlcluster
+    dataprotection.kubeblocks.io/backup-policy-name: backup-policy-demo
+    dataprotection.kubeblocks.io/backup-index: "0"
 
 spec:
   backupPolicyName: backup-policy-demo
@@ -172,7 +172,7 @@ status:
 	assureBackupPolicyObj := func(backupTool string) *dataprotectionv1alpha1.BackupPolicy {
 		By("By assure an backupPolicy obj")
 		backupPolicyYaml := `
-apiVersion: dataprotection.infracreate.com/v1alpha1
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupPolicy
 metadata:
   name: backup-policy-demo
@@ -229,7 +229,7 @@ spec:
 	assureBackupToolObj := func() *dataprotectionv1alpha1.BackupTool {
 		By("By assure an backupTool obj")
 		backupToolYaml := `
-apiVersion: dataprotection.infracreate.com/v1alpha1
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupTool
 metadata:
   name: xtrabackup-mysql

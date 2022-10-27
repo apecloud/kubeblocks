@@ -56,7 +56,7 @@ const (
 
 const (
 	// Group api group
-	Group = "dbaas.infracreate.com"
+	Group = "dbaas.kubeblocks.io"
 
 	// AppsGroup k8s apps group
 	AppsGroup = "apps"
@@ -91,8 +91,8 @@ const (
 	KindAppVersion     = "AppVersion"
 
 	InstanceLabelKey               = "app.kubernetes.io/instance"
-	ConsensusSetRoleLabelKey       = "cs.dbaas.infracreate.com/role"
-	ConsensusSetAccessModeLabelKey = "cs.dbaas.infracreate.com/access-mode"
+	ConsensusSetRoleLabelKey       = "cs.dbaas.kubeblocks.io/role"
+	ConsensusSetAccessModeLabelKey = "cs.dbaas.kubeblocks.io/access-mode"
 	ComponentLabelKey              = "app.kubernetes.io/component-name"
 	RegionLabelKey                 = "topology.kubernetes.io/region"
 	ZoneLabelKey                   = "topology.kubernetes.io/zone"

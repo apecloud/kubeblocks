@@ -50,9 +50,9 @@ type BackupJobReconciler struct {
 	clock    clock.RealClock
 }
 
-//+kubebuilder:rbac:groups=dataprotection.infracreate.com,resources=backupjobs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=dataprotection.infracreate.com,resources=backupjobs/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=dataprotection.infracreate.com,resources=backupjobs/finalizers,verbs=update
+//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backupjobs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backupjobs/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backupjobs/finalizers,verbs=update
 
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;list;watch;create;update;patch;delete
@@ -452,7 +452,7 @@ func (r *BackupJobReconciler) createHooksCommandJob(
 
 func buildBackupJobLabels(backupJobName string) map[string]string {
 	return map[string]string{
-		"backupjobs.dataprotection.infracreate.com/name": backupJobName,
+		"backupjobs.dataprotection.kubeblocks.io/name": backupJobName,
 	}
 }
 

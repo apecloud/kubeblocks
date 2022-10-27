@@ -20,7 +20,7 @@ import "time"
 
 const (
 	// name of our custom finalizer
-	dataProtectionFinalizerName = "dataprotection.infracreate.com/finalizer"
+	dataProtectionFinalizerName = "dataprotection.kubeblocks.io/finalizer"
 )
 
 const reconcileInterval = time.Second * 5

@@ -140,7 +140,7 @@ data:
 	assureClusterDefObj := func() *dbaasv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
 		clusterDefYAML := `
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
   name: cluster-definition
@@ -175,17 +175,17 @@ spec:
           - name: "MYSQL_ROOT_PASSWORD"
             valueFrom:
               secretKeyRef:
-                name: $(OPENDBAAS_MY_SECRET_NAME)
+                name: $(KB_SECRET_NAME)
                 key: password
         command: ["/usr/bin/bash", "-c"]
         args:
           - >
             cluster_info="";
-            for (( i=0; i<$OPENDBAAS_REPLICASETS_PRIMARY_N; i++ )); do
+            for (( i=0; i<$KB_REPLICASETS_PRIMARY_N; i++ )); do
               if [ $i -ne 0 ]; then
                 cluster_info="$cluster_info;";
               fi;
-              host=$(eval echo \$OPENDBAAS_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
+              host=$(eval echo \$KB_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
               cluster_info="$cluster_info$host:13306";
             done;
             idx=0;
@@ -193,7 +193,7 @@ spec:
               for i in "${ADDR[@]}"; do
                 idx=$i;
               done;
-            done <<< "$OPENDBAAS_MY_POD_NAME";
+            done <<< "$KB_POD_NAME";
             echo $idx;
             cluster_info="$cluster_info@$(($idx+1))";
             echo $cluster_info;
@@ -218,7 +218,7 @@ spec:
 	assureAppVersionObj := func() *dbaasv1alpha1.AppVersion {
 		By("By assure an appVersion obj")
 		appVerYAML := `
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       AppVersion
 metadata:
   name:     app-version
@@ -232,7 +232,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: registry.jihulab.com/infracreate/mysql-server/mysql/wesql-server-arm:latest
+        image: registry.jihulab.com/apecloud/mysql-server/mysql/wesql-server-arm:latest
   - type: proxy
     podSpec: 
       containers:
@@ -266,7 +266,7 @@ spec:
 
 		return &dbaasv1alpha1.Cluster{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: "dbaas.infracreate.com/v1alpha1",
+				APIVersion: "dbaas.kubeblocks.io/v1alpha1",
 				Kind:       "Cluster",
 			},
 			ObjectMeta: metav1.ObjectMeta{
@@ -303,7 +303,7 @@ spec:
 	assureClusterDefWithConsensusObj := func() *dbaasv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj with componentType = Consensus")
 		clusterDefYAML := `
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
   name: cluster-definition-consensus
@@ -364,11 +364,11 @@ spec:
         args:
           - >
             cluster_info="";
-            for (( i=0; i<$OPENDBAAS_REPLICASETS_N; i++ )); do
+            for (( i=0; i<$KB_REPLICASETS_N; i++ )); do
               if [ $i -ne 0 ]; then
                 cluster_info="$cluster_info;";
               fi;
-              host=$(eval echo \$OPENDBAAS_REPLICASETS_"$i"_HOSTNAME)
+              host=$(eval echo \$KB_REPLICASETS_"$i"_HOSTNAME)
               cluster_info="$cluster_info$host:13306";
             done;
             idx=0;
@@ -376,7 +376,7 @@ spec:
               for i in "${ADDR[@]}"; do
                 idx=$i;
               done;
-            done <<< "$OPENDBAAS_MY_POD_NAME";
+            done <<< "$KB_POD_NAME";
             echo $idx;
             cluster_info="$cluster_info@$(($idx+1))";
             echo $cluster_info;
@@ -393,7 +393,7 @@ spec:
 	assureAppVersionWithConsensusObj := func() *dbaasv1alpha1.AppVersion {
 		By("By assure an appVersion obj with componentType = Consensus")
 		appVerYAML := `
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       AppVersion
 metadata:
   name:     app-version-consensus
@@ -404,7 +404,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: docker.io/infracreate/wesql-server-8.0:0.1-SNAPSHOT
+        image: docker.io/apecloud/wesql-server-8.0:0.1-SNAPSHOT
         imagePullPolicy: IfNotPresent
 `
 		appVersion := &dbaasv1alpha1.AppVersion{}
@@ -434,7 +434,7 @@ spec:
 
 		return &dbaasv1alpha1.Cluster{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: "dbaas.infracreate.com/v1alpha1",
+				APIVersion: "dbaas.kubeblocks.io/v1alpha1",
 				Kind:       "Cluster",
 			},
 			ObjectMeta: metav1.ObjectMeta{
@@ -1210,20 +1210,20 @@ spec:
     - /bin/bash
     - -c
     env:
-    - name: OPENDBAAS_MY_POD_NAME
+    - name: KB_POD_NAME
       valueFrom:
         fieldRef:
           apiVersion: v1
           fieldPath: metadata.name
-    - name: OPENDBAAS_REPLICASETS_N
+    - name: KB_REPLICASETS_N
       value: "3"
-    - name: OPENDBAAS_REPLICASETS_0_HOSTNAME
+    - name: KB_REPLICASETS_0_HOSTNAME
       value: clusterepuglf-wesql-test-0
-    - name: OPENDBAAS_REPLICASETS_1_HOSTNAME
+    - name: KB_REPLICASETS_1_HOSTNAME
       value: clusterepuglf-wesql-test-1
-    - name: OPENDBAAS_REPLICASETS_2_HOSTNAME
+    - name: KB_REPLICASETS_2_HOSTNAME
       value: clusterepuglf-wesql-test-2
-    image: docker.io/infracreate/wesql-server-8.0:0.1-SNAPSHOT
+    image: docker.io/apecloud/wesql-server-8.0:0.1-SNAPSHOT
     imagePullPolicy: IfNotPresent
     name: mysql
     ports:

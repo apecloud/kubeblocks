@@ -48,7 +48,7 @@ var _ = Describe("util", func() {
 	It("Print yaml", func() {
 		obj := &unstructured.Unstructured{
 			Object: map[string]interface{}{
-				"apiVersion": "dataprotection.infracreate.com/v1alpha1",
+				"apiVersion": "dataprotection.kubeblocks.io/v1alpha1",
 				"kind":       "BackupJob",
 				"metadata": map[string]interface{}{
 					"namespace": "default",

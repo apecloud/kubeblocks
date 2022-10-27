@@ -51,7 +51,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 		It("Should update status of appVersion at the same time", func() {
 			By("By creating a clusterDefinition")
 			clusterDefYaml := `
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       ClusterDefinition
 metadata:
   name:     mysql-cluster-definition
@@ -87,17 +87,17 @@ spec:
           - name: "MYSQL_ROOT_PASSWORD"
             valueFrom:
               secretKeyRef:
-                name: $(OPENDBAAS_MY_SECRET_NAME)
+                name: $(KB_SECRET_NAME)
                 key: password
         command: ["/usr/bin/bash", "-c"]
         args:
           - >
             cluster_info="";
-            for (( i=0; i<$OPENDBAAS_REPLICASETS_PRIMARY_N; i++ )); do
+            for (( i=0; i<$KB_REPLICASETS_PRIMARY_N; i++ )); do
               if [ $i -ne 0 ]; then
                 cluster_info="$cluster_info;";
               fi;
-              host=$(eval echo \$OPENDBAAS_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
+              host=$(eval echo \$KB_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
               cluster_info="$cluster_info$host:13306";
             done;
             idx=0;
@@ -105,7 +105,7 @@ spec:
               for i in "${ADDR[@]}"; do
                 idx=$i;
               done;
-            done <<< "$OPENDBAAS_MY_POD_NAME";
+            done <<< "$KB_POD_NAME";
             echo $idx;
             cluster_info="$cluster_info@$(($idx+1))";
             echo $cluster_info;
@@ -116,7 +116,7 @@ spec:
           - name: MYSQL_ROOT_PASSWORD
             valueFrom:
               secretKeyRef:
-                name: $(OPENDBAAS_MY_SECRET_NAME)
+                name: $(KB_SECRET_NAME)
                 key: password
           - name: DATA_SOURCE_NAME
             value: "root:$(MYSQL_ROOT_PASSWORD)@(localhost:3306)/"
@@ -153,7 +153,7 @@ spec:
 			}, time.Second*10, time.Second*1).Should(BeTrue())
 			By("By creating an appVersion")
 			appVerYaml := `
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       AppVersion
 metadata:
   name:     appversion-mysql-latest
@@ -164,7 +164,7 @@ spec:
     podSpec: 
       containers:
       - name: mysql
-        image: registry.jihulab.com/infracreate/mysql-server/mysql/wesql-server-arm:latest
+        image: registry.jihulab.com/apecloud/mysql-server/mysql/wesql-server-arm:latest
       - name: mysql_exporter
         image: "prom/mysqld-exporter:v0.14.0"
 `

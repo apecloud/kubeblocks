@@ -131,7 +131,7 @@ func main() {
 		// following LeaderElectionID is generated via hash/fnv (FNV-1 and FNV-1a), in
 		// pattern of '{{ hashFNV .Repo }}.{{ .Domain }}', make sure regenerate this ID
 		// if you have forked from this project template.
-		LeaderElectionID: "002c317f.infracreate.com",
+		LeaderElectionID: "002c317f.kubeblocks.io",
 
 		// NOTES:
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily

@@ -87,7 +87,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 // createTestClusterDefinitionObj  other webhook_test called this function, carefully for modifying the function
 func createTestClusterDefinitionObj(name string) (*ClusterDefinition, error) {
 	clusterDefYaml := fmt.Sprintf(`
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       ClusterDefinition
 metadata:
   name:     %s
@@ -107,7 +107,7 @@ spec:
 // createTestClusterDefinitionObj2 create an invalid obj
 func createTestClusterDefinitionObj2(name string) (*ClusterDefinition, error) {
 	clusterDefYaml := fmt.Sprintf(`
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       ClusterDefinition
 metadata:
   name:     %s

@@ -89,7 +89,7 @@ var _ = Describe("cluster webhook", func() {
 
 func createTestCluster(clusterDefinitionName, appVersionName, clusterName string) (*Cluster, error) {
 	clusterYaml := fmt.Sprintf(`
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: %s

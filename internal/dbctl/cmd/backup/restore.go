@@ -118,7 +118,7 @@ func (o *RestoreOptions) Complete(f cmdutil.Factory, args []string) error {
 func (o *RestoreOptions) Run() error {
 	restoreJobName := "restorejob-" + time.Now().Format("20060102150405")
 	restoreJobObj := NewRestoreJobInstance(o.Namespace, restoreJobName, o.DbCluster, o.BackupJobName)
-	gvr := schema.GroupVersionResource{Group: "dataprotection.infracreate.com", Version: "v1alpha1", Resource: "restorejobs"}
+	gvr := schema.GroupVersionResource{Group: "dataprotection.kubeblocks.io", Version: "v1alpha1", Resource: "restorejobs"}
 	obj, err := o.client.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), restoreJobObj, metav1.CreateOptions{})
 	if err != nil {
 		return err
@@ -134,7 +134,7 @@ func (o *RestoreOptions) Run() error {
 func NewRestoreJobInstance(namespace, name, dbCluster, backupJob string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "dataprotection.infracreate.com/v1alpha1",
+			"apiVersion": "dataprotection.kubeblocks.io/v1alpha1",
 			"kind":       "RestoreJob",
 			"metadata": map[string]interface{}{
 				"namespace": namespace,

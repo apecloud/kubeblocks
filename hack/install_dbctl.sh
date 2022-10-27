@@ -156,7 +156,7 @@ fail_trap() {
     result=$?
     if [ "$result" != "0" ]; then
         echo "Failed to install dbctl"
-        echo "Go to https://infracreate.io for more support."
+        echo "Go to https://kubeblocks.io for more support."
     fi
     cleanup
     exit $result
@@ -170,7 +170,7 @@ cleanup() {
 
 installCompleted() {
     echo -e "\nFor more information on how to started, please visit:"
-    echo "  https://infracreate.io"
+    echo "  https://kubeblocks.io"
 }
 
 # -----------------------------------------------------------------------------

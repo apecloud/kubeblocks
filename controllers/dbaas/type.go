@@ -27,21 +27,21 @@ const (
 	cmNamespaceKey = "CM_NAMESPACE"
 
 	// name of our custom finalizer
-	dbClusterFinalizerName    = "cluster.infracreate.com/finalizer"
-	dbClusterDefFinalizerName = "clusterdefinition.infracreate.com/finalizer"
-	appVersionFinalizerName   = "appversion.infracreate.com/finalizer"
-	opsRequestFinalizerName   = "opsrequest.infracreate.com/finalizer"
+	dbClusterFinalizerName    = "cluster.kubeblocks.io/finalizer"
+	dbClusterDefFinalizerName = "clusterdefinition.kubeblocks.io/finalizer"
+	appVersionFinalizerName   = "appversion.kubeblocks.io/finalizer"
+	opsRequestFinalizerName   = "opsrequest.kubeblocks.io/finalizer"
 
 	// label keys
-	clusterDefLabelKey             = "clusterdefinition.infracreate.com/name"
-	appVersionLabelKey             = "appversion.infracreate.com/name"
+	clusterDefLabelKey             = "clusterdefinition.kubeblocks.io/name"
+	appVersionLabelKey             = "appversion.kubeblocks.io/name"
 	appInstanceLabelKey            = "app.kubernetes.io/instance"
 	appComponentLabelKey           = "app.kubernetes.io/component-name"
 	appNameLabelKey                = "app.kubernetes.io/name"
 	statefulSetPodNameLabelKey     = "statefulset.kubernetes.io/pod-name"
-	consensusSetRoleLabelKey       = "cs.dbaas.infracreate.com/role"
-	consensusSetAccessModeLabelKey = "cs.dbaas.infracreate.com/access-mode"
-	clusterLabelKey                = "cluster.infracreate.com/name"
+	consensusSetRoleLabelKey       = "cs.dbaas.kubeblocks.io/role"
+	consensusSetAccessModeLabelKey = "cs.dbaas.kubeblocks.io/access-mode"
+	clusterLabelKey                = "cluster.kubeblocks.io/name"
 
 	consensusSetStatusDefaultPodName = "Unknown"
 )

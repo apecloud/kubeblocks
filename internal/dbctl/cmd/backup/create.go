@@ -113,7 +113,7 @@ func (o *CreateOptions) Run() error {
 		backupJobName = "backupjob-" + time.Now().Format("20060102150405")
 	}
 	backupJobObj := NewBackupJobInstance(o.Namespace, backupJobName)
-	gvr := schema.GroupVersionResource{Group: "dataprotection.infracreate.com", Version: "v1alpha1", Resource: "backupjobs"}
+	gvr := schema.GroupVersionResource{Group: "dataprotection.kubeblocks.io", Version: "v1alpha1", Resource: "backupjobs"}
 	obj, err := o.client.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), backupJobObj, metav1.CreateOptions{})
 	if err != nil {
 		return err
@@ -129,7 +129,7 @@ func (o *CreateOptions) Run() error {
 func NewBackupJobInstance(namespace, name string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "dataprotection.infracreate.com/v1alpha1",
+			"apiVersion": "dataprotection.kubeblocks.io/v1alpha1",
 			"kind":       "BackupJob",
 			"metadata": map[string]interface{}{
 				"namespace": namespace,

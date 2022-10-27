@@ -5,16 +5,18 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  name: appversions.dbaas.infracreate.com
+  name: clusterdefinitions.dbaas.kubeblocks.io
 spec:
-  group: dbaas.infracreate.com
+  group: dbaas.kubeblocks.io
   names:
     categories:
     - dbaas
-    kind: AppVersion
-    listKind: AppVersionList
-    plural: appversions
-    singular: appversion
+    kind: ClusterDefinition
+    listKind: ClusterDefinitionList
+    plural: clusterdefinitions
+    shortNames:
+    - cd
+    singular: clusterdefinition
   scope: Cluster
   versions:
   - additionalPrinterColumns:
@@ -28,7 +30,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: AppVersion is the Schema for the appversions API
+        description: ClusterDefinition is the Schema for the clusterdefinitions API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -43,25 +45,37 @@ spec:
           metadata:
             type: object
           spec:
-            description: AppVersionSpec defines the desired state of AppVersion
+            description: ClusterDefinitionSpec defines the desired state of ClusterDefinition
             properties:
-              clusterDefinitionRef:
-                description: ref ClusterDefinition
-                type: string
               components:
-                description: List of components in current AppVersion. Component will
-                  replace the field in ClusterDefinition's component if type is matching
-                  typeName
+                description: List of components belonging to the cluster
                 items:
-                  description: AppVersionComponent is an application version component
-                    spec.
+                  description: ClusterDefinitionComponent is a group of pods, pods
+                    in one component usually share the same data
                   properties:
+                    antiAffinity:
+                      default: false
+                      description: antiAffinity defines components should have anti-affinity
+                        constraint to same component type
+                      type: boolean
+                    characterType:
+                      description: CharacterType defines well-known database component
+                        name, such as mongos(mongodb), proxy(redis), wesql(mysql)
+                        DBaas will generate proper monitor configs for wellknown CharacterType
+                        when BuiltIn is true.
+                      type: string
+                    componentType:
+                      default: Stateless
+                      description: ComponentType defines type of the component
+                      enum:
+                      - Stateless
+                      - Stateful
+                      - Consensus
+                      type: string
                     configTemplateRefs:
-                      description: ConfigTemplateRefs defines a configuration extension
-                        mechanism to handle configuration differences between versions,
-                        the configTemplateRefs field, together with configTemplateRefs
-                        in the ClusterDefinition, determines the final configuration
-                        file
+                      description: The configTemplateRefs field provided by ISV, and
+                        finally this configTemplateRefs will be rendered into the
+                        user's own configuration file according to the user's cluster
                       items:
                         properties:
                           name:
@@ -79,9 +93,171 @@ spec:
                             type: string
                         type: object
                       type: array
+                    consensusSpec:
+                      description: ConsensusSpec defines consensus related spec if
+                        componentType is Consensus CAN'T be empty if componentType
+                        is Consensus
+                      properties:
+                        followers:
+                          description: Followers, has voting right but not Leader
+                          items:
+                            properties:
+                              accessMode:
+                                default: ReadWrite
+                                description: AccessMode, what service this member
+                                  capable for
+                                enum:
+                                - None
+                                - Readonly
+                                - ReadWrite
+                                type: string
+                              name:
+                                default: leader
+                                description: Name, role name
+                                type: string
+                              replicas:
+                                default: 0
+                                description: Replicas, number of Pods of this role
+                                  default 1 for Leader default 0 for Learner default
+                                  Components[*].Replicas - Leader.Replicas - Learner.Replicas
+                                  for Followers
+                                format: int32
+                                minimum: 0
+                                type: integer
+                            required:
+                            - accessMode
+                            - name
+                            type: object
+                          type: array
+                        leader:
+                          description: Leader, one single leader
+                          properties:
+                            accessMode:
+                              default: ReadWrite
+                              description: AccessMode, what service this member capable
+                                for
+                              enum:
+                              - None
+                              - Readonly
+                              - ReadWrite
+                              type: string
+                            name:
+                              default: leader
+                              description: Name, role name
+                              type: string
+                            replicas:
+                              default: 0
+                              description: Replicas, number of Pods of this role default
+                                1 for Leader default 0 for Learner default Components[*].Replicas
+                                - Leader.Replicas - Learner.Replicas for Followers
+                              format: int32
+                              minimum: 0
+                              type: integer
+                          required:
+                          - accessMode
+                          - name
+                          type: object
+                        learner:
+                          description: Learner, no voting right
+                          properties:
+                            accessMode:
+                              default: ReadWrite
+                              description: AccessMode, what service this member capable
+                                for
+                              enum:
+                              - None
+                              - Readonly
+                              - ReadWrite
+                              type: string
+                            name:
+                              default: leader
+                              description: Name, role name
+                              type: string
+                            replicas:
+                              default: 0
+                              description: Replicas, number of Pods of this role default
+                                1 for Leader default 0 for Learner default Components[*].Replicas
+                                - Leader.Replicas - Learner.Replicas for Followers
+                              format: int32
+                              minimum: 0
+                              type: integer
+                          required:
+                          - accessMode
+                          - name
+                          type: object
+                        updateStrategy:
+                          default: Serial
+                          description: 'UpdateStrategy, Pods update strategy options:
+                            serial, bestEffortParallel, parallel serial: update Pods
+                            one by one that guarantee minimum component unavailable
+                            time Learner -> Follower(with AccessMode=none) -> Follower(with
+                            AccessMode=readonly) -> Follower(with AccessMode=readWrite)
+                            -> Leader bestEffortParallel: update Pods in parallel
+                            that guarantee minimum component un-writable time Learner,
+                            Follower(minority) in parallel -> Follower(majority) ->
+                            Leader, keep majority online all the time parallel: force
+                            parallel'
+                          enum:
+                          - Serial
+                          - BestEffortParallel
+                          - Parallel
+                          type: string
+                      required:
+                      - leader
+                      type: object
+                    defaultReplicas:
+                      default: 0
+                      description: Default replicas in this component if user not
+                        specify
+                      minimum: 0
+                      type: integer
+                    maxAvailable:
+                      description: Maximum available pod count after scale
+                      minimum: 0
+                      type: integer
+                    minAvailable:
+                      default: 0
+                      description: Minimum available pod count when updating
+                      minimum: 0
+                      type: integer
+                    monitor:
+                      description: Monitor is monitoring config which provided by
+                        ISV
+                      properties:
+                        builtIn:
+                          default: true
+                          description: BuiltIn is a switch to enable DBaas builtIn
+                            monitoring. If BuiltIn is true and CharacterType is wellknown,
+                            ExporterConfig and Sidecar container will generate automatically.
+                            Otherwise, ISV should set BuiltIn to false and provide
+                            ExporterConfig and Sidecar container own.
+                          type: boolean
+                        exporterConfig:
+                          description: Exporter provided by ISV, which specify necessary
+                            information to Time Series Database. ExporterConfig is
+                            valid when BuiltIn is false.
+                          properties:
+                            scrapePath:
+                              default: /metrics
+                              description: ScrapePath is exporter url path for Time
+                                Series Database to scrape metrics
+                              maxLength: 128
+                              type: string
+                            scrapePort:
+                              description: ScrapePort is exporter port for Time Series
+                                Database to scrape metrics
+                              maximum: 65536
+                              minimum: 1
+                              type: integer
+                          required:
+                          - scrapePath
+                          - scrapePort
+                          type: object
+                      required:
+                      - builtIn
+                      type: object
                     podSpec:
-                      description: PodSpec is pod spec, if not nil, will replace ClusterDefinitionSpec.PodSpec
-                        in ClusterDefinition
+                      description: podSpec of final workload
                       properties:
                         activeDeadlineSeconds:
                           description: Optional duration in seconds the pod may be
@@ -7357,9 +7533,421 @@ spec:
                       required:
                       - containers
                       type: object
+                    probes:
+                      properties:
+                        roleChangedProbe:
+                          properties:
+                            commands:
+                              properties:
+                                queries:
+                                  items:
+                                    type: string
+                                  type: array
+                                writes:
+                                  description: sqls executed on db node, used to check
+                                    db healthy
+                                  items:
+                                    type: string
+                                  type: array
+                              type: object
+                            enable:
+                              default: true
+                              description: enable probe or not
+                              type: boolean
+                            failureThreshold:
+                              default: 1
+                              description: Minimum consecutive failures for the probe
+                                to be considered failed after having succeeded.
+                              format: int32
+                              minimum: 1
+                              type: integer
+                            periodSeconds:
+                              default: 1
+                              description: How often (in seconds) to perform the probe.
+                              format: int32
+                              minimum: 1
+                              type: integer
+                            successThreshold:
+                              default: 1
+                              description: Minimum consecutive successes for the probe
+                                to be considered successful after having failed.
+                              format: int32
+                              minimum: 1
+                              type: integer
+                          type: object
+                        runningProbe:
+                          properties:
+                            commands:
+                              properties:
+                                queries:
+                                  items:
+                                    type: string
+                                  type: array
+                                writes:
+                                  description: sqls executed on db node, used to check
+                                    db healthy
+                                  items:
+                                    type: string
+                                  type: array
+                              type: object
+                            enable:
+                              default: true
+                              description: enable probe or not
+                              type: boolean
+                            failureThreshold:
+                              default: 1
+                              description: Minimum consecutive failures for the probe
+                                to be considered failed after having succeeded.
+                              format: int32
+                              minimum: 1
+                              type: integer
+                            periodSeconds:
+                              default: 1
+                              description: How often (in seconds) to perform the probe.
+                              format: int32
+                              minimum: 1
+                              type: integer
+                            successThreshold:
+                              default: 1
+                              description: Minimum consecutive successes for the probe
+                                to be considered successful after having failed.
+                              format: int32
+                              minimum: 1
+                              type: integer
+                          type: object
+                        statusProbe:
+                          properties:
+                            commands:
+                              properties:
+                                queries:
+                                  items:
+                                    type: string
+                                  type: array
+                                writes:
+                                  description: sqls executed on db node, used to check
+                                    db healthy
+                                  items:
+                                    type: string
+                                  type: array
+                              type: object
+                            enable:
+                              default: true
+                              description: enable probe or not
+                              type: boolean
+                            failureThreshold:
+                              default: 1
+                              description: Minimum consecutive failures for the probe
+                                to be considered failed after having succeeded.
+                              format: int32
+                              minimum: 1
+                              type: integer
+                            periodSeconds:
+                              default: 1
+                              description: How often (in seconds) to perform the probe.
+                              format: int32
+                              minimum: 1
+                              type: integer
+                            successThreshold:
+                              default: 1
+                              description: Minimum consecutive successes for the probe
+                                to be considered successful after having failed.
+                              format: int32
+                              minimum: 1
+                              type: integer
+                          type: object
+                      type: object
+                    scripts:
+                      description: 'Scripts executed before and after workload operation
+                        script exec order：component.pre => component.exec => component.post
+                        builtin ENV variables: self: KB_SELF_{builtin_properties}
+                        rule: KB_{conponent_name}[n]-{builtin_properties} builtin_properties:
+                        - ID # which shows in Cluster.status - HOST # e.g. example-mongodb2-0.example-mongodb2-svc.default.svc.cluster.local
+                        - PORT - N # number of current component'
+                      properties:
+                        create:
+                          description: Scripts executed before and after creation
+                          properties:
+                            post:
+                              description: Post hook after operation
+                              items:
+                                description: ClusterDefinitionContainerCMD defines
+                                  content of a hook script
+                                properties:
+                                  args:
+                                    description: Args executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  command:
+                                    description: Command executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  container:
+                                    description: Container used to execute command
+                                    type: string
+                                type: object
+                              type: array
+                            pre:
+                              description: Pre hook before operation
+                              items:
+                                description: ClusterDefinitionContainerCMD defines
+                                  content of a hook script
+                                properties:
+                                  args:
+                                    description: Args executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  command:
+                                    description: Command executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  container:
+                                    description: Container used to execute command
+                                    type: string
+                                type: object
+                              type: array
+                          type: object
+                        default:
+                          description: Default scripts executed if the following scripts
+                            not defined
+                          properties:
+                            post:
+                              description: Post hook after operation
+                              items:
+                                description: ClusterDefinitionContainerCMD defines
+                                  content of a hook script
+                                properties:
+                                  args:
+                                    description: Args executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  command:
+                                    description: Command executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  container:
+                                    description: Container used to execute command
+                                    type: string
+                                type: object
+                              type: array
+                            pre:
+                              description: Pre hook before operation
+                              items:
+                                description: ClusterDefinitionContainerCMD defines
+                                  content of a hook script
+                                properties:
+                                  args:
+                                    description: Args executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  command:
+                                    description: Command executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  container:
+                                    description: Container used to execute command
+                                    type: string
+                                type: object
+                              type: array
+                          type: object
+                        delete:
+                          description: Scripts executed before and after deletion
+                          properties:
+                            post:
+                              description: Post hook after operation
+                              items:
+                                description: ClusterDefinitionContainerCMD defines
+                                  content of a hook script
+                                properties:
+                                  args:
+                                    description: Args executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  command:
+                                    description: Command executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  container:
+                                    description: Container used to execute command
+                                    type: string
+                                type: object
+                              type: array
+                            pre:
+                              description: Pre hook before operation
+                              items:
+                                description: ClusterDefinitionContainerCMD defines
+                                  content of a hook script
+                                properties:
+                                  args:
+                                    description: Args executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  command:
+                                    description: Command executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  container:
+                                    description: Container used to execute command
+                                    type: string
+                                type: object
+                              type: array
+                          type: object
+                        horizontalScale:
+                          description: Scripts executed before and after horizontal
+                            scale
+                          properties:
+                            post:
+                              description: Post hook after operation
+                              items:
+                                description: ClusterDefinitionContainerCMD defines
+                                  content of a hook script
+                                properties:
+                                  args:
+                                    description: Args executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  command:
+                                    description: Command executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  container:
+                                    description: Container used to execute command
+                                    type: string
+                                type: object
+                              type: array
+                            pre:
+                              description: Pre hook before operation
+                              items:
+                                description: ClusterDefinitionContainerCMD defines
+                                  content of a hook script
+                                properties:
+                                  args:
+                                    description: Args executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  command:
+                                    description: Command executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  container:
+                                    description: Container used to execute command
+                                    type: string
+                                type: object
+                              type: array
+                          type: object
+                        upgrade:
+                          description: Scripts executed before and after upgrade
+                          properties:
+                            post:
+                              description: Post hook after operation
+                              items:
+                                description: ClusterDefinitionContainerCMD defines
+                                  content of a hook script
+                                properties:
+                                  args:
+                                    description: Args executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  command:
+                                    description: Command executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  container:
+                                    description: Container used to execute command
+                                    type: string
+                                type: object
+                              type: array
+                            pre:
+                              description: Pre hook before operation
+                              items:
+                                description: ClusterDefinitionContainerCMD defines
+                                  content of a hook script
+                                properties:
+                                  args:
+                                    description: Args executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  command:
+                                    description: Command executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  container:
+                                    description: Container used to execute command
+                                    type: string
+                                type: object
+                              type: array
+                          type: object
+                        verticalScale:
+                          description: Scripts executed before and after vertical
+                            scale
+                          properties:
+                            post:
+                              description: Post hook after operation
+                              items:
+                                description: ClusterDefinitionContainerCMD defines
+                                  content of a hook script
+                                properties:
+                                  args:
+                                    description: Args executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  command:
+                                    description: Command executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  container:
+                                    description: Container used to execute command
+                                    type: string
+                                type: object
+                              type: array
+                            pre:
+                              description: Pre hook before operation
+                              items:
+                                description: ClusterDefinitionContainerCMD defines
+                                  content of a hook script
+                                properties:
+                                  args:
+                                    description: Args executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  command:
+                                    description: Command executed in container
+                                    items:
+                                      type: string
+                                    type: array
+                                  container:
+                                    description: Container used to execute command
+                                    type: string
+                                type: object
+                              type: array
+                          type: object
+                      type: object
                     service:
-                      description: Service is service spec, if not nil, will replace
-                        ClusterDefinitionSpec.Service in ClusterDefinition spec.
+                      description: Service defines the behavior of a service spec.
+                        provide read-write service when ComponentType is Consensus
+                        https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
                       properties:
                         allocateLoadBalancerNodePorts:
                           description: allocateLoadBalancerNodePorts defines if NodePorts
@@ -7688,42 +8276,59 @@ spec:
                             https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types'
                           type: string
                       type: object
-                    type:
-                      description: Type is a component type in ClusterDefinition.
+                    typeName:
+                      description: Type name of the component, it can be any valid
+                        string
                       maxLength: 12
                       type: string
                   required:
-                  - type
+                  - componentType
                   type: object
                 minItems: 1
                 type: array
+              connectionCredential:
+                description: Credential used for connecting database
+                properties:
+                  password:
+                    type: string
+                  user:
+                    default: root
+                    type: string
+                type: object
+              defaultTerminationPolicy:
+                description: Default termination policy if no termination policy defined
+                  in cluster
+                enum:
+                - DoNotTerminate
+                - Halt
+                - Delete
+                - WipeOut
+                type: string
+              type:
+                description: Type define well known cluster types. Valid values are
+                  in-list of [state.redis, mq.mqtt, mq.kafka, state.mysql-8, state.mysql-5.7,
+                  state.mysql-5.6, state-mongodb]
+                maxLength: 24
+                type: string
+            required:
+            - type
             type: object
           status:
-            description: AppVersionStatus defines the observed state of AppVersion
+            description: ClusterDefinitionStatus defines the observed state of ClusterDefinition
             properties:
-              clusterDefGeneration:
-                description: ClusterDefinition generation number
-                format: int64
-                type: integer
-              clusterDefSyncStatus:
-                description: ClusterDefinition sync. status
-                enum:
-                - InSync
-                - OutOfSync
-                type: string
               message:
-                description: A human readable message indicating details about why
-                  the appVersion is in this phase.
+                description: Extra message in current phase
                 type: string
               observedGeneration:
-                description: generation number
+                description: observedGeneration is the most recent generation observed
+                  for this ClusterDefinition. It corresponds to the ClusterDefinition's
+                  generation, which is updated on mutation by the API Server.
                 format: int64
                 type: integer
               phase:
-                description: phase - in list of [Available,Unavailable]
+                description: phase - in list of [Available]
                 enum:
                 - Available
-                - Unavailable
                 type: string
             type: object
         type: object

@@ -30,7 +30,7 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Factory:   f,
 		Streams:   streams,
 		Short:     "List all database backup job.",
-		GroupKind: schema.GroupKind{Group: "dataprotection.infracreate.com", Kind: "BackupJob"},
+		GroupKind: schema.GroupKind{Group: "dataprotection.kubeblocks.io", Kind: "BackupJob"},
 	}
 	return cmd.Build()
 }

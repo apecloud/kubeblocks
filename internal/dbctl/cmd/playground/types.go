@@ -44,9 +44,9 @@ var (
 	// K3sImage is k3s image repo
 	K3sImage = "rancher/k3s:" + version.K3sImageTag
 	// K3dToolsImage is k3d tools image repo
-	K3dToolsImage = "docker.io/infracreate/k3d-tools:" + version.K3dVersion
+	K3dToolsImage = "docker.io/apecloud/k3d-tools:" + version.K3dVersion
 	// K3dProxyImage is k3d proxy image repo
-	K3dProxyImage = "docker.io/infracreate/k3d-proxy:" + version.K3dVersion
+	K3dProxyImage = "docker.io/apecloud/k3d-proxy:" + version.K3dVersion
 )
 
 type clusterInfo struct {
@@ -127,7 +127,7 @@ MySQL X-Cluster(WeSQL) "{{.Cluster.Name}}" has been CREATED!
 --------------------------------------------------------------------
 To view this guide: dbctl playground guide
 To get more help: dbctl help
-{{if ne .CloudProvider "local"}}To login to remote host:              ssh -i ~/.opendbaas/ssh/id_rsa ec2-user@{{.HostIP}}{{end}}
+{{if ne .CloudProvider "local"}}To login to remote host:              ssh -i ~/.kubeblocks/ssh/id_rsa ec2-user@{{.HostIP}}{{end}}
 Use "dbctl [command] --help" for more information about a command.
 
 `

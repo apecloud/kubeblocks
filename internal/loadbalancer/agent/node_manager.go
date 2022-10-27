@@ -34,10 +34,6 @@ import (
 	pb "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol"
 )
 
-const (
-	LabelKeyWorkloadNode = "kubeblocks.apecloud.com/workload-node"
-)
-
 var (
 	ErrNodeNotFound = errors.New("Node not found")
 
@@ -76,6 +72,7 @@ func NewNodeManager(logger logr.Logger, rpcPort int, cp cloud.Provider, c client
 		rpcPort: rpcPort,
 		nodes:   make(map[string]Node),
 	}
+	nm.logger.Info("Monitoring nodes", "labels", fmt.Sprintf("%v", config.TrafficNodeLabels))
 	if err := nm.refreshNodes(); err != nil {
 		return nil, errors.Wrapf(err, "Failed to init nodes")
 	}
@@ -92,10 +89,8 @@ func NewNodeManager(logger logr.Logger, rpcPort int, cp cloud.Provider, c client
 
 func (nm *nodeManager) refreshNodes() error {
 	nodeList := &corev1.NodeList{}
-	opts := client.MatchingLabels{
-		LabelKeyWorkloadNode: "true",
-	}
-	if err := nm.Client.List(context.Background(), nodeList, opts); err != nil {
+	opts := []client.ListOption{client.MatchingLabels(config.TrafficNodeLabels)}
+	if err := nm.Client.List(context.Background(), nodeList, opts...); err != nil {
 		return errors.Wrap(err, "Failed to list cluster nodes")
 	}
 	nodesLatest := make(map[string]bool)

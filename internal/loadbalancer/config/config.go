@@ -18,6 +18,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -33,6 +34,8 @@ var (
 	CleanLeakedENIInterval time.Duration
 	ENIReconcileInterval   time.Duration
 	RefreshNodeInterval    time.Duration
+	TrafficNodeLabels      map[string]string
+	EndpointsLabels        map[string]string
 )
 
 const (
@@ -44,6 +47,8 @@ const (
 	EnvENIReconcileInterval   = "ENI_RECONCILE_INTERVAL"
 	EnvCleanLeakedENIInterval = "CLEAN_LEAKED_ENI_INTERVAL"
 	EnvRefreshNodes           = "REFRESH_NODES_INTERVAL"
+	EnvTrafficNodeLabels      = "TRAFFIC_NODE_LABELS"
+	EnvEndpointsLabels        = "ENDPOINTS_LABELS"
 )
 
 func init() {
@@ -69,6 +74,12 @@ func init() {
 
 	_ = viper.BindEnv(EnvEnableDebug)
 	viper.SetDefault(EnvEnableDebug, false)
+
+	_ = viper.BindEnv(EnvTrafficNodeLabels)
+	viper.SetDefault(EnvTrafficNodeLabels, "")
+
+	_ = viper.BindEnv(EnvEndpointsLabels)
+	viper.SetDefault(EnvEndpointsLabels, "")
 }
 
 func ReadConfig(logger logr.Logger) {
@@ -85,4 +96,22 @@ func ReadConfig(logger logr.Logger) {
 	ENIReconcileInterval = time.Duration(viper.GetInt(EnvENIReconcileInterval)) * time.Second
 	CleanLeakedENIInterval = time.Duration(viper.GetInt(EnvCleanLeakedENIInterval)) * time.Second
 	RefreshNodeInterval = time.Duration(viper.GetInt(EnvRefreshNodes)) * time.Second
+	TrafficNodeLabels = ParseLabels(viper.GetString(EnvTrafficNodeLabels))
+	EndpointsLabels = ParseLabels(viper.GetString(EnvEndpointsLabels))
+}
+
+func ParseLabels(labels string) map[string]string {
+	result := make(map[string]string)
+	for _, label := range strings.Split(labels, ",") {
+		label = strings.TrimSpace(label)
+		if label == "" {
+			continue
+		}
+		parts := strings.SplitN(label, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		result[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+	}
+	return result
 }

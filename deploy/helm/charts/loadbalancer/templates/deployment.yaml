@@ -52,6 +52,10 @@ spec:
           env:
             - name: RPC_PORT
               value: "{{ .Values.agent.rpcPort }}"
+            - name: TRAFFIC_NODE_LABELS
+              value: {{ include "loadbalancer.nodeLabels" . | quote}}
+            - name: ENDPOINTS_LABELS
+              value: {{ include "loadbalancer.endpointLabels" . | quote }}
           readinessProbe:
             httpGet:
               path: /readyz

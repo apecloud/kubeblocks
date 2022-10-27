@@ -57,8 +57,7 @@ spec:
   components:
     - name: mongos1
       type: mongos # component name in ClusterDefinition
-      replicas: 1 # 修改即触发 scale 操作，如果个数不符合 definition 中的限制就报错
-      # 修改即触发变配
+      replicas: 1
       resources:
         requests:
           cpu: 1000m
@@ -141,7 +140,6 @@ status:
   message: ""
   components:
     - # id - {metadata.name}-{component.type}-{auto_generated_id}
-      # auto_generated_id 与 k8s deployment 的 id 生成方式一致
       id: mongo-cluster-idxxxxx-mongos-66b6c48dd5
       type: mongos
       # phase - in list of [Running, Failed, Creating, Upgrading, Scaling, Deleting, Deleted]

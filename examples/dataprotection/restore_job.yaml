@@ -20,12 +20,10 @@ spec:
 
   target:
     databaseEngine: mysql
-    # 如何恢复实例的说明
     labelsSelector:
       matchLabels:
         mysql.oracle.com/cluster: mycluster
 
-  # 声明恢复到集群的数据卷 for demo
   targetVolumes:
     - name: mysql-restore-storage
       persistentVolumeClaim:

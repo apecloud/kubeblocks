@@ -9,14 +9,12 @@ spec:
   #  clusterDefinitionRef: a-vendor-mongodbcluster
   #  components:
   #  - name: mongos # component name in ClusterDefinition
-  #    # containers 字段覆盖 ClusterDefinition 里的同字段
   #    containers: []<metav1 container spec>
   #    - name:
   #      ports:
   #      volumeMounts: []<pod.spec.containers.volumeMounts>
   #      - mountPath:
   #        name:
-  #    # service 字段覆盖 ClusterDefinition 里的同字段
   #    # type ServiceSpec struct from k8s.io/core/v1
   #    service:
   #      ports:

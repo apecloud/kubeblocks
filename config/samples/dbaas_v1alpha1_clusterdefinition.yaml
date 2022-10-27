@@ -64,7 +64,6 @@ spec:
     #       port:
     #       targetPort:
     #     type:
-    #   # script 执行顺序：component.pre => component.post
     #   scripts:
     #     create: <ComponentScriptBlock>
     #      - # builtin ENV variables:
@@ -96,7 +95,7 @@ spec:
             port: 80
             targetPort: 9376
         type: LoadBalancer
-      # script 执行顺序：component.pre => component.post
+      # script execute order：component.pre => component.post
       scripts:
         create:
           post:

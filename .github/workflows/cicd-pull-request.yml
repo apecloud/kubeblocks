@@ -3,7 +3,6 @@ name: CICD-PULL-REQUEST
 on:
   pull_request:
 
-
 jobs:
   make-test:
     runs-on: [ self-hosted, aws-eks-k8s-runner ]

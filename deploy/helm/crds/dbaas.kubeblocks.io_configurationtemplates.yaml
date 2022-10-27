@@ -9,13 +9,25 @@ metadata:
 spec:
   group: dbaas.kubeblocks.io
   names:
+    categories:
+    - dbaas
     kind: ConfigurationTemplate
     listKind: ConfigurationTemplateList
     plural: configurationtemplates
+    shortNames:
+    - ctpl
     singular: configurationtemplate
-  scope: Namespaced
+  scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: status phase
+      jsonPath: .status.phase
+      name: PHASE
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: ConfigurationTemplate is the Schema for the configurationtemplates

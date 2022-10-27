@@ -253,6 +253,13 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
 		os.Exit(1)
 	}
+	if err = (&dbaascontrollers.ConfigurationTemplateReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ConfigurationTemplate")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err = (&k8scorecontrollers.EventReconciler{

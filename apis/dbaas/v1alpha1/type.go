@@ -137,6 +137,24 @@ const (
 	SCOPE_MEMORY  ScopeType = "memory"
 )
 
+type ConfigurationFormatter string
+
+const (
+	INI    ConfigurationFormatter = "ini"
+	YAML   ConfigurationFormatter = "yaml"
+	JSON   ConfigurationFormatter = "json"
+	XML    ConfigurationFormatter = "xml"
+	HCL    ConfigurationFormatter = "hcl"
+	DOTENV ConfigurationFormatter = "dotenv"
+)
+
+type UpdateMode string
+
+const (
+	STATIC_MODE  UpdateMode = "static"
+	DYNAMIC_MODE UpdateMode = "dynamic"
+)
+
 func RegisterWebhookManager(mgr manager.Manager) {
 	webhookMgr = &webhookManager{mgr.GetClient()}
 }

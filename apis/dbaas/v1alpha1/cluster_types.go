@@ -245,7 +245,7 @@ type Affinity struct {
 	PodAntiAffinity PodAntiAffinity `json:"podAntiAffinity,omitempty"`
 	// TopologyKeys describe topologyKeys for `topologySpreadConstraint` and `podAntiAffinity` in ClusterDefinition API
 	// +optional
-	TopologyKeys []string `json:"topologyKeys"`
+	TopologyKeys []string `json:"topologyKeys,omitempty"`
 	// NodeLabels describe constrain which nodes pod can be scheduled on based on node labels
 	// +optional
 	NodeLabels map[string]string `json:"nodeLabels,omitempty"`

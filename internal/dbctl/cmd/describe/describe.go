@@ -17,102 +17,149 @@ limitations under the License.
 package describe
 
 import (
-	"embed"
 	"fmt"
 
-	"github.com/leaanthony/debme"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/get"
+	"k8s.io/kubectl/pkg/describe"
 )
 
-var (
-	//go:embed template/*
-	template embed.FS
-)
+// Options used to construct a describe command
+type Options struct {
+	Factory   cmdutil.Factory
+	Short     string
+	Namespace string
+	Selector  string
 
-type PrintExtra func() error
+	Describer func(*meta.RESTMapping) (describe.ResourceDescriber, error)
+	Builder   func() *resource.Builder
 
-// Command used to construct a describe command
-type Command struct {
-	Factory cmdutil.Factory
-	Short   string
+	GroupKind schema.GroupKind
+	Name      string
 
-	GroupKind  []schema.GroupKind
-	Template   []string
-	Name       string
-	PrintExtra PrintExtra
+	EnforceNamespace bool
+	AllNamespaces    bool
 
-	Streams genericclioptions.IOStreams
+	DescriberSettings *describe.DescriberSettings
+	genericclioptions.IOStreams
+}
+
+func NewOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, short string, gk schema.GroupKind) *Options {
+	return &Options{
+		Factory:   f,
+		IOStreams: streams,
+		Short:     short,
+		GroupKind: gk,
+		DescriberSettings: &describe.DescriberSettings{
+			ShowEvents: true,
+			ChunkSize:  cmdutil.DefaultChunkSize,
+		},
+	}
 }
 
 // Build return a describe command
-func (c *Command) Build() *cobra.Command {
-	o := get.NewOptions(c.Streams, []string{})
-
+func (o *Options) Build() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "describe",
-		Short: c.Short,
+		Short: o.Short,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(c.complete(args))
-			cmdutil.CheckErr(c.run(o, c.Factory))
+			cmdutil.CheckErr(o.complete(args))
+			cmdutil.CheckErr(o.run())
 		},
 	}
 
-	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespace", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
-	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
+	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().BoolVar(&o.AllNamespaces, "all-namespaces", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	cmd.Flags().BoolVar(&o.DescriberSettings.ShowEvents, "show-events", o.DescriberSettings.ShowEvents, "If true, display events related to the described object.")
+
 	return cmd
 }
 
-func (c *Command) complete(args []string) error {
-	if len(args) == 0 {
+func (o *Options) complete(args []string) error {
+	var err error
+	if len(args) == 0 || o.GroupKind.Empty() {
 		return errors.New("You must specify the name of resource to describe.")
 	}
-
-	if len(c.GroupKind) == 0 {
-		return errors.New("You must specify the resource type to describe.")
+	o.Name = args[0]
+	if o.Namespace, o.EnforceNamespace, err = o.Factory.ToRawKubeConfigLoader().Namespace(); err != nil {
+		return err
+	}
+	if o.AllNamespaces {
+		o.EnforceNamespace = false
 	}
 
-	if len(c.GroupKind) != len(c.Template) {
-		return errors.New("The number of resource type is not equal to template.")
+	o.Describer = func(mapping *meta.RESTMapping) (describe.ResourceDescriber, error) {
+		return DescriberFn(o.Factory, mapping)
 	}
-	c.Name = args[0]
+	o.Builder = o.Factory.NewBuilder
 	return nil
 }
 
-func (c *Command) run(o *get.Options, f cmdutil.Factory) error {
-	if err := o.Complete(f); err != nil {
+func (o *Options) run() error {
+	r := o.Builder().
+		Unstructured().
+		ContinueOnError().
+		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
+		LabelSelectorParam(o.Selector).
+		ResourceTypeOrNameArgs(true, o.GroupKind.String(), o.Name).
+		Flatten().
+		Do()
+	err := r.Err()
+	if err != nil {
 		return err
 	}
 
-	// Get object from k8s and render the template
-	tmplFs, _ := debme.FS(template, "template")
-	for i := 0; i < len(c.GroupKind); i++ {
-		tmplBytes, err := tmplFs.ReadFile(c.Template[i])
-		if err != nil {
-			fmt.Fprintln(o.ErrOut, "build describe command error")
-			return nil
-		}
-		tmplStr := fmt.Sprintf("go-template=%s", string(tmplBytes))
-		o.PrintFlags.OutputFormat = &tmplStr
-		o.BuildArgs = []string{c.GroupKind[i].String(), c.Name}
+	var allErrs []error
+	infos, err := r.Infos()
+	if err != nil {
+		allErrs = append(allErrs, err)
+	}
 
-		if err = o.Run(f); err != nil {
-			return err
+	errs := sets.NewString()
+	first := true
+	for _, info := range infos {
+		mapping := info.ResourceMapping()
+		describer, err := o.Describer(mapping)
+		if err != nil {
+			if errs.Has(err.Error()) {
+				continue
+			}
+			allErrs = append(allErrs, err)
+			errs.Insert(err.Error())
+			continue
+		}
+		s, err := describer.Describe(info.Namespace, info.Name, *o.DescriberSettings)
+		if err != nil {
+			if errs.Has(err.Error()) {
+				continue
+			}
+			allErrs = append(allErrs, err)
+			errs.Insert(err.Error())
+			continue
+		}
+		if first {
+			first = false
+			fmt.Fprint(o.Out, s)
+		} else {
+			fmt.Fprintf(o.Out, "\n\n%s", s)
 		}
 	}
 
-	// execute the custom print function to print other infos
-	if c.PrintExtra != nil {
-		err := c.PrintExtra()
-		if err != nil {
-			return err
+	if len(infos) == 0 && len(allErrs) == 0 {
+		// if we wrote no output, and had no errors, be sure we output something.
+		if o.AllNamespaces {
+			fmt.Fprintln(o.ErrOut, "No resources found")
+		} else {
+			fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
 		}
 	}
 
-	return nil
+	return utilerrors.NewAggregate(allErrs)
 }

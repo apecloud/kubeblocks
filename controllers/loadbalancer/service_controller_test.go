@@ -82,7 +82,9 @@ var newSvcObj = func(managed bool, masterIP string) (*corev1.Service, *types.Nam
 	}
 	annotations := make(map[string]string)
 	if managed {
-		annotations[AnnotationKeyLoadBalancerType] = AnnotationValueLoadBalancerType
+		annotations[AnnotationKeyLoadBalancerType] = AnnotationValueLoadBalancerTypePrivateIP
+	} else {
+		annotations[AnnotationKeyLoadBalancerType] = AnnotationValueLoadBalancerTypeNone
 	}
 	if masterIP != "" {
 		annotations[AnnotationKeyMasterNodeIP] = masterIP

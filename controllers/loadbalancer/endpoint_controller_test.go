@@ -45,12 +45,7 @@ var newEndpointsObj = func(svc *corev1.Service) (*corev1.Endpoints, *types.Names
 var _ = Describe("EndpointController", func() {
 	Context("", func() {
 		It("", func() {
-			serviceController.enabled = false
-			defer func() {
-				serviceController.enabled = true
-			}()
-
-			svc, svcKey := newSvcObj(true, node1IP)
+			svc, svcKey := newSvcObj(false, node1IP)
 			ep, epKey := newEndpointsObj(svc)
 			Expect(k8sClient.Create(context.Background(), svc)).Should(Succeed())
 			Expect(k8sClient.Create(context.Background(), ep)).Should(Succeed())

@@ -46,8 +46,9 @@ const (
 	AnnotationKeySubnetId     = "service.kubernetes.io/apecloud-loadbalancer-subnet-id"
 	AnnotationKeyMasterNodeIP = "service.kubernetes.io/apecloud-loadbalancer-master-node-ip"
 
-	AnnotationKeyLoadBalancerType   = "service.kubernetes.io/apecloud-loadbalancer-type"
-	AnnotationValueLoadBalancerType = "private-ip"
+	AnnotationKeyLoadBalancerType            = "service.kubernetes.io/apecloud-loadbalancer-type"
+	AnnotationValueLoadBalancerTypePrivateIP = "private-ip"
+	AnnotationValueLoadBalancerTypeNone      = "none"
 
 	AnnotationKeyTrafficPolicy          = "service.kubernetes.io/apecloud-loadbalancer-traffic-policy"
 	AnnotationValueClusterTrafficPolicy = "Cluster"
@@ -72,9 +73,6 @@ type ServiceController struct {
 	nm       agent.NodeManager
 	tps      map[string]TrafficPolicy
 	cache    map[string]*FloatingIP
-
-	// just for test
-	enabled bool
 }
 
 func NewServiceController(logger logr.Logger, client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder, cp cloud.Provider, nm agent.NodeManager) (*ServiceController, error) {
@@ -85,7 +83,6 @@ func NewServiceController(logger logr.Logger, client client.Client, scheme *runt
 		logger:   logger,
 		cp:       cp,
 		nm:       nm,
-		enabled:  true,
 		cache:    make(map[string]*FloatingIP),
 	}
 
@@ -175,18 +172,13 @@ func (c *ServiceController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	ctxLog := c.logger.WithValues("service", req.NamespacedName.String())
 	ctxLog.Info("Receive service reconcile event")
 
-	if !c.enabled {
-		ctxLog.Info("Controller is disabled, skip")
-		return intctrlutil.Reconciled()
-	}
-
 	svc := &corev1.Service{}
 	if err := c.Client.Get(ctx, req.NamespacedName, svc); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, c.logger, "")
 	}
 
 	annotations := svc.GetAnnotations()
-	if _, ok := annotations[AnnotationKeyLoadBalancerType]; !ok {
+	if annotations[AnnotationKeyLoadBalancerType] != AnnotationValueLoadBalancerTypePrivateIP {
 		ctxLog.Info("Ignore unrelated service")
 		return intctrlutil.Reconciled()
 	}

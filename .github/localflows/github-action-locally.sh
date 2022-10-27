@@ -9,5 +9,6 @@ if [ "$uNames" == "Darwin" ]; then
   fi
 fi
 
+
 # run act
 act --rm -P self-hosted=jashbook/golang-lint:latest -W .github/localflows/cicd-local.yml

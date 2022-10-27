@@ -59,7 +59,7 @@ spec:
         volumeMounts:
         - mountPath: /run/xtables.lock
           name: xtables-lock
-      dnsPolicy: ClusterFirst
+      dnsPolicy: ClusterFirstWithHostNet
       hostNetwork: true
       priorityClassName: system-node-critical
       restartPolicy: Always

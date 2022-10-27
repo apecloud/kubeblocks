@@ -114,13 +114,6 @@ admissionWebhooks:
   enabled: true
   createSelfSignedCert: true
 
-monitor:
-  image:
-    repository: docker.io/apecloud/kubeblocks
-    pullPolicy: IfNotPresent
-    # Overrides the image tag whose default is the chart appVersion.
-    tag: ""
-
 dashboards:
   ## If false, dashboards will not be installed
   ##

@@ -5,9 +5,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  name: backupjobs.dataprotection.infracreate.com
+  name: backupjobs.dataprotection.kubeblocks.io
 spec:
-  group: dataprotection.infracreate.com
+  group: dataprotection.kubeblocks.io
   names:
     categories:
     - dbaas

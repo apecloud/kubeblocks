@@ -21,18 +21,18 @@ DEBIAN_MIRROR=mirrors.aliyun.com
 DOCKER:=docker
 DOCKERFILE_DIR?=./docker
 
-LB_IMG ?= docker.io/infracreate/loadbalancer
+LB_IMG ?= docker.io/apecloud/loadbalancer
 LB_VERSION ?= 0.1.0
 LB_TAG ?= v$(LB_VERSION)
 
 # Image URL to use all building/pushing image targets
-IMG ?= docker.io/infracreate/$(APP_NAME)
-CLI_IMG ?= docker.io/infracreate/dbctl
+IMG ?= docker.io/apecloud/$(APP_NAME)
+CLI_IMG ?= docker.io/apecloud/dbctl
 CLI_TAG ?= v$(CLI_VERSION)
 
 # Update whenever you upgrade dev container image
 DEV_CONTAINER_VERSION_TAG ?= latest
-DEV_CONTAINER_IMAGE_NAME = docker.io/infracreate/$(APP_NAME)-dev
+DEV_CONTAINER_IMAGE_NAME = docker.io/apecloud/$(APP_NAME)-dev
 
 DEV_CONTAINER_DOCKERFILE = Dockerfile-dapr-dev
 DOCKERFILE_DIR = ./docker

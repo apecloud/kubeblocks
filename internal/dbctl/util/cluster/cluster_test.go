@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -143,7 +143,7 @@ var _ = Describe("cluster util", func() {
 		cluster := &dbaasv1alpha1.Cluster{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       types.KindCluster,
-				APIVersion: "dbaas.infracreate.com/v1alpha1",
+				APIVersion: "dbaas.kubeblocks.io/v1alpha1",
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      clusterName,

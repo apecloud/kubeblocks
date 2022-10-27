@@ -2,10 +2,10 @@
 	// Reference Doc: https://code.visualstudio.com/remote/advancedcontainers/overview
 	"name": "KubeBlocks Dev Environment",
 	// Update the container version when you publish dev-container
-	// "image": "docker.io/infracreate/kubeblocks-dev:latest",
+	// "image": "docker.io/apecloud/kubeblocks-dev:latest",
 	// Temporarily use DAPR container
 	// "image": "ghcr.io/dapr/dapr-dev:0.1.8",
-	"image": "docker.io/infracreate/kubeblocks-dev:latest",
+	"image": "docker.io/apecloud/kubeblocks-dev:latest",
 	// Replace with uncommented line below to build your own local copy of the image
 	// "dockerFile": "../docker/Dockerfile-dapr-dev",
 	"containerEnv": {

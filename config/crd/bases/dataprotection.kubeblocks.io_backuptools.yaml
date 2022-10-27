@@ -5,20 +5,23 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  name: backuptools.dbaas.infracreate.com
+  name: backuptools.dataprotection.kubeblocks.io
 spec:
-  group: dbaas.infracreate.com
+  group: dataprotection.kubeblocks.io
   names:
+    categories:
+    - dbaas
     kind: BackupTool
     listKind: BackupToolList
     plural: backuptools
     singular: backuptool
-  scope: Namespaced
+  scope: Cluster
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: BackupTool is the Schema for the BackupTools API
+        description: BackupTool is the Schema for the backuptools API (defined by
+          ISV)
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -35,28 +38,33 @@ spec:
           spec:
             description: BackupToolSpec defines the desired state of BackupTool
             properties:
+              backupCommands:
+                description: Array of command that dbaas can do database backup. from
+                  invoke args the order of commands follows the order of array.
+                items:
+                  type: string
+                type: array
               databaseEngine:
                 description: database engine to support in the backup.
                 enum:
                 - mysql
                 type: string
-              databaseEngineVersion:
+              databaseEngineVersions:
                 description: database engine to support in the backup.
                 enum:
-                - 5.6
-                - 5.7
-                - 8
+                - "5.6"
+                - "5.7"
+                - "8.0"
                 items:
                   type: string
                 type: array
               deployKind:
+                default: job
                 description: which kind for run a backup tool.
                 enum:
                 - job
-                - daemonset
-                items:
-                  type: string
-                type: array
+                - daemon
+                type: string
               env:
                 description: List of environment variables to set in the container.
                 items:
@@ -162,9 +170,88 @@ spec:
                   - name
                   type: object
                 type: array
+              envFrom:
+                description: List of sources to populate environment variables in
+                  the container. The keys defined within a source must be a C_IDENTIFIER.
+                  All invalid keys will be reported as an event when the container
+                  is starting. When a key exists in multiple sources, the value associated
+                  with the last source will take precedence. Values defined by an
+                  Env with a duplicate key will take precedence. Cannot be updated.
+                items:
+                  description: EnvFromSource represents the source of a set of ConfigMaps
+                  properties:
+                    configMapRef:
+                      description: The ConfigMap to select from
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                        optional:
+                          description: Specify whether the ConfigMap must be defined
+                          type: boolean
+                      type: object
+                    prefix:
+                      description: An optional identifier to prepend to each key in
+                        the ConfigMap. Must be a C_IDENTIFIER.
+                      type: string
+                    secretRef:
+                      description: The Secret to select from
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                        optional:
+                          description: Specify whether the Secret must be defined
+                          type: boolean
+                      type: object
+                  type: object
+                type: array
               image:
                 description: Backup tool Container image name.
                 type: string
+              incrementalBackupCommands:
+                description: Array of command that dbaas can do database incremental
+                  backup. like xtrabackup, that can performs an incremental backup
+                  file.
+                items:
+                  type: string
+                type: array
+              logical:
+                description: backup tool can support logical restore, in this case,
+                  restore NOT RESTART database.
+                properties:
+                  incrementalRestoreCommands:
+                    description: Array of incremental restore commands.
+                    items:
+                      type: string
+                    type: array
+                  restoreCommands:
+                    description: Array of command that dbaas can perform database
+                      restore. like xtrabackup, that can performs restore mysql from
+                      files.
+                    items:
+                      type: string
+                    type: array
+                type: object
+              physical:
+                description: backup tool can support physical restore, in this case,
+                  restore must be RESTART database.
+                properties:
+                  incrementalRestoreCommands:
+                    description: Array of incremental restore commands.
+                    items:
+                      type: string
+                    type: array
+                  restoreCommands:
+                    description: Array of command that dbaas can perform database
+                      restore. like xtrabackup, that can performs restore mysql from
+                      files.
+                    items:
+                      type: string
+                    type: array
+                type: object
               resources:
                 description: Compute Resources required by this container. Cannot
                   be updated.
@@ -192,49 +279,10 @@ spec:
                       to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                     type: object
                 type: object
-              stopServiceInRestore:
-                default: false
-                type: boolean
-              volumeMounts:
-                description: Pod volumes to mount into the container's filesystem.
-                  Cannot be updated.
-                items:
-                  description: VolumeMount describes a mounting of a Volume within
-                    a container.
-                  properties:
-                    mountPath:
-                      description: Path within the container at which the volume should
-                        be mounted.  Must not contain ':'.
-                      type: string
-                    mountPropagation:
-                      description: mountPropagation determines how mounts are propagated
-                        from the host to container and the other way around. When
-                        not set, MountPropagationNone is used. This field is beta
-                        in 1.10.
-                      type: string
-                    name:
-                      description: This must match the Name of a Volume.
-                      type: string
-                    readOnly:
-                      description: Mounted read-only if true, read-write otherwise
-                        (false or unspecified). Defaults to false.
-                      type: boolean
-                    subPath:
-                      description: Path within the volume from which the container's
-                        volume should be mounted. Defaults to "" (volume's root).
-                      type: string
-                    subPathExpr:
-                      description: Expanded path within the volume from which the
-                        container's volume should be mounted. Behaves similarly to
-                        SubPath but environment variable references $(VAR_NAME) are
-                        expanded using the container's environment. Defaults to ""
-                        (volume's root). SubPathExpr and SubPath are mutually exclusive.
-                      type: string
-                  required:
-                  - mountPath
-                  - name
-                  type: object
-                type: array
+            required:
+            - backupCommands
+            - image
+            - physical
             type: object
           status:
             description: BackupToolStatus defines the observed state of BackupTool

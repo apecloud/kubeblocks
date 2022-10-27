@@ -1,5 +1,5 @@
 # Standard Kubernetes Kind declaration. Required.
-apiVersion: dataprotection.infracreate.com/v1alpha1
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
 # Standard Kubernetes Kind declaration. Required.
 kind: BackupJob
 # Standard Kubernetes metadata. Required.
@@ -8,14 +8,14 @@ metadata:
   name: backup-job-demo
 
   labels:
-    dataprotection.infracreate.com/backup-type: snapshot
+    dataprotection.kubeblocks.io/backup-type: snapshot
     # if type is incremental, parentName is required.
-    #dataprotection.infracreate.com/parent-backup-name: null
+    #dataprotection.kubeblocks.io/parent-backup-name: null
     # reference db cluster name
-    clusters.dbaas.infracreate.com/name: wesql-cluster
-    backuppolicies.dataprotection.infracreate.com/name: backup-policy-demo
+    clusters.dbaas.kubeblocks.io/name: wesql-cluster
+    backuppolicies.dataprotection.kubeblocks.io/name: backup-policy-demo
     # backup index begin to 0 (full) for incremental.
-    dataprotection.infracreate.com/backup-index: "0"
+    dataprotection.kubeblocks.io/backup-index: "0"
 
 # Parameters about the backup. Required.
 spec:

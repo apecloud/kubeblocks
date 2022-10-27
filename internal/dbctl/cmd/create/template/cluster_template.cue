@@ -13,7 +13,7 @@ options: {
 
 // required, k8s api resource content
 content: {
-	apiVersion: "dbaas.infracreate.com/v1alpha1"
+	apiVersion: "dbaas.kubeblocks.io/v1alpha1"
 	kind:       "Cluster"
 	metadata: {
 		name:      options.name

@@ -1,4 +1,4 @@
-domain: infracreate.com
+domain: kubeblocks.io
 layout:
 - go.kubebuilder.io/v3
 multigroup: true
@@ -9,7 +9,7 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: infracreate.com
+  domain: kubeblocks.io
   group: dbaas
   kind: Cluster
   path: github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1
@@ -17,7 +17,7 @@ resources:
 - api:
     crdVersion: v1
   controller: true
-  domain: infracreate.com
+  domain: kubeblocks.io
   group: dbaas
   kind: ClusterDefinition
   path: github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1
@@ -25,7 +25,7 @@ resources:
 - api:
     crdVersion: v1
   controller: true
-  domain: infracreate.com
+  domain: kubeblocks.io
   group: dbaas
   kind: AppVersion
   path: github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1
@@ -34,7 +34,7 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: infracreate.com
+  domain: kubeblocks.io
   group: dbaas
   kind: BackupTool
   path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
@@ -43,7 +43,7 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: infracreate.com
+  domain: kubeblocks.io
   group: dataprotection
   kind: BackupPolicy
   path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
@@ -52,7 +52,7 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: infracreate.com
+  domain: kubeblocks.io
   group: dataprotection
   kind: BackupJob
   path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
@@ -61,7 +61,7 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: infracreate.com
+  domain: kubeblocks.io
   group: dataprotection
   kind: RestoreJob
   path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
@@ -70,7 +70,7 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: infracreate.com
+  domain: kubeblocks.io
   group: dataprotection
   kind: BackupPolicyTemplate
   path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
@@ -79,7 +79,7 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: infracreate.com
+  domain: kubeblocks.io
   group: dbaas
   kind: OpsRequest
   path: github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1

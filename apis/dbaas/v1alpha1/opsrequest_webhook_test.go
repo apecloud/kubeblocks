@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -268,7 +268,7 @@ var _ = Describe("OpsRequest webhook", func() {
 func createTestOpsRequest(clusterName, opsRequestName string, opsType OpsType) *OpsRequest {
 	randomStr, _ := password.Generate(6, 0, 0, true, false)
 	opsRequestYaml := fmt.Sprintf(`
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: %s

@@ -1,4 +1,4 @@
-apiVersion: dataprotection.infracreate.com/v1alpha1
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupConfig
 metadata:
   name: backupconfig-sample

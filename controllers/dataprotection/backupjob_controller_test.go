@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -79,16 +79,16 @@ var _ = Describe("BackupJob Controller", func() {
 	assureBackupJobObj := func(backupPolicy string) *dataprotectionv1alpha1.BackupJob {
 		By("By assure an backupJob obj")
 		backupJobYaml := `
-apiVersion: dataprotection.infracreate.com/v1alpha1
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupJob
 metadata:
   name: backup-success-demo
 
   labels:
-    dataprotection.infracreate.com/backup-type: full
-    db.infracreate.com/name: mysqlcluster
-    dataprotection.infracreate.com/backup-policy-name: backup-policy-demo
-    dataprotection.infracreate.com/backup-index: "0"
+    dataprotection.kubeblocks.io/backup-type: full
+    db.kubeblocks.io/name: mysqlcluster
+    dataprotection.kubeblocks.io/backup-policy-name: backup-policy-demo
+    dataprotection.kubeblocks.io/backup-index: "0"
 
 spec:
   backupPolicyName: backup-policy-demo
@@ -127,7 +127,7 @@ spec:
 	assureBackupPolicyObj := func(backupTool string) *dataprotectionv1alpha1.BackupPolicy {
 		By("By assure an backupPolicy obj")
 		backupPolicyYaml := `
-apiVersion: dataprotection.infracreate.com/v1alpha1
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupPolicy
 metadata:
   name: backup-policy-demo
@@ -182,7 +182,7 @@ spec:
 	assureBackupToolObj := func() *dataprotectionv1alpha1.BackupTool {
 		By("By assure an backupTool obj")
 		backupToolYaml := `
-apiVersion: dataprotection.infracreate.com/v1alpha1
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupTool
 metadata:
   name: xtrabackup-mysql
@@ -280,7 +280,7 @@ spec:
         command:
         - /bin/bash
         - -c
-        image: docker.io/infracreate/wesql-server-8.0:0.1-SNAPSHOT
+        image: docker.io/apecloud/wesql-server-8.0:0.1-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: mysql
         ports:
@@ -336,16 +336,16 @@ spec:
         - /bin/bash
         - '-c'
       env:
-        - name: OPENDBAAS_MY_POD_NAME
+        - name: KB_POD_NAME
           valueFrom:
             fieldRef:
               apiVersion: v1
               fieldPath: metadata.name
-        - name: OPENDBAAS_REPLICASETS_PRIMARY_N
+        - name: KB_REPLICASETS_PRIMARY_N
           value: '1'
-        - name: OPENDBAAS_REPLICASETS_PRIMARY_0_HOSTNAME
+        - name: KB_REPLICASETS_PRIMARY_0_HOSTNAME
           value: wesql-cluster-replicasets-primary-0
-      image: 'docker.io/infracreate/wesql-server-8.0:0.1-SNAPSHOT'
+      image: 'docker.io/apecloud/wesql-server-8.0:0.1-SNAPSHOT'
       imagePullPolicy: IfNotPresent
       name: mysql
       ports:

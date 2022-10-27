@@ -1,5 +1,5 @@
 # Standard Kubernetes Kind declaration. Required.
-apiVersion: dataprotection.infracreate.com/v1alpha1
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
 # Standard Kubernetes Kind declaration. Required.
 kind: BackupTool
 # Standard Kubernetes metadata. Required.

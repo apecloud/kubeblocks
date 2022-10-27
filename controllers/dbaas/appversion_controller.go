@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -86,9 +86,9 @@ type AppVersionReconciler struct {
 	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=dbaas.infracreate.com,resources=appversions,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=dbaas.infracreate.com,resources=appversions/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=dbaas.infracreate.com,resources=appversions/finalizers,verbs=update
+//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=appversions,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=appversions/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=appversions/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

@@ -9,13 +9,26 @@ metadata:
 spec:
   group: dbaas.kubeblocks.io
   names:
+    categories:
+    - dbaas
+    - all
     kind: ReconfigureRequest
     listKind: ReconfigureRequestList
     plural: reconfigurerequests
+    shortNames:
+    - upc
     singular: reconfigurerequest
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: Reconfigure Status.
+      jsonPath: .status.phase
+      name: PHASE
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: ReconfigureRequest is the Schema for the reconfigurerequests

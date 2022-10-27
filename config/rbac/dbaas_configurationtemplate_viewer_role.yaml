@@ -1,0 +1,20 @@
+# permissions for end users to view configurationtemplates.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: configurationtemplate-viewer-role
+rules:
+- apiGroups:
+  - dbaas.infracreate.com
+  resources:
+  - configurationtemplates
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - dbaas.infracreate.com
+  resources:
+  - configurationtemplates/status
+  verbs:
+  - get

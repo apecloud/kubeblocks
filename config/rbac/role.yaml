@@ -256,32 +256,6 @@ rules:
   - patch
   - update
 - apiGroups:
-  - dbaas.kubeblocks.com
-  resources:
-  - reconfigurerequests
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - dbaas.kubeblocks.com
-  resources:
-  - reconfigurerequests/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - dbaas.kubeblocks.com
-  resources:
-  - reconfigurerequests/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
   - dbaas.kubeblocks.io
   resources:
   - appversions
@@ -362,6 +336,32 @@ rules:
 - apiGroups:
   - dbaas.kubeblocks.io
   resources:
+  - configurationtemplates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dbaas.kubeblocks.io
+  resources:
+  - configurationtemplates/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dbaas.kubeblocks.io
+  resources:
+  - configurationtemplates/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dbaas.kubeblocks.io
+  resources:
   - opsrequests
   verbs:
   - create
@@ -381,6 +381,32 @@ rules:
   - dbaas.kubeblocks.io
   resources:
   - opsrequests/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dbaas.kubeblocks.io
+  resources:
+  - reconfigurerequests
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dbaas.kubeblocks.io
+  resources:
+  - reconfigurerequests/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dbaas.kubeblocks.io
+  resources:
+  - reconfigurerequests/status
   verbs:
   - get
   - patch

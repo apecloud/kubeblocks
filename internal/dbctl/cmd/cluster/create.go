@@ -67,6 +67,9 @@ func (o *CreateOptions) Validate() error {
 	if o.Name == "" {
 		return fmt.Errorf("missing cluster name")
 	}
+	if len(o.ComponentsFilePath) == 0 {
+		return fmt.Errorf("a valid component file path is needed")
+	}
 	return nil
 }
 

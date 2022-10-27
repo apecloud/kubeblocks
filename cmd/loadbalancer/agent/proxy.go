@@ -67,7 +67,19 @@ func (p Proxy) DescribeAllENIs(ctx context.Context, request *pb.DescribeAllENIsR
 		}
 	}
 	return resp, nil
+}
 
+func (p Proxy) DescribeNodeInfo(ctx context.Context, request *pb.DescribeNodeInfoRequest) (*pb.DescribeNodeInfoResponse, error) {
+	info := p.cp.GetInstanceInfo()
+	resp := &pb.DescribeNodeInfoResponse{
+		RequestId: request.GetRequestId(),
+		Info: &pb.InstanceInfo{
+			InstanceId:       info.InstanceId,
+			SubnetId:         info.SubnetId,
+			SecurityGroupIds: info.SecurityGroupIds,
+		},
+	}
+	return resp, nil
 }
 
 func (p Proxy) WaitForENIAttached(ctx context.Context, request *pb.WaitForENIAttachedRequest) (*pb.WaitForENIAttachedResponse, error) {

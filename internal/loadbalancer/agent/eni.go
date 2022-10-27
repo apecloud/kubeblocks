@@ -52,21 +52,32 @@ type ENIResource struct {
 }
 
 type eniManager struct {
-	logger       logr.Logger
-	maxIPsPerENI int
-	maxENI       int
-	minPrivateIP int
-	resource     *NodeResource
-	cp           cloud.Provider
-	nc           pb.NodeClient
+	logger           logr.Logger
+	maxIPsPerENI     int
+	maxENI           int
+	minPrivateIP     int
+	instanceId       string
+	subnetId         string
+	securityGroupIds []string
+	resource         *NodeResource
+	cp               cloud.Provider
+	nc               pb.NodeClient
 }
 
 func newENIManager(logger logr.Logger, ip string, nc pb.NodeClient, cp cloud.Provider) (*eniManager, error) {
 	c := &eniManager{
-		nc:     nc,
-		cp:     cp,
-		logger: logger.WithValues("ip", ip),
+		nc: nc,
+		cp: cp,
 	}
+
+	nodeInfo, err := c.getNodeInfo()
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to get instance id")
+	}
+	c.instanceId = nodeInfo.GetInstanceId()
+	c.subnetId = nodeInfo.GetSubnetId()
+	c.securityGroupIds = nodeInfo.GetSecurityGroupIds()
+	c.logger = logger.WithValues("ip", ip, "instance id", c.instanceId)
 
 	c.minPrivateIP = config.MinPrivateIP
 	c.maxIPsPerENI = cp.GetENIIPv4Limit()
@@ -240,11 +251,11 @@ func (c *eniManager) ensureENI() error {
 
 	if totalSpare < min {
 		if len(describeENIResponse.Enis) >= c.maxENI {
-			c.logger.Info("Limit exceed, can not alloc new eni", "current", len(describeENIResponse.Enis), "max", c.maxENI)
+			c.logger.Info("Limit exceed, can not create new eni", "current", len(describeENIResponse.Enis), "max", c.maxENI)
 			return nil
 		}
-		if err := c.tryAllocAndAttachENI(); err != nil {
-			c.logger.Error(err, "Failed to alloc and attach new ENI")
+		if err := c.tryCreateAndAttachENI(); err != nil {
+			c.logger.Error(err, "Failed to create and attach new ENI")
 		}
 	} else if totalSpare > max {
 		if err := c.tryDetachAndDeleteENI(managedENIs); err != nil {
@@ -254,21 +265,29 @@ func (c *eniManager) ensureENI() error {
 	return nil
 }
 
-func (c *eniManager) tryAllocAndAttachENI() error {
-	c.logger.Info("Try to alloc and attach new eni")
+func (c *eniManager) tryCreateAndAttachENI() error {
+	c.logger.Info("Try to create and attach new eni")
 
-	// alloc ENI, use same sg and subnet as primary ENI
-	eniId, err := c.cp.AllocENI()
+	// create ENI, use same sg and subnet as primary ENI
+	eniId, err := c.cp.CreateENI(c.instanceId, c.subnetId, c.securityGroupIds)
 	if err != nil {
-		return errors.Wrap(err, "Failed to alloc ENI, retry later")
+		return errors.Wrap(err, "Failed to create ENI, retry later")
 	}
-	c.logger.Info("Successfully create new eni, waiting for attached", "eni id", eniId)
+	c.logger.Info("Successfully create new eni", "eni id", eniId)
+
+	if _, err = c.cp.AttachENI(c.instanceId, eniId); err != nil {
+		if derr := c.cp.DeleteENI(eniId); derr != nil {
+			c.logger.Error(derr, "Failed to delete newly created untagged ENI!")
+		}
+		return errors.Wrap(err, "Failed to attach ENI")
+	}
+	c.logger.Info("Successfully attach new eni, waiting for it to take effect", "eni id", eniId)
 
 	// waiting for ENI attached
-	if err := c.WaitForENIAttached(eniId); err != nil {
+	if err := c.waitForENIAttached(eniId); err != nil {
 		return errors.Wrap(err, "Unable to discover attached ENI from metadata service")
 	}
-	c.logger.Info("New eni attached", "eni id", eniId)
+	c.logger.Info("Successfully find eni attached", "eni id", eniId)
 
 	// setup ENI networking stack
 	setupENIRequest := &pb.SetupNetworkForENIRequest{
@@ -310,7 +329,7 @@ func (c *eniManager) tryDetachAndDeleteENI(enis []*pb.ENIMetadata) error {
 func (c *eniManager) cleanLeakedENIs() error {
 	c.logger.Info("Start cleaning leaked enis")
 
-	leakedENIs, err := c.cp.FindLeakedENIs()
+	leakedENIs, err := c.cp.FindLeakedENIs(c.instanceId)
 	if err != nil {
 		return errors.Wrap(err, "Failed to find leaked enis, skip")
 	}
@@ -333,11 +352,19 @@ func (c *eniManager) cleanLeakedENIs() error {
 	return nil
 }
 
-func (c *eniManager) WaitForENIAttached(eniId string) error {
+func (c *eniManager) waitForENIAttached(eniId string) error {
 	request := &pb.WaitForENIAttachedRequest{
 		RequestId: util.GenRequestId(),
 		Eni:       &pb.ENIMetadata{EniId: eniId},
 	}
 	_, err := c.nc.WaitForENIAttached(context.Background(), request)
 	return err
+}
+
+func (c *eniManager) getNodeInfo() (*pb.InstanceInfo, error) {
+	resp, err := c.nc.DescribeNodeInfo(context.Background(), &pb.DescribeNodeInfoRequest{RequestId: util.GenRequestId()})
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to describe node info")
+	}
+	return resp.GetInfo(), nil
 }

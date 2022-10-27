@@ -832,7 +832,7 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 		}
 		// delete the pod to trigger associate StatefulSet to re-create it
 		if err := cli.Delete(ctx, &pod); err != nil {
-			return false, nil
+			return false, err
 		}
 
 		return true, nil

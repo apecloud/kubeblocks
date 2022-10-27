@@ -23,7 +23,7 @@ package k8score
 //+kubebuilder:rbac:groups=core,resources=services/finalizers;secrets/finalizers;configmaps/finalizers;resourcequotas/finalizers;persistentvolumeclaims/finalizers,verbs=update
 
 // read + update access
-//+kubebuilder:rbac:groups=core,resources=pods;endpoints,verbs=get;list;watch;update;patch
+//+kubebuilder:rbac:groups=core,resources=pods;endpoints,verbs=get;list;watch;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=pods/exec,verbs=create
 
 // read only + watch access

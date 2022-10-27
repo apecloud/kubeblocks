@@ -53,9 +53,9 @@ spec:
               value: "true"
           {{- end }}
             - name: AGAMOTTO_IMAGE_PULL_POLICY
-              value: {{ .Values.monitor.image.pullPolicy }}
+              value: {{ .Values.image.pullPolicy }}
             - name: AGAMOTTO_IMAGE
-              value: "{{ .Values.monitor.image.repository }}:{{ .Values.monitor.image.tag | default .Chart.AppVersion }}"
+              value: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"

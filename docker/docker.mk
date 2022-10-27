@@ -30,6 +30,10 @@ IMG ?= docker.io/apecloud/$(APP_NAME)
 CLI_IMG ?= docker.io/apecloud/dbctl
 CLI_TAG ?= v$(CLI_VERSION)
 
+PB_IMG ?= docker.io/apecloud/kbprobe
+PB_VERSION ?= latest
+PB_TAG ?= v$(LB_VERSION)
+
 # Update whenever you upgrade dev container image
 DEV_CONTAINER_VERSION_TAG ?= latest
 DEV_CONTAINER_IMAGE_NAME = docker.io/apecloud/$(APP_NAME)-dev
@@ -123,3 +127,31 @@ else
 endif
 endif
 
+.PHONY: build-probe-image
+build-probe-image: test ## Build probe container image.
+ifneq ($(BUILDX_ENABLED), true)
+	docker build . -t ${PB_IMG}:${PB_VERSION} -f $(DOCKERFILE_DIR)/Dockerfile-probe -t ${PB_IMG}:latest
+else
+ifeq ($(TAG_LATEST), true)
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-probe $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${PB_IMG}:latest
+else
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-probe $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${PB_IMG}:${VERSION}
+endif
+endif
+
+
+.PHONY: push-probe-image
+push-probe-image: ## Push probe container image.
+ifneq ($(BUILDX_ENABLED), true)
+ifeq ($(TAG_LATEST), true)
+	docker push ${PB_IMG}:latest
+else
+	docker push ${PB_IMG}:${PB_VERSION}
+endif
+else
+ifeq ($(TAG_LATEST), true)
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-probe $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${PB_IMG}:latest --push
+else
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile-probe $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${PB_IMG}:${PB_VERSION} --push
+endif
+endif

@@ -1258,7 +1258,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 	}
 
 	if len(probeContainers) >= 1 {
-		probeContainers[0].Image = "free6om/kbprobe:latest"
+		probeContainers[0].Image = "apecloud/kbprobe:latest"
 		probeContainers[0].Command = []string{"probe", "--app-id", "batch-sdk", "--dapr-http-port", "3501", "--dapr-grpc-port", "54215", "--app-protocol", "http", "--components-path", "/config/components"}
 
 		// set pod name and namespace, for role label updating inside pod

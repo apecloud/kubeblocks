@@ -91,6 +91,7 @@ func BuildCommand(inputs Inputs) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   inputs.Use,
 		Short: inputs.Short,
+		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(inputs.BaseOptionsObj.Run(inputs, args))
 		},

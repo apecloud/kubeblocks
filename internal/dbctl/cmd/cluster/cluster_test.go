@@ -47,6 +47,7 @@ var _ = Describe("Cluster", func() {
 			cmd := NewCreateCmd(tf, streams)
 			Expect(cmd != nil).To(BeTrue())
 			// must succeed otherwise exit 1 and make test fails
+			_ = cmd.Flags().Set("components", "../../testdata/component.yaml")
 			cmd.Run(nil, []string{"test1"})
 		})
 
@@ -71,6 +72,11 @@ var _ = Describe("Cluster", func() {
 
 			o.ComponentsFilePath = ""
 			Expect(o.Complete()).Should(Succeed())
+			Expect(o.Validate()).ShouldNot(Succeed())
+
+			o.ComponentsFilePath = "../../testdata/component.yaml"
+			Expect(o.Complete()).Should(Succeed())
+			Expect(o.Validate()).Should(Succeed())
 
 			inputs := create.Inputs{
 				ResourceName:    types.ResourceClusters,

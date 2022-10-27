@@ -84,6 +84,7 @@ var _ = Describe("Create", func() {
 			BuildCommand(inputs)
 			Expect(baseOptions.Complete(inputs, []string{})).Should(Succeed())
 			Expect(baseOptions.Run(inputs, []string{"test"})).Should(Succeed())
+			Expect(baseOptions.Run(inputs, []string{"test", "more", "args"})).Should(HaveOccurred())
 		})
 	})
 })

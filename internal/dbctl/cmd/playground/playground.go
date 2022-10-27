@@ -296,7 +296,13 @@ func printGuide(cloudProvider string, hostIP string, replicas int) error {
 	}
 
 	// get cluster info that will be used to render the guide template
-	if err = cluster.GetAllObjects(clientSet, dynamicClient, dbClusterNamespace, dbClusterName, clusterInfo.ClusterObjects); err != nil {
+	clusterGetter := &cluster.ObjectsGetter{
+		ClientSet:     clientSet,
+		DynamicClient: dynamicClient,
+		Namespace:     dbClusterNamespace,
+		Name:          dbClusterName,
+	}
+	if err = clusterGetter.Get(clusterInfo.ClusterObjects); err != nil {
 		return err
 	}
 

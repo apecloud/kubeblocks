@@ -28,6 +28,7 @@ import (
 	"golang.org/x/text/language"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/duration"
@@ -122,11 +123,17 @@ type ClusterDescriber struct {
 
 func (d *ClusterDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
 	var err error
-
 	d.describerSettings = describerSettings
 	d.ClusterObjects = cluster.NewClusterObjects()
 
-	if err = cluster.GetAllObjects(d.client, d.dynamic, namespace, name, d.ClusterObjects); err != nil {
+	clusterGetter := cluster.ObjectsGetter{
+		ClientSet:      d.client,
+		DynamicClient:  d.dynamic,
+		Name:           name,
+		Namespace:      namespace,
+		WithAppVersion: false,
+	}
+	if err = clusterGetter.Get(d.ClusterObjects); err != nil {
 		return "", err
 	}
 
@@ -245,9 +252,22 @@ func describeResource(resources *corev1.ResourceRequirements, w describe.PrefixW
 	for _, name := range names {
 		limit := resources.Limits[name]
 		request := resources.Requests[name]
-		w.Write(LEVEL_1, "%s:\t%s / %s (request / limit)\n",
-			cases.Title(language.Und, cases.NoLower).String(name.String()), request.String(), limit.String())
+		resName := cases.Title(language.Und, cases.NoLower).String(name.String())
+
+		if resourceIsEmpty(&limit) && resourceIsEmpty(&request) {
+			w.Write(LEVEL_1, "%s:\t%s\n", resName, valueNone)
+		} else {
+			w.Write(LEVEL_1, "%s:\t%s / %s (request / limit)\n", resName, request.String(), limit.String())
+		}
 	}
+}
+
+func resourceIsEmpty(res *resource.Quantity) bool {
+	resStr := res.String()
+	if resStr == "0" || resStr == "<nil>" {
+		return true
+	}
+	return false
 }
 
 func describeStorage(vcTmpls []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate, w describe.PrefixWriter) {
@@ -284,7 +304,6 @@ func (d *ClusterDescriber) describeInstance(pod *corev1.Pod, w describe.PrefixWr
 		w.Write(LEVEL_3, "Reason:\t%s\n", pod.Status.Reason)
 	}
 
-	// TODO: get AccessMode from label
 	w.Write(LEVEL_3, "AccessMode:\t%s\n", pod.Labels[types.ConsensusSetAccessModeLabelKey])
 
 	// node information include its region and AZ

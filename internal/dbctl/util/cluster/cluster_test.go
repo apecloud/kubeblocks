@@ -103,7 +103,13 @@ var _ = Describe("cluster util", func() {
 		tf := mockClient(&corev1.ConfigMap{})
 		clientSet, _ := tf.KubernetesClientSet()
 		dynamicClient, _ := tf.DynamicClient()
-		Expect(GetAllObjects(clientSet, dynamicClient, namespace, clusterName, objs)).Should(HaveOccurred())
+		getter := ObjectsGetter{
+			ClientSet:     clientSet,
+			DynamicClient: dynamicClient,
+			Namespace:     namespace,
+			Name:          clusterName,
+		}
+		Expect(getter.Get(objs)).Should(HaveOccurred())
 	})
 
 	It("Get type from pod", func() {

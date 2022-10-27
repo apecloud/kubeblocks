@@ -103,6 +103,9 @@ type ReconfigureStateInfo struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:resource:categories={dbaas},scope=Namespaced,shortName=upc
+//+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="Reconfigure Status."
+//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // ReconfigureRequest is the Schema for the reconfigurerequests API
 type ReconfigureRequest struct {

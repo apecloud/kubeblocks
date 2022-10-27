@@ -95,6 +95,7 @@ rules:
   - endpoints
   - pods
   verbs:
+  - delete
   - get
   - list
   - patch

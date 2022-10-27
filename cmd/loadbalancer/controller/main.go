@@ -44,15 +44,12 @@ import (
 	zaplogfmt "github.com/sykesm/zap-logfmt"
 	uzap "go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-
-	lb "github.com/apecloud/kubeblocks/controllers/loadbalancer"
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/factory"
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/config"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -63,6 +60,12 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	//+kubebuilder:scaffold:imports
+
+	lb "github.com/apecloud/kubeblocks/controllers/loadbalancer"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/factory"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/config"
 )
 
 // added lease.coordination.k8s.io for leader election
@@ -121,6 +124,10 @@ func main() {
 	// init config
 	config.ReadConfig(setupLog)
 
+	endpointLabelSet := labels.Set{}
+	for k, v := range config.EndpointsLabels {
+		endpointLabelSet[k] = v
+	}
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
@@ -145,6 +152,13 @@ func main() {
 		// if you are doing or is intended to do any operation such as perform cleanups
 		// after the manager stops then its usage might be unsafe.
 		LeaderElectionReleaseOnCancel: true,
+		NewCache: cache.BuilderWithOptions(cache.Options{
+			SelectorsByObject: cache.SelectorsByObject{
+				&corev1.Endpoints{}: {
+					Label: labels.SelectorFromSet(endpointLabelSet),
+				},
+			},
+		}),
 	})
 	if err != nil {
 		setupLog.Error(err, "Failed to start manager")
@@ -189,17 +203,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	/*
-		endpointController, err := lb.NewEndpointController(logger, c, mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"))
-		if err != nil {
-			setupLog.Error(err, "Failed to init endpoints controller")
-			os.Exit(1)
-		}
-		if err := endpointController.SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "Failed to create controller", "controller", "Endpoints")
-			os.Exit(1)
-		}
-	*/
+	endpointController, err := lb.NewEndpointController(logger, c, mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"))
+	if err != nil {
+		setupLog.Error(err, "Failed to init endpoints controller")
+		os.Exit(1)
+	}
+	if err := endpointController.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "Endpoints")
+		os.Exit(1)
+	}
 
 	//+kubebuilder:scaffold:builder
 

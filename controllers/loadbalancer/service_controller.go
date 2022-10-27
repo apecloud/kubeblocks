@@ -46,8 +46,9 @@ const (
 	AnnotationKeySubnetId     = "service.kubernetes.io/apecloud-loadbalancer-subnet-id"
 	AnnotationKeyMasterNodeIP = "service.kubernetes.io/apecloud-loadbalancer-master-node-ip"
 
-	AnnotationKeyLoadBalancerType   = "service.kubernetes.io/apecloud-loadbalancer-type"
-	AnnotationValueLoadBalancerType = "private-ip"
+	AnnotationKeyLoadBalancerType            = "service.kubernetes.io/apecloud-loadbalancer-type"
+	AnnotationValueLoadBalancerTypePrivateIP = "private-ip"
+	AnnotationValueLoadBalancerTypeNone      = "none"
 
 	AnnotationKeyTrafficPolicy          = "service.kubernetes.io/apecloud-loadbalancer-traffic-policy"
 	AnnotationValueClusterTrafficPolicy = "Cluster"
@@ -177,7 +178,7 @@ func (c *ServiceController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	annotations := svc.GetAnnotations()
-	if _, ok := annotations[AnnotationKeyLoadBalancerType]; !ok {
+	if annotations[AnnotationKeyLoadBalancerType] != AnnotationValueLoadBalancerTypePrivateIP {
 		ctxLog.Info("Ignore unrelated service")
 		return intctrlutil.Reconciled()
 	}

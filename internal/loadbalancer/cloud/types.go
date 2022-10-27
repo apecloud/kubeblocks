@@ -28,25 +28,37 @@ type Provider interface {
 
 	GetENIIPv4Limit() int
 
-	AllocENI() (string, error)
+	GetInstanceInfo() *InstanceInfo
 
-	DeleteENI(id string) error
+	CreateENI(instanceId, subnetId string, securityGroupIds []string) (string, error)
 
-	FreeENI(id string) error
+	AttachENI(instanceId string, eniId string) (string, error)
+
+	DeleteENI(eniId string) error
+
+	FreeENI(eniId string) error
 
 	DescribeAllENIs() (map[string]*ENIMetadata, error)
 
-	FindLeakedENIs() ([]*ENIMetadata, error)
+	FindLeakedENIs(instanceId string) ([]*ENIMetadata, error)
 
-	AllocIPAddresses(id string) (string, error)
+	AllocIPAddresses(eniId string) (string, error)
 
-	DeallocIPAddresses(id string, ips []string) error
+	DeallocIPAddresses(eniId string, ips []string) error
 
-	AssignPrivateIpAddresses(id string, ip string) error
+	AssignPrivateIpAddresses(eniId string, ip string) error
 
-	WaitForENIAttached(id string) (ENIMetadata, error)
+	WaitForENIAttached(eniId string) (ENIMetadata, error)
 
-	ModifySourceDestCheck(id string, enabled bool) error
+	ModifySourceDestCheck(eniId string, enabled bool) error
+}
+
+type InstanceInfo struct {
+	InstanceId string `json:"instance_id"`
+
+	SubnetId string `json:"subnet_id"`
+
+	SecurityGroupIds []string `json:"security_group_ids"`
 }
 
 type IPv4Address struct {

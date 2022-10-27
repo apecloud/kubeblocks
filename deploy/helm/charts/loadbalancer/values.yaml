@@ -74,3 +74,7 @@ podSecurityContext:
       - FOWNER
       - SETGID
       - SETUID
+
+nodeLabelList:
+
+endpointLabelList:

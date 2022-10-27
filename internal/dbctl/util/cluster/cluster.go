@@ -80,14 +80,23 @@ func NewClusterObjects() *types.ClusterObjects {
 	}
 }
 
-// GetAllObjects get all kubernetes objects belonging to the database cluster
-func GetAllObjects(clientSet clientset.Interface, dynamicClient dynamic.Interface, namespace string, name string, objs *types.ClusterObjects) error {
+type ObjectsGetter struct {
+	Name          string
+	Namespace     string
+	ClientSet     clientset.Interface
+	DynamicClient dynamic.Interface
+
+	WithAppVersion bool
+}
+
+// Get all kubernetes objects belonging to the database cluster
+func (o *ObjectsGetter) Get(objs *types.ClusterObjects) error {
 	var err error
 	builder := &builder{
-		namespace:     namespace,
-		name:          name,
-		clientSet:     clientSet,
-		dynamicClient: dynamicClient,
+		namespace:     o.Namespace,
+		name:          o.Name,
+		clientSet:     o.ClientSet,
+		dynamicClient: o.DynamicClient,
 	}
 
 	// get cluster
@@ -104,28 +113,30 @@ func GetAllObjects(clientSet clientset.Interface, dynamicClient dynamic.Interfac
 	}
 
 	// get appversion
-	if err = builder.withGK(types.AppVersionGK()).
-		withName(objs.Cluster.Spec.AppVersionRef).
-		do(objs); err != nil {
-		return err
+	if o.WithAppVersion {
+		if err = builder.withGK(types.AppVersionGK()).
+			withName(objs.Cluster.Spec.AppVersionRef).
+			do(objs); err != nil {
+			return err
+		}
 	}
 
 	// get service
-	if err = builder.withLabel(InstanceLabel(name)).
+	if err = builder.withLabel(InstanceLabel(o.Name)).
 		withGK(schema.GroupKind{Kind: "Service"}).
 		do(objs); err != nil {
 		return err
 	}
 
 	// get secret
-	if err = builder.withLabel(InstanceLabel(name)).
+	if err = builder.withLabel(InstanceLabel(o.Name)).
 		withGK(schema.GroupKind{Kind: "Secret"}).
 		do(objs); err != nil {
 		return err
 	}
 
 	// get pod
-	if err = builder.withLabel(InstanceLabel(name)).
+	if err = builder.withLabel(InstanceLabel(o.Name)).
 		withGK(schema.GroupKind{Kind: "Pod"}).
 		do(objs); err != nil {
 		return err

@@ -92,7 +92,7 @@ downloadDockerImage() {
     DBCTL_TMP_ROOT=$(mktemp -dt dbctl-install-XXXXXX)
     # pull image and run
     echo -e "Pulling dbctl image..."
-    docker run --name dbctl -d docker.io/infracreate/dbctl:${LATEST_RELEASE_TAG} sh &> /dev/null
+    docker run --name dbctl -d docker.io/apecloud/dbctl:${LATEST_RELEASE_TAG} sh &> /dev/null
     # copy dbctl to /tmp-xxx/dbctl
     docker cp dbctl:/dbctl.${OS}.${ARCH} ${DBCTL_TMP_ROOT}/${DBCTL_CLI_FILENAME} 2>&1 > /dev/null
     # remove docker
@@ -125,7 +125,7 @@ fail_trap() {
     result=$?
     if [ "$result" != "0" ]; then
         echo "Failed to install dbctl"
-        echo "Go to https://infracreate.io for more support."
+        echo "Go to https://kubeblocks.io for more support."
     fi
     cleanup
     exit $result
@@ -139,7 +139,7 @@ cleanup() {
 
 installCompleted() {
     echo -e "\nFor more information on how to started, please visit:"
-    echo "  https://infracreate.io"
+    echo "  https://kubeblocks.io"
 }
 
 # -----------------------------------------------------------------------------

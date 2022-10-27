@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,9 +38,9 @@ type BackupToolReconciler struct {
 	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=dataprotection.infracreate.com,resources=backuptools,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=dataprotection.infracreate.com,resources=backuptools/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=dataprotection.infracreate.com,resources=backuptools/finalizers,verbs=update
+//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuptools,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuptools/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuptools/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

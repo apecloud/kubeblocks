@@ -5,22 +5,33 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  name: backupconfigs.dataprotection.infracreate.com
+  name: restorejobs.dataprotection.kubeblocks.io
 spec:
-  group: dataprotection.infracreate.com
+  group: dataprotection.kubeblocks.io
   names:
     categories:
     - dbaas
-    kind: BackupConfig
-    listKind: BackupConfigList
-    plural: backupconfigs
-    singular: backupconfig
+    kind: RestoreJob
+    listKind: RestoreJobList
+    plural: restorejobs
+    singular: restorejob
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: PHASE
+      type: string
+    - jsonPath: .status.completionTimestamp
+      name: COMPLETIONTIME
+      type: date
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: BackupConfig is the Schema for the backupconfigs API
+        description: RestoreJob is the Schema for the restorejobs API (defined by
+          User)
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -35,23 +46,17 @@ spec:
           metadata:
             type: object
           spec:
-            description: BackupConfigSpec defines the desired state of BackupConfig
+            description: RestoreJobSpec defines the desired state of RestoreJob
             properties:
-              backupToolName:
-                description: which backup tool to perform database backup, only support
-                  one tool.
+              backupJobName:
+                description: Specified one backupJob to restore.
                 type: string
               onFailAttempted:
-                description: limit count of backup stop retries on fail. if unset,
-                  retry unlimit attempted.
+                description: count of backup stop retries on fail.
                 format: int32
                 type: integer
-              schedule:
-                default: 0 7 * * *
-                description: The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
-                type: string
               target:
-                description: database cluster service
+                description: the target database workload to restore
                 properties:
                   databaseEngine:
                     description: database engine to support in the backup.
@@ -113,19 +118,70 @@ spec:
                           "value". The requirements are ANDed.
                         type: object
                     type: object
-                  secretName:
+                  secret:
                     description: target db cluster access secret
-                    type: string
+                    properties:
+                      keyPassword:
+                        default: password
+                        description: which key name for password
+                        type: string
+                      keyUser:
+                        default: username
+                        description: which key name for user
+                        type: string
+                      name:
+                        description: the secret name
+                        type: string
+                    required:
+                    - name
+                    type: object
                 required:
                 - databaseEngine
                 - labelsSelector
+                - secret
                 type: object
-              ttl:
-                description: TTL is a time.Duration-parseable string describing how
-                  long the Backup should be retained for.
-                type: string
-              volumes:
-                description: array of remote volumes from CSI driver defination.
+              targetVolumeMounts:
+                description: array of restore volume mounts .
+                items:
+                  description: VolumeMount describes a mounting of a Volume within
+                    a container.
+                  properties:
+                    mountPath:
+                      description: Path within the container at which the volume should
+                        be mounted.  Must not contain ':'.
+                      type: string
+                    mountPropagation:
+                      description: mountPropagation determines how mounts are propagated
+                        from the host to container and the other way around. When
+                        not set, MountPropagationNone is used. This field is beta
+                        in 1.10.
+                      type: string
+                    name:
+                      description: This must match the Name of a Volume.
+                      type: string
+                    readOnly:
+                      description: Mounted read-only if true, read-write otherwise
+                        (false or unspecified). Defaults to false.
+                      type: boolean
+                    subPath:
+                      description: Path within the volume from which the container's
+                        volume should be mounted. Defaults to "" (volume's root).
+                      type: string
+                    subPathExpr:
+                      description: Expanded path within the volume from which the
+                        container's volume should be mounted. Behaves similarly to
+                        SubPath but environment variable references $(VAR_NAME) are
+                        expanded using the container's environment. Defaults to ""
+                        (volume's root). SubPathExpr and SubPath are mutually exclusive.
+                      type: string
+                  required:
+                  - mountPath
+                  - name
+                  type: object
+                minItems: 1
+                type: array
+              targetVolumes:
+                description: array of restore volumes .
                 items:
                   description: Volume represents a named volume in a pod that may
                     be accessed by any container in the pod.
@@ -553,6 +609,23 @@ spec:
                               description: May contain labels and annotations that
                                 will be copied into the PVC when creating it. No other
                                 fields are allowed and will be rejected during validation.
+                              properties:
+                                annotations:
+                                  additionalProperties:
+                                    type: string
+                                  type: object
+                                finalizers:
+                                  items:
+                                    type: string
+                                  type: array
+                                labels:
+                                  additionalProperties:
+                                    type: string
+                                  type: object
+                                name:
+                                  type: string
+                                namespace:
+                                  type: string
                               type: object
                             spec:
                               description: The specification for the PersistentVolumeClaim.
@@ -1621,19 +1694,33 @@ spec:
                 minItems: 1
                 type: array
             required:
-            - backupToolName
-            - schedule
+            - backupJobName
             - target
-            - volumes
+            - targetVolumeMounts
+            - targetVolumes
             type: object
           status:
-            description: BackupConfigStatus defines the observed state of BackupConfig
+            description: RestoreJobStatus defines the observed state of RestoreJob
             properties:
+              completionTimestamp:
+                description: Date/time when the backup finished being processed.
+                format: date-time
+                type: string
+              expiration:
+                description: The date and time when the Backup is eligible for garbage
+                  collection. 'null' means the Backup is NOT be cleaned except delete
+                  manual.
+                format: date-time
+                type: string
               failureReason:
                 type: string
               phase:
-                description: The current phase. Valid values are New, Available, InProgress,
-                  Failed.
+                description: RestoreJobPhase The current phase. Valid values are New,
+                  InProgress, Completed, Failed.
+                type: string
+              startTimestamp:
+                description: Date/time when the backup started being processed.
+                format: date-time
                 type: string
             type: object
         type: object

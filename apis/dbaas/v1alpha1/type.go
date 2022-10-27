@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	APIVersion            = "dbaas.infracreate.com/v1alpha1"
+	APIVersion            = "dbaas.kubeblocks.io/v1alpha1"
 	AppVersionKind        = "AppVersion"
 	ClusterDefinitionKind = "ClusterDefinition"
 	ClusterKind           = "Cluster"

@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@ type createParams struct {
 }
 
 const (
-	dbaasPrefix = "OPENDBAAS"
+	dbaasPrefix = "KB"
 )
 
 var (
@@ -1153,7 +1153,7 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 
 	sts := appsv1.StatefulSet{}
 
-	stsStrByte = injectEnv(stsStrByte, dbaasPrefix+"_MY_SECRET_NAME", params.cluster.Name)
+	stsStrByte = injectEnv(stsStrByte, dbaasPrefix+"_SECRET_NAME", params.cluster.Name)
 
 	if err = json.Unmarshal(stsStrByte, &sts); err != nil {
 		return nil, err
@@ -1170,7 +1170,7 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 		// inject self scope env
 		c := &sts.Spec.Template.Spec.Containers[i]
 		c.Env = append(c.Env, corev1.EnvVar{
-			Name: dbaasPrefix + "_MY_POD_NAME",
+			Name: dbaasPrefix + "_POD_NAME",
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
 					FieldPath: "metadata.name",
@@ -1341,7 +1341,7 @@ func buildDeploy(params createParams) (*appsv1.Deployment, error) {
 		return nil, err
 	}
 
-	stsStrByte = injectEnv(stsStrByte, dbaasPrefix+"_MY_SECRET_NAME", params.cluster.Name)
+	stsStrByte = injectEnv(stsStrByte, dbaasPrefix+"_SECRET_NAME", params.cluster.Name)
 
 	if err = json.Unmarshal(stsStrByte, &deploy); err != nil {
 		return nil, err

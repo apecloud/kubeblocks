@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Factory:   f,
 		Streams:   streams,
 		Short:     "List all database backup job.",
-		GroupKind: schema.GroupKind{Group: "dataprotection.infracreate.com", Kind: "BackupJob"},
+		GroupKind: schema.GroupKind{Group: "dataprotection.kubeblocks.io", Kind: "BackupJob"},
 	}
 	return cmd.Build()
 }

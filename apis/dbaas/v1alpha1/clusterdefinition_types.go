@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -176,8 +176,8 @@ type ClusterDefinitionComponent struct {
 	// Scripts executed before and after workload operation
 	// script exec order：component.pre => component.exec => component.post
 	// builtin ENV variables:
-	// self: OPENDBAAS_SELF_{builtin_properties}
-	// rule: OPENDBAAS_{conponent_name}[n]-{builtin_properties}
+	// self: KB_SELF_{builtin_properties}
+	// rule: KB_{conponent_name}[n]-{builtin_properties}
 	// builtin_properties:
 	// - ID # which shows in Cluster.status
 	// - HOST # e.g. example-mongodb2-0.example-mongodb2-svc.default.svc.cluster.local

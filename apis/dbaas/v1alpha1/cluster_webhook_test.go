@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -89,7 +89,7 @@ var _ = Describe("cluster webhook", func() {
 
 func createTestCluster(clusterDefinitionName, appVersionName, clusterName string) (*Cluster, error) {
 	clusterYaml := fmt.Sprintf(`
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: %s

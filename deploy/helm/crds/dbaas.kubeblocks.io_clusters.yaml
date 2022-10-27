@@ -5,9 +5,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  name: clusters.dbaas.infracreate.com
+  name: clusters.dbaas.kubeblocks.io
 spec:
-  group: dbaas.infracreate.com
+  group: dbaas.kubeblocks.io
   names:
     categories:
     - dbaas

@@ -4,4 +4,4 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     cert-manager.io/inject-ca-from: $(CERTIFICATE_NAMESPACE)/$(CERTIFICATE_NAME)
-  name: backupconfigs.dataprotection.infracreate.com
+  name: backupconfigs.dataprotection.kubeblocks.io

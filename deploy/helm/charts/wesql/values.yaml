@@ -4,7 +4,7 @@
 
 image:
   registry: 
-  repository: docker.io/infracreate/wesql-server-8.0
+  repository: docker.io/apecloud/wesql-server-8.0
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: 0.1.2

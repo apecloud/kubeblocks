@@ -26,6 +26,10 @@ spec:
       followers:
         - name: follower
           accessMode: Readonly
+    service:
+      ports:
+        - protocol: TCP
+          port: 3306
     podSpec:
       containers:
       - name: mysql

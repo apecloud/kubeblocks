@@ -34,11 +34,11 @@ RUN wget -O grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-prob
     && chmod +x grpc_health_probe
 
 # Copy the go source
-COPY cmd/loadbalancer/ cmd/loadbalancer/
 COPY apis/ apis/
-COPY internal/ internal/
-COPY controllers/ controllers/
 COPY version/ version/
+COPY controllers/ controllers/
+COPY internal/ internal/
+COPY cmd/loadbalancer/ cmd/loadbalancer/
 
 # Build
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o controller ./cmd/loadbalancer/controller \

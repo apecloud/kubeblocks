@@ -32,6 +32,9 @@ const (
 	appVersionFinalizerName   = "appversion.kubeblocks.io/finalizer"
 	opsRequestFinalizerName   = "opsrequest.kubeblocks.io/finalizer"
 
+	ConfigurationTemplateFinalizerName = "configurationtemplate.infracreate.com/finalizer"
+	ConfigurationTplLabelKey           = "configurationtemplate.infracreate.com/name"
+
 	// label keys
 	clusterDefLabelKey             = "clusterdefinition.kubeblocks.io/name"
 	appVersionLabelKey             = "appversion.kubeblocks.io/name"

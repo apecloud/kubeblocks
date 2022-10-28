@@ -102,6 +102,12 @@ spec:
             properties:
               message:
                 type: string
+              observedGeneration:
+                description: observedGeneration is the most recent generation observed
+                  for this ClusterDefinition. It corresponds to the ClusterDefinition's
+                  generation, which is updated on mutation by the API Server.
+                format: int64
+                type: integer
               phase:
                 description: Phase is configuration template status, if it is set
                   to AvailablePhase, ConfigurationTemplate be used by ClusterDefinition

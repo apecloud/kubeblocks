@@ -18,19 +18,24 @@ package dbaas
 
 import (
 	"context"
+	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // ConfigurationTemplateReconciler reconciles a ConfigurationTemplate object
 type ConfigurationTemplateReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 //+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=configurationtemplates,verbs=get;list;watch;create;update;patch;delete
@@ -47,11 +52,59 @@ type ConfigurationTemplateReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.2/pkg/reconcile
 func (r *ConfigurationTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithValues("clusterDefinition", req.NamespacedName),
+		Recorder: r.Recorder,
+	}
 
-	// TODO(user): your logic here
+	configTpl := &dbaasv1alpha1.ConfigurationTemplate{}
+	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, configTpl); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, configTpl, ConfigurationTemplateFinalizerName, func() (*ctrl.Result, error) {
+		recordEvent := func() {
+			r.Recorder.Event(configTpl, corev1.EventTypeWarning, "ExistsReferencedResources",
+				"cannot be deleted because of existing referencing ClusterDefinition or AppVersion.")
+		}
+		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, configTpl,
+			ConfigurationTplLabelKey, recordEvent, &dbaasv1alpha1.ClusterDefinitionList{},
+			&dbaasv1alpha1.AppVersionList{}); res != nil || err != nil {
+			return res, err
+		}
+		return nil, r.deleteExternalResources(reqCtx, configTpl)
+	})
+	if res != nil {
+		return *res, err
+	}
+
+	if configTpl.Status.ObservedGeneration == configTpl.GetObjectMeta().GetGeneration() {
+		return intctrlutil.Reconciled()
+	}
+
+	// TODO(zt) update configmap Finalizer and set Immutable
+
+	if ok, err := checkConfigurationTemplate(r.Client, reqCtx, configTpl); !ok || err != nil {
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "configMapIsReady")
+	}
+
+	statusPatch := client.MergeFrom(configTpl.DeepCopy())
+	configTpl.Status.ObservedGeneration = configTpl.GetObjectMeta().GetGeneration()
+	configTpl.Status.Phase = dbaasv1alpha1.AvailablePhase
+	if err = r.Client.Status().Patch(reqCtx.Ctx, configTpl, statusPatch); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	intctrlutil.RecordCreatedEvent(r.Recorder, configTpl)
 
 	return ctrl.Result{}, nil
+}
+
+func checkConfigurationTemplate(c client.Client, ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplate) (bool, error) {
+	// TODO(zt) validate configuration template
+
+	return true, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -59,4 +112,11 @@ func (r *ConfigurationTemplateReconciler) SetupWithManager(mgr ctrl.Manager) err
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dbaasv1alpha1.ConfigurationTemplate{}).
 		Complete(r)
+}
+
+func (r *ConfigurationTemplateReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, configTpl *dbaasv1alpha1.ConfigurationTemplate) error {
+	// TODO(zt) delete configmap Finalizer
+
+	// delete any external resources associated with the configuration template
+	return nil
 }

@@ -250,8 +250,9 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&dbaascontrollers.ConfigurationTemplateReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("configuration-template-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ConfigurationTemplate")
 		os.Exit(1)

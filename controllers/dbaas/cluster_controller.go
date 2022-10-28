@@ -506,20 +506,18 @@ func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *d
 	}
 
 	inNS := client.InNamespace(cluster.Namespace)
-	for _, component := range clusterDef.Spec.Components {
-		ml := client.MatchingLabels{
-			appInstanceLabelKey: fmt.Sprintf("%s-%s", cluster.GetName(), component.TypeName),
-			appNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
-		}
+	ml := client.MatchingLabels{
+		appInstanceLabelKey: cluster.GetName(),
+		appNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
+	}
 
-		pvcList := &corev1.PersistentVolumeClaimList{}
-		if err := r.List(reqCtx.Ctx, pvcList, inNS, ml); err != nil {
+	pvcList := &corev1.PersistentVolumeClaimList{}
+	if err := r.List(reqCtx.Ctx, pvcList, inNS, ml); err != nil {
+		return err
+	}
+	for _, pvc := range pvcList.Items {
+		if err := r.Delete(reqCtx.Ctx, &pvc); err != nil {
 			return err
-		}
-		for _, pvc := range pvcList.Items {
-			if err := r.Delete(reqCtx.Ctx, &pvc); err != nil {
-				return err
-			}
 		}
 	}
 	return nil

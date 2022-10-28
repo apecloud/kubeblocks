@@ -34,23 +34,27 @@ spec:
             volumeMounts:
               - name: data
                 mountPath: /var/run/etcd
-            command: [ "/bin/bash", "-c" ]
-            args:
-              - >
-                PEERS="";
-                for (( i=0; i<$KB_ETCD_N; i++ )); do
-                  if [ $i -ne 0 ]; then
-                    PEERS="$PEERS,";
-                  fi;
-                  host=$(eval echo \$KB_ETCD_"$i"_HOSTNAME)
-                  svc=${host%"-$i"}
-                  PEERS="$host=http://$host.$svc:2380";
-                done;
+            command:
+              - bin/sh
+              - -c
+              - |
+                echo "start etcd..."
+                PEERS=""
+                i=0
+                while [ $i -lt $KB_ETCD_N ]; do
+                	if [ $i -ne 0 ]; then
+                		PEERS="$PEERS,";
+                	fi;
+                	host=$(eval echo \$KB_ETCD_"$i"_HOSTNAME)
+                	svc=${host%"-$i"}
+                	PEERS="$PEERS$host=http://$host:2380"
+                    i=$(( i + 1))
+                done
                 exec etcd --name ${HOSTNAME} \
                 --listen-peer-urls http://0.0.0.0:2380 \
                 --listen-client-urls http://0.0.0.0:2379 \
-                --advertise-client-urls http://${HOSTNAME}.etcd:2379 \
-                --initial-advertise-peer-urls http://${HOSTNAME}.etcd:2380 \
+                --advertise-client-urls http://${HOSTNAME}:2379 \
+                --initial-advertise-peer-urls http://${HOSTNAME}:2380 \
                 --initial-cluster-token etcd-cluster-1 \
                 --initial-cluster ${PEERS} \
                 --initial-cluster-state new \

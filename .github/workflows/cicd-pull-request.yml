@@ -11,8 +11,8 @@ jobs:
     steps:
       - uses: JashBook/check-branch-name@v0.1.0
         with:
-          branch_pattern: 'feature/|bugfix/|chore/|release/|hotfix/|support/'
-          comment_for_invalid_branch_name: 'This branch name is not following the standards: feature/|bugfix/|chore/|release/|hotfix/|support/'
+          branch_pattern: 'feature/|bugfix/|release/|hotfix/|support/'
+          comment_for_invalid_branch_name: 'This branch name is not following the standards: feature/|bugfix/|release/|hotfix/|support/'
           fail_if_invalid_branch_name: 'true'
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

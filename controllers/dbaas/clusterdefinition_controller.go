@@ -89,7 +89,7 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	if ok, err := checkClusterDefinitionTemplateValidate(r.Client, reqCtx, dbClusterDef); !ok || err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "checkClusterIsReady")
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "configMapIsReady")
 	}
 
 	for _, handler := range clusterDefUpdateHandlers {
@@ -130,38 +130,40 @@ func checkClusterDefinitionTemplateValidate(client client.Client, ctx intctrluti
 			continue
 		}
 
-		if ok, err := CheckValidateConfigurationTpls(client, ctx, component.ConfigTemplateRefs); !ok || err != nil {
+		if ok, err := checkValidConfTpls(client, ctx, component.ConfigTemplateRefs); !ok || err != nil {
 			return ok, err
 		}
 	}
 	return true, nil
 }
 
-func CheckValidateConfigurationTpls(client client.Client, ctx intctrlutil.RequestCtx, configTpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
+func checkValidConfTpls(cli client.Client, ctx intctrlutil.RequestCtx, configTpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
+
+	// check ConfigTemplate Validate
+	isValidConfTplFn := func(configTpl dbaasv1alpha1.ConfigTemplate) (bool, error) {
+		if len(configTpl.Name) == 0 || len(configTpl.VolumeName) == 0 {
+			return false, fmt.Errorf("requiere configmap reference name not empty! [%v]", configTpl)
+		}
+
+		cmKey := client.ObjectKey{
+			Namespace: viper.GetString(cmNamespaceKey),
+			Name:      configTpl.Name,
+		}
+		cmObj := &corev1.ConfigMap{}
+		if err := cli.Get(ctx.Ctx, cmKey, cmObj); err != nil {
+			ctx.Log.Error(err, "get configuration template configmap object failed!", "configmap key", cmKey)
+			return false, err
+		}
+
+		return true, nil
+
+	}
+
 	for _, tplRef := range configTpls {
-		if ok, err := isValidateConfigurationTpl(client, ctx, tplRef); !ok || err != nil {
+		if ok, err := isValidConfTplFn(tplRef); !ok || err != nil {
 			ctx.Log.Error(err, "validate configuration template failed!", "configtemplate", tplRef)
 			return ok, err
 		}
-	}
-
-	return true, nil
-}
-
-func isValidateConfigurationTpl(cli client.Client, ctx intctrlutil.RequestCtx, configTpl dbaasv1alpha1.ConfigTemplate) (bool, error) {
-	if len(configTpl.Name) == 0 || len(configTpl.VolumeName) == 0 {
-		return false, fmt.Errorf("requiere configmap reference name not empty! [%v]", configTpl)
-	}
-
-	cmObj := &corev1.ConfigMap{}
-	cmKey := client.ObjectKey{
-		Namespace: viper.GetString(cmNamespaceKey),
-		Name:      configTpl.Name,
-	}
-
-	if err := cli.Get(ctx.Ctx, cmKey, cmObj); err != nil {
-		ctx.Log.Error(err, "get configuration template configmap object failed!", "configmap key", cmKey)
-		return false, err
 	}
 
 	return true, nil

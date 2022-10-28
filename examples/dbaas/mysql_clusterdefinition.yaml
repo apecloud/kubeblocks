@@ -41,6 +41,7 @@ spec:
               - name: MYSQL_ROOT_USER
                 value: root
               - name: MYSQL_ROOT_PASSWORD
+                value: ""
               - name: MYSQL_ALLOW_EMPTY_PASSWORD
                 value: "yes"
               - name: MYSQL_DATABASE
@@ -56,9 +57,13 @@ spec:
               - name: REPLICATIONUSER
                 value: replicator
               - name: REPLICATION_PASSWORD
+                value: ""
               - name: MYSQL_TEMPLATE_CONFIG
+                value: ""
               - name: MYSQL_CUSTOM_CONFIG
+                value: ""
               - name: MYSQL_DYNAMIC_CONFIG
+                value: ""
             imagePullPolicy: IfNotPresent
             name: mysql
             ports:

@@ -222,6 +222,9 @@ grafana:
       defaultDatasourceEnabled: true
       uid: prometheus
 
+      skipReload: true
+      initDatasources: true
+
   testFramework:
     enabled: false
 

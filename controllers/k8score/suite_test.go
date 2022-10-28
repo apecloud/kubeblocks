@@ -21,7 +21,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/apecloud/kubeblocks/internal/testutil"
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -43,9 +45,11 @@ import (
 
 var cfg *rest.Config
 var k8sClient client.Client
+var k8sManager manager.Manager
 var testEnv *envtest.Environment
 var ctx context.Context
 var cancel context.CancelFunc
+var testCtx testutil.TestContext
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -82,7 +86,7 @@ var _ = BeforeSuite(func() {
 	Expect(k8sClient).NotTo(BeNil())
 
 	// run reconcile
-	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
+	k8sManager, err = ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:             scheme.Scheme,
 		MetricsBindAddress: "0",
 	})
@@ -94,6 +98,8 @@ var _ = BeforeSuite(func() {
 		Recorder: k8sManager.GetEventRecorderFor("event-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
+
+	testCtx = testutil.NewDefaultTestContext(k8sManager.GetClient())
 
 	go func() {
 		defer GinkgoRecover()

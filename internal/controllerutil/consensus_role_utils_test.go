@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package controllerutil
 
 import "testing"
 
 func TestCreateRoleChangedEvent(t *testing.T) {
-	_, err := createRoleChangedEvent("wesql-test", "leader")
+	_, err := CreateRoleChangedEvent("wesql-test", "leader")
 	if err != nil {
 		t.Errorf("create role changed event error: %v", err)
 	}

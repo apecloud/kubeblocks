@@ -58,6 +58,21 @@ func TestIsMemberOf(t *testing.T) {
 
 // ------- end copy from stateful_set_utils_test.go ----
 
+func TestGetPodRevision(t *testing.T) {
+	set := newStatefulSet("foo", 3)
+	pod := newStatefulSetPod(set, 1)
+	if getPodRevision(pod) != "" {
+		t.Errorf("revision should be empty")
+	}
+
+	pod.Labels = make(map[string]string, 0)
+	pod.Labels[apps.StatefulSetRevisionLabel] = "bar"
+
+	if getPodRevision(pod) != "bar" {
+		t.Errorf("revision not matched")
+	}
+}
+
 func newStatefulSet(name string, replicas int) *apps.StatefulSet {
 	template := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
@@ -95,6 +110,7 @@ func newStatefulSet(name string, replicas int) *apps.StatefulSet {
 func newStatefulSetPod(set *apps.StatefulSet, ordinal int) *v1.Pod {
 	pod := &v1.Pod{}
 	pod.Name = getPodName(set, ordinal)
+
 	return pod
 }
 

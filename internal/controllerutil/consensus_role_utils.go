@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package controllerutil
 
 import (
 	"bytes"
@@ -88,7 +88,7 @@ func SetupConsensusRoleObservingLoop(log logger.Logger) {
 		namespace := os.Getenv("MY_POD_NAMESPACE")
 
 		// or emit event
-		event, err := createRoleChangedEvent(name, role)
+		event, err := CreateRoleChangedEvent(name, role)
 		if err != nil {
 			log.Error(err)
 			return
@@ -106,7 +106,7 @@ func SetupConsensusRoleObservingLoop(log logger.Logger) {
 	go wait.UntilWithContext(context.TODO(), roleObserve, time.Second*2)
 }
 
-func createRoleChangedEvent(podName, role string) (*corev1.Event, error) {
+func CreateRoleChangedEvent(podName, role string) (*corev1.Event, error) {
 	eventTmpl := `
 apiVersion: v1
 kind: Event

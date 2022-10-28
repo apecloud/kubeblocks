@@ -136,7 +136,7 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return intctrlutil.Reconciled()
 	}
 
-	if ok, err := checkAppVersionTemplateValidate(r.Client, reqCtx, appVersion); !ok || err != nil {
+	if ok, err := checkAppVersionTemplate(r.Client, reqCtx, appVersion); !ok || err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "configMapIsReady")
 	}
 
@@ -171,7 +171,7 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{}, nil
 }
 
-func checkAppVersionTemplateValidate(client client.Client, ctx intctrlutil.RequestCtx, appVersion *dbaasv1alpha1.AppVersion) (bool, error) {
+func checkAppVersionTemplate(client client.Client, ctx intctrlutil.RequestCtx, appVersion *dbaasv1alpha1.AppVersion) (bool, error) {
 	for _, component := range appVersion.Spec.Components {
 		if len(component.ConfigTemplateRefs) == 0 {
 			continue

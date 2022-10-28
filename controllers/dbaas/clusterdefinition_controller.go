@@ -88,7 +88,7 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return intctrlutil.Reconciled()
 	}
 
-	if ok, err := checkClusterDefinitionTemplateValidate(r.Client, reqCtx, dbClusterDef); !ok || err != nil {
+	if ok, err := checkClusterDefinitionTemplate(r.Client, reqCtx, dbClusterDef); !ok || err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "configMapIsReady")
 	}
 
@@ -124,7 +124,7 @@ func (r *ClusterDefinitionReconciler) deleteExternalResources(reqCtx intctrlutil
 	return nil
 }
 
-func checkClusterDefinitionTemplateValidate(client client.Client, ctx intctrlutil.RequestCtx, clusterDef *dbaasv1alpha1.ClusterDefinition) (bool, error) {
+func checkClusterDefinitionTemplate(client client.Client, ctx intctrlutil.RequestCtx, clusterDef *dbaasv1alpha1.ClusterDefinition) (bool, error) {
 	for _, component := range clusterDef.Spec.Components {
 		if len(component.ConfigTemplateRefs) == 0 {
 			continue
@@ -142,7 +142,7 @@ func checkValidConfTpls(cli client.Client, ctx intctrlutil.RequestCtx, configTpl
 	// check ConfigTemplate Validate
 	isValidConfTplFn := func(configTpl dbaasv1alpha1.ConfigTemplate) (bool, error) {
 		if len(configTpl.Name) == 0 || len(configTpl.VolumeName) == 0 {
-			return false, fmt.Errorf("requiere configmap reference name not empty! [%v]", configTpl)
+			return false, fmt.Errorf("required configmap reference name or volume name is empty! [%v]", configTpl)
 		}
 
 		cmKey := client.ObjectKey{
@@ -151,7 +151,7 @@ func checkValidConfTpls(cli client.Client, ctx intctrlutil.RequestCtx, configTpl
 		}
 		cmObj := &corev1.ConfigMap{}
 		if err := cli.Get(ctx.Ctx, cmKey, cmObj); err != nil {
-			ctx.Log.Error(err, "get configuration template configmap object failed!", "configmap key", cmKey)
+			ctx.Log.Error(err, "failed to get config template cm object!", "configmap key", cmKey)
 			return false, err
 		}
 
@@ -161,7 +161,7 @@ func checkValidConfTpls(cli client.Client, ctx intctrlutil.RequestCtx, configTpl
 
 	for _, tplRef := range configTpls {
 		if ok, err := isValidConfTplFn(tplRef); !ok || err != nil {
-			ctx.Log.Error(err, "validate configuration template failed!", "configtemplate", tplRef)
+			ctx.Log.Error(err, "failed to validate configuration template!", "config template", tplRef)
 			return ok, err
 		}
 	}

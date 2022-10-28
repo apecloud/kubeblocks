@@ -1288,6 +1288,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 			},
 		}
 
+		// TODO ClusterDefinition.Spec.Type
 		bindingType := corev1.EnvVar{
 			Name:  "BINDING_TYPE",
 			Value: "ETCD",

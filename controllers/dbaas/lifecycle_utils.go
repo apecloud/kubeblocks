@@ -622,7 +622,7 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 			return err
 		}
 		if params.component.ComponentType == dbaasv1alpha1.Consensus {
-			addSelectorLabels(svc, params.component, dbaasv1alpha1.ReadWrite)
+			addSelectorLabels(svc, dbaasv1alpha1.ReadWrite)
 		}
 		*params.applyObjs = append(*params.applyObjs, svc)
 	}
@@ -631,21 +631,8 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 }
 
 // TODO multi roles with same accessMode support
-func addSelectorLabels(service *corev1.Service, component *Component, accessMode dbaasv1alpha1.AccessMode) {
-	addSelector := func(service *corev1.Service, member dbaasv1alpha1.ConsensusMember, accessMode dbaasv1alpha1.AccessMode) {
-		if member.AccessMode == accessMode && len(member.Name) > 0 {
-			service.Spec.Selector[consensusSetRoleLabelKey] = member.Name
-		}
-	}
-
-	addSelector(service, component.ConsensusSpec.Leader, accessMode)
-	if component.ConsensusSpec.Learner != nil {
-		addSelector(service, *component.ConsensusSpec.Learner, accessMode)
-	}
-
-	for _, member := range component.ConsensusSpec.Followers {
-		addSelector(service, member, accessMode)
-	}
+func addSelectorLabels(service *corev1.Service, accessMode dbaasv1alpha1.AccessMode) {
+	service.Spec.Selector[consensusSetAccessModeLabelKey] = string(accessMode)
 }
 
 func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,

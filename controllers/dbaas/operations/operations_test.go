@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ import (
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,14 +41,6 @@ var _ = Describe("OpsRequest Controller", func() {
 	const timeout = time.Second * 10
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
-
-	checkedCreateObj := func(obj client.Object) error {
-		err := k8sClient.Create(context.Background(), obj)
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return err
-		}
-		return nil
-	}
 
 	assureDefaultStorageClassObj := func() *storagev1.StorageClass {
 		By("By assure an default storageClass")
@@ -66,14 +57,14 @@ volumeBindingMode: Immediate
 `
 		sc := &storagev1.StorageClass{}
 		Expect(yaml.Unmarshal([]byte(scYAML), sc)).Should(Succeed())
-		Expect(checkedCreateObj(sc)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, sc)).Should(Succeed())
 		return sc
 	}
 
 	assureClusterDefObj := func() *dbaasv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
 		clusterDefYAML := `
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
   name: cluster-definition-for-operations
@@ -81,8 +72,7 @@ spec:
   type: state.mysql-8
   components:
   - typeName: replicasets
-    roleGroups:
-    - primary
+    componentType: Consensus
     defaultReplicas: 1
     podSpec:
       containers:
@@ -104,17 +94,17 @@ spec:
           - name: "MYSQL_ROOT_PASSWORD"
             valueFrom:
               secretKeyRef:
-                name: $(OPENDBAAS_MY_SECRET_NAME)
+                name: $(KB_SECRET_NAME)
                 key: password
         command: ["/usr/bin/bash", "-c"]
         args:
           - >
             cluster_info="";
-            for (( i=0; i<$OPENDBAAS_REPLICASETS_PRIMARY_N; i++ )); do
+            for (( i=0; i<$KB_REPLICASETS_PRIMARY_N; i++ )); do
               if [ $i -ne 0 ]; then
                 cluster_info="$cluster_info;";
               fi;
-              host=$(eval echo \$OPENDBAAS_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
+              host=$(eval echo \$KB_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
               cluster_info="$cluster_info$host:13306";
             done;
             idx=0;
@@ -122,37 +112,28 @@ spec:
               for i in "${ADDR[@]}"; do
                 idx=$i;
               done;
-            done <<< "$OPENDBAAS_MY_POD_NAME";
+            done <<< "$KB_POD_NAME";
             echo $idx;
             cluster_info="$cluster_info@$(($idx+1))";
             echo $cluster_info;
             docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
   - typeName: proxy
-    roleGroups: ["proxy"]
+    componentType: Stateless
     defaultReplicas: 1
-    isStateless: true
     podSpec:
       containers:
       - name: nginx
-  roleGroupTemplates:
-  - typeName: primary
-    defaultReplicas: 3
-    updateStrategy:
-      # 对应 pdb 中的两个字段，两个中只能填一个
-      maxUnavailable: 1
-  - typeName: proxy
-    defaultReplicas: 2
 `
 		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
-		Expect(checkedCreateObj(clusterDefinition)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, clusterDefinition)).Should(Succeed())
 		return clusterDefinition
 	}
 
 	assureAppVersionObj := func() *dbaasv1alpha1.AppVersion {
 		By("By assure an appVersion obj")
 		appVerYAML := `
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       AppVersion
 metadata:
   name:     app-version-operations
@@ -163,7 +144,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: registry.jihulab.com/infracreate/mysql-server/mysql/wesql-server-arm:latest
+        image: registry.jihulab.com/apecloud/mysql-server/mysql/wesql-server-arm:latest
   - type: proxy
     podSpec: 
       containers:
@@ -172,7 +153,7 @@ spec:
 `
 		appVersion := &dbaasv1alpha1.AppVersion{}
 		Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(Succeed())
-		Expect(checkedCreateObj(appVersion)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, appVersion)).Should(Succeed())
 		return appVersion
 	}
 
@@ -197,7 +178,7 @@ spec:
 
 		return &dbaasv1alpha1.Cluster{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: "dbaas.infracreate.com/v1alpha1",
+				APIVersion: "dbaas.kubeblocks.io/v1alpha1",
 				Kind:       "Cluster",
 			},
 			ObjectMeta: metav1.ObjectMeta{
@@ -211,12 +192,6 @@ spec:
 					{
 						Name: "replicasets",
 						Type: "replicasets",
-						RoleGroups: []dbaasv1alpha1.ClusterRoleGroup{
-							{
-								Name:     "primary",
-								Replicas: 1,
-							},
-						},
 						VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{
 							{
 								Name: "log",
@@ -257,7 +232,7 @@ spec:
 
 	createOpsRequest := func(opsRequestName, clusterName string, opsType dbaasv1alpha1.OpsType) *dbaasv1alpha1.OpsRequest {
 		opsYaml := fmt.Sprintf(`
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: %s
@@ -538,14 +513,14 @@ spec:
 `, clusterName)
 		statefulSet := &appv1.StatefulSet{}
 		Expect(yaml.Unmarshal([]byte(statefulYaml), statefulSet)).Should(Succeed())
-		Expect(checkedCreateObj(statefulSet)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, statefulSet)).Should(Succeed())
 		return statefulSet
 	}
 
 	Context("Test OpsRequest", func() {
 		It("Should Test all OpsRequest", func() {
 			clusterObject, _, _, key := newClusterObj(nil, nil)
-			Expect(k8sClient.Create(context.Background(), clusterObject)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, clusterObject)).Should(Succeed())
 
 			By("Test Upgrade Ops")
 			ops := createOpsRequest("upgrade_ops", clusterObject.Name, dbaasv1alpha1.UpgradeType)
@@ -624,12 +599,6 @@ spec:
 					ComponentNames: []string{"replicasets"},
 					HorizontalScaling: &dbaasv1alpha1.HorizontalScaling{
 						Replicas: 1,
-						RoleGroups: []dbaasv1alpha1.ClusterRoleGroup{
-							{
-								Name:     "primary",
-								Replicas: 1,
-							},
-						},
 					},
 				},
 			}

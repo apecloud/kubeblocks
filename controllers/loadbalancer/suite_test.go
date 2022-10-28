@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,14 +22,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -42,13 +41,14 @@ func TestLoadbalancer(t *testing.T) {
 }
 
 var (
-	cfg               *rest.Config
-	k8sClient         client.Client
-	testEnv           *envtest.Environment
-	ctx               context.Context
-	cancel            context.CancelFunc
-	serviceController *ServiceController
-	logger            = zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	cfg                *rest.Config
+	k8sClient          client.Client
+	testEnv            *envtest.Environment
+	ctx                context.Context
+	cancel             context.CancelFunc
+	endpointController *EndpointController
+	serviceController  *ServiceController
+	logger             = zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
 )
 
 var _ = BeforeSuite(func() {
@@ -90,6 +90,16 @@ var _ = BeforeSuite(func() {
 		MetricsBindAddress: "0",
 	})
 	Expect(err).ToNot(HaveOccurred())
+
+	endpointController = &EndpointController{
+		logger:   logger,
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("LoadBalancer"),
+	}
+	err = endpointController.SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(endpointController).NotTo(BeNil())
 
 	serviceController = &ServiceController{
 		logger:   logger,

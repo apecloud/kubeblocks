@@ -1,7 +1,7 @@
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       AppVersion
 metadata:
-  name:     appversion-mysql-latest
+  name:     wesql-8.0.18
 spec:
   clusterDefinitionRef: mysql-cluster-definition
   components:
@@ -9,4 +9,4 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: docker.io/infracreate/wesql-server-8.0:0.1-SNAPSHOT
+        image: docker.io/infracreate/wesql-server-8.0:0.1.2

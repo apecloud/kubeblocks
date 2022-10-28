@@ -1,22 +1,26 @@
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       ClusterDefinition
 metadata:
-  name: wesql-clusterdefinition
+  name: apecloud-wesql
 spec:
   type: stat.mysql
   components:
     - typeName: replicasets
+      characterType: mysql
+      monitor:
+        builtIn: true
       configTemplateRefs:
         - name: mysql-3node-tpl-8.0
           volumeName: mysql-config
-      roleGroups:
-        - primary
-      defaultReplicas: 1
-      scripts:
-        horizontalScale:
-          pre:
-            - args:
-                - touch /data/mysql/data/.restore; sync
+      componentType: Consensus
+      consensusSpec:
+        leader:
+          name: leader
+          accessMode: ReadWrite
+        followers:
+          - name: follower
+            accessMode: Readonly
+      defaultReplicas: 3
       podSpec:
         containers:
           - args:
@@ -79,6 +83,3 @@ spec:
                 name: data
               - mountPath: /opt/mysql
                 name: mysql-config
-  roleGroupTemplates:
-  - typeName: primary
-    defaultReplicas: 3

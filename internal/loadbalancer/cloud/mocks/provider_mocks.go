@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -51,21 +51,6 @@ func (m *MockProvider) EXPECT() *MockProviderMockRecorder {
 	return m.recorder
 }
 
-// AllocENI mocks base method.
-func (m *MockProvider) AllocENI() (string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AllocENI")
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// AllocENI indicates an expected call of AllocENI.
-func (mr *MockProviderMockRecorder) AllocENI() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AllocENI", reflect.TypeOf((*MockProvider)(nil).AllocENI))
-}
-
 // AllocIPAddresses mocks base method.
 func (m *MockProvider) AllocIPAddresses(arg0 string) (string, error) {
 	m.ctrl.T.Helper()
@@ -93,6 +78,36 @@ func (m *MockProvider) AssignPrivateIpAddresses(arg0, arg1 string) error {
 func (mr *MockProviderMockRecorder) AssignPrivateIpAddresses(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AssignPrivateIpAddresses", reflect.TypeOf((*MockProvider)(nil).AssignPrivateIpAddresses), arg0, arg1)
+}
+
+// AttachENI mocks base method.
+func (m *MockProvider) AttachENI(arg0, arg1 string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AttachENI", arg0, arg1)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AttachENI indicates an expected call of AttachENI.
+func (mr *MockProviderMockRecorder) AttachENI(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AttachENI", reflect.TypeOf((*MockProvider)(nil).AttachENI), arg0, arg1)
+}
+
+// CreateENI mocks base method.
+func (m *MockProvider) CreateENI(arg0, arg1 string, arg2 []string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateENI", arg0, arg1, arg2)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateENI indicates an expected call of CreateENI.
+func (mr *MockProviderMockRecorder) CreateENI(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateENI", reflect.TypeOf((*MockProvider)(nil).CreateENI), arg0, arg1, arg2)
 }
 
 // DeallocIPAddresses mocks base method.
@@ -139,18 +154,18 @@ func (mr *MockProviderMockRecorder) DescribeAllENIs() *gomock.Call {
 }
 
 // FindLeakedENIs mocks base method.
-func (m *MockProvider) FindLeakedENIs() ([]*cloud.ENIMetadata, error) {
+func (m *MockProvider) FindLeakedENIs(arg0 string) ([]*cloud.ENIMetadata, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindLeakedENIs")
+	ret := m.ctrl.Call(m, "FindLeakedENIs", arg0)
 	ret0, _ := ret[0].([]*cloud.ENIMetadata)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // FindLeakedENIs indicates an expected call of FindLeakedENIs.
-func (mr *MockProviderMockRecorder) FindLeakedENIs() *gomock.Call {
+func (mr *MockProviderMockRecorder) FindLeakedENIs(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindLeakedENIs", reflect.TypeOf((*MockProvider)(nil).FindLeakedENIs))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindLeakedENIs", reflect.TypeOf((*MockProvider)(nil).FindLeakedENIs), arg0)
 }
 
 // FreeENI mocks base method.
@@ -193,6 +208,20 @@ func (m *MockProvider) GetENILimit() int {
 func (mr *MockProviderMockRecorder) GetENILimit() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetENILimit", reflect.TypeOf((*MockProvider)(nil).GetENILimit))
+}
+
+// GetInstanceInfo mocks base method.
+func (m *MockProvider) GetInstanceInfo() *cloud.InstanceInfo {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetInstanceInfo")
+	ret0, _ := ret[0].(*cloud.InstanceInfo)
+	return ret0
+}
+
+// GetInstanceInfo indicates an expected call of GetInstanceInfo.
+func (mr *MockProviderMockRecorder) GetInstanceInfo() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInstanceInfo", reflect.TypeOf((*MockProvider)(nil).GetInstanceInfo))
 }
 
 // ModifySourceDestCheck mocks base method.

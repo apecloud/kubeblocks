@@ -32,4 +32,7 @@ jobs:
         run: |
           helm registry login -u ${{ secrets.HELM_REGISTRY_USER }} -p ${{ secrets.HELM_REGISTRY_PASSWORD }} \
             ${{ env.HELM_REGISTRY_URL }}
-          VERSION=${{ env.RELEASE_VERSION }} make helm-push
+          
+          RELEASE_VERSION=`bash ${{ github.workspace }}/.github/workflows/utils.sh ${{ env.RELEASE_VERSION }} 1`
+          
+          VERSION=$RELEASE_VERSION make helm-push

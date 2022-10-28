@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,21 +17,23 @@ limitations under the License.
 package dbaas
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
-	appsv1 "k8s.io/api/apps/v1"
-
-	corev1 "k8s.io/api/core/v1"
-
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-
-	"github.com/leaanthony/debme"
-	ctrl "sigs.k8s.io/controller-runtime"
+	"github.com/sethvargo/go-password/password"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/yaml"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"github.com/leaanthony/debme"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -56,6 +58,15 @@ func TestReadCUETplFromEmbeddedFS(t *testing.T) {
 }
 
 var _ = Describe("lifecycle_utils", func() {
+
+	BeforeEach(func() {
+		// Add any steup steps that needs to be executed before each test
+	})
+
+	AfterEach(func() {
+		// Add any teardown steps that needs to be executed after each test
+	})
+
 	Context("mergeMonitorConfig", func() {
 		var component *Component
 		var cluster *dbaasv1alpha1.Cluster
@@ -195,7 +206,7 @@ var _ = Describe("lifecycle_utils", func() {
 							Containers: []corev1.Container{
 								{
 									Name:            "mysql",
-									Image:           "docker.io/infracreate/wesql-server-8.0:0.1-SNAPSHOT",
+									Image:           "docker.io/apecloud/wesql-server-8.0:0.1-SNAPSHOT",
 									ImagePullPolicy: "IfNotPresent",
 									VolumeMounts: []corev1.VolumeMount{
 										{
@@ -241,6 +252,307 @@ var _ = Describe("lifecycle_utils", func() {
 			err := checkAndUpdatePodVolumes(&sts, volumes)
 			Expect(err).Should(BeNil())
 			Expect(len(sts.Spec.Template.Spec.Volumes)).To(Equal(3))
+		})
+	})
+
+	allFieldsClusterDefObj := func() *dbaasv1alpha1.ClusterDefinition {
+		By("By assure an clusterDefinition obj")
+		clusterDefYAML := `
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: cluster-definition
+spec:
+  type: state.mysql-8
+  components:
+  - typeName: replicasets
+    componentType: Stateful
+    configTemplateRefs: 
+    - name: mysql-tree-node-template-8.0 
+      volumeName: mysql-config
+    defaultReplicas: 1
+    podSpec:
+      containers:
+      - name: mysql
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3306
+          protocol: TCP
+          name: mysql
+        - containerPort: 13306
+          protocol: TCP
+          name: paxos
+        volumeMounts:
+          - mountPath: /var/lib/mysql
+            name: data
+          - mountPath: /var/log
+            name: log
+          - mountPath: /data/config
+            name: mysql-config
+        env:
+          - name: "MYSQL_ROOT_PASSWORD"
+            valueFrom:
+              secretKeyRef:
+                name: $(OPENDBAAS_MY_SECRET_NAME)
+                key: password
+        command: ["/usr/bin/bash", "-c"]
+        args:
+          - >
+            cluster_info="";
+            for (( i=0; i<$OPENDBAAS_REPLICASETS_PRIMARY_N; i++ )); do
+              if [ $i -ne 0 ]; then
+                cluster_info="$cluster_info;";
+              fi;
+              host=$(eval echo \$OPENDBAAS_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
+              cluster_info="$cluster_info$host:13306";
+            done;
+            idx=0;
+            while IFS='-' read -ra ADDR; do
+              for i in "${ADDR[@]}"; do
+                idx=$i;
+              done;
+            done <<< "$OPENDBAAS_MY_POD_NAME";
+            echo $idx;
+            cluster_info="$cluster_info@$(($idx+1))";
+            echo $cluster_info;
+            docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
+  - typeName: proxy
+    componentType: Stateless
+    defaultReplicas: 1
+    podSpec:
+      containers:
+      - name: nginx
+    service:
+      ports:
+      - protocol: TCP
+        port: 80
+`
+		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
+		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, clusterDefinition)).Should(Succeed())
+		return clusterDefinition
+	}
+
+	allFieldsAppVersionObj := func() *dbaasv1alpha1.AppVersion {
+		By("By assure an appVersion obj")
+		appVerYAML := `
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind:       AppVersion
+metadata:
+  name:     app-version
+spec:
+  clusterDefinitionRef: cluster-definition
+  components:
+  - type: replicasets
+    configTemplateRefs: 
+    - name: mysql-tree-node-template-8.0 
+      volumeName: mysql-config
+    podSpec:
+      containers:
+      - name: mysql
+        image: registry.jihulab.com/infracreate/mysql-server/mysql/wesql-server-arm:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3306
+          protocol: TCP
+          name: mysql
+        - containerPort: 13306
+          protocol: TCP
+          name: paxos
+        volumeMounts:
+          - mountPath: /var/lib/mysql
+            name: data
+          - mountPath: /var/log
+            name: log
+          - mountPath: /data/config
+            name: mysql-config
+        env:
+          - name: "MYSQL_ROOT_PASSWORD"
+            valueFrom:
+              secretKeyRef:
+                name: $(OPENDBAAS_MY_SECRET_NAME)
+                key: password
+        command: ["/usr/bin/bash", "-c"]
+        args:
+          - >
+            cluster_info="";
+            for (( i=0; i<$OPENDBAAS_REPLICASETS_PRIMARY_N; i++ )); do
+              if [ $i -ne 0 ]; then
+                cluster_info="$cluster_info;";
+              fi;
+              host=$(eval echo \$OPENDBAAS_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
+              cluster_info="$cluster_info$host:13306";
+            done;
+            idx=0;
+            while IFS='-' read -ra ADDR; do
+              for i in "${ADDR[@]}"; do
+                idx=$i;
+              done;
+            done <<< "$OPENDBAAS_MY_POD_NAME";
+            echo $idx;
+            cluster_info="$cluster_info@$(($idx+1))";
+            echo $cluster_info;
+            docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
+        workingDir: "/"
+        envFrom: 
+        - configMapRef: 
+            name: test
+        resources: 
+          requests: 
+            cpu: 2
+            memory: 4Gi
+        volumeDevices:
+        - name: test
+          devicePath: /test
+        livenessProbe:
+          exec:
+            command:
+            - cat
+            - /tmp/healthy
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        readinessProbe:
+          exec:
+            command:
+            - cat
+            - /tmp/healthy
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        startupProbe:
+          exec:
+            command:
+            - cat
+            - /tmp/healthy
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        lifecycle: 
+          postStart:
+            exec: 
+              command: 
+              - cat
+              - /tmp/healthy
+          preStop:
+            exec: 
+              command: 
+              - cat
+              - /tmp/healthy
+        terminationMessagePath: "/dev/termination-log"
+        terminationMessagePolicy: File
+        securityContext:
+          allowPrivilegeEscalation: false
+  - type: proxy
+    podSpec: 
+      containers:
+      - name: nginx
+        image: nginx
+`
+		appVersion := &dbaasv1alpha1.AppVersion{}
+		Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, appVersion)).Should(Succeed())
+		return appVersion
+	}
+
+	newAllFieldsClusterObj := func(
+		clusterDefObj *dbaasv1alpha1.ClusterDefinition,
+		appVersionObj *dbaasv1alpha1.AppVersion,
+	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.AppVersion, types.NamespacedName) {
+		// setup Cluster obj required default ClusterDefinition and AppVersion objects if not provided
+		if clusterDefObj == nil {
+			clusterDefObj = allFieldsClusterDefObj()
+		}
+		if appVersionObj == nil {
+			appVersionObj = allFieldsAppVersionObj()
+		}
+
+		randomStr, _ := password.Generate(6, 0, 0, true, false)
+		key := types.NamespacedName{
+			Name:      "cluster" + randomStr,
+			Namespace: "default",
+		}
+
+		clusterYaml := fmt.Sprintf(`
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind: Cluster
+metadata:
+  name: %s
+  namespace: %s
+spec:
+  clusterDefinitionRef: %s
+  appVersionRef: %s
+  components:
+  - name: replicasets
+    type: replicasets
+    monitor: true
+    roleGroups:
+    - name: primary
+      type: primary
+      replicas: 3
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+    resources: 
+      requests: 
+        cpu: 2
+        memory: 4Gi
+`, key.Name, key.Namespace, clusterDefObj.GetName(), appVersionObj.GetName())
+
+		cluster := &dbaasv1alpha1.Cluster{}
+		Expect(yaml.Unmarshal([]byte(clusterYaml), cluster)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
+
+		return cluster, clusterDefObj, appVersionObj, key
+	}
+
+	Context("When mergeComponents", func() {
+		It("Should merge with no error", func() {
+			cluster, clusterDef, appVer, _ := newAllFieldsClusterObj(nil, nil)
+			By("assign every available fields")
+			component := mergeComponents(
+				cluster,
+				clusterDef,
+				&clusterDef.Spec.Components[0],
+				&appVer.Spec.Components[0],
+				&cluster.Spec.Components[0])
+			Expect(component).ShouldNot(BeNil())
+			By("leave appVer.podSpec nil")
+			appVer.Spec.Components[0].PodSpec = nil
+			component = mergeComponents(
+				cluster,
+				clusterDef,
+				&clusterDef.Spec.Components[0],
+				&appVer.Spec.Components[0],
+				&cluster.Spec.Components[0])
+			Expect(component).ShouldNot(BeNil())
+			appVer = allFieldsAppVersionObj()
+			By("new container in appversion not in clusterdefinition")
+			component = mergeComponents(
+				cluster,
+				clusterDef,
+				&clusterDef.Spec.Components[0],
+				&appVer.Spec.Components[1],
+				&cluster.Spec.Components[0])
+			Expect(len(component.PodSpec.Containers)).Should(Equal(2))
+			By("leave clusterComp nil")
+			component = mergeComponents(
+				cluster,
+				clusterDef,
+				&clusterDef.Spec.Components[0],
+				&appVer.Spec.Components[0],
+				nil)
+			Expect(component).ShouldNot(BeNil())
+			By("leave clusterDefComp nil")
+			component = mergeComponents(
+				cluster,
+				clusterDef,
+				nil,
+				&appVer.Spec.Components[0],
+				&cluster.Spec.Components[0])
+			Expect(component).Should(BeNil())
 		})
 	})
 })

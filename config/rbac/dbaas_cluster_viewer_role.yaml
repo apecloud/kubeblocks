@@ -5,7 +5,7 @@ metadata:
   name: cluster-viewer-role
 rules:
 - apiGroups:
-  - dbaas.infracreate.com
+  - dbaas.kubeblocks.io
   resources:
   - clusters
   verbs:
@@ -13,7 +13,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - dbaas.infracreate.com
+  - dbaas.kubeblocks.io
   resources:
   - clusters/status
   verbs:

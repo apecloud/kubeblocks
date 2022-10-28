@@ -95,8 +95,10 @@ rules:
   - endpoints
   - pods
   verbs:
+  - delete
   - get
   - list
+  - patch
   - update
   - watch
 - apiGroups:
@@ -108,6 +110,7 @@ rules:
   - get
   - list
   - patch
+  - watch
 - apiGroups:
   - ""
   resources:
@@ -123,7 +126,7 @@ rules:
   verbs:
   - create
 - apiGroups:
-  - dataprotection.infracreate.com
+  - dataprotection.kubeblocks.io
   resources:
   - backupjobs
   verbs:
@@ -135,13 +138,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - dataprotection.infracreate.com
+  - dataprotection.kubeblocks.io
   resources:
   - backupjobs/finalizers
   verbs:
   - update
 - apiGroups:
-  - dataprotection.infracreate.com
+  - dataprotection.kubeblocks.io
   resources:
   - backupjobs/status
   verbs:
@@ -149,7 +152,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - dataprotection.infracreate.com
+  - dataprotection.kubeblocks.io
   resources:
   - backuppolicies
   verbs:
@@ -161,13 +164,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - dataprotection.infracreate.com
+  - dataprotection.kubeblocks.io
   resources:
   - backuppolicies/finalizers
   verbs:
   - update
 - apiGroups:
-  - dataprotection.infracreate.com
+  - dataprotection.kubeblocks.io
   resources:
   - backuppolicies/status
   verbs:
@@ -175,7 +178,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - dataprotection.infracreate.com
+  - dataprotection.kubeblocks.io
   resources:
   - backuppolicytemplates
   verbs:
@@ -187,13 +190,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - dataprotection.infracreate.com
+  - dataprotection.kubeblocks.io
   resources:
   - backuppolicytemplates/finalizers
   verbs:
   - update
 - apiGroups:
-  - dataprotection.infracreate.com
+  - dataprotection.kubeblocks.io
   resources:
   - backuppolicytemplates/status
   verbs:
@@ -201,7 +204,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - dataprotection.infracreate.com
+  - dataprotection.kubeblocks.io
   resources:
   - backuptools
   verbs:
@@ -213,13 +216,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - dataprotection.infracreate.com
+  - dataprotection.kubeblocks.io
   resources:
   - backuptools/finalizers
   verbs:
   - update
 - apiGroups:
-  - dataprotection.infracreate.com
+  - dataprotection.kubeblocks.io
   resources:
   - backuptools/status
   verbs:
@@ -227,7 +230,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - dataprotection.infracreate.com
+  - dataprotection.kubeblocks.io
   resources:
   - restorejobs
   verbs:
@@ -239,13 +242,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - dataprotection.infracreate.com
+  - dataprotection.kubeblocks.io
   resources:
   - restorejobs/finalizers
   verbs:
   - update
 - apiGroups:
-  - dataprotection.infracreate.com
+  - dataprotection.kubeblocks.io
   resources:
   - restorejobs/status
   verbs:
@@ -253,7 +256,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - dbaas.infracreate.com
+  - dbaas.kubeblocks.io
   resources:
   - appversions
   verbs:
@@ -265,13 +268,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - dbaas.infracreate.com
+  - dbaas.kubeblocks.io
   resources:
   - appversions/finalizers
   verbs:
   - update
 - apiGroups:
-  - dbaas.infracreate.com
+  - dbaas.kubeblocks.io
   resources:
   - appversions/status
   verbs:
@@ -279,7 +282,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - dbaas.infracreate.com
+  - dbaas.kubeblocks.io
   resources:
   - clusterdefinitions
   verbs:
@@ -291,13 +294,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - dbaas.infracreate.com
+  - dbaas.kubeblocks.io
   resources:
   - clusterdefinitions/finalizers
   verbs:
   - update
 - apiGroups:
-  - dbaas.infracreate.com
+  - dbaas.kubeblocks.io
   resources:
   - clusterdefinitions/status
   verbs:
@@ -305,7 +308,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - dbaas.infracreate.com
+  - dbaas.kubeblocks.io
   resources:
   - clusters
   verbs:
@@ -317,13 +320,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - dbaas.infracreate.com
+  - dbaas.kubeblocks.io
   resources:
   - clusters/finalizers
   verbs:
   - update
 - apiGroups:
-  - dbaas.infracreate.com
+  - dbaas.kubeblocks.io
   resources:
   - clusters/status
   verbs:
@@ -331,7 +334,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - dbaas.infracreate.com
+  - dbaas.kubeblocks.io
   resources:
   - opsrequests
   verbs:
@@ -343,13 +346,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - dbaas.infracreate.com
+  - dbaas.kubeblocks.io
   resources:
   - opsrequests/finalizers
   verbs:
   - update
 - apiGroups:
-  - dbaas.infracreate.com
+  - dbaas.kubeblocks.io
   resources:
   - opsrequests/status
   verbs:
@@ -375,16 +378,24 @@ rules:
   verbs:
   - update
 - apiGroups:
-  - rbac.authorization.k8s.io
+  - snapshot.storage.k8s.io
   resources:
-  - rolebindings
-  - roles
+  - volumesnapshots
   verbs:
   - create
+  - delete
   - get
   - list
+  - patch
   - update
   - watch
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshots/finalizers
+  verbs:
+  - patch
+  - update
 - apiGroups:
   - storage.k8s.io
   resources:

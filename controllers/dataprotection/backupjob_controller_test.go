@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,9 +23,9 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 
 	"github.com/sethvargo/go-password/password"
+	"github.com/spf13/viper"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -43,12 +43,29 @@ var _ = Describe("BackupJob Controller", func() {
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
 
-	checkedCreateObj := func(obj client.Object) error {
-		if err := k8sClient.Create(context.Background(), obj); err != nil && !apierrors.IsAlreadyExists(err) {
-			return err
-		}
-		return nil
-	}
+	var ctx = context.Background()
+
+	BeforeEach(func() {
+		// Add any steup steps that needs to be executed before each test
+
+		err := k8sClient.DeleteAllOf(ctx, &appv1.StatefulSet{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &corev1.Pod{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &dataprotectionv1alpha1.BackupJob{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &dataprotectionv1alpha1.BackupTool{}, client.HasLabels{testCtx.DefaultNamespace})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &appv1.StatefulSet{},
+			client.InNamespace(testCtx.DefaultNamespace),
+			client.HasLabels{testCtx.TestObjLabelKey},
+		)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		// Add any teardown steps that needs to be executed after each test
+	})
 
 	genarateNS := func(prefix string) types.NamespacedName {
 		randomStr, _ := password.Generate(6, 0, 0, true, false)
@@ -62,17 +79,16 @@ var _ = Describe("BackupJob Controller", func() {
 	assureBackupJobObj := func(backupPolicy string) *dataprotectionv1alpha1.BackupJob {
 		By("By assure an backupJob obj")
 		backupJobYaml := `
-apiVersion: dataprotection.infracreate.com/v1alpha1
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupJob
 metadata:
   name: backup-success-demo
-  namespace: default
 
   labels:
-    dataprotection.infracreate.com/backup-type: full
-    db.infracreate.com/name: mysqlcluster
-    dataprotection.infracreate.com/backup-policy-name: backup-policy-demo
-    dataprotection.infracreate.com/backup-index: "0"
+    dataprotection.kubeblocks.io/backup-type: full
+    db.kubeblocks.io/name: mysqlcluster
+    dataprotection.kubeblocks.io/backup-policy-name: backup-policy-demo
+    dataprotection.kubeblocks.io/backup-index: "0"
 
 spec:
   backupPolicyName: backup-policy-demo
@@ -86,23 +102,23 @@ spec:
 		backupJob.Namespace = ns.Namespace
 		backupJob.Spec.BackupPolicyName = backupPolicy
 
-		Expect(checkedCreateObj(backupJob)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, backupJob)).Should(Succeed())
 		return backupJob
 	}
 
 	deleteBackupJobNWait := func(key types.NamespacedName) error {
 		Expect(func() error {
 			f := &dataprotectionv1alpha1.BackupJob{}
-			if err := k8sClient.Get(context.Background(), key, f); err != nil {
+			if err := k8sClient.Get(ctx, key, f); err != nil {
 				return client.IgnoreNotFound(err)
 			}
-			return k8sClient.Delete(context.Background(), f)
+			return k8sClient.Delete(ctx, f)
 		}()).Should(Succeed())
 
 		var err error
 		f := &dataprotectionv1alpha1.BackupJob{}
 		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(context.Background(), key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(context.Background(), key, f) {
+		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
 			f = &dataprotectionv1alpha1.BackupJob{}
 		}
 		return client.IgnoreNotFound(err)
@@ -111,11 +127,10 @@ spec:
 	assureBackupPolicyObj := func(backupTool string) *dataprotectionv1alpha1.BackupPolicy {
 		By("By assure an backupPolicy obj")
 		backupPolicyYaml := `
-apiVersion: dataprotection.infracreate.com/v1alpha1
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupPolicy
 metadata:
   name: backup-policy-demo
-  namespace: default
 spec:
   schedule: "0 3 * * *"
   ttl: 168h0m0s
@@ -142,23 +157,23 @@ spec:
 		backupPolicy.Name = ns.Name
 		backupPolicy.Namespace = ns.Namespace
 		backupPolicy.Spec.BackupToolName = backupTool
-		Expect(checkedCreateObj(backupPolicy)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, backupPolicy)).Should(Succeed())
 		return backupPolicy
 	}
 
 	deleteBackupPolicyNWait := func(key types.NamespacedName) error {
 		Expect(func() error {
 			f := &dataprotectionv1alpha1.BackupPolicy{}
-			if err := k8sClient.Get(context.Background(), key, f); err != nil {
+			if err := k8sClient.Get(ctx, key, f); err != nil {
 				return client.IgnoreNotFound(err)
 			}
-			return k8sClient.Delete(context.Background(), f)
+			return k8sClient.Delete(ctx, f)
 		}()).Should(Succeed())
 
 		var err error
 		f := &dataprotectionv1alpha1.BackupPolicy{}
 		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(context.Background(), key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(context.Background(), key, f) {
+		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
 			f = &dataprotectionv1alpha1.BackupPolicy{}
 		}
 		return client.IgnoreNotFound(err)
@@ -167,11 +182,10 @@ spec:
 	assureBackupToolObj := func() *dataprotectionv1alpha1.BackupTool {
 		By("By assure an backupTool obj")
 		backupToolYaml := `
-apiVersion: dataprotection.infracreate.com/v1alpha1
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupTool
 metadata:
   name: xtrabackup-mysql
-  namespace: default
 spec:
   image: percona/percona-xtrabackup
   databaseEngine: mysql
@@ -211,23 +225,23 @@ spec:
 		ns := genarateNS("backup-tool-")
 		backupTool.Name = ns.Name
 		backupTool.Namespace = ns.Namespace
-		Expect(checkedCreateObj(backupTool)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, backupTool)).Should(Succeed())
 		return backupTool
 	}
 
 	deleteBackupToolNWait := func(key types.NamespacedName) error {
 		Expect(func() error {
 			f := &dataprotectionv1alpha1.BackupTool{}
-			if err := k8sClient.Get(context.Background(), key, f); err != nil {
+			if err := k8sClient.Get(ctx, key, f); err != nil {
 				return client.IgnoreNotFound(err)
 			}
-			return k8sClient.Delete(context.Background(), f)
+			return k8sClient.Delete(ctx, f)
 		}()).Should(Succeed())
 
 		var err error
 		f := &dataprotectionv1alpha1.BackupTool{}
 		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(context.Background(), key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(context.Background(), key, f) {
+		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
 			f = &dataprotectionv1alpha1.BackupTool{}
 		}
 		return client.IgnoreNotFound(err)
@@ -239,11 +253,9 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  generation: 2
   labels:
     app.kubernetes.io/instance: wesql-cluster
   name: wesql-cluster-replicasets-primary
-  namespace: default
 spec:
   minReadySeconds: 10
   podManagementPolicy: Parallel
@@ -268,7 +280,7 @@ spec:
         command:
         - /bin/bash
         - -c
-        image: docker.io/infracreate/wesql-server-8.0:0.1-SNAPSHOT
+        image: docker.io/apecloud/wesql-server-8.0:0.1-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: mysql
         ports:
@@ -306,14 +318,11 @@ spec:
         requests:
           storage: 1Gi
       volumeMode: Filesystem
-    status:
-      phase: Pending
 `
 		podYaml := `
 apiVersion: v1
 kind: Pod
 metadata:
-  creationTimestamp: '2022-09-28T16:03:21Z'
   generateName: wesql-cluster-replicasets-primary-
   labels:
     statefulset.kubernetes.io/pod-name: wesql-cluster-replicasets-primary-0
@@ -327,16 +336,16 @@ spec:
         - /bin/bash
         - '-c'
       env:
-        - name: OPENDBAAS_MY_POD_NAME
+        - name: KB_POD_NAME
           valueFrom:
             fieldRef:
               apiVersion: v1
               fieldPath: metadata.name
-        - name: OPENDBAAS_REPLICASETS_PRIMARY_N
+        - name: KB_REPLICASETS_PRIMARY_N
           value: '1'
-        - name: OPENDBAAS_REPLICASETS_PRIMARY_0_HOSTNAME
+        - name: KB_REPLICASETS_PRIMARY_0_HOSTNAME
           value: wesql-cluster-replicasets-primary-0
-      image: 'docker.io/infracreate/wesql-server-8.0:0.1-SNAPSHOT'
+      image: 'docker.io/apecloud/wesql-server-8.0:0.1-SNAPSHOT'
       imagePullPolicy: IfNotPresent
       name: mysql
       ports:
@@ -377,22 +386,28 @@ spec:
 `
 		statefulSet := &appv1.StatefulSet{}
 		Expect(yaml.Unmarshal([]byte(statefulYaml), statefulSet)).Should(Succeed())
-		Expect(checkedCreateObj(statefulSet)).Should(Succeed())
+		statefulSet.SetNamespace(testCtx.DefaultNamespace)
+		statefulSet.Spec.Template.GetLabels()[testCtx.TestObjLabelKey] = "true"
+		Expect(testCtx.CheckedCreateObj(ctx, statefulSet)).Should(Succeed())
 
+		if viper.GetBool("USE_EXISTING_CLUSTER") {
+			return statefulSet
+		}
 		pod := &corev1.Pod{}
 		Expect(yaml.Unmarshal([]byte(podYaml), pod)).Should(Succeed())
-		Expect(checkedCreateObj(pod)).Should(Succeed())
+		pod.GetLabels()[testCtx.TestObjLabelKey] = "true"
+		Expect(testCtx.CheckedCreateObj(ctx, pod)).Should(Succeed())
 		return statefulSet
 	}
 
 	patchK8sJobStatus := func(jobStatus batchv1.JobConditionType, key types.NamespacedName) {
 		k8sJob := &batchv1.Job{}
-		Expect(k8sClient.Get(context.Background(), key, k8sJob)).Should(Succeed())
+		Expect(k8sClient.Get(ctx, key, k8sJob)).Should(Succeed())
 
 		patch := client.MergeFrom(k8sJob.DeepCopy())
 		jobCondition := batchv1.JobCondition{Type: jobStatus}
 		k8sJob.Status.Conditions = append(k8sJob.Status.Conditions, jobCondition)
-		Expect(k8sClient.Status().Patch(context.Background(), k8sJob, patch)).Should(Succeed())
+		Expect(k8sClient.Status().Patch(ctx, k8sJob, patch)).Should(Succeed())
 	}
 
 	Context("When creating backupJob", func() {
@@ -419,7 +434,7 @@ spec:
 			time.Sleep(waitDuration)
 
 			result := &dataprotectionv1alpha1.BackupJob{}
-			Expect(k8sClient.Get(context.Background(), key, result)).Should(Succeed())
+			Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
 
 			By("Deleting the scope")
 
@@ -468,7 +483,7 @@ spec:
 			time.Sleep(waitDuration)
 
 			result := &dataprotectionv1alpha1.BackupJob{}
-			Expect(k8sClient.Get(context.Background(), key, result)).Should(Succeed())
+			Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
 
 			By("Deleting the scope")
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -79,8 +79,11 @@ var _ = Describe("dbaas", func() {
 				Namespace: "default",
 			},
 			Version: version.DefaultKubeBlocksVersion,
+			Monitor: true,
 		}
 		Expect(o.run()).To(Or(Succeed(), HaveOccurred()))
+		Expect(len(o.Sets)).To(Equal(1))
+		Expect(o.Sets[0]).To(Equal(kMonitorParam))
 	})
 
 	It("check uninstall", func() {

@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/sethvargo/go-password/password"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -39,12 +38,19 @@ var _ = Describe("BackupPolicyTemplate Controller", func() {
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
 
-	checkedCreateObj := func(obj client.Object) error {
-		if err := k8sClient.Create(context.Background(), obj); err != nil && !apierrors.IsAlreadyExists(err) {
-			return err
-		}
-		return nil
-	}
+	var ctx = context.Background()
+
+	BeforeEach(func() {
+		// Add any steup steps that needs to be executed before each test
+		err := k8sClient.DeleteAllOf(ctx, &dataprotectionv1alpha1.BackupTool{}, client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &dataprotectionv1alpha1.BackupPolicyTemplate{}, client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		// Add any teardown steps that needs to be executed after each test
+	})
 
 	genarateNS := func(prefix string) types.NamespacedName {
 		randomStr, _ := password.Generate(6, 0, 0, true, false)
@@ -58,7 +64,7 @@ var _ = Describe("BackupPolicyTemplate Controller", func() {
 	assureBackupPolicyTemplateObj := func(backupTool string) *dataprotectionv1alpha1.BackupPolicyTemplate {
 		By("By assure an backupPolicyTemplate obj")
 		backupPolicyYaml := `
-apiVersion: dataprotection.infracreate.com/v1alpha1
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupPolicyTemplate
 metadata:
   name: backup-policy-template-demo
@@ -75,23 +81,23 @@ spec:
 		backupPolicyTemp.Name = ns.Name
 		backupPolicyTemp.Namespace = ns.Namespace
 		backupPolicyTemp.Spec.BackupToolName = backupTool
-		Expect(checkedCreateObj(backupPolicyTemp)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, backupPolicyTemp)).Should(Succeed())
 		return backupPolicyTemp
 	}
 
 	deleteBackupPolicyTemplateNWait := func(key types.NamespacedName) error {
 		Expect(func() error {
 			f := &dataprotectionv1alpha1.BackupPolicyTemplate{}
-			if err := k8sClient.Get(context.Background(), key, f); err != nil {
+			if err := k8sClient.Get(ctx, key, f); err != nil {
 				return client.IgnoreNotFound(err)
 			}
-			return k8sClient.Delete(context.Background(), f)
+			return k8sClient.Delete(ctx, f)
 		}()).Should(Succeed())
 
 		var err error
 		f := &dataprotectionv1alpha1.BackupPolicyTemplate{}
 		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(context.Background(), key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(context.Background(), key, f) {
+		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
 			f = &dataprotectionv1alpha1.BackupPolicyTemplate{}
 		}
 		return client.IgnoreNotFound(err)
@@ -100,7 +106,7 @@ spec:
 	assureBackupToolObj := func() *dataprotectionv1alpha1.BackupTool {
 		By("By assure an backupTool obj")
 		backupToolYaml := `
-apiVersion: dataprotection.infracreate.com/v1alpha1
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupTool
 metadata:
   name: xtrabackup-mysql
@@ -152,23 +158,23 @@ spec:
 		ns := genarateNS("backup-tool-")
 		backupTool.Name = ns.Name
 		backupTool.Namespace = ns.Namespace
-		Expect(checkedCreateObj(backupTool)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, backupTool)).Should(Succeed())
 		return backupTool
 	}
 
 	deleteBackupToolNWait := func(key types.NamespacedName) error {
 		Expect(func() error {
 			f := &dataprotectionv1alpha1.BackupTool{}
-			if err := k8sClient.Get(context.Background(), key, f); err != nil {
+			if err := k8sClient.Get(ctx, key, f); err != nil {
 				return client.IgnoreNotFound(err)
 			}
-			return k8sClient.Delete(context.Background(), f)
+			return k8sClient.Delete(ctx, f)
 		}()).Should(Succeed())
 
 		var err error
 		f := &dataprotectionv1alpha1.BackupTool{}
 		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(context.Background(), key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(context.Background(), key, f) {
+		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
 			f = &dataprotectionv1alpha1.BackupTool{}
 		}
 		return client.IgnoreNotFound(err)
@@ -188,7 +194,7 @@ spec:
 			}
 			time.Sleep(waitDuration)
 			result := &dataprotectionv1alpha1.BackupPolicyTemplate{}
-			Expect(k8sClient.Get(context.Background(), key, result)).Should(Succeed())
+			Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
 
 			By("Deleting the scope")
 

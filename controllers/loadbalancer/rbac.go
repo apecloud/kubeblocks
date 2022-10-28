@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ limitations under the License.
 package loadbalancer
 
 // read + update access
-//+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;update;watch
+//+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;update
 
 // read only + watch access
 //+kubebuilder:rbac:groups=core,resources=pods;endpoints,verbs=get;list;watch

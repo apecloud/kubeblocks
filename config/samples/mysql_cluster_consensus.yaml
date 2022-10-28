@@ -1,0 +1,26 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: mysql-cluster-01
+  namespace: default
+spec:
+  clusterDefinitionRef: mysql-clusterdef-consensus
+  appVersionRef: app-version-consensus
+  components:
+  - name: replicasets
+    type: replicasets
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+    - name: log
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi

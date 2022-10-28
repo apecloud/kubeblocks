@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,8 +17,6 @@ limitations under the License.
 package controllerutil
 
 import (
-	"context"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -45,9 +43,9 @@ func NewTask() Task {
 }
 
 // TaskFunction REVIEW (cx): using interface{} is rather error-prone
-type TaskFunction func(context.Context, client.Client, interface{}) error
+type TaskFunction func(RequestCtx, client.Client, interface{}) error
 
-func (t *Task) Exec(ctx context.Context, cli client.Client) error {
+func (t *Task) Exec(ctx RequestCtx, cli client.Client) error {
 	if t.PreFunction != nil {
 		if err := t.PreFunction(ctx, cli, t.Context["pre"]); err != nil {
 			return err

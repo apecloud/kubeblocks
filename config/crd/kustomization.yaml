@@ -2,16 +2,16 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-- bases/dbaas.infracreate.com_clusters.yaml
-- bases/dbaas.infracreate.com_clusterdefinitions.yaml
-- bases/dbaas.infracreate.com_appversions.yaml
-- bases/dataprotection.infracreate.com_backuptools.yaml
-- bases/dataprotection.infracreate.com_backupconfigs.yaml
-- bases/dataprotection.infracreate.com_backuppolicies.yaml
-- bases/dataprotection.infracreate.com_backupjobs.yaml
-- bases/dataprotection.infracreate.com_restorejobs.yaml
-- bases/dataprotection.infracreate.com_backuppolicytemplates.yaml
-- bases/dbaas.infracreate.com_opsrequests.yaml
+- bases/dbaas.kubeblocks.io_clusters.yaml
+- bases/dbaas.kubeblocks.io_clusterdefinitions.yaml
+- bases/dbaas.kubeblocks.io_appversions.yaml
+- bases/dataprotection.kubeblocks.io_backuptools.yaml
+- bases/dataprotection.kubeblocks.io_backupconfigs.yaml
+- bases/dataprotection.kubeblocks.io_backuppolicies.yaml
+- bases/dataprotection.kubeblocks.io_backupjobs.yaml
+- bases/dataprotection.kubeblocks.io_restorejobs.yaml
+- bases/dataprotection.kubeblocks.io_backuppolicytemplates.yaml
+- bases/dbaas.kubeblocks.io_opsrequests.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

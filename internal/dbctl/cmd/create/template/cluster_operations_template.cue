@@ -74,7 +74,7 @@ options: {
 
 // required, k8s api resource content
 content: {
-	apiVersion: "dbaas.infracreate.com/v1alpha1"
+	apiVersion: "dbaas.kubeblocks.io/v1alpha1"
 	kind:       "OpsRequest"
 	metadata: {
 		if options.opsRequestName == "" {

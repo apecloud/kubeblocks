@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,7 +31,8 @@ var _ = Describe("installer", func() {
 			Namespace: "default",
 			Version:   version.DefaultKubeBlocksVersion,
 		}
-		Expect(i.Install()).Should(Or(Succeed(), HaveOccurred()))
+		_, err := i.Install()
+		Expect(err).Should(Or(Succeed(), HaveOccurred()))
 	})
 
 	It("uninstall", func() {

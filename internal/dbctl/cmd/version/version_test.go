@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/dynamic"
@@ -40,15 +41,15 @@ kind: Deployment
 metadata:
   annotations:
     deployment.kubernetes.io/revision: "1"
-    meta.helm.sh/release-name: opendbaas-core
+    meta.helm.sh/release-name: kubeblocks
     meta.helm.sh/release-namespace: default
   labels:
-    app.kubernetes.io/instance: opendbaas-core
+    app.kubernetes.io/instance: kubeblocks
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: %s
     app.kubernetes.io/version: 0.2.0-wyl
-    helm.sh/chart: opendbaas-core-0.1.0-wyl
-  name: opendbaas-core
+    helm.sh/chart: kubeblocks-0.1.0-wyl
+  name: kubeblocks
   namespace: default
 spec:
   progressDeadlineSeconds: 600
@@ -56,14 +57,14 @@ spec:
   revisionHistoryLimit: 10
   selector:
     matchLabels:
-      app.kubernetes.io/instance: opendbaas-core
-      app.kubernetes.io/name: opendbaas-core
+      app.kubernetes.io/instance: kubeblocks
+      app.kubernetes.io/name: kubeblocks
   template:
     metadata:
       creationTimestamp: null
       labels:
-        app.kubernetes.io/instance: opendbaas-core
-        app.kubernetes.io/name: opendbaas-core
+        app.kubernetes.io/instance: kubeblocks
+        app.kubernetes.io/name: kubeblocks
     spec:
       containers:
       - args:
@@ -76,7 +77,7 @@ spec:
         env:
         - name: ENABLE_WEBHOOKS
           value: "true"
-        image: docker.io/wangyelei/opendbaas-core:0.1.0-wyl
+        image: docker.io/wangyelei/kubeblocks:0.1.0-wyl
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3
@@ -126,8 +127,8 @@ spec:
       schedulerName: default-scheduler
       securityContext:
         runAsNonRoot: true
-      serviceAccount: opendbaas-core
-      serviceAccountName: opendbaas-core
+      serviceAccount: kubeblocks
+      serviceAccountName: kubeblocks
       terminationGracePeriodSeconds: 10
       volumes:
       - configMap:
@@ -137,7 +138,7 @@ spec:
       - name: cert
         secret:
           defaultMode: 420
-          secretName: opendbaas-core.default.svc.tls-pair
+          secretName: kubeblocks.default.svc.tls-pair
 `, types.KubeBlocksChartName)
 		deployment := &appsv1.Deployment{}
 		_ = yaml.Unmarshal([]byte(deployYaml), deployment)

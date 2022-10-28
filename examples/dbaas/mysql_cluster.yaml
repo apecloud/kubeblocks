@@ -1,19 +1,15 @@
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: mysql-cluster-01
   namespace: default
 spec:
-  clusterDefinitionRef: wesql-clusterdefinition
-  appVersionRef: appversion-mysql-latest
+  clusterDefinitionRef: apecloud-wesql
+  appVersionRef: wesql-8.0.18
   components:
   - name: replicasets
     type: replicasets
     monitor: true
-    roleGroups:
-    - name: primary
-      type: primary
-      replicas: 3
     volumeClaimTemplates:
     - name: data
       spec:

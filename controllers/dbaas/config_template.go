@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -51,7 +51,6 @@ type ConfigTemplateBuilder struct {
 	appVersion *dbaasv1alpha1.AppVersion
 	cluster    *dbaasv1alpha1.Cluster
 	podSpec    *corev1.PodSpec
-	roleGroup  *RoleGroup
 }
 
 func NewCfgTemplateBuilder(clusterName, namespace string, cluster *dbaasv1alpha1.Cluster, version *dbaasv1alpha1.AppVersion) *ConfigTemplateBuilder {
@@ -82,7 +81,6 @@ const (
 	BuiltinClusterObject           = "Cluster"
 	BuiltinComponentObject         = "Component"
 	BuiltinPodObject               = "PodSpec"
-	BuiltinRoleObject              = "RoleGroup"
 	BuiltinAppVersionObject        = "Version"
 	BuiltinComponentResourceObject = "ComponentResource"
 )
@@ -92,18 +90,17 @@ func (c *ConfigTemplateBuilder) builtinObjects() *intctrlutil.TplValues {
 		BuiltinClusterObject:           c.cluster,
 		BuiltinComponentObject:         c.component,
 		BuiltinPodObject:               c.podSpec,
-		BuiltinRoleObject:              c.roleGroup,
 		BuiltinComponentResourceObject: c.componentValues.Resource,
 		BuiltinAppVersionObject:        c.appVersion,
 	}
 }
 
-func (c *ConfigTemplateBuilder) InjectBuiltInObjectsAndFunctions(podTemplate *corev1.PodTemplateSpec, configs []dbaasv1alpha1.ConfigTemplate, component *Component, group *RoleGroup) error {
-	if err := injectBuiltInObjects(c, podTemplate, component, group, configs); err != nil {
+func (c *ConfigTemplateBuilder) InjectBuiltInObjectsAndFunctions(podTemplate *corev1.PodTemplateSpec, configs []dbaasv1alpha1.ConfigTemplate, component *Component) error {
+	if err := injectBuiltInObjects(c, podTemplate, component, configs); err != nil {
 		return err
 	}
 
-	if err := injectBuiltInFunctions(c, podTemplate, component, group); err != nil {
+	if err := injectBuiltInFunctions(c, podTemplate, component); err != nil {
 		return err
 	}
 	return nil
@@ -123,7 +120,7 @@ const (
 	BuiltinMysqlCalBufferFunctionName = "callBufferSizeByResource"
 )
 
-func injectBuiltInFunctions(tplBuilder *ConfigTemplateBuilder, podTemplate *corev1.PodTemplateSpec, component *Component, group *RoleGroup) error {
+func injectBuiltInFunctions(tplBuilder *ConfigTemplateBuilder, podTemplate *corev1.PodTemplateSpec, component *Component) error {
 	// TODO add built-in function
 	tplBuilder.buildinFunctions = &intctrlutil.BuiltinObjectsFunc{
 		BuiltinMysqlCalBufferFunctionName: calDbPoolSize,
@@ -137,7 +134,7 @@ func injectBuiltInFunctions(tplBuilder *ConfigTemplateBuilder, podTemplate *core
 	return nil
 }
 
-func injectBuiltInObjects(tplBuilder *ConfigTemplateBuilder, podTemplate *corev1.PodTemplateSpec, component *Component, group *RoleGroup, configs []dbaasv1alpha1.ConfigTemplate) error {
+func injectBuiltInObjects(tplBuilder *ConfigTemplateBuilder, podTemplate *corev1.PodTemplateSpec, component *Component, configs []dbaasv1alpha1.ConfigTemplate) error {
 	var resource *ResourceDefinition
 	container := intctrlutil.GetContainerUsingConfig(*podTemplate, configs)
 	if container != nil && len(container.Resources.Limits) > 0 {
@@ -151,13 +148,12 @@ func injectBuiltInObjects(tplBuilder *ConfigTemplateBuilder, podTemplate *corev1
 		Name: component.Name,
 		// TODO add Component service name
 		ServiceName: "",
-		Replicas:    group.Replicas,
+		Replicas:    component.Replicas,
 		Resource:    resource,
 	}
 
 	tplBuilder.podSpec = &podTemplate.Spec
 	tplBuilder.component = component
-	tplBuilder.roleGroup = group
 
 	return nil
 }

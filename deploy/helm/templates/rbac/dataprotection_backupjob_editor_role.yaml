@@ -7,7 +7,7 @@ metadata:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 rules:
 - apiGroups:
-  - dataprotection.infracreate.com
+  - dataprotection.kubeblocks.io
   resources:
   - backupjobs
   verbs:
@@ -19,7 +19,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - dataprotection.infracreate.com
+  - dataprotection.kubeblocks.io
   resources:
   - backupjobs/status
   verbs:

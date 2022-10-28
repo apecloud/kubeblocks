@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,6 +29,16 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+const (
+	ProbeRoleChangedCheckPath = "spec.containers{kbprobe-rolechangedcheck}"
+)
+
+var EventHandlerMap = map[string]EventHandler{}
+
+type EventHandler interface {
+	Handle(client.Client, intctrlutil.RequestCtx, *corev1.Event) error
+}
+
 // EventReconciler reconciles an Event object
 type EventReconciler struct {
 	client.Client
@@ -56,7 +66,19 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	reqCtx.Log.V(1).Info("event watcher")
 
-	return ctrl.Result{}, nil
+	event := &corev1.Event{}
+	if err := r.Client.Get(ctx, req.NamespacedName, event); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "getEventError")
+	}
+
+	for _, handler := range EventHandlerMap {
+		err := handler.Handle(r.Client, reqCtx, event)
+		if err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "handleRoleChangedEventError")
+		}
+	}
+
+	return intctrlutil.Reconciled()
 }
 
 // SetupWithManager sets up the controller with the Manager.

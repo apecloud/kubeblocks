@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -111,7 +111,7 @@ func main() {
 		// following LeaderElectionID is generated via hash/fnv (FNV-1 and FNV-1a), in
 		// pattern of '{{ hashFNV .Repo }}.{{ .Domain }}', make sure regenerate this ID
 		// if you have forked from this project template.
-		LeaderElectionID: "001c317f.infracreate.com",
+		LeaderElectionID: "001c317f.kubeblocks.io",
 
 		// NOTES:
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily

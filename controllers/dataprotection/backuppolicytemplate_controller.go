@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,9 +38,9 @@ type BackupPolicyTemplateReconciler struct {
 	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=dataprotection.infracreate.com,resources=backuppolicytemplates,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=dataprotection.infracreate.com,resources=backuppolicytemplates/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=dataprotection.infracreate.com,resources=backuppolicytemplates/finalizers,verbs=update
+//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicytemplates,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicytemplates/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicytemplates/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -57,9 +57,10 @@ func (r *BackupPolicyTemplateReconciler) Reconcile(ctx context.Context, req ctrl
 	// NOTES:
 	// setup common request context
 	reqCtx := intctrlutil.RequestCtx{
-		Ctx: ctx,
-		Req: req,
-		Log: log.FromContext(ctx).WithValues("BackupPolicyTemplate", req.NamespacedName),
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithValues("BackupPolicyTemplate", req.NamespacedName),
+		Recorder: r.Recorder,
 	}
 
 	BackupPolicyTemplate := &dataprotectionv1alpha1.BackupPolicyTemplate{}

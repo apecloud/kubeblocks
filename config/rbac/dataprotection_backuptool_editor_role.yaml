@@ -5,7 +5,7 @@ metadata:
   name: backuptool-editor-role
 rules:
 - apiGroups:
-  - dataprotection.infracreate.com
+  - dataprotection.kubeblocks.io
   resources:
   - backuptools
   verbs:
@@ -17,7 +17,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - dataprotection.infracreate.com
+  - dataprotection.kubeblocks.io
   resources:
   - backuptools/status
   verbs:

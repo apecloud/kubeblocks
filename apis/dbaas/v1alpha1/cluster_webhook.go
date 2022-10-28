@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/mutate-dbaas-infracreate-com-v1alpha1-cluster,mutating=true,failurePolicy=fail,sideEffects=None,groups=dbaas.infracreate.com,resources=clusters,verbs=create;update,versions=v1alpha1,name=mcluster.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/mutate-dbaas-kubeblocks-io-v1alpha1-cluster,mutating=true,failurePolicy=fail,sideEffects=None,groups=dbaas.kubeblocks.io,resources=clusters,verbs=create;update,versions=v1alpha1,name=mcluster.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Defaulter = &Cluster{}
 
@@ -51,7 +51,7 @@ func (r *Cluster) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-dbaas-infracreate-com-v1alpha1-cluster,mutating=false,failurePolicy=fail,sideEffects=None,groups=dbaas.infracreate.com,resources=clusters,verbs=create;update,versions=v1alpha1,name=vcluster.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-dbaas-kubeblocks-io-v1alpha1-cluster,mutating=false,failurePolicy=fail,sideEffects=None,groups=dbaas.kubeblocks.io,resources=clusters,verbs=create;update,versions=v1alpha1,name=vcluster.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &Cluster{}
 
@@ -131,10 +131,12 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 		duplicateComponentNames = make(map[string]struct{})
 		componentNameMap        = make(map[string]struct{})
 		componentTypeMap        = make(map[string]struct{})
+		componentMap            = make(map[string]ClusterDefinitionComponent)
 	)
 
 	for _, v := range clusterDef.Spec.Components {
 		componentTypeMap[v.TypeName] = struct{}{}
+		componentMap[v.TypeName] = v
 	}
 
 	for _, v := range r.Spec.Components {
@@ -146,7 +148,6 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 			duplicateComponentNames[v.Name] = struct{}{}
 		}
 		componentNameMap[v.Name] = struct{}{}
-		// TODO validate roleGroups
 	}
 	if len(invalidComponentTypes) > 0 {
 		*allErrs = append(*allErrs, field.NotFound(field.NewPath("spec.components[*].type"),

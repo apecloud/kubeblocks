@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ func init() {
 	if err != nil {
 		panic(errors.Wrap(err, "Failed to get current user home dir"))
 	}
-	CLIBaseDir = path.Join(homeDir, ".opendbaas")
+	CLIBaseDir = path.Join(homeDir, ".kubeblocks")
 	TFBaseDir = path.Join(CLIBaseDir, "terraform")
 	TFPluginDir = path.Join(TFBaseDir, "providers")
 
@@ -102,7 +102,7 @@ func (p *TFPlugin) Install() error {
 
 	// TODO optimize, move to another place
 	// Get the data
-	resp, err := http.Get(fmt.Sprintf("http://54.223.93.54:8000/infracreate/v0.2.0/%s", p.Name))
+	resp, err := http.Get(fmt.Sprintf("http://54.223.93.54:8000/apecloud/v0.2.0/%s", p.Name))
 	if err != nil {
 		return err
 	}

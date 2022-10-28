@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ import (
 	//+kubebuilder:scaffold:imports
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -48,6 +49,7 @@ var testEnv *envtest.Environment
 var ctx context.Context
 var cancel context.CancelFunc
 var k8sManager ctrl.Manager
+var testCtx testutil.TestContext
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -89,6 +91,8 @@ var _ = BeforeSuite(func() {
 		MetricsBindAddress: "0",
 	})
 	Expect(err).ToNot(HaveOccurred())
+
+	testCtx = testutil.NewDefaultTestContext(k8sManager.GetClient())
 
 }, 60)
 

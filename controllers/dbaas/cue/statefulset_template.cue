@@ -9,6 +9,7 @@ component: {
 	clusterType:    string
 	type:           string
 	name:           string
+	replicas:       int
 	monitor: {
 		enable:     bool
 		scrapePort: int
@@ -17,8 +18,17 @@ component: {
 	podSpec: containers: [...]
 	volumeClaimTemplates: [...]
 }
-roleGroup: {
-	replicas: int
+
+probeContainer: {
+	image: "registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.6"
+	command: ["/pause"]
+	imagePullPolicy: "IfNotPresent"
+	name:            "string"
+	readinessProbe: {
+		exec: {
+			command: []
+		}
+	}
 }
 
 statefulset: {
@@ -43,7 +53,7 @@ statefulset: {
 				"app.kubernetes.io/component-name": "\(component.name)"
 			}
 		serviceName:         "\(cluster.metadata.name)-\(component.name)"
-		replicas:            roleGroup.replicas
+		replicas:            component.replicas
 		minReadySeconds:     10
 		podManagementPolicy: "Parallel"
 		template: {

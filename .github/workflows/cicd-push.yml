@@ -20,7 +20,6 @@ jobs:
           cp -r /go/bin/controller-gen ./bin/controller-gen
           make mod-vendor
           make lint
-          make staticcheck
 
       - name: make test
         run: |
@@ -28,6 +27,7 @@ jobs:
 
       - name: upload coverage report
         uses: codecov/codecov-action@v3
+        continue-on-error: true
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./cover.out

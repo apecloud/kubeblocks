@@ -36,6 +36,20 @@ var _ = Describe("ClusterDefinition Controller", func() {
 
 	var ctx = context.Background()
 
+	BeforeEach(func() {
+		// Add any steup steps that needs to be executed before each test
+		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		// Add any teardown steps that needs to be executed after each test
+	})
+
 	clusterDefYaml := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       ClusterDefinition
@@ -176,20 +190,6 @@ data:
 		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
 		return cfgCM
 	}
-
-	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
-		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-	})
 
 	Context("When updating clusterDefinition", func() {
 		It("Should update status of appVersion at the same time", func() {

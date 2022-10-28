@@ -54,6 +54,9 @@ spec:
                     in one component usually share the same data
                   properties:
                     PrimaryStsIndex:
+                      default: 0
+                      description: PrimaryStsIndex determines which statefulset is
+                        primary when Type is Replication
                       type: integer
                     antiAffinity:
                       default: false
@@ -7656,6 +7659,27 @@ spec:
                       description: ReplicationSpec defines replication related spec
                         if componentType is Replication CAN'T be empty if componentType
                         is Replication
+                      properties:
+                        createReplication:
+                          description: CreateReplication, create replicationSet replication
+                            relationship
+                          properties:
+                            commands:
+                              description: Commands, commands to create a replication
+                                relationship the order of commands follows the order
+                                of array.
+                              items:
+                                type: string
+                              type: array
+                            dbEngineContainer:
+                              description: DbEngineContainer, db engine container
+                                name define in podSpec
+                              type: string
+                            image:
+                              default: rancher/kubectl:v1.23.7
+                              description: exec command with image
+                              type: string
+                          type: object
                       type: object
                     scripts:
                       description: 'Scripts executed before and after workload operation

@@ -117,6 +117,21 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 	return updateConsensusSetRoleLabel(cli, reqCtx.Ctx, podName, role)
 }
 
+func updateReplicationSetRoleLabel(cli client.Client, ctx context.Context, podName types.NamespacedName, role string) error {
+	pod := &corev1.Pod{}
+	if err := cli.Get(ctx, podName, pod); err != nil {
+		return err
+	}
+
+	patch := client.MergeFrom(pod.DeepCopy())
+	pod.Labels[replicationSetRoleLabelKey] = role
+	err := cli.Patch(ctx, pod, patch)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName types.NamespacedName, role string) error {
 	// get pod
 	pod := &corev1.Pod{}

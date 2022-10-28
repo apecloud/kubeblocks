@@ -261,7 +261,7 @@ func (r *BackupJobReconciler) createPostCommandJobAndEnsure(reqCtx intctrlutil.R
 func (r *BackupJobReconciler) ensureBatchV1JobCompleted(
 	reqCtx intctrlutil.RequestCtx, key types.NamespacedName) (bool, error) {
 	job := &batchv1.Job{}
-	exists, err := checkResourceExists(reqCtx.Ctx, r.Client, key, job)
+	exists, err := CheckResourceExists(reqCtx.Ctx, r.Client, key, job)
 	if err != nil {
 		return false, err
 	}
@@ -282,7 +282,7 @@ func (r *BackupJobReconciler) createVolumeSnapshot(
 	backupJob *dataprotectionv1alpha1.BackupJob) error {
 
 	snap := &snapshotv1.VolumeSnapshot{}
-	exists, err := checkResourceExists(reqCtx.Ctx, r.Client, reqCtx.Req.NamespacedName, snap)
+	exists, err := CheckResourceExists(reqCtx.Ctx, r.Client, reqCtx.Req.NamespacedName, snap)
 	if err != nil {
 		return err
 	}
@@ -346,7 +346,7 @@ func (r *BackupJobReconciler) ensureVolumeSnapshotReady(reqCtx intctrlutil.Reque
 	key types.NamespacedName) (bool, error) {
 
 	snap := &snapshotv1.VolumeSnapshot{}
-	exists, err := checkResourceExists(reqCtx.Ctx, r.Client, key, snap)
+	exists, err := CheckResourceExists(reqCtx.Ctx, r.Client, key, snap)
 	if err != nil {
 		return false, err
 	}
@@ -366,7 +366,7 @@ func (r *BackupJobReconciler) createBackupToolJob(
 
 	key := types.NamespacedName{Namespace: backupJob.Namespace, Name: backupJob.Name}
 	job := batchv1.Job{}
-	exists, err := checkResourceExists(reqCtx.Ctx, r.Client, key, &job)
+	exists, err := CheckResourceExists(reqCtx.Ctx, r.Client, key, &job)
 	if err != nil {
 		return err
 	}
@@ -400,7 +400,7 @@ func (r *BackupJobReconciler) ensureEmptyHooksCommand(
 		Name:      backupJob.Spec.BackupPolicyName,
 	}
 
-	policyExists, err := checkResourceExists(reqCtx.Ctx, r.Client, backupPolicyKey, backupPolicy)
+	policyExists, err := CheckResourceExists(reqCtx.Ctx, r.Client, backupPolicyKey, backupPolicy)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to get backupPolicy %s .", backupPolicyKey.Name)
 		r.Recorder.Event(backupJob, corev1.EventTypeWarning, "BackupPolicyFailed", msg)
@@ -429,7 +429,7 @@ func (r *BackupJobReconciler) createHooksCommandJob(
 	preCommand bool) error {
 
 	job := batchv1.Job{}
-	exists, err := checkResourceExists(reqCtx.Ctx, r.Client, key, &job)
+	exists, err := CheckResourceExists(reqCtx.Ctx, r.Client, key, &job)
 	if err != nil {
 		return err
 	}

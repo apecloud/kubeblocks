@@ -23,7 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func checkResourceExists(
+func CheckResourceExists(
 	ctx context.Context,
 	client client.Client,
 	key client.ObjectKey,

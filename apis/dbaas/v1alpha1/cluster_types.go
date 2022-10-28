@@ -171,9 +171,8 @@ type ClusterComponent struct {
 	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
 
 	// PrimaryStsIndex determines which statefulset is primary when Type is Replication
-	// +kubebuilder:default=0
 	// +optional
-	PrimaryStsIndex int `json:"primaryStsIndex,omitempty"`
+	PrimaryStsIndex *int `json:"primaryStsIndex,omitempty"`
 }
 
 // ClusterStatusComponent record components status information

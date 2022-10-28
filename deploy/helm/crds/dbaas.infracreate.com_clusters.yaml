@@ -123,8 +123,7 @@ spec:
                       maxLength: 12
                       type: string
                     primaryStsIndex:
-                      default: 0
-                      description: PrimaryStsIndex determines which stateful set is
+                      description: PrimaryStsIndex determines which statefulset is
                         primary when Type is Replication
                       type: integer
                     replicas:

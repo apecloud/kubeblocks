@@ -1,0 +1,22 @@
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind: Cluster
+metadata:
+  name: redis
+  namespace: default
+spec:
+  clusterDefinitionRef: redis-replication-definition
+  appVersionRef: redis-replication-7.0.5
+  terminationPolicy: WipeOut
+  components:
+  - name: redis-rsts
+    type: replication
+    monitor: false
+    primaryStsIndex: 0
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi

@@ -200,7 +200,10 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	ReplicationSpec *ReplicationSpec `json:"replicationSpec,omitempty"`
 
-	PrimaryStsIndex int `json:"PrimaryStsIndex,omitempty"`
+	// PrimaryStsIndex determines which statefulset is primary when Type is Replication
+	// +kubebuilder:default=0
+	// +optional
+	PrimaryStsIndex *int `json:"PrimaryStsIndex,omitempty"`
 }
 
 type ComponentType string
@@ -366,9 +369,33 @@ const (
 	Parallel           UpdateStrategy = "Parallel"
 )
 
+type ReplicationSetRole string
+
+const (
+	Primary   ReplicationSetRole = "primary"
+	Secondary ReplicationSetRole = "secondary"
+)
+
 type ReplicationSpec struct {
-	// TODO xingran add replicationspec
-	// CreateReplCommands []string `json:"createReplCommands"`
+	// CreateReplication, create replicationSet replication relationship
+	// +kubebuilder:validation:Required
+	CreateReplication CreateReplication `json:"createReplication,omitempty"`
+}
+
+type CreateReplication struct {
+	// DbEngineContainer, db engine container name define in podSpec
+	// +kubebuilder:validation:Required
+	DbEngineContainer string `json:"dbEngineContainer,omitempty"`
+
+	// Commands, commands to create a replication relationship
+	// the order of commands follows the order of array.
+	// +kubebuilder:validation:Required
+	Commands []string `json:"commands,omitempty"`
+
+	// exec command with image
+	// +kubebuilder:default="rancher/kubectl:v1.23.7"
+	// +optional
+	Image string `json:"image,omitempty"`
 }
 
 func init() {

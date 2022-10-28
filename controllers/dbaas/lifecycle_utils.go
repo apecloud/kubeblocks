@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	batchv1 "k8s.io/api/batch/v1"
 	"sort"
 	"strconv"
 	"strings"
@@ -40,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	dataprotectutil "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -355,7 +357,7 @@ func mergeComponents(
 		ComponentType:   clusterDefComp.ComponentType,
 		ConsensusSpec:   clusterDefComp.ConsensusSpec,
 		ReplicationSpec: clusterDefComp.ReplicationSpec,
-		PrimaryStsIndex: clusterDefComp.PrimaryStsIndex,
+		PrimaryStsIndex: *clusterDefComp.PrimaryStsIndex,
 		PodSpec:         clusterDefComp.PodSpec,
 		Service:         clusterDefComp.Service,
 		Scripts:         clusterDefComp.Scripts,
@@ -448,6 +450,10 @@ func mergeComponents(
 
 		if clusterComp.Affinity != nil {
 			affinity = clusterComp.Affinity
+		}
+
+		if clusterComp.PrimaryStsIndex != nil {
+			component.PrimaryStsIndex = *clusterComp.PrimaryStsIndex
 		}
 	}
 	if component.PodSpec.Affinity == nil && affinity != nil {
@@ -623,7 +629,6 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 			}
 			*params.applyObjs = append(*params.applyObjs, svcs...)
 
-			// render config
 			configs, err := buildCfg(*params, rsts, reqCtx.Ctx, cli)
 			if err != nil {
 				return err
@@ -679,10 +684,15 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	ctx := reqCtx.Ctx
 	logger := reqCtx.Log
 	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
+	var stsList []*appsv1.StatefulSet
 	for _, obj := range objs {
 		logger.Info("create or update", "objs", obj)
 		if err := controllerutil.SetOwnerReference(cluster, obj, scheme); err != nil {
 			return err
+		}
+		stsObj, ok := obj.(*appsv1.StatefulSet)
+		if ok {
+			stsList = append(stsList, stsObj)
 		}
 		if err := cli.Create(ctx, obj); err == nil {
 			continue
@@ -733,8 +743,6 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 					return err
 				}
 			}
-			// TODO xingran ReplicationSet create a replication relationship
-
 			// check stsObj.Spec.VolumeClaimTemplates storage
 			// request size and find attached PVC and patch request
 			// storage size
@@ -798,7 +806,158 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			continue
 		}
 	}
+
+	// handle ReplicationSet including create a replication relationship and update Pod label, etc
+	err := handleReplicationSet(reqCtx, cli, cluster, stsList)
+	if err != nil {
+		return err
+	}
 	return nil
+}
+
+func handleReplicationSet(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	cluster *dbaasv1alpha1.Cluster,
+	stsList []*appsv1.StatefulSet) error {
+	podRoleMap := make(map[string]string, len(stsList))
+	for _, stsObj := range stsList {
+		var isPrimarySts = false
+		typeName := getComponentTypeName(*cluster, stsObj.Labels[appComponentLabelKey])
+		component, err := getComponent(reqCtx.Ctx, cli, cluster, typeName)
+		if err != nil {
+			return err
+		}
+		if component.ComponentType != dbaasv1alpha1.Replication {
+			continue
+		}
+		// get target engine pod info in stsObj
+		allPodList := &corev1.PodList{}
+		selector, err := labels.Parse(appInstanceLabelKey + "=" + cluster.Name)
+		if err != nil {
+			return err
+		}
+		if err := cli.List(reqCtx.Ctx, allPodList,
+			&client.ListOptions{Namespace: stsObj.Namespace},
+			client.MatchingLabelsSelector{Selector: selector}); err != nil {
+			return err
+		}
+		var targetStsPodList []corev1.Pod
+		for _, pod := range allPodList.Items {
+			for _, ownerRef := range pod.OwnerReferences {
+				if ownerRef.Name == stsObj.Name {
+					targetStsPodList = append(targetStsPodList, pod)
+				}
+			}
+		}
+		if len(targetStsPodList) != 1 {
+			return fmt.Errorf("pod number in statefulset %s is not equal one", stsObj.Name)
+		}
+		var dbEnginePod = &targetStsPodList[0]
+		claimPrimaryStsName := fmt.Sprintf("%s-%s-%d", cluster.Name, stsObj.Labels[appComponentLabelKey], *component.PrimaryStsIndex)
+		if stsObj.Name == claimPrimaryStsName {
+			isPrimarySts = true
+		}
+		podRoleMap[dbEnginePod.Name] = string(dbaasv1alpha1.Primary)
+		if !isPrimarySts {
+			podRoleMap[dbEnginePod.Name] = string(dbaasv1alpha1.Secondary)
+			// if not primary, create a replication relationship by running a Job with kube exec
+			err := createReplRelationJobAndEnsure(reqCtx, cli, cluster, component, stsObj, dbEnginePod)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	// update replicationSet Pod Label
+	for k, v := range podRoleMap {
+		podName := types.NamespacedName{
+			Namespace: cluster.Namespace,
+			Name:      k,
+		}
+		err := updateReplicationSetRoleLabel(cli, reqCtx.Ctx, podName, v)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func createReplRelationJobAndEnsure(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	cluster *dbaasv1alpha1.Cluster,
+	component dbaasv1alpha1.ClusterDefinitionComponent,
+	stsObj *appsv1.StatefulSet,
+	enginePod *corev1.Pod) error {
+	key := types.NamespacedName{Namespace: stsObj.Namespace, Name: stsObj.Name + "-repl"}
+	job := batchv1.Job{}
+	exists, err := dataprotectutil.CheckResourceExists(reqCtx.Ctx, cli, key, &job)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		// if not exist job, create a new job
+		jobPodSpec, err := buildReplRelationJobPodSpec(component, stsObj, enginePod)
+		if err != nil {
+			return err
+		}
+		job := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: key.Namespace,
+				Name:      key.Name,
+				Labels:    nil,
+			},
+			Spec: batchv1.JobSpec{
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: key.Namespace,
+						Name:      key.Name},
+					Spec: jobPodSpec,
+				},
+			},
+		}
+		scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
+		if err := controllerutil.SetOwnerReference(cluster, job, scheme); err != nil {
+			return err
+		}
+		reqCtx.Log.Info("create a built-in job from create replication relationship", "job", job)
+		if err := cli.Create(reqCtx.Ctx, job); err != nil {
+			return err
+		}
+	}
+
+	// ensure job finished
+	jobStatusConditions := job.Status.Conditions
+	if len(jobStatusConditions) > 0 {
+		if jobStatusConditions[0].Type != batchv1.JobComplete {
+			return fmt.Errorf("job status: %s is not Complete, please wait or check", jobStatusConditions[0].Type)
+		}
+	}
+	return nil
+}
+
+func buildReplRelationJobPodSpec(
+	component dbaasv1alpha1.ClusterDefinitionComponent,
+	stsObj *appsv1.StatefulSet,
+	dbEnginePod *corev1.Pod) (corev1.PodSpec, error) {
+	podSpec := corev1.PodSpec{}
+	container := corev1.Container{}
+	container.Name = stsObj.Name
+
+	var targetEngineContainer corev1.Container
+	for _, c := range dbEnginePod.Spec.Containers {
+		if c.Name == component.ReplicationSpec.CreateReplication.DbEngineContainer {
+			targetEngineContainer = c
+		}
+	}
+	container.Command = []string{"kubectl", "exec", "-i", dbEnginePod.Name, "-c", targetEngineContainer.Name, "--", "sh", "-c"}
+	container.Args = component.ReplicationSpec.CreateReplication.Commands
+	container.Image = component.ReplicationSpec.CreateReplication.Image
+	container.VolumeMounts = targetEngineContainer.VolumeMounts
+	container.Env = targetEngineContainer.Env
+	podSpec.Containers = []corev1.Container{container}
+	podSpec.Volumes = dbEnginePod.Spec.Volumes
+	podSpec.RestartPolicy = corev1.RestartPolicyNever
+	return podSpec, nil
 }
 
 func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, stsObj *appsv1.StatefulSet) (bool, error) {
@@ -1160,12 +1319,12 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx, params createParams) ([]
 
 func injectReplicationStsPodEnv(params createParams, sts *appsv1.StatefulSet, index int) (*appsv1.StatefulSet, error) {
 	for _, comp := range params.cluster.Spec.Components {
-		if index != comp.PrimaryStsIndex {
+		if index != *comp.PrimaryStsIndex {
 			for i := range sts.Spec.Template.Spec.Containers {
 				c := &sts.Spec.Template.Spec.Containers[i]
 				c.Env = append(c.Env, corev1.EnvVar{
 					Name:      dbaasPrefix + "_PRIMARY_POD_NAME",
-					Value:     sts.Name + "-" + strconv.Itoa(comp.PrimaryStsIndex) + "-0",
+					Value:     sts.Name + "-" + strconv.Itoa(*comp.PrimaryStsIndex) + "-0",
 					ValueFrom: nil,
 				})
 				for j, port := range c.Ports {

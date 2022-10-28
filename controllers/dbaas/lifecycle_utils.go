@@ -1247,14 +1247,14 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 			return nil, err
 		}
 		container.Name = "kbprobe-rolechangedcheck"
-		probe := container.ReadinessProbe
-		// probe.HTTPGet.Path = "/"
-		// HACK: hardcoded - "http://localhost:3501/v1.0/bindings/mtest"
-		// TODO: http port should be checked to avoid conflicts instead of hardcoded 3051
-		probe.Exec.Command = []string{"curl", "-X", "POST", "-H", "Content-Type: application/json", "http://localhost:3501/v1.0/bindings/mtest", "-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
-		probe.PeriodSeconds = componentProbes.RoleChangedProbe.PeriodSeconds
-		probe.SuccessThreshold = componentProbes.RoleChangedProbe.SuccessThreshold
-		probe.FailureThreshold = componentProbes.RoleChangedProbe.FailureThreshold
+		// probe := container.ReadinessProbe
+		// // probe.HTTPGet.Path = "/"
+		// // HACK: hardcoded - "http://localhost:3501/v1.0/bindings/mtest"
+		// // TODO: http port should be checked to avoid conflicts instead of hardcoded 3051
+		// probe.Exec.Command = []string{"curl", "-X", "POST", "-H", "Content-Type: application/json", "http://localhost:3501/v1.0/bindings/mtest", "-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
+		// probe.PeriodSeconds = componentProbes.RoleChangedProbe.PeriodSeconds
+		// probe.SuccessThreshold = componentProbes.RoleChangedProbe.SuccessThreshold
+		// probe.FailureThreshold = componentProbes.RoleChangedProbe.FailureThreshold
 		// probe.InitialDelaySeconds = 60
 		probeContainers = append(probeContainers, container)
 	}

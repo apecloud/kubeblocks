@@ -137,7 +137,7 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	if ok, err := checkAppVersionTemplateValidate(r.Client, reqCtx, appVersion); !ok || err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "checkClusterIsReady")
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "configMapIsReady")
 	}
 
 	clusterdefinition := &dbaasv1alpha1.ClusterDefinition{}
@@ -177,7 +177,7 @@ func checkAppVersionTemplateValidate(client client.Client, ctx intctrlutil.Reque
 			continue
 		}
 
-		if ok, err := CheckValidateConfigurationTpls(client, ctx, component.ConfigTemplateRefs); !ok || err != nil {
+		if ok, err := checkValidConfTpls(client, ctx, component.ConfigTemplateRefs); !ok || err != nil {
 			return ok, err
 		}
 	}

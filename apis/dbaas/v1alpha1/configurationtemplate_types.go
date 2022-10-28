@@ -90,6 +90,12 @@ type ConfigurationTemplateStatus struct {
 
 	// +kubebuilder:validation:Optional
 	Message string `json:"message,omitempty"`
+
+	// observedGeneration is the most recent generation observed for this
+	// ClusterDefinition. It corresponds to the ClusterDefinition's generation, which is
+	// updated on mutation by the API Server.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 //+kubebuilder:object:root=true

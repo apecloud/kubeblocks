@@ -19,7 +19,11 @@ package dbaas
 import (
 	"bytes"
 	"context"
+	"github.com/spf13/viper"
 	"io"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"math/rand"
 	"net/http"
 	"os"
@@ -31,10 +35,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 
 	"github.com/dapr/kit/logger"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 func SetupConsensusRoleObservingLoop(log logger.Logger) {
@@ -50,13 +51,30 @@ func SetupConsensusRoleObservingLoop(log logger.Logger) {
 		return
 	}
 
+	bindingType := viper.GetString("BINDING_TYPE")
+	log.Info("binding type: " + bindingType)
+
 	// lastRoleObserved, role cache
 	lastRoleObserved := ""
 	roleObserve := func(ctx context.Context) {
 		// observe role through dapr
-		url := "http://localhost:3501/v1.0/bindings/mtest"
+		var url string
+		var reqBody *strings.Reader
 		contentType := "application/json"
-		reqBody := strings.NewReader("{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}")
+		switch bindingType {
+		case "MYSQL":
+			url = "http://localhost:3501/v1.0/bindings/mtest"
+			reqBody = strings.NewReader("{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}")
+		case "ETCD":
+			url = "http://localhost:3501/v1.0/bindings/etcd"
+			reqBody = strings.NewReader("{\"operation\":\"query\"}")
+		}
+
+		if url == "" || reqBody == nil {
+			log.Fatal("binding type not supported: " + bindingType)
+			return
+		}
+
 		resp, err := http.Post(url, contentType, reqBody)
 		if err != nil {
 			log.Error(err)

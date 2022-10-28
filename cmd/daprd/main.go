@@ -17,6 +17,8 @@ limitations under the License.
 package main
 
 import (
+	"github.com/apecloud/kubeblocks/cmd/daprd/internal/binding/etcd"
+	"github.com/spf13/viper"
 	"os"
 	"os/signal"
 	"syscall"
@@ -56,6 +58,7 @@ var (
 
 func init() {
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mysql.NewMysql, "mysql")
+	bindingsLoader.DefaultRegistry.RegisterOutputBinding(etcd.NewEtcd, "etcd")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(dhttp.NewHTTP, "http")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(localstorage.NewLocalStorage, "localstorage")
 	nrLoader.DefaultRegistry.RegisterComponent(mdns.NewResolver, "mdns")
@@ -93,6 +96,7 @@ func main() {
 		log.Fatalf("fatal error from runtime: %s", err)
 	}
 
+	viper.AutomaticEnv()
 	// start role label updating loop
 	dbaas.SetupConsensusRoleObservingLoop(logContrib)
 

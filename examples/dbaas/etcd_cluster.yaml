@@ -1,0 +1,20 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: etcd-cluster
+spec:
+  appVersionRef: app-version-etcd
+  clusterDefinitionRef: cluster-definition-etcd
+  components:
+    - name: etcd
+      type: etcd
+      monitor: false
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+            volumeMode: Filesystem

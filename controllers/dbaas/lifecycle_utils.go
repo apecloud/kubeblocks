@@ -1261,7 +1261,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 
 	if len(probeContainers) >= 1 {
 		container := &probeContainers[0]
-		container.Image = viper.GetString("AGAMOTTO_IMAGE")
+		container.Image = "free6om/kbprobe-dev:latest"
 		container.ImagePullPolicy = corev1.PullPolicy(viper.GetString("AGAMOTTO_IMAGE_PULL_POLICY"))
 		// HACK: hardcoded port values
 		// TODO: ports should be checked to avoid conflicts instead of hardcoded values
@@ -1287,7 +1287,12 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 				},
 			},
 		}
-		container.Env = append(container.Env, podName, podNamespace)
+
+		bindingType := corev1.EnvVar{
+			Name:  "BINDING_TYPE",
+			Value: "ETCD",
+		}
+		container.Env = append(container.Env, podName, podNamespace, bindingType)
 
 		// HACK: hardcoded port values
 		// TODO: ports should be checked to avoid conflicts instead of hardcoded values

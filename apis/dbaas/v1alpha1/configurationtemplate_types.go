@@ -17,7 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	// apiv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -27,11 +27,14 @@ import (
 type CustomParametersValidation struct {
 	// TODO(zt) DAY2 support schema
 	// Schema provides a way for ISVs to verify the validity of user change parameters through CRD
-	// +kubebuilder:validation:Optional
-	// Schema *apiv1.JSONSchemaProps `json:"schema,omitempty"`
+	// controller-gen doesn't work with k8s.io/apiextensions-apiserver: https://github.com/kubernetes-sigs/controller-tools/issues/291
+	// +kubebuilder:validation:Schemaless
+	// +kubebuilder:validation:Type=object
+	// +kubebuilder:pruning:PreserveUnknownFields
+	Schema *apiext.JSONSchemaProps `json:"schema,omitempty"`
 
 	// Cue that to let ISV verify user configuration through cue language
-	// +kubebuilder:validation:Optional
+	// +optional
 	Cue *string `json:"cue,omitempty"`
 }
 
@@ -48,7 +51,7 @@ type ConfigurationTemplateSpec struct {
 	TplRef string `json:"tplRef,omitempty"`
 
 	// ConfigurationSchema that impose restrictions on engine parameter's rule
-	// +kubebuilder:validation:Optional
+	// +optional
 	ConfigurationSchema *CustomParametersValidation `json:"configurationSchema,omitempty"`
 
 	// StaticParameters require db instance restart

@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	dbaasconfig "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -140,7 +141,7 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return intctrlutil.Reconciled()
 	}
 
-	if ok, err := checkAppVersionTemplate(r.Client, reqCtx, appVersion); !ok || err != nil {
+	if ok, err := dbaasconfig.CheckAppVersionTemplate(r.Client, reqCtx, appVersion); !ok || err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "configMapIsReady")
 	}
 
@@ -174,18 +175,6 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 	intctrlutil.RecordCreatedEvent(r.Recorder, appVersion)
 	return ctrl.Result{}, nil
-}
-
-func checkAppVersionTemplate(client client.Client, ctx intctrlutil.RequestCtx, appVersion *dbaasv1alpha1.AppVersion) (bool, error) {
-	for _, component := range appVersion.Spec.Components {
-		if len(component.ConfigTemplateRefs) == 0 {
-			continue
-		}
-		if ok, err := checkValidConfTpls(client, ctx, component.ConfigTemplateRefs); !ok || err != nil {
-			return ok, err
-		}
-	}
-	return true, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

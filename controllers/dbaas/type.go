@@ -25,8 +25,6 @@ import (
 )
 
 const (
-	// settings keys
-	cmNamespaceKey              = "CM_NAMESPACE"
 	maxConcurReconAppVersionKey = "MAXCONCURRENTRECONCILES_APPVERSION"
 	maxConcurReconClusterDefKey = "MAXCONCURRENTRECONCILES_CLUSTERDEF"
 
@@ -35,9 +33,6 @@ const (
 	dbClusterDefFinalizerName = "clusterdefinition.kubeblocks.io/finalizer"
 	appVersionFinalizerName   = "appversion.kubeblocks.io/finalizer"
 	opsRequestFinalizerName   = "opsrequest.kubeblocks.io/finalizer"
-
-	ConfigurationTemplateFinalizerName = "configurationtemplate.infracreate.com/finalizer"
-	ConfigurationTplLabelKey           = "configurationtemplate.infracreate.com/name"
 
 	// label keys
 	clusterDefLabelKey         = "clusterdefinition.kubeblocks.io/name"

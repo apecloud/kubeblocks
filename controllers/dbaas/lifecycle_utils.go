@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	dbaasconfig "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -57,10 +58,6 @@ var (
 	//go:embed cue/*
 	cueTemplates embed.FS
 )
-
-func init() {
-	viper.SetDefault(cmNamespaceKey, "default")
-}
 
 func (c createParams) getCacheBytesValue(key string, valueCreator func() ([]byte, error)) ([]byte, error) {
 	vIf, ok := (*c.cacheCtx)[key]
@@ -1437,6 +1434,7 @@ func getInstanceCMName(obj client.Object, tpl *dbaasv1alpha1.ConfigTemplate) str
 func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder, cmName string, tplCfg dbaasv1alpha1.ConfigTemplate, params createParams, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
 	// Render config template by TplEngine
 	// The template namespace must be the same as the ClusterDefinition namespace
+	// TODO(zt) using dbaasconfig.GetConfigMapByName
 	configs, err := processConfigMapTemplate(ctx, cli, tplBuilder, client.ObjectKey{
 		Namespace: tplCfg.Namespace,
 		Name:      tplCfg.Name,

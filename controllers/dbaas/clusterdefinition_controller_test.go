@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	dbaasconfig "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 )
 
 var _ = Describe("ClusterDefinition Controller", func() {
@@ -308,7 +309,8 @@ data:
 			clusterDefinition.Spec.Components[0].ConfigTemplateRefs = []dbaasv1alpha1.ConfigTemplate{
 				{
 					Name:       cmName,
-					VolumeName: testCtx.DefaultNamespace,
+					Namespace: testCtx.DefaultNamespace,
+					VolumeName: "",
 				},
 			}
 

@@ -18,6 +18,7 @@ package dbaas
 
 import (
 	"context"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -28,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	dbaasconfig "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -64,17 +66,18 @@ func (r *ConfigurationTemplateReconciler) Reconcile(ctx context.Context, req ctr
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, configTpl, ConfigurationTemplateFinalizerName, func() (*ctrl.Result, error) {
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, configTpl, dbaasconfig.ConfigurationTemplateFinalizerName, func() (*ctrl.Result, error) {
 		recordEvent := func() {
 			r.Recorder.Event(configTpl, corev1.EventTypeWarning, "ExistsReferencedResources",
 				"cannot be deleted because of existing referencing ClusterDefinition or AppVersion.")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, configTpl,
-			ConfigurationTplLabelKey, recordEvent, &dbaasv1alpha1.ClusterDefinitionList{},
+			dbaasconfig.ConfigurationTplLabelKey, recordEvent, &dbaasv1alpha1.ClusterDefinitionList{},
 			&dbaasv1alpha1.AppVersionList{}); res != nil || err != nil {
 			return res, err
 		}
-		return nil, r.deleteExternalResources(reqCtx, configTpl)
+
+		return r.deleteExternalResources(reqCtx, configTpl)
 	})
 	if res != nil {
 		return *res, err
@@ -84,10 +87,13 @@ func (r *ConfigurationTemplateReconciler) Reconcile(ctx context.Context, req ctr
 		return intctrlutil.Reconciled()
 	}
 
-	// TODO(zt) update configmap Finalizer and set Immutable
+	if ok, err := dbaasconfig.CheckConfigurationTemplate(r.Client, reqCtx, configTpl); !ok || err != nil {
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "ValidateConfigurationTemplate")
+	}
 
-	if ok, err := checkConfigurationTemplate(r.Client, reqCtx, configTpl); !ok || err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "configMapIsReady")
+	// TODO(zt) update configmap Finalizer and set Immutable
+	if err := dbaasconfig.UpdateConfigMapFinalizer(r.Client, reqCtx, configTpl); err != nil {
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "UpdateConfigMapFinalizer")
 	}
 
 	statusPatch := client.MergeFrom(configTpl.DeepCopy())
@@ -101,22 +107,41 @@ func (r *ConfigurationTemplateReconciler) Reconcile(ctx context.Context, req ctr
 	return ctrl.Result{}, nil
 }
 
-func checkConfigurationTemplate(c client.Client, ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplate) (bool, error) {
-	// TODO(zt) validate configuration template
-
-	return true, nil
-}
-
 // SetupWithManager sets up the controller with the Manager.
 func (r *ConfigurationTemplateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dbaasv1alpha1.ConfigurationTemplate{}).
+		// for other resource
+		Owns(&corev1.ConfigMap{}).
 		Complete(r)
 }
 
-func (r *ConfigurationTemplateReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, configTpl *dbaasv1alpha1.ConfigurationTemplate) error {
+func (r *ConfigurationTemplateReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, configTpl *dbaasv1alpha1.ConfigurationTemplate) (*ctrl.Result, error) {
 	// TODO(zt) delete configmap Finalizer
 
 	// delete any external resources associated with the configuration template
-	return nil
+	labels := client.MatchingLabels{
+		dbaasconfig.ConfigurationTplLabelKey: configTpl.GetName(),
+	}
+	ns := client.InNamespace(dbaasconfig.ConfigNamespaceKey)
+
+	cmList := &corev1.ConfigMapList{}
+	if err := r.Client.List(reqCtx.Ctx, cmList, ns, labels); err != nil {
+		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return &res, err
+	}
+
+	for _, cm := range cmList.Items {
+		if !controllerutil.ContainsFinalizer(&cm, dbaasconfig.ConfigurationTemplateFinalizerName) {
+			continue
+		}
+		patch := client.MergeFrom(cm.DeepCopy())
+		controllerutil.RemoveFinalizer(&cm, dbaasconfig.ConfigurationTemplateFinalizerName)
+		if err := r.Patch(reqCtx.Ctx, &cm, patch); err != nil {
+			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return &res, err
+		}
+	}
+
+	return nil, nil
 }

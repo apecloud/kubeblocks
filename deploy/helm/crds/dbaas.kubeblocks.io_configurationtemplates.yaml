@@ -56,6 +56,13 @@ spec:
                     description: Cue that to let ISV verify user configuration through
                       cue language
                     type: string
+                  schema:
+                    description: 'TODO(zt) DAY2 support schema Schema provides a way
+                      for ISVs to verify the validity of user change parameters through
+                      CRD controller-gen doesn''t work with k8s.io/apiextensions-apiserver:
+                      https://github.com/kubernetes-sigs/controller-tools/issues/291'
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
                 type: object
               formatter:
                 default: YAML

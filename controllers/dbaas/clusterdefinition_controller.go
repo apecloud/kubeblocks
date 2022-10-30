@@ -18,10 +18,8 @@ package dbaas
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -30,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	dbaasconfig "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -88,7 +87,7 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return intctrlutil.Reconciled()
 	}
 
-	if ok, err := checkClusterDefinitionTemplate(r.Client, reqCtx, dbClusterDef); !ok || err != nil {
+	if ok, err := dbaasconfig.CheckClusterDefinitionTemplate(r.Client, reqCtx, dbClusterDef); !ok || err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "configMapIsReady")
 	}
 
@@ -122,49 +121,4 @@ func (r *ClusterDefinitionReconciler) deleteExternalResources(reqCtx intctrlutil
 	// Ensure that delete implementation is idempotent and safe to invoke
 	// multiple times for same object.
 	return nil
-}
-
-func checkClusterDefinitionTemplate(client client.Client, ctx intctrlutil.RequestCtx, clusterDef *dbaasv1alpha1.ClusterDefinition) (bool, error) {
-	for _, component := range clusterDef.Spec.Components {
-		if len(component.ConfigTemplateRefs) == 0 {
-			continue
-		}
-
-		if ok, err := checkValidConfTpls(client, ctx, component.ConfigTemplateRefs); !ok || err != nil {
-			return ok, err
-		}
-	}
-	return true, nil
-}
-
-func checkValidConfTpls(cli client.Client, ctx intctrlutil.RequestCtx, configTpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
-
-	// check ConfigTemplate Validate
-	isValidConfTplFn := func(configTpl dbaasv1alpha1.ConfigTemplate) (bool, error) {
-		if len(configTpl.Name) == 0 || len(configTpl.VolumeName) == 0 {
-			return false, fmt.Errorf("required configmap reference name or volume name is empty! [%v]", configTpl)
-		}
-
-		cmKey := client.ObjectKey{
-			Namespace: viper.GetString(cmNamespaceKey),
-			Name:      configTpl.Name,
-		}
-		cmObj := &corev1.ConfigMap{}
-		if err := cli.Get(ctx.Ctx, cmKey, cmObj); err != nil {
-			ctx.Log.Error(err, "failed to get config template cm object!", "configmap key", cmKey)
-			return false, err
-		}
-
-		return true, nil
-
-	}
-
-	for _, tplRef := range configTpls {
-		if ok, err := isValidConfTplFn(tplRef); !ok || err != nil {
-			ctx.Log.Error(err, "failed to validate configuration template!", "config template", tplRef)
-			return ok, err
-		}
-	}
-
-	return true, nil
 }

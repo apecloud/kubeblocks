@@ -23,17 +23,11 @@ import (
 )
 
 const (
-	// settings keys
-	cmNamespaceKey = "CM_NAMESPACE"
-
 	// name of our custom finalizer
 	dbClusterFinalizerName    = "cluster.kubeblocks.io/finalizer"
 	dbClusterDefFinalizerName = "clusterdefinition.kubeblocks.io/finalizer"
 	appVersionFinalizerName   = "appversion.kubeblocks.io/finalizer"
 	opsRequestFinalizerName   = "opsrequest.kubeblocks.io/finalizer"
-
-	ConfigurationTemplateFinalizerName = "configurationtemplate.infracreate.com/finalizer"
-	ConfigurationTplLabelKey           = "configurationtemplate.infracreate.com/name"
 
 	// label keys
 	clusterDefLabelKey             = "clusterdefinition.kubeblocks.io/name"

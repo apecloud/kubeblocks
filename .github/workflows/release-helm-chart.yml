@@ -1,4 +1,4 @@
-name: Release Charts To Github OCI Registry
+name: RELEASE-CHART
 
 on:
   release:

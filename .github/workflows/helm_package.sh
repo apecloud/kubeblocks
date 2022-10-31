@@ -176,12 +176,12 @@ install_chart_releaser() {
 
 filter_charts() {
     while read -r chart; do
-        [[ ! -d "$chart" ]] && continue
-        local file="$chart/Chart.yaml"
+        [[ ! -d "$charts_dir/$chart" ]] && continue
+        local file="$charts_dir/$chart/Chart.yaml"
         if [[ -f "$file" ]]; then
-            echo "$chart"
+            echo "$charts_dir/$chart"
         else
-           echo "WARNING: $file is missing, assuming that '$chart' is not a Helm chart. Skipping." 1>&2
+           echo "WARNING: $file is missing, assuming that '$charts_dir/$chart' is not a Helm chart. Skipping." 1>&2
         fi
     done
 }

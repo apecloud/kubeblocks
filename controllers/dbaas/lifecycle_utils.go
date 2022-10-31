@@ -23,12 +23,11 @@ import (
 	"errors"
 	"fmt"
 	batchv1 "k8s.io/api/batch/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"sort"
 	"strconv"
 	"strings"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/leaanthony/debme"
 	"github.com/spf13/viper"
@@ -357,7 +356,7 @@ func mergeComponents(
 		ComponentType:   clusterDefComp.ComponentType,
 		ConsensusSpec:   clusterDefComp.ConsensusSpec,
 		ReplicationSpec: clusterDefComp.ReplicationSpec,
-		PrimaryStsIndex: *clusterDefComp.PrimaryStsIndex,
+		PrimaryStsIndex: clusterDefComp.PrimaryStsIndex,
 		PodSpec:         clusterDefComp.PodSpec,
 		Service:         clusterDefComp.Service,
 		Scripts:         clusterDefComp.Scripts,
@@ -453,7 +452,7 @@ func mergeComponents(
 		}
 
 		if clusterComp.PrimaryStsIndex != nil {
-			component.PrimaryStsIndex = *clusterComp.PrimaryStsIndex
+			component.PrimaryStsIndex = clusterComp.PrimaryStsIndex
 		}
 	}
 	if component.PodSpec.Affinity == nil && affinity != nil {
@@ -841,19 +840,17 @@ func handleReplicationSet(reqCtx intctrlutil.RequestCtx,
 			client.MatchingLabelsSelector{Selector: selector}); err != nil {
 			return err
 		}
-		var targetStsPodList []corev1.Pod
+		var targetPodList []corev1.Pod
 		for _, pod := range allPodList.Items {
-			for _, ownerRef := range pod.OwnerReferences {
-				if ownerRef.Name == stsObj.Name {
-					targetStsPodList = append(targetStsPodList, pod)
-				}
+			if isMemberOf(stsObj, &pod) {
+				targetPodList = append(targetPodList, pod)
 			}
 		}
-		if len(targetStsPodList) != 1 {
+		if len(targetPodList) != 1 {
 			return fmt.Errorf("pod number in statefulset %s is not equal one", stsObj.Name)
 		}
-		var dbEnginePod = &targetStsPodList[0]
-		claimPrimaryStsName := fmt.Sprintf("%s-%s-%d", cluster.Name, stsObj.Labels[appComponentLabelKey], *component.PrimaryStsIndex)
+		var dbEnginePod = &targetPodList[0]
+		claimPrimaryStsName := fmt.Sprintf("%s-%s-%d", cluster.Name, stsObj.Labels[appComponentLabelKey], getClaimPrimaryStsIndex(cluster, component))
 		if stsObj.Name == claimPrimaryStsName {
 			isPrimarySts = true
 		}
@@ -881,6 +878,18 @@ func handleReplicationSet(reqCtx intctrlutil.RequestCtx,
 	return nil
 }
 
+func getClaimPrimaryStsIndex(cluster *dbaasv1alpha1.Cluster, clusterDefComp dbaasv1alpha1.ClusterDefinitionComponent) int {
+	claimPrimaryStsIndex := clusterDefComp.PrimaryStsIndex
+	for _, clusterComp := range cluster.Spec.Components {
+		if clusterComp.Type == clusterDefComp.TypeName {
+			if clusterComp.PrimaryStsIndex != nil {
+				claimPrimaryStsIndex = clusterComp.PrimaryStsIndex
+			}
+		}
+	}
+	return *claimPrimaryStsIndex
+}
+
 func createReplRelationJobAndEnsure(
 	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
@@ -900,6 +909,7 @@ func createReplRelationJobAndEnsure(
 		if err != nil {
 			return err
 		}
+		var ttlSecondsAfterJobFinished int32 = 30
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: key.Namespace,
@@ -913,6 +923,7 @@ func createReplRelationJobAndEnsure(
 						Name:      key.Name},
 					Spec: jobPodSpec,
 				},
+				TTLSecondsAfterFinished: &ttlSecondsAfterJobFinished,
 			},
 		}
 		scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()

@@ -203,7 +203,7 @@ type ClusterDefinitionComponent struct {
 	// PrimaryStsIndex determines which statefulset is primary when Type is Replication
 	// +kubebuilder:default=0
 	// +optional
-	PrimaryStsIndex *int `json:"PrimaryStsIndex,omitempty"`
+	PrimaryStsIndex *int `json:"primaryStsIndex,omitempty"`
 }
 
 type ComponentType string

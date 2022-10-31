@@ -65,7 +65,7 @@ type Component struct {
 	ComponentType        dbaasv1alpha1.ComponentType            `json:"componentType,omitempty"`
 	ConsensusSpec        *dbaasv1alpha1.ConsensusSetSpec        `json:"consensusSpec,omitempty"`
 	ReplicationSpec      *dbaasv1alpha1.ReplicationSpec         `json:"replicationSpec,omitempty"`
-	PrimaryStsIndex      int                                    `json:"primaryStsIndex,omitempty"`
+	PrimaryStsIndex      *int                                   `json:"primaryStsIndex,omitempty"`
 	PodSpec              *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	Service              corev1.ServiceSpec                     `json:"service,omitempty"`
 	Scripts              dbaasv1alpha1.ClusterDefinitionScripts `json:"scripts,omitempty"`

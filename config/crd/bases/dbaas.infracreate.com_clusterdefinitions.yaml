@@ -53,11 +53,6 @@ spec:
                   description: ClusterDefinitionComponent is a group of pods, pods
                     in one component usually share the same data
                   properties:
-                    PrimaryStsIndex:
-                      default: 0
-                      description: PrimaryStsIndex determines which statefulset is
-                        primary when Type is Replication
-                      type: integer
                     antiAffinity:
                       default: false
                       description: antiAffinity defines components should have anti-affinity
@@ -7532,6 +7527,11 @@ spec:
                       required:
                       - containers
                       type: object
+                    primaryStsIndex:
+                      default: 0
+                      description: PrimaryStsIndex determines which statefulset is
+                        primary when Type is Replication
+                      type: integer
                     probes:
                       properties:
                         roleChangedProbe:

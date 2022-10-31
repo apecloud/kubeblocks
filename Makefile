@@ -202,6 +202,10 @@ test-current-ctx: manifests generate fmt vet ## Run operator controller tests wi
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_MODULE)... -coverprofile cover.out
 
+.PHONY: test-delve
+test-delve: manifests generate fmt vet envtest ## Run tests.
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" dlv --listen=:2346 --headless=true --api-version=2 --accept-multiclient test ./$(TEST_MODULE)
+
 .PHONY: test-webhook-enabled
 test-webhook-enabled: ## Run tests with webhooks enabled.
 	$(MAKE) test ENABLE_WEBHOOKS=true

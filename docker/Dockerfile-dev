@@ -77,3 +77,8 @@ RUN bash /tmp/library-scripts/setup-user.sh "${USERNAME}" "${PATH}" \
 VOLUME [ "/var/lib/docker" ]
 
 
+# Initialize Dapr devcontainer script
+ENTRYPOINT [ "/usr/local/share/devcontainer-init.sh" ]
+CMD [ "sleep", "infinity" ]
+
+USER ${USERNAME}

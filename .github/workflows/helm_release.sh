@@ -45,11 +45,13 @@ main() {
     echo 'Adding install_dir to PATH...'
     export PATH="$install_dir:$PATH"
 
-    mv ../.cr-release-packages .
-    mv ../.cr-index .
+    if [ -d ../.cr-release-packages ]; then
+        mv ../.cr-release-packages .
+        mv ../.cr-index .
 
-    release_charts
-    update_index
+        release_charts
+        update_index
+    fi
 }
 
 parse_command_line() {

@@ -1,0 +1,68 @@
+name: Release Charts To Github OCI Registry
+
+on:
+  release:
+    types:
+      - published
+
+env:
+  CR_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+  CHART_RELEASER_VERSION: "v1.4.1"
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Kubeblocks
+        uses: actions/checkout@v3
+
+      - name: Fetch Kubeblocks History
+        run: git fetch --prune --unshallow
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.10.0
+
+      - name: Add Dependency Chart Repos
+        run: |
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+
+      - name: Package Kubeblocks Helm Chart
+        run: |
+          args=(--owner "apecloud" --repo "kubeclocks" --charts-dir "deploy" --version ${{ env.CHART_RELEASER_VERSION }})
+          "${{ github.workspace }}/.github/workflows/helm_package.sh" "${args[@]}"
+        shell: bash
+
+      - name: Checkout HelmCharts
+        uses: actions/checkout@v3
+        with:
+          repository: apecloud/helm-charts
+          path: helm-charts
+          token: ${{ env.CR_TOKEN }}
+
+      - name: Fetch HelmCharts History
+        run: |
+          cd helm-charts
+          git fetch --prune --unshallow
+
+      - name: Configure Git
+        run: |
+          cd helm-charts
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Upload and Index Kubeblocks Helm Charts
+        run: |
+          cd helm-charts
+          args=(--owner "apecloud" --repo "helm-charts" --version ${{ env.CHART_RELEASER_VERSION }})
+          "${{ github.workspace }}/.github/workflows/helm_release.sh" "${args[@]}"
+        shell: bash

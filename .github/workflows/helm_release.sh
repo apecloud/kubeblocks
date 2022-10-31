@@ -125,7 +125,7 @@ parse_command_line() {
 }
 
 release_charts() {
-    local args=(-o "$owner" -r "$repo" -c "$(git rev-parse HEAD)" -t $CR_TOKEN)
+    local args=(-o "$owner" -r "$repo" -c "$(git rev-parse HEAD)" -t $CR_TOKEN --skip-existing)
 
     echo 'Releasing charts...'
     cr upload "${args[@]}"

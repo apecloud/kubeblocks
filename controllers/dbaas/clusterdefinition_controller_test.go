@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	dbaasconfig "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 )
 
 var _ = Describe("ClusterDefinition Controller", func() {
@@ -279,7 +280,7 @@ data:
 			}, time.Second*10, time.Second*1).Should(BeFalse())
 
 			// create configmap
-			assureCfgTplConfigMapObj(cmName, viper.GetString(cmNamespaceKey))
+			assureCfgTplConfigMapObj(cmName, viper.GetString(dbaasconfig.ConfigNamespaceKey))
 
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{
@@ -313,7 +314,7 @@ data:
 			}
 
 			// create configmap
-			assureCfgTplConfigMapObj(cmName, viper.GetString(cmNamespaceKey))
+			assureCfgTplConfigMapObj(cmName, viper.GetString(dbaasconfig.ConfigNamespaceKey))
 
 			Expect(testCtx.CreateObj(ctx, clusterDefinition)).Should(Succeed())
 			createdClusterDef := &dbaasv1alpha1.ClusterDefinition{}

@@ -18,11 +18,12 @@ package configuration
 
 import (
 	"fmt"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/spf13/viper"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -63,14 +64,12 @@ func GetConfigMapByName(cli client.Client, ctx intctrlutil.RequestCtx, cmName st
 }
 
 func CheckConfigurationTemplate(cli client.Client, ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplate) (bool, error) {
-	// TODO(zt) validate configuration template
-
 	// check ConfigTemplate Validate
 	configmapFn := func(configTpl string) (*corev1.ConfigMap, error) {
 		return GetConfigMapByName(cli, ctx, configTpl)
 	}
 
-	// check
+	// TODO(zt) validate configuration template
 	isConfigSchemaFn := func(tpl *dbaasv1alpha1.CustomParametersValidation) (bool, error) {
 		// TODO(zt)
 

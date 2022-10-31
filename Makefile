@@ -251,6 +251,9 @@ dbctl: build-checks ## Build bin/dbctl CLI.
 clean-dbctl: ## Clean bin/dbctl* CLI tools.
 	rm -f bin/dbctl*
 
+.PHONY: doc
+dbctl-doc: ## generate dbctl command reference manual.
+	go run ./hack/docgen/dbctl/main.go ./docs/cli
 
 ##@ Load Balancer
 

@@ -430,8 +430,13 @@ WESQL_CLUSTER_CHART_VERSION ?= 0.1.1
 
 .PHONY: bump-chart-ver-wqsql-cluster
 bump-chart-ver-wqsql-cluster: ## Bump WeSQL Clsuter helm chart version.
+ifeq ($(GOOS), darwin)
 	sed -i '' "s/^version:.*/version: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
 	# sed -i '' "s/^appVersion:.*/appVersion: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
+else
+	sed -i "s/^version:.*/version: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
+	# sed -i "s/^appVersion:.*/appVersion: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
+endif
 
 .PHONY: helm-package-wqsql-cluster
 helm-package-wqsql-cluster: bump-chart-ver-wqsql-cluster ## Do WeSQL Clsuter helm package.

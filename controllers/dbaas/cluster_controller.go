@@ -114,10 +114,71 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 		Name:      event.InvolvedObject.Name,
 	}
 
-	return updateConsensusSetRoleLabel(cli, reqCtx.Ctx, podName, role)
+	return updateConsensusSetRoleLabel(cli, reqCtx, podName, role)
 }
 
-func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName types.NamespacedName, role string) error {
+type ConsensusRole string
+
+const (
+	Leader   ConsensusRole = "Leader"
+	Follower ConsensusRole = "Follower"
+	Learner  ConsensusRole = "Learner"
+)
+
+type consensusMemberExt struct {
+	name          string
+	consensusRole ConsensusRole
+	accessMode    dbaasv1alpha1.AccessMode
+	podName       string
+}
+
+func putConsensusMemberExt(roleMap map[string]consensusMemberExt, name string, role ConsensusRole, accessMode dbaasv1alpha1.AccessMode) {
+	if roleMap == nil {
+		return
+	}
+
+	if name == "" || role == "" || accessMode == "" {
+		return
+	}
+
+	memberExt := consensusMemberExt{
+		name:          name,
+		consensusRole: role,
+		accessMode:    accessMode,
+	}
+
+	roleMap[name] = memberExt
+}
+
+func composeConsensusRoleMap(componentDef dbaasv1alpha1.ClusterDefinitionComponent) map[string]consensusMemberExt {
+	roleMap := make(map[string]consensusMemberExt, 0)
+
+	putConsensusMemberExt(roleMap,
+		componentDef.ConsensusSpec.Leader.Name,
+		Leader,
+		componentDef.ConsensusSpec.Leader.AccessMode)
+
+	for _, follower := range componentDef.ConsensusSpec.Followers {
+		putConsensusMemberExt(roleMap,
+			follower.Name,
+			Follower,
+			follower.AccessMode)
+	}
+
+	if componentDef.ConsensusSpec.Learner != nil {
+		putConsensusMemberExt(roleMap,
+			componentDef.ConsensusSpec.Learner.Name,
+			Learner,
+			componentDef.ConsensusSpec.Learner.AccessMode)
+	}
+
+	return roleMap
+}
+
+func updateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx, podName types.NamespacedName, role string) error {
+	ctx := reqCtx.Ctx
+	log := reqCtx.Log
+
 	// get pod
 	pod := &corev1.Pod{}
 	if err := cli.Get(ctx, podName, pod); err != nil {
@@ -151,15 +212,12 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 		return err
 	}
 
-	// get all role names
-	leaderName := componentDef.ConsensusSpec.Leader.Name
-	followersMap := make(map[string]dbaasv1alpha1.ConsensusMember, 0)
-	for _, follower := range componentDef.ConsensusSpec.Followers {
-		followersMap[follower.Name] = follower
-	}
-	learnerName := ""
-	if componentDef.ConsensusSpec.Learner != nil {
-		learnerName = componentDef.ConsensusSpec.Learner.Name
+	// compose role label to consensus member map
+	roleMap := composeConsensusRoleMap(componentDef)
+	memberExt, ok := roleMap[role]
+	if !ok {
+		log.Info("role not defined: " + role)
+		return nil
 	}
 
 	// prepare cluster status patch
@@ -210,8 +268,20 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 	}
 
 	// set pod.Name to the right status field
-	accessMode := dbaasv1alpha1.AccessMode("")
+
+	resetLeader()
+	resetFollower()
+	resetLearner()
 	needUpdate := false
+	switch memberExt.consensusRole {
+	case Leader:
+		needUpdate = setLeader(consensusSetStatus, memberExt, pod.Name)
+	case Follower:
+		needUpdate = setFollower(consensusSetStatus, memberExt, pod.Name)
+	case Learner:
+		needUpdate = setLearner(consensusSetStatus, memberExt, pod.Name)
+	}
+
 	switch role {
 	case leaderName:
 		consensusSetStatus.Leader.Pod = pod.Name
@@ -264,7 +334,7 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 
 		// update pod accessMode label
 		patchAccessMode := client.MergeFrom(pod.DeepCopy())
-		pod.Labels[consensusSetAccessModeLabelKey] = string(accessMode)
+		pod.Labels[consensusSetAccessModeLabelKey] = string(memberExt.accessMode)
 		return cli.Patch(ctx, pod, patchAccessMode)
 	}
 

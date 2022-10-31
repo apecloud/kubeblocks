@@ -26,7 +26,7 @@ import (
 
 type CustomParametersValidation struct {
 	// TODO(zt) DAY2 support schema
-	// Schema provides a way for ISVs to verify the validity of user change parameters through CRD
+	// Schema provides a way for ISVs to verify the validity of user change parameters through json schema
 	// controller-gen doesn't work with k8s.io/apiextensions-apiserver: https://github.com/kubernetes-sigs/controller-tools/issues/291
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:validation:Type=object

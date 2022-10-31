@@ -1,7 +1,9 @@
 name: Release Charts To Github OCI Registry
 
 on:
-  push:
+  release:
+    types:
+      - published
 
 env:
   CR_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}

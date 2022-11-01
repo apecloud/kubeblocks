@@ -59,6 +59,7 @@ var _ = Describe("EndpointController", func() {
 				}
 				return svc.Annotations[AnnotationKeyEndpointsVersion] == ep.GetObjectMeta().GetResourceVersion()
 			}, timeout, interval).Should(BeTrue())
+			removeResource(svc)
 		})
 	})
 })

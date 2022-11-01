@@ -64,19 +64,15 @@ type eniManager struct {
 	nc               pb.NodeClient
 }
 
-func newENIManager(logger logr.Logger, ip string, nc pb.NodeClient, cp cloud.Provider) (*eniManager, error) {
+func newENIManager(logger logr.Logger, ip string, info *pb.InstanceInfo, nc pb.NodeClient, cp cloud.Provider) (*eniManager, error) {
 	c := &eniManager{
 		nc: nc,
 		cp: cp,
 	}
 
-	nodeInfo, err := c.getNodeInfo()
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to get instance id")
-	}
-	c.instanceId = nodeInfo.GetInstanceId()
-	c.subnetId = nodeInfo.GetSubnetId()
-	c.securityGroupIds = nodeInfo.GetSecurityGroupIds()
+	c.instanceId = info.GetInstanceId()
+	c.subnetId = info.GetSubnetId()
+	c.securityGroupIds = info.GetSecurityGroupIds()
 	c.logger = logger.WithValues("ip", ip, "instance id", c.instanceId)
 
 	c.minPrivateIP = config.MinPrivateIP
@@ -359,12 +355,4 @@ func (c *eniManager) waitForENIAttached(eniId string) error {
 	}
 	_, err := c.nc.WaitForENIAttached(context.Background(), request)
 	return err
-}
-
-func (c *eniManager) getNodeInfo() (*pb.InstanceInfo, error) {
-	resp, err := c.nc.DescribeNodeInfo(context.Background(), &pb.DescribeNodeInfoRequest{RequestId: util.GenRequestId()})
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to describe node info")
-	}
-	return resp.GetInfo(), nil
 }

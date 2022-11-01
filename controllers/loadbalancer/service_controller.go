@@ -52,10 +52,11 @@ const (
 	AnnotationValueLoadBalancerTypePrivateIP = "private-ip"
 	AnnotationValueLoadBalancerTypeNone      = "none"
 
-	AnnotationKeyTrafficPolicy          = "service.kubernetes.io/apecloud-loadbalancer-traffic-policy"
-	AnnotationValueClusterTrafficPolicy = "Cluster"
-	AnnotationValueLocalTrafficPolicy   = "Local"
-	DefaultTrafficPolicy                = AnnotationValueClusterTrafficPolicy
+	AnnotationKeyTrafficPolicy                  = "service.kubernetes.io/apecloud-loadbalancer-traffic-policy"
+	AnnotationValueClusterTrafficPolicy         = "Cluster"
+	AnnotationValueLocalTrafficPolicy           = "Local"
+	AnnotationValueBestEffortLocalTrafficPolicy = "BestEffortLocal"
+	DefaultTrafficPolicy                        = AnnotationValueClusterTrafficPolicy
 )
 
 type FloatingIP struct {
@@ -101,9 +102,15 @@ func NewServiceController(logger logr.Logger, client client.Client, scheme *runt
 }
 
 func (c *ServiceController) initTrafficPolicies() {
+	var (
+		cp  = &ClusterTrafficPolicy{nm: c.nm}
+		lp  = &LocalTrafficPolicy{logger: c.logger, nm: c.nm, client: c.Client}
+		blp = &BestEffortLocalPolicy{LocalTrafficPolicy: *lp, ClusterTrafficPolicy: *cp}
+	)
 	c.tps = map[string]TrafficPolicy{
-		AnnotationValueClusterTrafficPolicy: &ClusterTrafficPolicy{nm: c.nm},
-		AnnotationValueLocalTrafficPolicy:   &LocalTrafficPolicy{logger: c.logger, client: c.Client},
+		AnnotationValueClusterTrafficPolicy:         cp,
+		AnnotationValueLocalTrafficPolicy:           lp,
+		AnnotationValueBestEffortLocalTrafficPolicy: blp,
 	}
 }
 
@@ -220,7 +227,7 @@ func (c *ServiceController) ensureFloatingIP(ctx context.Context, ctxLog logr.Lo
 }
 
 func (c *ServiceController) migrateFloatingIP(ctx context.Context, ctxLog logr.Logger, nodeIP string, fip *FloatingIP, svc *corev1.Service) error {
-	ctxLog.WithName("migrateFloatingIP").WithValues("new node", nodeIP, "old node", fip.nodeIP)
+	ctxLog = ctxLog.WithName("migrateFloatingIP").WithValues("new node", nodeIP, "old node", fip.nodeIP)
 
 	if fip.nodeIP == nodeIP && fip.eni.EniId == svc.GetAnnotations()[AnnotationKeyENIId] {
 		ctxLog.Info("Floating ip is in sync, do nothing")
@@ -256,7 +263,7 @@ func (c *ServiceController) migrateFloatingIP(ctx context.Context, ctxLog logr.L
 }
 
 func (c *ServiceController) migrateOnNewMaster(ctx context.Context, ctxLog logr.Logger, nodeIP string, fip *FloatingIP, svc *corev1.Service) error {
-	ctxLog.WithName("migrateOnNewMaster").WithValues("node", nodeIP)
+	ctxLog = ctxLog.WithName("migrateOnNewMaster").WithValues("node", nodeIP)
 
 	if err := c.cp.DeallocIPAddresses(fip.eni.EniId, []string{fip.ip}); err != nil {
 		return errors.Wrapf(err, "Failed to dealloc private ip %s", fip.ip)
@@ -281,7 +288,7 @@ func (c *ServiceController) migrateOnNewMaster(ctx context.Context, ctxLog logr.
 	ctxLog.Info("Successfully setup service network")
 
 	if err = c.updateService(ctx, ctxLog, svc, newFip, false); err != nil {
-		return err
+		return errors.Wrap(err, "Failed to update service")
 	}
 	return nil
 }
@@ -365,8 +372,8 @@ func (c *ServiceController) deleteFloatingIP(ctx context.Context, ctxLog logr.Lo
 	c.removeFloatingIP(fip.ip)
 	ctxLog.Info("Successfully remove floating ip from cache")
 
-	if err := c.updateService(ctx, ctxLog, svc, fip, true); err != nil {
-		return err
+	if err = c.updateService(ctx, ctxLog, svc, fip, true); err != nil {
+		return errors.Wrap(err, "Failed to update service")
 	}
 	ctxLog.Info("Successfully deleted floating ip and cleaned it's host networking")
 	return nil
@@ -378,10 +385,26 @@ func (c *ServiceController) updateService(ctx context.Context, logger logr.Logge
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
+	if fip.eni.EniId == "" {
+		return errors.New("Invalid eni id")
+	}
 	annotations[AnnotationKeyENIId] = fip.eni.EniId
+
+	if fip.nodeIP == "" {
+		return errors.New("Invalid node ip")
+	}
 	annotations[AnnotationKeyENINodeIP] = fip.nodeIP
+
+	if fip.ip == "" {
+		return errors.New("Invalid floating ip")
+	}
 	annotations[AnnotationKeyFloatingIP] = fip.ip
+
+	if fip.subnetId == "" {
+		return errors.New("Invalid subnet id")
+	}
 	annotations[AnnotationKeySubnetId] = fip.subnetId
+
 	svc.SetAnnotations(annotations)
 
 	if deleting {
@@ -392,9 +415,8 @@ func (c *ServiceController) updateService(ctx context.Context, logger logr.Logge
 
 	svc.Spec.ExternalIPs = []string{fip.ip}
 
-	svcName := fmt.Sprintf("%s/%s", svc.GetNamespace(), svc.GetName())
 	if err := c.Client.Update(ctx, svc); err != nil {
-		return errors.Wrapf(err, "Failed to update service %s", svcName)
+		return err
 	}
 	logger.Info("Successfully update service", "info", svc.String())
 	return nil
@@ -434,6 +456,7 @@ func (c *ServiceController) tryAssignPrivateIP(ctxLog logr.Logger, ip string, no
 }
 
 func (c *ServiceController) chooseTrafficNode(svc *corev1.Service) (string, error) {
+	ctxLog := c.logger.WithValues("svc", getObjectFullName(svc))
 	var (
 		annotations = svc.GetAnnotations()
 	)
@@ -451,6 +474,7 @@ func (c *ServiceController) chooseTrafficNode(svc *corev1.Service) (string, erro
 	if !ok {
 		return "", fmt.Errorf("unknown traffic policy %s", trafficPolicy)
 	}
+	ctxLog.Info("Choosing traffic node", "policy", trafficPolicy)
 
 	return policy.ChooseNode(svc)
 }

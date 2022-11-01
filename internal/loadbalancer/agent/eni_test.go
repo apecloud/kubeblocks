@@ -181,7 +181,12 @@ var _ = Describe("Eni", func() {
 		mockNodeClient.EXPECT().DescribeAllENIs(gomock.Any(), gomock.Any()).Return(getDescribeAllENIResponse(), nil).AnyTimes()
 		mockNodeClient.EXPECT().SetupNetworkForENI(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 		mockNodeClient.EXPECT().DescribeNodeInfo(gomock.Any(), gomock.Any()).Return(getDescribeNodeInfoResponse(), nil)
-		manager, err := newENIManager(logger, nodeIP, mockNodeClient, mockProvider)
+		info := &pb.InstanceInfo{
+			InstanceId:       instanceId,
+			SubnetId:         subnet1Id,
+			SecurityGroupIds: []string{securityGroupId},
+		}
+		manager, err := newENIManager(logger, nodeIP, info, mockNodeClient, mockProvider)
 		Expect(err).Should(BeNil())
 		return manager, mockProvider, mockNodeClient
 	}

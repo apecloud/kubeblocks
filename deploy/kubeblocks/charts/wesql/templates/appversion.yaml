@@ -1,0 +1,15 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: AppVersion
+metadata:
+  name: wesql-{{ default .Chart.AppVersion .Values.appVersionOverride }}
+  labels:
+    {{- include "wesqlapp.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: apecloud-wesql
+  components:
+  - type: replicasets
+    podSpec:
+      containers:
+      - name: mysql
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}

@@ -1,25 +1,13 @@
-<<<<<<< HEAD
-apiVersion: dbaas.infracreate.com/v1alpha1
-=======
 apiVersion: dbaas.kubeblocks.io/v1alpha1
->>>>>>> cc96cfeb49ef0a7c7eddad95f93d9086442b22db
 kind:       AppVersion
 metadata:
   name:     app-version-consensus
 spec:
-<<<<<<< HEAD
-  clusterDefinitionRef: mysql_clusterdef_consensus
-=======
   clusterDefinitionRef: mysql-clusterdef-consensus
->>>>>>> cc96cfeb49ef0a7c7eddad95f93d9086442b22db
   components:
   - type: replicasets
     podSpec:
       containers:
       - name: mysql
-<<<<<<< HEAD
-        image: docker.io/infracreate/wesql-server-8.0:0.1-SNAPSHOT
-=======
         image: docker.io/apecloud/wesql-server-8.0:0.1-SNAPSHOT
->>>>>>> cc96cfeb49ef0a7c7eddad95f93d9086442b22db
         imagePullPolicy: IfNotPresent

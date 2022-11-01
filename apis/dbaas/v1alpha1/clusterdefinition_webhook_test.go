@@ -107,11 +107,7 @@ spec:
 // createTestClusterDefinitionObj2 create an invalid obj
 func createTestClusterDefinitionObj2(name string) (*ClusterDefinition, error) {
 	clusterDefYaml := fmt.Sprintf(`
-<<<<<<< HEAD
-apiVersion: dbaas.infracreate.com/v1alpha1
-=======
 apiVersion: dbaas.kubeblocks.io/v1alpha1
->>>>>>> cc96cfeb49ef0a7c7eddad95f93d9086442b22db
 kind:       ClusterDefinition
 metadata:
   name:     %s

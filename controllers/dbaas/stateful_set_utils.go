@@ -1,9 +1,5 @@
 /*
-<<<<<<< HEAD
-Copyright 2022 The KubeBlocks Authors
-=======
 Copyright ApeCloud Inc.
->>>>>>> cc96cfeb49ef0a7c7eddad95f93d9086442b22db
 Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");

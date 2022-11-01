@@ -51,8 +51,8 @@ var _ = Describe("EndpointController", func() {
 			Expect(k8sClient.Create(context.Background(), svc)).Should(Succeed())
 			Expect(k8sClient.Create(context.Background(), ep)).Should(Succeed())
 			Eventually(func() bool {
-				Expect(k8sClient.Get(context.Background(), *svcKey, svc)).Should(Succeed())
-				Expect(k8sClient.Get(context.Background(), *epKey, ep)).Should(Succeed())
+				_ = k8sClient.Get(context.Background(), *svcKey, svc)
+				_ = k8sClient.Get(context.Background(), *epKey, ep)
 				return svc.Annotations[AnnotationKeyEndpointsVersion] == ep.GetObjectMeta().GetResourceVersion()
 			}, timeout, interval).Should(BeTrue())
 		})

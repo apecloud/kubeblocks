@@ -80,7 +80,7 @@ var _ = Describe("Cluster", func() {
 
 			inputs := create.Inputs{
 				ResourceName:    types.ResourceClusters,
-				CueTemplateName: clusterCueTemplateName,
+				CueTemplateName: CueTemplateName,
 				Options:         o,
 				Factory:         tf,
 			}
@@ -89,7 +89,7 @@ var _ = Describe("Cluster", func() {
 			Expect(o.Namespace).To(Equal("default"))
 			Expect(o.Name).To(Equal("test"))
 
-			Expect(o.Run(inputs, []string{})).Should(Succeed())
+			Expect(o.Run(inputs)).Should(Succeed())
 
 			del := &DeleteOptions{IOStreams: streams}
 			Expect(del.Validate([]string{})).To(MatchError("missing cluster name"))

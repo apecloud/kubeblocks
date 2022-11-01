@@ -21,9 +21,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"helm.sh/helm/v3/pkg/repo"
-
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
-	"github.com/apecloud/kubeblocks/version"
 )
 
 var _ = Describe("helm util", func() {
@@ -41,19 +38,5 @@ var _ = Describe("helm util", func() {
 		cfg, err := NewActionConfig("test", "config")
 		Expect(err == nil).To(BeTrue())
 		Expect(cfg != nil).To(BeTrue())
-	})
-
-	It("Install", func() {
-		o := &InstallOpts{
-			Name:      types.KubeBlocksChartName,
-			Chart:     "kubeblocks-test-chart",
-			Namespace: "default",
-			Version:   version.DefaultKubeBlocksVersion,
-		}
-		cfg := FakeActionConfig()
-		Expect(cfg != nil).Should(BeTrue())
-		_, err := o.Install(cfg)
-		Expect(err).Should(HaveOccurred())
-		Expect(o.UnInstall(cfg)).Should(HaveOccurred())
 	})
 })

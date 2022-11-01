@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-var newEndpointsObj = func(svc *corev1.Service) (*corev1.Endpoints, *types.NamespacedName) {
+var newEndpointsObj = func(svc *corev1.Service) (*corev1.Endpoints, types.NamespacedName) {
 	endpoints := &corev1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      svc.GetName(),
@@ -37,7 +37,7 @@ var newEndpointsObj = func(svc *corev1.Service) (*corev1.Endpoints, *types.Names
 			},
 		},
 	}
-	return endpoints, &types.NamespacedName{
+	return endpoints, types.NamespacedName{
 		Name:      endpoints.GetName(),
 		Namespace: endpoints.GetNamespace(),
 	}
@@ -51,10 +51,10 @@ var _ = Describe("EndpointController", func() {
 			Expect(k8sClient.Create(context.Background(), svc)).Should(Succeed())
 			Expect(k8sClient.Create(context.Background(), ep)).Should(Succeed())
 			Eventually(func() bool {
-				if err := k8sClient.Get(context.Background(), *svcKey, svc); err != nil {
+				if err := k8sClient.Get(context.Background(), svcKey, svc); err != nil {
 					return false
 				}
-				if err := k8sClient.Get(context.Background(), *epKey, ep); err != nil {
+				if err := k8sClient.Get(context.Background(), epKey, ep); err != nil {
 					return false
 				}
 				return svc.Annotations[AnnotationKeyEndpointsVersion] == ep.GetObjectMeta().GetResourceVersion()

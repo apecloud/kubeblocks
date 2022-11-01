@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -135,6 +136,10 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return intctrlutil.Reconciled()
 	}
 
+	if ok, err := checkAppVersionTemplate(r.Client, reqCtx, appVersion); !ok || err != nil {
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "configMapIsReady")
+	}
+
 	clusterdefinition := &dbaasv1alpha1.ClusterDefinition{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Name: appVersion.Spec.ClusterDefinitionRef,
@@ -164,6 +169,19 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 	intctrlutil.RecordCreatedEvent(r.Recorder, appVersion)
 	return ctrl.Result{}, nil
+}
+
+func checkAppVersionTemplate(client client.Client, ctx intctrlutil.RequestCtx, appVersion *dbaasv1alpha1.AppVersion) (bool, error) {
+	for _, component := range appVersion.Spec.Components {
+		if len(component.ConfigTemplateRefs) == 0 {
+			continue
+		}
+
+		if ok, err := checkValidConfTpls(client, ctx, component.ConfigTemplateRefs); !ok || err != nil {
+			return ok, err
+		}
+	}
+	return true, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

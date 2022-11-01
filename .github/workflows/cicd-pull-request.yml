@@ -14,6 +14,7 @@ jobs:
           branch_pattern: 'feature/|bugfix/|release/|hotfix/|support/'
           comment_for_invalid_branch_name: 'This branch name is not following the standards: feature/|bugfix/|release/|hotfix/|support/'
           fail_if_invalid_branch_name: 'true'
+          ignore_branch_pattern: 'main|master'
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

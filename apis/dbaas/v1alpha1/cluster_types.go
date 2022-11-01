@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// TerminationPolicyType define termination policy types.
+// +enum
+type TerminationPolicyType string
+
 const (
 	DoNotTerminate TerminationPolicyType = "DoNotTerminate"
 	Halt           TerminationPolicyType = "Halt"
@@ -28,8 +32,8 @@ const (
 	WipeOut        TerminationPolicyType = "WipeOut"
 )
 
-type TerminationPolicyType string
-
+// PodAntiAffinity define pod anti-affinity strategy.
+// +enum
 type PodAntiAffinity string
 
 const (
@@ -195,18 +199,35 @@ type ClusterStatusComponent struct {
 }
 
 type ConsensusSetStatus struct {
-	// Leader pod name
+	// Leader status
+	// +kubebuilder:validation:Required
+	Leader ConsensusMemberStatus `json:"leader"`
+
+	// Followers status
+	// +optional
+	Followers []ConsensusMemberStatus `json:"followers,omitempty"`
+
+	// Learner status
+	// +optional
+	Learner *ConsensusMemberStatus `json:"learner,omitempty"`
+}
+
+type ConsensusMemberStatus struct {
+	// Name role name
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=leader
+	Name string `json:"name"`
+
+	// AccessMode, what service this pod provides
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum={None, Readonly, ReadWrite}
+	// +kubebuilder:default=ReadWrite
+	AccessMode AccessMode `json:"accessMode"`
+
+	// Pod name
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Unknown
-	Leader string `json:"leader"`
-
-	// Followers pod names
-	// +optional
-	Followers []string `json:"followers,omitempty"`
-
-	// Learner pod name
-	// +optional
-	Learner string `json:"learner,omitempty"`
+	Pod string `json:"pod"`
 }
 
 type ClusterComponentVolumeClaimTemplate struct {
@@ -228,7 +249,7 @@ type Affinity struct {
 	PodAntiAffinity PodAntiAffinity `json:"podAntiAffinity,omitempty"`
 	// TopologyKeys describe topologyKeys for `topologySpreadConstraint` and `podAntiAffinity` in ClusterDefinition API
 	// +optional
-	TopologyKeys []string `json:"topologyKeys"`
+	TopologyKeys []string `json:"topologyKeys,omitempty"`
 	// NodeLabels describe constrain which nodes pod can be scheduled on based on node labels
 	// +optional
 	NodeLabels map[string]string `json:"nodeLabels,omitempty"`

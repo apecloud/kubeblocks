@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 apiVersion: dbaas.infracreate.com/v1alpha1
+=======
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+>>>>>>> cc96cfeb49ef0a7c7eddad95f93d9086442b22db
 kind: ClusterDefinition
 metadata:
   name: cluster-definition-consensus
@@ -59,11 +63,19 @@ spec:
             args:
               - >
                 cluster_info="";
+<<<<<<< HEAD
                 for (( i=0; i<$OPENDBAAS_REPLICASETS_N; i++ )); do
                   if [ $i -ne 0 ]; then
                     cluster_info="$cluster_info;";
                   fi;
                   host=$(eval echo \$OPENDBAAS_REPLICASETS_"$i"_HOSTNAME)
+=======
+                for (( i=0; i<$KB_REPLICASETS_N; i++ )); do
+                  if [ $i -ne 0 ]; then
+                    cluster_info="$cluster_info;";
+                  fi;
+                  host=$(eval echo \$KB_REPLICASETS_"$i"_HOSTNAME)
+>>>>>>> cc96cfeb49ef0a7c7eddad95f93d9086442b22db
                   cluster_info="$cluster_info$host:13306";
                 done;
                 idx=0;
@@ -71,7 +83,11 @@ spec:
                   for i in "${ADDR[@]}"; do
                     idx=$i;
                   done;
+<<<<<<< HEAD
                 done <<< "$OPENDBAAS_MY_POD_NAME";
+=======
+                done <<< "$KB_POD_NAME";
+>>>>>>> cc96cfeb49ef0a7c7eddad95f93d9086442b22db
                 echo $idx;
                 cluster_info="$cluster_info@$(($idx+1))";
                 echo $cluster_info;

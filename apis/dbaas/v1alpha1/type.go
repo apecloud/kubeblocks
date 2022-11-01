@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,16 +22,17 @@ import (
 )
 
 const (
-	APIVersion            = "dbaas.infracreate.com/v1alpha1"
+	APIVersion            = "dbaas.kubeblocks.io/v1alpha1"
 	AppVersionKind        = "AppVersion"
 	ClusterDefinitionKind = "ClusterDefinition"
 	ClusterKind           = "Cluster"
 	OpsRequestKind        = "OpsRequestKind"
 )
 
+// Phase defines the CR .Status.Phase
+// +enum
 type Phase string
 
-// CR.Status.Phase
 const (
 	AvailablePhase   Phase = "Available"
 	UnavailablePhase Phase = "Unavailable"
@@ -44,14 +45,17 @@ const (
 	SucceedPhase     Phase = "Succeed"
 )
 
+// Status define CR .Status.ClusterDefSyncStatus
+// +enum
 type Status string
 
-// CR.Status.ClusterDefSyncStatus
 const (
 	OutOfSyncStatus Status = "OutOfSync"
 	InSyncStatus    Status = "InSync"
 )
 
+// OpsType defines operation types.
+// +enum
 type OpsType string
 
 const (

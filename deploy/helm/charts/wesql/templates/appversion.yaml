@@ -1,4 +1,4 @@
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: AppVersion
 metadata:
   name: wesql-{{ default .Chart.AppVersion .Values.appVersionOverride }}

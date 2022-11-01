@@ -1,5 +1,9 @@
 /*
+<<<<<<< HEAD
 Copyright 2022 The KubeBlocks Authors
+=======
+Copyright ApeCloud Inc.
+>>>>>>> cc96cfeb49ef0a7c7eddad95f93d9086442b22db
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,9 +47,10 @@ import (
 	// "github.com/dapr/components-contrib/bindings/mysql"
 	// "github.com/dapr/components-contrib/bindings"
 
+	"go.uber.org/automaxprocs/maxprocs"
+
 	"github.com/apecloud/kubeblocks/cmd/daprd/internal/binding/mysql"
 	"github.com/apecloud/kubeblocks/controllers/dbaas"
-	"go.uber.org/automaxprocs/maxprocs"
 )
 
 var (

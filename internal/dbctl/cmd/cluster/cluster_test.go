@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package cluster
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
@@ -46,6 +47,7 @@ var _ = Describe("Cluster", func() {
 			cmd := NewCreateCmd(tf, streams)
 			Expect(cmd != nil).To(BeTrue())
 			// must succeed otherwise exit 1 and make test fails
+			_ = cmd.Flags().Set("components", "../../testdata/component.yaml")
 			cmd.Run(nil, []string{"test1"})
 		})
 
@@ -70,6 +72,11 @@ var _ = Describe("Cluster", func() {
 
 			o.ComponentsFilePath = ""
 			Expect(o.Complete()).Should(Succeed())
+			Expect(o.Validate()).ShouldNot(Succeed())
+
+			o.ComponentsFilePath = "../../testdata/component.yaml"
+			Expect(o.Complete()).Should(Succeed())
+			Expect(o.Validate()).Should(Succeed())
 
 			inputs := create.Inputs{
 				ResourceName:    types.ResourceClusters,
@@ -157,23 +164,19 @@ var _ = Describe("Cluster", func() {
 		o.Storage = "2Gi"
 		Expect(o.Validate()).Should(Succeed())
 
-		By("validate horizontalScaling when replicas or roleGroupReplicas less than -1 ")
+		By("validate horizontalScaling when replicas less than -1 ")
 		o.OpsType = OpsTypeHorizontalScaling
 		o.Replicas = -2
 		Expect(o.Validate()).To(MatchError("replicas required natural number"))
-		o.Replicas = -1
-		o.RoleGroupReplicas = -2
-		Expect(o.Validate()).To(MatchError("role-group-replicas required natural number"))
 
-		By("validate horizontalScaling no replicas and role-group-names")
-		o.Replicas = -1
-		o.RoleGroupReplicas = -1
-		Expect(o.Validate()).To(MatchError("required replicas or role-group-names"))
-
-		By("validate horizontalScaling when exists role-group-names")
-		o.RoleGroupNames = []string{"primary"}
-		Expect(o.Validate()).To(MatchError("missing role-group-replicas when exists role-group-names"))
-		o.RoleGroupReplicas = 1
+		o.Replicas = 1
 		Expect(o.Validate()).Should(Succeed())
+	})
+
+	It("connect", func() {
+		tf := cmdtesting.NewTestFactory().WithNamespace("default")
+		defer tf.Cleanup()
+		cmd := NewConnectCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
 	})
 })

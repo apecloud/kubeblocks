@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -83,6 +84,7 @@ var _ = Describe("Create", func() {
 			BuildCommand(inputs)
 			Expect(baseOptions.Complete(inputs, []string{})).Should(Succeed())
 			Expect(baseOptions.Run(inputs, []string{"test"})).Should(Succeed())
+			Expect(baseOptions.Run(inputs, []string{"test", "more", "args"})).Should(HaveOccurred())
 		})
 	})
 })

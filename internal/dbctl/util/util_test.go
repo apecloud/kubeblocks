@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -47,7 +48,7 @@ var _ = Describe("util", func() {
 	It("Print yaml", func() {
 		obj := &unstructured.Unstructured{
 			Object: map[string]interface{}{
-				"apiVersion": "dataprotection.infracreate.com/v1alpha1",
+				"apiVersion": "dataprotection.kubeblocks.io/v1alpha1",
 				"kind":       "BackupJob",
 				"metadata": map[string]interface{}{
 					"namespace": "default",

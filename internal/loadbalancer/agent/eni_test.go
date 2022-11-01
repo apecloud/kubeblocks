@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,11 +40,13 @@ const (
 	nodeIP       = "172.31.1.100"
 	subnet       = "172.31.0.0/16"
 
-	eniId1  = "eni-01"
-	eniMac1 = "00:00:00:00:00:01"
-	eniIp11 = "172.31.1.10"
-	eniIp12 = "172.31.1.11"
-	eniIp13 = "172.31.1.12"
+	instanceId      = "i-0000000000000"
+	securityGroupId = "sec-0000000000000"
+	eniId1          = "eni-01"
+	eniMac1         = "00:00:00:00:00:01"
+	eniIp11         = "172.31.1.10"
+	eniIp12         = "172.31.1.11"
+	eniIp13         = "172.31.1.12"
 
 	eniId2  = "eni-02"
 	eniMac2 = "00:00:00:00:00:02"
@@ -67,6 +69,17 @@ var getDescribeAllENIResponse = func() *pb.DescribeAllENIsResponse {
 	return &pb.DescribeAllENIsResponse{
 		RequestId: util.GenRequestId(),
 		Enis:      getMockENIs(),
+	}
+}
+
+var getDescribeNodeInfoResponse = func() *pb.DescribeNodeInfoResponse {
+	return &pb.DescribeNodeInfoResponse{
+		RequestId: util.GenRequestId(),
+		Info: &pb.InstanceInfo{
+			InstanceId:       instanceId,
+			SubnetId:         subnet1Id,
+			SecurityGroupIds: []string{securityGroupId},
+		},
 	}
 }
 
@@ -167,6 +180,7 @@ var _ = Describe("Eni", func() {
 		mockProvider.EXPECT().GetENIIPv4Limit().Return(6)
 		mockNodeClient.EXPECT().DescribeAllENIs(gomock.Any(), gomock.Any()).Return(getDescribeAllENIResponse(), nil).AnyTimes()
 		mockNodeClient.EXPECT().SetupNetworkForENI(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+		mockNodeClient.EXPECT().DescribeNodeInfo(gomock.Any(), gomock.Any()).Return(getDescribeNodeInfoResponse(), nil)
 		manager, err := newENIManager(logger, nodeIP, mockNodeClient, mockProvider)
 		Expect(err).Should(BeNil())
 		return manager, mockProvider, mockNodeClient
@@ -191,8 +205,9 @@ var _ = Describe("Eni", func() {
 			manager.minPrivateIP = math.MaxInt
 
 			eni := cloud.ENIMetadata{ENIId: eniId5}
-			mockProvider.EXPECT().AllocENI().Return(eni.ENIId, nil)
-			mockProvider.EXPECT().WaitForENIAttached(eni.ENIId).Return(eni, nil)
+			mockProvider.EXPECT().CreateENI(gomock.Any(), gomock.Any(), gomock.Any()).Return(eni.ENIId, nil)
+			mockProvider.EXPECT().AttachENI(gomock.Any(), gomock.Any()).Return(eni.ENIId, nil)
+			mockNodeClient.EXPECT().WaitForENIAttached(gomock.Any(), gomock.Any()).Return(nil, nil)
 			mockNodeClient.EXPECT().SetupNetworkForENI(gomock.Any(), &eni).Return(nil, nil)
 			Expect(manager.ensureENI()).Should(Succeed())
 		})
@@ -224,7 +239,7 @@ var _ = Describe("Eni", func() {
 					DeviceNumber: 0,
 				},
 			}
-			mockProvider.EXPECT().FindLeakedENIs().Return(enis, nil)
+			mockProvider.EXPECT().FindLeakedENIs(gomock.Any()).Return(enis, nil)
 			mockProvider.EXPECT().DeleteENI(gomock.Any()).Return(nil).AnyTimes()
 			Expect(manager.cleanLeakedENIs()).Should(Succeed())
 		})

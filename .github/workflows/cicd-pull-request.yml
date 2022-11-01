@@ -5,7 +5,21 @@ on:
 
 
 jobs:
+  branch-name:
+    runs-on: ubuntu-latest
+    name: Branch Name
+    steps:
+      - uses: JashBook/check-branch-name@v0.1.0
+        with:
+          branch_pattern: 'feature/|bugfix/|release/|hotfix/|support/'
+          comment_for_invalid_branch_name: 'This branch name is not following the standards: feature/|bugfix/|release/|hotfix/|support/'
+          fail_if_invalid_branch_name: 'true'
+          ignore_branch_pattern: 'main|master'
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   make-test:
+    needs: branch-name
     runs-on: [ self-hosted, aws-eks-k8s-runner ]
     steps:
       - uses: actions/checkout@v3
@@ -15,7 +29,6 @@ jobs:
           cp -r /go/bin/controller-gen ./bin/controller-gen
           make mod-vendor
           make lint
-          make staticcheck  
 
       - name: make test
         run: |

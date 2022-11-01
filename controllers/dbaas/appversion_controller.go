@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -86,9 +87,9 @@ type AppVersionReconciler struct {
 	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=dbaas.infracreate.com,resources=appversions,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=dbaas.infracreate.com,resources=appversions/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=dbaas.infracreate.com,resources=appversions/finalizers,verbs=update
+//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=appversions,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=appversions/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=appversions/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -101,9 +102,10 @@ type AppVersionReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.2/pkg/reconcile
 func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqCtx := intctrlutil.RequestCtx{
-		Ctx: ctx,
-		Req: req,
-		Log: log.FromContext(ctx).WithValues("clusterDefinition", req.NamespacedName),
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithValues("clusterDefinition", req.NamespacedName),
+		Recorder: r.Recorder,
 	}
 
 	appVersion := &dbaasv1alpha1.AppVersion{}
@@ -113,7 +115,8 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, appVersion, appVersionFinalizerName, func() (*ctrl.Result, error) {
 		recordEvent := func() {
-			r.Recorder.Event(appVersion, corev1.EventTypeWarning, "ExistsReferencedCluster", appVersion.Status.Message)
+			r.Recorder.Event(appVersion, corev1.EventTypeWarning, intctrlutil.EventReasonRefCRUnavailable,
+				"cannot be deleted because of existing referencing Cluster.")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, appVersion,
 			appVersionLabelKey, recordEvent, &dbaasv1alpha1.ClusterList{}); res != nil || err != nil {
@@ -133,11 +136,15 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return intctrlutil.Reconciled()
 	}
 
+	if ok, err := checkAppVersionTemplate(r.Client, reqCtx, appVersion); !ok || err != nil {
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "configMapIsReady")
+	}
+
 	clusterdefinition := &dbaasv1alpha1.ClusterDefinition{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Name: appVersion.Spec.ClusterDefinitionRef,
 	}, clusterdefinition); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return intctrlutil.RequeueWithErrorAndRecordEvent(appVersion, r.Recorder, err, reqCtx.Log)
 	}
 
 	patch := client.MergeFrom(appVersion.DeepCopy())
@@ -160,8 +167,21 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err = r.Client.Status().Patch(ctx, appVersion, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-
+	intctrlutil.RecordCreatedEvent(r.Recorder, appVersion)
 	return ctrl.Result{}, nil
+}
+
+func checkAppVersionTemplate(client client.Client, ctx intctrlutil.RequestCtx, appVersion *dbaasv1alpha1.AppVersion) (bool, error) {
+	for _, component := range appVersion.Spec.Components {
+		if len(component.ConfigTemplateRefs) == 0 {
+			continue
+		}
+
+		if ok, err := checkValidConfTpls(client, ctx, component.ConfigTemplateRefs); !ok || err != nil {
+			return ok, err
+		}
+	}
+	return true, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

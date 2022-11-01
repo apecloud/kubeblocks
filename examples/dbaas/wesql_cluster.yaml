@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 apiVersion: dbaas.infracreate.com/v1alpha1
+=======
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+>>>>>>> cc96cfeb49ef0a7c7eddad95f93d9086442b22db
 kind: Cluster
 metadata:
   name: wesql
@@ -6,7 +10,11 @@ spec:
   appVersionRef: app-version-consensus
   clusterDefinitionRef: cluster-definition-consensus
   components:
+<<<<<<< HEAD
     - name: wesql-css
+=======
+    - name: wesql-test
+>>>>>>> cc96cfeb49ef0a7c7eddad95f93d9086442b22db
       type: replicasets
       monitor: false
       volumeClaimTemplates:

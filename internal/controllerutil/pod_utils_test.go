@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -115,7 +115,7 @@ var _ = Describe("tpl template", func() {
       "name": "MYSQL_ROOT_PASSWORD",
       "valueFrom": {
         "secretKeyRef": {
-          "name": "$(OPENDBAAS_MY_SECRET_NAME)",
+          "name": "$(KB_SECRET_NAME)",
           "key": "password"
         }
       }

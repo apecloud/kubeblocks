@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -64,7 +64,7 @@ volumeBindingMode: Immediate
 	assureClusterDefObj := func() *dbaasv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
 		clusterDefYAML := `
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
   name: cluster-definition-for-operations
@@ -94,17 +94,17 @@ spec:
           - name: "MYSQL_ROOT_PASSWORD"
             valueFrom:
               secretKeyRef:
-                name: $(OPENDBAAS_MY_SECRET_NAME)
+                name: $(KB_SECRET_NAME)
                 key: password
         command: ["/usr/bin/bash", "-c"]
         args:
           - >
             cluster_info="";
-            for (( i=0; i<$OPENDBAAS_REPLICASETS_PRIMARY_N; i++ )); do
+            for (( i=0; i<$KB_REPLICASETS_PRIMARY_N; i++ )); do
               if [ $i -ne 0 ]; then
                 cluster_info="$cluster_info;";
               fi;
-              host=$(eval echo \$OPENDBAAS_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
+              host=$(eval echo \$KB_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
               cluster_info="$cluster_info$host:13306";
             done;
             idx=0;
@@ -112,7 +112,7 @@ spec:
               for i in "${ADDR[@]}"; do
                 idx=$i;
               done;
-            done <<< "$OPENDBAAS_MY_POD_NAME";
+            done <<< "$KB_POD_NAME";
             echo $idx;
             cluster_info="$cluster_info@$(($idx+1))";
             echo $cluster_info;
@@ -133,7 +133,7 @@ spec:
 	assureAppVersionObj := func() *dbaasv1alpha1.AppVersion {
 		By("By assure an appVersion obj")
 		appVerYAML := `
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       AppVersion
 metadata:
   name:     app-version-operations
@@ -144,7 +144,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: registry.jihulab.com/infracreate/mysql-server/mysql/wesql-server-arm:latest
+        image: registry.jihulab.com/apecloud/mysql-server/mysql/wesql-server-arm:latest
   - type: proxy
     podSpec: 
       containers:
@@ -178,7 +178,7 @@ spec:
 
 		return &dbaasv1alpha1.Cluster{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: "dbaas.infracreate.com/v1alpha1",
+				APIVersion: "dbaas.kubeblocks.io/v1alpha1",
 				Kind:       "Cluster",
 			},
 			ObjectMeta: metav1.ObjectMeta{
@@ -232,7 +232,7 @@ spec:
 
 	createOpsRequest := func(opsRequestName, clusterName string, opsType dbaasv1alpha1.OpsType) *dbaasv1alpha1.OpsRequest {
 		opsYaml := fmt.Sprintf(`
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: %s

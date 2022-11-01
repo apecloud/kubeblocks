@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ func (r *AppVersion) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/mutate-dbaas-infracreate-com-v1alpha1-appversion,mutating=true,failurePolicy=fail,sideEffects=None,groups=dbaas.infracreate.com,resources=appversions,verbs=create;update,versions=v1alpha1,name=mappversion.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/mutate-dbaas-kubeblocks-io-v1alpha1-appversion,mutating=true,failurePolicy=fail,sideEffects=None,groups=dbaas.kubeblocks.io,resources=appversions,verbs=create;update,versions=v1alpha1,name=mappversion.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Defaulter = &AppVersion{}
 
@@ -52,7 +52,7 @@ func (r *AppVersion) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-dbaas-infracreate-com-v1alpha1-appversion,mutating=false,failurePolicy=fail,sideEffects=None,groups=dbaas.infracreate.com,resources=appversions,verbs=create;update,versions=v1alpha1,name=vappversion.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-dbaas-kubeblocks-io-v1alpha1-appversion,mutating=false,failurePolicy=fail,sideEffects=None,groups=dbaas.kubeblocks.io,resources=appversions,verbs=create;update,versions=v1alpha1,name=vappversion.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &AppVersion{}
 

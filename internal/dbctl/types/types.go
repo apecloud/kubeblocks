@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,6 +15,13 @@ limitations under the License.
 */
 
 package types
+
+import (
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+)
 
 const (
 	// DBCtlDefaultHome defines dbctl default home name
@@ -49,7 +56,7 @@ const (
 
 const (
 	// Group api group
-	Group = "dbaas.infracreate.com"
+	Group = "dbaas.kubeblocks.io"
 
 	// AppsGroup k8s apps group
 	AppsGroup = "apps"
@@ -73,25 +80,37 @@ const (
 
 	// KindCluster kind of cluster
 	KindCluster = "Cluster"
+
+	// ResourceClusterDefs clusterDefinition resource
+	ResourceClusterDefs = "clusterdefinitions"
+
+	// KindClusterDef kind of clusterDefinition
+	KindClusterDef = "ClusterDefinition"
+
+	ResourceAppVersion = "appversions"
+	KindAppVersion     = "AppVersion"
+
+	InstanceLabelKey               = "app.kubernetes.io/instance"
+	ConsensusSetRoleLabelKey       = "cs.dbaas.kubeblocks.io/role"
+	ConsensusSetAccessModeLabelKey = "cs.dbaas.kubeblocks.io/access-mode"
+	ComponentLabelKey              = "app.kubernetes.io/component-name"
+	RegionLabelKey                 = "topology.kubernetes.io/region"
+	ZoneLabelKey                   = "topology.kubernetes.io/zone"
+
+	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/apecloud-loadbalancer-type"
+	ServiceLBTypeAnnotationValue   = "private-ip"
+	ServiceFloatingIPAnnotationKey = "service.kubernetes.io/apecloud-loadbalancer-floating-ip"
 )
 
-type DBClusterInfo struct {
-	DBCluster       string
-	DBPort          string
-	Version         string
-	Topology        string
-	Status          string
-	StartTime       string
-	Labels          string
-	RootUser        string
-	DBNamespace     string
-	Instances       int64
-	ServerId        int64
-	Secret          string
-	OnlineInstances int64
-	Storage         int64
-	Engine          string
-	HostIP          string
+type ClusterObjects struct {
+	Cluster    *dbaasv1alpha1.Cluster
+	ClusterDef *dbaasv1alpha1.ClusterDefinition
+	AppVersion *dbaasv1alpha1.AppVersion
+
+	Pods     *corev1.PodList
+	Services *corev1.ServiceList
+	Secrets  *corev1.SecretList
+	Nodes    []*corev1.Node
 }
 
 type BackupJobInfo struct {
@@ -112,4 +131,28 @@ type BackupSnapInfo struct {
 	SourcePVC     string
 	SnapshotClass string
 	Labels        string
+}
+
+func ClusterGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceClusters}
+}
+
+func ClusterGK() schema.GroupKind {
+	return schema.GroupKind{Group: Group, Kind: KindCluster}
+}
+
+func ClusterDefGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceClusterDefs}
+}
+
+func ClusterDefGK() schema.GroupKind {
+	return schema.GroupKind{Group: Group, Kind: KindClusterDef}
+}
+
+func AppVersionGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceAppVersion}
+}
+
+func AppVersionGK() schema.GroupKind {
+	return schema.GroupKind{Group: Group, Kind: KindAppVersion}
 }

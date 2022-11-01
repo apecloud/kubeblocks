@@ -1,10 +1,18 @@
+<<<<<<< HEAD
 apiVersion: dbaas.infracreate.com/v1alpha1
+=======
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+>>>>>>> cc96cfeb49ef0a7c7eddad95f93d9086442b22db
 kind: Cluster
 metadata:
   name: mysql-cluster-01
   namespace: default
 spec:
+<<<<<<< HEAD
   clusterDefinitionRef: mysql_clusterdef_consensus
+=======
+  clusterDefinitionRef: mysql-clusterdef-consensus
+>>>>>>> cc96cfeb49ef0a7c7eddad95f93d9086442b22db
   appVersionRef: app-version-consensus
   components:
   - name: replicasets

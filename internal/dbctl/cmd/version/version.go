@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ func NewVersionCmd(f cmdutil.Factory) *cobra.Command {
 	o := &versionOptions{}
 	cmd := &cobra.Command{
 		Use:   "version",
-		Short: "print the version information",
+		Short: "Print the version information",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f))
 			o.Run()

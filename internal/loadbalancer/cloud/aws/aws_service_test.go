@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -302,7 +302,7 @@ var _ = Describe("AwsService", func() {
 				},
 			}
 			mockEC2.EXPECT().DescribeInstancesWithContext(gomock.Any(), describeInstanceInput).Return(describeInstanceOutput, nil).AnyTimes()
-			number, err := service.awsGetFreeDeviceNumber()
+			number, err := service.awsGetFreeDeviceNumber(instanceId)
 			Expect(err).Should(BeNil())
 			Expect(number).Should(Equal(3))
 
@@ -324,7 +324,7 @@ var _ = Describe("AwsService", func() {
 				NetworkInterfaceId: aws.String(eniId3),
 			}
 			mockEC2.EXPECT().ModifyNetworkInterfaceAttributeWithContext(context.Background(), modifyAttributeInput).Return(nil, nil)
-			eniId, err := service.AllocENI()
+			eniId, err := service.CreateENI(instanceId, subnetId, []string{securityGroupId})
 			Expect(err).Should(BeNil())
 			Expect(eniId).Should(Equal(eniId3))
 		})
@@ -422,7 +422,7 @@ var _ = Describe("AwsService", func() {
 				}
 			}
 			mockEC2.EXPECT().CreateTagsWithContext(gomock.Any(), gomock.Any()).DoAndReturn(recordCreatedTagsRequest).Return(nil, nil).AnyTimes()
-			leakedENIs, err := service.FindLeakedENIs()
+			leakedENIs, err := service.FindLeakedENIs(instanceId)
 			Expect(err).Should(BeNil())
 			Expect(len(leakedENIs)).Should(Equal(1))
 			Expect(leakedENIs[0].ENIId).Should(Equal(eniId2))

@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -91,6 +91,7 @@ func BuildCommand(inputs Inputs) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   inputs.Use,
 		Short: inputs.Short,
+		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(inputs.BaseOptionsObj.Run(inputs, args))
 		},

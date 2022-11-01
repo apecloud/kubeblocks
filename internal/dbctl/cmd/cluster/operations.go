@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -63,10 +63,6 @@ type OperationsOptions struct {
 
 	// HorizontalScaling options
 	Replicas int `json:"replicas"`
-	// if RoleGroupNames is nil, add omitempty json tag.
-	// because CueLang can not covert null to list.
-	RoleGroupNames    []string `json:"roleGroupNames,omitempty"`
-	RoleGroupReplicas int      `json:"roleGroupReplicas"`
 
 	// VolumeExpansion options.
 	// VctNames VolumeClaimTemplate names
@@ -120,21 +116,6 @@ func (o *OperationsOptions) validateVolumeExpansion() error {
 func (o *OperationsOptions) validateHorizontalScaling() error {
 	if o.Replicas < -1 {
 		return fmt.Errorf("replicas required natural number")
-	}
-
-	if o.RoleGroupReplicas < -1 {
-		return fmt.Errorf("role-group-replicas required natural number")
-	}
-
-	if len(o.RoleGroupNames) == 0 {
-		if o.Replicas == -1 {
-			return fmt.Errorf("required replicas or role-group-names")
-		}
-		return nil
-	}
-
-	if o.RoleGroupReplicas == -1 {
-		return fmt.Errorf("missing role-group-replicas when exists role-group-names")
 	}
 	return nil
 }
@@ -227,8 +208,6 @@ func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
 		cmd.Flags().IntVar(&o.Replicas, "replicas", -1, "Replicas with the specified components")
-		cmd.Flags().StringSliceVar(&o.RoleGroupNames, "role-group-names", nil, "Specify roleGroups to horizontal scale")
-		cmd.Flags().IntVar(&o.RoleGroupReplicas, "role-group-replicas", -1, "Replicas with the specified roleGroups")
 	}
 	return create.BuildCommand(inputs)
 }

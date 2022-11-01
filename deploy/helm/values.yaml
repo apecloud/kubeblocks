@@ -6,7 +6,7 @@
 replicaCount: 1
 
 image:
-  repository: docker.io/infracreate/kubeblocks
+  repository: docker.io/apecloud/kubeblocks
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
@@ -113,13 +113,6 @@ podDisruptionBudget:
 admissionWebhooks:
   enabled: true
   createSelfSignedCert: true
-
-monitor:
-  image:
-    repository: docker.io/infracreate/kubeblocks
-    pullPolicy: IfNotPresent
-    # Overrides the image tag whose default is the chart appVersion.
-    tag: ""
 
 dashboards:
   ## If false, dashboards will not be installed
@@ -229,10 +222,21 @@ grafana:
       defaultDatasourceEnabled: true
       uid: prometheus
 
+      skipReload: true
+      initDatasources: true
+
   testFramework:
     enabled: false
 
+  grafana.ini:
+    # Basic auth is enabled by default and works with the builtin Grafana user password authentication system and LDAP authentication integration.
+    auth.basic:
+      enabled: false
 
+    auth.anonymous:
+      enabled: true
+      # Hide the Grafana version text from the footer and help tooltip for unauthenticated users (default: false)
+      hide_version: true
 
 loadbalancer:
   enabled: false

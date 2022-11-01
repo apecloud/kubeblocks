@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,12 +32,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sethvargo/go-password/password"
 
-	policyv1 "k8s.io/api/policy/v1"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -51,7 +50,7 @@ import (
 
 var _ = Describe("Cluster Controller", func() {
 
-	const timeout = time.Second * 10
+	const timeout = time.Second * 20
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
 
@@ -120,30 +119,16 @@ data:
     gtid_mode=OFF
     consensus_auto_leader_transfer=ON
     
-    log-error=/data/mysql/log/mysqld.err
-    character-sets-dir=/usr/share/mysql-8.0/charsets
-    datadir=/data/mysql/data
+    pid-file=/var/run/mysqld/mysqld.pid
+    socket=/var/run/mysqld/mysqld.sock
+
     port=3306
-    general_log=1
-    general_log_file=/data/mysql/mysqld.log
-    pid-file=/data/mysql/run/mysqld.pid
+    general_log=0
     server-id=1
-    slow_query_log=1
-    slow_query_log_file=/data/mysql/mysqld-slow.log
-    socket=/data/mysql/tmp/mysqld.sock
-    ssl-ca=/data/mysql/std_data/cacert.pem
-    ssl-cert=/data/mysql/std_data/server-cert.pem
-    ssl-key=/data/mysql/std_data/server-key.pem
-    tmpdir=/data/mysql/tmp/
-    loose-sha256_password_auto_generate_rsa_keys=0
-    loose-caching_sha2_password_auto_generate_rsa_keys=0
-    secure-file-priv=/data/mysql
+    slow_query_log=0
     
     [client]
-    password=
-    user=root
-    port=3306
-    socket=/data/mysql/tmp/mysqld.sock
+    socket=/var/run/mysqld/mysqld.sock
     host=localhost
 `
 		cfgCM := &corev1.ConfigMap{}
@@ -152,25 +137,10 @@ data:
 		return cfgCM
 	}
 
-	// config template对于了container的mountPath
-	// configTemplateRefs:
-	// 	 - name: mysql-tree-node-template-8.0
-	//     volumeName: config1
-	//   - name: mysql-tree-node2
-	//     volumeName: config2
-	// for containner
-	// volumeMounts:
-	//   #将my.cnf configmap mount到pod的指定目录下，/data/config
-	//   #在pod中，会存在file: /data/config/my.cnf.override
-	//   #polardb-x在entrypoint的脚本会将my.cnf.override合并到/data/mysql/conf/my.cnf文件中
-	//   - mountPath: /data/config
-	//     name: config1
-	//   - mountPath: /etc/config
-	//	   name: config2
 	assureClusterDefObj := func() *dbaasv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
 		clusterDefYAML := `
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
   name: cluster-definition
@@ -205,17 +175,17 @@ spec:
           - name: "MYSQL_ROOT_PASSWORD"
             valueFrom:
               secretKeyRef:
-                name: $(OPENDBAAS_MY_SECRET_NAME)
+                name: $(KB_SECRET_NAME)
                 key: password
         command: ["/usr/bin/bash", "-c"]
         args:
           - >
             cluster_info="";
-            for (( i=0; i<$OPENDBAAS_REPLICASETS_PRIMARY_N; i++ )); do
+            for (( i=0; i<$KB_REPLICASETS_PRIMARY_N; i++ )); do
               if [ $i -ne 0 ]; then
                 cluster_info="$cluster_info;";
               fi;
-              host=$(eval echo \$OPENDBAAS_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
+              host=$(eval echo \$KB_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
               cluster_info="$cluster_info$host:13306";
             done;
             idx=0;
@@ -223,7 +193,7 @@ spec:
               for i in "${ADDR[@]}"; do
                 idx=$i;
               done;
-            done <<< "$OPENDBAAS_MY_POD_NAME";
+            done <<< "$KB_POD_NAME";
             echo $idx;
             cluster_info="$cluster_info@$(($idx+1))";
             echo $cluster_info;
@@ -248,7 +218,7 @@ spec:
 	assureAppVersionObj := func() *dbaasv1alpha1.AppVersion {
 		By("By assure an appVersion obj")
 		appVerYAML := `
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       AppVersion
 metadata:
   name:     app-version
@@ -262,7 +232,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: registry.jihulab.com/infracreate/mysql-server/mysql/wesql-server-arm:latest
+        image: registry.jihulab.com/apecloud/mysql-server/mysql/wesql-server-arm:latest
   - type: proxy
     podSpec: 
       containers:
@@ -296,7 +266,7 @@ spec:
 
 		return &dbaasv1alpha1.Cluster{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: "dbaas.infracreate.com/v1alpha1",
+				APIVersion: "dbaas.kubeblocks.io/v1alpha1",
 				Kind:       "Cluster",
 			},
 			ObjectMeta: metav1.ObjectMeta{
@@ -333,7 +303,7 @@ spec:
 	assureClusterDefWithConsensusObj := func() *dbaasv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj with componentType = Consensus")
 		clusterDefYAML := `
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
   name: cluster-definition-consensus
@@ -394,11 +364,11 @@ spec:
         args:
           - >
             cluster_info="";
-            for (( i=0; i<$OPENDBAAS_REPLICASETS_N; i++ )); do
+            for (( i=0; i<$KB_REPLICASETS_N; i++ )); do
               if [ $i -ne 0 ]; then
                 cluster_info="$cluster_info;";
               fi;
-              host=$(eval echo \$OPENDBAAS_REPLICASETS_"$i"_HOSTNAME)
+              host=$(eval echo \$KB_REPLICASETS_"$i"_HOSTNAME)
               cluster_info="$cluster_info$host:13306";
             done;
             idx=0;
@@ -406,7 +376,7 @@ spec:
               for i in "${ADDR[@]}"; do
                 idx=$i;
               done;
-            done <<< "$OPENDBAAS_MY_POD_NAME";
+            done <<< "$KB_POD_NAME";
             echo $idx;
             cluster_info="$cluster_info@$(($idx+1))";
             echo $cluster_info;
@@ -423,7 +393,7 @@ spec:
 	assureAppVersionWithConsensusObj := func() *dbaasv1alpha1.AppVersion {
 		By("By assure an appVersion obj with componentType = Consensus")
 		appVerYAML := `
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       AppVersion
 metadata:
   name:     app-version-consensus
@@ -434,7 +404,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: docker.io/infracreate/wesql-server-8.0:0.1-SNAPSHOT
+        image: docker.io/apecloud/wesql-server-8.0:0.1-SNAPSHOT
         imagePullPolicy: IfNotPresent
 `
 		appVersion := &dbaasv1alpha1.AppVersion{}
@@ -464,7 +434,7 @@ spec:
 
 		return &dbaasv1alpha1.Cluster{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: "dbaas.infracreate.com/v1alpha1",
+				APIVersion: "dbaas.kubeblocks.io/v1alpha1",
 				Kind:       "Cluster",
 			},
 			ObjectMeta: metav1.ObjectMeta{
@@ -1240,20 +1210,20 @@ spec:
     - /bin/bash
     - -c
     env:
-    - name: OPENDBAAS_MY_POD_NAME
+    - name: KB_POD_NAME
       valueFrom:
         fieldRef:
           apiVersion: v1
           fieldPath: metadata.name
-    - name: OPENDBAAS_REPLICASETS_N
+    - name: KB_REPLICASETS_N
       value: "3"
-    - name: OPENDBAAS_REPLICASETS_0_HOSTNAME
+    - name: KB_REPLICASETS_0_HOSTNAME
       value: clusterepuglf-wesql-test-0
-    - name: OPENDBAAS_REPLICASETS_1_HOSTNAME
+    - name: KB_REPLICASETS_1_HOSTNAME
       value: clusterepuglf-wesql-test-1
-    - name: OPENDBAAS_REPLICASETS_2_HOSTNAME
+    - name: KB_REPLICASETS_2_HOSTNAME
       value: clusterepuglf-wesql-test-2
-    image: docker.io/infracreate/wesql-server-8.0:0.1-SNAPSHOT
+    image: docker.io/apecloud/wesql-server-8.0:0.1-SNAPSHOT
     imagePullPolicy: IfNotPresent
     name: mysql
     ports:

@@ -11,12 +11,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-dbaas-infracreate-com-v1alpha1-appversion
+      path: /mutate-dbaas-kubeblocks-io-v1alpha1-appversion
   failurePolicy: Fail
   name: mappversion.kb.io
   rules:
   - apiGroups:
-    - dbaas.infracreate.com
+    - dbaas.kubeblocks.io
     apiVersions:
     - v1alpha1
     operations:
@@ -31,12 +31,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-dbaas-infracreate-com-v1alpha1-cluster
+      path: /mutate-dbaas-kubeblocks-io-v1alpha1-cluster
   failurePolicy: Fail
   name: mcluster.kb.io
   rules:
   - apiGroups:
-    - dbaas.infracreate.com
+    - dbaas.kubeblocks.io
     apiVersions:
     - v1alpha1
     operations:
@@ -51,12 +51,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-dbaas-infracreate-com-v1alpha1-clusterdefinition
+      path: /mutate-dbaas-kubeblocks-io-v1alpha1-clusterdefinition
   failurePolicy: Fail
   name: mclusterdefinition.kb.io
   rules:
   - apiGroups:
-    - dbaas.infracreate.com
+    - dbaas.kubeblocks.io
     apiVersions:
     - v1alpha1
     operations:
@@ -71,12 +71,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-dbaas-infracreate-com-v1alpha1-opsrequest
+      path: /mutate-dbaas-kubeblocks-io-v1alpha1-opsrequest
   failurePolicy: Fail
   name: mopsrequest.kb.io
   rules:
   - apiGroups:
-    - dbaas.infracreate.com
+    - dbaas.kubeblocks.io
     apiVersions:
     - v1alpha1
     operations:
@@ -98,12 +98,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-dbaas-infracreate-com-v1alpha1-appversion
+      path: /validate-dbaas-kubeblocks-io-v1alpha1-appversion
   failurePolicy: Fail
   name: vappversion.kb.io
   rules:
   - apiGroups:
-    - dbaas.infracreate.com
+    - dbaas.kubeblocks.io
     apiVersions:
     - v1alpha1
     operations:
@@ -118,12 +118,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-dbaas-infracreate-com-v1alpha1-cluster
+      path: /validate-dbaas-kubeblocks-io-v1alpha1-cluster
   failurePolicy: Fail
   name: vcluster.kb.io
   rules:
   - apiGroups:
-    - dbaas.infracreate.com
+    - dbaas.kubeblocks.io
     apiVersions:
     - v1alpha1
     operations:
@@ -138,12 +138,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-dbaas-infracreate-com-v1alpha1-clusterdefinition
+      path: /validate-dbaas-kubeblocks-io-v1alpha1-clusterdefinition
   failurePolicy: Fail
   name: vclusterdefinition.kb.io
   rules:
   - apiGroups:
-    - dbaas.infracreate.com
+    - dbaas.kubeblocks.io
     apiVersions:
     - v1alpha1
     operations:
@@ -158,12 +158,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-dbaas-infracreate-com-v1alpha1-opsrequest
+      path: /validate-dbaas-kubeblocks-io-v1alpha1-opsrequest
   failurePolicy: Fail
   name: vopsrequest.kb.io
   rules:
   - apiGroups:
-    - dbaas.infracreate.com
+    - dbaas.kubeblocks.io
     apiVersions:
     - v1alpha1
     operations:

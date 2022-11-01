@@ -1,4 +1,4 @@
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       AppVersion
 metadata:
   name:     appversion-mysql-latest
@@ -9,4 +9,4 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: registry.jihulab.com/infracreate/mysql-server/mysql/wesql-server-arm:latest
+        image: registry.jihulab.com/apecloud/mysql-server/mysql/wesql-server-arm:latest

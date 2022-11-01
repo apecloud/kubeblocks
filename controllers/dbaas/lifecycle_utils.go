@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,16 +22,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	batchv1 "k8s.io/api/batch/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"sort"
 	"strconv"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+
 	"github.com/leaanthony/debme"
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -54,7 +55,7 @@ type createParams struct {
 }
 
 const (
-	dbaasPrefix = "OPENDBAAS"
+	dbaasPrefix = "KB"
 )
 
 var (
@@ -363,7 +364,7 @@ func mergeComponents(
 		Probes:          clusterDefComp.Probes,
 	}
 
-	if appVerComp != nil && appVerComp.PodSpec.Containers != nil {
+	if appVerComp != nil && appVerComp.PodSpec != nil {
 		for _, container := range appVerComp.PodSpec.Containers {
 			i, c := getContainerByName(component.PodSpec.Containers, container.Name)
 			if c != nil {
@@ -987,7 +988,7 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 
 	// get podList owned by stsObj
 	podList := &corev1.PodList{}
-	selector, err := labels.Parse(appInstanceLabelKey + "=" + stsObj.Name)
+	selector, err := labels.Parse(appComponentLabelKey + "=" + stsObj.Labels[appComponentLabelKey])
 	if err != nil {
 		return false, err
 	}
@@ -1022,9 +1023,13 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 		if getPodRevision(&pod) == stsObj.Status.UpdateRevision {
 			return false, nil
 		}
+		// if DeletionTimestamp is not nil, it is terminating.
+		if pod.DeletionTimestamp != nil {
+			return true, nil
+		}
 		// delete the pod to trigger associate StatefulSet to re-create it
 		if err := cli.Delete(ctx, &pod); err != nil {
-			return false, nil
+			return false, err
 		}
 
 		return true, nil
@@ -1387,7 +1392,7 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 
 	sts := appsv1.StatefulSet{}
 
-	stsStrByte = injectEnv(stsStrByte, dbaasPrefix+"_MY_SECRET_NAME", params.cluster.Name)
+	stsStrByte = injectEnv(stsStrByte, dbaasPrefix+"_SECRET_NAME", params.cluster.Name)
 
 	if err = json.Unmarshal(stsStrByte, &sts); err != nil {
 		return nil, err
@@ -1404,14 +1409,14 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 		// inject self scope env
 		c := &sts.Spec.Template.Spec.Containers[i]
 		c.Env = append(c.Env, corev1.EnvVar{
-			Name: dbaasPrefix + "_MY_POD_NAME",
+			Name: dbaasPrefix + "_POD_NAME",
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
 					FieldPath: "metadata.name",
 				},
 			},
 		})
-		// inject roleGroup scope env
+		// inject component scope env
 		c.Env = append(c.Env, corev1.EnvVar{
 			Name:      prefix + "N",
 			Value:     strconv.Itoa(replicas),
@@ -1483,6 +1488,8 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 		container.Name = "kbprobe-rolechangedcheck"
 		probe := container.ReadinessProbe
 		// probe.HTTPGet.Path = "/"
+		// HACK: hardcoded - "http://localhost:3501/v1.0/bindings/mtest"
+		// TODO: http port should be checked to avoid conflicts instead of hardcoded 3051
 		probe.Exec.Command = []string{"curl", "-X", "POST", "-H", "Content-Type: application/json", "http://localhost:3501/v1.0/bindings/mtest", "-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
 		probe.PeriodSeconds = componentProbes.RoleChangedProbe.PeriodSeconds
 		probe.SuccessThreshold = componentProbes.RoleChangedProbe.SuccessThreshold
@@ -1492,8 +1499,15 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 	}
 
 	if len(probeContainers) >= 1 {
-		probeContainers[0].Image = "free6om/kbprobe:latest"
-		probeContainers[0].Command = []string{"probe", "--app-id", "batch-sdk", "--dapr-http-port", "3501", "--dapr-grpc-port", "54215", "--app-protocol", "http", "--components-path", "/config/components"}
+		container := &probeContainers[0]
+		container.Image = viper.GetString("AGAMOTTO_IMAGE")
+		container.ImagePullPolicy = corev1.PullPolicy(viper.GetString("AGAMOTTO_IMAGE_PULL_POLICY"))
+		// HACK: hardcoded port values
+		// TODO: ports should be checked to avoid conflicts instead of hardcoded values
+		container.Command = []string{"probe", "--app-id", "batch-sdk",
+			"--dapr-http-port", "3501",
+			"--dapr-grpc-port", "54215",
+			"--app-protocol", "http", "--components-path", "/config/components"}
 
 		// set pod name and namespace, for role label updating inside pod
 		podName := corev1.EnvVar{
@@ -1512,13 +1526,15 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 				},
 			},
 		}
-		probeContainers[0].Env = append(probeContainers[0].Env, podName, podNamespace)
+		container.Env = append(container.Env, podName, podNamespace)
 
-		containerPort := corev1.ContainerPort{}
-		containerPort.ContainerPort = 3501
-		containerPort.Name = "probe-port"
-		containerPort.Protocol = "TCP"
-		probeContainers[0].Ports = []corev1.ContainerPort{containerPort}
+		// HACK: hardcoded port values
+		// TODO: ports should be checked to avoid conflicts instead of hardcoded values
+		container.Ports = []corev1.ContainerPort{{
+			ContainerPort: 3501,
+			Name:          "probe-port",
+			Protocol:      "TCP",
+		}}
 	}
 
 	reqCtx.Log.Info("probe", "containers", probeContainers)
@@ -1575,7 +1591,7 @@ func buildDeploy(params createParams) (*appsv1.Deployment, error) {
 		return nil, err
 	}
 
-	stsStrByte = injectEnv(stsStrByte, dbaasPrefix+"_MY_SECRET_NAME", params.cluster.Name)
+	stsStrByte = injectEnv(stsStrByte, dbaasPrefix+"_SECRET_NAME", params.cluster.Name)
 
 	if err = json.Unmarshal(stsStrByte, &deploy); err != nil {
 		return nil, err

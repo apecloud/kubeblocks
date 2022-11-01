@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -66,6 +66,9 @@ func setMonitor(monitor bool, components []map[string]interface{}) {
 func (o *CreateOptions) Validate() error {
 	if o.Name == "" {
 		return fmt.Errorf("missing cluster name")
+	}
+	if len(o.ComponentsFilePath) == 0 {
+		return fmt.Errorf("a valid component file path is needed")
 	}
 	return nil
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -64,7 +64,7 @@ var _ = Describe("BackupPolicyTemplate Controller", func() {
 	assureBackupPolicyTemplateObj := func(backupTool string) *dataprotectionv1alpha1.BackupPolicyTemplate {
 		By("By assure an backupPolicyTemplate obj")
 		backupPolicyYaml := `
-apiVersion: dataprotection.infracreate.com/v1alpha1
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupPolicyTemplate
 metadata:
   name: backup-policy-template-demo
@@ -106,7 +106,7 @@ spec:
 	assureBackupToolObj := func() *dataprotectionv1alpha1.BackupTool {
 		By("By assure an backupTool obj")
 		backupToolYaml := `
-apiVersion: dataprotection.infracreate.com/v1alpha1
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupTool
 metadata:
   name: xtrabackup-mysql

@@ -21,29 +21,29 @@ DEBIAN_MIRROR=mirrors.aliyun.com
 DOCKER:=docker
 DOCKERFILE_DIR?=./docker
 
-LB_IMG ?= docker.io/infracreate/loadbalancer
+LB_IMG ?= docker.io/apecloud/loadbalancer
 LB_VERSION ?= 0.1.0
 LB_TAG ?= v$(LB_VERSION)
 
 # Image URL to use all building/pushing image targets
-IMG ?= docker.io/infracreate/$(APP_NAME)
-CLI_IMG ?= docker.io/infracreate/dbctl
+IMG ?= docker.io/apecloud/$(APP_NAME)
+CLI_IMG ?= docker.io/apecloud/dbctl
 CLI_TAG ?= v$(CLI_VERSION)
 
 # Update whenever you upgrade dev container image
 DEV_CONTAINER_VERSION_TAG ?= latest
-DEV_CONTAINER_IMAGE_NAME = docker.io/infracreate/$(APP_NAME)-dev
+DEV_CONTAINER_IMAGE_NAME = docker.io/apecloud/$(APP_NAME)-dev
 
-DEV_CONTAINER_DOCKERFILE = Dockerfile-dapr-dev
+DEV_CONTAINER_DOCKERFILE = Dockerfile-dev
 DOCKERFILE_DIR = ./docker
 
 .PHONY: build-dev-image
 build-dev-image: DOCKER_BUILD_ARGS += --build-arg DEBIAN_MIRROR=$(DEBIAN_MIRROR) --build-arg GITHUB_PROXY=$(GITHUB_PROXY) --build-arg GOPROXY=$(GOPROXY)
 build-dev-image: ## Build dev container image.
 ifneq ($(BUILDX_ENABLED), true)
-	docker build . $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/${DEV_CONTAINER_DOCKERFILE} -t $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG)
+	docker build $(DOCKERFILE_DIR)/. $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/${DEV_CONTAINER_DOCKERFILE} -t $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG)
 else
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -f $(DOCKERFILE_DIR)/$(DEV_CONTAINER_DOCKERFILE) -t $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG)
+	docker buildx build $(DOCKERFILE_DIR)/.  $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -f $(DOCKERFILE_DIR)/$(DEV_CONTAINER_DOCKERFILE) -t $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG)
 endif
 
 

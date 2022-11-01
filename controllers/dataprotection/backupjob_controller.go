@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -50,9 +50,9 @@ type BackupJobReconciler struct {
 	clock    clock.RealClock
 }
 
-//+kubebuilder:rbac:groups=dataprotection.infracreate.com,resources=backupjobs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=dataprotection.infracreate.com,resources=backupjobs/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=dataprotection.infracreate.com,resources=backupjobs/finalizers,verbs=update
+//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backupjobs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backupjobs/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backupjobs/finalizers,verbs=update
 
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;list;watch;create;update;patch;delete
@@ -73,9 +73,10 @@ func (r *BackupJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// NOTES:
 	// setup common request context
 	reqCtx := intctrlutil.RequestCtx{
-		Ctx: ctx,
-		Req: req,
-		Log: log.FromContext(ctx).WithValues("backupJob", req.NamespacedName),
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithValues("backupJob", req.NamespacedName),
+		Recorder: r.Recorder,
 	}
 	// 1. Get backupjob obj
 	// 2. if not found, get batchv1 job obj
@@ -451,7 +452,7 @@ func (r *BackupJobReconciler) createHooksCommandJob(
 
 func buildBackupJobLabels(backupJobName string) map[string]string {
 	return map[string]string{
-		"backupjobs.dataprotection.infracreate.com/name": backupJobName,
+		"backupjobs.dataprotection.kubeblocks.io/name": backupJobName,
 	}
 }
 

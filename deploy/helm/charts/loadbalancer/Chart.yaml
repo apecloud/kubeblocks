@@ -26,7 +26,7 @@ appVersion: "0.1.0"
 kubeVersion: '>=1.20.0-0'
 
 
-home: https://www.infracreate.com/
+home: https://www.kubeblocks.io/
 icon: https://github.com/apecloud/kubeblocks/raw/main/img/logo.png
 keywords:
   - kubernetes

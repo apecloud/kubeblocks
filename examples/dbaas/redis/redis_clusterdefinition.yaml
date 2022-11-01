@@ -1,4 +1,4 @@
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
   name: redis-replication-definition
@@ -12,7 +12,7 @@ spec:
         createReplication:
           dbEngineContainer: redis
           commands:
-            - "redis-cli replicaof $(OPENDBAAS_PRIMARY_POD_NAME) 6379"
+            - "redis-cli replicaof $(KB_PRIMARY_POD_NAME) 6379"
       service:
         ports:
           - protocol: TCP

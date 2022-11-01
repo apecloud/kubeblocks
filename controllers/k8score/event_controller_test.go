@@ -20,7 +20,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -49,7 +48,7 @@ var _ = Describe("Event Controller", func() {
 			// Expect(err).NotTo(HaveOccurred())
 
 			By("send role changed event")
-			sndEvent, err := controllerutil.CreateRoleChangedEvent("hello", "leader")
+			sndEvent, err := CreateRoleChangedEvent("hello", "leader")
 			Expect(err).Should(Succeed())
 			Expect(testCtx.CreateObj(ctx, sndEvent)).Should(Succeed())
 			Eventually(func() string {

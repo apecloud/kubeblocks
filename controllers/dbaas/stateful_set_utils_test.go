@@ -109,11 +109,7 @@ func newStatefulSet(name string, replicas int) *apps.StatefulSet {
 
 func newStatefulSetPod(set *apps.StatefulSet, ordinal int) *v1.Pod {
 	pod := &v1.Pod{}
-	pod.Name = getPodName(set, ordinal)
+	pod.Name = fmt.Sprintf("%s-%d", set.Name, ordinal)
 
 	return pod
-}
-
-func getPodName(set *apps.StatefulSet, ordinal int) string {
-	return fmt.Sprintf("%s-%d", set.Name, ordinal)
 }

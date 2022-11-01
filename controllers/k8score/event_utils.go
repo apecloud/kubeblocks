@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright 2022 The ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,97 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllerutil
+package k8score
 
 import (
 	"bytes"
-	"context"
-	"io"
 	"math/rand"
-	"net/http"
-	"os"
-	"strings"
 	"text/template"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-
-	"github.com/dapr/kit/logger"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
-
-func SetupConsensusRoleObservingLoop(log logger.Logger) {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-
-	// lastRoleObserved, role cache
-	lastRoleObserved := ""
-	roleObserve := func(ctx context.Context) {
-		// observe role through dapr
-		url := "http://localhost:3501/v1.0/bindings/mtest"
-		contentType := "application/json"
-		reqBody := strings.NewReader("{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}")
-		resp, err := http.Post(url, contentType, reqBody)
-		if err != nil {
-			log.Error(err)
-			return
-		}
-
-		defer resp.Body.Close()
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			log.Error(err)
-			return
-		}
-
-		// parse role
-		role := strings.ToLower(string(body))
-		log.Info("role observed: ", role)
-		if role == "db not ready" {
-			log.Info("db not ready, wait")
-			return
-		}
-		if role == lastRoleObserved {
-			log.Info("no role change since last observing, ignore")
-			return
-		}
-
-		// get pod object
-		name := os.Getenv("MY_POD_NAME")
-		namespace := os.Getenv("MY_POD_NAMESPACE")
-
-		// or emit event
-		event, err := CreateRoleChangedEvent(name, role)
-		if err != nil {
-			log.Error(err)
-			return
-		}
-		_, err = clientset.CoreV1().Events(namespace).Create(ctx, event, metav1.CreateOptions{})
-		if err != nil {
-			log.Error(err)
-			return
-		}
-
-		lastRoleObserved = role
-	}
-
-	// TODO parameterize interval
-	go wait.UntilWithContext(context.TODO(), roleObserve, time.Second*2)
-}
 
 func CreateRoleChangedEvent(podName, role string) (*corev1.Event, error) {
 	eventTmpl := `

@@ -21,9 +21,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/apecloud/kubeblocks/internal/testutil"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	"github.com/apecloud/kubeblocks/internal/testutil"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 

@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"github.com/apecloud/kubeblocks/controllers/dbaas"
 	"os"
 	"os/signal"
 	"syscall"
@@ -46,7 +47,6 @@ import (
 	"go.uber.org/automaxprocs/maxprocs"
 
 	"github.com/apecloud/kubeblocks/cmd/daprd/internal/binding/mysql"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var (
@@ -94,7 +94,7 @@ func main() {
 	}
 
 	// start role label updating loop
-	controllerutil.SetupConsensusRoleObservingLoop(logContrib)
+	dbaas.SetupConsensusRoleObservingLoop(logContrib)
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)

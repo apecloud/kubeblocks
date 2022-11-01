@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	"os"
 	"os/signal"
 	"syscall"
@@ -47,6 +46,7 @@ import (
 	"go.uber.org/automaxprocs/maxprocs"
 
 	"github.com/apecloud/kubeblocks/cmd/daprd/internal/binding/mysql"
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var (

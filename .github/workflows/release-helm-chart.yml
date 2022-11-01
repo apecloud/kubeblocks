@@ -41,7 +41,6 @@ jobs:
         run: |
           RELEASE_VERSION=`bash ${{ github.workspace }}/.github/workflows/utils.sh ${{ env.RELEASE_VERSION }} 1`
           VERSION=$RELEASE_VERSION make bump-chart-ver
-          VERSION=$RELEASE_VERSION make bump-chart-ver-wqsql-cluster
 
           args=(--owner "apecloud" --repo "kubeclocks" --charts-dir "deploy" --version ${{ env.CHART_RELEASER_VERSION }})
           "${{ github.workspace }}/.github/workflows/helm_package.sh" "${args[@]}"

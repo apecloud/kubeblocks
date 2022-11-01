@@ -62,6 +62,7 @@ var _ = Describe("logs_list_type test", func() {
 		Expect(o.Validate([]string{"cluster-name"})).Should(BeNil())
 		Expect(o.Complete(o.factory, []string{"cluster-name"})).Should(BeNil())
 		Expect(o.clusterName).Should(Equal("cluster-name"))
+		Expect(o.Run()).Should(HaveOccurred())
 	})
 	It("printLogContext test", func() {
 

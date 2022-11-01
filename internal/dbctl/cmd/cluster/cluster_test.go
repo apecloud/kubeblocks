@@ -183,7 +183,7 @@ var _ = Describe("Cluster", func() {
 	It("list-logs-type", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace("default")
 		defer tf.Cleanup()
-		cmd := NewLogsListCmd(tf, streams)
+		cmd := NewLogsListTypeCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 		Expect(cmd.Run).ShouldNot(BeNil())
 	})

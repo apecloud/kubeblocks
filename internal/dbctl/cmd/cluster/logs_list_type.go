@@ -46,6 +46,7 @@ var (
 		dbctl cluster logs-list mysql-cluster -i release-name-replicasets-0`))
 )
 
+// LogsListOptions declare the arguments accepted by the logs-list-type command
 type LogsListOptions struct {
 	namespace   string
 	clusterName string
@@ -57,7 +58,8 @@ type LogsListOptions struct {
 	genericclioptions.IOStreams
 }
 
-func NewLogsListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+// NewLogsListTypeCmd return logs list type cmd
+func NewLogsListTypeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &LogsListOptions{
 		factory:   f,
 		IOStreams: streams,

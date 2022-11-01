@@ -51,7 +51,7 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		NewHorizontalScalingCmd(f, streams),
 		NewConnectCmd(f, streams),
 		NewLogsCmd(f, streams),
-		NewLogsListCmd(f, streams),
+		NewLogsListTypeCmd(f, streams),
 	)
 
 	if viper.GetString(EnvExperimentalExpose) == "1" {

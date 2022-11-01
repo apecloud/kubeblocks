@@ -68,6 +68,7 @@ var (
 		dbctl cluster logs mysql-cluster -i mysql-cluster-replicasets-0 -c mysql --file-path=/var/log/yum.log`))
 )
 
+// LogsOptions declare the arguments accepted by the logs command
 type LogsOptions struct {
 	use         string
 	short       string

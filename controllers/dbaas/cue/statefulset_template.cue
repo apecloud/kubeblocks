@@ -42,7 +42,6 @@ statefulset: {
 			"app.kubernetes.io/instance": cluster.metadata.name
 			// "app.kubernetes.io/version" : # TODO
 			"app.kubernetes.io/component-name": "\(component.name)"
-			"app.kubernetes.io/created-by":     "controller-manager"
 		}
 	}
 	spec: {

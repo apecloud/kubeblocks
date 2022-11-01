@@ -31,7 +31,7 @@ import (
 
 // ReconcileActionWithCluster it will be performed when action is done and loop util OpsRequest.status.phase is Succeed.
 // if OpsRequest.spec.clusterOps is not null, you can use it to OpsBehaviour.ReconcileAction.
-func ReconcileActionWithCluster(opsRes *OpsResource) error {
+func ReconcileActionWithCluster(opsRes *OpsResource) (bool, error) {
 	var (
 		opsRequest = opsRes.OpsRequest
 		isChanged  bool
@@ -52,18 +52,15 @@ func ReconcileActionWithCluster(opsRes *OpsResource) error {
 	}
 	if isChanged {
 		if err := opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch); err != nil {
-			return err
+			return false, err
 		}
 	}
-	if opsRes.Cluster.Status.Phase != dbaasv1alpha1.RunningPhase {
-		return fmt.Errorf("opsRequest is not completed")
-	}
-	return nil
+	return opsRes.Cluster.Status.Phase == dbaasv1alpha1.RunningPhase, nil
 }
 
 // ReconcileActionWithComponentOps it will be performed when action is done and loop util OpsRequest.status.phase is Succeed.
 // if OpsRequest.spec.componentOps is not null, you can use it to OpsBehaviour.ReconcileAction.
-func ReconcileActionWithComponentOps(opsRes *OpsResource) error {
+func ReconcileActionWithComponentOps(opsRes *OpsResource) (bool, error) {
 	var (
 		opsRequest = opsRes.OpsRequest
 		isOk       = true
@@ -89,13 +86,10 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource) error {
 	}
 	if isChanged {
 		if err := opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch); err != nil {
-			return err
+			return false, err
 		}
 	}
-	if !isOk {
-		return fmt.Errorf("opsRequest is not completed")
-	}
-	return nil
+	return isOk, nil
 }
 
 // sendEventWhenComponentStatusChanged send an event when OpsRequest.status.components[*].phase is changed

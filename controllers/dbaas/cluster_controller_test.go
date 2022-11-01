@@ -46,6 +46,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/statefulset"
 )
 
 var _ = Describe("Cluster Controller", func() {
@@ -861,11 +862,9 @@ spec:
 				time.Sleep(interval * 5)
 
 				Eventually(func() bool {
-					err := k8sClient.Get(context.Background(), key, cluster)
-					if err != nil {
+					if err := k8sClient.Get(context.Background(), key, cluster); err != nil {
 						return false
 					}
-
 					return cluster.Status.Phase == dbaasv1alpha1.CreatingPhase
 				}, timeout*3, interval*5).Should(BeTrue())
 
@@ -921,7 +920,7 @@ spec:
 			Expect(k8sClient.List(context.Background(), podList, client.InNamespace(key.Namespace))).Should(Succeed())
 			pods := make([]corev1.Pod, 0)
 			for _, pod := range podList.Items {
-				if isMemberOf(sts, &pod) {
+				if statefulset.IsMemberOf(sts, &pod) {
 					pods = append(pods, pod)
 				}
 			}

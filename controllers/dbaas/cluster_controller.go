@@ -40,9 +40,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/apecloud/kubeblocks/controllers/k8score"
-
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/statefulset"
+	"github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -156,8 +156,8 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 
 	// get componentDef this pod belongs to
 	componentName := pod.Labels[appComponentLabelKey]
-	typeName := getComponentTypeName(*cluster, componentName)
-	componentDef, err := getComponent(ctx, cli, cluster, typeName)
+	typeName := statefulset.GetComponentTypeName(*cluster, componentName)
+	componentDef, err := statefulset.GetComponentFromClusterDefinition(ctx, cli, cluster, typeName)
 	if err != nil {
 		return err
 	}
@@ -314,13 +314,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if cluster.Status.ObservedGeneration == cluster.GetObjectMeta().GetGeneration() {
 		// check cluster all pods is ready
-		if r.needCheckClusterForReady(cluster) {
-			if ok, err := r.checkClusterIsReady(reqCtx.Ctx, cluster); !ok || err != nil {
-				return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "checkClusterIsReady")
-			}
-			if err = r.patchClusterToRunning(reqCtx.Ctx, cluster); err != nil {
-				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-			}
+		if err = r.checkAndPatchToRunning(reqCtx.Ctx, cluster); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()
 	}
@@ -565,107 +560,19 @@ func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctr
 	return r.Client.Status().Patch(reqCtx.Ctx, cluster, patch)
 }
 
-// checkClusterIsReady Check whether the cluster related pod resources are running. if ok, update Cluster.status.phase to Running
-func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *dbaasv1alpha1.Cluster) (bool, error) {
-	var (
-		statefulSetList         = &appsv1.StatefulSetList{}
-		isOk                    = true
-		needSyncStatusComponent bool
-	)
-	if err := r.Client.List(ctx, statefulSetList, client.InNamespace(cluster.Namespace),
-		client.MatchingLabels{appInstanceLabelKey: cluster.Name}); err != nil {
-		return false, err
-	}
-	patch := client.MergeFrom(cluster.DeepCopy())
-	for _, v := range statefulSetList.Items {
-		// if v is consensusSet
-		typeName := getComponentTypeName(*cluster, v.Labels[appComponentLabelKey])
-		componentDef, err := getComponent(ctx, r.Client, cluster, typeName)
-		if err != nil {
-			return false, err
-		}
-		statefulStatusRevisionIsEquals := false
-		end := true
-		switch componentDef.ComponentType {
-		case dbaasv1alpha1.Consensus:
-			if end, err = handleConsensusSetUpdate(ctx, r.Client, cluster, &v); err != nil {
-				return false, err
-			} else if !end {
-				// if not end, we are deleting pod.
-				isOk = false
-			}
-			// Consensus do not judge whether the revisions are consistent
-			statefulStatusRevisionIsEquals = true
-		case dbaasv1alpha1.Stateful:
-			// TODO wait other component type added
-			// when stateful updateStrategy is rollingUpdate, need to check revision
-			if v.Status.UpdateRevision == v.Status.CurrentRevision {
-				statefulStatusRevisionIsEquals = true
-			}
-		}
-
-		var componentIsRunning bool
-		// check whether the statefulset has reached the final state.
-		// when we delete the pod, statefulset.status may still be available due to statefulset controls the pod asynchronously,
-		// so we check the end variable
-		// ps: StatefulSet.Status.AvailableReplicas supported after k8s v1.22
-		if v.Status.AvailableReplicas != *v.Spec.Replicas ||
-			v.Status.ObservedGeneration != v.GetGeneration() ||
-			!statefulStatusRevisionIsEquals || !end {
-			isOk = false
-		} else {
-			componentIsRunning = true
-		}
-		// when component phase is changed, set needSyncStatusComponent to true, then patch cluster.status
-		if ok := r.patchStatusComponentsWithStatefulSet(cluster, &v, componentIsRunning); ok {
-			needSyncStatusComponent = true
-		}
-	}
-
-	if needSyncStatusComponent {
-		if err := r.Client.Status().Patch(ctx, cluster, patch); err != nil {
-			return false, err
-		}
-	}
-
-	return isOk, nil
-}
-
-// patchStatusComponentsWithStatefulSet Modify status.components information, include component phase
-func (r *ClusterReconciler) patchStatusComponentsWithStatefulSet(cluster *dbaasv1alpha1.Cluster, statefulSet *appsv1.StatefulSet, componentIsRunning bool) bool {
-	var (
-		cName           string
-		ok              bool
-		statusComponent *dbaasv1alpha1.ClusterStatusComponent
-	)
-	//  if it does not belong to this component, return false
-	if cName, ok = statefulSet.Labels[appComponentLabelKey]; !ok {
-		return false
+// checkAndPatchToRunning patch Cluster.status.phase to Running
+func (r *ClusterReconciler) checkAndPatchToRunning(ctx context.Context, cluster *dbaasv1alpha1.Cluster) error {
+	if !r.needCheckClusterForReady(cluster) {
+		return nil
 	}
 	if cluster.Status.Components == nil {
-		cluster.Status.Components = map[string]*dbaasv1alpha1.ClusterStatusComponent{}
+		return nil
 	}
-	if statusComponent, ok = cluster.Status.Components[cName]; !ok {
-		cluster.Status.Components[cName] = &dbaasv1alpha1.ClusterStatusComponent{Phase: cluster.Status.Phase}
-		return true
+	for _, v := range cluster.Status.Components {
+		if v.Phase != dbaasv1alpha1.RunningPhase {
+			return nil
+		}
 	}
-	// if componentIsRunning is false, means the cluster has an operation running.
-	// so we sync the cluster phase to component phase.
-	if statusComponent.Phase == dbaasv1alpha1.RunningPhase && !componentIsRunning {
-		statusComponent.Phase = cluster.Status.Phase
-		return true
-	}
-	// if componentIsRunning is true and component status is not Running.
-	// we should change component phase to Running
-	if statusComponent.Phase != dbaasv1alpha1.RunningPhase && componentIsRunning {
-		statusComponent.Phase = dbaasv1alpha1.RunningPhase
-		return true
-	}
-	return false
-}
-
-// patchClusterToRunning patch Cluster.status.phase to Running
-func (r *ClusterReconciler) patchClusterToRunning(ctx context.Context, cluster *dbaasv1alpha1.Cluster) error {
 	patch := client.MergeFrom(cluster.DeepCopy())
 	cluster.Status.Phase = dbaasv1alpha1.RunningPhase
 	if err := r.Client.Status().Patch(ctx, cluster, patch); err != nil {

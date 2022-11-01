@@ -15,14 +15,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package statefulset
 
 import (
+	"context"
 	"regexp"
 	"strconv"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
 // ------- copy from stateful_set_utils.go ----
@@ -52,8 +56,8 @@ func getParentName(pod *corev1.Pod) string {
 	return parent
 }
 
-// isMemberOf tests if pod is a member of set.
-func isMemberOf(set *appsv1.StatefulSet, pod *corev1.Pod) bool {
+// IsMemberOf tests if pod is a member of set.
+func IsMemberOf(set *appsv1.StatefulSet, pod *corev1.Pod) bool {
 	return getParentName(pod) == set.Name
 }
 
@@ -67,3 +71,29 @@ func getPodRevision(pod *corev1.Pod) string {
 }
 
 // ------- end copy from stateful_set_utils.go ----
+
+// GetComponentTypeName get component type name
+func GetComponentTypeName(cluster dbaasv1alpha1.Cluster, componentName string) string {
+	for _, component := range cluster.Spec.Components {
+		if componentName == component.Name {
+			return component.Type
+		}
+	}
+
+	return componentName
+}
+
+// GetComponentFromClusterDefinition get component from ClusterDefinition with typeName
+func GetComponentFromClusterDefinition(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, typeName string) (*dbaasv1alpha1.ClusterDefinitionComponent, error) {
+	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
+		return nil, err
+	}
+
+	for _, component := range clusterDef.Spec.Components {
+		if component.TypeName == typeName {
+			return &component, nil
+		}
+	}
+	return nil, nil
+}

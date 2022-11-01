@@ -1,13 +1,13 @@
-# permissions for end users to view backupconfigs.
+# permissions for end users to view backuppolicytemplates.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: backupconfig-viewer-role
+  name: backuppolicytemplate-viewer-role
 rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - backupconfigs
+  - backuppolicytemplates
   verbs:
   - get
   - list
@@ -15,6 +15,6 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - backupconfigs/status
+  - backuppolicytemplates/status
   verbs:
   - get

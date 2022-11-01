@@ -65,12 +65,12 @@ KubeBlocks uses `make` for a variety of build and test actions, and needs to be 
   2. When completed, you should see `make` and other command line developer tools in `/usr/bin`.
 
 ### Using VSCode and development container
-If you are using Visual Studio Code, you can connect to a development container configured for KuberBlocks development. With development container, you don't need to manually install all of the tools and frameworks needed.
+If you are using Visual Studio Code, you can connect to a [development container](https://code.visualstudio.com/docs/devcontainers/containers) configured for KuberBlocks development. With development container, you don't need to manually install all of the tools and frameworks needed.
 
 #### Setup the development container
 1. Install VSCode [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
 2. Open the KubeBlocks project folder in VSCode
-    - vscode will detect the presence of a dev container definition in the repo and will prompt you to reopen the project in a container:
+    - VSCode will detect the presence of a dev container definition in the repo and will prompt you to reopen the project in a container:
       ![reopen dev container by pop notification](./img/reopen_dev_container_notification.png)
     - Alternatively, you can open the command palette and use the Remote-Containers: Reopen in Container command:
       ![reopen dev container by command](./img/reopen_dev_container_command.png)

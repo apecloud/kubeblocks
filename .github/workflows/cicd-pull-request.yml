@@ -3,6 +3,9 @@ name: CICD-PULL-REQUEST
 on:
   pull_request:
 
+env:
+  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
 
 jobs:
   branch-name:
@@ -15,10 +18,9 @@ jobs:
           comment_for_invalid_branch_name: 'This branch name is not following the standards: feature/|bugfix/|release/|hotfix/|support/'
           fail_if_invalid_branch_name: 'true'
           ignore_branch_pattern: 'main|master'
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   make-test:
+    name: make test
     needs: branch-name
     runs-on: [ self-hosted, aws-eks-k8s-runner ]
     steps:
@@ -27,8 +29,7 @@ jobs:
         run: |
           mkdir -p ./bin
           cp -r /go/bin/controller-gen ./bin/controller-gen
-          make mod-vendor
-          make lint
+          make mod-vendor lint
 
       - name: make test
         run: |

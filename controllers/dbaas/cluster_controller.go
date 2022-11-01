@@ -222,6 +222,43 @@ func updateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCt
 
 	// prepare cluster status patch
 	patch = client.MergeFrom(cluster.DeepCopy())
+
+	initClusterComponentStatusIfNeed(cluster, componentName, typeName)
+	consensusSetStatus := cluster.Status.Components[componentName].ConsensusSetStatus
+
+	resetClusterConsensusRoleStatus(consensusSetStatus, pod.Name)
+
+	// set pod.Name to the right status field
+	needUpdate := false
+	switch memberExt.consensusRole {
+	case Leader:
+		needUpdate = setClusterConsensusLeaderStatus(consensusSetStatus, memberExt, pod.Name)
+	case Follower:
+		needUpdate = setClusterConsensusFollowerStatus(consensusSetStatus, memberExt, pod.Name)
+	case Learner:
+		needUpdate = setClusterConsensusLearnerStatus(consensusSetStatus, memberExt, pod.Name)
+	}
+
+	// finally, update cluster status
+	if needUpdate {
+		err = cli.Status().Patch(ctx, cluster, patch)
+		if err != nil {
+			return err
+		}
+
+		// update pod accessMode label
+		if err := cli.Get(ctx, podName, pod); err != nil {
+			return err
+		}
+		patchAccessMode := client.MergeFrom(pod.DeepCopy())
+		pod.Labels[consensusSetAccessModeLabelKey] = string(memberExt.accessMode)
+		return cli.Patch(ctx, pod, patchAccessMode)
+	}
+
+	return nil
+}
+
+func initClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster, componentName, typeName string) {
 	if cluster.Status.Components == nil {
 		cluster.Status.Components = make(map[string]*dbaasv1alpha1.ClusterStatusComponent)
 	}
@@ -244,101 +281,72 @@ func updateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCt
 			},
 		}
 	}
-	consensusSetStatus := componentStatus.ConsensusSetStatus
+}
 
-	resetLeader := func() {
-		if consensusSetStatus.Leader.Pod == pod.Name {
-			consensusSetStatus.Leader.Pod = consensusSetStatusDefaultPodName
-			consensusSetStatus.Leader.AccessMode = dbaasv1alpha1.None
-			consensusSetStatus.Leader.Name = ""
-		}
-	}
-	resetLearner := func() {
-		if consensusSetStatus.Learner != nil && consensusSetStatus.Learner.Pod == pod.Name {
-			consensusSetStatus.Learner = nil
-		}
+func setClusterConsensusLeaderStatus(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus, memberExt consensusMemberExt, podName string) bool {
+	if consensusSetStatus.Leader.Pod == podName {
+		return false
 	}
 
-	resetFollower := func() {
-		for index, member := range consensusSetStatus.Followers {
-			if member.Pod == pod.Name {
-				consensusSetStatus.Followers = append(consensusSetStatus.Followers[:index], consensusSetStatus.Followers[index+1:]...)
-			}
-		}
+	consensusSetStatus.Leader.Pod = podName
+	consensusSetStatus.Leader.AccessMode = memberExt.accessMode
+	consensusSetStatus.Leader.Name = memberExt.name
+
+	return true
+}
+
+func setClusterConsensusFollowerStatus(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus, memberExt consensusMemberExt, podName string) bool {
+	if consensusSetStatus.Learner == nil {
+		consensusSetStatus.Learner = &dbaasv1alpha1.ConsensusMemberStatus{}
 	}
 
-	// set pod.Name to the right status field
-
-	resetLeader()
-	resetFollower()
-	resetLearner()
-	needUpdate := false
-	switch memberExt.consensusRole {
-	case Leader:
-		needUpdate = setLeader(consensusSetStatus, memberExt, pod.Name)
-	case Follower:
-		needUpdate = setFollower(consensusSetStatus, memberExt, pod.Name)
-	case Learner:
-		needUpdate = setLearner(consensusSetStatus, memberExt, pod.Name)
+	if consensusSetStatus.Learner.Pod == podName {
+		return false
 	}
 
-	switch role {
-	case leaderName:
-		consensusSetStatus.Leader.Pod = pod.Name
-		consensusSetStatus.Leader.AccessMode = componentDef.ConsensusSpec.Leader.AccessMode
-		consensusSetStatus.Leader.Name = componentDef.ConsensusSpec.Leader.Name
-		accessMode = componentDef.ConsensusSpec.Leader.AccessMode
-		resetLearner()
-		resetFollower()
-		needUpdate = true
-	case learnerName:
-		if consensusSetStatus.Learner == nil {
-			consensusSetStatus.Learner = &dbaasv1alpha1.ConsensusMemberStatus{}
-		}
-		consensusSetStatus.Learner.Pod = pod.Name
-		consensusSetStatus.Learner.AccessMode = componentDef.ConsensusSpec.Learner.AccessMode
-		consensusSetStatus.Learner.Name = componentDef.ConsensusSpec.Learner.Name
-		accessMode = componentDef.ConsensusSpec.Learner.AccessMode
-		resetLeader()
-		resetFollower()
-		needUpdate = true
-	default:
-		if follower, ok := followersMap[role]; ok {
-			exist := false
-			for _, member := range consensusSetStatus.Followers {
-				if member.Pod == pod.Name {
-					exist = true
-				}
-			}
-			if !exist {
-				member := dbaasv1alpha1.ConsensusMemberStatus{
-					Pod:        pod.Name,
-					AccessMode: follower.AccessMode,
-					Name:       follower.Name,
-				}
-				accessMode = follower.AccessMode
-				consensusSetStatus.Followers = append(consensusSetStatus.Followers, member)
-				resetLeader()
-				resetLearner()
-				needUpdate = true
-			}
+	consensusSetStatus.Learner.Pod = podName
+	consensusSetStatus.Learner.AccessMode = memberExt.accessMode
+	consensusSetStatus.Learner.Name = memberExt.name
+
+	return true
+}
+
+func setClusterConsensusLearnerStatus(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus, memberExt consensusMemberExt, podName string) bool {
+	for _, member := range consensusSetStatus.Followers {
+		if member.Pod == podName {
+			return false
 		}
 	}
 
-	// finally, update cluster status
-	if needUpdate {
-		err = cli.Status().Patch(ctx, cluster, patch)
-		if err != nil {
-			return err
-		}
+	member := dbaasv1alpha1.ConsensusMemberStatus{
+		Pod:        podName,
+		AccessMode: memberExt.accessMode,
+		Name:       memberExt.name,
+	}
+	consensusSetStatus.Followers = append(consensusSetStatus.Followers, member)
 
-		// update pod accessMode label
-		patchAccessMode := client.MergeFrom(pod.DeepCopy())
-		pod.Labels[consensusSetAccessModeLabelKey] = string(memberExt.accessMode)
-		return cli.Patch(ctx, pod, patchAccessMode)
+	return true
+}
+
+func resetClusterConsensusRoleStatus(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus, podName string) {
+	// reset header
+	if consensusSetStatus.Leader.Pod == podName {
+		consensusSetStatus.Leader.Pod = consensusSetStatusDefaultPodName
+		consensusSetStatus.Leader.AccessMode = dbaasv1alpha1.None
+		consensusSetStatus.Leader.Name = ""
 	}
 
-	return nil
+	// reset follower
+	for index, member := range consensusSetStatus.Followers {
+		if member.Pod == podName {
+			consensusSetStatus.Followers = append(consensusSetStatus.Followers[:index], consensusSetStatus.Followers[index+1:]...)
+		}
+	}
+
+	// reset learner
+	if consensusSetStatus.Learner != nil && consensusSetStatus.Learner.Pod == podName {
+		consensusSetStatus.Learner = nil
+	}
 }
 
 //+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete

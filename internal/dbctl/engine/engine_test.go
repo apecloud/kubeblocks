@@ -43,4 +43,32 @@ var _ = Describe("Engine", func() {
 		Expect(engine).Should(BeNil())
 		Expect(err).Should(HaveOccurred())
 	})
+	Context("DataEngines Test", func() {
+		BeforeEach(func() {
+			// clear DataEngines registry
+			DataEngines = make(map[string]map[string]interface{}, 0)
+		})
+		It("Registry Test", func() {
+			Registry(stateMysql, logsModule, "test")
+			Expect(len(DataEngines)).To(Equal(1))
+			Expect(GetContext(stateMysql, logsModule)).To(Equal("test"))
+		})
+
+		It("GetContext Test", func() {
+			_, err := GetContext(stateMysql, logsModule)
+			Expect(err).To(MatchError("no registered data engine " + stateMysql))
+			Registry(stateMysql, logsModule, "test")
+			_, err = GetContext(stateMysql, connectModule)
+			Expect(err).To(MatchError("no registered context for module " + connectModule))
+		})
+
+		It("LogsContext Test", func() {
+			registryMySQLLogsContext()
+			_, err := LogsContext(stateMysql)
+			Expect(err).To(BeNil())
+			_, err = LogsContext("new")
+			Expect(err).To(MatchError("no log context for engine " + "new"))
+		})
+
+	})
 })

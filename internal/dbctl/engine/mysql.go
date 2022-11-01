@@ -76,13 +76,18 @@ func init() {
 
 func registryMySQLLogsContext() {
 	mysqlLogsContext := map[string]LogVariables{
+		"stdout": {
+			DefaultFilePath: "stdout/stderr",
+			Variables:       nil,
+			PathVar:         "",
+		},
 		"error": {
 			DefaultFilePath: "/data/mysql/log/mysqld.err",
 			Variables:       []string{"log-error"},
 			PathVar:         "log-error",
 		},
 		"slow": {
-			DefaultFilePath: "/data/mysql/data/wesql-cluster-replicasets-0-slow.log",
+			DefaultFilePath: "/data/mysql/data/release-name-replicasets-0-slow.log",
 			Variables:       []string{"slow_query_log_file", "slow_query_log", "long_query_time", "log_output"},
 			PathVar:         "slow_query_log_file",
 		},
@@ -92,8 +97,11 @@ func registryMySQLLogsContext() {
 }
 
 type LogVariables struct {
-	PathVar         string
-	Variables       []string
+	// PathVar indicate the variables of file path
+	PathVar string
+	// Variables engine variables of this specify log type
+	Variables []string
+	// DefaultFilePath indicate the default path for extensible file, such as dmesg, and have a more premium priority than PathVar.
 	DefaultFilePath string
 }
 

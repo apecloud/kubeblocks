@@ -36,6 +36,6 @@ jobs:
           
           FILE_PATH=`git diff --name-only $SHA $MAIN_SHA`
           
-          python ${{ github.workspace }}/.github/workflows/pcregrep.py \
+          python ${{ github.workspace }}/.github/utils/pcregrep.py \
             --source="${{ github.workspace }}/pcregrep.out" \
             --filter="$FILE_PATH"

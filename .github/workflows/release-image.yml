@@ -38,6 +38,6 @@ jobs:
           docker login --username ${{ secrets.DOCKER_REGISTRY_USER }} \
             --password ${{ secrets.DOCKER_REGISTRY_PASSWORD }} ${{ env.DOCKER_REGISTRY_URL }}
           
-          RELEASE_VERSION=`bash ${{ github.workspace }}/.github/workflows/utils.sh ${{ env.RELEASE_VERSION }} 1`
+          RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ env.RELEASE_VERSION }} 1`
           
           BUILDX_ENABLED=true VERSION=$RELEASE_VERSION make push-manager-image

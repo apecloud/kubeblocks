@@ -59,7 +59,7 @@ jobs:
         run: |
           mkdir -p ${{ matrix.os }}
           
-          DBCTL_OS_ARCH=`bash ${{ github.workspace }}/.github/workflows/utils.sh ${{ matrix.os }}`
+          DBCTL_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ matrix.os }}`
           
           make bin/dbctl.$DBCTL_OS_ARCH
           

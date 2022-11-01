@@ -32,6 +32,7 @@ This document covers basic needs to work with KubeBlocks codebase.
 
 ## Setup development environment
 There are two options for getting an environment up and running for KubeBlocks development.
+
 ### Bring your own toolbox
 To build `KubeBlocks` on your own host, needs to install the following tools:
 - Docker
@@ -40,16 +41,16 @@ To build `KubeBlocks` on your own host, needs to install the following tools:
 
 #### Docker environment
 1. Install [Docker](https://docs.docker.com/install/)
-    > For Linux, you'll have to configure docker to run without `sudo` for the dapr build scripts to work. Follow the instructions to [manage Docker as a non-root user](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).
+    > For Linux, you'll have to configure docker to run without `sudo` for the KubeBlocks build scripts to work. Follow the instructions to [manage Docker as a non-root user](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).
 2. Create your [Docker Hub account](https://hub.docker.com/signup) if you don't already have one.
 
 #### Go (Golang)
 1. Download and install [Go 1.18 or later](https://golang.org/doc/install#tarball).
-2. Install [Delve](https://github.com/go-delve/delve/tree/master/Documentation/installation) for Go debugging, if desired.
+2. Install [Delve](https://github.com/go-delve/delve/tree/master/Documentation/installation) for Go debugging, if de
 3. Install [golangci-lint](https://golangci-lint.run/usage/install).
 
 #### Installing Make
-Dapr uses `make` for a variety of build and test actions, and needs to be installed as appropriate for your platform:
+KubeBlocks uses `make` for a variety of build and test actions, and needs to be installed as appropriate for your platform:
 
 - Linux
   1. Install the `build-essential` package:
@@ -146,9 +147,10 @@ To run `KubeBlocks`, you needs a Kubernetes 1.24.1+ cluster for development, [`M
 
 ## Basics
 ### Kubebuilder
-KubeBlocks is using kubebuilder as the operator framework, before your start to code, suggest read [kubebuilder books](https://book.kubebuilder.io/).
+KubeBlocks is using kubebuilder as the operator framework, before your start to code, suggest to read [kubebuilder books](https://book.kubebuilder.io/).
+
 ### Makefile
-Vector includes a [Makefile](../Makefile) in the root of the repo. This serves as a high-level interface for common commands. Running `make help` will produce a list of make targets with descriptions. These targets will be referenced throughout this document.
+KubeBlocks includes a [Makefile](../Makefile) in the root of the repo. This serves as a high-level interface for common commands. Running `make help` will produce a list of make targets with descriptions. These targets will be referenced throughout this document.
 ### [TODO] dbctl
 
 ### Code style
@@ -162,7 +164,6 @@ make lint
 This is not a fast command. On my machine, at the time of writing, it takes about a full minute to run. You can instead run
 
 ### Building local binaries
-
 ```shell
 make all
 ```
@@ -173,9 +174,9 @@ KubeBlocks uses make for a variety of test actions.
 
 ### Envtest
 Setting up a local control plane and test all modules:
-    ```shell
-    make test
-    ```
+```shell
+make test
+```
 Test specific packages:
 
 ```shell

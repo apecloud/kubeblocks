@@ -46,6 +46,33 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters/finalizers,verbs=update
+//+kubebuilder:rbac:groups=apps,resources=deployments;statefulsets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=deployments/status;statefulsets/status,verbs=get
+//+kubebuilder:rbac:groups=apps,resources=deployments/finalizers;statefulsets/finalizers,verbs=update
+//+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets/finalizers,verbs=update
+//+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
+// NOTES: owned K8s core API resources controller-gen RBAC marker is maintained at {REPO}/controllers/k8score/rbac.go
+
+// ClusterReconciler reconciles a Cluster object
+type ClusterReconciler struct {
+	client.Client
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+}
+
+// TODO probeMessage should be defined by @xuanchi
+type probeMessage struct {
+	Data probeMessageData `json:"data,omitempty"`
+}
+
+type probeMessageData struct {
+	Role string `json:"role,omitempty"`
+}
+
 func init() {
 	clusterDefUpdateHandlers["cluster"] = clusterUpdateHandler
 	k8score.EventHandlerMap["cluster-controller"] = &ClusterReconciler{}
@@ -77,22 +104,6 @@ func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *db
 	}
 
 	return nil
-}
-
-// ClusterReconciler reconciles a Cluster object
-type ClusterReconciler struct {
-	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
-}
-
-// TODO probeMessage should be defined by @xuanchi
-type probeMessage struct {
-	Data probeMessageData `json:"data,omitempty"`
-}
-
-type probeMessageData struct {
-	Role string `json:"role,omitempty"`
 }
 
 func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, event *corev1.Event) error {
@@ -270,17 +281,6 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 
 	return nil
 }
-
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters/finalizers,verbs=update
-//+kubebuilder:rbac:groups=apps,resources=deployments;statefulsets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=apps,resources=deployments/status;statefulsets/status,verbs=get
-//+kubebuilder:rbac:groups=apps,resources=deployments/finalizers;statefulsets/finalizers,verbs=update
-//+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets/finalizers,verbs=update
-//+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
-// NOTES: owned K8s core API resources controller-gen RBAC marker is maintained at {REPO}/controllers/k8score/rbac.go
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

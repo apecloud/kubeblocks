@@ -3,14 +3,14 @@ This document covers basic needs to work with KubeBlocks codebase.
 
 - [Setup development environment](#setup-development-environment)
   - [Bring your own toolbox](#bring-your-own-toolbox)
-    - [Installing Go](#installing-go)
-    - [Installing Make](#installing-make)
-    - [Building KubeBlocks](#building-kubeblocks)
-  - [Using VSCode and development container](#using-vscode-and-development-container)
+    - [Install Go](#install-go)
+    - [Install Make](#install-make)
+    - [Build KubeBlocks](#build-kubeblocks)
+  - [Use VSCode and development container](#use-vscode-and-development-container)
     - [Setup the development container](#setup-the-development-container)
-    - [Customizing your dev container](#customizing-your-dev-container)
-      - [Using a custom dev container image](#using-a-custom-dev-container-image)
-      - [Connecting existing kubernetes Cluster](#connecting-existing-kubernetes-cluster)
+    - [Customize your dev container](#customize-your-dev-container)
+      - [Use a custom dev container image](#use-a-custom-dev-container-image)
+      - [Connect existing kubernetes Cluster](#connect-existing-kubernetes-cluster)
   - [Setup a Kubernetes development environment](#setup-a-kubernetes-development-environment)
     - [Docker environment](#docker-environment)
     - [Kubernetes environment](#kubernetes-environment)
@@ -39,9 +39,9 @@ To build `KubeBlocks` on your own host, needs to install the following tools:
 - Go (Golang)
 - Make
 
-#### Installing Go
+#### Install Go
 Download and install [Go 1.18 or later](https://go.dev/doc/install).
-#### Installing Make
+#### Install Make
 KubeBlocks uses `make` for a variety of build and test actions, and needs to be installed as appropriate for your platform:
 
 - Linux
@@ -56,7 +56,7 @@ KubeBlocks uses `make` for a variety of build and test actions, and needs to be 
      ```
   2. When completed, you should see `make` and other command line developer tools in `/usr/bin`.
 
-#### Building KubeBlocks
+#### Build KubeBlocks
 When `go` and `make` are installed, you can clone the `KubeBlocks` repository, and build `KubeBlocks`  binaries with the `make` tool.
 - To build for your current local environment:
   ```shell
@@ -67,7 +67,7 @@ When `go` and `make` are installed, you can clone the `KubeBlocks` repository, a
   make all GOOS=windows GOARCH=amd64
   ```
 
-### Using VSCode and development container
+### Use VSCode and development container
 If you are using Visual Studio Code, you can connect to a [development container](https://code.visualstudio.com/docs/devcontainers/containers) configured for KuberBlocks development. With development container, you don't need to manually install all of the tools and frameworks needed.
 
 #### Setup the development container
@@ -80,8 +80,8 @@ If you are using Visual Studio Code, you can connect to a [development container
     - VSCode will pull image and start dev cotnainer automatically, once the container is loaded, open an integrated terminal in VS Code and you're ready to develop KubeBlocks in a containerized environment.
 3. And you can run `make all` to build `KubeBlocks` in the dev container.
 
-#### Customizing your dev container
-##### Using a custom dev container image
+#### Customize your dev container
+##### Use a custom dev container image
 The [devcontainer.json](../.devcontainer/devcontainer.json) uses the latest image from [ApeCloud Dokcer hub](https://hub.docker.com/r/apecloud/kubeblocks-dev), you can customize image to suit your need. 
 1. Edit the [docker/Dockerfile-dev](../docker/Dockerfile-dev) dev container image definition, you can change the `[Option]` configuration or install additional tools.
     ```Dockerfile
@@ -115,7 +115,7 @@ The [devcontainer.json](../.devcontainer/devcontainer.json) uses the latest imag
     make build-dev-image DEV_CONTAINER_IMAGE_NAME=docker.io/xxxx/kubeblocks-dev
     ```
 
-##### Connecting existing kubernetes Cluster
+##### Connect existing kubernetes Cluster
 If you want to reuse an existing Kubernetes config, such as your [`EKS`](https://aws.amazon.com/eks/) cluster or local [`Minikube`](https://minikube.sigs.k8s.io/docs/) cluster, you can configure the `devcontainer.json` copy those settings into the dev container. This requires:
 
 1. Enabling the `SYNC_LOCALHOST_KUBECONFIG` environment variable

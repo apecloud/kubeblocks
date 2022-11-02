@@ -44,11 +44,7 @@ APP_NAME = kubeblocks
 
 
 VERSION ?= 0.1.0-beta.0
-CHART_PATH = deploy/helm
-
-
-# NOTES: get OCI registry auth. credential from Sunrun(yimeisun)
-CHART_OCI_REGISTRY ?= yimeisun.azurecr.io/helm-chart
+CHART_PATH = deploy/kubeblocks
 
 WEBHOOK_CERT_DIR ?= /tmp/k8s-webhook-server/serving-certs
 
@@ -187,7 +183,7 @@ mod-download: ## Run go mod download against go modules.
 
 .PHONY: mod-vendor
 mod-vendor: ## Run go mod tidy->vendor->verify against go modules.
-	$(GO) mod tidy -compat=1.18
+	$(GO) mod tidy -compat=1.19
 	$(GO) mod vendor
 	$(GO) mod verify
 
@@ -255,6 +251,9 @@ dbctl: build-checks ## Build bin/dbctl CLI.
 clean-dbctl: ## Clean bin/dbctl* CLI tools.
 	rm -f bin/dbctl*
 
+.PHONY: doc
+dbctl-doc: ## generate dbctl command reference manual.
+	go run ./hack/docgen/dbctl/main.go ./docs/cli
 
 ##@ Load Balancer
 
@@ -393,7 +392,7 @@ ci-test: ci-test-pre test ## Run CI tests.
 
 .PHONY: reviewable
 reviewable: generate build-checks test check-license-header ## Run code checks to proceed with PR reviews.
-	$(GO) mod tidy -compat=1.18
+	$(GO) mod tidy -compat=1.19
 
 .PHONY: check-diff
 check-diff: reviewable ## Run git code diff checker.
@@ -426,10 +425,6 @@ endif
 helm-package: bump-chart-ver ## Do helm package.
 	$(HELM) package $(CHART_PATH) --dependency-update
 
-.PHONY: helm-push
-helm-push: helm-package ## Do helm package and push.
-	$(HELM) push $(APP_NAME)-$(VERSION).tgz oci://$(CHART_OCI_REGISTRY)
-
 ##@ WeSQL Cluster Helm Chart Tasks
 
 WESQL_CLUSTER_CHART_PATH = deploy/wesqlcluster
@@ -438,16 +433,17 @@ WESQL_CLUSTER_CHART_VERSION ?= 0.1.1
 
 .PHONY: bump-chart-ver-wqsql-cluster
 bump-chart-ver-wqsql-cluster: ## Bump WeSQL Clsuter helm chart version.
+ifeq ($(GOOS), darwin)
 	sed -i '' "s/^version:.*/version: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
 	# sed -i '' "s/^appVersion:.*/appVersion: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
+else
+	sed -i "s/^version:.*/version: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
+	# sed -i "s/^appVersion:.*/appVersion: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
+endif
 
 .PHONY: helm-package-wqsql-cluster
 helm-package-wqsql-cluster: bump-chart-ver-wqsql-cluster ## Do WeSQL Clsuter helm package.
 	$(HELM) package $(WESQL_CLUSTER_CHART_PATH)
-
-.PHONY: helm-push-wqsql-cluster
-helm-push-wqsql-cluster: helm-package-wqsql-cluster ## Do WeSQL Clsuter helm package and push.
-	$(HELM) push $(WESQL_CLUSTER_CHART_NAME)-$(WESQL_CLUSTER_CHART_VERSION).tgz oci://$(CHART_OCI_REGISTRY)
 
 
 ##@ Build Dependencies
@@ -621,7 +617,7 @@ MINIKUBE=$(shell which minikube)
 
 .PHONY: brew-install-prerequisite
 brew-install-prerequisite: ## Use `brew install` to install required dependencies.
-	brew install go@1.18 kubebuilder delve golangci-lint staticcheck kustomize step cue oras jq yq git-hooks-go
+	brew install go@1.19 kubebuilder delve golangci-lint staticcheck kustomize step cue oras jq yq git-hooks-go
 
 ##@ Minikube
 K8S_VERSION ?= v1.22.15

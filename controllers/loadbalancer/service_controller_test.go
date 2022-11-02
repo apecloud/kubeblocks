@@ -56,7 +56,7 @@ const (
 	eniIp22 = "172.31.2.11"
 )
 
-var newSvcObj = func(managed bool, masterIP string) (*corev1.Service, *types.NamespacedName) {
+var newSvcObj = func(managed bool, masterIP string) (*corev1.Service, types.NamespacedName) {
 	randomStr, _ := password.Generate(6, 0, 0, true, false)
 	svcName := fmt.Sprintf("nginx-%s", randomStr)
 	svc := &corev1.Service{
@@ -90,7 +90,7 @@ var newSvcObj = func(managed bool, masterIP string) (*corev1.Service, *types.Nam
 		annotations[AnnotationKeyMasterNodeIP] = masterIP
 	}
 	svc.SetAnnotations(annotations)
-	return svc, &types.NamespacedName{
+	return svc, types.NamespacedName{
 		Name:      svc.GetName(),
 		Namespace: svc.GetNamespace(),
 	}
@@ -228,7 +228,9 @@ var _ = Describe("ServiceController", Ordered, func() {
 			Expect(k8sClient.Create(context.Background(), svc)).Should(Succeed())
 
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), *key, svc)
+				if err := k8sClient.Get(context.Background(), key, svc); err != nil {
+					return false
+				}
 				return svc.Annotations[AnnotationKeyFloatingIP] == floatingIP
 			}, timeout, interval).Should(BeTrue())
 
@@ -247,7 +249,7 @@ var _ = Describe("ServiceController", Ordered, func() {
 			svc.GetAnnotations()[AnnotationKeyMasterNodeIP] = newNodeIP
 			Expect(k8sClient.Update(context.Background(), svc)).Should(Succeed())
 			Eventually(func() bool {
-				Expect(k8sClient.Get(context.Background(), *key, svc)).Should(Succeed())
+				Expect(k8sClient.Get(context.Background(), key, svc)).Should(Succeed())
 				return svc.Annotations[AnnotationKeyENIId] == newENIId
 			}, timeout, interval).Should(BeTrue())
 
@@ -278,7 +280,9 @@ var _ = Describe("ServiceController", Ordered, func() {
 			Expect(k8sClient.Create(context.Background(), svc)).Should(Succeed())
 
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), *key, svc)
+				if err := k8sClient.Get(context.Background(), key, svc); err != nil {
+					return false
+				}
 				return svc.Annotations[AnnotationKeyFloatingIP] == eniIp12
 			}, timeout, interval).Should(BeTrue())
 
@@ -312,7 +316,9 @@ var _ = Describe("ServiceController", Ordered, func() {
 			}, timeout, interval).Should(BeTrue())
 
 			Eventually(func() bool {
-				_ = k8sClient.Get(context.Background(), *svcKey, svc)
+				if err := k8sClient.Get(context.Background(), svcKey, svc); err != nil {
+					return false
+				}
 				return svc.Annotations[AnnotationKeyENINodeIP] == pod.Status.HostIP
 			}, timeout, interval).Should(BeTrue())
 

@@ -107,4 +107,11 @@ jobs:
           github.event.action == 'published'
         run: |
           cd ${{ github.workspace }}
-          bash ${{ github.workspace }}/.github/workflows/issue-release.sh ${{ env.GITHUB_TOKEN }} ${{ github.repository }} $PROJECT_ID $COMPONENT_FIELD_ID ${{ env.BACKENDPORTAL_OPTION_ID }} "${{ github.event.release.body }}"
+          bash ${{ github.workspace }}/.github/utils/issue-release.sh \
+            ${{ env.GITHUB_TOKEN }} \
+            ${{ github.repository }} \
+            ${{ github.repository_owner }} \
+            $PROJECT_ID \
+            $COMPONENT_FIELD_ID \
+            ${{ env.BACKENDPORTAL_OPTION_ID }} \
+            "${{ github.event.release.body }}"

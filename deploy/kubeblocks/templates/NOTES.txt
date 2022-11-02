@@ -44,6 +44,7 @@ From outside the cluster, the Grafana Server URL(s) are:
 {{- end }}
 {{- end }}
 
+{{- if .Values.prometheus.enabled }}
 {{- if .Values.prometheus.server.enabled }}
 {{- if .Values.prometheus.server.ingress.enabled -}}
 From outside the cluster, the prometheus server URL(s) are:
@@ -98,6 +99,7 @@ From outside the cluster, the alertmanager URL(s) are:
     export POD_NAME=$(kubectl get pods --namespace {{ template "kubeblocks.prometheus.namespace" . }} -l "app=prometheus,component={{ .Values.prometheus.alertmanager.name }}" -o jsonpath="{.items[0].metadata.name}")
     kubectl --namespace {{ template "kubeblocks.prometheus.namespace" . }} port-forward $POD_NAME 9093
     open http://127.0.0.1:9093
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

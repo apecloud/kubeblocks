@@ -31,7 +31,7 @@ import (
 )
 
 type Installer struct {
-	cfg *action.Configuration
+	HelmCfg *action.Configuration
 
 	Namespace string
 	Version   string
@@ -40,7 +40,7 @@ type Installer struct {
 }
 
 func (i *Installer) Install() (string, error) {
-	sets := []string{}
+	var sets []string
 	for _, set := range i.Sets {
 		splitSet := strings.Split(set, ",")
 		sets = append(sets, splitSet...)
@@ -56,7 +56,7 @@ func (i *Installer) Install() (string, error) {
 		TryTimes:  2,
 	}
 
-	notes, err := chart.Install(i.cfg)
+	notes, err := chart.Install(i.HelmCfg)
 	if err != nil {
 		return "", err
 	}
@@ -71,7 +71,7 @@ func (i *Installer) Uninstall() error {
 		Namespace: i.Namespace,
 	}
 
-	if err := chart.UnInstall(i.cfg); err != nil {
+	if err := chart.UnInstall(i.HelmCfg); err != nil {
 		return err
 	}
 

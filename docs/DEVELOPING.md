@@ -3,21 +3,22 @@ This document covers basic needs to work with KubeBlocks codebase.
 
 - [Setup development environment](#setup-development-environment)
   - [Bring your own toolbox](#bring-your-own-toolbox)
-    - [Docker environment](#docker-environment)
-    - [Go (Golang)](#go-golang)
+    - [Installing Go](#installing-go)
     - [Installing Make](#installing-make)
+    - [Build KubeBlocks](#build-kubeblocks)
   - [Using VSCode and development container](#using-vscode-and-development-container)
     - [Setup the development container](#setup-the-development-container)
     - [Customizing your dev container](#customizing-your-dev-container)
       - [Using a custom dev container image](#using-a-custom-dev-container-image)
       - [Connecting existing kubernetes Cluster](#connecting-existing-kubernetes-cluster)
   - [Setup a Kubernetes development environment](#setup-a-kubernetes-development-environment)
+    - [Docker environment](#docker-environment)
+    - [Kubernetes environment](#kubernetes-environment)
 - [Basics](#basics)
   - [Kubebuilder](#kubebuilder)
   - [Makefile](#makefile)
   - [[TODO] dbctl](#todo-dbctl)
   - [Code style](#code-style)
-  - [Building local binaries](#building-local-binaries)
 - [Test](#test)
   - [Envtest](#envtest)
   - [Use existing kubernetes cluster](#use-existing-kubernetes-cluster)
@@ -35,20 +36,11 @@ There are two options for getting an environment up and running for KubeBlocks d
 
 ### Bring your own toolbox
 To build `KubeBlocks` on your own host, needs to install the following tools:
-- Docker
-- Go
+- Go (Golang)
 - Make
 
-#### Docker environment
-1. Install [Docker](https://docs.docker.com/install/)
-    > For Linux, you'll have to configure docker to run without `sudo` for the KubeBlocks build scripts to work. Follow the instructions to [manage Docker as a non-root user](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).
-2. Create your [Docker Hub account](https://hub.docker.com/signup) if you don't already have one.
-
-#### Go (Golang)
-1. Download and install [Go 1.18 or later](https://golang.org/doc/install#tarball).
-2. Install [Delve](https://github.com/go-delve/delve/tree/master/Documentation/installation) for Go debugging, if de
-3. Install [golangci-lint](https://golangci-lint.run/usage/install).
-
+#### Installing Go
+Download and install [Go 1.18 or later](https://go.dev/doc/install).
 #### Installing Make
 KubeBlocks uses `make` for a variety of build and test actions, and needs to be installed as appropriate for your platform:
 
@@ -64,6 +56,17 @@ KubeBlocks uses `make` for a variety of build and test actions, and needs to be 
      ```
   2. When completed, you should see `make` and other command line developer tools in `/usr/bin`.
 
+#### Build KubeBlocks
+When `go` and `make` are installed, you can clone the `KubeBlocks` repository, and build `KubeBlocks`  binaries with the `make` tool.
+- To build for your current local environment:
+  ```shell
+  make all
+  ```
+- To cross-compile for a different platform, use the `GOOS` and `GOARCH` environmental variables:
+  ```shell
+  make all GOOS=windows GOARCH=amd64
+  ```
+
 ### Using VSCode and development container
 If you are using Visual Studio Code, you can connect to a [development container](https://code.visualstudio.com/docs/devcontainers/containers) configured for KuberBlocks development. With development container, you don't need to manually install all of the tools and frameworks needed.
 
@@ -75,6 +78,7 @@ If you are using Visual Studio Code, you can connect to a [development container
     - Alternatively, you can open the command palette and use the Remote-Containers: Reopen in Container command:
       ![reopen dev container by command](./img/reopen_dev_container_command.png)
     - VSCode will pull image and start dev cotnainer automatically, once the container is loaded, open an integrated terminal in VS Code and you're ready to develop KubeBlocks in a containerized environment.
+3. And you can run `make all` to build `KubeBlocks` in the dev container.
 
 #### Customizing your dev container
 ##### Using a custom dev container image
@@ -112,7 +116,7 @@ The [devcontainer.json](../.devcontainer/devcontainer.json) uses the latest imag
     ```
 
 ##### Connecting existing kubernetes Cluster
-If you want to reuse an existing Kubernetes config, such as your [`EKS`](https://aws.amazon.com/eks/) cluste or local [`Minikube`](https://minikube.sigs.k8s.io/docs/) cluster, you can configure the `devcontainer.json` copy those settings into the dev container. This requires:
+If you want to reuse an existing Kubernetes config, such as your [`EKS`](https://aws.amazon.com/eks/) cluster or local [`Minikube`](https://minikube.sigs.k8s.io/docs/) cluster, you can configure the `devcontainer.json` copy those settings into the dev container. This requires:
 
 1. Enabling the `SYNC_LOCALHOST_KUBECONFIG` environment variable
 2. Bind mounting the locations of your Kubernetes and Minikube config paths to `/home/kubeblocks/.kube-localhost` and `/home/kubeblocks/.minikube-localhost` respectively.
@@ -141,9 +145,17 @@ If you want to reuse an existing Kubernetes config, such as your [`EKS`](https:/
 
 
 ### Setup a Kubernetes development environment
-To run `KubeBlocks`, you needs a Kubernetes 1.24.1+ cluster for development, [`Minikube`](https://minikube.sigs.k8s.io/docs/) and [`k3d`](https://k3d.io/stable/) are recommanded.
+To run `KubeBlocks`, you needs `Docker` and a `Kubernetes` 1.24.1+ cluster for development.
 
+#### Docker environment
+1. Install [Docker](https://docs.docker.com/install/)
+    > For Linux, you'll have to configure docker to run without `sudo` for the KubeBlocks build scripts to work. Follow the instructions to [manage Docker as a non-root user](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).
+2. Create your [Docker Hub account](https://hub.docker.com/signup) if you don't already have one.
 
+#### Kubernetes environment
+- Kubernetes cluster
+You can use cloud kubernetes service, such as [`EKS`](https://aws.amazon.com/eks/), [`GKE`](https://cloud.google.com/kubernetes-engine), [`AKS`](https://azure.microsoft.com/en-us/products/kubernetes-service/), or use local kubernetes cluster, such as [`Minikube`](https://minikube.sigs.k8s.io/docs/), [`k3d`](https://k3d.io/stable/)。
+- For development purposes, you will also want to follow the optional steps to install [Helm 3.x](https://helm.sh/docs/intro/install/).
 
 ## Basics
 ### Kubebuilder
@@ -162,11 +174,6 @@ Run our suite of linters:
 make lint
 ```
 This is not a fast command. On my machine, at the time of writing, it takes about a full minute to run. You can instead run
-
-### Building local binaries
-```shell
-make all
-```
 
 
 ## Test

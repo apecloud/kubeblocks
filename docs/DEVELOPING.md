@@ -5,7 +5,7 @@ This document covers basic needs to work with KubeBlocks codebase.
   - [Bring your own toolbox](#bring-your-own-toolbox)
     - [Installing Go](#installing-go)
     - [Installing Make](#installing-make)
-    - [Build KubeBlocks](#build-kubeblocks)
+    - [Building KubeBlocks](#building-kubeblocks)
   - [Using VSCode and development container](#using-vscode-and-development-container)
     - [Setup the development container](#setup-the-development-container)
     - [Customizing your dev container](#customizing-your-dev-container)
@@ -56,7 +56,7 @@ KubeBlocks uses `make` for a variety of build and test actions, and needs to be 
      ```
   2. When completed, you should see `make` and other command line developer tools in `/usr/bin`.
 
-#### Build KubeBlocks
+#### Building KubeBlocks
 When `go` and `make` are installed, you can clone the `KubeBlocks` repository, and build `KubeBlocks`  binaries with the `make` tool.
 - To build for your current local environment:
   ```shell

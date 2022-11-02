@@ -6,6 +6,7 @@ require (
 	cuelang.org/go v0.4.3
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/aws/aws-sdk-go v1.43.29
+	github.com/bhmj/jsonslice v1.1.2
 	github.com/briandowns/spinner v1.18.1
 	github.com/containers/common v0.49.1
 	github.com/coreos/go-iptables v0.5.0
@@ -58,6 +59,7 @@ require (
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20210927113745-59d0afb8317a // indirect
 	github.com/benbjohnson/clock v1.3.0 // indirect
+	github.com/bhmj/xpression v0.9.1 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect

@@ -28,7 +28,6 @@ type BackupPolicySpec struct {
 	BackupPolicyTemplateName string `json:"backupPolicyTemplateName,omitempty"`
 
 	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
-	// +kubebuilder:default="0 7 * * *"
 	// +optional
 	Schedule string `json:"schedule,omitempty"`
 
@@ -39,18 +38,19 @@ type BackupPolicySpec struct {
 	// TTL is a time.Duration-parseable string describing how long
 	// the Backup should be retained for.
 	// +optional
-	TTL metav1.Duration `json:"ttl,omitempty"`
+	TTL *metav1.Duration `json:"ttl,omitempty"`
 
 	// database cluster service
 	// +kubebuilder:validation:Required
 	Target TargetCluster `json:"target"`
 
 	// execute hook commands for backup.
-	Hooks BackupPolicyHook `json:"hooks"`
+	// +optional
+	Hooks *BackupPolicyHook `json:"hooks,omitempty"`
 
 	// array of remote volumes from CSI driver definition.
-	// +kubebuilder:validation:Required
-	RemoteVolume corev1.Volume `json:"remoteVolume"`
+	// +optional
+	RemoteVolume *corev1.Volume `json:"remoteVolume,omitempty"`
 
 	// count of backup stop retries on fail.
 	// +optional
@@ -61,8 +61,8 @@ type BackupPolicySpec struct {
 type TargetCluster struct {
 	// database engine to support in the backup.
 	// +kubebuilder:validation:Enum={mysql}
-	// +kubebuilder:validation:Required
-	DatabaseEngine string `json:"databaseEngine"`
+	// +optional
+	DatabaseEngine string `json:"databaseEngine,omitempty"`
 
 	// database engine to support in the backup.
 	// +kubebuilder:validation:Enum={5.6,5.7,8.0}
@@ -118,7 +118,7 @@ type BackupPolicyHook struct {
 	// which container can exec command
 	// +kubebuilder:default=mysql
 	// +optional
-	ContainerName string `json:"ContainerName,omitempty"`
+	ContainerName string `json:"containerName,omitempty"`
 }
 
 // BackupPolicyStatus defines the observed state of BackupPolicy
@@ -135,6 +135,8 @@ type BackupPolicyStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={dbaas},scope=Namespaced
+// +kubebuilder:printcolumn:name="PHASE",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // BackupPolicy is the Schema for the backuppolicies API  (defined by User)
 type BackupPolicy struct {

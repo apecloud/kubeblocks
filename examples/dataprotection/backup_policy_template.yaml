@@ -1,16 +1,16 @@
 # Standard Kubernetes Kind declaration. Required.
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 # Standard Kubernetes Kind declaration. Required.
-kind: BackupPolicy
+kind: BackupPolicyTemplate
 # Standard Kubernetes metadata. Required.
 metadata:
   # Backup name. Maybe any valid Kubernetes object name. Required.
-  name: backup-policy-demo
+  name: backup-policy-template-wesql
 # Parameters about the backup. Required.
 spec:
   # schedule will be ignored when create a backup session in manual.
   # [optional]
-  schedule: "0 3 * * *"
+  schedule: "0 18 * * *"
   # The amount of time before this backup is eligible for garbage collection. If not specified,
   # a default value of 30 days will be used. The default can be configured on the server
   # if set to infinity,
@@ -20,37 +20,14 @@ spec:
 
   backupToolName: xtrabackup-mysql
 
-  # inherit from backup config
-  backupPolicyTemplateName: backup-policy-template-wesql
-  # database cluster service selector
-  target:
-    databaseEngine: mysql
-    # ref definition is more general, but need to integrate with dbaas, define labelsSelector instead.
-    labelsSelector:
-      matchLabels:
-        app.kubernetes.io/instance: wesql-cluster
-
-    # the target database secret that backup tool can connect.
-    secret:
-      # the secret name
-      name: wesql-cluster
-      # which key name for user
-      keyUser: username
-      # which key name for password
-      keyPassword: password
+  # database engine for cluster service
+  databaseEngine: mysql
 
   hooks:
     preCommands:
       - touch /data/mysql/data/.restore; sync
     postCommands:
       - rm -f /data/mysql/data/.restore; sync
-
-  # backup remote volume from CSI driver definition.
-  remoteVolume:
-    name: backup-remote-volume
-    persistentVolumeClaim:
-      claimName: backup-s3-pvc
-
 
   # Number of backup retries on fail.
   onFailAttempted: 3

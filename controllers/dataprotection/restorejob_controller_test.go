@@ -18,6 +18,7 @@ package dataprotection
 
 import (
 	"context"
+	batchv1 "k8s.io/api/batch/v1"
 	"time"
 
 	"github.com/sethvargo/go-password/password"
@@ -192,10 +193,10 @@ spec:
     name: mysql-persistent-storage
     persistentVolumeClaim:
       claimName: datadir-mycluster-0
-  remoteVolumes:
-    - name: backup-remote-volume
-      persistentVolumeClaim:
-        claimName: backup-host-path-pvc
+  remoteVolume:
+    name: backup-remote-volume
+    persistentVolumeClaim:
+      claimName: backup-host-path-pvc
   onFailAttempted: 3
 `
 		backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
@@ -574,12 +575,32 @@ spec:
 	}
 
 	patchBackupJobStatus := func(phase dataprotectionv1alpha1.BackupJobPhase, key types.NamespacedName) {
-		backupJob := &dataprotectionv1alpha1.BackupJob{}
-		Expect(k8sClient.Get(ctx, key, backupJob)).Should(Succeed())
+		backupJob := dataprotectionv1alpha1.BackupJob{}
+		delta := time.Now().Add(timeout)
+		for err := k8sClient.Get(ctx, key, &backupJob); err != nil && time.Now().Before(delta); err = k8sClient.Get(ctx, key, &backupJob) {
+			backupJob = dataprotectionv1alpha1.BackupJob{}
+			time.Sleep(interval)
+		}
+		Expect(k8sClient.Get(ctx, key, &backupJob)).Should(Succeed())
 
 		patch := client.MergeFrom(backupJob.DeepCopy())
 		backupJob.Status.Phase = phase
-		Expect(k8sClient.Status().Patch(ctx, backupJob, patch)).Should(Succeed())
+		Expect(k8sClient.Status().Patch(ctx, &backupJob, patch)).Should(Succeed())
+	}
+
+	patchK8sJobStatus := func(jobStatus batchv1.JobConditionType, key types.NamespacedName) {
+		k8sJob := batchv1.Job{}
+		delta := time.Now().Add(timeout)
+		for err := k8sClient.Get(ctx, key, &k8sJob); err != nil && time.Now().Before(delta); err = k8sClient.Get(ctx, key, &k8sJob) {
+			k8sJob = batchv1.Job{}
+			time.Sleep(interval)
+		}
+		Expect(k8sClient.Get(ctx, key, &k8sJob)).Should(Succeed())
+
+		patch := client.MergeFrom(k8sJob.DeepCopy())
+		jobCondition := batchv1.JobCondition{Type: jobStatus}
+		k8sJob.Status.Conditions = append(k8sJob.Status.Conditions, jobCondition)
+		Expect(k8sClient.Status().Patch(ctx, &k8sJob, patch)).Should(Succeed())
 	}
 
 	Context("When creating restoreJob", func() {
@@ -605,10 +626,19 @@ spec:
 			}
 
 			patchBackupJobStatus(dataprotectionv1alpha1.BackupJobCompleted, types.NamespacedName{Name: backupJob.Name, Namespace: backupJob.Namespace})
-			time.Sleep(waitDuration)
+
+			patchK8sJobStatus(batchv1.JobComplete, types.NamespacedName{Name: toCreate.Name, Namespace: toCreate.Namespace})
 
 			result := &dataprotectionv1alpha1.RestoreJob{}
-			Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
+			delta := time.Now().Add(timeout)
+			for err := k8sClient.Get(ctx, key, result); err == nil && time.Now().Before(delta); err = k8sClient.Get(ctx, key, result) {
+				if result.Status.Phase == dataprotectionv1alpha1.RestoreJobCompleted {
+					break
+				}
+				result = &dataprotectionv1alpha1.RestoreJob{}
+				time.Sleep(interval)
+			}
+			Expect(result.Status.Phase).Should(Equal(dataprotectionv1alpha1.RestoreJobCompleted))
 
 			By("Deleting the scope")
 

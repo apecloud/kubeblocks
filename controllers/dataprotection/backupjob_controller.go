@@ -92,7 +92,7 @@ func (r *BackupJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, backupJob, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
 		return nil, r.deleteExternalResources(reqCtx, backupJob)
 	})
-	if err != nil {
+	if res != nil {
 		return *res, err
 	}
 
@@ -395,13 +395,13 @@ func (r *BackupJobReconciler) ensureEmptyHooksCommand(
 	preCommand bool) (bool, error) {
 
 	// get backup policy
-	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
+	backupPolicy := dataprotectionv1alpha1.BackupPolicy{}
 	backupPolicyKey := types.NamespacedName{
 		Namespace: reqCtx.Req.Namespace,
 		Name:      backupJob.Spec.BackupPolicyName,
 	}
 
-	policyExists, err := checkResourceExists(reqCtx.Ctx, r.Client, backupPolicyKey, backupPolicy)
+	policyExists, err := checkResourceExists(reqCtx.Ctx, r.Client, backupPolicyKey, &backupPolicy)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to get backupPolicy %s .", backupPolicyKey.Name)
 		r.Recorder.Event(backupJob, corev1.EventTypeWarning, "BackupPolicyFailed", msg)
@@ -413,6 +413,12 @@ func (r *BackupJobReconciler) ensureEmptyHooksCommand(
 		r.Recorder.Event(backupJob, corev1.EventTypeWarning, "BackupPolicyFailed", msg)
 		return false, errors.New(msg)
 	}
+
+	// true means empty hook commands, do nothing.
+	if backupPolicy.Spec.Hooks == nil {
+		return true, nil
+	}
+
 	commands := backupPolicy.Spec.Hooks.PostCommands
 	if preCommand {
 		commands = backupPolicy.Spec.Hooks.PreCommands
@@ -578,14 +584,12 @@ func (r *BackupJobReconciler) deleteExternalResources(reqCtx intctrlutil.Request
 func (r *BackupJobReconciler) GetTargetCluster(
 	reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) (*appv1.StatefulSet, error) {
 	// get stateful service
-	reqCtx.Log.Info("Get cluster from label", "label", backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
 	clusterTarget := &appv1.StatefulSetList{}
 	if err := r.Client.List(reqCtx.Ctx, clusterTarget,
 		client.InNamespace(reqCtx.Req.Namespace),
 		client.MatchingLabels(backupPolicy.Spec.Target.LabelsSelector.MatchLabels)); err != nil {
 		return nil, err
 	}
-	reqCtx.Log.Info("Get cluster target finish", "target", clusterTarget)
 	clusterItemsLen := len(clusterTarget.Items)
 	if clusterItemsLen != 1 {
 		if clusterItemsLen <= 0 {
@@ -728,7 +732,7 @@ func (r *BackupJobReconciler) BuildBackupToolPodSpec(reqCtx intctrlutil.RequestC
 	podSpec.Containers = []corev1.Container{container}
 
 	podSpec.Volumes = clusterPod.Spec.Volumes
-	podSpec.Volumes = append(podSpec.Volumes, backupPolicy.Spec.RemoteVolume)
+	podSpec.Volumes = append(podSpec.Volumes, *backupPolicy.Spec.RemoteVolume)
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
 
 	return podSpec, nil

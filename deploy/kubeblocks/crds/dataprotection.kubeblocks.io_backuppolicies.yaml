@@ -17,7 +17,14 @@ spec:
     singular: backuppolicy
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: PHASE
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: BackupPolicy is the Schema for the backuppolicies API  (defined
@@ -49,7 +56,7 @@ spec:
               hooks:
                 description: execute hook commands for backup.
                 properties:
-                  ContainerName:
+                  containerName:
                     default: mysql
                     description: which container can exec command
                     type: string
@@ -1559,7 +1566,6 @@ spec:
                 - name
                 type: object
               schedule:
-                default: 0 7 * * *
                 description: The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
                 type: string
               target:
@@ -1643,7 +1649,6 @@ spec:
                     - name
                     type: object
                 required:
-                - databaseEngine
                 - labelsSelector
                 - secret
                 type: object
@@ -1652,8 +1657,6 @@ spec:
                   long the Backup should be retained for.
                 type: string
             required:
-            - hooks
-            - remoteVolume
             - target
             type: object
           status:

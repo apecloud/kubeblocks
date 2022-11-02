@@ -136,7 +136,6 @@ spec:
                     - name
                     type: object
                 required:
-                - databaseEngine
                 - labelsSelector
                 - secret
                 type: object

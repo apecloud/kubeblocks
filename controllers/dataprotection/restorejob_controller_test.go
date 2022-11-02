@@ -18,20 +18,18 @@ package dataprotection
 
 import (
 	"context"
-	batchv1 "k8s.io/api/batch/v1"
 	"time"
 
 	"github.com/sethvargo/go-password/password"
 	appv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-
 	. "github.com/onsi/ginkgo"
-
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
 var _ = Describe("RestoreJob Controller", func() {

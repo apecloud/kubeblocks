@@ -156,7 +156,7 @@ spec:
 
 	assureBackupToolObj := func() *dataprotectionv1alpha1.BackupTool {
 		By("By assure an backupTool obj")
-		backupToolYaml := `
+		const backupToolYaml = `
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupTool
 metadata:

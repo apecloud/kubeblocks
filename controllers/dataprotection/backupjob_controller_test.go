@@ -18,24 +18,21 @@ package dataprotection
 
 import (
 	"context"
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"time"
 
-	batchv1 "k8s.io/api/batch/v1"
-
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/sethvargo/go-password/password"
 	"github.com/spf13/viper"
 	appv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-
 	. "github.com/onsi/ginkgo"
-
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
 var _ = Describe("BackupJob Controller", func() {

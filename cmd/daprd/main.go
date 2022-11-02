@@ -38,6 +38,7 @@ import (
 	dhttp "github.com/dapr/components-contrib/bindings/http"
 	"github.com/dapr/components-contrib/bindings/localstorage"
 	mdns "github.com/dapr/components-contrib/nameresolution/mdns"
+
 	// "github.com/dapr/components-contrib/bindings/redis"
 	// "github.com/dapr/components-contrib/bindings/postgres"
 	// "github.com/dapr/components-contrib/bindings/mysql"
@@ -46,7 +47,7 @@ import (
 	"go.uber.org/automaxprocs/maxprocs"
 
 	"github.com/apecloud/kubeblocks/cmd/daprd/internal/binding/mysql"
-	"github.com/apecloud/kubeblocks/controllers/dbaas"
+	//"github.com/apecloud/kubeblocks/controllers/dbaas"
 )
 
 var (
@@ -94,7 +95,7 @@ func main() {
 	}
 
 	// start role label updating loop
-	dbaas.SetupConsensusRoleObservingLoop(logContrib)
+	//dbaas.SetupConsensusRoleObservingLoop(logContrib)
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)

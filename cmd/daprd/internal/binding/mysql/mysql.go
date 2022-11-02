@@ -299,7 +299,9 @@ func (m *Mysql) roleCheck(ctx context.Context, sql string) ([]byte, error) {
 		sql = "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
 	}
 
-	rows, err := m.db.QueryContext(ctx, sql)
+	ctx1, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	rows, err := m.db.QueryContext(ctx1, sql)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error executing %s", sql)
 	}

@@ -1268,7 +1268,9 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 		container.Command = []string{"probe", "--app-id", "batch-sdk",
 			"--dapr-http-port", "3501",
 			"--dapr-grpc-port", "54215",
-			"--app-protocol", "http", "--components-path", "/config/components"}
+			"--app-protocol", "http",
+			"--components-path", "/config/components",
+			"--fail-with-body"}
 
 		// set pod name and namespace, for role label updating inside pod
 		podName := corev1.EnvVar{

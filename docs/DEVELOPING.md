@@ -10,7 +10,7 @@ This document covers basic needs to work with KubeBlocks codebase.
     - [Setup the development container](#setup-the-development-container)
     - [Customize your dev container](#customize-your-dev-container)
       - [Use a custom dev container image](#use-a-custom-dev-container-image)
-      - [Connect existing kubernetes Cluster](#connect-existing-kubernetes-cluster)
+      - [Connect existing Kubernetes cluster](#connect-existing-kubernetes-cluster)
   - [Setup a Kubernetes development environment](#setup-a-kubernetes-development-environment)
     - [Docker environment](#docker-environment)
     - [Kubernetes environment](#kubernetes-environment)
@@ -21,7 +21,7 @@ This document covers basic needs to work with KubeBlocks codebase.
   - [Code style](#code-style)
 - [Test](#test)
   - [Envtest](#envtest)
-  - [Use existing kubernetes cluster](#use-existing-kubernetes-cluster)
+  - [Use existing Kubernetes cluster](#use-existing-kubernetes-cluster)
   - [Check test code coverage](#check-test-code-coverage)
 - [Debug](#debug)
   - [Start a delve debug server](#start-a-delve-debug-server)
@@ -32,7 +32,7 @@ This document covers basic needs to work with KubeBlocks codebase.
 
 
 ## Setup development environment
-There are two options for getting an environment up and running for KubeBlocks development.
+There are two options for getting an environment up and running for `KubeBlocks` development.
 
 ### Bring your own toolbox
 To build `KubeBlocks` on your own host, needs to install the following tools:
@@ -42,7 +42,7 @@ To build `KubeBlocks` on your own host, needs to install the following tools:
 #### Install Go
 Download and install [Go 1.18 or later](https://go.dev/doc/install).
 #### Install Make
-KubeBlocks uses `make` for a variety of build and test actions, and needs to be installed as appropriate for your platform:
+`KubeBlocks` uses `make` for a variety of build and test actions, and needs to be installed as appropriate for your platform:
 
 - Linux
   1. Install the `build-essential` package:
@@ -72,12 +72,12 @@ If you are using Visual Studio Code, you can connect to a [development container
 
 #### Setup the development container
 1. Install VSCode [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
-2. Open the KubeBlocks project folder in VSCode
+2. Open the `KubeBlocks` project folder in VSCode
     - VSCode will detect the presence of a dev container definition in the repo and will prompt you to reopen the project in a container:
       ![reopen dev container by pop notification](./img/reopen_dev_container_notification.png)
     - Alternatively, you can open the command palette and use the Remote-Containers: Reopen in Container command:
       ![reopen dev container by command](./img/reopen_dev_container_command.png)
-    - VSCode will pull image and start dev cotnainer automatically, once the container is loaded, open an integrated terminal in VS Code and you're ready to develop KubeBlocks in a containerized environment.
+    - VSCode will pull image and start dev cotnainer automatically, once the container is loaded, open an integrated terminal in VS Code and you're ready to develop `KubeBlocks` in a containerized environment.
 3. And you can run `make all` to build `KubeBlocks` in the dev container.
 
 #### Customize your dev container
@@ -115,7 +115,7 @@ The [devcontainer.json](../.devcontainer/devcontainer.json) uses the latest imag
     make build-dev-image DEV_CONTAINER_IMAGE_NAME=docker.io/xxxx/kubeblocks-dev
     ```
 
-##### Connect existing kubernetes Cluster
+##### Connect existing Kubernetes cluster
 If you want to reuse an existing Kubernetes config, such as your [`EKS`](https://aws.amazon.com/eks/) cluster or local [`Minikube`](https://minikube.sigs.k8s.io/docs/) cluster, you can configure the `devcontainer.json` copy those settings into the dev container. This requires:
 
 1. Enabling the `SYNC_LOCALHOST_KUBECONFIG` environment variable
@@ -154,15 +154,15 @@ To run `KubeBlocks`, you needs `Docker` and a `Kubernetes` 1.24.1+ cluster for d
 
 #### Kubernetes environment
 - Kubernetes cluster
-You can use cloud kubernetes service, such as [`EKS`](https://aws.amazon.com/eks/), [`GKE`](https://cloud.google.com/kubernetes-engine), [`AKS`](https://azure.microsoft.com/en-us/products/kubernetes-service/), or use local kubernetes cluster, such as [`Minikube`](https://minikube.sigs.k8s.io/docs/), [`k3d`](https://k3d.io/stable/)。
+You can use cloud Kubernetes service, such as [`EKS`](https://aws.amazon.com/eks/) [`GKE`](https://cloud.google.com/kubernetes-engine) [`AKS`](https://azure.microsoft.com/en-us/products/kubernetes-service/), or use local Kubernetes cluster, such as [`Minikube`](https://minikube.sigs.k8s.io/docs/) [`k3d`](https://k3d.io/stable/)。
 - For development purposes, you will also want to follow the optional steps to install [Helm 3.x](https://helm.sh/docs/intro/install/).
 
 ## Basics
 ### Kubebuilder
-KubeBlocks is using kubebuilder as the operator framework, before your start to code, suggest to read [kubebuilder books](https://book.kubebuilder.io/).
+`KubeBlocks` is using kubebuilder as the operator framework, before your start to code, suggest to read [kubebuilder books](https://book.kubebuilder.io/).
 
 ### Makefile
-KubeBlocks includes a [Makefile](../Makefile) in the root of the repo. This serves as a high-level interface for common commands. Running `make help` will produce a list of make targets with descriptions. These targets will be referenced throughout this document.
+`KubeBlocks` includes a [Makefile](../Makefile) in the root of the repo. This serves as a high-level interface for common commands. Running `make help` will produce a list of make targets with descriptions. These targets will be referenced throughout this document.
 ### [TODO] dbctl
 
 ### Code style
@@ -177,10 +177,10 @@ This is not a fast command. On my machine, at the time of writing, it takes abou
 
 
 ## Test
-KubeBlocks uses make for a variety of test actions.
+`KubeBlocks` uses make for a variety of test actions.
 
 ### Envtest
-Setting up a local control plane and test all modules:
+Setting up a local control plane and test all packages:
 ```shell
 make test
 ```
@@ -194,7 +194,7 @@ make test TEST_MODULE=./controllers/
 make test-delve TEST_MODULE=./controllers/dbaas/
 ```
 
-### Use existing kubernetes cluster
+### Use existing Kubernetes cluster
 ```shell
 make test-current-ctx
 ```
@@ -203,9 +203,9 @@ Instead of setting up a local control plane, this command will point to the cont
 ### Check test code coverage
 
 ```shell
-make cover-report
+make test cover-report
 ```
-This command will generate a coverage report file `cover.html`, and open by your default browser automatically.
+This command will test all packages and generate a coverage report file `cover.html`, and open by your default browser automatically.
 
 
 

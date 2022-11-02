@@ -17,6 +17,7 @@ limitations under the License.
 package controllerutil
 
 import (
+	"context"
 	"reflect"
 	"strings"
 	"time"
@@ -187,4 +188,22 @@ func RecordCreatedEvent(r record.EventRecorder, cr client.Object) {
 	if r != nil && cr.GetGeneration() == 1 {
 		r.Eventf(cr, corev1.EventTypeNormal, EventReasonCreatedCR, "Created %s: %s", strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
 	}
+}
+
+func CheckResourceExists(
+	ctx context.Context,
+	client client.Client,
+	key client.ObjectKey,
+	obj client.Object) (bool, error) {
+
+	if err := client.Get(ctx, key, obj); err != nil {
+		// if err is NOT "not found", that means unknown error.
+		if !strings.Contains(err.Error(), "not found") {
+			return false, err
+		}
+		// if not found, return false
+		return false, nil
+	}
+	// if found, return true
+	return true, nil
 }

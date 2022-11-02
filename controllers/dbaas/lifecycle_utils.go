@@ -41,7 +41,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	dataprotectutil "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -900,7 +899,7 @@ func createReplRelationJobAndEnsure(
 	enginePod *corev1.Pod) error {
 	key := types.NamespacedName{Namespace: stsObj.Namespace, Name: stsObj.Name + "-repl"}
 	job := batchv1.Job{}
-	exists, err := dataprotectutil.CheckResourceExists(reqCtx.Ctx, cli, key, &job)
+	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, cli, key, &job)
 	if err != nil {
 		return err
 	}

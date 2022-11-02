@@ -20,6 +20,12 @@ import (
 	"net/http"
 	"os"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -28,9 +34,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	"k8s.io/kubectl/pkg/describe"
-
-	"github.com/apecloud/kubeblocks/internal/dbctl/engine"
 )
 
 var _ = Describe("logs_list_type test", func() {
@@ -62,28 +65,20 @@ var _ = Describe("logs_list_type test", func() {
 		Expect(o.Validate([]string{"cluster-name"})).Should(BeNil())
 		Expect(o.Complete(o.factory, []string{"cluster-name"})).Should(BeNil())
 		Expect(o.clusterName).Should(Equal("cluster-name"))
-		Expect(o.Run()).Should(HaveOccurred())
 	})
 	It("printLogContext test", func() {
-
-		mysqlLogsContext := map[string]engine.LogVariables{
-			"stdout": {
-				DefaultFilePath: "stdout/stderr",
-				Variables:       nil,
-				PathVar:         "",
-			},
-			"error": {
-				DefaultFilePath: "/data/mysql/log/mysqld.err",
-				Variables:       []string{"log-error"},
-				PathVar:         "log-error",
-			},
-			"slow": {
-				DefaultFilePath: "/data/mysql/data/release-name-replicasets-0-slow.log",
-				Variables:       []string{"slow_query_log_file", "slow_query_log", "long_query_time", "log_output"},
-				PathVar:         "slow_query_log_file",
-			},
+		dataObj := &types.ClusterObjects{
+			Cluster:    &dbaasv1alpha1.Cluster{},
+			ClusterDef: &dbaasv1alpha1.ClusterDefinition{},
+			Pods:       &corev1.PodList{},
 		}
-		w := describe.NewPrefixWriter(os.Stdout)
-		Expect(printLogContext(mysqlLogsContext, w)).Should(BeNil())
+		dataObj.ClusterDef.Spec.Type = "state.mysql"
+		pod := corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{},
+		}
+		pod.Name = "instName"
+		pod.Labels = map[string]string{types.ComponentLabelKey: "component-name"}
+		dataObj.Pods.Items = append(dataObj.Pods.Items, pod)
+		Expect(printLogContext(dataObj, os.Stdout, "instName")).Should(BeNil())
 	})
 })

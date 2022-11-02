@@ -18,8 +18,8 @@ package cluster
 
 import (
 	"fmt"
+	"io"
 	"strings"
-	"time"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 
@@ -56,6 +56,7 @@ type LogsListOptions struct {
 	clientSet     *kubernetes.Clientset
 	factory       cmdutil.Factory
 	genericclioptions.IOStreams
+	dataObj *types.ClusterObjects
 }
 
 // NewLogsListTypeCmd return logs list type cmd
@@ -63,6 +64,7 @@ func NewLogsListTypeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	o := &LogsListOptions{
 		factory:   f,
 		IOStreams: streams,
+		dataObj:   cluster.NewClusterObjects(),
 	}
 
 	cmd := &cobra.Command{
@@ -102,62 +104,52 @@ func (o *LogsListOptions) Complete(f cmdutil.Factory, args []string) (err error)
 }
 
 func (o *LogsListOptions) Run() error {
-	infoObject := cluster.NewClusterObjects()
 	clusterGetter := cluster.ObjectsGetter{
 		ClientSet:      o.clientSet,
 		DynamicClient:  o.dynamicClient,
 		Name:           o.clusterName,
 		Namespace:      o.namespace,
 		WithAppVersion: false,
+		WithConfigMap:  false,
 	}
-	if err := clusterGetter.Get(infoObject); err != nil {
+	if err := clusterGetter.Get(o.dataObj); err != nil {
 		return err
 	}
+	if err := printLogContext(o.dataObj, o.Out, o.instName); err != nil {
+		return err
+	}
+	return nil
+}
 
-	engineName := infoObject.ClusterDef.Spec.Type
+// printLogContext print logs list type info
+func printLogContext(dataObj *types.ClusterObjects, out io.Writer, instName string) error {
+	engineName := dataObj.ClusterDef.Spec.Type
 	logContext, err := engine.LogsContext(engineName)
 	if err != nil {
 		return err
 	}
-	c := infoObject.Cluster
-	w := cmddes.NewPrefixWriter(o.Out)
-	w.Write(describe.LEVEL_0, "Name:\t%s\n", c.Name)
-	w.Write(describe.LEVEL_0, "Namespace:\t%s\n", c.Namespace)
-	w.Write(describe.LEVEL_0, "AppVersion:\t%s\n", c.Spec.AppVersionRef)
+	c := dataObj.Cluster
+	w := cmddes.NewPrefixWriter(out)
+	w.Write(describe.LEVEL_0, "ClusterName:\t\t%s\n", c.Name)
+	w.Write(describe.LEVEL_0, "Namespace:\t\t%s\n", c.Namespace)
+	w.Write(describe.LEVEL_0, "AppVersion:\t\t%s\n", c.Spec.AppVersionRef)
 	w.Write(describe.LEVEL_0, "ClusterDefinition:\t%s\n", c.Spec.ClusterDefRef)
-	w.Write(describe.LEVEL_0, "CreationTimestamp:\t%s\n", c.CreationTimestamp.Time.Format(time.RFC1123Z))
-
-	for _, p := range infoObject.Pods.Items {
-		if len(o.instName) > 0 && !strings.EqualFold(p.Name, o.instName) {
+	for _, p := range dataObj.Pods.Items {
+		if len(instName) > 0 && !strings.EqualFold(p.Name, instName) {
 			continue
 		}
 		componentName, ok := p.Labels[types.ComponentLabelKey]
-		w.Write(describe.LEVEL_0, "\nInstance Name:\t%s\n", p.Name)
-		w.Write(describe.LEVEL_0, "Component Name:\t%s\n", componentName)
 		if ok {
-			if err := printLogContext(logContext, w); err != nil {
-				return err
+			w.Write(describe.LEVEL_0, "\nInstance Name:\t%s\n", p.Name)
+			w.Write(describe.LEVEL_0, "Component Name:\t%s\n", componentName)
+			for key, value := range logContext {
+				w.Write(describe.LEVEL_0, "Log file type :\t%s\n", key)
+				w.Write(describe.LEVEL_2, "Log file describe:\t\t%s\n", value.Describe)
+				w.Write(describe.LEVEL_2, "Log related variables:\t%s\n", strings.Join(value.Variables, ", "))
+				// todo output more log file info
 			}
 		}
 	}
 	w.Flush()
-	return nil
-}
-
-func printLogContext(logContext map[string]engine.LogVariables, w cmddes.PrefixWriter) error {
-	for key, value := range logContext {
-		w.Write(describe.LEVEL_0, "log file type :\t%s\n", key)
-		w.Write(describe.LEVEL_2, "variables:")
-		if len(value.Variables) == 0 {
-			w.Write(describe.LEVEL_2, "\tnil\n")
-		} else {
-			w.Write(describe.LEVEL_2, "\n")
-			for _, v := range value.Variables {
-				// todo get variable value from ConfigManagerModule
-				w.Write(describe.LEVEL_3, "%s:\t%s\n", v, v)
-			}
-		}
-		w.Write(describe.LEVEL_2, "default file path:\t%s\n", value.DefaultFilePath)
-	}
 	return nil
 }

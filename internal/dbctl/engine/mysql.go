@@ -79,17 +79,20 @@ func registryMySQLLogsContext() {
 		"stdout": {
 			DefaultFilePath: "stdout/stderr",
 			Variables:       nil,
-			PathVar:         "",
+			PathSQL:         "",
+			Describe:        "the stdout or stderr of container.",
 		},
 		"error": {
-			DefaultFilePath: "/data/mysql/log/mysqld.err",
-			Variables:       []string{"log-error"},
-			PathVar:         "log-error",
+			DefaultFilePath: "",
+			Variables:       []string{"log_error"},
+			PathSQL:         "mysql -N -e \"select VARIABLE_VALUE from performance_schema.global_variables where VARIABLE_NAME = 'log_error'\"",
+			Describe:        "the error log of mysql, and variable log_error indicate the log file path.",
 		},
 		"slow": {
-			DefaultFilePath: "/data/mysql/data/release-name-replicasets-0-slow.log",
+			DefaultFilePath: "",
 			Variables:       []string{"slow_query_log_file", "slow_query_log", "long_query_time", "log_output"},
-			PathVar:         "slow_query_log_file",
+			PathSQL:         "mysql -N -e \"select VARIABLE_VALUE from performance_schema.global_variables where VARIABLE_NAME = 'slow_query_log_file'\"",
+			Describe:        "the slow log of mysql, and variable slow_query_log_file indicate the log file path.",
 		},
 	}
 	Registry(stateMysql, logsModule, mysqlLogsContext)
@@ -97,12 +100,14 @@ func registryMySQLLogsContext() {
 }
 
 type LogVariables struct {
-	// PathVar indicate the variables of file path
-	PathVar string
+	// PathSQL indicate the SQL of log file path
+	PathSQL string
 	// Variables engine variables of this specify log type
 	Variables []string
 	// DefaultFilePath indicate the default path for extensible file, such as dmesg, and have a more premium priority than PathVar.
 	DefaultFilePath string
+	// Describe info
+	Describe string
 }
 
 func LogsContext(engine string) (map[string]LogVariables, error) {

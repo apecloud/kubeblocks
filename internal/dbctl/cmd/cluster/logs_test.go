@@ -19,7 +19,6 @@ package cluster
 import (
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -61,9 +60,9 @@ var _ = Describe("logs", func() {
 	})
 
 	It("assembleTailCommand Test", func() {
-		command := assembleTailCommand(true, 1, 100, "/var/log")
-		Expect(len(command)).Should(Equal(5))
-		Expect(strings.Join(command, " ")).Should(Equal("tail -f --lines=1 --bytes=100 /var/log"))
+		command := assembleTail(true, 1, 100)
+		Expect(command).ShouldNot(BeNil())
+		Expect(command).Should(Equal("tail -f --lines=1 --bytes=100"))
 	})
 
 	It("addPrefixIfNeeded Test", func() {

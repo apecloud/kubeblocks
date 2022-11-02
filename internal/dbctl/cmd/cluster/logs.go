@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apecloud/kubeblocks/internal/dbctl/engine"
+
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 
 	corev1 "k8s.io/api/core/v1"
@@ -36,7 +38,6 @@ import (
 	cmdlogs "k8s.io/kubectl/pkg/cmd/logs"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/engine"
 	"github.com/apecloud/kubeblocks/internal/dbctl/exec"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/cluster"
 )
@@ -153,16 +154,20 @@ func (o *LogsOptions) complete(args []string) error {
 	if err != nil {
 		return err
 	}
-
-	filePath := o.filePath
-	if len(filePath) == 0 {
-		if o.isStdoutForContainer() {
+	var command string
+	switch {
+	case len(o.filePath) > 0:
+		command = assembleTail(o.logOptions.Follow, o.logOptions.Tail, o.logOptions.LimitBytes) + " " + o.filePath
+	case o.isStdoutForContainer():
+		{
 			// no set file-path and file-type, and will output container's stdout & stderr, like kubectl logs
 			o.logOptions.RESTClientGetter = o.Factory
 			o.logOptions.LogsForObject = polymorphichelpers.LogsForObjectFn
 			o.logOptions.Object = pod
 			o.logOptions.Options, _ = o.logOptions.ToLogOptions()
-		} else {
+		}
+	default:
+		{
 			// get cluster engine name
 			engineName, err := cluster.GetClusterTypeByPod(pod)
 			if err != nil {
@@ -176,13 +181,14 @@ func (o *LogsOptions) complete(args []string) error {
 			if !ok {
 				return fmt.Errorf("file type %s is not supported yet", o.fileType)
 			}
-			filePath, err = getLogFilePath(fileInfo, o.clusterName)
-			if err != nil {
-				return err
+			if len(fileInfo.DefaultFilePath) > 0 {
+				command = assembleTail(o.logOptions.Follow, o.logOptions.Tail, o.logOptions.LimitBytes) + " " + fileInfo.DefaultFilePath
+			} else {
+				command = fileInfo.PathSQL + " | xargs " + assembleTail(o.logOptions.Follow, o.logOptions.Tail, o.logOptions.LimitBytes)
 			}
 		}
 	}
-	o.Command = assembleTailCommand(o.logOptions.Follow, o.logOptions.Tail, o.logOptions.LimitBytes, filePath)
+	o.Command = []string{"/bin/bash", "-c", command}
 	o.ContainerName = o.logOptions.Container
 	o.Pod = pod
 	return nil
@@ -218,18 +224,8 @@ func (o *LogsOptions) validate() error {
 	return nil
 }
 
-// getLogFilePath get file path according to variable of engine
-func getLogFilePath(logInfo engine.LogVariables, clusterName string) (string, error) {
-	if len(logInfo.DefaultFilePath) > 0 {
-		return logInfo.DefaultFilePath, nil
-	} else {
-		// todo get filepath variable from ConfigManager module
-		return "", nil
-	}
-}
-
-// assembleTailCommand assemble tail command for log file
-func assembleTailCommand(follow bool, tail int64, limitBytes int64, filePath string) []string {
+// assembleCommand assemble tail command for log file
+func assembleTail(follow bool, tail int64, limitBytes int64) string {
 	command := make([]string, 0, 5)
 	command = append(command, "tail")
 	if follow {
@@ -243,8 +239,7 @@ func assembleTailCommand(follow bool, tail int64, limitBytes int64, filePath str
 	if limitBytes > 0 {
 		command = append(command, "--bytes="+strconv.FormatInt(limitBytes, 10))
 	}
-	command = append(command, filePath)
-	return command
+	return strings.Join(command, " ")
 }
 
 func (o *LogsOptions) isStdoutForContainer() bool {

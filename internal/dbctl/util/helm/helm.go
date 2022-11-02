@@ -42,7 +42,6 @@ import (
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
@@ -349,21 +348,5 @@ func FakeActionConfig() *action.Configuration {
 		RegistryClient: registryClient,
 		Log: func(format string, v ...interface{}) {
 		},
-	}
-}
-
-func KubeBlocksHelmChart(version string, ns string) *InstallOpts {
-	return &InstallOpts{
-		Name:      types.KubeBlocksChartName,
-		Chart:     types.KubeBlocksChart,
-		Wait:      true,
-		Version:   version,
-		Namespace: ns,
-		Sets: []string{
-			"image.tag=latest",
-			"image.pullPolicy=Always",
-		},
-		Login:    true,
-		TryTimes: 2,
 	}
 }

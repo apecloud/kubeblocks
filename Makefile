@@ -183,7 +183,7 @@ mod-download: ## Run go mod download against go modules.
 
 .PHONY: mod-vendor
 mod-vendor: ## Run go mod tidy->vendor->verify against go modules.
-	$(GO) mod tidy -compat=1.18
+	$(GO) mod tidy -compat=1.19
 	$(GO) mod vendor
 	$(GO) mod verify
 
@@ -392,7 +392,7 @@ ci-test: ci-test-pre test ## Run CI tests.
 
 .PHONY: reviewable
 reviewable: generate build-checks test check-license-header ## Run code checks to proceed with PR reviews.
-	$(GO) mod tidy -compat=1.18
+	$(GO) mod tidy -compat=1.19
 
 .PHONY: check-diff
 check-diff: reviewable ## Run git code diff checker.
@@ -617,7 +617,7 @@ MINIKUBE=$(shell which minikube)
 
 .PHONY: brew-install-prerequisite
 brew-install-prerequisite: ## Use `brew install` to install required dependencies.
-	brew install go@1.18 kubebuilder delve golangci-lint staticcheck kustomize step cue oras jq yq git-hooks-go
+	brew install go@1.19 kubebuilder delve golangci-lint staticcheck kustomize step cue oras jq yq git-hooks-go
 
 ##@ Minikube
 K8S_VERSION ?= v1.22.15

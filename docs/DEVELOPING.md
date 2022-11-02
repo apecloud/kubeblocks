@@ -154,7 +154,7 @@ To run `KubeBlocks`, you needs `Docker` and a `Kubernetes` 1.24.1+ cluster for d
 
 #### Kubernetes environment
 - Kubernetes cluster
-You can use cloud Kubernetes service, such as [`EKS`](https://aws.amazon.com/eks/) [`GKE`](https://cloud.google.com/kubernetes-engine) [`AKS`](https://azure.microsoft.com/en-us/products/kubernetes-service/), or use local Kubernetes cluster, such as [`Minikube`](https://minikube.sigs.k8s.io/docs/) [`k3d`](https://k3d.io/stable/)。
+You can use cloud Kubernetes service, such as [`EKS`](https://aws.amazon.com/eks/) [`GKE`](https://cloud.google.com/kubernetes-engine) [`AKS`](https://azure.microsoft.com/en-us/products/kubernetes-service/), or use local Kubernetes cluster, such as [`Minikube`](https://minikube.sigs.k8s.io/docs/) [`k3d`](https://k3d.io/stable/).
 - For development purposes, you will also want to follow the optional steps to install [Helm 3.x](https://helm.sh/docs/intro/install/).
 
 ## Basics

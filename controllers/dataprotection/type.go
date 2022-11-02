@@ -23,4 +23,4 @@ const (
 	dataProtectionFinalizerName = "dataprotection.kubeblocks.io/finalizer"
 )
 
-const reconcileInterval = time.Second * 5
+const reconcileInterval = time.Second * 3

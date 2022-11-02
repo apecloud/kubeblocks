@@ -18,6 +18,8 @@ package dataprotection
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	appv1 "k8s.io/api/apps/v1"
@@ -80,7 +82,7 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, restoreJob, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
 		return nil, r.deleteExternalResources(reqCtx, restoreJob)
 	})
-	if err != nil {
+	if res != nil {
 		return *res, err
 	}
 
@@ -231,6 +233,13 @@ func (r *RestoreJobReconciler) getPodSpec(reqCtx intctrlutil.RequestCtx, restore
 		return podSpec, err
 	}
 
+	// check backup job is ready
+	if backupJob.Status.Phase != dataprotectionv1alpha1.BackupJobCompleted {
+		msg := fmt.Sprintf("backupJob %s status not ready.", backupJob.Name)
+		r.Recorder.Event(restoreJob, corev1.EventTypeWarning, "CreatedRestore", msg)
+		return podSpec, errors.New(msg)
+	}
+
 	// get backup policy
 	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
 	backupPolicyNameSpaceName := types.NamespacedName{
@@ -240,6 +249,12 @@ func (r *RestoreJobReconciler) getPodSpec(reqCtx intctrlutil.RequestCtx, restore
 	if err := r.Client.Get(reqCtx.Ctx, backupPolicyNameSpaceName, backupPolicy); err != nil {
 		logger.Error(err, "Unable to get backupPolicy for backupJob.", "BackupPolicy", backupPolicyNameSpaceName)
 		return podSpec, err
+	}
+
+	if backupPolicy.Spec.RemoteVolume == nil {
+		msg := fmt.Sprintf("backupPolicy %s remote volume is missing.", backupPolicy.Name)
+		r.Recorder.Event(restoreJob, corev1.EventTypeWarning, "CreatedRestore", msg)
+		return podSpec, errors.New(msg)
 	}
 
 	// get backup tool
@@ -289,7 +304,7 @@ func (r *RestoreJobReconciler) getPodSpec(reqCtx intctrlutil.RequestCtx, restore
 	podSpec.Volumes = restoreJob.Spec.TargetVolumes
 
 	// add remote volumes
-	podSpec.Volumes = append(podSpec.Volumes, backupPolicy.Spec.RemoteVolume)
+	podSpec.Volumes = append(podSpec.Volumes, *backupPolicy.Spec.RemoteVolume)
 
 	// TODO(dsj): mount readonly remote volumes for restore.
 	// podSpec.Volumes[0].PersistentVolumeClaim.ReadOnly = true

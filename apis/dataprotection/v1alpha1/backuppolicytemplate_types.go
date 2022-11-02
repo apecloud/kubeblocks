@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -24,10 +25,11 @@ import (
 type BackupPolicyTemplateSpec struct {
 	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
 	// +kubebuilder:default="0 7 * * *"
-	Schedule string `json:"schedule"`
+	// +optional
+	Schedule string `json:"schedule,omitempty"`
 
 	// which backup tool to perform database backup, only support one tool.
-	// +kubebuilder:validation:Required
+	// +optional
 	BackupToolName string `json:"backupToolName"`
 
 	// TTL is a time.Duration-parseable string describing how long
@@ -35,25 +37,38 @@ type BackupPolicyTemplateSpec struct {
 	// +optional
 	TTL metav1.Duration `json:"ttl,omitempty"`
 
+	// database cluster service
+	// +kubebuilder:validation:Required
+	DatabaseEngine string `json:"databaseEngine"`
+
+	// execute hook commands for backup.
+	// +optional
+	Hooks BackupPolicyHook `json:"hooks"`
+
+	// array of remote volumes from CSI driver definition.
+	// +optional
+	RemoteVolume corev1.Volume `json:"remoteVolume"`
+
 	// limit count of backup stop retries on fail.
 	// if unset, retry unlimit attempted.
 	// +optional
 	OnFailAttempted int32 `json:"onFailAttempted,omitempty"`
 }
 
-// BackupPolicyTemplatePhase defines phases for BackupPolicyTemplate CR, valid values are New, Available, InProgress, Failed.
+// The current phase. Valid values are New, Available, InProgress, Failed.
 // +enum
+
 type BackupPolicyTemplatePhase string
 
 // These are the valid statuses of BackupPolicyTemplate.
 const (
-	ConfigPending BackupPolicyTemplatePhase = "New"
+	PolicyNew BackupPolicyTemplatePhase = "New"
 
-	ConfigAvailable BackupPolicyTemplatePhase = "Available"
+	PolicyAvailable BackupPolicyTemplatePhase = "Available"
 
-	ConfigInProgress BackupPolicyTemplatePhase = "InProgress"
+	PolicyInProgress BackupPolicyTemplatePhase = "InProgress"
 
-	ConfigFailed BackupPolicyTemplatePhase = "Failed"
+	PolicyFailed BackupPolicyTemplatePhase = "Failed"
 )
 
 // BackupPolicyTemplateStatus defines the observed state of BackupPolicyTemplate

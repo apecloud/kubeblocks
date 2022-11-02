@@ -18,6 +18,10 @@ package dataprotection
 
 import (
 	"context"
+	"fmt"
+	corev1 "k8s.io/api/core/v1"
+
+	"k8s.io/apimachinery/pkg/types"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 
@@ -72,11 +76,92 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, backupPolicy, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
 		return nil, r.deleteExternalResources(reqCtx, backupPolicy)
 	})
-	if err != nil {
+	if res != nil {
 		return *res, err
-	} // TODO(user): your logic here
+	}
 
-	return ctrl.Result{}, nil
+	switch backupPolicy.Status.Phase {
+	case "", dataprotectionv1alpha1.PolicyNew:
+		return r.doNewPhaseAction(reqCtx, backupPolicy)
+	case dataprotectionv1alpha1.PolicyInProgress:
+		return r.doInProgressPhaseAction(reqCtx, backupPolicy)
+	default:
+		return intctrlutil.Reconciled()
+	}
+}
+
+func assignBackupPolicy(policy *dataprotectionv1alpha1.BackupPolicy, template *dataprotectionv1alpha1.BackupPolicyTemplate) {
+	if policy != nil && template != nil {
+		if policy.Spec.BackupToolName == "" {
+			policy.Spec.BackupToolName = template.Spec.BackupToolName
+		}
+		if policy.Spec.TTL == nil {
+			policy.Spec.TTL = &template.Spec.TTL
+		}
+		if policy.Spec.Schedule == "" {
+			policy.Spec.Schedule = template.Spec.Schedule
+		}
+
+		if policy.Spec.Target.DatabaseEngine == "" {
+			policy.Spec.Target.DatabaseEngine = template.Spec.DatabaseEngine
+		}
+
+		if policy.Spec.Hooks == nil {
+			policy.Spec.Hooks = &template.Spec.Hooks
+		}
+		if policy.Spec.RemoteVolume == nil {
+			policy.Spec.RemoteVolume = &template.Spec.RemoteVolume
+		}
+		if policy.Spec.OnFailAttempted == 0 {
+			policy.Spec.OnFailAttempted = template.Spec.OnFailAttempted
+		}
+	}
+}
+
+func (r *BackupPolicyReconciler) doNewPhaseAction(
+	reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) (ctrl.Result, error) {
+
+	if backupPolicy.Spec.BackupPolicyTemplateName != "" {
+		backupPolicyTemplate := &dataprotectionv1alpha1.BackupPolicyTemplate{}
+		key := types.NamespacedName{Namespace: backupPolicy.Namespace, Name: backupPolicy.Spec.BackupPolicyTemplateName}
+		if err := r.Client.Get(reqCtx.Ctx, key, backupPolicyTemplate); err != nil {
+			msg := fmt.Sprintf("Failed to get backupPolicyTemplateName: %s", err.Error())
+			r.Recorder.Event(backupPolicy, corev1.EventTypeWarning, "BackupPolicyTemplateFailed", msg)
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, msg)
+		}
+		assignBackupPolicy(backupPolicy, backupPolicyTemplate)
+
+		// update spec
+		if err := r.Client.Update(reqCtx.Ctx, backupPolicy); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+
+		// update Phase to InProgress
+		backupPolicy.Status.Phase = dataprotectionv1alpha1.PolicyInProgress
+		if err := r.Client.Status().Update(reqCtx.Ctx, backupPolicy); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+	} else {
+		// check required columns and record event
+		if backupPolicy.Spec.Schedule == "" {
+			r.Recorder.Event(backupPolicy, corev1.EventTypeWarning, "BackupPolicyCheck", "Missing schedule.")
+		}
+		if backupPolicy.Spec.Target.DatabaseEngine == "" {
+			r.Recorder.Event(backupPolicy, corev1.EventTypeWarning, "BackupPolicyCheck", "Missing target.databaseEngine.")
+		}
+	}
+	return intctrlutil.Reconciled()
+}
+
+func (r *BackupPolicyReconciler) doInProgressPhaseAction(
+	reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) (ctrl.Result, error) {
+
+	// update Phase to InProgress
+	backupPolicy.Status.Phase = dataprotectionv1alpha1.PolicyAvailable
+	if err := r.Client.Status().Update(reqCtx.Ctx, backupPolicy); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	return intctrlutil.Reconciled()
 }
 
 // SetupWithManager sets up the controller with the Manager.

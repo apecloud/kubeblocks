@@ -40,7 +40,7 @@ To build `KubeBlocks` on your own host, needs to install the following tools:
 - Make
 
 #### Install Go
-Download and install [Go 1.18 or later](https://go.dev/doc/install).
+Download and install [Go 1.19 or later](https://go.dev/doc/install).
 #### Install Make
 `KubeBlocks` uses `make` for a variety of build and test actions, and needs to be installed as appropriate for your platform:
 

@@ -1,0 +1,52 @@
+package delete
+
+import (
+	"net/http"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+
+	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest/fake"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+)
+
+var _ = Describe("Delete", func() {
+	buildTestCmd := func(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+		cmd := Command{
+			Use:       "test-delete",
+			Short:     "Test a delete command",
+			Example:   "Test command example",
+			Factory:   f,
+			IOStreams: streams,
+			GroupKind: schema.GroupKind{Kind: "Pod"},
+		}
+		return cmd.Build()
+	}
+
+	mockClient := func(data runtime.Object) *cmdtesting.TestFactory {
+		tf := cmdtesting.NewTestFactory().WithNamespace("test")
+		defer tf.Cleanup()
+		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+		tf.UnstructuredClient = &fake.RESTClient{
+			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+			Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, data)},
+		}
+		return tf
+	}
+
+	It("build a delete command", func() {
+		pods, _, _ := cmdtesting.TestData()
+		tf := mockClient(pods)
+		streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+		cmd := buildTestCmd(tf, streams)
+		cmd.Run(cmd, []string{"foo"})
+		Expect(buf.String()).Should(Equal("pod \"foo\" deleted\n"))
+	})
+})

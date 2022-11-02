@@ -29,19 +29,27 @@ import (
 
 // Command used to construct a list command
 type Command struct {
+	Use       string
+	Short     string
+	Example   string
 	Factory   cmdutil.Factory
 	GroupKind schema.GroupKind
 	Streams   genericclioptions.IOStreams
-	Short     string
 }
 
 // Build return a list command
 func (c *Command) Build() *cobra.Command {
 	o := get.NewOptions(c.Streams, []string{c.GroupKind.String()})
 
+	use := c.Use
+	if len(use) == 0 {
+		use = "list"
+	}
+
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: c.Short,
+		Use:     use,
+		Short:   c.Short,
+		Example: c.Example,
 		Run: func(cmd *cobra.Command, args []string) {
 			c.complete(o, cmd)
 			cmdutil.CheckErr(o.Complete(c.Factory))

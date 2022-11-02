@@ -18,34 +18,74 @@ package engine
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/cluster"
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/create"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
-var (
-	wesqlHelmChart = "oci://yimeisun.azurecr.io/helm-chart/wesqlcluster"
-	wesqlVersion   = "0.1.0"
-)
+type WeSQL struct{}
 
-type WeSQL struct {
-	name      string
-	namespace string
-	version   string
-	replicas  int
-}
+var _ Interface = &WeSQL{}
 
-func (w *WeSQL) HelmInstallOpts() *helm.InstallOpts {
-	return &helm.InstallOpts{
-		Name:      w.name,
-		Chart:     wesqlHelmChart,
-		Wait:      true,
-		Namespace: w.namespace,
-		Version:   wesqlVersion,
-		Sets: []string{
-			"serverVersion=" + w.version,
-			fmt.Sprintf("replicaCount=%d", w.replicas),
-		},
-		Login:    true,
-		TryTimes: 2,
+var component = `- name: wesql-test
+  type: replicasets
+  monitor: false
+  replicas: %d
+  volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+        volumeMode: Filesystem
+`
+
+func (w *WeSQL) Install(replicas int, name string, namespace string) error {
+	playgroundDir, err := util.PlaygroundDir()
+	if err != nil {
+		return err
 	}
+	componentPath := filepath.Join(playgroundDir, "component.yaml")
+	if err := os.WriteFile(componentPath, []byte(fmt.Sprintf(component, replicas)), 0600); err != nil {
+		return err
+	}
+
+	factory := util.NewFactory()
+	dynamicClient, err := factory.DynamicClient()
+	if err != nil {
+		return err
+	}
+	options := cluster.CreateOptions{
+		BaseOptions: create.BaseOptions{
+			IOStreams: genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr},
+			Namespace: namespace,
+			Name:      name,
+			Client:    dynamicClient,
+		},
+		ClusterDefRef:      cluster.DefaultClusterDef,
+		AppVersionRef:      cluster.DefaultAppVersion,
+		TerminationPolicy:  "WipeOut",
+		ComponentsFilePath: componentPath,
+	}
+
+	if err := options.Complete(); err != nil {
+		return err
+	}
+
+	inputs := create.Inputs{
+		BaseOptionsObj:  &options.BaseOptions,
+		Options:         options,
+		CueTemplateName: cluster.CueTemplateName,
+		ResourceName:    types.ResourceClusters,
+	}
+
+	return options.Run(inputs)
 }

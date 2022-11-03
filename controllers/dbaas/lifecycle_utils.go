@@ -1261,7 +1261,6 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 		}
 		container.Name = "kbprobe-rolechangedcheck"
 		probe := container.ReadinessProbe
-		// TODO: http port should be checked to avoid conflicts instead of hardcoded 3051
 		probe.Exec.Command = []string{"curl", "-X", "POST", "--fail-with-body",
 			"-H", "Content-Type: application/json",
 			"http://localhost:" + probeServicePort + "/v1.0/bindings/mtest",
@@ -1277,7 +1276,6 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 		container := &probeContainers[0]
 		container.Image = viper.GetString("KUBEBLOCKS_IMAGE")
 		container.ImagePullPolicy = corev1.PullPolicy(viper.GetString("KUBEBLOCKS_IMAGE_PULL_POLICY"))
-		// TODO: ports should be checked to avoid conflicts instead of hardcoded values
 		container.Command = []string{"probe", "--app-id", "batch-sdk",
 			"--dapr-http-port", probeServicePort,
 			"--dapr-grpc-port", "54215",
@@ -1304,7 +1302,6 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 		}
 		container.Env = append(container.Env, podName, podNamespace)
 
-		// TODO: ports should be checked to avoid conflicts instead of hardcoded values
 		container.Ports = []corev1.ContainerPort{{
 			ContainerPort: int32(probePort),
 			Name:          "probe-port",

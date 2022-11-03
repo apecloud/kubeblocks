@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -25,7 +24,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("appVersion webhook", func() {
@@ -46,17 +44,15 @@ var _ = Describe("appVersion webhook", func() {
 			Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
 
 			Eventually(func() bool {
-				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDef.Name}, clusterDef)
+				By("By testing component type is not found in cluserDefinition")
+				appVersion.Spec.Components[1].Type = "proxy1"
+				Expect(k8sClient.Create(ctx, appVersion)).ShouldNot(Succeed())
+
+				By("By creating an appVersion")
+				appVersion.Spec.Components[1].Type = "proxy"
+				err := k8sClient.Create(ctx, appVersion)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
-
-			By("By testing component type is not found in cluserDefinition")
-			appVersion.Spec.Components[1].Type = "proxy1"
-			Expect(k8sClient.Create(ctx, appVersion)).ShouldNot(Succeed())
-
-			By("By creating an appVersion")
-			appVersion.Spec.Components[1].Type = "proxy"
-			Expect(k8sClient.Create(ctx, appVersion)).Should(Succeed())
 
 			By("By testing update appVersion.status")
 			appVersion.Status.ClusterDefSyncStatus = OutOfSyncStatus

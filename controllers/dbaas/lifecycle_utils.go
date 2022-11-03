@@ -904,28 +904,28 @@ func handleReplicationSetExistSts(reqCtx intctrlutil.RequestCtx,
 		if compOwnsStsMap[compKey] != len(allStsList.Items) {
 			return fmt.Errorf("statefulset total number has changed")
 		}
-		aos := make([]*appsv1.StatefulSet, 0)
+		dos := make([]*appsv1.StatefulSet, 0)
 		partition := len(allStsList.Items) - stsToDelNum
 		for _, sts := range allStsList.Items {
 			// if current primary statefulSet ordinal is larger than target number replica, return err
 			if getOrdinalSts(&sts) > partition && checkStsIsPrimary(&sts) {
 				return fmt.Errorf("current primary statefulset ordinal is larger than target number replicas, can not be reduce, please switchover first")
 			}
-			aos = append(aos, sts.DeepCopy())
+			dos = append(dos, sts.DeepCopy())
 		}
 
 		// sort the statefulSets by their ordinals
-		sort.Sort(descendingOrdinalSts(aos))
+		sort.Sort(descendingOrdinalSts(dos))
 
 		// delete statefulSets and svc, etc
 		for i := 0; i < stsToDelNum; i++ {
-			if err := cli.Delete(reqCtx.Ctx, aos[i]); err != nil {
+			if err := cli.Delete(reqCtx.Ctx, dos[i]); err != nil {
 				return err
 			}
 			svc := &corev1.Service{}
 			svcKey := types.NamespacedName{
 				Namespace: cluster.Namespace,
-				Name:      fmt.Sprintf("%s-%d", aos[i].Name, 0),
+				Name:      fmt.Sprintf("%s-%d", dos[i].Name, 0),
 			}
 			if err := cli.Get(reqCtx.Ctx, svcKey, svc); err != nil {
 				return err

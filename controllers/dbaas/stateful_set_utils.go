@@ -69,22 +69,22 @@ func getPodRevision(pod *corev1.Pod) string {
 
 // ------- end copy from stateful_set_utils.go ----
 
-// ascendingOrdinalSts is a sort.Interface that Sorts a list of StatefulSet based on the ordinals extracted
+// descendingOrdinalSts is a sort.Interface that Sorts a list of StatefulSet based on the ordinals extracted
 // from the StatefulSet.
 type descendingOrdinalSts []*appsv1.StatefulSet
 
 var statefulSetRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 
-func (aos descendingOrdinalSts) Len() int {
-	return len(aos)
+func (dos descendingOrdinalSts) Len() int {
+	return len(dos)
 }
 
-func (aos descendingOrdinalSts) Swap(i, j int) {
-	aos[i], aos[j] = aos[j], aos[i]
+func (dos descendingOrdinalSts) Swap(i, j int) {
+	dos[i], dos[j] = dos[j], dos[i]
 }
 
-func (aos descendingOrdinalSts) Less(i, j int) bool {
-	return getOrdinalSts(aos[i]) > getOrdinalSts(aos[j])
+func (dos descendingOrdinalSts) Less(i, j int) bool {
+	return getOrdinalSts(dos[i]) > getOrdinalSts(dos[j])
 }
 
 // getOrdinal gets StatefulSet's ordinal. If StatefulSet has no ordinal, -1 is returned.

@@ -70,16 +70,13 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("By creating a appVersion for upgrade")
 		newAppVersion := createTestAppVersionObj(clusterDefinitionName, appVersionNameForUpgrade)
 		Expect(k8sClient.Create(ctx, newAppVersion)).Should(Succeed())
-		// wait until AppVersion created
+		By("By creating a upgrade opsRequest, it should be succeed")
 		Eventually(func() bool {
-			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: newAppVersion.Name,
-				Namespace: newAppVersion.Namespace}, &AppVersion{})
+			opsRequest.Spec.ClusterOps.Upgrade.AppVersionRef = newAppVersion.Name
+			err := k8sClient.Create(ctx, opsRequest)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
 
-		By("By creating a upgrade opsRequest, it should be succeed")
-		opsRequest.Spec.ClusterOps.Upgrade.AppVersionRef = appVersionNameForUpgrade
-		Expect(k8sClient.Create(ctx, opsRequest)).Should(Succeed())
 		// wait until OpsRequest created
 		Eventually(func() bool {
 			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: opsRequest.Name,
@@ -118,8 +115,11 @@ var _ = Describe("OpsRequest webhook", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, opsRequest)).ShouldNot(Succeed())
-		opsRequest.Spec.ComponentOpsList[0].ComponentNames = []string{"replicaSets"}
-		Expect(k8sClient.Create(ctx, opsRequest)).Should(Succeed())
+		Eventually(func() bool {
+			opsRequest.Spec.ComponentOpsList[0].ComponentNames = []string{"replicaSets"}
+			err := k8sClient.Create(ctx, opsRequest)
+			return err == nil
+		}, timeout, interval).Should(BeTrue())
 	}
 
 	testVolumeExpansion := func(cluster *Cluster) {
@@ -154,8 +154,11 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(k8sClient.Create(ctx, opsRequest)).ShouldNot(Succeed())
 
 		By("By testing volumeExpansion. if api is legal, it will create successfully")
-		opsRequest.Spec.ComponentOpsList[0].VolumeExpansion[0].Name = "data"
-		Expect(k8sClient.Create(ctx, opsRequest)).Should(Succeed())
+		Eventually(func() bool {
+			opsRequest.Spec.ComponentOpsList[0].VolumeExpansion[0].Name = "data"
+			err := k8sClient.Create(ctx, opsRequest)
+			return err == nil
+		}, timeout, interval).Should(BeTrue())
 	}
 
 	testHorizontalScaling := func(cluster *Cluster) {
@@ -178,14 +181,17 @@ var _ = Describe("OpsRequest webhook", func() {
 
 		By("By testing horizontalScaling. if api is legal, it will create successfully")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
-		opsRequest.Spec.ComponentOpsList = []*ComponentOps{
-			{ComponentNames: []string{"replicaSets"},
-				HorizontalScaling: &HorizontalScaling{
-					Replicas: 2,
+		Eventually(func() bool {
+			opsRequest.Spec.ComponentOpsList = []*ComponentOps{
+				{ComponentNames: []string{"replicaSets"},
+					HorizontalScaling: &HorizontalScaling{
+						Replicas: 2,
+					},
 				},
-			},
-		}
-		Expect(k8sClient.Create(ctx, opsRequest)).Should(Succeed())
+			}
+			err := k8sClient.Create(ctx, opsRequest)
+			return err == nil
+		}, timeout, interval).Should(BeTrue())
 
 		By("By testing horizontalScaling replica is not in [min,max]")
 		opsRequest.Spec.ComponentOpsList[0].HorizontalScaling.Replicas = 4
@@ -213,8 +219,11 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(k8sClient.Create(ctx, opsRequest)).ShouldNot(Succeed())
 
 		By("By testing restart. if api is legal, it will create successfully")
-		opsRequest.Spec.ComponentOpsList[0].ComponentNames = []string{"replicaSets"}
-		Expect(k8sClient.Create(ctx, opsRequest)).Should(Succeed())
+		Eventually(func() bool {
+			opsRequest.Spec.ComponentOpsList[0].ComponentNames = []string{"replicaSets"}
+			err := k8sClient.Create(ctx, opsRequest)
+			return err == nil
+		}, timeout, interval).Should(BeTrue())
 	}
 
 	Context("When appVersion create and update", func() {

@@ -16,11 +16,23 @@ limitations under the License.
 
 package dataprotection
 
-import "time"
+import (
+	"runtime"
+	"time"
+
+	"github.com/spf13/viper"
+)
 
 const (
 	// name of our custom finalizer
 	dataProtectionFinalizerName = "dataprotection.kubeblocks.io/finalizer"
+
+	// settings keys
+	maxConcurDataProtectionReconKey = "MAXCONCURRENTRECONCILES_DATAPROTECTION"
 )
 
 const reconcileInterval = time.Second * 5
+
+func init() {
+	viper.SetDefault(maxConcurDataProtectionReconKey, runtime.NumCPU()*2)
+}

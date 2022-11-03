@@ -19,7 +19,6 @@ package statefulset
 import (
 	"context"
 	"encoding/json"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -225,8 +224,9 @@ func (r *StatefulSetReconciler) patchOpsRequestAnnotation(reqCtx intctrlutil.Req
 // SetupWithManager sets up the controller with the Manager.
 func (r *StatefulSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1.StatefulSet{}, builder.WithPredicates(predicate.NewPredicateFuncs(filterLabels))).
+		For(&appsv1.StatefulSet{}).
 		Owns(&corev1.Pod{}).
+		WithEventFilter(predicate.NewPredicateFuncs(filterLabels)).
 		Complete(r)
 }
 

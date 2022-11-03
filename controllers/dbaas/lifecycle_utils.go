@@ -36,6 +36,7 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -1208,6 +1209,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 	if err != nil {
 		return nil, err
 	}
+	probeServicePort := viper.GetString("PROBE_SERVICE_PORT")
 	probeContainers := []corev1.Container{}
 	componentProbes := params.component.Probes
 	reqCtx.Log.Info("probe", "settings", componentProbes)
@@ -1248,28 +1250,25 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 		}
 		container.Name = "kbprobe-rolechangedcheck"
 		probe := container.ReadinessProbe
-		// probe.HTTPGet.Path = "/"
-		// HACK: hardcoded - "http://localhost:3501/v1.0/bindings/mtest"
 		// TODO: http port should be checked to avoid conflicts instead of hardcoded 3051
 		probe.Exec.Command = []string{"curl", "-X", "POST", "--fail-with-body",
 			"-H", "Content-Type: application/json",
-			"http://localhost:3501/v1.0/bindings/mtest",
+			"http://localhost:" + probeServicePort + "/v1.0/bindings/mtest",
 			"-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
 		probe.PeriodSeconds = componentProbes.RoleChangedProbe.PeriodSeconds
 		probe.SuccessThreshold = componentProbes.RoleChangedProbe.SuccessThreshold
 		probe.FailureThreshold = componentProbes.RoleChangedProbe.FailureThreshold
-		// probe.InitialDelaySeconds = 60
+		container.StartupProbe.TCPSocket.Port = intstr.FromString(probeServicePort)
 		probeContainers = append(probeContainers, container)
 	}
 
 	if len(probeContainers) >= 1 {
 		container := &probeContainers[0]
-		container.Image = viper.GetString("AGAMOTTO_IMAGE")
-		container.ImagePullPolicy = corev1.PullPolicy(viper.GetString("AGAMOTTO_IMAGE_PULL_POLICY"))
-		// HACK: hardcoded port values
+		container.Image = viper.GetString("KUBEBLOCKS_IMAGE")
+		container.ImagePullPolicy = corev1.PullPolicy(viper.GetString("KUBEBLOCKS_IMAGE_PULL_POLICY"))
 		// TODO: ports should be checked to avoid conflicts instead of hardcoded values
 		container.Command = []string{"probe", "--app-id", "batch-sdk",
-			"--dapr-http-port", "3501",
+			"--dapr-http-port", probeServicePort,
 			"--dapr-grpc-port", "54215",
 			"--app-protocol", "http",
 			"--log-level", "debug",
@@ -1294,10 +1293,13 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 		}
 		container.Env = append(container.Env, podName, podNamespace)
 
-		// HACK: hardcoded port values
+		probePort, err := strconv.ParseInt(probeServicePort, 10, 32)
+		if err != nil {
+			return nil, err
+		}
 		// TODO: ports should be checked to avoid conflicts instead of hardcoded values
 		container.Ports = []corev1.ContainerPort{{
-			ContainerPort: 3501,
+			ContainerPort: int32(probePort),
 			Name:          "probe-port",
 			Protocol:      "TCP",
 		}}

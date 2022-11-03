@@ -133,6 +133,7 @@ func (m *Mysql) InitDelay() error {
 		return err
 	}
 
+	// test if db is ready to connect or not
 	err = db.Ping()
 	if err != nil {
 		m.logger.Infof("unable to ping the DB")

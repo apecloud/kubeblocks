@@ -81,18 +81,19 @@ func TestRawConfig(t *testing.T) {
 			}
 		})
 
-	//ctx := NewCfgOptions("$..slow_query_log_file", "")
+	// ctx := NewCfgOptions("$..slow_query_log_file", "")
 
 	result, err := cfg.Query("$..slow_query_log_file", NewCfgOptions(""))
 	require.Nil(t, err)
 	require.NotNil(t, result)
 	require.Equal(t, "[\"/data/mysql/mysqld-slow.log\"]", string(result))
 
-	cfg.MergeFrom(map[string]interface{}{
-		"slow_query_log": 1,
-		"server-id":      2,
-		"socket":         "xxxxxxxxxxxxxxx",
-	}, ctx)
+	require.Nil(t,
+		cfg.MergeFrom(map[string]interface{}{
+			"slow_query_log": 1,
+			"server-id":      2,
+			"socket":         "xxxxxxxxxxxxxxx",
+		}, ctx))
 
 	content, err := cfg.ToCfgFileContent()
 	require.NotNil(t, content)
@@ -105,13 +106,15 @@ func TestRawConfig(t *testing.T) {
 	log.Log.Info("patch : %v", patch)
 
 	{
-		cfg.MergeFrom(map[string]interface{}{
-			"server-id": 1,
-			"socket":    "/data/mysql/tmp/mysqld.sock",
-		}, ctx)
-		content, _ := cfg.ToCfgFileContent()
-		newContent, _ := content[cfg.Name]
-		//CreateMergePatch([]byte(iniConfig), []byte(newContent), cfg.Option)
+		require.Nil(t,
+			cfg.MergeFrom(map[string]interface{}{
+				"server-id": 1,
+				"socket":    "/data/mysql/tmp/mysqld.sock",
+			}, ctx))
+		content, err := cfg.ToCfgFileContent()
+		require.Nil(t, err)
+		newContent := content[cfg.Name]
+		// CreateMergePatch([]byte(iniConfig), []byte(newContent), cfg.Option)
 		patch, err := CreateMergePatch([]byte(iniConfig), []byte(newContent), cfg.Option)
 		require.Nil(t, err)
 		log.Log.Info("patch : %v", patch)
@@ -138,6 +141,7 @@ func TestConfigMapConfig(t *testing.T) {
 		},
 	})
 
+	require.Nil(t, err)
 	log.Log.Info("cfg option: %v", cfg.Option)
 
 	require.Equal(t, cfg.FileCount, 2)
@@ -160,10 +164,11 @@ func TestConfigMapConfig(t *testing.T) {
 				}
 			})
 
-		cfg.MergeFrom(map[string]interface{}{
-			"slow_query_log": 0,
-			"general_log":    0,
-		}, ctx)
+		require.Nil(t,
+			cfg.MergeFrom(map[string]interface{}{
+				"slow_query_log": 0,
+				"general_log":    0,
+			}, ctx))
 
 		content, _ := cfg.ToCfgFileContent()
 

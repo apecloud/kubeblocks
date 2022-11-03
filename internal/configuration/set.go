@@ -18,8 +18,8 @@ package configuration
 
 import "github.com/spf13/viper"
 
-// Reference c++ set interface to implemented stl_set
-// With generics, it may be more generic
+// Set type Reference c++ set interface to implemented stl set.
+// With generics, it may be more generic.
 type Set map[string]struct{}
 
 func (s *Set) Insert(v string) bool {

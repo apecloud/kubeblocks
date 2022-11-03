@@ -133,6 +133,11 @@ func (m *Mysql) InitDelay() error {
 		return err
 	}
 
+	err = db.Ping()
+	if err != nil {
+		m.logger.Infof("unable to ping the DB")
+		return errors.Wrap(err, "unable to ping the DB")
+	}
 	m.db = db
 
 	return nil
@@ -153,8 +158,8 @@ func (m *Mysql) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindi
 		return nil, errors.Errorf("invoke request required")
 	}
 
-	err := m.InitDelay()
-	if err != nil {
+	if m.db == nil {
+		go m.InitDelay()
 		resp.Data = []byte("db not ready")
 		return resp, nil
 	}
@@ -319,11 +324,14 @@ func (m *Mysql) roleCheck(ctx context.Context, sql string) ([]byte, error) {
 			m.logger.Errorf("checkRole error: %", err)
 		}
 	}
-	if oriRole == "" {
+	//if oriRole == "" {
+	//	oriRole = role
+	//} else if oriRole != role {
+	if oriRole != role {
+		msg := fmt.Sprintf("role changed, original Role: %s, current role: %s", oriRole, role)
+		m.logger.Infof(msg)
 		oriRole = role
-	} else if oriRole != role {
-		oriRole = role
-		return nil, errors.Errorf("role changed, original Role: %s, current role: %s", oriRole, role)
+		return nil, errors.Errorf(msg)
 	}
 	return []byte(role), nil
 }

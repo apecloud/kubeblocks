@@ -1251,7 +1251,10 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 		// probe.HTTPGet.Path = "/"
 		// HACK: hardcoded - "http://localhost:3501/v1.0/bindings/mtest"
 		// TODO: http port should be checked to avoid conflicts instead of hardcoded 3051
-		probe.Exec.Command = []string{"curl", "-X", "POST", "-H", "Content-Type: application/json", "http://localhost:3501/v1.0/bindings/mtest", "-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
+		probe.Exec.Command = []string{"curl", "-X", "POST", "--fail-with-body",
+			"-H", "Content-Type: application/json",
+			"http://localhost:3501/v1.0/bindings/mtest",
+			"-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
 		probe.PeriodSeconds = componentProbes.RoleChangedProbe.PeriodSeconds
 		probe.SuccessThreshold = componentProbes.RoleChangedProbe.SuccessThreshold
 		probe.FailureThreshold = componentProbes.RoleChangedProbe.FailureThreshold
@@ -1269,8 +1272,8 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 			"--dapr-http-port", "3501",
 			"--dapr-grpc-port", "54215",
 			"--app-protocol", "http",
-			"--components-path", "/config/components",
-			"--fail-with-body"}
+			"--log-level", "debug",
+			"--components-path", "/config/components"}
 
 		// set pod name and namespace, for role label updating inside pod
 		podName := corev1.EnvVar{

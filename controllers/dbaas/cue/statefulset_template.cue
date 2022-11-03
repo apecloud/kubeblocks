@@ -29,6 +29,11 @@ probeContainer: {
 			command: []
 		}
 	}
+	startupProbe: {
+		tcpSocket: {
+			port: 3501
+		}
+	}
 }
 
 statefulset: {

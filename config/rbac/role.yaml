@@ -33,14 +33,6 @@ rules:
   verbs:
   - get
 - apiGroups:
-  - apps
-  resources:
-  - statefulsets
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - batch
   resources:
   - jobs

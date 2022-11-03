@@ -1191,6 +1191,12 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 				ValueFrom: nil,
 			})
 		}
+
+		// check if there is conflict contaierPorts
+		if isContainerPortsConflict(c) {
+			reqCtx.Log.Info("containerPorts conflict", "container", c)
+			return nil, fmt.Errorf("containerPorts conflict: [%+v]", c)
+		}
 	}
 	return &sts, nil
 }
@@ -1210,6 +1216,11 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 		return nil, err
 	}
 	probeServicePort := viper.GetString("PROBE_SERVICE_PORT")
+	probePort, err := strconv.ParseInt(probeServicePort, 10, 32)
+	if err != nil {
+		return nil, err
+	}
+
 	probeContainers := []corev1.Container{}
 	componentProbes := params.component.Probes
 	reqCtx.Log.Info("probe", "settings", componentProbes)
@@ -1258,7 +1269,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 		probe.PeriodSeconds = componentProbes.RoleChangedProbe.PeriodSeconds
 		probe.SuccessThreshold = componentProbes.RoleChangedProbe.SuccessThreshold
 		probe.FailureThreshold = componentProbes.RoleChangedProbe.FailureThreshold
-		container.StartupProbe.TCPSocket.Port = intstr.FromString(probeServicePort)
+		container.StartupProbe.TCPSocket.Port = intstr.FromInt(int(probePort))
 		probeContainers = append(probeContainers, container)
 	}
 
@@ -1293,10 +1304,6 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 		}
 		container.Env = append(container.Env, podName, podNamespace)
 
-		probePort, err := strconv.ParseInt(probeServicePort, 10, 32)
-		if err != nil {
-			return nil, err
-		}
 		// TODO: ports should be checked to avoid conflicts instead of hardcoded values
 		container.Ports = []corev1.ContainerPort{{
 			ContainerPort: int32(probePort),

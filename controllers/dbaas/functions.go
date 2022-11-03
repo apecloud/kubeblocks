@@ -168,3 +168,16 @@ func getPortByName(container *corev1.Container, portName string) *corev1.Contain
 
 	return nil
 }
+
+// check containerPorts conflict for general built-in
+func isContainerPortsConflict(container *corev1.Container) bool {
+	set := map[int32]bool{}
+	for _, v := range container.Ports {
+		_, ok := set[v.ContainerPort]
+		if ok {
+			return true
+		}
+		set[v.ContainerPort] = true
+	}
+	return false
+}

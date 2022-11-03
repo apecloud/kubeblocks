@@ -51,7 +51,6 @@ func init() {
 			Indexer:   make(map[string]*viper.Viper, 1),
 		}
 
-		//v := viper.New()
 		v := viper.NewWithOptions(viper.KeyDelimiter(CfgKeyDelimiter))
 
 		v.SetConfigType(string(option.CfgType))
@@ -77,11 +76,12 @@ func init() {
 			Indexer:   make(map[string]*viper.Viper, 1),
 		}
 
-		//v := viper.New()
 		v := viper.NewWithOptions(viper.KeyDelimiter(CfgKeyDelimiter))
 		v.SetConfigType(string(option.CfgType))
 		v.SetConfigFile(option.Path)
-		v.ReadInConfig()
+		if err := v.ReadInConfig(); err != nil {
+			return nil, wrapError(err, "failed to load config: [%s]", option.Path)
+		}
 		meta.V[0] = v
 		meta.Indexer[meta.Name] = v
 		return &meta, nil
@@ -112,10 +112,11 @@ func init() {
 
 		var index = 0
 		for fileName, content := range ctx.Configurations {
-			//v := viper.New()
 			v := viper.NewWithOptions(viper.KeyDelimiter(CfgKeyDelimiter))
 			v.SetConfigType(string(option.CfgType))
-			v.ReadConfig(bytes.NewReader([]byte(content)))
+			if err := v.ReadConfig(bytes.NewReader([]byte(content))); err != nil {
+				return nil, wrapError(err, "failed to load config: filename[%s]", fileName)
+			}
 			meta.Indexer[fileName] = v
 			meta.V[index] = v
 			index++
@@ -163,10 +164,6 @@ func NewConfigLoader(option CfgOption) (*DConfig, error) {
 		CfgWrapper: meta,
 	}, nil
 }
-
-//type Option interface {
-//	apply(ctx *QueryContext)
-//}
 
 // Option for operator
 type Option func(ctx *CfgOpOption)
@@ -246,10 +243,10 @@ func (c *CfgWrapper) Diff(target *CfgWrapper) (*ConfigDiffInformation, error) {
 	}
 
 	for elem := range *updateSet {
-		o, _ := c.Indexer[elem]
-		n, _ := target.Indexer[elem]
+		old := c.Indexer[elem]
+		new := target.Indexer[elem]
 
-		patch, err := jsonPatch(o.AllSettings(), n.AllSettings())
+		patch, err := jsonPatch(old.AllSettings(), new.AllSettings())
 		if err != nil {
 			return nil, err
 		}

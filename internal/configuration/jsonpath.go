@@ -19,6 +19,7 @@ package configuration
 import (
 	"bytes"
 	"encoding/json"
+
 	"github.com/bhmj/jsonslice"
 	jsonpatch "github.com/evanphx/json-patch"
 )

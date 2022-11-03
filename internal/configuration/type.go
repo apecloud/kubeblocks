@@ -39,12 +39,11 @@ type RawConfig struct {
 	RawData string
 }
 
-// TODO(zt) Support Init config
 type IniContext struct {
 	SectionName string
 }
 
-// TODO(zt) Support Xml config
+// XmlContext TODO(zt) Support Xml config
 type XmlContext struct {
 }
 
@@ -65,19 +64,17 @@ type CfgOpOption struct {
 }
 
 type ConfigOperator interface {
-	// update parameter by keyvalue
+	// MergeFrom update parameter by keyvalue
 	MergeFrom(params map[string]interface{}, option CfgOpOption) error
 
 	// MergeFromConfig(fileContent []byte, option CfgOpOption) error
-	//
 	// MergePatch(jsonPatch []byte, option CfgOpOption) error
+	// Diff(target *ConfigOperator) (*ConfigDiffInformation, error)
 
-	//Diff(target *ConfigOperator) (*ConfigDiffInformation, error)
-
-	// get parameter
+	// Query get parameter
 	Query(jsonpath string, option CfgOpOption) ([]byte, error)
 
-	// to configurate file content
+	// ToCfgFileContent to configuration file content
 	ToCfgFileContent() (map[string]string, error)
 }
 

@@ -229,34 +229,26 @@ var _ = Describe("OpsRequest webhook", func() {
 	Context("When appVersion create and update", func() {
 		It("Should webhook validate passed", func() {
 			By("By create a clusterDefinition")
-			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
-			Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
-			// wait until ClusterDefinition created
+
+			// wait until ClusterDefinition and AppVersion created
 			Eventually(func() bool {
-				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)
+				clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
+				Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
+				By("By creating a appVersion")
+				appVersion := createTestAppVersionObj(clusterDefinitionName, appVersionName)
+				err := k8sClient.Create(ctx, appVersion)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
-			By("By creating a appVersion")
-			appVersion := createTestAppVersionObj(clusterDefinitionName, appVersionName)
-			Expect(k8sClient.Create(ctx, appVersion)).Should(Succeed())
-			// wait until AppVersion created
-			Eventually(func() bool {
-				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: appVersionName}, appVersion)
-				return err == nil
-			}, timeout, interval).Should(BeTrue())
-
-			By("By testing spec.clusterDef is legal")
 			opsRequest := createTestOpsRequest(clusterName, opsRequestName, UpgradeType)
-			Expect(k8sClient.Create(ctx, opsRequest)).ShouldNot(Succeed())
-
-			By("By create a new cluster ")
-			cluster, _ := createTestCluster(clusterDefinitionName, appVersionName, clusterName)
-			Expect(k8sClient.Create(ctx, cluster)).Should(Succeed())
-
+			cluster := &Cluster{}
 			// wait until Cluster created
 			Eventually(func() bool {
-				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: cluster.Namespace}, &Cluster{})
+				By("By testing spec.clusterDef is legal")
+				Expect(k8sClient.Create(ctx, opsRequest)).ShouldNot(Succeed())
+				By("By create a new cluster ")
+				cluster, _ = createTestCluster(clusterDefinitionName, appVersionName, clusterName)
+				err := k8sClient.Create(ctx, cluster)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 

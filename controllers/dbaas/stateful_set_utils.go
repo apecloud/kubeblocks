@@ -18,6 +18,7 @@ limitations under the License.
 package dbaas
 
 import (
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"regexp"
 	"strconv"
 
@@ -67,3 +68,51 @@ func getPodRevision(pod *corev1.Pod) string {
 }
 
 // ------- end copy from stateful_set_utils.go ----
+
+// ascendingOrdinalSts is a sort.Interface that Sorts a list of StatefulSet based on the ordinals extracted
+// from the StatefulSet.
+type descendingOrdinalSts []*appsv1.StatefulSet
+
+var statefulSetRegex = regexp.MustCompile("(.*)-([0-9]+)$")
+
+func (aos descendingOrdinalSts) Len() int {
+	return len(aos)
+}
+
+func (aos descendingOrdinalSts) Swap(i, j int) {
+	aos[i], aos[j] = aos[j], aos[i]
+}
+
+func (aos descendingOrdinalSts) Less(i, j int) bool {
+	return getOrdinalSts(aos[i]) > getOrdinalSts(aos[j])
+}
+
+// getOrdinal gets StatefulSet's ordinal. If StatefulSet has no ordinal, -1 is returned.
+func getOrdinalSts(sts *appsv1.StatefulSet) int {
+	_, ordinal := getParentNameAndOrdinalSts(sts)
+	return ordinal
+}
+
+// getParentNameAndOrdinalSts gets the name of cluster-component and StatefulSet's ordinal as extracted from its Name. If
+// the StatefulSet's Name was not match a statefulSetRegex, its parent is considered to be empty string, and its ordinal is considered
+// to be -1.
+func getParentNameAndOrdinalSts(sts *appsv1.StatefulSet) (string, int) {
+	parent := ""
+	ordinal := -1
+	subMatches := statefulSetRegex.FindStringSubmatch(sts.Name)
+	if len(subMatches) < 3 {
+		return parent, ordinal
+	}
+	parent = subMatches[1]
+	if i, err := strconv.ParseInt(subMatches[2], 10, 32); err == nil {
+		ordinal = int(i)
+	}
+	return parent, ordinal
+}
+
+func checkStsIsPrimary(sts *appsv1.StatefulSet) bool {
+	if sts.Labels[replicationSetRoleLabelKey] == string(dbaasv1alpha1.Primary) {
+		return true
+	}
+	return false
+}

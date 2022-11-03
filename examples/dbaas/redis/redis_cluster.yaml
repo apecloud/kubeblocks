@@ -12,6 +12,7 @@ spec:
     type: replication
     monitor: false
     primaryStsIndex: 0
+    replicas: 2
     volumeClaimTemplates:
     - name: data
       spec:

@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -615,7 +616,7 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 			*params.applyObjs = append(*params.applyObjs, configs...)
 		}
 	case dbaasv1alpha1.Replication:
-		rstsList, err := buildReplicationSet(reqCtx, *params)
+		rstsList, err := buildReplicationSet(reqCtx, cli, *params)
 		if err != nil {
 			return err
 		}
@@ -683,22 +684,29 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	ctx := reqCtx.Ctx
 	logger := reqCtx.Log
 	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
-	var stsList []*appsv1.StatefulSet
+	var newCreateStsList []*appsv1.StatefulSet
+	var existStsList []*appsv1.StatefulSet
 	for _, obj := range objs {
 		logger.Info("create or update", "objs", obj)
 		if err := controllerutil.SetOwnerReference(cluster, obj, scheme); err != nil {
 			return err
 		}
-		stsObj, ok := obj.(*appsv1.StatefulSet)
-		if ok {
-			stsList = append(stsList, stsObj)
+		// appendToStsList is used to handleReplicationSet(...) when componentType is replication
+		appendToStsList := func(stsList []*appsv1.StatefulSet) []*appsv1.StatefulSet {
+			stsObj, ok := obj.(*appsv1.StatefulSet)
+			if ok {
+				stsList = append(stsList, stsObj)
+			}
+			return stsList
 		}
 		if err := cli.Create(ctx, obj); err == nil {
+			newCreateStsList = appendToStsList(newCreateStsList)
 			continue
-		} else if !apierrors.IsAlreadyExists(err) {
+		} else if apierrors.IsAlreadyExists(err) {
+			existStsList = appendToStsList(existStsList)
+		} else {
 			return err
 		}
-
 		if !controllerutil.ContainsFinalizer(obj, dbClusterFinalizerName) {
 			controllerutil.AddFinalizer(obj, dbClusterFinalizerName)
 		}
@@ -806,8 +814,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
-	// handle ReplicationSet including create a replication relationship and update Pod label, etc
-	err := handleReplicationSet(reqCtx, cli, cluster, stsList)
+	err := handleReplicationSet(reqCtx, cli, cluster, newCreateStsList, existStsList)
 	if err != nil {
 		return err
 	}
@@ -817,16 +824,135 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 func handleReplicationSet(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
-	stsList []*appsv1.StatefulSet) error {
-	podRoleMap := make(map[string]string, len(stsList))
-	for _, stsObj := range stsList {
-		var isPrimarySts = false
+	newCreateStsList []*appsv1.StatefulSet,
+	existStsList []*appsv1.StatefulSet) error {
+
+	filter := func(stsObj *appsv1.StatefulSet) (dbaasv1alpha1.ClusterDefinitionComponent, bool, error) {
 		typeName := getComponentTypeName(*cluster, stsObj.Labels[appComponentLabelKey])
 		component, err := getComponent(reqCtx.Ctx, cli, cluster, typeName)
 		if err != nil {
-			return err
+			return dbaasv1alpha1.ClusterDefinitionComponent{}, false, err
 		}
 		if component.ComponentType != dbaasv1alpha1.Replication {
+			return component, true, nil
+		}
+		return component, false, nil
+	}
+
+	// handle new create StatefulSets including create a replication relationship and update Pod label, etc
+	err := handleReplicationSetNewCreateSts(reqCtx, cli, cluster, newCreateStsList, filter)
+	if err != nil {
+		return err
+	}
+
+	// handle exist StatefulSets including delete sts when pod number larger than cluster.component[i].replicas
+	// delete the StatefulSets with the largest sequence number which is not the primary role
+	err = handleReplicationSetExistSts(reqCtx, cli, cluster, existStsList, filter)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func handleReplicationSetExistSts(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	cluster *dbaasv1alpha1.Cluster,
+	existStsList []*appsv1.StatefulSet,
+	filter func(stsObj *appsv1.StatefulSet) (dbaasv1alpha1.ClusterDefinitionComponent, bool, error)) error {
+
+	clusterCompReplicasMap := make(map[string]int, len(cluster.Spec.Components))
+	for _, clusterComp := range cluster.Spec.Components {
+		clusterCompReplicasMap[clusterComp.Name] = clusterComp.Replicas
+	}
+
+	compOwnsStsMap := make(map[string]int)
+	stsToDeleteMap := make(map[string]int)
+	for _, stsObj := range existStsList {
+		_, skip, err := filter(stsObj)
+		if err != nil {
+			return err
+		}
+		if skip {
+			continue
+		}
+		if _, ok := compOwnsStsMap[stsObj.Labels[appComponentLabelKey]]; !ok {
+			compOwnsStsMap[stsObj.Labels[appComponentLabelKey]] = 0
+			stsToDeleteMap[stsObj.Labels[appComponentLabelKey]] = 0
+		}
+		compOwnsStsMap[stsObj.Labels[appComponentLabelKey]] += 1
+		if compOwnsStsMap[stsObj.Labels[appComponentLabelKey]] > clusterCompReplicasMap[stsObj.Labels[appComponentLabelKey]] {
+			stsToDeleteMap[stsObj.Labels[appComponentLabelKey]] += 1
+		}
+	}
+
+	for compKey, stsToDelNum := range stsToDeleteMap {
+		if stsToDelNum == 0 {
+			break
+		}
+		// list all statefulSets by componentKey label
+		allStsList := &appsv1.StatefulSetList{}
+		selector, err := labels.Parse(appComponentLabelKey + "=" + compKey)
+		if err != nil {
+			return err
+		}
+		if err := cli.List(reqCtx.Ctx, allStsList,
+			&client.ListOptions{Namespace: cluster.Namespace},
+			client.MatchingLabelsSelector{Selector: selector}); err != nil {
+			return err
+		}
+		if compOwnsStsMap[compKey] != len(allStsList.Items) {
+			return fmt.Errorf("statefulset total number has changed")
+		}
+		aos := make([]*appsv1.StatefulSet, 0)
+		partition := len(allStsList.Items) - stsToDelNum
+		for _, sts := range allStsList.Items {
+			// if current primary statefulSet ordinal is larger than target number replica, return err
+			if getOrdinalSts(&sts) > partition && checkStsIsPrimary(&sts) {
+				return fmt.Errorf("current primary statefulset ordinal is larger than target number replicas, can not be reduce, please switchover first")
+			}
+			aos = append(aos, sts.DeepCopy())
+		}
+
+		// sort the statefulSets by their ordinals
+		sort.Sort(descendingOrdinalSts(aos))
+
+		// delete statefulSets and svc, etc
+		for i := 0; i < stsToDelNum; i++ {
+			if err := cli.Delete(reqCtx.Ctx, aos[i]); err != nil {
+				return err
+			}
+			svc := &corev1.Service{}
+			svcKey := types.NamespacedName{
+				Namespace: cluster.Namespace,
+				Name:      fmt.Sprintf("%s-%d", aos[i].Name, 0),
+			}
+			if err := cli.Get(reqCtx.Ctx, svcKey, svc); err != nil {
+				return err
+			}
+			if err := cli.Delete(reqCtx.Ctx, svc); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func handleReplicationSetNewCreateSts(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	cluster *dbaasv1alpha1.Cluster,
+	newCreateStsList []*appsv1.StatefulSet,
+	filter func(stsObj *appsv1.StatefulSet) (dbaasv1alpha1.ClusterDefinitionComponent, bool, error)) error {
+
+	podRoleMap := make(map[string]string, len(newCreateStsList))
+	stsRoleMap := make(map[string]string, len(newCreateStsList))
+	for _, stsObj := range newCreateStsList {
+		var isPrimarySts = false
+		component, skip, err := filter(stsObj)
+		if err != nil {
+			return err
+		}
+		if skip {
 			continue
 		}
 		// get target engine pod info in stsObj
@@ -855,13 +981,26 @@ func handleReplicationSet(reqCtx intctrlutil.RequestCtx,
 			isPrimarySts = true
 		}
 		podRoleMap[dbEnginePod.Name] = string(dbaasv1alpha1.Primary)
+		stsRoleMap[stsObj.Name] = string(dbaasv1alpha1.Primary)
 		if !isPrimarySts {
 			podRoleMap[dbEnginePod.Name] = string(dbaasv1alpha1.Secondary)
+			stsRoleMap[stsObj.Name] = string(dbaasv1alpha1.Secondary)
 			// if not primary, create a replication relationship by running a Job with kube exec
 			err := createReplRelationJobAndEnsure(reqCtx, cli, cluster, component, stsObj, dbEnginePod)
 			if err != nil {
 				return err
 			}
+		}
+	}
+	// update replicationSet StatefulSet Label
+	for k, v := range stsRoleMap {
+		stsName := types.NamespacedName{
+			Namespace: cluster.Namespace,
+			Name:      k,
+		}
+		err := updateReplicationSetStsRoleLabel(cli, reqCtx.Ctx, stsName, v)
+		if err != nil {
+			return err
 		}
 	}
 	// update replicationSet Pod Label
@@ -870,7 +1009,7 @@ func handleReplicationSet(reqCtx intctrlutil.RequestCtx,
 			Namespace: cluster.Namespace,
 			Name:      k,
 		}
-		err := updateReplicationSetRoleLabel(cli, reqCtx.Ctx, podName, v)
+		err := updateReplicationSetPodRoleLabel(cli, reqCtx.Ctx, podName, v)
 		if err != nil {
 			return err
 		}
@@ -1314,9 +1453,23 @@ func buildSecret(params createParams) (*corev1.Secret, error) {
 }
 
 // buildReplicationSet build on stateful set of replication
-func buildReplicationSet(reqCtx intctrlutil.RequestCtx, params createParams) ([]*appsv1.StatefulSet, error) {
+func buildReplicationSet(reqCtx intctrlutil.RequestCtx, cli client.Client, params createParams) ([]*appsv1.StatefulSet, error) {
 	var stsList []*appsv1.StatefulSet
-	for i := 0; i < params.component.Replicas; i++ {
+
+	// get math.Max(params.component.Replicas, current exist statefulSet)
+	existStsList := &appsv1.StatefulSetList{}
+	selector, err := labels.Parse(appComponentLabelKey + "=" + params.component.Name)
+	if err != nil {
+		return stsList, err
+	}
+	if err := cli.List(reqCtx.Ctx, existStsList,
+		&client.ListOptions{Namespace: params.cluster.Namespace},
+		client.MatchingLabelsSelector{Selector: selector}); err != nil {
+		return stsList, err
+	}
+	replicaNum := math.Max(float64(len(existStsList.Items)), float64(params.component.Replicas))
+
+	for i := 0; i < int(replicaNum); i++ {
 		sts, err := buildSts(reqCtx, params)
 		if err != nil {
 			return nil, err

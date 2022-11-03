@@ -117,7 +117,7 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 	return updateConsensusSetRoleLabel(cli, reqCtx.Ctx, podName, role)
 }
 
-func updateReplicationSetRoleLabel(cli client.Client, ctx context.Context, podName types.NamespacedName, role string) error {
+func updateReplicationSetPodRoleLabel(cli client.Client, ctx context.Context, podName types.NamespacedName, role string) error {
 	pod := &corev1.Pod{}
 	if err := cli.Get(ctx, podName, pod); err != nil {
 		return err
@@ -126,6 +126,21 @@ func updateReplicationSetRoleLabel(cli client.Client, ctx context.Context, podNa
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Labels[replicationSetRoleLabelKey] = role
 	err := cli.Patch(ctx, pod, patch)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func updateReplicationSetStsRoleLabel(cli client.Client, ctx context.Context, stsName types.NamespacedName, role string) error {
+	sts := &appsv1.StatefulSet{}
+	if err := cli.Get(ctx, stsName, sts); err != nil {
+		return err
+	}
+
+	patch := client.MergeFrom(sts.DeepCopy())
+	sts.Labels[replicationSetRoleLabelKey] = role
+	err := cli.Patch(ctx, sts, patch)
 	if err != nil {
 		return err
 	}
@@ -584,7 +599,7 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 	var (
 		statefulSetList         = &appsv1.StatefulSetList{}
 		isOk                    = true
-		needSyncStatusComponent bool
+		needSyncStatusComponent = true
 	)
 	if err := r.Client.List(ctx, statefulSetList, client.InNamespace(cluster.Namespace),
 		client.MatchingLabels{appInstanceLabelKey: cluster.Name}); err != nil {
@@ -616,9 +631,12 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 			if v.Status.UpdateRevision == v.Status.CurrentRevision {
 				statefulStatusRevisionIsEquals = true
 			}
+		case dbaasv1alpha1.Replication:
+			if v.Status.UpdateRevision == v.Status.CurrentRevision {
+				statefulStatusRevisionIsEquals = true
+			}
 		}
-
-		var componentIsRunning bool
+		var componentIsRunning = true
 		// check whether the statefulset has reached the final state.
 		// when we delete the pod, statefulset.status may still be available due to statefulset controls the pod asynchronously,
 		// so we check the end variable
@@ -627,12 +645,11 @@ func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *db
 			v.Status.ObservedGeneration != v.GetGeneration() ||
 			!statefulStatusRevisionIsEquals || !end {
 			isOk = false
-		} else {
-			componentIsRunning = true
+			componentIsRunning = false
 		}
 		// when component phase is changed, set needSyncStatusComponent to true, then patch cluster.status
-		if ok := r.patchStatusComponentsWithStatefulSet(cluster, &v, componentIsRunning); ok {
-			needSyncStatusComponent = true
+		if ok := r.patchStatusComponentsWithStatefulSet(cluster, &v, componentIsRunning); !ok {
+			needSyncStatusComponent = false
 		}
 	}
 

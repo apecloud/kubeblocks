@@ -159,7 +159,7 @@ cue-vet: cuetool ## Run cue vet against code.
 	$(CUE) vet controllers/dbaas/cue/*.cue
 
 .PHONY: fast-lint
-fast-lint: staticcheck  # [INTERNAL] fast lint
+fast-lint: golangci staticcheck  # [INTERNAL] fast lint
 	$(GOLANGCILINT) run ./...
 
 .PHONY: lint

@@ -732,6 +732,11 @@ func (r *BackupJobReconciler) BuildBackupToolPodSpec(reqCtx intctrlutil.RequestC
 	podSpec.Containers = []corev1.Container{container}
 
 	podSpec.Volumes = clusterPod.Spec.Volumes
+	if backupPolicy.Spec.RemoteVolume == nil {
+		msg := fmt.Sprintf("backupPolicy %s remote volume is missing.", backupPolicy.Name)
+		r.Recorder.Event(backupJob, corev1.EventTypeWarning, "CreatedBackup", msg)
+		return podSpec, errors.New(msg)
+	}
 	podSpec.Volumes = append(podSpec.Volumes, *backupPolicy.Spec.RemoteVolume)
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
 

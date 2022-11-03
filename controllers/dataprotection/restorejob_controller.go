@@ -251,12 +251,6 @@ func (r *RestoreJobReconciler) getPodSpec(reqCtx intctrlutil.RequestCtx, restore
 		return podSpec, err
 	}
 
-	if backupPolicy.Spec.RemoteVolume == nil {
-		msg := fmt.Sprintf("backupPolicy %s remote volume is missing.", backupPolicy.Name)
-		r.Recorder.Event(restoreJob, corev1.EventTypeWarning, "CreatedRestore", msg)
-		return podSpec, errors.New(msg)
-	}
-
 	// get backup tool
 	backupTool := &dataprotectionv1alpha1.BackupTool{}
 	backupToolNameSpaceName := types.NamespacedName{
@@ -303,6 +297,11 @@ func (r *RestoreJobReconciler) getPodSpec(reqCtx intctrlutil.RequestCtx, restore
 
 	podSpec.Volumes = restoreJob.Spec.TargetVolumes
 
+	if backupPolicy.Spec.RemoteVolume == nil {
+		msg := fmt.Sprintf("backupPolicy %s remote volume is missing.", backupPolicy.Name)
+		r.Recorder.Event(restoreJob, corev1.EventTypeWarning, "CreatedRestore", msg)
+		return podSpec, errors.New(msg)
+	}
 	// add remote volumes
 	podSpec.Volumes = append(podSpec.Volumes, *backupPolicy.Spec.RemoteVolume)
 

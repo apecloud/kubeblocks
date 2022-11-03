@@ -30,7 +30,7 @@ type BackupPolicyTemplateSpec struct {
 
 	// which backup tool to perform database backup, only support one tool.
 	// +optional
-	BackupToolName string `json:"backupToolName"`
+	BackupToolName string `json:"backupToolName,omitempty"`
 
 	// TTL is a time.Duration-parseable string describing how long
 	// the Backup should be retained for.
@@ -43,11 +43,11 @@ type BackupPolicyTemplateSpec struct {
 
 	// execute hook commands for backup.
 	// +optional
-	Hooks BackupPolicyHook `json:"hooks"`
+	Hooks BackupPolicyHook `json:"hooks,omitempty"`
 
 	// array of remote volumes from CSI driver definition.
 	// +optional
-	RemoteVolume corev1.Volume `json:"remoteVolume"`
+	RemoteVolume corev1.Volume `json:"remoteVolume,omitempty"`
 
 	// limit count of backup stop retries on fail.
 	// if unset, retry unlimit attempted.

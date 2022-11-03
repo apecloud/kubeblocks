@@ -24,7 +24,9 @@ import (
 
 const (
 	// settings keys
-	cmNamespaceKey = "CM_NAMESPACE"
+	cmNamespaceKey              = "CM_NAMESPACE"
+	maxConcurReconAppVersionKey = "MAXCONCURRENTRECONCILES_APPVERSION"
+	maxConcurReconClusterDefKey = "MAXCONCURRENTRECONCILES_CLUSTERDEF"
 
 	// name of our custom finalizer
 	dbClusterFinalizerName    = "cluster.kubeblocks.io/finalizer"

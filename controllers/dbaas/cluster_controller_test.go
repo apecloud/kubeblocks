@@ -47,6 +47,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/statefulset"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var _ = Describe("Cluster Controller", func() {
@@ -931,7 +932,7 @@ spec:
 			// 2 followers
 			leaderCount, followerCount := 0, 0
 			for _, pod := range pods {
-				switch pod.Labels[consensusSetRoleLabelKey] {
+				switch pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] {
 				case leader:
 					leaderCount++
 				case follower:
@@ -955,7 +956,7 @@ spec:
 			By("By deleting leader pod")
 			leaderPod := &corev1.Pod{}
 			for _, pod := range pods {
-				if pod.Labels[consensusSetRoleLabelKey] == leader {
+				if pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] == leader {
 					leaderPod = &pod
 					break
 				}
@@ -1267,10 +1268,10 @@ spec:
 		pod := corev1.Pod{}
 		Expect(yaml.Unmarshal([]byte(podYaml), &pod)).Should(Succeed())
 		pod.Name = parentName + "-" + strconv.Itoa(i)
-		pod.Labels[consensusSetRoleLabelKey] = "follower"
+		pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] = "follower"
 		pods = append(pods, pod)
 	}
-	pods[1].Labels[consensusSetRoleLabelKey] = "leader"
+	pods[1].Labels[intctrlutil.ConsensusSetRoleLabelKey] = "leader"
 
 	return pods
 }

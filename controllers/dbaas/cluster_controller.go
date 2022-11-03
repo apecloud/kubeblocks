@@ -137,7 +137,7 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 
 	// update pod role label
 	patch := client.MergeFrom(pod.DeepCopy())
-	pod.Labels[consensusSetRoleLabelKey] = role
+	pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] = role
 	err := cli.Patch(ctx, pod, patch)
 	if err != nil {
 		return err
@@ -148,14 +148,14 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 	cluster := &dbaasv1alpha1.Cluster{}
 	err = cli.Get(ctx, types.NamespacedName{
 		Namespace: pod.Namespace,
-		Name:      pod.Labels[appInstanceLabelKey],
+		Name:      pod.Labels[intctrlutil.AppInstanceLabelKey],
 	}, cluster)
 	if err != nil {
 		return err
 	}
 
 	// get componentDef this pod belongs to
-	componentName := pod.Labels[appComponentLabelKey]
+	componentName := pod.Labels[intctrlutil.AppComponentLabelKey]
 	typeName := statefulset.GetComponentTypeName(*cluster, componentName)
 	componentDef, err := statefulset.GetComponentFromClusterDefinition(ctx, cli, cluster, typeName)
 	if err != nil {
@@ -436,8 +436,8 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 	}
 
 	ml := client.MatchingLabels{
-		appInstanceLabelKey: cluster.GetName(),
-		appNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
+		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
+		intctrlutil.AppNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
 	}
 	inNS := client.InNamespace(cluster.Namespace)
 	stsList := &appsv1.StatefulSetList{}
@@ -502,8 +502,8 @@ func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *d
 
 	inNS := client.InNamespace(cluster.Namespace)
 	ml := client.MatchingLabels{
-		appInstanceLabelKey: cluster.GetName(),
-		appNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
+		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
+		intctrlutil.AppNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
 	}
 
 	pvcList := &corev1.PersistentVolumeClaimList{}

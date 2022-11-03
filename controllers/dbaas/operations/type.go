@@ -34,8 +34,7 @@ const (
 
 	// annotation keys
 
-	RestartAnnotationKey    = "kubeblocks.io/restart"
-	OpsRequestAnnotationKey = "kubeblocks.io/ops-request"
+	RestartAnnotationKey = "kubeblocks.io/restart"
 )
 
 type OpsBehaviour struct {

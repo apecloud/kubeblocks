@@ -19,6 +19,7 @@ package statefulset
 import (
 	"context"
 	"encoding/json"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -32,6 +33,11 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+)
+
+const (
+	// OpsRequestReconcileAnnotationKey Notify OpsRequest to reconcile
+	OpsRequestReconcileAnnotationKey = "kubeblocks.io/reconcile"
 )
 
 // StatefulSetReconciler reconciles an Event object
@@ -84,7 +90,7 @@ func (r *StatefulSetReconciler) checkStatefulSetStatusAndSyncCluster(reqCtx intc
 	if labels == nil {
 		return nil
 	}
-	if err = r.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: labels[appInstanceLabelKey], Namespace: sts.Namespace}, cluster); err != nil {
+	if err = r.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: labels[intctrlutil.AppInstanceLabelKey], Namespace: sts.Namespace}, cluster); err != nil {
 		return err
 	}
 
@@ -101,7 +107,7 @@ func (r *StatefulSetReconciler) checkStatefulSetStatusAndSyncCluster(reqCtx intc
 	}
 	// when component phase is changed, set needSyncStatusComponent to true, then patch cluster.status
 	patch := client.MergeFrom(cluster.DeepCopy())
-	componentName := labels[appComponentLabelKey]
+	componentName := labels[intctrlutil.AppComponentLabelKey]
 	if ok := r.needSyncStatusComponents(cluster, componentName, componentIsRunning); !ok {
 		return nil
 	}
@@ -121,7 +127,7 @@ func (r *StatefulSetReconciler) handleUpdateByComponentType(reqCtx intctrlutil.R
 		labels                         = sts.GetLabels()
 	)
 	for _, v := range cluster.Spec.Components {
-		if v.Name != labels[appComponentLabelKey] {
+		if v.Name != labels[intctrlutil.AppComponentLabelKey] {
 			continue
 		}
 		if componentDef, err = GetComponentFromClusterDefinition(reqCtx.Ctx, r.Client, cluster, v.Type); err != nil || componentDef == nil {
@@ -184,7 +190,7 @@ func (r *StatefulSetReconciler) markRunningOpsRequestAnnotation(reqCtx intctrlut
 	if cluster.Annotations == nil {
 		return nil
 	}
-	if opsRequestValue, ok = cluster.Annotations[OpsRequestAnnotationKey]; !ok {
+	if opsRequestValue, ok = cluster.Annotations[intctrlutil.OpsRequestAnnotationKey]; !ok {
 		return nil
 	}
 	if err = json.Unmarshal([]byte(opsRequestValue), &opsRequestMap); err != nil {
@@ -219,15 +225,14 @@ func (r *StatefulSetReconciler) patchOpsRequestAnnotation(reqCtx intctrlutil.Req
 // SetupWithManager sets up the controller with the Manager.
 func (r *StatefulSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1.StatefulSet{}).
+		For(&appsv1.StatefulSet{}, builder.WithPredicates(predicate.NewPredicateFuncs(filterLabels))).
 		Owns(&corev1.Pod{}).
-		WithEventFilter(predicate.NewPredicateFuncs(filterLabels)).
 		Complete(r)
 }
 
 // filterLabels filter the resources according to labels
 func filterLabels(object client.Object) bool {
-	matchLabels := []string{appInstanceLabelKey, appComponentLabelKey}
+	matchLabels := []string{intctrlutil.AppInstanceLabelKey, intctrlutil.AppComponentLabelKey}
 	objLabels := object.GetLabels()
 	if objLabels == nil {
 		return false

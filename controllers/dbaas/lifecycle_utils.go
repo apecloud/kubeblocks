@@ -188,8 +188,8 @@ func toK8sVolumeClaimTemplates(templates []dbaasv1alpha1.ClusterComponentVolumeC
 func buildAffinityLabelSelector(clusterName string, componentName string) *metav1.LabelSelector {
 	return &metav1.LabelSelector{
 		MatchLabels: map[string]string{
-			appInstanceLabelKey:  clusterName,
-			appComponentLabelKey: componentName,
+			intctrlutil.AppInstanceLabelKey:  clusterName,
+			intctrlutil.AppComponentLabelKey: componentName,
 		},
 	}
 }
@@ -630,7 +630,7 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 func addSelectorLabels(service *corev1.Service, component *Component, accessMode dbaasv1alpha1.AccessMode) {
 	addSelector := func(service *corev1.Service, member dbaasv1alpha1.ConsensusMember, accessMode dbaasv1alpha1.AccessMode) {
 		if member.AccessMode == accessMode && len(member.Name) > 0 {
-			service.Spec.Selector[consensusSetRoleLabelKey] = member.Name
+			service.Spec.Selector[intctrlutil.ConsensusSetRoleLabelKey] = member.Name
 		}
 	}
 
@@ -773,10 +773,10 @@ func buildHeadlessSvcs(params createParams, sts *appsv1.StatefulSet) ([]client.O
 		pod.ObjectMeta.Name = fmt.Sprintf("%s-%d", sts.GetName(), i)
 		pod.ObjectMeta.Namespace = sts.Namespace
 		pod.ObjectMeta.Labels = map[string]string{
-			statefulSetPodNameLabelKey: pod.ObjectMeta.Name,
-			appNameLabelKey:            stsPodLabels[appNameLabelKey],
-			appInstanceLabelKey:        stsPodLabels[appInstanceLabelKey],
-			appComponentLabelKey:       stsPodLabels[appNameLabelKey],
+			statefulSetPodNameLabelKey:       pod.ObjectMeta.Name,
+			intctrlutil.AppNameLabelKey:      stsPodLabels[intctrlutil.AppNameLabelKey],
+			intctrlutil.AppInstanceLabelKey:  stsPodLabels[intctrlutil.AppInstanceLabelKey],
+			intctrlutil.AppComponentLabelKey: stsPodLabels[intctrlutil.AppNameLabelKey],
 		}
 		pod.Spec.Containers = sts.Spec.Template.Spec.Containers
 

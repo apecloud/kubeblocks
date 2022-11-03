@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // ReconcileActionWithCluster it will be performed when action is done and loop util OpsRequest.status.phase is Succeed.
@@ -178,7 +179,7 @@ func getOpsRequestAnnotation(cluster *dbaasv1alpha1.Cluster, toClusterPhase dbaa
 	if cluster.Annotations == nil {
 		return nil
 	}
-	if opsRequestValue, ok = cluster.Annotations[OpsRequestAnnotationKey]; !ok {
+	if opsRequestValue, ok = cluster.Annotations[intctrlutil.OpsRequestAnnotationKey]; !ok {
 		return nil
 	}
 	// opsRequest annotation value in cluster to map
@@ -250,7 +251,7 @@ func deleteOpsRequestAnnotationInCluster(opsRes *OpsResource) error {
 	if opsRes.Cluster == nil || opsRes.Cluster.Annotations == nil {
 		return nil
 	}
-	if opsRequestValue, ok = opsRes.Cluster.Annotations[OpsRequestAnnotationKey]; !ok {
+	if opsRequestValue, ok = opsRes.Cluster.Annotations[intctrlutil.OpsRequestAnnotationKey]; !ok {
 		return nil
 	}
 	if err := json.Unmarshal([]byte(opsRequestValue), &opsRequestMap); err != nil {
@@ -283,7 +284,7 @@ func addOpsRequestAnnotationToCluster(opsRes *OpsResource, toClusterPhase dbaasv
 	if opsRes.Cluster.Annotations == nil {
 		opsRes.Cluster.Annotations = map[string]string{}
 	}
-	if opsRequestValue, ok = opsRes.Cluster.Annotations[OpsRequestAnnotationKey]; !ok {
+	if opsRequestValue, ok = opsRes.Cluster.Annotations[intctrlutil.OpsRequestAnnotationKey]; !ok {
 		opsRequestValue = "{}"
 	}
 	if err := json.Unmarshal([]byte(opsRequestValue), &opsRequestMap); err != nil {
@@ -298,9 +299,9 @@ func patchClusterAnnotations(opsRes *OpsResource, opsRequestMap map[dbaasv1alpha
 	patch := client.MergeFrom(opsRes.Cluster.DeepCopy())
 	if len(opsRequestMap) > 0 {
 		result, _ := json.Marshal(opsRequestMap)
-		opsRes.Cluster.Annotations[OpsRequestAnnotationKey] = string(result)
+		opsRes.Cluster.Annotations[intctrlutil.OpsRequestAnnotationKey] = string(result)
 	} else {
-		delete(opsRes.Cluster.Annotations, OpsRequestAnnotationKey)
+		delete(opsRes.Cluster.Annotations, intctrlutil.OpsRequestAnnotationKey)
 	}
 	return opsRes.Client.Patch(opsRes.Ctx, opsRes.Cluster, patch)
 }

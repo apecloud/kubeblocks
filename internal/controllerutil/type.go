@@ -25,6 +25,18 @@ import (
 )
 
 const (
+	// common label and annotation keys
+
+	AppInstanceLabelKey      = "app.kubernetes.io/instance"
+	AppComponentLabelKey     = "app.kubernetes.io/component-name"
+	AppNameLabelKey          = "app.kubernetes.io/name"
+	ConsensusSetRoleLabelKey = "cs.dbaas.kubeblocks.io/role"
+
+	// OpsRequestAnnotationKey OpsRequest annotation key in Cluster
+	OpsRequestAnnotationKey = "kubeblocks.io/ops-request"
+)
+
+const (
 	// EventReasonNotFoundCR referenced custom resource not found
 	EventReasonNotFoundCR = "NotFoundCR"
 	// EventReasonRefCRUnavailable  referenced custom resource is unavailable

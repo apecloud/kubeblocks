@@ -26,12 +26,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // handleConsensusSetUpdate handle ConsensusSet component when it to do updating
 func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, stsObj *appsv1.StatefulSet) (bool, error) {
 	// get typeName from stsObj.name
-	typeName := GetComponentTypeName(*cluster, stsObj.Labels[appComponentLabelKey])
+	typeName := GetComponentTypeName(*cluster, stsObj.Labels[intctrlutil.AppComponentLabelKey])
 
 	// get component from ClusterDefinition by typeName
 	component, err := GetComponentFromClusterDefinition(ctx, cli, cluster, typeName)
@@ -47,7 +48,7 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 	podList := &corev1.PodList{}
 	if err = cli.List(ctx, podList,
 		&client.ListOptions{Namespace: stsObj.Namespace},
-		client.MatchingLabels{appComponentLabelKey: stsObj.Labels[appComponentLabelKey]}); err != nil {
+		client.MatchingLabels{intctrlutil.AppComponentLabelKey: stsObj.Labels[intctrlutil.AppComponentLabelKey]}); err != nil {
 		return false, err
 	}
 	pods := make([]corev1.Pod, 0)
@@ -118,8 +119,8 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 
 	// make a Serial pod list, e.g.: learner -> follower1 -> follower2 -> leader
 	sort.SliceStable(pods, func(i, j int) bool {
-		roleI := pods[i].Labels[consensusSetRoleLabelKey]
-		roleJ := pods[j].Labels[consensusSetRoleLabelKey]
+		roleI := pods[i].Labels[intctrlutil.ConsensusSetRoleLabelKey]
+		roleJ := pods[j].Labels[intctrlutil.ConsensusSetRoleLabelKey]
 		if roleI == learner {
 			return true
 		}
@@ -176,7 +177,7 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 		// append learner
 		index := 0
 		for _, pod := range pods {
-			if pod.Labels[consensusSetRoleLabelKey] != learner {
+			if pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] != learner {
 				break
 			}
 			nextStep := &Step{}
@@ -191,7 +192,7 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 		podList := pods[index:]
 		followerCount := 0
 		for _, pod := range podList {
-			if followers[pod.Labels[consensusSetRoleLabelKey]] == exist {
+			if followers[pod.Labels[intctrlutil.ConsensusSetRoleLabelKey]] == exist {
 				followerCount++
 			}
 		}

@@ -166,6 +166,7 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	appVersion.Status.ClusterDefSyncStatus = dbaasv1alpha1.InSyncStatus
 	appVersion.Status.Phase = dbaasv1alpha1.AvailablePhase
+	appVersion.Status.Message = ""
 	appVersion.Status.ObservedGeneration = appVersion.GetGeneration()
 	appVersion.Status.ClusterDefGeneration = clusterdefinition.GetGeneration()
 	if err = r.Client.Status().Patch(ctx, appVersion, patch); err != nil {

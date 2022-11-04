@@ -28,11 +28,28 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// getObjectList get object list with cluster instance label
-func getObjectList(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, objectList client.ObjectList) error {
+// getObjectList get k8s workload list with cluster
+func getObjectListForCluster(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, objectList client.ObjectList) error {
 	matchLabels := client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey: cluster.Name,
+		intctrlutil.AppInstanceLabelKey:  cluster.Name,
+		intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
 	}
+	inNamespace := client.InNamespace(cluster.Namespace)
+	return cli.List(ctx, objectList, matchLabels, inNamespace)
+}
+
+// getComponentMatchLabels get the labels for matching the cluster component
+func getComponentMatchLabels(clusterName, componentName string) client.ListOption {
+	return client.MatchingLabels{
+		intctrlutil.AppInstanceLabelKey:  clusterName,
+		intctrlutil.AppComponentLabelKey: componentName,
+		intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
+	}
+}
+
+// getObjectListByComponentName get k8s workload list with component
+func getObjectListByComponentName(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, objectList client.ObjectList, componentName string) error {
+	matchLabels := getComponentMatchLabels(cluster.Name, componentName)
 	inNamespace := client.InNamespace(cluster.Namespace)
 	return cli.List(ctx, objectList, matchLabels, inNamespace)
 }

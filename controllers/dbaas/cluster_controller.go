@@ -104,9 +104,9 @@ func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *db
 	return nil
 }
 
-func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, event *corev1.Event) error {
+func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
 	if event.InvolvedObject.FieldPath != k8score.ProbeRoleChangedCheckPath {
-		return nil
+		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
 	}
 
 	// get role
@@ -485,7 +485,7 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 	if componentTypeMap, err = getComponentTypeMapWithCluster(ctx, r.Client, cluster); err != nil {
 		return false, err
 	}
-	if err = getObjectList(ctx, r.Client, cluster, statefulSetList); err != nil {
+	if err = getObjectListForCluster(ctx, r.Client, cluster, statefulSetList); err != nil {
 		return false, err
 	}
 	for _, sts := range statefulSetList.Items {
@@ -500,6 +500,7 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 			if statefulStatusRevisionIsEquals, err = checkConsensusStatefulSetRevision(ctx, r.Client, &sts); err != nil {
 				return false, err
 			}
+			// TODO check pod is ready by role label
 		case dbaasv1alpha1.Stateful:
 			// when stateful updateStrategy is rollingUpdate, need to check revision
 			if sts.Status.UpdateRevision != sts.Status.CurrentRevision {
@@ -520,7 +521,7 @@ func (r *ClusterReconciler) handleComponentStatusWithDeployment(ctx context.Cont
 		needSyncComponentStatus bool
 		deploymentList          = &appsv1.DeploymentList{}
 	)
-	if err := getObjectList(ctx, r.Client, cluster, deploymentList); err != nil {
+	if err := getObjectListForCluster(ctx, r.Client, cluster, deploymentList); err != nil {
 		return false, err
 	}
 	for _, deploy := range deploymentList.Items {

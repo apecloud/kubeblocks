@@ -58,6 +58,7 @@ func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster, componentName stri
 	// we should change component phase to Running
 	if statusComponent.Phase != dbaasv1alpha1.RunningPhase && componentIsRunning {
 		statusComponent.Phase = dbaasv1alpha1.RunningPhase
+		statusComponent.Message = ""
 		return true
 	}
 	return false
@@ -155,8 +156,8 @@ func checkComponentStatusAndSyncCluster(reqCtx intctrlutil.RequestCtx,
 	return nil
 }
 
-// workloadFilterPredicate provide filter predicate for workload objects, i.e., deployment/statefulset/pod.
-func workloadFilterPredicate(object client.Object) bool {
+// WorkloadFilterPredicate provide filter predicate for workload objects, i.e., deployment/statefulset/pod.
+func WorkloadFilterPredicate(object client.Object) bool {
 	objLabels := object.GetLabels()
 	if objLabels == nil {
 		return false

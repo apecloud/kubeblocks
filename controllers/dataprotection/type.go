@@ -26,12 +26,12 @@ import (
 const (
 	// name of our custom finalizer
 	dataProtectionFinalizerName = "dataprotection.kubeblocks.io/finalizer"
+	
+	reconcileInterval = time.Second * 5
 
 	// settings keys
 	maxConcurDataProtectionReconKey = "MAXCONCURRENTRECONCILES_DATAPROTECTION"
 )
-
-const reconcileInterval = time.Second * 5
 
 func init() {
 	viper.SetDefault(maxConcurDataProtectionReconKey, runtime.NumCPU()*2)

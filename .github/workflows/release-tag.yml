@@ -1,15 +1,17 @@
-name: RELEASE-PUBLISH
+name: RELEASE-TAG
 
 on:
-  release:
-    types:
-      - published
+  push:
+    branches:
+      - master
+      - release-*
+    tags:
+      - v*
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   TAG_NAME: ${{ github.ref_name }}
   GO_VERSION: '1.19'
-
 
 jobs:
   upload-release:

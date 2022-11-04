@@ -18,6 +18,7 @@ package config
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"time"
 
@@ -26,29 +27,31 @@ import (
 )
 
 var (
-	HostIP                 string
-	MaxENI                 int
-	MinPrivateIP           int
-	EnableDebug            bool
-	RPCPort                int
-	CleanLeakedENIInterval time.Duration
-	ENIReconcileInterval   time.Duration
-	RefreshNodeInterval    time.Duration
-	TrafficNodeLabels      map[string]string
-	EndpointsLabels        map[string]string
+	HostIP                  string
+	MaxENI                  int
+	MinPrivateIP            int
+	EnableDebug             bool
+	RPCPort                 int
+	CleanLeakedENIInterval  time.Duration
+	ENIReconcileInterval    time.Duration
+	RefreshNodeInterval     time.Duration
+	TrafficNodeLabels       map[string]string
+	EndpointsLabels         map[string]string
+	MaxConcurrentReconciles int
 )
 
 const (
-	EnvHostIP                 = "HOST_IP"
-	EnvMaxENI                 = "MAX_ENI"
-	EnvMinPrivateIP           = "MIN_PRIVATE_IP"
-	EnvEnableDebug            = "ENABLE_DEBUG"
-	EnvRPCPort                = "RPC_PORT"
-	EnvENIReconcileInterval   = "ENI_RECONCILE_INTERVAL"
-	EnvCleanLeakedENIInterval = "CLEAN_LEAKED_ENI_INTERVAL"
-	EnvRefreshNodes           = "REFRESH_NODES_INTERVAL"
-	EnvTrafficNodeLabels      = "TRAFFIC_NODE_LABELS"
-	EnvEndpointsLabels        = "ENDPOINTS_LABELS"
+	EnvHostIP                  = "HOST_IP"
+	EnvMaxENI                  = "MAX_ENI"
+	EnvMinPrivateIP            = "MIN_PRIVATE_IP"
+	EnvEnableDebug             = "ENABLE_DEBUG"
+	EnvRPCPort                 = "RPC_PORT"
+	EnvENIReconcileInterval    = "ENI_RECONCILE_INTERVAL"
+	EnvCleanLeakedENIInterval  = "CLEAN_LEAKED_ENI_INTERVAL"
+	EnvRefreshNodes            = "REFRESH_NODES_INTERVAL"
+	EnvTrafficNodeLabels       = "TRAFFIC_NODE_LABELS"
+	EnvEndpointsLabels         = "ENDPOINTS_LABELS"
+	EnvMaxConcurrentReconciles = "MAX_CONCURRENT_RECONCILES"
 )
 
 func init() {
@@ -80,6 +83,9 @@ func init() {
 
 	_ = viper.BindEnv(EnvEndpointsLabels)
 	viper.SetDefault(EnvEndpointsLabels, "")
+
+	_ = viper.BindEnv(EnvMaxConcurrentReconciles)
+	viper.SetDefault(EnvMaxConcurrentReconciles, runtime.NumCPU()*2)
 }
 
 func ReadConfig(logger logr.Logger) {
@@ -98,6 +104,7 @@ func ReadConfig(logger logr.Logger) {
 	RefreshNodeInterval = time.Duration(viper.GetInt(EnvRefreshNodes)) * time.Second
 	TrafficNodeLabels = ParseLabels(viper.GetString(EnvTrafficNodeLabels))
 	EndpointsLabels = ParseLabels(viper.GetString(EnvEndpointsLabels))
+	MaxConcurrentReconciles = viper.GetInt(EnvMaxConcurrentReconciles)
 }
 
 func ParseLabels(labels string) map[string]string {

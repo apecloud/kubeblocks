@@ -701,10 +701,12 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			}
 			return stsList
 		}
-		if err := cli.Create(ctx, obj); err == nil {
+		err := cli.Create(ctx, obj)
+		if err == nil {
 			newCreateStsList = appendToStsList(newCreateStsList)
 			continue
-		} else if apierrors.IsAlreadyExists(err) {
+		}
+		if apierrors.IsAlreadyExists(err) {
 			existStsList = appendToStsList(existStsList)
 		} else {
 			return err

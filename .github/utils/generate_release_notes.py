@@ -66,8 +66,6 @@ if os.getenv("GITHUB_ENV"):
 
 releaseNotePath = "docs/release_notes/v{}.md".format(releaseVersion)
 
-os.chdir("/Users/ldm/Documents/go/src/github.com/ldming/kubeblocks")
-
 # get milestone
 repoMilestones = re.findall(milestoneRegex, issue.body)
 if len(repoMilestones) == 0:
@@ -117,7 +115,7 @@ for change in sorted(changes, key=lambda c: (get_change_priority(c[0]), c[1].id)
         changeLines.append("### " + subtitle)
     breakingChange = 'breaking-change' in [label.name for label in change[1].labels]
     changeUrl = " ([#" + str(change[1].number) + "](" + change[4] + ")"
-    changeAuthor = ", [" + change[3] + "](https://github.com/{}".format(change[3][1:]) + "))"
+    changeAuthor = ", " + change[3] + ")"
     changeLines.append("- " + change[2] + changeUrl + changeAuthor)
     if breakingChange:
         breakingChangeLines.append("- " + change[2] + changeUrl + changeAuthor)

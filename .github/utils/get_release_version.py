@@ -14,15 +14,15 @@ with open(os.getenv("GITHUB_ENV"), "a") as githubEnv:
         print("This is not a release tag")
         sys.exit(0)
 
-    releaseVersion = gitRef[len(tagRefPrefix)]
+    releaseVersion = gitRef[len(tagRefPrefix):]
     releaseNotePath = "docs/release_notes/v{}.md".format(releaseVersion)
 
     if gitRef.find("-alpha.") > 0:
-        print("Alpha release build from {}...").format(gitRef)
+        print("Alpha release build from {} ...").format(gitRef)
     elif gitRef.find("-beta.") > 0:
-        print("Beta release build from {}...").format(gitRef)
+        print("Beta release build from {} ...").format(gitRef)
     elif gitRef.find("-rc.") > 0:
-        print("Release Candidate build from {}...").format(gitRef)
+        print("Release Candidate build from {} ...").format(gitRef)
     else:
         print("Checking if {} exists".format(releaseNotePath))
         if os.path.exists(releaseNotePath):
@@ -31,6 +31,6 @@ with open(os.getenv("GITHUB_ENV"), "a") as githubEnv:
         else:
             print("{} is not found".format(releaseNotePath))
             sys.exit(1)
-        print("Release build from {}...".format(gitRef))
+        print("Release build from {} ...".format(gitRef))
 
     githubEnv.write("REL_VERSION={}\n".format(releaseVersion))

@@ -18,9 +18,10 @@ limitations under the License.
 package dbaas
 
 import (
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"regexp"
 	"strconv"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -111,8 +112,5 @@ func getParentNameAndOrdinalSts(sts *appsv1.StatefulSet) (string, int) {
 }
 
 func checkStsIsPrimary(sts *appsv1.StatefulSet) bool {
-	if sts.Labels[replicationSetRoleLabelKey] == string(dbaasv1alpha1.Primary) {
-		return true
-	}
-	return false
+	return sts.Labels[replicationSetRoleLabelKey] == string(dbaasv1alpha1.Primary)
 }

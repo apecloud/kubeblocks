@@ -173,7 +173,7 @@ type ClusterComponent struct {
 	// +kubebuilder:validation:Enum={ClusterIP,NodePort,LoadBalancer}
 	// +optional
 	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
-	
+
 	// PrimaryStsIndex determines which statefulset is primary when Type is Replication
 	// +optional
 	PrimaryStsIndex *int `json:"primaryStsIndex,omitempty"`

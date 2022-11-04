@@ -1,3 +1,9 @@
+# generate release note for milestone
+# 1. get the open issue that named 'v** Release Planning'
+# 2. get the milestone URL
+# 3. fetch the issues and PRs belonging current milestone
+# 4. generate entries to render the release note template
+
 import os
 import re
 import sys
@@ -111,7 +117,7 @@ for change in sorted(changes, key=lambda c: (get_change_priority(c[0]), c[1].id)
         changeLines.append("### " + subtitle)
     breakingChange = 'breaking-change' in [label.name for label in change[1].labels]
     changeUrl = " ([#" + str(change[1].number) + "](" + change[4] + ")"
-    changeAuthor = ",[" + change[3] + "](https://github.com/{}".format(change[3][1:]) + "))"
+    changeAuthor = ", [" + change[3] + "](https://github.com/{}".format(change[3][1:]) + "))"
     changeLines.append("- " + change[2] + changeUrl + changeAuthor)
     if breakingChange:
         breakingChangeLines.append("- " + change[2] + changeUrl + changeAuthor)

@@ -8,75 +8,33 @@ on:
     tags:
       - v*
 
-env:
-  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-  TAG_NAME: ${{ github.ref_name }}
-  GO_VERSION: '1.19'
-
 jobs:
-  upload-release:
-    name: Upload ${{ matrix.filename }}
+  publish:
+    name: publish a release
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        filename: [install_dbctl.sh, install_dbctl_docker.sh]
     steps:
-      - uses: actions/checkout@v3
-      - name: Get release
-        id: get_release
-        uses: bruceadams/get-release@v1.2.3
-
-      - name: upload release asset  ${{ matrix.filename }}
-        uses: actions/upload-release-asset@main
-        with:
-          upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./hack/${{ matrix.filename }}
-          asset_name: ${{ matrix.filename }}
-          asset_content_type: text/plan
-
-
-  upload-release-assert:
-    name: Upload ${{ matrix.os }}
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        os: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64]
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          
-      - name: make generate
-        run: make generate
-        
-      - name: Get release
-        id: get_release
-        uses: bruceadams/get-release@v1.2.3
-        
-      - name: make build
-        env:
-          DBCTL_BINARY: dbctl-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v3
+      - name: Parse release version and set REL_VERSION and LATEST_RELEASE
+        run: python ./.github/utils/get_release_version.py ${{ github.event_name }}
+      - name: create release
+        if: startswith(github.ref, 'refs/tags/v')
         run: |
-          mkdir -p ${{ matrix.os }}
-          
-          DBCTL_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ matrix.os }}`
-          
-          make bin/dbctl.$DBCTL_OS_ARCH
-          
-          mv bin/dbctl.$DBCTL_OS_ARCH ${{ matrix.os }}/dbctl
-          
-          tar -zcvf ${{ env.DBCTL_BINARY }} ${{ matrix.os }}
-          
-          mv ${{ env.DBCTL_BINARY }} bin/
-
-      - name: upload release asset ${{ matrix.os }}
-        uses: actions/upload-release-asset@main
-        env:
-          DBCTL_BINARY: dbctl-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
-        with:
-          upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./bin/${{ env.DBCTL_BINARY }}
-          asset_name: ${{ env.DBCTL_BINARY }}
-          asset_content_type: application/zip
+          echo "installing github-release-cli..."
+          sudo npm install --silent --no-progress -g github-release-cli@2.1.0
+          if [ "$LATEST_RELEASE" = "true" ]; then
+          export RELEASE_BODY=`cat ./docs/release_notes/v${REL_VERSION}.md`
+          else
+          export RELEASE_BODY="This is the release candidate ${REL_VERSION}"
+          fi
+          # Parse repository to get owner and repo names
+          OWNER_NAME="${GITHUB_REPOSITORY%%/*}"
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          export GITHUB_TOKEN=${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          github-release upload \
+            --owner $OWNER_NAME \
+            --repo $REPO_NAME \
+            --tag "v${REL_VERSION}" \
+            --release-name "KubeBlocks v${REL_VERSION}" \
+            --body "${RELEASE_BODY}" \
+            --prerelease true \

@@ -191,21 +191,32 @@ type ClusterDefinitionComponent struct {
 	// ComponentType defines type of the component
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Stateless
-	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus}
+	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus,Replication}
 	ComponentType ComponentType `json:"componentType"`
 
 	// ConsensusSpec defines consensus related spec if componentType is Consensus
 	// CAN'T be empty if componentType is Consensus
 	// +optional
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
+
+	// ReplicationSpec defines replication related spec if componentType is Replication
+	// CAN'T be empty if componentType is Replication
+	// +optional
+	ReplicationSpec *ReplicationSpec `json:"replicationSpec,omitempty"`
+
+	// PrimaryStsIndex determines which statefulset is primary when Type is Replication
+	// +kubebuilder:default=0
+	// +optional
+	PrimaryStsIndex *int `json:"primaryStsIndex,omitempty"`
 }
 
 type ComponentType string
 
 const (
-	Stateless ComponentType = "Stateless"
-	Stateful  ComponentType = "Stateful"
-	Consensus ComponentType = "Consensus"
+	Stateless   ComponentType = "Stateless"
+	Stateful    ComponentType = "Stateful"
+	Consensus   ComponentType = "Consensus"
+	Replication ComponentType = "Replication"
 )
 
 type ClusterDefinitionScripts struct {
@@ -361,6 +372,35 @@ const (
 	BestEffortParallel UpdateStrategy = "BestEffortParallel"
 	Parallel           UpdateStrategy = "Parallel"
 )
+
+type ReplicationSetRole string
+
+const (
+	Primary   ReplicationSetRole = "primary"
+	Secondary ReplicationSetRole = "secondary"
+)
+
+type ReplicationSpec struct {
+	// CreateReplication, create replicationSet replication relationship
+	// +kubebuilder:validation:Required
+	CreateReplication CreateReplication `json:"createReplication,omitempty"`
+}
+
+type CreateReplication struct {
+	// DbEngineContainer, db engine container name define in podSpec
+	// +kubebuilder:validation:Required
+	DbEngineContainer string `json:"dbEngineContainer,omitempty"`
+
+	// Commands, commands to create a replication relationship
+	// the order of commands follows the order of array.
+	// +kubebuilder:validation:Required
+	Commands []string `json:"commands,omitempty"`
+
+	// exec command with image
+	// +kubebuilder:default="rancher/kubectl:v1.23.7"
+	// +optional
+	Image string `json:"image,omitempty"`
+}
 
 func init() {
 	SchemeBuilder.Register(&ClusterDefinition{}, &ClusterDefinitionList{})

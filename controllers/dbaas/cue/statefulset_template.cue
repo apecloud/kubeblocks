@@ -52,7 +52,12 @@ statefulset: {
 				"app.kubernetes.io/component-name": "\(component.name)"
 			}
 		serviceName:         "\(cluster.metadata.name)-\(component.name)"
-		replicas:            component.replicas
+		if component.type != "replication" {
+			replicas:            component.replicas
+		}
+		if component.type == "replication" {
+			replicas:            1
+		}
 		minReadySeconds:     10
 		podManagementPolicy: "Parallel"
 		template: {

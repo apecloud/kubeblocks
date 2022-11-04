@@ -71,6 +71,7 @@ spec:
                       - Stateless
                       - Stateful
                       - Consensus
+                      - Replication
                       type: string
                     configTemplateRefs:
                       description: The configTemplateRefs field provided by ISV, and
@@ -7533,6 +7534,11 @@ spec:
                       required:
                       - containers
                       type: object
+                    primaryStsIndex:
+                      default: 0
+                      description: PrimaryStsIndex determines which statefulset is
+                        primary when Type is Replication
+                      type: integer
                     probes:
                       properties:
                         roleChangedProbe:
@@ -7654,6 +7660,32 @@ spec:
                               format: int32
                               minimum: 1
                               type: integer
+                          type: object
+                      type: object
+                    replicationSpec:
+                      description: ReplicationSpec defines replication related spec
+                        if componentType is Replication CAN'T be empty if componentType
+                        is Replication
+                      properties:
+                        createReplication:
+                          description: CreateReplication, create replicationSet replication
+                            relationship
+                          properties:
+                            commands:
+                              description: Commands, commands to create a replication
+                                relationship the order of commands follows the order
+                                of array.
+                              items:
+                                type: string
+                              type: array
+                            dbEngineContainer:
+                              description: DbEngineContainer, db engine container
+                                name define in podSpec
+                              type: string
+                            image:
+                              default: rancher/kubectl:v1.23.7
+                              description: exec command with image
+                              type: string
                           type: object
                       type: object
                     scripts:

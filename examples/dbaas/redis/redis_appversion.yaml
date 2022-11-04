@@ -1,0 +1,12 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind:       AppVersion
+metadata:
+  name:     redis-replication-7.0.5
+spec:
+  clusterDefinitionRef: redis-replication-definition
+  components:
+  - type: replication
+    podSpec:
+      containers:
+      - name: redis
+        image: registry.hub.docker.com/library/redis:7.0.5-alpine

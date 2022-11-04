@@ -1,0 +1,38 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: redis-replication-definition
+spec:
+  type: state.redis-7
+  components:
+    - typeName: replication
+      defaultReplicas: 2
+      componentType: Replication
+      replicationSpec:
+        createReplication:
+          dbEngineContainer: redis
+          commands:
+            - "redis-cli replicaof $(KB_PRIMARY_POD_NAME) 6379"
+      service:
+        ports:
+          - protocol: TCP
+            port: 6379
+      podSpec:
+        containers:
+          - name: redis
+            image: redis:7.0.5-alpine
+            ports:
+              - name: redis
+                containerPort: 6379
+            volumeMounts:
+              - name: data
+                mountPath: /data
+              - name: config-map
+                mountPath: /etc/conf
+            args: ["/etc/conf/redis.conf"]
+        volumes:
+          - name: conf
+            emptyDir: { }
+          - name: config-map
+            configMap:
+              name: redis-config-7.0.5

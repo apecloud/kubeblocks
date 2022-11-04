@@ -42,6 +42,7 @@ const (
 	appNameLabelKey                = "app.kubernetes.io/name"
 	statefulSetPodNameLabelKey     = "statefulset.kubernetes.io/pod-name"
 	consensusSetRoleLabelKey       = "cs.dbaas.kubeblocks.io/role"
+	replicationSetRoleLabelKey     = "rs.dbaas.kubeblocks.com/role"
 	consensusSetAccessModeLabelKey = "cs.dbaas.kubeblocks.io/access-mode"
 	clusterLabelKey                = "cluster.kubeblocks.io/name"
 
@@ -66,6 +67,8 @@ type Component struct {
 	AntiAffinity         bool                                   `json:"antiAffinity,omitempty"`
 	ComponentType        dbaasv1alpha1.ComponentType            `json:"componentType,omitempty"`
 	ConsensusSpec        *dbaasv1alpha1.ConsensusSetSpec        `json:"consensusSpec,omitempty"`
+	ReplicationSpec      *dbaasv1alpha1.ReplicationSpec         `json:"replicationSpec,omitempty"`
+	PrimaryStsIndex      *int                                   `json:"primaryStsIndex,omitempty"`
 	PodSpec              *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	Service              corev1.ServiceSpec                     `json:"service,omitempty"`
 	Scripts              dbaasv1alpha1.ClusterDefinitionScripts `json:"scripts,omitempty"`

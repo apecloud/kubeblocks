@@ -22,9 +22,11 @@ import "github.com/spf13/viper"
 // With generics, it may be more generic.
 type Set map[string]struct{}
 
+type EmptyStruct struct{}
+
 func (s *Set) Insert(v string) bool {
 	prevLen := len(*s)
-	(*s)[v] = struct{}{}
+	(*s)[v] = EmptyStruct{}
 	return prevLen != len(*s)
 }
 

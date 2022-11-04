@@ -33,6 +33,7 @@ func main() {
 	}
 
 	dbctl := cmd.NewDbctlCmd()
+	dbctl.DisableAutoGenTag = true
 	dbctl.Long = fmt.Sprintf("```\n%s\n```", dbctl.Long)
 	err := doc.GenMarkdownTree(dbctl, rootPath)
 	if err != nil {

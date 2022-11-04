@@ -53,10 +53,6 @@ var (
 	CueTemplates embed.FS
 )
 
-// ===================================
-//   CharacterType == MySQL
-// ===================================
-
 type MysqlMonitor struct {
 	SecretName      string `json:"secretName"`
 	InternalPort    int    `json:"internalPort"`
@@ -98,7 +94,9 @@ func setMysqlComponent(cluster *dbaasv1alpha1.Cluster, component *Component) err
 	imagePullPolicy := viper.GetString("AGAMOTTO_IMAGE_PULL_POLICY")
 
 	mysqlMonitor := &MysqlMonitor{
-		SecretName:      cluster.Name,
+		SecretName: cluster.Name,
+		// HACK: fixed port value
+		// TODO: port value is checked against other containers.
 		InternalPort:    9104,
 		Image:           image,
 		ImagePullPolicy: imagePullPolicy,
@@ -118,17 +116,12 @@ func setMysqlComponent(cluster *dbaasv1alpha1.Cluster, component *Component) err
 	return nil
 }
 
-// ===================================
-//   CharacterType Logic
-// ===================================
-
 // CalcCharacterType calc wellknown CharacterType, if not wellknown return empty string
 func CalcCharacterType(clusterType string) string {
-	if v, ok := kWellKnownTypeMaps[clusterType]; !ok {
-		return KEmpty
-	} else {
+	if v, ok := kWellKnownTypeMaps[clusterType]; ok {
 		return v
 	}
+	return KEmpty
 }
 
 // IsWellKnownCharacterType check CharacterType is wellknown
@@ -137,9 +130,8 @@ func IsWellKnownCharacterType(characterType string) bool {
 }
 
 func isWellKnowCharacterType(characterType string,
-	wellKnownCharacterTypeFunc map[string]func(cluster *dbaasv1alpha1.Cluster, component *Component) error) bool {
-	val, ok := wellKnownCharacterTypeFunc[characterType]
-	if ok && val != nil {
+	processors map[string]func(*dbaasv1alpha1.Cluster, *Component) error) bool {
+	if val, ok := processors[characterType]; ok && val != nil {
 		return true
 	}
 	return false

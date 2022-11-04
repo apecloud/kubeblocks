@@ -1159,6 +1159,21 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 		return nil, err
 	}
 
+	// update sts.spec.volumeClaimTemplates[].metadata.labels
+	if len(sts.Spec.VolumeClaimTemplates) > 0 && len(sts.GetLabels()) > 0 {
+		for _, vct := range sts.Spec.VolumeClaimTemplates {
+			if vct.Labels == nil {
+				vct.Labels = make(map[string]string)
+				continue
+			}
+			for k, v := range sts.Labels {
+				if _, ok := vct.Labels[k]; !ok {
+					vct.Labels[k] = v
+				}
+			}
+		}
+	}
+
 	probeContainers, err := buildProbeContainers(reqCtx, params)
 	if err != nil {
 		return nil, err

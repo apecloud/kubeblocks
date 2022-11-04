@@ -153,13 +153,10 @@ vet: ## Run go vet against code.
 .PHONY: cue-fmt
 cue-fmt: cuetool ## Run cue fmt against code.
 	$(CUE) fmt controllers/dbaas/cue/*.cue
-
-.PHONY: cue-vet
-cue-vet: cuetool ## Run cue vet against code.
-	$(CUE) vet controllers/dbaas/cue/*.cue
+	$(CUE) fix controllers/dbaas/cue/*.cue
 
 .PHONY: fast-lint
-fast-lint: staticcheck  # [INTERNAL] fast lint
+fast-lint: golangci staticcheck  # [INTERNAL] fast lint
 	$(GOLANGCILINT) run ./...
 
 .PHONY: lint

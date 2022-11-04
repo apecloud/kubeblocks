@@ -363,36 +363,3 @@ func CreateMergePatch(oldcfg, target interface{}, option CfgOption) (*ConfigDiff
 
 	return old.Diff(new.CfgWrapper)
 }
-
-func compareWithConfig(left, right interface{}, option CfgOption) (bool, error) {
-	switch option.Type {
-	case CFG_RAW:
-		return bytes.Equal(left.([]byte), right.([]byte)), nil
-	case CFG_LOCAL:
-		return left.(string) == right.(string), nil
-	case CFG_CM, CFG_TPL:
-		o, ok1 := left.(*K8sConfig)
-		n, ok2 := right.(*K8sConfig)
-		if !ok1 || !ok2 {
-			return false, makeError("invalid data type!")
-		}
-		return o == n, nil
-	default:
-		return false, makeError("not support config type compare!")
-	}
-}
-
-func withOption(option CfgOption, data interface{}) CfgOption {
-	op := option
-	switch option.Type {
-	case CFG_RAW:
-		op.RawData = data.([]byte)
-	case CFG_LOCAL:
-		op.Path = data.(string)
-	case CFG_CM, CFG_TPL:
-		op.K8sKey = data.(*K8sConfig)
-	default:
-		// TODO(zt) process error
-	}
-	return op
-}

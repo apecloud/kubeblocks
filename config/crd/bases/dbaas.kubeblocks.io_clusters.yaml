@@ -491,11 +491,17 @@ spec:
                         current phase
                       type: string
                     phase:
-                      description: Phase - in list of [Running, Failed, Creating,
-                        Updating, Deleting, Deleted]
+                      description: 'Phase - in list of [Running, Failed, Creating,
+                        Abnormal, Updating, Deleting, Deleted] Failed Phase: component
+                        not available, i.e, all pod is not ready for Stateless/Stateful
+                        component; Leader/Primary pod is not ready for Consensus/Replication
+                        component Abnormal Phase: component available but some pod
+                        is not ready. if the component type is Consensus/Replication,
+                        the Leader/Primary pod is must ready in Abnormal phase.'
                       enum:
                       - Running
                       - Failed
+                      - Abnormal
                       - Creating
                       - Updating
                       - Deleting
@@ -582,11 +588,15 @@ spec:
                     type: array
                 type: object
               phase:
-                description: phase - in list of [Running, Failed, Creating, Updating,
-                  Deleting, Deleted]
+                description: 'phase - in list of [Running, Failed, Abnormal, Creating,
+                  Updating, Deleting, Deleted] Failed Phase: cluster not available.
+                  Abnormal Phase: cluster available but some component is not Abnormal.
+                  if the component type is Consensus/Replication, the Leader/Primary
+                  pod is must ready in Abnormal phase.'
                 enum:
                 - Running
                 - Failed
+                - Abnormal
                 - Creating
                 - Updating
                 - Deleting

@@ -78,8 +78,11 @@ type ClusterStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// phase - in list of [Running, Failed, Creating, Updating, Deleting, Deleted]
-	// +kubebuilder:validation:Enum={Running,Failed,Creating,Updating,Deleting,Deleted}
+	// phase - in list of [Running, Failed, Abnormal, Creating, Updating, Deleting, Deleted]
+	// Failed Phase: cluster not available.
+	// Abnormal Phase: cluster available but some component is not Abnormal.
+	// if the component type is Consensus/Replication, the Leader/Primary pod is must ready in Abnormal phase.
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted}
 	Phase Phase `json:"phase,omitempty"`
 
 	// Message cluster details message in current phase
@@ -181,8 +184,12 @@ type ClusterStatusComponent struct {
 	// +optional
 	Type string `json:"type,omitempty"`
 
-	// Phase - in list of [Running, Failed, Creating, Updating, Deleting, Deleted]
-	// +kubebuilder:validation:Enum={Running,Failed,Creating,Updating,Deleting,Deleted}
+	// Phase - in list of [Running, Failed, Creating, Abnormal, Updating, Deleting, Deleted]
+	// Failed Phase: component not available, i.e, all pod is not ready for Stateless/Stateful component;
+	// Leader/Primary pod is not ready for Consensus/Replication component
+	// Abnormal Phase: component available but some pod is not ready.
+	// if the component type is Consensus/Replication, the Leader/Primary pod is must ready in Abnormal phase.
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted}
 	Phase Phase `json:"phase,omitempty"`
 
 	// Message record the component details message in current phase

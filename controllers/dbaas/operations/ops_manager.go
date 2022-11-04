@@ -74,10 +74,11 @@ func (opsMgr *OpsManager) Do(opsRes *OpsResource) error {
 // loop until the operation is completed.
 func (opsMgr *OpsManager) Reconcile(opsRes *OpsResource) error {
 	var (
-		opsBehaviour *OpsBehaviour
-		ok           bool
-		err          error
-		opsRequest   = opsRes.OpsRequest
+		opsBehaviour    *OpsBehaviour
+		ok              bool
+		err             error
+		opsRequestPhase dbaasv1alpha1.Phase
+		opsRequest      = opsRes.OpsRequest
 	)
 
 	if opsRes.OpsRequest.Status.Phase != dbaasv1alpha1.RunningPhase {
@@ -91,10 +92,16 @@ func (opsMgr *OpsManager) Reconcile(opsRes *OpsResource) error {
 	if opsBehaviour == nil || opsBehaviour.ReconcileAction == nil {
 		return nil
 	}
-	if ok, err = opsBehaviour.ReconcileAction(opsRes); err != nil || !ok {
+	if opsRequestPhase, err = opsBehaviour.ReconcileAction(opsRes); err != nil {
 		return err
 	}
-	return PatchOpsStatus(opsRes, dbaasv1alpha1.SucceedPhase, dbaasv1alpha1.NewSucceedCondition(opsRequest))
+	if opsRequestPhase == dbaasv1alpha1.RunningPhase {
+		return nil
+	}
+	if opsRequestPhase == dbaasv1alpha1.SucceedPhase {
+		return PatchOpsStatus(opsRes, opsRequestPhase, dbaasv1alpha1.NewSucceedCondition(opsRequest))
+	}
+	return PatchOpsStatus(opsRes, opsRequestPhase, dbaasv1alpha1.NewFailedCondition(opsRequest))
 }
 
 // validateClusterPhase validate Cluster.status.phase is in opsBehaviour.FromClusterPhases or OpsRequest is reentry

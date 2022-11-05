@@ -18,19 +18,37 @@ package dbaas
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/types"
 
+	appv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	dbaasconfig "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
+	configutil "github.com/apecloud/kubeblocks/internal/configuration"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // ReconfigureRequestReconciler reconciles a ReconfigureRequest object
 type ReconfigureRequestReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+}
+
+var ConfigurationRequiredLabels = []string{
+	appNameLabelKey,
+	appInstanceLabelKey,
+	appComponentLabelKey,
+	dbaasconfig.CMConfigurationTplLabelKey,
+	dbaasconfig.CMInsConfigurationLabelKey,
 }
 
 //+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=reconfigurerequests,verbs=get;list;watch;create;update;patch;delete
@@ -47,16 +65,168 @@ type ReconfigureRequestReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.2/pkg/reconcile
 func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithValues("Configuration", req.NamespacedName),
+		Recorder: r.Recorder,
+	}
 
-	// TODO(user): your logic here
+	config := &corev1.ConfigMap{}
+	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
 
-	return ctrl.Result{}, nil
+	if checkConfigurationObject(config) {
+		intctrlutil.Reconciled()
+	}
+
+	isAppliedCfg, err := dbaasconfig.ApplyConfigurationChange(r.Client, reqCtx, config)
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to check last-applied-configuration")
+	} else if isAppliedCfg {
+		intctrlutil.Reconciled()
+	}
+
+	tpl := &dbaasv1alpha1.ConfigurationTemplate{}
+	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
+		Namespace: config.Namespace,
+		Name:      config.Labels[dbaasconfig.CMConfigurationTplLabelKey],
+	}, tpl); err != nil {
+		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
+	}
+
+	return r.sync(reqCtx, config, &tpl.Spec)
 }
+
+type ResourceConfigMapWithLabelPredicate struct {
+	// hook default interface func
+	predicate.Funcs
+}
+
+func (c *ResourceConfigMapWithLabelPredicate) Create(createEvent event.CreateEvent) bool {
+	return checkConfigurationObject(createEvent.Object)
+}
+
+func (r *ResourceConfigMapWithLabelPredicate) Update(updateEvent event.UpdateEvent) bool {
+	return checkConfigurationObject(updateEvent.ObjectNew)
+}
+
+func (r *ResourceConfigMapWithLabelPredicate) Delete(deleteEvent event.DeleteEvent) bool {
+	return checkConfigurationObject(deleteEvent.Object)
+}
+
+func (r *ResourceConfigMapWithLabelPredicate) Generic(genericEvent event.GenericEvent) bool {
+	return checkConfigurationObject(genericEvent.Object)
+}
+
+// type EnqueueRequestForConfigmap struct {
+//	// hook default interface func
+//	handler.Funcs
+// }
+//
+//// Update process reconfigure
+// func (e *EnqueueRequestForConfigmap) Update(event event.UpdateEvent, limitingInterface workqueue.RateLimitingInterface) {
+//	//TODO implement me
+//	panic("implement me")
+// }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ReconfigureRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&dbaasv1alpha1.ReconfigureRequest{}).
+		For(&corev1.ConfigMap{}).
+		// Watches(&source.Kind{Type: &dbaasv1alpha1.ReconfigureRequest{}},
+		//	&handler.EnqueueRequestForOwner{}).
+		WithEventFilter(&ResourceConfigMapWithLabelPredicate{}).
 		Complete(r)
+}
+
+func checkConfigurationObject(object client.Object) bool {
+	return dbaasconfig.CheckConfigurationLabels(object, ConfigurationRequiredLabels)
+}
+
+func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, config *corev1.ConfigMap, tpl *dbaasv1alpha1.ConfigurationTemplateSpec) (ctrl.Result, error) {
+
+	var (
+		clusters = dbaasv1alpha1.ClusterList{}
+		stsLists = appv1.StatefulSetList{}
+	)
+
+	clusterLabels := map[string]string{
+		appNameLabelKey:     config.Labels[appNameLabelKey],
+		appInstanceLabelKey: config.Labels[appInstanceLabelKey],
+	}
+
+	componentLabels := map[string]string{
+		appNameLabelKey:      config.Labels[appNameLabelKey],
+		appInstanceLabelKey:  config.Labels[appInstanceLabelKey],
+		appComponentLabelKey: config.Labels[appInstanceLabelKey],
+	}
+
+	versionMeta, err := dbaasconfig.GetConfigurationVersion(config, reqCtx, tpl)
+	if err != nil {
+		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
+	}
+
+	// Not any parameters update
+	if !versionMeta.IsModify {
+		return r.updateCfgStatus(reqCtx, versionMeta, config)
+	}
+
+	// find Cluster CR
+	if err := r.Client.List(reqCtx.Ctx, &clusters, client.InNamespace(config.Namespace), client.MatchingLabels(clusterLabels)); err != nil {
+		return intctrlutil.RequeueWithErrorAndRecordEvent(config,
+			r.Recorder,
+			configutil.WrapError(err,
+				"failed to get cluster. configmap[%s] label[%s]",
+				reqCtx.Req.NamespacedName,
+				clusterLabels),
+			reqCtx.Log)
+	}
+
+	if len(clusters.Items) != 1 {
+		return intctrlutil.RequeueWithErrorAndRecordEvent(config,
+			r.Recorder,
+			configutil.MakeError("get multi cluster[%d]. configmap[%s] label[%s]",
+				len(clusters.Items),
+				reqCtx.Req.NamespacedName,
+				clusterLabels),
+			reqCtx.Log)
+	}
+
+	// find STS CR
+	if err := r.Client.List(reqCtx.Ctx, &stsLists, client.InNamespace(config.Namespace), client.MatchingLabels(componentLabels)); err != nil {
+		return intctrlutil.RequeueWithErrorAndRecordEvent(config,
+			r.Recorder,
+			configutil.WrapError(err,
+				"failed to get component. configmap[%s] label[%s]",
+				reqCtx.Req.NamespacedName,
+				componentLabels),
+			reqCtx.Log)
+	}
+
+	if len(clusters.Items) == 0 {
+		return intctrlutil.Reconciled()
+	}
+
+	cluster := clusters.Items[0]
+	return r.performUpdate(reqCtx, versionMeta, config, cluster, stsLists.Items)
+}
+
+func (r *ReconfigureRequestReconciler) updateCfgStatus(ctx intctrlutil.RequestCtx, meta *configutil.ConfigDiffInformation, config *corev1.ConfigMap) (ctrl.Result, error) {
+	// TODO(zt) process update status
+	return intctrlutil.Reconciled()
+}
+
+func (r *ReconfigureRequestReconciler) performUpdate(ctx intctrlutil.RequestCtx, meta *configutil.ConfigDiffInformation, config *corev1.ConfigMap, cluster dbaasv1alpha1.Cluster, component []appv1.StatefulSet) (ctrl.Result, error) {
+	// TODO(zt) process update policy
+
+	r.updateCfgStatus(ctx, meta, config)
+	intctrlutil.RecordCreatedEvent(r.Recorder, config)
+
+	return intctrlutil.Reconciled()
 }

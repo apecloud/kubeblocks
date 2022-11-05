@@ -18,7 +18,6 @@ package configuration
 
 import (
 	"fmt"
-
 	"github.com/spf13/viper"
 
 	corev1 "k8s.io/api/core/v1"
@@ -26,16 +25,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 const (
-	// settings keys
 	ConfigNamespaceKey = "CM_NAMESPACE"
 
-	ConfigurationTemplateFinalizerName = "configurationtemplate.kubeblocks.io/finalizer"
-	ConfigurationTplLabelKey           = "configurationtemplate.kubeblocks.io/name"
-	CMConfigurationTplLabelKey         = "configurationtemplate.kubeblocks.io/configuration_template"
+	ConfigurationTemplateFinalizerName = "configuration.kubeblocks.io/finalizer"
+	ConfigurationTplLabelKey           = "configuration.kubeblocks.io/name"
+	CMConfigurationTplLabelKey         = "configuration.kubeblocks.io/configuration_template"
+
+	CMInsConfigurationLabelKey = "app.kubernetes.io/ins-configure"
 )
 
 type ValidateConfigMap func(configTpl string) (*corev1.ConfigMap, error)
@@ -43,6 +44,25 @@ type ValidateConfigSchema func(tpl *dbaasv1alpha1.CustomParametersValidation) (b
 
 func init() {
 	viper.SetDefault(ConfigNamespaceKey, "default")
+}
+
+func CheckConfigurationLabels(object client.Object, requiredLabs []string) bool {
+	labels := object.GetLabels()
+	if len(labels) == 0 {
+		return false
+	}
+
+	for _, label := range requiredLabs {
+		if _, ok := labels[label]; !ok {
+			return false
+		}
+	}
+
+	if _, ok := labels[CMInsConfigurationLabelKey]; !ok {
+		return false
+	}
+
+	return EnableCfgUpgrade(object)
 }
 
 func GetConfigMapByName(cli client.Client, ctx intctrlutil.RequestCtx, cmName string) (*corev1.ConfigMap, error) {
@@ -186,4 +206,25 @@ func validateConfTpls(cli client.Client, ctx intctrlutil.RequestCtx, configTpls 
 
 func ValidateConfTplStatus(configStatus dbaasv1alpha1.ConfigurationTemplateStatus) bool {
 	return configStatus.Phase == dbaasv1alpha1.AvailablePhase
+}
+
+func GetConfigurationVersion(config *corev1.ConfigMap, ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplateSpec) (*cfgcore.ConfigDiffInformation, error) {
+	lastConfig, err := GetLastVersionConfig(config)
+	if err != nil {
+		return nil, cfgcore.WrapError(err, "failed to get last version data. config[%v]", client.ObjectKeyFromObject(config))
+	}
+
+	option := cfgcore.CfgOption{
+		Type:    cfgcore.CFG_TPL,
+		CfgType: tpl.Formatter,
+		Log:     ctx.Log,
+	}
+
+	return cfgcore.CreateMergePatch(&cfgcore.K8sConfig{
+		CfgKey:         client.ObjectKeyFromObject(config),
+		Configurations: lastConfig,
+	}, &cfgcore.K8sConfig{
+		CfgKey:         client.ObjectKeyFromObject(config),
+		Configurations: config.Data,
+	}, option)
 }

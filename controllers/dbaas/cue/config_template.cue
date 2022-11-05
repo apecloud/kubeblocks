@@ -27,7 +27,7 @@ config: {
 			"app.kubernetes.io/name":     "\(meta.clusterDefinition.type)-\(meta.clusterDefinition.name)"
 			"app.kubernetes.io/instance": meta.cluster.name
 			// "app.kubernetes.io/version" : # TODO
-			"app.kubernetes.io/component":  "\(meta.component.type)-\(meta.component.name)"
+			"app.kubernetes.io/component-name":  "\(meta.component.name)"
 			"app.kubernetes.io/created-by": "controller-manager"
 
 			// config template name

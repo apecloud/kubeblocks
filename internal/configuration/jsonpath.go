@@ -66,7 +66,7 @@ func jsonMarshal(data interface{}) ([]byte, error) {
 	encoder.SetIndent("", "  ")
 	err := encoder.Encode(data)
 	if err != nil {
-		return nil, wrapError(err, "failed to marshalled data: [%v]", data)
+		return nil, WrapError(err, "failed to marshalled data: [%v]", data)
 	}
 	return buffer.Bytes(), nil
 }

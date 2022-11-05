@@ -18,15 +18,15 @@ package configuration
 
 import "fmt"
 
-func makeError(formatMsg string, args ...interface{}) error {
+func MakeError(formatMsg string, args ...interface{}) error {
 	return fmt.Errorf(formatMsg, args...)
 }
 
-func wrapError(err error, formatMsg string, args ...interface{}) error {
+func WrapError(err error, formatMsg string, args ...interface{}) error {
 	if err != nil {
 		return nil
 	}
 
 	// TODO add log info
-	return makeError("%v: %v", makeError(formatMsg, args...), err)
+	return MakeError("%v: %v", MakeError(formatMsg, args...), err)
 }

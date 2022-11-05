@@ -33,7 +33,7 @@ import (
 // component: component name
 func GetParameterFromConfiguration(configMap *corev1.ConfigMap, allFiles bool, fieldPath ...string) ([]string, error) {
 	if configMap == nil || len(configMap.Data) == 0 {
-		return nil, makeError("configmap not any configuration files. [%v]", configMap)
+		return nil, MakeError("configmap not any configuration files. [%v]", configMap)
 	}
 
 	// Load configmap
@@ -48,7 +48,7 @@ func GetParameterFromConfiguration(configMap *corev1.ConfigMap, allFiles bool, f
 		},
 	})
 	if err != nil {
-		return nil, wrapError(err, "failed to loader configmap")
+		return nil, WrapError(err, "failed to loader configmap")
 	}
 
 	res := make([]string, 0, len(fieldPath))
@@ -56,7 +56,7 @@ func GetParameterFromConfiguration(configMap *corev1.ConfigMap, allFiles bool, f
 	option.AllSearch = allFiles
 	for _, field := range fieldPath {
 		if rs, err := wrapCfg.Query(field, option); err != nil {
-			return nil, wrapError(err, "failed to get parameter:[%s]", field)
+			return nil, WrapError(err, "failed to get parameter:[%s]", field)
 		} else {
 			res = append(res, string(rs))
 		}

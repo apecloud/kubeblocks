@@ -25,21 +25,21 @@ func compareWithConfig(left, right interface{}, option CfgOption) (bool, error) 
 	switch option.Type {
 	case CFG_RAW:
 		if !TypeMatch([]byte{}, left, right) {
-			return false, makeError("invalid []byte data type!")
+			return false, MakeError("invalid []byte data type!")
 		}
 		return bytes.Equal(left.([]byte), right.([]byte)), nil
 	case CFG_LOCAL:
 		if !TypeMatch(string(""), left, right) {
-			return false, makeError("invalid string data type!")
+			return false, MakeError("invalid string data type!")
 		}
 		return left.(string) == right.(string), nil
 	case CFG_CM, CFG_TPL:
 		if !TypeMatch(&K8sConfig{}, left, right) {
-			return false, makeError("invalid data type!")
+			return false, MakeError("invalid data type!")
 		}
 		return left.(*K8sConfig) == right.(*K8sConfig), nil
 	default:
-		return false, makeError("not support config type compare!")
+		return false, MakeError("not support config type compare!")
 	}
 }
 
@@ -81,9 +81,9 @@ func NewMatcherWithType(expected interface{}) typeMatcher {
 
 func (matcher *typeMatcher) Match(actual interface{}) (success bool, err error) {
 	if actual == nil && matcher.expected == nil {
-		return false, makeError("type is <nil> to <nil>.")
+		return false, MakeError("type is <nil> to <nil>.")
 	} else if matcher.expected == nil {
-		return false, makeError("expected type is <nil>.")
+		return false, MakeError("expected type is <nil>.")
 	} else if actual == nil {
 		return false, nil
 	}

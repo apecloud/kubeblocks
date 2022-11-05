@@ -41,7 +41,7 @@ func init() {
 	// For RAW
 	loaderProvider[CFG_RAW] = func(option CfgOption) (*CfgWrapper, error) {
 		if len(option.RawData) == 0 {
-			return nil, makeError("rawdata not empty! [%v]", option)
+			return nil, MakeError("rawdata not empty! [%v]", option)
 		}
 
 		meta := CfgWrapper{
@@ -66,7 +66,7 @@ func init() {
 	// For local
 	loaderProvider[CFG_LOCAL] = func(option CfgOption) (*CfgWrapper, error) {
 		if _, err := os.Stat(option.Path); err != nil {
-			return nil, makeError("configuration file path[%s] not exist", option.Path)
+			return nil, MakeError("configuration file path[%s] not exist", option.Path)
 		}
 
 		meta := CfgWrapper{
@@ -80,7 +80,7 @@ func init() {
 		v.SetConfigType(string(option.CfgType))
 		v.SetConfigFile(option.Path)
 		if err := v.ReadInConfig(); err != nil {
-			return nil, wrapError(err, "failed to load config: [%s]", option.Path)
+			return nil, WrapError(err, "failed to load config: [%s]", option.Path)
 		}
 		meta.V[0] = v
 		meta.Indexer[meta.Name] = v
@@ -90,14 +90,14 @@ func init() {
 	// For CM
 	loaderProvider[CFG_CM] = func(option CfgOption) (*CfgWrapper, error) {
 		if option.K8sKey == nil {
-			return nil, makeError("invalid k8s resource[%v]", option)
+			return nil, MakeError("invalid k8s resource[%v]", option)
 		}
 
 		ctx := option.K8sKey
 		if ctx.Configurations == nil && ctx.ResourceFn != nil {
 			configs, err := ctx.ResourceFn(ctx.CfgKey)
 			if err != nil {
-				return nil, wrapError(err, "failed to get cm, cm key: [%v]", ctx.CfgKey)
+				return nil, WrapError(err, "failed to get cm, cm key: [%v]", ctx.CfgKey)
 			}
 			ctx.Configurations = configs
 		}
@@ -115,7 +115,7 @@ func init() {
 			v := viper.NewWithOptions(viper.KeyDelimiter(CfgKeyDelimiter))
 			v.SetConfigType(string(option.CfgType))
 			if err := v.ReadConfig(bytes.NewReader([]byte(content))); err != nil {
-				return nil, wrapError(err, "failed to load config: filename[%s]", fileName)
+				return nil, WrapError(err, "failed to load config: filename[%s]", fileName)
 			}
 			meta.Indexer[fileName] = v
 			meta.V[index] = v
@@ -151,7 +151,7 @@ type DConfig struct {
 func NewConfigLoader(option CfgOption) (*DConfig, error) {
 	loader, ok := loaderProvider[option.Type]
 	if !ok {
-		return nil, makeError("not support config type: %s", option.Type)
+		return nil, MakeError("not support config type: %s", option.Type)
 	}
 
 	meta, err := loader(option)
@@ -171,7 +171,7 @@ type Option func(ctx *CfgOpOption)
 func (c *CfgWrapper) MergeFrom(params map[string]interface{}, option CfgOpOption) error {
 	cfg := c.getCfgViper(option)
 	if cfg == nil {
-		return makeError("not any configuration. option:[%v]", option)
+		return MakeError("not any configuration. option:[%v]", option)
 	}
 
 	for paramKey, paramValue := range params {
@@ -187,7 +187,7 @@ func (c *CfgWrapper) ToCfgFileContent() (map[string]string, error) {
 	// Viper not support writer to buffer
 	tmpDir, err := os.MkdirTemp(os.TempDir(), "configuration-")
 	if err != nil {
-		return nil, wrapError(err, "failed to create temp directory!")
+		return nil, WrapError(err, "failed to create temp directory!")
 	}
 	defer os.RemoveAll(tmpDir)
 
@@ -195,7 +195,7 @@ func (c *CfgWrapper) ToCfgFileContent() (map[string]string, error) {
 		tmpFile := filepath.Join(tmpDir, strings.ReplaceAll(fileName, ".", "_"))
 		content, err := DumpCfgContent(v, tmpFile)
 		if err != nil {
-			return nil, wrapError(err,
+			return nil, WrapError(err,
 				"failed to generate config file[%s], meta: [%v]", fileName, v)
 		}
 		fileContents[fileName] = content
@@ -215,6 +215,9 @@ type ConfigDiffInformation struct {
 	// update config
 	// patch json
 	UpdateConfig map[string][]byte
+
+	Target      *CfgWrapper
+	LastVersion *CfgWrapper
 }
 
 func (c *CfgWrapper) Diff(target *CfgWrapper) (*ConfigDiffInformation, error) {
@@ -230,6 +233,9 @@ func (c *CfgWrapper) Diff(target *CfgWrapper) (*ConfigDiffInformation, error) {
 		AddConfig:    make(map[string]interface{}, addSet.Size()),
 		DeleteConfig: make(map[string]interface{}, deleteSet.Size()),
 		UpdateConfig: make(map[string][]byte, updateSet.Size()),
+
+		Target:      target,
+		LastVersion: c,
 	}
 
 	for elem := range *addSet {
@@ -278,20 +284,20 @@ func (c *CfgWrapper) Query(jsonpath string, option CfgOpOption) ([]byte, error) 
 
 	cfg := c.getCfgViper(option)
 	if cfg == nil {
-		return nil, makeError("not any configuration. option:[%v]", option)
+		return nil, MakeError("not any configuration. option:[%v]", option)
 	}
 
 	iniContext := option.IniContext
 	if iniContext != nil && len(iniContext.SectionName) > 0 {
 		if !cfg.InConfig(iniContext.SectionName) {
-			return nil, makeError("configuration not exist section [%s]", iniContext.SectionName)
+			return nil, MakeError("configuration not exist section [%s]", iniContext.SectionName)
 		}
 		cfg = cfg.Sub(iniContext.SectionName)
 	}
 
 	// var jsonString interface{}
 	// if err := cfg.Unmarshal(&jsonString); err != nil {
-	//	 return nil, wrapError(err, "failed to unmarshalled configure! [%v]", cfg)
+	//	 return nil, WrapError(err, "failed to unmarshalled configure! [%v]", cfg)
 	// }
 	return RetrievalWithJsonPath(cfg.AllSettings(), jsonpath)
 }
@@ -353,12 +359,12 @@ func CreateMergePatch(oldcfg, target interface{}, option CfgOption) (*ConfigDiff
 
 	old, err := NewConfigLoader(withOption(option, oldcfg))
 	if err != nil {
-		return nil, wrapError(err, "failed to create config: [%s]", oldcfg)
+		return nil, WrapError(err, "failed to create config: [%s]", oldcfg)
 	}
 
 	new, err := NewConfigLoader(withOption(option, target))
 	if err != nil {
-		return nil, wrapError(err, "failed to create config: [%s]", oldcfg)
+		return nil, WrapError(err, "failed to create config: [%s]", oldcfg)
 	}
 
 	return old.Diff(new.CfgWrapper)

@@ -1,0 +1,37 @@
+name: RELEASE-CREATE
+
+on:
+  push:
+    branches:
+      - master
+      - release-*
+    tags:
+      - v*
+
+jobs:
+  publish:
+    name: create a release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v3
+      - name: Parse release version and set REL_VERSION
+        run: python ./.github/utils/get_release_version.py
+      - name: release
+        uses: softprops/action-gh-release@v1
+        if: not ${{ env.WITH_RELEASE_NOTES }}
+        with:
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          name: KubeBlocks v${{ env.REL_VERSION }}
+          generate_release_notes: true
+          tag_name: v${{ env.REL_VERSION }}
+          prerelease: true
+      - name: release a latest release
+        uses: softprops/action-gh-release@v1
+        if: ${{ env.WITH_RELEASE_NOTES }}
+        with:
+          body_path: ./docs/release_notes/v${{ env.REL_VERSION }}.md
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          name: KubeBlocks v${{ env.REL_VERSION }}
+          tag_name: v${{ env.REL_VERSION }}
+          prerelease: true

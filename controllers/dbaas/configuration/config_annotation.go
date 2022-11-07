@@ -18,6 +18,7 @@ package configuration
 
 import (
 	"encoding/json"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	corev1 "k8s.io/api/core/v1"
 	"strconv"
@@ -58,13 +59,14 @@ func ApplyConfigurationChange(client client.Client, ctx intctrlutil.RequestCtx, 
 
 	lastConfig, ok := annotations[LastAppliedConfigAnnotation]
 	if !ok {
-		return updateFirstApplyConfiguration(client, ctx, config, configData)
+		return UpdateAppliedConfiguration(client, ctx, config, configData)
 	}
 
 	return lastConfig == string(configData), nil
 }
 
-func updateFirstApplyConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, configData []byte) (bool, error) {
+// UpdateAppliedConfiguration update hash label and last applied config
+func UpdateAppliedConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, configData []byte) (bool, error) {
 
 	patch := client.MergeFrom(config.DeepCopy())
 	if config.ObjectMeta.Annotations == nil {
@@ -72,6 +74,11 @@ func updateFirstApplyConfiguration(cli client.Client, ctx intctrlutil.RequestCtx
 	}
 
 	config.ObjectMeta.Annotations[LastAppliedConfigAnnotation] = string(configData)
+	hash, err := cfgcore.ComputeHash(config.Data)
+	if err != nil {
+		return false, err
+	}
+	config.ObjectMeta.Labels[CMInsConfigurationHashLabelKey] = hash
 	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
 		return false, err
 	}
@@ -80,10 +87,13 @@ func updateFirstApplyConfiguration(cli client.Client, ctx intctrlutil.RequestCtx
 }
 
 func GetLastVersionConfig(cfg *corev1.ConfigMap) (map[string]string, error) {
-	cfgContent := cfg.GetAnnotations()[LastAppliedConfigAnnotation]
-
 	data := make(map[string]string, 0)
-	if err := json.Unmarshal([]byte(cfgContent), data); err != nil {
+	cfgContent, ok := cfg.GetAnnotations()[LastAppliedConfigAnnotation]
+	if !ok {
+		return data, nil
+	}
+
+	if err := json.Unmarshal([]byte(cfgContent), &data); err != nil {
 		return nil, err
 	}
 

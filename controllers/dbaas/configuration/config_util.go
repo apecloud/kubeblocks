@@ -19,6 +19,7 @@ package configuration
 import (
 	"fmt"
 	"github.com/spf13/viper"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,9 +33,12 @@ import (
 const (
 	ConfigNamespaceKey = "CM_NAMESPACE"
 
+	ConfigReconcileInterval = time.Second * 5
+
 	ConfigurationTemplateFinalizerName = "configuration.kubeblocks.io/finalizer"
 	ConfigurationTplLabelKey           = "configuration.kubeblocks.io/name"
-	CMConfigurationTplLabelKey         = "configuration.kubeblocks.io/configuration_template"
+	CMConfigurationTplLabelKey         = "configuration.kubeblocks.io/configuration-template"
+	CMInsConfigurationHashLabelKey     = "configuration.kubeblocks.io/configuration-hash"
 
 	CMInsConfigurationLabelKey = "app.kubernetes.io/ins-configure"
 )

@@ -26,7 +26,7 @@ import (
 
 func RetrievalWithJsonPath(jsonobj interface{}, jsonpath string) ([]byte, error) {
 
-	jsonbytes, err := jsonMarshal(&jsonobj)
+	jsonbytes, err := json.Marshal(&jsonobj)
 	if err != nil {
 		return nil, err
 	}
@@ -45,12 +45,12 @@ func RetrievalWithJsonPath(jsonobj interface{}, jsonpath string) ([]byte, error)
 }
 
 func jsonPatch(originalJSON, modifiedJSON interface{}) ([]byte, error) {
-	originalBytes, err := jsonMarshal(originalJSON)
+	originalBytes, err := json.Marshal(originalJSON)
 	if err != nil {
 		return nil, err
 	}
 
-	modifiedBytes, err := jsonMarshal(modifiedJSON)
+	modifiedBytes, err := json.Marshal(modifiedJSON)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func jsonPatch(originalJSON, modifiedJSON interface{}) ([]byte, error) {
 func jsonMarshal(data interface{}) ([]byte, error) {
 	buffer := bytes.Buffer{}
 	encoder := json.NewEncoder(&buffer)
-	encoder.SetEscapeHTML(false)
+	encoder.SetEscapeHTML(true)
 	encoder.SetIndent("", "  ")
 	err := encoder.Encode(data)
 	if err != nil {

@@ -3,16 +3,16 @@ TOKEN=$1
 REPO=$2
 REPO_OWNER=$3
 PROJECT_ID=$4
-COMPONENT_FIELD_ID=$5
-BACKENDPORTAL_OPTION_ID=$6
+STATUS_FIELD_ID=$5
+TODO_OPTION_ID=$6
 BODY=$7
 
 echo "TOKEN:"$TOKEN
 echo "REPO:"$REPO
 echo "REPO_OWNER:"$REPO
 echo "PROJECT_ID:"$PROJECT_ID
-echo "COMPONENT_FIELD_ID:"$COMPONENT_FIELD_ID
-echo "BACKENDPORTAL_OPTION_ID:"$BACKENDPORTAL_OPTION_ID
+echo "STATUS_FIELD_ID:"$STATUS_FIELD_ID
+echo "TODO_OPTION_ID:"$TODO_OPTION_ID
 echo "BODY:"$BODY
 
 REPO_NAME="${REPO/${REPO_OWNER}\//}"
@@ -68,32 +68,34 @@ for pr_url in ${BODY[@]}; do
           # get issue project item_id
           item_id="$( gh api graphql -f query='
             mutation($project:ID!, $issueid:ID!) {
-              addProjectNextItem(input: {projectId: $project, contentId: $issueid}) {
-                projectNextItem {
+              addProjectV2ItemById(input: {projectId: $project, contentId: $issueid}) {
+                item {
                   id
                 }
               }
-            }' -f project=$PROJECT_ID -f issueid=$issue_node_id --jq '.data.addProjectNextItem.projectNextItem.id')"
+            }' -f project=$PROJECT_ID -f issueid=$issue_node_id --jq '.data.addProjectV2ItemById.item.id')"
           echo "item_id: "$item_id
           # set issue to block field
           gh api graphql -f query='
             mutation (
               $project: ID!
               $item: ID!
-              $component_field: ID!
-              $component_value: String!
+              $status_field: ID!
+              $status_value: String!
             ) {
-              set_component: updateProjectNextItemField(input: {
+              set_status: updateProjectV2ItemFieldValue(input: {
                 projectId: $project
                 itemId: $item
-                fieldId: $component_field
-                value: $component_value
+                fieldId: $status_field
+                value: {
+                  singleSelectOptionId: $status_value
+                  }
               }) {
-                projectNextItem {
+                projectV2Item {
                   id
                   }
               }
-            }' -f project=$PROJECT_ID -f item=$item_id -f component_field=$COMPONENT_FIELD_ID -f component_value=$BACKENDPORTAL_OPTION_ID --silent
+            }' -f project=$PROJECT_ID -f item=$item_id -f status_field=$STATUS_FIELD_ID -f status_value=$TODO_OPTION_ID --silent
             echo "move issue $item_id done"
         done
       fi

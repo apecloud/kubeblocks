@@ -20,12 +20,12 @@ import (
 	"context"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-
-	"k8s.io/client-go/tools/record"
-
+	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -85,6 +85,9 @@ func (r *BackupPolicyTemplateReconciler) Reconcile(ctx context.Context, req ctrl
 func (r *BackupPolicyTemplateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dataprotectionv1alpha1.BackupPolicyTemplate{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: viper.GetInt(maxConcurDataProtectionReconKey),
+		}).
 		Complete(r)
 }
 

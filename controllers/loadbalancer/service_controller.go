@@ -29,11 +29,13 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/config"
 	pb "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol"
 )
 
@@ -165,7 +167,9 @@ func (c *ServiceController) removeFloatingIP(ip string) {
 }
 
 func (c *ServiceController) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).For(&corev1.Service{}).Complete(c)
+	return ctrl.NewControllerManagedBy(mgr).WithOptions(controller.Options{
+		MaxConcurrentReconciles: config.MaxConcurrentReconciles,
+	}).For(&corev1.Service{}).Complete(c)
 }
 
 func (c *ServiceController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

@@ -28,13 +28,14 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -45,7 +46,7 @@ import (
 // BackupJobReconciler reconciles a BackupJob object
 type BackupJobReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
+	Scheme   *k8sruntime.Scheme
 	Recorder record.EventRecorder
 	clock    clock.RealClock
 }
@@ -112,6 +113,9 @@ func (r *BackupJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	b := ctrl.NewControllerManagedBy(mgr).
 		For(&dataprotectionv1alpha1.BackupJob{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: viper.GetInt(maxConcurDataProtectionReconKey),
+		}).
 		Owns(&batchv1.Job{})
 
 	if !viper.GetBool("NO_VOLUMESNAPSHOT") {

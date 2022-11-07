@@ -33,7 +33,8 @@ deployment: {
 		}
 	}
 	"spec": {
-		replicas: component.replicas
+		replicas:        component.replicas
+		minReadySeconds: 10
 		selector: {
 			matchLabels: {
 				"app.kubernetes.io/name":           "\(component.clusterType)-\(component.clusterDefName)"

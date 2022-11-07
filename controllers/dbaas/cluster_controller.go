@@ -41,7 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/statefulset"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -156,8 +156,8 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 
 	// get componentDef this pod belongs to
 	componentName := pod.Labels[intctrlutil.AppComponentLabelKey]
-	typeName := statefulset.GetComponentTypeName(*cluster, componentName)
-	componentDef, err := statefulset.GetComponentFromClusterDefinition(ctx, cli, cluster, typeName)
+	typeName := component.GetComponentTypeName(*cluster, componentName)
+	componentDef, err := component.GetComponentFromClusterDefinition(ctx, cli, cluster, typeName)
 	if err != nil {
 		return err
 	}

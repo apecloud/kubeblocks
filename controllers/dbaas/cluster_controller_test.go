@@ -46,7 +46,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/statefulset"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -921,7 +921,7 @@ spec:
 			Expect(k8sClient.List(context.Background(), podList, client.InNamespace(key.Namespace))).Should(Succeed())
 			pods := make([]corev1.Pod, 0)
 			for _, pod := range podList.Items {
-				if statefulset.IsMemberOf(sts, &pod) {
+				if component.IsMemberOf(sts, &pod) {
 					pods = append(pods, pod)
 				}
 			}

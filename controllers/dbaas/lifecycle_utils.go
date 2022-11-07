@@ -149,11 +149,11 @@ func getAppVersionComponentByType(components []dbaasv1alpha1.AppVersionComponent
 	return nil
 }
 
-func getClusterComponentsByType(components []dbaasv1alpha1.ClusterComponent, typeName string) []*dbaasv1alpha1.ClusterComponent {
-	comps := []*dbaasv1alpha1.ClusterComponent{}
+func getClusterComponentsByType(components []dbaasv1alpha1.ClusterComponent, typeName string) []dbaasv1alpha1.ClusterComponent {
+	comps := []dbaasv1alpha1.ClusterComponent{}
 	for _, component := range components {
 		if component.Type == typeName {
-			comps = append(comps, &component)
+			comps = append(comps, component)
 		}
 	}
 	return comps
@@ -507,7 +507,7 @@ func buildClusterCreationTasks(
 		} else {
 			clusterComps := getClusterComponentsByType(cluster.Spec.Components, componentName)
 			for _, clusterComp := range clusterComps {
-				buildTask(mergeComponents(cluster, clusterDefinition, &component, appVersionComponent, clusterComp))
+				buildTask(mergeComponents(cluster, clusterDefinition, &component, appVersionComponent, &clusterComp))
 			}
 		}
 	}

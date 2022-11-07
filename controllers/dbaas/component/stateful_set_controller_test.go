@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package statefulset
+package component
 
 import (
 	"context"
@@ -176,7 +176,6 @@ kind: StatefulSet
 metadata:
   labels:
     app.kubernetes.io/component-name: wesql-test
-    app.kubernetes.io/created-by: controller-manager
     app.kubernetes.io/instance: wesql
     app.kubernetes.io/name: state.mysql-8-cluster-definition-consensus
   name: %s

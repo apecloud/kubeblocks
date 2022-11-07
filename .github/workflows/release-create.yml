@@ -3,7 +3,7 @@ name: RELEASE-CREATE
 on:
   push:
     branches:
-      - master
+      - main
       - release-*
     tags:
       - v*

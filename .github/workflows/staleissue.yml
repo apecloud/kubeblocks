@@ -1,7 +1,7 @@
 name: "Tag stale issues"
 on:
   schedule:
-  - cron: "0 0 0 1/2 * *"
+  - cron: "0 0 0 1/2 * ?"
 jobs:
   stale:
     runs-on: ubuntu-latest

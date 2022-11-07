@@ -18,6 +18,7 @@ package dbaas
 
 import (
 	"context"
+	"encoding/json"
 	"k8s.io/apimachinery/pkg/types"
 
 	appv1 "k8s.io/api/apps/v1"
@@ -74,10 +75,14 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	config := &corev1.ConfigMap{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "not find configmap", "key", req.NamespacedName)
 	}
 
 	if checkConfigurationObject(config) {
+		intctrlutil.Reconciled()
+	}
+
+	if hash, ok := config.Labels[dbaasconfig.CMInsConfigurationHashLabelKey]; ok && hash == config.ResourceVersion {
 		intctrlutil.Reconciled()
 	}
 
@@ -162,9 +167,10 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	}
 
 	componentLabels := map[string]string{
-		appNameLabelKey:      config.Labels[appNameLabelKey],
-		appInstanceLabelKey:  config.Labels[appInstanceLabelKey],
-		appComponentLabelKey: config.Labels[appInstanceLabelKey],
+		appNameLabelKey:                        config.Labels[appNameLabelKey],
+		appInstanceLabelKey:                    config.Labels[appInstanceLabelKey],
+		appComponentLabelKey:                   config.Labels[appComponentLabelKey],
+		dbaasconfig.CMInsConfigurationLabelKey: config.Labels[dbaasconfig.CMInsConfigurationLabelKey],
 	}
 
 	versionMeta, err := dbaasconfig.GetConfigurationVersion(config, reqCtx, tpl)
@@ -172,7 +178,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
 
-	// Not any parameters update
+	// Not any parameters updated
 	if !versionMeta.IsModify {
 		return r.updateCfgStatus(reqCtx, versionMeta, config)
 	}
@@ -183,19 +189,19 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 			r.Recorder,
 			configutil.WrapError(err,
 				"failed to get cluster. configmap[%s] label[%s]",
-				reqCtx.Req.NamespacedName,
-				clusterLabels),
+				reqCtx.Req.NamespacedName, clusterLabels),
 			reqCtx.Log)
 	}
 
-	if len(clusters.Items) != 1 {
+	clusterLen := len(clusters.Items)
+	if clusterLen > 1 {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config,
 			r.Recorder,
 			configutil.MakeError("get multi cluster[%d]. configmap[%s] label[%s]",
-				len(clusters.Items),
-				reqCtx.Req.NamespacedName,
-				clusterLabels),
+				clusterLen, reqCtx.Req.NamespacedName, clusterLabels),
 			reqCtx.Log)
+	} else if clusterLen == 0 {
+		return intctrlutil.Reconciled()
 	}
 
 	// find STS CR
@@ -204,21 +210,27 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 			r.Recorder,
 			configutil.WrapError(err,
 				"failed to get component. configmap[%s] label[%s]",
-				reqCtx.Req.NamespacedName,
-				componentLabels),
+				reqCtx.Req.NamespacedName, componentLabels),
 			reqCtx.Log)
 	}
-
-	if len(clusters.Items) == 0 {
+	componentLen := len(stsLists.Items)
+	if componentLen == 0 {
 		return intctrlutil.Reconciled()
 	}
 
-	cluster := clusters.Items[0]
-	return r.performUpdate(reqCtx, versionMeta, config, cluster, stsLists.Items)
+	return r.performUpdate(reqCtx, versionMeta, config, clusters.Items[0], stsLists.Items)
 }
 
-func (r *ReconfigureRequestReconciler) updateCfgStatus(ctx intctrlutil.RequestCtx, meta *configutil.ConfigDiffInformation, config *corev1.ConfigMap) (ctrl.Result, error) {
-	// TODO(zt) process update status
+func (r *ReconfigureRequestReconciler) updateCfgStatus(ctx intctrlutil.RequestCtx, meta *configutil.ConfigDiffInformation, cfg *corev1.ConfigMap) (ctrl.Result, error) {
+	configData, err := json.Marshal(cfg.Data)
+	if err != nil {
+		return intctrlutil.RequeueWithErrorAndRecordEvent(cfg, r.Recorder, err, ctx.Log)
+	}
+
+	if ok, err := dbaasconfig.UpdateAppliedConfiguration(r.Client, ctx, cfg, configData); err != nil || !ok {
+		return intctrlutil.RequeueAfter(dbaasconfig.ConfigReconcileInterval, ctx.Log, "failed to patch status and retry...", "error", err)
+	}
+
 	return intctrlutil.Reconciled()
 }
 

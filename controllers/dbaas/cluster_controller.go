@@ -313,6 +313,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if cluster.Status.ObservedGeneration == cluster.GetObjectMeta().GetGeneration() {
+		// synchronize the latest status of components
+		if err = r.handleComponentStatus(reqCtx.Ctx, cluster); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
 		// check cluster all pods is ready
 		if err = r.checkAndPatchToRunning(reqCtx.Ctx, cluster); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -581,6 +585,95 @@ func (r *ClusterReconciler) checkAndPatchToRunning(ctx context.Context, cluster 
 	// send an event when Cluster.status.phase change to Running
 	r.Recorder.Eventf(cluster, corev1.EventTypeNormal, string(dbaasv1alpha1.RunningPhase), "Cluster: %s is ready, current phase is Running", cluster.Name)
 	return nil
+}
+
+// handleComponentStatus cluster controller and component controller are tuned asynchronously.
+// before processing whether the component is running, need to synchronize the latest status of components firstly.
+// it can prevent the use of expired component status, which may lead to inconsistent cluster status.
+func (r *ClusterReconciler) handleComponentStatus(ctx context.Context, cluster *dbaasv1alpha1.Cluster) error {
+	var (
+		needSyncDeploymentStatus  bool
+		needSyncStatefulSetStatus bool
+		err                       error
+	)
+	patch := client.MergeFrom(cluster.DeepCopy())
+	// handle stateless component status
+	if needSyncDeploymentStatus, err = r.handleComponentStatusWithDeployment(ctx, cluster); err != nil {
+		return err
+	}
+	// handle stateful/consensus component status
+	if needSyncStatefulSetStatus, err = r.handleComponentStatusWithStatefulSet(ctx, cluster); err != nil {
+		return err
+	}
+	if needSyncDeploymentStatus || needSyncStatefulSetStatus {
+		if err = r.Client.Status().Patch(ctx, cluster, patch); err != nil {
+			return err
+		}
+		return component.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
+	}
+	return nil
+}
+
+// handleComponentStatusWithStatefulSet handle the component status with statefulSet. One statefulSet corresponds to one component.
+func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Context, cluster *dbaasv1alpha1.Cluster) (bool, error) {
+	var (
+		needSyncComponentStatus bool
+		statefulSetList         = &appsv1.StatefulSetList{}
+		componentTypeMap        map[string]dbaasv1alpha1.ComponentType
+		err                     error
+	)
+	if componentTypeMap, err = getComponentTypeMapWithCluster(ctx, r.Client, cluster); err != nil {
+		return false, err
+	}
+	if err = getObjectList(ctx, r.Client, cluster, statefulSetList); err != nil {
+		return false, err
+	}
+	for _, sts := range statefulSetList.Items {
+		componentName := sts.GetLabels()[intctrlutil.AppComponentLabelKey]
+		if len(componentName) == 0 {
+			continue
+		}
+		componentType := componentTypeMap[componentName]
+		statefulStatusRevisionIsEquals := true
+		switch componentType {
+		case dbaasv1alpha1.Consensus:
+			if statefulStatusRevisionIsEquals, err = checkConsensusStatefulSetRevision(ctx, r.Client, &sts); err != nil {
+				return false, err
+			}
+		case dbaasv1alpha1.Stateful:
+			// when stateful updateStrategy is rollingUpdate, need to check revision
+			if sts.Status.UpdateRevision != sts.Status.CurrentRevision {
+				statefulStatusRevisionIsEquals = false
+			}
+		}
+		componentIsRunning := component.StatefulSetIsReady(&sts, statefulStatusRevisionIsEquals)
+		if ok := component.NeedSyncStatusComponents(cluster, componentName, componentIsRunning); ok {
+			needSyncComponentStatus = true
+		}
+	}
+	return needSyncComponentStatus, nil
+}
+
+// handleComponentStatusWithDeployment handle the component status with deployment. One deployment corresponds to one component.
+func (r *ClusterReconciler) handleComponentStatusWithDeployment(ctx context.Context, cluster *dbaasv1alpha1.Cluster) (bool, error) {
+	var (
+		needSyncComponentStatus bool
+		deploymentList          = &appsv1.DeploymentList{}
+	)
+	if err := getObjectList(ctx, r.Client, cluster, deploymentList); err != nil {
+		return false, err
+	}
+	for _, deploy := range deploymentList.Items {
+		componentName := deploy.GetLabels()[intctrlutil.AppComponentLabelKey]
+		if len(componentName) == 0 {
+			continue
+		}
+		componentIsRunning := component.DeploymentIsReady(&deploy)
+		if ok := component.NeedSyncStatusComponents(cluster, componentName, componentIsRunning); ok {
+			needSyncComponentStatus = true
+		}
+	}
+	return needSyncComponentStatus, nil
 }
 
 // reconcileStatusOperations when Cluster.spec updated, we need reconcile the Cluster.status.operations.

@@ -1,6 +1,7 @@
 package component
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -17,38 +18,8 @@ const (
 
 type handleComponentAndCheckStatus func(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *dbaasv1alpha1.Cluster, object client.Object) (bool, error)
 
-// checkComponentStatusAndSyncCluster check component status. if the component status changed, sync cluster.status.components
-func checkComponentStatusAndSyncCluster(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	object client.Object,
-	customFunc handleComponentAndCheckStatus) error {
-	var (
-		componentIsRunning bool
-		err                error
-		cluster            = &dbaasv1alpha1.Cluster{}
-		labels             = object.GetLabels()
-	)
-
-	if labels == nil {
-		return nil
-	}
-	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: labels[intctrlutil.AppInstanceLabelKey], Namespace: object.GetNamespace()}, cluster); err != nil {
-		return err
-	}
-	if customFunc == nil {
-		return nil
-	}
-	if componentIsRunning, err = customFunc(reqCtx, cli, cluster, object); err != nil {
-		return err
-	}
-	if err = patchClusterComponentStatus(reqCtx, cli, cluster, labels[intctrlutil.AppComponentLabelKey], componentIsRunning); err != nil {
-		return err
-	}
-	return markRunningOpsRequestAnnotation(reqCtx, cli, cluster)
-}
-
-// needSyncStatusComponents Determine whether the component status needs to be modified
-func needSyncStatusComponents(cluster *dbaasv1alpha1.Cluster, componentName string, componentIsRunning bool) bool {
+// NeedSyncStatusComponents Determine whether the component status needs to be modified
+func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster, componentName string, componentIsRunning bool) bool {
 	var (
 		ok              bool
 		statusComponent *dbaasv1alpha1.ClusterStatusComponent
@@ -83,7 +54,7 @@ func patchClusterComponentStatus(reqCtx intctrlutil.RequestCtx,
 	componentIsRunning bool) error {
 	// when component phase is changed, set needSyncStatusComponent to true, then patch cluster.status
 	patch := client.MergeFrom(cluster.DeepCopy())
-	if ok := needSyncStatusComponents(cluster, componentName, componentIsRunning); !ok {
+	if ok := NeedSyncStatusComponents(cluster, componentName, componentIsRunning); !ok {
 		return nil
 	}
 	reqCtx.Log.Info("component phase changed", "componentName", componentName, "phase", cluster.Status.Components[componentName].Phase)
@@ -91,9 +62,9 @@ func patchClusterComponentStatus(reqCtx intctrlutil.RequestCtx,
 }
 
 // patchOpsRequestAnnotation patch the reconcile annotation to OpsRequest
-func patchOpsRequestAnnotation(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *dbaasv1alpha1.Cluster, opsRequestName string) error {
+func patchOpsRequestAnnotation(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, opsRequestName string) error {
 	opsRequest := &dbaasv1alpha1.OpsRequest{}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: opsRequestName, Namespace: cluster.Namespace}, opsRequest); err != nil {
+	if err := cli.Get(ctx, client.ObjectKey{Name: opsRequestName, Namespace: cluster.Namespace}, opsRequest); err != nil {
 		return err
 	}
 	patch := client.MergeFrom(opsRequest.DeepCopy())
@@ -101,12 +72,12 @@ func patchOpsRequestAnnotation(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		opsRequest.Annotations = map[string]string{}
 	}
 	opsRequest.Annotations[OpsRequestReconcileAnnotationKey] = time.Now().Format(time.RFC3339)
-	return cli.Patch(reqCtx.Ctx, opsRequest, patch)
+	return cli.Patch(ctx, opsRequest, patch)
 }
 
-// MarkRunningOpsRequestAnnotation mark reconcile annotation to the OpsRequest running in the current cluster.
+// MarkRunningOpsRequestAnnotation mark reconcile annotation to the OpsRequest which is running in the cluster.
 // then the related OpsRequest can reconcile
-func markRunningOpsRequestAnnotation(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *dbaasv1alpha1.Cluster) error {
+func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster) error {
 	var (
 		opsRequestMap   map[dbaasv1alpha1.Phase]string
 		opsRequestValue string
@@ -127,9 +98,42 @@ func markRunningOpsRequestAnnotation(reqCtx intctrlutil.RequestCtx, cli client.C
 		if k != dbaasv1alpha1.UpdatingPhase {
 			continue
 		}
-		if err = patchOpsRequestAnnotation(reqCtx, cli, cluster, v); err != nil {
+		if err = patchOpsRequestAnnotation(ctx, cli, cluster, v); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// checkComponentStatusAndSyncCluster check component status. if the component status changed, sync cluster.status.components
+func checkComponentStatusAndSyncCluster(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	object client.Object,
+	customFunc handleComponentAndCheckStatus) error {
+	var (
+		componentIsRunning bool
+		err                error
+		cluster            = &dbaasv1alpha1.Cluster{}
+		labels             = object.GetLabels()
+	)
+
+	if labels == nil {
+		return nil
+	}
+	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: labels[intctrlutil.AppInstanceLabelKey], Namespace: object.GetNamespace()}, cluster); err != nil {
+		return err
+	}
+	if customFunc == nil {
+		return nil
+	}
+	if componentIsRunning, err = customFunc(reqCtx, cli, cluster, object); err != nil {
+		return err
+	}
+	if err = patchClusterComponentStatus(reqCtx, cli, cluster, labels[intctrlutil.AppComponentLabelKey], componentIsRunning); err != nil {
+		return err
+	}
+	if componentIsRunning {
+		return MarkRunningOpsRequestAnnotation(reqCtx.Ctx, cli, cluster)
 	}
 	return nil
 }

@@ -29,6 +29,24 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+// GetPodListByStatefulSet get statefulSet pod list
+func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet) ([]corev1.Pod, error) {
+	// get podList owned by stsObj
+	podList := &corev1.PodList{}
+	if err := cli.List(ctx, podList,
+		&client.ListOptions{Namespace: stsObj.Namespace},
+		client.MatchingLabels{intctrlutil.AppComponentLabelKey: stsObj.Labels[intctrlutil.AppComponentLabelKey]}); err != nil {
+		return nil, err
+	}
+	pods := make([]corev1.Pod, 0)
+	for _, pod := range podList.Items {
+		if IsMemberOf(stsObj, &pod) {
+			pods = append(pods, pod)
+		}
+	}
+	return pods, nil
+}
+
 // handleConsensusSetUpdate handle ConsensusSet component when it to do updating
 func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, stsObj *appsv1.StatefulSet) (bool, error) {
 	// get typeName from stsObj.name
@@ -43,21 +61,10 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 	if component.ComponentType != dbaasv1alpha1.Consensus {
 		return true, nil
 	}
-
-	// get podList owned by stsObj
-	podList := &corev1.PodList{}
-	if err = cli.List(ctx, podList,
-		&client.ListOptions{Namespace: stsObj.Namespace},
-		client.MatchingLabels{intctrlutil.AppComponentLabelKey: stsObj.Labels[intctrlutil.AppComponentLabelKey]}); err != nil {
+	pods, err := GetPodListByStatefulSet(ctx, cli, stsObj)
+	if err != nil {
 		return false, err
 	}
-	pods := make([]corev1.Pod, 0)
-	for _, pod := range podList.Items {
-		if IsMemberOf(stsObj, &pod) {
-			pods = append(pods, pod)
-		}
-	}
-
 	// get pod label and name, compute plan
 	plan := generateConsensusUpdatePlan(ctx, cli, stsObj, pods, *component)
 	// execute plan
@@ -74,7 +81,7 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 			return false, errors.New("wrong type: obj not Pod")
 		}
 		// if pod is the latest version, we do nothing
-		if getPodRevision(&pod) == stsObj.Status.UpdateRevision && stsObj.Generation == stsObj.Status.ObservedGeneration {
+		if GetPodRevision(&pod) == stsObj.Status.UpdateRevision && stsObj.Generation == stsObj.Status.ObservedGeneration {
 			return false, nil
 		}
 		// if DeletionTimestamp is not nil, it is terminating.

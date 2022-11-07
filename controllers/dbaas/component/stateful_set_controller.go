@@ -72,7 +72,6 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 func handleStatefulSetAndCheckStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *dbaasv1alpha1.Cluster, object client.Object) (bool, error) {
 	var (
 		statefulStatusRevisionIsEquals bool
-		componentIsRunning             = true
 		sts                            = object.(*appsv1.StatefulSet)
 		err                            error
 	)
@@ -80,14 +79,7 @@ func handleStatefulSetAndCheckStatus(reqCtx intctrlutil.RequestCtx, cli client.C
 	if statefulStatusRevisionIsEquals, err = handleUpdateByComponentType(reqCtx, cli, sts, cluster); err != nil {
 		return false, err
 	}
-
-	// judge whether statefulSet is ready
-	if sts.Status.AvailableReplicas != *sts.Spec.Replicas ||
-		sts.Status.ObservedGeneration != sts.GetGeneration() ||
-		!statefulStatusRevisionIsEquals {
-		componentIsRunning = false
-	}
-	return componentIsRunning, nil
+	return StatefulSetIsReady(sts, statefulStatusRevisionIsEquals), nil
 }
 
 // handleUpdateByComponentType handle cluster update operations according to component type and check statefulSet revision

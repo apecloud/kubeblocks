@@ -71,17 +71,22 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 // checkDeploymentStatus check whether the stateless component is already running
 func checkDeploymentStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *dbaasv1alpha1.Cluster, object client.Object) (bool, error) {
+	deploy := object.(*appsv1.Deployment)
+	return DeploymentIsReady(deploy), nil
+}
+
+// DeploymentIsReady check deployment is ready
+func DeploymentIsReady(deploy *appsv1.Deployment) bool {
 	var (
+		targetReplicas     = *deploy.Spec.Replicas
 		componentIsRunning = true
-		deploy             = object.(*appsv1.Deployment)
-		targetRepilcas     = *deploy.Spec.Replicas
 	)
-	if deploy.Status.AvailableReplicas != targetRepilcas ||
-		deploy.Status.Replicas != targetRepilcas ||
+	if deploy.Status.AvailableReplicas != targetReplicas ||
+		deploy.Status.Replicas != targetReplicas ||
 		deploy.Status.ObservedGeneration != deploy.GetGeneration() {
 		componentIsRunning = false
 	}
-	return componentIsRunning, nil
+	return componentIsRunning
 }
 
 // SetupWithManager sets up the controller with the Manager.

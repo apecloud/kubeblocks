@@ -61,9 +61,9 @@ func IsMemberOf(set *appsv1.StatefulSet, pod *corev1.Pod) bool {
 	return getParentName(pod) == set.Name
 }
 
-// getPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty
+// GetPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty
 // string is returned.
-func getPodRevision(pod *corev1.Pod) string {
+func GetPodRevision(pod *corev1.Pod) string {
 	if pod.Labels == nil {
 		return ""
 	}
@@ -96,4 +96,16 @@ func GetComponentFromClusterDefinition(ctx context.Context, cli client.Client, c
 		}
 	}
 	return nil, nil
+}
+
+// StatefulSetIsReady check statefulSet is ready
+func StatefulSetIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals bool) bool {
+	var componentIsRunning = true
+	// judge whether statefulSet is ready
+	if sts.Status.AvailableReplicas != *sts.Spec.Replicas ||
+		sts.Status.ObservedGeneration != sts.GetGeneration() ||
+		!statefulStatusRevisionIsEquals {
+		componentIsRunning = false
+	}
+	return componentIsRunning
 }

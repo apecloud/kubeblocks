@@ -692,7 +692,11 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			if err := cli.Get(ctx, key, stsObj); err != nil {
 				return err
 			}
+			tempAnnotations := stsObj.Spec.Template.Annotations
 			stsObj.Spec.Template = stsProto.Spec.Template
+			// keep the original template annotations.
+			// if annotations exist and are replaced, the statefulSet will be updated
+			stsObj.Spec.Template.Annotations = tempAnnotations
 			stsObj.Spec.Replicas = stsProto.Spec.Replicas
 			stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
 			if err := cli.Update(ctx, stsObj); err != nil {

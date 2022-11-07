@@ -2,9 +2,6 @@ name: RELEASE-CREATE
 
 on:
   push:
-    branches:
-      - main
-      - release-*
     tags:
       - v*
 

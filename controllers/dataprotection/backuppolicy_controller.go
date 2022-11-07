@@ -19,7 +19,6 @@ package dataprotection
 import (
 	"context"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/spf13/viper"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -27,6 +26,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )

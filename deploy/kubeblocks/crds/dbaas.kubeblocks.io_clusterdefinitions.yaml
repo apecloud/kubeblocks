@@ -7551,7 +7551,7 @@ spec:
                                   type: array
                               type: object
                             enable:
-                              default: true
+                              default: false
                               description: enable probe or not
                               type: boolean
                             failureThreshold:
@@ -7591,7 +7591,7 @@ spec:
                                   type: array
                               type: object
                             enable:
-                              default: true
+                              default: false
                               description: enable probe or not
                               type: boolean
                             failureThreshold:
@@ -7631,7 +7631,7 @@ spec:
                                   type: array
                               type: object
                             enable:
-                              default: true
+                              default: false
                               description: enable probe or not
                               type: boolean
                             failureThreshold:

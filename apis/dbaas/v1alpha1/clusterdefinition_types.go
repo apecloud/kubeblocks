@@ -186,7 +186,8 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Scripts ClusterDefinitionScripts `json:"scripts,omitempty"`
 
-	Probes ClusterDefinitionProbes `json:"probes,omitempty"`
+	// +optional
+	Probes *ClusterDefinitionProbes `json:"probes,omitempty"`
 
 	// ComponentType defines type of the component
 	// +kubebuilder:validation:Required
@@ -275,7 +276,7 @@ type ClusterDefinitionProbeCMDs struct {
 
 type ClusterDefinitionProbe struct {
 	// enable probe or not
-	// +kubebuilder:default=true
+	// +kubebuilder:default=false
 	Enable bool `json:"enable,omitempty"`
 	// How often (in seconds) to perform the probe.
 	// +kubebuilder:default=1
@@ -293,9 +294,9 @@ type ClusterDefinitionProbe struct {
 }
 
 type ClusterDefinitionProbes struct {
-	RunningProbe     ClusterDefinitionProbe `json:"runningProbe,omitempty"`
-	StatusProbe      ClusterDefinitionProbe `json:"statusProbe,omitempty"`
-	RoleChangedProbe ClusterDefinitionProbe `json:"roleChangedProbe,omitempty"`
+	RunningProbe     *ClusterDefinitionProbe `json:"runningProbe,omitempty"`
+	StatusProbe      *ClusterDefinitionProbe `json:"statusProbe,omitempty"`
+	RoleChangedProbe *ClusterDefinitionProbe `json:"roleChangedProbe,omitempty"`
 }
 
 type ConsensusSetSpec struct {

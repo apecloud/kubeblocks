@@ -1220,6 +1220,11 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 	probeContainers := []corev1.Container{}
 	componentProbes := params.component.Probes
 	reqCtx.Log.Info("probe", "settings", componentProbes)
+
+	if componentProbes == nil {
+		return probeContainers, nil
+	}
+
 	// if componentProbes.StatusProbe.Enable {
 	//	container := corev1.Container{}
 	//	if err = json.Unmarshal(probeContainerByte, &container); err != nil {
@@ -1250,7 +1255,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 	//	probeContainers = append(probeContainers, container)
 	// }
 
-	if componentProbes.RoleChangedProbe.Enable {
+	if componentProbes.RoleChangedProbe != nil && componentProbes.RoleChangedProbe.Enable {
 		container := corev1.Container{}
 		if err = json.Unmarshal(probeContainerByte, &container); err != nil {
 			return nil, err

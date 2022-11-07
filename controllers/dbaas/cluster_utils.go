@@ -2,12 +2,14 @@ package dbaas
 
 import (
 	"context"
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // getObjectList get object list with cluster instance label

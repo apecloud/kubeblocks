@@ -20,7 +20,6 @@ Thanks to everyone who made this release possible!
 $kubeblocks_contributors
 
 ## What's Changed
-
 $kubeblocks_changes
 
 ## Upgrading to KubeBlocks $kubeblocks_version

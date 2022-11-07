@@ -112,7 +112,7 @@ for change in sorted(changes, key=lambda c: (get_change_priority(c[0]), c[1].id)
     subtitle = change[0]
     if lastSubtitle != subtitle:
         lastSubtitle = subtitle
-        changeLines.append("### " + subtitle)
+        changeLines.append("\n### " + subtitle)
     breakingChange = 'breaking-change' in [label.name for label in change[1].labels]
     changeUrl = " ([#" + str(change[1].number) + "](" + change[4] + ")"
     changeAuthor = ", " + change[3] + ")"

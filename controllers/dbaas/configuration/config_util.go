@@ -18,9 +18,10 @@ package configuration
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
 	"time"
 
+	"github.com/spf13/viper"
+	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -212,10 +213,26 @@ func ValidateConfTplStatus(configStatus dbaasv1alpha1.ConfigurationTemplateStatu
 	return configStatus.Phase == dbaasv1alpha1.AvailablePhase
 }
 
-func GetConfigurationVersion(config *corev1.ConfigMap, ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplateSpec) (*cfgcore.ConfigDiffInformation, error) {
-	lastConfig, err := GetLastVersionConfig(config)
+func GetComponentByUsingCM(stsList *appv1.StatefulSetList, cfg client.ObjectKey) []appv1.StatefulSet {
+	stsLen := len(stsList.Items)
+	if stsLen == 0 {
+		return nil
+	}
+
+	sts := make([]appv1.StatefulSet, 0, stsLen)
+	for _, s := range stsList.Items {
+		volumeMounted := intctrlutil.GetVolumeMountName(s.Spec.Template.Spec.Volumes, cfg.Name)
+		if volumeMounted != nil {
+			sts = append(sts, s)
+		}
+	}
+	return sts
+}
+
+func GetConfigurationVersion(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplateSpec) (*cfgcore.ConfigDiffInformation, error) {
+	lastConfig, err := GetLastVersionConfig(cfg)
 	if err != nil {
-		return nil, cfgcore.WrapError(err, "failed to get last version data. config[%v]", client.ObjectKeyFromObject(config))
+		return nil, cfgcore.WrapError(err, "failed to get last version data. config[%v]", client.ObjectKeyFromObject(cfg))
 	}
 
 	option := cfgcore.CfgOption{
@@ -225,10 +242,10 @@ func GetConfigurationVersion(config *corev1.ConfigMap, ctx intctrlutil.RequestCt
 	}
 
 	return cfgcore.CreateMergePatch(&cfgcore.K8sConfig{
-		CfgKey:         client.ObjectKeyFromObject(config),
+		CfgKey:         client.ObjectKeyFromObject(cfg),
 		Configurations: lastConfig,
 	}, &cfgcore.K8sConfig{
-		CfgKey:         client.ObjectKeyFromObject(config),
-		Configurations: config.Data,
+		CfgKey:         client.ObjectKeyFromObject(cfg),
+		Configurations: cfg.Data,
 	}, option)
 }

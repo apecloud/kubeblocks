@@ -33,7 +33,8 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	dbaasconfig "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
-	configutil "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgpolicy "github.com/apecloud/kubeblocks/controllers/dbaas/configuration/policy"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -187,7 +188,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	if err := r.Client.List(reqCtx.Ctx, &clusters, client.InNamespace(config.Namespace), client.MatchingLabels(clusterLabels)); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config,
 			r.Recorder,
-			configutil.WrapError(err,
+			cfgcore.WrapError(err,
 				"failed to get cluster. configmap[%s] label[%s]",
 				reqCtx.Req.NamespacedName, clusterLabels),
 			reqCtx.Log)
@@ -197,7 +198,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	if clusterLen > 1 {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config,
 			r.Recorder,
-			configutil.MakeError("get multi cluster[%d]. configmap[%s] label[%s]",
+			cfgcore.MakeError("get multi cluster[%d]. configmap[%s] label[%s]",
 				clusterLen, reqCtx.Req.NamespacedName, clusterLabels),
 			reqCtx.Log)
 	} else if clusterLen == 0 {
@@ -208,37 +209,61 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	if err := r.Client.List(reqCtx.Ctx, &stsLists, client.InNamespace(config.Namespace), client.MatchingLabels(componentLabels)); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config,
 			r.Recorder,
-			configutil.WrapError(err,
+			cfgcore.WrapError(err,
 				"failed to get component. configmap[%s] label[%s]",
 				reqCtx.Req.NamespacedName, componentLabels),
 			reqCtx.Log)
 	}
-	componentLen := len(stsLists.Items)
-	if componentLen == 0 {
+
+	sts := dbaasconfig.GetComponentByUsingCM(&stsLists, client.ObjectKeyFromObject(config))
+	if len(sts) == 0 {
 		return intctrlutil.Reconciled()
 	}
 
-	return r.performUpdate(reqCtx, versionMeta, config, clusters.Items[0], stsLists.Items)
+	return r.performUpgrade(cfgpolicy.ReconfigureParams{
+		Meta:       versionMeta,
+		Cfg:        config,
+		Tpl:        tpl,
+		Client:     r.Client,
+		Ctx:        reqCtx,
+		Cluster:    &clusters.Items[0],
+		Components: sts,
+	})
 }
 
-func (r *ReconfigureRequestReconciler) updateCfgStatus(ctx intctrlutil.RequestCtx, meta *configutil.ConfigDiffInformation, cfg *corev1.ConfigMap) (ctrl.Result, error) {
+func (r *ReconfigureRequestReconciler) updateCfgStatus(reqCtx intctrlutil.RequestCtx, meta *cfgcore.ConfigDiffInformation, cfg *corev1.ConfigMap) (ctrl.Result, error) {
 	configData, err := json.Marshal(cfg.Data)
 	if err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(cfg, r.Recorder, err, ctx.Log)
+		return intctrlutil.RequeueWithErrorAndRecordEvent(cfg, r.Recorder, err, reqCtx.Log)
 	}
 
-	if ok, err := dbaasconfig.UpdateAppliedConfiguration(r.Client, ctx, cfg, configData); err != nil || !ok {
-		return intctrlutil.RequeueAfter(dbaasconfig.ConfigReconcileInterval, ctx.Log, "failed to patch status and retry...", "error", err)
+	if ok, err := dbaasconfig.UpdateAppliedConfiguration(r.Client, reqCtx, cfg, configData); err != nil || !ok {
+		return intctrlutil.RequeueAfter(dbaasconfig.ConfigReconcileInterval, reqCtx.Log, "failed to patch status and retry...", "error", err)
 	}
 
 	return intctrlutil.Reconciled()
 }
 
-func (r *ReconfigureRequestReconciler) performUpdate(ctx intctrlutil.RequestCtx, meta *configutil.ConfigDiffInformation, config *corev1.ConfigMap, cluster dbaasv1alpha1.Cluster, component []appv1.StatefulSet) (ctrl.Result, error) {
+func (r *ReconfigureRequestReconciler) performUpgrade(params cfgpolicy.ReconfigureParams) (ctrl.Result, error) {
 	// TODO(zt) process update policy
 
-	r.updateCfgStatus(ctx, meta, config)
-	intctrlutil.RecordCreatedEvent(r.Recorder, config)
+	policy, err := cfgpolicy.NewReconfigurePolicy(params.Tpl, params.Meta)
+	if err != nil {
+		return intctrlutil.RequeueWithErrorAndRecordEvent(params.Cfg, r.Recorder, err, params.Ctx.Log)
+	}
 
-	return intctrlutil.Reconciled()
+	execStatus, err := policy.Upgrade(params)
+	if err != nil {
+		return intctrlutil.RequeueWithErrorAndRecordEvent(params.Cfg, r.Recorder, err, params.Ctx.Log)
+	}
+
+	switch execStatus {
+	case cfgpolicy.ES_Retry:
+		return intctrlutil.RequeueAfter(dbaasconfig.ConfigReconcileInterval, params.Ctx.Log, "")
+	case cfgpolicy.ES_None:
+		return r.updateCfgStatus(params.Ctx, params.Meta, params.Cfg)
+	default:
+		return intctrlutil.Reconciled()
+	}
+	//return r.updateCfgStatus(params.Ctx, params.Meta, params.Cfg)
 }

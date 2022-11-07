@@ -27,9 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // BackupToolReconciler reconciles a BackupTool object

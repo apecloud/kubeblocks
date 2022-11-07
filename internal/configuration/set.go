@@ -35,6 +35,16 @@ func NewSet() *Set {
 	return &s
 }
 
+func NewSetFromList(v []string) *Set {
+	s := NewSet()
+
+	for _, item := range v {
+		s.Insert(item)
+	}
+
+	return s
+}
+
 func NewSetFromMap(v map[string]*viper.Viper) *Set {
 	s := NewSet()
 
@@ -47,6 +57,11 @@ func NewSetFromMap(v map[string]*viper.Viper) *Set {
 
 func Difference(left, right *Set) *Set {
 	return left.Difference(right)
+}
+
+func Union(left, right *Set) *Set {
+	deleteSet := Difference(left, right)
+	return Difference(left, deleteSet)
 }
 
 func (s *Set) Difference(other *Set) *Set {
@@ -68,6 +83,10 @@ func (s *Set) Contains(v string) bool {
 
 func (s *Set) Size() int {
 	return len(*s)
+}
+
+func (s *Set) Empty() bool {
+	return s.Size() == 0
 }
 
 func (s *Set) Remove(v string) bool {

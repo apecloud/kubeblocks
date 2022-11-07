@@ -56,7 +56,7 @@ func (receiver NoneExecPolicy) Upgrade(params ReconfigureParams) (ExecStatus, er
 	return ES_None, nil
 }
 
-func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigurationTemplateSpec, cfg *cfgcore.ConfigDiffInformation) (ReconfigurePolicy, error) {
+func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigurationTemplateSpec, cfg *cfgcore.ConfigDiffInformation, policy dbaasv1alpha1.UpgradePolicy) (ReconfigurePolicy, error) {
 	var (
 		dynamicUpdate = true
 		params        []string
@@ -75,7 +75,20 @@ func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigurationTemplateSpec, cfg *cfg
 	// TODO(zt) support rolling policy
 	if dynamicUpdate {
 		return NoneExecPolicy{}, nil
-	} else {
-		return &SimplePolicy{dbaasv1alpha1.Stateful}, nil
 	}
+
+	var execPolicy ReconfigurePolicy
+
+	switch policy {
+	case dbaasv1alpha1.NormalPolicy:
+		execPolicy = &SimplePolicy{dbaasv1alpha1.Stateful}
+	case dbaasv1alpha1.RestartPolicy:
+		execPolicy = &ParallelUpgradePolicy{}
+	case dbaasv1alpha1.RollingPolicy:
+		execPolicy = &RollingUpgradePolicy{}
+	default:
+		execPolicy = &SimplePolicy{dbaasv1alpha1.Stateful}
+	}
+
+	return execPolicy, nil
 }

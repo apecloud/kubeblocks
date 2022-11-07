@@ -155,6 +155,14 @@ const (
 	DYNAMIC_MODE UpdateMode = "dynamic"
 )
 
+type UpgradePolicy string
+
+const (
+	NormalPolicy  UpgradePolicy = "simple"
+	RestartPolicy UpgradePolicy = "parallel"
+	RollingPolicy UpgradePolicy = "rolling"
+)
+
 func RegisterWebhookManager(mgr manager.Manager) {
 	webhookMgr = &webhookManager{mgr.GetClient()}
 }

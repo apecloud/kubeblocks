@@ -18,17 +18,22 @@ package configuration
 
 import (
 	"encoding/json"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	corev1 "k8s.io/api/core/v1"
 	"strconv"
 
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 const (
 	LastAppliedConfigAnnotation          = "configuration.kubeblocks.io/last-applied-configuration"
 	UpgradeInsConfigurationAnnotationKey = "configuration.kubeblocks.io/rolling-upgrade"
+	UpgradePolicyAnnotationKey           = "configuration.kubeblocks.io/reconfigure-policy"
+
+	DefaultUpgradePolicy = dbaasv1alpha1.NormalPolicy
 )
 
 func EnableCfgUpgrade(object client.Object) bool {
@@ -79,6 +84,11 @@ func UpdateAppliedConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, c
 		return false, err
 	}
 	config.ObjectMeta.Labels[CMInsConfigurationHashLabelKey] = hash
+
+	// delete reconfigure-policy
+	if _, exist := config.ObjectMeta.Annotations[UpgradePolicyAnnotationKey]; exist {
+		delete(config.ObjectMeta.Annotations, UpgradePolicyAnnotationKey)
+	}
 	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
 		return false, err
 	}
@@ -98,4 +108,16 @@ func GetLastVersionConfig(cfg *corev1.ConfigMap) (map[string]string, error) {
 	}
 
 	return data, nil
+}
+
+func GetUpgradePolicy(cfg *corev1.ConfigMap) dbaasv1alpha1.UpgradePolicy {
+	// TODO(zt)
+
+	annotations := cfg.GetAnnotations()
+	value, ok := annotations[UpgradePolicyAnnotationKey]
+	if !ok {
+		return DefaultUpgradePolicy
+	}
+
+	return dbaasv1alpha1.UpgradePolicy(value)
 }

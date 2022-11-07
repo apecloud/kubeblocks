@@ -247,7 +247,7 @@ func (r *ReconfigureRequestReconciler) updateCfgStatus(reqCtx intctrlutil.Reques
 func (r *ReconfigureRequestReconciler) performUpgrade(params cfgpolicy.ReconfigureParams) (ctrl.Result, error) {
 	// TODO(zt) process update policy
 
-	policy, err := cfgpolicy.NewReconfigurePolicy(params.Tpl, params.Meta)
+	policy, err := cfgpolicy.NewReconfigurePolicy(params.Tpl, params.Meta, dbaasconfig.GetUpgradePolicy(params.Cfg))
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(params.Cfg, r.Recorder, err, params.Ctx.Log)
 	}

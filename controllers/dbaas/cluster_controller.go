@@ -313,10 +313,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if cluster.Status.ObservedGeneration == cluster.GetObjectMeta().GetGeneration() {
-		// synchronize the latest status of components
-		if err = r.handleComponentStatus(reqCtx.Ctx, cluster); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
 		// check cluster all pods is ready
 		if err = r.checkAndPatchToRunning(reqCtx.Ctx, cluster); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -568,6 +564,10 @@ func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctr
 func (r *ClusterReconciler) checkAndPatchToRunning(ctx context.Context, cluster *dbaasv1alpha1.Cluster) error {
 	if !r.needCheckClusterForReady(cluster) {
 		return nil
+	}
+	// synchronize the latest status of components
+	if err := r.handleComponentStatus(ctx, cluster); err != nil {
+		return err
 	}
 	if cluster.Status.Components == nil {
 		return nil

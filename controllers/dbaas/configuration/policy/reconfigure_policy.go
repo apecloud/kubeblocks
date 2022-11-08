@@ -57,17 +57,12 @@ func (receiver NoneExecPolicy) Upgrade(params ReconfigureParams) (ExecStatus, er
 }
 
 func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigurationTemplateSpec, cfg *cfgcore.ConfigDiffInformation, policy dbaasv1alpha1.UpgradePolicy) (ReconfigurePolicy, error) {
-	var (
-		dynamicUpdate = true
-		params        []string
-	)
-
 	if !cfg.IsModify {
 		// not exec here
 		return nil, cfgcore.MakeError("cfg not modify. [%v]", cfg)
 	}
 
-	dynamicUpdate, err := IsUpdateDynamicParameters(params, tpl, cfg)
+	dynamicUpdate, err := IsUpdateDynamicParameters(tpl, cfg)
 	if err != nil {
 		return nil, err
 	}

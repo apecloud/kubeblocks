@@ -1233,7 +1233,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 
 	//	container.Name = "kbprobe-statuscheck"
 	//	probe := container.ReadinessProbe
-	//	probe.Exec.Command = []string{"sh", "-c", "curl -X POST -H 'Content-Type: application/json' http://localhost:3501/v1.0/bindings/mtest  -d  '{\"operation\": \"statusCheck\", \"metadata\": {\"sql\" : \"\"}}'"}
+	//	probe.Exec.Command = []string{"sh", "-c", "curl -X POST -H 'Content-Type: application/json' http://localhost:3501/v1.0/bindings/probe  -d  '{\"operation\": \"statusCheck\", \"metadata\": {\"sql\" : \"\"}}'"}
 	//	probe.PeriodSeconds = componentProbes.StatusProbe.PeriodSeconds
 	//	probe.SuccessThreshold = componentProbes.StatusProbe.SuccessThreshold
 	//	probe.FailureThreshold = componentProbes.StatusProbe.FailureThreshold
@@ -1247,7 +1247,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 	//	}
 	//	container.Name = "kbprobe-runningcheck"
 	//	probe := container.ReadinessProbe
-	//	probe.Exec.Command = []string{"sh", "-c", "curl -X POST -H 'Content-Type: application/json' http://localhost:3501/v1.0/bindings/mtest  -d  '{\"operation\": \"statusCheck\", \"metadata\": {\"sql\" : \"\"}}'"}
+	//	probe.Exec.Command = []string{"sh", "-c", "curl -X POST -H 'Content-Type: application/json' http://localhost:3501/v1.0/bindings/probe  -d  '{\"operation\": \"statusCheck\", \"metadata\": {\"sql\" : \"\"}}'"}
 	//	//probe.HTTPGet.Path = "/"
 	//	probe.PeriodSeconds = componentProbes.RunningProbe.PeriodSeconds
 	//	probe.SuccessThreshold = componentProbes.RunningProbe.SuccessThreshold
@@ -1264,7 +1264,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 		probe := container.ReadinessProbe
 		probe.Exec.Command = []string{"curl", "-X", "POST", "--fail-with-body",
 			"-H", "Content-Type: application/json",
-			"http://localhost:" + strconv.Itoa(probeServicePort) + "/v1.0/bindings/mtest",
+			"http://localhost:" + strconv.Itoa(probeServicePort) + "/v1.0/bindings/probe",
 			"-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
 		probe.PeriodSeconds = componentProbes.RoleChangedProbe.PeriodSeconds
 		probe.SuccessThreshold = componentProbes.RoleChangedProbe.SuccessThreshold

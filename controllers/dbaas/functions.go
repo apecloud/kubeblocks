@@ -192,7 +192,7 @@ func getAvailableContainerPort(containers []corev1.Container, containerPort int3
 	}
 
 	for _, ok := set[containerPort]; ok; {
-		containerPort = containerPort + 1
+		containerPort++
 		_, ok = set[containerPort]
 	}
 	return containerPort, nil

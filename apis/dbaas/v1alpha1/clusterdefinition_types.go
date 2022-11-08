@@ -186,7 +186,7 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Scripts ClusterDefinitionScripts `json:"scripts,omitempty"`
 
-	// Probes setting for db healthy checks
+	// Probes setting for db healthy checks.
 	// +optional
 	Probes *ClusterDefinitionProbes `json:"probes,omitempty"`
 
@@ -259,29 +259,26 @@ type ClusterDefinitionConnectionCredential struct {
 
 type ClusterDefinitionStatusGeneration struct {
 
-	// ClusterDefinition generation number
+	// ClusterDefinition generation number.
 	// +optional
 	ClusterDefGeneration int64 `json:"clusterDefGeneration,omitempty"`
 
-	// ClusterDefinition sync. status
+	// ClusterDefinition sync. status.
 	// +kubebuilder:validation:Enum={InSync,OutOfSync}
 	// +optional
 	ClusterDefSyncStatus Status `json:"clusterDefSyncStatus,omitempty"`
 }
 
 type ClusterDefinitionProbeCMDs struct {
-	// Write sqls executed on db node, used to check db healthy
+	// Write sqls executed on db node, used to check db healthy.
 	// +optional
 	Writes []string `json:"writes,omitempty"`
-	// Read sqls executed on db node, used to check db healthy
+	// Read sqls executed on db node, used to check db healthy.
 	// +optional
 	Queries []string `json:"queries,omitempty"`
 }
 
 type ClusterDefinitionProbe struct {
-	// Enable probe or not
-	// +kubebuilder:default=false
-	Enable bool `json:"enable,omitempty"`
 	// How often (in seconds) to perform the probe.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
@@ -294,33 +291,33 @@ type ClusterDefinitionProbe struct {
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
 	SuccessThreshold int32 `json:"successThreshold,omitempty"`
-	// Cmds used to execute for probe
+	// Cmds used to execute for probe.
 	// +optional
 	Commands *ClusterDefinitionProbeCMDs `json:"commands,omitempty"`
 }
 
 type ClusterDefinitionProbes struct {
-	// Probe for db running check
+	// Probe for db running check.
 	// +optional
 	RunningProbe *ClusterDefinitionProbe `json:"runningProbe,omitempty"`
-	// Probe for db status check
+	// Probe for db status check.
 	// +optional
 	StatusProbe *ClusterDefinitionProbe `json:"statusProbe,omitempty"`
-	// Probe for db role changed check
+	// Probe for db role changed check.
 	// +optional
 	RoleChangedProbe *ClusterDefinitionProbe `json:"roleChangedProbe,omitempty"`
 }
 
 type ConsensusSetSpec struct {
-	// Leader, one single leader
+	// Leader, one single leader.
 	// +kubebuilder:validation:Required
 	Leader ConsensusMember `json:"leader"`
 
-	// Followers, has voting right but not Leader
+	// Followers, has voting right but not Leader.
 	// +optional
 	Followers []ConsensusMember `json:"followers,omitempty"`
 
-	// Learner, no voting right
+	// Learner, no voting right.
 	// +optional
 	Learner *ConsensusMember `json:"learner,omitempty"`
 

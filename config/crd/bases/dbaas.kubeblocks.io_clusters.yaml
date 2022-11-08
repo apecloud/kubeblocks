@@ -393,11 +393,11 @@ spec:
             description: ClusterStatus defines the observed state of Cluster
             properties:
               clusterDefGeneration:
-                description: ClusterDefinition generation number
+                description: ClusterDefinition generation number.
                 format: int64
                 type: integer
               clusterDefSyncStatus:
-                description: ClusterDefinition sync. status
+                description: ClusterDefinition sync. status.
                 enum:
                 - InSync
                 - OutOfSync

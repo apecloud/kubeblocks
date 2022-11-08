@@ -183,15 +183,6 @@ func getAllContainerPorts(containers []corev1.Container) (map[int32]bool, error)
 	return set, nil
 }
 
-// check containerPorts conflict for general built-in
-func isContainerPortsConflict(containers []corev1.Container) (bool, string) {
-	_, err := getAllContainerPorts(containers)
-	if err != nil {
-		return true, err.Error()
-	}
-	return false, ""
-}
-
 // get available container port, increased by one if conflict with exist ports
 // util no conflicts
 func getAvailableContainerPort(containers []corev1.Container, containerPort int32) (int32, error) {

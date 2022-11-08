@@ -186,6 +186,7 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Scripts ClusterDefinitionScripts `json:"scripts,omitempty"`
 
+	// Probes setting for db healthy checks
 	// +optional
 	Probes *ClusterDefinitionProbes `json:"probes,omitempty"`
 
@@ -269,13 +270,16 @@ type ClusterDefinitionStatusGeneration struct {
 }
 
 type ClusterDefinitionProbeCMDs struct {
-	// sqls executed on db node, used to check db healthy
-	Writes  []string `json:"writes,omitempty"`
+	// Write sqls executed on db node, used to check db healthy
+	// +optional
+	Writes []string `json:"writes,omitempty"`
+	// Read sqls executed on db node, used to check db healthy
+	// +optional
 	Queries []string `json:"queries,omitempty"`
 }
 
 type ClusterDefinitionProbe struct {
-	// enable probe or not
+	// Enable probe or not
 	// +kubebuilder:default=false
 	Enable bool `json:"enable,omitempty"`
 	// How often (in seconds) to perform the probe.
@@ -289,13 +293,21 @@ type ClusterDefinitionProbe struct {
 	// Minimum consecutive successes for the probe to be considered successful after having failed.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
-	SuccessThreshold int32                      `json:"successThreshold,omitempty"`
-	Commands         ClusterDefinitionProbeCMDs `json:"commands,omitempty"`
+	SuccessThreshold int32 `json:"successThreshold,omitempty"`
+	// Cmds used to execute for probe
+	// +optional
+	Commands *ClusterDefinitionProbeCMDs `json:"commands,omitempty"`
 }
 
 type ClusterDefinitionProbes struct {
-	RunningProbe     *ClusterDefinitionProbe `json:"runningProbe,omitempty"`
-	StatusProbe      *ClusterDefinitionProbe `json:"statusProbe,omitempty"`
+	// Probe for db running check
+	// +optional
+	RunningProbe *ClusterDefinitionProbe `json:"runningProbe,omitempty"`
+	// Probe for db status check
+	// +optional
+	StatusProbe *ClusterDefinitionProbe `json:"statusProbe,omitempty"`
+	// Probe for db role changed check
+	// +optional
 	RoleChangedProbe *ClusterDefinitionProbe `json:"roleChangedProbe,omitempty"`
 }
 

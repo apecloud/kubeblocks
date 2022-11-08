@@ -18,26 +18,27 @@ package delete
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/prompt"
 )
 
-// Command used to build a delete command
-type Command struct {
-	Use       string
-	Short     string
-	Example   string
-	GroupKind schema.GroupKind
-	Factory   cmdutil.Factory
-	genericclioptions.IOStreams
+type deleteBuilder struct {
+	*builder.CmdBuilder
+}
+
+func NewBuilder(b *builder.CmdBuilder) *deleteBuilder {
+	return &deleteBuilder{b}
 }
 
 // Build a delete command
-func (c *Command) Build() *cobra.Command {
+func (b *deleteBuilder) Build() *cobra.Command {
+	c := b.Cmd()
 	deleteFlags := newDeleteCommandFlags()
 	cmd := &cobra.Command{
 		Use:     c.Use,
@@ -46,7 +47,7 @@ func (c *Command) Build() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := deleteFlags.ToOptions(nil, c.IOStreams)
 			cmdutil.CheckErr(err)
-			cmdutil.CheckErr(c.validate(args))
+			cmdutil.CheckErr(validate(args, c.IOStreams.In))
 
 			// build resource to delete
 			args = append([]string{c.GroupKind.String()}, args...)
@@ -64,10 +65,20 @@ func (c *Command) Build() *cobra.Command {
 	return cmd
 }
 
-func (c *Command) validate(args []string) error {
+func validate(args []string, in io.Reader) error {
 	if len(args) < 1 {
 		return fmt.Errorf("missing name")
 	}
+
+	// confirm the name
+	name, err := prompt.NewPrompt("You should enter the name", "Please enter the name again:", in).GetInput()
+	if err != nil {
+		return err
+	}
+	if name != args[0] {
+		return fmt.Errorf("the entered name \"%s\" does not match \"%s\"", name, args[0])
+	}
+
 	return nil
 }
 

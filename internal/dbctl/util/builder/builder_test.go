@@ -14,31 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cluster
+package builder
 
 import (
-	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/util/templates"
+	"testing"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/delete"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
-	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
 )
 
-var deleteExample = templates.Examples(`
-		# delete a cluster named my-cluster
-		dbctl cluster delete my-cluster
-`)
+func Test(t *testing.T) {
+	cmd := NewCmdBuilder().
+		IOStreams(genericclioptions.NewTestIOStreamsDiscard()).
+		Factory(nil).
+		Use("test").
+		Short("test command short description").
+		Example("test command example").
+		GroupKind(types.ClusterGK()).Cmd()
 
-func NewDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	return delete.NewBuilder(builder.NewCmdBuilder().
-		Use("delete").
-		Short("Delete a cluster").
-		Example(deleteExample).
-		GroupKind(types.ClusterGK()).
-		Factory(f).
-		IOStreams(streams)).
-		Build()
+	if cmd == nil {
+		t.Errorf("cmd is nil")
+	}
 }

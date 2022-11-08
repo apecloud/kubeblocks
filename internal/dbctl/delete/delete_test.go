@@ -2,6 +2,7 @@ package delete
 
 import (
 	"net/http"
+	"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -15,19 +16,20 @@ import (
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
 )
 
 var _ = Describe("Delete", func() {
 	buildTestCmd := func(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-		cmd := Command{
-			Use:       "test-delete",
-			Short:     "Test a delete command",
-			Example:   "Test command example",
-			Factory:   f,
-			IOStreams: streams,
-			GroupKind: schema.GroupKind{Kind: "Pod"},
-		}
-		return cmd.Build()
+		return NewBuilder(builder.NewCmdBuilder().
+			Use("test-delete").
+			Short("Test a delete command").
+			Example("Test command example").
+			Factory(f).
+			IOStreams(streams).
+			GroupKind(schema.GroupKind{Kind: "Pod"})).
+			Build()
 	}
 
 	mockClient := func(data runtime.Object) *cmdtesting.TestFactory {
@@ -44,8 +46,16 @@ var _ = Describe("Delete", func() {
 	It("build a delete command", func() {
 		pods, _, _ := cmdtesting.TestData()
 		tf := mockClient(pods)
-		streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+		streams, in, buf, _ := genericclioptions.NewTestIOStreams()
 		cmd := buildTestCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+
+		input := strings.NewReader("foo\n")
+		Expect(validate([]string{}, input)).Should(MatchError("missing name"))
+		// prompt test always return error
+		Expect(validate([]string{"foo"}, input)).Should(Succeed())
+
+		_, _ = in.Write([]byte("foo\n"))
 		cmd.Run(cmd, []string{"foo"})
 		Expect(buf.String()).Should(Equal("pod \"foo\" deleted\n"))
 	})

@@ -21,6 +21,10 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
+func init() {
+	RegisterPolicy(dbaasv1alpha1.NormalPolicy, &SimplePolicy{})
+}
+
 type SimplePolicy struct {
 	componentType dbaasv1alpha1.ComponentType
 }

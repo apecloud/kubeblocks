@@ -58,6 +58,10 @@ type ConfigurationTemplateSpec struct {
 	// +kubebuilder:validation:Optional
 	StaticParameters []string `json:"staticParameters,omitempty"`
 
+	// DynamicParameters support reload
+	// +kubebuilder:validation:Optional
+	DynamicParameters []string `json:"dynamicParameters,omitempty"`
+
 	// ImmutableParameters describe not modify parameters by user
 	// +kubebuilder:validation:Optional
 	ImmutableParameters []string `json:"immutableParameters,omitempty"`

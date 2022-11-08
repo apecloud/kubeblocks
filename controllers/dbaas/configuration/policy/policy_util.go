@@ -47,12 +47,12 @@ func extractUpdatedParams(params interface{}) []string {
 func extractMapParameters(object map[string]interface{}) []string {
 	params := make([]string, 0)
 	for key, value := range object {
-		switch value.(type) {
+		switch val := value.(type) {
 		case []interface{}:
-			val := value.([]interface{})
+			// val := value.([]interface{})
 			params = append(params, extractListParameters(key, val)...)
 		case map[string]interface{}:
-			val := value.(map[string]interface{})
+			// val := value.(map[string]interface{})
 			params = append(params, extractMapParameters(val)...)
 		default:
 			params = append(params, key)
@@ -63,17 +63,17 @@ func extractMapParameters(object map[string]interface{}) []string {
 
 func extractListParameters(prefix string, objects []interface{}) []string {
 	if len(objects) == 0 {
-		return nil
+		return []string{prefix}
 	}
 
 	params := make([]string, 0)
 	for _, value := range objects {
-		switch value.(type) {
+		switch val := value.(type) {
 		case []interface{}:
-			val := value.([]interface{})
-			params = append(params, extractListParameters("", val)...)
+			// val := value.([]interface{})
+			params = append(params, extractListParameters(prefix, val)...)
 		case map[string]interface{}:
-			val := value.(map[string]interface{})
+			// val := value.(map[string]interface{})
 			params = append(params, extractMapParameters(val)...)
 		default:
 			if prefix != "" {
@@ -84,7 +84,7 @@ func extractListParameters(prefix string, objects []interface{}) []string {
 	return params
 }
 
-func IsUpdateDynamicParameters(params []string, tpl *dbaasv1alpha1.ConfigurationTemplateSpec, cfg *cfgcore.ConfigDiffInformation) (bool, error) {
+func IsUpdateDynamicParameters(tpl *dbaasv1alpha1.ConfigurationTemplateSpec, cfg *cfgcore.ConfigDiffInformation) (bool, error) {
 	if len(cfg.DeleteConfig) > 0 || len(cfg.AddConfig) > 0 {
 		return false, nil
 	}

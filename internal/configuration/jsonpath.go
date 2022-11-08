@@ -17,7 +17,6 @@ limitations under the License.
 package configuration
 
 import (
-	"bytes"
 	"encoding/json"
 
 	"github.com/bhmj/jsonslice"
@@ -57,16 +56,4 @@ func jsonPatch(originalJSON, modifiedJSON interface{}) ([]byte, error) {
 
 	// TODO(zt) It's a hack to do the logic, json object --> bytes, bytes --> json object
 	return jsonpatch.CreateMergePatch(originalBytes, modifiedBytes)
-}
-
-func jsonMarshal(data interface{}) ([]byte, error) {
-	buffer := bytes.Buffer{}
-	encoder := json.NewEncoder(&buffer)
-	encoder.SetEscapeHTML(true)
-	encoder.SetIndent("", "  ")
-	err := encoder.Encode(data)
-	if err != nil {
-		return nil, WrapError(err, "failed to marshalled data: [%v]", data)
-	}
-	return buffer.Bytes(), nil
 }

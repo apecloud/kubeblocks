@@ -86,9 +86,7 @@ func UpdateAppliedConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, c
 	config.ObjectMeta.Labels[CMInsConfigurationHashLabelKey] = hash
 
 	// delete reconfigure-policy
-	if _, exist := config.ObjectMeta.Annotations[UpgradePolicyAnnotationKey]; exist {
-		delete(config.ObjectMeta.Annotations, UpgradePolicyAnnotationKey)
-	}
+	delete(config.ObjectMeta.Annotations, UpgradePolicyAnnotationKey)
 	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
 		return false, err
 	}

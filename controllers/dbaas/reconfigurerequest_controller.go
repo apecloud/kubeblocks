@@ -80,18 +80,18 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	if checkConfigurationObject(config) {
-		intctrlutil.Reconciled()
+		return intctrlutil.Reconciled()
 	}
 
 	if hash, ok := config.Labels[dbaasconfig.CMInsConfigurationHashLabelKey]; ok && hash == config.ResourceVersion {
-		intctrlutil.Reconciled()
+		return intctrlutil.Reconciled()
 	}
 
 	isAppliedCfg, err := dbaasconfig.ApplyConfigurationChange(r.Client, reqCtx, config)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to check last-applied-configuration")
 	} else if isAppliedCfg {
-		intctrlutil.Reconciled()
+		return intctrlutil.Reconciled()
 	}
 
 	tpl := &dbaasv1alpha1.ConfigurationTemplate{}

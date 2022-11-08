@@ -54,7 +54,7 @@ func TestGetUpdateParameterList(t *testing.T) {
 	params := extractUpdatedParams(obj)
 	require.Equal(t, cfgcore.NewSetFromList(
 		[]string{
-			"a", "c", "msld", "cd", "f", "test1", "test2",
+			"a", "c", "msld", "cd", "f", "test1", "test2", "d",
 		}),
 		cfgcore.NewSetFromList(params))
 }

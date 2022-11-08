@@ -103,7 +103,7 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if opsRequest.Status.ObservedGeneration == opsRequest.GetGeneration() {
 		// waiting until OpsRequest.status.phase is Succeed
 		if err = operations.GetOpsManager().Reconcile(opsRes); err != nil {
-			return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "checkOpsIsCompleted")
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()
 	}

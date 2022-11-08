@@ -55,6 +55,7 @@ metadata:
   labels:
     appversion.kubeblocks.io/name: app-version-consensus
     clusterdefinition.kubeblocks.io/name: cluster-definition-consensus
+    app.kubernetes.io/managed-by: kubeblocks
   name: %s
   namespace: default
 spec:
@@ -98,6 +99,7 @@ metadata:
     app.kubernetes.io/component-name: nginx
     app.kubernetes.io/instance: %s
     app.kubernetes.io/name: state.mysql-8-cluster-definition-consensus
+    app.kubernetes.io/managed-by: kubeblocks
   name: %s
   namespace: default
 spec:

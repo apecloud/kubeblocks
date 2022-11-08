@@ -59,6 +59,7 @@ metadata:
   labels:
     appversion.kubeblocks.io/name: app-version-consensus
     clusterdefinition.kubeblocks.io/name: cluster-definition-consensus
+    app.kubernetes.io/managed-by: kubeblocks
   name: %s
   namespace: default
 spec:
@@ -153,6 +154,7 @@ metadata:
   name: wesql-restart-test
   labels:
     cluster.kubeblocks.io/name: wesql
+    app.kubernetes.io/managed-by: kubeblocks
   namespace: default
 spec:
   clusterRef: wesql
@@ -178,6 +180,7 @@ metadata:
     app.kubernetes.io/component-name: wesql-test
     app.kubernetes.io/instance: wesql
     app.kubernetes.io/name: state.mysql-8-cluster-definition-consensus
+    app.kubernetes.io/managed-by: kubeblocks
   name: %s
   namespace: default
 spec:
@@ -233,6 +236,7 @@ metadata:
     controller-revision-hash: wesql-wesql-test-6fdd48d9cd
     cs.dbaas.kubeblocks.io/access-mode: %s
     cs.dbaas.kubeblocks.io/role: %s
+    app.kubernetes.io/managed-by: kubeblocks
   name: %s
   namespace: default
 spec:

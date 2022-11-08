@@ -29,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
 	mockagent "github.com/apecloud/kubeblocks/internal/loadbalancer/agent/mocks"
@@ -56,15 +56,6 @@ const (
 	eniIp21 = "172.31.2.10"
 	eniIp22 = "172.31.2.11"
 )
-
-var removeResource = func(obj controllerclient.Object) {
-	Expect(k8sClient.Delete(context.Background(), obj)).Should(Succeed())
-	// waiting for resource deleted
-	key := types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}
-	Eventually(func() bool {
-		return k8sClient.Get(context.Background(), key, obj) != nil
-	}, timeout, interval).Should(BeTrue())
-}
 
 var newSvcObj = func(managed bool, masterIP string) (*corev1.Service, types.NamespacedName) {
 	randomStr, _ := password.Generate(6, 0, 0, true, false)
@@ -107,6 +98,21 @@ var newSvcObj = func(managed bool, masterIP string) (*corev1.Service, types.Name
 }
 
 var _ = Describe("ServiceController", Ordered, func() {
+
+	BeforeEach(func() {
+		// Add any steup steps that needs to be executed before each test
+		var (
+			objs = []client.Object{&corev1.Service{}, &corev1.Endpoints{}, &corev1.Pod{}}
+		)
+
+		for _, obj := range objs {
+			err := k8sClient.DeleteAllOf(context.Background(), obj,
+				client.InNamespace(namespace), client.HasLabels{testCtx.TestObjLabelKey})
+			Expect(err).Should(BeNil())
+		}
+
+	})
+
 	setupController := func() (*gomock.Controller, *mockcloud.MockProvider, *mockagent.MockNodeManager) {
 		ctrl := gomock.NewController(GinkgoT())
 
@@ -142,14 +148,6 @@ var _ = Describe("ServiceController", Ordered, func() {
 			Namespace: pod.GetNamespace(),
 		}
 	}
-
-	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
-	})
-
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-	})
 
 	Context("Init nodes", func() {
 		It("", func() {
@@ -261,7 +259,6 @@ var _ = Describe("ServiceController", Ordered, func() {
 			By("By deleting service")
 			mockCloud.EXPECT().DeallocIPAddresses(newENIId, gomock.Any()).Return(nil).AnyTimes()
 			mockNewNode.EXPECT().CleanNetworkForService(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-			removeResource(svc)
 		})
 	})
 
@@ -294,7 +291,6 @@ var _ = Describe("ServiceController", Ordered, func() {
 
 			mockProvider.EXPECT().DeallocIPAddresses(eniId1, gomock.Any()).Return(nil).AnyTimes()
 			mockNode.EXPECT().CleanNetworkForService(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-			removeResource(svc)
 		})
 	})
 
@@ -328,7 +324,7 @@ var _ = Describe("ServiceController", Ordered, func() {
 			pod, podKey := newPodObj(svc.GetName())
 			Expect(k8sClient.Create(context.Background(), pod)).Should(Succeed())
 
-			patch := controllerclient.MergeFrom(pod.DeepCopy())
+			patch := client.MergeFrom(pod.DeepCopy())
 			pod.Status.HostIP = node1IP
 			Expect(k8sClient.Status().Patch(context.Background(), pod, patch)).Should(Succeed())
 
@@ -355,8 +351,6 @@ var _ = Describe("ServiceController", Ordered, func() {
 			}, timeout, interval).Should(BeTrue())
 
 			By("release resources")
-			removeResource(svc)
-			removeResource(pod)
 		})
 	})
 

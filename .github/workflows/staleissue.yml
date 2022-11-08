@@ -1,0 +1,14 @@
+name: "Tag stale issues"
+on:
+  schedule:
+  - cron: "0 0 * * 1" #Runs at 00:00 UTC on Mon
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/stale@v6.0.1
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        stale-issue-message: 'This issue has been marked as stale because it has been open for 30 days with no activity'
+        days-before-stale: 30
+        operations-per-run: 100

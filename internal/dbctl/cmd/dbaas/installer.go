@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/repo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
@@ -40,6 +41,14 @@ type Installer struct {
 }
 
 func (i *Installer) Install() (string, error) {
+	entry := &repo.Entry{
+		Name: types.KubeBlocksChartName,
+		URL:  types.KubeBlocksChartURL,
+	}
+	if err := helm.AddRepo(entry); err != nil {
+		return "", err
+	}
+
 	var sets []string
 	for _, set := range i.Sets {
 		splitSet := strings.Split(set, ",")
@@ -47,7 +56,7 @@ func (i *Installer) Install() (string, error) {
 	}
 	chart := helm.InstallOpts{
 		Name:      types.KubeBlocksChartName,
-		Chart:     types.KubeBlocksChart,
+		Chart:     types.KubeBlocksChartName + "/" + types.KubeBlocksChartName,
 		Wait:      true,
 		Version:   i.Version,
 		Namespace: i.Namespace,

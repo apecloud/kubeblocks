@@ -24,7 +24,9 @@ import (
 
 const (
 	// settings keys
-	cmNamespaceKey = "CM_NAMESPACE"
+	cmNamespaceKey              = "CM_NAMESPACE"
+	maxConcurReconAppVersionKey = "MAXCONCURRENTRECONCILES_APPVERSION"
+	maxConcurReconClusterDefKey = "MAXCONCURRENTRECONCILES_CLUSTERDEF"
 
 	// name of our custom finalizer
 	dbClusterFinalizerName    = "cluster.kubeblocks.io/finalizer"
@@ -35,11 +37,7 @@ const (
 	// label keys
 	clusterDefLabelKey             = "clusterdefinition.kubeblocks.io/name"
 	appVersionLabelKey             = "appversion.kubeblocks.io/name"
-	appInstanceLabelKey            = "app.kubernetes.io/instance"
-	appComponentLabelKey           = "app.kubernetes.io/component-name"
-	appNameLabelKey                = "app.kubernetes.io/name"
 	statefulSetPodNameLabelKey     = "statefulset.kubernetes.io/pod-name"
-	consensusSetRoleLabelKey       = "cs.dbaas.kubeblocks.io/role"
 	consensusSetAccessModeLabelKey = "cs.dbaas.kubeblocks.io/access-mode"
 	clusterLabelKey                = "cluster.kubeblocks.io/name"
 

@@ -43,7 +43,7 @@ ENABLE_WEBHOOKS ?= false
 APP_NAME = kubeblocks
 
 
-VERSION ?= 0.1.0-beta.0
+VERSION ?= 0.1.0
 CHART_PATH = deploy/kubeblocks
 
 WEBHOOK_CERT_DIR ?= /tmp/k8s-webhook-server/serving-certs
@@ -153,13 +153,10 @@ vet: ## Run go vet against code.
 .PHONY: cue-fmt
 cue-fmt: cuetool ## Run cue fmt against code.
 	$(CUE) fmt controllers/dbaas/cue/*.cue
-
-.PHONY: cue-vet
-cue-vet: cuetool ## Run cue vet against code.
-	$(CUE) vet controllers/dbaas/cue/*.cue
+	$(CUE) fix controllers/dbaas/cue/*.cue
 
 .PHONY: fast-lint
-fast-lint: staticcheck  # [INTERNAL] fast lint
+fast-lint: golangci staticcheck  # [INTERNAL] fast lint
 	$(GOLANGCILINT) run ./...
 
 .PHONY: lint
@@ -424,26 +421,6 @@ endif
 .PHONY: helm-package
 helm-package: bump-chart-ver ## Do helm package.
 	$(HELM) package $(CHART_PATH) --dependency-update
-
-##@ WeSQL Cluster Helm Chart Tasks
-
-WESQL_CLUSTER_CHART_PATH = deploy/wesqlcluster
-WESQL_CLUSTER_CHART_NAME = wesqlcluster
-WESQL_CLUSTER_CHART_VERSION ?= 0.1.1
-
-.PHONY: bump-chart-ver-wqsql-cluster
-bump-chart-ver-wqsql-cluster: ## Bump WeSQL Clsuter helm chart version.
-ifeq ($(GOOS), darwin)
-	sed -i '' "s/^version:.*/version: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
-	# sed -i '' "s/^appVersion:.*/appVersion: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
-else
-	sed -i "s/^version:.*/version: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
-	# sed -i "s/^appVersion:.*/appVersion: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
-endif
-
-.PHONY: helm-package-wqsql-cluster
-helm-package-wqsql-cluster: bump-chart-ver-wqsql-cluster ## Do WeSQL Clsuter helm package.
-	$(HELM) package $(WESQL_CLUSTER_CHART_PATH)
 
 
 ##@ Build Dependencies

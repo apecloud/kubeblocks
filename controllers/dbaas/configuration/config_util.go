@@ -67,7 +67,7 @@ func CheckConfigurationLabels(object client.Object, requiredLabs []string) bool 
 		return false
 	}
 
-	return EnableCfgUpgrade(object)
+	return CheckEnableCfgUpgrade(object)
 }
 
 func GetConfigMapByName(cli client.Client, ctx intctrlutil.RequestCtx, cmName string) (*corev1.ConfigMap, error) {

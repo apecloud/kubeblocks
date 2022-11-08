@@ -269,7 +269,9 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params cfgpolicy.Reconfigu
 	case cfgpolicy.ES_None:
 		return r.updateCfgStatus(params.Ctx, params.Meta, params.Cfg)
 	case cfgpolicy.ES_Failed:
-		dbaasconfig.DisableCfgUpgrade(params.Client, params.Ctx, params.Cfg)
+		if err := dbaasconfig.SetCfgUpgradeFlag(params.Client, params.Ctx, params.Cfg, false); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, params.Ctx.Log, "")
+		}
 		return intctrlutil.Reconciled()
 	default:
 		return intctrlutil.Reconciled()

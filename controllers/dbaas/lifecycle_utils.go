@@ -1160,7 +1160,7 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 		return nil, err
 	}
 
-	probeContainers, err := buildProbeContainers(reqCtx, params)
+	probeContainers, err := buildProbeContainers(reqCtx, params, &sts)
 	if err != nil {
 		return nil, err
 	}
@@ -1192,16 +1192,17 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 			})
 		}
 
-		// check if there is conflict contaierPorts
-		if isContainerPortsConflict(c) {
-			reqCtx.Log.Info("containerPorts conflict", "container", c)
-			return nil, fmt.Errorf("containerPorts conflict: [%+v]", c)
-		}
+	}
+	// check if there is conflict contaierPorts
+	isConflict, msg := isContainerPortsConflict(sts.Spec.Template.Spec.Containers)
+	if isConflict {
+		reqCtx.Log.Info("containerPorts conflict", "message", msg)
+		return nil, fmt.Errorf("containerPorts conflict: [%+v]", msg)
 	}
 	return &sts, nil
 }
 
-func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([]corev1.Container, error) {
+func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams, sts *appsv1.StatefulSet) ([]corev1.Container, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
 	cueTpl, err := params.getCacheCUETplValue("statefulset_template.cue", func() (*intctrlutil.CUETpl, error) {
@@ -1215,7 +1216,12 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 	if err != nil {
 		return nil, err
 	}
-	probeServicePort := viper.GetInt("PROBE_SERVICE_PORT")
+	probeServicePort := viper.GetInt32("PROBE_SERVICE_PORT")
+	probeServicePort, err = getAvailableContainerPort(sts.Spec.Template.Spec.Containers, probeServicePort)
+	if err != nil {
+		reqCtx.Log.Info("get probe container port failed", "error", err)
+		return nil, err
+	}
 
 	probeContainers := []corev1.Container{}
 	componentProbes := params.component.Probes
@@ -1265,12 +1271,12 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 		probe.Exec.Command = []string{"curl", "-X", "POST",
 			"--fail-with-body", "--silent",
 			"-H", "Content-Type: application/json",
-			"http://localhost:" + strconv.Itoa(probeServicePort) + "/v1.0/bindings/probe",
+			"http://localhost:" + strconv.Itoa(int(probeServicePort)) + "/v1.0/bindings/probe",
 			"-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
 		probe.PeriodSeconds = componentProbes.RoleChangedProbe.PeriodSeconds
 		probe.SuccessThreshold = componentProbes.RoleChangedProbe.SuccessThreshold
 		probe.FailureThreshold = componentProbes.RoleChangedProbe.FailureThreshold
-		container.StartupProbe.TCPSocket.Port = intstr.FromInt(probeServicePort)
+		container.StartupProbe.TCPSocket.Port = intstr.FromInt(int(probeServicePort))
 		probeContainers = append(probeContainers, container)
 	}
 
@@ -1279,7 +1285,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 		container.Image = viper.GetString("KUBEBLOCKS_IMAGE")
 		container.ImagePullPolicy = corev1.PullPolicy(viper.GetString("KUBEBLOCKS_IMAGE_PULL_POLICY"))
 		container.Command = []string{"probe", "--app-id", "batch-sdk",
-			"--dapr-http-port", strconv.Itoa(probeServicePort),
+			"--dapr-http-port", strconv.Itoa(int(probeServicePort)),
 			"--dapr-grpc-port", "54215",
 			"--app-protocol", "http",
 			"--log-level", "debug",
@@ -1305,7 +1311,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 		container.Env = append(container.Env, podName, podNamespace)
 
 		container.Ports = []corev1.ContainerPort{{
-			ContainerPort: int32(probeServicePort),
+			ContainerPort: probeServicePort,
 			Name:          "probe-port",
 			Protocol:      "TCP",
 		}}

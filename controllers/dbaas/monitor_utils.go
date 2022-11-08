@@ -94,8 +94,8 @@ func buildMysqlContainer(key string, monitor *MysqlMonitor) (*corev1.Container, 
 }
 
 func setMysqlComponent(cluster *dbaasv1alpha1.Cluster, component *Component) error {
-	image := viper.GetString("AGAMOTTO_IMAGE")
-	imagePullPolicy := viper.GetString("AGAMOTTO_IMAGE_PULL_POLICY")
+	image := viper.GetString("KUBEBLOCKS_IMAGE")
+	imagePullPolicy := viper.GetString("KUBEBLOCKS_IMAGE_PULL_POLICY")
 
 	mysqlMonitor := &MysqlMonitor{
 		SecretName:      cluster.Name,

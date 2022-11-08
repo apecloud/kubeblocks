@@ -33,12 +33,12 @@ var deleteExample = templates.Examples(`
 `)
 
 func NewDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	return delete.NewBuilder(builder.NewCmdBuilder().
+	return builder.NewCmdBuilder().
 		Use("delete").
 		Short("Delete a cluster").
 		Example(deleteExample).
 		GroupKind(types.ClusterGK()).
 		Factory(f).
-		IOStreams(streams)).
-		Build()
+		IOStreams(streams).
+		Build(delete.Build)
 }

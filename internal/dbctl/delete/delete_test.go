@@ -22,14 +22,14 @@ import (
 
 var _ = Describe("Delete", func() {
 	buildTestCmd := func(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-		return NewBuilder(builder.NewCmdBuilder().
+		return builder.NewCmdBuilder().
 			Use("test-delete").
 			Short("Test a delete command").
 			Example("Test command example").
 			Factory(f).
 			IOStreams(streams).
-			GroupKind(schema.GroupKind{Kind: "Pod"})).
-			Build()
+			GroupKind(schema.GroupKind{Kind: "Pod"}).
+			Build(Build)
 	}
 
 	mockClient := func(data runtime.Object) *cmdtesting.TestFactory {

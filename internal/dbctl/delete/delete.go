@@ -28,17 +28,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/prompt"
 )
 
-type deleteBuilder struct {
-	*builder.CmdBuilder
-}
-
-func NewBuilder(b *builder.CmdBuilder) *deleteBuilder {
-	return &deleteBuilder{b}
-}
-
 // Build a delete command
-func (b *deleteBuilder) Build() *cobra.Command {
-	c := b.Cmd()
+func Build(c *builder.Command) *cobra.Command {
 	deleteFlags := newDeleteCommandFlags()
 	cmd := &cobra.Command{
 		Use:     c.Use,

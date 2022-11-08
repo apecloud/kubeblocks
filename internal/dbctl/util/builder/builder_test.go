@@ -19,19 +19,26 @@ package builder
 import (
 	"testing"
 
+	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
 func Test(t *testing.T) {
+	buildFn := func(cmd *Command) *cobra.Command {
+		return &cobra.Command{
+			Use: cmd.Use,
+		}
+	}
+
 	cmd := NewCmdBuilder().
 		IOStreams(genericclioptions.NewTestIOStreamsDiscard()).
 		Factory(nil).
 		Use("test").
 		Short("test command short description").
 		Example("test command example").
-		GroupKind(types.ClusterGK()).Cmd()
+		GroupKind(types.ClusterGK()).Build(buildFn)
 
 	if cmd == nil {
 		t.Errorf("cmd is nil")

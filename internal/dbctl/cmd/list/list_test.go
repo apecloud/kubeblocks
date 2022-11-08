@@ -37,12 +37,12 @@ import (
 
 var _ = Describe("Describe", func() {
 	buildTestCmd := func(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-		return NewBuilder(builder.NewCmdBuilder().
+		return builder.NewCmdBuilder().
 			Factory(f).
 			IOStreams(streams).
 			Short("Test list.").
-			GroupKind(schema.GroupKind{Group: "", Kind: "pods"})).
-			Build()
+			GroupKind(schema.GroupKind{Group: "", Kind: "pods"}).
+			Build(Build)
 	}
 
 	mockClient := func(data runtime.Object) *cmdtesting.TestFactory {

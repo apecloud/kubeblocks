@@ -44,11 +44,11 @@ var _ = Describe("Get", func() {
 	buf := new(bytes.Buffer)
 
 	buildTestCmd := func(f cmdutil.Factory, streams genericclioptions.IOStreams, groupKind schema.GroupKind) *cobra.Command {
-		return list.NewBuilder(builder.NewCmdBuilder().
+		return builder.NewCmdBuilder().
 			Factory(f).
 			IOStreams(streams).
 			Short("Test list.").
-			GroupKind(groupKind)).Build()
+			GroupKind(groupKind).Build(list.Build)
 	}
 
 	mockClient := func(data runtime.Object) *cmdtesting.TestFactory {

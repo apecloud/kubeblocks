@@ -27,10 +27,10 @@ import (
 )
 
 func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	return list.NewBuilder(builder.NewCmdBuilder().
+	return builder.NewCmdBuilder().
 		Short("List all database backup job.").
 		Factory(f).
 		GroupKind(schema.GroupKind{Group: "dataprotection.kubeblocks.io", Kind: "BackupJob"}).
-		IOStreams(streams)).
-		Build()
+		IOStreams(streams).
+		Build(list.Build)
 }

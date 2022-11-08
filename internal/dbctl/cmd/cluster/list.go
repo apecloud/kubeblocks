@@ -33,11 +33,11 @@ var listExample = templates.Examples(`
 `)
 
 func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	return list.NewBuilder(builder.NewCmdBuilder().
+	return builder.NewCmdBuilder().
 		Short("List all cluster.").
 		Example(listExample).
 		Factory(f).
 		GroupKind(types.ClusterGK()).
-		IOStreams(streams)).
-		Build()
+		IOStreams(streams).
+		Build(list.Build)
 }

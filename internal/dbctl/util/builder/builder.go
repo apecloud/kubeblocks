@@ -17,12 +17,15 @@ limitations under the License.
 package builder
 
 import (
+	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
-// Command used to build a command
+type BuildFn func(cmd *Command) *cobra.Command
+
+// Command records the command info
 type Command struct {
 	Use       string
 	Short     string
@@ -32,7 +35,7 @@ type Command struct {
 	genericclioptions.IOStreams
 }
 
-// CmdBuilder build a Command
+// CmdBuilder used to build a cobra Command
 type CmdBuilder struct {
 	cmd *Command
 }
@@ -71,6 +74,6 @@ func (b *CmdBuilder) IOStreams(streams genericclioptions.IOStreams) *CmdBuilder 
 	return b
 }
 
-func (b *CmdBuilder) Cmd() *Command {
-	return b.cmd
+func (b *CmdBuilder) Build(buildFn BuildFn) *cobra.Command {
+	return buildFn(b.cmd)
 }

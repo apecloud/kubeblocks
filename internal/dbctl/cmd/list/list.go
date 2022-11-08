@@ -26,17 +26,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
 )
 
-type listBuilder struct {
-	*builder.CmdBuilder
-}
-
-func NewBuilder(b *builder.CmdBuilder) *listBuilder {
-	return &listBuilder{b}
-}
-
 // Build return a list command
-func (b *listBuilder) Build() *cobra.Command {
-	c := b.Cmd()
+func Build(c *builder.Command) *cobra.Command {
 	o := get.NewOptions(c.IOStreams, []string{c.GroupKind.String()})
 
 	use := c.Use

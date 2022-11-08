@@ -1284,11 +1284,12 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams, st
 		container := &probeContainers[0]
 		container.Image = viper.GetString("KUBEBLOCKS_IMAGE")
 		container.ImagePullPolicy = corev1.PullPolicy(viper.GetString("KUBEBLOCKS_IMAGE_PULL_POLICY"))
+		logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
 		container.Command = []string{"probe", "--app-id", "batch-sdk",
 			"--dapr-http-port", strconv.Itoa(int(probeServiceHttpPort)),
 			"--dapr-grpc-port", strconv.Itoa(int(probeServiceGrpcPort)),
 			"--app-protocol", "http",
-			"--log-level", "debug",
+			"--log-level", logLevel,
 			"--components-path", "/config/components"}
 
 		// set pod name and namespace, for role label updating inside pod

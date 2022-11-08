@@ -26,5 +26,6 @@ func init() {
 }
 
 func (r *RollingUpgradePolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
+	// TODO(zt) rolling kill container
 	panic("")
 }

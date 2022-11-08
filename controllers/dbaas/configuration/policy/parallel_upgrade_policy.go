@@ -29,13 +29,18 @@ type ParallelUpgradePolicy struct {
 }
 
 func (p *ParallelUpgradePolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
-	if err := p.restartPods(params); err != nil {
+	finished, err := p.restartPods(params)
+	if err != nil {
 		return ES_Failed, err
 	}
 
-	return ES_None, nil
+	if finished {
+		return ES_None, nil
+	}
+	return ES_Retry, nil
 }
 
-func (p *ParallelUpgradePolicy) restartPods(params ReconfigureParams) error {
-	return cfgcore.MakeError("")
+func (p *ParallelUpgradePolicy) restartPods(params ReconfigureParams) (bool, error) {
+	// TODO(zt) kill program
+	return false, cfgcore.MakeError("")
 }

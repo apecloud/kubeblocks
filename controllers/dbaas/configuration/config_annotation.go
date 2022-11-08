@@ -40,7 +40,7 @@ const (
 	DefaultUpgradePolicy = dbaasv1alpha1.NormalPolicy
 )
 
-func EnableCfgUpgrade(object client.Object) bool {
+func CheckEnableCfgUpgrade(object client.Object) bool {
 	// check user disable upgrade
 	// configuration.kubeblocks.io/rolling-upgrade = "false"
 	annotations := object.GetAnnotations()
@@ -57,13 +57,13 @@ func EnableCfgUpgrade(object client.Object) bool {
 	return true
 }
 
-func DisableCfgUpgrade(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap) error {
+func SetCfgUpgradeFlag(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, flag bool) error {
 	patch := client.MergeFrom(config.DeepCopy())
 	if config.ObjectMeta.Annotations == nil {
 		config.ObjectMeta.Annotations = map[string]string{}
 	}
 
-	config.ObjectMeta.Annotations[UpgradeInsConfigurationAnnotationKey] = "false"
+	config.ObjectMeta.Annotations[UpgradeInsConfigurationAnnotationKey] = strconv.FormatBool(flag)
 	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
 		return err
 	}

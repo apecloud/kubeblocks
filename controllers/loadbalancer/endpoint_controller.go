@@ -52,6 +52,10 @@ func NewEndpointController(logger logr.Logger, client client.Client, scheme *run
 	}, nil
 }
 
+func (c *EndpointController) Start(ctx context.Context) error {
+	return nil
+}
+
 func (c *EndpointController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	ctxLog := c.logger.WithValues("endpoints", req.NamespacedName.String())
 	ctxLog.Info("Receive endpoint reconcile event")

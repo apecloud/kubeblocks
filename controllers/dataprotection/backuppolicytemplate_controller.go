@@ -19,7 +19,6 @@ package dataprotection
 import (
 	"context"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -29,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // BackupPolicyTemplateReconciler reconciles a BackupPolicyTemplate object

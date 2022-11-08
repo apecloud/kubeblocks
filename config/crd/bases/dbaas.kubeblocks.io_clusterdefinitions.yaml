@@ -7534,25 +7534,30 @@ spec:
                       - containers
                       type: object
                     probes:
+                      description: Probes setting for db healthy checks
                       properties:
                         roleChangedProbe:
+                          description: Probe for db role changed check
                           properties:
                             commands:
+                              description: Cmds used to execute for probe
                               properties:
                                 queries:
+                                  description: Read sqls executed on db node, used
+                                    to check db healthy
                                   items:
                                     type: string
                                   type: array
                                 writes:
-                                  description: sqls executed on db node, used to check
-                                    db healthy
+                                  description: Write sqls executed on db node, used
+                                    to check db healthy
                                   items:
                                     type: string
                                   type: array
                               type: object
                             enable:
                               default: false
-                              description: enable probe or not
+                              description: Enable probe or not
                               type: boolean
                             failureThreshold:
                               default: 1
@@ -7576,23 +7581,27 @@ spec:
                               type: integer
                           type: object
                         runningProbe:
+                          description: Probe for db running check
                           properties:
                             commands:
+                              description: Cmds used to execute for probe
                               properties:
                                 queries:
+                                  description: Read sqls executed on db node, used
+                                    to check db healthy
                                   items:
                                     type: string
                                   type: array
                                 writes:
-                                  description: sqls executed on db node, used to check
-                                    db healthy
+                                  description: Write sqls executed on db node, used
+                                    to check db healthy
                                   items:
                                     type: string
                                   type: array
                               type: object
                             enable:
                               default: false
-                              description: enable probe or not
+                              description: Enable probe or not
                               type: boolean
                             failureThreshold:
                               default: 1
@@ -7616,23 +7625,27 @@ spec:
                               type: integer
                           type: object
                         statusProbe:
+                          description: Probe for db status check
                           properties:
                             commands:
+                              description: Cmds used to execute for probe
                               properties:
                                 queries:
+                                  description: Read sqls executed on db node, used
+                                    to check db healthy
                                   items:
                                     type: string
                                   type: array
                                 writes:
-                                  description: sqls executed on db node, used to check
-                                    db healthy
+                                  description: Write sqls executed on db node, used
+                                    to check db healthy
                                   items:
                                     type: string
                                   type: array
                               type: object
                             enable:
                               default: false
-                              description: enable probe or not
+                              description: Enable probe or not
                               type: boolean
                             failureThreshold:
                               default: 1

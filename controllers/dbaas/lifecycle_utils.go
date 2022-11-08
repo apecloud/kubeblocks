@@ -1262,7 +1262,8 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 		}
 		container.Name = "kbprobe-rolechangedcheck"
 		probe := container.ReadinessProbe
-		probe.Exec.Command = []string{"curl", "-X", "POST", "--fail-with-body",
+		probe.Exec.Command = []string{"curl", "-X", "POST",
+			"--fail-with-body", "--silent",
 			"-H", "Content-Type: application/json",
 			"http://localhost:" + strconv.Itoa(probeServicePort) + "/v1.0/bindings/probe",
 			"-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}

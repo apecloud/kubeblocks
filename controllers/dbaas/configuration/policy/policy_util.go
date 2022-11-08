@@ -85,21 +85,34 @@ func extractListParameters(prefix string, objects []interface{}) []string {
 }
 
 func IsUpdateDynamicParameters(tpl *dbaasv1alpha1.ConfigurationTemplateSpec, cfg *cfgcore.ConfigDiffInformation) (bool, error) {
+	// TODO(zt) how to process new or delete file
 	if len(cfg.DeleteConfig) > 0 || len(cfg.AddConfig) > 0 {
 		return false, nil
-	}
-
-	if len(tpl.StaticParameters) == 0 {
-		return true, nil
 	}
 
 	params, err := GetUpdateParameterList(cfg)
 	if err != nil {
 		return false, nil
 	}
-	updateParams := cfgcore.NewSetFromList(params)
-	staticParams := cfgcore.NewSetFromList(tpl.StaticParameters)
 
-	union := cfgcore.Union(staticParams, updateParams)
-	return union.Empty(), nil
+	// if has StaticParameters, update static parameter
+	if len(tpl.StaticParameters) > 0 {
+		updateParams := cfgcore.NewSetFromList(params)
+		staticParams := cfgcore.NewSetFromList(tpl.StaticParameters)
+
+		union := cfgcore.Union(staticParams, updateParams)
+		return union.Empty(), nil
+	}
+
+	// if has dynamic parameters, all updated param in dynamic params
+	if len(tpl.DynamicParameters) > 0 {
+		updateParams := cfgcore.NewSetFromList(params)
+		dynamicParams := cfgcore.NewSetFromList(tpl.DynamicParameters)
+
+		union := cfgcore.Difference(dynamicParams, updateParams)
+		return union.Empty(), nil
+	}
+
+	// default policy
+	return tpl.UpgradeMode == dbaasv1alpha1.DYNAMIC_MODE, nil
 }

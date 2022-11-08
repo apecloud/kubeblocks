@@ -109,6 +109,7 @@ const (
 	NormalPolicy  UpgradePolicy = "simple"
 	RestartPolicy UpgradePolicy = "parallel"
 	RollingPolicy UpgradePolicy = "rolling"
+	AutoReload    UpgradePolicy = "autoReload"
 )
 
 func RegisterWebhookManager(mgr manager.Manager) {

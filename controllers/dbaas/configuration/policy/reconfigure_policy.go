@@ -17,13 +17,12 @@ limitations under the License.
 package policy
 
 import (
-	appv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	appv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type ExecStatus int
@@ -34,6 +33,10 @@ const (
 	ES_Failed
 	ES_NotSpport
 )
+
+func init() {
+	RegisterPolicy(dbaasv1alpha1.AutoReload, &AutoReloadPolicy{})
+}
 
 type ReconfigureParams struct {
 	Meta *cfgcore.ConfigDiffInformation
@@ -50,9 +53,16 @@ type ReconfigurePolicy interface {
 	Upgrade(params ReconfigureParams) (ExecStatus, error)
 }
 
-type NoneExecPolicy struct{}
+var upgradePolicyMap map[dbaasv1alpha1.UpgradePolicy]ReconfigurePolicy
 
-func (receiver NoneExecPolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
+func RegisterPolicy(policy dbaasv1alpha1.UpgradePolicy, action ReconfigurePolicy) {
+	upgradePolicyMap[policy] = action
+}
+
+type AutoReloadPolicy struct{}
+
+func (receiver AutoReloadPolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
+	_ = params
 	return ES_None, nil
 }
 
@@ -67,23 +77,13 @@ func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigurationTemplateSpec, cfg *cfg
 		return nil, err
 	}
 
-	// TODO(zt) support rolling policy
+	actionType := policy
 	if dynamicUpdate {
-		return NoneExecPolicy{}, nil
+		actionType = dbaasv1alpha1.AutoReload
 	}
 
-	var execPolicy ReconfigurePolicy
-
-	switch policy {
-	case dbaasv1alpha1.NormalPolicy:
-		execPolicy = &SimplePolicy{dbaasv1alpha1.Stateful}
-	case dbaasv1alpha1.RestartPolicy:
-		execPolicy = &ParallelUpgradePolicy{}
-	case dbaasv1alpha1.RollingPolicy:
-		execPolicy = &RollingUpgradePolicy{}
-	default:
-		execPolicy = &SimplePolicy{dbaasv1alpha1.Stateful}
+	if action, ok := upgradePolicyMap[actionType]; ok {
+		return action, nil
 	}
-
-	return execPolicy, nil
+	return nil, cfgcore.MakeError("not support upgrade policy:[%s]", actionType)
 }

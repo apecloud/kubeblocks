@@ -16,7 +16,13 @@ limitations under the License.
 
 package policy
 
+import dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+
 type RollingUpgradePolicy struct {
+}
+
+func init() {
+	RegisterPolicy(dbaasv1alpha1.RollingPolicy, &RollingUpgradePolicy{})
 }
 
 func (r *RollingUpgradePolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {

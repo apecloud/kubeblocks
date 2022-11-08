@@ -16,7 +16,14 @@ limitations under the License.
 
 package policy
 
-import cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+import (
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+)
+
+func init() {
+	RegisterPolicy(dbaasv1alpha1.RestartPolicy, &ParallelUpgradePolicy{})
+}
 
 type ParallelUpgradePolicy struct {
 }

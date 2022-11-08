@@ -90,14 +90,18 @@ func NewServiceController(logger logr.Logger, client client.Client, scheme *runt
 
 	c.initTrafficPolicies()
 
-	nodeList, err := nm.GetNodes()
+	return c, nil
+}
+
+func (c *ServiceController) Start(ctx context.Context) error {
+	nodeList, err := c.nm.GetNodes()
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to get cluster nodes")
+		return errors.Wrap(err, "Failed to get cluster nodes")
 	}
 	if err := c.initNodes(nodeList); err != nil {
-		return nil, errors.Wrap(err, "Failed to init nodes")
+		return errors.Wrap(err, "Failed to init nodes")
 	}
-	return c, nil
+	return nil
 }
 
 func (c *ServiceController) initTrafficPolicies() {

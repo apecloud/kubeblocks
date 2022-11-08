@@ -133,6 +133,12 @@ func (m *Mysql) InitDelay() error {
 		return err
 	}
 
+	// test if db is ready to connect or not
+	err = db.Ping()
+	if err != nil {
+		m.logger.Infof("unable to ping the DB")
+		return errors.Wrap(err, "unable to ping the DB")
+	}
 	m.db = db
 
 	return nil
@@ -153,8 +159,8 @@ func (m *Mysql) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindi
 		return nil, errors.Errorf("invoke request required")
 	}
 
-	err := m.InitDelay()
-	if err != nil {
+	if m.db == nil {
+		go m.InitDelay()
 		resp.Data = []byte("db not ready")
 		return resp, nil
 	}
@@ -299,7 +305,9 @@ func (m *Mysql) roleCheck(ctx context.Context, sql string) ([]byte, error) {
 		sql = "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
 	}
 
-	rows, err := m.db.QueryContext(ctx, sql)
+	ctx1, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	rows, err := m.db.QueryContext(ctx1, sql)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error executing %s", sql)
 	}
@@ -317,11 +325,11 @@ func (m *Mysql) roleCheck(ctx context.Context, sql string) ([]byte, error) {
 			m.logger.Errorf("checkRole error: %", err)
 		}
 	}
-	if oriRole == "" {
+	if oriRole != role {
+		msg := fmt.Sprintf("role changed, original role: %s, current role: %s", oriRole, role)
+		m.logger.Infof(msg)
 		oriRole = role
-	} else if oriRole != role {
-		oriRole = role
-		return nil, errors.Errorf("role changed, original Role: %s, current role: %s", oriRole, role)
+		return nil, errors.Errorf(msg)
 	}
 	return []byte(role), nil
 }

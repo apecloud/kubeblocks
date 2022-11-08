@@ -336,11 +336,11 @@ func (c *eniManager) cleanLeakedENIs() error {
 
 	var errs []string
 	for _, eni := range leakedENIs {
-		if err = c.cp.DeleteENI(eni.ENIId); err != nil {
-			errs = append(errs, fmt.Sprintf("%s: %s", eni.ENIId, err.Error()))
+		if err = c.cp.DeleteENI(eni.ID); err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %s", eni.ID, err.Error()))
 			continue
 		}
-		c.logger.Info("Successfully deleted leaked eni", "eni id", eni.ENIId)
+		c.logger.Info("Successfully deleted leaked eni", "eni id", eni.ID)
 	}
 	if len(errs) != 0 {
 		return errors.New(fmt.Sprintf("Failed to delete leaked enis, err: %s", strings.Join(errs, "|")))

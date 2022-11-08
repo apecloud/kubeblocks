@@ -56,10 +56,10 @@ func (p Proxy) DescribeAllENIs(ctx context.Context, request *pb.DescribeAllENIsR
 				Primary: addr.Primary,
 			})
 		}
-		resp.Enis[enis[index].ENIId] = &pb.ENIMetadata{
-			EniId:          eni.ENIId,
+		resp.Enis[enis[index].ID] = &pb.ENIMetadata{
+			EniId:          eni.ID,
 			Mac:            eni.MAC,
-			SubnetId:       eni.SubnetId,
+			SubnetId:       eni.SubnetID,
 			DeviceNumber:   int32(eni.DeviceNumber),
 			SubnetIpv4Cidr: eni.SubnetIPv4CIDR,
 			Tags:           eni.Tags,
@@ -74,9 +74,9 @@ func (p Proxy) DescribeNodeInfo(ctx context.Context, request *pb.DescribeNodeInf
 	resp := &pb.DescribeNodeInfoResponse{
 		RequestId: request.GetRequestId(),
 		Info: &pb.InstanceInfo{
-			InstanceId:       info.InstanceId,
-			SubnetId:         info.SubnetId,
-			SecurityGroupIds: info.SecurityGroupIds,
+			InstanceId:       info.InstanceID,
+			SubnetId:         info.SubnetID,
+			SecurityGroupIds: info.SecurityGroupIDs,
 		},
 	}
 	return resp, nil
@@ -87,14 +87,14 @@ func (p Proxy) WaitForENIAttached(ctx context.Context, request *pb.WaitForENIAtt
 	if err != nil {
 		return nil, err
 	}
-	return &pb.WaitForENIAttachedResponse{Eni: &pb.ENIMetadata{EniId: eni.ENIId}}, nil
+	return &pb.WaitForENIAttachedResponse{Eni: &pb.ENIMetadata{EniId: eni.ID}}, nil
 }
 
 func (p Proxy) SetupNetworkForService(ctx context.Context, request *pb.SetupNetworkForServiceRequest) (*pb.SetupNetworkForServiceResponse, error) {
 	eni := cloud.ENIMetadata{
-		ENIId:          request.GetEni().GetEniId(),
+		ID:             request.GetEni().GetEniId(),
 		MAC:            request.GetEni().GetMac(),
-		SubnetId:       request.GetEni().GetSubnetId(),
+		SubnetID:       request.GetEni().GetSubnetId(),
 		DeviceNumber:   int(request.GetEni().GetDeviceNumber()),
 		SubnetIPv4CIDR: request.GetEni().GetSubnetIpv4Cidr(),
 		Tags:           request.GetEni().GetTags(),
@@ -113,9 +113,9 @@ func (p Proxy) SetupNetworkForService(ctx context.Context, request *pb.SetupNetw
 
 func (p Proxy) CleanNetworkForService(ctx context.Context, request *pb.CleanNetworkForServiceRequest) (*pb.CleanNetworkForServiceResponse, error) {
 	eni := cloud.ENIMetadata{
-		ENIId:          request.GetEni().GetEniId(),
+		ID:             request.GetEni().GetEniId(),
 		MAC:            request.GetEni().GetMac(),
-		SubnetId:       request.GetEni().GetSubnetId(),
+		SubnetID:       request.GetEni().GetSubnetId(),
 		DeviceNumber:   int(request.GetEni().GetDeviceNumber()),
 		SubnetIPv4CIDR: request.GetEni().GetSubnetIpv4Cidr(),
 		Tags:           request.GetEni().GetTags(),
@@ -134,9 +134,9 @@ func (p Proxy) CleanNetworkForService(ctx context.Context, request *pb.CleanNetw
 
 func (p Proxy) SetupNetworkForENI(ctx context.Context, request *pb.SetupNetworkForENIRequest) (*pb.SetupNetworkForENIResponse, error) {
 	eni := cloud.ENIMetadata{
-		ENIId:          request.GetEni().GetEniId(),
+		ID:             request.GetEni().GetEniId(),
 		MAC:            request.GetEni().GetMac(),
-		SubnetId:       request.GetEni().GetSubnetId(),
+		SubnetID:       request.GetEni().GetSubnetId(),
 		DeviceNumber:   int(request.GetEni().GetDeviceNumber()),
 		SubnetIPv4CIDR: request.GetEni().GetSubnetIpv4Cidr(),
 		Tags:           request.GetEni().GetTags(),
@@ -155,7 +155,7 @@ func (p Proxy) SetupNetworkForENI(ctx context.Context, request *pb.SetupNetworkF
 
 func (p Proxy) CleanNetworkForENI(ctx context.Context, request *pb.CleanNetworkForENIRequest) (*pb.CleanNetworkForENIResponse, error) {
 	eni := cloud.ENIMetadata{
-		ENIId:          request.GetEni().GetEniId(),
+		ID:             request.GetEni().GetEniId(),
 		MAC:            request.GetEni().GetMac(),
 		DeviceNumber:   int(request.GetEni().GetDeviceNumber()),
 		SubnetIPv4CIDR: request.GetEni().GetSubnetIpv4Cidr(),

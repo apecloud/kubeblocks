@@ -61,7 +61,7 @@ const (
 
 type FloatingIP struct {
 	ip       string
-	subnetId string
+	subnetID string
 	nodeIP   string
 	eni      *pb.ENIMetadata
 }
@@ -139,7 +139,7 @@ func (c *ServiceController) initNode(nodeIP string) error {
 			if err := node.SetupNetworkForService(addr.Address, eni); err != nil {
 				return errors.Wrapf(err, "Failed to init service private ip %s for node %s", addr.Address, nodeIP)
 			}
-			c.setFloatingIP(addr.Address, &FloatingIP{ip: addr.Address, subnetId: eni.SubnetId, nodeIP: nodeIP, eni: eni})
+			c.setFloatingIP(addr.Address, &FloatingIP{ip: addr.Address, subnetID: eni.SubnetId, nodeIP: nodeIP, eni: eni})
 			ctxLog.Info("Successfully init service", "private ip", addr.Address)
 		}
 	}
@@ -279,7 +279,7 @@ func (c *ServiceController) migrateOnNewMaster(ctx context.Context, ctxLog logr.
 	if err != nil {
 		return errors.Wrap(err, "Failed to assign private ip")
 	}
-	newFip := &FloatingIP{ip: fip.ip, subnetId: fip.subnetId, nodeIP: nodeIP, eni: newENI}
+	newFip := &FloatingIP{ip: fip.ip, subnetID: fip.subnetID, nodeIP: nodeIP, eni: newENI}
 	c.setFloatingIP(newFip.ip, newFip)
 
 	if err = node.SetupNetworkForService(newFip.ip, newENI); err != nil {
@@ -323,7 +323,7 @@ func (c *ServiceController) createFloatingIP(ctx context.Context, ctxLog logr.Lo
 
 	fip := &FloatingIP{
 		ip:       privateIP,
-		subnetId: eni.SubnetId,
+		subnetID: eni.SubnetId,
 		nodeIP:   nodeIP,
 		eni:      eni,
 	}
@@ -400,10 +400,10 @@ func (c *ServiceController) updateService(ctx context.Context, logger logr.Logge
 	}
 	annotations[AnnotationKeyFloatingIP] = fip.ip
 
-	if fip.subnetId == "" {
+	if fip.subnetID == "" {
 		return errors.New("Invalid subnet id")
 	}
-	annotations[AnnotationKeySubnetId] = fip.subnetId
+	annotations[AnnotationKeySubnetId] = fip.subnetID
 
 	svc.SetAnnotations(annotations)
 
@@ -483,7 +483,7 @@ func (c *ServiceController) buildFIPFromAnnotation(svc *corev1.Service) *Floatin
 	annotations := svc.GetAnnotations()
 	result := &FloatingIP{
 		ip:       annotations[AnnotationKeyFloatingIP],
-		subnetId: annotations[AnnotationKeySubnetId],
+		subnetID: annotations[AnnotationKeySubnetId],
 		nodeIP:   annotations[AnnotationKeyENINodeIP],
 		eni: &pb.ENIMetadata{
 			EniId: annotations[AnnotationKeyENIId],

@@ -95,7 +95,7 @@ func (l LocalTrafficPolicy) ChooseNode(svc *corev1.Service) (string, error) {
 		nodeSubnetId = node.GetNodeInfo().GetSubnetId()
 	)
 	ctxLog.Info("Choose master pod", "name", getObjectFullName(pod),
-		"svc subnetId", svcSubnetId, "node subnetId", node.GetNodeInfo().GetSubnetId())
+		"svc subnetID", svcSubnetId, "node subnetID", node.GetNodeInfo().GetSubnetId())
 	if svcSubnetId == "" || svcSubnetId == nodeSubnetId {
 		return pod.Status.HostIP, nil
 	}

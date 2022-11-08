@@ -18,9 +18,11 @@ package policy
 
 import (
 	"encoding/json"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
 func TestGetUpdateParameterList(t *testing.T) {

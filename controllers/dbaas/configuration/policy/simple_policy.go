@@ -18,6 +18,7 @@ package policy
 
 import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	dbaascfg "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
@@ -26,22 +27,37 @@ func init() {
 }
 
 type SimplePolicy struct {
-	componentType dbaasv1alpha1.ComponentType
 }
 
 func (s *SimplePolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
 	params.Ctx.Log.V(1).Info("simple policy begin....")
 
-	switch s.componentType {
-	case dbaasv1alpha1.Stateful:
-		// process sts
-	case dbaasv1alpha1.Consensus:
+	switch params.ComponentType() {
+	case dbaasv1alpha1.Stateful, dbaasv1alpha1.Consensus:
+		return rollingStatefulSets(params)
 		// process consensus
-	case dbaasv1alpha1.Stateless:
-		// process deployment
 	default:
-		return ES_NotSpport, cfgcore.MakeError("not support component type:[%s]", s.componentType)
+		return ES_NotSpport, cfgcore.MakeError("not support component type:[%s]", params.ComponentType())
+	}
+}
+
+func rollingStatefulSets(param ReconfigureParams) (ExecStatus, error) {
+	var (
+		units      = param.ComponentUnits
+		client     = param.Client
+		newVersion = param.GetModifyVersion()
+		configKey  = param.GetConfigKey()
+	)
+
+	if configKey == "" {
+		return ES_Failed, cfgcore.MakeError("failed to found config meta. configmap : %s", param.TplName)
 	}
 
+	for _, sts := range units {
+		if err := dbaascfg.RestartStsWithRolling(client, param.Ctx, sts, configKey, newVersion); err != nil {
+			param.Ctx.Log.Error(err, "failed to restart statefulSet.", "stsName", sts.GetName())
+			return ES_Retry, nil
+		}
+	}
 	return ES_None, nil
 }

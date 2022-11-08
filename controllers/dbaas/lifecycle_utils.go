@@ -160,6 +160,15 @@ func getClusterComponentsByType(components []dbaasv1alpha1.ClusterComponent, typ
 	return comps
 }
 
+func getClusterComponentsByName(components []dbaasv1alpha1.ClusterComponent, componentName string) *dbaasv1alpha1.ClusterComponent {
+	for _, component := range components {
+		if component.Name == componentName {
+			return &component
+		}
+	}
+	return nil
+}
+
 func getContainerByName(containers []corev1.Container, name string) (int, *corev1.Container) {
 	for i, container := range containers {
 		if container.Name == name {

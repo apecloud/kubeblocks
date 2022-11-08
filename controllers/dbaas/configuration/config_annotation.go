@@ -18,8 +18,11 @@ package configuration
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
+	"strings"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -32,6 +35,7 @@ const (
 	LastAppliedConfigAnnotation          = "configuration.kubeblocks.io/last-applied-configuration"
 	UpgradeInsConfigurationAnnotationKey = "configuration.kubeblocks.io/rolling-upgrade"
 	UpgradePolicyAnnotationKey           = "configuration.kubeblocks.io/reconfigure-policy"
+	UpgradeRestartAnnotationKey          = "configuration.kubeblocks.io/restart"
 
 	DefaultUpgradePolicy = dbaasv1alpha1.NormalPolicy
 )
@@ -51,6 +55,20 @@ func EnableCfgUpgrade(object client.Object) bool {
 	}
 
 	return true
+}
+
+func DisableCfgUpgrade(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap) error {
+	patch := client.MergeFrom(config.DeepCopy())
+	if config.ObjectMeta.Annotations == nil {
+		config.ObjectMeta.Annotations = map[string]string{}
+	}
+
+	config.ObjectMeta.Annotations[UpgradeInsConfigurationAnnotationKey] = "false"
+	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // ApplyConfigurationChange is
@@ -118,4 +136,29 @@ func GetUpgradePolicy(cfg *corev1.ConfigMap) dbaasv1alpha1.UpgradePolicy {
 	}
 
 	return dbaasv1alpha1.UpgradePolicy(value)
+}
+
+func RestartStsWithRolling(cli client.Client, ctx intctrlutil.RequestCtx, sts appsv1.StatefulSet, configKey string, newVersion string) error {
+	cfgAnnotationKey := fmt.Sprintf("%s-%s", UpgradeRestartAnnotationKey, strings.ReplaceAll(configKey, "_", "-"))
+
+	if sts.Spec.Template.Annotations == nil {
+		sts.Spec.Template.Annotations = map[string]string{}
+	}
+
+	lastVersion := ""
+	if updatedVersion, ok := sts.Spec.Template.Annotations[cfgAnnotationKey]; ok {
+		lastVersion = updatedVersion
+	}
+
+	// updated UpgradeRestartAnnotationKey
+	if lastVersion == newVersion {
+		return nil
+	}
+
+	sts.Spec.Template.Annotations[cfgAnnotationKey] = newVersion
+	if err := cli.Update(ctx.Ctx, &sts); err != nil {
+		return err
+	}
+
+	return nil
 }

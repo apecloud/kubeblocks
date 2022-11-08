@@ -19,11 +19,10 @@ package dbaas
 import (
 	"context"
 	"encoding/json"
-	"k8s.io/apimachinery/pkg/types"
-
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -95,10 +94,6 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	tpl := &dbaasv1alpha1.ConfigurationTemplate{}
-	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: config.Namespace,
 		Name:      config.Labels[dbaasconfig.CMConfigurationTplLabelKey],
@@ -106,7 +101,7 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
 
-	return r.sync(reqCtx, config, &tpl.Spec)
+	return r.sync(reqCtx, config, tpl)
 }
 
 type ResourceConfigMapWithLabelPredicate struct {
@@ -155,17 +150,16 @@ func checkConfigurationObject(object client.Object) bool {
 	return dbaasconfig.CheckConfigurationLabels(object, ConfigurationRequiredLabels)
 }
 
-func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, config *corev1.ConfigMap, tpl *dbaasv1alpha1.ConfigurationTemplateSpec) (ctrl.Result, error) {
+func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, config *corev1.ConfigMap, tpl *dbaasv1alpha1.ConfigurationTemplate) (ctrl.Result, error) {
 
 	var (
-		clusters = dbaasv1alpha1.ClusterList{}
-		stsLists = appv1.StatefulSetList{}
+		stsLists   = appv1.StatefulSetList{}
+		cluster    = dbaasv1alpha1.Cluster{}
+		clusterKey = client.ObjectKey{
+			Namespace: config.GetNamespace(),
+			Name:      config.Labels[appInstanceLabelKey],
+		}
 	)
-
-	clusterLabels := map[string]string{
-		appNameLabelKey:     config.Labels[appNameLabelKey],
-		appInstanceLabelKey: config.Labels[appInstanceLabelKey],
-	}
 
 	componentLabels := map[string]string{
 		appNameLabelKey:                        config.Labels[appNameLabelKey],
@@ -174,7 +168,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		dbaasconfig.CMInsConfigurationLabelKey: config.Labels[dbaasconfig.CMInsConfigurationLabelKey],
 	}
 
-	versionMeta, err := dbaasconfig.GetConfigurationVersion(config, reqCtx, tpl)
+	versionMeta, err := dbaasconfig.GetConfigurationVersion(config, reqCtx, &tpl.Spec)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
@@ -184,25 +178,33 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		return r.updateCfgStatus(reqCtx, versionMeta, config)
 	}
 
-	// find Cluster CR
-	if err := r.Client.List(reqCtx.Ctx, &clusters, client.InNamespace(config.Namespace), client.MatchingLabels(clusterLabels)); err != nil {
+	// Find Cluster CR
+	if err := r.Client.Get(reqCtx.Ctx, clusterKey, &cluster); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config,
 			r.Recorder,
 			cfgcore.WrapError(err,
-				"failed to get cluster. configmap[%s] label[%s]",
-				reqCtx.Req.NamespacedName, clusterLabels),
+				"failed to get cluster. name[%s]", clusterKey),
 			reqCtx.Log)
 	}
 
-	clusterLen := len(clusters.Items)
-	if clusterLen > 1 {
+	// Find ClusterComponent from cluster cr
+	componentName := config.Labels[appComponentLabelKey]
+	clusterComponent := getClusterComponentsByName(cluster.Spec.Components, componentName)
+	if clusterComponent == nil {
+		// TODO(zt) how to process found component!
+		reqCtx.Log.Info("not found component.", "componentName", componentName,
+			"clusterName", cluster.GetName())
+		return intctrlutil.Reconciled()
+	}
+
+	// Find ClusterDefinition Component  from ClusterDefinition CR
+	component, err := getComponent(reqCtx.Ctx, r.Client, &cluster, clusterComponent.Type)
+	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config,
 			r.Recorder,
-			cfgcore.MakeError("get multi cluster[%d]. configmap[%s] label[%s]",
-				clusterLen, reqCtx.Req.NamespacedName, clusterLabels),
+			cfgcore.WrapError(err,
+				"failed to get component from cluster definition. type[%s]", clusterComponent.Type),
 			reqCtx.Log)
-	} else if clusterLen == 0 {
-		return intctrlutil.Reconciled()
 	}
 
 	// find STS CR
@@ -215,19 +217,23 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 			reqCtx.Log)
 	}
 
+	// configmap has never been used
 	sts := dbaasconfig.GetComponentByUsingCM(&stsLists, client.ObjectKeyFromObject(config))
 	if len(sts) == 0 {
 		return intctrlutil.Reconciled()
 	}
 
 	return r.performUpgrade(cfgpolicy.ReconfigureParams{
-		Meta:       versionMeta,
-		Cfg:        config,
-		Tpl:        tpl,
-		Client:     r.Client,
-		Ctx:        reqCtx,
-		Cluster:    &clusters.Items[0],
-		Components: sts,
+		TplName:          tpl.GetName(),
+		Meta:             versionMeta,
+		Cfg:              config,
+		Tpl:              &tpl.Spec,
+		Client:           r.Client,
+		Ctx:              reqCtx,
+		Cluster:          &cluster,
+		ComponentUnits:   sts,
+		Component:        &component,
+		ClusterComponent: clusterComponent,
 	})
 }
 
@@ -262,8 +268,10 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params cfgpolicy.Reconfigu
 		return intctrlutil.RequeueAfter(dbaasconfig.ConfigReconcileInterval, params.Ctx.Log, "")
 	case cfgpolicy.ES_None:
 		return r.updateCfgStatus(params.Ctx, params.Meta, params.Cfg)
+	case cfgpolicy.ES_Failed:
+		dbaasconfig.DisableCfgUpgrade(params.Client, params.Ctx, params.Cfg)
+		return intctrlutil.Reconciled()
 	default:
 		return intctrlutil.Reconciled()
 	}
-	//return r.updateCfgStatus(params.Ctx, params.Meta, params.Cfg)
 }

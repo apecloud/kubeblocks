@@ -17,12 +17,13 @@ limitations under the License.
 package policy
 
 import (
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type ExecStatus int
@@ -39,21 +40,47 @@ func init() {
 }
 
 type ReconfigureParams struct {
-	Meta *cfgcore.ConfigDiffInformation
-	Cfg  *corev1.ConfigMap
-	Tpl  *dbaasv1alpha1.ConfigurationTemplateSpec
+	TplName string
+	Meta    *cfgcore.ConfigDiffInformation
+	Cfg     *corev1.ConfigMap
+	Tpl     *dbaasv1alpha1.ConfigurationTemplateSpec
 
-	Client     client.Client
-	Ctx        intctrlutil.RequestCtx
-	Cluster    *dbaasv1alpha1.Cluster
-	Components []appv1.StatefulSet
+	Client           client.Client
+	Ctx              intctrlutil.RequestCtx
+	Cluster          *dbaasv1alpha1.Cluster
+	ClusterComponent *dbaasv1alpha1.ClusterComponent
+	Component        *dbaasv1alpha1.ClusterDefinitionComponent
+	ComponentUnits   []appv1.StatefulSet
+}
+
+func (param *ReconfigureParams) ComponentType() dbaasv1alpha1.ComponentType {
+	return param.Component.ComponentType
+}
+
+func (param *ReconfigureParams) GetConfigKey() string {
+	for _, tpl := range param.Component.ConfigTemplateRefs {
+		if tpl.Name == param.TplName {
+			return tpl.VolumeName
+		}
+	}
+	return ""
+}
+
+func (param *ReconfigureParams) GetModifyVersion() string {
+	hash, err := cfgcore.ComputeHash(param.Cfg.Data)
+	if err != nil {
+		param.Ctx.Log.Error(err, "failed to cal configuration version!")
+		return ""
+	}
+
+	return hash
 }
 
 type ReconfigurePolicy interface {
 	Upgrade(params ReconfigureParams) (ExecStatus, error)
 }
 
-var upgradePolicyMap map[dbaasv1alpha1.UpgradePolicy]ReconfigurePolicy
+var upgradePolicyMap = map[dbaasv1alpha1.UpgradePolicy]ReconfigurePolicy{}
 
 func RegisterPolicy(policy dbaasv1alpha1.UpgradePolicy, action ReconfigurePolicy) {
 	upgradePolicyMap[policy] = action

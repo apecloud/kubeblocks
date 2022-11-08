@@ -80,11 +80,12 @@ func NewMatcherWithType(expected interface{}) typeMatcher {
 }
 
 func (matcher *typeMatcher) Match(actual interface{}) (success bool, err error) {
-	if actual == nil && matcher.expected == nil {
+	switch {
+	case actual == nil && matcher.expected == nil:
 		return false, MakeError("type is <nil> to <nil>.")
-	} else if matcher.expected == nil {
+	case matcher.expected == nil:
 		return false, MakeError("expected type is <nil>.")
-	} else if actual == nil {
+	case actual == nil:
 		return false, nil
 	}
 

@@ -64,6 +64,11 @@ spec:
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
+              dynamicParameters:
+                description: DynamicParameters support reload
+                items:
+                  type: string
+                type: array
               formatter:
                 default: YAML
                 enum:

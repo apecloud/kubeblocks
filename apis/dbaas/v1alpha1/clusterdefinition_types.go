@@ -186,6 +186,7 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Scripts ClusterDefinitionScripts `json:"scripts,omitempty"`
 
+	// +kubebuilder:default={roleChangedProbe: {enable: true}}
 	Probes ClusterDefinitionProbes `json:"probes,omitempty"`
 
 	// ComponentType defines type of the component

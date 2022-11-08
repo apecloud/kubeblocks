@@ -27,8 +27,6 @@ import (
 	"strings"
 	"time"
 
-	v1 "k8s.io/api/batch/v1"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
@@ -704,33 +702,6 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			}
 			// horizontal scaling
 			if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
-				// read hook scripts from component
-				//compName := stsObj.Labels[appComponentLabelKey]
-				//component := getClusterDefinitionComponentByType(clusterDef.Spec.Components, compName)
-				//if len(component.Scripts.HorizontalScale.Pre) > 0 {
-				//	jobObjs := make([]client.Object, 0, 3)
-				//	for _, pre := range component.Scripts.HorizontalScale.Pre {
-				//		podLabels := client.MatchingLabels{
-				//			appComponentLabelKey: stsObj.Labels[appComponentLabelKey],
-				//			appInstanceLabelKey:  stsObj.Labels[appInstanceLabelKey],
-				//		}
-				//		podList := corev1.PodList{}
-				//		if err := cli.List(ctx, &podList, podLabels); err != nil {
-				//			return err
-				//		}
-				//		for _, pod := range podList.Items {
-				//			job, err := buildHooksJobs(pod, pre)
-				//			if err != nil {
-				//				return err
-				//			}
-				//			jobObjs := append(jobObjs, job)
-				//			if err := createOrReplaceResources(ctx, cli, cluster, clusterDef, jobObjs); err != nil {
-				//				return err
-				//			}
-				//		}
-				//	}
-				//	// create job to execute hooks
-				//}
 				ml := client.MatchingLabels{
 					clusterDefLabelKey: cluster.Spec.ClusterDefRef,
 				}
@@ -756,14 +727,20 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 					}
 				}
 			}
-			stsObj.Spec.Template = stsProto.Spec.Template
+			// merge two templates' labels
+			template := stsProto.Spec.Template
+			template.ObjectMeta.Annotations = stsObj.Spec.Template.ObjectMeta.Annotations
+			for k, v := range stsProto.Spec.Template.ObjectMeta.Annotations {
+				template.ObjectMeta.Annotations[k] = v
+			}
+			stsObj.Spec.Template = template
 			stsObj.Spec.Replicas = stsProto.Spec.Replicas
 			stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
 			if err := cli.Update(ctx, stsObj); err != nil {
 				return err
 			}
 			// handle ConsensusSet Update
-			if stsObj.Status.CurrentRevision != stsObj.Status.UpdateRevision {
+			if stsObj.Status.CurrentRevision != stsObj.Status.UpdateRevision && *stsObj.Spec.Replicas == *stsProto.Spec.Replicas {
 				_, err := handleConsensusSetUpdate(ctx, cli, cluster, stsObj)
 				if err != nil {
 					return err
@@ -794,6 +771,9 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 					}
 					var err error
 					if err = cli.Get(ctx, pvcKey, pvc); err != nil {
+						if apierrors.IsNotFound(err) {
+							continue
+						}
 						if !apierrors.IsNotFound(err) {
 							return err
 						}
@@ -894,9 +874,9 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 			return true, nil
 		}
 		// delete the pod to trigger associate StatefulSet to re-create it
-		if err := cli.Delete(ctx, &pod); err != nil {
-			return false, err
-		}
+		//if err := cli.Delete(ctx, &pod); err != nil {
+		//	return false, err
+		//}
 
 		return true, nil
 	}
@@ -1227,32 +1207,23 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 		return nil, err
 	}
 	sts.Spec.Template.Spec.Containers = append(sts.Spec.Template.Spec.Containers, probeContainers...)
-	prefix := dbaasPrefix + "_" + strings.ToUpper(params.component.Type) + "_"
-	replicas := int(*sts.Spec.Replicas)
 	for i := range sts.Spec.Template.Spec.Containers {
 		// inject self scope env
 		c := &sts.Spec.Template.Spec.Containers[i]
-		c.Env = append(c.Env, corev1.EnvVar{
-			Name: dbaasPrefix + "_POD_NAME",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "metadata.name",
-				},
-			},
-		})
-		// inject component scope env
-		c.Env = append(c.Env, corev1.EnvVar{
-			Name:      prefix + "N",
-			Value:     strconv.Itoa(replicas),
-			ValueFrom: nil,
-		})
-		for j := 0; j < replicas; j++ {
-			c.Env = append(c.Env, corev1.EnvVar{
-				Name:      prefix + strconv.Itoa(j) + "_HOSTNAME",
-				Value:     sts.Name + "-" + strconv.Itoa(j),
-				ValueFrom: nil,
-			})
+		if c.Env == nil {
+			c.Env = []corev1.EnvVar{}
 		}
+		envs := prepareInjectEnvs(params.component, params.cluster)
+		c.Env = append(c.Env, envs...)
+	}
+	for i := range sts.Spec.Template.Spec.InitContainers {
+		// inject self scope env
+		c := &sts.Spec.Template.Spec.InitContainers[i]
+		if c.Env == nil {
+			c.Env = []corev1.EnvVar{}
+		}
+		envs := prepareInjectEnvs(params.component, params.cluster)
+		c.Env = append(c.Env, envs...)
 	}
 	return &sts, nil
 }
@@ -1849,50 +1820,6 @@ func buildPVCFromSnapshot(sts appsv1.StatefulSet, pvcKey types.NamespacedName, b
 	return &pvc, nil
 }
 
-func buildHooksJobs(pod corev1.Pod, cmd dbaasv1alpha1.ClusterDefinitionContainerCMD) (*v1.Job, error) {
-	cueFS, _ := debme.FS(cueTemplates, "cue")
-
-	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("exec_job_template.cue"))
-	if err != nil {
-		return nil, err
-	}
-
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-
-	cmdStrByte, err := json.Marshal(cmd)
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("cmd", cmdStrByte); err != nil {
-		return nil, err
-	}
-
-	podStrByte, err := json.Marshal(pod)
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("pod", podStrByte); err != nil {
-		return nil, err
-	}
-
-	jobName := generateName(pod.Name + "-")
-	if err = cueValue.FillRaw("job_name", jobName); err != nil {
-		return nil, err
-	}
-
-	jobStrByte, err := cueValue.Lookup("job")
-	if err != nil {
-		return nil, err
-	}
-
-	job := v1.Job{}
-	if err = json.Unmarshal(jobStrByte, &job); err != nil {
-		return nil, err
-	}
-
-	return &job, nil
-}
-
 const (
 	maxNameLength          = 63
 	randomLength           = 14
@@ -1904,4 +1831,42 @@ func generateName(base string) string {
 		base = base[:MaxGeneratedNameLength]
 	}
 	return fmt.Sprintf("%s%s", base, time.Now().Format("20060102150405"))
+}
+
+func prepareInjectEnvs(component *Component, cluster *dbaasv1alpha1.Cluster) []corev1.EnvVar {
+	envs := []corev1.EnvVar{}
+	prefix := dbaasPrefix + "_" + strings.ToUpper(component.Type) + "_"
+	envs = append(envs, corev1.EnvVar{
+		Name: dbaasPrefix + "_POD_NAME",
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				FieldPath: "metadata.name",
+			},
+		},
+	})
+	// inject component scope env
+	envs = append(envs, corev1.EnvVar{
+		Name:      prefix + "N",
+		Value:     strconv.Itoa(component.Replicas),
+		ValueFrom: nil,
+	})
+	for j := 0; j < component.Replicas; j++ {
+		envs = append(envs, corev1.EnvVar{
+			Name:      prefix + strconv.Itoa(j) + "_HOSTNAME",
+			Value:     cluster.Name + "-" + component.Name + "-" + strconv.Itoa(j),
+			ValueFrom: nil,
+		})
+	}
+	// inject consensusset role env
+	if cluster.Status.Components != nil {
+		consensusSetStatus := cluster.Status.Components[component.Type].ConsensusSetStatus
+		if consensusSetStatus != nil {
+			envs = append(envs, corev1.EnvVar{
+				Name:      prefix + "LEADER",
+				Value:     consensusSetStatus.Leader.Pod,
+				ValueFrom: nil,
+			})
+		}
+	}
+	return envs
 }

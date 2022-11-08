@@ -15,7 +15,7 @@ backup_job: {
 		namespace: sts.metadata.namespace
 		labels: {
 			"dataprotection.infracreate.com/backup-type":         "snapshot"
-			"cluster.infracreate.com/name":                       sts.metadata.labels."app.kubernetes.io/instance"
+			"app.kubernetes.io/instance":                       sts.metadata.labels."app.kubernetes.io/instance"
 			"backuppolicies.dataprotection.infracreate.com/name": "\(sts.metadata.labels."app.kubernetes.io/instance")-scaling"
 			"dataprotection.infracreate.com/backup-index":        "0"
 		}

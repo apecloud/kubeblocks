@@ -27,22 +27,25 @@ spec:
           - name: init
             image: rancher/kubectl:latest
             imagePullPolicy: IfNotPresent
-            env:
-              - name: KB_LEADER_HOSTNAME
-                value: wesql-cluster-01-replicasets-0
-              - name: KB_POD_NAME
-                valueFrom:
-                  fieldRef:
-                    apiVersion: v1
-                    fieldPath: metadata.name
             command: ["sh", "-c"]
             args:
-            - | 
-              if [ "$KB_POD_NAME" != "$KB_LEADER_HOSTNAME" ]; then
-                kubectl exec -i $KB_LEADER_HOSTNAME -c mysql -- bash -c "mysql -e \"call dbms_consensus.add_follower('$KB_POD_NAME:13306');\" & pid=\$!; sleep 1; if ! ps \$pid > /dev/null; then wait \$pid; code=\$?; exit \$code; fi"
+            - |
+              leader=`cat /etc/podinfo/annotations | grep "cs.dbaas.kubeblocks.io/leader" | awk -F'"' '{print $2}'`
+              followers=`cat /etc/podinfo/annotations | grep "cs.dbaas.kubeblocks.io/followers" | awk -F'"' '{print $2}'`
+              echo $leader
+              echo $followers
+              sub_follower=`echo "$followers" | grep "$KB_POD_NAME"`
+              echo $KB_POD_NAME
+              echo $sub_follower
+              if [ -z "$leader" -o "$KB_POD_NAME" = "$leader" -o ! -z "$sub_follower" ]; then 
+                exit 0
               else 
-                kubectl
+                echo "kubectl exec -i $leader -c mysql -- bash -c \"mysql -e \"call dbms_consensus.add_follower('$KB_POD_NAME:13306');\" & pid=\$!; sleep 1; if ! ps \$pid > /dev/null; then wait \$pid; code=\$?; exit \$code; fi\""
+                kubectl exec -i $leader -c mysql -- bash -c "mysql -e \"call dbms_consensus.add_follower('$KB_POD_NAME:13306');\" & pid=\$!; sleep 1; if ! ps \$pid > /dev/null; then wait \$pid; code=\$?; exit \$code; fi"
               fi
+            volumeMounts:
+              - mountPath: /etc/podinfo
+                name: podinfo
         containers:
           - args:
               - |
@@ -61,13 +64,9 @@ spec:
                 echo $cluster_info; 
                 mkdir -p /data/mysql/data; 
                 chmod +777 -R /data/mysql; 
-                echo $KB_POD_NAME;
-                echo $KB_LEADER_HOSTNAME;
-                echo $(KB_POD_NAME);
-                echo $(KB_LEADER_HOSTNAME);
-                if [ -z $KB_LEADER_HOSTNAME ]; then
+                if [ -z $KB_REPLICASETS_LEADER ]; then
                   docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$cluster_info" --cluster-id=$CLUSTER_ID
-                elif [ "$KB_POD_NAME" != "$KB_LEADER_HOSTNAME" ]; then
+                elif [ "$KB_POD_NAME" != "$KB_REPLICASETS_LEADER" ]; then
                   docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$KB_POD_NAME:13306" --cluster-id=$CLUSTER_ID
                 else 
                   docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$KB_POD_NAME:13306@1" --cluster-id=$CLUSTER_ID
@@ -76,8 +75,6 @@ spec:
               - /bin/bash
               - -c
             env:
-              - name: KB_LEADER_HOSTNAME
-                value: wesql-cluster-01-replicasets-0
               - name: MYSQL_ROOT_HOST
                 value: '%'
               - name: MYSQL_ROOT_USER
@@ -121,3 +118,12 @@ spec:
                 name: data
               - mountPath: /opt/mysql
                 name: mysql-config
+              - mountPath: /etc/podinfo
+                name: podinfo
+        volumes:
+          - name: podinfo
+            downwardAPI:
+              items:
+                - path: "annotations"
+                  fieldRef:
+                    fieldPath: metadata.annotations

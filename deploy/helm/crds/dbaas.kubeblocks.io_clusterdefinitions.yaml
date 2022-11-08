@@ -7534,6 +7534,9 @@ spec:
                       - containers
                       type: object
                     probes:
+                      default:
+                        roleChangedProbe:
+                          enable: true
                       properties:
                         roleChangedProbe:
                           properties:

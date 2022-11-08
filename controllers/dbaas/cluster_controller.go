@@ -262,6 +262,54 @@ func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName
 			return err
 		}
 
+		followerLabel := ""
+		for _, follower := range cluster.Status.Components[componentName].ConsensusSetStatus.Followers {
+			if len(followerLabel) > 0 {
+				followerLabel = followerLabel + ","
+			}
+			followerLabel = followerLabel + follower.Pod
+		}
+		leaderLabel := cluster.Status.Components[componentName].ConsensusSetStatus.Leader.Pod
+		labelSelector, err := labels.Parse("app.kubernetes.io/instance=" + cluster.Name)
+		if err != nil {
+			return err
+		}
+		o := &client.ListOptions{LabelSelector: labelSelector}
+
+		// TODO:CT select component
+		// update label in exist pods
+		//list := &corev1.PodList{}
+		//if err := cli.List(ctx, list, o); err != nil {
+		//	return err
+		//}
+		//for _, pod := range list.Items {
+		//	patch := client.MergeFrom(pod.DeepCopy())
+		//	if pod.Annotations == nil {
+		//		pod.Annotations = map[string]string{}
+		//	}
+		//	pod.Annotations["cs.dbaas.kubeblocks.io/leader"] = leaderLabel
+		//	pod.Annotations["cs.dbaas.kubeblocks.io/followers"] = followerLabel
+		//	if err := cli.Patch(ctx, &pod, patch); err != nil {
+		//		return err
+		//	}
+		//}
+		// update label in StatefulSet template
+		stsList := &appsv1.StatefulSetList{}
+		if err := cli.List(ctx, stsList, o); err != nil {
+			return err
+		}
+		for _, sts := range stsList.Items {
+			patch := client.MergeFrom(sts.DeepCopy())
+			if sts.Spec.Template.ObjectMeta.Annotations == nil {
+				sts.Spec.Template.ObjectMeta.Annotations = map[string]string{}
+			}
+			sts.Spec.Template.ObjectMeta.Annotations["cs.dbaas.kubeblocks.io/leader"] = leaderLabel
+			sts.Spec.Template.ObjectMeta.Annotations["cs.dbaas.kubeblocks.io/followers"] = followerLabel
+			if err := cli.Patch(ctx, &sts, patch); err != nil {
+				return err
+			}
+		}
+
 		// update pod accessMode label
 		patchAccessMode := client.MergeFrom(pod.DeepCopy())
 		pod.Labels[consensusSetAccessModeLabelKey] = string(accessMode)

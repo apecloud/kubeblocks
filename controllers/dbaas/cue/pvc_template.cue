@@ -26,6 +26,9 @@ pvc: {
 	metadata: {
 		name:      pvc_key.Name
 		namespace: pvc_key.Namespace
+		labels: {
+			"app.kubernetes.io/instance": sts.metadata.labels["app.kubernetes.io/instance"]
+		}
 	}
 	spec: {
 		accessModes: sts.spec.volumeClaimTemplates[0].spec.accessModes

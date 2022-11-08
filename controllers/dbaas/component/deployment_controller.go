@@ -75,23 +75,9 @@ func checkDeploymentStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, clu
 	return DeploymentIsReady(deploy), nil
 }
 
-// DeploymentIsReady check deployment is ready
-func DeploymentIsReady(deploy *appsv1.Deployment) bool {
-	var (
-		targetReplicas     = *deploy.Spec.Replicas
-		componentIsRunning = true
-	)
-	if deploy.Status.AvailableReplicas != targetReplicas ||
-		deploy.Status.Replicas != targetReplicas ||
-		deploy.Status.ObservedGeneration != deploy.GetGeneration() {
-		componentIsRunning = false
-	}
-	return componentIsRunning
-}
-
 // SetupWithManager sets up the controller with the Manager.
 func (r *DeploymentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1.Deployment{}, builder.WithPredicates(predicate.NewPredicateFuncs(filterLabels))).
+		For(&appsv1.Deployment{}, builder.WithPredicates(predicate.NewPredicateFuncs(workloadFilterPredicate))).
 		Complete(r)
 }

@@ -32,6 +32,7 @@ import (
 
 // ReconcileActionWithCluster it will be performed when action is done and loop util OpsRequest.status.phase is Succeed.
 // if OpsRequest.spec.clusterOps is not null, you can use it to OpsBehaviour.ReconcileAction.
+// if true, the operation is execution completed. otherwise, the operation is running.
 func ReconcileActionWithCluster(opsRes *OpsResource) (bool, error) {
 	var (
 		opsRequest = opsRes.OpsRequest
@@ -61,6 +62,7 @@ func ReconcileActionWithCluster(opsRes *OpsResource) (bool, error) {
 
 // ReconcileActionWithComponentOps it will be performed when action is done and loop util OpsRequest.status.phase is Succeed.
 // if OpsRequest.spec.componentOps is not null, you can use it to OpsBehaviour.ReconcileAction.
+// if true, the operation is execution completed. otherwise, the operation is running.
 func ReconcileActionWithComponentOps(opsRes *OpsResource) (bool, error) {
 	var (
 		opsRequest = opsRes.OpsRequest

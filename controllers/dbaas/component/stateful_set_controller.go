@@ -119,6 +119,6 @@ func (r *StatefulSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1.StatefulSet{}).
 		Owns(&corev1.Pod{}).
-		WithEventFilter(predicate.NewPredicateFuncs(filterLabels)).
+		WithEventFilter(predicate.NewPredicateFuncs(workloadFilterPredicate)).
 		Complete(r)
 }

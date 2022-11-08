@@ -25,11 +25,13 @@ import (
 )
 
 const (
+	AppName = "kubeblocks"
 	// common label and annotation keys
 
 	AppInstanceLabelKey      = "app.kubernetes.io/instance"
 	AppComponentLabelKey     = "app.kubernetes.io/component-name"
 	AppNameLabelKey          = "app.kubernetes.io/name"
+	AppManagedByLabelKey     = "app.kubernetes.io/managed-by"
 	ConsensusSetRoleLabelKey = "cs.dbaas.kubeblocks.io/role"
 
 	// OpsRequestAnnotationKey OpsRequest annotation key in Cluster

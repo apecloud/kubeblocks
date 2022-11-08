@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -138,17 +139,25 @@ func checkComponentStatusAndSyncCluster(reqCtx intctrlutil.RequestCtx,
 	return nil
 }
 
-// filterLabels filter the resources according to labels
-func filterLabels(object client.Object) bool {
-	matchLabels := []string{intctrlutil.AppInstanceLabelKey, intctrlutil.AppComponentLabelKey}
+// workloadFilterPredicate provide filter predicate for workload objects, i.e., deployment/statefulset/pod.
+func workloadFilterPredicate(object client.Object) bool {
 	objLabels := object.GetLabels()
 	if objLabels == nil {
 		return false
 	}
-	for _, l := range matchLabels {
-		if _, ok := objLabels[l]; !ok {
-			return false
-		}
+	return objLabels[intctrlutil.AppManagedByLabelKey] == intctrlutil.AppName
+}
+
+// DeploymentIsReady check deployment is ready
+func DeploymentIsReady(deploy *appsv1.Deployment) bool {
+	var (
+		targetReplicas     = *deploy.Spec.Replicas
+		componentIsRunning = true
+	)
+	if deploy.Status.AvailableReplicas != targetReplicas ||
+		deploy.Status.Replicas != targetReplicas ||
+		deploy.Status.ObservedGeneration != deploy.GetGeneration() {
+		componentIsRunning = false
 	}
-	return true
+	return componentIsRunning
 }

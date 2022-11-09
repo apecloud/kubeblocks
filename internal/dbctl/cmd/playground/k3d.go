@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -228,17 +227,11 @@ func buildClusterConfig(clusterName string, opts k3d.ClusterCreateOpts) (k3d.Clu
 	nodes = append(nodes, clusterConfig.ServerLoadBalancer.Node)
 
 	// build k3d node
-	k3sImageDir, err := buildK3sImageDir()
-	if err != nil {
-		fmt.Printf("Failed to create k3s image dir: %v", err)
-	}
-
 	serverNode := k3d.Node{
 		Name:       k3dClient.GenerateNodeName(clusterConfig.Name, k3d.ServerRole, 0),
 		Role:       k3d.ServerRole,
 		Image:      K3sImage,
 		ServerOpts: k3d.ServerOpts{},
-		Volumes:    []string{k3sImageDir + ":/var/lib/rancher/k3s/agent/images/"},
 	}
 
 	nodes = append(nodes, &serverNode)
@@ -291,18 +284,6 @@ func buildLoadbalancer(cluster k3d.Cluster, opts k3d.ClusterCreateOpts) *k3d.Loa
 	lb.Node.Restart = true
 
 	return lb
-}
-
-func buildK3sImageDir() (string, error) {
-	dir, err := util.GetCliHomeDir()
-	if err != nil {
-		return "", err
-	}
-	k3sImagesDir := filepath.Join(dir, "playground", "k3s")
-	if err := os.MkdirAll(k3sImagesDir, 0700); err != nil {
-		return "", err
-	}
-	return k3sImagesDir, nil
 }
 
 func buildPortWithFilters() (config.PortWithNodeFilters, error) {

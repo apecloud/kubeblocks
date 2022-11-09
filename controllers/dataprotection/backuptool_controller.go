@@ -19,16 +19,16 @@ package dataprotection
 import (
 	"context"
 
-	"k8s.io/client-go/tools/record"
-
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-
+	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // BackupToolReconciler reconciles a BackupTool object
@@ -83,6 +83,9 @@ func (r *BackupToolReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 func (r *BackupToolReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dataprotectionv1alpha1.BackupTool{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: viper.GetInt(maxConcurDataProtectionReconKey),
+		}).
 		Complete(r)
 }
 

@@ -25,8 +25,10 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/config"
 )
 
 const (
@@ -48,6 +50,10 @@ func NewEndpointController(logger logr.Logger, client client.Client, scheme *run
 		Scheme:   scheme,
 		Recorder: recorder,
 	}, nil
+}
+
+func (c *EndpointController) Start(ctx context.Context) error {
+	return nil
 }
 
 func (c *EndpointController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -93,5 +99,7 @@ func (c *EndpointController) Reconcile(ctx context.Context, req ctrl.Request) (c
 }
 
 func (c *EndpointController) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).For(&corev1.Endpoints{}).Complete(c)
+	return ctrl.NewControllerManagedBy(mgr).WithOptions(controller.Options{
+		MaxConcurrentReconciles: config.MaxConcurrentReconciles,
+	}).For(&corev1.Endpoints{}).Complete(c)
 }

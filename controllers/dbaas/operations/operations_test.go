@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var _ = Describe("OpsRequest Controller", func() {
@@ -613,7 +614,7 @@ spec:
 			_ = GetOpsManager().Reconcile(opsRes)
 			// test getOpsRequestAnnotation function
 			opsRes.Cluster.Annotations = map[string]string{
-				OpsRequestAnnotationKey: `{"Updating":"horizontalscaling_ops"}`,
+				intctrlutil.OpsRequestAnnotationKey: `{"Updating":"horizontalscaling_ops"}`,
 			}
 			_ = GetOpsManager().Do(opsRes)
 

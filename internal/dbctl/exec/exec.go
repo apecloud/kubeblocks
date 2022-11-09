@@ -133,7 +133,7 @@ func (o *ExecOptions) Validate() error {
 		}
 	}
 
-	// pod is not fetched, try to get it by pod name
+	// pod is not get, try to get it by pod name
 	if o.Pod == nil {
 		if len(o.PodName) > 0 {
 			if o.Pod, err = o.ClientSet.CoreV1().Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{}); err != nil {

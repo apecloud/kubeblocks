@@ -93,7 +93,7 @@ func (o *installOptions) run() error {
 	}
 
 	installer := Installer{
-		cfg:       o.cfg,
+		HelmCfg:   o.cfg,
 		Namespace: o.Namespace,
 		Version:   o.Version,
 		Sets:      o.Sets,
@@ -124,7 +124,7 @@ func (o *options) run() error {
 	fmt.Fprintln(o.Out, "Uninstalling KubeBlocks")
 
 	installer := Installer{
-		cfg:       o.cfg,
+		HelmCfg:   o.cfg,
 		Namespace: o.Namespace,
 		client:    o.client,
 	}

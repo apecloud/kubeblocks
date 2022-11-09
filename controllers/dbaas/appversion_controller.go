@@ -19,24 +19,39 @@ package dbaas
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"strings"
 	"time"
 
+	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=appversions,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=appversions/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=appversions/finalizers,verbs=update
+
+// AppVersionReconciler reconciles a AppVersion object
+type AppVersionReconciler struct {
+	client.Client
+	Scheme   *k8sruntime.Scheme
+	Recorder record.EventRecorder
+}
+
 func init() {
 	clusterDefUpdateHandlers["appVersion"] = appVersionUpdateHandler
+	viper.SetDefault(maxConcurReconAppVersionKey, runtime.NumCPU()*2)
 }
 
 func appVersionUpdateHandler(cli client.Client, ctx context.Context, clusterDef *dbaasv1alpha1.ClusterDefinition) error {
@@ -79,17 +94,6 @@ func appVersionUpdateHandler(cli client.Client, ctx context.Context, clusterDef 
 
 	return nil
 }
-
-// AppVersionReconciler reconciles a AppVersion object
-type AppVersionReconciler struct {
-	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
-}
-
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=appversions,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=appversions/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=appversions/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -188,6 +192,9 @@ func checkAppVersionTemplate(client client.Client, ctx intctrlutil.RequestCtx, a
 func (r *AppVersionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dbaasv1alpha1.AppVersion{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: viper.GetInt(maxConcurReconAppVersionKey),
+		}).
 		Complete(r)
 }
 

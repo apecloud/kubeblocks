@@ -31,6 +31,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net"
@@ -81,6 +82,29 @@ var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
 )
+
+type OnLeaderAction struct {
+	sc *lb.ServiceController
+	ec *lb.EndpointController
+	nm agent.NodeManager
+}
+
+func (l OnLeaderAction) NeedLeaderElection() bool {
+	return true
+}
+
+func (l OnLeaderAction) Start(ctx context.Context) error {
+	if err := l.nm.Start(ctx); err != nil {
+		return err
+	}
+	if err := l.sc.Start(ctx); err != nil {
+		return err
+	}
+	if err := l.ec.Start(ctx); err != nil {
+		return err
+	}
+	return nil
+}
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
@@ -194,22 +218,22 @@ func main() {
 		setupLog.Error(err, "Failed to init node manager")
 		os.Exit(1)
 	}
-	serviceController, err := lb.NewServiceController(logger, c, mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"), cp, nm)
+	sc, err := lb.NewServiceController(logger, c, mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"), cp, nm)
 	if err != nil {
 		setupLog.Error(err, "Failed to init service controller")
 		os.Exit(1)
 	}
-	if err := serviceController.SetupWithManager(mgr); err != nil {
+	if err := sc.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "Service")
 		os.Exit(1)
 	}
 
-	endpointController, err := lb.NewEndpointController(logger, c, mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"))
+	ec, err := lb.NewEndpointController(logger, c, mgr.GetScheme(), mgr.GetEventRecorderFor("LoadBalancer"))
 	if err != nil {
 		setupLog.Error(err, "Failed to init endpoints controller")
 		os.Exit(1)
 	}
-	if err := endpointController.SetupWithManager(mgr); err != nil {
+	if err := ec.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "Endpoints")
 		os.Exit(1)
 	}
@@ -222,6 +246,11 @@ func main() {
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		setupLog.Error(err, "Failed to set up ready check")
+		os.Exit(1)
+	}
+
+	if err := mgr.Add(&OnLeaderAction{sc: sc, ec: ec, nm: nm}); err != nil {
+		setupLog.Error(err, "Failed to add on leader action")
 		os.Exit(1)
 	}
 

@@ -31,17 +31,18 @@ import (
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
 )
 
 var _ = Describe("Describe", func() {
 	buildTestCmd := func(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-		cmd := Command{
-			Factory:   f,
-			Streams:   streams,
-			Short:     "Test list.",
-			GroupKind: schema.GroupKind{Group: "", Kind: "pods"},
-		}
-		return cmd.Build()
+		return builder.NewCmdBuilder().
+			Factory(f).
+			IOStreams(streams).
+			Short("Test list.").
+			GroupKind(schema.GroupKind{Group: "", Kind: "pods"}).
+			Build(Build)
 	}
 
 	mockClient := func(data runtime.Object) *cmdtesting.TestFactory {

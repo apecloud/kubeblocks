@@ -30,8 +30,8 @@ service: {
 			"app.kubernetes.io/instance":       pod.metadata.labels."app.kubernetes.io/instance"
 			"app.kubernetes.io/name":           pod.metadata.labels."app.kubernetes.io/name"
 			"app.kubernetes.io/component-name": pod.metadata.labels."app.kubernetes.io/component-name"
+			"app.kubernetes.io/managed-by": "kubeblocks"
 			// "app.kubernetes.io/version" : # TODO
-			"app.kubernetes.io/created-by": "controller-manager"
 		}
 	}
 	"spec": {

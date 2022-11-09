@@ -47,6 +47,8 @@ var (
 )
 
 type NodeManager interface {
+	Start(ctx context.Context) error
+
 	GetNode(ip string) (Node, error)
 
 	GetNodes() ([]Node, error)
@@ -73,9 +75,14 @@ func NewNodeManager(logger logr.Logger, rpcPort int, cp cloud.Provider, c client
 		nodes:   make(map[string]Node),
 	}
 	nm.logger.Info("Monitoring nodes", "labels", fmt.Sprintf("%v", config.TrafficNodeLabels))
+	return nm, nil
+}
+
+func (nm *nodeManager) Start(ctx context.Context) error {
 	if err := nm.refreshNodes(); err != nil {
-		return nil, errors.Wrapf(err, "Failed to init nodes")
+		return errors.Wrapf(err, "Failed to refresh nodes")
 	}
+
 	f := func() {
 		if err := nm.refreshNodes(); err != nil {
 			nm.logger.Error(err, "Failed to refresh nodes")
@@ -83,8 +90,8 @@ func NewNodeManager(logger logr.Logger, rpcPort int, cp cloud.Provider, c client
 			nm.logger.Info("Successfully refresh nodes")
 		}
 	}
-	go wait.Forever(f, config.RefreshNodeInterval)
-	return nm, nil
+	go wait.Until(f, config.RefreshNodeInterval, ctx.Done())
+	return nil
 }
 
 func (nm *nodeManager) refreshNodes() error {

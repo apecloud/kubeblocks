@@ -25,9 +25,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var newEndpointsObj = func(svc *corev1.Service) (*corev1.Endpoints, *types.NamespacedName) {
+var newEndpointsObj = func(svc *corev1.Service) (*corev1.Endpoints, types.NamespacedName) {
 	endpoints := &corev1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      svc.GetName(),
@@ -37,13 +38,26 @@ var newEndpointsObj = func(svc *corev1.Service) (*corev1.Endpoints, *types.Names
 			},
 		},
 	}
-	return endpoints, &types.NamespacedName{
+	return endpoints, types.NamespacedName{
 		Name:      endpoints.GetName(),
 		Namespace: endpoints.GetNamespace(),
 	}
 }
 
 var _ = Describe("EndpointController", func() {
+	BeforeEach(func() {
+		// Add any steup steps that needs to be executed before each test
+		var (
+			objs = []client.Object{&corev1.Service{}, &corev1.Endpoints{}, &corev1.Pod{}}
+		)
+
+		for _, obj := range objs {
+			err := k8sClient.DeleteAllOf(context.Background(), obj,
+				client.InNamespace(namespace), client.HasLabels{testCtx.TestObjLabelKey})
+			Expect(err).Should(BeNil())
+		}
+	})
+
 	Context("", func() {
 		It("", func() {
 			svc, svcKey := newSvcObj(false, node1IP)
@@ -51,8 +65,12 @@ var _ = Describe("EndpointController", func() {
 			Expect(k8sClient.Create(context.Background(), svc)).Should(Succeed())
 			Expect(k8sClient.Create(context.Background(), ep)).Should(Succeed())
 			Eventually(func() bool {
-				Expect(k8sClient.Get(context.Background(), *svcKey, svc)).Should(Succeed())
-				Expect(k8sClient.Get(context.Background(), *epKey, ep)).Should(Succeed())
+				if err := k8sClient.Get(context.Background(), svcKey, svc); err != nil {
+					return false
+				}
+				if err := k8sClient.Get(context.Background(), epKey, ep); err != nil {
+					return false
+				}
 				return svc.Annotations[AnnotationKeyEndpointsVersion] == ep.GetObjectMeta().GetResourceVersion()
 			}, timeout, interval).Should(BeTrue())
 		})

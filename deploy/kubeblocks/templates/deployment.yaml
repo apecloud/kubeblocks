@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kubeblocks.fullname" . }}
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "kubeblocks.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "kubeblocks.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: manager
+          args:
+            - "--health-probe-bind-address=:8081"
+            - "--metrics-bind-address=:8080"
+            - "--leader-elect"
+            - "-zap-devel={{- default "false" .Values.loggerSettings.developmentMode }}"
+            - "-zap-time-encoding={{- default "iso8601" .Values.loggerSettings.timeEncoding }}"
+            {{- with .Values.loggerSettings.level }}
+            - "-zap-log-level={{ . }}"
+            {{- end }}
+            {{- with .Values.loggerSettings.encoder }}
+            - "-zap-encoder={{ . }}"
+            {{- end }}
+          env:
+            - name: CM_NAMESPACE
+              value: {{ .Release.Namespace }}
+          {{- if .Values.dataProtection.disableVolumeSnapshot }}
+            - name: NO_VOLUMESNAPSHOT
+              value: "true"
+          {{- end }}
+          {{- if .Values.admissionWebhooks.enabled }}
+            - name: ENABLE_WEBHOOKS
+              value: "true"
+          {{- end }}
+            - name: KUBEBLOCKS_IMAGE_PULL_POLICY
+              value: {{ .Values.image.pullPolicy }}
+            - name: KUBEBLOCKS_IMAGE
+              value: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: webhook-server
+              containerPort: 9443
+              protocol: TCP
+            - name: health
+              containerPort: 8081
+              protocol: TCP
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+          {{- if .Values.admissionWebhooks.enabled }}
+            - mountPath: /tmp/k8s-webhook-server/serving-certs
+              name: cert
+              readOnly: true
+          {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: 10
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: manager-config
+          configMap:
+            name: manager-config
+        {{- if .Values.admissionWebhooks.enabled }}
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.svc.tls-pair
+        {{- end }}

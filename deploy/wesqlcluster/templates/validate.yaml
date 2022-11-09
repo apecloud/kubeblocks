@@ -1,5 +1,0 @@
-{{- if .Values.replicaCount }}
-  {{- if ne (mod (int .Values.replicaCount) 2) 1 }}
-    {{ fail "WeSQL cluster does not support running with even number replicas." }}
-  {{- end }}
-{{- end }}

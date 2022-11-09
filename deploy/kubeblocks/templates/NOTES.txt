@@ -23,7 +23,7 @@ From outside the cluster, the Grafana Server URL(s) are:
     http://{{ . }}
 {{- end }}
 {{- else }}
-3. To view the Grafana console:
+-> To view the Grafana console:
 
 {{- if contains "NodePort" .Values.grafana.service.type }}
     export NODE_PORT=$(kubectl get --namespace {{ template "kubeblocks.grafana.namespace" . }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ template "kubeblocks.grafana.fullname" . }})
@@ -54,7 +54,7 @@ From outside the cluster, the prometheus server URL(s) are:
 {{- end }}
 {{- else }}
 
-4. To view the Prometheus console:
+-> To view the Prometheus console:
 
 {{- if contains "NodePort" .Values.prometheus.server.service.type }}
     export NODE_PORT=$(kubectl get --namespace {{ template "kubeblocks.prometheus.namespace" . }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ template "kubeblocks.prometheus.server.fullname" . }})
@@ -83,7 +83,7 @@ From outside the cluster, the alertmanager URL(s) are:
 {{- end }}
 {{- else }}
 
-5. To view the Prometheus AlertManager console:
+-> To view the Prometheus AlertManager console:
 
 {{- if contains "NodePort" .Values.prometheus.alertmanager.service.type }}
     export NODE_PORT=$(kubectl get --namespace {{ template "kubeblocks.prometheus.namespace" . }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ template "kubeblocks.prometheus.alertmanager.fullname" . }})

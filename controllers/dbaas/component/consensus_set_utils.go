@@ -20,6 +20,7 @@ import (
 	"context"
 	"sort"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/pkg/errors"
@@ -87,13 +88,15 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 		return false, err
 	}
 	// get pod label and name, compute plan
-	plan := generateConsensusUpdatePlan(ctx, cli, stsObj, pods, *component)
+	plan := generateConsensusUpdatePlan(ctx, cli, stsObj, pods, cluster, *component)
 	// execute plan
 	return plan.walkOneStep()
 }
 
 // generateConsensusUpdatePlan generates Update plan based on UpdateStrategy
-func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod, component dbaasv1alpha1.ClusterDefinitionComponent) *Plan {
+func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod,
+	cluster *dbaasv1alpha1.Cluster,
+	component dbaasv1alpha1.ClusterDefinitionComponent) *Plan {
 	plan := &Plan{}
 	plan.Start = &Step{}
 	plan.WalkFunc = func(obj interface{}) (bool, error) {
@@ -110,7 +113,12 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 			return true, nil
 		}
 		// delete the pod to trigger associate StatefulSet to re-create it
-		if err := cli.Delete(ctx, &pod); err != nil {
+		if err := cli.Delete(ctx, &pod); err != nil && !apierrors.IsNotFound(err) {
+			return false, err
+		}
+
+		componentName := pod.Labels[intctrlutil.AppComponentLabelKey]
+		if err := deleteConsensusSetRoleLabel(ctx, cli, cluster, componentName, pod.Name); err != nil {
 			return false, err
 		}
 
@@ -256,6 +264,22 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 	}
 
 	return plan
+}
+
+func deleteConsensusSetRoleLabel(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, componentName, podName string) error {
+	if cluster.Status.Components == nil {
+		return nil
+	}
+
+	componentStatus, ok := cluster.Status.Components[componentName]
+	if !ok {
+		return nil
+	}
+	patch := client.MergeFrom(cluster.DeepCopy())
+	consensusSetStatus := componentStatus.ConsensusSetStatus
+	resetClusterConsensusRoleStatus(consensusSetStatus, podName)
+
+	return cli.Status().Patch(ctx, cluster, patch)
 }
 
 func UpdateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx, podName types.NamespacedName, role string) error {
@@ -422,22 +446,6 @@ func setClusterConsensusLeaderStatus(consensusSetStatus *dbaasv1alpha1.Consensus
 }
 
 func setClusterConsensusFollowerStatus(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus, memberExt consensusMemberExt) bool {
-	if consensusSetStatus.Learner == nil {
-		consensusSetStatus.Learner = &dbaasv1alpha1.ConsensusMemberStatus{}
-	}
-
-	if consensusSetStatus.Learner.Pod == memberExt.podName {
-		return false
-	}
-
-	consensusSetStatus.Learner.Pod = memberExt.podName
-	consensusSetStatus.Learner.AccessMode = memberExt.accessMode
-	consensusSetStatus.Learner.Name = memberExt.name
-
-	return true
-}
-
-func setClusterConsensusLearnerStatus(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus, memberExt consensusMemberExt) bool {
 	for _, member := range consensusSetStatus.Followers {
 		if member.Pod == memberExt.podName {
 			return false
@@ -450,6 +458,22 @@ func setClusterConsensusLearnerStatus(consensusSetStatus *dbaasv1alpha1.Consensu
 		Name:       memberExt.name,
 	}
 	consensusSetStatus.Followers = append(consensusSetStatus.Followers, member)
+
+	return true
+}
+
+func setClusterConsensusLearnerStatus(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus, memberExt consensusMemberExt) bool {
+	if consensusSetStatus.Learner == nil {
+		consensusSetStatus.Learner = &dbaasv1alpha1.ConsensusMemberStatus{}
+	}
+
+	if consensusSetStatus.Learner.Pod == memberExt.podName {
+		return false
+	}
+
+	consensusSetStatus.Learner.Pod = memberExt.podName
+	consensusSetStatus.Learner.AccessMode = memberExt.accessMode
+	consensusSetStatus.Learner.Name = memberExt.name
 
 	return true
 }

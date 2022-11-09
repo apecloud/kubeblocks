@@ -108,7 +108,7 @@ reason: RoleChanged
 type: Normal
 `
 
-	seq, err := password.Generate(16, 6, 10, true, true)
+	seq, err := password.Generate(16, 16, 0, true, true)
 	if err != nil {
 		return nil, err
 	}

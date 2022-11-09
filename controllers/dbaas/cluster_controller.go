@@ -66,11 +66,14 @@ type ClusterReconciler struct {
 
 // TODO probeMessage should be defined by @xuanchi
 type probeMessage struct {
-	Data probeMessageData `json:"data,omitempty"`
+	ErrorCode string           `json:"errorCode,omitempty"`
+	Data      probeMessageData `json:"message,omitempty"`
 }
 
 type probeMessageData struct {
-	Role string `json:"role,omitempty"`
+	Event        string `json:"event,omitempty"`
+	OriginalRole string `json:"originalRole,omitempty"`
+	Role         string `json:"role,omitempty"`
 }
 
 func init() {
@@ -113,7 +116,8 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 
 	// get role
 	message := &probeMessage{}
-	err := json.Unmarshal([]byte(event.Message), message)
+	msg := strings.TrimLeft(event.Message, "Readiness probe failed:")
+	err := json.Unmarshal([]byte(msg), message)
 	if err != nil {
 		// not role related message, ignore it
 		reqCtx.Log.Info("not role message", "message", event.Message, "error", err)

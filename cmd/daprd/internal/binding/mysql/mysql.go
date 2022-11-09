@@ -326,10 +326,14 @@ func (m *Mysql) roleCheck(ctx context.Context, sql string) ([]byte, error) {
 		}
 	}
 	if oriRole != role {
-		msg := fmt.Sprintf("role changed, original role: %s, current role: %s", oriRole, role)
-		m.logger.Infof(msg)
+		result := map[string]string{}
+		result["event"] = "roleChanged"
+		result["originalRole"] = oriRole
+		result["Role"] = Role
+		msg, _ := json.Marshal(result)
+		m.logger.Infof(string(msg))
 		oriRole = role
-		return nil, errors.Errorf(msg)
+		return nil, errors.Errorf(string(msg))
 	}
 	return []byte(role), nil
 }

@@ -77,4 +77,8 @@ podSecurityContext:
 
 nodeLabelList:
 
+serviceLabelList:
+  - app.kubernetes.io/managed-by:kubeblocks
+
 endpointLabelList:
+  - app.kubernetes.io/managed-by:kubeblocks

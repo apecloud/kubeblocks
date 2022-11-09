@@ -1,0 +1,22 @@
+name: ISSUE-VALID-PULL-REQUEST
+
+on:
+  pull_request_target:
+    types: [ edited, opened ]
+
+env:
+  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+jobs:
+  issue-link:
+    name: Check Issue Link
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: check issue link
+        run: |
+          bash ${{ github.workspace }}/.github/utils/issue-link.sh \
+            ${{ github.repository }} \
+            ${{ github.repository_owner }} \
+            ${{ github.event.pull_request.number }} \
+            ${{ github.event.pull_request.title }}

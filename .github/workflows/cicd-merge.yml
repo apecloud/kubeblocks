@@ -9,7 +9,7 @@ on:
 jobs:
   make-test:
     if: github.event.pull_request.merged == true
-    runs-on: [ self-hosted, aws-eks-k8s-runner ]
+    runs-on: [ self-hosted, eks-fargate-runner ]
     steps:
       - uses: actions/checkout@v3
       - name: make test

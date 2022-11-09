@@ -23,18 +23,16 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/docker/docker/pkg/ioutils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v3/pkg/action"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/kubernetes/scheme"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cloudprovider"
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/dbaas"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/playground/engine"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/cluster"
@@ -47,7 +45,6 @@ type initOptions struct {
 	helmCfg *action.Configuration
 
 	Engine   string
-	Version  string
 	Replicas int
 	Verbose  bool
 
@@ -97,7 +94,6 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.AccessKey, "access-key", "", "Cloud provider access key")
 	cmd.Flags().StringVar(&o.AccessSecret, "access-secret", "", "Cloud provider access secret")
 	cmd.Flags().StringVar(&o.Region, "region", "", "Cloud provider region")
-	cmd.Flags().StringVar(&o.Version, "version", DefaultVersion, "Database engine version")
 	cmd.Flags().IntVar(&o.Replicas, "replicas", defaultReplicas, "Database cluster replicas")
 	cmd.Flags().BoolVar(&o.Verbose, "verbose", false, "Output more log info")
 	return cmd
@@ -136,6 +132,10 @@ func (o *initOptions) validate() error {
 }
 
 func (o *initOptions) run() error {
+	if err := initPlaygroundDir(); err != nil {
+		return err
+	}
+
 	if o.CloudProvider != cloudprovider.Local {
 		return o.remote()
 	}
@@ -153,7 +153,7 @@ func (o *initOptions) local() error {
 	installer.verboseLog(o.Verbose)
 
 	// Set up K3s as dbaas control plane cluster
-	spinner := util.Spinner(o.Out, "Create playground k3d cluster: %s ...", clusterName)
+	spinner := util.Spinner(o.Out, "Create playground k3d cluster: %s", clusterName)
 	defer spinner(false)
 	if err = installer.install(); err != nil {
 		return errors.Wrap(err, "Fail to set up k3d cluster")
@@ -162,7 +162,7 @@ func (o *initOptions) local() error {
 
 	// Deal with KUBECONFIG
 	configPath := util.ConfigPath(clusterName)
-	spinner = util.Spinner(o.Out, "Generate kubernetes config %s ...", configPath)
+	spinner = util.Spinner(o.Out, "Generate kubernetes config %s", configPath)
 	defer spinner(false)
 	if err = installer.genKubeconfig(); err != nil {
 		return errors.Wrap(err, "Fail to generate kubeconfig")
@@ -179,11 +179,13 @@ func (o *initOptions) local() error {
 	}
 
 	// Install KubeBlocks
+	fmt.Fprintf(o.Out, "Install KubeBlocks %s\n", version.DefaultKubeBlocksVersion)
 	if err = o.installKubeBlocks(); err != nil {
 		return errors.Wrap(err, "Failed to install KubeBlocks")
 	}
 
 	// Install database cluster
+	fmt.Fprintf(o.Out, "Install playground cluster %s\n", dbClusterName)
 	if err = o.installCluster(); err != nil {
 		return errors.Wrap(err, "Failed to install WeSQL")
 	}
@@ -228,8 +230,9 @@ func (o *destroyOptions) destroyPlayground() error {
 	}
 
 	installer.verboseLog(false)
-	spinner := util.Spinner(o.Out, "Destroy playground cluster ...")
+	spinner := util.Spinner(o.Out, "Destroy playground cluster")
 	defer spinner(false)
+
 	// remote playground, just destroy all cloud resources
 	cp, _ := cloudprovider.Get()
 	if cp.Name() != cloudprovider.Local {
@@ -251,6 +254,11 @@ func (o *destroyOptions) destroyPlayground() error {
 	// local playgroundG
 	if err := installer.uninstall(); err != nil {
 		return err
+	}
+
+	// remove playground directory
+	if dir, err := removePlaygroundDir(); err != nil {
+		fmt.Fprintf(o.ErrOut, "failed to remove playground temporary directory %s, you can remove it munally", dir)
 	}
 	spinner(true)
 	return nil
@@ -284,7 +292,7 @@ func printGuide(cloudProvider string, hostIP string, replicas int) error {
 		return err
 	}
 
-	f := newFactory()
+	f := util.NewFactory()
 	clientSet, err := f.KubernetesClientSet()
 	if err != nil {
 		return err
@@ -325,32 +333,52 @@ func printGuide(cloudProvider string, hostIP string, replicas int) error {
 }
 
 func (o *initOptions) installKubeBlocks() error {
-	chart := helm.KubeBlocksHelmChart(version.DefaultKubeBlocksVersion, dbClusterNamespace)
-	_, err := chart.Install(o.helmCfg)
+	installer := dbaas.Installer{
+		HelmCfg:   o.helmCfg,
+		Namespace: dbClusterNamespace,
+		Version:   version.DefaultKubeBlocksVersion,
+	}
+
+	_, err := installer.Install()
 	return err
 }
 
 func (o *initOptions) installCluster() error {
-	engine, err := engine.New(o.Engine, o.Version, o.Replicas, dbClusterName, dbClusterNamespace)
+	engine, err := engine.New(o.Engine)
 	if err != nil {
 		return err
 	}
 
-	_, err = engine.HelmInstallOpts().Install(o.helmCfg)
-	return err
+	return engine.Install(o.Replicas, dbClusterName, dbClusterNamespace)
 }
 
-var addToScheme sync.Once
+func initPlaygroundDir() error {
+	playgroundDir, err := util.PlaygroundDir()
+	if err != nil {
+		return err
+	}
 
-func newFactory() cmdutil.Factory {
-	getter := genericclioptions.NewConfigFlags(true)
+	if _, err := os.Stat(playgroundDir); err != nil && os.IsNotExist(err) {
+		err := os.MkdirAll(playgroundDir, 0750)
+		return err
+	}
 
-	// Add CRDs to the scheme. They are missing by default.
-	addToScheme.Do(func() {
-		if err := apiextv1.AddToScheme(scheme.Scheme); err != nil {
-			// This should never happen.
-			panic(err)
-		}
-	})
-	return cmdutil.NewFactory(getter)
+	return nil
+}
+
+func removePlaygroundDir() (string, error) {
+	playgroundDir, err := util.PlaygroundDir()
+	if err != nil {
+		return playgroundDir, err
+	}
+
+	if _, err := os.Stat(playgroundDir); err != nil && os.IsNotExist(err) {
+		return playgroundDir, nil
+	}
+
+	if err := os.RemoveAll(playgroundDir); err != nil {
+		return playgroundDir, err
+	}
+
+	return playgroundDir, nil
 }

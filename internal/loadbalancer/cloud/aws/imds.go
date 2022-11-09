@@ -59,7 +59,7 @@ func (i *imdsService) getLocalIPv4(ctx context.Context) (string, error) {
 	return i.GetMetadataWithContext(ctx, "local-ipv4")
 }
 
-func (i *imdsService) getInstanceId(ctx context.Context) (string, error) {
+func (i *imdsService) getInstanceID(ctx context.Context) (string, error) {
 	return i.GetMetadataWithContext(ctx, "instance-id")
 }
 
@@ -76,7 +76,7 @@ func (i *imdsService) getInterfaceIdByMAC(ctx context.Context, mac string) (stri
 	return i.GetMetadataWithContext(ctx, key)
 }
 
-func (i *imdsService) getSubnetId(ctx context.Context, mac string) (string, error) {
+func (i *imdsService) getSubnetID(ctx context.Context, mac string) (string, error) {
 	key := fmt.Sprintf("network/interfaces/macs/%s/subnet-id", mac)
 	return i.GetMetadataWithContext(ctx, key)
 }

@@ -181,7 +181,12 @@ var _ = Describe("Eni", func() {
 		mockNodeClient.EXPECT().DescribeAllENIs(gomock.Any(), gomock.Any()).Return(getDescribeAllENIResponse(), nil).AnyTimes()
 		mockNodeClient.EXPECT().SetupNetworkForENI(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 		mockNodeClient.EXPECT().DescribeNodeInfo(gomock.Any(), gomock.Any()).Return(getDescribeNodeInfoResponse(), nil)
-		manager, err := newENIManager(logger, nodeIP, mockNodeClient, mockProvider)
+		info := &pb.InstanceInfo{
+			InstanceId:       instanceId,
+			SubnetId:         subnet1Id,
+			SecurityGroupIds: []string{securityGroupId},
+		}
+		manager, err := newENIManager(logger, nodeIP, info, mockNodeClient, mockProvider)
 		Expect(err).Should(BeNil())
 		return manager, mockProvider, mockNodeClient
 	}
@@ -204,9 +209,9 @@ var _ = Describe("Eni", func() {
 			mockNodeClient.EXPECT().DescribeAllENIs(gomock.Any(), gomock.Any()).Return(getDescribeAllENIResponse(), nil)
 			manager.minPrivateIP = math.MaxInt
 
-			eni := cloud.ENIMetadata{ENIId: eniId5}
-			mockProvider.EXPECT().CreateENI(gomock.Any(), gomock.Any(), gomock.Any()).Return(eni.ENIId, nil)
-			mockProvider.EXPECT().AttachENI(gomock.Any(), gomock.Any()).Return(eni.ENIId, nil)
+			eni := cloud.ENIMetadata{ID: eniId5}
+			mockProvider.EXPECT().CreateENI(gomock.Any(), gomock.Any(), gomock.Any()).Return(eni.ID, nil)
+			mockProvider.EXPECT().AttachENI(gomock.Any(), gomock.Any()).Return(eni.ID, nil)
 			mockNodeClient.EXPECT().WaitForENIAttached(gomock.Any(), gomock.Any()).Return(nil, nil)
 			mockNodeClient.EXPECT().SetupNetworkForENI(gomock.Any(), &eni).Return(nil, nil)
 			Expect(manager.ensureENI()).Should(Succeed())
@@ -235,7 +240,7 @@ var _ = Describe("Eni", func() {
 			manager, mockProvider, _ := setup()
 			enis := []*cloud.ENIMetadata{
 				{
-					ENIId:        eniId1,
+					ID:           eniId1,
 					DeviceNumber: 0,
 				},
 			}

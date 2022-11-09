@@ -20,30 +20,27 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/get"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
 )
 
-// Command used to construct a list command
-type Command struct {
-	Factory   cmdutil.Factory
-	GroupKind schema.GroupKind
-	Streams   genericclioptions.IOStreams
-	Short     string
-}
-
 // Build return a list command
-func (c *Command) Build() *cobra.Command {
-	o := get.NewOptions(c.Streams, []string{c.GroupKind.String()})
+func Build(c *builder.Command) *cobra.Command {
+	o := get.NewOptions(c.IOStreams, []string{c.GroupKind.String()})
+
+	use := c.Use
+	if len(use) == 0 {
+		use = "list"
+	}
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: c.Short,
+		Use:     use,
+		Short:   c.Short,
+		Example: c.Example,
 		Run: func(cmd *cobra.Command, args []string) {
-			c.complete(o, cmd)
+			complete(o, cmd)
 			cmdutil.CheckErr(o.Complete(c.Factory))
 			cmdutil.CheckErr(o.Run(c.Factory))
 		},
@@ -58,7 +55,7 @@ func (c *Command) Build() *cobra.Command {
 	return cmd
 }
 
-func (c *Command) complete(o *get.Options, cmd *cobra.Command) {
+func complete(o *get.Options, cmd *cobra.Command) {
 	o.NoHeaders = cmdutil.GetFlagBool(cmd, "no-headers")
 	outputOption := cmd.Flags().Lookup("output").Value.String()
 	if strings.Contains(outputOption, "custom-columns") || outputOption == "yaml" || strings.Contains(outputOption, "json") {

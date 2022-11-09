@@ -1,4 +1,4 @@
-name: RELEASE-PUBILSH
+name: RELEASE-PUBLISH
 
 on:
   release:
@@ -8,7 +8,7 @@ on:
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   TAG_NAME: ${{ github.ref_name }}
-  GO_VERSION: '1.18'
+  GO_VERSION: '1.19'
 
 
 jobs:
@@ -59,7 +59,7 @@ jobs:
         run: |
           mkdir -p ${{ matrix.os }}
           
-          DBCTL_OS_ARCH=`bash ${{ github.workspace }}/.github/workflows/utils.sh ${{ matrix.os }}`
+          DBCTL_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ matrix.os }}`
           
           make bin/dbctl.$DBCTL_OS_ARCH
           

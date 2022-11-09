@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ------- copy from stateful_set_utils_test.go ----
 func TestGetParentNameAndOrdinal(t *testing.T) {
 	set := newStatefulSet("foo", 3)
 	pod := newStatefulSetPod(set, 1)
@@ -55,8 +54,6 @@ func TestIsMemberOf(t *testing.T) {
 		t.Error("isMemberOf returned false positive")
 	}
 }
-
-// ------- end copy from stateful_set_utils_test.go ----
 
 func TestGetPodRevision(t *testing.T) {
 	set := newStatefulSet("foo", 3)

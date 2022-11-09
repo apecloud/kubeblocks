@@ -32,7 +32,30 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+type roleEventValue struct {
+	PodName  string
+	EventSeq string
+	Role     string
+}
+
 var _ = Describe("Event Controller", func() {
+	BeforeEach(func() {
+		// Add any steup steps that needs to be executed before each test
+		err := k8sClient.DeleteAllOf(ctx, &corev1.Event{},
+			client.InNamespace(testCtx.DefaultNamespace),
+			client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+
+		err = k8sClient.DeleteAllOf(ctx, &corev1.Pod{},
+			client.InNamespace(testCtx.DefaultNamespace),
+			client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		// Add any teardown steps that needs to be executed after each test
+	})
+
 	var ctx = context.Background()
 	// eventChan := make(chan *corev1.Event)
 	// rec := reconcile.Func(func(_ context.Context, req reconcile.Request) (reconcile.Result, error) {
@@ -70,23 +93,6 @@ var _ = Describe("Event Controller", func() {
 			// event := <-eventChan
 			// Expect(event.InvolvedObject.Name).Should(Equal(sndEvent.InvolvedObject.Name))
 		})
-	})
-
-	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
-		err := k8sClient.DeleteAllOf(ctx, &corev1.Event{},
-			client.InNamespace(testCtx.DefaultNamespace),
-			client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-
-		err = k8sClient.DeleteAllOf(ctx, &corev1.Pod{},
-			client.InNamespace(testCtx.DefaultNamespace),
-			client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
 	})
 })
 
@@ -133,10 +139,4 @@ type: Normal
 	}
 
 	return event.(*corev1.Event), nil
-}
-
-type roleEventValue struct {
-	PodName  string
-	EventSeq string
-	Role     string
 }

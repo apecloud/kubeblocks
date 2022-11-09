@@ -65,11 +65,6 @@ type ClusterReconciler struct {
 	Recorder record.EventRecorder
 }
 
-type probeMessage struct {
-	ErrorCode string           `json:"errorCode,omitempty"`
-	Data      probeMessageData `json:"message,omitempty"`
-}
-
 type probeMessageData struct {
 	Event        string `json:"event,omitempty"`
 	OriginalRole string `json:"originalRole,omitempty"`

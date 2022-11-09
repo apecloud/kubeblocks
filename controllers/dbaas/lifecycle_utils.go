@@ -939,7 +939,7 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 		}
 	}
 
-	probeContainers, err := buildProbeContainers(reqCtx, params, &sts)
+	probeContainers, err := buildProbeContainers(reqCtx, params, sts.Spec.Template.Spec.Containers)
 	if err != nil {
 		return nil, err
 	}
@@ -975,11 +975,12 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 	return &sts, nil
 }
 
-func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams, sts *appsv1.StatefulSet) ([]corev1.Container, error) {
+func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams,
+	containers []corev1.Container) ([]corev1.Container, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
-	cueTpl, err := params.getCacheCUETplValue("statefulset_template.cue", func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("statefulset_template.cue"))
+	cueTpl, err := params.getCacheCUETplValue("probe_template.cue", func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("probe_template.cue"))
 	})
 	if err != nil {
 		return nil, err
@@ -998,17 +999,13 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams, st
 	}
 
 	probeServiceHttpPort := viper.GetInt32("PROBE_SERVICE_PORT")
-	probeServiceHttpPort, err = getAvailableContainerPort(sts.Spec.Template.Spec.Containers, probeServiceHttpPort)
+	availablePorts, err := getAvailableContainerPort(containers, []int32{probeServiceHttpPort, 50001})
+	probeServiceHttpPort = availablePorts[0]
+	probeServiceGrpcPort := availablePorts[1]
 	if err != nil {
 		reqCtx.Log.Info("get probe container port failed", "error", err)
 		return nil, err
 	}
-	probeServiceGrpcPort, err := getAvailableContainerPort(sts.Spec.Template.Spec.Containers, 50001)
-	if err != nil {
-		reqCtx.Log.Info("get probe grpc container port failed", "error", err)
-		return nil, err
-	}
-
 	// TODO: support status and running probes
 	// if componentProbes.StatusProbe.Enable {
 	//	container := corev1.Container{}

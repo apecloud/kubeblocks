@@ -17,13 +17,18 @@ limitations under the License.
 package k8score
 
 import (
+	"bytes"
 	"context"
+	"text/template"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -48,7 +53,7 @@ var _ = Describe("Event Controller", func() {
 			// Expect(err).NotTo(HaveOccurred())
 
 			By("send role changed event")
-			sndEvent, err := CreateRoleChangedEvent("hello", "leader")
+			sndEvent, err := createRoleChangedEvent("hello", "leader")
 			Expect(err).Should(Succeed())
 			Expect(testCtx.CreateObj(ctx, sndEvent)).Should(Succeed())
 			Eventually(func() string {
@@ -84,3 +89,54 @@ var _ = Describe("Event Controller", func() {
 		// Add any teardown steps that needs to be executed after each test
 	})
 })
+
+func createRoleChangedEvent(podName, role string) (*corev1.Event, error) {
+	eventTmpl := `
+apiVersion: v1
+kind: Event
+metadata:
+  name: {{ .PodName }}.{{ .EventSeq }}
+  namespace: default
+involvedObject:
+  apiVersion: v1
+  fieldPath: spec.containers{kbprobe-rolechangedcheck}
+  kind: Pod
+  name: {{ .PodName }}
+  namespace: default
+message: "{\"data\":{\"role\":\"{{ .Role }}\"}}"
+reason: RoleChanged
+type: Normal
+`
+
+	seq, err := password.Generate(16, 6, 10, true, true)
+	if err != nil {
+		return nil, err
+	}
+	roleValue := roleEventValue{
+		PodName:  podName,
+		EventSeq: seq,
+		Role:     role,
+	}
+	tmpl, err := template.New("event-tmpl").Parse(eventTmpl)
+	if err != nil {
+		return nil, err
+	}
+	buf := new(bytes.Buffer)
+	err = tmpl.Execute(buf, roleValue)
+	if err != nil {
+		return nil, err
+	}
+
+	event, _, err := scheme.Codecs.UniversalDeserializer().Decode(buf.Bytes(), nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return event.(*corev1.Event), nil
+}
+
+type roleEventValue struct {
+	PodName  string
+	EventSeq string
+	Role     string
+}

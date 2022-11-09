@@ -33,7 +33,7 @@ config: {
 			"app.kubernetes.io/configtemplate-name": "\(meta.component.templateName)"
 			// configmap selector for ConfigureController
 			"app.kubernetes.io/ins-configure": "true"
-			"app.kubernetes.io/managed-by": "kubeblocks"
+			"app.kubernetes.io/managed-by":    "kubeblocks"
 		}
 		annotations: {
 			// enable configmap upgrade

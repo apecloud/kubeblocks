@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package component
 
 import (
 	"fmt"
@@ -48,10 +48,10 @@ func TestIsMemberOf(t *testing.T) {
 	set2 := newStatefulSet("bar", 3)
 	set2.Name = "foo2"
 	pod := newStatefulSetPod(set, 1)
-	if !isMemberOf(set, pod) {
+	if !IsMemberOf(set, pod) {
 		t.Error("isMemberOf returned false negative")
 	}
-	if isMemberOf(set2, pod) {
+	if IsMemberOf(set2, pod) {
 		t.Error("isMemberOf returned false positive")
 	}
 }
@@ -61,14 +61,14 @@ func TestIsMemberOf(t *testing.T) {
 func TestGetPodRevision(t *testing.T) {
 	set := newStatefulSet("foo", 3)
 	pod := newStatefulSetPod(set, 1)
-	if getPodRevision(pod) != "" {
+	if GetPodRevision(pod) != "" {
 		t.Errorf("revision should be empty")
 	}
 
 	pod.Labels = make(map[string]string, 0)
 	pod.Labels[apps.StatefulSetRevisionLabel] = "bar"
 
-	if getPodRevision(pod) != "bar" {
+	if GetPodRevision(pod) != "bar" {
 		t.Errorf("revision not matched")
 	}
 }

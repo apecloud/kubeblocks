@@ -42,14 +42,7 @@ import (
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
-)
-
-const (
-	helmUser   = "yimeisun"
-	helmPasswd = "8V+PmX1oSDv4pumDvZp6m7LS8iPgbY3A"
-	helmURL    = "yimeisun.azurecr.io"
 )
 
 type InstallOpts struct {
@@ -186,10 +179,6 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 	}
 
 	settings := cli.New()
-	err := i.tryLogin(cfg)
-	if err != nil {
-		return "", err
-	}
 
 	// TODO: Does not work now
 	// If a release does not exist, install it.
@@ -273,11 +262,6 @@ func (i *InstallOpts) UnInstall(cfg *action.Configuration) error {
 }
 
 func (i *InstallOpts) tryUnInstall(cfg *action.Configuration) error {
-	err := i.tryLogin(cfg)
-	if err != nil {
-		return err
-	}
-
 	client := action.NewUninstall(cfg)
 	client.Wait = i.Wait
 	client.Timeout = time.Second * 300
@@ -297,20 +281,11 @@ func (i *InstallOpts) tryUnInstall(cfg *action.Configuration) error {
 		cancel()
 	}()
 
-	_, err = client.Run(i.Name)
+	_, err := client.Run(i.Name)
 	if err != nil {
 		return err
 	}
 	return nil
-}
-
-func (i *InstallOpts) tryLogin(cfg *action.Configuration) error {
-	if !i.Login {
-		return nil
-	}
-
-	return cfg.RegistryClient.Login(helmURL, registry.LoginOptBasicAuth(helmUser, helmPasswd),
-		registry.LoginOptInsecure(false))
 }
 
 func NewActionConfig(ns string, config string) (*action.Configuration, error) {
@@ -349,21 +324,5 @@ func FakeActionConfig() *action.Configuration {
 		RegistryClient: registryClient,
 		Log: func(format string, v ...interface{}) {
 		},
-	}
-}
-
-func KubeBlocksHelmChart(version string, ns string) *InstallOpts {
-	return &InstallOpts{
-		Name:      types.KubeBlocksChartName,
-		Chart:     types.KubeBlocksChart,
-		Wait:      true,
-		Version:   version,
-		Namespace: ns,
-		Sets: []string{
-			"image.tag=latest",
-			"image.pullPolicy=Always",
-		},
-		Login:    true,
-		TryTimes: 2,
 	}
 }

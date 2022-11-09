@@ -21,6 +21,7 @@ limitations under the License.
 package mock_agent
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -94,4 +95,18 @@ func (m *MockNodeManager) GetNodes() ([]agent.Node, error) {
 func (mr *MockNodeManagerMockRecorder) GetNodes() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodes", reflect.TypeOf((*MockNodeManager)(nil).GetNodes))
+}
+
+// Start mocks base method.
+func (m *MockNodeManager) Start(arg0 context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Start", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Start indicates an expected call of Start.
+func (mr *MockNodeManagerMockRecorder) Start(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockNodeManager)(nil).Start), arg0)
 }

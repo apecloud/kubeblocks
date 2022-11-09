@@ -35,6 +35,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/list"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
 )
 
 var _ = Describe("Get", func() {
@@ -43,13 +44,11 @@ var _ = Describe("Get", func() {
 	buf := new(bytes.Buffer)
 
 	buildTestCmd := func(f cmdutil.Factory, streams genericclioptions.IOStreams, groupKind schema.GroupKind) *cobra.Command {
-		cmd := list.Command{
-			Factory:   f,
-			Streams:   streams,
-			Short:     "Test list.",
-			GroupKind: groupKind,
-		}
-		return cmd.Build()
+		return builder.NewCmdBuilder().
+			Factory(f).
+			IOStreams(streams).
+			Short("Test list.").
+			GroupKind(groupKind).Build(list.Build)
 	}
 
 	mockClient := func(data runtime.Object) *cmdtesting.TestFactory {

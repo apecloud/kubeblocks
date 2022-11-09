@@ -27,7 +27,7 @@ import (
 var _ = Describe("installer", func() {
 	It("install", func() {
 		i := Installer{
-			cfg:       helm.FakeActionConfig(),
+			HelmCfg:   helm.FakeActionConfig(),
 			Namespace: "default",
 			Version:   version.DefaultKubeBlocksVersion,
 		}
@@ -37,7 +37,7 @@ var _ = Describe("installer", func() {
 
 	It("uninstall", func() {
 		i := Installer{
-			cfg:       helm.FakeActionConfig(),
+			HelmCfg:   helm.FakeActionConfig(),
 			Namespace: "default",
 		}
 		Expect(i.Uninstall()).To(HaveOccurred())

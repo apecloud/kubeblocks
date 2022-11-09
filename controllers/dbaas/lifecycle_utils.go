@@ -20,15 +20,12 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 
@@ -39,6 +36,7 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -156,11 +154,11 @@ func getAppVersionComponentByType(components []dbaasv1alpha1.AppVersionComponent
 	return nil
 }
 
-func getClusterComponentsByType(components []dbaasv1alpha1.ClusterComponent, typeName string) []*dbaasv1alpha1.ClusterComponent {
-	comps := []*dbaasv1alpha1.ClusterComponent{}
+func getClusterComponentsByType(components []dbaasv1alpha1.ClusterComponent, typeName string) []dbaasv1alpha1.ClusterComponent {
+	comps := []dbaasv1alpha1.ClusterComponent{}
 	for _, component := range components {
 		if component.Type == typeName {
-			comps = append(comps, &component)
+			comps = append(comps, component)
 		}
 	}
 	return comps
@@ -195,8 +193,8 @@ func toK8sVolumeClaimTemplates(templates []dbaasv1alpha1.ClusterComponentVolumeC
 func buildAffinityLabelSelector(clusterName string, componentName string) *metav1.LabelSelector {
 	return &metav1.LabelSelector{
 		MatchLabels: map[string]string{
-			appInstanceLabelKey:  clusterName,
-			appComponentLabelKey: componentName,
+			intctrlutil.AppInstanceLabelKey:  clusterName,
+			intctrlutil.AppComponentLabelKey: componentName,
 		},
 	}
 }
@@ -514,7 +512,7 @@ func buildClusterCreationTasks(
 		} else {
 			clusterComps := getClusterComponentsByType(cluster.Spec.Components, componentName)
 			for _, clusterComp := range clusterComps {
-				buildTask(mergeComponents(cluster, clusterDefinition, &component, appVersionComponent, clusterComp))
+				buildTask(mergeComponents(cluster, clusterDefinition, &component, appVersionComponent, &clusterComp))
 			}
 		}
 	}
@@ -637,7 +635,7 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 func addSelectorLabels(service *corev1.Service, component *Component, accessMode dbaasv1alpha1.AccessMode) {
 	addSelector := func(service *corev1.Service, member dbaasv1alpha1.ConsensusMember, accessMode dbaasv1alpha1.AccessMode) {
 		if member.AccessMode == accessMode && len(member.Name) > 0 {
-			service.Spec.Selector[consensusSetRoleLabelKey] = member.Name
+			service.Spec.Selector[intctrlutil.ConsensusSetRoleLabelKey] = member.Name
 		}
 	}
 
@@ -734,17 +732,15 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				template.ObjectMeta.Annotations[k] = v
 			}
 			stsObj.Spec.Template = template
+			tempAnnotations := stsObj.Spec.Template.Annotations
+			stsObj.Spec.Template = stsProto.Spec.Template
+			// keep the original template annotations.
+			// if annotations exist and are replaced, the statefulSet will be updated
+			stsObj.Spec.Template.Annotations = tempAnnotations
 			stsObj.Spec.Replicas = stsProto.Spec.Replicas
 			stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
 			if err := cli.Update(ctx, stsObj); err != nil {
 				return err
-			}
-			// handle ConsensusSet Update
-			if stsObj.Status.CurrentRevision != stsObj.Status.UpdateRevision && *stsObj.Spec.Replicas == *stsProto.Spec.Replicas {
-				_, err := handleConsensusSetUpdate(ctx, cli, cluster, stsObj)
-				if err != nil {
-					return err
-				}
 			}
 			// check stsObj.Spec.VolumeClaimTemplates storage
 			// request size and find attached PVC and patch request
@@ -818,235 +814,6 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	return nil
 }
 
-func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, stsObj *appsv1.StatefulSet) (bool, error) {
-	// get typeName from stsObj.name
-	typeName := getComponentTypeName(*cluster, stsObj.Labels[appComponentLabelKey])
-
-	// get component from ClusterDefinition by typeName
-	component, err := getComponent(ctx, cli, cluster, typeName)
-	if err != nil {
-		return false, err
-	}
-
-	if component.ComponentType != dbaasv1alpha1.Consensus {
-		return true, nil
-	}
-
-	// get podList owned by stsObj
-	podList := &corev1.PodList{}
-	selector, err := labels.Parse(appComponentLabelKey + "=" + stsObj.Labels[appComponentLabelKey])
-	if err != nil {
-		return false, err
-	}
-	if err := cli.List(ctx, podList,
-		&client.ListOptions{Namespace: stsObj.Namespace},
-		client.MatchingLabelsSelector{Selector: selector}); err != nil {
-		return false, err
-	}
-	pods := make([]corev1.Pod, 0)
-	for _, pod := range podList.Items {
-		if isMemberOf(stsObj, &pod) {
-			pods = append(pods, pod)
-		}
-	}
-
-	// get pod label and name, compute plan
-	plan := generateConsensusUpdatePlan(ctx, cli, stsObj, pods, component)
-	// execute plan
-	return plan.walkOneStep()
-}
-
-// generateConsensusUpdatePlan generates Update plan based on UpdateStrategy
-func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod, component dbaasv1alpha1.ClusterDefinitionComponent) *Plan {
-	plan := &Plan{}
-	plan.Start = &Step{}
-	plan.WalkFunc = func(obj interface{}) (bool, error) {
-		pod, ok := obj.(corev1.Pod)
-		if !ok {
-			return false, errors.New("wrong type: obj not Pod")
-		}
-		// if pod is the latest version, we do nothing
-		if getPodRevision(&pod) == stsObj.Status.UpdateRevision {
-			return false, nil
-		}
-		// if DeletionTimestamp is not nil, it is terminating.
-		if pod.DeletionTimestamp != nil {
-			return true, nil
-		}
-		// delete the pod to trigger associate StatefulSet to re-create it
-		//if err := cli.Delete(ctx, &pod); err != nil {
-		//	return false, err
-		//}
-
-		return true, nil
-	}
-
-	// list all roles
-	if component.ConsensusSpec == nil {
-		component.ConsensusSpec = &dbaasv1alpha1.ConsensusSetSpec{Leader: dbaasv1alpha1.DefaultLeader}
-	}
-	leader := component.ConsensusSpec.Leader.Name
-	learner := ""
-	if component.ConsensusSpec.Learner != nil {
-		learner = component.ConsensusSpec.Learner.Name
-	}
-	// now all are followers
-	noneFollowers := make(map[string]string)
-	readonlyFollowers := make(map[string]string)
-	readWriteFollowers := make(map[string]string)
-	// a follower name set
-	followers := make(map[string]string)
-	exist := "EXIST"
-	for _, follower := range component.ConsensusSpec.Followers {
-		followers[follower.Name] = exist
-		switch follower.AccessMode {
-		case dbaasv1alpha1.None:
-			noneFollowers[follower.Name] = exist
-		case dbaasv1alpha1.Readonly:
-			readonlyFollowers[follower.Name] = exist
-		case dbaasv1alpha1.ReadWrite:
-			readWriteFollowers[follower.Name] = exist
-		}
-	}
-
-	// make a Serial pod list, e.g.: learner -> follower1 -> follower2 -> leader
-	sort.SliceStable(pods, func(i, j int) bool {
-		roleI := pods[i].Labels[consensusSetRoleLabelKey]
-		roleJ := pods[j].Labels[consensusSetRoleLabelKey]
-		if roleI == learner {
-			return true
-		}
-		if roleJ == learner {
-			return false
-		}
-		if roleI == leader {
-			return false
-		}
-		if roleJ == leader {
-			return true
-		}
-		if noneFollowers[roleI] == exist {
-			return true
-		}
-		if noneFollowers[roleJ] == exist {
-			return false
-		}
-		if readonlyFollowers[roleI] == exist {
-			return true
-		}
-		if readonlyFollowers[roleJ] == exist {
-			return false
-		}
-		if readWriteFollowers[roleI] == exist {
-			return true
-		}
-
-		return false
-	})
-
-	// generate plan by UpdateStrategy
-	switch component.ConsensusSpec.UpdateStrategy {
-	case dbaasv1alpha1.Serial:
-		// learner -> followers(none->readonly->readwrite) -> leader
-		start := plan.Start
-		for _, pod := range pods {
-			nextStep := &Step{}
-			nextStep.Obj = pod
-			start.NextSteps = append(start.NextSteps, nextStep)
-			start = nextStep
-		}
-	case dbaasv1alpha1.Parallel:
-		// leader & followers & learner
-		start := plan.Start
-		for _, pod := range pods {
-			nextStep := &Step{}
-			nextStep.Obj = pod
-			start.NextSteps = append(start.NextSteps, nextStep)
-		}
-	case dbaasv1alpha1.BestEffortParallel:
-		// learner & 1/2 followers -> 1/2 followers -> leader
-		start := plan.Start
-		// append learner
-		index := 0
-		for _, pod := range pods {
-			if pod.Labels[consensusSetRoleLabelKey] != learner {
-				break
-			}
-			nextStep := &Step{}
-			nextStep.Obj = pod
-			start.NextSteps = append(start.NextSteps, nextStep)
-			index++
-		}
-		if len(start.NextSteps) > 0 {
-			start = start.NextSteps[0]
-		}
-		// append 1/2 followers
-		podList := pods[index:]
-		followerCount := 0
-		for _, pod := range podList {
-			if followers[pod.Labels[consensusSetRoleLabelKey]] == exist {
-				followerCount++
-			}
-		}
-		end := followerCount / 2
-		for i := 0; i < end; i++ {
-			nextStep := &Step{}
-			nextStep.Obj = podList[i]
-			start.NextSteps = append(start.NextSteps, nextStep)
-		}
-
-		if len(start.NextSteps) > 0 {
-			start = start.NextSteps[0]
-		}
-		// append the other 1/2 followers
-		podList = podList[end:]
-		end = followerCount - end
-		for i := 0; i < end; i++ {
-			nextStep := &Step{}
-			nextStep.Obj = podList[i]
-			start.NextSteps = append(start.NextSteps, nextStep)
-		}
-
-		if len(start.NextSteps) > 0 {
-			start = start.NextSteps[0]
-		}
-		// append leader
-		podList = podList[end:]
-		for _, pod := range podList {
-			nextStep := &Step{}
-			nextStep.Obj = pod
-			start.NextSteps = append(start.NextSteps, nextStep)
-		}
-	}
-
-	return plan
-}
-
-func getComponent(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, typeName string) (dbaasv1alpha1.ClusterDefinitionComponent, error) {
-	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
-	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
-		return dbaasv1alpha1.ClusterDefinitionComponent{}, err
-	}
-
-	for _, component := range clusterDef.Spec.Components {
-		if component.TypeName == typeName {
-			return component, nil
-		}
-	}
-
-	return dbaasv1alpha1.ClusterDefinitionComponent{}, errors.New("componentDef not found: " + typeName)
-}
-
-func getComponentTypeName(cluster dbaasv1alpha1.Cluster, componentName string) string {
-	for _, component := range cluster.Spec.Components {
-		if componentName == component.Name {
-			return component.Type
-		}
-	}
-
-	return componentName
-}
-
 func buildHeadlessSvcs(params createParams, sts *appsv1.StatefulSet) ([]client.Object, error) {
 	stsPodLabels := sts.Spec.Template.Labels
 	replicas := *sts.Spec.Replicas
@@ -1056,10 +823,10 @@ func buildHeadlessSvcs(params createParams, sts *appsv1.StatefulSet) ([]client.O
 		pod.ObjectMeta.Name = fmt.Sprintf("%s-%d", sts.GetName(), i)
 		pod.ObjectMeta.Namespace = sts.Namespace
 		pod.ObjectMeta.Labels = map[string]string{
-			statefulSetPodNameLabelKey: pod.ObjectMeta.Name,
-			appNameLabelKey:            stsPodLabels[appNameLabelKey],
-			appInstanceLabelKey:        stsPodLabels[appInstanceLabelKey],
-			appComponentLabelKey:       stsPodLabels[appNameLabelKey],
+			statefulSetPodNameLabelKey:       pod.ObjectMeta.Name,
+			intctrlutil.AppNameLabelKey:      stsPodLabels[intctrlutil.AppNameLabelKey],
+			intctrlutil.AppInstanceLabelKey:  stsPodLabels[intctrlutil.AppInstanceLabelKey],
+			intctrlutil.AppComponentLabelKey: stsPodLabels[intctrlutil.AppNameLabelKey],
 		}
 		pod.Spec.Containers = sts.Spec.Template.Spec.Containers
 
@@ -1202,7 +969,22 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 		return nil, err
 	}
 
-	probeContainers, err := buildProbeContainers(reqCtx, params)
+	// update sts.spec.volumeClaimTemplates[].metadata.labels
+	if len(sts.Spec.VolumeClaimTemplates) > 0 && len(sts.GetLabels()) > 0 {
+		for _, vct := range sts.Spec.VolumeClaimTemplates {
+			if vct.Labels == nil {
+				vct.Labels = make(map[string]string)
+				continue
+			}
+			for k, v := range sts.Labels {
+				if _, ok := vct.Labels[k]; !ok {
+					vct.Labels[k] = v
+				}
+			}
+		}
+	}
+
+	probeContainers, err := buildProbeContainers(reqCtx, params, &sts)
 	if err != nil {
 		return nil, err
 	}
@@ -1228,7 +1010,7 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 	return &sts, nil
 }
 
-func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([]corev1.Container, error) {
+func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams, sts *appsv1.StatefulSet) ([]corev1.Container, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
 	cueTpl, err := params.getCacheCUETplValue("statefulset_template.cue", func() (*intctrlutil.CUETpl, error) {
@@ -1242,9 +1024,27 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 	if err != nil {
 		return nil, err
 	}
+
 	probeContainers := []corev1.Container{}
 	componentProbes := params.component.Probes
 	reqCtx.Log.Info("probe", "settings", componentProbes)
+	if componentProbes == nil {
+		return probeContainers, nil
+	}
+
+	probeServiceHttpPort := viper.GetInt32("PROBE_SERVICE_PORT")
+	probeServiceHttpPort, err = getAvailableContainerPort(sts.Spec.Template.Spec.Containers, probeServiceHttpPort)
+	if err != nil {
+		reqCtx.Log.Info("get probe container port failed", "error", err)
+		return nil, err
+	}
+	probeServiceGrpcPort, err := getAvailableContainerPort(sts.Spec.Template.Spec.Containers, 50001)
+	if err != nil {
+		reqCtx.Log.Info("get probe grpc container port failed", "error", err)
+		return nil, err
+	}
+
+	// TODO: support status and running probes
 	// if componentProbes.StatusProbe.Enable {
 	//	container := corev1.Container{}
 	//	if err = json.Unmarshal(probeContainerByte, &container); err != nil {
@@ -1253,7 +1053,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 
 	//	container.Name = "kbprobe-statuscheck"
 	//	probe := container.ReadinessProbe
-	//	probe.Exec.Command = []string{"sh", "-c", "curl -X POST -H 'Content-Type: application/json' http://localhost:3501/v1.0/bindings/mtest  -d  '{\"operation\": \"statusCheck\", \"metadata\": {\"sql\" : \"\"}}'"}
+	//	probe.Exec.Command = []string{"sh", "-c", "curl -X POST -H 'Content-Type: application/json' http://localhost:3501/v1.0/bindings/probe  -d  '{\"operation\": \"statusCheck\", \"metadata\": {\"sql\" : \"\"}}'"}
 	//	probe.PeriodSeconds = componentProbes.StatusProbe.PeriodSeconds
 	//	probe.SuccessThreshold = componentProbes.StatusProbe.SuccessThreshold
 	//	probe.FailureThreshold = componentProbes.StatusProbe.FailureThreshold
@@ -1267,7 +1067,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 	//	}
 	//	container.Name = "kbprobe-runningcheck"
 	//	probe := container.ReadinessProbe
-	//	probe.Exec.Command = []string{"sh", "-c", "curl -X POST -H 'Content-Type: application/json' http://localhost:3501/v1.0/bindings/mtest  -d  '{\"operation\": \"statusCheck\", \"metadata\": {\"sql\" : \"\"}}'"}
+	//	probe.Exec.Command = []string{"sh", "-c", "curl -X POST -H 'Content-Type: application/json' http://localhost:3501/v1.0/bindings/probe  -d  '{\"operation\": \"statusCheck\", \"metadata\": {\"sql\" : \"\"}}'"}
 	//	//probe.HTTPGet.Path = "/"
 	//	probe.PeriodSeconds = componentProbes.RunningProbe.PeriodSeconds
 	//	probe.SuccessThreshold = componentProbes.RunningProbe.SuccessThreshold
@@ -1275,34 +1075,36 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 	//	probeContainers = append(probeContainers, container)
 	// }
 
-	if componentProbes.RoleChangedProbe.Enable {
+	if componentProbes.RoleChangedProbe != nil {
 		container := corev1.Container{}
 		if err = json.Unmarshal(probeContainerByte, &container); err != nil {
 			return nil, err
 		}
 		container.Name = "kbprobe-rolechangedcheck"
 		probe := container.ReadinessProbe
-		// probe.HTTPGet.Path = "/"
-		// HACK: hardcoded - "http://localhost:3501/v1.0/bindings/mtest"
-		// TODO: http port should be checked to avoid conflicts instead of hardcoded 3051
-		probe.Exec.Command = []string{"curl", "-X", "POST", "-H", "Content-Type: application/json", "http://localhost:3501/v1.0/bindings/mtest", "-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
+		probe.Exec.Command = []string{"curl", "-X", "POST",
+			"--fail-with-body", "--silent",
+			"-H", "Content-Type: application/json",
+			"http://localhost:" + strconv.Itoa(int(probeServiceHttpPort)) + "/v1.0/bindings/probe",
+			"-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
 		probe.PeriodSeconds = componentProbes.RoleChangedProbe.PeriodSeconds
 		probe.SuccessThreshold = componentProbes.RoleChangedProbe.SuccessThreshold
 		probe.FailureThreshold = componentProbes.RoleChangedProbe.FailureThreshold
-		// probe.InitialDelaySeconds = 60
+		container.StartupProbe.TCPSocket.Port = intstr.FromInt(int(probeServiceHttpPort))
 		probeContainers = append(probeContainers, container)
 	}
 
 	if len(probeContainers) >= 1 {
 		container := &probeContainers[0]
-		container.Image = viper.GetString("AGAMOTTO_IMAGE")
-		container.ImagePullPolicy = corev1.PullPolicy(viper.GetString("AGAMOTTO_IMAGE_PULL_POLICY"))
-		// HACK: hardcoded port values
-		// TODO: ports should be checked to avoid conflicts instead of hardcoded values
+		container.Image = viper.GetString("KUBEBLOCKS_IMAGE")
+		container.ImagePullPolicy = corev1.PullPolicy(viper.GetString("KUBEBLOCKS_IMAGE_PULL_POLICY"))
+		logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
 		container.Command = []string{"probe", "--app-id", "batch-sdk",
-			"--dapr-http-port", "3501",
-			"--dapr-grpc-port", "54215",
-			"--app-protocol", "http", "--components-path", "/config/components"}
+			"--dapr-http-port", strconv.Itoa(int(probeServiceHttpPort)),
+			"--dapr-grpc-port", strconv.Itoa(int(probeServiceGrpcPort)),
+			"--app-protocol", "http",
+			"--log-level", logLevel,
+			"--components-path", "/config/components"}
 
 		// set pod name and namespace, for role label updating inside pod
 		podName := corev1.EnvVar{
@@ -1323,10 +1125,8 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams) ([
 		}
 		container.Env = append(container.Env, podName, podNamespace)
 
-		// HACK: hardcoded port values
-		// TODO: ports should be checked to avoid conflicts instead of hardcoded values
 		container.Ports = []corev1.ContainerPort{{
-			ContainerPort: 3501,
+			ContainerPort: probeServiceHttpPort,
 			Name:          "probe-port",
 			Protocol:      "TCP",
 		}}

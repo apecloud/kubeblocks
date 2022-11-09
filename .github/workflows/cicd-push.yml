@@ -11,7 +11,7 @@ on:
 
 jobs:
   make-test:
-    runs-on: [self-hosted, aws-eks-k8s-runner ]
+    runs-on: [self-hosted, eks-fargate-runner ]
     steps:
       - uses: actions/checkout@v3
       - name: make mod-vendor and lint

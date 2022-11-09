@@ -23,12 +23,12 @@ import (
 
 var _ = Describe("playground", func() {
 	It("new engine", func() {
-		engine, err := New("wesql", "8.0.30", 3, "test", "test")
+		engine, err := New("wesql")
 		Expect(engine).ShouldNot(BeNil())
-		Expect(engine.HelmInstallOpts()).ShouldNot(BeNil())
+		Expect(engine.Install(3, "test", "test")).ShouldNot(BeNil())
 		Expect(err).Should(BeNil())
 
-		engine, err = New("test", "", 0, "test", "test")
+		engine, err = New("test")
 		Expect(engine).Should(BeNil())
 		Expect(err).Should(HaveOccurred())
 	})

@@ -30,16 +30,18 @@ deployment: {
 			"app.kubernetes.io/instance": cluster.metadata.name
 			// "app.kubernetes.io/version" : # TODO
 			"app.kubernetes.io/component-name": "\(component.name)"
-			"app.kubernetes.io/created-by":     "controller-manager"
+			"app.kubernetes.io/managed-by":     "kubeblocks"
 		}
 	}
 	"spec": {
-		replicas: component.replicas
+		replicas:        component.replicas
+		minReadySeconds: 10
 		selector: {
 			matchLabels: {
 				"app.kubernetes.io/name":           "\(component.clusterType)-\(component.clusterDefName)"
 				"app.kubernetes.io/instance":       "\(cluster.metadata.name)"
 				"app.kubernetes.io/component-name": "\(component.name)"
+				"app.kubernetes.io/managed-by":     "kubeblocks"
 			}
 		}
 		template: {
@@ -48,6 +50,7 @@ deployment: {
 					"app.kubernetes.io/name":           "\(component.clusterType)-\(component.clusterDefName)"
 					"app.kubernetes.io/instance":       "\(cluster.metadata.name)"
 					"app.kubernetes.io/component-name": "\(component.name)"
+					"app.kubernetes.io/managed-by":     "kubeblocks"
 					// "app.kubernetes.io/version" : # TODO
 				}
 				if component.monitor.enable == true {

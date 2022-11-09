@@ -90,12 +90,6 @@ var _ = Describe("Cluster", func() {
 			Expect(o.Name).To(Equal("test"))
 
 			Expect(o.Run(inputs)).Should(Succeed())
-
-			del := &DeleteOptions{IOStreams: streams}
-			Expect(del.Validate([]string{})).To(MatchError("missing cluster name"))
-			Expect(del.Complete(tf, []string{"test"})).Should(Succeed())
-			Expect(del.Namespace).To(Equal("default"))
-			Expect(del.Run()).Should(Succeed())
 		})
 	})
 
@@ -104,11 +98,6 @@ var _ = Describe("Cluster", func() {
 		defer tf.Cleanup()
 		cmd := NewDeleteCmd(tf, streams)
 		Expect(cmd != nil).To(BeTrue())
-
-		del := &DeleteOptions{IOStreams: streams}
-		Expect(del.Validate([]string{})).To(MatchError("missing cluster name"))
-		Expect(del.Complete(tf, []string{"test"})).Should(Succeed())
-		Expect(del.Namespace).To(Equal("default"))
 	})
 
 	It("describe", func() {

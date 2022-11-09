@@ -14,23 +14,33 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package backup
+package builder
 
 import (
-	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"testing"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/list"
-	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
+	"github.com/spf13/cobra"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
-func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	return builder.NewCmdBuilder().
-		Short("List all database backup job.").
-		Factory(f).
-		GroupKind(schema.GroupKind{Group: "dataprotection.kubeblocks.io", Kind: "BackupJob"}).
-		IOStreams(streams).
-		Build(list.Build)
+func Test(t *testing.T) {
+	buildFn := func(cmd *Command) *cobra.Command {
+		return &cobra.Command{
+			Use: cmd.Use,
+		}
+	}
+
+	cmd := NewCmdBuilder().
+		IOStreams(genericclioptions.NewTestIOStreamsDiscard()).
+		Factory(nil).
+		Use("test").
+		Short("test command short description").
+		Example("test command example").
+		GroupKind(types.ClusterGK()).Build(buildFn)
+
+	if cmd == nil {
+		t.Errorf("cmd is nil")
+	}
 }

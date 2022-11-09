@@ -14,29 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package prompt
 
 import (
-	"fmt"
-	"log"
-	"os"
-
-	"github.com/spf13/cobra/doc"
-
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd"
+	"bytes"
+	"io"
+	"testing"
 )
 
-func main() {
-	rootPath := "./docs/cli"
-	if len(os.Args) > 1 {
-		rootPath = os.Args[1]
+func Test(t *testing.T) {
+	c := NewPrompt("Test prompt", "Please input something", &bytes.Buffer{})
+	res, _ := c.GetInput()
+	if res != "" {
+		t.Errorf("expected an empty result")
 	}
 
-	dbctl := cmd.NewDbctlCmd()
-	dbctl.DisableAutoGenTag = true
-	dbctl.Long = fmt.Sprintf("```\n%s\n```", dbctl.Long)
-	err := doc.GenMarkdownTree(dbctl, rootPath)
+	in := &bytes.Buffer{}
+	in.Write([]byte("t\n"))
+	c.in = io.NopCloser(in)
+	res, err := c.GetInput()
 	if err != nil {
-		log.Fatal(err)
+		t.Errorf("prompt error %v", err)
+	}
+	if res != "t" {
+		t.Errorf("prompt result is not expected")
 	}
 }

@@ -1,7 +1,7 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: redis-replication-definition
+  name: apecloud-redis-replication
 spec:
   type: state.redis-7
   components:
@@ -20,7 +20,7 @@ spec:
       podSpec:
         containers:
           - name: redis
-            image: redis:7.0.5-alpine
+            image: redis:7.0.5
             ports:
               - name: redis
                 containerPort: 6379

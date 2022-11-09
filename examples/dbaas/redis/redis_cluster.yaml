@@ -4,7 +4,7 @@ metadata:
   name: redis
   namespace: default
 spec:
-  clusterDefinitionRef: redis-replication-definition
+  clusterDefinitionRef: apecloud-redis-replication
   appVersionRef: redis-replication-7.0.5
   terminationPolicy: WipeOut
   components:

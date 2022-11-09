@@ -3,10 +3,10 @@ kind:       AppVersion
 metadata:
   name:     redis-replication-7.0.5
 spec:
-  clusterDefinitionRef: redis-replication-definition
+  clusterDefinitionRef: apecloud-redis-replication
   components:
   - type: replication
     podSpec:
       containers:
       - name: redis
-        image: registry.hub.docker.com/library/redis:7.0.5-alpine
+        image: registry.hub.docker.com/library/redis:7.0.5

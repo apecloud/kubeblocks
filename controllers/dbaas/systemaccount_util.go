@@ -1,0 +1,449 @@
+/*
+Copyright ApeCloud Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package dbaas
+
+import (
+	"fmt"
+	"strings"
+	"text/template"
+
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/sethvargo/go-password/password"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+)
+
+type secretDataConfig struct {
+	Username string
+	Password string
+}
+
+// SecretMapStore is a cache, recording all (key, secret) pair for accounts to be created.
+type secretMapStore struct {
+	cache.Store
+}
+
+// SecretMapEntry records (key, secret) pair for account to be created.
+type secretMapEntry struct {
+	key   string
+	value *corev1.Secret
+}
+
+// SystemAccountExpectation records accounts to be created.
+type systemAccountExpectation struct {
+	toCreate dbaasv1alpha1.KBAccountType
+	key      string
+}
+
+// SystemAccountExpectationsManager is a cache, recording a key-expectation pair for each cluster
+// In each expectation we records accounts to create, and to delete.
+// Requirements are collected from objects:
+// - ClusterDefintion: kbprob, kbreplicator
+// - Cluster: kbmonitoring
+// - BackupPolicy: kbdataprotecion
+// - Others: kbadmin
+type systemAccountExpectationsManager struct {
+	cache.Store
+}
+
+// SecretKeyFunc to parse out the key from a SecretMapEntry.
+var secretKeyFunc = func(obj interface{}) (string, error) {
+	if e, ok := obj.(*secretMapEntry); ok {
+		return e.key, nil
+	}
+	return "", fmt.Errorf("could not find key for obj %#v", obj)
+}
+
+// ExpKeyFunc to parse out the key from an expecationl.
+var expKeyFunc = func(obj interface{}) (string, error) {
+	if e, ok := obj.(*systemAccountExpectation); ok {
+		return e.key, nil
+	}
+	return "", fmt.Errorf("could not find key for obj %#v", obj)
+}
+
+func newSecretMapStore() *secretMapStore {
+	return &secretMapStore{cache.NewStore(secretKeyFunc)}
+}
+
+func (r *secretMapStore) addSecret(key string, value *corev1.Secret) error {
+	_, exists, err := r.getSecret(key)
+	if err != nil {
+		return err
+	}
+	entry := &secretMapEntry{key: key, value: value}
+	if exists {
+		return r.Update(entry)
+	}
+	return r.Add(entry)
+}
+
+func (r *secretMapStore) getSecret(key string) (*secretMapEntry, bool, error) {
+	exp, exists, err := r.GetByKey(key)
+	if err == nil && exists {
+		return exp.(*secretMapEntry), true, nil
+	}
+	return nil, false, err
+}
+
+func (r *secretMapStore) deleteSecret(key string) error {
+	if exp, exists, err := r.GetByKey(key); err == nil && exists {
+		err = r.Delete(exp)
+		return err
+	}
+	return nil
+}
+
+func (e *systemAccountExpectation) set(add dbaasv1alpha1.KBAccountType) {
+	e.toCreate |= add
+}
+
+func (e *systemAccountExpectation) getExpectation() dbaasv1alpha1.KBAccountType {
+	return e.toCreate
+}
+
+func newExpectationsManager() *systemAccountExpectationsManager {
+	return &systemAccountExpectationsManager{cache.NewStore(expKeyFunc)}
+}
+
+func (r *systemAccountExpectationsManager) createExpectation(key string) (*systemAccountExpectation, error) {
+	exp, exists, err := r.getExpectation(key)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return exp, nil
+	}
+
+	exp = &systemAccountExpectation{toCreate: 0, key: key}
+	err = r.Add(exp)
+	return exp, err
+}
+
+func (r *systemAccountExpectationsManager) getExpectation(cluster string) (*systemAccountExpectation, bool, error) {
+	exp, exists, err := r.GetByKey(cluster)
+	if err == nil && exists {
+		return exp.(*systemAccountExpectation), true, nil
+	}
+	return nil, false, err
+}
+
+func (r *systemAccountExpectationsManager) deleteExpectation(cluster string) error {
+	if exp, exists, err := r.GetByKey(cluster); err == nil && exists {
+		err = r.Delete(exp)
+		return err
+	}
+	return nil
+}
+
+type customizedEngine struct {
+	cluster       *dbaasv1alpha1.Cluster
+	componentName string
+	image         string
+	command       []string
+	args          []string
+	envVarList    []corev1.EnvVar
+}
+
+func (e *customizedEngine) getImage() string {
+	return e.image
+}
+
+func (e *customizedEngine) getEnvs() []corev1.EnvVar {
+	return e.envVarList
+}
+
+// getPodCommand shows how to execute the sql statement.
+// for instance, mysql -h - demo-cluster-replicasets-1 -e  "create user username IDENTIFIED by 'passwd';"
+func (e customizedEngine) getCommand() []string {
+	return e.command
+}
+
+// getPodCommand shows how to execute the sql statement.
+// for instance, mysql -h - demo-cluster-replicasets-1 -e  "create user username IDENTIFIED by 'passwd';"
+func (e *customizedEngine) getArgs() []string {
+	return e.args
+}
+
+func newCustomizedEngine(execConfig *dbaasv1alpha1.CmdExecutorConfig, dbcluster *dbaasv1alpha1.Cluster, compName string) *customizedEngine {
+	return &customizedEngine{
+		cluster:       dbcluster,
+		componentName: compName,
+		image:         execConfig.Image,
+		command:       execConfig.Command,
+		args:          execConfig.Args,
+		envVarList:    execConfig.Env,
+	}
+}
+
+func replaceEnvsValues(clusterName string, sysAccounts *dbaasv1alpha1.SystemAccountSpec) {
+	replceNamedVars := func(namedValues map[string]string, needle string, limits int, matchAll bool) string {
+		for k, v := range namedValues {
+			r := strings.Replace(needle, k, v, limits)
+			// early termination on matching, when matchAll = false
+			if r != needle && !matchAll {
+				return r
+			}
+			needle = r
+		}
+		return needle
+	}
+
+	namedValues := getEnvReplacementMapForConnCrential(clusterName)
+	namedValuesInStmts := getEnvReplacementMapForAccount()
+
+	// replace systemAccounts.cmdExecutorConfig.env[].valueFrom.secretKeyRef.name variables
+	cmdConfig := sysAccounts.CmdExecutorConfig
+	if cmdConfig != nil {
+		for _, e := range cmdConfig.Env {
+			if e.ValueFrom == nil || e.ValueFrom.SecretKeyRef == nil {
+				continue
+			}
+			secretRef := e.ValueFrom.SecretKeyRef
+			name := replceNamedVars(namedValues, secretRef.Name, 1, false)
+			if name != secretRef.Name {
+				secretRef.Name = name
+			}
+		}
+	}
+
+	accounts := sysAccounts.Accounts
+	for _, acc := range accounts {
+		switch acc.ProvisionPolicy.Type {
+		case dbaasv1alpha1.ReferToExisting:
+			// replace systemAccounts.accounts[*].provisionPolciy.secretRef.name variables
+			secretRef := acc.ProvisionPolicy.SecretRef
+			name := replceNamedVars(namedValues, secretRef.Name, 1, false)
+			if name != secretRef.Name {
+				secretRef.Name = name
+			}
+		case dbaasv1alpha1.CreateByStmt:
+			// replace username and password from systemAccounts.accounts[*].provisionPolciy.statements
+			stmts := acc.ProvisionPolicy.Statements
+			stmts.CreationStatement = replceNamedVars(namedValuesInStmts, stmts.CreationStatement, -1, true)
+			stmts.DeletionStatement = replceNamedVars(namedValuesInStmts, stmts.DeletionStatement, -1, true)
+		}
+	}
+}
+
+// getLabelsForSecretsAndJobs construct matching labels for secrets and jobs.
+// This is consistent with that of secrets created during cluster initialization.
+func getLabelsForSecretsAndJobs(clusterName, clusterDefType, clusterDefName, compName string) client.MatchingLabels {
+	// get account facts, i.e., secrets created
+	return client.MatchingLabels{
+		intctrlutil.AppInstanceLabelKey:  clusterName,
+		intctrlutil.AppNameLabelKey:      fmt.Sprintf("%s-%s", clusterDefType, clusterDefName),
+		intctrlutil.AppComponentLabelKey: compName,
+	}
+}
+
+func renderJob(engine *customizedEngine, namespace, clusterName, clusterDefType, clusterDefName, compName, username string,
+	statement []string, endpoint string) *batchv1.Job {
+	randomStr, _ := password.Generate(6, 0, 0, true, false)
+	jobName := clusterName + "-" + randomStr
+
+	// label
+	ml := getLabelsForSecretsAndJobs(clusterName, clusterDefType, clusterDefName, compName)
+	ml[clusterAccountLabelKey] = username
+
+	// set job ttl to 1 seconds
+	var defaultTTLSeconds int32 = 1
+
+	// inject one more system env variables
+	statementEnv := corev1.EnvVar{
+		Name:  kbAccountStmtEnvName,
+		Value: strings.Join(statement, ";"),
+	}
+	endpointEnv := corev1.EnvVar{
+		Name:  kbAccountEndPointEnvName,
+		Value: endpoint,
+	}
+
+	envs := append(engine.getEnvs(), statementEnv, endpointEnv)
+
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      jobName,
+			Labels:    ml,
+		},
+		Spec: batchv1.JobSpec{
+			TTLSecondsAfterFinished: &defaultTTLSeconds,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      jobName},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					Containers: []corev1.Container{
+						{
+							Name:            randomStr,
+							Image:           engine.getImage(),
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							Command:         engine.getCommand(),
+							Args:            engine.getArgs(),
+							Env:             envs,
+						},
+					},
+				},
+			},
+		},
+	}
+	return job
+}
+
+func renderStmt(tpl string, config secretDataConfig) (string, error) {
+	tmpl, err := template.New("secret-tmpl").Parse(tpl)
+	if err != nil {
+		return "", err
+	}
+
+	var buf strings.Builder
+	err = tmpl.Execute(&buf, config)
+	if err != nil {
+		return "nil", err
+	}
+	return buf.String(), nil
+
+}
+
+func renderSecretWithPwd(namespace, clusterName, clusterDefType, clusterDefName, compName, username string, config secretDataConfig) *corev1.Secret {
+	secretData := map[string][]byte{}
+	secretData[accountNameForSecret] = []byte(config.Username)
+	secretData[accountPasswdForSecret] = []byte(config.Password)
+
+	ml := getLabelsForSecretsAndJobs(clusterName, clusterDefType, clusterDefName, compName)
+	ml[clusterAccountLabelKey] = config.Username
+	return renderSecret(namespace, clusterName, compName, config.Username, ml, secretData)
+}
+
+func renderSecretByCopy(namespace, clusterName, clusterDefType, clusterDefName, compName, username string, fromSecret *corev1.Secret) *corev1.Secret {
+	ml := getLabelsForSecretsAndJobs(clusterName, clusterDefType, clusterDefName, compName)
+	ml[clusterAccountLabelKey] = username
+	return renderSecret(namespace, clusterName, compName, username, ml, fromSecret.Data)
+}
+
+func renderSecret(namespace, clusterName, compName, username string, labels client.MatchingLabels, data map[string][]byte) *corev1.Secret {
+	// secret labels and secret fianlizers should be consistent with that of Cluster secret created by Cluster Controller.
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  namespace,
+			Name:       strings.Join([]string{clusterName, compName, username}, "-"),
+			Labels:     labels,
+			Finalizers: []string{dbClusterFinalizerName},
+		},
+		Data: data,
+	}
+	return secret
+}
+
+func retrieveEndpoints(scope dbaasv1alpha1.ProvisionScope,
+	svcEP *corev1.Endpoints, headlessEP *corev1.Endpoints) []string {
+	// parse endpoints
+	endpoints := make([]string, 0)
+	if scope == dbaasv1alpha1.AnyPods {
+		endpoints = append(endpoints, svcEP.Subsets[0].Addresses[0].IP)
+	} else {
+		for _, ss := range headlessEP.Subsets {
+			for _, add := range ss.Addresses {
+				endpoints = append(endpoints, add.IP)
+			}
+		}
+	}
+	return endpoints
+}
+
+func updateFacts(accountName dbaasv1alpha1.AccountName, detectedFacts *dbaasv1alpha1.KBAccountType) {
+	switch accountName {
+	case dbaasv1alpha1.AdminAccount:
+		*detectedFacts |= dbaasv1alpha1.KBAccountAdmin
+	case dbaasv1alpha1.DataprotectionAccount:
+		*detectedFacts |= dbaasv1alpha1.KBAccountDataprotection
+	case dbaasv1alpha1.ProbeAccount:
+		*detectedFacts |= dbaasv1alpha1.KBAccountProbe
+	case dbaasv1alpha1.MonitorAccount:
+		*detectedFacts |= dbaasv1alpha1.KBAccountMonitor
+	case dbaasv1alpha1.ReplicatorAccount:
+		*detectedFacts |= dbaasv1alpha1.KBAccountReplicator
+	}
+}
+
+func concatSecretName(ns, clusterName, component string, username string) string {
+	return fmt.Sprintf("%s-%s-%s-%s", ns, clusterName, component, username)
+}
+
+func expectationKey(ns, clusterName, component string) string {
+	return fmt.Sprintf("%s-%s-%s", ns, clusterName, component)
+}
+
+// getClusterAndEngineType infers cluster type and engine type we supported at the moment.
+func getEngineType(clusterDefType string, compDef dbaasv1alpha1.ClusterDefinitionComponent) string {
+	if len(compDef.CharacterType) > 0 {
+		return compDef.CharacterType
+	}
+
+	switch clusterDefType {
+	// clusterDefType define well known cluster types. could be one of
+	// [state.redis, mq.mqtt, mq.kafka, state.mysql-8, state.mysql-5.7, state.mysql-5.6, state-mongodb]
+	case "state.mysql-8", "state.mysql-5.7", "state.mysql-5.6":
+		return kMysql
+	default:
+		return ""
+	}
+}
+
+func getCreationStmtForAccount(namespace, clusterName, clusterDefType, clusterDefName, compName string, passConfig dbaasv1alpha1.PasswordConfig,
+	accountConfig dbaasv1alpha1.SystemAccountConfig) ([]string, *corev1.Secret, error) {
+	// generated password with mixedcases = true
+	passwd, _ := password.Generate((int)(passConfig.Length), (int)(passConfig.NumDigits), (int)(passConfig.NumSymbols), false, false)
+	// refine pasword to upper or lower cases w.r.t configuration
+	switch passConfig.LetterCase {
+	case dbaasv1alpha1.UpperCases:
+		passwd = strings.ToUpper(passwd)
+	case dbaasv1alpha1.LowerCases:
+		passwd = strings.ToLower(passwd)
+	}
+
+	userName := (string)(accountConfig.Name)
+	config := secretDataConfig{
+		Username: userName,
+		Password: passwd,
+	}
+
+	creationStmt := make([]string, 0)
+	// drop if exists + create if not exists
+	statements := accountConfig.ProvisionPolicy.Statements
+	stmt, err := renderStmt(statements.DeletionStatement, config)
+	if err != nil {
+		return nil, nil, err
+	}
+	creationStmt = append(creationStmt, stmt)
+
+	stmt, err = renderStmt(statements.CreationStatement, config)
+	if err != nil {
+		return nil, nil, err
+	}
+	creationStmt = append(creationStmt, stmt)
+	secret := renderSecretWithPwd(namespace, clusterName, clusterDefType, clusterDefName, compName, userName, config)
+	return creationStmt, secret, nil
+}

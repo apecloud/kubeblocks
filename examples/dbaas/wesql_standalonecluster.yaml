@@ -1,0 +1,21 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: wesql-standalone
+spec:
+  appVersionRef: app-version-consensus
+  clusterDefinitionRef: cluster-definition-consensus
+  components:
+    - name: wesql-test
+      type: replicasets
+      monitor: false
+      replicas: 1
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+            volumeMode: Filesystem

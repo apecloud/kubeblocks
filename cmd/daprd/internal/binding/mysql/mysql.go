@@ -329,7 +329,7 @@ func (m *Mysql) roleCheck(ctx context.Context, sql string) ([]byte, error) {
 		result := map[string]string{}
 		result["event"] = "roleChanged"
 		result["originalRole"] = oriRole
-		result["Role"] = Role
+		result["role"] = role
 		msg, _ := json.Marshal(result)
 		m.logger.Infof(string(msg))
 		oriRole = role

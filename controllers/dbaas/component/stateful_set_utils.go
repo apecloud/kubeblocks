@@ -29,7 +29,6 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
-// ------- copy from stateful_set_utils.go ----
 // statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
 var statefulPodRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 
@@ -69,8 +68,6 @@ func GetPodRevision(pod *corev1.Pod) string {
 	}
 	return pod.Labels[appsv1.StatefulSetRevisionLabel]
 }
-
-// ------- end copy from stateful_set_utils.go ----
 
 // GetComponentTypeName get component type name
 func GetComponentTypeName(cluster dbaasv1alpha1.Cluster, componentName string) string {

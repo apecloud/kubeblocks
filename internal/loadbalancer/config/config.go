@@ -37,6 +37,7 @@ var (
 	RefreshNodeInterval     time.Duration
 	TrafficNodeLabels       map[string]string
 	EndpointsLabels         map[string]string
+	ServiceLabels           map[string]string
 	MaxConcurrentReconciles int
 )
 
@@ -51,6 +52,7 @@ const (
 	EnvRefreshNodes            = "REFRESH_NODES_INTERVAL"
 	EnvTrafficNodeLabels       = "TRAFFIC_NODE_LABELS"
 	EnvEndpointsLabels         = "ENDPOINTS_LABELS"
+	EnvServiceLabels           = "SERVICE_LABELS"
 	EnvMaxConcurrentReconciles = "MAX_CONCURRENT_RECONCILES"
 )
 
@@ -84,6 +86,9 @@ func init() {
 	_ = viper.BindEnv(EnvEndpointsLabels)
 	viper.SetDefault(EnvEndpointsLabels, "")
 
+	_ = viper.BindEnv(EnvServiceLabels)
+	viper.SetDefault(EnvServiceLabels, "")
+
 	_ = viper.BindEnv(EnvMaxConcurrentReconciles)
 	viper.SetDefault(EnvMaxConcurrentReconciles, runtime.NumCPU()*2)
 }
@@ -104,6 +109,7 @@ func ReadConfig(logger logr.Logger) {
 	RefreshNodeInterval = time.Duration(viper.GetInt(EnvRefreshNodes)) * time.Second
 	TrafficNodeLabels = ParseLabels(viper.GetString(EnvTrafficNodeLabels))
 	EndpointsLabels = ParseLabels(viper.GetString(EnvEndpointsLabels))
+	ServiceLabels = ParseLabels(viper.GetString(EnvServiceLabels))
 	MaxConcurrentReconciles = viper.GetInt(EnvMaxConcurrentReconciles)
 }
 

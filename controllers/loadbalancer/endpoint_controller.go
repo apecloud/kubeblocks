@@ -24,8 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/config"
@@ -34,6 +36,15 @@ import (
 const (
 	AnnotationKeyEndpointsVersion = "service.kubernetes.io/apecloud-loadbalancer-endpoints-version"
 )
+
+var endpointsFilterPredicate = func(object client.Object) bool {
+	for k, v := range config.EndpointsLabels {
+		if object.GetLabels()[k] != v {
+			return false
+		}
+	}
+	return true
+}
 
 type EndpointController struct {
 	client.Client
@@ -101,5 +112,5 @@ func (c *EndpointController) Reconcile(ctx context.Context, req ctrl.Request) (c
 func (c *EndpointController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).WithOptions(controller.Options{
 		MaxConcurrentReconciles: config.MaxConcurrentReconciles,
-	}).For(&corev1.Endpoints{}).Complete(c)
+	}).For(&corev1.Endpoints{}, builder.WithPredicates(predicate.NewPredicateFuncs(endpointsFilterPredicate))).Complete(c)
 }

@@ -28,9 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
@@ -58,6 +60,15 @@ const (
 	AnnotationValueBestEffortLocalTrafficPolicy = "BestEffortLocal"
 	DefaultTrafficPolicy                        = AnnotationValueClusterTrafficPolicy
 )
+
+var serviceFilterPredicate = func(object client.Object) bool {
+	for k, v := range config.ServiceLabels {
+		if object.GetLabels()[k] != v {
+			return false
+		}
+	}
+	return true
+}
 
 type FloatingIP struct {
 	ip       string
@@ -180,7 +191,7 @@ func (c *ServiceController) removeFloatingIP(ip string) {
 func (c *ServiceController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).WithOptions(controller.Options{
 		MaxConcurrentReconciles: config.MaxConcurrentReconciles,
-	}).For(&corev1.Service{}).Complete(c)
+	}).For(&corev1.Service{}, builder.WithPredicates(predicate.NewPredicateFuncs(serviceFilterPredicate))).Complete(c)
 }
 
 func (c *ServiceController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

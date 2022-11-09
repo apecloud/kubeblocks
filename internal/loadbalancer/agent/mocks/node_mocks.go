@@ -110,6 +110,20 @@ func (mr *MockNodeMockRecorder) GetManagedENIs() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetManagedENIs", reflect.TypeOf((*MockNode)(nil).GetManagedENIs))
 }
 
+// GetNodeInfo mocks base method.
+func (m *MockNode) GetNodeInfo() *protocol.InstanceInfo {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNodeInfo")
+	ret0, _ := ret[0].(*protocol.InstanceInfo)
+	return ret0
+}
+
+// GetNodeInfo indicates an expected call of GetNodeInfo.
+func (mr *MockNodeMockRecorder) GetNodeInfo() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeInfo", reflect.TypeOf((*MockNode)(nil).GetNodeInfo))
+}
+
 // GetResource mocks base method.
 func (m *MockNode) GetResource() *agent.NodeResource {
 	m.ctrl.T.Helper()

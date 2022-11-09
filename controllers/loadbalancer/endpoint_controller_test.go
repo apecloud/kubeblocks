@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var newEndpointsObj = func(svc *corev1.Service) (*corev1.Endpoints, types.NamespacedName) {
@@ -44,6 +45,19 @@ var newEndpointsObj = func(svc *corev1.Service) (*corev1.Endpoints, types.Namesp
 }
 
 var _ = Describe("EndpointController", func() {
+	BeforeEach(func() {
+		// Add any steup steps that needs to be executed before each test
+		var (
+			objs = []client.Object{&corev1.Service{}, &corev1.Endpoints{}, &corev1.Pod{}}
+		)
+
+		for _, obj := range objs {
+			err := k8sClient.DeleteAllOf(context.Background(), obj,
+				client.InNamespace(namespace), client.HasLabels{testCtx.TestObjLabelKey})
+			Expect(err).Should(BeNil())
+		}
+	})
+
 	Context("", func() {
 		It("", func() {
 			svc, svcKey := newSvcObj(false, node1IP)

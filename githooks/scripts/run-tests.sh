@@ -1,2 +1,3 @@
 #!/bin/sh
-make lint test
+#make lint test
+./.github/localflows/github-action-locally.sh

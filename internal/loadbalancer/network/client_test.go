@@ -97,7 +97,7 @@ var _ = Describe("Client", func() {
 			privateIPNet := &net.IPNet{IP: net.ParseIP(svcVIP), Mask: net.IPv4Mask(255, 255, 255, 255)}
 			mockNetlink.EXPECT().AddrAdd(eth1, &netlink.Addr{IPNet: privateIPNet}).Return(errors.New("file exists"))
 
-			eni := &cloud.ENIMetadata{ENIId: eniId, MAC: eth1Mac, DeviceNumber: 1}
+			eni := &cloud.ENIMetadata{ID: eniId, MAC: eth1Mac, DeviceNumber: 1}
 			Expect(networkClient.SetupNetworkForService(svcVIP, eni)).Should(Succeed())
 
 			expectIptables := map[string]map[string][][]string{
@@ -151,7 +151,7 @@ var _ = Describe("Client", func() {
 				},
 			}
 			eni := &cloud.ENIMetadata{
-				ENIId:          eniId,
+				ID:             eniId,
 				MAC:            eth1Mac,
 				DeviceNumber:   1,
 				SubnetIPv4CIDR: subnet,
@@ -174,7 +174,7 @@ var _ = Describe("Client", func() {
 				"mangle": {
 					"PREROUTING": [][]string{
 						{
-							"-i", eth1.Attrs().Name, "-m", "comment", "--comment", fmt.Sprintf("KubeBlocks, %s", eni.ENIId),
+							"-i", eth1.Attrs().Name, "-m", "comment", "--comment", fmt.Sprintf("KubeBlocks, %s", eni.ID),
 							"-m", "addrtype", "--dst-type", "LOCAL", "--limit-iface-in", "-j", "CONNMARK", "--set-xmark", fmt.Sprintf("%#x/%#x", mark, mark),
 						},
 					},

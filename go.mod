@@ -1,6 +1,6 @@
 module github.com/apecloud/kubeblocks
 
-go 1.18
+go 1.19
 
 require (
 	cuelang.org/go v0.4.3
@@ -23,6 +23,7 @@ require (
 	github.com/hashicorp/terraform v1.2.6
 	github.com/k3d-io/k3d/v5 v5.4.4
 	github.com/leaanthony/debme v1.2.1
+	github.com/manifoldco/promptui v0.9.0
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/ginkgo/v2 v2.1.4
 	github.com/onsi/gomega v1.20.0

@@ -24,10 +24,13 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
 )
+
+var ErrCrossSubnet = errors.New("Cross subnet")
 
 type TrafficPolicy interface {
 	ChooseNode(svc *corev1.Service) (string, error)
@@ -55,9 +58,11 @@ func (c ClusterTrafficPolicy) ChooseNode(svc *corev1.Service) (string, error) {
 type LocalTrafficPolicy struct {
 	logger logr.Logger
 	client client.Client
+	nm     agent.NodeManager
 }
 
 func (l LocalTrafficPolicy) ChooseNode(svc *corev1.Service) (string, error) {
+	ctxLog := l.logger.WithValues("svc", getObjectFullName(svc))
 	matchLabels := client.MatchingLabels{}
 	for k, v := range svc.Spec.Selector {
 		matchLabels[k] = v
@@ -71,15 +76,31 @@ func (l LocalTrafficPolicy) ChooseNode(svc *corev1.Service) (string, error) {
 		return "", errors.Wrap(err, "Failed to list service related pods")
 	}
 	if len(pods.Items) == 0 {
-		return "", errors.New(fmt.Sprintf("Can not find master node for service %s", getServiceFullName(svc)))
+		return "", errors.New(fmt.Sprintf("Can not find master node for service %s", getObjectFullName(svc)))
 	}
-	l.logger.Info("Found master pods", "count", len(pods.Items))
+	ctxLog.Info("Found master pods", "count", len(pods.Items))
 
 	pod := l.choosePod(pods)
-	if pod != nil {
+	if pod == nil {
+		return "", errors.New("Can not find valid backend pod")
+	}
+
+	node, err := l.nm.GetNode(pod.Status.HostIP)
+	if err != nil {
+		return "", err
+	}
+
+	var (
+		svcSubnetId  = svc.GetAnnotations()[AnnotationKeySubnetId]
+		nodeSubnetId = node.GetNodeInfo().GetSubnetId()
+	)
+	ctxLog.Info("Choose master pod", "name", getObjectFullName(pod),
+		"svc subnetID", svcSubnetId, "node subnetID", node.GetNodeInfo().GetSubnetId())
+	if svcSubnetId == "" || svcSubnetId == nodeSubnetId {
 		return pod.Status.HostIP, nil
 	}
-	return "", errors.New("Can not find valid backend pod")
+
+	return "", ErrCrossSubnet
 }
 
 func (l LocalTrafficPolicy) choosePod(pods *corev1.PodList) *corev1.Pod {
@@ -96,6 +117,25 @@ func (l LocalTrafficPolicy) choosePod(pods *corev1.PodList) *corev1.Pod {
 	return nil
 }
 
-func getServiceFullName(service *corev1.Service) string {
-	return fmt.Sprintf("%s/%s", service.GetNamespace(), service.GetName())
+type BestEffortLocalPolicy struct {
+	LocalTrafficPolicy
+	ClusterTrafficPolicy
+}
+
+func (b BestEffortLocalPolicy) ChooseNode(svc *corev1.Service) (string, error) {
+	result, err := b.LocalTrafficPolicy.ChooseNode(svc)
+	if err == nil {
+		return result, nil
+	}
+
+	if err != ErrCrossSubnet {
+		return "", errors.Wrapf(err, "Failed to choose node using Local traffic policy")
+	}
+
+	b.logger.Info("Pod cross subnets, degrade to cluster traffic policy", "svc", getObjectFullName(svc))
+	return b.ClusterTrafficPolicy.ChooseNode(svc)
+}
+
+func getObjectFullName(obj metav1.Object) string {
+	return fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())
 }

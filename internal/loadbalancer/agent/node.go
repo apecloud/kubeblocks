@@ -42,6 +42,8 @@ type Node interface {
 
 	GetManagedENIs() ([]*pb.ENIMetadata, error)
 
+	GetNodeInfo() *pb.InstanceInfo
+
 	SetupNetworkForService(floatingIP string, eni *pb.ENIMetadata) error
 
 	CleanNetworkForService(floatingIP string, eni *pb.ENIMetadata) error
@@ -53,25 +55,34 @@ type node struct {
 	cp     cloud.Provider
 	em     *eniManager
 	once   sync.Once
+	info   *pb.InstanceInfo
 	stop   chan struct{}
 	logger logr.Logger
 }
 
 func NewNode(logger logr.Logger, ip string, nc pb.NodeClient, cp cloud.Provider) (*node, error) {
-	em, err := newENIManager(logger, ip, nc, cp)
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to init eni manager")
-	}
-
-	return &node{
-		em:     em,
+	result := &node{
 		nc:     nc,
 		ip:     ip,
 		cp:     cp,
 		once:   sync.Once{},
 		stop:   make(chan struct{}),
 		logger: logger.WithValues("ip", ip),
-	}, nil
+	}
+
+	resp, err := nc.DescribeNodeInfo(context.Background(), &pb.DescribeNodeInfoRequest{RequestId: util.GenRequestId()})
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to describe node info")
+	}
+	result.info = resp.GetInfo()
+
+	em, err := newENIManager(logger, ip, result.info, nc, cp)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to init eni manager")
+	}
+	result.em = em
+
+	return result, nil
 }
 
 func (n *node) Start() error {
@@ -88,6 +99,10 @@ func (n *node) Stop() {
 
 func (n *node) GetIP() string {
 	return n.ip
+}
+
+func (n *node) GetNodeInfo() *pb.InstanceInfo {
+	return n.info
 }
 
 func (n *node) GetResource() *NodeResource {
@@ -126,6 +141,7 @@ func (n *node) SetupNetworkForService(floatingIP string, eni *pb.ENIMetadata) er
 	_, err := n.nc.SetupNetworkForService(context.Background(), request)
 	return err
 }
+
 func (n *node) CleanNetworkForService(floatingIP string, eni *pb.ENIMetadata) error {
 	request := &pb.CleanNetworkForServiceRequest{
 		RequestId: util.GenRequestId(),

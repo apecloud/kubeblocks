@@ -20,22 +20,22 @@ import (
 	"context"
 	"time"
 
+	"github.com/spf13/viper"
 	appv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
-
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // RestoreJobReconciler reconciles a RestoreJob object
@@ -171,6 +171,9 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 func (r *RestoreJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dataprotectionv1alpha1.RestoreJob{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: viper.GetInt(maxConcurDataProtectionReconKey),
+		}).
 		Complete(r)
 }
 

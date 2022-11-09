@@ -21,6 +21,7 @@ import (
 	"time"
 
 	appv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -48,6 +49,9 @@ func RestartAction(opsRes *OpsResource) error {
 	if startTimestamp == nil {
 		return fmt.Errorf("status.startTimestamp can not be null")
 	}
+	if err := restartDeployment(opsRes, componentNameMap); err != nil {
+		return err
+	}
 	return restartStatefulSet(opsRes, componentNameMap)
 }
 
@@ -55,7 +59,6 @@ func RestartAction(opsRes *OpsResource) error {
 func restartStatefulSet(opsRes *OpsResource, componentNameMap map[string]*dbaasv1alpha1.ComponentOps) error {
 	var (
 		statefulSetList = &appv1.StatefulSetList{}
-		startTimestamp  = opsRes.OpsRequest.Status.StartTimestamp
 		err             error
 	)
 	if err = opsRes.Client.List(opsRes.Ctx, statefulSetList,
@@ -65,21 +68,7 @@ func restartStatefulSet(opsRes *OpsResource, componentNameMap map[string]*dbaasv
 	}
 
 	for _, v := range statefulSetList.Items {
-		cName := v.Labels[AppComponentNameLabelKey]
-		if _, ok := componentNameMap[cName]; !ok {
-			continue
-		}
-		if v.Spec.Template.Annotations == nil {
-			v.Spec.Template.Annotations = map[string]string{}
-		}
-		// check whether the statefulSet has been restarted
-		isRestarted := true
-		stsRestartTimeStamp := v.Spec.Template.Annotations[RestartAnnotationKey]
-		if res, _ := time.Parse(time.RFC3339, stsRestartTimeStamp); startTimestamp.After(res) {
-			v.Spec.Template.Annotations[RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
-			isRestarted = false
-		}
-		if isRestarted {
+		if isRestarted(opsRes, &v, componentNameMap, &v.Spec.Template) {
 			continue
 		}
 		if err = opsRes.Client.Update(opsRes.Ctx, &v); err != nil {
@@ -87,4 +76,46 @@ func restartStatefulSet(opsRes *OpsResource, componentNameMap map[string]*dbaasv
 		}
 	}
 	return nil
+}
+
+// restartDeployment restart deployment workload
+func restartDeployment(opsRes *OpsResource, componentNameMap map[string]*dbaasv1alpha1.ComponentOps) error {
+	var (
+		deploymentList = &appv1.DeploymentList{}
+		err            error
+	)
+	if err = opsRes.Client.List(opsRes.Ctx, deploymentList,
+		client.InNamespace(opsRes.Cluster.Namespace),
+		client.MatchingLabels{AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
+		return err
+	}
+
+	for _, v := range deploymentList.Items {
+		if isRestarted(opsRes, &v, componentNameMap, &v.Spec.Template) {
+			continue
+		}
+		if err = opsRes.Client.Update(opsRes.Ctx, &v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// isRestarted check whether the component has been restarted
+func isRestarted(opsRes *OpsResource, object client.Object, componentNameMap map[string]*dbaasv1alpha1.ComponentOps, podTemplate *corev1.PodTemplateSpec) bool {
+	cName := object.GetLabels()[AppComponentNameLabelKey]
+	if _, ok := componentNameMap[cName]; !ok {
+		return true
+	}
+	if podTemplate.Annotations == nil {
+		podTemplate.Annotations = map[string]string{}
+	}
+	hasRestarted := true
+	startTimestamp := opsRes.OpsRequest.Status.StartTimestamp
+	stsRestartTimeStamp := podTemplate.Annotations[RestartAnnotationKey]
+	if res, _ := time.Parse(time.RFC3339, stsRestartTimeStamp); startTimestamp.After(res) {
+		podTemplate.Annotations[RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
+		hasRestarted = false
+	}
+	return hasRestarted
 }

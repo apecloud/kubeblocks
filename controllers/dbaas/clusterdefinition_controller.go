@@ -19,32 +19,38 @@ package dbaas
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"time"
 
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-var clusterDefUpdateHandlers = map[string]func(client client.Client, ctx context.Context, clusterDef *dbaasv1alpha1.ClusterDefinition) error{}
+//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusterdefinitions,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusterdefinitions/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusterdefinitions/finalizers,verbs=update
 
 // ClusterDefinitionReconciler reconciles a ClusterDefinition object
 type ClusterDefinitionReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
+	Scheme   *k8sruntime.Scheme
 	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusterdefinitions,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusterdefinitions/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusterdefinitions/finalizers,verbs=update
+var clusterDefUpdateHandlers = map[string]func(client client.Client, ctx context.Context, clusterDef *dbaasv1alpha1.ClusterDefinition) error{}
+
+func init() {
+	viper.SetDefault(maxConcurReconClusterDefKey, runtime.NumCPU()*2)
+}
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -112,6 +118,9 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 func (r *ClusterDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dbaasv1alpha1.ClusterDefinition{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: viper.GetInt(maxConcurReconClusterDefKey),
+		}).
 		Complete(r)
 }
 

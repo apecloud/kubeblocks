@@ -27,7 +27,7 @@ pdb: {
 			"app.kubernetes.io/instance": cluster.metadata.name
 			// "app.kubernetes.io/version" : # TODO
 			"app.kubernetes.io/component-name": "\(component.name)"
-			"app.kubernetes.io/created-by":     "controller-manager"
+            "app.kubernetes.io/managed-by": "kubeblocks"
 		}
 	}
 	"spec": {
@@ -42,6 +42,7 @@ pdb: {
 				"app.kubernetes.io/name":           "\(component.clusterType)-\(component.clusterDefName)"
 				"app.kubernetes.io/instance":       "\(cluster.metadata.name)-\(component.name)"
 				"app.kubernetes.io/component-name": "\(component.name)"
+				"app.kubernetes.io/managed-by": "kubeblocks"
 			}
 		}
 	}

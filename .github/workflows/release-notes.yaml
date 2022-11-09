@@ -1,0 +1,42 @@
+name: RELEASE-NOTES
+
+on:
+  workflow_dispatch:
+
+env:
+  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+jobs:
+  build:
+    name: Generate release notes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install dependencies
+        run: pip install PyGithub
+      - name: Generate release notes
+        run: python ./.github/utils/generate_release_notes.py
+      - name: Commit and push to branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          COMMIT_MSG: |
+            Generating KubeBlocks release notes.
+            skip-checks: true
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git
+          git remote -v
+          git checkout ${REL_BRANCH} || git checkout main
+          echo "BASE_BRANCH=$(git branch --show-current)" >> $GITHUB_ENV
+          git checkout -b support/pre-release-notes-${REL_VERSION}
+          git add .
+          # Only commit and push if have changes
+          git diff --quiet && git diff --staged --quiet || (git commit -m "${COMMIT_MSG}"; git push -u origin support/pre-release-notes-${REL_VERSION})
+      - name: Create pull request
+        run: |
+          gh pr create --title "Create release notes for ${{ env.REL_VERSION }}." --body "Release notes." --base ${{ env.BASE_BRANCH }} --draft

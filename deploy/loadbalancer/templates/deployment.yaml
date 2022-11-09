@@ -56,6 +56,8 @@ spec:
               value: {{ include "loadbalancer.nodeLabels" . | quote}}
             - name: ENDPOINTS_LABELS
               value: {{ include "loadbalancer.endpointLabels" . | quote }}
+            - name: SERVICE_LABELS
+              value: {{ include "loadbalancer.serviceLabels" . | quote }}
           readinessProbe:
             httpGet:
               path: /readyz

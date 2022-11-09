@@ -81,7 +81,13 @@ maxUnavailable: {{ .Values.podDisruptionBudget.maxUnavailable }}
 {{- end }}
 
 {{- define "loadbalancer.endpointLabels" -}}
-{{- if .Values.endpointLabels }}
+{{- if .Values.endpointLabelList }}
 {{- join "," .Values.endpointLabelList }}
+{{- end }}
+{{- end }}
+
+{{- define "loadbalancer.serviceLabels" -}}
+{{- if .Values.serviceLabelList }}
+{{- join "," .Values.serviceLabelList }}
 {{- end }}
 {{- end }}

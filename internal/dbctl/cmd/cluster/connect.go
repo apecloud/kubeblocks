@@ -27,9 +27,8 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/engine"
-	"github.com/apecloud/kubeblocks/internal/dbctl/util/cluster"
-
 	"github.com/apecloud/kubeblocks/internal/dbctl/exec"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/cluster"
 )
 
 type ConnectOptions struct {

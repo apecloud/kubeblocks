@@ -15,16 +15,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package component
 
 import (
+	"context"
 	"regexp"
 	"strconv"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // ------- copy from stateful_set_utils.go ----
@@ -54,14 +57,14 @@ func getParentName(pod *corev1.Pod) string {
 	return parent
 }
 
-// isMemberOf tests if pod is a member of set.
-func isMemberOf(set *appsv1.StatefulSet, pod *corev1.Pod) bool {
+// IsMemberOf tests if pod is a member of set.
+func IsMemberOf(set *appsv1.StatefulSet, pod *corev1.Pod) bool {
 	return getParentName(pod) == set.Name
 }
 
-// getPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty
+// GetPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty
 // string is returned.
-func getPodRevision(pod *corev1.Pod) string {
+func GetPodRevision(pod *corev1.Pod) string {
 	if pod.Labels == nil {
 		return ""
 	}
@@ -69,6 +72,44 @@ func getPodRevision(pod *corev1.Pod) string {
 }
 
 // ------- end copy from stateful_set_utils.go ----
+
+// GetComponentTypeName get component type name
+func GetComponentTypeName(cluster dbaasv1alpha1.Cluster, componentName string) string {
+	for _, component := range cluster.Spec.Components {
+		if componentName == component.Name {
+			return component.Type
+		}
+	}
+
+	return componentName
+}
+
+// GetComponentFromClusterDefinition get component from ClusterDefinition with typeName
+func GetComponentFromClusterDefinition(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, typeName string) (*dbaasv1alpha1.ClusterDefinitionComponent, error) {
+	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
+		return nil, err
+	}
+
+	for _, component := range clusterDef.Spec.Components {
+		if component.TypeName == typeName {
+			return &component, nil
+		}
+	}
+	return nil, nil
+}
+
+// StatefulSetIsReady check statefulSet is ready
+func StatefulSetIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals bool) bool {
+	var componentIsRunning = true
+	// judge whether statefulSet is ready
+	if sts.Status.AvailableReplicas != *sts.Spec.Replicas ||
+		sts.Status.ObservedGeneration != sts.GetGeneration() ||
+		!statefulStatusRevisionIsEquals {
+		componentIsRunning = false
+	}
+	return componentIsRunning
+}
 
 // descendingOrdinalSts is a sort.Interface that Sorts a list of StatefulSet based on the ordinals extracted
 // from the StatefulSet.
@@ -112,5 +153,23 @@ func getParentNameAndOrdinalSts(sts *appsv1.StatefulSet) (string, int) {
 }
 
 func checkStsIsPrimary(sts *appsv1.StatefulSet) bool {
-	return sts.Labels[replicationSetRoleLabelKey] == string(dbaasv1alpha1.Primary)
+	return sts.Labels[intctrlutil.ReplicationSetRoleLabelKey] == string(dbaasv1alpha1.Primary)
+}
+
+// GetPodListByStatefulSet get statefulSet pod list
+func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet) ([]corev1.Pod, error) {
+	// get podList owned by stsObj
+	podList := &corev1.PodList{}
+	if err := cli.List(ctx, podList,
+		&client.ListOptions{Namespace: stsObj.Namespace},
+		client.MatchingLabels{intctrlutil.AppComponentLabelKey: stsObj.Labels[intctrlutil.AppComponentLabelKey]}); err != nil {
+		return nil, err
+	}
+	pods := make([]corev1.Pod, 0)
+	for _, pod := range podList.Items {
+		if IsMemberOf(stsObj, &pod) {
+			pods = append(pods, pod)
+		}
+	}
+	return pods, nil
 }

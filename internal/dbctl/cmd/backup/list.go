@@ -23,14 +23,14 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/list"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
 )
 
 func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	cmd := list.Command{
-		Factory:   f,
-		Streams:   streams,
-		Short:     "List all database backup job.",
-		GroupKind: schema.GroupKind{Group: "dataprotection.kubeblocks.io", Kind: "BackupJob"},
-	}
-	return cmd.Build()
+	return builder.NewCmdBuilder().
+		Short("List all database backup job.").
+		Factory(f).
+		GroupKind(schema.GroupKind{Group: "dataprotection.kubeblocks.io", Kind: "BackupJob"}).
+		IOStreams(streams).
+		Build(list.Build)
 }

@@ -29,6 +29,11 @@ probeContainer: {
 			command: []
 		}
 	}
+	startupProbe: {
+		tcpSocket: {
+			port: 3501
+		}
+	}
 }
 
 statefulset: {
@@ -40,6 +45,7 @@ statefulset: {
 		labels: {
 			"app.kubernetes.io/name":     "\(component.clusterType)-\(component.clusterDefName)"
 			"app.kubernetes.io/instance": cluster.metadata.name
+			"app.kubernetes.io/managed-by": "kubeblocks"
 			// "app.kubernetes.io/version" : # TODO
 			"app.kubernetes.io/component-name": "\(component.name)"
 		}
@@ -50,6 +56,7 @@ statefulset: {
 				"app.kubernetes.io/name":           "\(component.clusterType)-\(component.clusterDefName)"
 				"app.kubernetes.io/instance":       "\(cluster.metadata.name)"
 				"app.kubernetes.io/component-name": "\(component.name)"
+				"app.kubernetes.io/managed-by": "kubeblocks"
 			}
 		serviceName:         "\(cluster.metadata.name)-\(component.name)"
 		if component.type != "replication" {
@@ -66,6 +73,7 @@ statefulset: {
 					"app.kubernetes.io/name":           "\(component.clusterType)-\(component.clusterDefName)"
 					"app.kubernetes.io/instance":       "\(cluster.metadata.name)"
 					"app.kubernetes.io/component-name": "\(component.name)"
+					"app.kubernetes.io/managed-by": "kubeblocks"
 					// "app.kubernetes.io/version" : # TODO
 				}
 				if component.monitor.enable == true {

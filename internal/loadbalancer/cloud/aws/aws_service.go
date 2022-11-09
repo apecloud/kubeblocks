@@ -60,7 +60,7 @@ type awsService struct {
 	ec2Svc           EC2
 	imdsSvc          imdsService
 	securityGroups   []string
-	instanceId       string
+	instanceID       string
 	subnetID         string
 	localIPv4        string
 	instanceType     string
@@ -128,11 +128,11 @@ func (c *awsService) initWithEC2Metadata(ctx context.Context) error {
 	kvs = append(kvs, "local ip", c.localIPv4)
 
 	// retrieve instance-id
-	c.instanceId, err = c.imdsSvc.getInstanceId(ctx)
+	c.instanceID, err = c.imdsSvc.getInstanceID(ctx)
 	if err != nil {
 		return err
 	}
-	kvs = append(kvs, "instance id", c.instanceId)
+	kvs = append(kvs, "instance id", c.instanceID)
 
 	// retrieve instance-type
 	c.instanceType, err = c.imdsSvc.getInstanceType(ctx)
@@ -155,7 +155,7 @@ func (c *awsService) initWithEC2Metadata(ctx context.Context) error {
 	kvs = append(kvs, "primary eni id", c.primaryENI)
 
 	// retrieve sub-id
-	c.subnetID, err = c.imdsSvc.getSubnetId(ctx, c.primaryENImac)
+	c.subnetID, err = c.imdsSvc.getSubnetID(ctx, c.primaryENImac)
 	if err != nil {
 		return err
 	}
@@ -173,9 +173,9 @@ func (c *awsService) initWithEC2Metadata(ctx context.Context) error {
 // GetInstanceInfo return EC2 instance info
 func (c *awsService) GetInstanceInfo() *cloud.InstanceInfo {
 	return &cloud.InstanceInfo{
-		InstanceId:       c.instanceId,
-		SubnetId:         c.subnetID,
-		SecurityGroupIds: c.securityGroups,
+		InstanceID:       c.instanceID,
+		SubnetID:         c.subnetID,
+		SecurityGroupIDs: c.securityGroups,
 	}
 }
 
@@ -220,14 +220,14 @@ func (c *awsService) DescribeAllENIs() (map[string]*cloud.ENIMetadata, error) {
 
 	attachedENIMap := make(map[string]cloud.ENIMetadata, len(attachedENIList))
 	for _, eni := range attachedENIList {
-		attachedENIMap[eni.ENIId] = eni
+		attachedENIMap[eni.ID] = eni
 	}
 
 	input := &ec2.DescribeNetworkInterfacesInput{
 		Filters: []*ec2.Filter{{
 			Name: aws.String("attachment.instance-id"),
 			Values: []*string{
-				aws.String(c.instanceId),
+				aws.String(c.instanceID),
 			},
 		}},
 	}
@@ -248,7 +248,7 @@ func (c *awsService) DescribeAllENIs() (map[string]*cloud.ENIMetadata, error) {
 		eniId := aws.StringValue(item.NetworkInterfaceId)
 
 		eniMetadata := attachedENIMap[eniId]
-		eniMetadata.SubnetId = aws.StringValue(item.SubnetId)
+		eniMetadata.SubnetID = aws.StringValue(item.SubnetId)
 		eniMetadata.Tags = convertSDKTagsToTags(item.TagSet)
 
 		result[eniId] = &eniMetadata
@@ -331,7 +331,7 @@ func (c *awsService) FindLeakedENIs(instanceId string) ([]*cloud.ENIMetadata, er
 			eni := enis[index]
 			if needClean(eni) {
 				leakedENIs = append(leakedENIs, &cloud.ENIMetadata{
-					ENIId: aws.StringValue(eni.NetworkInterfaceId),
+					ID: aws.StringValue(eni.NetworkInterfaceId),
 				})
 			}
 		}
@@ -476,7 +476,7 @@ func (c *awsService) getENIMetadata(eniMAC string) (cloud.ENIMetadata, error) {
 	}
 
 	return cloud.ENIMetadata{
-		ENIId:          eniID,
+		ID:             eniID,
 		MAC:            eniMAC,
 		DeviceNumber:   deviceNum,
 		SubnetIPv4CIDR: cidr,
@@ -530,7 +530,7 @@ func (c *awsService) AllocIPAddresses(eniID string) (string, error) {
 }
 
 func (c *awsService) CreateENI(instanceId, subnetId string, securityGroupIds []string) (string, error) {
-	ctxLog := c.logger.WithValues("instanceId", instanceId)
+	ctxLog := c.logger.WithValues("instance Id", instanceId)
 	ctxLog.Info("Trying to create ENI")
 
 	eniDescription := fmt.Sprintf("kubeblocks-lb-%s", instanceId)
@@ -564,7 +564,7 @@ func (c *awsService) CreateENI(instanceId, subnetId string, securityGroupIds []s
 }
 
 func (c *awsService) AttachENI(instanceId string, eniID string) (string, error) {
-	ctxLog := c.logger.WithValues("instanceId", instanceId, "eni id", eniID)
+	ctxLog := c.logger.WithValues("instance Id", instanceId, "eni id", eniID)
 	ctxLog.Info("Trying to attach ENI")
 
 	freeDevice, err := c.awsGetFreeDeviceNumber(instanceId)
@@ -748,7 +748,7 @@ func (c *awsService) WaitForENIAttached(eniId string) (eniMetadata cloud.ENIMeta
 			return ErrNoNetworkInterfaces
 		}
 		for _, eni := range enis {
-			if eniId == eni.ENIId {
+			if eniId == eni.ID {
 				result = eni
 				return nil
 			}

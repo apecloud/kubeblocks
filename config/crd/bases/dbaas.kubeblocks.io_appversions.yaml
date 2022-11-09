@@ -7702,11 +7702,11 @@ spec:
             description: AppVersionStatus defines the observed state of AppVersion
             properties:
               clusterDefGeneration:
-                description: ClusterDefinition generation number
+                description: ClusterDefinition generation number.
                 format: int64
                 type: integer
               clusterDefSyncStatus:
-                description: ClusterDefinition sync. status
+                description: ClusterDefinition sync. status.
                 enum:
                 - InSync
                 - OutOfSync

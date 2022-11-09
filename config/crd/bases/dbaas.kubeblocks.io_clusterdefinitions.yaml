@@ -100,7 +100,7 @@ spec:
                         is Consensus
                       properties:
                         followers:
-                          description: Followers, has voting right but not Leader
+                          description: Followers, has voting right but not Leader.
                           items:
                             properties:
                               accessMode:
@@ -131,7 +131,7 @@ spec:
                             type: object
                           type: array
                         leader:
-                          description: Leader, one single leader
+                          description: Leader, one single leader.
                           properties:
                             accessMode:
                               default: ReadWrite
@@ -159,7 +159,7 @@ spec:
                           - name
                           type: object
                         learner:
-                          description: Learner, no voting right
+                          description: Learner, no voting right.
                           properties:
                             accessMode:
                               default: ReadWrite
@@ -7540,26 +7540,27 @@ spec:
                         primary when Type is Replication
                       type: integer
                     probes:
+                      description: Probes setting for db healthy checks.
                       properties:
                         roleChangedProbe:
+                          description: Probe for db role changed check.
                           properties:
                             commands:
+                              description: Cmds used to execute for probe.
                               properties:
                                 queries:
+                                  description: Read sqls executed on db node, used
+                                    to check db healthy.
                                   items:
                                     type: string
                                   type: array
                                 writes:
-                                  description: sqls executed on db node, used to check
-                                    db healthy
+                                  description: Write sqls executed on db node, used
+                                    to check db healthy.
                                   items:
                                     type: string
                                   type: array
                               type: object
-                            enable:
-                              default: true
-                              description: enable probe or not
-                              type: boolean
                             failureThreshold:
                               default: 1
                               description: Minimum consecutive failures for the probe
@@ -7582,24 +7583,24 @@ spec:
                               type: integer
                           type: object
                         runningProbe:
+                          description: Probe for db running check.
                           properties:
                             commands:
+                              description: Cmds used to execute for probe.
                               properties:
                                 queries:
+                                  description: Read sqls executed on db node, used
+                                    to check db healthy.
                                   items:
                                     type: string
                                   type: array
                                 writes:
-                                  description: sqls executed on db node, used to check
-                                    db healthy
+                                  description: Write sqls executed on db node, used
+                                    to check db healthy.
                                   items:
                                     type: string
                                   type: array
                               type: object
-                            enable:
-                              default: true
-                              description: enable probe or not
-                              type: boolean
                             failureThreshold:
                               default: 1
                               description: Minimum consecutive failures for the probe
@@ -7622,24 +7623,24 @@ spec:
                               type: integer
                           type: object
                         statusProbe:
+                          description: Probe for db status check.
                           properties:
                             commands:
+                              description: Cmds used to execute for probe.
                               properties:
                                 queries:
+                                  description: Read sqls executed on db node, used
+                                    to check db healthy.
                                   items:
                                     type: string
                                   type: array
                                 writes:
-                                  description: sqls executed on db node, used to check
-                                    db healthy
+                                  description: Write sqls executed on db node, used
+                                    to check db healthy.
                                   items:
                                     type: string
                                   type: array
                               type: object
-                            enable:
-                              default: true
-                              description: enable probe or not
-                              type: boolean
                             failureThreshold:
                               default: 1
                               description: Minimum consecutive failures for the probe

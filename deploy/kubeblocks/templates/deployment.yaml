@@ -52,9 +52,9 @@ spec:
             - name: ENABLE_WEBHOOKS
               value: "true"
           {{- end }}
-            - name: AGAMOTTO_IMAGE_PULL_POLICY
+            - name: KUBEBLOCKS_IMAGE_PULL_POLICY
               value: {{ .Values.image.pullPolicy }}
-            - name: AGAMOTTO_IMAGE
+            - name: KUBEBLOCKS_IMAGE
               value: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}

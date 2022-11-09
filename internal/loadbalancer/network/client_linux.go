@@ -55,7 +55,7 @@ func NewClient(logger logr.Logger, nl netlinkwrapper.NetLink, ipt iptableswrappe
 }
 
 func (c *networkClient) SetupNetworkForService(privateIP string, eni *cloud.ENIMetadata) error {
-	ctxLog := c.logger.WithValues("eni id", eni.ENIId, "private ip", privateIP)
+	ctxLog := c.logger.WithValues("eni id", eni.ID, "private ip", privateIP)
 	ctxLog.Info("Configuring policy routing rules and routes")
 
 	link, err := c.getLinkByMac(c.logger, eni.MAC)
@@ -91,7 +91,7 @@ func (c *networkClient) SetupNetworkForService(privateIP string, eni *cloud.ENIM
 }
 
 func (c *networkClient) CleanNetworkForService(privateIP string, eni *cloud.ENIMetadata) error {
-	ctxLog := c.logger.WithValues("private ip", privateIP, "eni id", eni.ENIId)
+	ctxLog := c.logger.WithValues("private ip", privateIP, "eni id", eni.ID)
 	ctxLog.Info("Remove policy route rules and routes")
 
 	link, err := c.getLinkByMac(c.logger, eni.MAC)
@@ -130,14 +130,14 @@ func (c *networkClient) CleanNetworkForService(privateIP string, eni *cloud.ENIM
 }
 
 func (c *networkClient) SetupNetworkForENI(eni *cloud.ENIMetadata) error {
-	ctxLog := c.logger.WithValues("eni id", eni.ENIId)
+	ctxLog := c.logger.WithValues("eni id", eni.ID)
 
 	if eni.DeviceNumber == 0 {
-		return fmt.Errorf("can not setup primary eni %s", eni.ENIId)
+		return fmt.Errorf("can not setup primary eni %s", eni.ID)
 	}
 
 	if err := c.looseReversePathFilter(eni); err != nil {
-		return errors.Wrapf(err, "Failed to loose reverse path filter for interface %s", eni.ENIId)
+		return errors.Wrapf(err, "Failed to loose reverse path filter for interface %s", eni.ID)
 	}
 
 	link, err := c.getLinkByMac(c.logger, eni.MAC)
@@ -289,7 +289,7 @@ func (c *networkClient) CleanNetworkForENI(eni *cloud.ENIMetadata) error {
 		if strings.Contains(err.Error(), "no such file or directory") {
 			c.logger.Info("Policy rule not exists, skip delete", "rule", rule.String())
 		} else {
-			return errors.Wrapf(err, "Failed to remove eni %s policy routing rule", eni.ENIId)
+			return errors.Wrapf(err, "Failed to remove eni %s policy routing rule", eni.ID)
 		}
 	}
 
@@ -302,7 +302,7 @@ func (c *networkClient) CleanNetworkForENI(eni *cloud.ENIMetadata) error {
 		return err
 	}
 
-	c.logger.Info("Successfully clean eni network", "eni id", eni.ENIId)
+	c.logger.Info("Successfully clean eni network", "eni id", eni.ID)
 	return nil
 }
 
@@ -333,7 +333,7 @@ func (c *networkClient) looseReversePathFilter(eni *cloud.ENIMetadata) error {
 	}
 
 	c.logger.Info("Successfully loose network interface reverse path filter",
-		"from", src, "to", LooseReversePathFilterValue, "eni id", eni.ENIId)
+		"from", src, "to", LooseReversePathFilterValue, "eni id", eni.ID)
 	return nil
 }
 
@@ -350,7 +350,7 @@ func (c *networkClient) buildServiceIptablesRules(privateIP string, eni *cloud.E
 		chain: "PREROUTING",
 		rule: []string{
 			"-m", "conntrack", "--ctorigdst", privateIP,
-			"-m", "comment", "--comment", fmt.Sprintf("KubeBlocks, %s", eni.ENIId),
+			"-m", "comment", "--comment", fmt.Sprintf("KubeBlocks, %s", eni.ID),
 			"-j", "CONNMARK", "--restore-mark", "--mask", fmt.Sprintf("%#x", mark),
 		},
 	})
@@ -362,7 +362,7 @@ func (c *networkClient) buildServiceIptablesRules(privateIP string, eni *cloud.E
 		chain: "OUTPUT",
 		rule: []string{
 			"-m", "conntrack", "--ctorigdst", privateIP,
-			"-m", "comment", "--comment", fmt.Sprintf("KubeBlocks, %s", eni.ENIId),
+			"-m", "comment", "--comment", fmt.Sprintf("KubeBlocks, %s", eni.ID),
 			"-j", "CONNMARK", "--restore-mark", "--mask", fmt.Sprintf("%#x", mark),
 		},
 	})
@@ -407,7 +407,7 @@ func (c *networkClient) buildENIIptablesRules(iface string, eni *cloud.ENIMetada
 		table: "mangle",
 		chain: "PREROUTING",
 		rule: []string{
-			"-i", iface, "-m", "comment", "--comment", fmt.Sprintf("KubeBlocks, %s", eni.ENIId),
+			"-i", iface, "-m", "comment", "--comment", fmt.Sprintf("KubeBlocks, %s", eni.ID),
 			"-m", "addrtype", "--dst-type", "LOCAL", "--limit-iface-in", "-j", "CONNMARK", "--set-xmark", fmt.Sprintf("%#x/%#x", mark, mark),
 		}})
 
@@ -417,7 +417,7 @@ func (c *networkClient) buildENIIptablesRules(iface string, eni *cloud.ENIMetada
 			table: "mangle",
 			chain: "PREROUTING",
 			rule: []string{
-				"-i", "eni+", "-m", "comment", "--comment", fmt.Sprintf("KubeBlocks, %s", eni.ENIId),
+				"-i", "eni+", "-m", "comment", "--comment", fmt.Sprintf("KubeBlocks, %s", eni.ID),
 				"-j", "CONNMARK", "--restore-mark", "--mask", fmt.Sprintf("%#x", mark),
 			},
 		})

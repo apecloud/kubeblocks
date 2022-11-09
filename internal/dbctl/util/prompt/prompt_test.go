@@ -14,13 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package prompt
 
-import "testing"
+import (
+	"bytes"
+	"io"
+	"testing"
+)
 
-func TestCreateRoleChangedEvent(t *testing.T) {
-	_, err := createRoleChangedEvent("wesql-test", "leader")
+func Test(t *testing.T) {
+	c := NewPrompt("Test prompt", "Please input something", &bytes.Buffer{})
+	res, _ := c.GetInput()
+	if res != "" {
+		t.Errorf("expected an empty result")
+	}
+
+	in := &bytes.Buffer{}
+	in.Write([]byte("t\n"))
+	c.in = io.NopCloser(in)
+	res, err := c.GetInput()
 	if err != nil {
-		t.Errorf("create role changed event error: %v", err)
+		t.Errorf("prompt error %v", err)
+	}
+	if res != "t" {
+		t.Errorf("prompt result is not expected")
 	}
 }

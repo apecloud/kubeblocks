@@ -14,12 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package iptables
+package prompt
 
-type IPTables interface {
-	Exists(table, chain string, ruleSpec ...string) (bool, error)
+import (
+	"bytes"
+	"io"
+	"testing"
+)
 
-	Append(table, chain string, ruleSpec ...string) error
+func Test(t *testing.T) {
+	c := NewPrompt("Test prompt", "Please input something", &bytes.Buffer{})
+	res, _ := c.GetInput()
+	if res != "" {
+		t.Errorf("expected an empty result")
+	}
 
-	Delete(table, chain string, ruleSpec ...string) error
+	in := &bytes.Buffer{}
+	in.Write([]byte("t\n"))
+	c.in = io.NopCloser(in)
+	res, err := c.GetInput()
+	if err != nil {
+		t.Errorf("prompt error %v", err)
+	}
+	if res != "t" {
+		t.Errorf("prompt result is not expected")
+	}
 }

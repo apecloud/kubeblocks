@@ -122,7 +122,7 @@ var _ = Describe("AwsService", func() {
 		ctrl := gomock.NewController(GinkgoT())
 		mockEC2 := mockaws.NewMockEC2(ctrl)
 		service := &awsService{
-			instanceId: instanceId,
+			instanceID: instanceId,
 			logger:     logger,
 			ec2Svc:     mockEC2,
 			imdsSvc:    getImdsService(overrides),
@@ -136,7 +136,7 @@ var _ = Describe("AwsService", func() {
 
 			Expect(service.initWithEC2Metadata(context.Background())).Should(Succeed())
 			Expect(service.securityGroups).Should(Equal([]string{securityGroupId}))
-			Expect(service.instanceId).Should(Equal(instanceId))
+			Expect(service.instanceID).Should(Equal(instanceId))
 			Expect(service.primaryENImac).Should(Equal(primaryMAC))
 		})
 	})
@@ -243,7 +243,7 @@ var _ = Describe("AwsService", func() {
 			var eni2 cloud.ENIMetadata
 			imdsENIs, err := service.GetAttachedENIs()
 			for _, item := range imdsENIs {
-				if item.ENIId == eniId2 {
+				if item.ID == eniId2 {
 					eni2 = item
 					break
 				}
@@ -425,7 +425,7 @@ var _ = Describe("AwsService", func() {
 			leakedENIs, err := service.FindLeakedENIs(instanceId)
 			Expect(err).Should(BeNil())
 			Expect(len(leakedENIs)).Should(Equal(1))
-			Expect(leakedENIs[0].ENIId).Should(Equal(eniId2))
+			Expect(leakedENIs[0].ID).Should(Equal(eniId2))
 			_, ok := store[cloud.TagENICreatedAt]
 			Expect(ok).Should(BeTrue())
 		})

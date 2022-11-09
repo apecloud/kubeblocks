@@ -30,35 +30,35 @@ type Provider interface {
 
 	GetInstanceInfo() *InstanceInfo
 
-	CreateENI(instanceId, subnetId string, securityGroupIds []string) (string, error)
+	CreateENI(instanceID, subnetID string, securityGroupIDs []string) (string, error)
 
-	AttachENI(instanceId string, eniId string) (string, error)
+	AttachENI(instanceID string, eniID string) (string, error)
 
-	DeleteENI(eniId string) error
+	DeleteENI(eniID string) error
 
-	FreeENI(eniId string) error
+	FreeENI(eniID string) error
 
 	DescribeAllENIs() (map[string]*ENIMetadata, error)
 
-	FindLeakedENIs(instanceId string) ([]*ENIMetadata, error)
+	FindLeakedENIs(instanceID string) ([]*ENIMetadata, error)
 
-	AllocIPAddresses(eniId string) (string, error)
+	AllocIPAddresses(eniID string) (string, error)
 
-	DeallocIPAddresses(eniId string, ips []string) error
+	DeallocIPAddresses(eniID string, ips []string) error
 
-	AssignPrivateIpAddresses(eniId string, ip string) error
+	AssignPrivateIpAddresses(eniID string, ip string) error
 
-	WaitForENIAttached(eniId string) (ENIMetadata, error)
+	WaitForENIAttached(eniID string) (ENIMetadata, error)
 
-	ModifySourceDestCheck(eniId string, enabled bool) error
+	ModifySourceDestCheck(eniID string, enabled bool) error
 }
 
 type InstanceInfo struct {
-	InstanceId string `json:"instance_id"`
+	InstanceID string `json:"instance_id"`
 
-	SubnetId string `json:"subnet_id"`
+	SubnetID string `json:"subnet_id"`
 
-	SecurityGroupIds []string `json:"security_group_ids"`
+	SecurityGroupIDs []string `json:"security_group_ids"`
 }
 
 type IPv4Address struct {
@@ -68,8 +68,8 @@ type IPv4Address struct {
 }
 
 type ENIMetadata struct {
-	// ENIId is the id of network interface
-	ENIId string
+	// ID is the id of network interface
+	ID string
 
 	// MAC is the mac address of network interface
 	MAC string
@@ -78,8 +78,8 @@ type ENIMetadata struct {
 	// 0 means it is primary interface
 	DeviceNumber int
 
-	// SubnetId is the subnet id of network interface
-	SubnetId string
+	// SubnetID is the subnet id of network interface
+	SubnetID string
 
 	// SubnetIPv4CIDR is the IPv4 CIDR of network interface
 	SubnetIPv4CIDR string

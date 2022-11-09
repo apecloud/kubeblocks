@@ -32,6 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
 func TestLoadbalancer(t *testing.T) {
@@ -49,6 +51,7 @@ var (
 	endpointController *EndpointController
 	serviceController  *ServiceController
 	logger             = zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	testCtx            testutil.TestContext
 )
 
 var _ = BeforeSuite(func() {
@@ -111,6 +114,8 @@ var _ = BeforeSuite(func() {
 	err = serviceController.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(serviceController).NotTo(BeNil())
+
+	testCtx = testutil.NewDefaultTestContext(k8sManager.GetClient())
 
 	go func() {
 		defer GinkgoRecover()

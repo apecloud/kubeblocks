@@ -1,23 +1,8 @@
-/*
-Copyright ApeCloud Inc.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
-package list
+package delete
 
 import (
 	"net/http"
+	"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -35,20 +20,21 @@ import (
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
 )
 
-var _ = Describe("Describe", func() {
+var _ = Describe("Delete", func() {
 	buildTestCmd := func(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 		return builder.NewCmdBuilder().
+			Use("test-delete").
+			Short("Test a delete command").
+			Example("Test command example").
 			Factory(f).
 			IOStreams(streams).
-			Short("Test list.").
-			GroupKind(schema.GroupKind{Group: "", Kind: "pods"}).
+			GroupKind(schema.GroupKind{Kind: "Pod"}).
 			Build(Build)
 	}
 
 	mockClient := func(data runtime.Object) *cmdtesting.TestFactory {
 		tf := cmdtesting.NewTestFactory().WithNamespace("test")
 		defer tf.Cleanup()
-
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
@@ -57,17 +43,20 @@ var _ = Describe("Describe", func() {
 		return tf
 	}
 
-	It("run", func() {
+	It("build a delete command", func() {
 		pods, _, _ := cmdtesting.TestData()
 		tf := mockClient(pods)
-		streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+		streams, in, buf, _ := genericclioptions.NewTestIOStreams()
 		cmd := buildTestCmd(tf, streams)
-		cmd.Run(cmd, []string{})
+		Expect(cmd).ShouldNot(BeNil())
 
-		expected := `NAME   AGE
-foo    <unknown>
-bar    <unknown>
-`
-		Expect(buf.String()).To(Equal(expected))
+		input := strings.NewReader("foo\n")
+		Expect(validate([]string{}, input)).Should(MatchError("missing name"))
+		// prompt test always return error
+		Expect(validate([]string{"foo"}, input)).Should(Succeed())
+
+		_, _ = in.Write([]byte("foo\n"))
+		cmd.Run(cmd, []string{"foo"})
+		Expect(buf.String()).Should(Equal("pod \"foo\" deleted\n"))
 	})
 })

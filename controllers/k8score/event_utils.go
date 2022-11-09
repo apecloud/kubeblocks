@@ -18,9 +18,9 @@ package k8score
 
 import (
 	"bytes"
-	"math/rand"
 	"text/template"
 
+	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 )
@@ -43,7 +43,10 @@ reason: RoleChanged
 type: Normal
 `
 
-	seq := randStringBytes(16)
+	seq, err := password.Generate(16, 6, 10, true, true)
+	if err != nil {
+		return nil, err
+	}
 	roleValue := roleEventValue{
 		PodName:  podName,
 		EventSeq: seq,
@@ -71,14 +74,4 @@ type roleEventValue struct {
 	PodName  string
 	EventSeq string
 	Role     string
-}
-
-const letterBytes = "0123456789abcdefghijklmnopqrstuvwxyz"
-
-func randStringBytes(n int) string {
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
-	}
-	return string(b)
 }

@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"github.com/apecloud/kubeblocks/controllers/dbaas"
 	"os"
 	"os/signal"
 	"syscall"

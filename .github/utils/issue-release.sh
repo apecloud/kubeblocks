@@ -38,7 +38,7 @@ for pr_url in ${BODY[@]}; do
     # get PR Issues References
     PR_NUMBER="${pr_url#*$GITHUB/$REPO/pull/}"
     echo "PR_NUMBER:"$PR_NUMBER
-    if [[ ! -z $PR_NUMBER ]];then
+    if [[ ! -z "$PR_NUMBER" ]];then
       closingIssuesReferences="$(
       gh api graphql -f query='
       {
@@ -57,7 +57,7 @@ for pr_url in ${BODY[@]}; do
       }' --jq '.data.repository.pullRequest.closingIssuesReferences.edges'
       )"
       echo "Closing Issues References:"$closingIssuesReferences
-      if [[ -z $closingIssuesReferences || "$closingIssuesReferences" == "[]" ]];then
+      if [[ -z "$closingIssuesReferences" || "$closingIssuesReferences" == "[]" ]];then
         echo "PR $PR_NUMBER has no Issues References"
       else
         closingIssues=$(echo $closingIssuesReferences | jq -c -r ".[]")

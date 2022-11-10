@@ -15,18 +15,3 @@ limitations under the License.
 */
 
 package configuration
-
-import "fmt"
-
-func MakeError(formatMsg string, args ...interface{}) error {
-	return fmt.Errorf(formatMsg, args...)
-}
-
-func WrapError(err error, formatMsg string, args ...interface{}) error {
-	if err == nil {
-		return nil
-	}
-
-	// TODO add log info
-	return MakeError("%v: [%v]", MakeError(formatMsg, args...), err)
-}

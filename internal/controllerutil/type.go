@@ -28,11 +28,12 @@ const (
 	AppName = "kubeblocks"
 	// common label and annotation keys
 
-	AppInstanceLabelKey      = "app.kubernetes.io/instance"
-	AppComponentLabelKey     = "app.kubernetes.io/component-name"
-	AppNameLabelKey          = "app.kubernetes.io/name"
-	AppManagedByLabelKey     = "app.kubernetes.io/managed-by"
-	ConsensusSetRoleLabelKey = "cs.dbaas.kubeblocks.io/role"
+	AppInstanceLabelKey            = "app.kubernetes.io/instance"
+	AppComponentLabelKey           = "app.kubernetes.io/component-name"
+	AppNameLabelKey                = "app.kubernetes.io/name"
+	AppManagedByLabelKey           = "app.kubernetes.io/managed-by"
+	ConsensusSetRoleLabelKey       = "cs.dbaas.kubeblocks.io/role"
+	ConsensusSetAccessModeLabelKey = "cs.dbaas.kubeblocks.io/access-mode"
 
 	// OpsRequestAnnotationKey OpsRequest annotation key in Cluster
 	OpsRequestAnnotationKey = "kubeblocks.io/ops-request"

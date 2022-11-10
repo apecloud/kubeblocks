@@ -19,6 +19,7 @@ package component
 import (
 	"context"
 	"sort"
+	"strings"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -92,14 +93,15 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 
 	// update cluster.status.component.consensusSetStatus based on all pods currently exist
 	componentName := stsObj.Labels[intctrlutil.AppComponentLabelKey]
-	// first, we calculate the new status
-	newConsensusSetStatus := &dbaasv1alpha1.ConsensusSetStatus{}
-	setConsensusSetStatusRoles(newConsensusSetStatus, *component, pods)
-	// then, compare to the old one
+
+	// first, get the old status
 	var oldConsensusSetStatus *dbaasv1alpha1.ConsensusSetStatus
 	if cluster.Status.Components != nil && cluster.Status.Components[componentName] != nil {
 		oldConsensusSetStatus = cluster.Status.Components[componentName].ConsensusSetStatus
 	}
+	newConsensusSetStatus := oldConsensusSetStatus.DeepCopy()
+	// then, calculate the new status
+	setConsensusSetStatusRoles(newConsensusSetStatus, *component, pods)
 	// if status changed, do update
 	if !cmp.Equal(newConsensusSetStatus, oldConsensusSetStatus) {
 		patch := client.MergeFrom(cluster.DeepCopy())
@@ -440,6 +442,11 @@ func setConsensusSetStatusFollower(consensusSetStatus *dbaasv1alpha1.ConsensusSe
 		Name:       memberExt.name,
 	}
 	consensusSetStatus.Followers = append(consensusSetStatus.Followers, member)
+	sort.SliceStable(consensusSetStatus.Followers, func(i, j int) bool {
+		fi := consensusSetStatus.Followers[i]
+		fj := consensusSetStatus.Followers[j]
+		return strings.Compare(fi.Pod, fj.Pod) < 0
+	})
 
 	return true
 }

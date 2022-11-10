@@ -65,7 +65,7 @@ type ClusterReconciler struct {
 	Recorder record.EventRecorder
 }
 
-type probeMessageData struct {
+type probeMessage struct {
 	Event        string `json:"event,omitempty"`
 	OriginalRole string `json:"originalRole,omitempty"`
 	Role         string `json:"role,omitempty"`
@@ -110,7 +110,7 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 	}
 
 	// get role
-	message := &probeMessageData{}
+	message := &probeMessage{}
 	re := regexp.MustCompile(`Readiness probe failed: {.*({.*}).*}`)
 	matches := re.FindStringSubmatch(event.Message)
 	if len(matches) != 2 {

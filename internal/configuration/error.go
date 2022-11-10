@@ -17,8 +17,9 @@ limitations under the License.
 package configuration
 
 import (
-	"cuelang.org/go/cue/errors"
 	"fmt"
+
+	"cuelang.org/go/cue/errors"
 )
 
 func MakeError(formatMsg string, args ...interface{}) error {

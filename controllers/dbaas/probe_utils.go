@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"strconv"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/leaanthony/debme"
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams,
@@ -24,6 +26,10 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams,
 	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
 	probeContainerByte, err := cueValue.Lookup("probeContainer")
 	if err != nil {
+		return nil, err
+	}
+	container := corev1.Container{}
+	if err = json.Unmarshal(probeContainerByte, &container); err != nil {
 		return nil, err
 	}
 
@@ -45,62 +51,68 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams,
 	// TODO: support status and running probes
 
 	if componentProbes.RoleChangedProbe != nil {
-		container := corev1.Container{}
-		if err = json.Unmarshal(probeContainerByte, &container); err != nil {
-			return nil, err
-		}
-		container.Name = "kbprobe-rolechangedcheck"
-		probe := container.ReadinessProbe
-		probe.Exec.Command = []string{"curl", "-X", "POST",
-			"--fail-with-body", "--silent",
-			"-H", "Content-Type: application/json",
-			"http://localhost:" + strconv.Itoa(int(probeServiceHttpPort)) + "/v1.0/bindings/probe",
-			"-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
-		probe.PeriodSeconds = componentProbes.RoleChangedProbe.PeriodSeconds
-		probe.SuccessThreshold = componentProbes.RoleChangedProbe.SuccessThreshold
-		probe.FailureThreshold = componentProbes.RoleChangedProbe.FailureThreshold
-		container.StartupProbe.TCPSocket.Port = intstr.FromInt(int(probeServiceHttpPort))
-		probeContainers = append(probeContainers, container)
+		roleChangedContainer := container.DeepCopy()
+		buildRoleChangedProbeContainer(roleChangedContainer, componentProbes.RoleChangedProbe, int(probeServiceHttpPort))
+		probeContainers = append(probeContainers, *roleChangedContainer)
 	}
 
 	if len(probeContainers) >= 1 {
 		container := &probeContainers[0]
-		container.Image = viper.GetString("KUBEBLOCKS_IMAGE")
-		container.ImagePullPolicy = corev1.PullPolicy(viper.GetString("KUBEBLOCKS_IMAGE_PULL_POLICY"))
-		logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
-		container.Command = []string{"probe", "--app-id", "batch-sdk",
-			"--dapr-http-port", strconv.Itoa(int(probeServiceHttpPort)),
-			"--dapr-grpc-port", strconv.Itoa(int(probeServiceGrpcPort)),
-			"--app-protocol", "http",
-			"--log-level", logLevel,
-			"--components-path", "/config/components"}
-
-		// set pod name and namespace, for role label updating inside pod
-		podName := corev1.EnvVar{
-			Name: "MY_POD_NAME",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "metadata.name",
-				},
-			},
-		}
-		podNamespace := corev1.EnvVar{
-			Name: "MY_POD_NAMESPACE",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "metadata.namespace",
-				},
-			},
-		}
-		container.Env = append(container.Env, podName, podNamespace)
-
-		container.Ports = []corev1.ContainerPort{{
-			ContainerPort: probeServiceHttpPort,
-			Name:          "probe-port",
-			Protocol:      "TCP",
-		}}
+		buildProbeServiceContainer(container, int(probeServiceHttpPort), int(probeServiceGrpcPort))
 	}
 
 	reqCtx.Log.Info("probe", "containers", probeContainers)
 	return probeContainers, nil
+}
+
+func buildProbeServiceContainer(container *corev1.Container, probeServiceHttpPort int, probeServiceGrpcPort int) {
+	container.Image = viper.GetString("KUBEBLOCKS_IMAGE")
+	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString("KUBEBLOCKS_IMAGE_PULL_POLICY"))
+	logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
+	container.Command = []string{"probe", "--app-id", "batch-sdk",
+		"--dapr-http-port", strconv.Itoa(probeServiceHttpPort),
+		"--dapr-grpc-port", strconv.Itoa(probeServiceGrpcPort),
+		"--app-protocol", "http",
+		"--log-level", logLevel,
+		"--components-path", "/config/components"}
+
+	// set pod name and namespace, for role label updating inside pod
+	podName := corev1.EnvVar{
+		Name: "MY_POD_NAME",
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				FieldPath: "metadata.name",
+			},
+		},
+	}
+	podNamespace := corev1.EnvVar{
+		Name: "MY_POD_NAMESPACE",
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				FieldPath: "metadata.namespace",
+			},
+		},
+	}
+	container.Env = append(container.Env, podName, podNamespace)
+
+	container.Ports = []corev1.ContainerPort{{
+		ContainerPort: int32(probeServiceHttpPort),
+		Name:          "probe-port",
+		Protocol:      "TCP",
+	}}
+}
+
+func buildRoleChangedProbeContainer(roleChangedContainer *corev1.Container,
+	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeServiceHttpPort int) {
+	roleChangedContainer.Name = "kbprobe-rolechangedcheck"
+	probe := roleChangedContainer.ReadinessProbe
+	probe.Exec.Command = []string{"curl", "-X", "POST",
+		"--fail-with-body", "--silent",
+		"-H", "Content-Type: application/json",
+		"http://localhost:" + strconv.Itoa(probeServiceHttpPort) + "/v1.0/bindings/probe",
+		"-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
+	probe.PeriodSeconds = probeSetting.PeriodSeconds
+	probe.SuccessThreshold = probeSetting.SuccessThreshold
+	probe.FailureThreshold = probeSetting.FailureThreshold
+	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(int(probeServiceHttpPort))
 }

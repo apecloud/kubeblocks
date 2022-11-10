@@ -123,6 +123,9 @@ dashboards:
 dataProtection:
   ## disableVolumeSnapshot - set this to true if cluster does not have snapshot.storage.k8s.io API installed
   disableVolumeSnapshot: false
+  backup:
+    schedule: "0 2 * * *"
+    ttl: "168h0m0s"
 
 
 # Sub-charts
@@ -244,4 +247,22 @@ loadbalancer:
 
 wesql:
   enabled: true
+  backup:
+    schedule: "0 2 * * *"
 
+snapshot-controller:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: registry.aliyuncs.com/google_containers/snapshot-controller
+
+csi-s3:
+  enabled: false
+  secret:
+    accessKey: ""
+    secretKey: ""
+    endpoint: https://s3.cn-northwest-1.amazonaws.com.cn
+  storageClass:
+    create: true
+    singleBucket: ""
+    mountOptions: "--memory-limit 1000 --dir-mode 0777 --file-mode 0666 --region cn-northwest-1"

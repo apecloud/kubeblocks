@@ -48,6 +48,11 @@ spec:
             - name: NO_VOLUMESNAPSHOT
               value: "true"
           {{- end }}
+            - name: DP_BACKUP_SCHEDULE
+              value: .Values.dataProtection.backup.schedule
+            - name: DP_BACKUP_TTL
+              value: .Values.dataProtection.backup.ttl
+
           {{- if .Values.admissionWebhooks.enabled }}
             - name: ENABLE_WEBHOOKS
               value: "true"

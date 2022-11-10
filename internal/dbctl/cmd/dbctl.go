@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/backup_config"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -86,6 +88,7 @@ A database management tool for KubeBlocks`,
 		backup.NewBackupCmd(f, ioStreams),
 		options.NewCmdOptions(ioStreams.Out),
 		version.NewVersionCmd(f),
+		backup_config.NewBackupConfigCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}

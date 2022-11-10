@@ -929,7 +929,6 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 		for _, vct := range sts.Spec.VolumeClaimTemplates {
 			if vct.Labels == nil {
 				vct.Labels = make(map[string]string)
-				continue
 			}
 			for k, v := range sts.Labels {
 				if _, ok := vct.Labels[k]; !ok {

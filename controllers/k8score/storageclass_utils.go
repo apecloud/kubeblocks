@@ -1,0 +1,216 @@
+package k8score
+
+import (
+	"context"
+	"fmt"
+	"k8s.io/kubectl/pkg/util/storage"
+	"reflect"
+	"strings"
+
+	"golang.org/x/exp/slices"
+	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+)
+
+func isDefaultStorageClassAnnotation(storageClass *storagev1.StorageClass) bool {
+	return storageClass.Annotations != nil && storageClass.Annotations[storage.IsDefaultStorageClassAnnotation] == "true"
+}
+
+func isSupportVolumeExpansion(storageClass *storagev1.StorageClass) bool {
+	return storageClass.AllowVolumeExpansion != nil && *storageClass.AllowVolumeExpansion
+}
+
+// GetSupportVolumeExpansionComponents Get the components that support volume expansion and the volumeClaimTemplates
+func GetSupportVolumeExpansionComponents(ctx context.Context, cli client.Client,
+	cluster *dbaasv1alpha1.Cluster) ([]dbaasv1alpha1.OperationComponent, error) {
+	var (
+		storageClassMap             = map[string]bool{}
+		hasCheckDefaultStorageClass bool
+		// the default storageClass may not exist, so use a bool key to check
+		defaultStorageClassAllowExpansion bool
+		volumeExpansionComponents         = make([]dbaasv1alpha1.OperationComponent, 0)
+	)
+	for _, v := range cluster.Spec.Components {
+		operationComponent := dbaasv1alpha1.OperationComponent{}
+		for _, vct := range v.VolumeClaimTemplates {
+			if vct.Spec == nil {
+				continue
+			}
+			// check the StorageClass whether support volume expansion
+			if ok, err := checkStorageClassIsSupportExpansion(ctx, cli, storageClassMap, vct.Spec.StorageClassName,
+				&hasCheckDefaultStorageClass, &defaultStorageClassAllowExpansion); err != nil {
+				return nil, err
+			} else if ok {
+				operationComponent.VolumeClaimTemplateNames = append(operationComponent.VolumeClaimTemplateNames, vct.Name)
+			}
+		}
+
+		if len(operationComponent.VolumeClaimTemplateNames) > 0 {
+			operationComponent.Name = v.Name
+			volumeExpansionComponents = append(volumeExpansionComponents, operationComponent)
+		}
+	}
+	return volumeExpansionComponents, nil
+}
+
+// checkStorageClassIsSupportExpansion check whether the storageClass supports volume expansion
+func checkStorageClassIsSupportExpansion(ctx context.Context,
+	cli client.Client,
+	storageClassMap map[string]bool,
+	storageClassName *string,
+	hasCheckDefaultStorageClass *bool,
+	defaultStorageClassAllowExpansion *bool) (bool, error) {
+	var (
+		ok  bool
+		err error
+	)
+	if storageClassName != nil {
+		if ok, err = checkSpecifyStorageClass(ctx, cli, storageClassMap, *storageClassName); err != nil {
+			return false, err
+		}
+		return ok, nil
+	} else {
+		// get the default StorageClass whether supports volume expansion for the first time
+		if !*hasCheckDefaultStorageClass {
+			if *defaultStorageClassAllowExpansion, err = checkDefaultStorageClass(ctx, cli); err != nil {
+				return false, err
+			}
+			*hasCheckDefaultStorageClass = true
+		}
+		return *defaultStorageClassAllowExpansion, nil
+	}
+}
+
+// checkStorageClassIsSupportExpansion check whether the specified storageClass supports volume expansion
+func checkSpecifyStorageClass(ctx context.Context, cli client.Client, storageClassMap map[string]bool, storageClassName string) (bool, error) {
+	var (
+		supportVolumeExpansion bool
+	)
+	if val, ok := storageClassMap[storageClassName]; ok {
+		return val, nil
+	}
+	// if storageClass is not in the storageClassMap, get it
+	storageClass := &storagev1.StorageClass{}
+	if err := cli.Get(ctx, types.NamespacedName{Name: storageClassName}, storageClass); err != nil && !apierrors.IsNotFound(err) {
+		return false, err
+	}
+	// get bool value of StorageClass.AllowVolumeExpansion and put it to storageClassMap
+	if storageClass != nil && storageClass.AllowVolumeExpansion != nil {
+		supportVolumeExpansion = *storageClass.AllowVolumeExpansion
+	}
+	storageClassMap[storageClassName] = supportVolumeExpansion
+	return supportVolumeExpansion, nil
+}
+
+// checkDefaultStorageClass check whether the default storageClass supports volume expansion
+func checkDefaultStorageClass(ctx context.Context, cli client.Client) (bool, error) {
+	storageClassList := &storagev1.StorageClassList{}
+	if err := cli.List(ctx, storageClassList); err != nil {
+		return false, err
+	}
+	// check the first default storageClass
+	for _, sc := range storageClassList.Items {
+		if isDefaultStorageClassAnnotation(&sc) {
+			return sc.AllowVolumeExpansion != nil && *sc.AllowVolumeExpansion, nil
+		}
+	}
+	return false, nil
+}
+
+// getVolumeClaimTemplateName get volumeTemplate name by cluster name and component name
+func getVolumeClaimTemplateName(pvcName, clusterName, componentName string) string {
+	separator := fmt.Sprintf("-%s-%s", clusterName, componentName)
+	return strings.Split(pvcName, separator)[0]
+}
+
+// needSyncClusterStatusWhenAllowExpansion when StorageClass allow volume expansion, do it
+func needSyncClusterStatusWhenAllowExpansion(componentName, volumeClaimTemplateName string, cluster *dbaasv1alpha1.Cluster) bool {
+	var (
+		needSyncStatusOperations bool
+		needAppendComponent      = true
+		volumeExpandable         = cluster.Status.Operations.VolumeExpandable
+	)
+
+	for i, x := range volumeExpandable {
+		if x.Name != componentName {
+			continue
+		}
+		needAppendComponent = false
+		// if old volumeClaimTemplate not support expansion, append it
+		if !slices.Contains(x.VolumeClaimTemplateNames, volumeClaimTemplateName) {
+			x.VolumeClaimTemplateNames = append(x.VolumeClaimTemplateNames, volumeClaimTemplateName)
+			volumeExpandable[i].VolumeClaimTemplateNames = x.VolumeClaimTemplateNames
+			needSyncStatusOperations = true
+		}
+		break
+	}
+	if needAppendComponent {
+		volumeExpandable = append(volumeExpandable, dbaasv1alpha1.OperationComponent{
+			Name:                     componentName,
+			VolumeClaimTemplateNames: []string{volumeClaimTemplateName},
+		})
+		needSyncStatusOperations = true
+	}
+	cluster.Status.Operations.VolumeExpandable = volumeExpandable
+	return needSyncStatusOperations
+}
+
+// needSyncClusterStatusWhenNotAllowExpansion when StorageClass not allow volume expansion, do it
+func needSyncClusterStatusWhenNotAllowExpansion(componentName, volumeClaimTemplateName string, cluster *dbaasv1alpha1.Cluster) bool {
+	var (
+		needSyncStatusOperations bool
+		volumeExpandable         = cluster.Status.Operations.VolumeExpandable
+	)
+	for i, x := range volumeExpandable {
+		if x.Name != componentName {
+			continue
+		}
+		// if old volumeClaimTemplate support expansion, delete it
+		index := slices.Index(x.VolumeClaimTemplateNames, volumeClaimTemplateName)
+		if index != -1 {
+			x.VolumeClaimTemplateNames = append(x.VolumeClaimTemplateNames[:index], x.VolumeClaimTemplateNames[index+1:]...)
+			needSyncStatusOperations = true
+		}
+		// if VolumeClaimTemplateNames is empty, delete the component
+		if len(x.VolumeClaimTemplateNames) == 0 {
+			volumeExpandable = append(volumeExpandable[:i], volumeExpandable[i+1:]...)
+		} else {
+			volumeExpandable[i].VolumeClaimTemplateNames = x.VolumeClaimTemplateNames
+		}
+		break
+	}
+	cluster.Status.Operations.VolumeExpandable = volumeExpandable
+	return needSyncStatusOperations
+}
+
+// needSyncClusterStatus check whether sync cluster.status.operations by StorageClass
+func needSyncClusterStatus(storageClass *storagev1.StorageClass,
+	componentName, volumeClaimTemplateName string,
+	cluster *dbaasv1alpha1.Cluster) bool {
+	if isSupportVolumeExpansion(storageClass) {
+		// if the storageClass support volume expansion
+		return needSyncClusterStatusWhenAllowExpansion(componentName, volumeClaimTemplateName, cluster)
+	} else {
+		return needSyncClusterStatusWhenNotAllowExpansion(componentName, volumeClaimTemplateName, cluster)
+	}
+}
+
+// handleNoExistsPVC when the cluster not exists PVC, maybe the cluster is creating. so we do the same things with creating a cluster.
+func handleNoExistsPVC(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *dbaasv1alpha1.Cluster) (bool, error) {
+	var needSyncStatusOperations bool
+	volumeExpandableComponents, err := GetSupportVolumeExpansionComponents(reqCtx.Ctx, cli, cluster)
+	if err != nil {
+		return false, err
+	}
+	// if volumeExpandable changed, do it
+	if !reflect.DeepEqual(cluster.Status.Operations.VolumeExpandable, volumeExpandableComponents) {
+		cluster.Status.Operations.VolumeExpandable = volumeExpandableComponents
+		needSyncStatusOperations = true
+	}
+	return needSyncStatusOperations, nil
+}

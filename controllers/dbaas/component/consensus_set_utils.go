@@ -92,10 +92,19 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 	if len(pods) == 0 {
 		return true, nil
 	}
+	hasRoleLabel := false
+	for _, pod := range pods {
+		if _, ok := pod.Labels[intctrlutil.ConsensusSetRoleLabelKey]; ok {
+			hasRoleLabel = true
+		}
+	}
+	// do nothing if role label not ready
+	if !hasRoleLabel {
+		return true, nil
+	}
 
 	// update cluster.status.component.consensusSetStatus based on all pods currently exist
 	componentName := stsObj.Labels[intctrlutil.AppComponentLabelKey]
-
 	// first, we calculate the new status
 	newConsensusSetStatus := &dbaasv1alpha1.ConsensusSetStatus{}
 	setConsensusSetStatusRoles(newConsensusSetStatus, *component, pods)

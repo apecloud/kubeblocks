@@ -489,8 +489,11 @@ func resetConsensusSetStatusRole(consensusSetStatus *dbaasv1alpha1.ConsensusSetS
 }
 
 func setConsensusSetStatusRoles(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus,
-	componentDef dbaasv1alpha1.ClusterDefinitionComponent,
-	pods []corev1.Pod) {
+	componentDef dbaasv1alpha1.ClusterDefinitionComponent, pods []corev1.Pod) {
+	if consensusSetStatus == nil {
+		return
+	}
+
 	for _, pod := range pods {
 		if role, ok := pod.Labels[intctrlutil.ConsensusSetRoleLabelKey]; ok {
 			_ = setConsensusSetStatusRole(consensusSetStatus, componentDef, role, pod.Name)

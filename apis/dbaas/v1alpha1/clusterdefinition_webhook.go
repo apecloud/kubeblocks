@@ -17,6 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+	"strings"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -83,6 +86,7 @@ func (r *ClusterDefinition) validate() error {
 	}
 
 	r.validateComponents(&allErrs)
+	r.validateLogFilePatternPrefix(&allErrs)
 
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
@@ -90,6 +94,29 @@ func (r *ClusterDefinition) validate() error {
 			r.Name, allErrs)
 	}
 	return nil
+}
+
+// validateLogsPatternPrefix validate spec.components[*].logsConfig[*].filePathPattern
+func (r *ClusterDefinition) validateLogFilePatternPrefix(allErrs *field.ErrorList) {
+	for idx1, component := range r.Spec.Components {
+		if len(component.LogsConfig) == 0 {
+			continue
+		}
+		volumeMounts := component.PodSpec.Containers[0].VolumeMounts
+		for idx2, logConfig := range component.LogsConfig {
+			flag := false
+			for _, v := range volumeMounts {
+				if strings.HasPrefix(logConfig.FilePathPattern, v.MountPath) {
+					flag = true
+					break
+				}
+			}
+			if !flag {
+				*allErrs = append(*allErrs, field.Required(field.NewPath(fmt.Sprintf("spec.components[%d].logsConfig[%d].filePathPattern", idx1, idx2)),
+					fmt.Sprintf("filePathPattern %s should have a prefix string which in container VolumeMounts", logConfig.FilePathPattern)))
+			}
+		}
+	}
 }
 
 // ValidateComponents validate spec.components is legal

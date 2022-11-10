@@ -358,6 +358,7 @@ func mergeComponents(
 		Service:         clusterDefComp.Service,
 		Scripts:         clusterDefComp.Scripts,
 		Probes:          clusterDefComp.Probes,
+		LogsConfig:      clusterDefComp.LogsConfig,
 	}
 
 	if appVerComp != nil && appVerComp.PodSpec != nil {
@@ -426,6 +427,7 @@ func mergeComponents(
 	affinity := cluster.Spec.Affinity
 	if clusterComp != nil {
 		component.Name = clusterComp.Name
+		component.EnableLogs = clusterComp.EnableLogs
 
 		// respect user's declaration
 		if clusterComp.Replicas > 0 {
@@ -1166,6 +1168,7 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 	sts.Spec.Template.Spec.Containers = append(sts.Spec.Template.Spec.Containers, probeContainers...)
 	prefix := dbaasPrefix + "_" + strings.ToUpper(params.component.Type) + "_"
 	replicas := int(*sts.Spec.Replicas)
+
 	for i := range sts.Spec.Template.Spec.Containers {
 		// inject self scope env
 		c := &sts.Spec.Template.Spec.Containers[i]

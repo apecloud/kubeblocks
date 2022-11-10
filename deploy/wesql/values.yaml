@@ -65,8 +65,7 @@ configTemplate:
     {{- $data_root := getVolumePathByName ( index .PodSpec.Containers 0 ) "data" }}
     {{- $mysql_port_info := getPortByName ( index .PodSpec.Containers 0 ) "mysql" }}
     {{- $pool_buffer_size := ( callBufferSizeByResource ( index .PodSpec.Containers 0 ) ) }}
-
-
+    
     {{- if $pool_buffer_size }}
     innodb-buffer-pool-size={{ $pool_buffer_size }}
     {{- end }}
@@ -84,14 +83,27 @@ configTemplate:
     port={{ $mysql_port }}
     
     datadir={{ $data_root }}/data
-    {{ if $log_root }}
+    
+    {{- if $log_root }}
+    {{- if has "error" $.Component.EnableLogs }}
     # Mysql error log
-    log-error={{ $log_root }}/mysqld.err
+    log_error={{ $log_root }}/mysqld.err
+    {{- end }}
+    
+    {{- if has "slow" $.Component.EnableLogs }}
+    # MySQL Slow log
+    slow_query_log=ON
+    long_query_time=5
+    log_output=FILE
+    slow_query_log_file={{ $log_root }}/mysqld-slow.log
+    {{- end }}
+   
     # SQL access log
     general_log=1
-    general_log_file={{ $log_root }}/mysqld.log
+    general_log_file={{ $log_root }}/mysqld-audit.log
     {{- end }}
- 
+    
+    
     pid-file=/var/run/mysqld/mysqld.pid
     socket=/var/run/mysqld/mysqld.sock
  
@@ -104,3 +116,7 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 appVersionOverride: ""
+
+logsConfig:
+  error: /log/mysql/mysqld.err
+  slow: /log/mysql/*slow.log

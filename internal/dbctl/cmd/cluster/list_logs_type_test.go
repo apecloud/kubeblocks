@@ -20,20 +20,19 @@ import (
 	"net/http"
 	"os"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
 var _ = Describe("logs_list_type test", func() {
@@ -66,19 +65,49 @@ var _ = Describe("logs_list_type test", func() {
 		Expect(o.Complete(o.factory, []string{"cluster-name"})).Should(BeNil())
 		Expect(o.clusterName).Should(Equal("cluster-name"))
 	})
-	It("printLogContext test", func() {
+	It("printContext test", func() {
 		dataObj := &types.ClusterObjects{
-			Cluster:    &dbaasv1alpha1.Cluster{},
-			ClusterDef: &dbaasv1alpha1.ClusterDefinition{},
-			Pods:       &corev1.PodList{},
+			Cluster: &dbaasv1alpha1.Cluster{
+				Spec: dbaasv1alpha1.ClusterSpec{
+					Components: []dbaasv1alpha1.ClusterComponent{
+						{
+							Name:       "component-name",
+							Type:       "component-type",
+							EnableLogs: []string{"slow"},
+						},
+					},
+				},
+			},
+			ClusterDef: &dbaasv1alpha1.ClusterDefinition{
+				Spec: dbaasv1alpha1.ClusterDefinitionSpec{
+					Components: []dbaasv1alpha1.ClusterDefinitionComponent{
+						{
+							TypeName: "component-type",
+							LogsConfig: []*dbaasv1alpha1.LogConfig{
+								{
+									Name:            "slow",
+									FilePathPattern: "",
+								},
+							},
+						},
+					},
+				},
+			},
+			Pods: &corev1.PodList{},
 		}
-		dataObj.ClusterDef.Spec.Type = "state.mysql"
 		pod := corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "foo",
+				Namespace:       "test",
+				ResourceVersion: "10",
+				Labels: map[string]string{
+					"app.kubernetes.io/name": "state.mysql-apecloud-wesql",
+					types.ComponentLabelKey:  "component-name",
+				},
+			},
 		}
-		pod.Name = "instName"
-		pod.Labels = map[string]string{types.ComponentLabelKey: "component-name"}
 		dataObj.Pods.Items = append(dataObj.Pods.Items, pod)
-		Expect(printLogContext(dataObj, os.Stdout, "instName")).Should(BeNil())
+		o := &LogsListOptions{}
+		Expect(o.printListLogsMessage(dataObj, os.Stdout)).Should(BeNil())
 	})
 })

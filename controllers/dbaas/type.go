@@ -70,4 +70,6 @@ type Component struct {
 	Probes               dbaasv1alpha1.ClusterDefinitionProbes  `json:"probes,omitempty"`
 	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 	Monitor              MonitorConfig                          `json:"monitor,omitempty"`
+	EnableLogs           []string                               `json:"enableLogs,omitempty"`
+	LogsConfig           []*dbaasv1alpha1.LogConfig             `json:"logsConfig,omitempty"`
 }

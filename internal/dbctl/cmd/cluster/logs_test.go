@@ -21,6 +21,12 @@ import (
 	"os"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/cluster"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -87,7 +93,7 @@ var _ = Describe("logs", func() {
 		Expect(ok).Should(BeTrue())
 	})
 
-	It("new logs command test", func() {
+	It("new logs command Test", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace("test")
 		defer tf.Cleanup()
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -141,9 +147,65 @@ var _ = Describe("logs", func() {
 		Expect(l.complete([]string{"cluster-name"})).Should(Succeed())
 		Expect(l.validate()).Should(Succeed())
 		Expect(l.logOptions.Options).ShouldNot(BeNil())
-		// validate slow
-		l.fileType = "slow"
-		Expect(l.complete([]string{"cluster-name"})).Should(Succeed())
 
+	})
+
+	It("createFileTypeCommand Test", func() {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "foo",
+				Namespace:       "test",
+				ResourceVersion: "10",
+				Labels: map[string]string{
+					"app.kubernetes.io/name": "state.mysql-apecloud-wesql",
+					types.ComponentLabelKey:  "component-name",
+				},
+			},
+		}
+		obj := cluster.NewClusterObjects()
+		l := &LogsOptions{}
+		// corner case
+		cmd, err := l.createFileTypeCommand(pod, obj)
+		Expect(cmd).Should(Equal(""))
+		Expect(err).Should(HaveOccurred())
+		// normal case
+		obj.Cluster = &dbaasv1alpha1.Cluster{
+			Spec: dbaasv1alpha1.ClusterSpec{
+				Components: []dbaasv1alpha1.ClusterComponent{
+					{
+						Name: "component-name",
+						Type: "component-type",
+					},
+				},
+			},
+		}
+		obj.ClusterDef = &dbaasv1alpha1.ClusterDefinition{
+			Spec: dbaasv1alpha1.ClusterDefinitionSpec{
+				Components: []dbaasv1alpha1.ClusterDefinitionComponent{
+					{
+						TypeName: "component-type",
+						LogsConfig: []*dbaasv1alpha1.LogConfig{
+							{
+								Name:            "slow",
+								FilePathPattern: "/log/mysql/*slow.log",
+							},
+							{
+								Name:            "error",
+								FilePathPattern: "/log/mysql/*.err",
+							},
+						},
+					},
+				},
+			},
+		}
+		l.fileType = "slow"
+		cmd, err = l.createFileTypeCommand(pod, obj)
+		Expect(err).Should(BeNil())
+		Expect(cmd).Should(Equal("ls /log/mysql/*slow.log | xargs tail --lines=0"))
+		// error case
+		l.fileType = "slow-error"
+		cmd, err = l.createFileTypeCommand(pod, obj)
+		Expect(err).Should(HaveOccurred())
+		Expect(cmd).Should(Equal(""))
 	})
 })

@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/engine"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 
@@ -166,29 +166,27 @@ func (o *LogsOptions) complete(args []string) error {
 			o.logOptions.Object = pod
 			o.logOptions.Options, _ = o.logOptions.ToLogOptions()
 		}
-	default:
+	default: // find corresponding file path by file type
 		{
-			// get cluster engine name
-			engineName, err := cluster.GetClusterTypeByPod(pod)
-			if err != nil {
+			obj := cluster.NewClusterObjects()
+			clusterGetter := cluster.ObjectsGetter{
+				ClientSet:      o.ClientSet,
+				DynamicClient:  dynamicClient,
+				Name:           o.clusterName,
+				Namespace:      o.Namespace,
+				WithAppVersion: false,
+				WithConfigMap:  false,
+			}
+			if err := clusterGetter.Get(obj); err != nil {
 				return err
 			}
-			logContext, err := engine.LogsContext(engineName)
-			if err != nil {
+			if command, err = o.createFileTypeCommand(pod, obj); err != nil {
 				return err
-			}
-			fileInfo, ok := logContext[o.fileType]
-			if !ok {
-				return fmt.Errorf("file type %s is not supported yet", o.fileType)
-			}
-			if len(fileInfo.DefaultFilePath) > 0 {
-				command = assembleTail(o.logOptions.Follow, o.logOptions.Tail, o.logOptions.LimitBytes) + " " + fileInfo.DefaultFilePath
-			} else {
-				command = fileInfo.PathSQL + " | xargs " + assembleTail(o.logOptions.Follow, o.logOptions.Tail, o.logOptions.LimitBytes)
 			}
 		}
 	}
 	o.Command = []string{"/bin/bash", "-c", command}
+	fmt.Println(o.Command)
 	o.ContainerName = o.logOptions.Container
 	o.Pod = pod
 	return nil
@@ -222,6 +220,43 @@ func (o *LogsOptions) validate() error {
 		}
 	}
 	return nil
+}
+
+// createFileTypeCommand create file type case and assemble command
+func (o *LogsOptions) createFileTypeCommand(pod *corev1.Pod, obj *types.ClusterObjects) (string, error) {
+	var command string
+	componentName, ok := pod.Labels[types.ComponentLabelKey]
+	if !ok {
+		return command, fmt.Errorf("get component name from pod labels fail")
+	}
+	var comTypeName string
+	for _, comCluster := range obj.Cluster.Spec.Components {
+		if strings.EqualFold(comCluster.Name, componentName) {
+			comTypeName = comCluster.Type
+			break
+		}
+	}
+	if len(comTypeName) == 0 {
+		return command, fmt.Errorf("get pod component type in cluster.yaml fail")
+	}
+	var filePathPattern string
+	for _, com := range obj.ClusterDef.Spec.Components {
+		if strings.EqualFold(com.TypeName, comTypeName) {
+			for _, logConfig := range com.LogsConfig {
+				if strings.EqualFold(logConfig.Name, o.fileType) {
+					filePathPattern = logConfig.FilePathPattern
+					break
+				}
+			}
+			break
+		}
+	}
+	if len(filePathPattern) > 0 {
+		command = "ls " + filePathPattern + " | xargs " + assembleTail(o.logOptions.Follow, o.logOptions.Tail, o.logOptions.LimitBytes)
+	} else {
+		return command, fmt.Errorf("can't get file path pattern by type %s", o.fileType)
+	}
+	return command, nil
 }
 
 // assembleCommand assemble tail command for log file

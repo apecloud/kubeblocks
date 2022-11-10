@@ -211,6 +211,25 @@ spec:
                         specify
                       minimum: 0
                       type: integer
+                    logsConfig:
+                      description: LogsConfig is detail log file config which provided
+                        by ISV
+                      items:
+                        properties:
+                          filePathPattern:
+                            description: FilePathPattern log file path pattern which
+                              indicate how to find this file corresponding to variable
+                              (log path) in database kernel. please don't set this
+                              casually
+                            maxLength: 256
+                            type: string
+                          name:
+                            description: Name log type name, such as slow for MySQL
+                              slow log file
+                            maxLength: 128
+                            type: string
+                        type: object
+                      type: array
                     maxAvailable:
                       description: Maximum available pod count after scale
                       minimum: 0

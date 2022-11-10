@@ -124,6 +124,19 @@ type MonitorConfig struct {
 	Exporter *ExporterConfig `json:"exporterConfig,omitempty"`
 }
 
+type LogConfig struct {
+	// Name log type name, such as slow for MySQL slow log file
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=128
+	Name string `json:"name,omitempty"`
+
+	// FilePathPattern log file path pattern which indicate how to find this file
+	// corresponding to variable (log path) in database kernel. please don't set this casually
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=256
+	FilePathPattern string `json:"filePathPattern,omitempty"`
+}
+
 // ClusterDefinitionComponent is a group of pods, pods in one component usually share the same data
 type ClusterDefinitionComponent struct {
 	// Type name of the component, it can be any valid string
@@ -158,6 +171,10 @@ type ClusterDefinitionComponent struct {
 	// Monitor is monitoring config which provided by ISV
 	// +optional
 	Monitor *MonitorConfig `json:"monitor,omitempty"`
+
+	// LogsConfig is detail log file config which provided by ISV
+	// +optional
+	LogsConfig []*LogConfig `json:"logsConfig,omitempty"`
 
 	// antiAffinity defines components should have anti-affinity constraint to same component type
 	// +kubebuilder:default=false

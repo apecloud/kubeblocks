@@ -9,6 +9,8 @@ appVersionOverride: ""
 monitor:
   enabled: false
 
+enableLogs: [error, slow]
+
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little
@@ -42,7 +44,7 @@ persistence:
   # separate log volume for app log
   log:
     # If enabled, log emptyDir volume will be superseded.
-    enabled: false
+    enabled: true
     storageClassName:
     size: 1Gi
 

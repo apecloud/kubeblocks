@@ -35,15 +35,17 @@ const (
 	defaultAppVersion      = "wesql-8.0.18"
 	clusterCueTemplateName = "cluster_template.cue"
 	monitorKey             = "monitor"
+	enableLogsKey          = "enableLogs"
 )
 
 type CreateOptions struct {
 	// ClusterDefRef reference clusterDefinition
-	ClusterDefRef     string `json:"clusterDefRef"`
-	AppVersionRef     string `json:"appVersionRef"`
-	TerminationPolicy string `json:"terminationPolicy"`
-	PodAntiAffinity   string `json:"podAntiAffinity"`
-	Monitor           bool   `json:"monitor"`
+	ClusterDefRef     string   `json:"clusterDefRef"`
+	AppVersionRef     string   `json:"appVersionRef"`
+	TerminationPolicy string   `json:"terminationPolicy"`
+	PodAntiAffinity   string   `json:"podAntiAffinity"`
+	Monitor           bool     `json:"monitor"`
+	EnableLogs        []string `json:"enableLogs"`
 	// TopologyKeys if TopologyKeys is nil, add omitempty json tag.
 	// because CueLang can not covert null to list.
 	TopologyKeys []string                 `json:"topologyKeys,omitempty"`
@@ -60,6 +62,15 @@ func setMonitor(monitor bool, components []map[string]interface{}) {
 	}
 	for _, component := range components {
 		component[monitorKey] = monitor
+	}
+}
+
+func setEnableLogs(enableLogs []string, components []map[string]interface{}) {
+	if components == nil {
+		return
+	}
+	for _, component := range components {
+		component[enableLogsKey] = enableLogs
 	}
 }
 
@@ -91,6 +102,9 @@ func (o *CreateOptions) Complete() error {
 		}
 	}
 	setMonitor(o.Monitor, components)
+	if len(o.EnableLogs) > 0 {
+		setEnableLogs(o.EnableLogs, components)
+	}
 	o.Components = components
 	return nil
 }
@@ -113,6 +127,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 			cmd.Flags().StringVar(&o.TerminationPolicy, "termination-policy", "Halt", "Termination policy")
 			cmd.Flags().StringVar(&o.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type")
 			cmd.Flags().BoolVar(&o.Monitor, "monitor", false, "Set monitor enabled (default false)")
+			cmd.Flags().StringArrayVar(&o.EnableLogs, "enable-logs", nil, "Enable enhance log file. such as [error, slow]")
 			cmd.Flags().StringArrayVar(&o.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
 			cmd.Flags().StringToStringVar(&o.NodeLabels, "node-labels", nil, "Node label selector")
 			cmd.Flags().StringVar(&o.ComponentsFilePath, "components", "", "Use yaml file to specify the cluster components")

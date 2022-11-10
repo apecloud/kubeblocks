@@ -36,6 +36,11 @@ func GenerateOpenApiSchema(cueTpl string, schemaType string) (*apiextv1.JSONSche
 	}
 
 	insts := load.Instances([]string{"-"}, cfg)
+	for _, ins := range insts {
+		if err := ins.Err; err != nil {
+			return nil, WrapError(err, "failed to generate build.Instance for %s", schemaType)
+		}
+	}
 	if len(insts) != 1 {
 		return nil, MakeError("failed to create cue.Instances. [%s]", cueTpl)
 	}
@@ -48,20 +53,20 @@ func GenerateOpenApiSchema(cueTpl string, schemaType string) (*apiextv1.JSONSche
 		),
 	}
 
-	schema, err := openapicfg.Schemas(cue.Build(insts)[0])
+	schema, err := openapicfg.Schemas(cue.Build(insts)[0]) //nolint:staticcheck
 	if err != nil {
 		return nil, err
 	}
 
 	var (
-		typeSchema *openapi.OrderedMap
+		typeSchema *openapi.OrderedMap //nolint:staticcheck
 		all        = make([]string, len(schema.Elts))
 	)
 
 	for _, kv := range schema.Pairs() {
 		all = append(all, kv.Key)
 		if kv.Key == schemaType || schemaType == "" {
-			typeSchema = kv.Value.(*openapi.OrderedMap)
+			typeSchema = kv.Value.(*openapi.OrderedMap) //nolint:staticcheck
 			break
 		}
 	}

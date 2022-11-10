@@ -31,6 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/config"
 	pb "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol"
+	"github.com/apecloud/kubeblocks/internal/loadbalancer/subnet"
 )
 
 type NodeResource struct {
@@ -59,6 +60,7 @@ type eniManager struct {
 	instanceID       string
 	subnetID         string
 	securityGroupIds []string
+	availabilityZone string
 	resource         *NodeResource
 	cp               cloud.Provider
 	nc               pb.NodeClient
@@ -263,6 +265,12 @@ func (c *eniManager) ensureENI() error {
 
 func (c *eniManager) tryCreateAndAttachENI() error {
 	c.logger.Info("Try to create and attach new eni")
+
+	subnetID, err := subnet.ChooseSubnet(c.availabilityZone)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to choose subnet in az %s", c.availabilityZone)
+	}
+	c.logger.Info("Successfully choose subnet", "subnet id", subnetID, "az", c.availabilityZone)
 
 	// create ENI, use same sg and subnet as primary ENI
 	eniID, err := c.cp.CreateENI(c.instanceID, c.subnetID, c.securityGroupIds)

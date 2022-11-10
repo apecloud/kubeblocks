@@ -30,6 +30,10 @@ type Provider interface {
 
 	GetInstanceInfo() *InstanceInfo
 
+	DescribeAllENIs() (map[string]*ENIMetadata, error)
+
+	WaitForENIAttached(eniID string) (ENIMetadata, error)
+
 	CreateENI(instanceID, subnetID string, securityGroupIDs []string) (string, error)
 
 	AttachENI(instanceID string, eniID string) (string, error)
@@ -37,8 +41,6 @@ type Provider interface {
 	DeleteENI(eniID string) error
 
 	FreeENI(eniID string) error
-
-	DescribeAllENIs() (map[string]*ENIMetadata, error)
 
 	FindLeakedENIs(instanceID string) ([]*ENIMetadata, error)
 
@@ -48,15 +50,23 @@ type Provider interface {
 
 	AssignPrivateIPAddresses(eniID string, ip string) error
 
-	WaitForENIAttached(eniID string) (ENIMetadata, error)
-
 	ModifySourceDestCheck(eniID string, enabled bool) error
+
+	CreateSubnet(az string, vpcID string, cidr string) (string, error)
+
+	DescribeSubnets() (Subnet, error)
+}
+
+type Subnet struct {
+	ID string
 }
 
 type InstanceInfo struct {
 	InstanceID string `json:"instance_id"`
 
 	SubnetID string `json:"subnet_id"`
+
+	AvailabilityZone string `json:"availability_zone"`
 
 	SecurityGroupIDs []string `json:"security_group_ids"`
 }

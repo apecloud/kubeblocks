@@ -76,6 +76,7 @@ func (p Proxy) DescribeNodeInfo(ctx context.Context, request *pb.DescribeNodeInf
 		Info: &pb.InstanceInfo{
 			InstanceId:       info.InstanceID,
 			SubnetId:         info.SubnetID,
+			AvailabilityZone: info.AvailabilityZone,
 			SecurityGroupIds: info.SecurityGroupIDs,
 		},
 	}

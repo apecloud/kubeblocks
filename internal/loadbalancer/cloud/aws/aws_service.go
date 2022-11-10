@@ -175,6 +175,7 @@ func (c *awsService) GetInstanceInfo() *cloud.InstanceInfo {
 	return &cloud.InstanceInfo{
 		InstanceID:       c.instanceID,
 		SubnetID:         c.subnetID,
+		AvailabilityZone: c.availabilityZone,
 		SecurityGroupIDs: c.securityGroups,
 	}
 }

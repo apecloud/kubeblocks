@@ -98,6 +98,8 @@ message InstanceInfo {
   string subnet_id = 2;
 
   repeated string security_group_ids = 3;
+
+  string availability_zone = 4;
 }
 
 message ENIMetadata {

@@ -74,13 +74,13 @@ spec:
                   type: string
                 type: array
               formatter:
-                default: YAML
+                default: yaml
                 enum:
-                - DOTENV
-                - INI
-                - YAML
-                - JSON
-                - HCL
+                - dotenv
+                - ini
+                - yaml
+                - json
+                - hcl
                 type: string
               immutable:
                 description: Immutable, if set to true, ensures that data stored in
@@ -105,11 +105,11 @@ spec:
                   determines how to generate the configurations
                 type: string
               upgradeMode:
-                default: STATIC_MODE
+                default: dynamic
                 description: UpgradeMode describe parameter update mode
                 enum:
-                - DYNAMIC_MODE
-                - STATIC_MODE
+                - dynamic
+                - static
                 type: string
             type: object
           status:
@@ -129,9 +129,9 @@ spec:
                   to AvailablePhase, ConfigurationTemplate be used by ClusterDefinition
                   or AppVersion
                 enum:
-                - AvailablePhase
-                - UnavailablePhase
-                - DeletingPhase
+                - Available
+                - Unavailable
+                - Deleting
                 type: string
             type: object
         type: object

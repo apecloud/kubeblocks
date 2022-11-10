@@ -94,18 +94,20 @@ func CheckConfigurationTemplate(cli client.Client, ctx intctrlutil.RequestCtx, t
 		return GetConfigMapByName(cli, ctx, configTpl)
 	}
 
-	// TODO(zt) validate configuration template
+	// validate configuration template
 	isConfigSchemaFn := func(tpl *dbaasv1alpha1.CustomParametersValidation) (bool, error) {
-		// TODO(zt)
+		if tpl.Cue == nil {
+			return true, nil
+		}
 
-		return false, nil
+		err := cfgcore.CueValidate(*tpl.Cue)
+		return err == nil, err
 	}
 
 	return checkConfigTpl(ctx, tpl, configmapFn, isConfigSchemaFn)
 }
 
 func UpdateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplate) error {
-	// TODO(zt)
 	// step1: add finalizer
 	// step2: add labels: CMConfigurationTplLabelKey
 	// step3: update immutable

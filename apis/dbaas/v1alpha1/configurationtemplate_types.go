@@ -71,13 +71,13 @@ type ConfigurationTemplateSpec struct {
 	ImmutableParameters []string `json:"immutableParameters,omitempty"`
 
 	// UpgradeMode describe parameter update mode
-	// +kubebuilder:default:Enum=STATIC_MODE
-	// +kubebuilder:validation:Enum=DYNAMIC_MODE;STATIC_MODE
+	// +kubebuilder:default:Enum=dynamic
+	// +kubebuilder:validation:Enum={dynamic,static}
 	// +kubebuilder:validation:Optional
 	UpgradeMode UpdateMode `json:"upgradeMode,omitempty"`
 
-	// +kubebuilder:default:Enum=YAML
-	// +kubebuilder:validation:Enum=DOTENV;INI;YAML;JSON;HCL
+	// +kubebuilder:default:Enum=yaml
+	// +kubebuilder:validation:Enum={dotenv,ini,yaml,json,hcl}
 	Formatter ConfigurationFormatter `json:"formatter,omitempty"`
 
 	// Immutable, if set to true, ensures that data stored in the ConfigMap cannot be updated (only object metadata can be modified).
@@ -95,7 +95,7 @@ type ConfigurationTemplateStatus struct {
 
 	// Phase is configuration template status, if it is set to AvailablePhase,
 	// ConfigurationTemplate be used by ClusterDefinition or AppVersion
-	// +kubebuilder:validation:Enum=AvailablePhase;UnavailablePhase;DeletingPhase
+	// +kubebuilder:validation:Enum={Available,Unavailable,Deleting}
 	// +kubebuilder:validation:Optional
 	Phase Phase `json:"phase,omitempty"`
 

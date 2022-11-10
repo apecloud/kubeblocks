@@ -22,6 +22,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"reflect"
 	"strconv"
@@ -107,35 +108,19 @@ var _ = Describe("Cluster Controller", func() {
 
 	assureCfgTplConfigMapObj := func(cmName string) *corev1.ConfigMap {
 		By("Assuring an cm obj")
-		appVerYAML := `
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: mysql-tree-node-template-8.0
-  namespace: default
-data:
-  my.cnf: |-
-    [mysqld]
-    innodb-buffer-pool-size=512M
-    log-bin=master-bin
-    gtid_mode=OFF
-    consensus_auto_leader_transfer=ON
-    
-    pid-file=/var/run/mysqld/mysqld.pid
-    socket=/var/run/mysqld/mysqld.sock
+		configmapYAML, err := os.ReadFile("./testdata/mysql_configmap.yaml")
+		Expect(err).Should(BeNil())
+		Expect(configmapYAML).ShouldNot(BeNil())
+		configTemplateYaml, err := os.ReadFile("./testdata/mysql_config_template.yaml")
+		Expect(err).Should(BeNil())
+		Expect(configTemplateYaml).ShouldNot(BeNil())
 
-    port=3306
-    general_log=0
-    server-id=1
-    slow_query_log=0
-    
-    [client]
-    socket=/var/run/mysqld/mysqld.sock
-    host=localhost
-`
 		cfgCM := &corev1.ConfigMap{}
-		Expect(yaml.Unmarshal([]byte(appVerYAML), cfgCM)).Should(Succeed())
+		cfgTpl := &dbaasv1alpha1.ConfigurationTemplate{}
+		Expect(yaml.Unmarshal(configmapYAML, cfgCM)).Should(Succeed())
+		Expect(yaml.Unmarshal(configTemplateYaml, cfgTpl)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, cfgTpl)).Should(Succeed())
 		return cfgCM
 	}
 

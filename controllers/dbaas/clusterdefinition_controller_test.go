@@ -18,6 +18,7 @@ package dbaas
 
 import (
 	"context"
+	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -153,41 +154,28 @@ spec:
         image: "prom/mysqld-exporter:v0.14.0"
 `
 
-	configTemplateYaml := `
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: mysql-tree-node-template-8.0-test
-  namespace: default
-data:
-  my.cnf: |-
-    [mysqld]
-    innodb-buffer-pool-size=512M
-    log-bin=master-bin
-    gtid_mode=OFF
-    consensus_auto_leader_transfer=ON
-    
-    pid-file=/var/run/mysqld/mysqld.pid
-    socket=/var/run/mysqld/mysqld.sock
-
-    port=3306
-    general_log=0
-    server-id=1
-    slow_query_log=0
-    
-    [client]
-    socket=/var/run/mysqld/mysqld.sock
-    host=localhost
-`
-
 	assureCfgTplConfigMapObj := func(cmName, cmNs string) *corev1.ConfigMap {
 		By("By assure an cm obj")
 
+		configmapYAML, err := os.ReadFile("./testdata/mysql_configmap.yaml")
+		Expect(err).Should(BeNil())
+		Expect(configmapYAML).ShouldNot(BeNil())
+		configTemplateYaml, err := os.ReadFile("./testdata/mysql_config_template.yaml")
+		Expect(err).Should(BeNil())
+		Expect(configTemplateYaml).ShouldNot(BeNil())
+
 		cfgCM := &corev1.ConfigMap{}
-		Expect(yaml.Unmarshal([]byte(configTemplateYaml), cfgCM)).Should(Succeed())
-		cfgCM.Name = cmNs
+		cfgTpl := &dbaasv1alpha1.ConfigurationTemplate{}
+		Expect(yaml.Unmarshal(configmapYAML, cfgCM)).Should(Succeed())
+		Expect(yaml.Unmarshal(configTemplateYaml, cfgTpl)).Should(Succeed())
+
 		cfgCM.Name = cmName
+		cfgCM.Namespace = cmNs
 		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
+
+		cfgTpl.Name = cmName
+		cfgTpl.Spec.TplRef = cmName
+		Expect(testCtx.CheckedCreateObj(ctx, cfgTpl)).Should(Succeed())
 		return cfgCM
 	}
 

@@ -156,18 +156,21 @@ func checkConfigTpl(ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.Configuration
 
 type ConfigTemplateHander func([]dbaasv1alpha1.ConfigTemplate) (bool, error)
 
-func CheckClusterDefinitionTemplate(client client.Client, ctx intctrlutil.RequestCtx, clusterDef *dbaasv1alpha1.ClusterDefinition) (bool, error) {
+func CheckCDConfigTemplate(client client.Client, ctx intctrlutil.RequestCtx, clusterDef *dbaasv1alpha1.ClusterDefinition) (bool, error) {
 	return HandleConfigTemplate(clusterDef, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 		return validateConfTpls(client, ctx, tpls)
 	})
 }
 
-func HandleConfigTemplate(clusterDef *dbaasv1alpha1.ClusterDefinition, handler ConfigTemplateHander) (bool, error) {
-	tpls := make([]dbaasv1alpha1.ConfigTemplate, 0)
-	for _, component := range clusterDef.Spec.Components {
-		if len(component.ConfigTemplateRefs) > 0 {
-			tpls = append(tpls, component.ConfigTemplateRefs...)
-		}
+func HandleConfigTemplate(object client.Object, handler ConfigTemplateHander) (bool, error) {
+	var tpls []dbaasv1alpha1.ConfigTemplate
+	switch cr := object.(type) {
+	case *dbaasv1alpha1.ClusterDefinition:
+		tpls = getCfgTplFromCD(cr)
+	case *dbaasv1alpha1.AppVersion:
+		tpls = getCfgTplFromAV(cr)
+	default:
+		return false, cfgcore.MakeError("not support CR type: %v", cr)
 	}
 
 	if len(tpls) > 0 {
@@ -177,7 +180,27 @@ func HandleConfigTemplate(clusterDef *dbaasv1alpha1.ClusterDefinition, handler C
 	}
 }
 
-func UpdateLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, cd *dbaasv1alpha1.ClusterDefinition) (bool, error) {
+func getCfgTplFromAV(appVer *dbaasv1alpha1.AppVersion) []dbaasv1alpha1.ConfigTemplate {
+	tpls := make([]dbaasv1alpha1.ConfigTemplate, 0)
+	for _, component := range appVer.Spec.Components {
+		if len(component.ConfigTemplateRefs) > 0 {
+			tpls = append(tpls, component.ConfigTemplateRefs...)
+		}
+	}
+	return tpls
+}
+
+func getCfgTplFromCD(clusterDef *dbaasv1alpha1.ClusterDefinition) []dbaasv1alpha1.ConfigTemplate {
+	tpls := make([]dbaasv1alpha1.ConfigTemplate, 0)
+	for _, component := range clusterDef.Spec.Components {
+		if len(component.ConfigTemplateRefs) > 0 {
+			tpls = append(tpls, component.ConfigTemplateRefs...)
+		}
+	}
+	return tpls
+}
+
+func UpdateCDLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, cd *dbaasv1alpha1.ClusterDefinition) (bool, error) {
 	return HandleConfigTemplate(cd, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 		patch := client.MergeFrom(cd.DeepCopy())
 		for _, tpl := range tpls {
@@ -187,17 +210,20 @@ func UpdateLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.Reque
 	})
 }
 
-func CheckAppVersionTemplate(client client.Client, ctx intctrlutil.RequestCtx, appVersion *dbaasv1alpha1.AppVersion) (bool, error) {
-	for _, component := range appVersion.Spec.Components {
-		if len(component.ConfigTemplateRefs) == 0 {
-			continue
-		}
+func CheckAVConfigTemplate(client client.Client, ctx intctrlutil.RequestCtx, appVersion *dbaasv1alpha1.AppVersion) (bool, error) {
+	return HandleConfigTemplate(appVersion, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
+		return validateConfTpls(client, ctx, tpls)
+	})
+}
 
-		if ok, err := validateConfTpls(client, ctx, component.ConfigTemplateRefs); !ok || err != nil {
-			return ok, err
+func UpdateAVLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, appVer *dbaasv1alpha1.AppVersion) (bool, error) {
+	return HandleConfigTemplate(appVer, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
+		patch := client.MergeFrom(appVer.DeepCopy())
+		for _, tpl := range tpls {
+			appVer.Labels[GenerateUniqKeyWithConfig(ConfigurationTplLabelPrefixKey, tpl.Name)] = tpl.Name
 		}
-	}
-	return true, nil
+		return true, cli.Patch(ctx.Ctx, appVer, patch)
+	})
 }
 
 func validateConfTpls(cli client.Client, ctx intctrlutil.RequestCtx, configTpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {

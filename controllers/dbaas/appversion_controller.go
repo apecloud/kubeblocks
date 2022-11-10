@@ -141,8 +141,12 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return intctrlutil.Reconciled()
 	}
 
-	if ok, err := dbaasconfig.CheckAppVersionTemplate(r.Client, reqCtx, appVersion); !ok || err != nil {
+	if ok, err := dbaasconfig.CheckAVConfigTemplate(r.Client, reqCtx, appVersion); !ok || err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "configMapIsReady")
+	}
+
+	if ok, err := dbaasconfig.UpdateAVLabelsWithUsingConfiguration(r.Client, reqCtx, appVersion); !ok || err != nil {
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "update using config template info")
 	}
 
 	clusterdefinition := &dbaasv1alpha1.ClusterDefinition{}

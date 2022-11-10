@@ -94,11 +94,11 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return intctrlutil.Reconciled()
 	}
 
-	if ok, err := dbaasconfig.CheckClusterDefinitionTemplate(r.Client, reqCtx, dbClusterDef); !ok || err != nil {
+	if ok, err := dbaasconfig.CheckCDConfigTemplate(r.Client, reqCtx, dbClusterDef); !ok || err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "configMapIsReady")
 	}
 
-	if ok, err := dbaasconfig.UpdateLabelsWithUsingConfiguration(r.Client, reqCtx, dbClusterDef); !ok || err != nil {
+	if ok, err := dbaasconfig.UpdateCDLabelsWithUsingConfiguration(r.Client, reqCtx, dbClusterDef); !ok || err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "update using config template info")
 	}
 

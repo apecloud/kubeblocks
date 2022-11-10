@@ -50,6 +50,10 @@ type ConfigurationTemplateSpec struct {
 	// +kubebuilder:validation:Required
 	TplRef string `json:"tplRef,omitempty"`
 
+	// CfgSchemaTopLevelName is cue type name, which generate openapi schema
+	// +kubebuilder:validation:Optional
+	CfgSchemaTopLevelName string `json:"cfgSchemaTopLevelName,omitempty"`
+
 	// ConfigurationSchema that impose restrictions on engine parameter's rule
 	// +optional
 	ConfigurationSchema *CustomParametersValidation `json:"configurationSchema,omitempty"`

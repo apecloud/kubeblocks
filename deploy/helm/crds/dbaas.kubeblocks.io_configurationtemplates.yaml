@@ -48,6 +48,10 @@ spec:
           spec:
             description: ConfigurationTemplateSpec defines the desired state of ConfigurationTemplate
             properties:
+              cfgSchemaTopLevelName:
+                description: CfgSchemaTopLevelName is cue type name, which generate
+                  openapi schema
+                type: string
               configurationSchema:
                 description: ConfigurationSchema that impose restrictions on engine
                   parameter's rule

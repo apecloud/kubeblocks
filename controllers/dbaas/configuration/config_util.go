@@ -249,3 +249,15 @@ func GetConfigurationVersion(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, 
 		Configurations: cfg.Data,
 	}, option)
 }
+
+func UpdateConfigurationSchema(tpl *dbaasv1alpha1.ConfigurationTemplateSpec) error {
+	schema := tpl.ConfigurationSchema
+	if schema.Cue != nil && len(*schema.Cue) > 0 && schema.Schema == nil {
+		customSchema, err := cfgcore.GenerateOpenApiSchema(*schema.Cue, tpl.CfgSchemaTopLevelName)
+		if err != nil {
+			return err
+		}
+		tpl.ConfigurationSchema.Schema = customSchema
+	}
+	return nil
+}

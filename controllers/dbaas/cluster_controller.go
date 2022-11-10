@@ -117,17 +117,10 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 	if err != nil {
 		// not role related message, ignore it
 		reqCtx.Log.Info("not role message", "message", event.Message, "error", err)
-		//return nil
-	}
-	currentRoleStr := "current role: "
-	index := strings.Index(event.Message, currentRoleStr)
-	if index < 0 {
 		return nil
 	}
-	endIndex := strings.Index(event.Message[index+len(currentRoleStr):], "\"")
-	role := event.Message[index+len(currentRoleStr) : index+len(currentRoleStr)+endIndex]
-	role = strings.ToLower(role)
-	//role := strings.ToLower(message.Data.Role)
+
+	role := strings.ToLower(message.Data.Role)
 	podName := types.NamespacedName{
 		Namespace: event.InvolvedObject.Namespace,
 		Name:      event.InvolvedObject.Name,

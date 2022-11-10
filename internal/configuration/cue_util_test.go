@@ -63,9 +63,9 @@ func TestCueLang(t *testing.T) {
 		// SectionName is extract section name
 
 		// [OFF|ON] default ON
-		//if SectionName != "client" {
+		if SectionName != "client" {
 			automatic_sp_privileges: string & "OFF" | "ON" | *"ON"
-		//}
+		}
 
 		// [1~65535] default ON
 		auto_increment_increment: int & >= 1 & <= 65535 | *1

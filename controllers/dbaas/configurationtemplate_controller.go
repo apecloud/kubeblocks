@@ -73,7 +73,8 @@ func (r *ConfigurationTemplateReconciler) Reconcile(ctx context.Context, req ctr
 				"cannot be deleted because of existing referencing ClusterDefinition or AppVersion.")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, configTpl,
-			dbaasconfig.ConfigurationTplLabelKey, recordEvent, &dbaasv1alpha1.ClusterDefinitionList{},
+			dbaasconfig.GenerateUniqKeyWithConfig(dbaasconfig.ConfigurationTplLabelPrefixKey, configTpl.GetName()),
+			recordEvent, &dbaasv1alpha1.ClusterDefinitionList{},
 			&dbaasv1alpha1.AppVersionList{}); res != nil || err != nil {
 			return res, err
 		}
@@ -126,7 +127,7 @@ func (r *ConfigurationTemplateReconciler) deleteExternalResources(reqCtx intctrl
 
 	// delete any external resources associated with the configuration template
 	labels := client.MatchingLabels{
-		dbaasconfig.ConfigurationTplLabelKey: configTpl.GetName(),
+		dbaasconfig.CMConfigurationTplNameLabelKey: configTpl.GetName(),
 	}
 	ns := client.InNamespace(dbaasconfig.ConfigNamespaceKey)
 

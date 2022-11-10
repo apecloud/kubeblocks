@@ -11,7 +11,8 @@ spec:
 
   # ConfigurationSchema that impose restrictions on engine parameter's rule
   configurationSchema:
-    # schema:
+    # schema: auto generate from cue scripts
+    # example: ../../internal/configuration/testdata/mysql_openapi.json
     cue: |-
       // top level configuration type
       #MysqlParameter: {
@@ -24,6 +25,7 @@ spec:
             // [1~65535] default ON
             auto_increment_increment: int & >= 1 & <= 65535 | *1
 
+            // [4096~16777216] default 2G
             binlog_stmt_cache_size?: int & >= 4096 & <= 16777216 | *2097152
 
             // [0|1|2] default: 2

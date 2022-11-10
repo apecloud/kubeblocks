@@ -98,6 +98,10 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "configMapIsReady")
 	}
 
+	if ok, err := dbaasconfig.UpdateLabelsWithUsingConfiguration(r.Client, reqCtx, dbClusterDef); !ok || err != nil {
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "update using config template info")
+	}
+
 	for _, handler := range clusterDefUpdateHandlers {
 		if err := handler(r.Client, reqCtx.Ctx, dbClusterDef); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")

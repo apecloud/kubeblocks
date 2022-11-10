@@ -17,53 +17,92 @@ limitations under the License.
 package configuration
 
 import (
+	"bytes"
 	"encoding/json"
-	"fmt"
+	"os"
+	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/google/go-cmp/cmp"
 )
 
-func TestCueOpenApi(t *testing.T) {
-
-	mysqlCfgTpl := `
-#MysqlParameter: {
-	[SectionName=_]: {
-		// SectionName is extract section name
-
-		// [OFF|ON] default ON
-		//if SectionName != "client" {
-			automatic_sp_privileges: string & "OFF" | "ON" | *"ON"
-		//}
-
-		// [1~65535] default ON
-		auto_increment_increment: int & >= 1 & <= 65535 | *1
-
-		binlog_stmt_cache_size?: int & >= 4096 & <= 16777216 | *2097152
-		// [0|1|2] default: 2
-		innodb_autoinc_lock_mode?: int & 0 | 1 | 2 | *2
-
-		// other parmeters
-		// reference mysql parmeters
-		...
+func TestGenerateOpenApiSchema(t *testing.T) {
+	type args struct {
+		cueFile    string
+		schemaType string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "normal_test",
+			args: args{
+				cueFile:    "mysql.cue",
+				schemaType: "MysqlParameter",
+			},
+			want:    "mysql_openapi.json",
+			wantErr: false,
+		},
+		{
+			name: "normal_with_not_empty",
+			args: args{
+				cueFile:    "mysql.cue",
+				schemaType: "",
+			},
+			want:    "mysql_openapi.json",
+			wantErr: false,
+		},
+		{
+			name: "failed_test",
+			args: args{
+				cueFile:    "mysql.cue",
+				schemaType: "NotType",
+			},
+			want:    "mysql_openapi_failed_not_exist",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := runOpenApiTest(tt.args.cueFile, tt.args.schemaType)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GenerateOpenApiSchema() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			wantContent := getContentFromFile(tt.want)
+			if !reflect.DeepEqual(got, wantContent) {
+				t.Errorf("GenerateOpenApiSchema() diff: %s", cmp.Diff(wantContent, got))
+			}
+		})
 	}
 }
 
-// configuration require
-configuration: #MysqlParameter & {
+func getContentFromFile(file string) []byte {
+	content, err := os.ReadFile("./testdata/" + file)
+	if err != nil {
+		return nil
+	}
+	return content
 }
-`
 
-	schema, err := GenerateOpenApiSchema(mysqlCfgTpl, "MysqlParameter")
-	require.Nil(t, err)
-	schemaString, _ := json.Marshal(schema)
-	fmt.Println(string(schemaString))
+func runOpenApiTest(cueFile string, typeName string) ([]byte, error) {
+	cueTpl := getContentFromFile(cueFile)
+	if cueTpl == nil {
+		return nil, MakeError("not open file[%s]", cueTpl)
+	}
 
-	schema, err = GenerateOpenApiSchema(mysqlCfgTpl, "MysqlParameter_not_exist")
-	require.NotNil(t, err)
-	require.Nil(t, schema)
+	schema, err := GenerateOpenApiSchema(string(cueTpl), typeName)
+	if err != nil {
+		return nil, err
+	}
 
-	schema, err = GenerateOpenApiSchema(mysqlCfgTpl, "")
-	require.Nil(t, err)
-	require.NotNil(t, schema)
+	b, _ := json.Marshal(schema)
+
+	var out = &bytes.Buffer{}
+	_ = json.Indent(out, b, "", "  ")
+
+	return out.Bytes(), nil
 }

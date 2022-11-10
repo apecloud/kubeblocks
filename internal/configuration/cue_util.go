@@ -17,11 +17,13 @@ limitations under the License.
 package configuration
 
 import (
+	"strings"
+
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/spf13/viper"
-	"strings"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
 // CueValidate cue validate

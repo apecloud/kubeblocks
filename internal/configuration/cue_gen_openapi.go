@@ -52,7 +52,7 @@ func GenerateOpenApiSchema(cueTpl string, schemaType string) (*apiextv1.JSONSche
 	openapicfg := openapi.Config{
 		Version:       OpenApiVersion,
 		SelfContained: true,
-		//ExpandReferences: true,
+		// ExpandReferences: true,
 		Info: ast.NewStruct(
 			"title", ast.NewString(fmt.Sprintf("%s configuration schema", schemaType)),
 			"version", ast.NewString(OpenApiVersion),

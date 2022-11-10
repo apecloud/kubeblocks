@@ -20,6 +20,8 @@ import (
 	"context"
 	"sort"
 
+	"github.com/google/go-cmp/cmp"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -87,14 +89,33 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 	if err != nil {
 		return false, err
 	}
+	if len(pods) == 0 {
+		return true, nil
+	}
 
 	// update cluster.status.component.consensusSetStatus based on all pods currently exist
-	patch := client.MergeFrom(cluster.DeepCopy())
 	componentName := stsObj.Labels[intctrlutil.AppComponentLabelKey]
-	resetAllClusterConsensusRoleStatus(cluster, componentName)
-	updateAllClusterConsensusRoleStatus(cluster, *component, componentName, pods)
-	if err = cli.Status().Patch(ctx, cluster, patch); err != nil {
-		return false, err
+
+	// first, we calculate the new status
+	newConsensusSetStatus := &dbaasv1alpha1.ConsensusSetStatus{}
+	setConsensusSetStatusRoles(newConsensusSetStatus, *component, pods)
+	// then, compare to the old one
+	var oldConsensusSetStatus *dbaasv1alpha1.ConsensusSetStatus
+	if cluster.Status.Components != nil {
+		oldConsensusSetStatus = cluster.Status.Components[componentName].ConsensusSetStatus
+	}
+	// if status changed, do update
+	if !cmp.Equal(newConsensusSetStatus, oldConsensusSetStatus) {
+		patch := client.MergeFrom(cluster.DeepCopy())
+		if oldConsensusSetStatus != nil {
+			cluster.Status.Components[componentName].ConsensusSetStatus = nil
+		}
+		initClusterComponentStatusIfNeed(cluster, componentName)
+		oldConsensusSetStatus = cluster.Status.Components[componentName].ConsensusSetStatus
+		setConsensusSetStatusRoles(oldConsensusSetStatus, *component, pods)
+		if err = cli.Status().Patch(ctx, cluster, patch); err != nil {
+			return false, err
+		}
 	}
 
 	// get pod label and name, compute plan
@@ -308,25 +329,29 @@ func UpdateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCt
 
 	// prepare cluster status patch
 	patch = client.MergeFrom(cluster.DeepCopy())
-	needUpdate := setClusterConsensusRoleStatus(cluster, *componentDef, componentName, role, pod.Name)
+	initClusterComponentStatusIfNeed(cluster, componentName)
+	consensusSetStatus := cluster.Status.Components[componentName].ConsensusSetStatus
+	needUpdate := setConsensusSetStatusRole(consensusSetStatus, *componentDef, role, pod.Name)
 	// update cluster status
-	if needUpdate {
-		err = cli.Status().Patch(ctx, cluster, patch)
-		if err != nil {
-			return err
-		}
-
-		// update pod accessMode label
-		if err := cli.Get(ctx, podName, pod); err != nil {
-			return err
-		}
-		patchAccessMode := client.MergeFrom(pod.DeepCopy())
-		roleMap := composeConsensusRoleMap(*componentDef)
-		pod.Labels[intctrlutil.ConsensusSetAccessModeLabelKey] = string(roleMap[role].accessMode)
-		return cli.Patch(ctx, pod, patchAccessMode)
+	if !needUpdate {
+		return nil
 	}
 
-	return nil
+	err = cli.Status().Patch(ctx, cluster, patch)
+	if err != nil {
+		return err
+	}
+
+	// update pod accessMode label
+	if err := cli.Get(ctx, podName, pod); err != nil {
+		return err
+	}
+	patchAccessMode := client.MergeFrom(pod.DeepCopy())
+	roleMap := composeConsensusRoleMap(*componentDef)
+	pod.Labels[intctrlutil.ConsensusSetAccessModeLabelKey] = string(roleMap[role].accessMode)
+
+	return cli.Patch(ctx, pod, patchAccessMode)
+
 }
 func putConsensusMemberExt(roleMap map[string]consensusMemberExt, name string, role ConsensusRole, accessMode dbaasv1alpha1.AccessMode) {
 	if roleMap == nil {
@@ -381,13 +406,6 @@ func initClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster, componentN
 		cluster.Status.Components[componentName] = &dbaasv1alpha1.ClusterStatusComponent{
 			Type:  typeName,
 			Phase: dbaasv1alpha1.RunningPhase,
-			ConsensusSetStatus: &dbaasv1alpha1.ConsensusSetStatus{
-				Leader: dbaasv1alpha1.ConsensusMemberStatus{
-					Pod:        consensusSetStatusDefaultPodName,
-					AccessMode: dbaasv1alpha1.None,
-					Name:       "",
-				},
-			},
 		}
 	}
 	componentStatus := cluster.Status.Components[componentName]
@@ -402,7 +420,7 @@ func initClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster, componentN
 	}
 }
 
-func setClusterConsensusLeaderStatus(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus, memberExt consensusMemberExt) bool {
+func setConsensusSetStatusLeader(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus, memberExt consensusMemberExt) bool {
 	if consensusSetStatus.Leader.Pod == memberExt.podName {
 		return false
 	}
@@ -414,7 +432,7 @@ func setClusterConsensusLeaderStatus(consensusSetStatus *dbaasv1alpha1.Consensus
 	return true
 }
 
-func setClusterConsensusFollowerStatus(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus, memberExt consensusMemberExt) bool {
+func setConsensusSetStatusFollower(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus, memberExt consensusMemberExt) bool {
 	for _, member := range consensusSetStatus.Followers {
 		if member.Pod == memberExt.podName {
 			return false
@@ -431,7 +449,7 @@ func setClusterConsensusFollowerStatus(consensusSetStatus *dbaasv1alpha1.Consens
 	return true
 }
 
-func setClusterConsensusLearnerStatus(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus, memberExt consensusMemberExt) bool {
+func setConsensusSetStatusLearner(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus, memberExt consensusMemberExt) bool {
 	if consensusSetStatus.Learner == nil {
 		consensusSetStatus.Learner = &dbaasv1alpha1.ConsensusMemberStatus{}
 	}
@@ -447,7 +465,7 @@ func setClusterConsensusLearnerStatus(consensusSetStatus *dbaasv1alpha1.Consensu
 	return true
 }
 
-func resetClusterConsensusRoleStatus(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus, podName string) {
+func resetConsensusSetStatusRole(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus, podName string) {
 	// reset header
 	if consensusSetStatus.Leader.Pod == podName {
 		consensusSetStatus.Leader.Pod = consensusSetStatusDefaultPodName
@@ -468,35 +486,19 @@ func resetClusterConsensusRoleStatus(consensusSetStatus *dbaasv1alpha1.Consensus
 	}
 }
 
-func resetAllClusterConsensusRoleStatus(cluster *dbaasv1alpha1.Cluster, componentName string) {
-	if cluster == nil {
-		return
-	}
-
-	if cluster.Status.Components == nil {
-		return
-	}
-
-	if component, ok := cluster.Status.Components[componentName]; ok {
-		component.ConsensusSetStatus = nil
-	}
-}
-
-func updateAllClusterConsensusRoleStatus(cluster *dbaasv1alpha1.Cluster, componentDef dbaasv1alpha1.ClusterDefinitionComponent,
-	componentName string, pods []corev1.Pod) {
-	if cluster == nil || cluster.Status.Components == nil {
-		return
-	}
-
+func setConsensusSetStatusRoles(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus,
+	componentDef dbaasv1alpha1.ClusterDefinitionComponent,
+	pods []corev1.Pod) {
 	for _, pod := range pods {
 		if role, ok := pod.Labels[intctrlutil.ConsensusSetRoleLabelKey]; ok {
-			_ = setClusterConsensusRoleStatus(cluster, componentDef, componentName, role, pod.Name)
+			_ = setConsensusSetStatusRole(consensusSetStatus, componentDef, role, pod.Name)
 		}
 	}
 }
 
-func setClusterConsensusRoleStatus(cluster *dbaasv1alpha1.Cluster, componentDef dbaasv1alpha1.ClusterDefinitionComponent,
-	componentName, role, podName string) bool {
+func setConsensusSetStatusRole(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus,
+	componentDef dbaasv1alpha1.ClusterDefinitionComponent,
+	role, podName string) bool {
 	// mapping role label to consensus member
 	roleMap := composeConsensusRoleMap(componentDef)
 	memberExt, ok := roleMap[role]
@@ -505,20 +507,17 @@ func setClusterConsensusRoleStatus(cluster *dbaasv1alpha1.Cluster, componentDef 
 	}
 	memberExt.podName = podName
 
-	initClusterComponentStatusIfNeed(cluster, componentName)
-	consensusSetStatus := cluster.Status.Components[componentName].ConsensusSetStatus
-
-	resetClusterConsensusRoleStatus(consensusSetStatus, memberExt.podName)
+	resetConsensusSetStatusRole(consensusSetStatus, memberExt.podName)
 
 	// update cluster.status
 	needUpdate := false
 	switch memberExt.consensusRole {
 	case Leader:
-		needUpdate = setClusterConsensusLeaderStatus(consensusSetStatus, memberExt)
+		needUpdate = setConsensusSetStatusLeader(consensusSetStatus, memberExt)
 	case Follower:
-		needUpdate = setClusterConsensusFollowerStatus(consensusSetStatus, memberExt)
+		needUpdate = setConsensusSetStatusFollower(consensusSetStatus, memberExt)
 	case Learner:
-		needUpdate = setClusterConsensusLearnerStatus(consensusSetStatus, memberExt)
+		needUpdate = setConsensusSetStatusLearner(consensusSetStatus, memberExt)
 	}
 
 	return needUpdate

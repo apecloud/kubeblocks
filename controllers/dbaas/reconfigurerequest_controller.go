@@ -49,7 +49,7 @@ var ConfigurationRequiredLabels = []string{
 	appNameLabelKey,
 	appInstanceLabelKey,
 	appComponentLabelKey,
-	dbaasconfig.CMConfigurationTplLabelKey,
+	dbaasconfig.CMConfigurationTplNameLabelKey,
 	dbaasconfig.CMInsConfigurationLabelKey,
 }
 
@@ -79,7 +79,7 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "not find configmap", "key", req.NamespacedName)
 	}
 
-	if checkConfigurationObject(config) {
+	if !checkConfigurationObject(config) {
 		return intctrlutil.Reconciled()
 	}
 
@@ -97,7 +97,7 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 	tpl := &dbaasv1alpha1.ConfigurationTemplate{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: config.Namespace,
-		Name:      config.Labels[dbaasconfig.CMConfigurationTplLabelKey],
+		Name:      config.Labels[dbaasconfig.CMConfigurationTplNameLabelKey],
 	}, tpl); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}

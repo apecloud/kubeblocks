@@ -37,10 +37,16 @@ const (
 	ConfigReconcileInterval = time.Second * 5
 
 	ConfigurationTemplateFinalizerName = "configuration.kubeblocks.io/finalizer"
-	ConfigurationTplLabelKey           = "configuration.kubeblocks.io/name"
-	CMConfigurationTplLabelKey         = "configuration.kubeblocks.io/configuration-template"
-	CMInsConfigurationHashLabelKey     = "configuration.kubeblocks.io/configuration-hash"
 
+	// ConfigurationTplLabelPrefixKey appVersion or clusterdefinition using tpl
+	ConfigurationTplLabelPrefixKey = "configuration.kubeblocks.io/tpl"
+
+	// CMConfigurationTplLabelKey  configmap is config template
+	CMConfigurationTplLabelKey     = "configuration.kubeblocks.io/configuration-template"
+	CMConfigurationTplNameLabelKey = "app.kubernetes.io/configurationtpl-name"
+	CMInsConfigurationHashLabelKey = "configuration.kubeblocks.io/configuration-hash"
+
+	// CMInsConfigurationLabelKey configmap is configuration file for component
 	CMInsConfigurationLabelKey = "app.kubernetes.io/ins-configure"
 )
 
@@ -148,17 +154,37 @@ func checkConfigTpl(ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.Configuration
 	return true, nil
 }
 
-func CheckClusterDefinitionTemplate(client client.Client, ctx intctrlutil.RequestCtx, clusterDef *dbaasv1alpha1.ClusterDefinition) (bool, error) {
-	for _, component := range clusterDef.Spec.Components {
-		if len(component.ConfigTemplateRefs) == 0 {
-			continue
-		}
+type ConfigTemplateHander func([]dbaasv1alpha1.ConfigTemplate) (bool, error)
 
-		if ok, err := validateConfTpls(client, ctx, component.ConfigTemplateRefs); !ok || err != nil {
-			return ok, err
+func CheckClusterDefinitionTemplate(client client.Client, ctx intctrlutil.RequestCtx, clusterDef *dbaasv1alpha1.ClusterDefinition) (bool, error) {
+	return HandleConfigTemplate(clusterDef, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
+		return validateConfTpls(client, ctx, tpls)
+	})
+}
+
+func HandleConfigTemplate(clusterDef *dbaasv1alpha1.ClusterDefinition, handler ConfigTemplateHander) (bool, error) {
+	tpls := make([]dbaasv1alpha1.ConfigTemplate, 0)
+	for _, component := range clusterDef.Spec.Components {
+		if len(component.ConfigTemplateRefs) > 0 {
+			tpls = append(tpls, component.ConfigTemplateRefs...)
 		}
 	}
-	return true, nil
+
+	if len(tpls) > 0 {
+		return handler(tpls)
+	} else {
+		return true, nil
+	}
+}
+
+func UpdateLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, cd *dbaasv1alpha1.ClusterDefinition) (bool, error) {
+	return HandleConfigTemplate(cd, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
+		patch := client.MergeFrom(cd.DeepCopy())
+		for _, tpl := range tpls {
+			cd.Labels[GenerateUniqKeyWithConfig(ConfigurationTplLabelPrefixKey, tpl.Name)] = tpl.Name
+		}
+		return true, cli.Patch(ctx.Ctx, cd, patch)
+	})
 }
 
 func CheckAppVersionTemplate(client client.Client, ctx intctrlutil.RequestCtx, appVersion *dbaasv1alpha1.AppVersion) (bool, error) {

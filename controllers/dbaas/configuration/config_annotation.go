@@ -139,7 +139,8 @@ func GetUpgradePolicy(cfg *corev1.ConfigMap) dbaasv1alpha1.UpgradePolicy {
 }
 
 func RestartStsWithRolling(cli client.Client, ctx intctrlutil.RequestCtx, sts appsv1.StatefulSet, configKey string, newVersion string) error {
-	cfgAnnotationKey := fmt.Sprintf("%s-%s", UpgradeRestartAnnotationKey, strings.ReplaceAll(configKey, "_", "-"))
+	// cfgAnnotationKey := fmt.Sprintf("%s-%s", UpgradeRestartAnnotationKey, strings.ReplaceAll(configKey, "_", "-"))
+	cfgAnnotationKey := GenerateUniqKeyWithConfig(UpgradeRestartAnnotationKey, configKey)
 
 	if sts.Spec.Template.Annotations == nil {
 		sts.Spec.Template.Annotations = map[string]string{}
@@ -161,4 +162,8 @@ func RestartStsWithRolling(cli client.Client, ctx intctrlutil.RequestCtx, sts ap
 	}
 
 	return nil
+}
+
+func GenerateUniqKeyWithConfig(label string, configKey string) string {
+	return fmt.Sprintf("%s-%s", label, strings.ReplaceAll(configKey, "_", "-"))
 }

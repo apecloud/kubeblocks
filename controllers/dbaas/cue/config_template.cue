@@ -25,15 +25,16 @@ config: {
 		namespace: meta.cluster.namespace
 		labels: {
 			"app.kubernetes.io/name":     "\(meta.clusterDefinition.type)-\(meta.clusterDefinition.name)"
+			// cluster name
 			"app.kubernetes.io/instance": meta.cluster.name
-			// "app.kubernetes.io/version" : # TODO
+			// component name
 			"app.kubernetes.io/component-name":  "\(meta.component.name)"
 			"app.kubernetes.io/created-by": "controller-manager"
 
-			// config template name
-			"app.kubernetes.io/configtemplate-name": "\(meta.component.templateName)"
 			// configmap selector for ConfigureController
 			"app.kubernetes.io/ins-configure": "true"
+			// config template name
+			"app.kubernetes.io/configurationtpl-name": "\(meta.component.templateName)"
 		}
 		annotations: {
 			// enable configmap upgrade

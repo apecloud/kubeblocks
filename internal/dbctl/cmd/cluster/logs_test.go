@@ -110,16 +110,14 @@ var _ = Describe("logs", func() {
 
 		stream := genericclioptions.NewTestIOStreamsDiscard()
 		l := &LogsOptions{
-			use:         "logs",
-			short:       "Access up-to-date server log file",
 			ExecOptions: exec.NewExecOptions(tf, stream),
 			logOptions: cmdlogs.LogsOptions{
 				IOStreams: stream,
 			},
 		}
 		input := &exec.ExecInput{
-			Use:      l.use,
-			Short:    l.short,
+			Use:      "logs",
+			Short:    "Access up-to-date cluster log file",
 			Example:  logsExample,
 			Validate: l.validate,
 			Complete: l.complete,

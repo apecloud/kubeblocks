@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,14 +21,8 @@ import (
 	"io"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
-
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/dbctl/exec"
-
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
-
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -36,17 +30,23 @@ import (
 	cmddes "k8s.io/kubectl/pkg/describe"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/describe"
+	"github.com/apecloud/kubeblocks/internal/dbctl/exec"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/cluster"
 )
 
 var (
 	logsListExample = templates.Examples(`
-		# Display supported log file from cluster mysql-cluster with default leader instance
-		dbctl cluster logs-list mysql-cluster
+		# Display supported log file in cluster my-cluster with all instance
+		dbctl cluster list-logs-type my-cluster
 
-		# Display supported log file from cluster mysql-cluster with specify instance release-name-replicasets-0
-		dbctl cluster logs-list mysql-cluster -i release-name-replicasets-0`)
+        # Display supported log file in cluster my-cluster with specify component my-component
+		./bin/dbctl cluster list-logs-type my-cluster --component my-component
+
+		# Display supported log file in cluster my-cluster with specify instance my-instance-0
+		dbctl cluster list-logs-type my-cluster --instance my-instance-0`)
 )
 
 // LogsListOptions declare the arguments accepted by the logs-list-type command
@@ -92,7 +92,7 @@ func (o *LogsListOptions) Validate(args []string) error {
 	return nil
 }
 
-func (o *LogsListOptions) Complete(f cmdutil.Factory, args []string) (err error) {
+func (o *LogsListOptions) Complete(f cmdutil.Factory, args []string) error {
 	// set cluster name from args
 	o.clusterName = args[0]
 	config, err := o.factory.ToRESTConfig()
@@ -101,17 +101,17 @@ func (o *LogsListOptions) Complete(f cmdutil.Factory, args []string) (err error)
 	}
 	o.namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
-		return
+		return err
 	}
 	o.clientSet, err = o.factory.KubernetesClientSet()
 	if err != nil {
-		return
+		return err
 	}
 	o.dynamicClient, err = f.DynamicClient()
 	o.exec = exec.NewExecOptions(o.factory, o.IOStreams)
 	o.exec.Input = &exec.ExecInput{}
 	o.exec.Config = config
-	return
+	return err
 }
 
 func (o *LogsListOptions) Run() error {

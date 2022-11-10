@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeBlocks Authors
+Copyright ApeCloud Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,55 +24,50 @@ import (
 	"strings"
 	"time"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
-
-	"k8s.io/kubectl/pkg/polymorphichelpers"
-
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/kubectl/pkg/util/i18n"
-	"k8s.io/kubectl/pkg/util/templates"
-
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdlogs "k8s.io/kubectl/pkg/cmd/logs"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/polymorphichelpers"
+	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/exec"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/cluster"
 )
 
 var (
-	logsExample = templates.Examples(i18n.T(`
-		# Return snapshot logs from cluster mysql-cluster with default primary instance (stdout)
-		dbctl cluster logs mysql-cluster
+	logsExample = templates.Examples(`
+		# Return snapshot logs from cluster my-cluster with default primary instance (stdout)
+		dbctl cluster logs my-cluster
 
-		# Display only the most recent 20 lines from cluster mysql-cluster with default leader instance (stdout)
-		dbctl cluster logs --tail=20 mysql-cluster
+		# Display only the most recent 20 lines from cluster my-cluster with default primary instance (stdout)
+		dbctl cluster logs --tail=20 my-cluster
 
-		# Return snapshot logs from cluster mysql-cluster with specify instance mysql-cluster-replicasets-0 (stdout)
-		dbctl cluster logs mysql-cluster -i mysql-cluster-replicasets-0 
+		# Return snapshot logs from cluster my-cluster with specify instance my-instance-0 (stdout)
+		dbctl cluster logs my-cluster --instance my-instance-0
 
-		# Return snapshot logs from cluster mysql-cluster with specify instance mysql-cluster-replicasets-0 and specify mysql container (stdout)
-		dbctl cluster logs mysql-cluster -i mysql-cluster-replicasets-0 -c mysql
+		# Return snapshot logs from cluster my-cluster with specify instance my-instance-0 and specify container my-container (stdout)
+		dbctl cluster logs my-cluster --instance my-instance-0 -c my-container
 
-		# Return slow logs from cluster mysql-cluster with default leader instance
-		dbctl cluster logs mysql-cluster --file-type=slow
+		# Return slow logs from cluster my-cluster with default primary instance
+		dbctl cluster logs my-cluster --file-type=slow
 
-		# Begin streaming the slow logs from cluster mysql-cluster with default leader instance
-		dbctl cluster logs -f mysql-cluster --file-type=slow
+		# Begin streaming the slow logs from cluster my-cluster with default primary instance
+		dbctl cluster logs -f my-cluster --file-type=slow
 
-		# Return the specify file logs from cluster mysql-cluster with specify instance mysql-cluster-replicasets-0
-		dbctl cluster logs mysql-cluster -i mysql-cluster-replicasets-0 --file-path=/var/log/yum.log
+		# Return the specify file logs from cluster my-cluster with specify instance my-instance-0
+		dbctl cluster logs my-cluster --instance my-instance-0 --file-path=/var/log/yum.log
 
-		# Return the specify file logs from cluster mysql-cluster with specify instance mysql-cluster-replicasets-0 and specify mysql container
-		dbctl cluster logs mysql-cluster -i mysql-cluster-replicasets-0 -c mysql --file-path=/var/log/yum.log`))
+		# Return the specify file logs from cluster my-cluster with specify instance my-instance-0 and specify container my-container
+		dbctl cluster logs my-cluster --instance my-instance-0 -c my-container --file-path=/var/log/yum.log`)
 )
 
 // LogsOptions declare the arguments accepted by the logs command
 type LogsOptions struct {
-	use         string
-	short       string
 	clusterName string
 	instName    string
 	fileType    string
@@ -84,16 +79,14 @@ type LogsOptions struct {
 // NewLogsCmd return the logic of accessing up-to-date server log file
 func NewLogsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	l := &LogsOptions{
-		use:         "logs",
-		short:       "Access up-to-date server log file",
 		ExecOptions: exec.NewExecOptions(f, streams),
 		logOptions: cmdlogs.LogsOptions{
 			IOStreams: streams,
 		},
 	}
 	input := &exec.ExecInput{
-		Use:      l.use,
-		Short:    l.short,
+		Use:      "logs",
+		Short:    "Access up-to-date cluster log file",
 		Example:  logsExample,
 		Validate: l.validate,
 		Complete: l.complete,

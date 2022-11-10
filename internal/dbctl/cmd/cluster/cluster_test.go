@@ -180,12 +180,11 @@ var _ = Describe("Cluster", func() {
 		Expect(cmd).ShouldNot(BeNil())
 	})
 
-	It("logs-list-type", func() {
+	It("list-logs-type", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace("default")
 		defer tf.Cleanup()
 		cmd := NewLogsListTypeCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
-		Expect(cmd.Run).ShouldNot(BeNil())
 	})
 
 	It("logs", func() {
@@ -193,6 +192,5 @@ var _ = Describe("Cluster", func() {
 		defer tf.Cleanup()
 		cmd := NewLogsCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
-		Expect(cmd.Run).ShouldNot(BeNil())
 	})
 })

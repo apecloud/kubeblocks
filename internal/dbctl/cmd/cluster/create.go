@@ -167,8 +167,8 @@ func setEnableAllLogs(c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinit
 	for idx, comCluster := range c.Spec.Components {
 		for _, com := range cd.Spec.Components {
 			if strings.EqualFold(comCluster.Type, com.TypeName) {
-				typeList := make([]string, 0, len(com.LogsConfig))
-				for _, logConf := range com.LogsConfig {
+				typeList := make([]string, 0, len(com.LogConfigs))
+				for _, logConf := range com.LogConfigs {
 					typeList = append(typeList, logConf.Name)
 				}
 				c.Spec.Components[idx].EnabledLogs = typeList

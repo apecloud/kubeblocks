@@ -182,7 +182,7 @@ var _ = Describe("logs", func() {
 				Components: []dbaasv1alpha1.ClusterDefinitionComponent{
 					{
 						TypeName: "component-type",
-						LogsConfig: []dbaasv1alpha1.LogConfig{
+						LogConfigs: []dbaasv1alpha1.LogConfig{
 							{
 								Name:            "slow",
 								FilePathPattern: "/log/mysql/*slow.log",

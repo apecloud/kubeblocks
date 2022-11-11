@@ -211,8 +211,8 @@ spec:
                         specify
                       minimum: 0
                       type: integer
-                    logsConfig:
-                      description: LogsConfig is detail log file config which provided
+                    logConfigs:
+                      description: LogConfigs is detail log file config which provided
                         by ISV
                       items:
                         properties:

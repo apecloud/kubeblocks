@@ -235,7 +235,7 @@ func (o *LogsOptions) createFileTypeCommand(pod *corev1.Pod, obj *types.ClusterO
 	var filePathPattern string
 	for _, com := range obj.ClusterDef.Spec.Components {
 		if strings.EqualFold(com.TypeName, comTypeName) {
-			for _, logConfig := range com.LogsConfig {
+			for _, logConfig := range com.LogConfigs {
 				if strings.EqualFold(logConfig.Name, o.fileType) {
 					filePathPattern = logConfig.FilePathPattern
 					break

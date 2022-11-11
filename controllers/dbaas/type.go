@@ -66,5 +66,5 @@ type Component struct {
 	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 	Monitor              MonitorConfig                          `json:"monitor,omitempty"`
 	EnabledLogs          []string                               `json:"enabledLogs,omitempty"`
-	LogsConfig           []dbaasv1alpha1.LogConfig              `json:"logsConfig,omitempty"`
+	LogConfigs           []dbaasv1alpha1.LogConfig              `json:"logConfigs,omitempty"`
 }

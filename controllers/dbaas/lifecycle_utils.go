@@ -354,7 +354,7 @@ func mergeComponents(
 		Service:         clusterDefComp.Service,
 		Scripts:         clusterDefComp.Scripts,
 		Probes:          clusterDefComp.Probes,
-		LogsConfig:      clusterDefComp.LogsConfig,
+		LogConfigs:      clusterDefComp.LogConfigs,
 	}
 
 	if appVerComp != nil && appVerComp.PodSpec != nil {

@@ -84,12 +84,12 @@ configTemplate:
     
     datadir={{ $data_root }}/data
     
-    {{- if mustHas "error" $.Component.EnableLogs }}
+    {{- if mustHas "error" $.Component.EnabledLogs }}
     # Mysql error log
     log_error={{ $log_root }}/mysqld.err
     {{- end }}
     
-    {{- if mustHas "slow" $.Component.EnableLogs }}
+    {{- if mustHas "slow" $.Component.EnabledLogs }}
     # MySQL Slow log
     slow_query_log=ON
     long_query_time=5
@@ -117,6 +117,6 @@ nameOverride: ""
 fullnameOverride: ""
 appVersionOverride: ""
 
-logsConfig:
+logConfigs:
   error: /log/mysql/mysqld.err
   slow: /log/mysql/*slow.log

@@ -99,11 +99,11 @@ func (r *ClusterDefinition) validate() error {
 // validateLogsPatternPrefix validate spec.components[*].logsConfig[*].filePathPattern
 func (r *ClusterDefinition) validateLogFilePatternPrefix(allErrs *field.ErrorList) {
 	for idx1, component := range r.Spec.Components {
-		if len(component.LogsConfig) == 0 {
+		if len(component.LogConfigs) == 0 {
 			continue
 		}
 		volumeMounts := component.PodSpec.Containers[0].VolumeMounts
-		for idx2, logConfig := range component.LogsConfig {
+		for idx2, logConfig := range component.LogConfigs {
 			flag := false
 			for _, v := range volumeMounts {
 				if strings.HasPrefix(logConfig.FilePathPattern, v.MountPath) {

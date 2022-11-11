@@ -712,10 +712,10 @@ func validateEnableLogsConfig(c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.Cluste
 		for _, com := range cd.Spec.Components {
 			if strings.EqualFold(comCluster.Type, com.TypeName) {
 				logTypes := make(map[string]bool)
-				for _, logV := range com.LogsConfig {
+				for _, logV := range com.LogConfigs {
 					logTypes[logV.Name] = true
 				}
-				invalidNames := make([]string, 0, len(com.LogsConfig))
+				invalidNames := make([]string, 0, len(com.LogConfigs))
 				for _, name := range comCluster.EnabledLogs {
 					if ok := logTypes[name]; !ok {
 						invalidNames = append(invalidNames, name)

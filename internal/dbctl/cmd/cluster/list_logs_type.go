@@ -171,7 +171,7 @@ func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 				// w.Write(describe.LEVEL_0, "Component Type:\t%s\n", comTypeName)
 				for _, com := range cd.Spec.Components {
 					if strings.EqualFold(com.TypeName, comTypeName) {
-						for _, logConfig := range com.LogsConfig {
+						for _, logConfig := range com.LogConfigs {
 							_, ok := logTypeMap[logConfig.Name]
 							if ok {
 								w.Write(describe.LEVEL_0, "Log file type :\t%s\n", logConfig.Name)

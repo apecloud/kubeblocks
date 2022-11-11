@@ -14,8 +14,8 @@ spec:
     characterType: mysql
     monitor:
       builtIn: true
-    logsConfig:
-      {{- range $name,$pattern := .Values.logsConfig }}
+    logConfigs:
+      {{- range $name,$pattern := .Values.logConfigs }}
       - name: {{ $name }}
         filePathPattern: {{ $pattern }}
       {{- end }}

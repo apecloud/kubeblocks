@@ -114,5 +114,5 @@ func buildRoleChangedProbeContainer(roleChangedContainer *corev1.Container,
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
 	probe.SuccessThreshold = probeSetting.SuccessThreshold
 	probe.FailureThreshold = probeSetting.FailureThreshold
-	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(int(probeServiceHttpPort))
+	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeServiceHttpPort)
 }

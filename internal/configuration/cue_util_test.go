@@ -19,8 +19,9 @@ package configuration
 import (
 	"testing"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/stretchr/testify/require"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
 func TestCueLang(t *testing.T) {

@@ -218,31 +218,28 @@ func needSyncComponentStatusForEvent(cluster *dbaasv1alpha1.Cluster, componentNa
 	return false
 }
 
-// getEventInvolvedObject get event involved object
+// getEventInvolvedObject get event involved object for StatefulSet/Deployment/Pod workload
 func getEventInvolvedObject(ctx context.Context, cli client.Client, event *corev1.Event) (client.Object, error) {
-	var (
-		object client.Object
-		err    error
-	)
 	objectKey := client.ObjectKey{
 		Name:      event.InvolvedObject.Name,
 		Namespace: event.InvolvedObject.Namespace,
 	}
+	var err error
 	switch event.InvolvedObject.Kind {
-	case StatefulSetKind:
-		sts := &appsv1.StatefulSet{}
-		err = cli.Get(ctx, objectKey, sts)
-		object = sts
-	case DeploymentKind:
-		deployment := &appsv1.Deployment{}
-		err = cli.Get(ctx, objectKey, deployment)
-		object = deployment
 	case PodKind:
 		pod := &corev1.Pod{}
 		err = cli.Get(ctx, objectKey, pod)
-		object = pod
+		return pod, err
+	case StatefulSetKind:
+		sts := &appsv1.StatefulSet{}
+		err = cli.Get(ctx, objectKey, sts)
+		return sts, err
+	case DeploymentKind:
+		deployment := &appsv1.Deployment{}
+		err = cli.Get(ctx, objectKey, deployment)
+		return deployment, err
 	}
-	return object, err
+	return nil, err
 }
 
 // handleClusterStatusPhaseByEvent handle the Cluster.status.phase when warning event happened.

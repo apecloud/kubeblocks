@@ -167,6 +167,7 @@ type ClusterDefinitionComponent struct {
 
 	// antiAffinity defines components should have anti-affinity constraint to same component type
 	// +kubebuilder:default=false
+	// +optional
 	AntiAffinity bool `json:"antiAffinity,omitempty"`
 
 	// podSpec of final workload

@@ -27,11 +27,12 @@ type BuildFn func(cmd *Command) *cobra.Command
 
 // Command records the command info
 type Command struct {
-	Use       string
-	Short     string
-	Example   string
-	GroupKind schema.GroupKind
-	Factory   cmdutil.Factory
+	Use     string
+	Short   string
+	Example string
+	GVR     schema.GroupVersionResource
+	Factory cmdutil.Factory
+
 	genericclioptions.IOStreams
 }
 
@@ -59,8 +60,8 @@ func (b *CmdBuilder) Example(example string) *CmdBuilder {
 	return b
 }
 
-func (b *CmdBuilder) GroupKind(gk schema.GroupKind) *CmdBuilder {
-	b.cmd.GroupKind = gk
+func (b *CmdBuilder) GVR(gvr schema.GroupVersionResource) *CmdBuilder {
+	b.cmd.GVR = gvr
 	return b
 }
 

@@ -38,7 +38,7 @@ func Test(t *testing.T) {
 		Use("test").
 		Short("test command short description").
 		Example("test command example").
-		GroupKind(types.ClusterGK()).Build(buildFn)
+		GVR(types.ClusterGVR()).Build(buildFn)
 
 	if cmd == nil {
 		t.Errorf("cmd is nil")

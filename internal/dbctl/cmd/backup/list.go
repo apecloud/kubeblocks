@@ -23,6 +23,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/list"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
 )
 
@@ -30,7 +31,7 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	return builder.NewCmdBuilder().
 		Short("List all database backup job.").
 		Factory(f).
-		GroupKind(schema.GroupKind{Group: "dataprotection.kubeblocks.io", Kind: "BackupJob"}).
+		GVR(schema.GroupVersionResource{Group: "dataprotection.kubeblocks.io", Version: types.Version, Resource: "backupjobs"}).
 		IOStreams(streams).
 		Build(list.Build)
 }

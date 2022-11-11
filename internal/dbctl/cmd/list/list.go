@@ -23,12 +23,13 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/get"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
 )
 
 // Build return a list command
 func Build(c *builder.Command) *cobra.Command {
-	o := get.NewOptions(c.IOStreams, []string{c.GroupKind.String()})
+	o := get.NewOptions(c.IOStreams, []string{util.GVRToString(c.GVR)})
 
 	use := c.Use
 	if len(use) == 0 {

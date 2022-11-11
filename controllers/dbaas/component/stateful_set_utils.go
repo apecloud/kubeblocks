@@ -55,6 +55,20 @@ func getParentName(pod *corev1.Pod) string {
 	return parent
 }
 
+func isReady(pod corev1.Pod) bool {
+	if pod.Status.Conditions == nil {
+		return false
+	}
+
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
+			return true
+		}
+	}
+
+	return false
+}
+
 // IsMemberOf tests if pod is a member of set.
 func IsMemberOf(set *appsv1.StatefulSet, pod *corev1.Pod) bool {
 	return getParentName(pod) == set.Name

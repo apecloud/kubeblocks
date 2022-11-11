@@ -116,7 +116,23 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 		}
 	}
 
-	// get pod label and name, compute plan
+	// prepare to do pods Deletion, that's the only thing we should do.
+	// the stateful set reconciler will do the others.
+	// to simplify the process, wo do pods Delete after stateful set reconcile done,
+	// that is stsObj.Generation == stsObj.Status.ObservedGeneration
+	if stsObj.Generation != stsObj.Status.ObservedGeneration {
+		return true, nil
+	}
+
+	// then we wait all pods' presence, that is len(pods) == stsObj.Spec.Replicas
+	// only then, we have enough info about the previous pods before delete the current one
+	if len(pods) != int(*stsObj.Spec.Replicas) {
+		return true, nil
+	}
+
+	// we don't check whether pod role label present: prefer stateful set's Update done than role probing ready
+
+	// generate the pods Deletion plan
 	plan := generateConsensusUpdatePlan(ctx, cli, stsObj, pods, *component)
 	// execute plan
 	return plan.walkOneStep()
@@ -132,14 +148,22 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 		if !ok {
 			return false, errors.New("wrong type: obj not Pod")
 		}
-		// if pod is the latest version, we do nothing
-		if GetPodRevision(&pod) == stsObj.Status.UpdateRevision && stsObj.Generation == stsObj.Status.ObservedGeneration {
-			return false, nil
-		}
+
 		// if DeletionTimestamp is not nil, it is terminating.
 		if pod.DeletionTimestamp != nil {
 			return true, nil
 		}
+
+		// if pod is the latest version, we do nothing
+		if GetPodRevision(&pod) == stsObj.Status.UpdateRevision {
+			// wait until ready
+			if !isReady(pod) {
+				return true, nil
+			}
+
+			return false, nil
+		}
+
 		// delete the pod to trigger associate StatefulSet to re-create it
 		if err := cli.Delete(ctx, &pod); err != nil && !apierrors.IsNotFound(err) {
 			return false, err

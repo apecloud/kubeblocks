@@ -55,6 +55,28 @@ func TestIsMemberOf(t *testing.T) {
 	}
 }
 
+func TestIsReady(t *testing.T) {
+	set := newStatefulSet("foo", 3)
+	pod := newStatefulSetPod(set, 1)
+	pod.Status.Conditions = []v1.PodCondition{
+		{
+			Type:   v1.PodReady,
+			Status: v1.ConditionTrue,
+		},
+	}
+	if !isReady(*pod) {
+		t.Errorf("isReady returned false negative")
+	}
+	pod.Status.Conditions = nil
+	if isReady(*pod) {
+		t.Errorf("isReady returned false positive")
+	}
+	pod.Status.Conditions = []v1.PodCondition{}
+	if isReady(*pod) {
+		t.Errorf("isReady returned false positive")
+	}
+}
+
 func TestGetPodRevision(t *testing.T) {
 	set := newStatefulSet("foo", 3)
 	pod := newStatefulSetPod(set, 1)

@@ -382,31 +382,6 @@ func UpdateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCt
 	pod.Labels[intctrlutil.ConsensusSetAccessModeLabelKey] = string(roleMap[role].accessMode)
 
 	return cli.Patch(ctx, pod, patch)
-
-	//// prepare cluster status patch
-	//patch = client.MergeFrom(cluster.DeepCopy())
-	//initClusterComponentStatusIfNeed(cluster, componentName)
-	//consensusSetStatus := cluster.Status.Components[componentName].ConsensusSetStatus
-	//needUpdate := setConsensusSetStatusRole(consensusSetStatus, *componentDef, role, pod.Name)
-	//// update cluster status
-	//if !needUpdate {
-	//	return nil
-	//}
-	//
-	//if err := cli.Status().Patch(ctx, cluster, patch); err != nil {
-	//	return err
-	//}
-
-	//// update pod accessMode label
-	//if err := cli.Get(ctx, podName, pod); err != nil {
-	//	return err
-	//}
-	//patchAccessMode := client.MergeFrom(pod.DeepCopy())
-	//roleMap := composeConsensusRoleMap(*componentDef)
-	//pod.Labels[intctrlutil.ConsensusSetAccessModeLabelKey] = string(roleMap[role].accessMode)
-	//
-	//return cli.Patch(ctx, pod, patchAccessMode)
-
 }
 func putConsensusMemberExt(roleMap map[string]consensusMemberExt, name string, role ConsensusRole, accessMode dbaasv1alpha1.AccessMode) {
 	if roleMap == nil {

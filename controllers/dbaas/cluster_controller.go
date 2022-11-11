@@ -65,7 +65,6 @@ type ClusterReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// TODO probeMessage should be defined by @xuanchi
 type probeMessage struct {
 	Event        string `json:"event,omitempty"`
 	OriginalRole string `json:"originalRole,omitempty"`

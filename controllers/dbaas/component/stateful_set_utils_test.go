@@ -19,9 +19,10 @@ package component
 
 import (
 	"fmt"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"testing"
 	"time"
+
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"

@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
@@ -64,13 +65,10 @@ type ClusterReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// TODO probeMessage should be defined by @xuanchi
 type probeMessage struct {
-	Data probeMessageData `json:"data,omitempty"`
-}
-
-type probeMessageData struct {
-	Role string `json:"role,omitempty"`
+	Event        string `json:"event,omitempty"`
+	OriginalRole string `json:"originalRole,omitempty"`
+	Role         string `json:"role,omitempty"`
 }
 
 func init() {
@@ -113,13 +111,19 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 
 	// get role
 	message := &probeMessage{}
-	err := json.Unmarshal([]byte(event.Message), message)
+	re := regexp.MustCompile(`Readiness probe failed: {.*({.*}).*}`)
+	matches := re.FindStringSubmatch(event.Message)
+	if len(matches) != 2 {
+		return nil
+	}
+	msg := strings.ReplaceAll(matches[1], "\\", "")
+	err := json.Unmarshal([]byte(msg), message)
 	if err != nil {
 		// not role related message, ignore it
 		reqCtx.Log.Info("not role message", "message", event.Message, "error", err)
 		return nil
 	}
-	role := strings.ToLower(message.Data.Role)
+	role := strings.ToLower(message.Role)
 	podName := types.NamespacedName{
 		Namespace: event.InvolvedObject.Namespace,
 		Name:      event.InvolvedObject.Name,

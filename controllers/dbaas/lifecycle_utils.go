@@ -38,7 +38,6 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -562,7 +561,7 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 
 	switch params.component.ComponentType {
 	case dbaasv1alpha1.Stateless:
-		sts, err := buildDeploy(*params)
+		sts, err := buildDeploy(reqCtx, *params)
 		if err != nil {
 			return err
 		}
@@ -1003,7 +1002,7 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 		}
 	}
 
-	probeContainers, err := buildProbeContainers(reqCtx, params, &sts)
+	probeContainers, err := buildProbeContainers(reqCtx, params, sts.Spec.Template.Spec.Containers)
 	if err != nil {
 		return nil, err
 	}
@@ -1029,132 +1028,6 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 	return &sts, nil
 }
 
-func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams, sts *appsv1.StatefulSet) ([]corev1.Container, error) {
-	cueFS, _ := debme.FS(cueTemplates, "cue")
-
-	cueTpl, err := params.getCacheCUETplValue("statefulset_template.cue", func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("statefulset_template.cue"))
-	})
-	if err != nil {
-		return nil, err
-	}
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-	probeContainerByte, err := cueValue.Lookup("probeContainer")
-	if err != nil {
-		return nil, err
-	}
-
-	probeContainers := []corev1.Container{}
-	componentProbes := params.component.Probes
-	reqCtx.Log.Info("probe", "settings", componentProbes)
-	if componentProbes == nil {
-		return probeContainers, nil
-	}
-
-	probeServiceHttpPort := viper.GetInt32("PROBE_SERVICE_PORT")
-	probeServiceHttpPort, err = getAvailableContainerPort(sts.Spec.Template.Spec.Containers, probeServiceHttpPort)
-	if err != nil {
-		reqCtx.Log.Info("get probe container port failed", "error", err)
-		return nil, err
-	}
-	probeServiceGrpcPort, err := getAvailableContainerPort(sts.Spec.Template.Spec.Containers, 50001)
-	if err != nil {
-		reqCtx.Log.Info("get probe grpc container port failed", "error", err)
-		return nil, err
-	}
-
-	// TODO: support status and running probes
-	// if componentProbes.StatusProbe.Enable {
-	//	container := corev1.Container{}
-	//	if err = json.Unmarshal(probeContainerByte, &container); err != nil {
-	//		return nil, err
-	//	}
-
-	//	container.Name = "kbprobe-statuscheck"
-	//	probe := container.ReadinessProbe
-	//	probe.Exec.Command = []string{"sh", "-c", "curl -X POST -H 'Content-Type: application/json' http://localhost:3501/v1.0/bindings/probe  -d  '{\"operation\": \"statusCheck\", \"metadata\": {\"sql\" : \"\"}}'"}
-	//	probe.PeriodSeconds = componentProbes.StatusProbe.PeriodSeconds
-	//	probe.SuccessThreshold = componentProbes.StatusProbe.SuccessThreshold
-	//	probe.FailureThreshold = componentProbes.StatusProbe.FailureThreshold
-	//	probeContainers = append(probeContainers, container)
-	// }
-
-	// if componentProbes.RunningProbe.Enable {
-	//	container := corev1.Container{}
-	//	if err = json.Unmarshal(probeContainerByte, &container); err != nil {
-	//		return nil, err
-	//	}
-	//	container.Name = "kbprobe-runningcheck"
-	//	probe := container.ReadinessProbe
-	//	probe.Exec.Command = []string{"sh", "-c", "curl -X POST -H 'Content-Type: application/json' http://localhost:3501/v1.0/bindings/probe  -d  '{\"operation\": \"statusCheck\", \"metadata\": {\"sql\" : \"\"}}'"}
-	//	//probe.HTTPGet.Path = "/"
-	//	probe.PeriodSeconds = componentProbes.RunningProbe.PeriodSeconds
-	//	probe.SuccessThreshold = componentProbes.RunningProbe.SuccessThreshold
-	//	probe.FailureThreshold = componentProbes.RunningProbe.FailureThreshold
-	//	probeContainers = append(probeContainers, container)
-	// }
-
-	if componentProbes.RoleChangedProbe != nil {
-		container := corev1.Container{}
-		if err = json.Unmarshal(probeContainerByte, &container); err != nil {
-			return nil, err
-		}
-		container.Name = "kbprobe-rolechangedcheck"
-		probe := container.ReadinessProbe
-		probe.Exec.Command = []string{"curl", "-X", "POST",
-			"--fail-with-body", "--silent",
-			"-H", "Content-Type: application/json",
-			"http://localhost:" + strconv.Itoa(int(probeServiceHttpPort)) + "/v1.0/bindings/probe",
-			"-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
-		probe.PeriodSeconds = componentProbes.RoleChangedProbe.PeriodSeconds
-		probe.SuccessThreshold = componentProbes.RoleChangedProbe.SuccessThreshold
-		probe.FailureThreshold = componentProbes.RoleChangedProbe.FailureThreshold
-		container.StartupProbe.TCPSocket.Port = intstr.FromInt(int(probeServiceHttpPort))
-		probeContainers = append(probeContainers, container)
-	}
-
-	if len(probeContainers) >= 1 {
-		container := &probeContainers[0]
-		container.Image = viper.GetString("KUBEBLOCKS_IMAGE")
-		container.ImagePullPolicy = corev1.PullPolicy(viper.GetString("KUBEBLOCKS_IMAGE_PULL_POLICY"))
-		logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
-		container.Command = []string{"probe", "--app-id", "batch-sdk",
-			"--dapr-http-port", strconv.Itoa(int(probeServiceHttpPort)),
-			"--dapr-grpc-port", strconv.Itoa(int(probeServiceGrpcPort)),
-			"--app-protocol", "http",
-			"--log-level", logLevel,
-			"--components-path", "/config/components"}
-
-		// set pod name and namespace, for role label updating inside pod
-		podName := corev1.EnvVar{
-			Name: "MY_POD_NAME",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "metadata.name",
-				},
-			},
-		}
-		podNamespace := corev1.EnvVar{
-			Name: "MY_POD_NAMESPACE",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "metadata.namespace",
-				},
-			},
-		}
-		container.Env = append(container.Env, podName, podNamespace)
-
-		container.Ports = []corev1.ContainerPort{{
-			ContainerPort: probeServiceHttpPort,
-			Name:          "probe-port",
-			Protocol:      "TCP",
-		}}
-	}
-
-	reqCtx.Log.Info("probe", "containers", probeContainers)
-	return probeContainers, nil
-}
-
 // buildConsensusSet build on a stateful set
 func buildConsensusSet(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.StatefulSet, error) {
 	sts, err := buildSts(reqCtx, params)
@@ -1166,7 +1039,7 @@ func buildConsensusSet(reqCtx intctrlutil.RequestCtx, params createParams) (*app
 	return sts, err
 }
 
-func buildDeploy(params createParams) (*appsv1.Deployment, error) {
+func buildDeploy(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.Deployment, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
 	cueTpl, err := params.getCacheCUETplValue("deployment_template.cue", func() (*intctrlutil.CUETpl, error) {
@@ -1210,6 +1083,12 @@ func buildDeploy(params createParams) (*appsv1.Deployment, error) {
 	if err = json.Unmarshal(stsStrByte, &deploy); err != nil {
 		return nil, err
 	}
+
+	probeContainers, err := buildProbeContainers(reqCtx, params, deploy.Spec.Template.Spec.Containers)
+	if err != nil {
+		return nil, err
+	}
+	deploy.Spec.Template.Spec.Containers = append(deploy.Spec.Template.Spec.Containers, probeContainers...)
 
 	// TODO: inject environment
 

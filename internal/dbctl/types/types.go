@@ -81,6 +81,9 @@ const (
 	// KindCluster kind of cluster
 	KindCluster = "Cluster"
 
+	// KindOpsRequest kind of OpsRequest
+	KindOpsRequest = "OpsRequest"
+
 	// ResourceClusterDefs clusterDefinition resource
 	ResourceClusterDefs = "clusterdefinitions"
 
@@ -96,6 +99,7 @@ const (
 	ComponentLabelKey              = "app.kubernetes.io/component-name"
 	RegionLabelKey                 = "topology.kubernetes.io/region"
 	ZoneLabelKey                   = "topology.kubernetes.io/zone"
+	ClusterLabelKey                = "cluster.kubeblocks.io/name"
 
 	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/apecloud-loadbalancer-type"
 	ServiceLBTypeAnnotationValue   = "private-ip"
@@ -155,4 +159,8 @@ func AppVersionGVR() schema.GroupVersionResource {
 
 func AppVersionGK() schema.GroupKind {
 	return schema.GroupKind{Group: Group, Kind: KindAppVersion}
+}
+
+func OpsGK() schema.GroupKind {
+	return schema.GroupKind{Group: Group, Kind: KindOpsRequest}
 }

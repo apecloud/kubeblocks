@@ -66,11 +66,11 @@ var _ = Describe("Delete", func() {
 		streams, in, buf, _ := genericclioptions.NewTestIOStreams()
 		cmd := buildTestCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
-
+		deleteFlag := &DeleteFlags{}
 		input := strings.NewReader("foo\n")
-		Expect(validate([]string{}, input)).Should(MatchError("missing name"))
+		Expect(validate(deleteFlag, []string{}, input)).Should(MatchError("missing name"))
 		// prompt test always return error
-		Expect(validate([]string{"foo"}, input)).Should(Succeed())
+		Expect(validate(deleteFlag, []string{"foo"}, input)).Should(Succeed())
 
 		_, _ = in.Write([]byte("foo\n"))
 		cmd.Run(cmd, []string{"foo"})

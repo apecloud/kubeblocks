@@ -17,13 +17,18 @@ limitations under the License.
 package cluster
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/create"
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/get"
+	"github.com/apecloud/kubeblocks/internal/dbctl/delete"
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
@@ -160,6 +165,38 @@ var _ = Describe("Cluster", func() {
 
 		o.Replicas = 1
 		Expect(o.Validate()).Should(Succeed())
+	})
+
+	It("list and delete operations", func() {
+		tf := cmdtesting.NewTestFactory().WithNamespace("default")
+		tf.ClientConfigVal = cfg
+		defer tf.Cleanup()
+		o := &get.Options{}
+		clusterName := "wesql"
+		By("test list OpsRequest with cluster")
+		completeForListOps(o, []string{clusterName})
+		clusterLabel := fmt.Sprintf("%s=%s", types.ClusterLabelKey, clusterName)
+		Expect(o.LabelSelector == clusterLabel).Should(BeTrue())
+		By("test list OpsRequest with cluster and custom label")
+		testLabel := "kubeblocks.io/test=test"
+		o.LabelSelector = testLabel
+		completeForListOps(o, []string{clusterName})
+		Expect(o.LabelSelector == testLabel+","+clusterLabel).Should(BeTrue())
+
+		By("test delete OpsRequest with cluster")
+		deleteFlags := &delete.DeleteFlags{
+			DeleteFlags: cmddelete.NewDeleteCommandFlags("containing the resource to delete."),
+		}
+		completeForDeleteOps(deleteFlags, []string{clusterName})
+		Expect(*deleteFlags.LabelSelector == clusterLabel).Should(BeTrue())
+		By("test delete OpsRequest with cluster and custom label")
+		deleteFlags.LabelSelector = &testLabel
+		completeForDeleteOps(deleteFlags, []string{clusterName})
+		Expect(*deleteFlags.LabelSelector == testLabel+","+clusterLabel).Should(BeTrue())
+		By("test delete OpsRequest with name")
+		deleteFlags.Name = "test1"
+		args := completeForDeleteOps(deleteFlags, []string{})
+		Expect(args[0] == deleteFlags.Name).Should(BeTrue())
 	})
 
 	It("connect", func() {

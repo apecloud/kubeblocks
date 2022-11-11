@@ -29,6 +29,11 @@ import (
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/prompt"
 )
 
+type DeleteFlags struct {
+	*cmddelete.DeleteFlags
+	Name string
+}
+
 // Build a delete command
 func Build(c *builder.Command) *cobra.Command {
 	deleteFlags := newDeleteCommandFlags()
@@ -37,10 +42,12 @@ func Build(c *builder.Command) *cobra.Command {
 		Short:   c.Short,
 		Example: c.Example,
 		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(validate(deleteFlags, args, c.IOStreams.In))
+			if c.CustomComplete != nil {
+				args = c.CustomComplete(deleteFlags, args)
+			}
 			o, err := deleteFlags.ToOptions(nil, c.IOStreams)
 			cmdutil.CheckErr(err)
-			cmdutil.CheckErr(validate(args, c.IOStreams.In))
-
 			// build resource to delete
 			args = append([]string{util.GVRToString(c.GVR)}, args...)
 
@@ -50,14 +57,19 @@ func Build(c *builder.Command) *cobra.Command {
 			cmdutil.CheckErr(o.RunDelete(c.Factory))
 		},
 	}
-
+	if c.CustomFlags != nil {
+		c.CustomFlags(deleteFlags, cmd)
+	}
 	deleteFlags.AddFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 
 	return cmd
 }
 
-func validate(args []string, in io.Reader) error {
+func validate(deleteFlags *DeleteFlags, args []string, in io.Reader) error {
+	if len(deleteFlags.Name) > 0 {
+		return nil
+	}
 	if len(args) < 1 {
 		return fmt.Errorf("missing name")
 	}
@@ -76,15 +88,15 @@ func validate(args []string, in io.Reader) error {
 
 // newDeleteCommandFlags return a kubectl delete command flags, disable some flags that
 // we do not supported.
-func newDeleteCommandFlags() *cmddelete.DeleteFlags {
-	deleteFlags := cmddelete.NewDeleteCommandFlags("containing the resource to delete.")
+func newDeleteCommandFlags() *DeleteFlags {
+	deleteCmdFlags := cmddelete.NewDeleteCommandFlags("containing the resource to delete.")
 
 	// disable some flags
-	deleteFlags.FieldSelector = nil
-	deleteFlags.Raw = nil
-	deleteFlags.All = nil
-	deleteFlags.IgnoreNotFound = nil
-	deleteFlags.FileNameFlags = nil
+	deleteCmdFlags.FieldSelector = nil
+	deleteCmdFlags.Raw = nil
+	deleteCmdFlags.All = nil
+	deleteCmdFlags.IgnoreNotFound = nil
+	deleteCmdFlags.FileNameFlags = nil
 
-	return deleteFlags
+	return &DeleteFlags{DeleteFlags: deleteCmdFlags}
 }

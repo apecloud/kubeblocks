@@ -1192,6 +1192,52 @@ spec:
 			}, timeout, interval).Should(Succeed())
 		})
 	})
+
+	Context("validateEnableLogsConfig Test", func() {
+		cluster := &dbaasv1alpha1.Cluster{}
+		clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+		clusterByte := `
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: wesql
+spec:
+  appVersionRef: app-version-consensus
+  clusterDefinitionRef: cluster-definition-consensus
+  components:
+    - name: wesql-test
+      type: replicasets
+      enableLogs: [error, slow]
+`
+		clusterDefByte := `
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: cluster-definition-consensus
+spec:
+  type: state.mysql-8
+  components:
+    - typeName: replicasets
+      componentType: Consensus
+      logsConfig:
+        - name: error
+          filePathPattern: /log/mysql/mysqld.err
+        - name: slow
+          filePathPattern: /log/mysql/*slow.log
+      podSpec:
+        containers:
+          - name: mysql
+            imagePullPolicy: IfNotPresent`
+		_ = yaml.Unmarshal([]byte(clusterByte), cluster)
+		_ = yaml.Unmarshal([]byte(clusterDefByte), clusterDef)
+		// normal case
+		conditionList := validateEnableLogsConfig(cluster, clusterDef)
+		Expect(len(conditionList)).Should(Equal(0))
+		// corner case
+		cluster.Spec.Components[0].EnableLogs = []string{"error-test", "slow"}
+		conditionList1 := validateEnableLogsConfig(cluster, clusterDef)
+		Expect(len(conditionList1)).Should(Equal(1))
+	})
 })
 
 func createFakePod(parentName string, number int) []corev1.Pod {

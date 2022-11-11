@@ -84,22 +84,22 @@ configTemplate:
     
     datadir={{ $data_root }}/data
     
-    {{- if $log_root }}
-    {{- if has "error" $.Component.EnableLogs }}
+    {{- if mustHas "error" $.Component.EnableLogs }}
     # Mysql error log
     log_error={{ $log_root }}/mysqld.err
     {{- end }}
     
-    {{- if has "slow" $.Component.EnableLogs }}
+    {{- if mustHas "slow" $.Component.EnableLogs }}
     # MySQL Slow log
     slow_query_log=ON
     long_query_time=5
     log_output=FILE
     slow_query_log_file={{ $log_root }}/mysqld-slow.log
     {{- end }}
-   
-    # SQL access log
-    general_log=1
+    
+    {{- if $log_root }}
+    # SQL access log, default off 
+    general_log=OFF
     general_log_file={{ $log_root }}/mysqld-audit.log
     {{- end }}
     

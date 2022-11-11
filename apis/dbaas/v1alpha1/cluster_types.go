@@ -95,6 +95,10 @@ type ClusterStatus struct {
 	Operations Operations `json:"operations,omitempty"`
 
 	ClusterDefinitionStatusGeneration `json:",inline"`
+
+	// describe current state of cluster API Resource, like warning
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true

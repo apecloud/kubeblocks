@@ -221,13 +221,16 @@ spec:
                               indicate how to find this file corresponding to variable
                               (log path) in database kernel. please don't set this
                               casually
-                            maxLength: 256
+                            maxLength: 4096
                             type: string
                           name:
                             description: Name log type name, such as slow for MySQL
                               slow log file
                             maxLength: 128
                             type: string
+                        required:
+                        - filePathPattern
+                        - name
                         type: object
                       type: array
                     maxAvailable:

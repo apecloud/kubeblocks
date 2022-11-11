@@ -43,7 +43,7 @@ var (
 		dbctl cluster list-logs-type my-cluster
 
         # Display supported log file in cluster my-cluster with specify component my-component
-		./bin/dbctl cluster list-logs-type my-cluster --component my-component
+		dbctl cluster list-logs-type my-cluster --component my-component
 
 		# Display supported log file in cluster my-cluster with specify instance my-instance-0
 		dbctl cluster list-logs-type my-cluster --instance my-instance-0`)
@@ -138,8 +138,6 @@ func (o *LogsListOptions) printHeaderMessage(w cmddes.PrefixWriter, c *dbaasv1al
 	w.Write(describe.LEVEL_0, "ClusterName:\t\t%s\n", c.Name)
 	w.Write(describe.LEVEL_0, "Namespace:\t\t%s\n", c.Namespace)
 	w.Write(describe.LEVEL_0, "ClusterDefinition:\t%s\n", c.Spec.ClusterDefRef)
-	w.Write(describe.LEVEL_0, "DefaultFileType:\tstdout & stderr \n")
-
 }
 
 // printBodyMessage

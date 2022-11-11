@@ -7,6 +7,11 @@ spec:
   components:
     - typeName: replicasets
       componentType: Consensus
+      logsConfig:
+        - name: error
+          filePathPattern: /log/mysql/mysqld.err
+        - name: slow
+          filePathPattern: /log/mysql/*slow.log
       consensusSpec:
         leader:
           name: "leader"

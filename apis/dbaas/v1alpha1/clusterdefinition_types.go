@@ -128,13 +128,13 @@ type LogConfig struct {
 	// Name log type name, such as slow for MySQL slow log file
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=128
-	Name string `json:"name,omitempty"`
+	Name string `json:"name"`
 
 	// FilePathPattern log file path pattern which indicate how to find this file
 	// corresponding to variable (log path) in database kernel. please don't set this casually
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=256
-	FilePathPattern string `json:"filePathPattern,omitempty"`
+	// +kubebuilder:validation:MaxLength=4096
+	FilePathPattern string `json:"filePathPattern"`
 }
 
 // ClusterDefinitionComponent is a group of pods, pods in one component usually share the same data

@@ -60,6 +60,9 @@ func (f *NotifyEventType) String() string {
 type VolumeWatcherOpts struct {
 	VolumeDirs []string
 
+	// fileRegex watch file regex
+	FileRegex string
+
 	// ProcessName: program name
 	ProcessName string
 
@@ -99,4 +102,8 @@ func InstallFlags(flags *pflag.FlagSet, opt *VolumeWatcherOpts) {
 		"log-level",
 		opt.LogLevel,
 		"the config set log level.")
+	flags.StringVar(&opt.FileRegex,
+		"regex",
+		opt.FileRegex,
+		"the config set filter config file.")
 }

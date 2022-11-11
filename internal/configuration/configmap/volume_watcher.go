@@ -55,15 +55,19 @@ func NewVolumeWatcher(volume []string, ctx context.Context) *ConfigMapVolumeWatc
 		ctx:             ctx,
 		retryCount:      DefaultRetryCount,
 		filters:         make([]NotifyEventFilter, 0),
-	}).AddFilter(func(event fsnotify.Event) (bool, error) {
-		if event.Op&fsnotify.Create != fsnotify.Create {
-			return false, nil
-		}
-		if filepath.Base(event.Name) != "..data" {
-			return false, nil
-		}
-		return true, nil
-	})
+	}).AddFilter(isValidWatcherEvent)
+}
+
+// doFilter process configmap volume
+// https://github.com/ossrs/srs/issues/1635
+func isValidWatcherEvent(event fsnotify.Event) (bool, error) {
+	if event.Op&fsnotify.Create != fsnotify.Create {
+		return false, nil
+	}
+	if filepath.Base(event.Name) != "..data" {
+		return false, nil
+	}
+	return true, nil
 }
 
 func (w *ConfigMapVolumeWatcher) AddHandler(handler WatchEventHandler) *ConfigMapVolumeWatcher {
@@ -124,9 +128,11 @@ func (w *ConfigMapVolumeWatcher) loopNotifyEvent(watcher *fsnotify.Watcher, ctx 
 	for {
 		select {
 		case event := <-watcher.Events:
-			if doFilter(w.filters, event) {
+			logrus.Tracef("watch fsnotify event: [%s]", event.String())
+			if !doFilter(w.filters, event) {
 				continue
 			}
+			logrus.Debugf("volume configmap updated. [%s]", event.String())
 			runWithRetry(w.handler, event, w.retryCount)
 		case err := <-watcher.Errors:
 			logrus.Error(err)

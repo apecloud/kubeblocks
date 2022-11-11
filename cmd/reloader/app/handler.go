@@ -22,8 +22,10 @@ import (
 	"syscall"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/shirou/gopsutil/v3/process"
 	"github.com/sirupsen/logrus"
 
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/configmap"
 )
 
@@ -50,8 +52,36 @@ func createHandlerWithWatchType(opt *VolumeWatcherOpts) cfgcore.WatchEventHandle
 	return nil
 }
 
-func findProcessFromName(name string) (int, error) {
-	return 10, nil
+// findParentPidFromProcessName get parent pid
+func findParentPidFromProcessName(processName string) (*process.Process, error) {
+	allProcess, err := process.Processes()
+	if err != nil {
+		return nil, err
+	}
+
+	psGraph := map[*process.Process]int32{}
+	for _, proc := range allProcess {
+		name, err := proc.Name()
+		if err != nil {
+			return nil, cfgutil.WrapError(err, "failed to get process name from pid[%d]", proc.Pid)
+		}
+		if name != processName {
+			continue
+		}
+		ppid, err := proc.Ppid()
+		if err != nil {
+			return nil, cfgutil.WrapError(err, "failed to get parent pid from pid[%d]", proc.Pid)
+		}
+		psGraph[proc] = ppid
+	}
+
+	for key, value := range psGraph {
+		if value == 0 {
+			return key, nil
+		}
+	}
+
+	return nil, cfgutil.MakeError("not find pid fo process name: ", processName)
 }
 
 func createSignalHandler(opt *VolumeWatcherOpts) cfgcore.WatchEventHandler {
@@ -60,14 +90,10 @@ func createSignalHandler(opt *VolumeWatcherOpts) cfgcore.WatchEventHandler {
 		logrus.Fatalf("not support unix signal: %s", signal)
 	}
 	return func(event fsnotify.Event) error {
-		pid, err := findProcessFromName(opt.ProcessName)
+		proc, err := findParentPidFromProcessName(opt.ProcessName)
 		if err != nil {
 			return err
 		}
-		if process, err := os.FindProcess(pid); err != nil {
-			return err
-		} else {
-			return process.Signal(signal)
-		}
+		return proc.SendSignal(signal)
 	}
 }

@@ -18,7 +18,9 @@ package app
 
 import (
 	"context"
+	"regexp"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -46,6 +48,17 @@ func NewConfigReloadCommand(ctx context.Context, name string) *cobra.Command {
 	return cmd
 }
 
+func createCfgRegexFilter(regexString string) (cfgcore.NotifyEventFilter, error) {
+	regxPattern, err := regexp.Compile(regexString)
+	if err != nil {
+		return nil, cfgutil.WrapError(err, "failed to create regexp [%s]", regexString)
+	}
+
+	return func(event fsnotify.Event) (bool, error) {
+		return regxPattern.MatchString(event.Name), nil
+	}, nil
+}
+
 func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 	initLog(opt.LogLevel)
 
@@ -55,6 +68,15 @@ func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 
 	// new volume watcher
 	watcher := cfgcore.NewVolumeWatcher(opt.VolumeDirs, ctx)
+
+	// set regex filter
+	if len(opt.FileRegex) > 0 {
+		filter, err := createCfgRegexFilter(opt.FileRegex)
+		if err != nil {
+			return err
+		}
+		watcher.AddFilter(filter)
+	}
 
 	defer watcher.Close()
 	err := watcher.AddHandler(createHandlerWithWatchType(opt)).Run()

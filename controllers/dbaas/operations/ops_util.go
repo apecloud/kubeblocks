@@ -58,10 +58,10 @@ func ReconcileActionWithCluster(opsRes *OpsResource) (dbaasv1alpha1.Phase, error
 			return opsRequestPhase, err
 		}
 	}
-	clusterPhase := opsRes.Cluster.Status.Phase
-	if clusterPhase == dbaasv1alpha1.RunningPhase {
+	switch opsRes.Cluster.Status.Phase {
+	case dbaasv1alpha1.RunningPhase:
 		opsRequestPhase = dbaasv1alpha1.SucceedPhase
-	} else if isFailedPhase(clusterPhase) {
+	case dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase:
 		opsRequestPhase = dbaasv1alpha1.FailedPhase
 	}
 	return opsRequestPhase, nil
@@ -128,12 +128,13 @@ func sendEventWhenComponentPhaseChanged(opsRes *OpsResource, componentName strin
 		reason    = dbaasv1alpha1.ReasonStarting
 		eventType = corev1.EventTypeNormal
 	)
+	switch phase {
 	// component is running
-	if phase == dbaasv1alpha1.RunningPhase {
+	case dbaasv1alpha1.RunningPhase:
 		tip = "Successfully"
 		reason = dbaasv1alpha1.ReasonSuccessful
 		// component is failed
-	} else if isFailedPhase(phase) {
+	case dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase:
 		tip = "Failed"
 		reason = dbaasv1alpha1.ReasonComponentFailed
 		eventType = corev1.EventTypeWarning

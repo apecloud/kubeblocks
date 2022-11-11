@@ -95,13 +95,14 @@ func (opsMgr *OpsManager) Reconcile(opsRes *OpsResource) error {
 	if opsRequestPhase, err = opsBehaviour.ReconcileAction(opsRes); err != nil {
 		return err
 	}
-	if opsRequestPhase == dbaasv1alpha1.RunningPhase {
+	switch opsRequestPhase {
+	case dbaasv1alpha1.SucceedPhase:
+		return PatchOpsStatus(opsRes, opsRequestPhase, dbaasv1alpha1.NewSucceedCondition(opsRequest))
+	case dbaasv1alpha1.FailedPhase:
+		return PatchOpsStatus(opsRes, opsRequestPhase, dbaasv1alpha1.NewFailedCondition(opsRequest))
+	default:
 		return nil
 	}
-	if opsRequestPhase == dbaasv1alpha1.SucceedPhase {
-		return PatchOpsStatus(opsRes, opsRequestPhase, dbaasv1alpha1.NewSucceedCondition(opsRequest))
-	}
-	return PatchOpsStatus(opsRes, opsRequestPhase, dbaasv1alpha1.NewFailedCondition(opsRequest))
 }
 
 // validateClusterPhase validate Cluster.status.phase is in opsBehaviour.FromClusterPhases or OpsRequest is reentry

@@ -57,7 +57,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams,
 	}
 
 	probeServiceHttpPort := viper.GetInt32("PROBE_SERVICE_PORT")
-	availablePorts, err := getAvailableContainerPort(containers, []int32{probeServiceHttpPort, 50001})
+	availablePorts, err := getAvailableContainerPorts(containers, []int32{probeServiceHttpPort, 50001})
 	probeServiceHttpPort = availablePorts[0]
 	probeServiceGrpcPort := availablePorts[1]
 	if err != nil {

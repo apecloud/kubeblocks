@@ -171,7 +171,7 @@ func setEnableAllLogs(c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinit
 				for _, logConf := range com.LogsConfig {
 					typeList = append(typeList, logConf.Name)
 				}
-				c.Spec.Components[idx].EnableLogs = typeList
+				c.Spec.Components[idx].EnabledLogs = typeList
 				break
 			}
 		}

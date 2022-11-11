@@ -151,11 +151,11 @@ type ClusterComponent struct {
 	// +kubebuilder:default=false
 	Monitor bool `json:"monitor"`
 
-	// EnableLogs indicate which log file takes effect in database cluster
+	// EnabledLogs indicate which log file takes effect in database cluster
 	// element is the log type which listed in cluster definition logsConfig.name,
 	// and will open relative variables about this log type in database kernel
 	// +optional
-	EnableLogs []string `json:"enableLogs,omitempty"`
+	EnabledLogs []string `json:"enabledLogs,omitempty"`
 
 	// Resources requests and limits of workload
 	// +optional

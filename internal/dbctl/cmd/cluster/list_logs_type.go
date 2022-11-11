@@ -156,11 +156,11 @@ func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 			logTypeMap := make(map[string]bool)
 			for _, comCluster := range c.Spec.Components {
 				if strings.EqualFold(comCluster.Name, componentName) {
-					if len(comCluster.EnableLogs) == 0 {
+					if len(comCluster.EnabledLogs) == 0 {
 						w.Write(describe.LEVEL_0, "No log file open in %s, please set EnableLogs filed", comCluster.Name)
 					} else {
 						comTypeName = comCluster.Type
-						for _, logType := range comCluster.EnableLogs {
+						for _, logType := range comCluster.EnabledLogs {
 							logTypeMap[logType] = true
 						}
 					}

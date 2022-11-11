@@ -72,9 +72,9 @@ var _ = Describe("logs_list_type test", func() {
 				Spec: dbaasv1alpha1.ClusterSpec{
 					Components: []dbaasv1alpha1.ClusterComponent{
 						{
-							Name:       "component-name",
-							Type:       "component-type",
-							EnableLogs: []string{"slow"},
+							Name:        "component-name",
+							Type:        "component-type",
+							EnabledLogs: []string{"slow"},
 						},
 					},
 				},
@@ -84,7 +84,7 @@ var _ = Describe("logs_list_type test", func() {
 					Components: []dbaasv1alpha1.ClusterDefinitionComponent{
 						{
 							TypeName: "component-type",
-							LogsConfig: []*dbaasv1alpha1.LogConfig{
+							LogsConfig: []dbaasv1alpha1.LogConfig{
 								{
 									Name:            "slow",
 									FilePathPattern: "",

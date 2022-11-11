@@ -107,6 +107,6 @@ spec:
 		_ = yaml.Unmarshal([]byte(clusterDefByte), clusterDef)
 		_ = yaml.Unmarshal([]byte(clusterByte), cluster)
 		setEnableAllLogs(cluster, clusterDef)
-		Expect(len(cluster.Spec.Components[0].EnableLogs)).Should(Equal(2))
+		Expect(len(cluster.Spec.Components[0].EnabledLogs)).Should(Equal(2))
 	})
 })

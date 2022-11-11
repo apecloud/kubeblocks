@@ -423,7 +423,7 @@ func mergeComponents(
 	affinity := cluster.Spec.Affinity
 	if clusterComp != nil {
 		component.Name = clusterComp.Name
-		component.EnableLogs = clusterComp.EnableLogs
+		component.EnabledLogs = clusterComp.EnabledLogs
 
 		// respect user's declaration
 		if clusterComp.Replicas > 0 {

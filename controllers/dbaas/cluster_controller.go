@@ -706,7 +706,7 @@ func getSupportHorizontalScalingComponents(cluster *dbaasv1alpha1.Cluster,
 func validateEnableLogsConfig(c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinition) []*metav1.Condition {
 	conditionList := make([]*metav1.Condition, 0)
 	for _, comCluster := range c.Spec.Components {
-		if comCluster.EnableLogs == nil || len(comCluster.EnableLogs) == 0 {
+		if comCluster.EnabledLogs == nil || len(comCluster.EnabledLogs) == 0 {
 			continue
 		}
 		for _, com := range cd.Spec.Components {
@@ -716,7 +716,7 @@ func validateEnableLogsConfig(c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.Cluste
 					logTypes[logV.Name] = true
 				}
 				invalidNames := make([]string, 0, len(com.LogsConfig))
-				for _, name := range comCluster.EnableLogs {
+				for _, name := range comCluster.EnabledLogs {
 					if ok := logTypes[name]; !ok {
 						invalidNames = append(invalidNames, name)
 					}

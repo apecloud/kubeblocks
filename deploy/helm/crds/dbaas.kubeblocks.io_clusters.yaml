@@ -111,8 +111,8 @@ spec:
                             type: string
                           type: array
                       type: object
-                    enableLogs:
-                      description: EnableLogs indicate which log file takes effect
+                    enabledLogs:
+                      description: EnabledLogs indicate which log file takes effect
                         in database cluster element is the log type which listed in
                         cluster definition logsConfig.name, and will open relative
                         variables about this log type in database kernel

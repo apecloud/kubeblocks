@@ -174,7 +174,7 @@ type ClusterDefinitionComponent struct {
 
 	// LogsConfig is detail log file config which provided by ISV
 	// +optional
-	LogsConfig []*LogConfig `json:"logsConfig,omitempty"`
+	LogsConfig []LogConfig `json:"logsConfig,omitempty"`
 
 	// antiAffinity defines components should have anti-affinity constraint to same component type
 	// +kubebuilder:default=false

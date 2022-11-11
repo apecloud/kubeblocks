@@ -1234,7 +1234,7 @@ spec:
 		conditionList := validateEnableLogsConfig(cluster, clusterDef)
 		Expect(len(conditionList)).Should(Equal(0))
 		// corner case
-		cluster.Spec.Components[0].EnableLogs = []string{"error-test", "slow"}
+		cluster.Spec.Components[0].EnabledLogs = []string{"error-test", "slow"}
 		conditionList1 := validateEnableLogsConfig(cluster, clusterDef)
 		Expect(len(conditionList1)).Should(Equal(1))
 	})

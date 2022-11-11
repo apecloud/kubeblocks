@@ -185,7 +185,7 @@ func getAllContainerPorts(containers []corev1.Container) (map[int32]bool, error)
 
 // get available container ports, increased by one if conflict with exist ports
 // util no conflicts.
-// only update conflict ports, and keep unchanged containerPorts as maximum as possible
+// only update conflict ports, and keep unchanged containerPorts as many as possible
 func getAvailableContainerPort(containers []corev1.Container, containerPorts []int32) ([]int32, error) {
 	conflictIndexes := []int{}
 	set, err := getAllContainerPorts(containers)
@@ -194,6 +194,9 @@ func getAvailableContainerPort(containers []corev1.Container, containerPorts []i
 	}
 
 	for i := range containerPorts {
+		if containerPorts[i] <= 0 || containerPorts[i] > 65536 {
+			containerPorts[i] = 1024
+		}
 		_, ok := set[containerPorts[i]]
 		if ok {
 			conflictIndexes = append(conflictIndexes, i)
@@ -202,10 +205,16 @@ func getAvailableContainerPort(containers []corev1.Container, containerPorts []i
 		}
 	}
 
+	// in general, the count of container ports would less than 10,
+	// so the possiblity of ports conflict is small, and next for loop would
+	// not run in most case.
 	for _, index := range conflictIndexes {
 		ok := true
 		for ok {
 			containerPorts[index]++
+			if containerPorts[index] > 65536 {
+				containerPorts[index] = 1024
+			}
 			_, ok = set[containerPorts[index]]
 		}
 		set[containerPorts[index]] = true

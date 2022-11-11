@@ -52,6 +52,17 @@ const (
 
 const (
 	consensusSetStatusDefaultPodName = "Unknown"
+	RoleEmpty                        = ""
+)
+
+const (
+	leaderPriority            = 1 << 5
+	followerReadWritePriority = 1 << 4
+	followerReadonlyPriority  = 1 << 3
+	followerNonePriority      = 1 << 2
+	learnerPriority           = 1 << 1
+	emptyPriority             = 1 << 0
+	// unknownPriority           = 0
 )
 
 // GetPodListByStatefulSet get statefulSet pod list
@@ -176,174 +187,133 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 		return true, nil
 	}
 
-	// list all roles
 	if component.ConsensusSpec == nil {
 		component.ConsensusSpec = &dbaasv1alpha1.ConsensusSetSpec{Leader: dbaasv1alpha1.DefaultLeader}
 	}
-	leader := component.ConsensusSpec.Leader.Name
-	learner := ""
-	if component.ConsensusSpec.Learner != nil {
-		learner = component.ConsensusSpec.Learner.Name
-	}
-	// now all are followers
-	noneFollowers := make(map[string]string)
-	readonlyFollowers := make(map[string]string)
-	readWriteFollowers := make(map[string]string)
-	// a follower name set
-	followers := make(map[string]string)
-	exist := "EXIST"
-	for _, follower := range component.ConsensusSpec.Followers {
-		followers[follower.Name] = exist
-		switch follower.AccessMode {
-		case dbaasv1alpha1.None:
-			noneFollowers[follower.Name] = exist
-		case dbaasv1alpha1.Readonly:
-			readonlyFollowers[follower.Name] = exist
-		case dbaasv1alpha1.ReadWrite:
-			readWriteFollowers[follower.Name] = exist
-		}
-	}
+	rolePriorityMap := composeRolePriorityMap(component)
 
 	// make a Serial pod list,
-	// e.g.: unknown -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
+	// e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
 	sort.SliceStable(pods, func(i, j int) bool {
 		roleI := pods[i].Labels[intctrlutil.ConsensusSetRoleLabelKey]
 		roleJ := pods[j].Labels[intctrlutil.ConsensusSetRoleLabelKey]
-		if roleI == "" && roleJ == "" {
+
+		if rolePriorityMap[roleI] == rolePriorityMap[roleJ] {
 			return strings.Compare(pods[i].Name, pods[j].Name) < 0
-		}
-		if roleI == "" {
-			return true
-		}
-		if roleJ == "" {
-			return false
-		}
-		if roleI == learner && roleJ == learner {
-			return strings.Compare(pods[i].Name, pods[j].Name) < 0
-		}
-		if roleI == learner {
-			return true
-		}
-		if roleJ == learner {
-			return false
-		}
-		if noneFollowers[roleI] == exist && noneFollowers[roleJ] == exist {
-			return strings.Compare(pods[i].Name, pods[j].Name) < 0
-		}
-		if noneFollowers[roleI] == exist {
-			return true
-		}
-		if noneFollowers[roleJ] == exist {
-			return false
-		}
-		if readonlyFollowers[roleI] == exist && readonlyFollowers[roleJ] == exist {
-			return strings.Compare(pods[i].Name, pods[j].Name) < 0
-		}
-		if readonlyFollowers[roleI] == exist {
-			return true
-		}
-		if readonlyFollowers[roleJ] == exist {
-			return false
-		}
-		if readWriteFollowers[roleI] == exist && readWriteFollowers[roleJ] == exist {
-			return strings.Compare(pods[i].Name, pods[j].Name) < 0
-		}
-		if readWriteFollowers[roleI] == exist {
-			return true
-		}
-		if readWriteFollowers[roleJ] == exist {
-			return false
-		}
-		if roleI == leader && roleJ == leader {
-			return strings.Compare(pods[i].Name, pods[j].Name) < 0
-		}
-		if roleI == leader {
-			return false
-		}
-		if roleJ == leader {
-			return true
 		}
 
-		return strings.Compare(pods[i].Name, pods[j].Name) < 0
+		return rolePriorityMap[roleI] < rolePriorityMap[roleJ]
 	})
 
 	// generate plan by UpdateStrategy
 	switch component.ConsensusSpec.UpdateStrategy {
 	case dbaasv1alpha1.Serial:
-		// unknown -> learner -> followers(none->readonly->readwrite) -> leader
-		start := plan.Start
-		for _, pod := range pods {
-			nextStep := &Step{}
-			nextStep.Obj = pod
-			start.NextSteps = append(start.NextSteps, nextStep)
-			start = nextStep
-		}
+		generateConsensusSerialPlan(plan, pods)
 	case dbaasv1alpha1.Parallel:
-		// unknown & leader & followers & learner
-		start := plan.Start
-		for _, pod := range pods {
-			nextStep := &Step{}
-			nextStep.Obj = pod
-			start.NextSteps = append(start.NextSteps, nextStep)
-		}
+		generateConsensusParallelPlan(plan, pods)
 	case dbaasv1alpha1.BestEffortParallel:
-		// unknown & learner & 1/2 followers -> 1/2 followers -> leader
-		start := plan.Start
-		// append learner
-		index := 0
-		for _, pod := range pods {
-			role := pod.Labels[intctrlutil.ConsensusSetRoleLabelKey]
-			if role != "" && role != learner {
-				break
-			}
+		generateConsensusBestEffortParallelPlan(plan, pods, rolePriorityMap)
+	}
+
+	return plan
+}
+
+// unknown & empty & learner & 1/2 followers -> 1/2 followers -> leader
+func generateConsensusBestEffortParallelPlan(plan *Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
+	start := plan.Start
+	// append unknown, empty and learner
+	index := 0
+	for _, pod := range pods {
+		role := pod.Labels[intctrlutil.ConsensusSetRoleLabelKey]
+		if rolePriorityMap[role] <= learnerPriority {
 			nextStep := &Step{}
 			nextStep.Obj = pod
 			start.NextSteps = append(start.NextSteps, nextStep)
 			index++
 		}
-		if len(start.NextSteps) > 0 {
-			start = start.NextSteps[0]
+	}
+	if len(start.NextSteps) > 0 {
+		start = start.NextSteps[0]
+	}
+	// append 1/2 followers
+	podList := pods[index:]
+	followerCount := 0
+	for _, pod := range podList {
+		if rolePriorityMap[pod.Labels[intctrlutil.ConsensusSetRoleLabelKey]] < leaderPriority {
+			followerCount++
 		}
-		// append 1/2 followers
-		podList := pods[index:]
-		followerCount := 0
-		for _, pod := range podList {
-			if followers[pod.Labels[intctrlutil.ConsensusSetRoleLabelKey]] == exist {
-				followerCount++
-			}
-		}
-		end := followerCount / 2
-		for i := 0; i < end; i++ {
-			nextStep := &Step{}
-			nextStep.Obj = podList[i]
-			start.NextSteps = append(start.NextSteps, nextStep)
-		}
+	}
+	end := followerCount / 2
+	for i := 0; i < end; i++ {
+		nextStep := &Step{}
+		nextStep.Obj = podList[i]
+		start.NextSteps = append(start.NextSteps, nextStep)
+	}
 
-		if len(start.NextSteps) > 0 {
-			start = start.NextSteps[0]
-		}
-		// append the other 1/2 followers
-		podList = podList[end:]
-		end = followerCount - end
-		for i := 0; i < end; i++ {
-			nextStep := &Step{}
-			nextStep.Obj = podList[i]
-			start.NextSteps = append(start.NextSteps, nextStep)
-		}
+	if len(start.NextSteps) > 0 {
+		start = start.NextSteps[0]
+	}
+	// append the other 1/2 followers
+	podList = podList[end:]
+	end = followerCount - end
+	for i := 0; i < end; i++ {
+		nextStep := &Step{}
+		nextStep.Obj = podList[i]
+		start.NextSteps = append(start.NextSteps, nextStep)
+	}
 
-		if len(start.NextSteps) > 0 {
-			start = start.NextSteps[0]
-		}
-		// append leader
-		podList = podList[end:]
-		for _, pod := range podList {
-			nextStep := &Step{}
-			nextStep.Obj = pod
-			start.NextSteps = append(start.NextSteps, nextStep)
+	if len(start.NextSteps) > 0 {
+		start = start.NextSteps[0]
+	}
+	// append leader
+	podList = podList[end:]
+	for _, pod := range podList {
+		nextStep := &Step{}
+		nextStep.Obj = pod
+		start.NextSteps = append(start.NextSteps, nextStep)
+	}
+}
+
+// unknown & empty & leader & followers & learner
+func generateConsensusParallelPlan(plan *Plan, pods []corev1.Pod) {
+	start := plan.Start
+	for _, pod := range pods {
+		nextStep := &Step{}
+		nextStep.Obj = pod
+		start.NextSteps = append(start.NextSteps, nextStep)
+	}
+}
+
+// unknown -> empty -> learner -> followers(none->readonly->readwrite) -> leader
+func generateConsensusSerialPlan(plan *Plan, pods []corev1.Pod) {
+	start := plan.Start
+	for _, pod := range pods {
+		nextStep := &Step{}
+		nextStep.Obj = pod
+		start.NextSteps = append(start.NextSteps, nextStep)
+		start = nextStep
+	}
+}
+
+func composeRolePriorityMap(component dbaasv1alpha1.ClusterDefinitionComponent) map[string]int {
+	rolePriorityMap := make(map[string]int, 0)
+	rolePriorityMap[RoleEmpty] = emptyPriority
+	rolePriorityMap[component.ConsensusSpec.Leader.Name] = leaderPriority
+	if component.ConsensusSpec.Learner != nil {
+		rolePriorityMap[component.ConsensusSpec.Learner.Name] = learnerPriority
+	}
+	for _, follower := range component.ConsensusSpec.Followers {
+		switch follower.AccessMode {
+		case dbaasv1alpha1.None:
+			rolePriorityMap[follower.Name] = followerNonePriority
+		case dbaasv1alpha1.Readonly:
+			rolePriorityMap[follower.Name] = followerReadonlyPriority
+		case dbaasv1alpha1.ReadWrite:
+			rolePriorityMap[follower.Name] = followerReadWritePriority
 		}
 	}
 
-	return plan
+	return rolePriorityMap
 }
 
 func UpdateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx, pod *corev1.Pod, role string) error {

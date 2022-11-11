@@ -35,13 +35,10 @@ const (
 	opsRequestFinalizerName   = "opsrequest.kubeblocks.io/finalizer"
 
 	// label keys
-	clusterDefLabelKey             = "clusterdefinition.kubeblocks.io/name"
-	appVersionLabelKey             = "appversion.kubeblocks.io/name"
-	statefulSetPodNameLabelKey     = "statefulset.kubernetes.io/pod-name"
-	consensusSetAccessModeLabelKey = "cs.dbaas.kubeblocks.io/access-mode"
-	clusterLabelKey                = "cluster.kubeblocks.io/name"
-
-	consensusSetStatusDefaultPodName = "Unknown"
+	clusterDefLabelKey         = "clusterdefinition.kubeblocks.io/name"
+	appVersionLabelKey         = "appversion.kubeblocks.io/name"
+	statefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
+	clusterLabelKey            = "cluster.kubeblocks.io/name"
 )
 
 type MonitorConfig struct {

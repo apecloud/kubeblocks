@@ -1,4 +1,4 @@
-name: ISSUE-VALID-PULL-REQUEST
+name: PULL-REQUEST-CHECK
 
 on:
   pull_request_target:
@@ -8,10 +8,13 @@ env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
 jobs:
-  issue-link:
-    name: Check Issue Link
+  pr-check:
+    name: Check PR Title And Issue
     runs-on: ubuntu-latest
     steps:
+      - name: check PR title
+        uses: amannn/action-semantic-pull-request@v5
+
       - uses: actions/checkout@v3
       - name: check issue link
         run: |
@@ -19,4 +22,4 @@ jobs:
             ${{ github.repository }} \
             ${{ github.repository_owner }} \
             ${{ github.event.pull_request.number }} \
-            ${{ github.event.pull_request.title }}
+            "${{ github.event.pull_request.title }}"

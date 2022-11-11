@@ -1,6 +1,6 @@
 sts: {
 	metadata: {
-		labels: [string]:string
+		labels: [string]: string
 	}
 	spec: {
 		volumeClaimTemplates: [
@@ -24,7 +24,7 @@ pvc: {
 	metadata: {
 		name:      pvc_key.Name
 		namespace: pvc_key.Namespace
-		labels: sts.metadata.labels
+		labels:    sts.metadata.labels
 	}
 	spec: {
 		accessModes: sts.spec.volumeClaimTemplates[0].spec.accessModes

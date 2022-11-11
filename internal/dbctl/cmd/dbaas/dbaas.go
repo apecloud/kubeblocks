@@ -17,16 +17,24 @@ limitations under the License.
 package dbaas
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
-
-	"k8s.io/client-go/dynamic"
+	"os"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v3/pkg/action"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
+	"github.com/ghodss/yaml"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
 	"github.com/apecloud/kubeblocks/version"
 )
@@ -50,6 +58,14 @@ type installOptions struct {
 	Monitor bool
 }
 
+type addEngineOptions struct {
+	options             options
+	AppVersionsByte     []byte
+	ClusterDefsByte     []byte
+	AppVersionsFilePath string
+	ClusterDefsFilePath string
+}
+
 // NewDbaasCmd creates the dbaas command
 func NewDbaasCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
@@ -59,6 +75,7 @@ func NewDbaasCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	cmd.AddCommand(
 		newInstallCmd(f, streams),
 		newUninstallCmd(f, streams),
+		newAddEngineCmd(f, streams),
 	)
 	return cmd
 }
@@ -174,4 +191,95 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		},
 	}
 	return cmd
+}
+
+func newAddEngineCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &addEngineOptions{
+		options: options{
+			IOStreams: streams,
+		},
+	}
+
+	cmd := &cobra.Command{
+		Use:   "add-engine",
+		Short: "Add a new engine to KubeBlocks",
+		Args:  cobra.NoArgs,
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Complete(f, cmd))
+			cmdutil.CheckErr(o.Run())
+		},
+	}
+
+	cmd.Flags().StringVar(&o.AppVersionsFilePath, "app-version", "", "KubeBlocks new engine app version yaml file path")
+	cmd.Flags().StringVar(&o.ClusterDefsFilePath, "cluster-definition", "", "KubeBlocks new engine cluster definition yaml file path")
+
+	return cmd
+}
+
+func (o *addEngineOptions) Validate() error {
+	if o.AppVersionsFilePath == "" && o.ClusterDefsFilePath == "" {
+		return fmt.Errorf("a valid appversion yaml file or clusterdefinition yaml file path is needed")
+	}
+	return nil
+}
+
+func (o *addEngineOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+	var (
+		appVersionsByte []byte
+		clusterDefsByte []byte
+		err             error
+	)
+	if len(o.AppVersionsFilePath) > 0 {
+		if appVersionsByte, err = os.ReadFile(o.AppVersionsFilePath); err != nil {
+			return err
+		}
+		if appVersionsByte, err = yaml.YAMLToJSON(appVersionsByte); err != nil {
+			return err
+		}
+		o.AppVersionsByte = appVersionsByte
+	}
+	if len(o.ClusterDefsFilePath) > 0 {
+		if clusterDefsByte, err = os.ReadFile(o.ClusterDefsFilePath); err != nil {
+			return err
+		}
+		if clusterDefsByte, err = yaml.YAMLToJSON(clusterDefsByte); err != nil {
+			return err
+		}
+		o.ClusterDefsByte = clusterDefsByte
+	}
+	err = o.options.complete(f, cmd)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Run execute command. the options of parameter contain the command flags and args.
+func (o *addEngineOptions) Run() error {
+	var (
+		err             error
+		unstructuredObj *unstructured.Unstructured
+	)
+	if o.ClusterDefsFilePath != "" {
+		if err = json.Unmarshal(o.ClusterDefsByte, &unstructuredObj); err != nil {
+			return err
+		}
+		gvr := schema.GroupVersionResource{Group: types.Group, Version: types.Version, Resource: types.ResourceClusterDefinitions}
+		if unstructuredObj, err = o.options.client.Resource(gvr).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
+			return err
+		}
+		fmt.Fprintf(o.options.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
+	}
+	if o.AppVersionsFilePath != "" {
+		if err = json.Unmarshal(o.AppVersionsByte, &unstructuredObj); err != nil {
+			return err
+		}
+		gvr := schema.GroupVersionResource{Group: types.Group, Version: types.Version, Resource: types.ResourceAppVersions}
+		if unstructuredObj, err = o.options.client.Resource(gvr).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
+			return err
+		}
+		fmt.Fprintf(o.options.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
+	}
+	return nil
 }

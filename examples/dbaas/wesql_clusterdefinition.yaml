@@ -15,6 +15,9 @@ spec:
           - name: "follower"
             accessMode: Readonly
         updateStrategy: BestEffortParallel
+      probes:
+        roleChangedProbe:
+          periodSeconds: 1
       service:
         ports:
           - protocol: TCP

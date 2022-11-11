@@ -183,17 +183,29 @@ func getAllContainerPorts(containers []corev1.Container) (map[int32]bool, error)
 	return set, nil
 }
 
-// get available container port, increased by one if conflict with exist ports
-// util no conflicts
-func getAvailableContainerPort(containers []corev1.Container, containerPort int32) (int32, error) {
+// get available container ports, increased by one if conflict with exist ports
+// util no conflicts.
+func getAvailableContainerPorts(containers []corev1.Container, containerPorts []int32) ([]int32, error) {
 	set, err := getAllContainerPorts(containers)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	for _, ok := set[containerPort]; ok; {
-		containerPort++
-		_, ok = set[containerPort]
+	iterAvailPort := func(p int32) int32 {
+		for {
+			if _, ok := set[p]; !ok {
+				set[p] = true
+				return p
+			}
+			p++
+			if p <= 0 || p > 65536 {
+				p = 1024
+			}
+		}
 	}
-	return containerPort, nil
+
+	for i, p := range containerPorts {
+		containerPorts[i] = iterAvailPort(p)
+	}
+	return containerPorts, nil
 }

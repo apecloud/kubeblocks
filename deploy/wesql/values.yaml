@@ -104,3 +104,4 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 appVersionOverride: ""
+defaultTerminationPolicy: "Delete"

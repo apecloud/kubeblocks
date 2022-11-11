@@ -6,6 +6,7 @@ metadata:
     {{- include "wesqlapp.labels" . | nindent 4 }}
 spec:
   type: state.mysql
+  defaultTerminationPolicy: {{ .Values.defaultTerminationPolicy }}
   connectionCredential:
     user: {{ .Values.auth.rootUser }}
     password: {{ .Values.auth.rootPassword }}

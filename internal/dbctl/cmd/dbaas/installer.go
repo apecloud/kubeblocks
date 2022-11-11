@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/repo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
@@ -31,7 +32,7 @@ import (
 )
 
 type Installer struct {
-	cfg *action.Configuration
+	HelmCfg *action.Configuration
 
 	Namespace string
 	Version   string
@@ -40,14 +41,22 @@ type Installer struct {
 }
 
 func (i *Installer) Install() (string, error) {
-	sets := []string{}
+	entry := &repo.Entry{
+		Name: types.KubeBlocksChartName,
+		URL:  types.KubeBlocksChartURL,
+	}
+	if err := helm.AddRepo(entry); err != nil {
+		return "", err
+	}
+
+	var sets []string
 	for _, set := range i.Sets {
 		splitSet := strings.Split(set, ",")
 		sets = append(sets, splitSet...)
 	}
 	chart := helm.InstallOpts{
 		Name:      types.KubeBlocksChartName,
-		Chart:     types.KubeBlocksChart,
+		Chart:     types.KubeBlocksChartName + "/" + types.KubeBlocksChartName,
 		Wait:      true,
 		Version:   i.Version,
 		Namespace: i.Namespace,
@@ -56,7 +65,7 @@ func (i *Installer) Install() (string, error) {
 		TryTimes:  2,
 	}
 
-	notes, err := chart.Install(i.cfg)
+	notes, err := chart.Install(i.HelmCfg)
 	if err != nil {
 		return "", err
 	}
@@ -71,7 +80,7 @@ func (i *Installer) Uninstall() error {
 		Namespace: i.Namespace,
 	}
 
-	if err := chart.UnInstall(i.cfg); err != nil {
+	if err := chart.UnInstall(i.HelmCfg); err != nil {
 		return err
 	}
 

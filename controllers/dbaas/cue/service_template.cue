@@ -28,13 +28,14 @@ service: {
 			"app.kubernetes.io/instance": cluster.metadata.name
 			// "app.kubernetes.io/version" : # TODO
 			"app.kubernetes.io/component-name": "\(component.name)"
-			"app.kubernetes.io/created-by":     "controller-manager"
+			"app.kubernetes.io/managed-by":     "kubeblocks"
 		}
 	}
 	"spec": {
 		"selector": {
 			"app.kubernetes.io/instance":       "\(cluster.metadata.name)"
 			"app.kubernetes.io/component-name": "\(component.name)"
+			"app.kubernetes.io/managed-by":     "kubeblocks"
 		}
 		ports: component.service.ports
 		if component.service.type != _|_ {

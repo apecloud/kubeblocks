@@ -39,8 +39,8 @@ const (
 	// KubeBlocksChartName helm name for installing kubeblocks
 	KubeBlocksChartName = "kubeblocks"
 
-	// KubeBlocksChart the helm chart for installing kubeblocks
-	KubeBlocksChart = "oci://yimeisun.azurecr.io/helm-chart/kubeblocks"
+	// KubeBlocksChartURL the helm chart for installing kubeblocks
+	KubeBlocksChartURL = "https://apecloud.github.io/helm-charts"
 
 	// PlaygroundSourceName is the playground default operator
 	PlaygroundSourceName = "innodbclusters"

@@ -96,7 +96,9 @@ func BuildCommand(inputs Inputs) *cobra.Command {
 		Short: inputs.Short,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(inputs.BaseOptionsObj.Run(inputs, args))
+			cmdutil.CheckErr(inputs.BaseOptionsObj.Complete(inputs, args))
+			cmdutil.CheckErr(inputs.BaseOptionsObj.Validate(inputs))
+			cmdutil.CheckErr(inputs.BaseOptionsObj.Run(inputs))
 		},
 	}
 	if inputs.BuildFlags != nil {
@@ -128,25 +130,24 @@ func (o *BaseOptions) Complete(inputs Inputs, args []string) error {
 	return nil
 }
 
+func (o *BaseOptions) Validate(inputs Inputs) error {
+	// do options validate
+	if inputs.Validate != nil {
+		if err := inputs.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Run execute command. the options of parameter contain the command flags and args.
-func (o *BaseOptions) Run(inputs Inputs, args []string) error {
+func (o *BaseOptions) Run(inputs Inputs) error {
 	var (
 		cueValue        cue.Value
 		err             error
 		unstructuredObj *unstructured.Unstructured
 		optionsByte     []byte
 	)
-	// complete options variables
-	if err = o.Complete(inputs, args); err != nil {
-		return err
-	}
-
-	// do options validate
-	if inputs.Validate != nil {
-		if err = inputs.Validate(); err != nil {
-			return err
-		}
-	}
 
 	if optionsByte, err = json.Marshal(inputs.Options); err != nil {
 		return err

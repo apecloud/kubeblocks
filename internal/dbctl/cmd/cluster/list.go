@@ -18,20 +18,26 @@ package cluster
 
 import (
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/list"
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
 )
 
+var listExample = templates.Examples(`
+		# list all cluster
+		dbctl cluster list
+`)
+
 func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	cmd := list.Command{
-		Factory:   f,
-		Streams:   streams,
-		Short:     "List all database cluster.",
-		GroupKind: schema.GroupKind{Group: types.Group, Kind: types.KindCluster},
-	}
-	return cmd.Build()
+	return builder.NewCmdBuilder().
+		Short("List all cluster.").
+		Example(listExample).
+		Factory(f).
+		GroupKind(types.ClusterGK()).
+		IOStreams(streams).
+		Build(list.Build)
 }

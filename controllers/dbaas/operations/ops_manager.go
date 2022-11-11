@@ -91,7 +91,7 @@ func (opsMgr *OpsManager) Reconcile(opsRes *OpsResource) error {
 	if opsBehaviour == nil || opsBehaviour.ReconcileAction == nil {
 		return nil
 	}
-	if err = opsBehaviour.ReconcileAction(opsRes); err != nil {
+	if ok, err = opsBehaviour.ReconcileAction(opsRes); err != nil || !ok {
 		return err
 	}
 	return PatchOpsStatus(opsRes, dbaasv1alpha1.SucceedPhase, dbaasv1alpha1.NewSucceedCondition(opsRequest))

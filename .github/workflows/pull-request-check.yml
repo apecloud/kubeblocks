@@ -1,0 +1,25 @@
+name: PULL-REQUEST-CHECK
+
+on:
+  pull_request_target:
+    types: [ edited, opened ]
+
+env:
+  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+jobs:
+  pr-check:
+    name: Check PR Title And Issue
+    runs-on: ubuntu-latest
+    steps:
+      - name: check PR title
+        uses: amannn/action-semantic-pull-request@v5
+
+      - uses: actions/checkout@v3
+      - name: check issue link
+        run: |
+          bash ${{ github.workspace }}/.github/utils/issue-link.sh \
+            ${{ github.repository }} \
+            ${{ github.repository_owner }} \
+            ${{ github.event.pull_request.number }} \
+            "${{ github.event.pull_request.title }}"

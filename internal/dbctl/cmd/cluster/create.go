@@ -39,10 +39,11 @@ import (
 )
 
 const (
-	defaultClusterDef      = "apecloud-wesql"
-	defaultAppVersion      = "wesql-8.0.18"
-	clusterCueTemplateName = "cluster_template.cue"
-	monitorKey             = "monitor"
+	DefaultClusterDef = "apecloud-wesql"
+	DefaultAppVersion = "wesql-8.0.30"
+
+	CueTemplateName = "cluster_template.cue"
+	monitorKey      = "monitor"
 )
 
 type CreateOptions struct {
@@ -110,7 +111,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	inputs := create.Inputs{
 		Use:             "create",
 		Short:           "Create a database cluster",
-		CueTemplateName: clusterCueTemplateName,
+		CueTemplateName: CueTemplateName,
 		ResourceName:    types.ResourceClusters,
 		BaseOptionsObj:  &o.BaseOptions,
 		Options:         o,
@@ -119,8 +120,8 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Complete:        o.Complete,
 		PreCreate:       o.PreCreate,
 		BuildFlags: func(cmd *cobra.Command) {
-			cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", defaultClusterDef, "ClusterDefinition reference")
-			cmd.Flags().StringVar(&o.AppVersionRef, "app-version", defaultAppVersion, "AppVersion reference")
+			cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", DefaultClusterDef, "ClusterDefinition reference")
+			cmd.Flags().StringVar(&o.AppVersionRef, "app-version", DefaultAppVersion, "AppVersion reference")
 			cmd.Flags().StringVar(&o.TerminationPolicy, "termination-policy", "Halt", "Termination policy")
 			cmd.Flags().StringVar(&o.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type")
 			cmd.Flags().BoolVar(&o.Monitor, "monitor", false, "Set monitor enabled (default false)")

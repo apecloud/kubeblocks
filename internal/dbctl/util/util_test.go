@@ -85,5 +85,9 @@ var _ = Describe("util", func() {
 		}
 		Expect(MakeSSHKeyPair("", "")).Should(HaveOccurred())
 		Expect(SetKubeConfig("test")).Should(Succeed())
+		Expect(NewFactory()).ShouldNot(BeNil())
+		dir, err := PlaygroundDir()
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(dir).ShouldNot(Equal(""))
 	})
 })

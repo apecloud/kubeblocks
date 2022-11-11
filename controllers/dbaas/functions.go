@@ -168,3 +168,44 @@ func getPortByName(container *corev1.Container, portName string) *corev1.Contain
 
 	return nil
 }
+
+func getAllContainerPorts(containers []corev1.Container) (map[int32]bool, error) {
+	set := map[int32]bool{}
+	for _, container := range containers {
+		for _, v := range container.Ports {
+			_, ok := set[v.ContainerPort]
+			if ok {
+				return nil, fmt.Errorf("containerPorts conflict: [%+v]", v.ContainerPort)
+			}
+			set[v.ContainerPort] = true
+		}
+	}
+	return set, nil
+}
+
+// get available container ports, increased by one if conflict with exist ports
+// util no conflicts.
+func getAvailableContainerPorts(containers []corev1.Container, containerPorts []int32) ([]int32, error) {
+	set, err := getAllContainerPorts(containers)
+	if err != nil {
+		return nil, err
+	}
+
+	iterAvailPort := func(p int32) int32 {
+		for {
+			if _, ok := set[p]; !ok {
+				set[p] = true
+				return p
+			}
+			p++
+			if p <= 0 || p > 65536 {
+				p = 1024
+			}
+		}
+	}
+
+	for i, p := range containerPorts {
+		containerPorts[i] = iterAvailPort(p)
+	}
+	return containerPorts, nil
+}

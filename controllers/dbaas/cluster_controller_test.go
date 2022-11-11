@@ -46,6 +46,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var _ = Describe("Cluster Controller", func() {
@@ -861,11 +863,9 @@ spec:
 				time.Sleep(interval * 5)
 
 				Eventually(func() bool {
-					err := k8sClient.Get(context.Background(), key, cluster)
-					if err != nil {
+					if err := k8sClient.Get(context.Background(), key, cluster); err != nil {
 						return false
 					}
-
 					return cluster.Status.Phase == dbaasv1alpha1.CreatingPhase
 				}, timeout*3, interval*5).Should(BeTrue())
 
@@ -921,7 +921,7 @@ spec:
 			Expect(k8sClient.List(context.Background(), podList, client.InNamespace(key.Namespace))).Should(Succeed())
 			pods := make([]corev1.Pod, 0)
 			for _, pod := range podList.Items {
-				if isMemberOf(sts, &pod) {
+				if component.IsMemberOf(sts, &pod) {
 					pods = append(pods, pod)
 				}
 			}
@@ -932,7 +932,7 @@ spec:
 			// 2 followers
 			leaderCount, followerCount := 0, 0
 			for _, pod := range pods {
-				switch pod.Labels[consensusSetRoleLabelKey] {
+				switch pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] {
 				case leader:
 					leaderCount++
 				case follower:
@@ -956,7 +956,7 @@ spec:
 			By("By deleting leader pod")
 			leaderPod := &corev1.Pod{}
 			for _, pod := range pods {
-				if pod.Labels[consensusSetRoleLabelKey] == leader {
+				if pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] == leader {
 					leaderPod = &pod
 					break
 				}
@@ -1314,10 +1314,10 @@ spec:
 		pod := corev1.Pod{}
 		Expect(yaml.Unmarshal([]byte(podYaml), &pod)).Should(Succeed())
 		pod.Name = parentName + "-" + strconv.Itoa(i)
-		pod.Labels[consensusSetRoleLabelKey] = "follower"
+		pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] = "follower"
 		pods = append(pods, pod)
 	}
-	pods[1].Labels[consensusSetRoleLabelKey] = "leader"
+	pods[1].Labels[intctrlutil.ConsensusSetRoleLabelKey] = "leader"
 
 	return pods
 }

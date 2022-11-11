@@ -40,7 +40,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/kubernetes/scheme"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
@@ -243,6 +247,26 @@ func Spinner(w io.Writer, fmtstr string, a ...any) func(result bool) {
 	}
 }
 
-func InstanceLabel(name string) string {
-	return fmt.Sprintf("app.kubernetes.io/instance=%s", name)
+var addToScheme sync.Once
+
+func NewFactory() cmdutil.Factory {
+	getter := genericclioptions.NewConfigFlags(true)
+
+	// Add CRDs to the scheme. They are missing by default.
+	addToScheme.Do(func() {
+		if err := apiextv1.AddToScheme(scheme.Scheme); err != nil {
+			// This should never happen.
+			panic(err)
+		}
+	})
+	return cmdutil.NewFactory(getter)
+}
+
+func PlaygroundDir() (string, error) {
+	cliPath, err := GetCliHomeDir()
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(cliPath, "playground"), nil
 }

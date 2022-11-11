@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
@@ -41,11 +42,35 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/apecloud/kubeblocks/controllers/k8score"
-
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
+	"github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
+
+//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters/finalizers,verbs=update
+//+kubebuilder:rbac:groups=apps,resources=deployments;statefulsets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=deployments/status;statefulsets/status,verbs=get
+//+kubebuilder:rbac:groups=apps,resources=deployments/finalizers;statefulsets/finalizers,verbs=update
+//+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets/finalizers,verbs=update
+//+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
+// NOTES: owned K8s core API resources controller-gen RBAC marker is maintained at {REPO}/controllers/k8score/rbac.go
+
+// ClusterReconciler reconciles a Cluster object
+type ClusterReconciler struct {
+	client.Client
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+}
+
+type probeMessage struct {
+	Event        string `json:"event,omitempty"`
+	OriginalRole string `json:"originalRole,omitempty"`
+	Role         string `json:"role,omitempty"`
+}
 
 func init() {
 	clusterDefUpdateHandlers["cluster"] = clusterUpdateHandler
@@ -80,22 +105,6 @@ func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *db
 	return nil
 }
 
-// ClusterReconciler reconciles a Cluster object
-type ClusterReconciler struct {
-	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
-}
-
-// TODO probeMessage should be defined by @xuanchi
-type probeMessage struct {
-	Data probeMessageData `json:"data,omitempty"`
-}
-
-type probeMessageData struct {
-	Role string `json:"role,omitempty"`
-}
-
 func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, event *corev1.Event) error {
 	if event.InvolvedObject.FieldPath != k8score.ProbeRoleChangedCheckPath {
 		return nil
@@ -103,185 +112,26 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 
 	// get role
 	message := &probeMessage{}
-	err := json.Unmarshal([]byte(event.Message), message)
+	re := regexp.MustCompile(`Readiness probe failed: {.*({.*}).*}`)
+	matches := re.FindStringSubmatch(event.Message)
+	if len(matches) != 2 {
+		return nil
+	}
+	msg := strings.ReplaceAll(matches[1], "\\", "")
+	err := json.Unmarshal([]byte(msg), message)
 	if err != nil {
 		// not role related message, ignore it
 		reqCtx.Log.Info("not role message", "message", event.Message, "error", err)
 		return nil
 	}
-	role := strings.ToLower(message.Data.Role)
+	role := strings.ToLower(message.Role)
 	podName := types.NamespacedName{
 		Namespace: event.InvolvedObject.Namespace,
 		Name:      event.InvolvedObject.Name,
 	}
 
-	return updateConsensusSetRoleLabel(cli, reqCtx.Ctx, podName, role)
+	return component.UpdateConsensusSetRoleLabel(cli, reqCtx, podName, role)
 }
-
-func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName types.NamespacedName, role string) error {
-	// get pod
-	pod := &corev1.Pod{}
-	if err := cli.Get(ctx, podName, pod); err != nil {
-		return err
-	}
-
-	// update pod role label
-	patch := client.MergeFrom(pod.DeepCopy())
-	pod.Labels[consensusSetRoleLabelKey] = role
-	err := cli.Patch(ctx, pod, patch)
-	if err != nil {
-		return err
-	}
-
-	// update cluster status
-	// get cluster obj
-	cluster := &dbaasv1alpha1.Cluster{}
-	err = cli.Get(ctx, types.NamespacedName{
-		Namespace: pod.Namespace,
-		Name:      pod.Labels[appInstanceLabelKey],
-	}, cluster)
-	if err != nil {
-		return err
-	}
-
-	// get componentDef this pod belongs to
-	componentName := pod.Labels[appComponentLabelKey]
-	typeName := getComponentTypeName(*cluster, componentName)
-	componentDef, err := getComponent(ctx, cli, cluster, typeName)
-	if err != nil {
-		return err
-	}
-
-	// get all role names
-	leaderName := componentDef.ConsensusSpec.Leader.Name
-	followersMap := make(map[string]dbaasv1alpha1.ConsensusMember, 0)
-	for _, follower := range componentDef.ConsensusSpec.Followers {
-		followersMap[follower.Name] = follower
-	}
-	learnerName := ""
-	if componentDef.ConsensusSpec.Learner != nil {
-		learnerName = componentDef.ConsensusSpec.Learner.Name
-	}
-
-	// prepare cluster status patch
-	patch = client.MergeFrom(cluster.DeepCopy())
-	if cluster.Status.Components == nil {
-		cluster.Status.Components = make(map[string]*dbaasv1alpha1.ClusterStatusComponent)
-	}
-	if cluster.Status.Components[componentName] == nil {
-		cluster.Status.Components[componentName] = &dbaasv1alpha1.ClusterStatusComponent{
-			Type:  typeName,
-			Phase: dbaasv1alpha1.RunningPhase,
-			ConsensusSetStatus: &dbaasv1alpha1.ConsensusSetStatus{
-				Leader: dbaasv1alpha1.ConsensusMemberStatus{
-					Pod: consensusSetStatusDefaultPodName,
-				},
-			},
-		}
-	}
-	componentStatus := cluster.Status.Components[componentName]
-	if componentStatus.ConsensusSetStatus == nil {
-		componentStatus.ConsensusSetStatus = &dbaasv1alpha1.ConsensusSetStatus{
-			Leader: dbaasv1alpha1.ConsensusMemberStatus{
-				Pod: consensusSetStatusDefaultPodName,
-			},
-		}
-	}
-	consensusSetStatus := componentStatus.ConsensusSetStatus
-
-	resetLeader := func() {
-		if consensusSetStatus.Leader.Pod == pod.Name {
-			consensusSetStatus.Leader.Pod = consensusSetStatusDefaultPodName
-			consensusSetStatus.Leader.AccessMode = dbaasv1alpha1.None
-			consensusSetStatus.Leader.Name = ""
-		}
-	}
-	resetLearner := func() {
-		if consensusSetStatus.Learner != nil && consensusSetStatus.Learner.Pod == pod.Name {
-			consensusSetStatus.Learner = nil
-		}
-	}
-
-	resetFollower := func() {
-		for index, member := range consensusSetStatus.Followers {
-			if member.Pod == pod.Name {
-				consensusSetStatus.Followers = append(consensusSetStatus.Followers[:index], consensusSetStatus.Followers[index+1:]...)
-			}
-		}
-	}
-
-	// set pod.Name to the right status field
-	accessMode := dbaasv1alpha1.AccessMode("")
-	needUpdate := false
-	switch role {
-	case leaderName:
-		consensusSetStatus.Leader.Pod = pod.Name
-		consensusSetStatus.Leader.AccessMode = componentDef.ConsensusSpec.Leader.AccessMode
-		consensusSetStatus.Leader.Name = componentDef.ConsensusSpec.Leader.Name
-		accessMode = componentDef.ConsensusSpec.Leader.AccessMode
-		resetLearner()
-		resetFollower()
-		needUpdate = true
-	case learnerName:
-		if consensusSetStatus.Learner == nil {
-			consensusSetStatus.Learner = &dbaasv1alpha1.ConsensusMemberStatus{}
-		}
-		consensusSetStatus.Learner.Pod = pod.Name
-		consensusSetStatus.Learner.AccessMode = componentDef.ConsensusSpec.Learner.AccessMode
-		consensusSetStatus.Learner.Name = componentDef.ConsensusSpec.Learner.Name
-		accessMode = componentDef.ConsensusSpec.Learner.AccessMode
-		resetLeader()
-		resetFollower()
-		needUpdate = true
-	default:
-		if follower, ok := followersMap[role]; ok {
-			exist := false
-			for _, member := range consensusSetStatus.Followers {
-				if member.Pod == pod.Name {
-					exist = true
-				}
-			}
-			if !exist {
-				member := dbaasv1alpha1.ConsensusMemberStatus{
-					Pod:        pod.Name,
-					AccessMode: follower.AccessMode,
-					Name:       follower.Name,
-				}
-				accessMode = follower.AccessMode
-				consensusSetStatus.Followers = append(consensusSetStatus.Followers, member)
-				resetLeader()
-				resetLearner()
-				needUpdate = true
-			}
-		}
-	}
-
-	// finally, update cluster status
-	if needUpdate {
-		err = cli.Status().Patch(ctx, cluster, patch)
-		if err != nil {
-			return err
-		}
-
-		// update pod accessMode label
-		patchAccessMode := client.MergeFrom(pod.DeepCopy())
-		pod.Labels[consensusSetAccessModeLabelKey] = string(accessMode)
-		return cli.Patch(ctx, pod, patchAccessMode)
-	}
-
-	return nil
-}
-
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters/finalizers,verbs=update
-//+kubebuilder:rbac:groups=apps,resources=deployments;statefulsets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=apps,resources=deployments/status;statefulsets/status,verbs=get
-//+kubebuilder:rbac:groups=apps,resources=deployments/finalizers;statefulsets/finalizers,verbs=update
-//+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets/finalizers,verbs=update
-//+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
-// NOTES: owned K8s core API resources controller-gen RBAC marker is maintained at {REPO}/controllers/k8score/rbac.go
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -315,13 +165,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if cluster.Status.ObservedGeneration == cluster.GetObjectMeta().GetGeneration() {
 		// check cluster all pods is ready
-		if r.needCheckClusterForReady(cluster) {
-			if ok, err := r.checkClusterIsReady(reqCtx.Ctx, cluster); !ok || err != nil {
-				return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "checkClusterIsReady")
-			}
-			if err = r.patchClusterToRunning(reqCtx.Ctx, cluster); err != nil {
-				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-			}
+		if err = r.checkAndPatchToRunning(reqCtx.Ctx, cluster); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()
 	}
@@ -454,8 +299,8 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 	}
 
 	ml := client.MatchingLabels{
-		appInstanceLabelKey: cluster.GetName(),
-		appNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
+		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
+		intctrlutil.AppNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
 	}
 	inNS := client.InNamespace(cluster.Namespace)
 	stsList := &appsv1.StatefulSetList{}
@@ -520,8 +365,8 @@ func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *d
 
 	inNS := client.InNamespace(cluster.Namespace)
 	ml := client.MatchingLabels{
-		appInstanceLabelKey: cluster.GetName(),
-		appNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
+		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
+		intctrlutil.AppNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
 	}
 
 	pvcList := &corev1.PersistentVolumeClaimList{}
@@ -578,107 +423,23 @@ func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctr
 	return r.Client.Status().Patch(reqCtx.Ctx, cluster, patch)
 }
 
-// checkClusterIsReady Check whether the cluster related pod resources are running. if ok, update Cluster.status.phase to Running
-func (r *ClusterReconciler) checkClusterIsReady(ctx context.Context, cluster *dbaasv1alpha1.Cluster) (bool, error) {
-	var (
-		statefulSetList         = &appsv1.StatefulSetList{}
-		isOk                    = true
-		needSyncStatusComponent bool
-	)
-	if err := r.Client.List(ctx, statefulSetList, client.InNamespace(cluster.Namespace),
-		client.MatchingLabels{appInstanceLabelKey: cluster.Name}); err != nil {
-		return false, err
+// checkAndPatchToRunning patch Cluster.status.phase to Running
+func (r *ClusterReconciler) checkAndPatchToRunning(ctx context.Context, cluster *dbaasv1alpha1.Cluster) error {
+	if !r.needCheckClusterForReady(cluster) {
+		return nil
 	}
-	patch := client.MergeFrom(cluster.DeepCopy())
-	for _, v := range statefulSetList.Items {
-		// if v is consensusSet
-		typeName := getComponentTypeName(*cluster, v.Labels[appComponentLabelKey])
-		componentDef, err := getComponent(ctx, r.Client, cluster, typeName)
-		if err != nil {
-			return false, err
-		}
-		statefulStatusRevisionIsEquals := false
-		end := true
-		switch componentDef.ComponentType {
-		case dbaasv1alpha1.Consensus:
-			if end, err = handleConsensusSetUpdate(ctx, r.Client, cluster, &v); err != nil {
-				return false, err
-			} else if !end {
-				// if not end, we are deleting pod.
-				isOk = false
-			}
-			// Consensus do not judge whether the revisions are consistent
-			statefulStatusRevisionIsEquals = true
-		case dbaasv1alpha1.Stateful:
-			// TODO wait other component type added
-			// when stateful updateStrategy is rollingUpdate, need to check revision
-			if v.Status.UpdateRevision == v.Status.CurrentRevision {
-				statefulStatusRevisionIsEquals = true
-			}
-		}
-
-		var componentIsRunning bool
-		// check whether the statefulset has reached the final state.
-		// when we delete the pod, statefulset.status may still be available due to statefulset controls the pod asynchronously,
-		// so we check the end variable
-		// ps: StatefulSet.Status.AvailableReplicas supported after k8s v1.22
-		if v.Status.AvailableReplicas != *v.Spec.Replicas ||
-			v.Status.ObservedGeneration != v.GetGeneration() ||
-			!statefulStatusRevisionIsEquals || !end {
-			isOk = false
-		} else {
-			componentIsRunning = true
-		}
-		// when component phase is changed, set needSyncStatusComponent to true, then patch cluster.status
-		if ok := r.patchStatusComponentsWithStatefulSet(cluster, &v, componentIsRunning); ok {
-			needSyncStatusComponent = true
-		}
-	}
-
-	if needSyncStatusComponent {
-		if err := r.Client.Status().Patch(ctx, cluster, patch); err != nil {
-			return false, err
-		}
-	}
-
-	return isOk, nil
-}
-
-// patchStatusComponentsWithStatefulSet Modify status.components information, include component phase
-func (r *ClusterReconciler) patchStatusComponentsWithStatefulSet(cluster *dbaasv1alpha1.Cluster, statefulSet *appsv1.StatefulSet, componentIsRunning bool) bool {
-	var (
-		cName           string
-		ok              bool
-		statusComponent *dbaasv1alpha1.ClusterStatusComponent
-	)
-	//  if it does not belong to this component, return false
-	if cName, ok = statefulSet.Labels[appComponentLabelKey]; !ok {
-		return false
+	// synchronize the latest status of components
+	if err := r.handleComponentStatus(ctx, cluster); err != nil {
+		return err
 	}
 	if cluster.Status.Components == nil {
-		cluster.Status.Components = map[string]*dbaasv1alpha1.ClusterStatusComponent{}
+		return nil
 	}
-	if statusComponent, ok = cluster.Status.Components[cName]; !ok {
-		cluster.Status.Components[cName] = &dbaasv1alpha1.ClusterStatusComponent{Phase: cluster.Status.Phase}
-		return true
+	for _, v := range cluster.Status.Components {
+		if v.Phase != dbaasv1alpha1.RunningPhase {
+			return nil
+		}
 	}
-	// if componentIsRunning is false, means the cluster has an operation running.
-	// so we sync the cluster phase to component phase.
-	if statusComponent.Phase == dbaasv1alpha1.RunningPhase && !componentIsRunning {
-		statusComponent.Phase = cluster.Status.Phase
-		return true
-	}
-	// if componentIsRunning is true and component status is not Running.
-	// we should change component phase to Running
-	if statusComponent.Phase != dbaasv1alpha1.RunningPhase && componentIsRunning {
-		statusComponent.Phase = dbaasv1alpha1.RunningPhase
-		return true
-	}
-	return false
-}
-
-// patchClusterToRunning patch Cluster.status.phase to Running
-func (r *ClusterReconciler) patchClusterToRunning(ctx context.Context, cluster *dbaasv1alpha1.Cluster) error {
 	patch := client.MergeFrom(cluster.DeepCopy())
 	cluster.Status.Phase = dbaasv1alpha1.RunningPhase
 	if err := r.Client.Status().Patch(ctx, cluster, patch); err != nil {
@@ -687,6 +448,95 @@ func (r *ClusterReconciler) patchClusterToRunning(ctx context.Context, cluster *
 	// send an event when Cluster.status.phase change to Running
 	r.Recorder.Eventf(cluster, corev1.EventTypeNormal, string(dbaasv1alpha1.RunningPhase), "Cluster: %s is ready, current phase is Running", cluster.Name)
 	return nil
+}
+
+// handleComponentStatus cluster controller and component controller are tuned asynchronously.
+// before processing whether the component is running, need to synchronize the latest status of components firstly.
+// it can prevent the use of expired component status, which may lead to inconsistent cluster status.
+func (r *ClusterReconciler) handleComponentStatus(ctx context.Context, cluster *dbaasv1alpha1.Cluster) error {
+	var (
+		needSyncDeploymentStatus  bool
+		needSyncStatefulSetStatus bool
+		err                       error
+	)
+	patch := client.MergeFrom(cluster.DeepCopy())
+	// handle stateless component status
+	if needSyncDeploymentStatus, err = r.handleComponentStatusWithDeployment(ctx, cluster); err != nil {
+		return err
+	}
+	// handle stateful/consensus component status
+	if needSyncStatefulSetStatus, err = r.handleComponentStatusWithStatefulSet(ctx, cluster); err != nil {
+		return err
+	}
+	if needSyncDeploymentStatus || needSyncStatefulSetStatus {
+		if err = r.Client.Status().Patch(ctx, cluster, patch); err != nil {
+			return err
+		}
+		return component.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
+	}
+	return nil
+}
+
+// handleComponentStatusWithStatefulSet handle the component status with statefulSet. One statefulSet corresponds to one component.
+func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Context, cluster *dbaasv1alpha1.Cluster) (bool, error) {
+	var (
+		needSyncComponentStatus bool
+		statefulSetList         = &appsv1.StatefulSetList{}
+		componentTypeMap        map[string]dbaasv1alpha1.ComponentType
+		err                     error
+	)
+	if componentTypeMap, err = getComponentTypeMapWithCluster(ctx, r.Client, cluster); err != nil {
+		return false, err
+	}
+	if err = getObjectList(ctx, r.Client, cluster, statefulSetList); err != nil {
+		return false, err
+	}
+	for _, sts := range statefulSetList.Items {
+		componentName := sts.GetLabels()[intctrlutil.AppComponentLabelKey]
+		if len(componentName) == 0 {
+			continue
+		}
+		componentType := componentTypeMap[componentName]
+		statefulStatusRevisionIsEquals := true
+		switch componentType {
+		case dbaasv1alpha1.Consensus:
+			if statefulStatusRevisionIsEquals, err = checkConsensusStatefulSetRevision(ctx, r.Client, &sts); err != nil {
+				return false, err
+			}
+		case dbaasv1alpha1.Stateful:
+			// when stateful updateStrategy is rollingUpdate, need to check revision
+			if sts.Status.UpdateRevision != sts.Status.CurrentRevision {
+				statefulStatusRevisionIsEquals = false
+			}
+		}
+		componentIsRunning := component.StatefulSetIsReady(&sts, statefulStatusRevisionIsEquals)
+		if ok := component.NeedSyncStatusComponents(cluster, componentName, componentIsRunning); ok {
+			needSyncComponentStatus = true
+		}
+	}
+	return needSyncComponentStatus, nil
+}
+
+// handleComponentStatusWithDeployment handle the component status with deployment. One deployment corresponds to one component.
+func (r *ClusterReconciler) handleComponentStatusWithDeployment(ctx context.Context, cluster *dbaasv1alpha1.Cluster) (bool, error) {
+	var (
+		needSyncComponentStatus bool
+		deploymentList          = &appsv1.DeploymentList{}
+	)
+	if err := getObjectList(ctx, r.Client, cluster, deploymentList); err != nil {
+		return false, err
+	}
+	for _, deploy := range deploymentList.Items {
+		componentName := deploy.GetLabels()[intctrlutil.AppComponentLabelKey]
+		if len(componentName) == 0 {
+			continue
+		}
+		componentIsRunning := component.DeploymentIsReady(&deploy)
+		if ok := component.NeedSyncStatusComponents(cluster, componentName, componentIsRunning); ok {
+			needSyncComponentStatus = true
+		}
+	}
+	return needSyncComponentStatus, nil
 }
 
 // reconcileStatusOperations when Cluster.spec updated, we need reconcile the Cluster.status.operations.

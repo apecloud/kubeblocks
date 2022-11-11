@@ -38,13 +38,13 @@
 		"type=bind,source=/var/run/docker.sock,target=/var/run/docker-host.sock",
 
 		// Bind mount docker socket under an alias to support docker-from-docker
-		"type=bind,source=${env:HOME}${env:USERPROFILE}/.minikube/cache,target=/home/kubeblocks/.minikube/cache",
+		// "type=bind,source=${env:HOME}${env:USERPROFILE}/.minikube/cache,target=/home/kubeblocks/.minikube/cache",
 
 		// Uncomment to clone local .kube/config into devcontainer
 		"type=bind,source=${env:HOME}${env:USERPROFILE}/.kube,target=/home/kubeblocks/.kube-localhost",
 
 		// Uncomment to additionally clone minikube certs into devcontainer for use with .kube/config
-		"type=bind,source=${env:HOME}${env:USERPROFILE}/.minikube,target=/home/kubeblocks/.minikube-localhost"
+		// "type=bind,source=${env:HOME}${env:USERPROFILE}/.minikube,target=/home/kubeblocks/.minikube-localhost"
 	],
 	// Always run image-defined default command
 	"overrideCommand": false,
@@ -68,7 +68,6 @@
 		// Run the entrypoint defined in container image.
 		"--init"
 	],
-	"postStartCommand": "sudo chown $USER:$USER $HOME/.minikube",
 	"settings": {
 		"go.toolsManagement.checkForUpdates": "local",
 		"go.useLanguageServer": true,

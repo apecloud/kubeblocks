@@ -8,4 +8,13 @@ spec:
   components:
     - name: wesql-test
       type: replicasets
-      enableLogs: [error, slow]
+      monitor: false
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+            volumeMode: Filesystem

@@ -7,11 +7,6 @@ spec:
   components:
     - typeName: replicasets
       componentType: Consensus
-      logsConfig:
-        - name: error
-          filePathPattern: /log/mysql/mysqld.err
-        - name: slow
-          filePathPattern: /log/mysql/*slow.log
       consensusSpec:
         leader:
           name: "leader"
@@ -20,6 +15,9 @@ spec:
           - name: "follower"
             accessMode: Readonly
         updateStrategy: BestEffortParallel
+      probes:
+        roleChangedProbe:
+          periodSeconds: 1
       service:
         ports:
           - protocol: TCP

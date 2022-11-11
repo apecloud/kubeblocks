@@ -18,31 +18,27 @@ package engine
 
 import "fmt"
 
-// DataEngines engineName --- moduleName ---context (custom define)
-var DataEngines = map[string]map[string]interface{}{}
+// ClusterDefinition Type Const Define
+const (
+	stateMysql  = "state.mysql"
+	stateMysql8 = "state.mysql-8"
+)
 
-func Registry(engineName string, moduleName string, moduleContext interface{}) {
-	v, ok := DataEngines[engineName]
-	if ok {
-		v[moduleName] = moduleContext
-	} else {
-		vv := map[string]interface{}{
-			moduleName: moduleContext,
-		}
-		DataEngines[engineName] = vv
-	}
+type ExecInfo struct {
+	Command       []string
+	ContainerName string
 }
 
-func GetContext(engineName string, moduleName string) (interface{}, error) {
-	v, ok := DataEngines[engineName]
-	if !ok {
-		return nil, fmt.Errorf("no registered data engine %s", engineName)
-	} else {
-		vv, ok := v[moduleName]
-		if ok {
-			return vv, nil
-		} else {
-			return nil, fmt.Errorf("no registered context for module %s", moduleName)
-		}
+type Interface interface {
+	ConnectCommand(database string) []string
+	EngineName() string
+	EngineContainer() string
+}
+
+func New(typeName string) (Interface, error) {
+	switch typeName {
+	case stateMysql, stateMysql8:
+		return &mysql{}, nil
 	}
+	return nil, fmt.Errorf("unsupported engine type: %s", typeName)
 }

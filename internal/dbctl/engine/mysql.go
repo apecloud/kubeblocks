@@ -16,26 +16,15 @@ limitations under the License.
 
 package engine
 
-import "fmt"
+type mysql struct{}
 
-// ClusterDefinition Type Const Define
 const (
-	stateMysql         = "state.mysql"
-	stateMysql8        = "state.mysql-8"
-	connectModule      = "connect"
 	mysqlEngineName    = "mysql"
 	mysqlClient        = "mysql"
 	mysqlContainerName = "mysql"
 )
 
-type Interface interface {
-	ConnectCommand(database string) []string
-	EngineName() string
-	EngineContainer() string
-}
-
-// Interface implementation of mysql connect
-type mysql struct{}
+var _ Interface = &mysql{}
 
 func (m *mysql) ConnectCommand(database string) []string {
 	if len(database) > 0 {
@@ -50,23 +39,4 @@ func (m *mysql) EngineName() string {
 
 func (m *mysql) EngineContainer() string {
 	return mysqlContainerName
-}
-
-func New(typeName string) (Interface, error) {
-	if v, err := GetContext(typeName, connectModule); err == nil {
-		if iv, ok := v.(Interface); ok {
-			return iv, nil
-		}
-	}
-	return nil, fmt.Errorf("unsupported engine type: %s", typeName)
-}
-
-func init() {
-	// todo a more high level abstraction will continue and automatically registered by yaml-conf may be more better in the future.
-	// for well-known database systems, how to connect or what logs they is a common sense, which maybe not require ISV configuration.
-
-	// register connect context for mysql and mysql8 engine
-	var m = &mysql{}
-	Registry(stateMysql, connectModule, m)
-	Registry(stateMysql8, connectModule, m)
 }

@@ -63,8 +63,8 @@ type LogsListOptions struct {
 	exec *exec.ExecOptions
 }
 
-// NewLogsListTypeCmd return logs list type cmd
-func NewLogsListTypeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+// NewListLogsTypeCmd return logs list type cmd
+func NewListLogsTypeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &LogsListOptions{
 		factory:   f,
 		IOStreams: streams,
@@ -133,14 +133,13 @@ func (o *LogsListOptions) Run() error {
 	return nil
 }
 
-// printHeaderMessage
 func (o *LogsListOptions) printHeaderMessage(w cmddes.PrefixWriter, c *dbaasv1alpha1.Cluster) {
 	w.Write(describe.LEVEL_0, "ClusterName:\t\t%s\n", c.Name)
 	w.Write(describe.LEVEL_0, "Namespace:\t\t%s\n", c.Namespace)
 	w.Write(describe.LEVEL_0, "ClusterDefinition:\t%s\n", c.Spec.ClusterDefRef)
 }
 
-// printBodyMessage
+// printBodyMessage print message about logs file
 func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinition, pods *corev1.PodList) {
 	for _, p := range pods.Items {
 		if len(o.instName) > 0 && !strings.EqualFold(p.Name, o.instName) {

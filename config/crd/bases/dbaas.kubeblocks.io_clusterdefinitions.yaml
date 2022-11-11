@@ -8032,6 +8032,7 @@ spec:
                 maxLength: 24
                 type: string
             required:
+            - components
             - type
             type: object
           status:

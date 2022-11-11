@@ -30,9 +30,9 @@ type ClusterDefinitionSpec struct {
 	Type string `json:"type"`
 
 	// List of components belonging to the cluster.
+	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
-	// +optional
-	Components []ClusterDefinitionComponent `json:"components,omitempty"`
+	Components []ClusterDefinitionComponent `json:"components"`
 
 	// Default termination policy if no termination policy defined in cluster.
 	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}

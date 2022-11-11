@@ -146,7 +146,7 @@ var _ = Describe("OpsRequest webhook", func() {
 				VolumeExpansion: []VolumeExpansion{
 					{
 						Name:    "data1",
-						Storage: "2Gi",
+						Storage: resource.MustParse("2Gi"),
 					},
 				},
 			},

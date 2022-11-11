@@ -18,12 +18,12 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // OpsRequestSpec defines the desired state of OpsRequest
 type OpsRequestSpec struct {
-
 	// ClusterRef reference clusterDefinition resource
 	// +kubebuilder:validation:Required
 	ClusterRef string `json:"clusterRef"`
@@ -74,6 +74,59 @@ type OpsRequestStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
+type ClusterOps struct {
+	// +kubebuilder:validation:Required
+	Upgrade *Upgrade `json:"upgrade"`
+}
+
+type ComponentOps struct {
+	// ComponentNames defines which components perform the operation
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	ComponentNames []string `json:"componentNames"`
+
+	// VolumeExpansion defines the variables that need to be input when expanding a volume
+	// +optional
+	VolumeExpansion []VolumeExpansion `json:"volumeExpansion,omitempty"`
+
+	// VerticalScaling defines the variables that need to be input when scaling compute resources
+	// +optional
+	VerticalScaling *corev1.ResourceRequirements `json:"verticalScaling,omitempty"`
+
+	// HorizontalScaling defines the variables that need to be input when scaling replicas
+	// +optional
+	HorizontalScaling *HorizontalScaling `json:"horizontalScaling,omitempty"`
+}
+
+type Upgrade struct {
+	// AppVersionRef reference AppVersion.
+	// +kubebuilder:validation:Required
+	AppVersionRef string `json:"appVersionRef"`
+}
+
+type VolumeExpansion struct {
+	// The request storage size.
+	// +kubebuilder:validation:Required
+	Storage resource.Quantity `json:"storage"`
+
+	// ClusterComponentVolumeClaimTemplate.Name
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+}
+
+type HorizontalScaling struct {
+	// Replicas for the workloads.
+	// +optional
+	Replicas int `json:"replicas,omitempty"`
+}
+
+type OpsRequestStatusComponent struct {
+	// Phase - in list of [Running, Failed, Creating, Updating, Deleting, Deleted]
+	// +kubebuilder:validation:Enum={Running,Failed,Creating,Updating,Deleting,Deleted}
+	// +optional
+	Phase Phase `json:"phase,omitempty"`
+}
+
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:categories={dbaas,all},shortName=ops
@@ -96,57 +149,6 @@ type OpsRequestList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []OpsRequest `json:"items"`
-}
-
-type ClusterOps struct {
-	// +kubebuilder:validation:Required
-	Upgrade *Upgrade `json:"upgrade"`
-}
-
-type ComponentOps struct {
-	// ComponentNames defines which components perform the operation
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	ComponentNames []string `json:"componentNames,omitempty"`
-
-	// VolumeExpansion defines the variables that need to be input when expanding a volume
-	// +optional
-	VolumeExpansion []VolumeExpansion `json:"volumeExpansion,omitempty"`
-
-	// VerticalScaling defines the variables that need to be input when scaling compute resources
-	// +optional
-	VerticalScaling *corev1.ResourceRequirements `json:"verticalScaling,omitempty"`
-
-	// HorizontalScaling defines the variables that need to be input when scaling replicas
-	// +optional
-	HorizontalScaling *HorizontalScaling `json:"horizontalScaling,omitempty"`
-}
-
-type Upgrade struct {
-	// AppVersionRef reference AppVersion
-	// +kubebuilder:validation:Required
-	AppVersionRef string `json:"appVersionRef"`
-}
-
-type VolumeExpansion struct {
-	// the request storage size
-	// +kubebuilder:validation:Required
-	Storage string `json:"storage"`
-
-	// ClusterComponentVolumeClaimTemplate.Name
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
-}
-
-type HorizontalScaling struct {
-	// +optional
-	Replicas int `json:"replicas,omitempty"`
-}
-
-type OpsRequestStatusComponent struct {
-	// Phase - in list of [Running, Failed, Creating, Updating, Deleting, Deleted]
-	// +kubebuilder:validation:Enum={Running,Failed,Creating,Updating,Deleting,Deleted}
-	Phase Phase `json:"phase,omitempty"`
 }
 
 func init() {

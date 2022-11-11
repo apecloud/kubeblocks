@@ -29,18 +29,19 @@ type ClusterDefinitionSpec struct {
 	// +kubebuilder:validation:MaxLength=24
 	Type string `json:"type"`
 
-	// List of components belonging to the cluster
+	// List of components belonging to the cluster.
 	// +kubebuilder:validation:MinItems=1
 	// +optional
 	Components []ClusterDefinitionComponent `json:"components,omitempty"`
 
-	// Default termination policy if no termination policy defined in cluster
+	// Default termination policy if no termination policy defined in cluster.
 	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
+	// +optional
 	DefaultTerminationPolicy string `json:"defaultTerminationPolicy,omitempty"`
 
-	// Credential used for connecting database
+	// Credential used for connecting database.
 	// +optional
-	ConnectionCredential ClusterDefinitionConnectionCredential `json:"connectionCredential,omitempty"`
+	ConnectionCredential *ClusterDefinitionConnectionCredential `json:"connectionCredential,omitempty"`
 }
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
@@ -48,9 +49,11 @@ type ClusterDefinitionStatus struct {
 	// phase - in list of [Available]
 	// +kubebuilder:validation:Enum={Available}
 	Phase Phase `json:"phase,omitempty"`
+
 	// Extra message in current phase
 	// +optional
 	Message string `json:"message,omitempty"`
+
 	// observedGeneration is the most recent generation observed for this
 	// ClusterDefinition. It corresponds to the ClusterDefinition's generation, which is
 	// updated on mutation by the API Server.
@@ -58,42 +61,18 @@ type ClusterDefinitionStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:resource:categories={dbaas},scope=Cluster,shortName=cd
-//+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
-//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
-
-// ClusterDefinition is the Schema for the clusterdefinitions API
-type ClusterDefinition struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   ClusterDefinitionSpec   `json:"spec,omitempty"`
-	Status ClusterDefinitionStatus `json:"status,omitempty"`
-}
-
-//+kubebuilder:object:root=true
-
-// ClusterDefinitionList contains a list of ClusterDefinition
-type ClusterDefinitionList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ClusterDefinition `json:"items"`
-}
-
 type ConfigTemplate struct {
 	// Specify the name of the referenced configuration template, which is a configmap object
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=128
-	Name string `json:"name,omitempty"`
+	Name string `json:"name"`
 
 	// VolumeName is the volume name of PodTemplate, which the configuration file produced through the configuration template will be mounted to the corresponding volume.
 	// The volume name must be defined in podSpec.containers[*].volumeMounts.
 	// reference example: https://github.com/apecloud/kubeblocks/blob/main/examples/dbaas/mysql_clusterdefinition.yaml#L12
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32
-	VolumeName string `json:"volumeName,omitempty"`
+	VolumeName string `json:"volumeName"`
 }
 
 type ExporterConfig struct {
@@ -129,7 +108,7 @@ type ClusterDefinitionComponent struct {
 	// Type name of the component, it can be any valid string
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
-	TypeName string `json:"typeName,omitempty"`
+	TypeName string `json:"typeName"`
 
 	// CharacterType defines well-known database component name, such as mongos(mongodb), proxy(redis), wesql(mysql)
 	// DBaas will generate proper monitor configs for wellknown CharacterType when BuiltIn is true.
@@ -139,15 +118,18 @@ type ClusterDefinitionComponent struct {
 	// Minimum available pod count when updating
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
+	// +optional
 	MinAvailable int `json:"minAvailable,omitempty"`
 
 	// Maximum available pod count after scale
 	// +kubebuilder:validation:Minimum=0
+	// +optional
 	MaxAvailable int `json:"maxAvailable,omitempty"`
 
 	// Default replicas in this component if user not specify
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
+	// +optional
 	DefaultReplicas int `json:"defaultReplicas,omitempty"`
 
 	// The configTemplateRefs field provided by ISV, and
@@ -161,6 +143,7 @@ type ClusterDefinitionComponent struct {
 
 	// antiAffinity defines components should have anti-affinity constraint to same component type
 	// +kubebuilder:default=false
+	// +optional
 	AntiAffinity bool `json:"antiAffinity,omitempty"`
 
 	// podSpec of final workload
@@ -172,19 +155,6 @@ type ClusterDefinitionComponent struct {
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Service corev1.ServiceSpec `json:"service,omitempty"`
-
-	// Scripts executed before and after workload operation
-	// script exec order：component.pre => component.exec => component.post
-	// builtin ENV variables:
-	// self: KB_SELF_{builtin_properties}
-	// rule: KB_{conponent_name}[n]-{builtin_properties}
-	// builtin_properties:
-	// - ID # which shows in Cluster.status
-	// - HOST # e.g. example-mongodb2-0.example-mongodb2-svc.default.svc.cluster.local
-	// - PORT
-	// - N # number of current component
-	// +optional
-	Scripts ClusterDefinitionScripts `json:"scripts,omitempty"`
 
 	// Probes setting for db healthy checks.
 	// +optional
@@ -202,63 +172,18 @@ type ClusterDefinitionComponent struct {
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
 }
 
-type ComponentType string
-
-const (
-	Stateless ComponentType = "Stateless"
-	Stateful  ComponentType = "Stateful"
-	Consensus ComponentType = "Consensus"
-)
-
-type ClusterDefinitionScripts struct {
-	// Default scripts executed if the following scripts not defined
-	Default ClusterDefinitionScript `json:"default,omitempty"`
-	// Scripts executed before and after creation
-	Create ClusterDefinitionScript `json:"create,omitempty"`
-	// Scripts executed before and after upgrade
-	Upgrade ClusterDefinitionScript `json:"upgrade,omitempty"`
-	// Scripts executed before and after vertical scale
-	VerticalScale ClusterDefinitionScript `json:"verticalScale,omitempty"`
-	// Scripts executed before and after horizontal scale
-	HorizontalScale ClusterDefinitionScript `json:"horizontalScale,omitempty"`
-	// Scripts executed before and after deletion
-	Delete ClusterDefinitionScript `json:"delete,omitempty"`
-}
-
-type ClusterDefinitionScript struct {
-	// Pre hook before operation
-	Pre []ClusterDefinitionContainerCMD `json:"pre,omitempty"`
-	// Post hook after operation
-	Post []ClusterDefinitionContainerCMD `json:"post,omitempty"`
-}
-
-// ClusterDefinitionContainerCMD defines content of a hook script
-type ClusterDefinitionContainerCMD struct {
-	// Container used to execute command
-	Container string `json:"container,omitempty"`
-	// Command executed in container
-	Command []string `json:"command,omitempty"`
-	// Args executed in container
-	Args []string `json:"args,omitempty"`
-}
-
-type ClusterDefinitionUpdateStrategy struct {
-	// +kubebuilder:default=1
-	// +kubebuilder:validation:Minimum=0
-	MaxUnavailable int `json:"maxUnavailable,omitempty"`
-	// +kubebuilder:default=0
-	// +kubebuilder:validation:Minimum=0
-	MaxSurge int `json:"maxSurge,omitempty"`
-}
-
 type ClusterDefinitionConnectionCredential struct {
+	// User defines system credential username.
+	// +kubebuilder:validation:Required
 	// +kubebuilder:default=root
-	User     string `json:"user,omitempty"`
+	User string `json:"user"`
+
+	// Password defines system credential password.
+	// +optional
 	Password string `json:"password,omitempty"`
 }
 
 type ClusterDefinitionStatusGeneration struct {
-
 	// ClusterDefinition generation number.
 	// +optional
 	ClusterDefGeneration int64 `json:"clusterDefGeneration,omitempty"`
@@ -270,10 +195,11 @@ type ClusterDefinitionStatusGeneration struct {
 }
 
 type ClusterDefinitionProbeCMDs struct {
-	// Write sqls executed on db node, used to check db healthy.
+	// Write check executed on probe sidecar, used to check workload's allow write access.
 	// +optional
 	Writes []string `json:"writes,omitempty"`
-	// Read sqls executed on db node, used to check db healthy.
+
+	// Read check executed on probe sidecar, used to check workload's reaonly access .
 	// +optional
 	Queries []string `json:"queries,omitempty"`
 }
@@ -283,14 +209,17 @@ type ClusterDefinitionProbe struct {
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
 	PeriodSeconds int32 `json:"periodSeconds,omitempty"`
+
 	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
 	FailureThreshold int32 `json:"failureThreshold,omitempty"`
+
 	// Minimum consecutive successes for the probe to be considered successful after having failed.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
 	SuccessThreshold int32 `json:"successThreshold,omitempty"`
+
 	// Cmds used to execute for probe.
 	// +optional
 	Commands *ClusterDefinitionProbeCMDs `json:"commands,omitempty"`
@@ -356,21 +285,29 @@ type ConsensusMember struct {
 	Replicas *int32 `json:"replicas,omitempty"`
 }
 
-type AccessMode string
+//+kubebuilder:object:root=true
+//+kubebuilder:subresource:status
+//+kubebuilder:resource:categories={dbaas},scope=Cluster,shortName=cd
+//+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
+//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-const (
-	ReadWrite AccessMode = "ReadWrite"
-	Readonly  AccessMode = "Readonly"
-	None      AccessMode = "None"
-)
+// ClusterDefinition is the Schema for the clusterdefinitions API
+type ClusterDefinition struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-type UpdateStrategy string
+	Spec   ClusterDefinitionSpec   `json:"spec,omitempty"`
+	Status ClusterDefinitionStatus `json:"status,omitempty"`
+}
 
-const (
-	Serial             UpdateStrategy = "Serial"
-	BestEffortParallel UpdateStrategy = "BestEffortParallel"
-	Parallel           UpdateStrategy = "Parallel"
-)
+//+kubebuilder:object:root=true
+
+// ClusterDefinitionList contains a list of ClusterDefinition
+type ClusterDefinitionList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []ClusterDefinition `json:"items"`
+}
 
 func init() {
 	SchemeBuilder.Register(&ClusterDefinition{}, &ClusterDefinitionList{})

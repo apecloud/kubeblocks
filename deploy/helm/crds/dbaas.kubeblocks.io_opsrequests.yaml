@@ -54,7 +54,7 @@ spec:
                   upgrade:
                     properties:
                       appVersionRef:
-                        description: AppVersionRef reference AppVersion
+                        description: AppVersionRef reference AppVersion.
                         type: string
                     required:
                     - appVersionRef
@@ -82,6 +82,7 @@ spec:
                         to be input when scaling replicas
                       properties:
                         replicas:
+                          description: Replicas for the workloads.
                           type: integer
                       type: object
                     verticalScaling:
@@ -121,13 +122,19 @@ spec:
                             description: ClusterComponentVolumeClaimTemplate.Name
                             type: string
                           storage:
-                            description: the request storage size
-                            type: string
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            description: The request storage size.
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
                         required:
                         - name
                         - storage
                         type: object
                       type: array
+                  required:
+                  - componentNames
                   type: object
                 type: array
               ttlSecondsAfterSucceed:

@@ -48,7 +48,7 @@ spec:
             description: ClusterDefinitionSpec defines the desired state of ClusterDefinition
             properties:
               components:
-                description: List of components belonging to the cluster
+                description: List of components belonging to the cluster.
                 items:
                   description: ClusterDefinitionComponent is a group of pods, pods
                     in one component usually share the same data
@@ -91,6 +91,9 @@ spec:
                               reference example: https://github.com/apecloud/kubeblocks/blob/main/examples/dbaas/mysql_clusterdefinition.yaml#L12'
                             maxLength: 32
                             type: string
+                        required:
+                        - name
+                        - volumeName
                         type: object
                       type: array
                     consensusSpec:
@@ -7543,14 +7546,14 @@ spec:
                               description: Cmds used to execute for probe.
                               properties:
                                 queries:
-                                  description: Read sqls executed on db node, used
-                                    to check db healthy.
+                                  description: Read check executed on probe sidecar,
+                                    used to check workload's reaonly access .
                                   items:
                                     type: string
                                   type: array
                                 writes:
-                                  description: Write sqls executed on db node, used
-                                    to check db healthy.
+                                  description: Write check executed on probe sidecar,
+                                    used to check workload's allow write access.
                                   items:
                                     type: string
                                   type: array
@@ -7583,14 +7586,14 @@ spec:
                               description: Cmds used to execute for probe.
                               properties:
                                 queries:
-                                  description: Read sqls executed on db node, used
-                                    to check db healthy.
+                                  description: Read check executed on probe sidecar,
+                                    used to check workload's reaonly access .
                                   items:
                                     type: string
                                   type: array
                                 writes:
-                                  description: Write sqls executed on db node, used
-                                    to check db healthy.
+                                  description: Write check executed on probe sidecar,
+                                    used to check workload's allow write access.
                                   items:
                                     type: string
                                   type: array
@@ -7623,14 +7626,14 @@ spec:
                               description: Cmds used to execute for probe.
                               properties:
                                 queries:
-                                  description: Read sqls executed on db node, used
-                                    to check db healthy.
+                                  description: Read check executed on probe sidecar,
+                                    used to check workload's reaonly access .
                                   items:
                                     type: string
                                   type: array
                                 writes:
-                                  description: Write sqls executed on db node, used
-                                    to check db healthy.
+                                  description: Write check executed on probe sidecar,
+                                    used to check workload's allow write access.
                                   items:
                                     type: string
                                   type: array
@@ -7655,294 +7658,6 @@ spec:
                               format: int32
                               minimum: 1
                               type: integer
-                          type: object
-                      type: object
-                    scripts:
-                      description: 'Scripts executed before and after workload operation
-                        script exec order：component.pre => component.exec => component.post
-                        builtin ENV variables: self: KB_SELF_{builtin_properties}
-                        rule: KB_{conponent_name}[n]-{builtin_properties} builtin_properties:
-                        - ID # which shows in Cluster.status - HOST # e.g. example-mongodb2-0.example-mongodb2-svc.default.svc.cluster.local
-                        - PORT - N # number of current component'
-                      properties:
-                        create:
-                          description: Scripts executed before and after creation
-                          properties:
-                            post:
-                              description: Post hook after operation
-                              items:
-                                description: ClusterDefinitionContainerCMD defines
-                                  content of a hook script
-                                properties:
-                                  args:
-                                    description: Args executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    description: Command executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    description: Container used to execute command
-                                    type: string
-                                type: object
-                              type: array
-                            pre:
-                              description: Pre hook before operation
-                              items:
-                                description: ClusterDefinitionContainerCMD defines
-                                  content of a hook script
-                                properties:
-                                  args:
-                                    description: Args executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    description: Command executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    description: Container used to execute command
-                                    type: string
-                                type: object
-                              type: array
-                          type: object
-                        default:
-                          description: Default scripts executed if the following scripts
-                            not defined
-                          properties:
-                            post:
-                              description: Post hook after operation
-                              items:
-                                description: ClusterDefinitionContainerCMD defines
-                                  content of a hook script
-                                properties:
-                                  args:
-                                    description: Args executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    description: Command executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    description: Container used to execute command
-                                    type: string
-                                type: object
-                              type: array
-                            pre:
-                              description: Pre hook before operation
-                              items:
-                                description: ClusterDefinitionContainerCMD defines
-                                  content of a hook script
-                                properties:
-                                  args:
-                                    description: Args executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    description: Command executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    description: Container used to execute command
-                                    type: string
-                                type: object
-                              type: array
-                          type: object
-                        delete:
-                          description: Scripts executed before and after deletion
-                          properties:
-                            post:
-                              description: Post hook after operation
-                              items:
-                                description: ClusterDefinitionContainerCMD defines
-                                  content of a hook script
-                                properties:
-                                  args:
-                                    description: Args executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    description: Command executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    description: Container used to execute command
-                                    type: string
-                                type: object
-                              type: array
-                            pre:
-                              description: Pre hook before operation
-                              items:
-                                description: ClusterDefinitionContainerCMD defines
-                                  content of a hook script
-                                properties:
-                                  args:
-                                    description: Args executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    description: Command executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    description: Container used to execute command
-                                    type: string
-                                type: object
-                              type: array
-                          type: object
-                        horizontalScale:
-                          description: Scripts executed before and after horizontal
-                            scale
-                          properties:
-                            post:
-                              description: Post hook after operation
-                              items:
-                                description: ClusterDefinitionContainerCMD defines
-                                  content of a hook script
-                                properties:
-                                  args:
-                                    description: Args executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    description: Command executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    description: Container used to execute command
-                                    type: string
-                                type: object
-                              type: array
-                            pre:
-                              description: Pre hook before operation
-                              items:
-                                description: ClusterDefinitionContainerCMD defines
-                                  content of a hook script
-                                properties:
-                                  args:
-                                    description: Args executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    description: Command executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    description: Container used to execute command
-                                    type: string
-                                type: object
-                              type: array
-                          type: object
-                        upgrade:
-                          description: Scripts executed before and after upgrade
-                          properties:
-                            post:
-                              description: Post hook after operation
-                              items:
-                                description: ClusterDefinitionContainerCMD defines
-                                  content of a hook script
-                                properties:
-                                  args:
-                                    description: Args executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    description: Command executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    description: Container used to execute command
-                                    type: string
-                                type: object
-                              type: array
-                            pre:
-                              description: Pre hook before operation
-                              items:
-                                description: ClusterDefinitionContainerCMD defines
-                                  content of a hook script
-                                properties:
-                                  args:
-                                    description: Args executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    description: Command executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    description: Container used to execute command
-                                    type: string
-                                type: object
-                              type: array
-                          type: object
-                        verticalScale:
-                          description: Scripts executed before and after vertical
-                            scale
-                          properties:
-                            post:
-                              description: Post hook after operation
-                              items:
-                                description: ClusterDefinitionContainerCMD defines
-                                  content of a hook script
-                                properties:
-                                  args:
-                                    description: Args executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    description: Command executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    description: Container used to execute command
-                                    type: string
-                                type: object
-                              type: array
-                            pre:
-                              description: Pre hook before operation
-                              items:
-                                description: ClusterDefinitionContainerCMD defines
-                                  content of a hook script
-                                properties:
-                                  args:
-                                    description: Args executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  command:
-                                    description: Command executed in container
-                                    items:
-                                      type: string
-                                    type: array
-                                  container:
-                                    description: Container used to execute command
-                                    type: string
-                                type: object
-                              type: array
                           type: object
                       type: object
                     service:
@@ -8284,21 +7999,26 @@ spec:
                       type: string
                   required:
                   - componentType
+                  - typeName
                   type: object
                 minItems: 1
                 type: array
               connectionCredential:
-                description: Credential used for connecting database
+                description: Credential used for connecting database.
                 properties:
                   password:
+                    description: Password defines system credential password.
                     type: string
                   user:
                     default: root
+                    description: User defines system credential username.
                     type: string
+                required:
+                - user
                 type: object
               defaultTerminationPolicy:
                 description: Default termination policy if no termination policy defined
-                  in cluster
+                  in cluster.
                 enum:
                 - DoNotTerminate
                 - Halt

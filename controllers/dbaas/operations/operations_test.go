@@ -556,7 +556,7 @@ spec:
 					VolumeExpansion: []dbaasv1alpha1.VolumeExpansion{
 						{
 							Name:    "log",
-							Storage: "2Gi",
+							Storage: resource.MustParse("2Gi"),
 						},
 					},
 				},

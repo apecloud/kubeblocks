@@ -66,10 +66,60 @@ const (
 	RestartType           OpsType = "Restart"
 )
 
+// AccessMode define SVC access mode enums.
+// +enum
+type AccessMode string
+
+const (
+	ReadWrite AccessMode = "ReadWrite"
+	Readonly  AccessMode = "Readonly"
+	None      AccessMode = "None"
+)
+
+// UpdateStrategy define Cluster Component update strategy.
+// +enum
+type UpdateStrategy string
+
+const (
+	Serial             UpdateStrategy = "Serial"
+	BestEffortParallel UpdateStrategy = "BestEffortParallel"
+	Parallel           UpdateStrategy = "Parallel"
+)
+
 var DefaultLeader = ConsensusMember{
 	Name:       "leader",
 	AccessMode: ReadWrite,
 }
+
+// ComponentType defines ClusterDefinition's component type.
+// +enum
+type ComponentType string
+
+const (
+	Stateless ComponentType = "Stateless"
+	Stateful  ComponentType = "Stateful"
+	Consensus ComponentType = "Consensus"
+)
+
+// TerminationPolicyType define termination policy types.
+// +enum
+type TerminationPolicyType string
+
+const (
+	DoNotTerminate TerminationPolicyType = "DoNotTerminate"
+	Halt           TerminationPolicyType = "Halt"
+	Delete         TerminationPolicyType = "Delete"
+	WipeOut        TerminationPolicyType = "WipeOut"
+)
+
+// PodAntiAffinity define pod anti-affinity strategy.
+// +enum
+type PodAntiAffinity string
+
+const (
+	Preferred PodAntiAffinity = "Preferred"
+	Required  PodAntiAffinity = "Required"
+)
 
 var webhookMgr *webhookManager
 

@@ -61,7 +61,6 @@ type Component struct {
 	ConsensusSpec        *dbaasv1alpha1.ConsensusSetSpec        `json:"consensusSpec,omitempty"`
 	PodSpec              *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	Service              corev1.ServiceSpec                     `json:"service,omitempty"`
-	Scripts              dbaasv1alpha1.ClusterDefinitionScripts `json:"scripts,omitempty"`
 	Probes               *dbaasv1alpha1.ClusterDefinitionProbes `json:"probes,omitempty"`
 	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 	Monitor              MonitorConfig                          `json:"monitor,omitempty"`

@@ -352,7 +352,6 @@ func mergeComponents(
 		ConsensusSpec:   clusterDefComp.ConsensusSpec,
 		PodSpec:         clusterDefComp.PodSpec,
 		Service:         clusterDefComp.Service,
-		Scripts:         clusterDefComp.Scripts,
 		Probes:          clusterDefComp.Probes,
 	}
 

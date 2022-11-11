@@ -21,26 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TerminationPolicyType define termination policy types.
-// +enum
-type TerminationPolicyType string
-
-const (
-	DoNotTerminate TerminationPolicyType = "DoNotTerminate"
-	Halt           TerminationPolicyType = "Halt"
-	Delete         TerminationPolicyType = "Delete"
-	WipeOut        TerminationPolicyType = "WipeOut"
-)
-
-// PodAntiAffinity define pod anti-affinity strategy.
-// +enum
-type PodAntiAffinity string
-
-const (
-	Preferred PodAntiAffinity = "Preferred"
-	Required  PodAntiAffinity = "Required"
-)
-
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
 	// ref ClusterDefinition, immutable
@@ -65,9 +45,10 @@ type ClusterSpec struct {
 	// Halt means delete resources such as sts,deploy,svc,pdb, but keep pvcs.
 	// Delete is based on Halt and delete pvcs.
 	// WipeOut is based on Delete and wipe out all snapshots and snapshot data from bucket.
+	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Halt
 	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
-	TerminationPolicy TerminationPolicyType `json:"terminationPolicy,omitempty"`
+	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
 }
 
 // ClusterStatus defines the observed state of Cluster
@@ -80,6 +61,7 @@ type ClusterStatus struct {
 
 	// phase - in list of [Running, Failed, Creating, Updating, Deleting, Deleted]
 	// +kubebuilder:validation:Enum={Running,Failed,Creating,Updating,Deleting,Deleted}
+	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
 	// Message cluster details message in current phase
@@ -92,34 +74,9 @@ type ClusterStatus struct {
 
 	// Operations declares which operations the cluster supports
 	// +optional
-	Operations Operations `json:"operations,omitempty"`
+	Operations *Operations `json:"operations,omitempty"`
 
 	ClusterDefinitionStatusGeneration `json:",inline"`
-}
-
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:resource:categories={dbaas,all}
-//+kubebuilder:printcolumn:name="APP-VERSION",type="string",JSONPath=".spec.appVersionRef",description="Cluster Application Version."
-//+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="Cluster Status."
-//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
-
-// Cluster is the Schema for the clusters API
-type Cluster struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   ClusterSpec   `json:"spec,omitempty"`
-	Status ClusterStatus `json:"status,omitempty"`
-}
-
-//+kubebuilder:object:root=true
-
-// ClusterList contains a list of Cluster
-type ClusterList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Cluster `json:"items"`
 }
 
 type ClusterComponent struct {
@@ -230,6 +187,7 @@ type ClusterComponentVolumeClaimTemplate struct {
 	// Ref AppVersion.spec.components.containers.volumeMounts.name
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
+
 	// Spec defines the desired characteristics of a volume requested by a pod author
 	// +optional
 	Spec *corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"`
@@ -243,9 +201,11 @@ type Affinity struct {
 	// +kubebuilder:validation:Enum={Preferred,Required}
 	// +optional
 	PodAntiAffinity PodAntiAffinity `json:"podAntiAffinity,omitempty"`
+
 	// TopologyKeys describe topologyKeys for `topologySpreadConstraint` and `podAntiAffinity` in ClusterDefinition API
 	// +optional
 	TopologyKeys []string `json:"topologyKeys,omitempty"`
+
 	// NodeLabels describe constrain which nodes pod can be scheduled on based on node labels
 	// +optional
 	NodeLabels map[string]string `json:"nodeLabels,omitempty"`
@@ -276,7 +236,7 @@ type Operations struct {
 type OperationComponent struct {
 	// Name component name
 	// +kubebuilder:validation:Required
-	Name string `json:"name,omitempty"`
+	Name string `json:"name"`
 
 	// Min minimum of replicas when operation is horizontalScaling,
 	// +optional
@@ -289,6 +249,31 @@ type OperationComponent struct {
 	// VolumeClaimTemplateNames which VolumeClaimTemplate of the component support volumeExpansion
 	// +optional
 	VolumeClaimTemplateNames []string `json:"volumeClaimTemplateNames,omitempty"`
+}
+
+//+kubebuilder:object:root=true
+//+kubebuilder:subresource:status
+//+kubebuilder:resource:categories={dbaas,all}
+//+kubebuilder:printcolumn:name="APP-VERSION",type="string",JSONPath=".spec.appVersionRef",description="Cluster Application Version."
+//+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="Cluster Status."
+//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+
+// Cluster is the Schema for the clusters API
+type Cluster struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   ClusterSpec   `json:"spec,omitempty"`
+	Status ClusterStatus `json:"status,omitempty"`
+}
+
+//+kubebuilder:object:root=true
+
+// ClusterList contains a list of Cluster
+type ClusterList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []Cluster `json:"items"`
 }
 
 func init() {

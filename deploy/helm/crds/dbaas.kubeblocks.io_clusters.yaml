@@ -388,6 +388,7 @@ spec:
             required:
             - appVersionRef
             - clusterDefinitionRef
+            - terminationPolicy
             type: object
           status:
             description: ClusterStatus defines the observed state of Cluster
@@ -540,6 +541,8 @@ spec:
                           items:
                             type: string
                           type: array
+                      required:
+                      - name
                       type: object
                     type: array
                   restartable:
@@ -578,6 +581,8 @@ spec:
                           items:
                             type: string
                           type: array
+                      required:
+                      - name
                       type: object
                     type: array
                 type: object

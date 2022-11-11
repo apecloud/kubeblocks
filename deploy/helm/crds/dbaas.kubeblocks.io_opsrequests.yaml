@@ -21,7 +21,15 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: Cluster Status.
+    - description: Operation request type.
+      jsonPath: .spec.type
+      name: TYPE
+      type: string
+    - description: Operand cluster.
+      jsonPath: .spec.clusterRef
+      name: CLUSTER
+      type: string
+    - description: Operation status phase.
       jsonPath: .status.phase
       name: PHASE
       type: string

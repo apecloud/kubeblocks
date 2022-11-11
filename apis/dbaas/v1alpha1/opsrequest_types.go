@@ -130,7 +130,9 @@ type OpsRequestStatusComponent struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:categories={dbaas,all},shortName=ops
-//+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="Cluster Status."
+//+kubebuilder:printcolumn:name="TYPE",type="string",JSONPath=".spec.type",description="Operation request type."
+//+kubebuilder:printcolumn:name="CLUSTER",type="string",JSONPath=".spec.clusterRef",description="Operand cluster."
+//+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="Operation status phase."
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // OpsRequest is the Schema for the opsrequests API

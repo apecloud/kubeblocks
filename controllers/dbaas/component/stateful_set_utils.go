@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
@@ -57,6 +58,14 @@ func getParentName(pod *corev1.Pod) string {
 
 func isReady(pod corev1.Pod) bool {
 	if pod.Status.Conditions == nil {
+		return false
+	}
+
+	if pod.DeletionTimestamp != nil {
+		return false
+	}
+
+	if _, ok := pod.Labels[intctrlutil.ConsensusSetRoleLabelKey]; !ok {
 		return false
 	}
 

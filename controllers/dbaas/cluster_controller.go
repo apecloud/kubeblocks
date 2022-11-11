@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
@@ -66,11 +67,9 @@ type ClusterReconciler struct {
 
 // TODO probeMessage should be defined by @xuanchi
 type probeMessage struct {
-	Data probeMessageData `json:"data,omitempty"`
-}
-
-type probeMessageData struct {
-	Role string `json:"role,omitempty"`
+	Event        string `json:"event,omitempty"`
+	OriginalRole string `json:"originalRole,omitempty"`
+	Role         string `json:"role,omitempty"`
 }
 
 func init() {
@@ -113,19 +112,35 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 
 	// get role
 	message := &probeMessage{}
-	err := json.Unmarshal([]byte(event.Message), message)
+	re := regexp.MustCompile(`Readiness probe failed: {.*({.*}).*}`)
+	matches := re.FindStringSubmatch(event.Message)
+	if len(matches) != 2 {
+		return nil
+	}
+	msg := strings.ReplaceAll(matches[1], "\\", "")
+	err := json.Unmarshal([]byte(msg), message)
 	if err != nil {
 		// not role related message, ignore it
 		reqCtx.Log.Info("not role message", "message", event.Message, "error", err)
 		return nil
 	}
-	role := strings.ToLower(message.Data.Role)
+	role := strings.ToLower(message.Role)
+
 	podName := types.NamespacedName{
 		Namespace: event.InvolvedObject.Namespace,
 		Name:      event.InvolvedObject.Name,
 	}
+	// get pod
+	pod := &corev1.Pod{}
+	if err := cli.Get(reqCtx.Ctx, podName, pod); err != nil {
+		return err
+	}
+	// event belongs to old pod with the same name, ignore it
+	if pod.UID != event.InvolvedObject.UID {
+		return nil
+	}
 
-	return component.UpdateConsensusSetRoleLabel(cli, reqCtx, podName, role)
+	return component.UpdateConsensusSetRoleLabel(cli, reqCtx, pod, role)
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to

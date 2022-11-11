@@ -19,7 +19,9 @@ package component
 
 import (
 	"fmt"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"testing"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -64,8 +66,17 @@ func TestIsReady(t *testing.T) {
 			Status: v1.ConditionTrue,
 		},
 	}
+	pod.Labels = map[string]string{intctrlutil.ConsensusSetRoleLabelKey: "leader"}
 	if !isReady(*pod) {
 		t.Errorf("isReady returned false negative")
+	}
+	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+	if isReady(*pod) {
+		t.Errorf("isReady returned false positive")
+	}
+	pod.Labels = nil
+	if isReady(*pod) {
+		t.Errorf("isReady returned false positive")
 	}
 	pod.Status.Conditions = nil
 	if isReady(*pod) {

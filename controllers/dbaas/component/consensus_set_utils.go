@@ -73,6 +73,7 @@ func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *app
 }
 
 // handleConsensusSetUpdate handle ConsensusSet component when it to do updating
+// return true means stateful set reconcile done
 func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, stsObj *appsv1.StatefulSet) (bool, error) {
 	// get typeName from stsObj.name
 	typeName := GetComponentTypeName(*cluster, stsObj.Labels[intctrlutil.AppComponentLabelKey])
@@ -128,13 +129,13 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 	// to simplify the process, wo do pods Delete after stateful set reconcile done,
 	// that is stsObj.Generation == stsObj.Status.ObservedGeneration
 	if stsObj.Generation != stsObj.Status.ObservedGeneration {
-		return true, nil
+		return false, nil
 	}
 
 	// then we wait all pods' presence, that is len(pods) == stsObj.Spec.Replicas
 	// only then, we have enough info about the previous pods before delete the current one
 	if len(pods) != int(*stsObj.Spec.Replicas) {
-		return true, nil
+		return false, nil
 	}
 
 	// we don't check whether pod role label present: prefer stateful set's Update done than role probing ready
@@ -164,11 +165,7 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 		// if pod is the latest version, we do nothing
 		if GetPodRevision(&pod) == stsObj.Status.UpdateRevision {
 			// wait until ready
-			if !isReady(pod) {
-				return true, nil
-			}
-
-			return false, nil
+			return !isReady(pod), nil
 		}
 
 		// delete the pod to trigger associate StatefulSet to re-create it
@@ -562,4 +559,26 @@ func setConsensusSetStatusRole(consensusSetStatus *dbaasv1alpha1.ConsensusSetSta
 	}
 
 	return needUpdate
+}
+
+func isReady(pod corev1.Pod) bool {
+	if pod.Status.Conditions == nil {
+		return false
+	}
+
+	if pod.DeletionTimestamp != nil {
+		return false
+	}
+
+	if _, ok := pod.Labels[intctrlutil.ConsensusSetRoleLabelKey]; !ok {
+		return false
+	}
+
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
+			return true
+		}
+	}
+
+	return false
 }

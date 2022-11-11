@@ -20,10 +20,7 @@ package component
 import (
 	"fmt"
 	"testing"
-	"time"
-
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-
+	
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,37 +52,6 @@ func TestIsMemberOf(t *testing.T) {
 	}
 	if IsMemberOf(set2, pod) {
 		t.Error("isMemberOf returned false positive")
-	}
-}
-
-func TestIsReady(t *testing.T) {
-	set := newStatefulSet("foo", 3)
-	pod := newStatefulSetPod(set, 1)
-	pod.Status.Conditions = []v1.PodCondition{
-		{
-			Type:   v1.PodReady,
-			Status: v1.ConditionTrue,
-		},
-	}
-	pod.Labels = map[string]string{intctrlutil.ConsensusSetRoleLabelKey: "leader"}
-	if !isReady(*pod) {
-		t.Errorf("isReady returned false negative")
-	}
-	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-	if isReady(*pod) {
-		t.Errorf("isReady returned false positive")
-	}
-	pod.Labels = nil
-	if isReady(*pod) {
-		t.Errorf("isReady returned false positive")
-	}
-	pod.Status.Conditions = nil
-	if isReady(*pod) {
-		t.Errorf("isReady returned false positive")
-	}
-	pod.Status.Conditions = []v1.PodCondition{}
-	if isReady(*pod) {
-		t.Errorf("isReady returned false positive")
 	}
 }
 

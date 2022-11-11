@@ -1,8 +1,6 @@
 sts: {
 	metadata: {
-		labels: {
-			"app.kubernetes.io/instance": string
-		}
+		labels: [string]:string
 	}
 	spec: {
 		volumeClaimTemplates: [
@@ -15,7 +13,7 @@ sts: {
 		]
 	}
 }
-backup_job_name: string
+snapshot_name: string
 pvc_key: {
 	Name:      string
 	Namespace: string
@@ -26,15 +24,13 @@ pvc: {
 	metadata: {
 		name:      pvc_key.Name
 		namespace: pvc_key.Namespace
-		labels: {
-			"app.kubernetes.io/instance": sts.metadata.labels["app.kubernetes.io/instance"]
-		}
+		labels: sts.metadata.labels
 	}
 	spec: {
 		accessModes: sts.spec.volumeClaimTemplates[0].spec.accessModes
 		resources:   sts.spec.volumeClaimTemplates[0].spec.resources
 		dataSource: {
-			"name":     backup_job_name
+			"name":     snapshot_name
 			"kind":     "VolumeSnapshot"
 			"apiGroup": "snapshot.storage.k8s.io"
 		}

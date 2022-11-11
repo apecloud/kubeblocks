@@ -21,6 +21,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"strconv"
 	"strings"
 	"time"
@@ -723,15 +724,32 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 							return err
 						}
 					}
+				} else {
+					snapshotName := generateName(cluster.Name + "-scaling-")
+					pvcName := strings.Join([]string{stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, "0"}, "-")
+					snapshot, err := buildVolumeSnapshot(snapshotName, pvcName, *stsObj)
+					if err != nil {
+						return err
+					}
+					if err := cli.Create(ctx, snapshot); err != nil {
+						if !apierrors.IsAlreadyExists(err) {
+							return err
+						}
+					}
+					if err := controllerutil.SetOwnerReference(cluster, snapshot, scheme); err != nil {
+						return err
+					}
+					for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
+						pvcKey := types.NamespacedName{
+							Namespace: key.Namespace,
+							Name:      fmt.Sprintf("%s-%s-%d", "data", stsObj.Name, i),
+						}
+						if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, snapshotName); err != nil {
+							return err
+						}
+					}
 				}
 			}
-			// merge two templates' labels
-			template := stsProto.Spec.Template
-			template.ObjectMeta.Annotations = stsObj.Spec.Template.ObjectMeta.Annotations
-			for k, v := range stsProto.Spec.Template.ObjectMeta.Annotations {
-				template.ObjectMeta.Annotations[k] = v
-			}
-			stsObj.Spec.Template = template
 			tempAnnotations := stsObj.Spec.Template.Annotations
 			stsObj.Spec.Template = stsProto.Spec.Template
 			// keep the original template annotations.
@@ -1566,8 +1584,8 @@ func buildBackupJob(sts appsv1.StatefulSet, backupJobName string) (*dataprotecti
 	return &backupJob, nil
 }
 
-func createPVCFromSnapshot(ctx context.Context, cli client.Client, sts appsv1.StatefulSet, pvcKey types.NamespacedName, backupJobName string) error {
-	pvc, err := buildPVCFromSnapshot(sts, pvcKey, backupJobName)
+func createPVCFromSnapshot(ctx context.Context, cli client.Client, sts appsv1.StatefulSet, pvcKey types.NamespacedName, snapshotName string) error {
+	pvc, err := buildPVCFromSnapshot(sts, pvcKey, snapshotName)
 	if err != nil {
 		return err
 	}
@@ -1577,7 +1595,7 @@ func createPVCFromSnapshot(ctx context.Context, cli client.Client, sts appsv1.St
 	return nil
 }
 
-func buildPVCFromSnapshot(sts appsv1.StatefulSet, pvcKey types.NamespacedName, backupJobName string) (*corev1.PersistentVolumeClaim, error) {
+func buildPVCFromSnapshot(sts appsv1.StatefulSet, pvcKey types.NamespacedName, snapshotName string) (*corev1.PersistentVolumeClaim, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
 	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("pvc_template.cue"))
@@ -1603,7 +1621,7 @@ func buildPVCFromSnapshot(sts appsv1.StatefulSet, pvcKey types.NamespacedName, b
 		return nil, err
 	}
 
-	if err := cueValue.FillRaw("backup_job_name", backupJobName); err != nil {
+	if err := cueValue.FillRaw("snapshot_name", snapshotName); err != nil {
 		return nil, err
 	}
 
@@ -1669,4 +1687,43 @@ func prepareInjectEnvs(component *Component, cluster *dbaasv1alpha1.Cluster) []c
 		}
 	}
 	return envs
+}
+
+func buildVolumeSnapshot(snapshotName string, pvcName string, sts appsv1.StatefulSet) (*snapshotv1.VolumeSnapshot, error) {
+	cueFS, _ := debme.FS(cueTemplates, "cue")
+
+	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("snapshot_template.cue"))
+	if err != nil {
+		return nil, err
+	}
+
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+
+	if err := cueValue.FillRaw("snapshot_name", snapshotName); err != nil {
+		return nil, err
+	}
+
+	if err := cueValue.FillRaw("pvc_name", pvcName); err != nil {
+		return nil, err
+	}
+
+	stsStrByte, err := json.Marshal(sts)
+	if err != nil {
+		return nil, err
+	}
+	if err := cueValue.Fill("sts", stsStrByte); err != nil {
+		return nil, err
+	}
+
+	snapshotStrByte, err := cueValue.Lookup("snapshot")
+	if err != nil {
+		return nil, err
+	}
+
+	snapshot := snapshotv1.VolumeSnapshot{}
+	if err = json.Unmarshal(snapshotStrByte, &snapshot); err != nil {
+		return nil, err
+	}
+
+	return &snapshot, nil
 }

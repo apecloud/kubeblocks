@@ -53,35 +53,35 @@ func createHandlerWithWatchType(opt *VolumeWatcherOpts) cfgcore.WatchEventHandle
 }
 
 // findParentPidFromProcessName get parent pid
-func findParentPidFromProcessName(processName string) (*process.Process, error) {
+func findParentPidFromProcessName(processName string) (PID, error) {
 	allProcess, err := process.Processes()
 	if err != nil {
-		return nil, err
+		return INVALID_PID, err
 	}
 
-	psGraph := map[*process.Process]int32{}
+	psGraph := map[PID]int32{}
 	for _, proc := range allProcess {
 		name, err := proc.Name()
 		if err != nil {
-			return nil, cfgutil.WrapError(err, "failed to get process name from pid[%d]", proc.Pid)
+			return INVALID_PID, cfgutil.WrapError(err, "failed to get process name from pid[%d]", proc.Pid)
 		}
 		if name != processName {
 			continue
 		}
 		ppid, err := proc.Ppid()
 		if err != nil {
-			return nil, cfgutil.WrapError(err, "failed to get parent pid from pid[%d]", proc.Pid)
+			return INVALID_PID, cfgutil.WrapError(err, "failed to get parent pid from pid[%d]", proc.Pid)
 		}
-		psGraph[proc] = ppid
+		psGraph[PID(proc.Pid)] = ppid
 	}
 
 	for key, value := range psGraph {
-		if value == 0 {
+		if _, ok := psGraph[PID(value)]; !ok {
 			return key, nil
 		}
 	}
 
-	return nil, cfgutil.MakeError("not find pid fo process name: ", processName)
+	return INVALID_PID, cfgutil.MakeError("not find pid fo process name: [%s]", processName)
 }
 
 func createSignalHandler(opt *VolumeWatcherOpts) cfgcore.WatchEventHandler {
@@ -90,10 +90,10 @@ func createSignalHandler(opt *VolumeWatcherOpts) cfgcore.WatchEventHandler {
 		logrus.Fatalf("not support unix signal: %s", signal)
 	}
 	return func(event fsnotify.Event) error {
-		proc, err := findParentPidFromProcessName(opt.ProcessName)
+		pid, err := findParentPidFromProcessName(opt.ProcessName)
 		if err != nil {
 			return err
 		}
-		return proc.SendSignal(signal)
+		return sendSignal(pid, signal)
 	}
 }

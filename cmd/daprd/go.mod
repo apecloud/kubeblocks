@@ -2,11 +2,8 @@ module github.com/apecloud/kubeblocks/cmd/daprd
 
 go 1.19
 
-replace github.com/apecloud/kubeblocks => ../..
-
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
-	github.com/apecloud/kubeblocks v0.0.0-00010101000000-000000000000
 	github.com/dapr/components-contrib v1.9.0
 	github.com/dapr/dapr v1.9.0
 	github.com/dapr/kit v0.0.3-0.20220930182601-272e358ba6a7

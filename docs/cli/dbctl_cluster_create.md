@@ -9,7 +9,7 @@ dbctl cluster create [flags]
 ### Options
 
 ```
-      --app-version string           AppVersion reference (default "wesql-8.0.18")
+      --app-version string           AppVersion reference (default "wesql-8.0.30")
       --cluster-definition string    ClusterDefinition reference (default "apecloud-wesql")
       --components string            Use yaml file to specify the cluster components
   -h, --help                         help for create

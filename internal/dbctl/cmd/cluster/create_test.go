@@ -95,7 +95,7 @@ spec:
   components:
     - typeName: replicasets
       componentType: Consensus
-      logsConfig:
+      logConfigs:
         - name: error
           filePathPattern: /log/mysql/mysqld.err
         - name: slow

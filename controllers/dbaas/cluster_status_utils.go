@@ -250,9 +250,9 @@ func handleClusterStatusPhaseByEvent(cluster *dbaasv1alpha1.Cluster, componentMa
 	)
 	for k, v := range cluster.Status.Components {
 		componentType := componentMap[k]
-		clusterAvailabilityNoImpact := clusterAvailabilityMap[componentType]
-		// if the component is in Failed phase and the component can impact cluster availability, set Cluster.status.phase to Failed
-		if !clusterAvailabilityNoImpact && v.Phase == dbaasv1alpha1.FailedPhase {
+		clusterAvailabilityEffect := clusterAvailabilityMap[componentType]
+		// if the component is in Failed phase and the component can affect cluster availability, set Cluster.status.phase to Failed
+		if clusterAvailabilityEffect && v.Phase == dbaasv1alpha1.FailedPhase {
 			isFailed = true
 		}
 		// determine whether other components are still operation, i.e., create/restart/scaling
@@ -271,6 +271,18 @@ func handleClusterStatusPhaseByEvent(cluster *dbaasv1alpha1.Cluster, componentMa
 	}
 }
 
+// getClusterAvailabilityEffect whether the component will affect the cluster availability.
+// if the component can affect and be Failed, the cluster will be Failed too.
+func getClusterAvailabilityEffect(componentDef *dbaasv1alpha1.ClusterDefinitionComponent) bool {
+	switch componentDef.ComponentType {
+	case dbaasv1alpha1.Consensus:
+		return true
+	default:
+		// other types of components need to judge whether there has PodDisruptionBudget
+		return componentDef.MaxAvailable != 0 || componentDef.MinAvailable != 0
+	}
+}
+
 // getComponentRelatedInfo get componentMap, clusterAvailabilityMap and component definition information
 func getComponentRelatedInfo(cluster *dbaasv1alpha1.Cluster, clusterDef *dbaasv1alpha1.ClusterDefinition, componentName string) (map[string]string, map[string]bool, dbaasv1alpha1.ClusterDefinitionComponent) {
 	var (
@@ -284,14 +296,14 @@ func getComponentRelatedInfo(cluster *dbaasv1alpha1.Cluster, clusterDef *dbaasv1
 		}
 		componentMap[v.Name] = v.Type
 	}
-	clusterAvailabilityMap := map[string]bool{}
+	clusterAvailabilityEffectMap := map[string]bool{}
 	for _, v := range clusterDef.Spec.Components {
-		clusterAvailabilityMap[v.TypeName] = v.ClusterAvailabilityNoImpact
+		clusterAvailabilityEffectMap[v.TypeName] = getClusterAvailabilityEffect(&v)
 		if v.TypeName == typeName {
 			componentDef = v
 		}
 	}
-	return componentMap, clusterAvailabilityMap, componentDef
+	return componentMap, clusterAvailabilityEffectMap, componentDef
 }
 
 // handleClusterStatusByEvent handle the cluster status when warning event happened
@@ -312,7 +324,7 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 	componentName := labels[intctrlutil.AppComponentLabelKey]
 	// get the component phase by component type and sync to Cluster.status.components
 	patch := client.MergeFrom(cluster.DeepCopy())
-	componentMap, clusterAvailabilityMap, componentDef := getComponentRelatedInfo(cluster, clusterDef, componentName)
+	componentMap, clusterAvailabilityEffectMap, componentDef := getComponentRelatedInfo(cluster, clusterDef, componentName)
 	// get the component status by event and check whether the component status needs to be synchronized to the cluster
 	switch componentDef.ComponentType {
 	case dbaasv1alpha1.Consensus:
@@ -329,7 +341,7 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 		return nil
 	}
 	// handle Cluster.status.phase
-	handleClusterStatusPhaseByEvent(cluster, componentMap, clusterAvailabilityMap)
+	handleClusterStatusPhaseByEvent(cluster, componentMap, clusterAvailabilityEffectMap)
 	if err = cli.Status().Patch(ctx, cluster, patch); err != nil {
 		return err
 	}

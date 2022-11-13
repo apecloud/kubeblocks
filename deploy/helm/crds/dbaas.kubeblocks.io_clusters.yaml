@@ -491,13 +491,13 @@ spec:
                         current phase
                       type: string
                     phase:
-                      description: 'Phase - in list of [Running, Failed, Creating,
-                        Abnormal, Updating, Deleting, Deleted] Failed Phase: component
-                        not available, i.e, all pod is not ready for Stateless/Stateful
-                        component; Leader/Primary pod is not ready for Consensus/Replication
-                        component Abnormal Phase: component available but some pod
-                        is not ready. if the component type is Consensus/Replication,
-                        the Leader/Primary pod is must ready in Abnormal phase.'
+                      description: 'Failed Phase: component not available, i.e, all
+                        pod is not ready for Stateless/Stateful component; Leader/Primary
+                        pod is not ready for Consensus/Replication component Abnormal
+                        Phase: component available but some pod is not ready. if the
+                        component type is Consensus/Replication, the Leader/Primary
+                        pod is must ready in Abnormal phase. Other phases behave the
+                        same as the cluster phase.'
                       enum:
                       - Running
                       - Failed
@@ -588,11 +588,12 @@ spec:
                     type: array
                 type: object
               phase:
-                description: 'phase - in list of [Running, Failed, Abnormal, Creating,
-                  Updating, Deleting, Deleted] Failed Phase: cluster not available.
-                  Abnormal Phase: cluster available but some component is not Abnormal.
-                  if the component type is Consensus/Replication, the Leader/Primary
-                  pod is must ready in Abnormal phase.'
+                description: 'Creating: creating cluster Running: cluster is running,
+                  all components is available Updating: cluster changes, such as horizontal-scaling/vertical-scaling/restart
+                  Deleting/Deleted: deleting cluster/cluster is deleted Failed: cluster
+                  not available. Abnormal: cluster available but some component is
+                  not Abnormal. if the component type is Consensus/Replication, the
+                  Leader/Primary pod is must ready in Abnormal phase.'
                 enum:
                 - Running
                 - Failed

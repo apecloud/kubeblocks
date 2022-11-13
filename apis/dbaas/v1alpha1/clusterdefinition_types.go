@@ -159,12 +159,6 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Monitor *MonitorConfig `json:"monitor,omitempty"`
 
-	// ClusterAvailabilityNoImpact whether the component affects the cluster availability.
-	// if set true, cluster will be in Failed phase when component is Failed.
-	// otherwise, the cluster will be in Abnormal phase
-	// +optional
-	ClusterAvailabilityNoImpact bool `json:"clusterAvailabilityNoImpact,omitempty"`
-
 	// antiAffinity defines components should have anti-affinity constraint to same component type
 	// +kubebuilder:default=false
 	// +optional

@@ -67,6 +67,7 @@ spec:
   type: state.mysql-8
   components:
   - typeName: replicasets
+    minAvailable: 1
     componentType: Stateful
     defaultReplicas: 3
     podSpec:

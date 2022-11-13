@@ -64,12 +64,6 @@ spec:
                         DBaas will generate proper monitor configs for wellknown CharacterType
                         when BuiltIn is true.
                       type: string
-                    clusterAvailabilityNoImpact:
-                      description: ClusterAvailabilityNoImpact whether the component
-                        affects the cluster availability. if set true, cluster will
-                        be in Failed phase when component is Failed. otherwise, the
-                        cluster will be in Abnormal phase
-                      type: boolean
                     componentType:
                       default: Stateless
                       description: ComponentType defines type of the component

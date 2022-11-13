@@ -48,18 +48,21 @@ func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster, componentName stri
 		cluster.Status.Components[componentName] = &dbaasv1alpha1.ClusterStatusComponent{Phase: cluster.Status.Phase}
 		return true
 	}
-	// if componentIsRunning is false, means the cluster has an operation running.
-	// so we sync the cluster phase to component phase when cluster phase is not Running.
-	if cluster.Status.Phase != dbaasv1alpha1.RunningPhase && !componentIsRunning && statusComponent.Phase == dbaasv1alpha1.RunningPhase {
-		statusComponent.Phase = cluster.Status.Phase
-		return true
-	}
-	// if componentIsRunning is true and component status is not Running.
-	// we should change component phase to Running
-	if statusComponent.Phase != dbaasv1alpha1.RunningPhase && componentIsRunning {
-		statusComponent.Phase = dbaasv1alpha1.RunningPhase
-		statusComponent.Message = ""
-		return true
+	if !componentIsRunning {
+		// if componentIsRunning is false, means the cluster has an operation running.
+		// so we sync the cluster phase to component phase when cluster phase is not Running.
+		if cluster.Status.Phase != dbaasv1alpha1.RunningPhase && statusComponent.Phase == dbaasv1alpha1.RunningPhase {
+			statusComponent.Phase = cluster.Status.Phase
+			return true
+		}
+	} else {
+		// if componentIsRunning is true and component status is not Running.
+		// we should change component phase to Running
+		if statusComponent.Phase != dbaasv1alpha1.RunningPhase {
+			statusComponent.Phase = dbaasv1alpha1.RunningPhase
+			statusComponent.Message = ""
+			return true
+		}
 	}
 	return false
 }

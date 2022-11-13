@@ -36,6 +36,7 @@ import (
 	dbaasconfig "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	cfgpolicy "github.com/apecloud/kubeblocks/controllers/dbaas/configuration/policy"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -216,6 +217,10 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 			cfgcore.WrapError(err,
 				"failed to get component from cluster definition. type[%s]", clusterComponent.Type),
 			reqCtx.Log)
+	}
+
+	if ok, _ := cfgcm.NeedBuildConfigSidecar(component.ConfigAutoReload, component.ConfigReloadType, component.ReloadConfiguration); !ok {
+		return intctrlutil.Reconciled()
 	}
 
 	// find STS CR

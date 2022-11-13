@@ -75,8 +75,8 @@ spec:
                     configAutoReload:
                       default: false
                       description: ConfigAutoReload indicates whether the engine itself
-                        supports reload, if true, if true, the controller does not
-                        need to update.
+                        supports reload, if true, the controller does not need to
+                        update.
                       type: boolean
                     configReloadType:
                       description: ConfigReloadType decided to restart the way

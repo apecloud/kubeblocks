@@ -6,9 +6,9 @@ template: {
 	args: parameter.args
 
 	//"registry.cn-hangzhou.aliyuncs.com/google_containers/etcd:3.5.0-0"
-	image:           parameter.sidecarimage
+	image:           parameter.sidecarImage
 	imagePullPolicy: "IfNotPresent"
-	volumeMounts:    parameter.volums
+	volumeMounts:    parameter.volumes
 }
 
 #ArgType: string
@@ -25,5 +25,5 @@ parameter: {
 	sidecarImage: string
 	args: [...#ArgType]
 	// envs?: [...#EnvType]
-	volums: [...]
+	volumes: [...]
 }

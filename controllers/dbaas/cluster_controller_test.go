@@ -138,6 +138,11 @@ spec:
     - name: mysql-tree-node-template-8.0 
       volumeName: mysql-config
     defaultReplicas: 1
+    configAutoReload: false
+    configReloadType: signal
+    reloadConfiguration:
+      signal: SIGHUP
+      processName: xxxxxxx
     podSpec:
       containers:
       - name: mysql

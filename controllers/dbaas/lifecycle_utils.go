@@ -1541,8 +1541,7 @@ func updateConfigurationManagerWithComponent(params createParams, sts *appsv1.St
 
 	// db auto scan configuration and reload
 	component := params.component
-	ok, err := cfgcm.NeedBuildConfigSidecar(component.ConfigAutoReload, component.ConfigReloadType, component.ReloadConfiguration)
-	if err != nil {
+	if ok, err := cfgcm.NeedBuildConfigSidecar(component.ConfigAutoReload, component.ConfigReloadType, component.ReloadConfiguration); err != nil {
 		return err
 	} else if !ok {
 		return nil
@@ -1563,7 +1562,7 @@ func updateConfigurationManagerWithComponent(params createParams, sts *appsv1.St
 
 	// find first container using
 	// Find out which configurations are used by the container
-	volumeDirs := make([]corev1.VolumeMount, len(cfgTemplates))
+	volumeDirs := make([]corev1.VolumeMount, 0)
 	container := usingContainers[0]
 	for i := firstCfg; i < len(cfgTemplates); i++ {
 		tpl := cfgTemplates[i]
@@ -1585,13 +1584,20 @@ func updateConfigurationManagerWithComponent(params createParams, sts *appsv1.St
 		Volumes:     volumeDirs,
 	}
 
-	container, err = buildCfgManagerContainer(params, managerSidecar)
+	container, err := buildCfgManagerContainer(params, managerSidecar)
 	if err != nil {
 		return err
 	}
 
 	// Add sidecar to podTemplate
 	sts.Spec.Template.Spec.Containers = append(sts.Spec.Template.Spec.Containers, *container)
+
+	// This sidecar container will be able to view and signal processes from other containers
+	if sts.Spec.Template.Spec.ShareProcessNamespace == nil {
+		sts.Spec.Template.Spec.ShareProcessNamespace = new(bool)
+	}
+	*sts.Spec.Template.Spec.ShareProcessNamespace = true
+
 	return nil
 }
 

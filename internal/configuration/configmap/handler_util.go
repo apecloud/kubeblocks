@@ -53,7 +53,7 @@ func NeedBuildConfigSidecar(autoReload bool, reloadType string, configuration db
 }
 
 func checkSignalType(configuration dbaasv1alpha1.ReloadConfiguration) (bool, error) {
-	if IsValidUnixSignal(configuration.Signal) {
+	if !IsValidUnixSignal(configuration.Signal) {
 		return false, cfgutil.MakeError("This special signal [%s] is not supported for now!", configuration.Signal)
 	}
 	if configuration.ProcessName == "" {

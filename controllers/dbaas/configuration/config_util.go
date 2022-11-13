@@ -28,6 +28,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -154,29 +155,42 @@ func checkConfigTpl(ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.Configuration
 	return true, nil
 }
 
-type ConfigTemplateHander func([]dbaasv1alpha1.ConfigTemplate) (bool, error)
+type ConfigTemplateHandler func([]dbaasv1alpha1.ConfigTemplate) (bool, error)
+type ComponentValidateHandler func(component dbaasv1alpha1.ClusterDefinitionComponent) error
 
 func CheckCDConfigTemplate(client client.Client, ctx intctrlutil.RequestCtx, clusterDef *dbaasv1alpha1.ClusterDefinition) (bool, error) {
-	return HandleConfigTemplate(clusterDef, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
-		return validateConfTpls(client, ctx, tpls)
-	})
+	return HandleConfigTemplate(clusterDef,
+		func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
+			return validateConfTpls(client, ctx, tpls)
+		},
+		func(component dbaasv1alpha1.ClusterDefinitionComponent) error {
+			_, err := cfgcm.NeedBuildConfigSidecar(component.ConfigAutoReload, component.ConfigReloadType, component.ReloadConfiguration)
+			return err
+		})
 }
 
-func HandleConfigTemplate(object client.Object, handler ConfigTemplateHander) (bool, error) {
-	var tpls []dbaasv1alpha1.ConfigTemplate
+func HandleConfigTemplate(object client.Object, handler ConfigTemplateHandler, handler2 ...ComponentValidateHandler) (bool, error) {
+	var (
+		err  error
+		tpls []dbaasv1alpha1.ConfigTemplate
+	)
 	switch cr := object.(type) {
 	case *dbaasv1alpha1.ClusterDefinition:
-		tpls = getCfgTplFromCD(cr)
+		tpls, err = getCfgTplFromCD(cr, handler2...)
 	case *dbaasv1alpha1.AppVersion:
 		tpls = getCfgTplFromAV(cr)
 	default:
 		return false, cfgcore.MakeError("not support CR type: %v", cr)
 	}
 
-	if len(tpls) > 0 {
+	switch {
+	case err != nil:
+		return false, err
+	case len(tpls) > 0:
 		return handler(tpls)
-	} else {
+	default:
 		return true, nil
+
 	}
 }
 
@@ -190,14 +204,20 @@ func getCfgTplFromAV(appVer *dbaasv1alpha1.AppVersion) []dbaasv1alpha1.ConfigTem
 	return tpls
 }
 
-func getCfgTplFromCD(clusterDef *dbaasv1alpha1.ClusterDefinition) []dbaasv1alpha1.ConfigTemplate {
+func getCfgTplFromCD(clusterDef *dbaasv1alpha1.ClusterDefinition, validators ...ComponentValidateHandler) ([]dbaasv1alpha1.ConfigTemplate, error) {
 	tpls := make([]dbaasv1alpha1.ConfigTemplate, 0)
 	for _, component := range clusterDef.Spec.Components {
 		if len(component.ConfigTemplateRefs) > 0 {
 			tpls = append(tpls, component.ConfigTemplateRefs...)
+			// Check reload configure if has config template
+			for _, validator := range validators {
+				if err := validator(component); err != nil {
+					return nil, err
+				}
+			}
 		}
 	}
-	return tpls
+	return tpls, nil
 }
 
 func UpdateCDLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, cd *dbaasv1alpha1.ClusterDefinition) (bool, error) {
@@ -227,7 +247,6 @@ func UpdateAVLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.Req
 }
 
 func validateConfTpls(cli client.Client, ctx intctrlutil.RequestCtx, configTpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
-
 	// check ConfigTemplate Validate
 	foundConfTplFn := func(configTpl dbaasv1alpha1.ConfigTemplate) (*dbaasv1alpha1.ConfigurationTemplate, error) {
 		if len(configTpl.Name) == 0 || len(configTpl.VolumeName) == 0 {

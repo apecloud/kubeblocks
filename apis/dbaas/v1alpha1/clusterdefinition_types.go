@@ -211,7 +211,7 @@ type ClusterDefinitionComponent struct {
 	// +kubebuilder:validation:Minimum=0
 	ReconfigureResourceCount int `json:"reconfigureResourceCount,omitempty"`
 
-	// ConfigAutoReload indicates whether the engine itself supports reload, if true,
+	// ConfigAutoReload indicates whether the engine itself supports reload,
 	// if true, the controller does not need to update.
 	// +kubebuilder:default=false
 	ConfigAutoReload bool `json:"configAutoReload,omitempty"`

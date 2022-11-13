@@ -41,6 +41,8 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	dbaasconfig "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -55,6 +57,11 @@ type createParams struct {
 
 const (
 	dbaasPrefix = "KB"
+
+	ConfigTemplateCueTplName   = "config_template.cue"
+	ConfigManageSidecarTplName = "config_manager_sidecar.cue"
+	ConfigSidecarIMAGE         = "config_sidecar_image"
+	ConfigSidecarName          = "config-manager-sidecar"
 )
 
 var (
@@ -364,6 +371,10 @@ func mergeComponents(
 		Service:         clusterDefComp.Service,
 		Scripts:         clusterDefComp.Scripts,
 		Probes:          clusterDefComp.Probes,
+
+		ConfigAutoReload:    clusterDefComp.ConfigAutoReload,
+		ConfigReloadType:    clusterDefComp.ConfigReloadType,
+		ReloadConfiguration: clusterDefComp.ReloadConfiguration,
 	}
 
 	if appVerComp != nil && appVerComp.PodSpec != nil {
@@ -1481,10 +1492,12 @@ func buildCfg(params createParams, sts *appsv1.StatefulSet, ctx context.Context,
 	volumes := make(map[string]dbaasv1alpha1.ConfigTemplate, len(tpls))
 	// TODO Support Update AppVersionRef of Cluster
 	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
+	cfgLables := make(map[string]string, len(tpls))
 	for _, tpl := range tpls {
 		// Check config cm already exists
 		cmName := getInstanceCmName(sts, &tpl)
 		volumes[cmName] = tpl
+		cfgLables[dbaasconfig.GenerateUniqLabelKeyWithConfig(tpl.Name)] = tpl.Name
 		isExist, err := isAlreadyExists(cmName, params.cluster.Namespace, ctx, cli)
 		if err != nil {
 			return nil, err
@@ -1506,9 +1519,100 @@ func buildCfg(params createParams, sts *appsv1.StatefulSet, ctx context.Context,
 		}
 		configs = append(configs, configmap)
 	}
+	updateStatefulLabelsWithTemplate(sts, cfgLables)
 
 	// Generate Pod Volumes for ConfigMap objects
-	return configs, checkAndUpdatePodVolumes(sts, volumes)
+	if err := checkAndUpdatePodVolumes(sts, volumes); err != nil {
+		return nil, cfgcore.WrapError(err, "failed to generate pod volume")
+	}
+
+	if err := updateConfigurationManagerWithComponent(params, sts, tpls); err != nil {
+		return nil, cfgcore.WrapError(err, "failed to generate sidecar for configmap's reloader")
+	}
+
+	return configs, nil
+}
+
+func updateConfigurationManagerWithComponent(params createParams, sts *appsv1.StatefulSet, cfgTemplates []dbaasv1alpha1.ConfigTemplate) error {
+	var (
+		firstCfg        = 0
+		usingContainers []*corev1.Container
+	)
+
+	// db auto scan configuration and reload
+	component := params.component
+	ok, err := cfgcm.NeedBuildConfigSidecar(component.ConfigAutoReload, component.ConfigReloadType, component.ReloadConfiguration)
+	if err != nil {
+		return err
+	} else if !ok {
+		return nil
+	}
+
+	podSpec := &sts.Spec.Template.Spec
+	for i, tpl := range cfgTemplates {
+		usingContainers = intctrlutil.GetPodContainerWithVolumeMount(podSpec, tpl.VolumeName)
+		if len(usingContainers) > 0 {
+			firstCfg = i
+		}
+	}
+
+	// not container using any config template
+	if len(usingContainers) == 0 {
+		return nil
+	}
+
+	// find first container using
+	// Find out which configurations are used by the container
+	volumeDirs := make([]corev1.VolumeMount, len(cfgTemplates))
+	container := usingContainers[0]
+	for i := firstCfg; i < len(cfgTemplates); i++ {
+		tpl := cfgTemplates[i]
+		volume := intctrlutil.GetVolumeMountByVolume(container, tpl.VolumeName)
+		if volume != nil {
+			volumeDirs = append(volumeDirs, *volume)
+		}
+	}
+
+	// If you do not need to watch any configmap volume
+	if len(volumeDirs) == 0 {
+		return nil
+	}
+
+	managerSidecar := &cfgcm.ConfigManagerSidecar{
+		ManagerName: ConfigSidecarName,
+		Image:       viper.GetString(ConfigSidecarIMAGE),
+		Args:        cfgcm.BuildReloadSidecarParams(component.ConfigReloadType, component.ReloadConfiguration, volumeDirs),
+		Volumes:     volumeDirs,
+	}
+
+	container, err = buildCfgManagerContainer(params, managerSidecar)
+	if err != nil {
+		return err
+	}
+
+	// Add sidecar to podTemplate
+	sts.Spec.Template.Spec.Containers = append(sts.Spec.Template.Spec.Containers, *container)
+	return nil
+}
+
+func updateStatefulLabelsWithTemplate(sts *appsv1.StatefulSet, allLabels map[string]string) {
+	// full configmap upgrade
+	existLabels := make(map[string]string)
+	for key, val := range sts.Labels {
+		if strings.HasPrefix(key, dbaasconfig.ConfigurationTplLabelPrefixKey) {
+			existLabels[key] = val
+		}
+	}
+
+	// delete not exist configmap label
+	deletedLabels := cfgcore.MapKeyDifference(existLabels, allLabels)
+	deletedLabels.ForEach(func(key string) {
+		delete(sts.Labels, key)
+	})
+
+	for key, val := range allLabels {
+		sts.Labels[key] = val
+	}
 }
 
 func checkAndUpdatePodVolumes(sts *appsv1.StatefulSet, volumes map[string]dbaasv1alpha1.ConfigTemplate) error {
@@ -1520,7 +1624,7 @@ func checkAndUpdatePodVolumes(sts *appsv1.StatefulSet, volumes map[string]dbaasv
 		if volumeMounted != nil {
 			configMapVolume := volumeMounted.ConfigMap
 			if configMapVolume == nil {
-				return fmt.Errorf("mount volume[%s] type require ConfigMap: [%+v]", volumeMounted.Name, volumeMounted)
+				return cfgcore.MakeError("mount volume[%s] type require ConfigMap: [%+v]", volumeMounted.Name, volumeMounted)
 			}
 			configMapVolume.Name = cmName
 			continue
@@ -1571,7 +1675,7 @@ func generateConfigMapFromTpl(tplBuilder *ConfigTemplateBuilder, cmName string, 
 	// The template namespace must be the same as the ClusterDefinition namespace
 	// TODO(zt) using dbaasconfig.GetConfigMapByName
 	configs, err := processConfigMapTemplate(ctx, cli, tplBuilder, client.ObjectKey{
-		Namespace: viper.GetString(dbaasconfig.ConfigNamespaceKey),
+		Namespace: "", // configuration template is cluster scope
 		Name:      tplCfg.Name,
 	})
 	if err != nil {
@@ -1579,15 +1683,15 @@ func generateConfigMapFromTpl(tplBuilder *ConfigTemplateBuilder, cmName string, 
 	}
 
 	// Using ConfigMap cue template render to configmap of config
-	return generateConfigMapWithTemplate(configs, params, cmName, tplCfg.Name)
+	return buildConfigMapWithTemplate(configs, params, cmName, tplCfg.Name)
 }
 
-func generateConfigMapWithTemplate(configs map[string]string, params createParams, cmName, templateName string) (*corev1.ConfigMap, error) {
+func buildConfigMapWithTemplate(configs map[string]string, params createParams, cmName, templateName string) (*corev1.ConfigMap, error) {
 
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
-	cueTpl, err := params.getCacheCUETplValue("config_template.cue", func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("config_template.cue"))
+	cueTpl, err := params.getCacheCUETplValue(ConfigTemplateCueTplName, func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(ConfigTemplateCueTplName))
 	})
 	if err != nil {
 		return nil, err
@@ -1636,14 +1740,66 @@ func generateConfigMapWithTemplate(configs map[string]string, params createParam
 	return &cm, nil
 }
 
+func buildCfgManagerContainer(params createParams, sidecarRenderedParam *cfgcm.ConfigManagerSidecar) (*corev1.Container, error) {
+	cueFS, _ := debme.FS(CueTemplates, "cue")
+
+	cueTpl, err := params.getCacheCUETplValue(ConfigManageSidecarTplName, func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(ConfigManageSidecarTplName))
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+	paramBytes, err := json.Marshal(sidecarRenderedParam)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = cueValue.Fill("parameter", paramBytes); err != nil {
+		return nil, err
+	}
+
+	containerStrByte, err := cueValue.Lookup("template")
+	if err != nil {
+		return nil, err
+	}
+	container := corev1.Container{}
+	if err = json.Unmarshal(containerStrByte, &container); err != nil {
+		return nil, err
+	}
+	return &container, nil
+}
+
 // processConfigMapTemplate Render config file using template engine
 func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder *ConfigTemplateBuilder, cmKey client.ObjectKey) (map[string]string, error) {
+
+	cfgTpl := &dbaasv1alpha1.ConfigurationTemplate{}
+	if err := cli.Get(ctx, cmKey, cfgTpl); err != nil {
+		return nil, cfgcore.WrapError(err, "failed to get ConfigurationTemplate, key[%s].", cmKey.String())
+	}
+
+	// NOTE: not require checker configuration template status
+	configChecker := cfgcore.NewConfigValidator(&cfgTpl.Spec)
 	cmObj := &corev1.ConfigMap{}
 	//  Require template configmap exist
-	if err := cli.Get(ctx, cmKey, cmObj); err != nil {
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: viper.GetString(dbaasconfig.ConfigNamespaceKey),
+		Name:      cfgTpl.Spec.TplRef,
+	}, cmObj); err != nil {
 		return nil, err
 	}
 
 	// TODO process invalid data: e.g empty data
-	return tplBuilder.Render(cmObj.Data)
+	renderedCfg, err := tplBuilder.Render(cmObj.Data)
+	if err != nil {
+		return nil, cfgcore.WrapError(err, "failed to render configmap")
+	}
+
+	// NOTE: It is necessary to verify the correctness of the data
+	if err := configChecker.Validate(renderedCfg); err != nil {
+		return nil, cfgcore.WrapError(err, "failed to validate configmap")
+	}
+
+	return renderedCfg, nil
 }

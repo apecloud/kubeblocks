@@ -37,10 +37,10 @@ func CueValidate(cueTpl string) error {
 	return tpl.Validate()
 }
 
-func ValidateConfigurationWithCue(cueTpl string, cfgType dbaasv1alpha1.ConfigurationFormatter, rawData string) (bool, error) {
+func ValidateConfigurationWithCue(cueTpl string, cfgType dbaasv1alpha1.ConfigurationFormatter, rawData string) error {
 	cfg := LoadConfiguration(cfgType, rawData)
 	if cfg == nil {
-		return false, MakeError("failed to load configuration. [%s]", rawData)
+		return MakeError("failed to load configuration. [%s]", rawData)
 	}
 
 	return CfgDataValidateByCue(cueTpl, cfg)
@@ -56,7 +56,7 @@ func LoadConfiguration(cfgType dbaasv1alpha1.ConfigurationFormatter, rawData str
 	return v.AllSettings()
 }
 
-func CfgDataValidateByCue(cueTpl string, config interface{}) (bool, error) {
+func CfgDataValidateByCue(cueTpl string, config interface{}) error {
 	const (
 		ConfigurationCueVariableName = "configuration"
 	)
@@ -69,17 +69,17 @@ func CfgDataValidateByCue(cueTpl string, config interface{}) (bool, error) {
 	context := cuecontext.New()
 	tpl := context.CompileString(cueTpl)
 	if err := tpl.Err(); err != nil {
-		return false, err
+		return err
 	}
 
 	cfgPath := cue.ParsePath(ConfigurationCueVariableName)
 	tpl = tpl.FillPath(cfgPath, config)
 	if err := tpl.Err(); err != nil {
-		return false, WrapError(err, "failed to cue template render configure")
+		return WrapError(err, "failed to cue template render configure")
 	}
 
 	cfg := tpl.LookupPath(cfgPath)
 	// debug, _ := cfg.MarshalJSON()
 	// fmt.Println(debug)
-	return cfg.Validate() == nil, cfg.Err()
+	return cfg.Validate()
 }

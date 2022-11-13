@@ -160,13 +160,16 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 			Namespace: config.GetNamespace(),
 			Name:      config.Labels[appInstanceLabelKey],
 		}
+
+		configTplName     = config.Labels[dbaasconfig.CMConfigurationTplNameLabelKey]
+		configTplLabelKey = dbaasconfig.GenerateUniqLabelKeyWithConfig(configTplName)
 	)
 
 	componentLabels := map[string]string{
-		appNameLabelKey:                        config.Labels[appNameLabelKey],
-		appInstanceLabelKey:                    config.Labels[appInstanceLabelKey],
-		appComponentLabelKey:                   config.Labels[appComponentLabelKey],
-		dbaasconfig.CMInsConfigurationLabelKey: config.Labels[dbaasconfig.CMInsConfigurationLabelKey],
+		appNameLabelKey:      config.Labels[appNameLabelKey],
+		appInstanceLabelKey:  config.Labels[appInstanceLabelKey],
+		appComponentLabelKey: config.Labels[appComponentLabelKey],
+		configTplLabelKey:    config.Labels[dbaasconfig.CMConfigurationTplNameLabelKey],
 	}
 
 	versionMeta, err := dbaasconfig.GetConfigurationVersion(config, reqCtx, &tpl.Spec)

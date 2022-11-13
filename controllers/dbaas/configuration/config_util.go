@@ -204,7 +204,7 @@ func UpdateCDLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.Req
 	return HandleConfigTemplate(cd, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 		patch := client.MergeFrom(cd.DeepCopy())
 		for _, tpl := range tpls {
-			cd.Labels[GenerateUniqKeyWithConfig(ConfigurationTplLabelPrefixKey, tpl.Name)] = tpl.Name
+			cd.Labels[GenerateUniqLabelKeyWithConfig(tpl.Name)] = tpl.Name
 		}
 		return true, cli.Patch(ctx.Ctx, cd, patch)
 	})
@@ -220,7 +220,7 @@ func UpdateAVLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.Req
 	return HandleConfigTemplate(appVer, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 		patch := client.MergeFrom(appVer.DeepCopy())
 		for _, tpl := range tpls {
-			appVer.Labels[GenerateUniqKeyWithConfig(ConfigurationTplLabelPrefixKey, tpl.Name)] = tpl.Name
+			appVer.Labels[GenerateUniqLabelKeyWithConfig(tpl.Name)] = tpl.Name
 		}
 		return true, cli.Patch(ctx.Ctx, appVer, patch)
 	})

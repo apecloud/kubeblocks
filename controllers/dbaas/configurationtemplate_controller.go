@@ -73,7 +73,7 @@ func (r *ConfigurationTemplateReconciler) Reconcile(ctx context.Context, req ctr
 				"cannot be deleted because of existing referencing ClusterDefinition or AppVersion.")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, configTpl,
-			dbaasconfig.GenerateUniqKeyWithConfig(dbaasconfig.ConfigurationTplLabelPrefixKey, configTpl.GetName()),
+			dbaasconfig.GenerateUniqLabelKeyWithConfig(configTpl.GetName()),
 			recordEvent, &dbaasv1alpha1.ClusterDefinitionList{},
 			&dbaasv1alpha1.AppVersionList{}); res != nil || err != nil {
 			return res, err

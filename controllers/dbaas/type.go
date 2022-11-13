@@ -67,4 +67,8 @@ type Component struct {
 	Probes               dbaasv1alpha1.ClusterDefinitionProbes  `json:"probes,omitempty"`
 	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 	Monitor              MonitorConfig                          `json:"monitor,omitempty"`
+
+	ConfigAutoReload    bool                              `json:"configAutoReload,omitempty"`
+	ConfigReloadType    string                            `json:"configReloadType,omitempty"`
+	ReloadConfiguration dbaasv1alpha1.ReloadConfiguration `json:"reloadConfiguration,omitempty"`
 }

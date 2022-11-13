@@ -18,9 +18,7 @@ package app
 
 import (
 	"context"
-	"regexp"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -48,17 +46,6 @@ func NewConfigReloadCommand(ctx context.Context, name string) *cobra.Command {
 	return cmd
 }
 
-func createCfgRegexFilter(regexString string) (cfgcore.NotifyEventFilter, error) {
-	regxPattern, err := regexp.Compile(regexString)
-	if err != nil {
-		return nil, cfgutil.WrapError(err, "failed to create regexp [%s]", regexString)
-	}
-
-	return func(event fsnotify.Event) (bool, error) {
-		return regxPattern.MatchString(event.Name), nil
-	}, nil
-}
-
 func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 	initLog(opt.LogLevel)
 
@@ -71,7 +58,7 @@ func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 
 	// set regex filter
 	if len(opt.FileRegex) > 0 {
-		filter, err := createCfgRegexFilter(opt.FileRegex)
+		filter, err := cfgcore.CreateCfgRegexFilter(opt.FileRegex)
 		if err != nil {
 			return err
 		}
@@ -110,4 +97,16 @@ func initLog(level string) {
 	}
 
 	logrus.SetLevel(logLevel)
+}
+
+func createHandlerWithWatchType(opt *VolumeWatcherOpts) cfgcore.WatchEventHandler {
+	switch opt.NotifyHandType {
+	case UnixSignal:
+		return cfgcore.CreateSignalHandler(opt.Signal, opt.ProcessName)
+	case Sql, ShellTool, WebHook:
+		logrus.Fatalf("event type[%s]: not yet, but in the future", opt.NotifyHandType.String())
+	default:
+		logrus.Fatal("not support event type.")
+	}
+	return nil
 }

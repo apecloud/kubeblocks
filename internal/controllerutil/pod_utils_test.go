@@ -206,24 +206,24 @@ var _ = Describe("tpl template", func() {
 	// for test GetVolumeMountName
 	Context("GetPodContainerWithVolumeMount test", func() {
 		It("Should success with no error", func() {
-			mountedContainers := GetPodContainerWithVolumeMount(pod, "config1")
+			mountedContainers := GetPodContainerWithVolumeMount(&pod.Spec, "config1")
 			Expect(len(mountedContainers)).To(Equal(2))
 			Expect(mountedContainers[0].Name).To(Equal("mysql"))
 			Expect(mountedContainers[1].Name).To(Equal("mysql2"))
 
 			//
-			mountedContainers = GetPodContainerWithVolumeMount(pod, "config2")
+			mountedContainers = GetPodContainerWithVolumeMount(&pod.Spec, "config2")
 			Expect(len(mountedContainers)).To(Equal(2))
 			Expect(mountedContainers[0].Name).To(Equal("mysql"))
 			Expect(mountedContainers[1].Name).To(Equal("mysql3"))
 		})
 		It("Should failed", func() {
-			Expect(len(GetPodContainerWithVolumeMount(pod, "not_exist_cm"))).To(Equal(0))
+			Expect(len(GetPodContainerWithVolumeMount(&pod.Spec, "not_exist_cm"))).To(Equal(0))
 
 			emptyPod := corev1.Pod{}
 			emptyPod.ObjectMeta.Name = "empty_test"
 			emptyPod.ObjectMeta.Namespace = "empty_test_ns"
-			Expect(GetPodContainerWithVolumeMount(&emptyPod, "not_exist_cm")).To(BeNil())
+			Expect(GetPodContainerWithVolumeMount(&emptyPod.Spec, "not_exist_cm")).To(BeNil())
 
 		})
 	})

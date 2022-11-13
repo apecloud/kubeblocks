@@ -164,6 +164,13 @@ const (
 	AutoReload    UpgradePolicy = "autoReload"
 )
 
+const (
+	UnixSignal string = "signal"
+	SqlReload  string = "sql"
+	ExecReload string = "exec"
+	HttpReload string = "http"
+)
+
 func RegisterWebhookManager(mgr manager.Manager) {
 	webhookMgr = &webhookManager{mgr.GetClient()}
 }

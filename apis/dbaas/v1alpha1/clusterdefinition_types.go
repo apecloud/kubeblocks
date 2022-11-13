@@ -137,6 +137,20 @@ type LogConfig struct {
 	FilePathPattern string `json:"filePathPattern"`
 }
 
+type ReloadConfiguration struct {
+	// Signal is valid for unix signal
+	// eg: SIGHUP
+	// url: ../../internal/configuration/configmap/handler.go:allUnixSignals
+	// +optional
+	Signal string `json:"signal,omitempty"`
+
+	// ProcessName is process name, send unix signal to proc
+	// +optional
+	ProcessName string `json:"processName,omitempty"`
+
+	// TODO support reload way
+}
+
 // ClusterDefinitionComponent is a group of pods, pods in one component usually share the same data
 type ClusterDefinitionComponent struct {
 	// Type name of the component, it can be any valid string.
@@ -201,6 +215,15 @@ type ClusterDefinitionComponent struct {
 	// if true, the controller does not need to update.
 	// +kubebuilder:default=false
 	ConfigAutoReload bool `json:"configAutoReload,omitempty"`
+
+	// ConfigReloadType decided to restart the way
+	// +kubebuilder:validation:Enum={signal,http,sql,exec}
+	// +optional
+	ConfigReloadType string `json:"configReloadType,omitempty"`
+
+	// ReloadConfiguration describe the configuration for reload type
+	// +optional
+	ReloadConfiguration ReloadConfiguration `json:"reloadConfiguration,omitempty"`
 
 	// SupportRawUpgrade indicates whether the engine supports memory updates parameter.
 	// Sidecar not support sql query set parameter if false

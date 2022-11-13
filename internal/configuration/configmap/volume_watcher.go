@@ -18,7 +18,6 @@ package configmap
 
 import (
 	"context"
-	"path/filepath"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -50,24 +49,15 @@ type ConfigMapVolumeWatcher struct {
 }
 
 func NewVolumeWatcher(volume []string, ctx context.Context) *ConfigMapVolumeWatcher {
-	return (&ConfigMapVolumeWatcher{
+	watcher := &ConfigMapVolumeWatcher{
 		volumeDirectory: volume,
 		ctx:             ctx,
 		retryCount:      DefaultRetryCount,
 		filters:         make([]NotifyEventFilter, 0),
-	}).AddFilter(isValidWatcherEvent)
-}
-
-// doFilter process configmap volume
-// https://github.com/ossrs/srs/issues/1635
-func isValidWatcherEvent(event fsnotify.Event) (bool, error) {
-	if event.Op&fsnotify.Create != fsnotify.Create {
-		return false, nil
 	}
-	if filepath.Base(event.Name) != "..data" {
-		return false, nil
-	}
-	return true, nil
+	// default add cm volume filter
+	watcher.AddFilter(CreateValidConfigMapFilter())
+	return watcher
 }
 
 func (w *ConfigMapVolumeWatcher) AddHandler(handler WatchEventHandler) *ConfigMapVolumeWatcher {

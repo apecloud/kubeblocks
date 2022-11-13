@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package app
+package configmap
 
 import (
 	"os"
@@ -26,11 +26,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/configmap"
 )
 
 var allUnixSignals = map[string]os.Signal{
-	"SIGHUP":  syscall.SIGHUP,  // reload signal
+	"SIGHUP":  syscall.SIGHUP,  // reload signal for mysql 8.x.xxx
 	"SIGTERM": syscall.SIGTERM, // shutdown signal
 	"SIGINT":  syscall.SIGINT,
 	"SIGKILL": syscall.SIGKILL,
@@ -38,18 +37,6 @@ var allUnixSignals = map[string]os.Signal{
 	"SIGQUIT": syscall.SIGQUIT,
 	"SIGUSR1": syscall.SIGUSR1,
 	"SIGUSR2": syscall.SIGUSR2,
-}
-
-func createHandlerWithWatchType(opt *VolumeWatcherOpts) cfgcore.WatchEventHandler {
-	switch opt.NotifyHandType {
-	case UnixSignal:
-		return createSignalHandler(opt)
-	case Sql, ShellTool, WebHook:
-		logrus.Fatalf("event type[%s]: not yet, but in the future", opt.NotifyHandType.String())
-	default:
-		logrus.Fatal("not support event type.")
-	}
-	return nil
 }
 
 // findParentPidFromProcessName get parent pid
@@ -84,16 +71,21 @@ func findParentPidFromProcessName(processName string) (PID, error) {
 	return INVALID_PID, cfgutil.MakeError("not find pid fo process name: [%s]", processName)
 }
 
-func createSignalHandler(opt *VolumeWatcherOpts) cfgcore.WatchEventHandler {
-	signal, ok := allUnixSignals[strings.ToUpper(opt.Signal)]
+func CreateSignalHandler(sig string, processName string) WatchEventHandler {
+	signal, ok := allUnixSignals[strings.ToUpper(sig)]
 	if !ok {
 		logrus.Fatalf("not support unix signal: %s", signal)
 	}
 	return func(event fsnotify.Event) error {
-		pid, err := findParentPidFromProcessName(opt.ProcessName)
+		pid, err := findParentPidFromProcessName(processName)
 		if err != nil {
 			return err
 		}
 		return sendSignal(pid, signal)
 	}
+}
+
+func IsValidUnixSignal(sig string) bool {
+	_, ok := allUnixSignals[strings.ToUpper(sig)]
+	return ok
 }

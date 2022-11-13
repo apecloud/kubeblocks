@@ -58,8 +58,8 @@ func GetContainerUsingConfig(podSpec *corev1.PodSpec, configs []dbaasv1alpha1.Co
 // Case: When the configmap update, we restart all containers who using configmap
 //
 // Return: all containers mount volumeName
-func GetPodContainerWithVolumeMount(pod *corev1.Pod, volumeName string) []*corev1.Container {
-	containers := pod.Spec.Containers
+func GetPodContainerWithVolumeMount(podSpec *corev1.PodSpec, volumeName string) []*corev1.Container {
+	containers := podSpec.Containers
 	if len(containers) == 0 {
 		return nil
 	}
@@ -127,6 +127,16 @@ func getContainerWithVolumeMount(containers []corev1.Container, volumeName strin
 		}
 	}
 	return mountContainers
+}
+
+func GetVolumeMountByVolume(container *corev1.Container, volumeName string) *corev1.VolumeMount {
+	for _, volume := range container.VolumeMounts {
+		if volume.Name == volumeName {
+			return &volume
+		}
+	}
+
+	return nil
 }
 
 // GetCoreNum function description:

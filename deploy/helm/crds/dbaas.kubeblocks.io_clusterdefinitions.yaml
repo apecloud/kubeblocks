@@ -83,6 +83,14 @@ spec:
                         supports reload, if true, if true, the controller does not
                         need to update.
                       type: boolean
+                    configReloadType:
+                      description: ConfigReloadType decided to restart the way
+                      enum:
+                      - signal
+                      - http
+                      - sql
+                      - exec
+                      type: string
                     configTemplateRefs:
                       description: The configTemplateRefs field provided by provider,
                         and finally this configTemplateRefs will be rendered into
@@ -7807,6 +7815,19 @@ spec:
                         default, 6 versions are reserved
                       minimum: 0
                       type: integer
+                    reloadConfiguration:
+                      description: ReloadConfiguration describe the configuration
+                        for reload type
+                      properties:
+                        processName:
+                          description: ProcessName is process name, send unix signal
+                            to proc
+                          type: string
+                        signal:
+                          description: 'Signal is valid for unix signal eg: SIGHUP
+                            url: ../../internal/configuration/configmap/handler.go:allUnixSignals'
+                          type: string
+                      type: object
                     service:
                       description: service defines the behavior of a service spec.
                         provide read-write service when ComponentType is Consensus.

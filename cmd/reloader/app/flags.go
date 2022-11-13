@@ -20,6 +20,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
@@ -27,16 +28,16 @@ type NotifyEventType int
 
 const (
 	UnixSignal NotifyEventType = iota // "signal"
-	WebHook                           //  "webhook"
-	ShellTool                         //  "exec"
-	Sql                               //  "sql"
+	WebHook                           // "http"
+	ShellTool                         // "exec"
+	Sql                               // "sql"
 )
 
 var allNotifyType = map[NotifyEventType]string{
-	UnixSignal: "signal",
-	WebHook:    "webhook",
-	ShellTool:  "exec",
-	Sql:        "sql",
+	UnixSignal: dbaasv1alpha1.UnixSignal,
+	WebHook:    dbaasv1alpha1.HttpReload,
+	ShellTool:  dbaasv1alpha1.ExecReload,
+	Sql:        dbaasv1alpha1.SqlReload,
 }
 
 func (f *NotifyEventType) Type() string {

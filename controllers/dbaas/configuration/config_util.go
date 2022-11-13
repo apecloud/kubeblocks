@@ -50,12 +50,8 @@ const (
 	CMInsConfigurationLabelKey = "app.kubernetes.io/ins-configure"
 )
 
-type ValidateConfigMap func(configTpl string) (*corev1.ConfigMap, error)
+type ValidateConfigMap func(configTpl, ns string) (*corev1.ConfigMap, error)
 type ValidateConfigSchema func(tpl *dbaasv1alpha1.CustomParametersValidation) (bool, error)
-
-func init() {
-	viper.SetDefault(ConfigNamespaceKey, "default")
-}
 
 func CheckConfigurationLabels(object client.Object, requiredLabs []string) bool {
 	labels := object.GetLabels()
@@ -76,13 +72,13 @@ func CheckConfigurationLabels(object client.Object, requiredLabs []string) bool 
 	return CheckEnableCfgUpgrade(object)
 }
 
-func GetConfigMapByName(cli client.Client, ctx intctrlutil.RequestCtx, cmName string) (*corev1.ConfigMap, error) {
+func GetConfigMapByName(cli client.Client, ctx intctrlutil.RequestCtx, cmName, ns string) (*corev1.ConfigMap, error) {
 	if len(cmName) == 0 {
 		return nil, fmt.Errorf("required configmap reference name is empty! [%v]", cmName)
 	}
 
 	configKey := client.ObjectKey{
-		Namespace: viper.GetString(ConfigNamespaceKey),
+		Namespace: ns,
 		Name:      cmName,
 	}
 	configObj := &corev1.ConfigMap{}
@@ -96,8 +92,8 @@ func GetConfigMapByName(cli client.Client, ctx intctrlutil.RequestCtx, cmName st
 
 func CheckConfigurationTemplate(cli client.Client, ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplate) (bool, error) {
 	// check ConfigTemplate Validate
-	configmapFn := func(configTpl string) (*corev1.ConfigMap, error) {
-		return GetConfigMapByName(cli, ctx, configTpl)
+	configmapFn := func(configTpl, ns string) (*corev1.ConfigMap, error) {
+		return GetConfigMapByName(cli, ctx, configTpl, ns)
 	}
 
 	// validate configuration template
@@ -118,7 +114,7 @@ func UpdateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl
 	// step2: add labels: CMConfigurationTplLabelKey
 	// step3: update immutable
 
-	cmObj, err := GetConfigMapByName(cli, ctx, tpl.Spec.TplRef)
+	cmObj, err := GetConfigMapByName(cli, ctx, tpl.Spec.TplRef, tpl.Namespace)
 	if err != nil {
 		ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", cmObj.Name)
 	}
@@ -139,7 +135,7 @@ func UpdateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl
 
 func checkConfigTpl(ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplate, confTplFn ValidateConfigMap, schemaFn ValidateConfigSchema) (bool, error) {
 	// check cm isExist
-	cmObj, err := confTplFn(tpl.Spec.TplRef)
+	cmObj, err := confTplFn(tpl.Spec.TplRef, tpl.Namespace)
 	if err != nil {
 		ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", cmObj.Name)
 		return false, err
@@ -204,7 +200,7 @@ func UpdateCDLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.Req
 	return HandleConfigTemplate(cd, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 		patch := client.MergeFrom(cd.DeepCopy())
 		for _, tpl := range tpls {
-			cd.Labels[GenerateUniqKeyWithConfig(ConfigurationTplLabelPrefixKey, tpl.Name)] = tpl.Name
+			cd.Labels[GenerateUniqLabelKeyWithConfig(tpl.Name)] = tpl.Name
 		}
 		return true, cli.Patch(ctx.Ctx, cd, patch)
 	})
@@ -220,7 +216,7 @@ func UpdateAVLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.Req
 	return HandleConfigTemplate(appVer, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 		patch := client.MergeFrom(appVer.DeepCopy())
 		for _, tpl := range tpls {
-			appVer.Labels[GenerateUniqKeyWithConfig(ConfigurationTplLabelPrefixKey, tpl.Name)] = tpl.Name
+			appVer.Labels[GenerateUniqLabelKeyWithConfig(tpl.Name)] = tpl.Name
 		}
 		return true, cli.Patch(ctx.Ctx, appVer, patch)
 	})

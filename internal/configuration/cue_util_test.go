@@ -89,7 +89,6 @@ configuration: #MysqlParameter & {
 
 	require.Nil(t, CueValidate(mysqlCfgTpl))
 
-	a, err := ValidateConfigurationWithCue(mysqlCfgTpl, dbaasv1alpha1.INI, mysqlCfg)
+	err := ValidateConfigurationWithCue(mysqlCfgTpl, dbaasv1alpha1.INI, mysqlCfg)
 	require.Nil(t, err)
-	require.True(t, a)
 }

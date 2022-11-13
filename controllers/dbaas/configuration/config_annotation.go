@@ -164,6 +164,10 @@ func RestartStsWithRolling(cli client.Client, ctx intctrlutil.RequestCtx, sts ap
 	return nil
 }
 
+func GenerateUniqLabelKeyWithConfig(configKey string) string {
+	return GenerateUniqKeyWithConfig(ConfigurationTplLabelPrefixKey, configKey)
+}
+
 func GenerateUniqKeyWithConfig(label string, configKey string) string {
 	return fmt.Sprintf("%s-%s", label, strings.ReplaceAll(configKey, "_", "-"))
 }

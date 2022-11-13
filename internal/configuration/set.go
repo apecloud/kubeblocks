@@ -16,8 +16,6 @@ limitations under the License.
 
 package configuration
 
-import "github.com/spf13/viper"
-
 // Set type Reference c++ set interface to implemented stl set.
 // With generics, it may be more generic.
 type Set map[string]struct{}
@@ -45,7 +43,7 @@ func NewSetFromList(v []string) *Set {
 	return s
 }
 
-func NewSetFromMap(v map[string]*viper.Viper) *Set {
+func NewSetFromMap[T interface{}](v map[string]T) *Set {
 	s := NewSet()
 
 	for key := range v {
@@ -57,6 +55,12 @@ func NewSetFromMap(v map[string]*viper.Viper) *Set {
 
 func Difference(left, right *Set) *Set {
 	return left.Difference(right)
+}
+
+func MapKeyDifference(left, right map[string]string) *Set {
+	lSet := NewSetFromMap(left)
+	rSet := NewSetFromMap(right)
+	return Difference(lSet, rSet)
 }
 
 func Union(left, right *Set) *Set {
@@ -74,6 +78,17 @@ func (s *Set) Difference(other *Set) *Set {
 	}
 
 	return diff
+}
+
+type ApplyFunc func(key string)
+
+func (s *Set) ForEach(fn ApplyFunc) {
+	if s.Size() == 0 {
+		return
+	}
+	for key := range *s {
+		fn(key)
+	}
 }
 
 func (s *Set) Contains(v string) bool {

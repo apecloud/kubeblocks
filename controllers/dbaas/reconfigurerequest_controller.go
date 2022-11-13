@@ -32,10 +32,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
 	dbaasconfig "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	cfgpolicy "github.com/apecloud/kubeblocks/controllers/dbaas/configuration/policy"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+)
+
+const (
+	appInstanceLabelKey  = "app.kubernetes.io/instance"
+	appComponentLabelKey = "app.kubernetes.io/component-name"
+	appNameLabelKey      = "app.kubernetes.io/name"
 )
 
 // ReconfigureRequestReconciler reconciles a ReconfigureRequest object
@@ -160,13 +167,16 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 			Namespace: config.GetNamespace(),
 			Name:      config.Labels[appInstanceLabelKey],
 		}
+
+		configTplName     = config.Labels[dbaasconfig.CMConfigurationTplNameLabelKey]
+		configTplLabelKey = dbaasconfig.GenerateUniqLabelKeyWithConfig(configTplName)
 	)
 
 	componentLabels := map[string]string{
-		appNameLabelKey:                        config.Labels[appNameLabelKey],
-		appInstanceLabelKey:                    config.Labels[appInstanceLabelKey],
-		appComponentLabelKey:                   config.Labels[appComponentLabelKey],
-		dbaasconfig.CMInsConfigurationLabelKey: config.Labels[dbaasconfig.CMInsConfigurationLabelKey],
+		appNameLabelKey:      config.Labels[appNameLabelKey],
+		appInstanceLabelKey:  config.Labels[appInstanceLabelKey],
+		appComponentLabelKey: config.Labels[appComponentLabelKey],
+		configTplLabelKey:    config.Labels[dbaasconfig.CMConfigurationTplNameLabelKey],
 	}
 
 	versionMeta, err := dbaasconfig.GetConfigurationVersion(config, reqCtx, &tpl.Spec)
@@ -199,7 +209,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	}
 
 	// Find ClusterDefinition Component  from ClusterDefinition CR
-	component, err := getComponent(reqCtx.Ctx, r.Client, &cluster, clusterComponent.Type)
+	component, err := component.GetComponentFromClusterDefinition(reqCtx.Ctx, r.Client, &cluster, clusterComponent.Type)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config,
 			r.Recorder,
@@ -233,7 +243,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		Ctx:              reqCtx,
 		Cluster:          &cluster,
 		ComponentUnits:   sts,
-		Component:        &component,
+		Component:        component,
 		ClusterComponent: clusterComponent,
 	})
 }

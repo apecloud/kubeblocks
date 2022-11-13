@@ -297,7 +297,7 @@ spec:
 			clusterDefinition.Spec.Components[0].ConfigTemplateRefs = []dbaasv1alpha1.ConfigTemplate{
 				{
 					Name:       cmName,
-					Namespace: testCtx.DefaultNamespace,
+					Namespace:  testCtx.DefaultNamespace,
 					VolumeName: "",
 				},
 			}

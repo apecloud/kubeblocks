@@ -227,7 +227,7 @@ var _ = Describe("ServiceController", Ordered, func() {
 			mockOldNode.EXPECT().SetupNetworkForService(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 			svc, key := newSvcObj(true, oldNodeIP)
-			Expect(k8sClient.Create(context.Background(), svc)).Should(Succeed())
+			Expect(testCtx.CreateObj(context.Background(), svc)).Should(Succeed())
 
 			Eventually(func() bool {
 				if err := k8sClient.Get(context.Background(), key, svc); err != nil {
@@ -280,7 +280,7 @@ var _ = Describe("ServiceController", Ordered, func() {
 
 			svc, key := newSvcObj(true, "")
 			svc.GetAnnotations()[AnnotationKeyTrafficPolicy] = AnnotationValueClusterTrafficPolicy
-			Expect(k8sClient.Create(context.Background(), svc)).Should(Succeed())
+			Expect(testCtx.CreateObj(context.Background(), svc)).Should(Succeed())
 
 			Eventually(func() bool {
 				if err := k8sClient.Get(context.Background(), key, svc); err != nil {
@@ -320,9 +320,9 @@ var _ = Describe("ServiceController", Ordered, func() {
 
 			svc, svcKey := newSvcObj(true, "")
 			svc.GetAnnotations()[AnnotationKeyTrafficPolicy] = AnnotationValueBestEffortLocalTrafficPolicy
-			Expect(k8sClient.Create(context.Background(), svc)).Should(Succeed())
+			Expect(testCtx.CreateObj(context.Background(), svc)).Should(Succeed())
 			pod, podKey := newPodObj(svc.GetName())
-			Expect(k8sClient.Create(context.Background(), pod)).Should(Succeed())
+			Expect(testCtx.CreateObj(context.Background(), pod)).Should(Succeed())
 
 			patch := client.MergeFrom(pod.DeepCopy())
 			pod.Status.HostIP = node1IP

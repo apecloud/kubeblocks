@@ -27,7 +27,7 @@ import (
 )
 
 func main() {
-	rootPath := "./docs/cli"
+	rootPath := "./docs/cli_docs"
 	if len(os.Args) > 1 {
 		rootPath = os.Args[1]
 	}

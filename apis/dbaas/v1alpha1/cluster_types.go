@@ -80,7 +80,7 @@ type ClusterStatus struct {
 
 	// Operations declares which operations the cluster supports.
 	// +optional
-	Operations *Operations `json:"operations"`
+	Operations *Operations `json:"operations,omitempty"`
 
 	ClusterDefinitionStatusGeneration `json:",inline"`
 }
@@ -145,10 +145,11 @@ type ClusterStatusComponent struct {
 	// +optional
 	Type string `json:"type,omitempty"`
 
-	// Failed Phase: component not available, i.e, all pod is not ready for Stateless/Stateful component;
+	// Phase describe the phase of the cluster. the detail information of phase is as follows:
+	// Failed: component not available, i.e, all pod is not ready for Stateless/Stateful component;
 	// Leader/Primary pod is not ready for Consensus/Replication component.
-	// Abnormal Phase: component available but some pod is not ready.
-	// if the component type is Consensus/Replication, the Leader/Primary pod is must ready in Abnormal phase.
+	// Abnormal: component available but some pod is not ready.
+	// If the component type is Consensus/Replication, the Leader/Primary pod is must ready in Abnormal phase.
 	// Other phases behave the same as the cluster phase.
 	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted}
 	Phase Phase `json:"phase,omitempty"`
@@ -216,7 +217,7 @@ type Affinity struct {
 	// +optional
 	TopologyKeys []string `json:"topologyKeys,omitempty"`
 
-	// NodeLabels describe constrain which nodes pod can be scheduled on based on node labels
+	// NodeLabels describe constrain which nodes pod can be scheduled on based on node labels.
 	// +optional
 	NodeLabels map[string]string `json:"nodeLabels,omitempty"`
 }

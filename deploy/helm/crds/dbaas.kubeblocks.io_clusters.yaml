@@ -57,7 +57,7 @@ spec:
                     additionalProperties:
                       type: string
                     description: NodeLabels describe constrain which nodes pod can
-                      be scheduled on based on node labels
+                      be scheduled on based on node labels.
                     type: object
                   podAntiAffinity:
                     description: PodAntiAffinity defines pods of component anti-affnity.
@@ -94,7 +94,7 @@ spec:
                           additionalProperties:
                             type: string
                           description: NodeLabels describe constrain which nodes pod
-                            can be scheduled on based on node labels
+                            can be scheduled on based on node labels.
                           type: object
                         podAntiAffinity:
                           description: PodAntiAffinity defines pods of component anti-affnity.
@@ -494,13 +494,14 @@ spec:
                         current phase.
                       type: string
                     phase:
-                      description: 'Failed Phase: component not available, i.e, all
-                        pod is not ready for Stateless/Stateful component; Leader/Primary
-                        pod is not ready for Consensus/Replication component. Abnormal
-                        Phase: component available but some pod is not ready. if the
-                        component type is Consensus/Replication, the Leader/Primary
-                        pod is must ready in Abnormal phase. Other phases behave the
-                        same as the cluster phase.'
+                      description: 'Phase describe the phase of the cluster. the detail
+                        information of phase is as follows: Failed: component not
+                        available, i.e, all pod is not ready for Stateless/Stateful
+                        component; Leader/Primary pod is not ready for Consensus/Replication
+                        component. Abnormal: component available but some pod is not
+                        ready. If the component type is Consensus/Replication, the
+                        Leader/Primary pod is must ready in Abnormal phase. Other
+                        phases behave the same as the cluster phase.'
                       enum:
                       - Running
                       - Failed

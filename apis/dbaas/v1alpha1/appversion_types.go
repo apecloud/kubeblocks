@@ -23,11 +23,11 @@ import (
 
 // AppVersionSpec defines the desired state of AppVersion
 type AppVersionSpec struct {
-	// ref ClusterDefinition
+	// ref ClusterDefinition.
 	// +kubebuilder:validation:Required
 	ClusterDefinitionRef string `json:"clusterDefinitionRef,omitempty"`
 
-	// List of components in current AppVersion. Component will replace the field in ClusterDefinition's component if type is matching typeName
+	// List of components in current AppVersion. Component will replace the field in ClusterDefinition's component if type is matching typeName.
 	// +kubebuilder:validation:MinItems=1
 	Components []AppVersionComponent `json:"components,omitempty"`
 }
@@ -38,8 +38,7 @@ type AppVersionStatus struct {
 	// +kubebuilder:validation:Enum={Available,Unavailable}
 	Phase Phase `json:"phase,omitempty"`
 
-	// A human readable message indicating details about why the appVersion is in this
-	// phase.
+	// A human readable message indicating details about why the appVersion is in this phase.
 	// +optional
 	Message string `json:"message,omitempty"`
 
@@ -83,11 +82,11 @@ type AppVersionComponent struct {
 
 	// ConfigTemplateRefs defines a configuration extension mechanism to handle configuration differences between versions,
 	// the configTemplateRefs field, together with configTemplateRefs in the ClusterDefinition,
-	// determines the final configuration file
+	// determines the final configuration file.
 	// +optional
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
 
-	// PodSpec is pod spec, if not nil, will replace ClusterDefinitionSpec.PodSpec in ClusterDefinition
+	// PodSpec is pod spec, if not nil, will replace ClusterDefinitionSpec.PodSpec in ClusterDefinition.
 	// +optional
 	PodSpec *corev1.PodSpec `json:"podSpec,omitempty"`
 

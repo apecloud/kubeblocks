@@ -685,7 +685,7 @@ func getSupportHorizontalScalingComponents(cluster *dbaasv1alpha1.Cluster,
 		clusterComponentNames = append(clusterComponentNames, v.Name)
 		for _, component := range clusterDef.Spec.Components {
 			if v.Type != component.TypeName || (component.MinReplicas != 0 &&
-				component.MaxReplicas == component.MaxReplicas) {
+				component.MaxReplicas == component.MinReplicas) {
 				continue
 			}
 			horizontalScalableComponents = append(horizontalScalableComponents, &dbaasv1alpha1.OperationComponent{

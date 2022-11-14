@@ -24,6 +24,7 @@ import (
 	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/prompt"
 )
@@ -41,7 +42,7 @@ func Build(c *builder.Command) *cobra.Command {
 			cmdutil.CheckErr(validate(args, c.IOStreams.In))
 
 			// build resource to delete
-			args = append([]string{c.GroupKind.String()}, args...)
+			args = append([]string{util.GVRToString(c.GVR)}, args...)
 
 			// call kubectl delete options methods
 			cmdutil.CheckErr(o.Complete(c.Factory, args, cmd))

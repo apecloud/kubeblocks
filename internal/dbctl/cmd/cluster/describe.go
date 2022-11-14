@@ -18,7 +18,6 @@ package cluster
 
 import (
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
@@ -29,6 +28,6 @@ import (
 func NewDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := describe.NewOptions(f, streams,
 		"Describe database cluster info",
-		schema.GroupKind{Group: types.Group, Kind: types.KindCluster})
+		types.ClusterGVR())
 	return o.Build()
 }

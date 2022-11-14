@@ -202,7 +202,12 @@ func (d *ClusterDescriber) describeTopology(w describe.PrefixWriter) error {
 		// describe instance name
 		pods := d.getPodsOfComponent(c.Name)
 		for _, pod := range pods {
-			w.Write(LEVEL_3, "%s@%s\n", pod.Name, pod.Labels[types.ConsensusSetRoleLabelKey])
+			instance := pod.Name
+			role, ok := pod.Labels[types.ConsensusSetRoleLabelKey]
+			if ok && len(role) > 0 {
+				instance = fmt.Sprintf("%s@%s\n", instance, role)
+			}
+			w.Write(LEVEL_3, "%s\n", instance)
 		}
 	}
 	return nil
@@ -291,7 +296,12 @@ func (d *ClusterDescriber) describeInstance(pod *corev1.Pod, w describe.PrefixWr
 	w.Write(LEVEL_1, "\n")
 	w.Write(LEVEL_1, "Instance:\t\n")
 	w.Write(LEVEL_2, "%s:\n", pod.Name)
-	w.Write(LEVEL_3, "Role:\t%s\n", pod.Labels[types.ConsensusSetRoleLabelKey])
+
+	role := pod.Labels[types.ConsensusSetRoleLabelKey]
+	if len(role) == 0 {
+		role = valueNone
+	}
+	w.Write(LEVEL_3, "Role:\t%s\n", role)
 
 	// status and reason
 	if pod.DeletionTimestamp != nil {
@@ -304,7 +314,11 @@ func (d *ClusterDescriber) describeInstance(pod *corev1.Pod, w describe.PrefixWr
 		w.Write(LEVEL_3, "Reason:\t%s\n", pod.Status.Reason)
 	}
 
-	w.Write(LEVEL_3, "AccessMode:\t%s\n", pod.Labels[types.ConsensusSetAccessModeLabelKey])
+	accessMode := pod.Labels[types.ConsensusSetAccessModeLabelKey]
+	if len(accessMode) == 0 {
+		accessMode = valueNone
+	}
+	w.Write(LEVEL_3, "AccessMode:\t%s\n", accessMode)
 
 	// node information include its region and AZ
 	if pod.Spec.NodeName == "" {

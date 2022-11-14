@@ -51,7 +51,7 @@ jobs:
           echo 'STATUS_FIELD_ID='$(jq '.data.organization.projectV2.fields.nodes[] | select(.name== "Status") | .id' project_data.json) >> $GITHUB_ENV
           echo 'TODO_OPTION_ID='$(jq '.data.organization.projectV2.fields.nodes[] | select(.name== "Status") | .options[] | select(.name=="Todo") |.id' project_data.json) >> $GITHUB_ENV
 
-     - name: Get item id
+     - name: Add Issue to Project
        env:
          ISSUE_ID: ${{ github.event.issue.node_id }}
        run: |

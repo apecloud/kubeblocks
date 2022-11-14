@@ -85,10 +85,6 @@ func newStatefulSet(name string, replicas int) *apps.StatefulSet {
 	template.Labels = map[string]string{"foo": "bar"}
 
 	return &apps.StatefulSet{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "StatefulSet",
-			APIVersion: "apps/v1",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: v1.NamespaceDefault,

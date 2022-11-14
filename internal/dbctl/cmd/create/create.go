@@ -22,14 +22,13 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/errors"
-
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/cuecontext"
 	cuejson "cuelang.org/go/encoding/json"
 	"github.com/leaanthony/debme"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -81,6 +80,9 @@ type Inputs struct {
 	Complete func() error
 
 	BuildFlags func(*cobra.Command)
+
+	// PreCreate optional, make changes on yaml before create
+	PreCreate func(*unstructured.Unstructured) error
 }
 
 // BaseOptions the options of creation command should inherit baseOptions
@@ -171,6 +173,11 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 		return err
 	}
 
+	if inputs.PreCreate != nil {
+		if err = inputs.PreCreate(unstructuredObj); err != nil {
+			return err
+		}
+	}
 	group := inputs.Group
 	if len(group) == 0 {
 		group = types.Group

@@ -343,8 +343,8 @@ func mergeComponents(
 		ClusterType:     clusterDef.Spec.Type,
 		Name:            clusterDefComp.TypeName,
 		Type:            clusterDefComp.TypeName,
-		MinAvailable:    clusterDefComp.MinAvailable,
-		MaxAvailable:    clusterDefComp.MaxAvailable,
+		MinReplicas:     clusterDefComp.MinReplicas,
+		MaxReplicas:     clusterDefComp.MaxReplicas,
 		DefaultReplicas: clusterDefComp.DefaultReplicas,
 		Replicas:        clusterDefComp.DefaultReplicas,
 		AntiAffinity:    clusterDefComp.AntiAffinity,
@@ -352,8 +352,8 @@ func mergeComponents(
 		ConsensusSpec:   clusterDefComp.ConsensusSpec,
 		PodSpec:         clusterDefComp.PodSpec,
 		Service:         clusterDefComp.Service,
-		Scripts:         clusterDefComp.Scripts,
 		Probes:          clusterDefComp.Probes,
+		LogConfigs:      clusterDefComp.LogConfigs,
 	}
 
 	if appVerComp != nil && appVerComp.PodSpec != nil {
@@ -422,6 +422,7 @@ func mergeComponents(
 	affinity := cluster.Spec.Affinity
 	if clusterComp != nil {
 		component.Name = clusterComp.Name
+		component.EnabledLogs = clusterComp.EnabledLogs
 
 		// respect user's declaration
 		if clusterComp.Replicas > 0 {
@@ -546,6 +547,24 @@ func prepareSecretObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj int
 	return nil
 }
 
+func existsPDBSpec(pdbSpec *policyv1.PodDisruptionBudgetSpec) bool {
+	if pdbSpec == nil {
+		return false
+	}
+	if pdbSpec.MinAvailable == nil && pdbSpec.MaxUnavailable == nil {
+		return false
+	}
+	return true
+}
+
+// needBuildPDB check whether the PodDisruptionBudget needs to be built
+func needBuildPDB(params *createParams) bool {
+	if params.component.ComponentType == dbaasv1alpha1.Consensus {
+		return false
+	}
+	return existsPDBSpec(params.component.PodDisruptionBudgetSpec)
+}
+
 // TODO: @free6om handle config of all component types
 func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) error {
 	params, ok := obj.(*createParams)
@@ -606,11 +625,13 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		// end render config
 	}
 
-	pdb, err := buildPDB(*params)
-	if err != nil {
-		return err
+	if needBuildPDB(params) {
+		pdb, err := buildPDB(*params)
+		if err != nil {
+			return err
+		}
+		*params.applyObjs = append(*params.applyObjs, pdb)
 	}
-	*params.applyObjs = append(*params.applyObjs, pdb)
 
 	if params.component.Service.Ports != nil {
 		svc, err := buildSvc(*params)
@@ -945,6 +966,7 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 	sts.Spec.Template.Spec.Containers = append(sts.Spec.Template.Spec.Containers, probeContainers...)
 	prefix := dbaasPrefix + "_" + strings.ToUpper(params.component.Type) + "_"
 	replicas := int(*sts.Spec.Replicas)
+
 	for i := range sts.Spec.Template.Spec.Containers {
 		// inject self scope env
 		c := &sts.Spec.Template.Spec.Containers[i]

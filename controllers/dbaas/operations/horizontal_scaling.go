@@ -20,7 +20,7 @@ import dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 
 func init() {
 	horizontalScalingBehaviour := &OpsBehaviour{
-		FromClusterPhases:      []dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase},
+		FromClusterPhases:      []dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase},
 		ToClusterPhase:         dbaasv1alpha1.UpdatingPhase,
 		Action:                 HorizontalScalingAction,
 		ActionStartedCondition: dbaasv1alpha1.NewHorizontalScalingCondition,

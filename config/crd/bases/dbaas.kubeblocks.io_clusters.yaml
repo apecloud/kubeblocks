@@ -123,7 +123,9 @@ spec:
                       maxLength: 12
                       type: string
                     replicas:
-                      description: default value in ClusterDefinition.
+                      description: Component replicas, use default value in ClusterDefinition
+                        if not specified.
+                      format: int32
                       type: integer
                     resources:
                       description: Resources requests and limits of workload.
@@ -388,6 +390,7 @@ spec:
             required:
             - appVersionRef
             - clusterDefinitionRef
+            - terminationPolicy
             type: object
           status:
             description: ClusterStatus defines the observed state of Cluster
@@ -407,10 +410,10 @@ spec:
                   description: ClusterStatusComponent record components status information
                   properties:
                     consensusSetStatus:
-                      description: ConsensusSetStatus role and pod name mapping
+                      description: ConsensusSetStatus role and pod name mapping.
                       properties:
                         followers:
-                          description: Followers status
+                          description: Followers status.
                           items:
                             properties:
                               accessMode:
@@ -436,7 +439,7 @@ spec:
                             type: object
                           type: array
                         leader:
-                          description: Leader status
+                          description: Leader status.
                           properties:
                             accessMode:
                               default: ReadWrite
@@ -460,7 +463,7 @@ spec:
                           - pod
                           type: object
                         learner:
-                          description: Learner status
+                          description: Learner status.
                           properties:
                             accessMode:
                               default: ReadWrite
@@ -488,7 +491,7 @@ spec:
                       type: object
                     message:
                       description: Message record the component details message in
-                        current phase
+                        current phase.
                       type: string
                     phase:
                       description: 'Phase describe the phase of the cluster. the detail
@@ -496,7 +499,7 @@ spec:
                         available, i.e, all pod is not ready for Stateless/Stateful
                         component; Leader/Primary pod is not ready for Consensus/Replication
                         component. Abnormal: component available but some pod is not
-                        ready. if the component type is Consensus/Replication, the
+                        ready. If the component type is Consensus/Replication, the
                         Leader/Primary pod is must ready in Abnormal phase. Other
                         phases behave the same as the cluster phase.'
                       enum:
@@ -509,7 +512,7 @@ spec:
                       - Deleted
                       type: string
                     type:
-                      description: Type component type
+                      description: Type of component.
                       type: string
                   type: object
                 description: Components record the current status information of all
@@ -534,9 +537,11 @@ spec:
                       properties:
                         max:
                           description: Max maximum of replicas when operation is horizontalScaling.
+                          format: int32
                           type: integer
                         min:
                           description: Min minimum of replicas when operation is horizontalScaling.
+                          format: int32
                           type: integer
                         name:
                           description: Name reference component name.
@@ -547,6 +552,8 @@ spec:
                           items:
                             type: string
                           type: array
+                      required:
+                      - name
                       type: object
                     type: array
                   restartable:
@@ -572,9 +579,11 @@ spec:
                       properties:
                         max:
                           description: Max maximum of replicas when operation is horizontalScaling.
+                          format: int32
                           type: integer
                         min:
                           description: Min minimum of replicas when operation is horizontalScaling.
+                          format: int32
                           type: integer
                         name:
                           description: Name reference component name.
@@ -585,6 +594,8 @@ spec:
                           items:
                             type: string
                           type: array
+                      required:
+                      - name
                       type: object
                     type: array
                 type: object

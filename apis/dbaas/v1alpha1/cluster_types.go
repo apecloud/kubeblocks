@@ -21,26 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TerminationPolicyType define termination policy types.
-// +enum
-type TerminationPolicyType string
-
-const (
-	DoNotTerminate TerminationPolicyType = "DoNotTerminate"
-	Halt           TerminationPolicyType = "Halt"
-	Delete         TerminationPolicyType = "Delete"
-	WipeOut        TerminationPolicyType = "WipeOut"
-)
-
-// PodAntiAffinity define pod anti-affinity strategy.
-// +enum
-type PodAntiAffinity string
-
-const (
-	Preferred PodAntiAffinity = "Preferred"
-	Required  PodAntiAffinity = "Required"
-)
-
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
 	// ref ClusterDefinition, immutable.
@@ -51,14 +31,6 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:Required
 	AppVersionRef string `json:"appVersionRef"`
 
-	// List of components you want to replace in ClusterDefinition and AppVersion. It will replace the field in ClusterDefinition's and AppVersion's component if type is matching.
-	// +optional
-	Components []ClusterComponent `json:"components,omitempty"`
-
-	// Affinity describes affinities which specific by users.
-	// +optional
-	Affinity *Affinity `json:"affinity,omitempty"`
-
 	// One of DoNotTerminate, Halt, Delete, WipeOut.
 	// Defaults to Halt.
 	// DoNotTerminate means block delete operation.
@@ -67,7 +39,15 @@ type ClusterSpec struct {
 	// WipeOut is based on Delete and wipe out all snapshots and snapshot data from bucket.
 	// +kubebuilder:default=Halt
 	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
-	TerminationPolicy TerminationPolicyType `json:"terminationPolicy,omitempty"`
+	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
+
+	// List of components you want to replace in ClusterDefinition and AppVersion. It will replace the field in ClusterDefinition's and AppVersion's component if type is matching.
+	// +optional
+	Components []ClusterComponent `json:"components,omitempty"`
+
+	// Affinity describes affinities which specific by users.
+	// +optional
+	Affinity *Affinity `json:"affinity,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster
@@ -87,6 +67,7 @@ type ClusterStatus struct {
 	// Abnormal: cluster available but some component is not Abnormal.
 	// if the component type is Consensus/Replication, the Leader/Primary pod is must ready in Abnormal phase.
 	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted}
+	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
 	// Message cluster details message in current phase.
@@ -99,34 +80,9 @@ type ClusterStatus struct {
 
 	// Operations declares which operations the cluster supports.
 	// +optional
-	Operations Operations `json:"operations,omitempty"`
+	Operations *Operations `json:"operations,omitempty"`
 
 	ClusterDefinitionStatusGeneration `json:",inline"`
-}
-
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:resource:categories={dbaas,all}
-//+kubebuilder:printcolumn:name="APP-VERSION",type="string",JSONPath=".spec.appVersionRef",description="Cluster Application Version."
-//+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="Cluster Status."
-//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
-
-// Cluster is the Schema for the clusters API
-type Cluster struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   ClusterSpec   `json:"spec,omitempty"`
-	Status ClusterStatus `json:"status,omitempty"`
-}
-
-//+kubebuilder:object:root=true
-
-// ClusterList contains a list of Cluster
-type ClusterList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Cluster `json:"items"`
 }
 
 type ClusterComponent struct {
@@ -139,13 +95,6 @@ type ClusterComponent struct {
 	// +kubebuilder:validation:MaxLength=12
 	Type string `json:"type"`
 
-	// default value in ClusterDefinition.
-	Replicas int `json:"replicas,omitempty"`
-
-	// Affinity describes affinities which specific by users.
-	// +optional
-	Affinity *Affinity `json:"affinity,omitempty"`
-
 	// Monitor which is a switch to enable monitoring, default is false
 	// DBaas provides an extension mechanism to support component level monitoring,
 	// which will scrape metrics auto or manually from servers in component and export
@@ -153,6 +102,14 @@ type ClusterComponent struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=false
 	Monitor bool `json:"monitor"`
+
+	// Component replicas, use default value in ClusterDefinition if not specified.
+	// +optional
+	Replicas int32 `json:"replicas,omitempty"`
+
+	// Affinity describes affinities which specific by users.
+	// +optional
+	Affinity *Affinity `json:"affinity,omitempty"`
 
 	// Resources requests and limits of workload.
 	// +optional
@@ -184,7 +141,7 @@ type ClusterComponent struct {
 
 // ClusterStatusComponent record components status information
 type ClusterStatusComponent struct {
-	// Type component type
+	// Type of component.
 	// +optional
 	Type string `json:"type,omitempty"`
 
@@ -192,30 +149,30 @@ type ClusterStatusComponent struct {
 	// Failed: component not available, i.e, all pod is not ready for Stateless/Stateful component;
 	// Leader/Primary pod is not ready for Consensus/Replication component.
 	// Abnormal: component available but some pod is not ready.
-	// if the component type is Consensus/Replication, the Leader/Primary pod is must ready in Abnormal phase.
+	// If the component type is Consensus/Replication, the Leader/Primary pod is must ready in Abnormal phase.
 	// Other phases behave the same as the cluster phase.
 	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted}
 	Phase Phase `json:"phase,omitempty"`
 
-	// Message record the component details message in current phase
+	// Message record the component details message in current phase.
 	// +optional
 	Message string `json:"message,omitempty"`
 
-	// ConsensusSetStatus role and pod name mapping
+	// ConsensusSetStatus role and pod name mapping.
 	// +optional
 	ConsensusSetStatus *ConsensusSetStatus `json:"consensusSetStatus,omitempty"`
 }
 
 type ConsensusSetStatus struct {
-	// Leader status
+	// Leader status.
 	// +kubebuilder:validation:Required
 	Leader ConsensusMemberStatus `json:"leader"`
 
-	// Followers status
+	// Followers status.
 	// +optional
 	Followers []ConsensusMemberStatus `json:"followers,omitempty"`
 
-	// Learner status
+	// Learner status.
 	// +optional
 	Learner *ConsensusMemberStatus `json:"learner,omitempty"`
 }
@@ -255,9 +212,11 @@ type Affinity struct {
 	// +kubebuilder:validation:Enum={Preferred,Required}
 	// +optional
 	PodAntiAffinity PodAntiAffinity `json:"podAntiAffinity,omitempty"`
+
 	// TopologyKeys describe topologyKeys for `topologySpreadConstraint` and `podAntiAffinity` in ClusterDefinition API.
 	// +optional
 	TopologyKeys []string `json:"topologyKeys,omitempty"`
+
 	// NodeLabels describe constrain which nodes pod can be scheduled on based on node labels.
 	// +optional
 	NodeLabels map[string]string `json:"nodeLabels,omitempty"`
@@ -278,29 +237,54 @@ type Operations struct {
 
 	// VolumeExpandable which components of the cluster and its volumeClaimTemplates support volumeExpansion.
 	// +optional
-	VolumeExpandable []*OperationComponent `json:"volumeExpandable,omitempty"`
+	VolumeExpandable []OperationComponent `json:"volumeExpandable,omitempty"`
 
 	// HorizontalScalable which components of the cluster support horizontalScaling, and the replicas range limit.
 	// +optional
-	HorizontalScalable []*OperationComponent `json:"horizontalScalable,omitempty"`
+	HorizontalScalable []OperationComponent `json:"horizontalScalable,omitempty"`
 }
 
 type OperationComponent struct {
 	// Name reference component name.
 	// +kubebuilder:validation:Required
-	Name string `json:"name,omitempty"`
+	Name string `json:"name"`
 
 	// Min minimum of replicas when operation is horizontalScaling.
 	// +optional
-	Min int `json:"min,omitempty"`
+	Min int32 `json:"min,omitempty"`
 
 	// Max maximum of replicas when operation is horizontalScaling.
 	// +optional
-	Max int `json:"max,omitempty"`
+	Max int32 `json:"max,omitempty"`
 
 	// VolumeClaimTemplateNames which VolumeClaimTemplate of the component support volumeExpansion.
 	// +optional
 	VolumeClaimTemplateNames []string `json:"volumeClaimTemplateNames,omitempty"`
+}
+
+//+kubebuilder:object:root=true
+//+kubebuilder:subresource:status
+//+kubebuilder:resource:categories={dbaas,all}
+//+kubebuilder:printcolumn:name="APP-VERSION",type="string",JSONPath=".spec.appVersionRef",description="Cluster Application Version."
+//+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="Cluster Status."
+//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+
+// Cluster is the Schema for the clusters API
+type Cluster struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   ClusterSpec   `json:"spec,omitempty"`
+	Status ClusterStatus `json:"status,omitempty"`
+}
+
+//+kubebuilder:object:root=true
+
+// ClusterList contains a list of Cluster
+type ClusterList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []Cluster `json:"items"`
 }
 
 func init() {

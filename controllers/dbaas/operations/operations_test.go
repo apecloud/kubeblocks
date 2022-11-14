@@ -178,17 +178,14 @@ spec:
 		storageClassName := "csi-hostpath-sc"
 
 		return &dbaasv1alpha1.Cluster{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "dbaas.kubeblocks.io/v1alpha1",
-				Kind:       "Cluster",
-			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      key.Name,
 				Namespace: key.Namespace,
 			},
 			Spec: dbaasv1alpha1.ClusterSpec{
-				ClusterDefRef: clusterDefObj.GetName(),
-				AppVersionRef: appVersionObj.GetName(),
+				ClusterDefRef:     clusterDefObj.GetName(),
+				AppVersionRef:     appVersionObj.GetName(),
+				TerminationPolicy: dbaasv1alpha1.WipeOut,
 				Components: []dbaasv1alpha1.ClusterComponent{
 					{
 						Name: "replicasets",
@@ -550,13 +547,13 @@ spec:
 			// create storageClass
 			assureDefaultStorageClassObj()
 			ops = createOpsRequest("volumeexpansion_ops", clusterObject.Name, dbaasv1alpha1.VolumeExpansionType)
-			ops.Spec.ComponentOpsList = []*dbaasv1alpha1.ComponentOps{
+			ops.Spec.ComponentOpsList = []dbaasv1alpha1.ComponentOps{
 				{
 					ComponentNames: []string{"replicasets"},
 					VolumeExpansion: []dbaasv1alpha1.VolumeExpansion{
 						{
 							Name:    "log",
-							Storage: "2Gi",
+							Storage: resource.MustParse("2Gi"),
 						},
 					},
 				},
@@ -566,7 +563,7 @@ spec:
 
 			By("Test VerticalScaling")
 			ops = createOpsRequest("verticalscaling_ops", clusterObject.Name, dbaasv1alpha1.VerticalScalingType)
-			ops.Spec.ComponentOpsList = []*dbaasv1alpha1.ComponentOps{
+			ops.Spec.ComponentOpsList = []dbaasv1alpha1.ComponentOps{
 				{ComponentNames: []string{"replicasets"},
 					VerticalScaling: &corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
@@ -585,7 +582,7 @@ spec:
 
 			By("Test Restart")
 			ops = createOpsRequest("restart_ops", clusterObject.Name, dbaasv1alpha1.RestartType)
-			ops.Spec.ComponentOpsList = []*dbaasv1alpha1.ComponentOps{
+			ops.Spec.ComponentOpsList = []dbaasv1alpha1.ComponentOps{
 				{ComponentNames: []string{"replicasets"}},
 			}
 			ops.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
@@ -595,7 +592,7 @@ spec:
 
 			By("Test HorizontalScaling")
 			ops = createOpsRequest("horizontalscaling_ops", clusterObject.Name, dbaasv1alpha1.HorizontalScalingType)
-			ops.Spec.ComponentOpsList = []*dbaasv1alpha1.ComponentOps{
+			ops.Spec.ComponentOpsList = []dbaasv1alpha1.ComponentOps{
 				{
 					ComponentNames: []string{"replicasets"},
 					HorizontalScaling: &dbaasv1alpha1.HorizontalScaling{

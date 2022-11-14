@@ -76,10 +76,6 @@ var _ = Describe("appVersion webhook", func() {
 
 func createTestAppVersionObj(clusterDefinitionName, appVersionName string) *AppVersion {
 	appVersion := &AppVersion{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: APIVersion,
-			Kind:       AppVersionKind,
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      appVersionName,
 			Namespace: "default",

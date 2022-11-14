@@ -77,6 +77,9 @@ spec:
                               reference example: https://github.com/apecloud/kubeblocks/blob/main/examples/dbaas/mysql_clusterdefinition.yaml#L12'
                             maxLength: 32
                             type: string
+                        required:
+                        - name
+                        - volumeName
                         type: object
                       type: array
                     podSpec:
@@ -7697,6 +7700,9 @@ spec:
                   type: object
                 minItems: 1
                 type: array
+            required:
+            - clusterDefinitionRef
+            - components
             type: object
           status:
             description: AppVersionStatus defines the observed state of AppVersion

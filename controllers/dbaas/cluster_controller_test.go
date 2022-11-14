@@ -102,7 +102,7 @@ var _ = Describe("Cluster Controller", func() {
 			sc.Annotations = map[string]string{}
 		}
 		sc.Annotations["storageclass.kubernetes.io/is-default-class"] = "true"
-		return k8sClient.Patch(context.Background(), sc, patch)
+		return k8sClient.Patch(ctx, sc, patch)
 	}
 
 	assureCfgTplConfigMapObj := func(cmName string) *corev1.ConfigMap {
@@ -267,17 +267,14 @@ spec:
 		}
 
 		return &dbaasv1alpha1.Cluster{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "dbaas.kubeblocks.io/v1alpha1",
-				Kind:       "Cluster",
-			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      key.Name,
 				Namespace: key.Namespace,
 			},
 			Spec: dbaasv1alpha1.ClusterSpec{
-				ClusterDefRef: clusterDefObj.GetName(),
-				AppVersionRef: appVersionObj.GetName(),
+				ClusterDefRef:     clusterDefObj.GetName(),
+				AppVersionRef:     appVersionObj.GetName(),
+				TerminationPolicy: dbaasv1alpha1.WipeOut,
 			},
 		}, clusterDefObj, appVersionObj, key
 	}
@@ -435,17 +432,14 @@ spec:
 		}
 
 		return &dbaasv1alpha1.Cluster{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "dbaas.kubeblocks.io/v1alpha1",
-				Kind:       "Cluster",
-			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      key.Name,
 				Namespace: key.Namespace,
 			},
 			Spec: dbaasv1alpha1.ClusterSpec{
-				ClusterDefRef: clusterDefObj.GetName(),
-				AppVersionRef: appVersionObj.GetName(),
+				ClusterDefRef:     clusterDefObj.GetName(),
+				AppVersionRef:     appVersionObj.GetName(),
+				TerminationPolicy: dbaasv1alpha1.WipeOut,
 				Components: []dbaasv1alpha1.ClusterComponent{
 					{
 						Name: "wesql-test",
@@ -518,7 +512,7 @@ spec:
 				return fetchedG1.Status.ObservedGeneration == 1
 			}, timeout, interval).Should(BeTrue())
 
-			fetchedG1.Spec.TerminationPolicy = dbaasv1alpha1.Halt
+			fetchedG1.Spec.TerminationPolicy = dbaasv1alpha1.WipeOut
 			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
 
 			fetchedG2 := &dbaasv1alpha1.Cluster{}
@@ -569,7 +563,7 @@ spec:
 			fetchedG1.Spec.Components = append(fetchedG1.Spec.Components, dbaasv1alpha1.ClusterComponent{
 				Name:     "replicasets",
 				Type:     "replicasets",
-				Replicas: updatedReplicas,
+				Replicas: int32(updatedReplicas),
 			})
 			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
 
@@ -845,7 +839,7 @@ spec:
 			"1 service routes to 'leader' pod", func() {
 			By("By creating a cluster with componentType = Consensus")
 			toCreate, _, _, key := newClusterWithConsensusObj(nil, nil)
-			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
 			By("By waiting the cluster is created")
 			cluster := &dbaasv1alpha1.Cluster{}
@@ -856,14 +850,14 @@ spec:
 				stsName := toCreate.Name + "-" + toCreate.Spec.Components[0].Name
 				pods := createFakePod(stsName, 3)
 				for _, pod := range pods {
-					Expect(k8sClient.Create(context.Background(), &pod)).Should(Succeed())
+					Expect(testCtx.CreateObj(ctx, &pod)).Should(Succeed())
 				}
 
 				// fake pods and stateful set creation done
 				time.Sleep(interval * 5)
 
 				Eventually(func() bool {
-					if err := k8sClient.Get(context.Background(), key, cluster); err != nil {
+					if err := k8sClient.Get(ctx, key, cluster); err != nil {
 						return false
 					}
 					return cluster.Status.Phase == dbaasv1alpha1.CreatingPhase
@@ -874,7 +868,7 @@ spec:
 			// end remove
 
 			Eventually(func() bool {
-				err := k8sClient.Get(context.Background(), key, cluster)
+				err := k8sClient.Get(ctx, key, cluster)
 				if err != nil {
 					return false
 				}
@@ -912,13 +906,13 @@ spec:
 			}
 
 			stsList := &appsv1.StatefulSetList{}
-			Expect(k8sClient.List(context.Background(), stsList, client.MatchingLabels{
+			Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
 				"app.kubernetes.io/instance": key.Name,
 			}, client.InNamespace(key.Namespace))).Should(Succeed())
 			Expect(len(stsList.Items)).Should(Equal(1))
 			sts := &stsList.Items[0]
 			podList := &corev1.PodList{}
-			Expect(k8sClient.List(context.Background(), podList, client.InNamespace(key.Namespace))).Should(Succeed())
+			Expect(k8sClient.List(ctx, podList, client.InNamespace(key.Namespace))).Should(Succeed())
 			pods := make([]corev1.Pod, 0)
 			for _, pod := range podList.Items {
 				if component.IsMemberOf(sts, &pod) {
@@ -945,7 +939,7 @@ spec:
 			By("By checking services' status")
 			// we should have 1 services
 			svcList := &corev1.ServiceList{}
-			Expect(k8sClient.List(context.Background(), svcList, client.MatchingLabels{
+			Expect(k8sClient.List(ctx, svcList, client.MatchingLabels{
 				"app.kubernetes.io/instance": key.Name,
 			}, client.InNamespace(key.Namespace))).Should(Succeed())
 			Expect(len(svcList.Items)).Should(Equal(1))
@@ -961,10 +955,10 @@ spec:
 					break
 				}
 			}
-			Expect(k8sClient.Delete(context.Background(), leaderPod)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, leaderPod)).Should(Succeed())
 			time.Sleep(interval * 2)
 			Eventually(func() bool {
-				Expect(k8sClient.Get(context.Background(), types.NamespacedName{
+				Expect(k8sClient.Get(ctx, types.NamespacedName{
 					Namespace: sts.Namespace,
 					Name:      sts.Name,
 				}, sts)).Should(Succeed())
@@ -1488,7 +1482,7 @@ func observeRole(ip string, port int32) (string, error) {
 		return "", err
 	}
 
-	result, err := mysql.query(context.Background(), sql)
+	result, err := mysql.query(ctx, sql)
 	if err != nil {
 		return "", err
 	}

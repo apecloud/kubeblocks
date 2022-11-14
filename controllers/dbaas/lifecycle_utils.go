@@ -352,7 +352,6 @@ func mergeComponents(
 		ConsensusSpec:   clusterDefComp.ConsensusSpec,
 		PodSpec:         clusterDefComp.PodSpec,
 		Service:         clusterDefComp.Service,
-		Scripts:         clusterDefComp.Scripts,
 		Probes:          clusterDefComp.Probes,
 	}
 
@@ -546,11 +545,11 @@ func prepareSecretObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj int
 	return nil
 }
 
-func existsPDBSpec(podDisruptionBudgetSpec *policyv1.PodDisruptionBudgetSpec) bool {
-	if podDisruptionBudgetSpec == nil {
+func existsPDBSpec(pdbSpec *policyv1.PodDisruptionBudgetSpec) bool {
+	if pdbSpec == nil {
 		return false
 	}
-	if podDisruptionBudgetSpec.MinAvailable == nil && podDisruptionBudgetSpec.MaxUnavailable == nil {
+	if pdbSpec.MinAvailable == nil && pdbSpec.MaxUnavailable == nil {
 		return false
 	}
 	return true

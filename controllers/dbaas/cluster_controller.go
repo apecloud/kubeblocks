@@ -31,7 +31,7 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -204,11 +204,11 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	// validate config and send warning event log necessarily
-	conditionList := validateEnableLogsConfig(cluster, clusterdefinition)
+	conditionList := cluster.ValidateEnabledLogs(clusterdefinition)
 	if len(conditionList) > 0 {
 		patch := client.MergeFrom(cluster.DeepCopy())
 		for _, cond := range conditionList {
-			cluster.SetStatusCondition(*cond)
+			meta.SetStatusCondition(&cluster.Status.Conditions, *cond)
 			r.Recorder.Event(cluster, corev1.EventTypeWarning, cond.Reason, cond.Message)
 		}
 		if err = r.Client.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
@@ -700,35 +700,4 @@ func getSupportHorizontalScalingComponents(cluster *dbaasv1alpha1.Cluster,
 	}
 
 	return horizontalScalableComponents, clusterComponentNames
-}
-
-// validateEnableLogsConfig validate enableLogs config, and return metav1.Condition when detect invalid value
-func validateEnableLogsConfig(c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinition) []*metav1.Condition {
-	conditionList := make([]*metav1.Condition, 0)
-	for _, comCluster := range c.Spec.Components {
-		if comCluster.EnabledLogs == nil || len(comCluster.EnabledLogs) == 0 {
-			continue
-		}
-		for _, com := range cd.Spec.Components {
-			if strings.EqualFold(comCluster.Type, com.TypeName) {
-				logTypes := make(map[string]bool)
-				for _, logV := range com.LogConfigs {
-					logTypes[logV.Name] = true
-				}
-				invalidNames := make([]string, 0, len(com.LogConfigs))
-				for _, name := range comCluster.EnabledLogs {
-					if ok := logTypes[name]; !ok {
-						invalidNames = append(invalidNames, name)
-					}
-				}
-				if len(invalidNames) > 0 {
-					reason := "ValidateEnableLogsFail"
-					message := fmt.Sprintf("EnableLogs of cluster component %s has invalid value %s which isn't definded in cluster definition component %s", comCluster.Name, invalidNames, com.TypeName)
-					conditionList = append(conditionList, dbaasv1alpha1.NewValidateConfigFailedCondition(reason, message))
-				}
-				break
-			}
-		}
-	}
-	return conditionList
 }

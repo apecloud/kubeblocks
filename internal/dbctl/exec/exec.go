@@ -50,7 +50,7 @@ type ExecInput struct {
 	// ValidateFunc optional, custom Validate func
 	Validate func() error
 
-	// AddFlagsFunc optional, custom build flags
+	// AddFlags Func optional, custom build flags
 	AddFlags func(*cobra.Command)
 
 	// RunFunc optional, custom Run logic and return false or error means no need to exec, conversely return true will continue run exec

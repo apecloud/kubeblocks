@@ -113,8 +113,8 @@ spec:
                       type: object
                     enabledLogs:
                       description: EnabledLogs indicate which log file takes effect
-                        in database cluster element is the log type which listed in
-                        cluster definition logsConfig.name, and will open relative
+                        in database cluster element is the log type which defined
+                        in cluster definition logConfig.name, and will set relative
                         variables about this log type in database kernel
                       items:
                         type: string

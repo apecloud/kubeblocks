@@ -125,7 +125,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 			cmd.Flags().StringVar(&o.TerminationPolicy, "termination-policy", "Halt", "Termination policy")
 			cmd.Flags().StringVar(&o.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type")
 			cmd.Flags().BoolVar(&o.Monitor, "monitor", false, "Set monitor enabled (default false)")
-			cmd.Flags().BoolVar(&o.EnableAllLogs, "enable-all-logs", false, "Enable advanced application all log extraction, and true will ignore enableLogs of component level")
+			cmd.Flags().BoolVar(&o.EnableAllLogs, "enable-all-logs", false, "Enable advanced application all log extraction, and true will ignore enabledLogs of component level")
 			cmd.Flags().StringArrayVar(&o.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
 			cmd.Flags().StringToStringVar(&o.NodeLabels, "node-labels", nil, "Node label selector")
 			cmd.Flags().StringVar(&o.ComponentsFilePath, "components", "", "Use yaml file to specify the cluster components")
@@ -162,18 +162,18 @@ func (o *CreateOptions) PreCreate(obj *unstructured.Unstructured) error {
 	return nil
 }
 
-// setEnableAllLog set enable all logs, and ignore enableLogs of component level.
+// setEnableAllLog set enable all logs, and ignore enabledLogs of component level.
 func setEnableAllLogs(c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinition) {
 	for idx, comCluster := range c.Spec.Components {
 		for _, com := range cd.Spec.Components {
-			if strings.EqualFold(comCluster.Type, com.TypeName) {
-				typeList := make([]string, 0, len(com.LogConfigs))
-				for _, logConf := range com.LogConfigs {
-					typeList = append(typeList, logConf.Name)
-				}
-				c.Spec.Components[idx].EnabledLogs = typeList
-				break
+			if !strings.EqualFold(comCluster.Type, com.TypeName) {
+				continue
 			}
+			typeList := make([]string, 0, len(com.LogConfigs))
+			for _, logConf := range com.LogConfigs {
+				typeList = append(typeList, logConf.Name)
+			}
+			c.Spec.Components[idx].EnabledLogs = typeList
 		}
 	}
 }

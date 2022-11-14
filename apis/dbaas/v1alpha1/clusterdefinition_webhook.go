@@ -96,7 +96,7 @@ func (r *ClusterDefinition) validate() error {
 	return nil
 }
 
-// validateLogsPatternPrefix validate spec.components[*].logsConfig[*].filePathPattern
+// validateLogsPatternPrefix validate spec.components[*].logConfigs[*].filePathPattern
 func (r *ClusterDefinition) validateLogFilePatternPrefix(allErrs *field.ErrorList) {
 	for idx1, component := range r.Spec.Components {
 		if len(component.LogConfigs) == 0 {
@@ -112,7 +112,7 @@ func (r *ClusterDefinition) validateLogFilePatternPrefix(allErrs *field.ErrorLis
 				}
 			}
 			if !flag {
-				*allErrs = append(*allErrs, field.Required(field.NewPath(fmt.Sprintf("spec.components[%d].logsConfig[%d].filePathPattern", idx1, idx2)),
+				*allErrs = append(*allErrs, field.Required(field.NewPath(fmt.Sprintf("spec.components[%d].logConfigs[%d].filePathPattern", idx1, idx2)),
 					fmt.Sprintf("filePathPattern %s should have a prefix string which in container VolumeMounts", logConfig.FilePathPattern)))
 			}
 		}

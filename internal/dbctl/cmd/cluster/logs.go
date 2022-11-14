@@ -31,7 +31,6 @@ import (
 	cmdlogs "k8s.io/kubectl/pkg/cmd/logs"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
-	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/exec"
@@ -105,7 +104,7 @@ func (o *LogsOptions) addFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&o.logOptions.Prefix, "prefix", false, "Prefix each log line with the log source (pod name and container name). Only take effect for stdout&stderr.")
 	cmd.Flags().BoolVar(&o.logOptions.IgnoreLogErrors, "ignore-errors", false, "If watching / following pod logs, allow for any errors that occur to be non-fatal. Only take effect for stdout&stderr.")
 	cmd.Flags().BoolVar(&o.logOptions.Timestamps, "timestamps", false, "Include timestamps on each line in the log output. Only take effect for stdout&stderr.")
-	cmd.Flags().StringVar(&o.logOptions.SinceTime, "since-time", o.logOptions.SinceTime, i18n.T("Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used. Only take effect for stdout&stderr."))
+	cmd.Flags().StringVar(&o.logOptions.SinceTime, "since-time", o.logOptions.SinceTime, "Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used. Only take effect for stdout&stderr.")
 	cmd.Flags().DurationVar(&o.logOptions.SinceSeconds, "since", o.logOptions.SinceSeconds, "Only return logs newer than a relative duration like 5s, 2m, or 3h. Defaults to all logs. Only one of since-time / since may be used. Only take effect for stdout&stderr.")
 	cmd.Flags().BoolVarP(&o.logOptions.Previous, "previous", "p", o.logOptions.Previous, "If true, print the logs for the previous instance of the container in a pod if it exists. Only take effect for stdout&stderr.")
 

@@ -59,9 +59,6 @@ var _ = Describe("Exec", func() {
 			Validate: testOptions.validate,
 			Complete: testOptions.complete,
 			AddFlags: testOptions.addFlags,
-			Run: func() (bool, error) {
-				return true, nil
-			},
 		}
 
 		cmd := testOptions.Build(input)

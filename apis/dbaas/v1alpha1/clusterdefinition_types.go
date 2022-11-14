@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -391,4 +393,24 @@ const (
 
 func init() {
 	SchemeBuilder.Register(&ClusterDefinition{}, &ClusterDefinitionList{})
+}
+
+// ValidateEnabledLogConfigs validate enabledLogs, and return the log names which isn't defined in ClusterDefinition
+func (cd *ClusterDefinition) ValidateEnabledLogConfigs(typeName string, enabledLogs []string) []string {
+	invalidLogNames := make([]string, 0, len(enabledLogs))
+	for _, comp := range cd.Spec.Components {
+		if !strings.EqualFold(typeName, comp.TypeName) {
+			continue
+		}
+		logTypes := make(map[string]bool)
+		for _, logConfig := range comp.LogConfigs {
+			logTypes[logConfig.Name] = true
+		}
+		for _, name := range enabledLogs {
+			if _, ok := logTypes[name]; !ok {
+				invalidLogNames = append(invalidLogNames, name)
+			}
+		}
+	}
+	return invalidLogNames
 }

@@ -146,47 +146,43 @@ func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 			continue
 		}
 		componentName, ok := p.Labels[types.ComponentLabelKey]
-		if len(o.componentName) > 0 && !strings.EqualFold(o.componentName, componentName) {
-			continue
-		}
 		if ok {
+			if len(o.componentName) > 0 && !strings.EqualFold(o.componentName, componentName) {
+				continue
+			}
 			w.Write(describe.LEVEL_0, "\nInstance  Name:\t%s\n", p.Name)
 			w.Write(describe.LEVEL_0, "Component Name:\t%s\n", componentName)
 			var comTypeName string
 			logTypeMap := make(map[string]bool)
 			for _, comCluster := range c.Spec.Components {
-				if strings.EqualFold(comCluster.Name, componentName) {
-					if len(comCluster.EnabledLogs) == 0 {
-						w.Write(describe.LEVEL_0, "No log file open in %s, please set EnableLogs filed", comCluster.Name)
-					} else {
-						comTypeName = comCluster.Type
-						for _, logType := range comCluster.EnabledLogs {
-							logTypeMap[logType] = true
-						}
-					}
-					break
+				if !strings.EqualFold(comCluster.Name, componentName) {
+					continue
+				}
+				comTypeName = comCluster.Type
+				for _, logType := range comCluster.EnabledLogs {
+					logTypeMap[logType] = true
 				}
 			}
-			if len(comTypeName) > 0 {
-				// w.Write(describe.LEVEL_0, "Component Type:\t%s\n", comTypeName)
-				for _, com := range cd.Spec.Components {
-					if strings.EqualFold(com.TypeName, comTypeName) {
-						for _, logConfig := range com.LogConfigs {
-							_, ok := logTypeMap[logConfig.Name]
-							if ok {
-								w.Write(describe.LEVEL_0, "Log file type :\t%s\n", logConfig.Name)
-								// todo display more log file info
-								if len(logConfig.FilePathPattern) > 0 {
-									o.printRealFileMessage(&p, logConfig.FilePathPattern)
-								}
-							}
+			if len(comTypeName) == 0 {
+				w.Write(describe.LEVEL_0, "\nComponent name %s in pod labels can't find corresponding type in cluster yaml. \n", componentName)
+				continue
+			}
+			for _, com := range cd.Spec.Components {
+				if !strings.EqualFold(com.TypeName, comTypeName) {
+					continue
+				}
+				for _, logConfig := range com.LogConfigs {
+					if _, ok := logTypeMap[logConfig.Name]; ok {
+						w.Write(describe.LEVEL_0, "Log file type :\t%s\n", logConfig.Name)
+						// todo display more log file info
+						if len(logConfig.FilePathPattern) > 0 {
+							o.printRealFileMessage(&p, logConfig.FilePathPattern)
 						}
-						break
 					}
 				}
-			} else {
-				w.Write(describe.LEVEL_0, "\nComponent name: %s can't find corresponding type in cluster yaml. \n", componentName)
 			}
+		} else {
+			w.Write(describe.LEVEL_0, "Component name in pod label %s isn't set\n", p.Name)
 		}
 	}
 }

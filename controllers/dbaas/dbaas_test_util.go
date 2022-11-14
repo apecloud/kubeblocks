@@ -35,6 +35,11 @@ import (
 
 const (
 	ISV_CLUSTER_SCOPE = "default"
+
+	ISV_TEST_CD_PREFIX  = "test-clusterdefinition-"
+	ISV_TEST_AV_PREFIX  = "test-appversion-"
+	ISV_TEST_TPL_PREFIX = "test-cfgtpl-"
+	TEST_CLUSTER_PREFIX = "test-cluster-"
 )
 
 type FakeTest struct {
@@ -74,8 +79,8 @@ func (w *TestWrapper) HasError() error {
 func (w *TestWrapper) CreateCluster(name string) *dbaasv1alpha1.Cluster {
 	clusterObj := &dbaasv1alpha1.Cluster{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "dbaas.kubeblocks.io/v1alpha1",
-			Kind:       "Cluster",
+			APIVersion: dbaasv1alpha1.APIVersion,
+			Kind:       dbaasv1alpha1.ClusterKind,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -110,7 +115,8 @@ func (w *TestWrapper) updateAvComTplMeta(appVer *dbaasv1alpha1.AppVersion) {
 }
 
 func (w *TestWrapper) updateComTplMeta(cd *dbaasv1alpha1.ClusterDefinition) {
-	configuration.HandleConfigTemplate(cd,
+	// fix return value of xxx func is not checked (errcheck)
+	ok, _ := configuration.HandleConfigTemplate(cd,
 		func(templates []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 			return true, nil
 		},
@@ -120,7 +126,7 @@ func (w *TestWrapper) updateComTplMeta(cd *dbaasv1alpha1.ClusterDefinition) {
 			}
 			return nil
 		})
-
+	_ = ok
 }
 
 func (w *TestWrapper) DeleteAllCR() error {
@@ -205,19 +211,19 @@ func (w *TestWrapper) WithCRName(name string) client.ObjectKey {
 }
 
 func GenRandomCDName() string {
-	return "test-clusterdefinition-" + BuildRandomString()
+	return ISV_TEST_CD_PREFIX + BuildRandomString()
 }
 
 func GenRandomAVName() string {
-	return "test-appversion-" + BuildRandomString()
+	return ISV_TEST_AV_PREFIX + BuildRandomString()
 }
 
 func GenRandomClusterName() string {
-	return "test-cluster-" + BuildRandomString()
+	return TEST_CLUSTER_PREFIX + BuildRandomString()
 }
 
 func GenRandomTplName() string {
-	return "test-cfgtpl-" + BuildRandomString()
+	return ISV_TEST_TPL_PREFIX + BuildRandomString()
 }
 
 func BuildRandomString() string {
@@ -327,7 +333,7 @@ func DeleteCluster(test *TestWrapper, cluster *dbaasv1alpha1.Cluster) error {
 	return test.DeleteCluster(client.ObjectKeyFromObject(cluster))
 }
 
-func ValidateISVCR[T interface{}, OBJECT interface{ client.Object }](test *TestWrapper, obj client.Object, defaultValue T, handle func(obj OBJECT) T) (T, error) {
+func ValidateISVCR[T any, OBJECT interface{ client.Object }](test *TestWrapper, obj client.Object, defaultValue T, handle func(obj OBJECT) T) (T, error) {
 	var (
 		ctx       = test.ctx
 		k8sClient = test.cli

@@ -205,7 +205,7 @@ func getCfgTplFromCD(clusterDef *dbaasv1alpha1.ClusterDefinition, validators ...
 	for _, component := range clusterDef.Spec.Components {
 		if len(component.ConfigTemplateRefs) > 0 {
 			tpls = append(tpls, component.ConfigTemplateRefs...)
-			// Check reload configure if has config template
+			// Check reload configure config template
 			for _, validator := range validators {
 				if err := validator(&component); err != nil {
 					return nil, err

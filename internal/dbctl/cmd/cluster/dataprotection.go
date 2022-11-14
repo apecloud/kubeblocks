@@ -200,6 +200,7 @@ func (o *CreateRestoreOptions) Complete() error {
 	o.AppVersionRef = cluster.Spec.AppVersionRef
 	o.ClusterDefRef = cluster.Spec.ClusterDefRef
 	o.TerminationPolicy = string(cluster.Spec.TerminationPolicy)
+	o.PodAntiAffinity = string(cluster.Spec.Affinity.PodAntiAffinity)
 	o.Monitor = cluster.Spec.Components[0].Monitor
 	componentByte, err := json.Marshal(cluster.Spec.Components)
 	if err != nil {
@@ -228,8 +229,8 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Short:           "Restore a new cluster from backup",
 		CueTemplateName: CueTemplateName,
 		ResourceName:    types.ResourceClusters,
-		Group:           types.DPGroup,
-		Version:         types.DPVersion,
+		Group:           types.Group,
+		Version:         types.Version,
 		BaseOptionsObj:  &o.BaseOptions,
 		Options:         o,
 		Factory:         f,

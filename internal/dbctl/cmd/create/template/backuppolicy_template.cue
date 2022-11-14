@@ -33,10 +33,10 @@ content: {
 
 	  hooks: {
 	  	preCommands: [
-	  		"touch /data/mysql/.restore"
+	  		"touch /data/mysql/data/.restore; sync"
 	  	]
 	  	postCommands: [
-	  		"rm -f /data/mysql/.restore"
+	  		"rm -f /data/mysql/data/.restore; sync"
 	  	]
 	  }
 

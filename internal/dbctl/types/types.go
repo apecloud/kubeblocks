@@ -107,9 +107,6 @@ const (
 	ResourceBackupJobs     = "backupjobs"
 	ResourceRestoreJobs    = "restorejobs"
 	ResourceBackupPolicies = "backuppolicies"
-	KindBackupJob          = "BackupJob"
-	KindRestoreJob         = "RestoreJob"
-	KindBackupPolicy       = "BackupPolicy"
 )
 
 type ClusterObjects struct {
@@ -171,22 +168,6 @@ func BackupJobGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceBackupJobs}
 }
 
-func BackupJobGK() schema.GroupKind {
-	return schema.GroupKind{Group: DPGroup, Kind: KindBackupJob}
-}
-
 func RestoreJobGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceRestoreJobs}
-}
-
-func RestoreJobGK() schema.GroupKind {
-	return schema.GroupKind{Group: DPGroup, Kind: KindRestoreJob}
-}
-
-func BackupPolicyGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceBackupPolicies}
-}
-
-func BackupPolicyGK() schema.GroupKind {
-	return schema.GroupKind{Group: DPGroup, Kind: KindBackupPolicy}
 }

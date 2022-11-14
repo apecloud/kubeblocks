@@ -41,13 +41,13 @@ func NewOpsListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 }
 
 // completeForListOps complete the cmd for list OpsRequest
-func completeForListOps(option interface{}, args []string) []string {
+func completeForListOps(option interface{}, args []string) error {
 	var (
 		o  *get.Options
 		ok bool
 	)
 	if o, ok = option.(*get.Options); !ok {
-		return args
+		return nil
 	}
 	// if cluster name is not nil, covert to label for list OpsRequest
 	if len(args) > 0 {
@@ -58,5 +58,5 @@ func completeForListOps(option interface{}, args []string) []string {
 			o.LabelSelector += "," + labelString
 		}
 	}
-	return args
+	return nil
 }

@@ -25,7 +25,7 @@ import (
 
 type BuildFn func(cmd *Command) *cobra.Command
 
-type CustomCompleteFn func(o interface{}, args []string) []string
+type CustomCompleteFn func(o interface{}, args []string) error
 
 type CustomFlags func(o interface{}, cmd *cobra.Command)
 

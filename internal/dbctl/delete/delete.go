@@ -19,6 +19,7 @@ package delete
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/spf13/cobra"
 	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
@@ -31,7 +32,10 @@ import (
 
 type DeleteFlags struct {
 	*cmddelete.DeleteFlags
-	Name string
+	// cluster name. if the resources is not owns by cluster, ignore it
+	ClusterName string
+	// the resource names of cluster need to be deleted
+	ResourceNames []string
 }
 
 // Build a delete command
@@ -42,15 +46,13 @@ func Build(c *builder.Command) *cobra.Command {
 		Short:   c.Short,
 		Example: c.Example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(validate(deleteFlags, args, c.IOStreams.In))
 			if c.CustomComplete != nil {
-				args = c.CustomComplete(deleteFlags, args)
+				cmdutil.CheckErr(c.CustomComplete(deleteFlags, args))
 			}
+			cmdutil.CheckErr(validate(deleteFlags, args, c.IOStreams.In))
 			o, err := deleteFlags.ToOptions(nil, c.IOStreams)
 			cmdutil.CheckErr(err)
-			// build resource to delete
-			args = append([]string{util.GVRToString(c.GVR)}, args...)
-
+			args = buildArgs(c, deleteFlags, args)
 			// call kubectl delete options methods
 			cmdutil.CheckErr(o.Complete(c.Factory, args, cmd))
 			cmdutil.CheckErr(o.Validate())
@@ -66,21 +68,35 @@ func Build(c *builder.Command) *cobra.Command {
 	return cmd
 }
 
+// buildArgs build resource to delete
+func buildArgs(c *builder.Command, deleteFlags *DeleteFlags, args []string) []string {
+	if len(deleteFlags.ResourceNames) > 0 {
+		args = deleteFlags.ResourceNames
+	} else if deleteFlags.ClusterName != "" {
+		// using the cluster label selector, args should be empty
+		args = []string{}
+	}
+	args = append([]string{util.GVRToString(c.GVR)}, args...)
+	return args
+}
+
 func validate(deleteFlags *DeleteFlags, args []string, in io.Reader) error {
-	if len(deleteFlags.Name) > 0 {
-		return nil
+	// build resource to delete.
+	// if resource names is specified, use it, otherwise use the args.
+	if deleteFlags.ResourceNames != nil && len(deleteFlags.ResourceNames) > 0 {
+		args = deleteFlags.ResourceNames
 	}
 	if len(args) < 1 {
 		return fmt.Errorf("missing name")
 	}
 
 	// confirm the name
-	name, err := prompt.NewPrompt("You should enter the name", "Please enter the name again:", in).GetInput()
+	name, err := prompt.NewPrompt("You should enter the name.", "Please enter the name again(separate with commas when more than one):", in).GetInput()
 	if err != nil {
 		return err
 	}
-	if name != args[0] {
-		return fmt.Errorf("the entered name \"%s\" does not match \"%s\"", name, args[0])
+	if name != strings.Join(args, ",") {
+		return fmt.Errorf("the entered name \"%s\" does not match \"%s\"", name, strings.Join(args, ","))
 	}
 
 	return nil

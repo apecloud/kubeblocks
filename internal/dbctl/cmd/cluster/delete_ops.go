@@ -48,31 +48,27 @@ func customFlagsForDeleteOps(option interface{}, cmd *cobra.Command) {
 	if o, ok = option.(*delete.DeleteFlags); !ok {
 		return
 	}
-	cmd.Flags().StringVarP(&o.Name, "name", "", "", "OpsRequest name")
+	cmd.Flags().StringSliceVar(&o.ResourceNames, "name", []string{}, "OpsRequest names")
 }
 
 // completeForDeleteOps complete cmd for delete OpsRequest
-func completeForDeleteOps(option interface{}, args []string) []string {
+func completeForDeleteOps(option interface{}, args []string) error {
 	var (
-		flag        *delete.DeleteFlags
-		ok          bool
-		clusterName string
+		flag *delete.DeleteFlags
+		ok   bool
 	)
 	if flag, ok = option.(*delete.DeleteFlags); !ok {
-		return args
+		return nil
 	}
-	// covert OpsRequest name to delete args, then we can delete the OpsRequest
-	if len(flag.Name) > 0 {
-		args = []string{flag.Name}
-	} else if len(args) > 0 {
-		clusterName = (args)[0]
-		args = []string{}
+	if len(flag.ResourceNames) > 0 || len(args) == 0 {
+		return nil
 	}
-	if len(clusterName) == 0 {
-		return args
+	if len(args) > 1 {
+		return fmt.Errorf("only supported delete the OpsRequests of one cluster")
 	}
+	flag.ClusterName = args[0]
 	// if no specify OpsRequest name and cluster name is specified. it will delete all OpsRequest with the cluster
-	labelString := fmt.Sprintf("%s=%s", types.InstanceLabelKey, clusterName)
+	labelString := fmt.Sprintf("%s=%s", types.InstanceLabelKey, flag.ClusterName)
 	if flag.LabelSelector == nil || len(*flag.LabelSelector) == 0 {
 		flag.LabelSelector = &labelString
 	} else {
@@ -80,5 +76,5 @@ func completeForDeleteOps(option interface{}, args []string) []string {
 		newLabelSelector := *flag.LabelSelector + "," + labelString
 		flag.LabelSelector = &newLabelSelector
 	}
-	return args
+	return nil
 }

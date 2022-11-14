@@ -174,29 +174,30 @@ var _ = Describe("Cluster", func() {
 		o := &get.Options{}
 		clusterName := "wesql"
 		By("test list OpsRequest with cluster")
-		completeForListOps(o, []string{clusterName})
+		Expect(completeForListOps(o, []string{clusterName})).Should(Succeed())
 		clusterLabel := fmt.Sprintf("%s=%s", types.InstanceLabelKey, clusterName)
 		Expect(o.LabelSelector == clusterLabel).Should(BeTrue())
 		By("test list OpsRequest with cluster and custom label")
 		testLabel := "kubeblocks.io/test=test"
 		o.LabelSelector = testLabel
-		completeForListOps(o, []string{clusterName})
+		Expect(completeForListOps(o, []string{clusterName})).Should(Succeed())
 		Expect(o.LabelSelector == testLabel+","+clusterLabel).Should(BeTrue())
 
 		By("test delete OpsRequest with cluster")
 		deleteFlags := &delete.DeleteFlags{
 			DeleteFlags: cmddelete.NewDeleteCommandFlags("containing the resource to delete."),
 		}
-		completeForDeleteOps(deleteFlags, []string{clusterName})
+		Expect(completeForDeleteOps(deleteFlags, []string{clusterName})).Should(Succeed())
 		Expect(*deleteFlags.LabelSelector == clusterLabel).Should(BeTrue())
 		By("test delete OpsRequest with cluster and custom label")
 		deleteFlags.LabelSelector = &testLabel
-		completeForDeleteOps(deleteFlags, []string{clusterName})
+		Expect(completeForDeleteOps(deleteFlags, []string{clusterName})).Should(Succeed())
 		Expect(*deleteFlags.LabelSelector == testLabel+","+clusterLabel).Should(BeTrue())
 		By("test delete OpsRequest with name")
-		deleteFlags.Name = "test1"
-		args := completeForDeleteOps(deleteFlags, []string{})
-		Expect(args[0] == deleteFlags.Name).Should(BeTrue())
+		deleteFlags.ClusterName = ""
+		deleteFlags.ResourceNames = []string{"test1"}
+		Expect(completeForDeleteOps(deleteFlags, []string{})).Should(Succeed())
+		Expect(deleteFlags.ClusterName == "").Should(BeTrue())
 	})
 
 	It("connect", func() {

@@ -1544,7 +1544,15 @@ func isAlreadyExists(cmName string, namespace string, ctx context.Context, cli c
 
 // {{statefull.Name}}-{{appVersion.Name}}-{{tpl.Name}}-"config"
 func getInstanceCMName(obj client.Object, tpl *dbaasv1alpha1.ConfigTemplate) string {
-	return fmt.Sprintf("%s-%s", obj.GetName(), tpl.VolumeName)
+	return getInstanceCfgCMName(obj.GetName(), tpl.VolumeName)
+}
+
+func getInstanceCfgCMName(objName, tplName string) string {
+	return fmt.Sprintf("%s-%s", objName, tplName)
+}
+
+func GetComponentCfgName(clusterName, componentName, tplName string) string {
+	return getInstanceCfgCMName(fmt.Sprintf("%s-%s", clusterName, componentName), tplName)
 }
 
 // generateConfigMapFromTpl render config file by config template provided by provider.

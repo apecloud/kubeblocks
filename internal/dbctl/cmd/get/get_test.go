@@ -35,6 +35,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/list"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
 )
 
@@ -43,12 +44,12 @@ var _ = Describe("Get", func() {
 	var streams genericclioptions.IOStreams
 	buf := new(bytes.Buffer)
 
-	buildTestCmd := func(f cmdutil.Factory, streams genericclioptions.IOStreams, groupKind schema.GroupKind) *cobra.Command {
+	buildTestCmd := func(f cmdutil.Factory, streams genericclioptions.IOStreams, gvr schema.GroupVersionResource) *cobra.Command {
 		return builder.NewCmdBuilder().
 			Factory(f).
 			IOStreams(streams).
 			Short("Test list.").
-			GroupKind(groupKind).Build(list.Build)
+			GVR(gvr).Build(list.Build)
 	}
 
 	mockClient := func(data runtime.Object) *cmdtesting.TestFactory {
@@ -67,7 +68,7 @@ var _ = Describe("Get", func() {
 		pods, _, _ := cmdtesting.TestData()
 		tf := mockClient(pods)
 		streams, _, buf, _ = genericclioptions.NewTestIOStreams()
-		cmd = buildTestCmd(tf, streams, schema.GroupKind{Group: "", Kind: "pods"})
+		cmd = buildTestCmd(tf, streams, schema.GroupVersionResource{Group: "", Resource: "pods", Version: types.VersionV1})
 		cmd.SetOut(buf)
 	})
 
@@ -209,7 +210,7 @@ bar   <unknown>
 		It("No resources found", func() {
 			tf := mockClient(&corev1.PodList{})
 			streams, _, buf, errbuf := genericclioptions.NewTestIOStreams()
-			cmd = buildTestCmd(tf, streams, schema.GroupKind{Group: "", Kind: "pods"})
+			cmd = buildTestCmd(tf, streams, schema.GroupVersionResource{Group: "", Resource: "pods", Version: types.VersionV1})
 			cmd.SetOut(buf)
 			cmd.Run(cmd, []string{})
 

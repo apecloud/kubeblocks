@@ -31,7 +31,7 @@ type ResourceDefinition struct {
 type ComponentTemplateValues struct {
 	Name        string
 	ServiceName string
-	Replicas    int
+	Replicas    int32
 
 	// Container *corev1.Container
 	Resource  *ResourceDefinition

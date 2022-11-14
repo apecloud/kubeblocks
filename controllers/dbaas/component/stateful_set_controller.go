@@ -103,6 +103,7 @@ func handleUpdateByComponentType(reqCtx intctrlutil.RequestCtx, cli client.Clien
 			if statefulStatusRevisionIsEquals, err = handleConsensusSetUpdate(reqCtx.Ctx, cli, cluster, sts); err != nil {
 				return false, err
 			}
+			// TODO check pod is ready by role label
 		case dbaasv1alpha1.Stateful:
 			// when stateful updateStrategy is rollingUpdate, need to check revision
 			if sts.Status.UpdateRevision == sts.Status.CurrentRevision {
@@ -119,6 +120,6 @@ func (r *StatefulSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1.StatefulSet{}).
 		Owns(&corev1.Pod{}).
-		WithEventFilter(predicate.NewPredicateFuncs(workloadFilterPredicate)).
+		WithEventFilter(predicate.NewPredicateFuncs(WorkloadFilterPredicate)).
 		Complete(r)
 }

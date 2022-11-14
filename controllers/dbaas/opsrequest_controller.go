@@ -205,11 +205,11 @@ func (r *OpsRequestReconciler) patchOpsRequestWithClusterLabel(reqCtx intctrluti
 	if opsRequest.Labels == nil {
 		opsRequest.Labels = map[string]string{}
 	}
-	clusterName := opsRequest.Labels[clusterLabelKey]
+	clusterName := opsRequest.Labels[intctrlutil.AppInstanceLabelKey]
 	if clusterName == opsRequest.Spec.ClusterRef {
 		return nil
 	}
-	opsRequest.Labels[clusterLabelKey] = opsRequest.Spec.ClusterRef
+	opsRequest.Labels[intctrlutil.AppInstanceLabelKey] = opsRequest.Spec.ClusterRef
 	return r.Client.Patch(reqCtx.Ctx, opsRequest, patch)
 }
 

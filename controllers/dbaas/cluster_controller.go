@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -64,13 +66,10 @@ type ClusterReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// TODO probeMessage should be defined by @xuanchi
 type probeMessage struct {
-	Data probeMessageData `json:"data,omitempty"`
-}
-
-type probeMessageData struct {
-	Role string `json:"role,omitempty"`
+	Event        string `json:"event,omitempty"`
+	OriginalRole string `json:"originalRole,omitempty"`
+	Role         string `json:"role,omitempty"`
 }
 
 func init() {
@@ -95,6 +94,9 @@ func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *db
 			patch := client.MergeFrom(cluster.DeepCopy())
 			// sync status.Operations.HorizontalScalable
 			horizontalScalableComponents, _ := getSupportHorizontalScalingComponents(&cluster, clusterDef)
+			if cluster.Status.Operations == nil {
+				cluster.Status.Operations = &dbaasv1alpha1.Operations{}
+			}
 			cluster.Status.Operations.HorizontalScalable = horizontalScalableComponents
 			cluster.Status.ClusterDefSyncStatus = dbaasv1alpha1.OutOfSyncStatus
 			if err = cli.Status().Patch(ctx, &cluster, patch); err != nil {
@@ -106,26 +108,42 @@ func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *db
 	return nil
 }
 
-func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, event *corev1.Event) error {
+func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
 	if event.InvolvedObject.FieldPath != k8score.ProbeRoleChangedCheckPath {
-		return nil
+		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
 	}
 
 	// get role
 	message := &probeMessage{}
-	err := json.Unmarshal([]byte(event.Message), message)
+	re := regexp.MustCompile(`Readiness probe failed: {.*({.*}).*}`)
+	matches := re.FindStringSubmatch(event.Message)
+	if len(matches) != 2 {
+		return nil
+	}
+	msg := strings.ReplaceAll(matches[1], "\\", "")
+	err := json.Unmarshal([]byte(msg), message)
 	if err != nil {
 		// not role related message, ignore it
 		reqCtx.Log.Info("not role message", "message", event.Message, "error", err)
 		return nil
 	}
-	role := strings.ToLower(message.Data.Role)
+	role := strings.ToLower(message.Role)
+
 	podName := types.NamespacedName{
 		Namespace: event.InvolvedObject.Namespace,
 		Name:      event.InvolvedObject.Name,
 	}
+	// get pod
+	pod := &corev1.Pod{}
+	if err := cli.Get(reqCtx.Ctx, podName, pod); err != nil {
+		return err
+	}
+	// event belongs to old pod with the same name, ignore it
+	if pod.UID != event.InvolvedObject.UID {
+		return nil
+	}
 
-	return component.UpdateConsensusSetRoleLabel(cli, reqCtx, podName, role)
+	return component.UpdateConsensusSetRoleLabel(cli, reqCtx, pod, role)
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -197,6 +215,18 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if err = r.reconcileStatusOperations(ctx, cluster, clusterdefinition); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	// validate config and send warning event log necessarily
+	conditionList := cluster.ValidateEnabledLogs(clusterdefinition)
+	if len(conditionList) > 0 {
+		patch := client.MergeFrom(cluster.DeepCopy())
+		for _, cond := range conditionList {
+			meta.SetStatusCondition(&cluster.Status.Conditions, *cond)
+			r.Recorder.Event(cluster, corev1.EventTypeWarning, cond.Reason, cond.Message)
+		}
+		if err = r.Client.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
 	}
 
 	task, err := buildClusterCreationTasks(clusterdefinition, appversion, cluster)
@@ -471,7 +501,7 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 	if componentTypeMap, err = getComponentTypeMapWithCluster(ctx, r.Client, cluster); err != nil {
 		return false, err
 	}
-	if err = getObjectList(ctx, r.Client, cluster, statefulSetList); err != nil {
+	if err = getObjectListForCluster(ctx, r.Client, cluster, statefulSetList); err != nil {
 		return false, err
 	}
 	for _, sts := range statefulSetList.Items {
@@ -486,6 +516,7 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 			if statefulStatusRevisionIsEquals, err = checkConsensusStatefulSetRevision(ctx, r.Client, &sts); err != nil {
 				return false, err
 			}
+			// TODO check pod is ready by role label
 		case dbaasv1alpha1.Stateful:
 			// when stateful updateStrategy is rollingUpdate, need to check revision
 			if sts.Status.UpdateRevision != sts.Status.CurrentRevision {
@@ -506,7 +537,7 @@ func (r *ClusterReconciler) handleComponentStatusWithDeployment(ctx context.Cont
 		needSyncComponentStatus bool
 		deploymentList          = &appsv1.DeploymentList{}
 	)
-	if err := getObjectList(ctx, r.Client, cluster, deploymentList); err != nil {
+	if err := getObjectListForCluster(ctx, r.Client, cluster, deploymentList); err != nil {
 		return false, err
 	}
 	for _, deploy := range deploymentList.Items {
@@ -524,12 +555,16 @@ func (r *ClusterReconciler) handleComponentStatusWithDeployment(ctx context.Cont
 
 // reconcileStatusOperations when Cluster.spec updated, we need reconcile the Cluster.status.operations.
 func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, cluster *dbaasv1alpha1.Cluster, clusterDef *dbaasv1alpha1.ClusterDefinition) error {
+	if cluster.Status.Operations == nil {
+		cluster.Status.Operations = &dbaasv1alpha1.Operations{}
+	}
+
 	var (
 		err                       error
 		upgradable                bool
-		volumeExpansionComponents []*dbaasv1alpha1.OperationComponent
+		volumeExpansionComponents []dbaasv1alpha1.OperationComponent
 		oldOperations             = cluster.Status.Operations.DeepCopy()
-		operations                = cluster.Status.Operations
+		operations                = *cluster.Status.Operations
 		appVersionList            = &dbaasv1alpha1.AppVersionList{}
 	)
 	// determine whether to support volumeExpansion
@@ -559,22 +594,22 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 		return nil
 	}
 	patch := client.MergeFrom(cluster.DeepCopy())
-	cluster.Status.Operations = operations
+	cluster.Status.Operations = &operations
 	return r.Client.Status().Patch(ctx, cluster, patch)
 }
 
 // getSupportVolumeExpansionComponents Get the components that support volume expansion and the volumeClaimTemplates
 func (r *ClusterReconciler) getSupportVolumeExpansionComponents(ctx context.Context,
-	cluster *dbaasv1alpha1.Cluster) ([]*dbaasv1alpha1.OperationComponent, error) {
+	cluster *dbaasv1alpha1.Cluster) ([]dbaasv1alpha1.OperationComponent, error) {
 	var (
 		storageClassMap             = map[string]bool{}
 		hasCheckDefaultStorageClass bool
 		// the default storageClass may not exist, so use a bool key to check
 		defaultStorageClassAllowExpansion bool
-		volumeExpansionComponents         = make([]*dbaasv1alpha1.OperationComponent, 0)
+		volumeExpansionComponents         = make([]dbaasv1alpha1.OperationComponent, 0)
 	)
 	for _, v := range cluster.Spec.Components {
-		operationComponent := &dbaasv1alpha1.OperationComponent{}
+		operationComponent := dbaasv1alpha1.OperationComponent{}
 		for _, vct := range v.VolumeClaimTemplates {
 			if vct.Spec == nil {
 				continue
@@ -659,24 +694,25 @@ func (r *ClusterReconciler) checkDefaultStorageClass(ctx context.Context) (bool,
 }
 
 // getSupportHorizontalScalingComponents Get the components that support horizontalScaling
-func getSupportHorizontalScalingComponents(cluster *dbaasv1alpha1.Cluster,
-	clusterDef *dbaasv1alpha1.ClusterDefinition) ([]*dbaasv1alpha1.OperationComponent, []string) {
+func getSupportHorizontalScalingComponents(
+	cluster *dbaasv1alpha1.Cluster,
+	clusterDef *dbaasv1alpha1.ClusterDefinition) ([]dbaasv1alpha1.OperationComponent, []string) {
 	var (
 		clusterComponentNames        = make([]string, 0)
-		horizontalScalableComponents = make([]*dbaasv1alpha1.OperationComponent, 0)
+		horizontalScalableComponents = make([]dbaasv1alpha1.OperationComponent, 0)
 	)
 	// determine whether to support horizontalScaling
 	for _, v := range cluster.Spec.Components {
 		clusterComponentNames = append(clusterComponentNames, v.Name)
 		for _, component := range clusterDef.Spec.Components {
-			if v.Type != component.TypeName || (component.MinAvailable != 0 &&
-				component.MaxAvailable == component.MinAvailable) {
+			if v.Type != component.TypeName || (component.MinReplicas != 0 &&
+				component.MaxReplicas == component.MinReplicas) {
 				continue
 			}
-			horizontalScalableComponents = append(horizontalScalableComponents, &dbaasv1alpha1.OperationComponent{
+			horizontalScalableComponents = append(horizontalScalableComponents, dbaasv1alpha1.OperationComponent{
 				Name: v.Name,
-				Min:  component.MinAvailable,
-				Max:  component.MaxAvailable,
+				Min:  component.MinReplicas,
+				Max:  component.MaxReplicas,
 			})
 			break
 		}

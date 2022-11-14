@@ -135,16 +135,27 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 			return false, errors.New("wrong type: obj not Pod")
 		}
 		// if pod is the latest version, we do nothing
-		if GetPodRevision(&pod) == stsObj.Status.UpdateRevision && stsObj.Generation == stsObj.Status.ObservedGeneration {
+		if len(stsObj.Status.UpdateRevision) == 0 || GetPodRevision(&pod) == stsObj.Status.UpdateRevision || stsObj.Generation == stsObj.Status.ObservedGeneration {
 			return false, nil
 		}
 		// if DeletionTimestamp is not nil, it is terminating.
 		if pod.DeletionTimestamp != nil {
 			return true, nil
 		}
-		// delete the pod to trigger associate StatefulSet to re-create it
-		if err := cli.Delete(ctx, &pod); err != nil && !apierrors.IsNotFound(err) {
-			return false, err
+		if pod.Annotations == nil || len(pod.Annotations["cs.dbaas.kubeblocks.io/do-not-delete"]) == 0 {
+			// delete the pod to trigger associate StatefulSet to re-create it
+			if err := cli.Delete(ctx, &pod); err != nil && !apierrors.IsNotFound(err) {
+				return false, err
+			}
+		} else {
+			patch := client.MergeFrom(pod.DeepCopy())
+			delete(pod.Annotations, "cs.dbaas.kubeblocks.io/do-not-delete")
+			if pod.Labels != nil {
+				pod.Labels[appsv1.StatefulSetRevisionLabel] = stsObj.Status.UpdateRevision
+			}
+			if err := cli.Patch(ctx, &pod, patch); err != nil && !apierrors.IsNotFound(err) {
+				return false, err
+			}
 		}
 
 		return true, nil
@@ -354,6 +365,22 @@ func UpdateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCt
 		return err
 	}
 	o := &client.ListOptions{LabelSelector: labelSelector}
+
+	podList := &corev1.PodList{}
+	if err := cli.List(ctx, podList, o); err != nil {
+		return err
+	}
+	for _, pod := range podList.Items {
+		patch := client.MergeFrom(pod.DeepCopy())
+		if pod.ObjectMeta.Annotations == nil {
+			pod.ObjectMeta.Annotations = map[string]string{}
+		}
+		// prevent exist pods from deletion
+		pod.ObjectMeta.Annotations["cs.dbaas.kubeblocks.io/do-not-delete"] = "true"
+		if err := cli.Patch(ctx, &pod, patch); err != nil {
+			return err
+		}
+	}
 
 	// update label in StatefulSet template
 	stsList := &appsv1.StatefulSetList{}

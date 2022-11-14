@@ -711,7 +711,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				if len(backupPolicyTemplateList.Items) > 0 {
 					// TODO chantu: check volume snapshot support
 					backupJobName := generateName(cluster.Name + "-scaling-")
-					err := createBackup(ctx, cli, *stsObj, backupPolicyTemplateList.Items[0], backupJobName)
+					err := createBackup(ctx, cli, *stsObj, backupPolicyTemplateList.Items[0], backupJobName, cluster)
 					if err != nil {
 						return err
 					}
@@ -1373,7 +1373,7 @@ func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder
 	return tplBuilder.Render(cmObj.Data)
 }
 
-func createBackup(ctx context.Context, cli client.Client, sts appsv1.StatefulSet, backupPolicyTemplate dataprotectionv1alpha1.BackupPolicyTemplate, backupJobName string) error {
+func createBackup(ctx context.Context, cli client.Client, sts appsv1.StatefulSet, backupPolicyTemplate dataprotectionv1alpha1.BackupPolicyTemplate, backupJobName string, cluster *dbaasv1alpha1.Cluster) error {
 	backupPolicy, err := buildBackupPolicy(sts, backupPolicyTemplate)
 	if err != nil {
 		return err
@@ -1385,6 +1385,10 @@ func createBackup(ctx context.Context, cli client.Client, sts appsv1.StatefulSet
 	}
 	backupJob, err := buildBackupJob(sts, backupJobName)
 	if err != nil {
+		return err
+	}
+	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
+	if err := controllerutil.SetOwnerReference(cluster, backupJob, scheme); err != nil {
 		return err
 	}
 	if err := cli.Create(ctx, backupJob); err != nil {

@@ -64,11 +64,16 @@ spec:
                 echo $cluster_info; 
                 mkdir -p /data/mysql/data; 
                 chmod +777 -R /data/mysql; 
-                if [ -z $KB_REPLICASETS_LEADER ]; then
+                leader=`cat /etc/podinfo/annotations | grep "cs.dbaas.kubeblocks.io/leader" | awk -F'"' '{print $2}'`
+                echo $leader
+                if [ -z $leader ]; then
+                  echo "docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info=\"$cluster_info\" --cluster-id=$CLUSTER_ID"
                   docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$cluster_info" --cluster-id=$CLUSTER_ID
-                elif [ "$KB_POD_NAME" != "$KB_REPLICASETS_LEADER" ]; then
+                elif [ "$KB_POD_NAME" != "$leader" ]; then
+                  echo "docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info=\"$KB_POD_NAME:13306\" --cluster-id=$CLUSTER_ID"
                   docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$KB_POD_NAME:13306" --cluster-id=$CLUSTER_ID
                 else 
+                  echo "docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info=\"$KB_POD_NAME:13306@1\" --cluster-id=$CLUSTER_ID"
                   docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$KB_POD_NAME:13306@1" --cluster-id=$CLUSTER_ID
                 fi
             command:

@@ -547,12 +547,7 @@ func prepareSecretObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj int
 	return nil
 }
 
-// needBuildPDB check whether the PodDisruptionBudget needs to be built
-func needBuildPDB(params *createParams) bool {
-	if params.component.ComponentType == dbaasv1alpha1.Consensus {
-		return false
-	}
-	podDisruptionBudgetSpec := params.component.PodDisruptionBudgetSpec
+func existsPDBSpec(podDisruptionBudgetSpec *policyv1.PodDisruptionBudgetSpec) bool {
 	if podDisruptionBudgetSpec == nil {
 		return false
 	}
@@ -560,6 +555,14 @@ func needBuildPDB(params *createParams) bool {
 		return false
 	}
 	return true
+}
+
+// needBuildPDB check whether the PodDisruptionBudget needs to be built
+func needBuildPDB(params *createParams) bool {
+	if params.component.ComponentType == dbaasv1alpha1.Consensus {
+		return false
+	}
+	return existsPDBSpec(params.component.PodDisruptionBudgetSpec)
 }
 
 // TODO: @free6om handle config of all component types
@@ -622,15 +625,13 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		// end render config
 	}
 
-	if !needBuildPDB(params) {
-		return nil
+	if needBuildPDB(params) {
+		pdb, err := buildPDB(*params)
+		if err != nil {
+			return err
+		}
+		*params.applyObjs = append(*params.applyObjs, pdb)
 	}
-
-	pdb, err := buildPDB(*params)
-	if err != nil {
-		return err
-	}
-	*params.applyObjs = append(*params.applyObjs, pdb)
 
 	if params.component.Service.Ports != nil {
 		svc, err := buildSvc(*params)

@@ -44,7 +44,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 	)
 
 	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
+		// Add any setup steps that needs to be executed before each test
 		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
@@ -67,7 +67,8 @@ spec:
   type: state.mysql-8
   components:
   - typeName: replicasets
-    minAvailable: 1
+    podDisruptionBudgetSpec:
+      minAvailable: 1
     componentType: Stateful
     defaultReplicas: 3
     podSpec:

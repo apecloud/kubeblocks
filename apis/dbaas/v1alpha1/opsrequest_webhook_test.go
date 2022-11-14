@@ -57,7 +57,7 @@ var _ = Describe("OpsRequest webhook", func() {
 	testUpgrade := func(cluster *Cluster, opsRequest *OpsRequest) {
 
 		By("By testing when cluster not support upgrade")
-		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).ShouldNot(Succeed())
+		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
 		// set cluster support upgrade
 		patch := client.MergeFrom(cluster.DeepCopy())
 		cluster.Status.Operations.Upgradable = true
@@ -70,17 +70,17 @@ var _ = Describe("OpsRequest webhook", func() {
 		}, timeout, interval).Should(BeTrue())
 
 		By("By testing when spec.clusterOps is null")
-		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).ShouldNot(Succeed())
+		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
 
 		By("By testing spec.clusterOps.upgrade.appVersionRef when it equals Cluster.spec.appVersionRef")
 		opsRequest.Spec.ClusterOps = &ClusterOps{Upgrade: &Upgrade{
 			AppVersionRef: appVersionName,
 		}}
-		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).ShouldNot(Succeed())
+		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
 
 		By("By creating a appVersion for upgrade")
 		newAppVersion := createTestAppVersionObj(clusterDefinitionName, appVersionNameForUpgrade)
-		Expect(testCtx.CheckedCreateObj(ctx, newAppVersion)).Should(Succeed())
+		Expect(testCtx.CreateObj(ctx, newAppVersion)).Should(Succeed())
 		By("By creating a upgrade opsRequest, it should be succeed")
 		Eventually(func() bool {
 			opsRequest.Spec.ClusterOps.Upgrade.AppVersionRef = newAppVersion.Name
@@ -125,7 +125,7 @@ var _ = Describe("OpsRequest webhook", func() {
 				},
 			},
 		}
-		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).ShouldNot(Succeed())
+		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
 		Eventually(func() bool {
 			opsRequest.Spec.ComponentOpsList[0].ComponentNames = []string{"replicaSets"}
 			err := testCtx.CheckedCreateObj(ctx, opsRequest)
@@ -162,7 +162,7 @@ var _ = Describe("OpsRequest webhook", func() {
 				},
 			},
 		}
-		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).ShouldNot(Succeed())
+		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
 
 		By("By testing volumeExpansion. if api is legal, it will create successfully")
 		Eventually(func() bool {
@@ -206,7 +206,7 @@ var _ = Describe("OpsRequest webhook", func() {
 
 		By("By testing horizontalScaling replica is not in [min,max]")
 		opsRequest.Spec.ComponentOpsList[0].HorizontalScaling.Replicas = 4
-		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).ShouldNot(Succeed())
+		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
 
 	}
 
@@ -227,7 +227,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		opsRequest.Spec.ComponentOpsList = []*ComponentOps{
 			{ComponentNames: []string{"replicaSets1"}},
 		}
-		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).ShouldNot(Succeed())
+		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
 
 		By("By testing restart. if api is legal, it will create successfully")
 		Eventually(func() bool {

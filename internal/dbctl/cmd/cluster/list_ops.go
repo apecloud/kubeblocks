@@ -49,14 +49,18 @@ func completeForListOps(option interface{}, args []string) error {
 	if o, ok = option.(*get.Options); !ok {
 		return nil
 	}
+	if len(args) == 0 {
+		return nil
+	}
+	if len(args) > 1 {
+		return fmt.Errorf("only supported list the OpsRequests of one cluster")
+	}
 	// if cluster name is not nil, covert to label for list OpsRequest
-	if len(args) > 0 {
-		labelString := fmt.Sprintf("%s=%s", types.InstanceLabelKey, args[0])
-		if len(o.LabelSelector) == 0 {
-			o.LabelSelector = labelString
-		} else {
-			o.LabelSelector += "," + labelString
-		}
+	labelString := fmt.Sprintf("%s=%s", types.InstanceLabelKey, args[0])
+	if len(o.LabelSelector) == 0 {
+		o.LabelSelector = labelString
+	} else {
+		o.LabelSelector += "," + labelString
 	}
 	return nil
 }

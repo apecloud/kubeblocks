@@ -216,7 +216,7 @@ func (o *LogsOptions) validate() error {
 }
 
 // createFileTypeCommand create file type case and assemble command
-func (o *LogsOptions) createFileTypeCommand(pod *corev1.Pod, obj *types.ClusterObjects) (string, error) {
+func (o *LogsOptions) createFileTypeCommand(pod *corev1.Pod, obj *cluster.ClusterObjects) (string, error) {
 	var command string
 	componentName, ok := pod.Labels[types.ComponentLabelKey]
 	if !ok {

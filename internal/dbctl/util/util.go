@@ -39,10 +39,13 @@ import (
 	"github.com/fatih/color"
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
+	"github.com/gosuri/uitable"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
+	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -317,4 +320,49 @@ func printErr(err error) {
 		}
 		fmt.Fprint(os.Stderr, msg)
 	}
+}
+
+func PrintTable(out io.Writer, table *uitable.Table) error {
+	raw := table.Bytes()
+	raw = append(raw, []byte("\n")...)
+	_, err := out.Write(raw)
+	if err != nil {
+		return errors.Wrap(err, "unable to write table output")
+	}
+	return nil
+}
+
+// GetNodeByName choose node by name from a node array
+func GetNodeByName(nodes []*corev1.Node, name string) *corev1.Node {
+	for _, node := range nodes {
+		if node.Name == name {
+			return node
+		}
+	}
+	return nil
+}
+
+// ResourceIsEmpty check if resource is empty or not
+func ResourceIsEmpty(res *resource.Quantity) bool {
+	resStr := res.String()
+	if resStr == "0" || resStr == "<nil>" {
+		return true
+	}
+	return false
+}
+
+func GetPodStatus(pods []*corev1.Pod) (running, waiting, succeeded, failed int) {
+	for _, pod := range pods {
+		switch pod.Status.Phase {
+		case corev1.PodRunning:
+			running++
+		case corev1.PodPending:
+			waiting++
+		case corev1.PodSucceeded:
+			succeeded++
+		case corev1.PodFailed:
+			failed++
+		}
+	}
+	return
 }

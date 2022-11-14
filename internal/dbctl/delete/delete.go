@@ -32,9 +32,16 @@ import (
 
 type DeleteFlags struct {
 	*cmddelete.DeleteFlags
-	// cluster name. if the resources is not owns by cluster, ignore it
+
+	// ClusterName only used when delete resources not cluster, ClusterName
+	// is the owner of the resources, it will be used to construct a label
+	// selector to filter the resource. If ClusterName is empty, command will
+	// delete resources according to the ResourceNames without any label selector.
 	ClusterName string
-	// the resource names of cluster need to be deleted
+
+	// ResourceNames the resource names that will be deleted, if it is empty,
+	// and ClusterName is specified, use label selector to delete all resource
+	// belonging to the ClusterName
 	ResourceNames []string
 }
 
@@ -46,13 +53,21 @@ func Build(c *builder.Command) *cobra.Command {
 		Short:   c.Short,
 		Example: c.Example,
 		Run: func(cmd *cobra.Command, args []string) {
+			// If delete resources belonging to cluster, custom complete function
+			// should fill the ResourceName or construct the label selector based
+			// on the ClusterName
 			if c.CustomComplete != nil {
-				util.CheckErr(c.CustomComplete(deleteFlags, args))
+				cmdutil.CheckErr(c.CustomComplete(deleteFlags, args))
 			}
+
 			util.CheckErr(validate(deleteFlags, args, c.IOStreams.In))
+
 			o, err := deleteFlags.ToOptions(nil, c.IOStreams)
 			util.CheckErr(err)
+
+			// build args that will be used to
 			args = buildArgs(c, deleteFlags, args)
+
 			// call kubectl delete options methods
 			util.CheckErr(o.Complete(c.Factory, args, cmd))
 			util.CheckErr(o.Validate())
@@ -73,7 +88,9 @@ func buildArgs(c *builder.Command, deleteFlags *DeleteFlags, args []string) []st
 	if len(deleteFlags.ResourceNames) > 0 {
 		args = deleteFlags.ResourceNames
 	} else if deleteFlags.ClusterName != "" {
-		// using the cluster label selector, args should be empty
+		// use the cluster label selector to select the resources that should
+		// be deleted, so args should be empty, the original args should have
+		// been used to construct the label selector.
 		args = []string{}
 	}
 	args = append([]string{util.GVRToString(c.GVR)}, args...)
@@ -82,8 +99,8 @@ func buildArgs(c *builder.Command, deleteFlags *DeleteFlags, args []string) []st
 
 func validate(deleteFlags *DeleteFlags, args []string, in io.Reader) error {
 	// build resource to delete.
-	// if resource names is specified, use it, otherwise use the args.
-	if deleteFlags.ResourceNames != nil && len(deleteFlags.ResourceNames) > 0 {
+	// if resource names is specified, use it first, otherwise use the args.
+	if len(deleteFlags.ResourceNames) > 0 {
 		args = deleteFlags.ResourceNames
 	}
 	if len(args) < 1 {

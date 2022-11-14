@@ -17,36 +17,55 @@ limitations under the License.
 package list
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/get"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
 )
 
-// Build return a list command
+// Build return a list command, if the resource is not cluster, construct a label
+// selector based on cluster name to select resource to list.
 func Build(c *builder.Command) *cobra.Command {
 	o := get.NewOptions(c.IOStreams, []string{util.GVRToString(c.GVR)})
 
 	use := c.Use
+	var alias string
 	if len(use) == 0 {
 		use = "list"
+		alias = "ls"
 	}
 
 	cmd := &cobra.Command{
 		Use:     use,
 		Short:   c.Short,
 		Example: c.Example,
+		Aliases: []string{alias},
 		Run: func(cmd *cobra.Command, args []string) {
-			complete(o, cmd)
+			var (
+				goon = true
+				err  error
+			)
+			c.Args = args
+			c.Cmd = cmd
+
+			complete(c, o)
 			if c.CustomComplete != nil {
 				util.CheckErr(c.CustomComplete(o, args))
 			}
 			util.CheckErr(o.Complete(c.Factory))
-			util.CheckErr(o.Run(c.Factory))
+
+			if c.CustomRun != nil {
+				goon, err = c.CustomRun(c)
+			}
+			if goon && err == nil {
+				util.CheckErr(o.Run(c.Factory))
+			}
 		},
 	}
 
@@ -56,12 +75,16 @@ func Build(c *builder.Command) *cobra.Command {
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespace", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
 	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
+
+	if c.CustomFlags != nil {
+		c.CustomFlags(c.Options, cmd)
+	}
 	return cmd
 }
 
-func complete(o *get.Options, cmd *cobra.Command) {
-	o.NoHeaders = cmdutil.GetFlagBool(cmd, "no-headers")
-	outputOption := cmd.Flags().Lookup("output").Value.String()
+func complete(c *builder.Command, o *get.Options) {
+	o.NoHeaders = cmdutil.GetFlagBool(c.Cmd, "no-headers")
+	outputOption := c.Cmd.Flags().Lookup("output").Value.String()
 	if strings.Contains(outputOption, "custom-columns") || outputOption == "yaml" || strings.Contains(outputOption, "json") {
 		o.ServerPrint = false
 	}
@@ -73,5 +96,30 @@ func complete(o *get.Options, cmd *cobra.Command) {
 
 	if (len(*o.PrintFlags.OutputFormat) == 0 && len(templateArg) == 0) || *o.PrintFlags.OutputFormat == "wide" {
 		o.IsHumanReadablePrinter = true
+	}
+
+	buildListArgs(c, o)
+}
+
+// buildListArgs build resource to list, if Resource is not Cluster, use cluster name to
+// construct label selector.
+func buildListArgs(c *builder.Command, o *get.Options) {
+	switch c.GVR {
+	case types.ClusterGVR():
+		// args are the cluster names
+		o.BuildArgs = append(o.BuildArgs, c.Args...)
+	default:
+		// for other resources, use cluster name to construct the label selector,
+		// the label selector is like "instance-key in (cluster1, cluster2)"
+		if len(c.Args) == 0 {
+			return
+		}
+
+		label := fmt.Sprintf("%s in (%s)", types.InstanceLabelKey, strings.Join(c.Args, ","))
+		if len(o.LabelSelector) == 0 {
+			o.LabelSelector = label
+		} else {
+			o.LabelSelector += "," + label
+		}
 	}
 }

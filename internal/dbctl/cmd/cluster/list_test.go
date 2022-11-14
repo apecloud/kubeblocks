@@ -17,21 +17,26 @@ limitations under the License.
 package cluster
 
 import (
-	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/list"
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
-	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
-func NewListOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	return builder.NewCmdBuilder().
-		Use("list-ops").
-		Short("List all opsRequest.").
-		Factory(f).
-		GVR(types.OpsGVR()).
-		IOStreams(streams).
-		Build(list.Build)
-}
+var _ = Describe("list", func() {
+	var streams genericclioptions.IOStreams
+	BeforeEach(func() {
+		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+	})
+
+	It("list", func() {
+		tf := cmdtesting.NewTestFactory().WithNamespace("default")
+		defer tf.Cleanup()
+		cmd := NewListCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+
+		Expect(cmd.Flags().Lookup("show-instance").Value.String()).Should(Equal("false"))
+		Expect(cmd.Flags().Lookup("show-component").Value.String()).Should(Equal("false"))
+	})
+})

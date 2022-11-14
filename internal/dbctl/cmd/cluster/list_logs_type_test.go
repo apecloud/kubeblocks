@@ -34,6 +34,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/cluster"
 )
 
 var _ = Describe("logs_list_type test", func() {
@@ -67,7 +68,7 @@ var _ = Describe("logs_list_type test", func() {
 		Expect(o.clusterName).Should(Equal("cluster-name"))
 	})
 	It("printContext test", func() {
-		dataObj := &types.ClusterObjects{
+		dataObj := &cluster.ClusterObjects{
 			Cluster: &dbaasv1alpha1.Cluster{
 				Spec: dbaasv1alpha1.ClusterSpec{
 					Components: []dbaasv1alpha1.ClusterComponent{

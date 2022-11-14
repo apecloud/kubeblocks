@@ -27,7 +27,6 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/create"
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/get"
 	"github.com/apecloud/kubeblocks/internal/dbctl/delete"
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
@@ -50,7 +49,7 @@ var _ = Describe("Cluster", func() {
 			defer tf.Cleanup()
 			tf.ClientConfigVal = cfg
 			cmd := NewCreateCmd(tf, streams)
-			Expect(cmd != nil).To(BeTrue())
+			Expect(cmd).ShouldNot(BeNil())
 			Expect(cmd.Flags().GetString("termination-policy")).Should(Equal(""))
 
 			// must succeed otherwise exit 1 and make test fails
@@ -107,28 +106,14 @@ var _ = Describe("Cluster", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace("default")
 		defer tf.Cleanup()
 		cmd := NewDeleteCmd(tf, streams)
-		Expect(cmd != nil).To(BeTrue())
-	})
-
-	It("describe", func() {
-		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		defer tf.Cleanup()
-		cmd := NewDescribeCmd(tf, streams)
-		Expect(cmd != nil).To(BeTrue())
-	})
-
-	It("list", func() {
-		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		defer tf.Cleanup()
-		cmd := NewListCmd(tf, streams)
-		Expect(cmd != nil).To(BeTrue())
+		Expect(cmd).ShouldNot(BeNil())
 	})
 
 	It("cluster", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace("default")
 		defer tf.Cleanup()
 		cmd := NewClusterCmd(tf, streams)
-		Expect(cmd != nil).To(BeTrue())
+		Expect(cmd).ShouldNot(BeNil())
 		Expect(cmd.HasSubCommands()).To(BeTrue())
 	})
 
@@ -176,17 +161,10 @@ var _ = Describe("Cluster", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace("default")
 		tf.ClientConfigVal = cfg
 		defer tf.Cleanup()
-		o := &get.Options{}
+
 		clusterName := "wesql"
-		By("test list OpsRequest with cluster")
-		Expect(completeForListOps(o, []string{clusterName})).Should(Succeed())
 		clusterLabel := fmt.Sprintf("%s=%s", types.InstanceLabelKey, clusterName)
-		Expect(o.LabelSelector == clusterLabel).Should(BeTrue())
-		By("test list OpsRequest with cluster and custom label")
 		testLabel := "kubeblocks.io/test=test"
-		o.LabelSelector = testLabel
-		Expect(completeForListOps(o, []string{clusterName})).Should(Succeed())
-		Expect(o.LabelSelector == testLabel+","+clusterLabel).Should(BeTrue())
 
 		By("test delete OpsRequest with cluster")
 		deleteFlags := &delete.DeleteFlags{
@@ -194,10 +172,12 @@ var _ = Describe("Cluster", func() {
 		}
 		Expect(completeForDeleteOps(deleteFlags, []string{clusterName})).Should(Succeed())
 		Expect(*deleteFlags.LabelSelector == clusterLabel).Should(BeTrue())
+
 		By("test delete OpsRequest with cluster and custom label")
 		deleteFlags.LabelSelector = &testLabel
 		Expect(completeForDeleteOps(deleteFlags, []string{clusterName})).Should(Succeed())
 		Expect(*deleteFlags.LabelSelector == testLabel+","+clusterLabel).Should(BeTrue())
+
 		By("test delete OpsRequest with name")
 		deleteFlags.ClusterName = ""
 		deleteFlags.ResourceNames = []string{"test1"}

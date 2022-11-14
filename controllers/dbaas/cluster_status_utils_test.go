@@ -287,7 +287,7 @@ spec:
 					newCluster.Status.Phase == expectPhase
 			}
 			return statusComponents[componentName].Phase == expectPhase
-		}, timeout*3, interval).Should(BeTrue())
+		}, timeout*5, interval).Should(BeTrue())
 
 	}
 

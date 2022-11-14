@@ -21,15 +21,11 @@ import (
 	"os"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
-	"github.com/apecloud/kubeblocks/internal/dbctl/util/cluster"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -38,6 +34,10 @@ import (
 	cmdexec "k8s.io/kubectl/pkg/cmd/exec"
 	cmdlogs "k8s.io/kubectl/pkg/cmd/logs"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/cluster"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/exec"
 )

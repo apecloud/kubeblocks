@@ -51,8 +51,8 @@ type FakeTest struct {
 }
 
 type TestWrapper struct {
-	testEnv     FakeTest
-	clusterName string
+	testEnv FakeTest
+	// clusterName string
 
 	// test error
 	err     error
@@ -120,6 +120,7 @@ func (w *TestWrapper) updateComTplMeta(cd *dbaasv1alpha1.ClusterDefinition) {
 			}
 			return nil
 		})
+
 }
 
 func (w *TestWrapper) DeleteAllCR() error {
@@ -326,7 +327,7 @@ func DeleteCluster(test *TestWrapper, cluster *dbaasv1alpha1.Cluster) error {
 	return test.DeleteCluster(client.ObjectKeyFromObject(cluster))
 }
 
-func ValidateISVCR[T interface{}, OBJECT interface{ client.Object }](test *TestWrapper, obj client.Object, handle func(obj OBJECT) T) (error, T) {
+func ValidateISVCR[T interface{}, OBJECT interface{ client.Object }](test *TestWrapper, obj client.Object, defaultValue T, handle func(obj OBJECT) T) (T, error) {
 	var (
 		ctx       = test.ctx
 		k8sClient = test.cli
@@ -355,18 +356,17 @@ func ValidateISVCR[T interface{}, OBJECT interface{ client.Object }](test *TestW
 			Name:      test.testEnv.CfgTplName,
 		}
 	default:
-		return cfgcore.MakeError("not support cr type."), *new(T)
+		return defaultValue, cfgcore.MakeError("not support cr type.")
 	}
 
 	if err := k8sClient.Get(ctx, objKey, obj); err != nil {
-		return err, *new(T)
+		return defaultValue, err
 	}
 
-	return nil, handle(obj.(OBJECT))
+	return handle(obj.(OBJECT)), nil
 }
 
-func ValidateCR[T interface{}, T2 interface{ client.Object }](test *TestWrapper, obj T2, objKey client.ObjectKey,
-	handle func(obj T2) T) (error, T) {
+func ValidateCR[T any, T2 interface{ client.Object }](test *TestWrapper, obj T2, objKey client.ObjectKey, defaultValue T, handle func(obj T2) T) (T, error) {
 	var (
 		ctx       = test.ctx
 		k8sClient = test.cli
@@ -374,8 +374,8 @@ func ValidateCR[T interface{}, T2 interface{ client.Object }](test *TestWrapper,
 
 	// obj := *new(T2)
 	if err := k8sClient.Get(ctx, objKey, obj); err != nil {
-		return err, *new(T)
+		return defaultValue, err
 	}
 
-	return nil, handle(obj)
+	return handle(obj), nil
 }

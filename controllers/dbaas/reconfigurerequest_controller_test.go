@@ -18,12 +18,15 @@ package dbaas
 
 import (
 	"context"
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
+	"time"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
-	"time"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 )
 
 var _ = Describe("Cluster Controller", func() {
@@ -60,7 +63,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			// step2: Check configuration template status
 			Eventually(func() bool {
-				err, ok := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigurationTemplate{},
+				ok, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigurationTemplate{}, false,
 					func(tpl *dbaasv1alpha1.ConfigurationTemplate) bool {
 						return configuration.ValidateConfTplStatus(tpl.Status)
 					})
@@ -69,7 +72,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			// step3: Check cluster definition status
 			Eventually(func() bool {
-				_, ok := ValidateISVCR(testWrapper, &dbaasv1alpha1.ClusterDefinition{},
+				ok, _ := ValidateISVCR(testWrapper, &dbaasv1alpha1.ClusterDefinition{}, false,
 					func(cd *dbaasv1alpha1.ClusterDefinition) bool {
 						return cd.Status.Phase == dbaasv1alpha1.AvailablePhase
 					})
@@ -83,8 +86,8 @@ var _ = Describe("Cluster Controller", func() {
 
 			// step5: Check cluster definition status
 			Eventually(func() bool {
-				err, ok := ValidateCR(testWrapper, &dbaasv1alpha1.Cluster{},
-					testWrapper.WithCRName(clusterName),
+				ok, err := ValidateCR(testWrapper, &dbaasv1alpha1.Cluster{},
+					testWrapper.WithCRName(clusterName), false,
 					func(obj *dbaasv1alpha1.Cluster) bool {
 						return obj.Status.Phase == dbaasv1alpha1.CreatingPhase
 					})
@@ -93,11 +96,10 @@ var _ = Describe("Cluster Controller", func() {
 
 			// step5 Check config for instance
 			Eventually(func() bool {
-				_, ok := ValidateCR(testWrapper, &corev1.ConfigMap{},
+				ok, _ := ValidateCR(testWrapper, &corev1.ConfigMap{},
 					testWrapper.WithCRName(GetComponentCfgName(clusterName,
-						"replicasets", // component name
-						"mysql-config")), // volume name
-					// testWrapper.testEnv.CfgTplName)),
+						"replicasets",
+						"mysql-config")), false,
 					func(cm *corev1.ConfigMap) bool {
 						return cm.Labels[appInstanceLabelKey] == clusterName &&
 							cm.Labels[configuration.CMConfigurationTplNameLabelKey] == testWrapper.testEnv.CfgTplName &&

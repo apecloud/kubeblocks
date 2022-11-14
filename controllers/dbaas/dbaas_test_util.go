@@ -56,7 +56,8 @@ type FakeTest struct {
 }
 
 type TestWrapper struct {
-	testEnv FakeTest
+	testEnv      FakeTest
+	testRootPath string
 	// clusterName string
 
 	// test error
@@ -210,6 +211,15 @@ func (w *TestWrapper) WithCRName(name string) client.ObjectKey {
 	}
 }
 
+func (w *TestWrapper) updateCrObject(obj client.Object, patch client.Patch) error {
+	var (
+		ctx       = w.ctx
+		k8sClient = w.cli
+	)
+
+	return k8sClient.Patch(ctx, obj, patch)
+}
+
 func GenRandomCDName() string {
 	return ISV_TEST_CD_PREFIX + BuildRandomString()
 }
@@ -246,10 +256,11 @@ func CreateDBaasFromISV(testCtx testutil.TestContext, ctx context.Context, k8sCl
 	}
 
 	testWrapper := &TestWrapper{
-		testEnv: testInfo,
-		ctx:     ctx,
-		testCtx: testCtx,
-		cli:     k8sClient,
+		testEnv:      testInfo,
+		ctx:          ctx,
+		testCtx:      testCtx,
+		cli:          k8sClient,
+		testRootPath: dataPath,
 	}
 
 	// create dbaas
@@ -278,20 +289,20 @@ func createCRFromISVWithT(t *TestWrapper, tplName string, fileName string, crTyp
 
 	switch obj := crType.(type) {
 	case *dbaasv1alpha1.AppVersion:
-		crObj, err = createCrFromFile(fileName, obj, t.updateAvComTplMeta)
+		crObj, err = createISVCrFromFile(fileName, obj, t.updateAvComTplMeta)
 		t.av = crObj.(*dbaasv1alpha1.AppVersion)
 	case *dbaasv1alpha1.ClusterDefinition:
-		crObj, err = createCrFromFile(fileName, obj, t.updateComTplMeta)
+		crObj, err = createISVCrFromFile(fileName, obj, t.updateComTplMeta)
 		t.cd = crObj.(*dbaasv1alpha1.ClusterDefinition)
 	case *dbaasv1alpha1.ConfigurationTemplate:
-		crObj, err = createCrFromFile(fileName, obj, func(tpl *dbaasv1alpha1.ConfigurationTemplate) {
+		crObj, err = createISVCrFromFile(fileName, obj, func(tpl *dbaasv1alpha1.ConfigurationTemplate) {
 			tpl.Spec.TplRef = t.testEnv.CfgTplName
 		})
 		t.tpl = crObj.(*dbaasv1alpha1.ConfigurationTemplate)
 	// case *dbaasv1alpha1.Cluster:
-	//	crObj, err = createCrFromFile(fileName, obj)
+	//	crObj, err = createISVCrFromFile(fileName, obj)
 	case *corev1.ConfigMap:
-		crObj, err = createCrFromFile(fileName, obj)
+		crObj, err = createISVCrFromFile(fileName, obj)
 		t.cm = crObj.(*corev1.ConfigMap)
 	}
 
@@ -305,7 +316,7 @@ func createCRFromISVWithT(t *TestWrapper, tplName string, fileName string, crTyp
 	t.createCrObject(crObj)
 }
 
-func createCrFromFile[T corev1.ConfigMap | dbaasv1alpha1.ClusterDefinition | dbaasv1alpha1.Cluster | dbaasv1alpha1.AppVersion | dbaasv1alpha1.ConfigurationTemplate](fileName string, param *T, ops ...func(obj *T)) (*T, error) {
+func createISVCrFromFile[T corev1.ConfigMap | dbaasv1alpha1.ClusterDefinition | dbaasv1alpha1.Cluster | dbaasv1alpha1.AppVersion | dbaasv1alpha1.ConfigurationTemplate](fileName string, param *T, ops ...func(obj *T)) (*T, error) {
 	_ = param
 
 	cdYaml, err := os.ReadFile(fileName)
@@ -333,11 +344,12 @@ func DeleteCluster(test *TestWrapper, cluster *dbaasv1alpha1.Cluster) error {
 	return test.DeleteCluster(client.ObjectKeyFromObject(cluster))
 }
 
-func ValidateISVCR[T any, OBJECT interface{ client.Object }](test *TestWrapper, obj client.Object, defaultValue T, handle func(obj OBJECT) T) (T, error) {
+func ValidateISVCR[T any, OBJECT interface{ client.Object }](test *TestWrapper, obj client.Object, handle func(obj OBJECT) T) (T, error) {
 	var (
-		ctx       = test.ctx
-		k8sClient = test.cli
-		objKey    client.ObjectKey
+		ctx          = test.ctx
+		k8sClient    = test.cli
+		objKey       client.ObjectKey
+		defaultValue T
 	)
 
 	switch obj.(type) {
@@ -372,10 +384,11 @@ func ValidateISVCR[T any, OBJECT interface{ client.Object }](test *TestWrapper, 
 	return handle(obj.(OBJECT)), nil
 }
 
-func ValidateCR[T any, T2 interface{ client.Object }](test *TestWrapper, obj T2, objKey client.ObjectKey, defaultValue T, handle func(obj T2) T) (T, error) {
+func ValidateCR[T any, T2 interface{ client.Object }](test *TestWrapper, obj T2, objKey client.ObjectKey, handle func(obj T2) T) (T, error) {
 	var (
-		ctx       = test.ctx
-		k8sClient = test.cli
+		ctx          = test.ctx
+		k8sClient    = test.cli
+		defaultValue T
 	)
 
 	// obj := *new(T2)
@@ -384,4 +397,42 @@ func ValidateCR[T any, T2 interface{ client.Object }](test *TestWrapper, obj T2,
 	}
 
 	return handle(obj), nil
+}
+
+func createCrFromFile[T interface{ client.Object }](fileName string) (T, error) {
+	obj := new(T)
+
+	cdYaml, err := os.ReadFile(fileName)
+	if err != nil {
+		return *obj, err
+	}
+
+	if err := yaml.Unmarshal(cdYaml, obj); err != nil {
+		return *obj, err
+	}
+
+	return *obj, nil
+}
+
+func UpdateCR[T any, T2 interface{ client.Object }](test *TestWrapper, obj T2, objKey client.ObjectKey, fileName string, op func(cm T2, newCm T2) (client.Patch, error)) error {
+	var (
+		ctx       = test.ctx
+		k8sClient = test.cli
+	)
+
+	crObj, err := createCrFromFile[T2](path.Join(test.testRootPath, fileName))
+	if err != nil {
+		return err
+	}
+
+	if err := k8sClient.Get(ctx, objKey, obj); err != nil {
+		return err
+	}
+
+	if patch, err := op(obj, crObj); err != nil {
+		return err
+	} else {
+		return test.updateCrObject(obj, patch)
+	}
+
 }

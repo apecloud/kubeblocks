@@ -158,6 +158,14 @@ func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *
 	r.commonValidationWithComponentOps(allErrs, cluster, supportedComponentMap, customValidate)
 }
 
+// invalidReplicas verify whether the replicas is invalid
+func invalidReplicas(replicas int, operationComponent *OperationComponent) bool {
+	if operationComponent.Min == 0 || operationComponent.Max == 0 {
+		return true
+	}
+	return replicas < operationComponent.Min || replicas > operationComponent.Max
+}
+
 // validateVolumeExpansion validate api is legal when spec.type is HorizontalScaling
 func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.ErrorList) {
 	supportedComponentMap := covertOperationComponentsToMap(cluster.Status.Operations.HorizontalScalable)
@@ -166,7 +174,7 @@ func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.
 			return field.NotFound(field.NewPath(fmt.Sprintf("spec.componentOps[%d].horizontalScaling", index)), "can not be empty")
 		}
 		replicas := componentOps.HorizontalScaling.Replicas
-		if replicas < operationComponent.Min || replicas > operationComponent.Max {
+		if invalidReplicas(replicas, operationComponent) {
 			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].horizontalScaling.replicas", index)), replicas,
 				fmt.Sprintf("replicas must in [%d,%d]", operationComponent.Min, operationComponent.Max))
 		}

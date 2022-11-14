@@ -40,8 +40,8 @@ type OpsBehaviour struct {
 	// you need to call PatchOpsStatus function in ops_util.go and set OpsRequest.status.phase to Failed
 	Action func(opsResource *OpsResource) error
 	// ReconcileAction loop until the operation is completed.
-	// if true, the operation is execution completed. otherwise, the operation is running.
-	ReconcileAction func(opsResource *OpsResource) (bool, error)
+	// return OpsRequest.status.phase
+	ReconcileAction func(opsResource *OpsResource) (dbaasv1alpha1.Phase, error)
 	// ActionStartedCondition append to OpsRequest.status.conditions when start performing Action function
 	ActionStartedCondition func(opsRequest *dbaasv1alpha1.OpsRequest) *metav1.Condition
 }

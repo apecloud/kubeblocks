@@ -104,32 +104,32 @@ type ClusterOps struct {
 }
 
 type ComponentOps struct {
-	// ComponentNames defines which components perform the operation
+	// ComponentNames defines which components perform the operation.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	ComponentNames []string `json:"componentNames,omitempty"`
 
-	// VolumeExpansion defines the variables that need to be input when expanding a volume
+	// VolumeExpansion defines the variables that need to be input when expanding a volume.
 	// +optional
 	VolumeExpansion []VolumeExpansion `json:"volumeExpansion,omitempty"`
 
-	// VerticalScaling defines the variables that need to be input when scaling compute resources
+	// VerticalScaling defines the variables that need to be input when scaling compute resources.
 	// +optional
 	VerticalScaling *corev1.ResourceRequirements `json:"verticalScaling,omitempty"`
 
-	// HorizontalScaling defines the variables that need to be input when scaling replicas
+	// HorizontalScaling defines the variables that need to be input when scaling replicas.
 	// +optional
 	HorizontalScaling *HorizontalScaling `json:"horizontalScaling,omitempty"`
 }
 
 type Upgrade struct {
-	// AppVersionRef reference AppVersion
+	// AppVersionRef reference AppVersion.
 	// +kubebuilder:validation:Required
 	AppVersionRef string `json:"appVersionRef"`
 }
 
 type VolumeExpansion struct {
-	// the request storage size
+	// the request storage size.
 	// +kubebuilder:validation:Required
 	Storage string `json:"storage"`
 
@@ -144,8 +144,8 @@ type HorizontalScaling struct {
 }
 
 type OpsRequestStatusComponent struct {
-	// Phase - in list of [Running, Failed, Creating, Updating, Deleting, Deleted]
-	// +kubebuilder:validation:Enum={Running,Failed,Creating,Updating,Deleting,Deleted}
+	// Phase describe the component phase, Reference ClusterDefinition.status.component.phase.
+	// +kubebuilder:validation:Enum={Running,Failed,Creating,Abnormal,Updating,Deleting,Deleted}
 	Phase Phase `json:"phase,omitempty"`
 }
 

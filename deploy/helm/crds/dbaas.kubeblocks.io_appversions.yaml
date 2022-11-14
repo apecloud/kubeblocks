@@ -46,12 +46,12 @@ spec:
             description: AppVersionSpec defines the desired state of AppVersion
             properties:
               clusterDefinitionRef:
-                description: ref ClusterDefinition
+                description: ref ClusterDefinition.
                 type: string
               components:
                 description: List of components in current AppVersion. Component will
                   replace the field in ClusterDefinition's component if type is matching
-                  typeName
+                  typeName.
                 items:
                   description: AppVersionComponent is an application version component
                     spec.
@@ -61,12 +61,12 @@ spec:
                         mechanism to handle configuration differences between versions,
                         the configTemplateRefs field, together with configTemplateRefs
                         in the ClusterDefinition, determines the final configuration
-                        file
+                        file.
                       items:
                         properties:
                           name:
                             description: Specify the name of the referenced configuration
-                              template, which is a configmap object
+                              template, which is a configmap object.
                             maxLength: 128
                             type: string
                           volumeName:
@@ -81,7 +81,7 @@ spec:
                       type: array
                     podSpec:
                       description: PodSpec is pod spec, if not nil, will replace ClusterDefinitionSpec.PodSpec
-                        in ClusterDefinition
+                        in ClusterDefinition.
                       properties:
                         activeDeadlineSeconds:
                           description: Optional duration in seconds the pod may be

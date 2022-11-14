@@ -30,7 +30,7 @@ import (
 
 func init() {
 	restartBehaviour := &OpsBehaviour{
-		FromClusterPhases:      []dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase},
+		FromClusterPhases:      []dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase},
 		ToClusterPhase:         dbaasv1alpha1.UpdatingPhase,
 		Action:                 RestartAction,
 		ActionStartedCondition: dbaasv1alpha1.NewRestartingCondition,

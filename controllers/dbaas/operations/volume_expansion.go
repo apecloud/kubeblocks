@@ -18,7 +18,6 @@ package operations
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
@@ -56,7 +55,7 @@ func VolumeExpansionAction(opsRes *OpsResource) error {
 					continue
 				}
 				opsRes.Cluster.Spec.Components[index].VolumeClaimTemplates[i].
-					Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse(v.Storage)
+					Spec.Resources.Requests[corev1.ResourceStorage] = v.Storage
 			}
 		}
 

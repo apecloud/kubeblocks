@@ -64,7 +64,7 @@ var _ = Describe("Cluster", func() {
 			o := &CreateOptions{
 				BaseOptions:        create.BaseOptions{IOStreams: streams, Name: "test"},
 				ComponentsFilePath: "",
-				TerminationPolicy:  "Halt",
+				TerminationPolicy:  "WipeOut",
 				ClusterDefRef:      "wesql",
 				AppVersionRef:      "app-version",
 				PodAntiAffinity:    "Preferred",

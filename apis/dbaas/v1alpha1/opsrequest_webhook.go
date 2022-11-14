@@ -104,6 +104,10 @@ func (r *OpsRequest) validate() error {
 
 // validateOps validate ops attributes is legal
 func (r *OpsRequest) validateOps(ctx context.Context, cluster *Cluster, allErrs *field.ErrorList) {
+	if cluster.Status.Operations == nil {
+		cluster.Status.Operations = &Operations{}
+	}
+
 	// Check whether the corresponding attribute is legal according to the operation type
 	switch r.Spec.Type {
 	case UpgradeType:
@@ -159,14 +163,14 @@ func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *
 }
 
 // invalidReplicas verify whether the replicas is invalid
-func invalidReplicas(replicas int, operationComponent *OperationComponent) bool {
+func invalidReplicas(replicas int32, operationComponent *OperationComponent) bool {
 	if operationComponent.Min == 0 || operationComponent.Max == 0 {
 		return true
 	}
 	return replicas < operationComponent.Min || replicas > operationComponent.Max
 }
 
-// validateVolumeExpansion validate api is legal when spec.type is HorizontalScaling
+// validateHorizontalScaling validate api is legal when spec.type is HorizontalScaling
 func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.ErrorList) {
 	supportedComponentMap := covertOperationComponentsToMap(cluster.Status.Operations.HorizontalScalable)
 	customValidate := func(componentOps *ComponentOps, index int, operationComponent *OperationComponent) *field.Error {
@@ -263,7 +267,7 @@ func (r *OpsRequest) commonValidationWithComponentOps(allErrs *field.ErrorList, 
 			if customValidate == nil {
 				continue
 			}
-			if err := customValidate(componentOps, index, operationComponent); err != nil {
+			if err := customValidate(&componentOps, index, operationComponent); err != nil {
 				*allErrs = append(*allErrs, err)
 			}
 		}
@@ -293,10 +297,10 @@ func covertComponentNamesToMap(componentNames []string) map[string]*OperationCom
 }
 
 // covertOperationComponentsToMap covert supportedOperationComponent slice to map
-func covertOperationComponentsToMap(componentNames []*OperationComponent) map[string]*OperationComponent {
+func covertOperationComponentsToMap(componentNames []OperationComponent) map[string]*OperationComponent {
 	supportedComponentMap := map[string]*OperationComponent{}
 	for _, v := range componentNames {
-		supportedComponentMap[v.Name] = v
+		supportedComponentMap[v.Name] = &v
 	}
 	return supportedComponentMap
 }

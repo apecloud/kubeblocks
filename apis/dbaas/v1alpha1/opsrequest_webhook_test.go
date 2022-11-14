@@ -33,6 +33,7 @@ import (
 )
 
 var _ = Describe("OpsRequest webhook", func() {
+
 	var (
 		clusterDefinitionName    = "opsrequest-webhook-mysql-definition"
 		appVersionName           = "opsrequest-webhook-mysql-appversion"
@@ -41,6 +42,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		opsRequestName           = "opsrequest-webhook-mysql-ops"
 		timeout                  = time.Second * 10
 		interval                 = time.Second
+		ctx                      = context.Background()
 	)
 	BeforeEach(func() {
 		// Add any setup steps that needs to be executed before each test
@@ -54,12 +56,18 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	testUpgrade := func(cluster *Cluster, opsRequest *OpsRequest) {
+	AfterEach(func() {
+		// Add any teardown steps that needs to be executed after each test
+	})
 
+	testUpgrade := func(cluster *Cluster, opsRequest *OpsRequest) {
 		By("By testing when cluster not support upgrade")
 		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
 		// set cluster support upgrade
 		patch := client.MergeFrom(cluster.DeepCopy())
+		if cluster.Status.Operations == nil {
+			cluster.Status.Operations = &Operations{}
+		}
 		cluster.Status.Operations.Upgradable = true
 		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
 		// wait until patch succeed
@@ -115,7 +123,7 @@ var _ = Describe("OpsRequest webhook", func() {
 
 		By("By testing verticalScaling opsRequest components is not consistent")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VerticalScalingType)
-		opsRequest.Spec.ComponentOpsList = []*ComponentOps{
+		opsRequest.Spec.ComponentOpsList = []ComponentOps{
 			{ComponentNames: []string{"proxy1", "proxy"},
 				VerticalScaling: &corev1.ResourceRequirements{
 					Requests: corev1.ResourceList{
@@ -136,7 +144,7 @@ var _ = Describe("OpsRequest webhook", func() {
 	testVolumeExpansion := func(cluster *Cluster) {
 		// set cluster support volumeExpansion
 		patch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Status.Operations.VolumeExpandable = []*OperationComponent{
+		cluster.Status.Operations.VolumeExpandable = []OperationComponent{
 			{
 				Name:                     "replicaSets",
 				VolumeClaimTemplateNames: []string{"data"},
@@ -152,12 +160,12 @@ var _ = Describe("OpsRequest webhook", func() {
 
 		By("By testing volumeExpansion volumeClaimTemplate name is not consistent")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VolumeExpansionType)
-		opsRequest.Spec.ComponentOpsList = []*ComponentOps{
+		opsRequest.Spec.ComponentOpsList = []ComponentOps{
 			{ComponentNames: []string{"replicaSets"},
 				VolumeExpansion: []VolumeExpansion{
 					{
 						Name:    "data1",
-						Storage: "2Gi",
+						Storage: resource.MustParse("2Gi"),
 					},
 				},
 			},
@@ -175,7 +183,7 @@ var _ = Describe("OpsRequest webhook", func() {
 	testHorizontalScaling := func(cluster *Cluster) {
 		// set cluster support horizontalScaling
 		patch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Status.Operations.HorizontalScalable = []*OperationComponent{
+		cluster.Status.Operations.HorizontalScalable = []OperationComponent{
 			{
 				Name: "replicaSets",
 				Min:  1,
@@ -193,7 +201,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("By testing horizontalScaling. if api is legal, it will create successfully")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
 		Eventually(func() bool {
-			opsRequest.Spec.ComponentOpsList = []*ComponentOps{
+			opsRequest.Spec.ComponentOpsList = []ComponentOps{
 				{ComponentNames: []string{"replicaSets"},
 					HorizontalScaling: &HorizontalScaling{
 						Replicas: 2,
@@ -224,7 +232,7 @@ var _ = Describe("OpsRequest webhook", func() {
 
 		By("By testing restart when componentNames is not correct")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, RestartType)
-		opsRequest.Spec.ComponentOpsList = []*ComponentOps{
+		opsRequest.Spec.ComponentOpsList = []ComponentOps{
 			{ComponentNames: []string{"replicaSets1"}},
 		}
 		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())

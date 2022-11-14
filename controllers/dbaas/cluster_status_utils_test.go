@@ -67,7 +67,7 @@ spec:
   type: state.mysql-8
   components:
   - typeName: replicasets
-    podDisruptionBudgetSpec:
+    pdbSpec:
       minAvailable: 1
     componentType: Stateful
     defaultReplicas: 3
@@ -287,7 +287,7 @@ spec:
 					newCluster.Status.Phase == expectPhase
 			}
 			return statusComponents[componentName].Phase == expectPhase
-		}, timeout, interval).Should(BeTrue())
+		}, timeout*3, interval).Should(BeTrue())
 
 	}
 

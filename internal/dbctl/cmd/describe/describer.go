@@ -203,9 +203,8 @@ func (d *ClusterDescriber) describeTopology(w describe.PrefixWriter) error {
 		pods := d.getPodsOfComponent(c.Name)
 		for _, pod := range pods {
 			instance := pod.Name
-			role, ok := pod.Labels[types.ConsensusSetRoleLabelKey]
-			if ok && len(role) > 0 {
-				instance = fmt.Sprintf("%s@%s\n", instance, role)
+			if role, ok := pod.Labels[types.ConsensusSetRoleLabelKey]; ok {
+				instance = fmt.Sprintf("%s@%s", instance, role)
 			}
 			w.Write(LEVEL_3, "%s\n", instance)
 		}

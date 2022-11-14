@@ -78,6 +78,7 @@ type ClusterStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
+	// Phase describe the phase of the cluster. the detail information of phase is as follows:
 	// Creating: creating cluster.
 	// Running: cluster is running, all components is available.
 	// Updating: cluster changes, such as horizontal-scaling/vertical-scaling/restart.
@@ -187,9 +188,10 @@ type ClusterStatusComponent struct {
 	// +optional
 	Type string `json:"type,omitempty"`
 
-	// Failed Phase: component not available, i.e, all pod is not ready for Stateless/Stateful component;
+	// Phase describe the phase of the cluster. the detail information of phase is as follows:
+	// Failed: component not available, i.e, all pod is not ready for Stateless/Stateful component;
 	// Leader/Primary pod is not ready for Consensus/Replication component.
-	// Abnormal Phase: component available but some pod is not ready.
+	// Abnormal: component available but some pod is not ready.
 	// if the component type is Consensus/Replication, the Leader/Primary pod is must ready in Abnormal phase.
 	// Other phases behave the same as the cluster phase.
 	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted}

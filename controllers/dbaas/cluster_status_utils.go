@@ -89,9 +89,8 @@ func getStatefulPhaseForEvent(ctx context.Context, cli client.Client, cluster *d
 		podsIsTerminating = false
 		err               error
 	)
-	podsIsTerminating, err = checkRelatedPodIsTerminating(ctx, cli, cluster, componentName)
-	if podsIsTerminating {
-		return "", nil
+	if podsIsTerminating, err = checkRelatedPodIsTerminating(ctx, cli, cluster, componentName); err != nil || podsIsTerminating {
+		return "", err
 	}
 	if err = getObjectListByComponentName(ctx, cli, cluster, stsList, componentName); err != nil {
 		return "", err
@@ -117,9 +116,8 @@ func getStatelessPhaseForEvent(ctx context.Context, cli client.Client, cluster *
 		podsIsTerminating = false
 		err               error
 	)
-	podsIsTerminating, err = checkRelatedPodIsTerminating(ctx, cli, cluster, componentName)
-	if podsIsTerminating {
-		return "", nil
+	if podsIsTerminating, err = checkRelatedPodIsTerminating(ctx, cli, cluster, componentName); err != nil || podsIsTerminating {
+		return "", err
 	}
 	if err = getObjectListByComponentName(ctx, cli, cluster, deployList, componentName); err != nil {
 		return "", err

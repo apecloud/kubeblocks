@@ -1,0 +1,20 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind:       AppVersion
+metadata:
+  name:     app-version
+spec:
+  clusterDefinitionRef: cluster-definition
+  components:
+    - type: replicasets
+      configTemplateRefs:
+        - name: mysql-tree-node-template-8.0
+          volumeName: mysql-config
+      podSpec:
+        containers:
+          - name: mysql
+            image: registry.jihulab.com/apecloud/mysql-server/mysql/wesql-server-arm:latest
+    - type: proxy
+      podSpec:
+        containers:
+          - name: nginx
+            image: nginx

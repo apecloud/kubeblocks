@@ -1672,7 +1672,16 @@ func isAlreadyExists(cmName string, namespace string, ctx context.Context, cli c
 
 // {{statefull.Name}}-{{appVersion.Name}}-{{tpl.Name}}-"config"
 func getInstanceCmName(sts *appsv1.StatefulSet, tpl *dbaasv1alpha1.ConfigTemplate) string {
-	return fmt.Sprintf("%s-%s-config", sts.GetName(), tpl.VolumeName)
+	return getInstanceCfgCmName(sts.GetName(), tpl.VolumeName)
+	// return fmt.Sprintf("%s-%s-config", sts.GetName(), tpl.VolumeName)
+}
+
+func getInstanceCfgCmName(stsName, tplName string) string {
+	return fmt.Sprintf("%s-%s-config", stsName, tplName)
+}
+
+func GetComponentCfgName(clusterName, componentName, tplName string) string {
+	return getInstanceCfgCmName(fmt.Sprintf("%s-%s", clusterName, componentName), tplName)
 }
 
 // generateConfigMapFromTpl render config file by config template provided ISV

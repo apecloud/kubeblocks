@@ -226,11 +226,11 @@ type Operations struct {
 
 	// VolumeExpandable which components of the cluster and its volumeClaimTemplates support volumeExpansion.
 	// +optional
-	VolumeExpandable []*OperationComponent `json:"volumeExpandable,omitempty"`
+	VolumeExpandable []OperationComponent `json:"volumeExpandable,omitempty"`
 
 	// HorizontalScalable which components of the cluster support horizontalScaling, and the replicas range limit.
 	// +optional
-	HorizontalScalable []*OperationComponent `json:"horizontalScalable,omitempty"`
+	HorizontalScalable []OperationComponent `json:"horizontalScalable,omitempty"`
 }
 
 type OperationComponent struct {

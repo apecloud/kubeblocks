@@ -212,7 +212,7 @@ func getAllComponentsNameMap(opsRequest *dbaasv1alpha1.OpsRequest) map[string]*d
 	componentNameMap := make(map[string]*dbaasv1alpha1.ComponentOps)
 	for _, componentOps := range opsRequest.Spec.ComponentOpsList {
 		for _, v := range componentOps.ComponentNames {
-			componentNameMap[v] = componentOps
+			componentNameMap[v] = &componentOps
 		}
 	}
 	return componentNameMap

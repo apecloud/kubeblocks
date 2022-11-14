@@ -43,7 +43,7 @@ type OpsRequestSpec struct {
 
 	// ComponentOpsList defines operations in component scope, like VolumeExpansion,VerticalScaling,HorizontalScaling
 	// +optional
-	ComponentOpsList []*ComponentOps `json:"componentOps,omitempty"`
+	ComponentOpsList []ComponentOps `json:"componentOps,omitempty"`
 }
 
 // OpsRequestStatus defines the observed state of OpsRequest

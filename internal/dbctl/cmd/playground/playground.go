@@ -191,7 +191,7 @@ func (o *initOptions) local() error {
 	}
 
 	// Print guide information
-	if err = printGuide(defaultCloudProvider, localHost, int(o.Replicas)); err != nil {
+	if err = printGuide(defaultCloudProvider, localHost, o.Replicas); err != nil {
 		return errors.Wrap(err, "Failed to print user guide")
 	}
 

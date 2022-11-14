@@ -531,7 +531,7 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 	var (
 		err                       error
 		upgradable                bool
-		volumeExpansionComponents []*dbaasv1alpha1.OperationComponent
+		volumeExpansionComponents []dbaasv1alpha1.OperationComponent
 		oldOperations             = cluster.Status.Operations.DeepCopy()
 		operations                = cluster.Status.Operations
 		appVersionList            = &dbaasv1alpha1.AppVersionList{}
@@ -569,16 +569,16 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 
 // getSupportVolumeExpansionComponents Get the components that support volume expansion and the volumeClaimTemplates
 func (r *ClusterReconciler) getSupportVolumeExpansionComponents(ctx context.Context,
-	cluster *dbaasv1alpha1.Cluster) ([]*dbaasv1alpha1.OperationComponent, error) {
+	cluster *dbaasv1alpha1.Cluster) ([]dbaasv1alpha1.OperationComponent, error) {
 	var (
 		storageClassMap             = map[string]bool{}
 		hasCheckDefaultStorageClass bool
 		// the default storageClass may not exist, so use a bool key to check
 		defaultStorageClassAllowExpansion bool
-		volumeExpansionComponents         = make([]*dbaasv1alpha1.OperationComponent, 0)
+		volumeExpansionComponents         = make([]dbaasv1alpha1.OperationComponent, 0)
 	)
 	for _, v := range cluster.Spec.Components {
-		operationComponent := &dbaasv1alpha1.OperationComponent{}
+		operationComponent := dbaasv1alpha1.OperationComponent{}
 		for _, vct := range v.VolumeClaimTemplates {
 			if vct.Spec == nil {
 				continue
@@ -663,11 +663,12 @@ func (r *ClusterReconciler) checkDefaultStorageClass(ctx context.Context) (bool,
 }
 
 // getSupportHorizontalScalingComponents Get the components that support horizontalScaling
-func getSupportHorizontalScalingComponents(cluster *dbaasv1alpha1.Cluster,
-	clusterDef *dbaasv1alpha1.ClusterDefinition) ([]*dbaasv1alpha1.OperationComponent, []string) {
+func getSupportHorizontalScalingComponents(
+	cluster *dbaasv1alpha1.Cluster,
+	clusterDef *dbaasv1alpha1.ClusterDefinition) ([]dbaasv1alpha1.OperationComponent, []string) {
 	var (
 		clusterComponentNames        = make([]string, 0)
-		horizontalScalableComponents = make([]*dbaasv1alpha1.OperationComponent, 0)
+		horizontalScalableComponents = make([]dbaasv1alpha1.OperationComponent, 0)
 	)
 	// determine whether to support horizontalScaling
 	for _, v := range cluster.Spec.Components {
@@ -677,7 +678,7 @@ func getSupportHorizontalScalingComponents(cluster *dbaasv1alpha1.Cluster,
 				component.MaxAvailable == component.MinAvailable) {
 				continue
 			}
-			horizontalScalableComponents = append(horizontalScalableComponents, &dbaasv1alpha1.OperationComponent{
+			horizontalScalableComponents = append(horizontalScalableComponents, dbaasv1alpha1.OperationComponent{
 				Name: v.Name,
 				Min:  component.MinAvailable,
 				Max:  component.MaxAvailable,

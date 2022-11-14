@@ -432,10 +432,6 @@ spec:
 		}
 
 		return &dbaasv1alpha1.Cluster{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "dbaas.kubeblocks.io/v1alpha1",
-				Kind:       "Cluster",
-			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      key.Name,
 				Namespace: key.Namespace,

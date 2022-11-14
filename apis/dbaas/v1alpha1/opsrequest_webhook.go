@@ -255,7 +255,7 @@ func (r *OpsRequest) commonValidationWithComponentOps(allErrs *field.ErrorList, 
 			if customValidate == nil {
 				continue
 			}
-			if err := customValidate(componentOps, index, operationComponent); err != nil {
+			if err := customValidate(&componentOps, index, operationComponent); err != nil {
 				*allErrs = append(*allErrs, err)
 			}
 		}
@@ -285,10 +285,10 @@ func covertComponentNamesToMap(componentNames []string) map[string]*OperationCom
 }
 
 // covertOperationComponentsToMap covert supportedOperationComponent slice to map
-func covertOperationComponentsToMap(componentNames []*OperationComponent) map[string]*OperationComponent {
+func covertOperationComponentsToMap(componentNames []OperationComponent) map[string]*OperationComponent {
 	supportedComponentMap := map[string]*OperationComponent{}
 	for _, v := range componentNames {
-		supportedComponentMap[v.Name] = v
+		supportedComponentMap[v.Name] = &v
 	}
 	return supportedComponentMap
 }

@@ -126,10 +126,6 @@ func fakeClusterObjs() *types.ClusterObjects {
 
 func fakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
 	return &dbaasv1alpha1.Cluster{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: types.ClusterGVR().GroupVersion().String(),
-			Kind:       types.KindCluster,
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,

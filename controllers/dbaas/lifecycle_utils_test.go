@@ -104,10 +104,10 @@ var _ = Describe("lifecycle_utils", func() {
 			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeFalse())
-			Expect(monitorConfig.ScrapePort).To(Equal(0))
+			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(0))
 			Expect(monitorConfig.ScrapePath).To(Equal(""))
 			if component.PodSpec != nil {
-				Expect(len(component.PodSpec.Containers)).To(Equal(0))
+				Expect(len(component.PodSpec.Containers)).To(BeEquivalentTo(0))
 			}
 		})
 
@@ -118,10 +118,10 @@ var _ = Describe("lifecycle_utils", func() {
 			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeTrue())
-			Expect(monitorConfig.ScrapePort).To(Equal(9144))
+			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(9144))
 			Expect(monitorConfig.ScrapePath).To(Equal("/metrics"))
 			if component.PodSpec != nil {
-				Expect(len(component.PodSpec.Containers)).To(Equal(0))
+				Expect(len(component.PodSpec.Containers)).To(BeEquivalentTo(0))
 			}
 		})
 
@@ -133,7 +133,7 @@ var _ = Describe("lifecycle_utils", func() {
 			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeFalse())
-			Expect(monitorConfig.ScrapePort).To(Equal(0))
+			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(0))
 			Expect(monitorConfig.ScrapePath).To(Equal(""))
 			if component.PodSpec != nil {
 				Expect(len(component.PodSpec.Containers)).To(Equal(0))
@@ -148,7 +148,7 @@ var _ = Describe("lifecycle_utils", func() {
 			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeFalse())
-			Expect(monitorConfig.ScrapePort).To(Equal(0))
+			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(0))
 			Expect(monitorConfig.ScrapePath).To(Equal(""))
 			if component.PodSpec != nil {
 				Expect(len(component.PodSpec.Containers)).To(Equal(0))
@@ -164,7 +164,7 @@ var _ = Describe("lifecycle_utils", func() {
 			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeFalse())
-			Expect(monitorConfig.ScrapePort).To(Equal(0))
+			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(0))
 			Expect(monitorConfig.ScrapePath).To(Equal(""))
 			if component.PodSpec != nil {
 				Expect(len(component.PodSpec.Containers)).To(Equal(0))
@@ -180,7 +180,7 @@ var _ = Describe("lifecycle_utils", func() {
 			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeTrue())
-			Expect(monitorConfig.ScrapePort).To(Equal(9104))
+			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(9104))
 			Expect(monitorConfig.ScrapePath).To(Equal("/metrics"))
 			Expect(len(component.PodSpec.Containers)).To(Equal(1))
 			Expect(strings.HasPrefix(component.PodSpec.Containers[0].Name, "inject-")).To(BeTrue())

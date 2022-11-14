@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/cli-runtime/pkg/resource"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -159,7 +160,10 @@ var _ = Describe("cluster util", func() {
 				},
 			},
 		}
-		client := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), cluster)
+
+		scheme := runtime.NewScheme()
+		utilruntime.Must(dbaasv1alpha1.AddToScheme(scheme))
+		client := dynamicfake.NewSimpleDynamicClient(scheme, cluster)
 		pod, err := GetDefaultPodName(client, clusterName, namespace)
 		Expect(pod).Should(Equal(podName))
 		Expect(err).ShouldNot(HaveOccurred())

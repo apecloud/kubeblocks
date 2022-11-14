@@ -153,7 +153,7 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 			if consensusSpec.Learner != nil && consensusSpec.Learner.Replicas != nil {
 				memberCount += *consensusSpec.Learner.Replicas
 			}
-			if memberCount != int32(component.DefaultReplicas) {
+			if memberCount != component.DefaultReplicas {
 				*allErrs = append(*allErrs,
 					field.Invalid(field.NewPath("spec.components[*].consensusSpec.defaultReplicas"),
 						component.DefaultReplicas,

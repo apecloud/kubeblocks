@@ -82,11 +82,12 @@ var _ = Describe("Event Controller", func() {
 			Expect(testCtx.CreateObj(ctx, sndEvent)).Should(Succeed())
 			Eventually(func() string {
 				event := &corev1.Event{}
-				Expect(k8sClient.Get(ctx, types.NamespacedName{
+				if err := k8sClient.Get(ctx, types.NamespacedName{
 					Namespace: sndEvent.Namespace,
 					Name:      sndEvent.Name,
-				}, event)).Should(Succeed())
-
+				}, event); err != nil {
+					return err.Error()
+				}
 				return event.InvolvedObject.Name
 			}, time.Second*30, time.Second).Should(Equal(sndEvent.InvolvedObject.Name))
 

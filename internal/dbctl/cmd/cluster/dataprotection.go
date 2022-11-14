@@ -123,7 +123,7 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	o := &CreateBackupOptions{BaseOptions: create.BaseOptions{IOStreams: streams}}
 	inputs := create.Inputs{
 		Use:             "backup",
-		Short:           "Create a database backup",
+		Short:           "Create a backup",
 		CueTemplateName: "backupjob_template.cue",
 		ResourceName:    types.ResourceBackupJobs,
 		Group:           types.DPGroup,
@@ -220,27 +220,12 @@ func (o *CreateRestoreOptions) Validate() error {
 	return nil
 }
 
-func (o *CreateRestoreOptions) PostRun() error {
-	inputs := create.Inputs{
-		CueTemplateName: "restore_job_template.cue",
-		ResourceName:    types.ResourceRestoreJobs,
-		Group:           types.DPGroup,
-		Version:         types.DPVersion,
-		BaseOptionsObj:  &o.BaseOptions,
-		Options:         o,
-	}
-	if err := o.BaseOptions.Run(inputs); err != nil {
-		return err
-	}
-	return nil
-}
-
 func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &CreateRestoreOptions{}
 	o.BaseOptions = create.BaseOptions{IOStreams: streams}
 	inputs := create.Inputs{
 		Use:             "restore",
-		Short:           "Restore a database from backup",
+		Short:           "Restore a new cluster from backup",
 		CueTemplateName: CueTemplateName,
 		ResourceName:    types.ResourceClusters,
 		Group:           types.DPGroup,
@@ -254,11 +239,7 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 			cmd.Flags().StringVar(&o.Backup, "backup", "", "Backup name")
 		},
 	}
-	cmd := create.BuildCommand(inputs)
-	cmd.PostRun = func(cmd *cobra.Command, args []string) {
-		cmdutil.CheckErr(o.PostRun())
-	}
-	return cmd
+	return create.BuildCommand(inputs)
 }
 
 func NewListRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {

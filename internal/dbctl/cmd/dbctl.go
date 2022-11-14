@@ -29,7 +29,6 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/backup"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/bench"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/dbaas"
@@ -85,7 +84,6 @@ A database management tool for KubeBlocks`,
 		dbaas.NewDbaasCmd(f, ioStreams),
 		cluster.NewClusterCmd(f, ioStreams),
 		bench.NewBenchCmd(),
-		backup.NewBackupCmd(f, ioStreams),
 		options.NewCmdOptions(ioStreams.Out),
 		version.NewVersionCmd(f),
 		backup_config.NewBackupConfigCmd(f, ioStreams),

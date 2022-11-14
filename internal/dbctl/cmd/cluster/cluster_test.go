@@ -206,4 +206,18 @@ var _ = Describe("Cluster", func() {
 		cmd := NewConnectCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 	})
+
+	It("list-logs-type", func() {
+		tf := cmdtesting.NewTestFactory().WithNamespace("default")
+		defer tf.Cleanup()
+		cmd := NewListLogsTypeCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+	})
+
+	It("logs", func() {
+		tf := cmdtesting.NewTestFactory().WithNamespace("default")
+		defer tf.Cleanup()
+		cmd := NewLogsCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+	})
 })

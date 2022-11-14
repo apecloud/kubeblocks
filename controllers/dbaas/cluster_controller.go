@@ -31,6 +31,7 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -214,6 +215,18 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if err = r.reconcileStatusOperations(ctx, cluster, clusterdefinition); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	// validate config and send warning event log necessarily
+	conditionList := cluster.ValidateEnabledLogs(clusterdefinition)
+	if len(conditionList) > 0 {
+		patch := client.MergeFrom(cluster.DeepCopy())
+		for _, cond := range conditionList {
+			meta.SetStatusCondition(&cluster.Status.Conditions, *cond)
+			r.Recorder.Event(cluster, corev1.EventTypeWarning, cond.Reason, cond.Message)
+		}
+		if err = r.Client.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
 	}
 
 	task, err := buildClusterCreationTasks(clusterdefinition, appversion, cluster)

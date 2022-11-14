@@ -17,6 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -83,6 +86,10 @@ type ClusterStatus struct {
 	Operations *Operations `json:"operations,omitempty"`
 
 	ClusterDefinitionStatusGeneration `json:",inline"`
+
+	// describe current state of cluster API Resource, like warning.
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 type ClusterComponent struct {
@@ -102,6 +109,12 @@ type ClusterComponent struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=false
 	Monitor bool `json:"monitor"`
+
+	// EnabledLogs indicate which log file takes effect in database cluster
+	// element is the log type which defined in cluster definition logConfig.name,
+	// and will set relative variables about this log type in database kernel.
+	// +optional
+	EnabledLogs []string `json:"enabledLogs,omitempty"`
 
 	// Component replicas, use default value in ClusterDefinition if not specified.
 	// +optional
@@ -289,4 +302,24 @@ type ClusterList struct {
 
 func init() {
 	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
+}
+
+// ValidateEnabledLogs validate enabledLogs config, and return metav1.Condition when detect invalid value
+func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) []*metav1.Condition {
+	conditionList := make([]*metav1.Condition, 0)
+	for _, comp := range r.Spec.Components {
+		invalidLogNames := cd.ValidateEnabledLogConfigs(comp.Type, comp.EnabledLogs)
+		if len(invalidLogNames) == 0 {
+			continue
+		}
+		message := fmt.Sprintf("EnabledLogs of cluster component %s has invalid value %s which isn't definded in cluster definition", comp.Name, invalidLogNames)
+		conditionList = append(conditionList, &metav1.Condition{
+			Type:               "ValidateEnabledLogs",
+			Status:             metav1.ConditionFalse,
+			Reason:             "ValidateEnabledLogsFail",
+			LastTransitionTime: metav1.NewTime(time.Now()),
+			Message:            message,
+		})
+	}
+	return conditionList
 }

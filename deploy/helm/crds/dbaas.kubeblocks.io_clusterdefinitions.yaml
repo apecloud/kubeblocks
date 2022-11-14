@@ -214,6 +214,28 @@ spec:
                       format: int32
                       minimum: 0
                       type: integer
+                    logConfigs:
+                      description: LogConfigs is detail log file config which provided
+                        by ISV.
+                      items:
+                        properties:
+                          filePathPattern:
+                            description: FilePathPattern log file path pattern which
+                              indicate how to find this file corresponding to variable
+                              (log path) in database kernel. please don't set this
+                              casually.
+                            maxLength: 4096
+                            type: string
+                          name:
+                            description: Name log type name, such as slow for MySQL
+                              slow log file.
+                            maxLength: 128
+                            type: string
+                        required:
+                        - filePathPattern
+                        - name
+                        type: object
+                      type: array
                     maxReplicas:
                       description: MaxReplicas maximum replicas pod for component
                         pod count.

@@ -72,7 +72,7 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	for _, handler := range EventHandlerMap {
-		if err := handler.Handle(r.Client, reqCtx,r.Recorder, event); err != nil {
+		if err := handler.Handle(r.Client, reqCtx, r.Recorder, event); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "handleEventError")
 		}
 	}

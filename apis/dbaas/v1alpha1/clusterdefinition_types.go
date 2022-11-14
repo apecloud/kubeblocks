@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -136,19 +137,23 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	CharacterType string `json:"characterType,omitempty"`
 
-	// Minimum available pod count when updating
+	// MinReplicas minimum replicas for component pod count
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
-	MinAvailable int `json:"minAvailable,omitempty"`
+	MinReplicas int `json:"minReplicas,omitempty"`
 
-	// Maximum available pod count after scale
+	// MaxReplicas maximum replicas pod for component pod count
 	// +kubebuilder:validation:Minimum=0
-	MaxAvailable int `json:"maxAvailable,omitempty"`
+	MaxReplicas int `json:"maxReplicas,omitempty"`
 
-	// Default replicas in this component if user not specify
+	// DefaultReplicas default replicas in this component if user not specify
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	DefaultReplicas int `json:"defaultReplicas,omitempty"`
+
+	// PodDisruptionBudgetSpec pod disruption budget spec. This is mutually exclusive with the component type of Consensus
+	// +optional
+	PodDisruptionBudgetSpec *policyv1.PodDisruptionBudgetSpec `json:"podDisruptionBudgetSpec,omitempty"`
 
 	// The configTemplateRefs field provided by ISV, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster

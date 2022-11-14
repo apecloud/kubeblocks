@@ -684,14 +684,14 @@ func getSupportHorizontalScalingComponents(cluster *dbaasv1alpha1.Cluster,
 	for _, v := range cluster.Spec.Components {
 		clusterComponentNames = append(clusterComponentNames, v.Name)
 		for _, component := range clusterDef.Spec.Components {
-			if v.Type != component.TypeName || (component.MinAvailable != 0 &&
-				component.MaxAvailable == component.MinAvailable) {
+			if v.Type != component.TypeName || (component.MinReplicas != 0 &&
+				component.MaxReplicas == component.MaxReplicas) {
 				continue
 			}
 			horizontalScalableComponents = append(horizontalScalableComponents, &dbaasv1alpha1.OperationComponent{
 				Name: v.Name,
-				Min:  component.MinAvailable,
-				Max:  component.MaxAvailable,
+				Min:  component.MinReplicas,
+				Max:  component.MaxReplicas,
 			})
 			break
 		}

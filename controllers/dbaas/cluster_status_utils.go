@@ -64,14 +64,36 @@ func calculateComponentPhaseForEvent(isFailed, isWarning bool) dbaasv1alpha1.Pha
 	return componentPhase
 }
 
+// checkRelatedPodIsTerminating check related pods is terminating for Stateless/Stateful
+func checkRelatedPodIsTerminating(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, componentName string) (bool, error) {
+	podList := &corev1.PodList{}
+	if err := cli.List(ctx, podList, client.InNamespace(cluster.Namespace),
+		getComponentMatchLabels(cluster.Name, componentName)); err != nil {
+		return false, err
+	}
+	for _, v := range podList.Items {
+		// if the pod is terminating, ignore the warning event
+		if v.DeletionTimestamp != nil {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // getStatefulPhaseForEvent get the component phase for stateful type
 func getStatefulPhaseForEvent(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, componentName string) (dbaasv1alpha1.Phase, error) {
 	var (
-		isFailed  = true
-		isWarning bool
-		stsList   = &appsv1.StatefulSetList{}
+		isFailed          = true
+		isWarning         bool
+		stsList           = &appsv1.StatefulSetList{}
+		podsIsTerminating = false
+		err               error
 	)
-	if err := getObjectListByComponentName(ctx, cli, cluster, stsList, componentName); err != nil {
+	podsIsTerminating, err = checkRelatedPodIsTerminating(ctx, cli, cluster, componentName)
+	if podsIsTerminating {
+		return "", nil
+	}
+	if err = getObjectListByComponentName(ctx, cli, cluster, stsList, componentName); err != nil {
 		return "", err
 	}
 	for _, v := range stsList.Items {
@@ -89,11 +111,17 @@ func getStatefulPhaseForEvent(ctx context.Context, cli client.Client, cluster *d
 // getStatelessPhaseForEvent get the component phase for stateless type
 func getStatelessPhaseForEvent(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, componentName string) (dbaasv1alpha1.Phase, error) {
 	var (
-		isFailed   = true
-		isWarning  bool
-		deployList = &appsv1.DeploymentList{}
+		isFailed          = true
+		isWarning         bool
+		deployList        = &appsv1.DeploymentList{}
+		podsIsTerminating = false
+		err               error
 	)
-	if err := getObjectListByComponentName(ctx, cli, cluster, deployList, componentName); err != nil {
+	podsIsTerminating, err = checkRelatedPodIsTerminating(ctx, cli, cluster, componentName)
+	if podsIsTerminating {
+		return "", nil
+	}
+	if err = getObjectListByComponentName(ctx, cli, cluster, deployList, componentName); err != nil {
 		return "", err
 	}
 	for _, v := range deployList.Items {
@@ -123,6 +151,10 @@ func getConsensusPhaseForEvent(ctx context.Context, cli client.Client, cluster *
 		return dbaasv1alpha1.FailedPhase, nil
 	}
 	for _, v := range podList.Items {
+		// if the pod is terminating, ignore the warning event
+		if v.DeletionTimestamp != nil {
+			return "", nil
+		}
 		labelValue := v.Labels[intctrlutil.ConsensusSetRoleLabelKey]
 		if labelValue == componentDef.ConsensusSpec.Leader.Name {
 			isFailed = false
@@ -279,7 +311,11 @@ func getClusterAvailabilityEffect(componentDef *dbaasv1alpha1.ClusterDefinitionC
 		return true
 	default:
 		// other types of components need to judge whether there has PodDisruptionBudget
-		return componentDef.MaxAvailable != 0 || componentDef.MinAvailable != 0
+		podDisruptionBudgetSpec := componentDef.PodDisruptionBudgetSpec
+		if podDisruptionBudgetSpec == nil {
+			return false
+		}
+		return podDisruptionBudgetSpec.MinAvailable != nil || podDisruptionBudgetSpec.MaxUnavailable != nil
 	}
 }
 

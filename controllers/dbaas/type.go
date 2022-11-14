@@ -38,7 +38,6 @@ const (
 	clusterDefLabelKey         = "clusterdefinition.kubeblocks.io/name"
 	appVersionLabelKey         = "appversion.kubeblocks.io/name"
 	statefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
-	clusterLabelKey            = "cluster.kubeblocks.io/name"
 )
 
 type MonitorConfig struct {

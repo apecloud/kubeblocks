@@ -171,3 +171,7 @@ func BackupJobGVR() schema.GroupVersionResource {
 func RestoreJobGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceRestoreJobs}
 }
+
+func OpsGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceOpsRequests}
+}

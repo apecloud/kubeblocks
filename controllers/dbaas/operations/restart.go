@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 func init() {
@@ -63,7 +64,7 @@ func restartStatefulSet(opsRes *OpsResource, componentNameMap map[string]*dbaasv
 	)
 	if err = opsRes.Client.List(opsRes.Ctx, statefulSetList,
 		client.InNamespace(opsRes.Cluster.Namespace),
-		client.MatchingLabels{AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
+		client.MatchingLabels{intctrlutil.AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
 		return err
 	}
 
@@ -86,7 +87,7 @@ func restartDeployment(opsRes *OpsResource, componentNameMap map[string]*dbaasv1
 	)
 	if err = opsRes.Client.List(opsRes.Ctx, deploymentList,
 		client.InNamespace(opsRes.Cluster.Namespace),
-		client.MatchingLabels{AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
+		client.MatchingLabels{intctrlutil.AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
 		return err
 	}
 
@@ -103,7 +104,7 @@ func restartDeployment(opsRes *OpsResource, componentNameMap map[string]*dbaasv1
 
 // isRestarted check whether the component has been restarted
 func isRestarted(opsRes *OpsResource, object client.Object, componentNameMap map[string]*dbaasv1alpha1.ComponentOps, podTemplate *corev1.PodTemplateSpec) bool {
-	cName := object.GetLabels()[AppComponentNameLabelKey]
+	cName := object.GetLabels()[intctrlutil.AppComponentLabelKey]
 	if _, ok := componentNameMap[cName]; !ok {
 		return true
 	}

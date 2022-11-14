@@ -38,7 +38,7 @@ import (
 	//+kubebuilder:scaffold:imports
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	testutil "github.com/apecloud/kubeblocks/internal/testutil"
+	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to

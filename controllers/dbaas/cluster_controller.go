@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
@@ -64,13 +65,10 @@ type ClusterReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// TODO probeMessage should be defined by @xuanchi
 type probeMessage struct {
-	Data probeMessageData `json:"data,omitempty"`
-}
-
-type probeMessageData struct {
-	Role string `json:"role,omitempty"`
+	Event        string `json:"event,omitempty"`
+	OriginalRole string `json:"originalRole,omitempty"`
+	Role         string `json:"role,omitempty"`
 }
 
 func init() {
@@ -113,173 +111,25 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 
 	// get role
 	message := &probeMessage{}
-	err := json.Unmarshal([]byte(event.Message), message)
+	re := regexp.MustCompile(`Readiness probe failed: {.*({.*}).*}`)
+	matches := re.FindStringSubmatch(event.Message)
+	if len(matches) != 2 {
+		return nil
+	}
+	msg := strings.ReplaceAll(matches[1], "\\", "")
+	err := json.Unmarshal([]byte(msg), message)
 	if err != nil {
 		// not role related message, ignore it
 		reqCtx.Log.Info("not role message", "message", event.Message, "error", err)
 		return nil
 	}
-	role := strings.ToLower(message.Data.Role)
+	role := strings.ToLower(message.Role)
 	podName := types.NamespacedName{
 		Namespace: event.InvolvedObject.Namespace,
 		Name:      event.InvolvedObject.Name,
 	}
 
-	return updateConsensusSetRoleLabel(cli, reqCtx.Ctx, podName, role)
-}
-
-func updateConsensusSetRoleLabel(cli client.Client, ctx context.Context, podName types.NamespacedName, role string) error {
-	// get pod
-	pod := &corev1.Pod{}
-	if err := cli.Get(ctx, podName, pod); err != nil {
-		return err
-	}
-
-	// update pod role label
-	patch := client.MergeFrom(pod.DeepCopy())
-	pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] = role
-	err := cli.Patch(ctx, pod, patch)
-	if err != nil {
-		return err
-	}
-
-	// update cluster status
-	// get cluster obj
-	cluster := &dbaasv1alpha1.Cluster{}
-	err = cli.Get(ctx, types.NamespacedName{
-		Namespace: pod.Namespace,
-		Name:      pod.Labels[intctrlutil.AppInstanceLabelKey],
-	}, cluster)
-	if err != nil {
-		return err
-	}
-
-	// get componentDef this pod belongs to
-	componentName := pod.Labels[intctrlutil.AppComponentLabelKey]
-	typeName := component.GetComponentTypeName(*cluster, componentName)
-	componentDef, err := component.GetComponentFromClusterDefinition(ctx, cli, cluster, typeName)
-	if err != nil {
-		return err
-	}
-
-	// get all role names
-	leaderName := componentDef.ConsensusSpec.Leader.Name
-	followersMap := make(map[string]dbaasv1alpha1.ConsensusMember, 0)
-	for _, follower := range componentDef.ConsensusSpec.Followers {
-		followersMap[follower.Name] = follower
-	}
-	learnerName := ""
-	if componentDef.ConsensusSpec.Learner != nil {
-		learnerName = componentDef.ConsensusSpec.Learner.Name
-	}
-
-	// prepare cluster status patch
-	patch = client.MergeFrom(cluster.DeepCopy())
-	if cluster.Status.Components == nil {
-		cluster.Status.Components = make(map[string]*dbaasv1alpha1.ClusterStatusComponent)
-	}
-	if cluster.Status.Components[componentName] == nil {
-		cluster.Status.Components[componentName] = &dbaasv1alpha1.ClusterStatusComponent{
-			Type:  typeName,
-			Phase: dbaasv1alpha1.RunningPhase,
-			ConsensusSetStatus: &dbaasv1alpha1.ConsensusSetStatus{
-				Leader: dbaasv1alpha1.ConsensusMemberStatus{
-					Pod: consensusSetStatusDefaultPodName,
-				},
-			},
-		}
-	}
-	componentStatus := cluster.Status.Components[componentName]
-	if componentStatus.ConsensusSetStatus == nil {
-		componentStatus.ConsensusSetStatus = &dbaasv1alpha1.ConsensusSetStatus{
-			Leader: dbaasv1alpha1.ConsensusMemberStatus{
-				Pod: consensusSetStatusDefaultPodName,
-			},
-		}
-	}
-	consensusSetStatus := componentStatus.ConsensusSetStatus
-
-	resetLeader := func() {
-		if consensusSetStatus.Leader.Pod == pod.Name {
-			consensusSetStatus.Leader.Pod = consensusSetStatusDefaultPodName
-			consensusSetStatus.Leader.AccessMode = dbaasv1alpha1.None
-			consensusSetStatus.Leader.Name = ""
-		}
-	}
-	resetLearner := func() {
-		if consensusSetStatus.Learner != nil && consensusSetStatus.Learner.Pod == pod.Name {
-			consensusSetStatus.Learner = nil
-		}
-	}
-
-	resetFollower := func() {
-		for index, member := range consensusSetStatus.Followers {
-			if member.Pod == pod.Name {
-				consensusSetStatus.Followers = append(consensusSetStatus.Followers[:index], consensusSetStatus.Followers[index+1:]...)
-			}
-		}
-	}
-
-	// set pod.Name to the right status field
-	accessMode := dbaasv1alpha1.AccessMode("")
-	needUpdate := false
-	switch role {
-	case leaderName:
-		consensusSetStatus.Leader.Pod = pod.Name
-		consensusSetStatus.Leader.AccessMode = componentDef.ConsensusSpec.Leader.AccessMode
-		consensusSetStatus.Leader.Name = componentDef.ConsensusSpec.Leader.Name
-		accessMode = componentDef.ConsensusSpec.Leader.AccessMode
-		resetLearner()
-		resetFollower()
-		needUpdate = true
-	case learnerName:
-		if consensusSetStatus.Learner == nil {
-			consensusSetStatus.Learner = &dbaasv1alpha1.ConsensusMemberStatus{}
-		}
-		consensusSetStatus.Learner.Pod = pod.Name
-		consensusSetStatus.Learner.AccessMode = componentDef.ConsensusSpec.Learner.AccessMode
-		consensusSetStatus.Learner.Name = componentDef.ConsensusSpec.Learner.Name
-		accessMode = componentDef.ConsensusSpec.Learner.AccessMode
-		resetLeader()
-		resetFollower()
-		needUpdate = true
-	default:
-		if follower, ok := followersMap[role]; ok {
-			exist := false
-			for _, member := range consensusSetStatus.Followers {
-				if member.Pod == pod.Name {
-					exist = true
-				}
-			}
-			if !exist {
-				member := dbaasv1alpha1.ConsensusMemberStatus{
-					Pod:        pod.Name,
-					AccessMode: follower.AccessMode,
-					Name:       follower.Name,
-				}
-				accessMode = follower.AccessMode
-				consensusSetStatus.Followers = append(consensusSetStatus.Followers, member)
-				resetLeader()
-				resetLearner()
-				needUpdate = true
-			}
-		}
-	}
-
-	// finally, update cluster status
-	if needUpdate {
-		err = cli.Status().Patch(ctx, cluster, patch)
-		if err != nil {
-			return err
-		}
-
-		// update pod accessMode label
-		patchAccessMode := client.MergeFrom(pod.DeepCopy())
-		pod.Labels[consensusSetAccessModeLabelKey] = string(accessMode)
-		return cli.Patch(ctx, pod, patchAccessMode)
-	}
-
-	return nil
+	return component.UpdateConsensusSetRoleLabel(cli, reqCtx, podName, role)
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to

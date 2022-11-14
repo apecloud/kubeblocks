@@ -149,7 +149,7 @@ func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 		Short("List backup jobs.").
 		Example(listBackupExample).
 		Factory(f).
-		GroupKind(types.BackupJobGK()).
+		GVR(types.BackupJobGVR()).
 		IOStreams(streams).
 		Build(list.Build)
 }
@@ -159,7 +159,7 @@ func NewDeleteBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Use("delete-backup").
 		Short("Delete a backup job.").
 		Example(deleteBackupExample).
-		GroupKind(types.BackupJobGK()).
+		GVR(types.BackupJobGVR()).
 		Factory(f).
 		IOStreams(streams).
 		Build(delete.Build)
@@ -248,7 +248,7 @@ func NewListRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		Short("List all restore jobs.").
 		Example(listRestoreExample).
 		Factory(f).
-		GroupKind(types.RestoreJobGK()).
+		GVR(types.RestoreJobGVR()).
 		IOStreams(streams).
 		Build(list.Build)
 }
@@ -258,7 +258,7 @@ func NewDeleteRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Use("delete-restore").
 		Short("Delete a restore job.").
 		Example(deleteRestoreExample).
-		GroupKind(types.RestoreJobGK()).
+		GVR(types.RestoreJobGVR()).
 		Factory(f).
 		IOStreams(streams).
 		Build(delete.Build)

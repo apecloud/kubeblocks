@@ -51,7 +51,7 @@ func completeForListOps(option interface{}, args []string) []string {
 	}
 	// if cluster name is not nil, covert to label for list OpsRequest
 	if len(args) > 0 {
-		labelString := fmt.Sprintf("%s=%s", types.ClusterLabelKey, args[0])
+		labelString := fmt.Sprintf("%s=%s", types.InstanceLabelKey, args[0])
 		if len(o.LabelSelector) == 0 {
 			o.LabelSelector = labelString
 		} else {

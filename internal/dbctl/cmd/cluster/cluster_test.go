@@ -175,7 +175,7 @@ var _ = Describe("Cluster", func() {
 		clusterName := "wesql"
 		By("test list OpsRequest with cluster")
 		completeForListOps(o, []string{clusterName})
-		clusterLabel := fmt.Sprintf("%s=%s", types.ClusterLabelKey, clusterName)
+		clusterLabel := fmt.Sprintf("%s=%s", types.InstanceLabelKey, clusterName)
 		Expect(o.LabelSelector == clusterLabel).Should(BeTrue())
 		By("test list OpsRequest with cluster and custom label")
 		testLabel := "kubeblocks.io/test=test"

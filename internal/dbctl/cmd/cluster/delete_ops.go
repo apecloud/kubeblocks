@@ -72,7 +72,7 @@ func completeForDeleteOps(option interface{}, args []string) []string {
 		return args
 	}
 	// if no specify OpsRequest name and cluster name is specified. it will delete all OpsRequest with the cluster
-	labelString := fmt.Sprintf("%s=%s", types.ClusterLabelKey, clusterName)
+	labelString := fmt.Sprintf("%s=%s", types.InstanceLabelKey, clusterName)
 	if flag.LabelSelector == nil || len(*flag.LabelSelector) == 0 {
 		flag.LabelSelector = &labelString
 	} else {

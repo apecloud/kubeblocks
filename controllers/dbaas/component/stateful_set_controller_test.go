@@ -153,7 +153,7 @@ kind: OpsRequest
 metadata:
   name: wesql-restart-test
   labels:
-    cluster.kubeblocks.io/name: wesql
+    app.kubernetes.io/instance: wesql
     app.kubernetes.io/managed-by: kubeblocks
   namespace: default
 spec:

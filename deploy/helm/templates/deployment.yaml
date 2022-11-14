@@ -44,14 +44,12 @@ spec:
           env:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}
-          {{- if .Values.dataProtection.disableVolumeSnapshot }}
             - name: NO_VOLUMESNAPSHOT
-              value: "true"
-          {{- end }}
+              value: "{{ .Values.dataProtection.disableVolumeSnapshot }}"
             - name: DP_BACKUP_SCHEDULE
-              value: .Values.dataProtection.backup.schedule
+              value: "{{ .Values.dataProtection.backup.schedule }}"
             - name: DP_BACKUP_TTL
-              value: .Values.dataProtection.backup.ttl
+              value: "{{ .Values.dataProtection.backup.ttl }}"
 
           {{- if .Values.admissionWebhooks.enabled }}
             - name: ENABLE_WEBHOOKS

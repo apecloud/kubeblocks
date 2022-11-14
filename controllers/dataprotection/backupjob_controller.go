@@ -251,7 +251,13 @@ func (r *BackupJobReconciler) patchBackupJobLabels(
 
 	patch := client.MergeFrom(backupJob.DeepCopy())
 	if len(labels) > 0 {
-		backupJob.Labels = labels
+		if backupJob.Labels == nil {
+			backupJob.Labels = labels
+		} else {
+			for k, v := range labels {
+				backupJob.Labels[k] = v
+			}
+		}
 	}
 	return r.Client.Patch(reqCtx.Ctx, backupJob, patch)
 }

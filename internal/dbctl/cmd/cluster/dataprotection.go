@@ -84,7 +84,7 @@ func (o *CreateBackupOptions) Complete() error {
 
 	// generate backupName
 	if len(o.BackupName) == 0 {
-		o.BackupName = strings.Join([]string{o.Name, "backup", time.Now().Format("20060102150405")}, "-")
+		o.BackupName = strings.Join([]string{"backup", o.Namespace, o.Name, time.Now().Format("20060102150405")}, "-")
 	}
 
 	return nil

@@ -17,11 +17,17 @@ limitations under the License.
 package cluster
 
 import (
+	"fmt"
+	"time"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
 var _ = Describe("DataProtection", func() {
@@ -75,5 +81,40 @@ var _ = Describe("DataProtection", func() {
 		defer tf.Cleanup()
 		cmd := NewListRestoreCmd(tf, streams)
 		Expect(cmd != nil).To(BeTrue())
+	})
+
+	It("restore", func() {
+		tf := cmdtesting.NewTestFactory().WithNamespace("default")
+		defer tf.Cleanup()
+
+		timestamp := time.Now().Format("20060102150405")
+		backupName := "backup-test-" + timestamp
+		clusterName := "source-cluster-" + timestamp
+		newClusterName := "new-cluster-" + timestamp
+
+		// create test cluster
+		cmd := NewCreateCmd(tf, streams)
+		Expect(cmd != nil).To(BeTrue())
+		_ = cmd.Flags().Set("components", "../../testdata/component.yaml")
+		cmd.Run(nil, []string{clusterName})
+
+		// create backup
+		cmd = NewCreateBackupCmd(tf, streams)
+		Expect(cmd != nil).To(BeTrue())
+		_ = cmd.Flags().Set("backup-type", "snapshot")
+		_ = cmd.Flags().Set("backup-name", backupName)
+		cmd.Run(nil, []string{clusterName})
+
+		// mock labels backup
+		labels := fmt.Sprintf(`{"metadata":{"labels": {"app.kubernetes.io/instance":"%s"}}}`, clusterName)
+		patchByte := []byte(labels)
+		_, _ = tf.FakeDynamicClient.Resource(types.BackupJobGVR()).Namespace("default").Patch(ctx, backupName,
+			k8sapitypes.MergePatchType, patchByte, metav1.PatchOptions{})
+
+		// create restore cluster
+		cmd_restore := NewCreateRestoreCmd(tf, streams)
+		Expect(cmd_restore != nil).To(BeTrue())
+		_ = cmd_restore.Flags().Set("backup", backupName)
+		cmd_restore.Run(nil, []string{newClusterName})
 	})
 })

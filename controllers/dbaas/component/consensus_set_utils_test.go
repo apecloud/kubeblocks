@@ -20,9 +20,10 @@ import (
 	"testing"
 	"time"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 func TestIsReady(t *testing.T) {

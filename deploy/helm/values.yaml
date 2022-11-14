@@ -122,7 +122,7 @@ dashboards:
 # Data protection settings
 dataProtection:
   ## disableVolumeSnapshot - set this to true if cluster does not have snapshot.storage.k8s.io API installed
-  disableVolumeSnapshot: false
+  disableVolumeSnapshot: true
   backup:
     schedule: "0 2 * * *"
     ttl: "168h0m0s"
@@ -259,7 +259,7 @@ csi-s3:
   secret:
     accessKey: ""
     secretKey: ""
-    endpoint: https://s3.cn-northwest-1.amazonaws.com.cn
+    endpoint: ""
   storageClass:
     create: true
     singleBucket: ""

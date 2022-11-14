@@ -104,9 +104,9 @@ func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *db
 	return nil
 }
 
-func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, event *corev1.Event) error {
+func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
 	if event.InvolvedObject.FieldPath != k8score.ProbeRoleChangedCheckPath {
-		return nil
+		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
 	}
 
 	// get role
@@ -124,12 +124,22 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 		return nil
 	}
 	role := strings.ToLower(message.Role)
+
 	podName := types.NamespacedName{
 		Namespace: event.InvolvedObject.Namespace,
 		Name:      event.InvolvedObject.Name,
 	}
+	// get pod
+	pod := &corev1.Pod{}
+	if err := cli.Get(reqCtx.Ctx, podName, pod); err != nil {
+		return err
+	}
+	// event belongs to old pod with the same name, ignore it
+	if pod.UID != event.InvolvedObject.UID {
+		return nil
+	}
 
-	return component.UpdateConsensusSetRoleLabel(cli, reqCtx, podName, role)
+	return component.UpdateConsensusSetRoleLabel(cli, reqCtx, pod, role)
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -475,7 +485,7 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 	if componentTypeMap, err = getComponentTypeMapWithCluster(ctx, r.Client, cluster); err != nil {
 		return false, err
 	}
-	if err = getObjectList(ctx, r.Client, cluster, statefulSetList); err != nil {
+	if err = getObjectListForCluster(ctx, r.Client, cluster, statefulSetList); err != nil {
 		return false, err
 	}
 	for _, sts := range statefulSetList.Items {
@@ -490,6 +500,7 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 			if statefulStatusRevisionIsEquals, err = checkConsensusStatefulSetRevision(ctx, r.Client, &sts); err != nil {
 				return false, err
 			}
+			// TODO check pod is ready by role label
 		case dbaasv1alpha1.Stateful:
 			// when stateful updateStrategy is rollingUpdate, need to check revision
 			if sts.Status.UpdateRevision != sts.Status.CurrentRevision {
@@ -510,7 +521,7 @@ func (r *ClusterReconciler) handleComponentStatusWithDeployment(ctx context.Cont
 		needSyncComponentStatus bool
 		deploymentList          = &appsv1.DeploymentList{}
 	)
-	if err := getObjectList(ctx, r.Client, cluster, deploymentList); err != nil {
+	if err := getObjectListForCluster(ctx, r.Client, cluster, deploymentList); err != nil {
 		return false, err
 	}
 	for _, deploy := range deploymentList.Items {
@@ -673,14 +684,14 @@ func getSupportHorizontalScalingComponents(cluster *dbaasv1alpha1.Cluster,
 	for _, v := range cluster.Spec.Components {
 		clusterComponentNames = append(clusterComponentNames, v.Name)
 		for _, component := range clusterDef.Spec.Components {
-			if v.Type != component.TypeName || (component.MinAvailable != 0 &&
-				component.MaxAvailable == component.MinAvailable) {
+			if v.Type != component.TypeName || (component.MinReplicas != 0 &&
+				component.MaxReplicas == component.MinReplicas) {
 				continue
 			}
 			horizontalScalableComponents = append(horizontalScalableComponents, &dbaasv1alpha1.OperationComponent{
 				Name: v.Name,
-				Min:  component.MinAvailable,
-				Max:  component.MaxAvailable,
+				Min:  component.MinReplicas,
+				Max:  component.MaxReplicas,
 			})
 			break
 		}

@@ -30,6 +30,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"text/template"
 	"time"
@@ -42,6 +43,7 @@ import (
 	"golang.org/x/crypto/ssh"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes/scheme"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -269,4 +271,8 @@ func PlaygroundDir() (string, error) {
 	}
 
 	return filepath.Join(cliPath, "playground"), nil
+}
+
+func GVRToString(gvr schema.GroupVersionResource) string {
+	return strings.Join([]string{gvr.Resource, gvr.Version, gvr.Group}, ".")
 }

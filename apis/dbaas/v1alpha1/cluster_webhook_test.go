@@ -37,18 +37,27 @@ var _ = Describe("cluster webhook", func() {
 		timeout                   = time.Second * 10
 		interval                  = time.Second
 	)
+	BeforeEach(func() {
+		// Add any setup steps that needs to be executed before each test
+		err := k8sClient.DeleteAllOf(ctx, &Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+	})
 	Context("When cluster create and update", func() {
 		It("Should webhook validate passed", func() {
 			By("By testing creating a new clusterDefinition when no appVersion and clusterDefinition")
 			cluster, _ := createTestCluster(clusterDefinitionName, appVersionName, clusterName)
-			Expect(k8sClient.Create(ctx, cluster)).ShouldNot(Succeed())
+			Expect(testCtx.CreateObj(ctx, cluster)).ShouldNot(Succeed())
 
 			By("By creating a new clusterDefinition")
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
-			Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 
 			clusterDefSecond, _ := createTestClusterDefinitionObj(sencondeClusterDefinition)
-			Expect(k8sClient.Create(ctx, clusterDefSecond)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, clusterDefSecond)).Should(Succeed())
 
 			// wait until ClusterDefinition created
 			Eventually(func() bool {
@@ -58,7 +67,7 @@ var _ = Describe("cluster webhook", func() {
 
 			By("By creating a new appVersion")
 			appVersion := createTestAppVersionObj(clusterDefinitionName, appVersionName)
-			Expect(k8sClient.Create(ctx, appVersion)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, appVersion)).Should(Succeed())
 			// wait until AppVersion created
 			Eventually(func() bool {
 				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: appVersionName}, appVersion)
@@ -67,7 +76,7 @@ var _ = Describe("cluster webhook", func() {
 
 			By("By creating a new Cluster")
 			cluster, _ = createTestCluster(clusterDefinitionName, appVersionName, clusterName)
-			Expect(k8sClient.Create(ctx, cluster)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, cluster)).Should(Succeed())
 
 			By("By testing update spec.clusterDefinitionRef")
 			cluster.Spec.ClusterDefRef = sencondeClusterDefinition

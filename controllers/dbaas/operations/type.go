@@ -27,11 +27,6 @@ import (
 )
 
 const (
-	// label keys
-
-	AppInstanceLabelKey      = "app.kubernetes.io/instance"
-	AppComponentNameLabelKey = "app.kubernetes.io/component-name"
-
 	// annotation keys
 
 	RestartAnnotationKey = "kubeblocks.io/restart"

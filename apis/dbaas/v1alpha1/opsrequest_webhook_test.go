@@ -42,7 +42,6 @@ var _ = Describe("OpsRequest webhook", func() {
 		opsRequestName           = "opsrequest-webhook-mysql-ops"
 		timeout                  = time.Second * 10
 		interval                 = time.Second
-		namespace                = "default"
 		ctx                      = context.Background()
 	)
 	BeforeEach(func() {
@@ -54,14 +53,6 @@ var _ = Describe("OpsRequest webhook", func() {
 		err = k8sClient.DeleteAllOf(ctx, &AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
-		err := k8sClient.DeleteAllOf(ctx, &OpsRequest{},
-			client.InNamespace(namespace),
-			client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -101,7 +92,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("By creating a upgrade opsRequest, it should be succeed")
 		Eventually(func() bool {
 			opsRequest.Spec.ClusterOps.Upgrade.AppVersionRef = newAppVersion.Name
-			err := testCtx.CreateObj(ctx, opsRequest)
+			err := testCtx.CheckedCreateObj(ctx, opsRequest)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
 
@@ -145,7 +136,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
 		Eventually(func() bool {
 			opsRequest.Spec.ComponentOpsList[0].ComponentNames = []string{"replicaSets"}
-			err := testCtx.CreateObj(ctx, opsRequest)
+			err := testCtx.CheckedCreateObj(ctx, opsRequest)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
 	}
@@ -184,7 +175,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("By testing volumeExpansion. if api is legal, it will create successfully")
 		Eventually(func() bool {
 			opsRequest.Spec.ComponentOpsList[0].VolumeExpansion[0].Name = "data"
-			err := testCtx.CreateObj(ctx, opsRequest)
+			err := testCtx.CheckedCreateObj(ctx, opsRequest)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
 	}
@@ -217,7 +208,7 @@ var _ = Describe("OpsRequest webhook", func() {
 					},
 				},
 			}
-			err := testCtx.CreateObj(ctx, opsRequest)
+			err := testCtx.CheckedCreateObj(ctx, opsRequest)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
 
@@ -249,7 +240,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("By testing restart. if api is legal, it will create successfully")
 		Eventually(func() bool {
 			opsRequest.Spec.ComponentOpsList[0].ComponentNames = []string{"replicaSets"}
-			err := testCtx.CreateObj(ctx, opsRequest)
+			err := testCtx.CheckedCreateObj(ctx, opsRequest)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
 	}
@@ -261,10 +252,10 @@ var _ = Describe("OpsRequest webhook", func() {
 			// wait until ClusterDefinition and AppVersion created
 			Eventually(func() bool {
 				clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
-				Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
+				Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
 				By("By creating a appVersion")
 				appVersion := createTestAppVersionObj(clusterDefinitionName, appVersionName)
-				err := testCtx.CreateObj(ctx, appVersion)
+				err := testCtx.CheckedCreateObj(ctx, appVersion)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
@@ -273,10 +264,10 @@ var _ = Describe("OpsRequest webhook", func() {
 			// wait until Cluster created
 			Eventually(func() bool {
 				By("By testing spec.clusterDef is legal")
-				Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
+				Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).ShouldNot(Succeed())
 				By("By create a new cluster ")
 				cluster, _ = createTestCluster(clusterDefinitionName, appVersionName, clusterName)
-				err := testCtx.CreateObj(ctx, cluster)
+				err := testCtx.CheckedCreateObj(ctx, cluster)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 

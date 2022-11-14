@@ -97,6 +97,11 @@ var _ = Describe("cluster util", func() {
 		// get node
 		builder.withGK(schema.GroupKind{Kind: "Node"})
 		Expect(builder.do(objs)).Should(HaveOccurred())
+
+		// get node that name is empty
+		builder.name = ""
+		builder.withGK(schema.GroupKind{Kind: "Node"})
+		Expect(builder.do(objs)).Should(Succeed())
 	})
 
 	It("get all objects", func() {

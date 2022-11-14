@@ -138,6 +138,10 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	PDBSpec *policyv1.PodDisruptionBudgetSpec `json:"pdbSpec,omitempty"`
 
+	// PodDisruptionBudgetSpec pod disruption budget spec. This is mutually exclusive with the component type of Consensus.
+	// +optional
+	PodDisruptionBudgetSpec *policyv1.PodDisruptionBudgetSpec `json:"podDisruptionBudgetSpec,omitempty"`
+
 	// The configTemplateRefs field provided by ISV, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
 	// +optional

@@ -50,8 +50,8 @@ var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
 var ctx context.Context
-var cancel context.CancelFunc
 var testCtx testutil.TestContext
+var cancel context.CancelFunc
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)

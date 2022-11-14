@@ -25,13 +25,21 @@ import (
 
 type BuildFn func(cmd *Command) *cobra.Command
 
+type CustomCompleteFn func(o interface{}, args []string) error
+
+type CustomFlags func(o interface{}, cmd *cobra.Command)
+
 // Command records the command info
 type Command struct {
-	Use       string
-	Short     string
-	Example   string
-	GroupKind schema.GroupKind
-	Factory   cmdutil.Factory
+	Use     string
+	Short   string
+	Example string
+	GVR     schema.GroupVersionResource
+	Factory cmdutil.Factory
+	// CustomComplete custom complete function for cmd
+	CustomComplete CustomCompleteFn
+	// CustomFlags custom flags for cmd, return args
+	CustomFlags CustomFlags
 	genericclioptions.IOStreams
 }
 
@@ -59,8 +67,8 @@ func (b *CmdBuilder) Example(example string) *CmdBuilder {
 	return b
 }
 
-func (b *CmdBuilder) GroupKind(gk schema.GroupKind) *CmdBuilder {
-	b.cmd.GroupKind = gk
+func (b *CmdBuilder) GVR(gvr schema.GroupVersionResource) *CmdBuilder {
+	b.cmd.GVR = gvr
 	return b
 }
 
@@ -71,6 +79,16 @@ func (b *CmdBuilder) Factory(f cmdutil.Factory) *CmdBuilder {
 
 func (b *CmdBuilder) IOStreams(streams genericclioptions.IOStreams) *CmdBuilder {
 	b.cmd.IOStreams = streams
+	return b
+}
+
+func (b *CmdBuilder) CustomComplete(fn CustomCompleteFn) *CmdBuilder {
+	b.cmd.CustomComplete = fn
+	return b
+}
+
+func (b *CmdBuilder) CustomFlags(fn CustomFlags) *CmdBuilder {
+	b.cmd.CustomFlags = fn
 	return b
 }
 

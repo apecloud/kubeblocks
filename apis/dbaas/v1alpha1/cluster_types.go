@@ -58,6 +58,7 @@ type ClusterStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
+	// Phase describe the phase of the cluster. the detail information of phase is as follows:
 	// Creating: creating cluster.
 	// Running: cluster is running, all components is available.
 	// Updating: cluster changes, such as horizontal-scaling/vertical-scaling/restart.

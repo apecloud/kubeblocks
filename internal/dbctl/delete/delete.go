@@ -19,14 +19,24 @@ package delete
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/spf13/cobra"
 	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/prompt"
 )
+
+type DeleteFlags struct {
+	*cmddelete.DeleteFlags
+	// cluster name. if the resources is not owns by cluster, ignore it
+	ClusterName string
+	// the resource names of cluster need to be deleted
+	ResourceNames []string
+}
 
 // Build a delete command
 func Build(c *builder.Command) *cobra.Command {
@@ -36,38 +46,57 @@ func Build(c *builder.Command) *cobra.Command {
 		Short:   c.Short,
 		Example: c.Example,
 		Run: func(cmd *cobra.Command, args []string) {
+			if c.CustomComplete != nil {
+				cmdutil.CheckErr(c.CustomComplete(deleteFlags, args))
+			}
+			cmdutil.CheckErr(validate(deleteFlags, args, c.IOStreams.In))
 			o, err := deleteFlags.ToOptions(nil, c.IOStreams)
 			cmdutil.CheckErr(err)
-			cmdutil.CheckErr(validate(args, c.IOStreams.In))
-
-			// build resource to delete
-			args = append([]string{c.GroupKind.String()}, args...)
-
+			args = buildArgs(c, deleteFlags, args)
 			// call kubectl delete options methods
 			cmdutil.CheckErr(o.Complete(c.Factory, args, cmd))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunDelete(c.Factory))
 		},
 	}
-
+	if c.CustomFlags != nil {
+		c.CustomFlags(deleteFlags, cmd)
+	}
 	deleteFlags.AddFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 
 	return cmd
 }
 
-func validate(args []string, in io.Reader) error {
+// buildArgs build resource to delete
+func buildArgs(c *builder.Command, deleteFlags *DeleteFlags, args []string) []string {
+	if len(deleteFlags.ResourceNames) > 0 {
+		args = deleteFlags.ResourceNames
+	} else if deleteFlags.ClusterName != "" {
+		// using the cluster label selector, args should be empty
+		args = []string{}
+	}
+	args = append([]string{util.GVRToString(c.GVR)}, args...)
+	return args
+}
+
+func validate(deleteFlags *DeleteFlags, args []string, in io.Reader) error {
+	// build resource to delete.
+	// if resource names is specified, use it, otherwise use the args.
+	if deleteFlags.ResourceNames != nil && len(deleteFlags.ResourceNames) > 0 {
+		args = deleteFlags.ResourceNames
+	}
 	if len(args) < 1 {
 		return fmt.Errorf("missing name")
 	}
 
 	// confirm the name
-	name, err := prompt.NewPrompt("You should enter the name", "Please enter the name again:", in).GetInput()
+	name, err := prompt.NewPrompt("You should enter the name.", "Please enter the name again(separate with commas when more than one):", in).GetInput()
 	if err != nil {
 		return err
 	}
-	if name != args[0] {
-		return fmt.Errorf("the entered name \"%s\" does not match \"%s\"", name, args[0])
+	if name != strings.Join(args, ",") {
+		return fmt.Errorf("the entered name \"%s\" does not match \"%s\"", name, strings.Join(args, ","))
 	}
 
 	return nil
@@ -75,15 +104,15 @@ func validate(args []string, in io.Reader) error {
 
 // newDeleteCommandFlags return a kubectl delete command flags, disable some flags that
 // we do not supported.
-func newDeleteCommandFlags() *cmddelete.DeleteFlags {
-	deleteFlags := cmddelete.NewDeleteCommandFlags("containing the resource to delete.")
+func newDeleteCommandFlags() *DeleteFlags {
+	deleteCmdFlags := cmddelete.NewDeleteCommandFlags("containing the resource to delete.")
 
 	// disable some flags
-	deleteFlags.FieldSelector = nil
-	deleteFlags.Raw = nil
-	deleteFlags.All = nil
-	deleteFlags.IgnoreNotFound = nil
-	deleteFlags.FileNameFlags = nil
+	deleteCmdFlags.FieldSelector = nil
+	deleteCmdFlags.Raw = nil
+	deleteCmdFlags.All = nil
+	deleteCmdFlags.IgnoreNotFound = nil
+	deleteCmdFlags.FileNameFlags = nil
 
-	return deleteFlags
+	return &DeleteFlags{DeleteFlags: deleteCmdFlags}
 }

@@ -45,11 +45,11 @@ var _ = Describe("appVersion webhook", func() {
 		It("Should webhook validate passed", func() {
 			By("By testing create a new appVersion when clusterDefinition not exist")
 			appVersion := createTestAppVersionObj(clusterDefinitionName, appVersionName)
-			Expect(testCtx.CheckedCreateObj(ctx, appVersion)).ShouldNot(Succeed())
+			Expect(testCtx.CreateObj(ctx, appVersion)).ShouldNot(Succeed())
 
 			By("By creating a new clusterDefinition")
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
-			Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 
 			Eventually(func() bool {
 				By("By testing component type is not found in cluserDefinition")

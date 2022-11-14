@@ -72,9 +72,15 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	for _, handler := range EventHandlerMap {
-		err := handler.Handle(r.Client, reqCtx, r.Recorder, event)
-		if err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "handleRoleChangedEventError")
+		if err := handler.Handle(r.Client, reqCtx, r.Recorder, event); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "handleEventError")
+		}
+	}
+
+	// event order is crucial in role probing, but it's not guaranteed when controller restarted, so we have to delete them
+	if event.InvolvedObject.FieldPath == ProbeRoleChangedCheckPath {
+		if err := r.Client.Delete(ctx, event); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "deleteEventError")
 		}
 	}
 

@@ -127,12 +127,22 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 		return nil
 	}
 	role := strings.ToLower(message.Role)
+
 	podName := types.NamespacedName{
 		Namespace: event.InvolvedObject.Namespace,
 		Name:      event.InvolvedObject.Name,
 	}
+	// get pod
+	pod := &corev1.Pod{}
+	if err := cli.Get(reqCtx.Ctx, podName, pod); err != nil {
+		return err
+	}
+	// event belongs to old pod with the same name, ignore it
+	if pod.UID != event.InvolvedObject.UID {
+		return nil
+	}
 
-	return component.UpdateConsensusSetRoleLabel(cli, reqCtx, podName, role)
+	return component.UpdateConsensusSetRoleLabel(cli, reqCtx, pod, role)
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to

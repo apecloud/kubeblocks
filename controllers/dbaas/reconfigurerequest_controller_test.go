@@ -18,12 +18,14 @@ package dbaas
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
@@ -63,7 +65,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			// step2: Check configuration template status
 			Eventually(func() bool {
-				ok, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigurationTemplate{}, false,
+				ok, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigurationTemplate{},
 					func(tpl *dbaasv1alpha1.ConfigurationTemplate) bool {
 						return configuration.ValidateConfTplStatus(tpl.Status)
 					})
@@ -72,7 +74,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			// step3: Check cluster definition status
 			Eventually(func() bool {
-				ok, _ := ValidateISVCR(testWrapper, &dbaasv1alpha1.ClusterDefinition{}, false,
+				ok, _ := ValidateISVCR(testWrapper, &dbaasv1alpha1.ClusterDefinition{},
 					func(cd *dbaasv1alpha1.ClusterDefinition) bool {
 						return cd.Status.Phase == dbaasv1alpha1.AvailablePhase
 					})
@@ -87,28 +89,57 @@ var _ = Describe("Cluster Controller", func() {
 			// step5: Check cluster definition status
 			Eventually(func() bool {
 				ok, err := ValidateCR(testWrapper, &dbaasv1alpha1.Cluster{},
-					testWrapper.WithCRName(clusterName), false,
+					testWrapper.WithCRName(clusterName),
 					func(obj *dbaasv1alpha1.Cluster) bool {
 						return obj.Status.Phase == dbaasv1alpha1.CreatingPhase
 					})
 				return err == nil && ok
 			}, time.Second*30, time.Second*1).Should(BeTrue())
 
+			insCfgCMName := GetComponentCfgName(clusterName, "replicasets", "mysql-config")
+
 			// step5 Check config for instance
+			var configHash string
 			Eventually(func() bool {
 				ok, _ := ValidateCR(testWrapper, &corev1.ConfigMap{},
-					testWrapper.WithCRName(GetComponentCfgName(clusterName,
-						"replicasets",    // component name
-						"mysql-config")), // volume name
-					false,
-					// testWrapper.testEnv.CfgTplName)),
+					testWrapper.WithCRName(insCfgCMName),
 					func(cm *corev1.ConfigMap) bool {
+						configHash = cm.Labels[configuration.CMInsConfigurationHashLabelKey]
 						return cm.Labels[appInstanceLabelKey] == clusterName &&
 							cm.Labels[configuration.CMConfigurationTplNameLabelKey] == testWrapper.testEnv.CfgTplName &&
-							cm.Labels[configuration.CMInsConfigurationLabelKey] != ""
+							cm.Labels[configuration.CMInsConfigurationLabelKey] != "" &&
+							configHash != ""
 					})
 				return ok
 			}, time.Second*30, time.Second*1).Should(BeTrue())
+
+			// step6: update configmap
+			Expect(UpdateCR[corev1.ConfigMap](testWrapper, &corev1.ConfigMap{},
+				testWrapper.WithCRName(insCfgCMName),
+				"mysql_ins_config2.yaml",
+				func(cm *corev1.ConfigMap, newCm *corev1.ConfigMap) (client.Patch, error) {
+					patch := client.MergeFrom(cm.DeepCopy())
+					cm.Data = newCm.Data
+					return patch, nil
+				})).Should(Succeed())
+
+			// check update configmap
+			fmt.Println("------------------------------------------")
+			fmt.Printf("old config hash: %s\n", configHash)
+			fmt.Println("------------------------------------------")
+			Eventually(func() bool {
+				ok, _ := ValidateCR(testWrapper, &corev1.ConfigMap{},
+					testWrapper.WithCRName(insCfgCMName),
+					func(cm *corev1.ConfigMap) bool {
+						newHash := cm.Labels[configuration.CMInsConfigurationHashLabelKey]
+						fmt.Println("------------------------------------------")
+						fmt.Printf("old config hash: %s\n", configHash)
+						fmt.Printf("new config hash: %s\n", newHash)
+						fmt.Println("------------------------------------------")
+						return newHash != configHash
+					})
+				return ok
+			}, time.Second*70, time.Second*1).Should(BeTrue())
 
 			Expect(DeleteCluster(testWrapper, clusterObject)).Should(Succeed())
 		})

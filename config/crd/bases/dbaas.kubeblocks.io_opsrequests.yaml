@@ -91,6 +91,7 @@ spec:
                       properties:
                         replicas:
                           description: Replicas for the workloads.
+                          format: int32
                           type: integer
                       type: object
                     verticalScaling:
@@ -148,6 +149,7 @@ spec:
               ttlSecondsAfterSucceed:
                 description: TTLSecondsAfterSucceed OpsRequest will be deleted after
                   TTLSecondsAfterSucceed second when OpsRequest.status.phase is Running
+                format: int32
                 type: integer
               type:
                 description: Type defines the operation type

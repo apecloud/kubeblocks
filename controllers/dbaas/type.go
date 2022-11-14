@@ -43,7 +43,7 @@ const (
 
 type MonitorConfig struct {
 	Enable     bool   `json:"enable"`
-	ScrapePort int    `json:"scrapePort,omitempty"`
+	ScrapePort int32  `json:"scrapePort,omitempty"`
 	ScrapePath string `json:"scrapePath,omitempty"`
 }
 
@@ -52,10 +52,10 @@ type Component struct {
 	ClusterType          string                                 `json:"clusterType,omitempty"`
 	Name                 string                                 `json:"name,omitempty"`
 	Type                 string                                 `json:"type,omitempty"`
-	MinAvailable         int                                    `json:"minAvailable,omitempty"`
-	MaxAvailable         int                                    `json:"maxAvailable,omitempty"`
-	DefaultReplicas      int                                    `json:"defaultReplicas,omitempty"`
-	Replicas             int                                    `json:"replicas,omitempty"`
+	MinAvailable         int32                                  `json:"minAvailable,omitempty"`
+	MaxAvailable         int32                                  `json:"maxAvailable,omitempty"`
+	DefaultReplicas      int32                                  `json:"defaultReplicas,omitempty"`
+	Replicas             int32                                  `json:"replicas,omitempty"`
 	AntiAffinity         bool                                   `json:"antiAffinity,omitempty"`
 	ComponentType        dbaasv1alpha1.ComponentType            `json:"componentType,omitempty"`
 	ConsensusSpec        *dbaasv1alpha1.ConsensusSetSpec        `json:"consensusSpec,omitempty"`

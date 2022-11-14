@@ -212,15 +212,18 @@ spec:
                       default: 0
                       description: Default replicas in this component if user not
                         specify
+                      format: int32
                       minimum: 0
                       type: integer
                     maxAvailable:
                       description: Maximum available pod count after scale
+                      format: int32
                       minimum: 0
                       type: integer
                     minAvailable:
                       default: 0
                       description: Minimum available pod count when updating
+                      format: int32
                       minimum: 0
                       type: integer
                     monitor:
@@ -249,8 +252,9 @@ spec:
                             scrapePort:
                               description: ScrapePort is exporter port for Time Series
                                 Database to scrape metrics
-                              maximum: 65536
-                              minimum: 1
+                              format: int32
+                              maximum: 65535
+                              minimum: 0
                               type: integer
                           required:
                           - scrapePath

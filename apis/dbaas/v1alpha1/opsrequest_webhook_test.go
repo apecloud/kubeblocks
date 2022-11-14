@@ -33,6 +33,7 @@ import (
 )
 
 var _ = Describe("OpsRequest webhook", func() {
+
 	var (
 		clusterDefinitionName    = "opsrequest-webhook-mysql-definition"
 		appVersionName           = "opsrequest-webhook-mysql-appversion"
@@ -41,14 +42,30 @@ var _ = Describe("OpsRequest webhook", func() {
 		opsRequestName           = "opsrequest-webhook-mysql-ops"
 		timeout                  = time.Second * 10
 		interval                 = time.Second
+		namespace                = "default"
+		ctx                      = context.Background()
 	)
 
-	testUpgrade := func(cluster *Cluster, opsRequest *OpsRequest) {
+	BeforeEach(func() {
+		// Add any steup steps that needs to be executed before each test
+		err := k8sClient.DeleteAllOf(ctx, &OpsRequest{},
+			client.InNamespace(namespace),
+			client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+	})
 
+	AfterEach(func() {
+		// Add any teardown steps that needs to be executed after each test
+	})
+
+	testUpgrade := func(cluster *Cluster, opsRequest *OpsRequest) {
 		By("By testing when cluster not support upgrade")
-		Expect(k8sClient.Create(ctx, opsRequest)).ShouldNot(Succeed())
+		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
 		// set cluster support upgrade
 		patch := client.MergeFrom(cluster.DeepCopy())
+		if cluster.Status.Operations == nil {
+			cluster.Status.Operations = &Operations{}
+		}
 		cluster.Status.Operations.Upgradable = true
 		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
 		// wait until patch succeed
@@ -59,21 +76,21 @@ var _ = Describe("OpsRequest webhook", func() {
 		}, timeout, interval).Should(BeTrue())
 
 		By("By testing when spec.clusterOps is null")
-		Expect(k8sClient.Create(ctx, opsRequest)).ShouldNot(Succeed())
+		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
 
 		By("By testing spec.clusterOps.upgrade.appVersionRef when it equals Cluster.spec.appVersionRef")
 		opsRequest.Spec.ClusterOps = &ClusterOps{Upgrade: &Upgrade{
 			AppVersionRef: appVersionName,
 		}}
-		Expect(k8sClient.Create(ctx, opsRequest)).ShouldNot(Succeed())
+		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
 
 		By("By creating a appVersion for upgrade")
 		newAppVersion := createTestAppVersionObj(clusterDefinitionName, appVersionNameForUpgrade)
-		Expect(k8sClient.Create(ctx, newAppVersion)).Should(Succeed())
+		Expect(testCtx.CreateObj(ctx, newAppVersion)).Should(Succeed())
 		By("By creating a upgrade opsRequest, it should be succeed")
 		Eventually(func() bool {
 			opsRequest.Spec.ClusterOps.Upgrade.AppVersionRef = newAppVersion.Name
-			err := k8sClient.Create(ctx, opsRequest)
+			err := testCtx.CreateObj(ctx, opsRequest)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
 
@@ -114,10 +131,10 @@ var _ = Describe("OpsRequest webhook", func() {
 				},
 			},
 		}
-		Expect(k8sClient.Create(ctx, opsRequest)).ShouldNot(Succeed())
+		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
 		Eventually(func() bool {
 			opsRequest.Spec.ComponentOpsList[0].ComponentNames = []string{"replicaSets"}
-			err := k8sClient.Create(ctx, opsRequest)
+			err := testCtx.CreateObj(ctx, opsRequest)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
 	}
@@ -151,12 +168,12 @@ var _ = Describe("OpsRequest webhook", func() {
 				},
 			},
 		}
-		Expect(k8sClient.Create(ctx, opsRequest)).ShouldNot(Succeed())
+		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
 
 		By("By testing volumeExpansion. if api is legal, it will create successfully")
 		Eventually(func() bool {
 			opsRequest.Spec.ComponentOpsList[0].VolumeExpansion[0].Name = "data"
-			err := k8sClient.Create(ctx, opsRequest)
+			err := testCtx.CreateObj(ctx, opsRequest)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
 	}
@@ -189,13 +206,13 @@ var _ = Describe("OpsRequest webhook", func() {
 					},
 				},
 			}
-			err := k8sClient.Create(ctx, opsRequest)
+			err := testCtx.CreateObj(ctx, opsRequest)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
 
 		By("By testing horizontalScaling replica is not in [min,max]")
 		opsRequest.Spec.ComponentOpsList[0].HorizontalScaling.Replicas = 4
-		Expect(k8sClient.Create(ctx, opsRequest)).ShouldNot(Succeed())
+		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
 
 	}
 
@@ -216,12 +233,12 @@ var _ = Describe("OpsRequest webhook", func() {
 		opsRequest.Spec.ComponentOpsList = []*ComponentOps{
 			{ComponentNames: []string{"replicaSets1"}},
 		}
-		Expect(k8sClient.Create(ctx, opsRequest)).ShouldNot(Succeed())
+		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
 
 		By("By testing restart. if api is legal, it will create successfully")
 		Eventually(func() bool {
 			opsRequest.Spec.ComponentOpsList[0].ComponentNames = []string{"replicaSets"}
-			err := k8sClient.Create(ctx, opsRequest)
+			err := testCtx.CreateObj(ctx, opsRequest)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
 	}
@@ -233,10 +250,10 @@ var _ = Describe("OpsRequest webhook", func() {
 			// wait until ClusterDefinition and AppVersion created
 			Eventually(func() bool {
 				clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
-				Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
+				Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 				By("By creating a appVersion")
 				appVersion := createTestAppVersionObj(clusterDefinitionName, appVersionName)
-				err := k8sClient.Create(ctx, appVersion)
+				err := testCtx.CreateObj(ctx, appVersion)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
@@ -245,10 +262,10 @@ var _ = Describe("OpsRequest webhook", func() {
 			// wait until Cluster created
 			Eventually(func() bool {
 				By("By testing spec.clusterDef is legal")
-				Expect(k8sClient.Create(ctx, opsRequest)).ShouldNot(Succeed())
+				Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
 				By("By create a new cluster ")
 				cluster, _ = createTestCluster(clusterDefinitionName, appVersionName, clusterName)
-				err := k8sClient.Create(ctx, cluster)
+				err := testCtx.CreateObj(ctx, cluster)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 

@@ -35,7 +35,7 @@ type OpsRequestSpec struct {
 
 	// TTLSecondsAfterSucceed OpsRequest will be deleted after TTLSecondsAfterSucceed second when OpsRequest.status.phase is Running
 	// +optional
-	TTLSecondsAfterSucceed int `json:"ttlSecondsAfterSucceed,omitempty"`
+	TTLSecondsAfterSucceed int32 `json:"ttlSecondsAfterSucceed,omitempty"`
 
 	// ClusterOps defines cluster level operations, like Upgrade
 	// +optional
@@ -117,7 +117,7 @@ type VolumeExpansion struct {
 type HorizontalScaling struct {
 	// Replicas for the workloads.
 	// +optional
-	Replicas int `json:"replicas,omitempty"`
+	Replicas int32 `json:"replicas,omitempty"`
 }
 
 type OpsRequestStatusComponent struct {

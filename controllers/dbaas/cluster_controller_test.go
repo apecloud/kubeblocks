@@ -267,17 +267,14 @@ spec:
 		}
 
 		return &dbaasv1alpha1.Cluster{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "dbaas.kubeblocks.io/v1alpha1",
-				Kind:       "Cluster",
-			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      key.Name,
 				Namespace: key.Namespace,
 			},
 			Spec: dbaasv1alpha1.ClusterSpec{
-				ClusterDefRef: clusterDefObj.GetName(),
-				AppVersionRef: appVersionObj.GetName(),
+				ClusterDefRef:     clusterDefObj.GetName(),
+				AppVersionRef:     appVersionObj.GetName(),
+				TerminationPolicy: dbaasv1alpha1.Halt,
 			},
 		}, clusterDefObj, appVersionObj, key
 	}
@@ -569,7 +566,7 @@ spec:
 			fetchedG1.Spec.Components = append(fetchedG1.Spec.Components, dbaasv1alpha1.ClusterComponent{
 				Name:     "replicasets",
 				Type:     "replicasets",
-				Replicas: updatedReplicas,
+				Replicas: int32(updatedReplicas),
 			})
 			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
 
@@ -845,7 +842,7 @@ spec:
 			"1 service routes to 'leader' pod", func() {
 			By("By creating a cluster with componentType = Consensus")
 			toCreate, _, _, key := newClusterWithConsensusObj(nil, nil)
-			Expect(k8sClient.Create(context.Background(), toCreate)).Should(Succeed())
+			Expect(testCtx.CreateObj(context.Background(), toCreate)).Should(Succeed())
 
 			By("By waiting the cluster is created")
 			cluster := &dbaasv1alpha1.Cluster{}
@@ -856,7 +853,7 @@ spec:
 				stsName := toCreate.Name + "-" + toCreate.Spec.Components[0].Name
 				pods := createFakePod(stsName, 3)
 				for _, pod := range pods {
-					Expect(k8sClient.Create(context.Background(), &pod)).Should(Succeed())
+					Expect(testCtx.CreateObj(context.Background(), &pod)).Should(Succeed())
 				}
 
 				// fake pods and stateful set creation done

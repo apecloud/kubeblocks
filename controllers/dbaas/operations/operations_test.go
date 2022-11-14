@@ -187,8 +187,9 @@ spec:
 				Namespace: key.Namespace,
 			},
 			Spec: dbaasv1alpha1.ClusterSpec{
-				ClusterDefRef: clusterDefObj.GetName(),
-				AppVersionRef: appVersionObj.GetName(),
+				ClusterDefRef:     clusterDefObj.GetName(),
+				AppVersionRef:     appVersionObj.GetName(),
+				TerminationPolicy: dbaasv1alpha1.Halt,
 				Components: []dbaasv1alpha1.ClusterComponent{
 					{
 						Name: "replicasets",

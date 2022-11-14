@@ -39,6 +39,8 @@ type roleEventValue struct {
 }
 
 var _ = Describe("Event Controller", func() {
+	var ctx = context.Background()
+
 	BeforeEach(func() {
 		// Add any steup steps that needs to be executed before each test
 		err := k8sClient.DeleteAllOf(ctx, &corev1.Event{},
@@ -56,7 +58,6 @@ var _ = Describe("Event Controller", func() {
 		// Add any teardown steps that needs to be executed after each test
 	})
 
-	var ctx = context.Background()
 	// eventChan := make(chan *corev1.Event)
 	// rec := reconcile.Func(func(_ context.Context, req reconcile.Request) (reconcile.Result, error) {
 	//	event := &corev1.Event{}
@@ -87,7 +88,7 @@ var _ = Describe("Event Controller", func() {
 				}, event)).Should(Succeed())
 
 				return event.InvolvedObject.Name
-			}, time.Second*5, time.Second).Should(Equal(sndEvent.InvolvedObject.Name))
+			}, time.Second*30, time.Second).Should(Equal(sndEvent.InvolvedObject.Name))
 
 			// TODO: an interesting bug
 			// event := <-eventChan

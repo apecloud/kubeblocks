@@ -78,9 +78,9 @@ type ConfigTemplate struct {
 type ExporterConfig struct {
 	// ScrapePort is exporter port for Time Series Database to scrape metrics
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Maximum=65536
-	// +kubebuilder:validation:Minimum=1
-	ScrapePort int `json:"scrapePort"`
+	// +kubebuilder:validation:Maximum=65535
+	// +kubebuilder:validation:Minimum=0
+	ScrapePort int32 `json:"scrapePort"`
 
 	// ScrapePath is exporter url path for Time Series Database to scrape metrics
 	// +kubebuilder:validation:Required
@@ -119,18 +119,18 @@ type ClusterDefinitionComponent struct {
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
-	MinAvailable int `json:"minAvailable,omitempty"`
+	MinAvailable int32 `json:"minAvailable,omitempty"`
 
 	// Maximum available pod count after scale
 	// +kubebuilder:validation:Minimum=0
 	// +optional
-	MaxAvailable int `json:"maxAvailable,omitempty"`
+	MaxAvailable int32 `json:"maxAvailable,omitempty"`
 
 	// Default replicas in this component if user not specify
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
-	DefaultReplicas int `json:"defaultReplicas,omitempty"`
+	DefaultReplicas int32 `json:"defaultReplicas,omitempty"`
 
 	// The configTemplateRefs field provided by ISV, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster

@@ -31,6 +31,16 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:Required
 	AppVersionRef string `json:"appVersionRef"`
 
+	// One of DoNotTerminate, Halt, Delete, WipeOut.
+	// Defaults to Halt.
+	// DoNotTerminate means block delete operation.
+	// Halt means delete resources such as sts,deploy,svc,pdb, but keep pvcs.
+	// Delete is based on Halt and delete pvcs.
+	// WipeOut is based on Delete and wipe out all snapshots and snapshot data from bucket.
+	// +kubebuilder:default=Halt
+	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
+	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
+
 	// List of components you want to replace in ClusterDefinition and AppVersion. It will replace the field in ClusterDefinition's and AppVersion's component if type is matching
 	// +optional
 	Components []ClusterComponent `json:"components,omitempty"`
@@ -38,17 +48,6 @@ type ClusterSpec struct {
 	// Affinity describes affinities which specific by users
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
-
-	// One of DoNotTerminate, Halt, Delete, WipeOut.
-	// Defaults to Halt.
-	// DoNotTerminate means block delete operation.
-	// Halt means delete resources such as sts,deploy,svc,pdb, but keep pvcs.
-	// Delete is based on Halt and delete pvcs.
-	// WipeOut is based on Delete and wipe out all snapshots and snapshot data from bucket.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=Halt
-	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
-	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
 }
 
 // ClusterStatus defines the observed state of Cluster
@@ -89,13 +88,6 @@ type ClusterComponent struct {
 	// +kubebuilder:validation:MaxLength=12
 	Type string `json:"type"`
 
-	// default value in ClusterDefinition
-	Replicas int `json:"replicas,omitempty"`
-
-	// Affinity describes affinities which specific by users
-	// +optional
-	Affinity *Affinity `json:"affinity,omitempty"`
-
 	// Monitor which is a switch to enable monitoring, default is false
 	// DBaas provides an extension mechanism to support component level monitoring,
 	// which will scrape metrics auto or manually from servers in component and export
@@ -103,6 +95,14 @@ type ClusterComponent struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=false
 	Monitor bool `json:"monitor"`
+
+	// default value in ClusterDefinition
+	// +optional
+	Replicas int32 `json:"replicas,omitempty"`
+
+	// Affinity describes affinities which specific by users
+	// +optional
+	Affinity *Affinity `json:"affinity,omitempty"`
 
 	// Resources requests and limits of workload
 	// +optional
@@ -240,11 +240,11 @@ type OperationComponent struct {
 
 	// Min minimum of replicas when operation is horizontalScaling,
 	// +optional
-	Min int `json:"min,omitempty"`
+	Min int32 `json:"min,omitempty"`
 
 	// Max maximum of replicas when operation is horizontalScaling
 	// +optional
-	Max int `json:"max,omitempty"`
+	Max int32 `json:"max,omitempty"`
 
 	// VolumeClaimTemplateNames which VolumeClaimTemplate of the component support volumeExpansion
 	// +optional

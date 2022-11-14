@@ -97,6 +97,7 @@ metadata:
 spec:
   clusterDefinitionRef: %s
   appVersionRef: %s
+  terminationPolicy: Halt
   components:
   - name: replicaSets
     type: replicaSets

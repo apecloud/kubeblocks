@@ -124,6 +124,7 @@ spec:
                       type: string
                     replicas:
                       description: default value in ClusterDefinition
+                      format: int32
                       type: integer
                     resources:
                       description: Resources requests and limits of workload
@@ -528,9 +529,11 @@ spec:
                       properties:
                         max:
                           description: Max maximum of replicas when operation is horizontalScaling
+                          format: int32
                           type: integer
                         min:
                           description: Min minimum of replicas when operation is horizontalScaling,
+                          format: int32
                           type: integer
                         name:
                           description: Name component name
@@ -568,9 +571,11 @@ spec:
                       properties:
                         max:
                           description: Max maximum of replicas when operation is horizontalScaling
+                          format: int32
                           type: integer
                         min:
                           description: Min minimum of replicas when operation is horizontalScaling,
+                          format: int32
                           type: integer
                         name:
                           description: Name component name

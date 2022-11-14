@@ -73,7 +73,7 @@ type ClusterStatus struct {
 
 	// Operations declares which operations the cluster supports
 	// +optional
-	Operations *Operations `json:"operations,omitempty"`
+	Operations *Operations `json:"operations"`
 
 	ClusterDefinitionStatusGeneration `json:",inline"`
 }

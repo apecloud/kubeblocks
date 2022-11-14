@@ -229,10 +229,16 @@ func (r *AppVersionReconciler) syncClusterStatusOperationsWithUpgrade(ctx contex
 		upgradable = true
 	}
 	for _, v := range clusterList.Items {
-		if v.Status.Operations.Upgradable == upgradable {
-			continue
+		var patch client.Patch
+		if v.Status.Operations != nil {
+			if v.Status.Operations.Upgradable == upgradable {
+				continue
+			}
+			patch = client.MergeFrom(v.DeepCopy())
+		} else {
+			patch = client.MergeFrom(v.DeepCopy())
+			v.Status.Operations = &dbaasv1alpha1.Operations{}
 		}
-		patch := client.MergeFrom(v.DeepCopy())
 		v.Status.Operations.Upgradable = upgradable
 		if err = r.Client.Status().Patch(ctx, &v, patch); err != nil {
 			return err

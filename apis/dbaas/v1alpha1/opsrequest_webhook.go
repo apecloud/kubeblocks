@@ -104,6 +104,10 @@ func (r *OpsRequest) validate() error {
 
 // validateOps validate ops attributes is legal
 func (r *OpsRequest) validateOps(ctx context.Context, cluster *Cluster, allErrs *field.ErrorList) {
+	if cluster.Status.Operations == nil {
+		cluster.Status.Operations = &Operations{}
+	}
+
 	// Check whether the corresponding attribute is legal according to the operation type
 	switch r.Spec.Type {
 	case UpgradeType:
@@ -158,7 +162,7 @@ func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *
 	r.commonValidationWithComponentOps(allErrs, cluster, supportedComponentMap, customValidate)
 }
 
-// validateVolumeExpansion validate api is legal when spec.type is HorizontalScaling
+// validateHorizontalScaling validate api is legal when spec.type is HorizontalScaling
 func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.ErrorList) {
 	supportedComponentMap := covertOperationComponentsToMap(cluster.Status.Operations.HorizontalScalable)
 	customValidate := func(componentOps *ComponentOps, index int, operationComponent *OperationComponent) *field.Error {

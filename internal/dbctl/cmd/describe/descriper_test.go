@@ -136,7 +136,7 @@ func fakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
 		Spec: dbaasv1alpha1.ClusterSpec{
 			ClusterDefRef:     clusterDefName,
 			AppVersionRef:     appVersionName,
-			TerminationPolicy: dbaasv1alpha1.Halt,
+			TerminationPolicy: dbaasv1alpha1.WipeOut,
 			Components: []dbaasv1alpha1.ClusterComponent{
 				{
 					Name: componentName,

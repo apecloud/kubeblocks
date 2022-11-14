@@ -93,6 +93,9 @@ func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *db
 			patch := client.MergeFrom(cluster.DeepCopy())
 			// sync status.Operations.HorizontalScalable
 			horizontalScalableComponents, _ := getSupportHorizontalScalingComponents(&cluster, clusterDef)
+			if cluster.Status.Operations == nil {
+				cluster.Status.Operations = &dbaasv1alpha1.Operations{}
+			}
 			cluster.Status.Operations.HorizontalScalable = horizontalScalableComponents
 			cluster.Status.ClusterDefSyncStatus = dbaasv1alpha1.OutOfSyncStatus
 			if err = cli.Status().Patch(ctx, &cluster, patch); err != nil {
@@ -528,12 +531,16 @@ func (r *ClusterReconciler) handleComponentStatusWithDeployment(ctx context.Cont
 
 // reconcileStatusOperations when Cluster.spec updated, we need reconcile the Cluster.status.operations.
 func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, cluster *dbaasv1alpha1.Cluster, clusterDef *dbaasv1alpha1.ClusterDefinition) error {
+	if cluster.Status.Operations == nil {
+		cluster.Status.Operations = &dbaasv1alpha1.Operations{}
+	}
+
 	var (
 		err                       error
 		upgradable                bool
 		volumeExpansionComponents []dbaasv1alpha1.OperationComponent
 		oldOperations             = cluster.Status.Operations.DeepCopy()
-		operations                = cluster.Status.Operations
+		operations                = *cluster.Status.Operations
 		appVersionList            = &dbaasv1alpha1.AppVersionList{}
 	)
 	// determine whether to support volumeExpansion
@@ -563,7 +570,7 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 		return nil
 	}
 	patch := client.MergeFrom(cluster.DeepCopy())
-	cluster.Status.Operations = operations
+	cluster.Status.Operations = &operations
 	return r.Client.Status().Patch(ctx, cluster, patch)
 }
 

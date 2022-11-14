@@ -97,7 +97,6 @@ metadata:
 spec:
   clusterDefinitionRef: %s
   appVersionRef: %s
-  terminationPolicy: Halt
   components:
   - name: replicaSets
     type: replicaSets
@@ -108,5 +107,6 @@ spec:
 `, clusterName, clusterDefinitionName, appVersionName)
 	cluster := &Cluster{}
 	err := yaml.Unmarshal([]byte(clusterYaml), cluster)
+	cluster.Spec.TerminationPolicy = WipeOut
 	return cluster, err
 }

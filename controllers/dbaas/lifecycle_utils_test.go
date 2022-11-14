@@ -479,7 +479,7 @@ metadata:
 spec:
   clusterDefinitionRef: %s
   appVersionRef: %s
-  terminationPolicy: Halt
+  terminationPolicy: WipeOut
   components:
   - name: replicasets
     type: replicasets

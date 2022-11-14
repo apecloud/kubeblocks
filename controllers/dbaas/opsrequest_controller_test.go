@@ -182,7 +182,7 @@ spec:
 			Spec: dbaasv1alpha1.ClusterSpec{
 				ClusterDefRef:     clusterDefObj.GetName(),
 				AppVersionRef:     appVersionObj.GetName(),
-				TerminationPolicy: dbaasv1alpha1.Halt,
+				TerminationPolicy: dbaasv1alpha1.WipeOut,
 			},
 		}, clusterDefObj, appVersionObj, key
 	}

@@ -72,7 +72,7 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, backupPolicy, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
 		return nil, r.deleteExternalResources(reqCtx, backupPolicy)
 	})
-	if err != nil {
+	if res != nil {
 		return *res, err
 	} // TODO(user): your logic here
 

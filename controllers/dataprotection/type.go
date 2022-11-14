@@ -31,6 +31,8 @@ const (
 
 	// settings keys
 	maxConcurDataProtectionReconKey = "MAXCONCURRENTRECONCILES_DATAPROTECTION"
+
+	dataProtectionLabelBackupTypeKey = "dataprotection.kubeblocks.io/backup-type"
 )
 
 func init() {

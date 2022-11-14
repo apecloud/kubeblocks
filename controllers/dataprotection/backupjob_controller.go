@@ -93,7 +93,7 @@ func (r *BackupJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, backupJob, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
 		return nil, r.deleteExternalResources(reqCtx, backupJob)
 	})
-	if err != nil {
+	if res != nil {
 		return *res, err
 	}
 
@@ -137,6 +137,24 @@ func (r *BackupJobReconciler) doNewPhaseAction(
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()
+	}
+
+	// update labels
+	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
+	backupPolicyNameSpaceName := types.NamespacedName{
+		Namespace: reqCtx.Req.Namespace,
+		Name:      backupJob.Spec.BackupPolicyName,
+	}
+	if err := r.Get(reqCtx.Ctx, backupPolicyNameSpaceName, backupPolicy); err != nil {
+		r.Recorder.Eventf(backupJob, corev1.EventTypeWarning, "CreatingBackupJob",
+			"Unable to get backupPolicy for backupJob %s.", backupPolicyNameSpaceName)
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
+	labels := backupPolicy.Spec.Target.LabelsSelector.MatchLabels
+	labels[dataProtectionLabelBackupTypeKey] = string(backupJob.Spec.BackupType)
+	if err := r.patchBackupJobLabels(reqCtx, backupJob, labels); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
 	// update Phase to InProgress
@@ -223,6 +241,19 @@ func (r *BackupJobReconciler) doInProgressPhaseAction(
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
+}
+
+// patchBackupJobLabels patch backupJob labels
+func (r *BackupJobReconciler) patchBackupJobLabels(
+	reqCtx intctrlutil.RequestCtx,
+	backupJob *dataprotectionv1alpha1.BackupJob,
+	labels map[string]string) error {
+
+	patch := client.MergeFrom(backupJob.DeepCopy())
+	if len(labels) > 0 {
+		backupJob.Labels = labels
+	}
+	return r.Client.Patch(reqCtx.Ctx, backupJob, patch)
 }
 
 func (r *BackupJobReconciler) createPreCommandJobAndEnsure(reqCtx intctrlutil.RequestCtx,

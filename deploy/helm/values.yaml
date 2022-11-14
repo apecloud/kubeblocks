@@ -247,8 +247,6 @@ loadbalancer:
 
 wesql:
   enabled: true
-  backup:
-    schedule: "0 2 * * *"
 
 snapshot-controller:
   enabled: false

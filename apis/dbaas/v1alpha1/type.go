@@ -43,6 +43,7 @@ const (
 	FailedPhase      Phase = "Failed"
 	UpdatingPhase    Phase = "Updating"
 	SucceedPhase     Phase = "Succeed"
+	AbnormalPhase    Phase = "Abnormal"
 )
 
 // Status define CR .Status.ClusterDefSyncStatus

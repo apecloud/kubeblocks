@@ -634,7 +634,7 @@ spec:
 				Expect(k8sClient.List(ctx, pdbList, client.MatchingLabels{
 					"app.kubernetes.io/instance": key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				return len(pdbList.Items) != 0
+				return len(pdbList.Items) == 0
 			}, timeout, interval).Should(BeTrue())
 
 			By("Deleting the scope")

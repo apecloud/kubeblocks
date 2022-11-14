@@ -80,14 +80,14 @@ spec:
                   properties:
                     componentNames:
                       description: ComponentNames defines which components perform
-                        the operation
+                        the operation.
                       items:
                         type: string
                       minItems: 1
                       type: array
                     horizontalScaling:
                       description: HorizontalScaling defines the variables that need
-                        to be input when scaling replicas
+                        to be input when scaling replicas.
                       properties:
                         replicas:
                           description: Replicas for the workloads.
@@ -96,7 +96,7 @@ spec:
                       type: object
                     verticalScaling:
                       description: VerticalScaling defines the variables that need
-                        to be input when scaling compute resources
+                        to be input when scaling compute resources.
                       properties:
                         limits:
                           additionalProperties:
@@ -124,7 +124,7 @@ spec:
                       type: object
                     volumeExpansion:
                       description: VolumeExpansion defines the variables that need
-                        to be input when expanding a volume
+                        to be input when expanding a volume.
                       items:
                         properties:
                           name:

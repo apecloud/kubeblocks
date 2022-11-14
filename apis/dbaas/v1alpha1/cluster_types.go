@@ -23,7 +23,7 @@ import (
 
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
-	// ref ClusterDefinition, immutable
+	// ref ClusterDefinition, immutable.
 	// +kubebuilder:validation:Required
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
@@ -41,11 +41,11 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
 	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
 
-	// List of components you want to replace in ClusterDefinition and AppVersion. It will replace the field in ClusterDefinition's and AppVersion's component if type is matching
+	// List of components you want to replace in ClusterDefinition and AppVersion. It will replace the field in ClusterDefinition's and AppVersion's component if type is matching.
 	// +optional
 	Components []ClusterComponent `json:"components,omitempty"`
 
-	// Affinity describes affinities which specific by users
+	// Affinity describes affinities which specific by users.
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 }
@@ -58,20 +58,26 @@ type ClusterStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// phase - in list of [Running, Failed, Creating, Updating, Deleting, Deleted]
-	// +kubebuilder:validation:Enum={Running,Failed,Creating,Updating,Deleting,Deleted}
+	// Creating: creating cluster.
+	// Running: cluster is running, all components is available.
+	// Updating: cluster changes, such as horizontal-scaling/vertical-scaling/restart.
+	// Deleting/Deleted: deleting cluster/cluster is deleted.
+	// Failed: cluster not available.
+	// Abnormal: cluster available but some component is not Abnormal.
+	// if the component type is Consensus/Replication, the Leader/Primary pod is must ready in Abnormal phase.
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
-	// Message cluster details message in current phase
+	// Message cluster details message in current phase.
 	// +optional
 	Message string `json:"message,omitempty"`
 
-	// Components record the current status information of all components of the cluster
+	// Components record the current status information of all components of the cluster.
 	// +optional
 	Components map[string]*ClusterStatusComponent `json:"components,omitempty"`
 
-	// Operations declares which operations the cluster supports
+	// Operations declares which operations the cluster supports.
 	// +optional
 	Operations *Operations `json:"operations"`
 
@@ -83,7 +89,7 @@ type ClusterComponent struct {
 	// +kubebuilder:validation:MaxLength=12
 	Name string `json:"name"`
 
-	// component name in ClusterDefinition
+	// component name in ClusterDefinition.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
 	Type string `json:"type"`
@@ -96,19 +102,19 @@ type ClusterComponent struct {
 	// +kubebuilder:default=false
 	Monitor bool `json:"monitor"`
 
-	// default value in ClusterDefinition
+	// Component replicas, use default value in ClusterDefinition if not specified.
 	// +optional
 	Replicas int32 `json:"replicas,omitempty"`
 
-	// Affinity describes affinities which specific by users
+	// Affinity describes affinities which specific by users.
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
-	// Resources requests and limits of workload
+	// Resources requests and limits of workload.
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
-	// VolumeClaimTemplates information for statefulset.spec.volumeClaimTemplates
+	// VolumeClaimTemplates information for statefulset.spec.volumeClaimTemplates.
 	// +optional
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 
@@ -134,50 +140,54 @@ type ClusterComponent struct {
 
 // ClusterStatusComponent record components status information
 type ClusterStatusComponent struct {
-	// Type component type
+	// Type of component.
 	// +optional
 	Type string `json:"type,omitempty"`
 
-	// Phase - in list of [Running, Failed, Creating, Updating, Deleting, Deleted]
-	// +kubebuilder:validation:Enum={Running,Failed,Creating,Updating,Deleting,Deleted}
+	// Failed Phase: component not available, i.e, all pod is not ready for Stateless/Stateful component;
+	// Leader/Primary pod is not ready for Consensus/Replication component.
+	// Abnormal Phase: component available but some pod is not ready.
+	// if the component type is Consensus/Replication, the Leader/Primary pod is must ready in Abnormal phase.
+	// Other phases behave the same as the cluster phase.
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted}
 	Phase Phase `json:"phase,omitempty"`
 
-	// Message record the component details message in current phase
+	// Message record the component details message in current phase.
 	// +optional
 	Message string `json:"message,omitempty"`
 
-	// ConsensusSetStatus role and pod name mapping
+	// ConsensusSetStatus role and pod name mapping.
 	// +optional
 	ConsensusSetStatus *ConsensusSetStatus `json:"consensusSetStatus,omitempty"`
 }
 
 type ConsensusSetStatus struct {
-	// Leader status
+	// Leader status.
 	// +kubebuilder:validation:Required
 	Leader ConsensusMemberStatus `json:"leader"`
 
-	// Followers status
+	// Followers status.
 	// +optional
 	Followers []ConsensusMemberStatus `json:"followers,omitempty"`
 
-	// Learner status
+	// Learner status.
 	// +optional
 	Learner *ConsensusMemberStatus `json:"learner,omitempty"`
 }
 
 type ConsensusMemberStatus struct {
-	// Name role name
+	// Name role name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=leader
 	Name string `json:"name"`
 
-	// AccessMode, what service this pod provides
+	// AccessMode, what service this pod provides.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum={None, Readonly, ReadWrite}
 	// +kubebuilder:default=ReadWrite
 	AccessMode AccessMode `json:"accessMode"`
 
-	// Pod name
+	// Pod name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Unknown
 	Pod string `json:"pod"`
@@ -187,14 +197,13 @@ type ClusterComponentVolumeClaimTemplate struct {
 	// Ref AppVersion.spec.components.containers.volumeMounts.name
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
-
-	// Spec defines the desired characteristics of a volume requested by a pod author
+	// Spec defines the desired characteristics of a volume requested by a pod author.
 	// +optional
 	Spec *corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"`
 }
 
 type Affinity struct {
-	// PodAntiAffinity defines pods of component anti-affnity
+	// PodAntiAffinity defines pods of component anti-affnity.
 	// Defaults to Preferred
 	// Preferred means try spread pods by topologyKey
 	// Required means must spread pods by topologyKey
@@ -202,7 +211,7 @@ type Affinity struct {
 	// +optional
 	PodAntiAffinity PodAntiAffinity `json:"podAntiAffinity,omitempty"`
 
-	// TopologyKeys describe topologyKeys for `topologySpreadConstraint` and `podAntiAffinity` in ClusterDefinition API
+	// TopologyKeys describe topologyKeys for `topologySpreadConstraint` and `podAntiAffinity` in ClusterDefinition API.
 	// +optional
 	TopologyKeys []string `json:"topologyKeys,omitempty"`
 
@@ -212,7 +221,7 @@ type Affinity struct {
 }
 
 type Operations struct {
-	// Upgradable whether the cluster supports upgrade. if multiple appVersions existed, it is true
+	// Upgradable whether the cluster supports upgrade. if multiple appVersions existed, it is true.
 	// +optional
 	Upgradable bool `json:"upgradable,omitempty"`
 
@@ -234,19 +243,19 @@ type Operations struct {
 }
 
 type OperationComponent struct {
-	// Name component name
+	// Name reference component name.
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Min minimum of replicas when operation is horizontalScaling,
+	// Min minimum of replicas when operation is horizontalScaling.
 	// +optional
 	Min int32 `json:"min,omitempty"`
 
-	// Max maximum of replicas when operation is horizontalScaling
+	// Max maximum of replicas when operation is horizontalScaling.
 	// +optional
 	Max int32 `json:"max,omitempty"`
 
-	// VolumeClaimTemplateNames which VolumeClaimTemplate of the component support volumeExpansion
+	// VolumeClaimTemplateNames which VolumeClaimTemplate of the component support volumeExpansion.
 	// +optional
 	VolumeClaimTemplateNames []string `json:"volumeClaimTemplateNames,omitempty"`
 }

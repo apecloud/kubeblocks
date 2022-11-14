@@ -18,13 +18,14 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition
 type ClusterDefinitionSpec struct {
 	// Type define well known cluster types. Valid values are in-list of
-	// [state.redis, mq.mqtt, mq.kafka, state.mysql-8, state.mysql-5.7, state.mysql-5.6, state-mongodb]
+	// [state.redis, mq.mqtt, mq.kafka, state.mysql-8, state.mysql-5.7, state.mysql-5.6, state-mongodb].
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=24
 	Type string `json:"type"`
@@ -46,7 +47,8 @@ type ClusterDefinitionSpec struct {
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
 type ClusterDefinitionStatus struct {
-	// phase - in list of [Available]
+	// ClusterDefinition phase -
+	// Available is ClusterDefinition become available, and can be referenced for co-related objects.
 	// +kubebuilder:validation:Enum={Available}
 	Phase Phase `json:"phase,omitempty"`
 
@@ -62,7 +64,7 @@ type ClusterDefinitionStatus struct {
 }
 
 type ConfigTemplate struct {
-	// Specify the name of the referenced configuration template, which is a configmap object
+	// Specify the name of the referenced configuration template, which is a configmap object.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=128
 	Name string `json:"name"`
@@ -76,13 +78,13 @@ type ConfigTemplate struct {
 }
 
 type ExporterConfig struct {
-	// ScrapePort is exporter port for Time Series Database to scrape metrics
+	// ScrapePort is exporter port for Time Series Database to scrape metrics.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Maximum=65535
 	// +kubebuilder:validation:Minimum=0
 	ScrapePort int32 `json:"scrapePort"`
 
-	// ScrapePath is exporter url path for Time Series Database to scrape metrics
+	// ScrapePath is exporter url path for Time Series Database to scrape metrics.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=128
 	// +kubebuilder:default="/metrics"
@@ -105,7 +107,7 @@ type MonitorConfig struct {
 
 // ClusterDefinitionComponent is a group of pods, pods in one component usually share the same data
 type ClusterDefinitionComponent struct {
-	// Type name of the component, it can be any valid string
+	// Type name of the component, it can be any valid string.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
 	TypeName string `json:"typeName"`
@@ -115,33 +117,37 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	CharacterType string `json:"characterType,omitempty"`
 
-	// Minimum available pod count when updating
+	// MinReplicas minimum replicas for component pod count.
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
-	MinAvailable int32 `json:"minAvailable,omitempty"`
+	MinReplicas int32 `json:"minReplicas,omitempty"`
 
-	// Maximum available pod count after scale
+	// MaxReplicas maximum replicas pod for component pod count.
 	// +kubebuilder:validation:Minimum=0
 	// +optional
-	MaxAvailable int32 `json:"maxAvailable,omitempty"`
+	MaxReplicas int32 `json:"maxReplicas,omitempty"`
 
-	// Default replicas in this component if user not specify
+	// DefaultReplicas default replicas in this component if user not specify.
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	DefaultReplicas int32 `json:"defaultReplicas,omitempty"`
 
+	// PDBSpec pod disruption budget spec. This is mutually exclusive with the component type of Consensus.
+	// +optional
+	PDBSpec *policyv1.PodDisruptionBudgetSpec `json:"pdbSpec,omitempty"`
+
 	// The configTemplateRefs field provided by ISV, and
-	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster
+	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
 	// +optional
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
 
-	// Monitor is monitoring config which provided by ISV
+	// Monitor is monitoring config which provided by ISV.
 	// +optional
 	Monitor *MonitorConfig `json:"monitor,omitempty"`
 
-	// antiAffinity defines components should have anti-affinity constraint to same component type
+	// antiAffinity defines components should have anti-affinity constraint to same component type.
 	// +kubebuilder:default=false
 	// +optional
 	AntiAffinity bool `json:"antiAffinity,omitempty"`
@@ -151,7 +157,7 @@ type ClusterDefinitionComponent struct {
 	PodSpec *corev1.PodSpec `json:"podSpec,omitempty"`
 
 	// Service defines the behavior of a service spec.
-	// provide read-write service when ComponentType is Consensus
+	// provide read-write service when ComponentType is Consensus.
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Service corev1.ServiceSpec `json:"service,omitempty"`
@@ -160,14 +166,14 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Probes *ClusterDefinitionProbes `json:"probes,omitempty"`
 
-	// ComponentType defines type of the component
+	// ComponentType defines type of the component.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Stateless
 	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus}
 	ComponentType ComponentType `json:"componentType"`
 
-	// ConsensusSpec defines consensus related spec if componentType is Consensus
-	// CAN'T be empty if componentType is Consensus
+	// ConsensusSpec defines consensus related spec if componentType is Consensus.
+	// CAN'T be empty if componentType is Consensus.
 	// +optional
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
 }
@@ -250,12 +256,11 @@ type ConsensusSetSpec struct {
 	// +optional
 	Learner *ConsensusMember `json:"learner,omitempty"`
 
-	// UpdateStrategy, Pods update strategy
-	// options: serial, bestEffortParallel, parallel
-	// serial: update Pods one by one that guarantee minimum component unavailable time
+	// UpdateStrategy, Pods update strategy.
+	// serial: update Pods one by one that guarantee minimum component unavailable time.
 	// 		Learner -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader
-	// bestEffortParallel: update Pods in parallel that guarantee minimum component un-writable time
-	//		Learner, Follower(minority) in parallel -> Follower(majority) -> Leader, keep majority online all the time
+	// bestEffortParallel: update Pods in parallel that guarantee minimum component un-writable time.
+	//		Learner, Follower(minority) in parallel -> Follower(majority) -> Leader, keep majority online all the time.
 	// parallel: force parallel
 	// +kubebuilder:default=Serial
 	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
@@ -264,18 +269,18 @@ type ConsensusSetSpec struct {
 }
 
 type ConsensusMember struct {
-	// Name, role name
+	// Name, role name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=leader
 	Name string `json:"name"`
 
-	// AccessMode, what service this member capable for
+	// AccessMode, what service this member capable.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=ReadWrite
 	// +kubebuilder:validation:Enum={None, Readonly, ReadWrite}
 	AccessMode AccessMode `json:"accessMode"`
 
-	// Replicas, number of Pods of this role
+	// Replicas, number of Pods of this role.
 	// default 1 for Leader
 	// default 0 for Learner
 	// default Components[*].Replicas - Leader.Replicas - Learner.Replicas for Followers

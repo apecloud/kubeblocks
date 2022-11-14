@@ -119,10 +119,12 @@ var _ = BeforeSuite(func() {
 	err = (&Cluster{}).SetupWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
-	RegisterWebhookManager(mgr)
-
 	err = (&OpsRequest{}).SetupWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
+
+	RegisterWebhookManager(mgr)
+
+	testCtx = testutil.NewDefaultTestContext(k8sClient)
 
 	//+kubebuilder:scaffold:webhook
 

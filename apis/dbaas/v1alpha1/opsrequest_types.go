@@ -80,20 +80,20 @@ type ClusterOps struct {
 }
 
 type ComponentOps struct {
-	// ComponentNames defines which components perform the operation
+	// ComponentNames defines which components perform the operation.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	ComponentNames []string `json:"componentNames"`
 
-	// VolumeExpansion defines the variables that need to be input when expanding a volume
+	// VolumeExpansion defines the variables that need to be input when expanding a volume.
 	// +optional
 	VolumeExpansion []VolumeExpansion `json:"volumeExpansion,omitempty"`
 
-	// VerticalScaling defines the variables that need to be input when scaling compute resources
+	// VerticalScaling defines the variables that need to be input when scaling compute resources.
 	// +optional
 	VerticalScaling *corev1.ResourceRequirements `json:"verticalScaling,omitempty"`
 
-	// HorizontalScaling defines the variables that need to be input when scaling replicas
+	// HorizontalScaling defines the variables that need to be input when scaling replicas.
 	// +optional
 	HorizontalScaling *HorizontalScaling `json:"horizontalScaling,omitempty"`
 }

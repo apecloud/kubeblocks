@@ -103,7 +103,7 @@ var _ = Describe("Cluster Controller", func() {
 					func(cm *corev1.ConfigMap) bool {
 						return cm.Labels[appInstanceLabelKey] == clusterName &&
 							cm.Labels[configuration.CMConfigurationTplNameLabelKey] == testWrapper.testEnv.CfgTplName &&
-							cm.Labels[configuration.CMInsConfigurationLabelKey] == "true"
+							cm.Labels[configuration.CMInsConfigurationLabelKey] != ""
 					})
 				return ok
 			}, time.Second*30, time.Second*1).Should(BeTrue())

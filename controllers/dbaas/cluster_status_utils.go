@@ -86,7 +86,7 @@ func getStatefulPhaseForEvent(ctx context.Context, cli client.Client, cluster *d
 		isFailed          = true
 		isWarning         bool
 		stsList           = &appsv1.StatefulSetList{}
-		podsIsTerminating = false
+		podsIsTerminating bool
 		err               error
 	)
 	if podsIsTerminating, err = checkRelatedPodIsTerminating(ctx, cli, cluster, componentName); err != nil || podsIsTerminating {
@@ -113,7 +113,7 @@ func getStatelessPhaseForEvent(ctx context.Context, cli client.Client, cluster *
 		isFailed          = true
 		isWarning         bool
 		deployList        = &appsv1.DeploymentList{}
-		podsIsTerminating = false
+		podsIsTerminating bool
 		err               error
 	)
 	if podsIsTerminating, err = checkRelatedPodIsTerminating(ctx, cli, cluster, componentName); err != nil || podsIsTerminating {

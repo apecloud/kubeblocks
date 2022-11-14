@@ -32,7 +32,7 @@ func NewDeleteOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	return builder.NewCmdBuilder().
 		Use("delete-ops").
 		Short("Delete a OpsRequest").
-		GroupKind(types.OpsGK()).
+		GVR(types.OpsGVR()).
 		Factory(f).
 		IOStreams(streams).
 		CustomComplete(completeForDeleteOps).

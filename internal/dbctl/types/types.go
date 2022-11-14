@@ -81,9 +81,6 @@ const (
 	// KindCluster kind of cluster
 	KindCluster = "Cluster"
 
-	// KindOpsRequest kind of OpsRequest
-	KindOpsRequest = "OpsRequest"
-
 	// ResourceClusterDefs clusterDefinition resource
 	ResourceClusterDefs = "clusterdefinitions"
 
@@ -160,6 +157,6 @@ func AppVersionGK() schema.GroupKind {
 	return schema.GroupKind{Group: Group, Kind: KindAppVersion}
 }
 
-func OpsGK() schema.GroupKind {
-	return schema.GroupKind{Group: Group, Kind: KindOpsRequest}
+func OpsGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceOpsRequests}
 }

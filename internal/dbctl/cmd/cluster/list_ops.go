@@ -34,7 +34,7 @@ func NewOpsListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Use("list-ops").
 		Short("List all opsRequest.").
 		Factory(f).
-		GroupKind(types.OpsGK()).
+		GVR(types.OpsGVR()).
 		CustomComplete(completeForListOps).
 		IOStreams(streams).
 		Build(list.Build)

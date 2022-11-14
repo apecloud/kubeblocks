@@ -54,7 +54,7 @@ spec:
                   upgrade:
                     properties:
                       appVersionRef:
-                        description: AppVersionRef reference AppVersion
+                        description: AppVersionRef reference AppVersion.
                         type: string
                     required:
                     - appVersionRef
@@ -72,21 +72,21 @@ spec:
                   properties:
                     componentNames:
                       description: ComponentNames defines which components perform
-                        the operation
+                        the operation.
                       items:
                         type: string
                       minItems: 1
                       type: array
                     horizontalScaling:
                       description: HorizontalScaling defines the variables that need
-                        to be input when scaling replicas
+                        to be input when scaling replicas.
                       properties:
                         replicas:
                           type: integer
                       type: object
                     verticalScaling:
                       description: VerticalScaling defines the variables that need
-                        to be input when scaling compute resources
+                        to be input when scaling compute resources.
                       properties:
                         limits:
                           additionalProperties:
@@ -114,14 +114,14 @@ spec:
                       type: object
                     volumeExpansion:
                       description: VolumeExpansion defines the variables that need
-                        to be input when expanding a volume
+                        to be input when expanding a volume.
                       items:
                         properties:
                           name:
                             description: ClusterComponentVolumeClaimTemplate.Name
                             type: string
                           storage:
-                            description: the request storage size
+                            description: the request storage size.
                             type: string
                         required:
                         - name
@@ -163,12 +163,12 @@ spec:
                 additionalProperties:
                   properties:
                     phase:
-                      description: Phase - in list of [Running, Failed, Creating,
-                        Updating, Deleting, Deleted]
+                      description: Phase describe the component phase, Reference ClusterDefinition.status.component.phase.
                       enum:
                       - Running
                       - Failed
                       - Creating
+                      - Abnormal
                       - Updating
                       - Deleting
                       - Deleted

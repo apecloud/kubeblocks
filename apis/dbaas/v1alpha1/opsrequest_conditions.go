@@ -30,6 +30,7 @@ const (
 	ConditionTypeProgressing       = "Progressing"
 	ConditionTypeValidated         = "Validated"
 	ConditionTypeSucceed           = "Succeed"
+	ConditionTypeFailed            = "Failed"
 	ConditionTypeRestarting        = "Restarting"
 	ConditionTypeVerticalScaling   = "VerticalScaling"
 	ConditionTypeHorizontalScaling = "HorizontalScaling"
@@ -38,13 +39,14 @@ const (
 
 	// condition and event reasons
 
-	ReasonClusterPhaseMisMatch         = "ClusterPhaseMisMatch"
-	ReasonOpsTypeNotSupported          = "OpsTypeNotSupported"
-	ReasonClusterExistOtherOperation   = "ClusterExistOtherOperation"
-	ReasonClusterNotFound              = "ClusterNotFound"
-	ReasonVolumeExpansionValidateError = "VolumeExpansionValidateError"
-	ReasonStarting                     = "Starting"
-	ReasonSuccessful                   = "Successful"
+	ReasonClusterPhaseMisMatch       = "ClusterPhaseMisMatch"
+	ReasonOpsTypeNotSupported        = "OpsTypeNotSupported"
+	ReasonClusterExistOtherOperation = "ClusterExistOtherOperation"
+	ReasonClusterNotFound            = "ClusterNotFound"
+	ReasonStarting                   = "Starting"
+	ReasonComponentFailed            = "ComponentFailed"
+	ReasonSuccessful                 = "Successful"
+	ReasonOpsRequestFailed           = "OpsRequestFailed"
 )
 
 func (r *OpsRequest) SetStatusCondition(condition metav1.Condition) {
@@ -82,6 +84,18 @@ func NewValidateFailedCondition(reason, message string) *metav1.Condition {
 		Reason:             reason,
 		LastTransitionTime: metav1.NewTime(time.Now()),
 		Message:            message,
+	}
+}
+
+// NewFailedCondition new a condition that the OpsRequest processing failed
+func NewFailedCondition(ops *OpsRequest) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeFailed,
+		Status:             metav1.ConditionTrue,
+		Reason:             ReasonOpsRequestFailed,
+		LastTransitionTime: metav1.NewTime(time.Now()),
+		Message: fmt.Sprintf("The OpsRequest: %s in Cluster: %s processing failed",
+			ops.Name, ops.Spec.ClusterRef),
 	}
 }
 

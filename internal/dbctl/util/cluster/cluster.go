@@ -220,6 +220,9 @@ func (b *builder) do(clusterObjs *types.ClusterObjects) error {
 			return err
 		}
 	case "Node":
+		if len(b.name) == 0 {
+			return nil
+		}
 		node, err := b.clientSet.CoreV1().Nodes().Get(ctx, b.name, metav1.GetOptions{})
 		if err != nil {
 			return err

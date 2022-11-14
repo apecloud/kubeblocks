@@ -32,6 +32,7 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
 )
 
@@ -41,7 +42,7 @@ var _ = Describe("Describe", func() {
 			Factory(f).
 			IOStreams(streams).
 			Short("Test list.").
-			GroupKind(schema.GroupKind{Group: "", Kind: "pods"}).
+			GVR(schema.GroupVersionResource{Group: "", Resource: "pods", Version: types.VersionV1}).
 			Build(Build)
 	}
 

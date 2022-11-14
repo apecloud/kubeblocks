@@ -157,3 +157,7 @@ func AppVersionGVR() schema.GroupVersionResource {
 func AppVersionGK() schema.GroupKind {
 	return schema.GroupKind{Group: Group, Kind: KindAppVersion}
 }
+
+func OpsGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceOpsRequests}
+}

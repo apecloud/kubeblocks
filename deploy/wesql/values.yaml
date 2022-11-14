@@ -86,7 +86,7 @@ configTemplate:
     
     {{- if mustHas "error" $.Component.EnabledLogs }}
     # Mysql error log
-    log_error={{ $log_root }}/mysqld.err
+    log_error={{ $data_root }}/log/mysqld.err
     {{- end }}
     
     {{- if mustHas "slow" $.Component.EnabledLogs }}
@@ -94,7 +94,7 @@ configTemplate:
     slow_query_log=ON
     long_query_time=5
     log_output=FILE
-    slow_query_log_file={{ $log_root }}/mysqld-slow.log
+    slow_query_log_file={{ $data_root }}/log/mysqld-slow.log
     {{- end }}
     
     {{- if $log_root }}
@@ -118,5 +118,5 @@ fullnameOverride: ""
 appVersionOverride: ""
 
 logConfigs:
-  error: /log/mysql/mysqld.err
-  slow: /log/mysql/*slow.log
+  error: /data/mysql/log/mysqld.err
+  slow: /data/mysql/log/*slow.log

@@ -42,8 +42,8 @@ spec:
         volumeMounts:
         - mountPath: /data/mysql
           name: data
-        - mountPath: /log/mysql
-          name: log
+#        - mountPath: /log/mysql
+#          name: log
         - mountPath: /opt/mysql
           name: mysql-config
         ports:
@@ -103,6 +103,6 @@ spec:
           cluster_info="$cluster_info@$(($idx+1))";
           echo $cluster_info; echo {{ .Values.cluster.replicaSetCount }};
           mkdir -p /data/mysql/data;
+          mkdir -p /data/mysql/log;
           chmod +777 -R /data/mysql;
-          chmod +777 -R /log/mysql;
           docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$cluster_info" --cluster-id=$CLUSTER_ID

@@ -36,12 +36,17 @@ var _ = Describe("clusterDefinition webhook", func() {
 		timeout                = time.Second * 10
 		interval               = time.Second
 	)
+	BeforeEach(func() {
+		// Add any setup steps that needs to be executed before each test
+		err := k8sClient.DeleteAllOf(ctx, &ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+	})
 	Context("When clusterDefinition create and update", func() {
 		It("Should webhook validate passed", func() {
 
 			By("By creating a new clusterDefinition")
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
-			Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 			// wait until ClusterDefinition created
 			Eventually(func() bool {
 				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)
@@ -59,13 +64,13 @@ var _ = Describe("clusterDefinition webhook", func() {
 
 			By("By creating a new clusterDefinition with componentType==Consensus but consensusSpec not present")
 			clusterDef, _ = createTestClusterDefinitionObj2(clusterDefinitionName2)
-			Expect(k8sClient.Create(ctx, clusterDef)).ShouldNot(Succeed())
+			Expect(testCtx.CreateObj(ctx, clusterDef)).ShouldNot(Succeed())
 
 			By("Set Leader.Replicas > 1")
 			clusterDef.Spec.Components[0].ConsensusSpec = &ConsensusSetSpec{Leader: DefaultLeader}
 			replicas := int32(2)
 			clusterDef.Spec.Components[0].ConsensusSpec.Leader.Replicas = &replicas
-			Expect(k8sClient.Create(ctx, clusterDef)).ShouldNot(Succeed())
+			Expect(testCtx.CreateObj(ctx, clusterDef)).ShouldNot(Succeed())
 			// restore clusterDef
 			clusterDef.Spec.Components[0].ConsensusSpec.Leader.Replicas = nil
 
@@ -74,21 +79,21 @@ var _ = Describe("clusterDefinition webhook", func() {
 			rel := int32(3)
 			followers[0] = ConsensusMember{Name: "follower", AccessMode: "Readonly", Replicas: &rel}
 			clusterDef.Spec.Components[0].ConsensusSpec.Followers = followers
-			Expect(k8sClient.Create(ctx, clusterDef)).ShouldNot(Succeed())
+			Expect(testCtx.CreateObj(ctx, clusterDef)).ShouldNot(Succeed())
 
 			By("Set Followers.Replicas to 2, component.defaultReplicas to 4, " +
 				"which means Leader.Replicas(1) + Followers.Replicas(2) + Learner.Replicas(0) != component.defaultReplicas")
 			rel2 := int32(2)
 			followers[0].Replicas = &rel2
 			clusterDef.Spec.Components[0].DefaultReplicas = 4
-			Expect(k8sClient.Create(ctx, clusterDef)).ShouldNot(Succeed())
+			Expect(testCtx.CreateObj(ctx, clusterDef)).ShouldNot(Succeed())
 
 			By("Set a 5 nodes cluster with 1 leader, 2 followers and 2 learners")
 			clusterDef.Spec.Components[0].DefaultReplicas = 5
 			clusterDef.Spec.Components[0].ConsensusSpec.Leader = ConsensusMember{Name: "leader", AccessMode: ReadWrite}
 			rel3 := int32(2)
 			clusterDef.Spec.Components[0].ConsensusSpec.Learner = &ConsensusMember{Name: "learner", AccessMode: None, Replicas: &rel3}
-			Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 
 		})
 	})

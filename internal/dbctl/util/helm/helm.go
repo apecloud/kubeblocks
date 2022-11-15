@@ -42,6 +42,7 @@ import (
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
 
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
@@ -321,4 +322,26 @@ func FakeActionConfig() *action.Configuration {
 		Log: func(format string, v ...interface{}) {
 		},
 	}
+}
+
+func AddKubeBlocksRepo() error {
+	entry := &repo.Entry{
+		Name: types.KubeBlocksChartName,
+		URL:  types.KubeBlocksChartURL,
+	}
+	if err := AddRepo(entry); err != nil {
+		return err
+	}
+	return nil
+}
+
+func RemoveKubeBlocksRepo() error {
+	entry := &repo.Entry{
+		Name: types.KubeBlocksChartName,
+		URL:  types.KubeBlocksChartURL,
+	}
+	if err := RemoveRepo(entry); err != nil {
+		return err
+	}
+	return nil
 }

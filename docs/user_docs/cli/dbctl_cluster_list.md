@@ -1,9 +1,16 @@
 ## dbctl cluster list
 
-List all database cluster.
+List all cluster.
 
 ```
 dbctl cluster list [flags]
+```
+
+### Examples
+
+```
+  # list all cluster
+  dbctl cluster list
 ```
 
 ### Options

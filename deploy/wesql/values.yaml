@@ -121,3 +121,8 @@ defaultTerminationPolicy: "Delete"
 logConfigs:
   error: /data/mysql/log/mysqld.err
   slow: /data/mysql/log/*slow.log
+
+roleChangedProbe:
+  failureThreshold: 2
+  periodSeconds: 1
+  successThreshold: 1

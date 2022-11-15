@@ -13,6 +13,11 @@ spec:
   components:
   - typeName: replicasets
     characterType: mysql
+    probes:
+      roleChangedProbe:
+        failureThreshold: {{ .Values.roleChangedProbe.failureThreshold }}
+        periodSeconds: {{ .Values.roleChangedProbe.periodSeconds }}
+        successThreshold: {{ .Values.roleChangedProbe.successThreshold }}
     monitor:
       builtIn: true
     logConfigs:

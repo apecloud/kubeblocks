@@ -218,6 +218,27 @@ var _ = Describe("OpsRequest webhook", func() {
 
 	}
 
+	patchStatusPhase := func(opsRequest *OpsRequest, phase Phase) {
+		patch := client.MergeFrom(opsRequest.DeepCopy())
+		opsRequest.Status.Phase = phase
+		Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).Should(Succeed())
+		Eventually(func() bool {
+			newOpsRequest := &OpsRequest{}
+			_ = k8sClient.Get(ctx, client.ObjectKey{Name: opsRequest.Name, Namespace: opsRequest.Namespace}, newOpsRequest)
+			return newOpsRequest.Status.Phase == phase
+		}, timeout, interval).Should(BeTrue())
+	}
+
+	testDelete := func(opsRequest *OpsRequest) {
+		By("test delete OpsRequest when phase is Running")
+		patchStatusPhase(opsRequest, RunningPhase)
+		Expect(k8sClient.Delete(ctx, opsRequest)).ShouldNot(Succeed())
+
+		By("test delete OpsRequest when phase is Succeed")
+		patchStatusPhase(opsRequest, SucceedPhase)
+		Expect(k8sClient.Delete(ctx, opsRequest)).Should(Succeed())
+	}
+
 	testRestart := func(cluster *Cluster) {
 		// set cluster support restart
 		patch := client.MergeFrom(cluster.DeepCopy())
@@ -243,6 +264,8 @@ var _ = Describe("OpsRequest webhook", func() {
 			err := testCtx.CheckedCreateObj(ctx, opsRequest)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
+
+		testDelete(opsRequest)
 	}
 
 	Context("When appVersion create and update", func() {

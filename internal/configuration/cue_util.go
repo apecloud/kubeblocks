@@ -21,10 +21,15 @@ import (
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
+	mxjv2 "github.com/clbanning/mxj/v2"
 	"github.com/spf13/viper"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
+
+func init() {
+	mxjv2.CastValuesToInt(true)
+}
 
 // CueValidate cue validate
 func CueValidate(cueTpl string) error {
@@ -47,6 +52,14 @@ func ValidateConfigurationWithCue(cueTpl string, cfgType dbaasv1alpha1.Configura
 }
 
 func LoadConfiguration(cfgType dbaasv1alpha1.ConfigurationFormatter, rawData string) interface{} {
+	// viper not support xml
+	if cfgType == dbaasv1alpha1.XML {
+		xmlMap, err := mxjv2.NewMapXml([]byte(rawData), true)
+		if err != nil {
+			return err
+		}
+		return xmlMap
+	}
 	v := viper.New()
 	v.SetConfigType(string(cfgType))
 	if err := v.ReadConfig(strings.NewReader(rawData)); err != nil {

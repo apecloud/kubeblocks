@@ -52,7 +52,7 @@ annotations:
 dependencies:
   - condition: wesql.enabled
     name: wesql
-    repository: https://apecloud.github.io/helm-charts
+    repository: file://../wesql
     version: 0.1.*
   - condition: grafana.enabled
     name: grafana
@@ -64,5 +64,5 @@ dependencies:
     version: 15.15 - 15.16
   - condition: loadbalancer.enabled
     name: loadbalancer
-    repository: https://apecloud.github.io/helm-charts
+    repository: file://../loadbalancer
     version: 0.1.*

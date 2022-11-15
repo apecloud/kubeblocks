@@ -177,3 +177,37 @@ func DeploymentIsReady(deploy *appsv1.Deployment) bool {
 	}
 	return componentIsRunning
 }
+
+func InitClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster,
+	componentName string,
+	component *dbaasv1alpha1.ClusterDefinitionComponent) {
+	if cluster.Status.Components == nil {
+		cluster.Status.Components = make(map[string]*dbaasv1alpha1.ClusterStatusComponent)
+	}
+	if cluster.Status.Components[componentName] == nil {
+		typeName := GetComponentTypeName(*cluster, componentName)
+
+		cluster.Status.Components[componentName] = &dbaasv1alpha1.ClusterStatusComponent{
+			Type:  typeName,
+			Phase: dbaasv1alpha1.RunningPhase,
+		}
+	}
+	componentStatus := cluster.Status.Components[componentName]
+	if component.ComponentType == dbaasv1alpha1.Consensus && componentStatus.ConsensusSetStatus == nil {
+		componentStatus.ConsensusSetStatus = &dbaasv1alpha1.ConsensusSetStatus{
+			Leader: dbaasv1alpha1.ConsensusMemberStatus{
+				Pod:        consensusSetStatusDefaultPodName,
+				AccessMode: dbaasv1alpha1.None,
+				Name:       "",
+			},
+		}
+	}
+	if component.ComponentType == dbaasv1alpha1.Replication && componentStatus.ReplicationSetStatus == nil {
+		componentStatus.ReplicationSetStatus = &dbaasv1alpha1.ReplicationSetStatus{
+			Primary: dbaasv1alpha1.ReplicationMemberStatus{
+				Pod:  replicationSetStatusDefaultPodName,
+				Role: "",
+			},
+		}
+	}
+}

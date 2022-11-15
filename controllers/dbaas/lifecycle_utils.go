@@ -651,6 +651,9 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		if params.component.ComponentType == dbaasv1alpha1.Consensus {
 			addSelectorLabels(svc, params.component, dbaasv1alpha1.ReadWrite)
 		}
+		if params.component.ComponentType == dbaasv1alpha1.Replication {
+			svc.Spec.Selector[intctrlutil.ReplicationSetRoleLabelKey] = string(dbaasv1alpha1.Primary)
+		}
 		*params.applyObjs = append(*params.applyObjs, svc)
 	}
 
@@ -682,8 +685,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	ctx := reqCtx.Ctx
 	logger := reqCtx.Log
 	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
-	var newCreateStsList []*appsv1.StatefulSet
-	var existStsList []*appsv1.StatefulSet
+	var stsList []*appsv1.StatefulSet
 	for _, obj := range objs {
 		logger.Info("create or update", "objs", obj)
 		if err := controllerutil.SetOwnerReference(cluster, obj, scheme); err != nil {
@@ -700,11 +702,11 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 		err := cli.Create(ctx, obj)
 		if err == nil {
-			newCreateStsList = appendToStsList(newCreateStsList)
+			stsList = appendToStsList(stsList)
 			continue
 		}
 		if apierrors.IsAlreadyExists(err) {
-			existStsList = appendToStsList(existStsList)
+			stsList = appendToStsList(stsList)
 		} else {
 			return err
 		}
@@ -813,7 +815,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
-	err := component.HandleReplicationSet(reqCtx, cli, cluster, newCreateStsList, existStsList)
+	err := component.HandleReplicationSet(reqCtx, cli, cluster, stsList)
 	if err != nil {
 		return err
 	}
@@ -1059,18 +1061,23 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx, cli client.Client, param
 		if err != nil {
 			return nil, err
 		}
-		// inject replicationSet Pod Env
-		if sts, err = injectReplicationStsPodEnv(params, sts, i); err != nil {
+		// inject replicationSet pod env and role label
+		if sts, err = injectReplicationSetPodEnvAndLabel(params, sts, i); err != nil {
 			return nil, err
 		}
+		// sts.Name rename and add role label
 		sts.ObjectMeta.Name = fmt.Sprintf("%s-%d", sts.ObjectMeta.Name, i)
+		sts.Labels[intctrlutil.ReplicationSetRoleLabelKey] = string(dbaasv1alpha1.Secondary)
+		if i == *params.component.PrimaryStsIndex {
+			sts.Labels[intctrlutil.ReplicationSetRoleLabelKey] = string(dbaasv1alpha1.Primary)
+		}
 		sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
 		stsList = append(stsList, sts)
 	}
 	return stsList, nil
 }
 
-func injectReplicationStsPodEnv(params createParams, sts *appsv1.StatefulSet, index int) (*appsv1.StatefulSet, error) {
+func injectReplicationSetPodEnvAndLabel(params createParams, sts *appsv1.StatefulSet, index int) (*appsv1.StatefulSet, error) {
 	for _, comp := range params.cluster.Spec.Components {
 		if index != *comp.PrimaryStsIndex {
 			for i := range sts.Spec.Template.Spec.Containers {
@@ -1088,6 +1095,9 @@ func injectReplicationStsPodEnv(params createParams, sts *appsv1.StatefulSet, in
 					})
 				}
 			}
+			sts.Spec.Template.Labels[intctrlutil.ReplicationSetRoleLabelKey] = string(dbaasv1alpha1.Secondary)
+		} else {
+			sts.Spec.Template.Labels[intctrlutil.ReplicationSetRoleLabelKey] = string(dbaasv1alpha1.Primary)
 		}
 	}
 	return sts, nil

@@ -58,13 +58,15 @@ func GetDefaultPodName(dynamic dynamic.Interface, name string, namespace string)
 	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cluster); err != nil {
 		return "", err
 	}
-
 	// travel all components, check type
 	for _, c := range cluster.Status.Components {
 		if c.ConsensusSetStatus != nil {
 			return c.ConsensusSetStatus.Leader.Pod, nil
 		}
-		// TODO: now we only support consensus set
+		if c.ReplicationSetStatus != nil {
+			return c.ReplicationSetStatus.Primary.Pod, nil
+		}
+		// TODO: the other componentType Pod to be supported
 	}
 
 	return "", fmt.Errorf("failed to find the pod to exec command")

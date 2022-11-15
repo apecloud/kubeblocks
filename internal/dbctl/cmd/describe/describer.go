@@ -202,7 +202,11 @@ func (d *ClusterDescriber) describeTopology(w describe.PrefixWriter) error {
 		// describe instance name
 		pods := d.getPodsOfComponent(c.Name)
 		for _, pod := range pods {
-			w.Write(LEVEL_3, "%s@%s\n", pod.Name, pod.Labels[types.ConsensusSetRoleLabelKey])
+			if compInClusterDef.ComponentType == dbaasv1alpha1.Replication {
+				w.Write(LEVEL_3, "%s@%s\n", pod.Name, pod.Labels[types.ReplicationSetRoleLabelKey])
+			} else {
+				w.Write(LEVEL_3, "%s@%s\n", pod.Name, pod.Labels[types.ConsensusSetRoleLabelKey])
+			}
 		}
 	}
 	return nil
@@ -241,7 +245,7 @@ func (d *ClusterDescriber) describeComponent(w describe.PrefixWriter) error {
 
 		// instance
 		for _, pod := range pods {
-			d.describeInstance(pod, w)
+			d.describeInstance(compInClusterDef, pod, w)
 		}
 	}
 	return nil
@@ -287,11 +291,16 @@ func describeStorage(vcTmpls []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate
 	}
 }
 
-func (d *ClusterDescriber) describeInstance(pod *corev1.Pod, w describe.PrefixWriter) {
+func (d *ClusterDescriber) describeInstance(component dbaasv1alpha1.ClusterDefinitionComponent, pod *corev1.Pod, w describe.PrefixWriter) {
 	w.Write(LEVEL_1, "\n")
 	w.Write(LEVEL_1, "Instance:\t\n")
 	w.Write(LEVEL_2, "%s:\n", pod.Name)
-	w.Write(LEVEL_3, "Role:\t%s\n", pod.Labels[types.ConsensusSetRoleLabelKey])
+	if component.ComponentType == dbaasv1alpha1.Replication {
+		w.Write(LEVEL_3, "Role:\t%s\n", pod.Labels[types.ReplicationSetRoleLabelKey])
+	} else {
+		w.Write(LEVEL_3, "Role:\t%s\n", pod.Labels[types.ConsensusSetRoleLabelKey])
+		w.Write(LEVEL_3, "AccessMode:\t%s\n", pod.Labels[types.ConsensusSetAccessModeLabelKey])
+	}
 
 	// status and reason
 	if pod.DeletionTimestamp != nil {
@@ -303,8 +312,6 @@ func (d *ClusterDescriber) describeInstance(pod *corev1.Pod, w describe.PrefixWr
 	if len(pod.Status.Reason) > 0 {
 		w.Write(LEVEL_3, "Reason:\t%s\n", pod.Status.Reason)
 	}
-
-	w.Write(LEVEL_3, "AccessMode:\t%s\n", pod.Labels[types.ConsensusSetAccessModeLabelKey])
 
 	// node information include its region and AZ
 	if pod.Spec.NodeName == "" {

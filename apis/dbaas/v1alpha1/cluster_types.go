@@ -196,6 +196,10 @@ type ClusterStatusComponent struct {
 	// ConsensusSetStatus role and pod name mapping
 	// +optional
 	ConsensusSetStatus *ConsensusSetStatus `json:"consensusSetStatus,omitempty"`
+
+	// ReplicationSetStatus role and pod name mapping
+	// +optional
+	ReplicationSetStatus *ReplicationSetStatus `json:"replicationSetStatus,omitempty"`
 }
 
 type ConsensusSetStatus struct {
@@ -223,6 +227,28 @@ type ConsensusMemberStatus struct {
 	// +kubebuilder:validation:Enum={None, Readonly, ReadWrite}
 	// +kubebuilder:default=ReadWrite
 	AccessMode AccessMode `json:"accessMode"`
+
+	// Pod name
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=Unknown
+	Pod string `json:"pod"`
+}
+
+type ReplicationSetStatus struct {
+	// Primary status
+	// +kubebuilder:validation:Required
+	Primary ReplicationMemberStatus `json:"primary"`
+
+	// Secondaries status
+	// +optional
+	Secondaries []ReplicationMemberStatus `json:"secondaries,omitempty"`
+}
+
+type ReplicationMemberStatus struct {
+	// Name role name
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=primary
+	Role string `json:"role"`
 
 	// Pod name
 	// +kubebuilder:validation:Required

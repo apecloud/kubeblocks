@@ -505,6 +505,44 @@ spec:
                       - Deleting
                       - Deleted
                       type: string
+                    replicationSetStatus:
+                      description: ReplicationSetStatus role and pod name mapping
+                      properties:
+                        primary:
+                          description: Primary status
+                          properties:
+                            pod:
+                              default: Unknown
+                              description: Pod name
+                              type: string
+                            role:
+                              default: primary
+                              description: Name role name
+                              type: string
+                          required:
+                          - pod
+                          - role
+                          type: object
+                        secondaries:
+                          description: Secondaries status
+                          items:
+                            properties:
+                              pod:
+                                default: Unknown
+                                description: Pod name
+                                type: string
+                              role:
+                                default: primary
+                                description: Name role name
+                                type: string
+                            required:
+                            - pod
+                            - role
+                            type: object
+                          type: array
+                      required:
+                      - primary
+                      type: object
                     type:
                       description: Type component type
                       type: string

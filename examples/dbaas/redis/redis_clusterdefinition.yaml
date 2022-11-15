@@ -1,7 +1,7 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: apecloud-redis-replication
+  name: apecloud-redis
 spec:
   type: state.redis-7
   components:
@@ -30,6 +30,21 @@ spec:
               - name: config-map
                 mountPath: /etc/conf
             args: ["/etc/conf/redis.conf"]
+            lifecycle:
+              postStart:
+                exec:
+                  command:
+                    - /bin/sh
+                    - "-c"
+                    - |
+                      set -ex
+                      if [ $KB_PRIMARY_POD_NAME ]; then
+                        until redis-cli -h $KB_PRIMARY_POD_NAME -p $KB_PRIMARY_POD_PORT_0 ping; do sleep 1; done
+                        redis-cli -h 127.0.0.1 -p 6379 replicaof $KB_PRIMARY_POD_NAME $KB_PRIMARY_POD_PORT_0 || exit 1
+                      else
+                        echo "primary instance skip create a replication relationship."
+                        exit 0
+                      fi
         volumes:
           - name: conf
             emptyDir: { }

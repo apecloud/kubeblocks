@@ -90,7 +90,7 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 		if oldConsensusSetStatus != nil {
 			cluster.Status.Components[componentName].ConsensusSetStatus = nil
 		}
-		initClusterComponentStatusIfNeed(cluster, componentName)
+		InitClusterComponentStatusIfNeed(cluster, componentName, component)
 		oldConsensusSetStatus = cluster.Status.Components[componentName].ConsensusSetStatus
 		setConsensusSetStatusRoles(oldConsensusSetStatus, *component, pods)
 		if err = cli.Status().Patch(ctx, cluster, patch); err != nil {
@@ -309,7 +309,7 @@ func UpdateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCt
 
 	// prepare cluster status patch
 	patch = client.MergeFrom(cluster.DeepCopy())
-	initClusterComponentStatusIfNeed(cluster, componentName)
+	InitClusterComponentStatusIfNeed(cluster, componentName, componentDef)
 	consensusSetStatus := cluster.Status.Components[componentName].ConsensusSetStatus
 	needUpdate := setConsensusSetStatusRole(consensusSetStatus, *componentDef, role, pod.Name)
 	// update cluster status
@@ -373,30 +373,6 @@ func composeConsensusRoleMap(componentDef dbaasv1alpha1.ClusterDefinitionCompone
 	}
 
 	return roleMap
-}
-
-func initClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster, componentName string) {
-	if cluster.Status.Components == nil {
-		cluster.Status.Components = make(map[string]*dbaasv1alpha1.ClusterStatusComponent)
-	}
-	if cluster.Status.Components[componentName] == nil {
-		typeName := GetComponentTypeName(*cluster, componentName)
-
-		cluster.Status.Components[componentName] = &dbaasv1alpha1.ClusterStatusComponent{
-			Type:  typeName,
-			Phase: dbaasv1alpha1.RunningPhase,
-		}
-	}
-	componentStatus := cluster.Status.Components[componentName]
-	if componentStatus.ConsensusSetStatus == nil {
-		componentStatus.ConsensusSetStatus = &dbaasv1alpha1.ConsensusSetStatus{
-			Leader: dbaasv1alpha1.ConsensusMemberStatus{
-				Pod:        consensusSetStatusDefaultPodName,
-				AccessMode: dbaasv1alpha1.None,
-				Name:       "",
-			},
-		}
-	}
 }
 
 func setConsensusSetStatusLeader(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus, memberExt consensusMemberExt) bool {

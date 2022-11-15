@@ -92,6 +92,7 @@ const (
 
 	InstanceLabelKey               = "app.kubernetes.io/instance"
 	ConsensusSetRoleLabelKey       = "cs.dbaas.kubeblocks.io/role"
+	ReplicationSetRoleLabelKey     = "rs.dbaas.kubeblocks.io/role"
 	ConsensusSetAccessModeLabelKey = "cs.dbaas.kubeblocks.io/access-mode"
 	ComponentLabelKey              = "app.kubernetes.io/component-name"
 	RegionLabelKey                 = "topology.kubernetes.io/region"

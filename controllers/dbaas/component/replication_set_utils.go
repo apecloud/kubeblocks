@@ -21,25 +21,26 @@ import (
 	"fmt"
 	"sort"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
-	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+const (
+	replicationSetStatusDefaultPodName = "Unknown"
+)
+
+// HandleReplicationSet Handling replicationSet component replica count changes, and sync cluster status
+// TODO(xingran) if the probe event detects an abnormal replication relationship or unavailable, it needs to be repaired in another process
 func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
-	newCreateStsList []*appsv1.StatefulSet,
-	existStsList []*appsv1.StatefulSet) error {
+	stsList []*appsv1.StatefulSet) error {
 
 	filter := func(stsObj *appsv1.StatefulSet) (*dbaasv1alpha1.ClusterDefinitionComponent, bool, error) {
 		typeName := GetComponentTypeName(*cluster, stsObj.Labels[intctrlutil.AppComponentLabelKey])
@@ -53,36 +54,17 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 		return component, false, nil
 	}
 
-	// handle new create StatefulSets including create a replication relationship and update Pod label, etc
-	err := handleReplicationSetNewCreateSts(reqCtx, cli, cluster, newCreateStsList, filter)
-	if err != nil {
-		return err
-	}
-
-	// handle exist StatefulSets including delete sts when pod number larger than cluster.component[i].replicas
+	// handle StatefulSets including delete sts when pod number larger than cluster.component[i].replicas
 	// delete the StatefulSets with the largest sequence number which is not the primary role
-	err = handleReplicationSetExistSts(reqCtx, cli, cluster, existStsList, filter)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func handleReplicationSetExistSts(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	cluster *dbaasv1alpha1.Cluster,
-	existStsList []*appsv1.StatefulSet,
-	filter func(stsObj *appsv1.StatefulSet) (*dbaasv1alpha1.ClusterDefinitionComponent, bool, error)) error {
-
 	clusterCompReplicasMap := make(map[string]int, len(cluster.Spec.Components))
 	for _, clusterComp := range cluster.Spec.Components {
 		clusterCompReplicasMap[clusterComp.Name] = clusterComp.Replicas
 	}
 
+	podRoleMap := make(map[string]string)
 	compOwnsStsMap := make(map[string]int)
 	stsToDeleteMap := make(map[string]int)
-	for _, stsObj := range existStsList {
+	for _, stsObj := range stsList {
 		_, skip, err := filter(stsObj)
 		if err != nil {
 			return err
@@ -90,6 +72,16 @@ func handleReplicationSetExistSts(reqCtx intctrlutil.RequestCtx,
 		if skip {
 			continue
 		}
+		targetPodList, err := GetPodListByStatefulSet(reqCtx.Ctx, cli, stsObj)
+		if err != nil {
+			return err
+		}
+		if len(targetPodList) != 1 {
+			return fmt.Errorf("pod number in statefulset %s is not equal one", stsObj.Name)
+		}
+
+		podRoleMap[targetPodList[0].Name] = targetPodList[0].Labels[intctrlutil.ReplicationSetRoleLabelKey]
+
 		if _, ok := compOwnsStsMap[stsObj.Labels[intctrlutil.AppComponentLabelKey]]; !ok {
 			compOwnsStsMap[stsObj.Labels[intctrlutil.AppComponentLabelKey]] = 0
 			stsToDeleteMap[stsObj.Labels[intctrlutil.AppComponentLabelKey]] = 0
@@ -149,68 +141,14 @@ func handleReplicationSetExistSts(reqCtx intctrlutil.RequestCtx,
 			}
 		}
 	}
-	return nil
-}
 
-func handleReplicationSetNewCreateSts(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	cluster *dbaasv1alpha1.Cluster,
-	newCreateStsList []*appsv1.StatefulSet,
-	filter func(stsObj *appsv1.StatefulSet) (*dbaasv1alpha1.ClusterDefinitionComponent, bool, error)) error {
-
-	podRoleMap := make(map[string]string, len(newCreateStsList))
-	stsRoleMap := make(map[string]string, len(newCreateStsList))
-	for _, stsObj := range newCreateStsList {
-		var isPrimarySts = false
-		component, skip, err := filter(stsObj)
-		if err != nil {
-			return err
-		}
-		if skip {
-			continue
-		}
-		targetPodList, err := GetPodListByStatefulSet(reqCtx.Ctx, cli, stsObj)
-		if err != nil {
-			return err
-		}
-		if len(targetPodList) != 1 {
-			return fmt.Errorf("pod number in statefulset %s is not equal one", stsObj.Name)
-		}
-		var dbEnginePod = &targetPodList[0]
-		claimPrimaryStsName := fmt.Sprintf("%s-%s-%d", cluster.Name, stsObj.Labels[intctrlutil.AppComponentLabelKey], getClaimPrimaryStsIndex(cluster, *component))
-		if stsObj.Name == claimPrimaryStsName {
-			isPrimarySts = true
-		}
-		podRoleMap[dbEnginePod.Name] = string(dbaasv1alpha1.Primary)
-		stsRoleMap[stsObj.Name] = string(dbaasv1alpha1.Primary)
-		if !isPrimarySts {
-			podRoleMap[dbEnginePod.Name] = string(dbaasv1alpha1.Secondary)
-			stsRoleMap[stsObj.Name] = string(dbaasv1alpha1.Secondary)
-			// if not primary, create a replication relationship by running a Job with kube exec
-			err := createReplRelationJobAndEnsure(reqCtx, cli, cluster, *component, stsObj, dbEnginePod)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	// update replicationSet StatefulSet Label
-	for k, v := range stsRoleMap {
-		stsName := types.NamespacedName{
+	// sync cluster status
+	for podName, role := range podRoleMap {
+		podNSObj := types.NamespacedName{
 			Namespace: cluster.Namespace,
-			Name:      k,
+			Name:      podName,
 		}
-		err := updateReplicationSetStsRoleLabel(cli, reqCtx.Ctx, stsName, v)
-		if err != nil {
-			return err
-		}
-	}
-	// update replicationSet Pod Label
-	for k, v := range podRoleMap {
-		podName := types.NamespacedName{
-			Namespace: cluster.Namespace,
-			Name:      k,
-		}
-		err := updateReplicationSetPodRoleLabel(cli, reqCtx.Ctx, podName, v)
+		err := SyncReplicationSetClusterStatus(cli, reqCtx.Ctx, podNSObj, role)
 		if err != nil {
 			return err
 		}
@@ -218,125 +156,67 @@ func handleReplicationSetNewCreateSts(reqCtx intctrlutil.RequestCtx,
 	return nil
 }
 
-func getClaimPrimaryStsIndex(cluster *dbaasv1alpha1.Cluster, clusterDefComp dbaasv1alpha1.ClusterDefinitionComponent) int {
-	claimPrimaryStsIndex := clusterDefComp.PrimaryStsIndex
-	for _, clusterComp := range cluster.Spec.Components {
-		if clusterComp.Type == clusterDefComp.TypeName {
-			if clusterComp.PrimaryStsIndex != nil {
-				claimPrimaryStsIndex = clusterComp.PrimaryStsIndex
-			}
-		}
-	}
-	return *claimPrimaryStsIndex
-}
-
-func createReplRelationJobAndEnsure(
-	reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	cluster *dbaasv1alpha1.Cluster,
-	component dbaasv1alpha1.ClusterDefinitionComponent,
-	stsObj *appsv1.StatefulSet,
-	enginePod *corev1.Pod) error {
-	key := types.NamespacedName{Namespace: stsObj.Namespace, Name: stsObj.Name + "-repl"}
-	job := batchv1.Job{}
-	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, cli, key, &job)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		// if not exist job, create a new job
-		jobPodSpec, err := buildReplRelationJobPodSpec(component, stsObj, enginePod)
-		if err != nil {
-			return err
-		}
-		var ttlSecondsAfterJobFinished int32 = 30
-		job := &batchv1.Job{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: key.Namespace,
-				Name:      key.Name,
-				Labels:    nil,
-			},
-			Spec: batchv1.JobSpec{
-				Template: corev1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: key.Namespace,
-						Name:      key.Name},
-					Spec: jobPodSpec,
-				},
-				TTLSecondsAfterFinished: &ttlSecondsAfterJobFinished,
-			},
-		}
-		scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
-		if err := controllerutil.SetOwnerReference(cluster, job, scheme); err != nil {
-			return err
-		}
-		reqCtx.Log.Info("create a built-in job from create replication relationship", "job", job)
-		if err := cli.Create(reqCtx.Ctx, job); err != nil {
-			return err
-		}
-	}
-
-	// ensure job finished
-	jobStatusConditions := job.Status.Conditions
-	if len(jobStatusConditions) > 0 {
-		if jobStatusConditions[0].Type != batchv1.JobComplete {
-			return fmt.Errorf("job status: %s is not Complete, please wait or check", jobStatusConditions[0].Type)
-		}
-	}
-	return nil
-}
-
-func buildReplRelationJobPodSpec(
-	component dbaasv1alpha1.ClusterDefinitionComponent,
-	stsObj *appsv1.StatefulSet,
-	dbEnginePod *corev1.Pod) (corev1.PodSpec, error) {
-	podSpec := corev1.PodSpec{}
-	container := corev1.Container{}
-	container.Name = stsObj.Name
-
-	var targetEngineContainer corev1.Container
-	for _, c := range dbEnginePod.Spec.Containers {
-		if c.Name == component.ReplicationSpec.CreateReplication.DbEngineContainer {
-			targetEngineContainer = c
-		}
-	}
-	container.Command = []string{"kubectl", "exec", "-i", dbEnginePod.Name, "-c", targetEngineContainer.Name, "--", "sh", "-c"}
-	container.Args = component.ReplicationSpec.CreateReplication.Commands
-	container.Image = component.ReplicationSpec.CreateReplication.Image
-	container.VolumeMounts = targetEngineContainer.VolumeMounts
-	container.Env = targetEngineContainer.Env
-	podSpec.Containers = []corev1.Container{container}
-	podSpec.Volumes = dbEnginePod.Spec.Volumes
-	podSpec.RestartPolicy = corev1.RestartPolicyNever
-	return podSpec, nil
-}
-
-func updateReplicationSetPodRoleLabel(cli client.Client, ctx context.Context, podName types.NamespacedName, role string) error {
+// SyncReplicationSetClusterStatus Sync replicationSet status to cluster.status.component[componentName].ReplicationStatus
+func SyncReplicationSetClusterStatus(cli client.Client, ctx context.Context, podName types.NamespacedName, role string) error {
 	pod := &corev1.Pod{}
 	if err := cli.Get(ctx, podName, pod); err != nil {
 		return err
 	}
-
-	patch := client.MergeFrom(pod.DeepCopy())
-	pod.Labels[intctrlutil.ReplicationSetRoleLabelKey] = role
-	err := cli.Patch(ctx, pod, patch)
+	// update cluster status
+	cluster := &dbaasv1alpha1.Cluster{}
+	err := cli.Get(ctx, types.NamespacedName{
+		Namespace: pod.Namespace,
+		Name:      pod.Labels[intctrlutil.AppInstanceLabelKey],
+	}, cluster)
 	if err != nil {
+		return err
+	}
+
+	componentName := pod.Labels[intctrlutil.AppComponentLabelKey]
+	typeName := GetComponentTypeName(*cluster, componentName)
+	componentDef, err := GetComponentFromClusterDefinition(ctx, cli, cluster, typeName)
+	if err != nil {
+		return err
+	}
+
+	patch := client.MergeFrom(cluster.DeepCopy())
+	InitClusterComponentStatusIfNeed(cluster, componentName, componentDef)
+	replicationSetStatus := cluster.Status.Components[componentName].ReplicationSetStatus
+	needUpdate := needUpdateReplicationSetStatus(replicationSetStatus, role, pod.Name)
+	if !needUpdate {
+		return nil
+	}
+	if err := cli.Status().Patch(ctx, cluster, patch); err != nil {
 		return err
 	}
 	return nil
 }
 
-func updateReplicationSetStsRoleLabel(cli client.Client, ctx context.Context, stsName types.NamespacedName, role string) error {
-	sts := &appsv1.StatefulSet{}
-	if err := cli.Get(ctx, stsName, sts); err != nil {
-		return err
+func needUpdateReplicationSetStatus(replicationStatus *dbaasv1alpha1.ReplicationSetStatus, role, podName string) bool {
+	if role == string(dbaasv1alpha1.Primary) {
+		if replicationStatus.Primary.Pod == podName && replicationStatus.Primary.Role == role {
+			return false
+		}
+		replicationStatus.Primary.Pod = podName
+		replicationStatus.Primary.Role = role
+		return true
+	} else {
+		var exist = false
+		for _, secondary := range replicationStatus.Secondaries {
+			if secondary.Pod == podName {
+				if secondary.Role == role {
+					return false
+				}
+				exist = true
+				secondary.Role = role
+			}
+		}
+		if !exist {
+			replicationStatus.Secondaries = append(replicationStatus.Secondaries, dbaasv1alpha1.ReplicationMemberStatus{
+				Pod:  podName,
+				Role: role,
+			})
+		}
+		return true
 	}
-
-	patch := client.MergeFrom(sts.DeepCopy())
-	sts.Labels[intctrlutil.ReplicationSetRoleLabelKey] = role
-	err := cli.Patch(ctx, sts, patch)
-	if err != nil {
-		return err
-	}
-	return nil
 }

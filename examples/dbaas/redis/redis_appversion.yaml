@@ -1,9 +1,9 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       AppVersion
 metadata:
-  name:     redis-replication-7.0.5
+  name:     redis-7.0.5
 spec:
-  clusterDefinitionRef: apecloud-redis-replication
+  clusterDefinitionRef: apecloud-redis
   components:
   - type: replication
     podSpec:

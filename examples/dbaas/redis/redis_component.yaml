@@ -1,0 +1,13 @@
+- name: redis-rsts
+  type: replication
+  monitor: false
+  primaryStsIndex: 0
+  replicas: 2
+  volumeClaimTemplates:
+  - name: data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi

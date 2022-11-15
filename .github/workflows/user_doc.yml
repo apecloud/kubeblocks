@@ -4,12 +4,13 @@ on:
     types: [labeled]
 
 env:
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
 jobs:
   User_doc:
     runs-on: ubuntu-latest
-    if: github.event.label.name == 'user doc'
+    if: | 
+      contains(github.event.issue.labels.*.name, 'user doc') 
     steps:
      - name: Update issue
        uses: actions-cool/issues-helper@v3

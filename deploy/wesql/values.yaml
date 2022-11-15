@@ -116,6 +116,7 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 appVersionOverride: ""
+defaultTerminationPolicy: "Delete"
 
 logConfigs:
   error: /data/mysql/log/mysqld.err

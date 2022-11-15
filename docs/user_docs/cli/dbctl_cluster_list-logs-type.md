@@ -1,11 +1,30 @@
-## dbctl cluster
+## dbctl cluster list-logs-type
 
-Database cluster operation command
+List the supported logs file types in cluster
+
+```
+dbctl cluster list-logs-type [flags]
+```
+
+### Examples
+
+```
+  # Display supported log file in cluster my-cluster with all instance
+  dbctl cluster list-logs-type my-cluster
+  
+  # Display supported log file in cluster my-cluster with specify component my-component
+  dbctl cluster list-logs-type my-cluster --component my-component
+  
+  # Display supported log file in cluster my-cluster with specify instance my-instance-0
+  dbctl cluster list-logs-type my-cluster --instance my-instance-0
+```
 
 ### Options
 
 ```
-  -h, --help   help for cluster
+      --component string   Component name.
+  -h, --help               help for list-logs-type
+  -i, --instance string    Instance name.
 ```
 
 ### Options inherited from parent commands
@@ -33,19 +52,5 @@ Database cluster operation command
 
 ### SEE ALSO
 
-* [dbctl](dbctl.md)	 - KubeBlocks CLI
-* [dbctl cluster connect](dbctl_cluster_connect.md)	 - connect to a database cluster
-* [dbctl cluster create](dbctl_cluster_create.md)	 - Create a database cluster
-* [dbctl cluster delete](dbctl_cluster_delete.md)	 - Delete a cluster
-* [dbctl cluster delete-ops](dbctl_cluster_delete-ops.md)	 - Delete a OpsRequest
-* [dbctl cluster describe](dbctl_cluster_describe.md)	 - Describe database cluster info
-* [dbctl cluster horizontal-scaling](dbctl_cluster_horizontal-scaling.md)	 - horizontal scaling the specified components in the cluster
-* [dbctl cluster list](dbctl_cluster_list.md)	 - List all cluster.
-* [dbctl cluster list-logs-type](dbctl_cluster_list-logs-type.md)	 - List the supported logs file types in cluster
-* [dbctl cluster list-ops](dbctl_cluster_list-ops.md)	 - List all opsRequest.
-* [dbctl cluster logs](dbctl_cluster_logs.md)	 - Access up-to-date cluster log file
-* [dbctl cluster restart](dbctl_cluster_restart.md)	 - restart the specified components in the cluster
-* [dbctl cluster upgrade](dbctl_cluster_upgrade.md)	 - upgrade the cluster
-* [dbctl cluster vertical-scaling](dbctl_cluster_vertical-scaling.md)	 - vertical scaling the specified components in the cluster
-* [dbctl cluster volume-expansion](dbctl_cluster_volume-expansion.md)	 - expand volume with the specified components and volumeClaimTemplates in the cluster
+* [dbctl cluster](dbctl_cluster.md)	 - Database cluster operation command
 

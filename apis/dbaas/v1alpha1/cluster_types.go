@@ -42,7 +42,8 @@ type ClusterSpec struct {
 	// WipeOut is based on Delete and wipe out all snapshots and snapshot data from bucket.
 	// +kubebuilder:default=Halt
 	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
-	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
+	// +optional
+	TerminationPolicy TerminationPolicyType `json:"terminationPolicy,omitempty"`
 
 	// List of components you want to replace in ClusterDefinition and AppVersion. It will replace the field in ClusterDefinition's and AppVersion's component if type is matching.
 	// +optional

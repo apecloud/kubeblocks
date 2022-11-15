@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -67,8 +68,9 @@ func (r *OpsRequest) ValidateCreate() error {
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 	opsrequestlog.Info("validate update", "name", r.Name)
-	if r.Status.Phase == SucceedPhase {
-		return newInvalidError(OpsRequestKind, r.Name, "status.phase", fmt.Sprintf("can not update OpsRequest when status.Phase is %s", r.Status.Phase))
+	lastOpsRequest := old.(*OpsRequest)
+	if r.Status.Phase == SucceedPhase && !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
+		return newInvalidError(OpsRequestKind, r.Name, "spec", fmt.Sprintf("update OpsRequest is forbidden when status.Phase is %s", r.Status.Phase))
 	}
 	return r.validate()
 }
@@ -78,7 +80,7 @@ func (r *OpsRequest) ValidateDelete() error {
 	opsrequestlog.Info("validate delete", "name", r.Name)
 
 	if r.Status.Phase == RunningPhase {
-		return newInvalidError(OpsRequestKind, r.Name, "status.phase", fmt.Sprintf("can not delete OpsRequest when status.Phase is %s", r.Status.Phase))
+		return newInvalidError(OpsRequestKind, r.Name, "status.phase", fmt.Sprintf("delete OpsRequest is forbidden when status.Phase is %s", r.Status.Phase))
 	}
 	return nil
 }
@@ -211,7 +213,7 @@ func (r *OpsRequest) validateVolumeExpansion(allErrs *field.ErrorList, cluster *
 			}
 		}
 		if len(invalidVctNames) > 0 {
-			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].volumeExpansion[*].name", index)), invalidVctNames, "not support volume expansion")
+			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].volumeExpansion[*].name", index)), invalidVctNames, "not support volume expansion, check the StorageClass whether allow volume expansion.")
 		}
 		return nil
 	}
@@ -233,7 +235,12 @@ func (r *OpsRequest) commonValidationWithComponentOps(allErrs *field.ErrorList, 
 	)
 	// check whether cluster support the operation when it in component scope
 	if len(supportedComponentMap) == 0 {
-		addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s", r.Spec.ClusterRef))
+		switch r.Spec.Type {
+		case VolumeExpansionType:
+			addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s, check the StorageClass whether allow volume expansion.", r.Spec.ClusterRef))
+		default:
+			addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s", r.Spec.ClusterRef))
+		}
 		return false
 	}
 	if len(r.Spec.ComponentOpsList) == 0 {

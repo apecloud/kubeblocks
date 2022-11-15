@@ -84,14 +84,10 @@ func AddRepo(r *repo.Entry) error {
 	if f.Has(r.Name) {
 		existing := f.Get(r.Name)
 		if *r != *existing {
-
 			// The input coming in for the Name is different from what is already
 			// configured. Return an error.
 			return errors.Errorf("repository Name (%s) already exists, please specify a different Name", r.Name)
 		}
-
-		// The add is idempotent so do nothing
-		return nil
 	}
 
 	cp, err := repo.NewChartRepository(r, getter.All(settings))

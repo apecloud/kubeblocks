@@ -6,12 +6,18 @@ metadata:
     {{- include "wesqlapp.labels" . | nindent 4 }}
 spec:
   type: state.mysql
+  defaultTerminationPolicy: {{ .Values.defaultTerminationPolicy }}
   connectionCredential:
     user: {{ .Values.auth.rootUser }}
     password: {{ .Values.auth.rootPassword }}
   components:
   - typeName: replicasets
     characterType: mysql
+    probes:
+      roleChangedProbe:
+        failureThreshold: {{ .Values.roleChangedProbe.failureThreshold }}
+        periodSeconds: {{ .Values.roleChangedProbe.periodSeconds }}
+        successThreshold: {{ .Values.roleChangedProbe.successThreshold }}
     monitor:
       builtIn: true
     logConfigs:

@@ -8,6 +8,7 @@ require (
 	github.com/aws/aws-sdk-go v1.43.29
 	github.com/bhmj/jsonslice v1.1.2
 	github.com/briandowns/spinner v1.18.1
+	github.com/clbanning/mxj/v2 v2.5.7
 	github.com/containers/common v0.49.1
 	github.com/coreos/go-iptables v0.5.0
 	github.com/docker/docker v20.10.17+incompatible
@@ -152,7 +153,7 @@ require (
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d // indirect
 	github.com/fatih/camelcase v1.0.0 // indirect
 	github.com/fatih/color v1.13.0
-	github.com/fsnotify/fsnotify v1.5.4
+	github.com/fsnotify/fsnotify v1.6.0
 	github.com/fvbommel/sortorder v1.0.2 // indirect
 	github.com/go-errors/errors v1.4.0 // indirect
 	github.com/go-gorp/gorp/v3 v3.0.2 // indirect

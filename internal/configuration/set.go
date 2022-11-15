@@ -18,7 +18,7 @@ package configuration
 
 // Set type Reference c++ set interface to implemented stl set.
 // With generics, it may be more generic.
-type Set map[string]struct{}
+type Set map[string]EmptyStruct
 
 type EmptyStruct struct{}
 
@@ -57,7 +57,7 @@ func Difference(left, right *Set) *Set {
 	return left.Difference(right)
 }
 
-func MapKeyDifference(left, right map[string]string) *Set {
+func MapKeyDifference[T interface{}](left, right map[string]T) *Set {
 	lSet := NewSetFromMap(left)
 	rSet := NewSetFromMap(right)
 	return Difference(lSet, rSet)

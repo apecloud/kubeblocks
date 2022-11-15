@@ -52,6 +52,9 @@ type Inputs struct {
 	// Short is the short description shown in the 'help' output.
 	Short string
 
+	// Example is examples of how to use the command.
+	Example string
+
 	// BaseOptionsObj
 	BaseOptionsObj *BaseOptions
 
@@ -100,9 +103,10 @@ type BaseOptions struct {
 // BuildCommand build create command
 func BuildCommand(inputs Inputs) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   inputs.Use,
-		Short: inputs.Short,
-		Args:  cobra.ExactArgs(1),
+		Use:     inputs.Use,
+		Short:   inputs.Short,
+		Example: inputs.Example,
+		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(inputs.BaseOptionsObj.Complete(inputs, args))
 			cmdutil.CheckErr(inputs.BaseOptionsObj.Validate(inputs))

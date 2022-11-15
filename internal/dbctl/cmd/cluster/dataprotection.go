@@ -42,9 +42,13 @@ import (
 )
 
 var (
+	createBackupExample = templates.Examples(`
+		# create a backup
+		dbctl cluster backup cluster-name
+	`)
 	listBackupExample = templates.Examples(`
 		# list all backup
-		dbctl cluster list-backup CLUSTER-NAME
+		dbctl cluster list-backup
 	`)
 	deleteBackupExample = templates.Examples(`
 		# delete a backup named backup-name
@@ -57,6 +61,10 @@ var (
 	deleteRestoreExample = templates.Examples(`
 		# delete a restore named restore-name
 		dbctl cluster delete-restore restore-name
+	`)
+	createRestoreExample = templates.Examples(`
+		# restore a new cluster from a backup
+		dbctl cluster restore new-cluster-name --backup backup-name
 	`)
 )
 
@@ -106,11 +114,12 @@ func (o *CreateBackupOptions) Validate() error {
 		BaseOptionsObj:  &policyOptions.BaseOptions,
 		Options:         policyOptions,
 	}
-	/* cluster backup do 2 following things:
-	 * 1. create or apply the backupPolicy, cause backupPolicy has defined the reference the cluster labels.
-	 *    so it need apply the backupPolicy after the first backupPolicy created.
-	 * 2. create a backupJob.
-	 */
+
+	// cluster backup do 2 following things:
+	// 1. create or apply the backupPolicy, cause backupJob reference to a backupPolicy,
+	//   and backupPolicy reference to the cluster.
+	//   so it need apply the backupPolicy after the first backupPolicy created.
+	// 2. create a backupJob.
 	if err := policyOptions.BaseOptions.RunAsApply(inputs); err != nil {
 		return err
 	}
@@ -124,6 +133,7 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	inputs := create.Inputs{
 		Use:             "backup",
 		Short:           "Create a backup",
+		Example:         createBackupExample,
 		CueTemplateName: "backupjob_template.cue",
 		ResourceName:    types.ResourceBackupJobs,
 		Group:           types.DPGroup,
@@ -227,6 +237,7 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	inputs := create.Inputs{
 		Use:             "restore",
 		Short:           "Restore a new cluster from backup",
+		Example:         createRestoreExample,
 		CueTemplateName: CueTemplateName,
 		ResourceName:    types.ResourceClusters,
 		Group:           types.Group,

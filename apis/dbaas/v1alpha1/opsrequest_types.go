@@ -121,7 +121,7 @@ type HorizontalScaling struct {
 }
 
 type OpsRequestStatusComponent struct {
-	// Phase  describe the component phase, Reference ClusterDefinition.status.component.phase.
+	// Phase describe the component phase, Reference ClusterDefinition.status.component.phase.
 	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`

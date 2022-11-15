@@ -72,6 +72,9 @@ type Inputs struct {
 	Complete func() error
 
 	BuildFlags func(*cobra.Command)
+
+	// PreCreate optional, make changes on yaml before create
+	PreCreate func(*unstructured.Unstructured) error
 }
 
 // BaseOptions the options of creation command should inherit baseOptions
@@ -162,6 +165,11 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 		return err
 	}
 
+	if inputs.PreCreate != nil {
+		if err = inputs.PreCreate(unstructuredObj); err != nil {
+			return err
+		}
+	}
 	// create k8s resource
 	gvr := schema.GroupVersionResource{Group: types.Group, Version: types.Version, Resource: inputs.ResourceName}
 	if unstructuredObj, err = o.Client.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {

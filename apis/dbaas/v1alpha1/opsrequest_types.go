@@ -18,12 +18,12 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // OpsRequestSpec defines the desired state of OpsRequest
 type OpsRequestSpec struct {
-
 	// ClusterRef reference clusterDefinition resource
 	// +kubebuilder:validation:Required
 	ClusterRef string `json:"clusterRef"`
@@ -35,7 +35,7 @@ type OpsRequestSpec struct {
 
 	// TTLSecondsAfterSucceed OpsRequest will be deleted after TTLSecondsAfterSucceed second when OpsRequest.status.phase is Running
 	// +optional
-	TTLSecondsAfterSucceed int `json:"ttlSecondsAfterSucceed,omitempty"`
+	TTLSecondsAfterSucceed int32 `json:"ttlSecondsAfterSucceed,omitempty"`
 
 	// ClusterOps defines cluster level operations, like Upgrade
 	// +optional
@@ -43,7 +43,7 @@ type OpsRequestSpec struct {
 
 	// ComponentOpsList defines operations in component scope, like VolumeExpansion,VerticalScaling,HorizontalScaling
 	// +optional
-	ComponentOpsList []*ComponentOps `json:"componentOps,omitempty"`
+	ComponentOpsList []ComponentOps `json:"componentOps,omitempty"`
 }
 
 // OpsRequestStatus defines the observed state of OpsRequest
@@ -74,30 +74,6 @@ type OpsRequestStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:resource:categories={dbaas,all},shortName=ops
-//+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="Cluster Status."
-//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
-
-// OpsRequest is the Schema for the opsrequests API
-type OpsRequest struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   OpsRequestSpec   `json:"spec,omitempty"`
-	Status OpsRequestStatus `json:"status,omitempty"`
-}
-
-//+kubebuilder:object:root=true
-
-// OpsRequestList contains a list of OpsRequest
-type OpsRequestList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []OpsRequest `json:"items"`
-}
-
 type ClusterOps struct {
 	// +kubebuilder:validation:Required
 	Upgrade *Upgrade `json:"upgrade"`
@@ -107,7 +83,7 @@ type ComponentOps struct {
 	// ComponentNames defines which components perform the operation.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
-	ComponentNames []string `json:"componentNames,omitempty"`
+	ComponentNames []string `json:"componentNames"`
 
 	// VolumeExpansion defines the variables that need to be input when expanding a volume.
 	// +optional
@@ -129,9 +105,9 @@ type Upgrade struct {
 }
 
 type VolumeExpansion struct {
-	// the request storage size.
+	// The request storage size.
 	// +kubebuilder:validation:Required
-	Storage string `json:"storage"`
+	Storage resource.Quantity `json:"storage"`
 
 	// ClusterComponentVolumeClaimTemplate.Name
 	// +kubebuilder:validation:Required
@@ -139,14 +115,42 @@ type VolumeExpansion struct {
 }
 
 type HorizontalScaling struct {
+	// Replicas for the workloads.
 	// +optional
-	Replicas int `json:"replicas,omitempty"`
+	Replicas int32 `json:"replicas,omitempty"`
 }
 
 type OpsRequestStatusComponent struct {
-	// Phase describe the component phase, Reference ClusterDefinition.status.component.phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Creating,Abnormal,Updating,Deleting,Deleted}
+	// Phase - in list of [Running, Failed, Creating, Updating, Deleting, Deleted]
+	// +kubebuilder:validation:Enum={Running,Failed,Creating,Updating,Deleting,Deleted}
+	// +optional
 	Phase Phase `json:"phase,omitempty"`
+}
+
+//+kubebuilder:object:root=true
+//+kubebuilder:subresource:status
+//+kubebuilder:resource:categories={dbaas,all},shortName=ops
+//+kubebuilder:printcolumn:name="TYPE",type="string",JSONPath=".spec.type",description="Operation request type."
+//+kubebuilder:printcolumn:name="CLUSTER",type="string",JSONPath=".spec.clusterRef",description="Operand cluster."
+//+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="Operation status phase."
+//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+
+// OpsRequest is the Schema for the opsrequests API
+type OpsRequest struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   OpsRequestSpec   `json:"spec,omitempty"`
+	Status OpsRequestStatus `json:"status,omitempty"`
+}
+
+//+kubebuilder:object:root=true
+
+// OpsRequestList contains a list of OpsRequest
+type OpsRequestList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []OpsRequest `json:"items"`
 }
 
 func init() {

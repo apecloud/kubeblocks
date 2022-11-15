@@ -21,7 +21,15 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: Cluster Status.
+    - description: Operation request type.
+      jsonPath: .spec.type
+      name: TYPE
+      type: string
+    - description: Operand cluster.
+      jsonPath: .spec.clusterRef
+      name: CLUSTER
+      type: string
+    - description: Operation status phase.
       jsonPath: .status.phase
       name: PHASE
       type: string
@@ -82,6 +90,8 @@ spec:
                         to be input when scaling replicas.
                       properties:
                         replicas:
+                          description: Replicas for the workloads.
+                          format: int32
                           type: integer
                       type: object
                     verticalScaling:
@@ -121,18 +131,25 @@ spec:
                             description: ClusterComponentVolumeClaimTemplate.Name
                             type: string
                           storage:
-                            description: the request storage size.
-                            type: string
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            description: The request storage size.
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
                         required:
                         - name
                         - storage
                         type: object
                       type: array
+                  required:
+                  - componentNames
                   type: object
                 type: array
               ttlSecondsAfterSucceed:
                 description: TTLSecondsAfterSucceed OpsRequest will be deleted after
                   TTLSecondsAfterSucceed second when OpsRequest.status.phase is Running
+                format: int32
                 type: integer
               type:
                 description: Type defines the operation type
@@ -163,12 +180,12 @@ spec:
                 additionalProperties:
                   properties:
                     phase:
-                      description: Phase describe the component phase, Reference ClusterDefinition.status.component.phase.
+                      description: Phase - in list of [Running, Failed, Creating,
+                        Updating, Deleting, Deleted]
                       enum:
                       - Running
                       - Failed
                       - Creating
-                      - Abnormal
                       - Updating
                       - Deleting
                       - Deleted

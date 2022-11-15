@@ -137,9 +137,10 @@ func getStatelessPhaseForEvent(ctx context.Context, cli client.Client, cluster *
 // getConsensusPhaseForEvent get the component phase for consensus type
 func getConsensusPhaseForEvent(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, componentDef *dbaasv1alpha1.ClusterDefinitionComponent, componentName string) (dbaasv1alpha1.Phase, error) {
 	var (
-		isFailed  = true
-		isWarning bool
-		podList   = &corev1.PodList{}
+		isFailed      = true
+		isWarning     bool
+		podList       = &corev1.PodList{}
+		allPodIsReady = true
 	)
 	if err := cli.List(ctx, podList, client.InNamespace(cluster.Namespace),
 		getComponentMatchLabels(cluster.Name, componentName)); err != nil {
@@ -161,6 +162,13 @@ func getConsensusPhaseForEvent(ctx context.Context, cli client.Client, cluster *
 		if labelValue == "" {
 			isWarning = true
 		}
+		if !intctrlutil.PodIsReady(&v) {
+			allPodIsReady = false
+		}
+	}
+	// if all pod is ready, ignore the warning event
+	if allPodIsReady {
+		return "", nil
 	}
 	return calculateComponentPhaseForEvent(isFailed, isWarning), nil
 }
@@ -309,7 +317,7 @@ func getClusterAvailabilityEffect(componentDef *dbaasv1alpha1.ClusterDefinitionC
 		return true
 	default:
 		// other types of components need to judge whether there has PodDisruptionBudget
-		return existsPDBSpec(componentDef.PodDisruptionBudgetSpec)
+		return existsPDBSpec(componentDef.PDBSpec)
 	}
 }
 

@@ -175,17 +175,14 @@ spec:
 		}
 
 		return &dbaasv1alpha1.Cluster{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "dbaas.kubeblocks.io/v1alpha1",
-				Kind:       "Cluster",
-			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      key.Name,
 				Namespace: key.Namespace,
 			},
 			Spec: dbaasv1alpha1.ClusterSpec{
-				ClusterDefRef: clusterDefObj.GetName(),
-				AppVersionRef: appVersionObj.GetName(),
+				ClusterDefRef:     clusterDefObj.GetName(),
+				AppVersionRef:     appVersionObj.GetName(),
+				TerminationPolicy: dbaasv1alpha1.WipeOut,
 			},
 		}, clusterDefObj, appVersionObj, key
 	}
@@ -236,7 +233,7 @@ spec:
 
 			verticalScalingOpsRequest := createOpsRequest("mysql-verticalscaling", clusterObject.Name, dbaasv1alpha1.VerticalScalingType)
 			verticalScalingOpsRequest.Spec.TTLSecondsAfterSucceed = 1
-			verticalScalingOpsRequest.Spec.ComponentOpsList = []*dbaasv1alpha1.ComponentOps{
+			verticalScalingOpsRequest.Spec.ComponentOpsList = []dbaasv1alpha1.ComponentOps{
 				{
 					ComponentNames: []string{"replicasets"},
 					VerticalScaling: &corev1.ResourceRequirements{

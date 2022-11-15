@@ -32,6 +32,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 	var (
 		clusterDefinitionName  = "clusterdefinition-webhook-mysql-definition"
 		clusterDefinitionName2 = "clusterdefinition-webhook-mysql-definition2"
+		clusterDefinitionName3 = "clusterdefinition-webhook-mysql-definition3"
 		timeout                = time.Second * 10
 		interval               = time.Second
 	)
@@ -49,6 +50,15 @@ var _ = Describe("clusterDefinition webhook", func() {
 			// wait until ClusterDefinition created
 			Eventually(func() bool {
 				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
+
+			By("By creating a new clusterDefinition")
+			clusterDef, _ = createTestClusterDefinitionObj3(clusterDefinitionName3)
+			Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
+			// wait until ClusterDefinition created
+			Eventually(func() bool {
+				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName3}, clusterDef)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
@@ -121,6 +131,66 @@ spec:
   components:
   - typeName: mysql-rafted
     componentType: Consensus
+`, name)
+	clusterDefinition := &ClusterDefinition{}
+	err := yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)
+	return clusterDefinition, err
+}
+
+func createTestClusterDefinitionObj3(name string) (*ClusterDefinition, error) {
+	clusterDefYaml := fmt.Sprintf(`
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind:       ClusterDefinition
+metadata:
+  name:     %s
+spec:
+  type: state.mysql-8
+  components:
+  - typeName: replicasets
+    componentType: Consensus
+    logConfig:
+      - name: error
+        filePathPattern: /data/mysql/log/mysqld.err
+      - name: slow
+        filePathPattern: /data/mysql/mysqld-slow.log
+    configTemplateRefs:
+      - name: mysql-tree-node-template-8.0
+        volumeName: mysql-config
+    componentType: Consensus
+    consensusSpec:
+      leader:
+        name: leader
+        accessMode: ReadWrite
+      followers:
+        - name: follower
+          accessMode: Readonly
+    defaultReplicas: 3
+    podSpec:
+      containers:
+      - name: mysql
+        image: docker.io/apecloud/wesql-server-8.0:0.1.2
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3306
+          protocol: TCP
+          name: mysql
+        - containerPort: 13306
+          protocol: TCP
+          name: paxos
+        volumeMounts:
+          - mountPath: /data
+            name: data
+          - mountPath: /log
+            name: log
+          - mountPath: /data/config/mysql
+            name: mysql-config
+        env:
+          - name: "MYSQL_ROOT_PASSWORD"
+            valueFrom:
+              secretKeyRef:
+                name: $(KB_SECRET_NAME)
+                key: password
+        command: ["/usr/bin/bash", "-c"]
 `, name)
 	clusterDefinition := &ClusterDefinition{}
 	err := yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)

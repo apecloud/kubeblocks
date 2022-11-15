@@ -47,7 +47,7 @@ const (
 
 type MonitorConfig struct {
 	Enable     bool   `json:"enable"`
-	ScrapePort int    `json:"scrapePort,omitempty"`
+	ScrapePort int32  `json:"scrapePort,omitempty"`
 	ScrapePath string `json:"scrapePath,omitempty"`
 }
 
@@ -56,18 +56,19 @@ type Component struct {
 	ClusterType             string                                 `json:"clusterType,omitempty"`
 	Name                    string                                 `json:"name,omitempty"`
 	Type                    string                                 `json:"type,omitempty"`
-	MinReplicas             int                                    `json:"minReplicas,omitempty"`
-	MaxReplicas             int                                    `json:"maxReplicas,omitempty"`
-	DefaultReplicas         int                                    `json:"defaultReplicas,omitempty"`
-	Replicas                int                                    `json:"replicas,omitempty"`
+	MinReplicas             int32                                  `json:"minReplicas,omitempty"`
+	MaxReplicas             int32                                  `json:"maxReplicas,omitempty"`
+	DefaultReplicas         int32                                  `json:"defaultReplicas,omitempty"`
+	Replicas                int32                                  `json:"replicas,omitempty"`
 	PodDisruptionBudgetSpec *policyv1.PodDisruptionBudgetSpec      `json:"podDisruptionBudgetSpec,omitempty"`
 	AntiAffinity            bool                                   `json:"antiAffinity,omitempty"`
 	ComponentType           dbaasv1alpha1.ComponentType            `json:"componentType,omitempty"`
 	ConsensusSpec           *dbaasv1alpha1.ConsensusSetSpec        `json:"consensusSpec,omitempty"`
 	PodSpec                 *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	Service                 corev1.ServiceSpec                     `json:"service,omitempty"`
-	Scripts                 dbaasv1alpha1.ClusterDefinitionScripts `json:"scripts,omitempty"`
 	Probes                  *dbaasv1alpha1.ClusterDefinitionProbes `json:"probes,omitempty"`
 	VolumeClaimTemplates    []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 	Monitor                 MonitorConfig                          `json:"monitor,omitempty"`
+	EnabledLogs             []string                               `json:"enabledLogs,omitempty"`
+	LogConfigs              []dbaasv1alpha1.LogConfig              `json:"logConfigs,omitempty"`
 }

@@ -87,6 +87,7 @@ type ObjectsGetter struct {
 	DynamicClient dynamic.Interface
 
 	WithAppVersion bool
+	WithConfigMap  bool
 }
 
 // Get all kubernetes objects belonging to the database cluster
@@ -133,6 +134,15 @@ func (o *ObjectsGetter) Get(objs *types.ClusterObjects) error {
 		withGK(schema.GroupKind{Kind: "Secret"}).
 		do(objs); err != nil {
 		return err
+	}
+
+	// get configmap
+	if o.WithConfigMap {
+		if err = builder.withLabel(InstanceLabel(o.Name)).
+			withGK(schema.GroupKind{Kind: "ConfigMap"}).
+			do(objs); err != nil {
+			return err
+		}
 	}
 
 	// get pod
@@ -201,6 +211,11 @@ func (b *builder) do(clusterObjs *types.ClusterObjects) error {
 		}
 	case "Secret":
 		clusterObjs.Secrets, err = b.clientSet.CoreV1().Secrets(b.namespace).List(ctx, listOpts)
+		if err != nil {
+			return err
+		}
+	case "ConfigMap":
+		clusterObjs.ConfigMaps, err = b.clientSet.CoreV1().ConfigMaps(b.namespace).List(ctx, listOpts)
 		if err != nil {
 			return err
 		}

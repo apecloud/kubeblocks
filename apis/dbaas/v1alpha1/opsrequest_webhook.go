@@ -54,7 +54,7 @@ func (r *OpsRequest) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-dbaas-kubeblocks-io-v1alpha1-opsrequest,mutating=false,failurePolicy=fail,sideEffects=None,groups=dbaas.kubeblocks.io,resources=opsrequests,verbs=create;update,versions=v1alpha1,name=vopsrequest.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-dbaas-kubeblocks-io-v1alpha1-opsrequest,mutating=false,failurePolicy=fail,sideEffects=None,groups=dbaas.kubeblocks.io,resources=opsrequests,verbs=create;update;delete,versions=v1alpha1,name=vopsrequest.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &OpsRequest{}
 
@@ -77,7 +77,9 @@ func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 func (r *OpsRequest) ValidateDelete() error {
 	opsrequestlog.Info("validate delete", "name", r.Name)
 
-	// TODO(user): fill in your validation logic upon object deletion.
+	if r.Status.Phase == RunningPhase {
+		return newInvalidError(OpsRequestKind, r.Name, "status.phase", fmt.Sprintf("can not delete OpsRequest when status.Phase is %s", r.Status.Phase))
+	}
 	return nil
 }
 
@@ -104,6 +106,10 @@ func (r *OpsRequest) validate() error {
 
 // validateOps validate ops attributes is legal
 func (r *OpsRequest) validateOps(ctx context.Context, cluster *Cluster, allErrs *field.ErrorList) {
+	if cluster.Status.Operations == nil {
+		cluster.Status.Operations = &Operations{}
+	}
+
 	// Check whether the corresponding attribute is legal according to the operation type
 	switch r.Spec.Type {
 	case UpgradeType:
@@ -159,14 +165,14 @@ func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *
 }
 
 // invalidReplicas verify whether the replicas is invalid
-func invalidReplicas(replicas int, operationComponent *OperationComponent) bool {
+func invalidReplicas(replicas int32, operationComponent *OperationComponent) bool {
 	if operationComponent.Min == 0 || operationComponent.Max == 0 {
 		return true
 	}
 	return replicas < operationComponent.Min || replicas > operationComponent.Max
 }
 
-// validateVolumeExpansion validate api is legal when spec.type is HorizontalScaling
+// validateHorizontalScaling validate api is legal when spec.type is HorizontalScaling
 func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.ErrorList) {
 	supportedComponentMap := covertOperationComponentsToMap(cluster.Status.Operations.HorizontalScalable)
 	customValidate := func(componentOps *ComponentOps, index int, operationComponent *OperationComponent) *field.Error {
@@ -263,7 +269,7 @@ func (r *OpsRequest) commonValidationWithComponentOps(allErrs *field.ErrorList, 
 			if customValidate == nil {
 				continue
 			}
-			if err := customValidate(componentOps, index, operationComponent); err != nil {
+			if err := customValidate(&componentOps, index, operationComponent); err != nil {
 				*allErrs = append(*allErrs, err)
 			}
 		}
@@ -293,10 +299,10 @@ func covertComponentNamesToMap(componentNames []string) map[string]*OperationCom
 }
 
 // covertOperationComponentsToMap covert supportedOperationComponent slice to map
-func covertOperationComponentsToMap(componentNames []*OperationComponent) map[string]*OperationComponent {
+func covertOperationComponentsToMap(componentNames []OperationComponent) map[string]*OperationComponent {
 	supportedComponentMap := map[string]*OperationComponent{}
 	for _, v := range componentNames {
-		supportedComponentMap[v.Name] = v
+		supportedComponentMap[v.Name] = &v
 	}
 	return supportedComponentMap
 }

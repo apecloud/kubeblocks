@@ -111,6 +111,14 @@ spec:
                             type: string
                           type: array
                       type: object
+                    enabledLogs:
+                      description: EnabledLogs indicate which log file takes effect
+                        in database cluster element is the log type which defined
+                        in cluster definition logConfig.name, and will set relative
+                        variables about this log type in database kernel.
+                      items:
+                        type: string
+                      type: array
                     monitor:
                       default: false
                       description: Monitor which is a switch to enable monitoring,
@@ -123,7 +131,9 @@ spec:
                       maxLength: 12
                       type: string
                     replicas:
-                      description: default value in ClusterDefinition.
+                      description: Component replicas, use default value in ClusterDefinition
+                        if not specified.
+                      format: int32
                       type: integer
                     resources:
                       description: Resources requests and limits of workload.
@@ -388,6 +398,7 @@ spec:
             required:
             - appVersionRef
             - clusterDefinitionRef
+            - terminationPolicy
             type: object
           status:
             description: ClusterStatus defines the observed state of Cluster
@@ -407,10 +418,10 @@ spec:
                   description: ClusterStatusComponent record components status information
                   properties:
                     consensusSetStatus:
-                      description: ConsensusSetStatus role and pod name mapping
+                      description: ConsensusSetStatus role and pod name mapping.
                       properties:
                         followers:
-                          description: Followers status
+                          description: Followers status.
                           items:
                             properties:
                               accessMode:
@@ -436,7 +447,7 @@ spec:
                             type: object
                           type: array
                         leader:
-                          description: Leader status
+                          description: Leader status.
                           properties:
                             accessMode:
                               default: ReadWrite
@@ -460,7 +471,7 @@ spec:
                           - pod
                           type: object
                         learner:
-                          description: Learner status
+                          description: Learner status.
                           properties:
                             accessMode:
                               default: ReadWrite
@@ -488,7 +499,7 @@ spec:
                       type: object
                     message:
                       description: Message record the component details message in
-                        current phase
+                        current phase.
                       type: string
                     phase:
                       description: 'Phase describe the phase of the cluster. the detail
@@ -496,7 +507,7 @@ spec:
                         available, i.e, all pod is not ready for Stateless/Stateful
                         component; Leader/Primary pod is not ready for Consensus/Replication
                         component. Abnormal: component available but some pod is not
-                        ready. if the component type is Consensus/Replication, the
+                        ready. If the component type is Consensus/Replication, the
                         Leader/Primary pod is must ready in Abnormal phase. Other
                         phases behave the same as the cluster phase.'
                       enum:
@@ -509,12 +520,82 @@ spec:
                       - Deleted
                       type: string
                     type:
-                      description: Type component type
+                      description: Type of component.
                       type: string
                   type: object
                 description: Components record the current status information of all
                   components of the cluster.
                 type: object
+              conditions:
+                description: describe current state of cluster API Resource, like
+                  warning.
+                items:
+                  description: "Condition contains details for one aspect of the current
+                    state of this API Resource. --- This struct is intended for direct
+                    use as an array at the field path .status.conditions.  For example,
+                    type FooStatus struct{ // Represents the observations of a foo's
+                    current state. // Known .status.conditions.type are: \"Available\",
+                    \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge
+                    // +listType=map // +listMapKey=type Conditions []metav1.Condition
+                    `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\"
+                    protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
+                  properties:
+                    lastTransitionTime:
+                      description: lastTransitionTime is the last time the condition
+                        transitioned from one status to another. This should be when
+                        the underlying condition changed.  If that is not known, then
+                        using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: message is a human readable message indicating
+                        details about the transition. This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: observedGeneration represents the .metadata.generation
+                        that the condition was set based upon. For instance, if .metadata.generation
+                        is currently 12, but the .status.conditions[x].observedGeneration
+                        is 9, the condition is out of date with respect to the current
+                        state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: reason contains a programmatic identifier indicating
+                        the reason for the condition's last transition. Producers
+                        of specific condition types may define expected values and
+                        meanings for this field, and whether the values are considered
+                        a guaranteed API. The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                        --- Many .condition.type values are consistent across resources
+                        like Available, but because arbitrary conditions can be useful
+                        (see .node.status.conditions), the ability to deconflict is
+                        important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
               message:
                 description: Message cluster details message in current phase.
                 type: string
@@ -534,9 +615,11 @@ spec:
                       properties:
                         max:
                           description: Max maximum of replicas when operation is horizontalScaling.
+                          format: int32
                           type: integer
                         min:
                           description: Min minimum of replicas when operation is horizontalScaling.
+                          format: int32
                           type: integer
                         name:
                           description: Name reference component name.
@@ -547,6 +630,8 @@ spec:
                           items:
                             type: string
                           type: array
+                      required:
+                      - name
                       type: object
                     type: array
                   restartable:
@@ -572,9 +657,11 @@ spec:
                       properties:
                         max:
                           description: Max maximum of replicas when operation is horizontalScaling.
+                          format: int32
                           type: integer
                         min:
                           description: Min minimum of replicas when operation is horizontalScaling.
+                          format: int32
                           type: integer
                         name:
                           description: Name reference component name.
@@ -585,6 +672,8 @@ spec:
                           items:
                             type: string
                           type: array
+                      required:
+                      - name
                       type: object
                     type: array
                 type: object

@@ -51,6 +51,7 @@ var _ = Describe("Cluster", func() {
 			tf.ClientConfigVal = cfg
 			cmd := NewCreateCmd(tf, streams)
 			Expect(cmd != nil).To(BeTrue())
+			Expect(cmd.Flags().GetString("termination-policy")).Should(Equal("Delete"))
 			// must succeed otherwise exit 1 and make test fails
 			_ = cmd.Flags().Set("components", "../../testdata/component.yaml")
 			cmd.Run(nil, []string{"test1"})
@@ -64,7 +65,7 @@ var _ = Describe("Cluster", func() {
 			o := &CreateOptions{
 				BaseOptions:        create.BaseOptions{IOStreams: streams, Name: "test"},
 				ComponentsFilePath: "",
-				TerminationPolicy:  "Halt",
+				TerminationPolicy:  "WipeOut",
 				ClusterDefRef:      "wesql",
 				AppVersionRef:      "app-version",
 				PodAntiAffinity:    "Preferred",
@@ -204,6 +205,20 @@ var _ = Describe("Cluster", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace("default")
 		defer tf.Cleanup()
 		cmd := NewConnectCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+	})
+
+	It("list-logs-type", func() {
+		tf := cmdtesting.NewTestFactory().WithNamespace("default")
+		defer tf.Cleanup()
+		cmd := NewListLogsTypeCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+	})
+
+	It("logs", func() {
+		tf := cmdtesting.NewTestFactory().WithNamespace("default")
+		defer tf.Cleanup()
+		cmd := NewLogsCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 	})
 })

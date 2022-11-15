@@ -55,6 +55,7 @@ var _ = Describe("Exec", func() {
 		input := &ExecInput{
 			Use:      "connect",
 			Short:    "connect to a database cluster",
+			Example:  "example",
 			Validate: testOptions.validate,
 			Complete: testOptions.complete,
 			AddFlags: testOptions.addFlags,
@@ -62,6 +63,8 @@ var _ = Describe("Exec", func() {
 
 		cmd := testOptions.Build(input)
 		Expect(cmd).ShouldNot(BeNil())
+		Expect(cmd.Use).ShouldNot(BeNil())
+		Expect(cmd.Example).ShouldNot(BeNil())
 
 		execOptions := testOptions.ExecOptions
 		Expect(execOptions.Input).ShouldNot(BeNil())
@@ -77,6 +80,7 @@ var _ = Describe("Exec", func() {
 		Expect(len(testOptions.name) > 0).Should(BeTrue())
 		Expect(testOptions.Pod).ShouldNot(BeNil())
 		Expect(len(testOptions.Command) > 0).Should(BeTrue())
+		Expect(testOptions.ExecOptions.Complete([]string{"test"})).Should(Succeed())
 
 		// Validate
 		Expect(testOptions.validate()).Should(Succeed())
@@ -84,6 +88,14 @@ var _ = Describe("Exec", func() {
 
 		// Run
 		Expect(testOptions.Run()).Should(HaveOccurred())
+
+		// Corner case test
+		testOptions.ContainerName = ""
+		Expect(testOptions.ExecOptions.Validate()).Should(Succeed())
+		Expect(testOptions.ContainerName).Should(Equal("bar"))
+		testOptions.Pod = nil
+		testOptions.PodName = ""
+		Expect(testOptions.ExecOptions.Validate()).Should(MatchError("failed to get the pod to execute"))
 	})
 })
 

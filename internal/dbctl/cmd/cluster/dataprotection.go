@@ -19,12 +19,10 @@ package cluster
 import (
 	"context"
 	"fmt"
-
-	"github.com/pkg/errors"
-
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -60,9 +58,6 @@ var (
 		# delete a restore named restore-name
 		dbctl cluster delete-restore restore-name
 	`)
-
-	// snapshotGroup = "snapshot.storage.k8s.io"
-	// snapshotKind  = "VolumeSnapshot"
 )
 
 type CreateBackupOptions struct {
@@ -111,6 +106,11 @@ func (o *CreateBackupOptions) Validate() error {
 		BaseOptionsObj:  &policyOptions.BaseOptions,
 		Options:         policyOptions,
 	}
+	/* cluster backup do 2 following things:
+	 * 1. create or apply the backupPolicy, cause backupPolicy has defined the reference the cluster labels.
+	 *    so it need apply the backupPolicy after the first backupPolicy created.
+	 * 2. create a backupJob.
+	 */
 	if err := policyOptions.BaseOptions.RunAsApply(inputs); err != nil {
 		return err
 	}

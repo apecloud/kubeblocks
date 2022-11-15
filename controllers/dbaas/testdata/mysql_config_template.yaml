@@ -49,7 +49,7 @@ spec:
 
   #  require db instance restart
   staticParameters:
-    -
+    - automatic_sp_privileges
 
   # mysql configuration file format
   formatter: ini

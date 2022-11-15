@@ -40,6 +40,10 @@ func (p *ParallelUpgradePolicy) Upgrade(params ReconfigureParams) (ExecStatus, e
 	return ES_Retry, nil
 }
 
+func (p *ParallelUpgradePolicy) GetPolicyName() string {
+	return string(dbaasv1alpha1.RestartPolicy)
+}
+
 func (p *ParallelUpgradePolicy) restartPods(params ReconfigureParams) (bool, error) {
 	// TODO(zt) kill program
 	return false, cfgcore.MakeError("")

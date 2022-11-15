@@ -187,7 +187,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 
 	// Not any parameters updated
 	if !versionMeta.IsModify {
-		return r.updateCfgStatus(reqCtx, versionMeta, config)
+		return r.updateCfgStatus(reqCtx, config, dbaasconfig.ReconfigureNoChangeType)
 	}
 
 	// Find Cluster CR
@@ -256,13 +256,13 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	})
 }
 
-func (r *ReconfigureRequestReconciler) updateCfgStatus(reqCtx intctrlutil.RequestCtx, meta *cfgcore.ConfigDiffInformation, cfg *corev1.ConfigMap) (ctrl.Result, error) {
+func (r *ReconfigureRequestReconciler) updateCfgStatus(reqCtx intctrlutil.RequestCtx, cfg *corev1.ConfigMap, reconfigureType string) (ctrl.Result, error) {
 	configData, err := json.Marshal(cfg.Data)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(cfg, r.Recorder, err, reqCtx.Log)
 	}
 
-	if ok, err := dbaasconfig.UpdateAppliedConfiguration(r.Client, reqCtx, cfg, configData); err != nil || !ok {
+	if ok, err := dbaasconfig.UpdateAppliedConfiguration(r.Client, reqCtx, cfg, configData, reconfigureType); err != nil || !ok {
 		return intctrlutil.RequeueAfter(dbaasconfig.ConfigReconcileInterval, reqCtx.Log, "failed to patch status and retry...", "error", err)
 	}
 
@@ -286,7 +286,7 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params cfgpolicy.Reconfigu
 	case cfgpolicy.ES_Retry:
 		return intctrlutil.RequeueAfter(dbaasconfig.ConfigReconcileInterval, params.Ctx.Log, "")
 	case cfgpolicy.ES_None:
-		return r.updateCfgStatus(params.Ctx, params.Meta, params.Cfg)
+		return r.updateCfgStatus(params.Ctx, params.Cfg, policy.GetPolicyName())
 	case cfgpolicy.ES_Failed:
 		if err := dbaasconfig.SetCfgUpgradeFlag(params.Client, params.Ctx, params.Cfg, false); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, params.Ctx.Log, "")

@@ -82,14 +82,14 @@ func ApplyConfigurationChange(client client.Client, ctx intctrlutil.RequestCtx, 
 
 	lastConfig, ok := annotations[LastAppliedConfigAnnotation]
 	if !ok {
-		return UpdateAppliedConfiguration(client, ctx, config, configData)
+		return UpdateAppliedConfiguration(client, ctx, config, configData, ReconfigureFirstConfigType)
 	}
 
 	return lastConfig == string(configData), nil
 }
 
 // UpdateAppliedConfiguration update hash label and last applied config
-func UpdateAppliedConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, configData []byte) (bool, error) {
+func UpdateAppliedConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, configData []byte, reconfigureType string) (bool, error) {
 
 	patch := client.MergeFrom(config.DeepCopy())
 	if config.ObjectMeta.Annotations == nil {
@@ -102,6 +102,7 @@ func UpdateAppliedConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, c
 		return false, err
 	}
 	config.ObjectMeta.Labels[CMInsConfigurationHashLabelKey] = hash
+	config.ObjectMeta.Labels[CMInsLastReconfigureMethodLabelKey] = reconfigureType
 
 	// delete reconfigure-policy
 	delete(config.ObjectMeta.Annotations, UpgradePolicyAnnotationKey)

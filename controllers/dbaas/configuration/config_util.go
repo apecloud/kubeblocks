@@ -49,6 +49,15 @@ const (
 
 	// CMInsConfigurationLabelKey configmap is configuration file for component
 	CMInsConfigurationLabelKey = "app.kubernetes.io/ins-configure"
+
+	CMInsLastReconfigureMethodLabelKey = "configuration.kubeblocks.io/last-applied-reconfigure-policy"
+
+	ReconfigureFirstConfigType = "created"
+	ReconfigureNoChangeType    = "noChange"
+	ReconfigureAutoReloadType  = string(dbaasv1alpha1.AutoReload)
+	ReconfigureSimpleType      = string(dbaasv1alpha1.NormalPolicy)
+	ReconfigureParallelType    = string(dbaasv1alpha1.RestartPolicy)
+	ReconfigureRollingType     = string(dbaasv1alpha1.RollingPolicy)
 )
 
 type ValidateConfigMap func(configTpl, ns string) (*corev1.ConfigMap, error)

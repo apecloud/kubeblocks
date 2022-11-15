@@ -29,3 +29,7 @@ func (r *RollingUpgradePolicy) Upgrade(params ReconfigureParams) (ExecStatus, er
 	// TODO(zt) rolling kill container
 	panic("")
 }
+
+func (r *RollingUpgradePolicy) GetPolicyName() string {
+	return string(dbaasv1alpha1.RollingPolicy)
+}

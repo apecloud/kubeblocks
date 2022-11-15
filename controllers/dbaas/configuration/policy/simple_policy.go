@@ -41,6 +41,10 @@ func (s *SimplePolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
 	}
 }
 
+func (s *SimplePolicy) GetPolicyName() string {
+	return string(dbaasv1alpha1.NormalPolicy)
+}
+
 func rollingStatefulSets(param ReconfigureParams) (ExecStatus, error) {
 	var (
 		units      = param.ComponentUnits

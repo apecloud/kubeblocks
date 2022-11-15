@@ -108,6 +108,7 @@ var _ = Describe("Cluster Controller", func() {
 						return cm.Labels[appInstanceLabelKey] == clusterName &&
 							cm.Labels[configuration.CMConfigurationTplNameLabelKey] == testWrapper.testEnv.CfgTplName &&
 							cm.Labels[configuration.CMInsConfigurationLabelKey] != "" &&
+							cm.Labels[configuration.CMInsLastReconfigureMethodLabelKey] == configuration.ReconfigureFirstConfigType &&
 							configHash != ""
 					})
 				return ok
@@ -116,7 +117,7 @@ var _ = Describe("Cluster Controller", func() {
 			// step6: update configmap
 			Expect(UpdateCR[corev1.ConfigMap](testWrapper, &corev1.ConfigMap{},
 				testWrapper.WithCRName(insCfgCMName),
-				"mysql_ins_config2.yaml",
+				"mysql_ins_config_update.yaml",
 				func(cm *corev1.ConfigMap, newCm *corev1.ConfigMap) (client.Patch, error) {
 					patch := client.MergeFrom(cm.DeepCopy())
 					cm.Data = newCm.Data
@@ -135,8 +136,58 @@ var _ = Describe("Cluster Controller", func() {
 						fmt.Println("------------------------------------------")
 						fmt.Printf("old config hash: %s\n", configHash)
 						fmt.Printf("new config hash: %s\n", newHash)
+						fmt.Printf("last reconfigure: %s : %s\n", cm.Labels[configuration.CMInsLastReconfigureMethodLabelKey], configuration.ReconfigureAutoReloadType)
 						fmt.Println("------------------------------------------")
-						return newHash != configHash
+						return newHash != configHash &&
+							cm.Labels[configuration.CMInsLastReconfigureMethodLabelKey] == configuration.ReconfigureAutoReloadType
+					})
+				return ok
+			}, time.Second*70, time.Second*1).Should(BeTrue())
+
+			// step7: update invalid update
+			Expect(UpdateCR[corev1.ConfigMap](testWrapper, &corev1.ConfigMap{},
+				testWrapper.WithCRName(insCfgCMName),
+				"mysql_ins_config_invalid_update.yaml",
+				func(cm *corev1.ConfigMap, newCm *corev1.ConfigMap) (client.Patch, error) {
+					patch := client.MergeFrom(cm.DeepCopy())
+					cm.Data = newCm.Data
+					return patch, nil
+				})).Should(Succeed())
+
+			// Check update configmap
+			Eventually(func() bool {
+				ok, _ := ValidateCR(testWrapper, &corev1.ConfigMap{},
+					testWrapper.WithCRName(insCfgCMName),
+					func(cm *corev1.ConfigMap) bool {
+						newHash := cm.Labels[configuration.CMInsConfigurationHashLabelKey]
+						fmt.Println("------------------------------------------")
+						fmt.Printf("new config hash: %s\n", newHash)
+						fmt.Println("------------------------------------------")
+						return cm.Labels[configuration.CMInsLastReconfigureMethodLabelKey] == configuration.ReconfigureNoChangeType
+					})
+				return ok
+			}, time.Second*70, time.Second*1).Should(BeTrue())
+
+			// step8: need restart update parameter
+			Expect(UpdateCR[corev1.ConfigMap](testWrapper, &corev1.ConfigMap{},
+				testWrapper.WithCRName(insCfgCMName),
+				"mysql_ins_config_update_with_restart.yaml",
+				func(cm *corev1.ConfigMap, newCm *corev1.ConfigMap) (client.Patch, error) {
+					patch := client.MergeFrom(cm.DeepCopy())
+					cm.Data = newCm.Data
+					return patch, nil
+				})).Should(Succeed())
+
+			// Check update configmap
+			Eventually(func() bool {
+				ok, _ := ValidateCR(testWrapper, &corev1.ConfigMap{},
+					testWrapper.WithCRName(insCfgCMName),
+					func(cm *corev1.ConfigMap) bool {
+						newHash := cm.Labels[configuration.CMInsConfigurationHashLabelKey]
+						fmt.Println("------------------------------------------")
+						fmt.Printf("new config hash: %s\n", newHash)
+						fmt.Println("------------------------------------------")
+						return cm.Labels[configuration.CMInsLastReconfigureMethodLabelKey] == configuration.ReconfigureSimpleType
 					})
 				return ok
 			}, time.Second*70, time.Second*1).Should(BeTrue())

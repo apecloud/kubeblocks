@@ -78,6 +78,7 @@ func (param *ReconfigureParams) GetModifyVersion() string {
 
 type ReconfigurePolicy interface {
 	Upgrade(params ReconfigureParams) (ExecStatus, error)
+	GetPolicyName() string
 }
 
 var upgradePolicyMap = map[dbaasv1alpha1.UpgradePolicy]ReconfigurePolicy{}
@@ -91,6 +92,10 @@ type AutoReloadPolicy struct{}
 func (receiver AutoReloadPolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
 	_ = params
 	return ES_None, nil
+}
+
+func (receiver AutoReloadPolicy) GetPolicyName() string {
+	return string(dbaasv1alpha1.AutoReload)
 }
 
 func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigurationTemplateSpec, cfg *cfgcore.ConfigDiffInformation, policy dbaasv1alpha1.UpgradePolicy) (ReconfigurePolicy, error) {

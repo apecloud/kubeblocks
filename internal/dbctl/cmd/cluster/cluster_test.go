@@ -51,7 +51,6 @@ var _ = Describe("Cluster", func() {
 			tf.ClientConfigVal = cfg
 			cmd := NewCreateCmd(tf, streams)
 			Expect(cmd != nil).To(BeTrue())
-			Expect(cmd.Flags().GetString("termination-policy")).Should(Equal("Delete"))
 			// must succeed otherwise exit 1 and make test fails
 			_ = cmd.Flags().Set("components", "../../testdata/component.yaml")
 			cmd.Run(nil, []string{"test1"})

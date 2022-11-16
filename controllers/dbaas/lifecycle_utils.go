@@ -1534,10 +1534,10 @@ func prepareInjectEnvs(component *Component, cluster *dbaasv1alpha1.Cluster) []c
 	// inject component scope env
 	envs = append(envs, corev1.EnvVar{
 		Name:      prefix + "N",
-		Value:     strconv.Itoa(component.Replicas),
+		Value:     strconv.Itoa(int(component.Replicas)),
 		ValueFrom: nil,
 	})
-	for j := 0; j < component.Replicas; j++ {
+	for j := 0; j < int(component.Replicas); j++ {
 		envs = append(envs, corev1.EnvVar{
 			Name:      prefix + strconv.Itoa(j) + "_HOSTNAME",
 			Value:     cluster.Name + "-" + component.Name + "-" + strconv.Itoa(j),

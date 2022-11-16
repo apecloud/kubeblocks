@@ -71,8 +71,8 @@ type Component struct {
 	ConfigTemplates         []dbaasv1alpha1.ConfigTemplate         `json:"configTemplates,omitempty"`
 
 	ConfigAutoReload    bool                              `json:"configAutoReload,omitempty"`
-	ConfigReloadType    string                            `json:"configReloadType,omitempty"`
-	ReloadConfiguration dbaasv1alpha1.ConfigReloadTrigger `json:"reloadConfiguration,omitempty"`
+	ConfigReloadType    dbaasv1alpha1.CfgReloadType       `json:"configReloadType,omitempty"`
+	ConfigReloadTrigger dbaasv1alpha1.ConfigReloadTrigger `json:"configReloadTrigger,omitempty"`
 }
 
 type ResourceDefinition struct {

@@ -335,7 +335,7 @@ func mergeComponents(
 
 		ConfigAutoReload:    clusterDefComp.ConfigAutoReload,
 		ConfigReloadType:    clusterDefComp.ConfigReloadType,
-		ReloadConfiguration: clusterDefComp.ConfigReloadTrigger,
+		ConfigReloadTrigger: clusterDefComp.ConfigReloadTrigger,
 	}
 
 	doContainerAttrOverride := func(container corev1.Container) {
@@ -1336,7 +1336,7 @@ func updateConfigurationManagerWithComponent(params createParams, podSpec *corev
 
 	// db auto scan configuration and reload
 	component := params.component
-	if ok, err := cfgcm.NeedBuildConfigSidecar(component.ConfigAutoReload, component.ConfigReloadType, component.ReloadConfiguration); err != nil {
+	if ok, err := cfgcm.NeedBuildConfigSidecar(component.ConfigAutoReload, component.ConfigReloadType, component.ConfigReloadTrigger); err != nil {
 		return err
 	} else if !ok {
 		return nil
@@ -1374,7 +1374,7 @@ func updateConfigurationManagerWithComponent(params createParams, podSpec *corev
 	managerSidecar := &cfgcm.ConfigManagerSidecar{
 		ManagerName: configSidecarName,
 		Image:       viper.GetString(configSidecarIMAGE),
-		Args:        cfgcm.BuildReloadSidecarParams(component.ConfigReloadType, component.ReloadConfiguration, volumeDirs),
+		Args:        cfgcm.BuildReloadSidecarParams(component.ConfigReloadType, component.ConfigReloadTrigger, volumeDirs),
 		Volumes:     volumeDirs,
 	}
 

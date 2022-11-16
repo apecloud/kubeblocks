@@ -13,9 +13,9 @@ spec:
       defaultReplicas: 1
       configAutoReload: false
       configReloadType: signal
-      reloadConfiguration:
+      configReloadTrigger:
         signal: SIGHUP
-        processName: xxxxxxx
+        processName: mysqld
       podSpec:
         containers:
           - name: mysql

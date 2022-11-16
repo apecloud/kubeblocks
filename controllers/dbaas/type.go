@@ -18,6 +18,7 @@ package dbaas
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
@@ -38,33 +39,38 @@ const (
 	clusterDefLabelKey         = "clusterdefinition.kubeblocks.io/name"
 	appVersionLabelKey         = "appversion.kubeblocks.io/name"
 	statefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
-	clusterLabelKey            = "cluster.kubeblocks.io/name"
+
+	DeploymentKind  = "Deployment"
+	StatefulSetKind = "StatefulSet"
+	PodKind         = "Pod"
 )
 
 type MonitorConfig struct {
 	Enable     bool   `json:"enable"`
-	ScrapePort int    `json:"scrapePort,omitempty"`
+	ScrapePort int32  `json:"scrapePort,omitempty"`
 	ScrapePath string `json:"scrapePath,omitempty"`
 }
 
 type Component struct {
-	ClusterDefName       string                                 `json:"clusterDefName,omitempty"`
-	ClusterType          string                                 `json:"clusterType,omitempty"`
-	Name                 string                                 `json:"name,omitempty"`
-	Type                 string                                 `json:"type,omitempty"`
-	MinAvailable         int                                    `json:"minAvailable,omitempty"`
-	MaxAvailable         int                                    `json:"maxAvailable,omitempty"`
-	DefaultReplicas      int                                    `json:"defaultReplicas,omitempty"`
-	Replicas             int                                    `json:"replicas,omitempty"`
-	AntiAffinity         bool                                   `json:"antiAffinity,omitempty"`
-	ComponentType        dbaasv1alpha1.ComponentType            `json:"componentType,omitempty"`
-	ConsensusSpec        *dbaasv1alpha1.ConsensusSetSpec        `json:"consensusSpec,omitempty"`
-	ReplicationSpec      *dbaasv1alpha1.ReplicationSpec         `json:"replicationSpec,omitempty"`
-	PrimaryStsIndex      *int                                   `json:"primaryStsIndex,omitempty"`
-	PodSpec              *corev1.PodSpec                        `json:"podSpec,omitempty"`
-	Service              corev1.ServiceSpec                     `json:"service,omitempty"`
-	Scripts              dbaasv1alpha1.ClusterDefinitionScripts `json:"scripts,omitempty"`
-	Probes               *dbaasv1alpha1.ClusterDefinitionProbes `json:"probes,omitempty"`
-	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
-	Monitor              MonitorConfig                          `json:"monitor,omitempty"`
+	ClusterDefName          string                                 `json:"clusterDefName,omitempty"`
+	ClusterType             string                                 `json:"clusterType,omitempty"`
+	Name                    string                                 `json:"name,omitempty"`
+	Type                    string                                 `json:"type,omitempty"`
+	MinReplicas             int32                                  `json:"minReplicas,omitempty"`
+	MaxReplicas             int32                                  `json:"maxReplicas,omitempty"`
+	DefaultReplicas         int32                                  `json:"defaultReplicas,omitempty"`
+	Replicas                int32                                  `json:"replicas,omitempty"`
+	PodDisruptionBudgetSpec *policyv1.PodDisruptionBudgetSpec      `json:"podDisruptionBudgetSpec,omitempty"`
+	AntiAffinity            bool                                   `json:"antiAffinity,omitempty"`
+	ComponentType           dbaasv1alpha1.ComponentType            `json:"componentType,omitempty"`
+	ConsensusSpec           *dbaasv1alpha1.ConsensusSetSpec        `json:"consensusSpec,omitempty"`
+	ReplicationSpec         *dbaasv1alpha1.ReplicationSpec         `json:"replicationSpec,omitempty"`
+	PrimaryStsIndex         *int                                   `json:"primaryStsIndex,omitempty"`
+	PodSpec                 *corev1.PodSpec                        `json:"podSpec,omitempty"`
+	Service                 corev1.ServiceSpec                     `json:"service,omitempty"`
+	Probes                  *dbaasv1alpha1.ClusterDefinitionProbes `json:"probes,omitempty"`
+	VolumeClaimTemplates    []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
+	Monitor                 MonitorConfig                          `json:"monitor,omitempty"`
+	EnabledLogs             []string                               `json:"enabledLogs,omitempty"`
+	LogConfigs              []dbaasv1alpha1.LogConfig              `json:"logConfigs,omitempty"`
 }

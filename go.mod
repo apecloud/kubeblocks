@@ -9,7 +9,6 @@ require (
 	github.com/briandowns/spinner v1.18.1
 	github.com/containers/common v0.49.1
 	github.com/coreos/go-iptables v0.5.0
-	github.com/dapr/kit v0.0.2
 	github.com/docker/docker v20.10.17+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/ghodss/yaml v1.0.0
@@ -59,6 +58,7 @@ require (
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20210927113745-59d0afb8317a // indirect
 	github.com/benbjohnson/clock v1.3.0 // indirect
+	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
@@ -159,7 +159,7 @@ require (
 	github.com/goodhosts/hostsfile v0.1.1 // indirect
 	github.com/google/btree v1.0.1 // indirect
 	github.com/google/gnostic v0.5.7-v3refs // indirect
-	github.com/google/go-cmp v0.5.8 // indirect
+	github.com/google/go-cmp v0.5.8
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect

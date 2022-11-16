@@ -24,6 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("appVersion webhook", func() {
@@ -33,24 +34,31 @@ var _ = Describe("appVersion webhook", func() {
 		timeout               = time.Second * 10
 		interval              = time.Second
 	)
+	BeforeEach(func() {
+		// Add any steup steps that needs to be executed before each test
+		err := k8sClient.DeleteAllOf(ctx, &AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+	})
 	Context("When appVersion create and update", func() {
 		It("Should webhook validate passed", func() {
 			By("By testing create a new appVersion when clusterDefinition not exist")
 			appVersion := createTestAppVersionObj(clusterDefinitionName, appVersionName)
-			Expect(k8sClient.Create(ctx, appVersion)).ShouldNot(Succeed())
+			Expect(testCtx.CreateObj(ctx, appVersion)).ShouldNot(Succeed())
 
 			By("By creating a new clusterDefinition")
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
-			Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 
 			Eventually(func() bool {
 				By("By testing component type is not found in cluserDefinition")
 				appVersion.Spec.Components[1].Type = "proxy1"
-				Expect(k8sClient.Create(ctx, appVersion)).ShouldNot(Succeed())
+				Expect(testCtx.CheckedCreateObj(ctx, appVersion)).ShouldNot(Succeed())
 
 				By("By creating an appVersion")
 				appVersion.Spec.Components[1].Type = "proxy"
-				err := k8sClient.Create(ctx, appVersion)
+				err := testCtx.CheckedCreateObj(ctx, appVersion)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
@@ -68,10 +76,6 @@ var _ = Describe("appVersion webhook", func() {
 
 func createTestAppVersionObj(clusterDefinitionName, appVersionName string) *AppVersion {
 	appVersion := &AppVersion{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: APIVersion,
-			Kind:       AppVersionKind,
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      appVersionName,
 			Namespace: "default",

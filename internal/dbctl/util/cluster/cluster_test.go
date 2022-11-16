@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/cli-runtime/pkg/resource"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -96,6 +97,11 @@ var _ = Describe("cluster util", func() {
 		// get node
 		builder.withGK(schema.GroupKind{Kind: "Node"})
 		Expect(builder.do(objs)).Should(HaveOccurred())
+
+		// get node that name is empty
+		builder.name = ""
+		builder.withGK(schema.GroupKind{Kind: "Node"})
+		Expect(builder.do(objs)).Should(Succeed())
 	})
 
 	It("get all objects", func() {
@@ -141,10 +147,6 @@ var _ = Describe("cluster util", func() {
 		)
 
 		cluster := &dbaasv1alpha1.Cluster{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       types.KindCluster,
-				APIVersion: "dbaas.kubeblocks.io/v1alpha1",
-			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      clusterName,
 				Namespace: namespace,
@@ -163,7 +165,10 @@ var _ = Describe("cluster util", func() {
 				},
 			},
 		}
-		client := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), cluster)
+
+		scheme := runtime.NewScheme()
+		utilruntime.Must(dbaasv1alpha1.AddToScheme(scheme))
+		client := dynamicfake.NewSimpleDynamicClient(scheme, cluster)
 		pod, err := GetDefaultPodName(client, clusterName, namespace)
 		Expect(pod).Should(Equal(podName))
 		Expect(err).ShouldNot(HaveOccurred())

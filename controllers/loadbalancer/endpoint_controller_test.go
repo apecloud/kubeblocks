@@ -62,8 +62,8 @@ var _ = Describe("EndpointController", func() {
 		It("", func() {
 			svc, svcKey := newSvcObj(false, node1IP)
 			ep, epKey := newEndpointsObj(svc)
-			Expect(k8sClient.Create(context.Background(), svc)).Should(Succeed())
-			Expect(k8sClient.Create(context.Background(), ep)).Should(Succeed())
+			Expect(testCtx.CreateObj(context.Background(), svc)).Should(Succeed())
+			Expect(testCtx.CreateObj(context.Background(), ep)).Should(Succeed())
 			Eventually(func() bool {
 				if err := k8sClient.Get(context.Background(), svcKey, svc); err != nil {
 					return false

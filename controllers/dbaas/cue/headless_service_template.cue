@@ -1,53 +1,46 @@
-pod: {
+cluster: {
 	metadata: {
-		labels: {
-			"statefulset.kubernetes.io/pod-name": string
-			"app.kubernetes.io/name":             string
-			"app.kubernetes.io/instance":         string
-			"app.kubernetes.io/component-name":   string
-		}
-		name:      string
 		namespace: string
+		name:      string
 	}
-	spec: {
-		containers: [...{
-			ports: [...{
-				containerPort: int
-				name:          string
-				protocol:      string
-			}]
-		}]
+}
+component: {
+	clusterDefName: string
+	clusterType:    string
+	type:           string
+	name:           string
+	service: {
+		ports: [...]
+		type: string
 	}
+	podSpec: containers: [...]
+	volumeClaimTemplates: [...]
 }
 
 service: {
 	"apiVersion": "v1"
 	"kind":       "Service"
 	"metadata": {
-		"name":      pod.metadata.name
-		"namespace": pod.metadata.namespace
+		namespace: cluster.metadata.namespace
+		name:      "\(cluster.metadata.name)-\(component.name)-headless"
 		labels: {
-			"app.kubernetes.io/instance":       pod.metadata.labels."app.kubernetes.io/instance"
-			"app.kubernetes.io/name":           pod.metadata.labels."app.kubernetes.io/name"
-			"app.kubernetes.io/component-name": pod.metadata.labels."app.kubernetes.io/component-name"
-			"app.kubernetes.io/managed-by":     "kubeblocks"
+			"app.kubernetes.io/name":     "\(component.clusterType)-\(component.clusterDefName)"
+			"app.kubernetes.io/instance": cluster.metadata.name
 			// "app.kubernetes.io/version" : # TODO
+			"app.kubernetes.io/component-name": "\(component.name)"
+			"app.kubernetes.io/managed-by":     "kubeblocks"
 		}
 	}
 	"spec": {
 		"clusterIP": "None"
 		"selector": {
-			"statefulset.kubernetes.io/pod-name": pod.metadata.labels."statefulset.kubernetes.io/pod-name"
+			"app.kubernetes.io/instance":       "\(cluster.metadata.name)"
+			"app.kubernetes.io/component-name": "\(component.name)"
+			"app.kubernetes.io/managed-by":     "kubeblocks"
 		}
-		ports: [
-			for _, container in pod.spec.containers
-			for _, v in container.ports {
-				name:       v.name
-				protocol:   v.protocol
-				port:       v.containerPort
-				targetPort: v.containerPort
-			},
-
-		]
+		ports: component.service.ports
+		if component.service.type != _|_ {
+			type: component.service.type
+		}
 	}
 }

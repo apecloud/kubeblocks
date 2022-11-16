@@ -320,7 +320,7 @@ func printGuide(cloudProvider string, hostIP string, replicas int) error {
 		if cluster == nil {
 			return fmt.Errorf("failed to get cluster \"%s\" info", dbClusterName)
 		}
-		replicas = cluster.Spec.Components[0].Replicas
+		replicas = int(cluster.Spec.Components[0].Replicas)
 	}
 
 	// build host port to access database

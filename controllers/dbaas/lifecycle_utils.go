@@ -346,8 +346,8 @@ func mergeComponents(
 		ClusterType:     clusterDef.Spec.Type,
 		Name:            clusterDefComp.TypeName,
 		Type:            clusterDefComp.TypeName,
-		MinAvailable:    clusterDefComp.MinAvailable,
-		MaxAvailable:    clusterDefComp.MaxAvailable,
+		MinReplicas:     clusterDefComp.MinReplicas,
+		MaxReplicas:     clusterDefComp.MaxReplicas,
 		DefaultReplicas: clusterDefComp.DefaultReplicas,
 		Replicas:        clusterDefComp.DefaultReplicas,
 		AntiAffinity:    clusterDefComp.AntiAffinity,
@@ -357,8 +357,8 @@ func mergeComponents(
 		PrimaryStsIndex: clusterDefComp.PrimaryStsIndex,
 		PodSpec:         clusterDefComp.PodSpec,
 		Service:         clusterDefComp.Service,
-		Scripts:         clusterDefComp.Scripts,
 		Probes:          clusterDefComp.Probes,
+		LogConfigs:      clusterDefComp.LogConfigs,
 	}
 
 	if appVerComp != nil && appVerComp.PodSpec != nil {
@@ -427,6 +427,7 @@ func mergeComponents(
 	affinity := cluster.Spec.Affinity
 	if clusterComp != nil {
 		component.Name = clusterComp.Name
+		component.EnabledLogs = clusterComp.EnabledLogs
 
 		// respect user's declaration
 		if clusterComp.Replicas > 0 {
@@ -555,6 +556,24 @@ func prepareSecretObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj int
 	return nil
 }
 
+func existsPDBSpec(pdbSpec *policyv1.PodDisruptionBudgetSpec) bool {
+	if pdbSpec == nil {
+		return false
+	}
+	if pdbSpec.MinAvailable == nil && pdbSpec.MaxUnavailable == nil {
+		return false
+	}
+	return true
+}
+
+// needBuildPDB check whether the PodDisruptionBudget needs to be built
+func needBuildPDB(params *createParams) bool {
+	if params.component.ComponentType == dbaasv1alpha1.Consensus {
+		return false
+	}
+	return existsPDBSpec(params.component.PodDisruptionBudgetSpec)
+}
+
 // TODO: @free6om handle config of all component types
 func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) error {
 	params, ok := obj.(*createParams)
@@ -576,11 +595,11 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		}
 		*params.applyObjs = append(*params.applyObjs, sts)
 
-		svcs, err := buildHeadlessSvcs(*params, sts)
+		svc, err := buildSvc(*params, true)
 		if err != nil {
 			return err
 		}
-		*params.applyObjs = append(*params.applyObjs, svcs...)
+		*params.applyObjs = append(*params.applyObjs, svc)
 
 		// render config
 		configs, err := buildCfg(*params, sts, reqCtx.Ctx, cli)
@@ -598,11 +617,11 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		}
 		*params.applyObjs = append(*params.applyObjs, css)
 
-		svcs, err := buildHeadlessSvcs(*params, css)
+		svc, err := buildSvc(*params, true)
 		if err != nil {
 			return err
 		}
-		*params.applyObjs = append(*params.applyObjs, svcs...)
+		*params.applyObjs = append(*params.applyObjs, svc)
 
 		// render config
 		configs, err := buildCfg(*params, css, reqCtx.Ctx, cli)
@@ -637,14 +656,16 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		}
 	}
 
-	pdb, err := buildPDB(*params)
-	if err != nil {
-		return err
+	if needBuildPDB(params) {
+		pdb, err := buildPDB(*params)
+		if err != nil {
+			return err
+		}
+		*params.applyObjs = append(*params.applyObjs, pdb)
 	}
-	*params.applyObjs = append(*params.applyObjs, pdb)
 
 	if params.component.Service.Ports != nil {
-		svc, err := buildSvc(*params)
+		svc, err := buildSvc(*params, false)
 		if err != nil {
 			return err
 		}
@@ -822,36 +843,16 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	return nil
 }
 
-func buildHeadlessSvcs(params createParams, sts *appsv1.StatefulSet) ([]client.Object, error) {
-	stsPodLabels := sts.Spec.Template.Labels
-	replicas := *sts.Spec.Replicas
-	svcs := make([]client.Object, replicas)
-	for i := 0; i < int(replicas); i++ {
-		pod := &corev1.Pod{}
-		pod.ObjectMeta.Name = fmt.Sprintf("%s-%d", sts.GetName(), i)
-		pod.ObjectMeta.Namespace = sts.Namespace
-		pod.ObjectMeta.Labels = map[string]string{
-			statefulSetPodNameLabelKey:       pod.ObjectMeta.Name,
-			intctrlutil.AppNameLabelKey:      stsPodLabels[intctrlutil.AppNameLabelKey],
-			intctrlutil.AppInstanceLabelKey:  stsPodLabels[intctrlutil.AppInstanceLabelKey],
-			intctrlutil.AppComponentLabelKey: stsPodLabels[intctrlutil.AppNameLabelKey],
-		}
-		pod.Spec.Containers = sts.Spec.Template.Spec.Containers
-
-		svc, err := buildHeadlessService(params, pod)
-		if err != nil {
-			return nil, err
-		}
-		svcs[i] = svc
-	}
-	return svcs, nil
-}
-
-func buildSvc(params createParams) (*corev1.Service, error) {
+func buildSvc(params createParams, headless bool) (*corev1.Service, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
-	cueTpl, err := params.getCacheCUETplValue("service_template.cue", func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("service_template.cue"))
+	svcTmpl := "service_template.cue"
+	if headless {
+		svcTmpl = "headless_service_template.cue"
+	}
+
+	cueTpl, err := params.getCacheCUETplValue(svcTmpl, func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(svcTmpl))
 	})
 	if err != nil {
 		return nil, err
@@ -999,6 +1000,8 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 	sts.Spec.Template.Spec.Containers = append(sts.Spec.Template.Spec.Containers, probeContainers...)
 	prefix := dbaasPrefix + "_" + strings.ToUpper(params.component.Type) + "_"
 	replicas := int(*sts.Spec.Replicas)
+	svcName := strings.Join([]string{params.cluster.Name, params.component.Name, "headless"}, "-")
+
 	for i := range sts.Spec.Template.Spec.Containers {
 		// inject self scope env
 		c := &sts.Spec.Template.Spec.Containers[i]
@@ -1019,7 +1022,7 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 		for j := 0; j < replicas; j++ {
 			c.Env = append(c.Env, corev1.EnvVar{
 				Name:      prefix + strconv.Itoa(j) + "_HOSTNAME",
-				Value:     sts.Name + "-" + strconv.Itoa(j),
+				Value:     fmt.Sprintf("%s.%s", sts.Name+"-"+strconv.Itoa(j), svcName),
 				ValueFrom: nil,
 			})
 		}
@@ -1157,44 +1160,6 @@ func buildDeploy(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.De
 	// TODO: inject environment
 
 	return &deploy, nil
-}
-
-func buildHeadlessService(params createParams, pod *corev1.Pod) (*corev1.Service, error) {
-	cueFS, _ := debme.FS(cueTemplates, "cue")
-
-	cueTpl, err := params.getCacheCUETplValue("headless_service_template.cue", func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("headless_service_template.cue"))
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-
-	podStrByte, err := json.Marshal(pod)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = cueValue.Fill("pod", podStrByte); err != nil {
-		return nil, err
-	}
-
-	svcStrByte, err := cueValue.Lookup("service")
-	if err != nil {
-		return nil, err
-	}
-	svc := corev1.Service{}
-	if err = json.Unmarshal(svcStrByte, &svc); err != nil {
-		return nil, err
-	}
-
-	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
-	if err = controllerutil.SetOwnerReference(params.cluster, &svc, scheme); err != nil {
-		return nil, err
-	}
-
-	return &svc, nil
 }
 
 func buildPDB(params createParams) (*policyv1.PodDisruptionBudget, error) {

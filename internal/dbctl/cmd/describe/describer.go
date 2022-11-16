@@ -202,11 +202,17 @@ func (d *ClusterDescriber) describeTopology(w describe.PrefixWriter) error {
 		// describe instance name
 		pods := d.getPodsOfComponent(c.Name)
 		for _, pod := range pods {
+			instance := pod.Name
 			if compInClusterDef.ComponentType == dbaasv1alpha1.Replication {
-				w.Write(LEVEL_3, "%s@%s\n", pod.Name, pod.Labels[types.ReplicationSetRoleLabelKey])
+				if role, ok := pod.Labels[types.ReplicationSetRoleLabelKey]; ok {
+					instance = fmt.Sprintf("%s@%s", instance, role)
+				}
 			} else {
-				w.Write(LEVEL_3, "%s@%s\n", pod.Name, pod.Labels[types.ConsensusSetRoleLabelKey])
+				if role, ok := pod.Labels[types.ConsensusSetRoleLabelKey]; ok {
+					instance = fmt.Sprintf("%s@%s", instance, role)
+				}
 			}
+			w.Write(LEVEL_3, "%s\n", instance)
 		}
 	}
 	return nil
@@ -245,7 +251,7 @@ func (d *ClusterDescriber) describeComponent(w describe.PrefixWriter) error {
 
 		// instance
 		for _, pod := range pods {
-			d.describeInstance(compInClusterDef, pod, w)
+			d.describeInstance(pod, w, compInClusterDef)
 		}
 	}
 	return nil
@@ -291,16 +297,25 @@ func describeStorage(vcTmpls []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate
 	}
 }
 
-func (d *ClusterDescriber) describeInstance(component dbaasv1alpha1.ClusterDefinitionComponent, pod *corev1.Pod, w describe.PrefixWriter) {
+func (d *ClusterDescriber) describeInstance(
+	pod *corev1.Pod,
+	w describe.PrefixWriter,
+	component dbaasv1alpha1.ClusterDefinitionComponent) {
 	w.Write(LEVEL_1, "\n")
 	w.Write(LEVEL_1, "Instance:\t\n")
 	w.Write(LEVEL_2, "%s:\n", pod.Name)
-	if component.ComponentType == dbaasv1alpha1.Replication {
-		w.Write(LEVEL_3, "Role:\t%s\n", pod.Labels[types.ReplicationSetRoleLabelKey])
-	} else {
-		w.Write(LEVEL_3, "Role:\t%s\n", pod.Labels[types.ConsensusSetRoleLabelKey])
-		w.Write(LEVEL_3, "AccessMode:\t%s\n", pod.Labels[types.ConsensusSetAccessModeLabelKey])
+
+	var role string
+	switch component.ComponentType {
+	case dbaasv1alpha1.Replication:
+		role = pod.Labels[types.ReplicationSetRoleLabelKey]
+	default:
+		role = pod.Labels[types.ConsensusSetRoleLabelKey]
 	}
+	if len(role) == 0 {
+		role = valueNone
+	}
+	w.Write(LEVEL_3, "Role:\t%s\n", role)
 
 	// status and reason
 	if pod.DeletionTimestamp != nil {
@@ -311,6 +326,14 @@ func (d *ClusterDescriber) describeInstance(component dbaasv1alpha1.ClusterDefin
 	}
 	if len(pod.Status.Reason) > 0 {
 		w.Write(LEVEL_3, "Reason:\t%s\n", pod.Status.Reason)
+	}
+
+	if component.ComponentType == dbaasv1alpha1.Consensus {
+		accessMode := pod.Labels[types.ConsensusSetAccessModeLabelKey]
+		if len(accessMode) == 0 {
+			accessMode = valueNone
+		}
+		w.Write(LEVEL_3, "AccessMode:\t%s\n", accessMode)
 	}
 
 	// node information include its region and AZ

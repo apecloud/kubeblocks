@@ -46,11 +46,14 @@ spec:
               value: {{ .Release.Namespace }}
             - name: NO_VOLUMESNAPSHOT
               value: "{{ .Values.dataProtection.disableVolumeSnapshot }}"
+          {{- if .Values.dataProtection.backupSchedule }}
             - name: DP_BACKUP_SCHEDULE
-              value: "{{ .Values.dataProtection.backup.schedule }}"
+              value: {{ .Values.dataProtection.backupSchedule }}
+          {{- end }}
+          {{- if .Values.dataProtection.backupTTL }}
             - name: DP_BACKUP_TTL
-              value: "{{ .Values.dataProtection.backup.ttl }}"
-
+              value: {{ .Values.dataProtection.backupTTL }}
+          {{- end }}
           {{- if .Values.admissionWebhooks.enabled }}
             - name: ENABLE_WEBHOOKS
               value: "true"

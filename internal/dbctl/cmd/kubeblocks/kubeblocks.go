@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package kubeblocks
 
 import (
 	"fmt"
 
 	"k8s.io/client-go/dynamic"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -50,11 +51,21 @@ type installOptions struct {
 	Monitor bool
 }
 
-// NewDbaasCmd creates the dbaas command
-func NewDbaasCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+var example = templates.Examples(`
+		# install KubeBlocks
+		dbctl kubeblocks install
+
+		# uninstall KubeBlocks
+        dbctl kubeblocks uninstall
+`)
+
+// NewKubeBlocksCmd creates the kubeblocks command
+func NewKubeBlocksCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "dbaas",
-		Short: "DBaaS(KubeBlocks) operation commands",
+		Use:     "kubeblocks [install | uninstall]",
+		Short:   "KubeBlocks operation commands",
+		Aliases: []string{"kb"},
+		Example: example,
 	}
 	cmd.AddCommand(
 		newInstallCmd(f, streams),
@@ -102,7 +113,7 @@ func (o *installOptions) run() error {
 	var notes string
 	var err error
 	if notes, err = installer.Install(); err != nil {
-		return errors.Wrap(err, "Failed to install KubeBlocks")
+		return errors.Wrap(err, "failed to install KubeBlocks")
 	}
 
 	fmt.Fprintf(o.Out, `
@@ -114,7 +125,7 @@ KubeBlocks %s Install SUCCESSFULLY!
     dbctl cluster describe <cluster name>  # get cluster information
 
 -> Uninstall DBaaS:
-    dbctl dbaas uninstall
+    dbctl kubeblocks uninstall
 `, o.Version)
 	fmt.Fprint(o.Out, notes)
 	return nil

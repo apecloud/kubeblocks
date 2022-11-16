@@ -169,7 +169,7 @@ func CheckCDConfigTemplate(client client.Client, ctx intctrlutil.RequestCtx, clu
 			return validateConfTpls(client, ctx, tpls)
 		},
 		func(component *dbaasv1alpha1.ClusterDefinitionComponent) error {
-			_, err := cfgcm.NeedBuildConfigSidecar(component.ConfigAutoReload, component.ConfigReloadType, component.ReloadConfiguration)
+			_, err := cfgcm.NeedBuildConfigSidecar(component.ConfigAutoReload, component.ConfigReloadType, component.ConfigReloadTrigger)
 			return err
 		})
 }

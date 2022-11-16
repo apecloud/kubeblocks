@@ -21,9 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 type Configuration struct {
 
 	// Scope refers to the effect range of the update parameter
@@ -46,10 +43,6 @@ type Configuration struct {
 // ReconfigureRequestSpec defines the desired state of ReconfigureRequest
 type ReconfigureRequestSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of ReconfigureRequest. Edit reconfigurerequest_types.go to remove/update
-	// Foo string `json:"foo,omitempty"`
 
 	// +kubebuilder:validation:Required
 	ClusterRef string `json:"clusterRef,omitempty"`
@@ -76,15 +69,15 @@ type ReconfigureRequestStatus struct {
 	Pods []ReconfigurePodStatus `json:"pods,omitempty"`
 
 	// +optional
-	WaitPods []*corev1.ObjectReference `json:"waitPods,omitempty"`
+	WaitPods []corev1.ObjectReference `json:"waitPods,omitempty"`
 }
 
 type ReconfigurePodStatus struct {
 	// +optional
-	ProcessStartTime metav1.Time `json:"processStartTime,omitempty"`
+	ProcessStartTime *metav1.Time `json:"processStartTime,omitempty"`
 
 	// +optional
-	ProcessLatency metav1.Duration `json:"processLatency,omitempty"`
+	ProcessLatency *metav1.Duration `json:"processLatency,omitempty"`
 
 	// +optional
 	PodRef *corev1.ObjectReference `json:"podRef,omitempty" protobuf:"bytes,4,opt,name=targetRef"`
@@ -92,7 +85,7 @@ type ReconfigurePodStatus struct {
 
 type ReconfigureStateInfo struct {
 	// +optional
-	StartTime metav1.Time `json:"startTime,omitempty"`
+	StartTime *metav1.Time `json:"startTime,omitempty"`
 
 	// +kubebuilder:validation:Required
 	Step string `json:"step,omitempty"`

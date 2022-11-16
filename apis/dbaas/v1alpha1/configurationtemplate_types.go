@@ -21,9 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 type CustomParametersValidation struct {
 	// TODO(zt) DAY2 support schema
 	// Schema provides a way for ISVs to verify the validity of user change parameters through json schema
@@ -41,17 +38,13 @@ type CustomParametersValidation struct {
 // ConfigurationTemplateSpec defines the desired state of ConfigurationTemplate
 type ConfigurationTemplateSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of ConfigurationTemplate. Edit configurationtemplate_types.go to remove/update
-	// Foo string `json:"foo,omitempty"`
 
 	// TplRef is a reference to the configmap object, the configmap determines how to generate the configurations
 	// +kubebuilder:validation:Required
 	TplRef string `json:"tplRef,omitempty"`
 
 	// CfgSchemaTopLevelName is cue type name, which generate openapi schema
-	// +kubebuilder:validation:Optional
+	// +optional
 	CfgSchemaTopLevelName string `json:"cfgSchemaTopLevelName,omitempty"`
 
 	// ConfigurationSchema that impose restrictions on engine parameter's rule
@@ -59,21 +52,21 @@ type ConfigurationTemplateSpec struct {
 	ConfigurationSchema *CustomParametersValidation `json:"configurationSchema,omitempty"`
 
 	// StaticParameters require db instance restart
-	// +kubebuilder:validation:Optional
+	// +optional
 	StaticParameters []string `json:"staticParameters,omitempty"`
 
 	// DynamicParameters support reload
-	// +kubebuilder:validation:Optional
+	// +optional
 	DynamicParameters []string `json:"dynamicParameters,omitempty"`
 
 	// ImmutableParameters describe not modify parameters by user
-	// +kubebuilder:validation:Optional
+	// +optional
 	ImmutableParameters []string `json:"immutableParameters,omitempty"`
 
 	// UpgradeMode describe parameter update mode
 	// +kubebuilder:default:Enum=dynamic
 	// +kubebuilder:validation:Enum={dynamic,static}
-	// +kubebuilder:validation:Optional
+	// +optional
 	UpgradeMode UpdateMode `json:"upgradeMode,omitempty"`
 
 	// +kubebuilder:default:Enum=yaml
@@ -96,10 +89,10 @@ type ConfigurationTemplateStatus struct {
 	// Phase is configuration template status, if it is set to AvailablePhase,
 	// ConfigurationTemplate be used by ClusterDefinition or AppVersion
 	// +kubebuilder:validation:Enum={Available,Unavailable,Deleting}
-	// +kubebuilder:validation:Optional
+	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
-	// +kubebuilder:validation:Optional
+	// +optional
 	Message string `json:"message,omitempty"`
 
 	// observedGeneration is the most recent generation observed for this

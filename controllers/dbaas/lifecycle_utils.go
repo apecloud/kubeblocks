@@ -335,7 +335,7 @@ func mergeComponents(
 
 		ConfigAutoReload:    clusterDefComp.ConfigAutoReload,
 		ConfigReloadType:    clusterDefComp.ConfigReloadType,
-		ReloadConfiguration: clusterDefComp.ReloadConfiguration,
+		ReloadConfiguration: clusterDefComp.ConfigReloadTrigger,
 	}
 
 	doContainerAttrOverride := func(container corev1.Container) {

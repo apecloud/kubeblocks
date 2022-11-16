@@ -36,7 +36,7 @@ type ConfigManagerSidecar struct {
 	Volumes []corev1.VolumeMount `json:"volumes"`
 }
 
-func NeedBuildConfigSidecar(autoReload bool, reloadType string, configuration dbaasv1alpha1.ReloadConfiguration) (bool, error) {
+func NeedBuildConfigSidecar(autoReload bool, reloadType string, configuration dbaasv1alpha1.ConfigReloadTrigger) (bool, error) {
 	if autoReload || reloadType == "" {
 		return false, nil
 	}
@@ -52,7 +52,7 @@ func NeedBuildConfigSidecar(autoReload bool, reloadType string, configuration db
 	}
 }
 
-func checkSignalType(configuration dbaasv1alpha1.ReloadConfiguration) (bool, error) {
+func checkSignalType(configuration dbaasv1alpha1.ConfigReloadTrigger) (bool, error) {
 	if !IsValidUnixSignal(configuration.Signal) {
 		return false, cfgutil.MakeError("This special signal [%s] is not supported for now!", configuration.Signal)
 	}
@@ -62,7 +62,7 @@ func checkSignalType(configuration dbaasv1alpha1.ReloadConfiguration) (bool, err
 	return true, nil
 }
 
-func BuildReloadSidecarParams(reloadType string, configuration dbaasv1alpha1.ReloadConfiguration, volumeDirs []corev1.VolumeMount) []string {
+func BuildReloadSidecarParams(reloadType string, configuration dbaasv1alpha1.ConfigReloadTrigger, volumeDirs []corev1.VolumeMount) []string {
 	switch reloadType {
 	case dbaasv1alpha1.UnixSignal:
 		return buildSignalArgs(configuration, volumeDirs)
@@ -72,7 +72,7 @@ func BuildReloadSidecarParams(reloadType string, configuration dbaasv1alpha1.Rel
 	}
 }
 
-func buildSignalArgs(configuration dbaasv1alpha1.ReloadConfiguration, volumeDirs []corev1.VolumeMount) []string {
+func buildSignalArgs(configuration dbaasv1alpha1.ConfigReloadTrigger, volumeDirs []corev1.VolumeMount) []string {
 	args := make([]string, 0)
 	args = append(args, "--process", configuration.ProcessName)
 	for _, volume := range volumeDirs {

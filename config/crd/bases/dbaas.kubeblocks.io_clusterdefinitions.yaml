@@ -83,6 +83,19 @@ spec:
                         supports reload, if true, the controller does not need to
                         update.
                       type: boolean
+                    configReloadTrigger:
+                      description: ConfigReloadTrigger describe the configuration
+                        for reload type
+                      properties:
+                        processName:
+                          description: ProcessName is process name, send unix signal
+                            to proc
+                          type: string
+                        signal:
+                          description: 'Signal is valid for unix signal e.g: SIGHUP
+                            url: ../../internal/configuration/configmap/handler.go:allUnixSignals'
+                          type: string
+                      type: object
                     configReloadType:
                       description: ConfigReloadType decided to restart the way
                       enum:
@@ -91,6 +104,13 @@ spec:
                       - sql
                       - exec
                       type: string
+                    configRevisionHistoryLimit:
+                      default: 6
+                      description: ConfigRevisionHistoryLimit is number of historical
+                        versions of configuration variations submitted by users, By
+                        default, 6 versions are reserved
+                      minimum: 0
+                      type: integer
                     configTemplateRefs:
                       description: The configTemplateRefs field provided by provider,
                         and finally this configTemplateRefs will be rendered into
@@ -7807,26 +7827,6 @@ spec:
                               minimum: 1
                               type: integer
                           type: object
-                      type: object
-                    reconfigureResourceCount:
-                      default: 6
-                      description: ReconfigureResourceCount is number of historical
-                        versions of configuration variations submitted by users, By
-                        default, 6 versions are reserved
-                      minimum: 0
-                      type: integer
-                    reloadConfiguration:
-                      description: ReloadConfiguration describe the configuration
-                        for reload type
-                      properties:
-                        processName:
-                          description: ProcessName is process name, send unix signal
-                            to proc
-                          type: string
-                        signal:
-                          description: 'Signal is valid for unix signal eg: SIGHUP
-                            url: ../../internal/configuration/configmap/handler.go:allUnixSignals'
-                          type: string
                       type: object
                     service:
                       description: service defines the behavior of a service spec.

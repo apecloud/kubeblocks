@@ -137,9 +137,9 @@ type LogConfig struct {
 	FilePathPattern string `json:"filePathPattern"`
 }
 
-type ReloadConfiguration struct {
+type ConfigReloadTrigger struct {
 	// Signal is valid for unix signal
-	// eg: SIGHUP
+	// e.g: SIGHUP
 	// url: ../../internal/configuration/configmap/handler.go:allUnixSignals
 	// +optional
 	Signal string `json:"signal,omitempty"`
@@ -194,7 +194,6 @@ type ClusterDefinitionComponent struct {
 
 	// The configTemplateRefs field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
-	//
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
@@ -206,14 +205,15 @@ type ClusterDefinitionComponent struct {
 	// User modify scene in cluster field or reconfigure ops.
 	// DefaultScene string `json:"defaultScene,omitempty"`
 
-	// ReconfigureResourceCount is number of historical versions of configuration variations submitted by users, By default, 6 versions are reserved
+	// ConfigRevisionHistoryLimit is number of historical versions of configuration variations submitted by users, By default, 6 versions are reserved
 	// +kubebuilder:default=6
 	// +kubebuilder:validation:Minimum=0
-	ReconfigureResourceCount int `json:"reconfigureResourceCount,omitempty"`
+	ConfigRevisionHistoryLimit int `json:"configRevisionHistoryLimit,omitempty"`
 
 	// ConfigAutoReload indicates whether the engine itself supports reload,
 	// if true, the controller does not need to update.
 	// +kubebuilder:default=false
+	// +optional
 	ConfigAutoReload bool `json:"configAutoReload,omitempty"`
 
 	// ConfigReloadType decided to restart the way
@@ -221,9 +221,9 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	ConfigReloadType string `json:"configReloadType,omitempty"`
 
-	// ReloadConfiguration describe the configuration for reload type
+	// ConfigReloadTrigger describe the configuration for reload type
 	// +optional
-	ReloadConfiguration ReloadConfiguration `json:"reloadConfiguration,omitempty"`
+	ConfigReloadTrigger ConfigReloadTrigger `json:"configReloadTrigger,omitempty"`
 
 	// SupportRawUpgrade indicates whether the engine supports memory updates parameter.
 	// Sidecar not support sql query set parameter if false

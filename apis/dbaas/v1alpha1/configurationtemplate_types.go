@@ -37,34 +37,39 @@ type ConfigurationTemplateSpec struct {
 	// +optional
 	ConfigurationSchema *CustomParametersValidation `json:"configurationSchema,omitempty"`
 
-	// StaticParameters require db instance restart.
+	// After any parameters in StaticParameters are modified, the controller need to restart the engine instance.
 	// +optional
 	StaticParameters []string `json:"staticParameters,omitempty"`
 
-	// DynamicParameters support reload.
+	// DynamicParameters field and StaticParameters field are the same.
+	// for the convenience of the ISVs, if there are more static parameters, it is recommended to use StaticParameters field, otherwise it is recommended to use DynamicParameters field.
 	// +optional
 	DynamicParameters []string `json:"dynamicParameters,omitempty"`
 
-	// ImmutableParameters describe not modify parameters by user.
+	// ImmutableParameters describe parameters that prohibit user from modification.
 	// +optional
 	ImmutableParameters []string `json:"immutableParameters,omitempty"`
 
 	// UpgradeMode describe parameter update mode.
+	// For ISVs, it's impossible to enumerate all parameters, and when the user modify unknown parameters, or ISVs does not configure StaticParameters or DynamicParameters field,
+	// these parameters should be treated as dynamic parameter or static parameter?
+	// if it is treated as static parameter, the engine instance will be restarted, otherwise it will be reloaded.
 	// +kubebuilder:default:Enum=dynamic
 	// +kubebuilder:validation:Enum={dynamic,static}
 	// +optional
 	UpgradeMode UpdateMode `json:"upgradeMode,omitempty"`
 
-	// Formatter This parameter defines the format of the configuration file,
-	// controller parses the file contents based on formatter parameter, and analyzes the modified parameters list.
+	// Formatter describe the format of the configuration file,
+	// the controller parses configuration file based on formatter, and analyzes the modified parameters list,
+	// and then decides what policy to use to make those modified parameters take effect.
 	// +kubebuilder:default:Enum=yaml
 	// +kubebuilder:validation:Enum={dotenv,ini,yaml,json,hcl}
 	Formatter ConfigurationFormatter `json:"formatter,omitempty"`
 
-	// Immutable, if set to true, ensures that data stored in the ConfigMap cannot be updated (only object metadata can be modified).
-	// If set to true, Configmap object referenced by TplRef will also be modified to immutable
-	// Defaulted to true,
-	// It is recommended to turn this option on only during the development or testing phase.
+	// The configuration template is common, if it is modified incorrectly, it will affect all clusters using this configuration,
+	// we do not recommend modifying the template that is already online, but modifications are inevitable during development or CICD,
+	// so this control parameter is provided.
+	// if set to true, Configmap object referenced by TplRef will also be modified to immutable. defaulted to true.
 	// +kubebuilder:default:true
 	Immutable bool `json:"immutable,omitempty"`
 }
@@ -80,6 +85,7 @@ type ConfigurationTemplateStatus struct {
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
+	// If the configuration template is incorrect, Message field describes the error information.
 	// +optional
 	Message string `json:"message,omitempty"`
 
@@ -92,7 +98,7 @@ type ConfigurationTemplateStatus struct {
 
 type CustomParametersValidation struct {
 	// TODO(zt) DAY2 support schema
-	// Schema provides a way for ISVs to verify the validity of user change parameters through json schema.
+	// Schema provides a way for ISVs to validate the changed parameters through json.
 	// fix controller-gen doesn't work with k8s.io/apiextensions-apiserver: https://github.com/kubernetes-sigs/controller-tools/issues/291
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:validation:Type=object

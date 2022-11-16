@@ -153,7 +153,7 @@ kind: OpsRequest
 metadata:
   name: wesql-restart-test
   labels:
-    cluster.kubeblocks.io/name: wesql
+    app.kubernetes.io/instance: wesql
     app.kubernetes.io/managed-by: kubeblocks
   namespace: default
 spec:
@@ -252,6 +252,14 @@ spec:
 			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: podName, Namespace: namespace}, &corev1.Pod{})
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
+		patch := client.MergeFrom(pod.DeepCopy())
+		pod.Status.Conditions = []corev1.PodCondition{
+			{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			},
+		}
+		Expect(k8sClient.Status().Patch(context.Background(), pod, patch)).Should(Succeed())
 	}
 
 	testUpdateStrategy := func(updateStrategy dbaasv1alpha1.UpdateStrategy, componentName string, index int) {

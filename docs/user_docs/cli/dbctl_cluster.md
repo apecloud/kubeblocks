@@ -37,9 +37,13 @@ Database cluster operation command
 * [dbctl cluster connect](dbctl_cluster_connect.md)	 - connect to a database cluster
 * [dbctl cluster create](dbctl_cluster_create.md)	 - Create a database cluster
 * [dbctl cluster delete](dbctl_cluster_delete.md)	 - Delete a cluster
+* [dbctl cluster delete-ops](dbctl_cluster_delete-ops.md)	 - Delete a OpsRequest
 * [dbctl cluster describe](dbctl_cluster_describe.md)	 - Describe database cluster info
 * [dbctl cluster horizontal-scaling](dbctl_cluster_horizontal-scaling.md)	 - horizontal scaling the specified components in the cluster
-* [dbctl cluster list](dbctl_cluster_list.md)	 - List all database cluster.
+* [dbctl cluster list](dbctl_cluster_list.md)	 - List all cluster.
+* [dbctl cluster list-logs-type](dbctl_cluster_list-logs-type.md)	 - List the supported logs file types in cluster
+* [dbctl cluster list-ops](dbctl_cluster_list-ops.md)	 - List all opsRequest.
+* [dbctl cluster logs](dbctl_cluster_logs.md)	 - Access up-to-date cluster log file
 * [dbctl cluster restart](dbctl_cluster_restart.md)	 - restart the specified components in the cluster
 * [dbctl cluster upgrade](dbctl_cluster_upgrade.md)	 - upgrade the cluster
 * [dbctl cluster vertical-scaling](dbctl_cluster_vertical-scaling.md)	 - vertical scaling the specified components in the cluster

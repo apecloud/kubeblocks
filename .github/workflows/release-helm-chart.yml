@@ -36,7 +36,7 @@ jobs:
         run: |
           helm repo add grafana https://grafana.github.io/helm-charts
           helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-          helm repo add kubeblocks https://apecloud.github.io/helm-charts
+          helm dep update deploy/helm
 
       - name: Package Kubeblocks Helm Chart
         run: |

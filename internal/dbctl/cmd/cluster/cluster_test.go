@@ -17,13 +17,18 @@ limitations under the License.
 package cluster
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/create"
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/get"
+	"github.com/apecloud/kubeblocks/internal/dbctl/delete"
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
@@ -46,6 +51,7 @@ var _ = Describe("Cluster", func() {
 			tf.ClientConfigVal = cfg
 			cmd := NewCreateCmd(tf, streams)
 			Expect(cmd != nil).To(BeTrue())
+			Expect(cmd.Flags().GetString("termination-policy")).Should(Equal("Delete"))
 			// must succeed otherwise exit 1 and make test fails
 			_ = cmd.Flags().Set("components", "../../testdata/component.yaml")
 			cmd.Run(nil, []string{"test1"})
@@ -59,7 +65,7 @@ var _ = Describe("Cluster", func() {
 			o := &CreateOptions{
 				BaseOptions:        create.BaseOptions{IOStreams: streams, Name: "test"},
 				ComponentsFilePath: "",
-				TerminationPolicy:  "Halt",
+				TerminationPolicy:  "WipeOut",
 				ClusterDefRef:      "wesql",
 				AppVersionRef:      "app-version",
 				PodAntiAffinity:    "Preferred",
@@ -162,10 +168,57 @@ var _ = Describe("Cluster", func() {
 		Expect(o.Validate()).Should(Succeed())
 	})
 
+	It("list and delete operations", func() {
+		tf := cmdtesting.NewTestFactory().WithNamespace("default")
+		tf.ClientConfigVal = cfg
+		defer tf.Cleanup()
+		o := &get.Options{}
+		clusterName := "wesql"
+		By("test list OpsRequest with cluster")
+		Expect(completeForListOps(o, []string{clusterName})).Should(Succeed())
+		clusterLabel := fmt.Sprintf("%s=%s", types.InstanceLabelKey, clusterName)
+		Expect(o.LabelSelector == clusterLabel).Should(BeTrue())
+		By("test list OpsRequest with cluster and custom label")
+		testLabel := "kubeblocks.io/test=test"
+		o.LabelSelector = testLabel
+		Expect(completeForListOps(o, []string{clusterName})).Should(Succeed())
+		Expect(o.LabelSelector == testLabel+","+clusterLabel).Should(BeTrue())
+
+		By("test delete OpsRequest with cluster")
+		deleteFlags := &delete.DeleteFlags{
+			DeleteFlags: cmddelete.NewDeleteCommandFlags("containing the resource to delete."),
+		}
+		Expect(completeForDeleteOps(deleteFlags, []string{clusterName})).Should(Succeed())
+		Expect(*deleteFlags.LabelSelector == clusterLabel).Should(BeTrue())
+		By("test delete OpsRequest with cluster and custom label")
+		deleteFlags.LabelSelector = &testLabel
+		Expect(completeForDeleteOps(deleteFlags, []string{clusterName})).Should(Succeed())
+		Expect(*deleteFlags.LabelSelector == testLabel+","+clusterLabel).Should(BeTrue())
+		By("test delete OpsRequest with name")
+		deleteFlags.ClusterName = ""
+		deleteFlags.ResourceNames = []string{"test1"}
+		Expect(completeForDeleteOps(deleteFlags, []string{})).Should(Succeed())
+		Expect(deleteFlags.ClusterName == "").Should(BeTrue())
+	})
+
 	It("connect", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace("default")
 		defer tf.Cleanup()
 		cmd := NewConnectCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+	})
+
+	It("list-logs-type", func() {
+		tf := cmdtesting.NewTestFactory().WithNamespace("default")
+		defer tf.Cleanup()
+		cmd := NewListLogsTypeCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+	})
+
+	It("logs", func() {
+		tf := cmdtesting.NewTestFactory().WithNamespace("default")
+		defer tf.Cleanup()
+		cmd := NewLogsCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 	})
 })

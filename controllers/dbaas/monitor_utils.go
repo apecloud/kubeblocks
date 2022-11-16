@@ -55,7 +55,7 @@ var (
 
 type MysqlMonitor struct {
 	SecretName      string `json:"secretName"`
-	InternalPort    int    `json:"internalPort"`
+	InternalPort    int32  `json:"internalPort"`
 	Image           string `json:"image"`
 	ImagePullPolicy string `json:"imagePullPolicy"`
 }

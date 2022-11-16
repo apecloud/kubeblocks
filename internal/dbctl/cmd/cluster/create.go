@@ -17,9 +17,17 @@ limitations under the License.
 package cluster
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
@@ -45,6 +53,7 @@ type CreateOptions struct {
 	TerminationPolicy string `json:"terminationPolicy"`
 	PodAntiAffinity   string `json:"podAntiAffinity"`
 	Monitor           bool   `json:"monitor"`
+	EnableAllLogs     bool   `json:"enableAllLogs"`
 	// TopologyKeys if TopologyKeys is nil, add omitempty json tag.
 	// because CueLang can not covert null to list.
 	TopologyKeys []string                 `json:"topologyKeys,omitempty"`
@@ -92,6 +101,7 @@ func (o *CreateOptions) Complete() error {
 		}
 	}
 	setMonitor(o.Monitor, components)
+
 	o.Components = components
 	return nil
 }
@@ -108,16 +118,62 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Factory:         f,
 		Validate:        o.Validate,
 		Complete:        o.Complete,
+		PreCreate:       o.PreCreate,
 		BuildFlags: func(cmd *cobra.Command) {
 			cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", DefaultClusterDef, "ClusterDefinition reference")
 			cmd.Flags().StringVar(&o.AppVersionRef, "app-version", DefaultAppVersion, "AppVersion reference")
-			cmd.Flags().StringVar(&o.TerminationPolicy, "termination-policy", "Halt", "Termination policy")
+			cmd.Flags().StringVar(&o.TerminationPolicy, "termination-policy", "Delete", "Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)")
 			cmd.Flags().StringVar(&o.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type")
 			cmd.Flags().BoolVar(&o.Monitor, "monitor", false, "Set monitor enabled (default false)")
+			cmd.Flags().BoolVar(&o.EnableAllLogs, "enable-all-logs", false, "Enable advanced application all log extraction, and true will ignore enabledLogs of component level")
 			cmd.Flags().StringArrayVar(&o.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
 			cmd.Flags().StringToStringVar(&o.NodeLabels, "node-labels", nil, "Node label selector")
 			cmd.Flags().StringVar(&o.ComponentsFilePath, "components", "", "Use yaml file to specify the cluster components")
 		},
 	}
 	return create.BuildCommand(inputs)
+}
+
+// PreCreate before commit yaml to k8s, make changes on Unstructured yaml
+func (o *CreateOptions) PreCreate(obj *unstructured.Unstructured) error {
+	if !o.EnableAllLogs {
+		// EnableAllLogs is false, nothing will change
+		return nil
+	}
+	c := &dbaasv1alpha1.Cluster{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, c); err != nil {
+		return err
+	}
+	// get cluster definition from k8s
+	res, err := o.Client.Resource(types.ClusterDefGVR()).Namespace("").Get(context.TODO(), c.Spec.ClusterDefRef, metav1.GetOptions{}, "")
+	if err != nil {
+		return err
+	}
+	cd := &dbaasv1alpha1.ClusterDefinition{}
+	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(res.Object, cd); err != nil {
+		return err
+	}
+	setEnableAllLogs(c, cd)
+	data, e := runtime.DefaultUnstructuredConverter.ToUnstructured(c)
+	if e != nil {
+		return e
+	}
+	obj.SetUnstructuredContent(data)
+	return nil
+}
+
+// setEnableAllLog set enable all logs, and ignore enabledLogs of component level.
+func setEnableAllLogs(c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinition) {
+	for idx, comCluster := range c.Spec.Components {
+		for _, com := range cd.Spec.Components {
+			if !strings.EqualFold(comCluster.Type, com.TypeName) {
+				continue
+			}
+			typeList := make([]string, 0, len(com.LogConfigs))
+			for _, logConf := range com.LogConfigs {
+				typeList = append(typeList, logConf.Name)
+			}
+			c.Spec.Components[idx].EnabledLogs = typeList
+		}
+	}
 }

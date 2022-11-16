@@ -32,13 +32,23 @@ func Test(t *testing.T) {
 		}
 	}
 
+	customCompleteFn := func(o interface{}, args []string) error {
+		return nil
+	}
+
+	customFlags := func(o interface{}, cmd *cobra.Command) {
+
+	}
+
 	cmd := NewCmdBuilder().
 		IOStreams(genericclioptions.NewTestIOStreamsDiscard()).
 		Factory(nil).
 		Use("test").
 		Short("test command short description").
+		CustomComplete(customCompleteFn).
+		CustomFlags(customFlags).
 		Example("test command example").
-		GroupKind(types.ClusterGK()).Build(buildFn)
+		GVR(types.ClusterGVR()).Build(buildFn)
 
 	if cmd == nil {
 		t.Errorf("cmd is nil")

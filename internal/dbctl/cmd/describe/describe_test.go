@@ -31,6 +31,8 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/describe"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
 var _ = Describe("Describe", func() {
@@ -43,7 +45,7 @@ var _ = Describe("Describe", func() {
 				ShowEvents: true,
 				ChunkSize:  cmdutil.DefaultChunkSize,
 			},
-			GroupKind: schema.GroupKind{Kind: "pod"},
+			GVR: schema.GroupVersionResource{Version: types.VersionV1, Resource: "pods"},
 		}
 		return o
 	}

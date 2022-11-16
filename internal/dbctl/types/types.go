@@ -107,10 +107,11 @@ type ClusterObjects struct {
 	ClusterDef *dbaasv1alpha1.ClusterDefinition
 	AppVersion *dbaasv1alpha1.AppVersion
 
-	Pods     *corev1.PodList
-	Services *corev1.ServiceList
-	Secrets  *corev1.SecretList
-	Nodes    []*corev1.Node
+	Pods       *corev1.PodList
+	Services   *corev1.ServiceList
+	Secrets    *corev1.SecretList
+	Nodes      []*corev1.Node
+	ConfigMaps *corev1.ConfigMapList
 }
 
 type BackupJobInfo struct {
@@ -155,4 +156,8 @@ func AppVersionGVR() schema.GroupVersionResource {
 
 func AppVersionGK() schema.GroupKind {
 	return schema.GroupKind{Group: Group, Kind: KindAppVersion}
+}
+
+func OpsGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceOpsRequests}
 }

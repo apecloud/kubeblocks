@@ -6,14 +6,25 @@ metadata:
     {{- include "wesqlapp.labels" . | nindent 4 }}
 spec:
   type: state.mysql
+  defaultTerminationPolicy: {{ .Values.defaultTerminationPolicy }}
   connectionCredential:
     user: {{ .Values.auth.rootUser }}
     password: {{ .Values.auth.rootPassword }}
   components:
   - typeName: replicasets
     characterType: mysql
+    probes:
+      roleChangedProbe:
+        failureThreshold: {{ .Values.roleChangedProbe.failureThreshold }}
+        periodSeconds: {{ .Values.roleChangedProbe.periodSeconds }}
+        successThreshold: {{ .Values.roleChangedProbe.successThreshold }}
     monitor:
       builtIn: true
+    logConfigs:
+      {{- range $name,$pattern := .Values.logConfigs }}
+      - name: {{ $name }}
+        filePathPattern: {{ $pattern }}
+      {{- end }}
     configTemplateRefs:
     - name: mysql-3node-tpl-8.0
       volumeName: mysql-config
@@ -37,8 +48,8 @@ spec:
         volumeMounts:
         - mountPath: /data/mysql
           name: data
-      #  - mountPath: /log
-      #    name: log
+#        - mountPath: /log/mysql
+#          name: log
         - mountPath: /opt/mysql
           name: mysql-config
         ports:
@@ -98,5 +109,6 @@ spec:
           cluster_info="$cluster_info@$(($idx+1))";
           echo $cluster_info; echo {{ .Values.cluster.replicaSetCount }};
           mkdir -p /data/mysql/data;
+          mkdir -p /data/mysql/log;
           chmod +777 -R /data/mysql;
           docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$cluster_info" --cluster-id=$CLUSTER_ID

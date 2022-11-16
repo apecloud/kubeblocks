@@ -42,6 +42,7 @@ import (
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
 
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
@@ -84,14 +85,10 @@ func AddRepo(r *repo.Entry) error {
 	if f.Has(r.Name) {
 		existing := f.Get(r.Name)
 		if *r != *existing {
-
 			// The input coming in for the Name is different from what is already
 			// configured. Return an error.
 			return errors.Errorf("repository Name (%s) already exists, please specify a different Name", r.Name)
 		}
-
-		// The add is idempotent so do nothing
-		return nil
 	}
 
 	cp, err := repo.NewChartRepository(r, getter.All(settings))
@@ -325,4 +322,26 @@ func FakeActionConfig() *action.Configuration {
 		Log: func(format string, v ...interface{}) {
 		},
 	}
+}
+
+func AddKubeBlocksRepo() error {
+	entry := &repo.Entry{
+		Name: types.KubeBlocksChartName,
+		URL:  types.KubeBlocksChartURL,
+	}
+	if err := AddRepo(entry); err != nil {
+		return err
+	}
+	return nil
+}
+
+func RemoveKubeBlocksRepo() error {
+	entry := &repo.Entry{
+		Name: types.KubeBlocksChartName,
+		URL:  types.KubeBlocksChartURL,
+	}
+	if err := RemoveRepo(entry); err != nil {
+		return err
+	}
+	return nil
 }

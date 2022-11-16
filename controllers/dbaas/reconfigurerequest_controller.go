@@ -215,7 +215,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 			reqCtx.Log)
 	}
 
-	if ok, _ := cfgcm.NeedBuildConfigSidecar(component.ConfigAutoReload, component.ConfigReloadType, component.ReloadConfiguration); !ok {
+	if ok, _ := cfgcm.NeedBuildConfigSidecar(component.ConfigAutoReload, component.ConfigReloadType, component.ConfigReloadTrigger); !ok {
 		return intctrlutil.Reconciled()
 	}
 

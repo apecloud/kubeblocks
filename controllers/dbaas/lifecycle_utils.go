@@ -374,7 +374,7 @@ func mergeComponents(
 
 		ConfigAutoReload:    clusterDefComp.ConfigAutoReload,
 		ConfigReloadType:    clusterDefComp.ConfigReloadType,
-		ReloadConfiguration: clusterDefComp.ReloadConfiguration,
+		ReloadConfiguration: clusterDefComp.ConfigReloadTrigger,
 	}
 
 	if appVerComp != nil && appVerComp.PodSpec != nil {

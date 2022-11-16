@@ -80,9 +80,9 @@ type webhookManager struct {
 type ScopeType string
 
 const (
-	SCOPE_BOTH    ScopeType = "BOTH"
-	SCOPE_PERSIST ScopeType = "file"
-	SCOPE_MEMORY  ScopeType = "memory"
+	ScopeBothType   ScopeType = "ScopeBoth"
+	ScopeFileType   ScopeType = "ScopeFile"
+	ScopeMemoryType ScopeType = "ScopeMemory"
 )
 
 type ConfigurationFormatter string

@@ -70,5 +70,5 @@ type Component struct {
 
 	ConfigAutoReload    bool                              `json:"configAutoReload,omitempty"`
 	ConfigReloadType    string                            `json:"configReloadType,omitempty"`
-	ReloadConfiguration dbaasv1alpha1.ReloadConfiguration `json:"reloadConfiguration,omitempty"`
+	ReloadConfiguration dbaasv1alpha1.ConfigReloadTrigger `json:"reloadConfiguration,omitempty"`
 }

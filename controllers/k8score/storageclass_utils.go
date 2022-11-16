@@ -3,7 +3,6 @@ package k8score
 import (
 	"context"
 	"fmt"
-	"k8s.io/kubectl/pkg/util/storage"
 	"reflect"
 	"strings"
 
@@ -11,6 +10,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubectl/pkg/util/storage"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"

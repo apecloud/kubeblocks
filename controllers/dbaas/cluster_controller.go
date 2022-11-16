@@ -565,7 +565,7 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 		operations                = *cluster.Status.Operations
 		appVersionList            = &dbaasv1alpha1.AppVersionList{}
 	)
-	// determine whether to support volumeExpansion. volumeClaimTemplates is forbidden to update except for storage size when cluster created.
+	// determine whether to support volumeExpansion when creating the cluster. because volumeClaimTemplates is forbidden to update except for storage size when cluster created.
 	if cluster.Status.ObservedGeneration == 0 {
 		if volumeExpansionComponents, err = k8score.GetSupportVolumeExpansionComponents(ctx, r.Client, cluster); err != nil {
 			return err

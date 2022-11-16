@@ -186,7 +186,7 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	ConfigAutoReload bool `json:"configAutoReload,omitempty"`
 
-	// ConfigReloadType decided to restart the way
+	// ConfigReloadType decided to restart the way.
 	// +kubebuilder:validation:Enum={signal,http,sql,exec}
 	// +optional
 	ConfigReloadType CfgReloadType `json:"configReloadType,omitempty"`
@@ -196,11 +196,11 @@ type ClusterDefinitionComponent struct {
 	ConfigReloadTrigger ConfigReloadTrigger `json:"configReloadTrigger,omitempty"`
 
 	// SupportRawUpgrade indicates whether the engine supports memory updates parameter.
-	// Sidecar not support sql query set parameter if false
+	// Sidecar not support sql query set parameter if false.
 	// +kubebuilder:default=false
 	SupportRawUpgrade bool `json:"supportRawUpgrade,omitempty"`
 
-	// CustomConfigurationVolume is volume name which the user specifies update to
+	// CustomConfigurationVolume is volume name which the user specifies update to.
 	// +optional
 	CustomConfigurationVolume string `json:"customConfigurationVolume,omitempty"`
 

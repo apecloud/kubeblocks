@@ -25,55 +25,57 @@ import (
 type ConfigurationTemplateSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 
-	// TplRef is a reference to the configmap object, the configmap determines how to generate the configurations
+	// TplRef is a reference to the configmap object, the configmap determines how to generate the configurations.
 	// +kubebuilder:validation:Required
 	TplRef string `json:"tplRef,omitempty"`
 
-	// CfgSchemaTopLevelName is cue type name, which generate openapi schema
+	// CfgSchemaTopLevelName is cue type name, which generate openapi schema.
 	// +optional
 	CfgSchemaTopLevelName string `json:"cfgSchemaTopLevelName,omitempty"`
 
-	// ConfigurationSchema that impose restrictions on engine parameter's rule
+	// ConfigurationSchema that impose restrictions on engine parameter's rule.
 	// +optional
 	ConfigurationSchema *CustomParametersValidation `json:"configurationSchema,omitempty"`
 
-	// StaticParameters require db instance restart
+	// StaticParameters require db instance restart.
 	// +optional
 	StaticParameters []string `json:"staticParameters,omitempty"`
 
-	// DynamicParameters support reload
+	// DynamicParameters support reload.
 	// +optional
 	DynamicParameters []string `json:"dynamicParameters,omitempty"`
 
-	// ImmutableParameters describe not modify parameters by user
+	// ImmutableParameters describe not modify parameters by user.
 	// +optional
 	ImmutableParameters []string `json:"immutableParameters,omitempty"`
 
-	// UpgradeMode describe parameter update mode
+	// UpgradeMode describe parameter update mode.
 	// +kubebuilder:default:Enum=dynamic
 	// +kubebuilder:validation:Enum={dynamic,static}
 	// +optional
 	UpgradeMode UpdateMode `json:"upgradeMode,omitempty"`
 
+	// Formatter This parameter defines the format of the configuration file,
+	// controller parses the file contents based on formatter parameter, and analyzes the modified parameters list.
 	// +kubebuilder:default:Enum=yaml
 	// +kubebuilder:validation:Enum={dotenv,ini,yaml,json,hcl}
 	Formatter ConfigurationFormatter `json:"formatter,omitempty"`
 
 	// Immutable, if set to true, ensures that data stored in the ConfigMap cannot be updated (only object metadata can be modified).
 	// If set to true, Configmap object referenced by TplRef will also be modified to immutable
-	// Defaulted to true
+	// Defaulted to true,
 	// It is recommended to turn this option on only during the development or testing phase.
 	// +kubebuilder:default:true
 	Immutable bool `json:"immutable,omitempty"`
 }
 
-// ConfigurationTemplateStatus defines the observed state of ConfigurationTemplate
+// ConfigurationTemplateStatus defines the observed state of ConfigurationTemplate.
 type ConfigurationTemplateStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Phase is configuration template status, if it is set to AvailablePhase,
-	// ConfigurationTemplate be used by ClusterDefinition or AppVersion
+	// ConfigurationTemplate be used by ClusterDefinition or AppVersion.
 	// +kubebuilder:validation:Enum={Available,Unavailable,Deleting}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
@@ -90,14 +92,14 @@ type ConfigurationTemplateStatus struct {
 
 type CustomParametersValidation struct {
 	// TODO(zt) DAY2 support schema
-	// Schema provides a way for ISVs to verify the validity of user change parameters through json schema
-	// controller-gen doesn't work with k8s.io/apiextensions-apiserver: https://github.com/kubernetes-sigs/controller-tools/issues/291
+	// Schema provides a way for ISVs to verify the validity of user change parameters through json schema.
+	// fix controller-gen doesn't work with k8s.io/apiextensions-apiserver: https://github.com/kubernetes-sigs/controller-tools/issues/291
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:validation:Type=object
 	// +kubebuilder:pruning:PreserveUnknownFields
 	Schema *apiext.JSONSchemaProps `json:"schema,omitempty"`
 
-	// Cue that to let ISV verify user configuration through cue language
+	// Cue that to let ISV verify user configuration through cue language.
 	// +optional
 	Cue *string `json:"cue,omitempty"`
 }
@@ -119,7 +121,7 @@ type ConfigurationTemplate struct {
 
 //+kubebuilder:object:root=true
 
-// ConfigurationTemplateList contains a list of ConfigurationTemplate
+// ConfigurationTemplateList contains a list of ConfigurationTemplate.
 type ConfigurationTemplateList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

@@ -320,7 +320,7 @@ spec:
   components:
   - typeName: replicasets
     componentType: Stateful
-	configSpec:
+    configSpec:
       configTemplateRefs:
       - name: mysql-tree-node-template-8.0
         volumeName: mysql-config

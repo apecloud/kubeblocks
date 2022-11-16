@@ -83,15 +83,19 @@ spec:
                         configReload:
                           default: false
                           description: ConfigReload indicates whether the engine supports
-                            reload.
+                            reload. if false, the controller will restart the engine
+                            instance. if true, the controller will determine the behavior
+                            of the engine instance based on the configuration templates,
+                            restart or reload depending on whether any parameters
+                            in the StaticParameters have been modified.
                           type: boolean
                         configReloadTrigger:
-                          description: ConfigReloadTrigger describe the configuration
-                            for reload type
+                          description: ConfigReloadTrigger describes the configuration
+                            against reload type.
                           properties:
                             processName:
-                              description: ProcessName is process name, send unix
-                                signal to proc
+                              description: ProcessName is process name,sends unix
+                                signal to proc.
                               type: string
                             signal:
                               description: 'Signal is valid for unix signal e.g: SIGHUP
@@ -99,7 +103,7 @@ spec:
                               type: string
                           type: object
                         configReloadType:
-                          description: ConfigReloadType decided to restart the way.
+                          description: ConfigReloadType describes the restart methods.
                           enum:
                           - signal
                           - http
@@ -110,14 +114,13 @@ spec:
                           default: 6
                           description: ConfigRevisionHistoryLimit is number of historical
                             versions of configuration variations submitted by users,
-                            By default, 6 versions are reserved
+                            By default, 6 versions are reserved.
                           minimum: 0
                           type: integer
                         configTemplateRefs:
                           description: The configTemplateRefs field provided by ISV,
                             and finally this configTemplateRefs will be rendered into
-                            the user's own configuration file according to the user's
-                            cluster.
+                            the user's own configuration file against the user's cluster.
                           items:
                             properties:
                               defaultMode:

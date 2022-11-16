@@ -37,7 +37,7 @@ func NewDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Use("delete").
 		Short("Delete a appversion").
 		Example(deleteExample).
-		GroupKind(types.AppVersionGK()).
+		GVR(types.AppVersionGVR()).
 		Factory(f).
 		IOStreams(streams).
 		Build(delete.Build)

@@ -37,7 +37,7 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Short("List all appversion.").
 		Example(listExample).
 		Factory(f).
-		GroupKind(types.AppVersionGK()).
+		GVR(types.AppVersionGVR()).
 		IOStreams(streams).
 		Build(list.Build)
 }

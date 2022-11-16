@@ -37,7 +37,7 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Short("List all clusterdefinition.").
 		Example(listExample).
 		Factory(f).
-		GroupKind(types.ClusterDefGK()).
+		GVR(types.ClusterDefGVR()).
 		IOStreams(streams).
 		Build(list.Build)
 }

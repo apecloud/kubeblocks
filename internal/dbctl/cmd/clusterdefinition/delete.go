@@ -37,7 +37,7 @@ func NewDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Use("delete").
 		Short("Delete a clusterdefinition").
 		Example(deleteExample).
-		GroupKind(types.ClusterDefGK()).
+		GVR(types.ClusterDefGVR()).
 		Factory(f).
 		IOStreams(streams).
 		Build(delete.Build)

@@ -568,7 +568,7 @@ func existsPDBSpec(pdbSpec *policyv1.PodDisruptionBudgetSpec) bool {
 
 // needBuildPDB check whether the PodDisruptionBudget needs to be built
 func needBuildPDB(params *createParams) bool {
-	if params.component.ComponentType == dbaasv1alpha1.Consensus {
+	if params.component.ComponentType == dbaasv1alpha1.Consensus || params.component.ComponentType == dbaasv1alpha1.Replication {
 		return false
 	}
 	return existsPDBSpec(params.component.PodDisruptionBudgetSpec)
@@ -1048,13 +1048,18 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx, cli client.Client, param
 
 	// get math.Max(params.component.Replicas, current exist statefulSet)
 	existStsList := &appsv1.StatefulSetList{}
-	selector, err := labels.Parse(intctrlutil.AppComponentLabelKey + "=" + params.component.Name)
+	clusterSelector, err := labels.Parse(intctrlutil.AppInstanceLabelKey + "=" + params.cluster.Name)
+	if err != nil {
+		return stsList, err
+	}
+	compSelector, err := labels.Parse(intctrlutil.AppComponentLabelKey + "=" + params.component.Name)
 	if err != nil {
 		return stsList, err
 	}
 	if err := cli.List(reqCtx.Ctx, existStsList,
 		&client.ListOptions{Namespace: params.cluster.Namespace},
-		client.MatchingLabelsSelector{Selector: selector}); err != nil {
+		client.MatchingLabelsSelector{Selector: compSelector},
+		client.MatchingLabelsSelector{Selector: clusterSelector}); err != nil {
 		return stsList, err
 	}
 	replicaNum := math.Max(float64(len(existStsList.Items)), float64(params.component.Replicas))

@@ -42,30 +42,30 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 	cluster *dbaasv1alpha1.Cluster,
 	stsList []*appsv1.StatefulSet) error {
 
-	filter := func(stsObj *appsv1.StatefulSet) (*dbaasv1alpha1.ClusterDefinitionComponent, bool, error) {
+	filter := func(stsObj *appsv1.StatefulSet) (bool, error) {
 		typeName := GetComponentTypeName(*cluster, stsObj.Labels[intctrlutil.AppComponentLabelKey])
 		component, err := GetComponentFromClusterDefinition(reqCtx.Ctx, cli, cluster, typeName)
 		if err != nil {
-			return &dbaasv1alpha1.ClusterDefinitionComponent{}, false, err
+			return false, err
 		}
 		if component.ComponentType != dbaasv1alpha1.Replication {
-			return component, true, nil
+			return true, nil
 		}
-		return component, false, nil
+		return false, nil
 	}
 
 	// handle StatefulSets including delete sts when pod number larger than cluster.component[i].replicas
 	// delete the StatefulSets with the largest sequence number which is not the primary role
 	clusterCompReplicasMap := make(map[string]int, len(cluster.Spec.Components))
 	for _, clusterComp := range cluster.Spec.Components {
-		clusterCompReplicasMap[clusterComp.Name] = clusterComp.Replicas
+		clusterCompReplicasMap[clusterComp.Name] = int(clusterComp.Replicas)
 	}
 
 	podRoleMap := make(map[string]string)
 	compOwnsStsMap := make(map[string]int)
 	stsToDeleteMap := make(map[string]int)
 	for _, stsObj := range stsList {
-		_, skip, err := filter(stsObj)
+		skip, err := filter(stsObj)
 		if err != nil {
 			return err
 		}

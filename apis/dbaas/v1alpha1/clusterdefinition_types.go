@@ -351,25 +351,7 @@ const (
 )
 
 type ReplicationSpec struct {
-	// CreateReplication, create replicationSet replication relationship
-	// +kubebuilder:validation:Required
-	CreateReplication CreateReplication `json:"createReplication,omitempty"`
-}
-
-type CreateReplication struct {
-	// DbEngineContainer, db engine container name define in podSpec
-	// +kubebuilder:validation:Required
-	DbEngineContainer string `json:"dbEngineContainer,omitempty"`
-
-	// Commands, commands to create a replication relationship
-	// the order of commands follows the order of array.
-	// +kubebuilder:validation:Required
-	Commands []string `json:"commands,omitempty"`
-
-	// exec command with image
-	// +kubebuilder:default="rancher/kubectl:v1.23.7"
-	// +optional
-	Image string `json:"image,omitempty"`
+	// TODO(xingran) define switchPolicy here when replicationSet do failover and switchover
 }
 
 func init() {

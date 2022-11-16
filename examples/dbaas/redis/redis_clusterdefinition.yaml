@@ -9,10 +9,6 @@ spec:
       defaultReplicas: 2
       componentType: Replication
       replicationSpec:
-        createReplication:
-          dbEngineContainer: redis
-          commands:
-            - "redis-cli replicaof $(KB_PRIMARY_POD_NAME) 6379"
       service:
         ports:
           - protocol: TCP

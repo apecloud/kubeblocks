@@ -640,11 +640,11 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		for _, rsts := range rstsList {
 			*params.applyObjs = append(*params.applyObjs, rsts)
 
-			svcs, err := buildHeadlessSvcs(*params, rsts)
+			svcs, err := buildSvc(*params, true)
 			if err != nil {
 				return err
 			}
-			*params.applyObjs = append(*params.applyObjs, svcs...)
+			*params.applyObjs = append(*params.applyObjs, svcs)
 
 			configs, err := buildCfg(*params, rsts, reqCtx.Ctx, cli)
 			if err != nil {
@@ -1083,11 +1083,12 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx, cli client.Client, param
 func injectReplicationSetPodEnvAndLabel(params createParams, sts *appsv1.StatefulSet, index int) (*appsv1.StatefulSet, error) {
 	for _, comp := range params.cluster.Spec.Components {
 		if index != *comp.PrimaryStsIndex {
+			svcName := strings.Join([]string{params.cluster.Name, params.component.Name, "headless"}, "-")
 			for i := range sts.Spec.Template.Spec.Containers {
 				c := &sts.Spec.Template.Spec.Containers[i]
 				c.Env = append(c.Env, corev1.EnvVar{
 					Name:      dbaasPrefix + "_PRIMARY_POD_NAME",
-					Value:     sts.Name + "-" + strconv.Itoa(*comp.PrimaryStsIndex) + "-0",
+					Value:     fmt.Sprintf("%s-%d-%d.%s", sts.Name, *comp.PrimaryStsIndex, 0, svcName),
 					ValueFrom: nil,
 				})
 				for j, port := range c.Ports {

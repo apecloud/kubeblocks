@@ -144,7 +144,6 @@ spec:
         resources:
           requests:
             storage: 1Gi
-        storageClassName: standard 
   - name: proxy
     type: proxy
     replicas: 1

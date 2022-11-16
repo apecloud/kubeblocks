@@ -31,4 +31,3 @@ package k8score
 
 // events API only allows ready-only, create, patch
 //+kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;patch
-//+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch

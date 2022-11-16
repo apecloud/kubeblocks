@@ -39,7 +39,7 @@ type StorageClassReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// NOTES: controller-gen RBAC marker is maintained at rbac.go
+//+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

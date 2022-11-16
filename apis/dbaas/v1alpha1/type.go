@@ -112,11 +112,13 @@ const (
 	AutoReload    UpgradePolicy = "autoReload"
 )
 
+type CfgReloadType string
+
 const (
-	UnixSignal string = "signal"
-	SqlReload  string = "sql"
-	ExecReload string = "exec"
-	HttpReload string = "http"
+	UnixSignalType CfgReloadType = "signal"
+	SqlType        CfgReloadType = "sql"
+	ShellType      CfgReloadType = "exec"
+	HttpType       CfgReloadType = "http"
 )
 
 func RegisterWebhookManager(mgr manager.Manager) {

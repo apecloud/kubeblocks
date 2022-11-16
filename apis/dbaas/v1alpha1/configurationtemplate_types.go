@@ -21,20 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type CustomParametersValidation struct {
-	// TODO(zt) DAY2 support schema
-	// Schema provides a way for ISVs to verify the validity of user change parameters through json schema
-	// controller-gen doesn't work with k8s.io/apiextensions-apiserver: https://github.com/kubernetes-sigs/controller-tools/issues/291
-	// +kubebuilder:validation:Schemaless
-	// +kubebuilder:validation:Type=object
-	// +kubebuilder:pruning:PreserveUnknownFields
-	Schema *apiext.JSONSchemaProps `json:"schema,omitempty"`
-
-	// Cue that to let ISV verify user configuration through cue language
-	// +optional
-	Cue *string `json:"cue,omitempty"`
-}
-
 // ConfigurationTemplateSpec defines the desired state of ConfigurationTemplate
 type ConfigurationTemplateSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -100,6 +86,20 @@ type ConfigurationTemplateStatus struct {
 	// updated on mutation by the API Server.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+}
+
+type CustomParametersValidation struct {
+	// TODO(zt) DAY2 support schema
+	// Schema provides a way for ISVs to verify the validity of user change parameters through json schema
+	// controller-gen doesn't work with k8s.io/apiextensions-apiserver: https://github.com/kubernetes-sigs/controller-tools/issues/291
+	// +kubebuilder:validation:Schemaless
+	// +kubebuilder:validation:Type=object
+	// +kubebuilder:pruning:PreserveUnknownFields
+	Schema *apiext.JSONSchemaProps `json:"schema,omitempty"`
+
+	// Cue that to let ISV verify user configuration through cue language
+	// +optional
+	Cue *string `json:"cue,omitempty"`
 }
 
 //+kubebuilder:object:root=true

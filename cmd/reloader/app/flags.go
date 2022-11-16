@@ -33,11 +33,11 @@ const (
 	Sql                               // "sql"
 )
 
-var allNotifyType = map[NotifyEventType]string{
-	UnixSignal: dbaasv1alpha1.UnixSignal,
-	WebHook:    dbaasv1alpha1.HttpReload,
-	ShellTool:  dbaasv1alpha1.ExecReload,
-	Sql:        dbaasv1alpha1.SqlReload,
+var allNotifyType = map[NotifyEventType]dbaasv1alpha1.CfgReloadType{
+	UnixSignal: dbaasv1alpha1.UnixSignalType,
+	WebHook:    dbaasv1alpha1.HttpType,
+	ShellTool:  dbaasv1alpha1.ShellType,
+	Sql:        dbaasv1alpha1.SqlType,
 }
 
 func (f *NotifyEventType) Type() string {
@@ -46,7 +46,7 @@ func (f *NotifyEventType) Type() string {
 
 func (f *NotifyEventType) Set(val string) error {
 	for key, value := range allNotifyType {
-		if val == value {
+		if val == string(value) {
 			*f = key
 			return nil
 		}
@@ -55,7 +55,11 @@ func (f *NotifyEventType) Set(val string) error {
 }
 
 func (f *NotifyEventType) String() string {
-	return allNotifyType[*f]
+	reloadType, ok := allNotifyType[*f]
+	if !ok {
+		return ""
+	}
+	return string(reloadType)
 }
 
 type VolumeWatcherOpts struct {

@@ -36,15 +36,15 @@ type ConfigManagerSidecar struct {
 	Volumes []corev1.VolumeMount `json:"volumes"`
 }
 
-func NeedBuildConfigSidecar(autoReload bool, reloadType string, configuration dbaasv1alpha1.ConfigReloadTrigger) (bool, error) {
+func NeedBuildConfigSidecar(autoReload bool, reloadType dbaasv1alpha1.CfgReloadType, configuration dbaasv1alpha1.ConfigReloadTrigger) (bool, error) {
 	if autoReload || reloadType == "" {
 		return false, nil
 	}
 
 	switch reloadType {
-	case dbaasv1alpha1.UnixSignal:
+	case dbaasv1alpha1.UnixSignalType:
 		return checkSignalType(configuration)
-	case dbaasv1alpha1.SqlReload, dbaasv1alpha1.ExecReload, dbaasv1alpha1.HttpReload:
+	case dbaasv1alpha1.SqlType, dbaasv1alpha1.ShellType, dbaasv1alpha1.HttpType:
 		// TODO support other way
 		return false, cfgutil.MakeError("This special reload type [%s] is not supported for now!", reloadType)
 	default:
@@ -62,9 +62,9 @@ func checkSignalType(configuration dbaasv1alpha1.ConfigReloadTrigger) (bool, err
 	return true, nil
 }
 
-func BuildReloadSidecarParams(reloadType string, configuration dbaasv1alpha1.ConfigReloadTrigger, volumeDirs []corev1.VolumeMount) []string {
+func BuildReloadSidecarParams(reloadType dbaasv1alpha1.CfgReloadType, configuration dbaasv1alpha1.ConfigReloadTrigger, volumeDirs []corev1.VolumeMount) []string {
 	switch reloadType {
-	case dbaasv1alpha1.UnixSignal:
+	case dbaasv1alpha1.UnixSignalType:
 		return buildSignalArgs(configuration, volumeDirs)
 	default:
 		// not walk here

@@ -177,6 +177,7 @@ type ClusterDefinitionComponent struct {
 	// ConfigRevisionHistoryLimit is number of historical versions of configuration variations submitted by users, By default, 6 versions are reserved
 	// +kubebuilder:default=6
 	// +kubebuilder:validation:Minimum=0
+	// +optional
 	ConfigRevisionHistoryLimit int `json:"configRevisionHistoryLimit,omitempty"`
 
 	// ConfigAutoReload indicates whether the engine itself supports reload,
@@ -188,7 +189,7 @@ type ClusterDefinitionComponent struct {
 	// ConfigReloadType decided to restart the way
 	// +kubebuilder:validation:Enum={signal,http,sql,exec}
 	// +optional
-	ConfigReloadType string `json:"configReloadType,omitempty"`
+	ConfigReloadType CfgReloadType `json:"configReloadType,omitempty"`
 
 	// ConfigReloadTrigger describe the configuration for reload type
 	// +optional

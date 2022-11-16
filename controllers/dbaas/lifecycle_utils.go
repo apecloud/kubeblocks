@@ -374,7 +374,7 @@ func mergeComponents(
 
 		ConfigAutoReload:    clusterDefComp.ConfigAutoReload,
 		ConfigReloadType:    clusterDefComp.ConfigReloadType,
-		ReloadConfiguration: clusterDefComp.ConfigReloadTrigger,
+		ConfigReloadTrigger: clusterDefComp.ConfigReloadTrigger,
 	}
 
 	if appVerComp != nil && appVerComp.PodSpec != nil {
@@ -1541,7 +1541,7 @@ func updateConfigurationManagerWithComponent(params createParams, sts *appsv1.St
 
 	// db auto scan configuration and reload
 	component := params.component
-	if ok, err := cfgcm.NeedBuildConfigSidecar(component.ConfigAutoReload, component.ConfigReloadType, component.ReloadConfiguration); err != nil {
+	if ok, err := cfgcm.NeedBuildConfigSidecar(component.ConfigAutoReload, component.ConfigReloadType, component.ConfigReloadTrigger); err != nil {
 		return err
 	} else if !ok {
 		return nil
@@ -1580,7 +1580,7 @@ func updateConfigurationManagerWithComponent(params createParams, sts *appsv1.St
 	managerSidecar := &cfgcm.ConfigManagerSidecar{
 		ManagerName: ConfigSidecarName,
 		Image:       viper.GetString(ConfigSidecarIMAGE),
-		Args:        cfgcm.BuildReloadSidecarParams(component.ConfigReloadType, component.ReloadConfiguration, volumeDirs),
+		Args:        cfgcm.BuildReloadSidecarParams(component.ConfigReloadType, component.ConfigReloadTrigger, volumeDirs),
 		Volumes:     volumeDirs,
 	}
 

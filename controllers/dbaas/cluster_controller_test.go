@@ -1112,7 +1112,7 @@ spec:
 	})
 
 	Context("When creating cluster", func() {
-		It("Should compoment affinity overrider cluster affinity if component affinity exists", func() {
+		It("Should compoment affinity override cluster affinity if component affinity exists", func() {
 			By("By creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
 			toCreate.Spec.Affinity = &dbaasv1alpha1.Affinity{
@@ -1146,6 +1146,131 @@ spec:
 				Expect(len(podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution) == 0).Should(BeTrue())
 				Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable == corev1.DoNotSchedule).Should(BeTrue())
 				return len(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0
+			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting the scope")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	Context("When creating cluster", func() {
+		It("Should PodSpec tolerations be nil if cluster tolerations is nil", func() {
+			By("By creating a cluster")
+			toCreate, _, _, key := newClusterObj(nil, nil)
+
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
+
+			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
+			Eventually(func() bool {
+				_ = k8sClient.Get(ctx, key, fetchedClusterG1)
+				return fetchedClusterG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+
+			stsList := &appsv1.StatefulSetList{}
+			Eventually(func() bool {
+				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				Expect(len(stsList.Items) == 1).Should(BeTrue())
+				sts := stsList.Items[0]
+				return sts.Spec.Template.Spec.Tolerations == nil
+			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting the scope")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	Context("When creating cluster", func() {
+		It("Should PodSpec tolerations exists if cluster tolerations exists", func() {
+			By("By creating a cluster")
+			toCreate, _, _, key := newClusterObj(nil, nil)
+			var tolerations []corev1.Toleration
+			toCreate.Spec.Tolerations = append(tolerations, corev1.Toleration{
+				Key:      "testClusterTolerationKey",
+				Value:    "testClusterTolerationValue",
+				Operator: corev1.TolerationOpEqual,
+				Effect:   corev1.TaintEffectNoSchedule,
+			})
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
+
+			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
+			Eventually(func() bool {
+				_ = k8sClient.Get(ctx, key, fetchedClusterG1)
+				return fetchedClusterG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+
+			stsList := &appsv1.StatefulSetList{}
+			Eventually(func() bool {
+				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				Expect(len(stsList.Items) == 1).Should(BeTrue())
+				podSpec := stsList.Items[0].Spec.Template.Spec
+
+				Expect(len(podSpec.Tolerations) > 0).Should(BeTrue())
+				toleration := podSpec.Tolerations[0]
+				Expect(toleration.Key == "testClusterTolerationKey" && toleration.Value == "testClusterTolerationValue").Should(BeTrue())
+				return toleration.Operator == corev1.TolerationOpEqual && toleration.Effect == corev1.TaintEffectNoSchedule
+			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting the scope")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	Context("When creating cluster", func() {
+		It("Should compoment tolerations override cluster tolerations if component tolerations exists", func() {
+			By("By creating a cluster")
+			toCreate, _, _, key := newClusterObj(nil, nil)
+			var clusterTolerations []corev1.Toleration
+			toCreate.Spec.Tolerations = append(clusterTolerations, corev1.Toleration{
+				Key:      "testClusterTolerationKey",
+				Value:    "testClusterTolerationValue",
+				Operator: corev1.TolerationOpEqual,
+				Effect:   corev1.TaintEffectNoSchedule,
+			})
+
+			var compTolerations []corev1.Toleration
+			compTolerations = append(compTolerations, corev1.Toleration{
+				Key:      "testCompTolerationKey",
+				Value:    "testCompTolerationValue",
+				Operator: corev1.TolerationOpEqual,
+				Effect:   corev1.TaintEffectNoSchedule,
+			})
+
+			toCreate.Spec.Components = []dbaasv1alpha1.ClusterComponent{}
+			toCreate.Spec.Components = append(toCreate.Spec.Components, dbaasv1alpha1.ClusterComponent{
+				Name:        "replicasets",
+				Type:        "replicasets",
+				Tolerations: compTolerations,
+			})
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
+
+			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
+			Eventually(func() bool {
+				_ = k8sClient.Get(ctx, key, fetchedClusterG1)
+				return fetchedClusterG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+
+			stsList := &appsv1.StatefulSetList{}
+			Eventually(func() bool {
+				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				Expect(len(stsList.Items) == 1).Should(BeTrue())
+				podSpec := stsList.Items[0].Spec.Template.Spec
+
+				Expect(len(podSpec.Tolerations) > 0).Should(BeTrue())
+				toleration := podSpec.Tolerations[0]
+				Expect(toleration.Key == "testCompTolerationKey" && toleration.Value == "testCompTolerationValue").Should(BeTrue())
+				return toleration.Operator == corev1.TolerationOpEqual && toleration.Effect == corev1.TaintEffectNoSchedule
 			}, timeout, interval).Should(BeTrue())
 
 			By("Deleting the scope")

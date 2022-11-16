@@ -58,9 +58,11 @@ type CreateOptions struct {
 	// because CueLang can not covert null to list.
 	TopologyKeys []string                 `json:"topologyKeys,omitempty"`
 	NodeLabels   map[string]string        `json:"nodeLabels,omitempty"`
+	Tolerations  []map[string]string      `json:"tolerations,omitempty"`
 	Components   []map[string]interface{} `json:"components"`
 	// ComponentsFilePath components file path
-	ComponentsFilePath string `json:"-"`
+	ComponentsFilePath string   `json:"-"`
+	TolerationsRaw     []string `json:"-"`
 	create.BaseOptions
 }
 
@@ -101,8 +103,21 @@ func (o *CreateOptions) Complete() error {
 		}
 	}
 	setMonitor(o.Monitor, components)
-
 	o.Components = components
+
+	// TolerationsRaw looks like ["key=engineType,value=mongo,operator=Equal,effect=NoSchedule"]
+	tolerations := make([]map[string]string, 0)
+	for _, tolerationRaw := range o.TolerationsRaw {
+		toleration := map[string]string{}
+		for _, entries := range strings.Split(tolerationRaw, ",") {
+			parts := strings.Split(entries, "=")
+			toleration[parts[0]] = parts[1]
+		}
+		tolerations = append(tolerations, toleration)
+	}
+	if len(tolerations) > 0 {
+		o.Tolerations = tolerations
+	}
 	return nil
 }
 
@@ -128,6 +143,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 			cmd.Flags().BoolVar(&o.EnableAllLogs, "enable-all-logs", false, "Enable advanced application all log extraction, and true will ignore enabledLogs of component level")
 			cmd.Flags().StringArrayVar(&o.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
 			cmd.Flags().StringToStringVar(&o.NodeLabels, "node-labels", nil, "Node label selector")
+			cmd.Flags().StringSliceVar(&o.TolerationsRaw, "tolerations", nil, "Tolerations for cluster")
 			cmd.Flags().StringVar(&o.ComponentsFilePath, "components", "", "Use yaml file to specify the cluster components")
 		},
 	}

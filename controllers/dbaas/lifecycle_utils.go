@@ -420,6 +420,7 @@ func mergeComponents(
 		}
 	}
 	affinity := cluster.Spec.Affinity
+	tolerations := cluster.Spec.Tolerations
 	if clusterComp != nil {
 		component.Name = clusterComp.Name
 		component.EnabledLogs = clusterComp.EnabledLogs
@@ -444,12 +445,18 @@ func mergeComponents(
 		if clusterComp.Affinity != nil {
 			affinity = clusterComp.Affinity
 		}
+		if len(clusterComp.Tolerations) != 0 {
+			tolerations = clusterComp.Tolerations
+		}
 	}
 	if component.PodSpec.Affinity == nil && affinity != nil {
 		component.PodSpec.Affinity = buildPodAffinity(cluster, affinity, component)
 	}
 	if len(component.PodSpec.TopologySpreadConstraints) == 0 && affinity != nil {
 		component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(cluster, affinity, component)
+	}
+	if len(component.PodSpec.Tolerations) == 0 && tolerations != nil {
+		component.PodSpec.Tolerations = tolerations
 	}
 
 	// TODO(zhixu.zt) We need to reserve the VolumeMounts of the container for ConfigMap or Secret,

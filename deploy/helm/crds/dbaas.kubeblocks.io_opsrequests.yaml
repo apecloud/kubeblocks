@@ -180,8 +180,7 @@ spec:
                 additionalProperties:
                   properties:
                     phase:
-                      description: Phase  describe the component phase, Reference
-                        ClusterDefinition.status.component.phase.
+                      description: Phase describe the component phase, Reference ClusterDefinition.status.component.phase.
                       enum:
                       - Running
                       - Failed

@@ -75,8 +75,6 @@ func init() {
 	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:0.1.2-probe-improment")
 	viper.SetDefault("PROBE_SERVICE_PORT", 3501)
 	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
-	viper.SetDefault("DP_BACKUP_SCHEDULE", "0 2 * * *")
-	viper.SetDefault("DP_BACKUP_TTL", "168h0m0s")
 }
 
 func main() {

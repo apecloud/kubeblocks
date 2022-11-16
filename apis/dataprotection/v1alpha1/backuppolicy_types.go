@@ -29,7 +29,7 @@ type BackupPolicySpec struct {
 
 	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
 	// +optional
-	Schedule *string `json:"schedule,omitempty"`
+	Schedule string `json:"schedule,omitempty"`
 
 	// which backup tool to perform database backup, only support one tool.
 	// +optional

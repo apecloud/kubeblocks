@@ -80,10 +80,10 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// update default value from viper config if necessary
 	patch := client.MergeFrom(backupPolicy.DeepCopy())
-	if backupPolicy.Spec.Schedule == nil {
+	if len(backupPolicy.Spec.Schedule) == 0 {
 		schedule := viper.GetString("DP_BACKUP_SCHEDULE")
 		if len(schedule) > 0 {
-			backupPolicy.Spec.Schedule = &schedule
+			backupPolicy.Spec.Schedule = schedule
 		}
 	}
 	if backupPolicy.Spec.TTL == nil {

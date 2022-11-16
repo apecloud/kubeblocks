@@ -123,9 +123,6 @@ dashboards:
 dataProtection:
   ## disableVolumeSnapshot - set this to true if cluster does not have snapshot.storage.k8s.io API installed
   disableVolumeSnapshot: true
-  backup:
-    schedule: "0 2 * * *"
-    ttl: "168h0m0s"
 
 
 # Sub-charts

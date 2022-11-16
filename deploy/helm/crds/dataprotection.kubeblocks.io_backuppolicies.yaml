@@ -1559,7 +1559,8 @@ spec:
                 - name
                 type: object
               schedule:
-                description: The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+                description: The schedule in Cron format, the timezone is in UTC.
+                  see https://en.wikipedia.org/wiki/Cron.
                 type: string
               target:
                 description: database cluster service
@@ -1653,6 +1654,7 @@ spec:
             required:
             - hooks
             - remoteVolume
+            - schedule
             - target
             type: object
           status:

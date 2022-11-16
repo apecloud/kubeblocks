@@ -139,7 +139,7 @@ type LogConfig struct {
 
 type ConfigurationSpec struct {
 	// The configTemplateRefs field provided by ISV, and
-	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
+	// finally this configTemplateRefs will be rendered into the user's own configuration file against the user's cluster.
 	// +optional
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
 
@@ -148,23 +148,26 @@ type ConfigurationSpec struct {
 	// ConfigTemplateRefs map[string][]ConfigTemplate `json:"configTemplateRefs,omitempty"`
 	// DefaultScene string `json:"defaultScene,omitempty"`
 
-	// ConfigRevisionHistoryLimit is number of historical versions of configuration variations submitted by users, By default, 6 versions are reserved
+	// ConfigRevisionHistoryLimit is number of historical versions of configuration variations submitted by users, By default, 6 versions are reserved.
 	// +kubebuilder:default=6
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	ConfigRevisionHistoryLimit int `json:"configRevisionHistoryLimit,omitempty"`
 
 	// ConfigReload indicates whether the engine supports reload.
+	// if false, the controller will restart the engine instance.
+	// if true, the controller will determine the behavior of the engine instance based on the configuration templates,
+	// restart or reload depending on whether any parameters in the StaticParameters have been modified.
 	// +kubebuilder:default=false
 	// +optional
 	ConfigReload bool `json:"configReload,omitempty"`
 
-	// ConfigReloadType decided to restart the way.
+	// ConfigReloadType describes the restart methods.
 	// +kubebuilder:validation:Enum={signal,http,sql,exec}
 	// +optional
 	ConfigReloadType CfgReloadType `json:"configReloadType,omitempty"`
 
-	// ConfigReloadTrigger describe the configuration for reload type
+	// ConfigReloadTrigger describes the configuration against reload type.
 	// +optional
 	ConfigReloadTrigger ConfigReloadTrigger `json:"configReloadTrigger,omitempty"`
 }
@@ -176,7 +179,7 @@ type ConfigReloadTrigger struct {
 	// +optional
 	Signal string `json:"signal,omitempty"`
 
-	// ProcessName is process name, send unix signal to proc
+	// ProcessName is process name,sends unix signal to proc.
 	// +optional
 	ProcessName string `json:"processName,omitempty"`
 

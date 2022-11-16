@@ -12,11 +12,12 @@ dbctl cluster create [flags]
       --app-version string           AppVersion reference (default "wesql-8.0.30")
       --cluster-definition string    ClusterDefinition reference (default "apecloud-wesql")
       --components string            Use yaml file to specify the cluster components
+      --enable-all-logs              Enable advanced application all log extraction, and true will ignore enabledLogs of component level
   -h, --help                         help for create
       --monitor                      Set monitor enabled (default false)
       --node-labels stringToString   Node label selector (default [])
       --pod-anti-affinity string     Pod anti-affinity type (default "Preferred")
-      --termination-policy string    Termination policy (default "Halt")
+      --termination-policy string    Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
       --topology-keys stringArray    Topology keys for affinity
 ```
 

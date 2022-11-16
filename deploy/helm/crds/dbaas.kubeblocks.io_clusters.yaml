@@ -398,7 +398,6 @@ spec:
             required:
             - appVersionRef
             - clusterDefinitionRef
-            - terminationPolicy
             type: object
           status:
             description: ClusterStatus defines the observed state of Cluster

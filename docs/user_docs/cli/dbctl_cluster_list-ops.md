@@ -1,9 +1,9 @@
-## dbctl cluster list
+## dbctl cluster list-ops
 
-List all database cluster.
+List all opsRequest.
 
 ```
-dbctl cluster list [flags]
+dbctl cluster list-ops [flags]
 ```
 
 ### Options
@@ -12,7 +12,7 @@ dbctl cluster list [flags]
   -A, --all-namespace                 If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
       --allow-missing-template-keys   If true, ignore any errors in templates when a field or map key is missing in the template. Only applies to golang and jsonpath output formats. (default true)
       --field-selector string         Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.
-  -h, --help                          help for list
+  -h, --help                          help for list-ops
       --ignore-not-found              If the requested object does not exist the command will return exit code 0.
   -L, --label-columns strings         Accepts a comma separated list of labels that are going to be presented as columns. Names are case-sensitive. You can also use multiple flag options like -L label1 -L label2...
       --no-headers                    When using the default or custom-column output format, don't print headers (default print headers).

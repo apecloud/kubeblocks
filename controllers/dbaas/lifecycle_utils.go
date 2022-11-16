@@ -331,11 +331,7 @@ func mergeComponents(
 		Service:         clusterDefCompObj.Service,
 		Probes:          clusterDefCompObj.Probes,
 		LogConfigs:      clusterDefCompObj.LogConfigs,
-		ConfigTemplates: clusterDefCompObj.ConfigTemplateRefs,
-
-		ConfigAutoReload:    clusterDefComp.ConfigAutoReload,
-		ConfigReloadType:    clusterDefComp.ConfigReloadType,
-		ConfigReloadTrigger: clusterDefComp.ConfigReloadTrigger,
+		Config:          clusterDefCompObj.ConfigSpec,
 	}
 
 	doContainerAttrOverride := func(container corev1.Container) {
@@ -398,6 +394,10 @@ func mergeComponents(
 		if container.SecurityContext != nil {
 			component.PodSpec.Containers[i].SecurityContext = container.SecurityContext
 		}
+	}
+
+	if clusterDefCompObj.ConfigSpec != nil {
+		component.ConfigTemplates = clusterDefCompObj.ConfigSpec.ConfigTemplateRefs
 	}
 
 	if appVerComp != nil {
@@ -1331,12 +1331,17 @@ func buildCfg(params createParams,
 func updateConfigurationManagerWithComponent(params createParams, podSpec *corev1.PodSpec, cfgTemplates []dbaasv1alpha1.ConfigTemplate) error {
 	var (
 		firstCfg        = 0
+		component       = params.component
 		usingContainers []*corev1.Container
 	)
 
+	if component.Config == nil {
+		return nil
+	}
+
+	cfgSpec := component.Config
 	// db auto scan configuration and reload
-	component := params.component
-	if ok, err := cfgcm.NeedBuildConfigSidecar(component.ConfigAutoReload, component.ConfigReloadType, component.ConfigReloadTrigger); err != nil {
+	if ok, err := cfgcm.NeedBuildConfigSidecar(cfgSpec.ConfigReload, cfgSpec.ConfigReloadType, cfgSpec.ConfigReloadTrigger); err != nil {
 		return err
 	} else if !ok {
 		return nil
@@ -1374,7 +1379,7 @@ func updateConfigurationManagerWithComponent(params createParams, podSpec *corev
 	managerSidecar := &cfgcm.ConfigManagerSidecar{
 		ManagerName: configSidecarName,
 		Image:       viper.GetString(configSidecarIMAGE),
-		Args:        cfgcm.BuildReloadSidecarParams(component.ConfigReloadType, component.ConfigReloadTrigger, volumeDirs),
+		Args:        cfgcm.BuildReloadSidecarParams(cfgSpec.ConfigReloadType, cfgSpec.ConfigReloadTrigger, volumeDirs),
 		Volumes:     volumeDirs,
 	}
 

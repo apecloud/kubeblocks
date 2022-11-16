@@ -31,7 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 )
 
-var _ = Describe("Cluster Controller", func() {
+var _ = Describe("Reconfigure Controller", func() {
 	var ctx = context.Background()
 
 	BeforeEach(func() {
@@ -142,7 +142,7 @@ var _ = Describe("Cluster Controller", func() {
 							cm.Labels[configuration.CMInsLastReconfigureMethodLabelKey] == configuration.ReconfigureAutoReloadType
 					})
 				return ok
-			}, time.Second*70, time.Second*1).Should(BeTrue())
+			}, time.Second*30, time.Second*1).Should(BeTrue())
 
 			// step7: update invalid update
 			Expect(UpdateCR[corev1.ConfigMap](testWrapper, &corev1.ConfigMap{},
@@ -166,7 +166,7 @@ var _ = Describe("Cluster Controller", func() {
 						return cm.Labels[configuration.CMInsLastReconfigureMethodLabelKey] == configuration.ReconfigureNoChangeType
 					})
 				return ok
-			}, time.Second*70, time.Second*1).Should(BeTrue())
+			}, time.Second*30, time.Second*1).Should(BeTrue())
 
 			// step8: need restart update parameter
 			Expect(UpdateCR[corev1.ConfigMap](testWrapper, &corev1.ConfigMap{},

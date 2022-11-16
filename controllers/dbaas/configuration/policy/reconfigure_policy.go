@@ -40,6 +40,7 @@ func init() {
 }
 
 type ReconfigureParams struct {
+	Restart bool
 	TplName string
 	Meta    *cfgcore.ConfigDiffInformation
 	Cfg     *corev1.ConfigMap
@@ -58,7 +59,7 @@ func (param *ReconfigureParams) ComponentType() dbaasv1alpha1.ComponentType {
 }
 
 func (param *ReconfigureParams) GetConfigKey() string {
-	for _, tpl := range param.Component.ConfigTemplateRefs {
+	for _, tpl := range param.Component.ConfigSpec.ConfigTemplateRefs {
 		if tpl.Name == param.TplName {
 			return tpl.VolumeName
 		}
@@ -98,20 +99,19 @@ func (receiver AutoReloadPolicy) GetPolicyName() string {
 	return string(dbaasv1alpha1.AutoReload)
 }
 
-func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigurationTemplateSpec, cfg *cfgcore.ConfigDiffInformation, policy dbaasv1alpha1.UpgradePolicy) (ReconfigurePolicy, error) {
+func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigurationTemplateSpec, cfg *cfgcore.ConfigDiffInformation, policy dbaasv1alpha1.UpgradePolicy, restart bool) (ReconfigurePolicy, error) {
 	if !cfg.IsModify {
 		// not exec here
 		return nil, cfgcore.MakeError("cfg not modify. [%v]", cfg)
 	}
 
-	dynamicUpdate, err := IsUpdateDynamicParameters(tpl, cfg)
-	if err != nil {
-		return nil, err
-	}
-
 	actionType := policy
-	if dynamicUpdate {
-		actionType = dbaasv1alpha1.AutoReload
+	if !restart {
+		if dynamicUpdate, err := IsUpdateDynamicParameters(tpl, cfg); err != nil {
+			return nil, err
+		} else if dynamicUpdate {
+			actionType = dbaasv1alpha1.AutoReload
+		}
 	}
 
 	if action, ok := upgradePolicyMap[actionType]; ok {

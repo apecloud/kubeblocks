@@ -137,6 +137,38 @@ type LogConfig struct {
 	FilePathPattern string `json:"filePathPattern"`
 }
 
+type ConfigurationSpec struct {
+	// The configTemplateRefs field provided by ISV, and
+	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
+	// +optional
+	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
+
+	// TODO(zt) support multi scene, Different scenarios use different configuration templates.
+	// User modify scene in cluster field or reconfigure ops.
+	// ConfigTemplateRefs map[string][]ConfigTemplate `json:"configTemplateRefs,omitempty"`
+	// DefaultScene string `json:"defaultScene,omitempty"`
+
+	// ConfigRevisionHistoryLimit is number of historical versions of configuration variations submitted by users, By default, 6 versions are reserved
+	// +kubebuilder:default=6
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	ConfigRevisionHistoryLimit int `json:"configRevisionHistoryLimit,omitempty"`
+
+	// ConfigReload indicates whether the engine supports reload.
+	// +kubebuilder:default=false
+	// +optional
+	ConfigReload bool `json:"configReload,omitempty"`
+
+	// ConfigReloadType decided to restart the way.
+	// +kubebuilder:validation:Enum={signal,http,sql,exec}
+	// +optional
+	ConfigReloadType CfgReloadType `json:"configReloadType,omitempty"`
+
+	// ConfigReloadTrigger describe the configuration for reload type
+	// +optional
+	ConfigReloadTrigger ConfigReloadTrigger `json:"configReloadTrigger,omitempty"`
+}
+
 type ConfigReloadTrigger struct {
 	// Signal is valid for unix signal
 	// e.g: SIGHUP
@@ -192,48 +224,9 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	PDBSpec *policyv1.PodDisruptionBudgetSpec `json:"pdbSpec,omitempty"`
 
-	// The configTemplateRefs field provided by provider, and
-	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
+	// ConfigSpec defines configuration related spec.
 	// +optional
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
-
-	// TODO(zt) support multi scene, Different scenarios use different configuration templates.
-	// User modify scene in cluster field or reconfigure ops.
-	// DefaultScene string `json:"defaultScene,omitempty"`
-
-	// ConfigRevisionHistoryLimit is number of historical versions of configuration variations submitted by users, By default, 6 versions are reserved
-	// +kubebuilder:default=6
-	// +kubebuilder:validation:Minimum=0
-	// +optional
-	ConfigRevisionHistoryLimit int `json:"configRevisionHistoryLimit,omitempty"`
-
-	// ConfigAutoReload indicates whether the engine itself supports reload,
-	// if true, the controller does not need to update.
-	// +kubebuilder:default=false
-	// +optional
-	ConfigAutoReload bool `json:"configAutoReload,omitempty"`
-
-	// ConfigReloadType decided to restart the way.
-	// +kubebuilder:validation:Enum={signal,http,sql,exec}
-	// +optional
-	ConfigReloadType CfgReloadType `json:"configReloadType,omitempty"`
-
-	// ConfigReloadTrigger describe the configuration for reload type
-	// +optional
-	ConfigReloadTrigger ConfigReloadTrigger `json:"configReloadTrigger,omitempty"`
-
-	// SupportRawUpgrade indicates whether the engine supports memory updates parameter.
-	// Sidecar not support sql query set parameter if false.
-	// +kubebuilder:default=false
-	SupportRawUpgrade bool `json:"supportRawUpgrade,omitempty"`
-
-	// CustomConfigurationVolume is volume name which the user specifies update to.
-	// +optional
-	CustomConfigurationVolume string `json:"customConfigurationVolume,omitempty"`
+	ConfigSpec *ConfigurationSpec `json:"configSpec,omitempty"`
 
 	// Monitor is monitoring config which provided by provider.
 	// +optional

@@ -77,87 +77,88 @@ spec:
                       - Stateful
                       - Consensus
                       type: string
-                    configAutoReload:
-                      default: false
-                      description: ConfigAutoReload indicates whether the engine itself
-                        supports reload, if true, the controller does not need to
-                        update.
-                      type: boolean
-                    configReloadTrigger:
-                      description: ConfigReloadTrigger describe the configuration
-                        for reload type
+                    configSpec:
+                      description: ConfigSpec defines configuration related spec.
                       properties:
-                        processName:
-                          description: ProcessName is process name, send unix signal
-                            to proc
+                        configReload:
+                          default: false
+                          description: ConfigReload indicates whether the engine supports
+                            reload.
+                          type: boolean
+                        configReloadTrigger:
+                          description: ConfigReloadTrigger describe the configuration
+                            for reload type
+                          properties:
+                            processName:
+                              description: ProcessName is process name, send unix
+                                signal to proc
+                              type: string
+                            signal:
+                              description: 'Signal is valid for unix signal e.g: SIGHUP
+                                url: ../../internal/configuration/configmap/handler.go:allUnixSignals'
+                              type: string
+                          type: object
+                        configReloadType:
+                          description: ConfigReloadType decided to restart the way.
+                          enum:
+                          - signal
+                          - http
+                          - sql
+                          - exec
                           type: string
-                        signal:
-                          description: 'Signal is valid for unix signal e.g: SIGHUP
-                            url: ../../internal/configuration/configmap/handler.go:allUnixSignals'
-                          type: string
+                        configRevisionHistoryLimit:
+                          default: 6
+                          description: ConfigRevisionHistoryLimit is number of historical
+                            versions of configuration variations submitted by users,
+                            By default, 6 versions are reserved
+                          minimum: 0
+                          type: integer
+                        configTemplateRefs:
+                          description: The configTemplateRefs field provided by ISV,
+                            and finally this configTemplateRefs will be rendered into
+                            the user's own configuration file according to the user's
+                            cluster.
+                          items:
+                            properties:
+                              defaultMode:
+                                description: 'defaultMode is optional: mode bits used
+                                  to set permissions on created files by default.
+                                  Must be an octal value between 0000 and 0777 or
+                                  a decimal value between 0 and 511. YAML accepts
+                                  both octal and decimal values, JSON requires decimal
+                                  values for mode bits. Defaults to 0644. Directories
+                                  within the path are not affected by this setting.
+                                  This might be in conflict with other options that
+                                  affect the file mode, like fsGroup, and the result
+                                  can be other mode bits set.'
+                                format: int32
+                                type: integer
+                              name:
+                                description: Specify the name of the referenced the
+                                  configuration template ConfigMap object.
+                                maxLength: 63
+                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                type: string
+                              namespace:
+                                default: default
+                                description: Specify the namespace of the referenced
+                                  the configuration template ConfigMap object. An
+                                  empty namespace is equivalent to the "default" namespace.
+                                maxLength: 63
+                                type: string
+                              volumeName:
+                                description: VolumeName is the volume name of PodTemplate,
+                                  which the configuration file produced through the
+                                  configuration template will be mounted to the corresponding
+                                  volume. The volume name must be defined in podSpec.containers[*].volumeMounts.
+                                maxLength: 32
+                                type: string
+                            required:
+                            - name
+                            - volumeName
+                            type: object
+                          type: array
                       type: object
-                    configReloadType:
-                      description: ConfigReloadType decided to restart the way.
-                      enum:
-                      - signal
-                      - http
-                      - sql
-                      - exec
-                      type: string
-                    configRevisionHistoryLimit:
-                      default: 6
-                      description: ConfigRevisionHistoryLimit is number of historical
-                        versions of configuration variations submitted by users, By
-                        default, 6 versions are reserved
-                      minimum: 0
-                      type: integer
-                    configTemplateRefs:
-                      description: The configTemplateRefs field provided by provider,
-                        and finally this configTemplateRefs will be rendered into
-                        the user's own configuration file according to the user's
-                        cluster.
-                      items:
-                        properties:
-                          defaultMode:
-                            description: 'defaultMode is optional: mode bits used
-                              to set permissions on created files by default. Must
-                              be an octal value between 0000 and 0777 or a decimal
-                              value between 0 and 511. YAML accepts both octal and
-                              decimal values, JSON requires decimal values for mode
-                              bits. Defaults to 0644. Directories within the path
-                              are not affected by this setting. This might be in conflict
-                              with other options that affect the file mode, like fsGroup,
-                              and the result can be other mode bits set.'
-                            format: int32
-                            type: integer
-                          name:
-                            description: Specify the name of the referenced the configuration
-                              template ConfigMap object.
-                            maxLength: 63
-                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                            type: string
-                          namespace:
-                            default: default
-                            description: Specify the namespace of the referenced the
-                              configuration template ConfigMap object. An empty namespace
-                              is equivalent to the "default" namespace.
-                            maxLength: 63
-                            type: string
-                          volumeName:
-                            description: VolumeName is the volume name of PodTemplate,
-                              which the configuration file produced through the configuration
-                              template will be mounted to the corresponding volume.
-                              The volume name must be defined in podSpec.containers[*].volumeMounts.
-                            maxLength: 32
-                            type: string
-                        required:
-                        - name
-                        - volumeName
-                        type: object
-                      type: array
-                      x-kubernetes-list-map-keys:
-                      - name
-                      x-kubernetes-list-type: map
                     consensusSpec:
                       description: consensusSpec defines consensus related spec if
                         componentType is Consensus, required if componentType is Consensus.
@@ -268,10 +269,6 @@ spec:
                       required:
                       - leader
                       type: object
-                    customConfigurationVolume:
-                      description: CustomConfigurationVolume is volume name which
-                        the user specifies update to.
-                      type: string
                     defaultReplicas:
                       default: 0
                       description: DefaultReplicas default replicas in this component
@@ -8160,12 +8157,6 @@ spec:
                             https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types'
                           type: string
                       type: object
-                    supportRawUpgrade:
-                      default: false
-                      description: SupportRawUpgrade indicates whether the engine
-                        supports memory updates parameter. Sidecar not support sql
-                        query set parameter if false.
-                      type: boolean
                     typeName:
                       description: Type name of the component, it can be any valid
                         string.

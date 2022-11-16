@@ -1,7 +1,9 @@
 #ProfilesParameter: {
     profiles: [string]: #ClickhouseParameter
+    // ignore other configure
+}
 
-    #ClickhouseParameter: {
+#ClickhouseParameter: {
         // [0|1|2] default 0
         readonly: int & 0 | 1 | 2 | *0
 
@@ -18,9 +20,6 @@
         // other parameter
         // Clickhouse all parameter define: clickhouse settings define
     }
-
-    // ignore other configure
-}
 
 configuration: #ProfilesParameter & {
 }

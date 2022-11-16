@@ -69,10 +69,7 @@ type Component struct {
 	EnabledLogs             []string                               `json:"enabledLogs,omitempty"`
 	LogConfigs              []dbaasv1alpha1.LogConfig              `json:"logConfigs,omitempty"`
 	ConfigTemplates         []dbaasv1alpha1.ConfigTemplate         `json:"configTemplates,omitempty"`
-
-	ConfigAutoReload    bool                              `json:"configAutoReload,omitempty"`
-	ConfigReloadType    dbaasv1alpha1.CfgReloadType       `json:"configReloadType,omitempty"`
-	ConfigReloadTrigger dbaasv1alpha1.ConfigReloadTrigger `json:"configReloadTrigger,omitempty"`
+	Config                  *dbaasv1alpha1.ConfigurationSpec       `json:"config,omitempty"`
 }
 
 type ResourceDefinition struct {

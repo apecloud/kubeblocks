@@ -18,8 +18,10 @@ package dataprotection
 
 import (
 	"context"
+	"time"
 
 	"github.com/spf13/viper"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -74,7 +76,28 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	})
 	if res != nil {
 		return *res, err
-	} // TODO(user): your logic here
+	}
+
+	// update default value from viper config if necessary
+	patch := client.MergeFrom(backupPolicy.DeepCopy())
+	if backupPolicy.Spec.Schedule == nil {
+		schedule := viper.GetString("DP_BACKUP_SCHEDULE")
+		if len(schedule) > 0 {
+			backupPolicy.Spec.Schedule = &schedule
+		}
+	}
+	if backupPolicy.Spec.TTL == nil {
+		ttlString := viper.GetString("DP_BACKUP_TTL")
+		if len(ttlString) > 0 {
+			ttl, err := time.ParseDuration(ttlString)
+			if err == nil {
+				backupPolicy.Spec.TTL = &metav1.Duration{Duration: ttl}
+			}
+		}
+	}
+	if err = r.Client.Patch(reqCtx.Ctx, backupPolicy, patch); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
 
 	return ctrl.Result{}, nil
 }

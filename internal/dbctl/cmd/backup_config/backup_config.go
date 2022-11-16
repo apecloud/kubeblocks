@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/kubectl/pkg/util/templates"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v3/pkg/action"
@@ -106,7 +108,7 @@ func (o *upgradeOptions) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 }
 
 func (o *upgradeOptions) run() error {
-	_, _ = fmt.Fprintf(o.Out, "Config backup...\n")
+	fmt.Fprintf(o.Out, "Config backup...\n")
 
 	config := configOptions{
 		HelmCfg:   o.cfg,
@@ -119,9 +121,14 @@ func (o *upgradeOptions) run() error {
 		return errors.Wrap(err, "Failed to update backup config")
 	}
 
-	_, _ = fmt.Fprintf(o.Out, "Backup config SUCCESSFULLY!\n")
+	fmt.Fprintf(o.Out, "Backup config SUCCESSFULLY!\n")
 	return nil
 }
+
+var BackupConfigExample = templates.Examples(`
+		# Enable the snapshot-controller and volumesnapshot, to support snapshot backup.
+		dbctl backup-config --set snapshot-controller.enabled=true --set dataProtection.disableVolumeSnapshot=false
+	`)
 
 // NewBackupConfigCmd creates the backup-config command
 func NewBackupConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -129,9 +136,10 @@ func NewBackupConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		IOStreams: streams,
 	}
 	cmd := &cobra.Command{
-		Use:   "backup-config",
-		Short: "KubeBlocks backup config",
-		Args:  cobra.NoArgs,
+		Use:     "backup-config",
+		Short:   "KubeBlocks backup config",
+		Example: BackupConfigExample,
+		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.complete(f, cmd))
 			cmdutil.CheckErr(o.run())

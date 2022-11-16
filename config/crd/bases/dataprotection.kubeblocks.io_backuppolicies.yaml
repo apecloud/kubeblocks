@@ -1559,7 +1559,6 @@ spec:
                 - name
                 type: object
               schedule:
-                default: 0 7 * * *
                 description: The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
                 type: string
               target:

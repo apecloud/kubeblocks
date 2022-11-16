@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/backup_config"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -29,6 +27,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/backup_config"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/bench"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/dbaas"

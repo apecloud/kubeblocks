@@ -36,8 +36,12 @@ type ConfigManagerSidecar struct {
 	Volumes []corev1.VolumeMount `json:"volumes"`
 }
 
+func IsNotSupportReload(autoReload bool, reloadType dbaasv1alpha1.CfgReloadType) bool {
+	return !autoReload || reloadType == ""
+}
+
 func NeedBuildConfigSidecar(autoReload bool, reloadType dbaasv1alpha1.CfgReloadType, configuration dbaasv1alpha1.ConfigReloadTrigger) (bool, error) {
-	if autoReload || reloadType == "" {
+	if !autoReload || reloadType == "" {
 		return false, nil
 	}
 
@@ -45,7 +49,7 @@ func NeedBuildConfigSidecar(autoReload bool, reloadType dbaasv1alpha1.CfgReloadT
 	case dbaasv1alpha1.UnixSignalType:
 		return checkSignalType(configuration)
 	case dbaasv1alpha1.SqlType, dbaasv1alpha1.ShellType, dbaasv1alpha1.HttpType:
-		// TODO support other way
+		// TODO support other method
 		return false, cfgutil.MakeError("This special reload type [%s] is not supported for now!", reloadType)
 	default:
 		return false, cfgutil.MakeError("Invalid Features: %s", reloadType)

@@ -130,8 +130,12 @@ func (w *TestWrapper) updateComTplMeta(cd *dbaasv1alpha1.ClusterDefinition) {
 			return true, nil
 		},
 		func(component *dbaasv1alpha1.ClusterDefinitionComponent) error {
-			for i := 0; i < len(component.ConfigTemplateRefs); i++ {
-				component.ConfigTemplateRefs[i].Name = w.testEnv.CfgTplName
+			configSpec := component.ConfigSpec
+			if configSpec == nil {
+				return nil
+			}
+			for i := 0; i < len(configSpec.ConfigTemplateRefs); i++ {
+				configSpec.ConfigTemplateRefs[i].Name = w.testEnv.CfgTplName
 			}
 			return nil
 		})

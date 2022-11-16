@@ -197,10 +197,8 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	clusterComponent := getClusterComponentsByName(cluster.Spec.Components, componentName)
 	// fix cluster maybe not any component
 	if clusterComponent == nil {
-		// TODO(zt) how to process found component!
 		reqCtx.Log.Info("not found component.", "componentName", componentName,
 			"clusterName", cluster.GetName())
-		// return intctrlutil.Reconciled()
 	} else {
 		componentName = clusterComponent.Type
 	}
@@ -215,7 +213,8 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 			reqCtx.Log)
 	}
 
-	if ok, _ := cfgcm.NeedBuildConfigSidecar(component.ConfigAutoReload, component.ConfigReloadType, component.ConfigReloadTrigger); !ok {
+	cfgSpec := component.ConfigSpec
+	if cfgSpec == nil {
 		return intctrlutil.Reconciled()
 	}
 
@@ -246,6 +245,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		ComponentUnits:   sts,
 		Component:        &component,
 		ClusterComponent: clusterComponent,
+		Restart:          cfgcm.IsNotSupportReload(cfgSpec.ConfigReload, cfgSpec.ConfigReloadType),
 	})
 }
 
@@ -263,9 +263,7 @@ func (r *ReconfigureRequestReconciler) updateCfgStatus(reqCtx intctrlutil.Reques
 }
 
 func (r *ReconfigureRequestReconciler) performUpgrade(params cfgpolicy.ReconfigureParams) (ctrl.Result, error) {
-	// TODO(zt) process update policy
-
-	policy, err := cfgpolicy.NewReconfigurePolicy(params.Tpl, params.Meta, dbaasconfig.GetUpgradePolicy(params.Cfg))
+	policy, err := cfgpolicy.NewReconfigurePolicy(params.Tpl, params.Meta, dbaasconfig.GetUpgradePolicy(params.Cfg), params.Restart)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(params.Cfg, r.Recorder, err, params.Ctx.Log)
 	}

@@ -173,7 +173,8 @@ func CheckCDConfigTemplate(client client.Client, ctx intctrlutil.RequestCtx, clu
 			return validateConfTpls(client, ctx, tpls)
 		},
 		func(component *dbaasv1alpha1.ClusterDefinitionComponent) error {
-			_, err := cfgcm.NeedBuildConfigSidecar(component.ConfigAutoReload, component.ConfigReloadType, component.ConfigReloadTrigger)
+			cfgSpec := component.ConfigSpec
+			_, err := cfgcm.NeedBuildConfigSidecar(cfgSpec.ConfigReload, cfgSpec.ConfigReloadType, cfgSpec.ConfigReloadTrigger)
 			return err
 		})
 }
@@ -216,8 +217,8 @@ func getCfgTplFromAV(appVer *dbaasv1alpha1.AppVersion) []dbaasv1alpha1.ConfigTem
 func getCfgTplFromCD(clusterDef *dbaasv1alpha1.ClusterDefinition, validators ...ComponentValidateHandler) ([]dbaasv1alpha1.ConfigTemplate, error) {
 	tpls := make([]dbaasv1alpha1.ConfigTemplate, 0)
 	for _, component := range clusterDef.Spec.Components {
-		if len(component.ConfigTemplateRefs) > 0 {
-			tpls = append(tpls, component.ConfigTemplateRefs...)
+		if component.ConfigSpec != nil && len(component.ConfigSpec.ConfigTemplateRefs) > 0 {
+			tpls = append(tpls, component.ConfigSpec.ConfigTemplateRefs...)
 			// Check reload configure config template
 			for _, validator := range validators {
 				if err := validator(&component); err != nil {

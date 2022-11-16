@@ -245,12 +245,15 @@ spec:
 			Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)).Should(Succeed())
 
 			clusterDefinition.Name += "-for-test"
-			clusterDefinition.Spec.Components[0].ConfigTemplateRefs = []dbaasv1alpha1.ConfigTemplate{
-				{
-					Name:       cmName,
-					VolumeName: "xxx",
+			clusterDefinition.Spec.Components[0].ConfigSpec = &dbaasv1alpha1.ConfigurationSpec{
+				ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{
+					{
+						Name:       cmName,
+						VolumeName: "xxx",
+					},
 				},
 			}
+
 			Expect(testCtx.CreateObj(ctx, clusterDefinition)).Should(Succeed())
 			createdClusterDef := &dbaasv1alpha1.ClusterDefinition{}
 			// check reconciled finalizer and status
@@ -294,10 +297,12 @@ spec:
 
 			cmName := "mysql-tree-node-template-8.0-test-failed"
 			clusterDefinition.Name += "-for-failed-test"
-			clusterDefinition.Spec.Components[0].ConfigTemplateRefs = []dbaasv1alpha1.ConfigTemplate{
-				{
-					Name:       cmName,
-					VolumeName: "",
+			clusterDefinition.Spec.Components[0].ConfigSpec = &dbaasv1alpha1.ConfigurationSpec{
+				ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{
+					{
+						Name:       cmName,
+						VolumeName: "xxx",
+					},
 				},
 			}
 

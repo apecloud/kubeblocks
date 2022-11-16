@@ -267,9 +267,10 @@ spec:
   components:
   - typeName: replicasets
     componentType: Stateful
-    configTemplateRefs: 
-    - name: mysql-tree-node-template-8.0 
-      volumeName: mysql-config
+	configSpec:
+      configTemplateRefs:
+      - name: mysql-tree-node-template-8.0
+        volumeName: mysql-config
     defaultReplicas: 1
     podSpec:
       containers:
@@ -344,9 +345,10 @@ spec:
   clusterDefinitionRef: cluster-definition
   components:
   - type: replicasets
-    configTemplateRefs: 
-    - name: mysql-tree-node-template-8.0 
-      volumeName: mysql-config
+    configSpec:
+      configTemplateRefs:
+      - name: mysql-tree-node-template-8.0
+        volumeName: mysql-config
     podSpec:
       containers:
       - name: mysql

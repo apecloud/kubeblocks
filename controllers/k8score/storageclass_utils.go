@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -16,6 +17,15 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
+
+// clusterContainsStorageClass check whether cluster used the StorageClass
+func clusterContainsStorageClass(cluster *dbaasv1alpha1.Cluster, storageClassName string) bool {
+	if cluster.Annotations == nil {
+		return false
+	}
+	storageClassNameList := strings.Split(cluster.Annotations[intctrlutil.StorageClassAnnotationKey], ",")
+	return slices.Contains(storageClassNameList, storageClassName)
+}
 
 func isDefaultStorageClassAnnotation(storageClass *storagev1.StorageClass) bool {
 	return storageClass.Annotations != nil && storageClass.Annotations[storage.IsDefaultStorageClassAnnotation] == "true"
@@ -55,6 +65,18 @@ func GetSupportVolumeExpansionComponents(ctx context.Context, cli client.Client,
 			volumeExpansionComponents = append(volumeExpansionComponents, operationComponent)
 		}
 	}
+	if len(storageClassMap) > 0 {
+		// patch cluster StorageClass annotation
+		patch := client.MergeFrom(cluster.DeepCopy())
+		if cluster.Annotations == nil {
+			cluster.Annotations = map[string]string{}
+		}
+		keys := maps.Keys(storageClassMap)
+		cluster.Annotations[intctrlutil.StorageClassAnnotationKey] = strings.Join(keys, ",")
+		if err := cli.Patch(ctx, cluster, patch); err != nil {
+			return volumeExpansionComponents, err
+		}
+	}
 	return volumeExpansionComponents, nil
 }
 
@@ -77,7 +99,7 @@ func checkStorageClassIsSupportExpansion(ctx context.Context,
 	} else {
 		// get the default StorageClass whether supports volume expansion for the first time
 		if !*hasCheckDefaultStorageClass {
-			if *defaultStorageClassAllowExpansion, err = checkDefaultStorageClass(ctx, cli); err != nil {
+			if *defaultStorageClassAllowExpansion, err = checkDefaultStorageClass(ctx, cli, storageClassMap); err != nil {
 				return false, err
 			}
 			*hasCheckDefaultStorageClass = true
@@ -108,7 +130,7 @@ func checkSpecifyStorageClass(ctx context.Context, cli client.Client, storageCla
 }
 
 // checkDefaultStorageClass check whether the default storageClass supports volume expansion
-func checkDefaultStorageClass(ctx context.Context, cli client.Client) (bool, error) {
+func checkDefaultStorageClass(ctx context.Context, cli client.Client, storageClassMap map[string]bool) (bool, error) {
 	storageClassList := &storagev1.StorageClassList{}
 	if err := cli.List(ctx, storageClassList); err != nil {
 		return false, err
@@ -116,7 +138,9 @@ func checkDefaultStorageClass(ctx context.Context, cli client.Client) (bool, err
 	// check the first default storageClass
 	for _, sc := range storageClassList.Items {
 		if isDefaultStorageClassAnnotation(&sc) {
-			return sc.AllowVolumeExpansion != nil && *sc.AllowVolumeExpansion, nil
+			allowExpansion := sc.AllowVolumeExpansion != nil && *sc.AllowVolumeExpansion
+			storageClassMap[sc.Name] = allowExpansion
+			return allowExpansion, nil
 		}
 	}
 	return false, nil

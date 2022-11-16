@@ -37,6 +37,8 @@ const (
 
 	// OpsRequestAnnotationKey OpsRequest annotation key in Cluster
 	OpsRequestAnnotationKey = "kubeblocks.io/ops-request"
+	// StorageClassAnnotationKey StorageClass annotation key in Cluster
+	StorageClassAnnotationKey = "kubeblocks.io/storage-class"
 )
 
 const (

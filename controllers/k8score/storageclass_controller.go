@@ -75,11 +75,16 @@ func (r *StorageClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 func (r *StorageClassReconciler) handleClusterVolumeExpansion(reqCtx intctrlutil.RequestCtx, storageClass *storagev1.StorageClass) error {
 	var err error
 	clusterList := &dbaasv1alpha1.ClusterList{}
-	if err = r.Client.List(reqCtx.Ctx, clusterList, client.MatchingLabels{intctrlutil.AppManagedByLabelKey: intctrlutil.AppName}); err != nil {
+	if err = r.Client.List(reqCtx.Ctx, clusterList); err != nil {
 		return err
 	}
 	// handle the created cluster
+	storageCLassName := storageClass.Name
 	for _, cluster := range clusterList.Items {
+		// if cluster not used the StorageClass, continue
+		if !clusterContainsStorageClass(&cluster, storageCLassName) {
+			continue
+		}
 		patch := client.MergeFrom(cluster.DeepCopy())
 		if needPatchClusterStatusOperations, err := r.needSyncClusterStatusOperations(reqCtx, &cluster, storageClass); err != nil {
 			return err

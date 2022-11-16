@@ -79,6 +79,7 @@ metadata:
   annotations:
        kubeblocks.io/ops-request: |
           {"Updating":"wesql-restart-test"}
+       kubeblocks.io/storage-class: csi-hostpath-sc,standard
   labels:
     appversion.kubeblocks.io/name: app-version-consensus
     clusterdefinition.kubeblocks.io/name: cluster-definition-consensus

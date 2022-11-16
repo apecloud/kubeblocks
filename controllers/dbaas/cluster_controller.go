@@ -250,7 +250,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if !ok {
 		cluster.Labels[clusterDefLabelKey] = clusterdefinition.Name
 		cluster.Labels[appVersionLabelKey] = appversion.Name
-		cluster.Labels[intctrlutil.AppManagedByLabelKey] = intctrlutil.AppName
 		if err = r.Client.Patch(reqCtx.Ctx, cluster, patch); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}

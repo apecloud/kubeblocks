@@ -1654,7 +1654,6 @@ spec:
             required:
             - hooks
             - remoteVolume
-            - schedule
             - target
             type: object
           status:

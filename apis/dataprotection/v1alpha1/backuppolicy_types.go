@@ -27,7 +27,7 @@ type BackupPolicySpec struct {
 	// +optional
 	BackupPolicyTemplateName string `json:"backupPolicyTemplateName,omitempty"`
 
-	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+	// The schedule in Cron format, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
 	// +optional
 	Schedule string `json:"schedule,omitempty"`
 

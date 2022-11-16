@@ -61,6 +61,7 @@ type CreateOptions struct {
 	Components   []map[string]interface{} `json:"components"`
 	// ComponentsFilePath components file path
 	ComponentsFilePath string `json:"-"`
+
 	create.BaseOptions
 }
 
@@ -77,6 +78,11 @@ func (o *CreateOptions) Validate() error {
 	if o.Name == "" {
 		return fmt.Errorf("missing cluster name")
 	}
+
+	if o.TerminationPolicy == "" {
+		return fmt.Errorf("a valid termination policy is needed, use --termination-policy to specify one of: DoNotTerminate, Halt, Delete, WipeOut")
+	}
+
 	if len(o.ComponentsFilePath) == 0 {
 		return fmt.Errorf("a valid component file path is needed")
 	}
@@ -109,7 +115,7 @@ func (o *CreateOptions) Complete() error {
 func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &CreateOptions{BaseOptions: create.BaseOptions{IOStreams: streams}}
 	inputs := create.Inputs{
-		Use:             "create",
+		Use:             "create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOut --components=file-path",
 		Short:           "Create a database cluster",
 		CueTemplateName: CueTemplateName,
 		ResourceName:    types.ResourceClusters,
@@ -122,7 +128,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		BuildFlags: func(cmd *cobra.Command) {
 			cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", DefaultClusterDef, "ClusterDefinition reference")
 			cmd.Flags().StringVar(&o.AppVersionRef, "app-version", DefaultAppVersion, "AppVersion reference")
-			cmd.Flags().StringVar(&o.TerminationPolicy, "termination-policy", "Delete", "Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)")
+			cmd.Flags().StringVar(&o.TerminationPolicy, "termination-policy", "", "Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)")
 			cmd.Flags().StringVar(&o.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type")
 			cmd.Flags().BoolVar(&o.Monitor, "monitor", false, "Set monitor enabled (default false)")
 			cmd.Flags().BoolVar(&o.EnableAllLogs, "enable-all-logs", false, "Enable advanced application all log extraction, and true will ignore enabledLogs of component level")
@@ -131,7 +137,13 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 			cmd.Flags().StringVar(&o.ComponentsFilePath, "components", "", "Use yaml file to specify the cluster components")
 		},
 	}
-	return create.BuildCommand(inputs)
+
+	cmd := create.BuildCommand(inputs)
+	cmdutil.CheckErr(cmd.MarkFlagRequired("termination-policy"))
+	cmdutil.CheckErr(cmd.MarkFlagRequired("components"))
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc("termination-policy", terminationPolicyCompletionFunc))
+
+	return cmd
 }
 
 // PreCreate before commit yaml to k8s, make changes on Unstructured yaml
@@ -176,4 +188,8 @@ func setEnableAllLogs(c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinit
 			c.Spec.Components[idx].EnabledLogs = typeList
 		}
 	}
+}
+
+func terminationPolicyCompletionFunc(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return []string{"DoNotTerminate", "Halt", "Delete", "WipeOut"}, cobra.ShellCompDirectiveNoFileComp
 }

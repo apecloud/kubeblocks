@@ -51,9 +51,11 @@ var _ = Describe("Cluster", func() {
 			tf.ClientConfigVal = cfg
 			cmd := NewCreateCmd(tf, streams)
 			Expect(cmd != nil).To(BeTrue())
-			Expect(cmd.Flags().GetString("termination-policy")).Should(Equal("Delete"))
+			Expect(cmd.Flags().GetString("termination-policy")).Should(Equal(""))
+
 			// must succeed otherwise exit 1 and make test fails
 			_ = cmd.Flags().Set("components", "../../testdata/component.yaml")
+			_ = cmd.Flags().Set("termination-policy", "Delete")
 			cmd.Run(nil, []string{"test1"})
 		})
 
@@ -65,7 +67,6 @@ var _ = Describe("Cluster", func() {
 			o := &CreateOptions{
 				BaseOptions:        create.BaseOptions{IOStreams: streams, Name: "test"},
 				ComponentsFilePath: "",
-				TerminationPolicy:  "WipeOut",
 				ClusterDefRef:      "wesql",
 				AppVersionRef:      "app-version",
 				PodAntiAffinity:    "Preferred",
@@ -73,6 +74,9 @@ var _ = Describe("Cluster", func() {
 				NodeLabels:         map[string]string{"testLabelKey": "testLabelValue"},
 			}
 
+			Expect(o.Validate()).Should(HaveOccurred())
+
+			o.TerminationPolicy = "WipeOut"
 			o.ComponentsFilePath = "test.yaml"
 			Expect(o.Complete()).ShouldNot(Succeed())
 

@@ -97,7 +97,7 @@ spec:
                           type: string
                       type: object
                     configReloadType:
-                      description: ConfigReloadType decided to restart the way
+                      description: ConfigReloadType decided to restart the way.
                       enum:
                       - signal
                       - http
@@ -270,7 +270,7 @@ spec:
                       type: object
                     customConfigurationVolume:
                       description: CustomConfigurationVolume is volume name which
-                        the user specifies update to
+                        the user specifies update to.
                       type: string
                     defaultReplicas:
                       default: 0
@@ -8164,7 +8164,7 @@ spec:
                       default: false
                       description: SupportRawUpgrade indicates whether the engine
                         supports memory updates parameter. Sidecar not support sql
-                        query set parameter if false
+                        query set parameter if false.
                       type: boolean
                     typeName:
                       description: Type name of the component, it can be any valid

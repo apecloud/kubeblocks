@@ -50,31 +50,34 @@ spec:
             properties:
               cfgSchemaTopLevelName:
                 description: CfgSchemaTopLevelName is cue type name, which generate
-                  openapi schema
+                  openapi schema.
                 type: string
               configurationSchema:
                 description: ConfigurationSchema that impose restrictions on engine
-                  parameter's rule
+                  parameter's rule.
                 properties:
                   cue:
                     description: Cue that to let ISV verify user configuration through
-                      cue language
+                      cue language.
                     type: string
                   schema:
                     description: 'TODO(zt) DAY2 support schema Schema provides a way
                       for ISVs to verify the validity of user change parameters through
-                      json schema controller-gen doesn''t work with k8s.io/apiextensions-apiserver:
+                      json schema. fix controller-gen doesn''t work with k8s.io/apiextensions-apiserver:
                       https://github.com/kubernetes-sigs/controller-tools/issues/291'
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
               dynamicParameters:
-                description: DynamicParameters support reload
+                description: DynamicParameters support reload.
                 items:
                   type: string
                 type: array
               formatter:
                 default: yaml
+                description: Formatter This parameter defines the format of the configuration
+                  file, controller parses the file contents based on formatter parameter,
+                  and analyzes the modified parameters list.
                 enum:
                 - dotenv
                 - ini
@@ -86,27 +89,27 @@ spec:
                 description: Immutable, if set to true, ensures that data stored in
                   the ConfigMap cannot be updated (only object metadata can be modified).
                   If set to true, Configmap object referenced by TplRef will also
-                  be modified to immutable Defaulted to true It is recommended to
+                  be modified to immutable Defaulted to true, It is recommended to
                   turn this option on only during the development or testing phase.
                 type: boolean
               immutableParameters:
                 description: ImmutableParameters describe not modify parameters by
-                  user
+                  user.
                 items:
                   type: string
                 type: array
               staticParameters:
-                description: StaticParameters require db instance restart
+                description: StaticParameters require db instance restart.
                 items:
                   type: string
                 type: array
               tplRef:
                 description: TplRef is a reference to the configmap object, the configmap
-                  determines how to generate the configurations
+                  determines how to generate the configurations.
                 type: string
               upgradeMode:
                 default: dynamic
-                description: UpgradeMode describe parameter update mode
+                description: UpgradeMode describe parameter update mode.
                 enum:
                 - dynamic
                 - static
@@ -114,7 +117,7 @@ spec:
             type: object
           status:
             description: ConfigurationTemplateStatus defines the observed state of
-              ConfigurationTemplate
+              ConfigurationTemplate.
             properties:
               message:
                 type: string
@@ -127,7 +130,7 @@ spec:
               phase:
                 description: Phase is configuration template status, if it is set
                   to AvailablePhase, ConfigurationTemplate be used by ClusterDefinition
-                  or AppVersion
+                  or AppVersion.
                 enum:
                 - Available
                 - Unavailable

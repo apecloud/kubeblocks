@@ -85,6 +85,10 @@ func (w *TestWrapper) HasError() error {
 	return w.err
 }
 
+func (w *TestWrapper) TplName() string {
+	return w.testEnv.CfgTplName
+}
+
 func (w *TestWrapper) CreateCluster(name string) *dbaasv1alpha1.Cluster {
 	clusterObj := &dbaasv1alpha1.Cluster{
 		TypeMeta: metav1.TypeMeta{
@@ -201,6 +205,25 @@ func (w *TestWrapper) DeleteAllCR() error {
 	}
 
 	return nil
+}
+
+func (w *TestWrapper) DeleteCD() error {
+	return w.cli.Delete(w.ctx, w.cd)
+}
+
+func (w *TestWrapper) DeleteAV() error {
+	return w.cli.Delete(w.ctx, w.av)
+}
+
+func (w *TestWrapper) DeleteTpl() error {
+	var (
+		ctx       = w.ctx
+		k8sClient = w.cli
+	)
+	if err := k8sClient.Delete(ctx, w.tpl); err != nil {
+		return err
+	}
+	return k8sClient.Delete(ctx, w.cm)
 }
 
 func (w *TestWrapper) DeleteCluster(objKey client.ObjectKey) error {

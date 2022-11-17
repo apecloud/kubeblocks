@@ -6,6 +6,22 @@ Install KubeBlocks
 dbctl kubeblocks install [flags]
 ```
 
+### Examples
+
+```
+  # Install KubeBlocks
+  dbctl kubeblocks install
+  
+  # Install KubeBlocks with specified version
+  dbctl kubeblocks install --version=0.2.0
+  
+  # Install KubeBlocks and enable the monitor including prometheus, grafana
+  dbctl kubeblocks install --monitor=true
+  
+  # Install KubeBlocks with other settings, for example, set replicaCount to 3
+  dbctl kubeblocks install --set replicaCount=3
+```
+
 ### Options
 
 ```

@@ -6,6 +6,13 @@ Uninstall KubeBlocks
 dbctl kubeblocks uninstall [flags]
 ```
 
+### Examples
+
+```
+  # uninstall KubeBlocks
+  dbctl kubeblocks uninstall
+```
+
 ### Options
 
 ```

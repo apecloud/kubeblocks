@@ -2,16 +2,6 @@
 
 KubeBlocks operation commands
 
-### Examples
-
-```
-  # install KubeBlocks
-  dbctl kubeblocks install
-  
-  # uninstall KubeBlocks
-  dbctl kubeblocks uninstall
-```
-
 ### Options
 
 ```

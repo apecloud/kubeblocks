@@ -23,18 +23,17 @@ import (
 	"os"
 	"strings"
 
+	"github.com/ghodss/yaml"
+	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-
-	"github.com/ghodss/yaml"
-	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/create"
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
@@ -80,6 +79,9 @@ type CreateOptions struct {
 	// ComponentsFilePath components file path
 	ComponentsFilePath string `json:"-"`
 
+	// backup name to restore in creation
+	Backup string `json:"backup,omitempty"`
+
 	create.BaseOptions
 }
 
@@ -90,6 +92,40 @@ func setMonitor(monitor bool, components []map[string]interface{}) {
 	for _, component := range components {
 		component[monitorKey] = monitor
 	}
+}
+
+func setBackup(o *CreateOptions, components []map[string]interface{}) error {
+	backup := o.Backup
+	if len(backup) == 0 {
+		return nil
+	}
+	if components == nil {
+		return nil
+	}
+
+	gvr := schema.GroupVersionResource{Group: types.DPGroup, Version: types.DPVersion, Resource: types.ResourceBackupJobs}
+	backupJobObj, err := o.Client.Resource(gvr).Namespace(o.Namespace).Get(context.TODO(), backup, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	backupType, _, _ := unstructured.NestedString(backupJobObj.Object, "spec", "backupType")
+	if backupType != "snapshot" {
+		return fmt.Errorf("only support snapshot backup, specified backup type is '%v'", backupType)
+	}
+
+	dataSource := make(map[string]interface{}, 0)
+	_ = unstructured.SetNestedField(dataSource, backup, "name")
+	_ = unstructured.SetNestedField(dataSource, "VolumeSnapshot", "kind")
+	_ = unstructured.SetNestedField(dataSource, "snapshot.storage.k8s.io", "apiGroup")
+
+	for _, component := range components {
+		templates := component["volumeClaimTemplates"].([]interface{})
+		for _, t := range templates {
+			templateMap := t.(map[string]interface{})
+			_ = unstructured.SetNestedField(templateMap, dataSource, "spec", "dataSource")
+		}
+	}
+	return nil
 }
 
 func (o *CreateOptions) Validate() error {
@@ -111,8 +147,9 @@ func (o *CreateOptions) Complete() error {
 	var (
 		componentByte []byte
 		err           error
-		components    = make([]map[string]interface{}, 0)
+		components    = o.Components
 	)
+
 	if len(o.ComponentsFilePath) > 0 {
 		if componentByte, err = os.ReadFile(o.ComponentsFilePath); err != nil {
 			return err
@@ -125,7 +162,9 @@ func (o *CreateOptions) Complete() error {
 		}
 	}
 	setMonitor(o.Monitor, components)
-
+	if err = setBackup(o, components); err != nil {
+		return err
+	}
 	o.Components = components
 	return nil
 }
@@ -160,6 +199,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 
 			cmd.Flags().StringVar(&o.ComponentsFilePath, "components", "", "Use yaml file to specify the cluster components")
 			cmdutil.CheckErr(cmd.MarkFlagRequired("components"))
+			cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 		},
 	}
 

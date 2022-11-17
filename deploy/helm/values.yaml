@@ -119,10 +119,22 @@ dashboards:
   ##
   enabled: false
 
-# Data protection settings
+## Data protection settings
+##
 dataProtection:
-  ## disableVolumeSnapshot - set this to true if cluster does not have snapshot.storage.k8s.io API installed
-  disableVolumeSnapshot: false
+  ## @param dataProtection.disableVolumeSnapshot - set this to true if cluster does not have snapshot.storage.k8s.io API installed
+  ##
+  disableVolumeSnapshot: true
+  ## @param dataProtection.backupSchedule -- set backup policy schedule time
+  ## backupSchedule is in Cron format, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
+  ## Example: 0 2 * * *  -- backup job will be scheduled to start at 2:00 each day.
+  ##
+  backupSchedule: ""
+  ## @param dataProtection.backupTTL -- set backup time to live.
+  ## backupTTL is a time.Duration-parseable string describing how long.
+  ## Example: 168h0m0s  -- the backup will expire in 7 days.
+  ##
+  backupTTL: ""
 
 
 # Sub-charts
@@ -245,3 +257,43 @@ loadbalancer:
 wesql:
   enabled: true
 
+## snapshot-controller settings
+## ref: https://artifacthub.io/packages/helm/piraeus-charts/snapshot-controller#configuration
+##
+snapshot-controller:
+  ## @param snapshot-controller.enabled -- Enable snapshot-controller chart.
+  ##
+  enabled: false
+  ## @param snapshot-controller.replicaCount -- Number of replicas to deploy.
+  ##
+  replicaCount: 1
+  ## snapshot-controller image setting, easy access for CN users.
+  ## @param snapshot-controller.image.repository -- Repository to pull the image from.
+  ##
+  image:
+    repository: registry.aliyuncs.com/google_containers/snapshot-controller
+
+## csi-s3 settings
+## ref: https://artifacthub.io/packages/helm/cloudve/csi-s3#configuration
+##
+csi-s3:
+  ## @param csi-s3.enabled -- Enable csi-s3 chart.
+  enabled: false
+  ## csi-s3 secret settings
+  ## @param csi-s3.secret.accessKey -- S3 Access Key.
+  ## @param csi-s3.secret.secretKey -- S3 Secret Key.
+  ## @param csi-s3.secret.endpoint -- S3 Endpoint.
+  ##
+  secret:
+    accessKey: ""
+    secretKey: ""
+    endpoint: ""
+  ## csi-s3 storageClass setting
+  ## @param csi-s3.storageClass.create -- Specifies whether the storage class should be created.
+  ## @param csi-s3.storageClass.singleBucket -- Use a single bucket for all dynamically provisioned persistent volumes.
+  ## @param csi-s3.storageClass.mountOptions -- mount options.
+  ##
+  storageClass:
+    create: true
+    singleBucket: ""
+    mountOptions: "--memory-limit 1000 --dir-mode 0777 --file-mode 0666 --region cn-northwest-1"

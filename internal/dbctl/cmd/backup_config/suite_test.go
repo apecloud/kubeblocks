@@ -14,28 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package backup
+package backup_config
 
 import (
-	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"testing"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
-// NewBackupCmd creates the backup command
-func NewBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "backup",
-		Short: "backup operation command",
-	}
-
-	// add subcommands
-	cmd.AddCommand(
-		NewListCmd(f, streams),
-		NewCreateCmd(f, streams),
-		NewRestoreCmd(f, streams),
-		NewSnapshotCmd(f, streams),
-	)
-
-	return cmd
+func TestDbaas(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "BackupConfig Suite")
 }

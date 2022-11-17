@@ -30,6 +30,7 @@ dbctl cluster create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOu
 
 ```
       --app-version string           AppVersion reference (default "wesql-8.0.30")
+      --backup string                Set a source backup to restore data
       --cluster-definition string    ClusterDefinition reference (default "apecloud-wesql")
       --components string            Use yaml file to specify the cluster components
       --enable-all-logs              Enable advanced application all log extraction, and true will ignore enabledLogs of component level

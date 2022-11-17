@@ -28,9 +28,11 @@ import (
 	cuejson "cuelang.org/go/encoding/json"
 	"github.com/leaanthony/debme"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -64,6 +66,12 @@ type Inputs struct {
 
 	// ResourceName k8s resource name
 	ResourceName string
+
+	// Group of API, default is dbaas
+	Group string
+
+	// Group of Version, default is v1alpha1
+	Version string
 
 	// Factory
 	Factory cmdutil.Factory
@@ -174,12 +182,83 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 			return err
 		}
 	}
+	group := inputs.Group
+	if len(group) == 0 {
+		group = types.Group
+	}
+
+	version := inputs.Version
+	if len(version) == 0 {
+		version = types.Version
+	}
 	// create k8s resource
-	gvr := schema.GroupVersionResource{Group: types.Group, Version: types.Version, Resource: inputs.ResourceName}
+	gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: inputs.ResourceName}
 	if unstructuredObj, err = o.Client.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 	fmt.Fprintf(o.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
+	return nil
+}
+
+// RunAsApply execute command. the options of parameter contain the command flags and args.
+// if the resource exists, run as "kubectl apply".
+func (o *BaseOptions) RunAsApply(inputs Inputs) error {
+	var (
+		cueValue        cue.Value
+		err             error
+		unstructuredObj *unstructured.Unstructured
+		optionsByte     []byte
+	)
+
+	if optionsByte, err = json.Marshal(inputs.Options); err != nil {
+		return err
+	}
+
+	if cueValue, err = newCueValue(inputs.CueTemplateName); err != nil {
+		return err
+	}
+
+	if cueValue, err = fillOptions(cueValue, optionsByte); err != nil {
+		return err
+	}
+
+	if unstructuredObj, err = covertContentToUnstructured(cueValue); err != nil {
+		return err
+	}
+
+	group := inputs.Group
+	if len(group) == 0 {
+		group = types.Group
+	}
+
+	version := inputs.Version
+	if len(version) == 0 {
+		version = types.Version
+	}
+	// create k8s resource
+	gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: inputs.ResourceName}
+	objectName, _, err := unstructured.NestedString(unstructuredObj.Object, "metadata", "name")
+	if err != nil {
+		return err
+	}
+	objectByte, err := json.Marshal(unstructuredObj)
+	if err != nil {
+		return err
+	}
+	if _, err := o.Client.Resource(gvr).Namespace(o.Namespace).Patch(
+		context.TODO(), objectName, k8sapitypes.MergePatchType,
+		objectByte, metav1.PatchOptions{}); err != nil {
+
+		// create object if not found
+		if errors.IsNotFound(err) {
+			if _, err = o.Client.Resource(gvr).Namespace(o.Namespace).Create(
+				context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
 	return nil
 }
 

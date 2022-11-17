@@ -190,6 +190,7 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	cmd := &cobra.Command{
 		Use:     "uninstall",
 		Short:   "Uninstall KubeBlocks",
+		Args:    cobra.NoArgs,
 		Example: uninstallExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.complete(f, cmd))

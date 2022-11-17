@@ -31,6 +31,7 @@ import (
 	pubsubLoader "github.com/dapr/dapr/pkg/components/pubsub"
 	secretstoresLoader "github.com/dapr/dapr/pkg/components/secretstores"
 	stateLoader "github.com/dapr/dapr/pkg/components/state"
+	httpMiddleware "github.com/dapr/dapr/pkg/middleware/http"
 
 	"github.com/dapr/dapr/pkg/runtime"
 	"github.com/dapr/kit/logger"
@@ -43,7 +44,7 @@ import (
 	"go.uber.org/automaxprocs/maxprocs"
 
 	"github.com/apecloud/kubeblocks/cmd/daprd/internal/binding/mysql"
-	"github.com/apecloud/kubeblocks/cmd/daprd/internal/middleware/probe"
+	"github.com/apecloud/kubeblocks/cmd/daprd/internal/middleware/http/probe"
 )
 
 var (

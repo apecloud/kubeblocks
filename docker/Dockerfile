@@ -68,7 +68,7 @@ WORKDIR /
 COPY --from=binary-downloader /bin/curl /bin
 COPY --from=builder /workspace/kubectl /bin
 COPY --from=builder /workspace/cmd/daprd/probe /bin
-COPY config/components config/components
+COPY config/dapr config/dapr
 COPY --from=builder /workspace/agamotto /bin
 COPY --from=builder /workspace/manager .
 USER 65532:65532

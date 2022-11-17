@@ -90,7 +90,8 @@ func buildProbeServiceContainer(container *corev1.Container, probeServiceHttpPor
 		"--dapr-grpc-port", strconv.Itoa(probeServiceGrpcPort),
 		"--app-protocol", "http",
 		"--log-level", logLevel,
-		"--components-path", "/config/components"}
+		"--config", "/config/dapr/config.yaml",
+		"--components-path", "/config/dapr/components"}
 
 	// set pod name and namespace, for role label updating inside pod
 	podName := corev1.EnvVar{

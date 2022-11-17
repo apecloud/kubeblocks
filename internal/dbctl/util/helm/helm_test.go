@@ -56,4 +56,18 @@ var _ = Describe("helm util", func() {
 		Expect(err).Should(HaveOccurred())
 		Expect(o.UnInstall(cfg)).Should(HaveOccurred())
 	})
+
+	It("Upgrade", func() {
+		o := &InstallOpts{
+			Name:      types.KubeBlocksChartName,
+			Chart:     "kubeblocks-test-chart",
+			Namespace: "default",
+			Version:   version.DefaultKubeBlocksVersion,
+		}
+		cfg := FakeActionConfig()
+		Expect(cfg != nil).Should(BeTrue())
+		_, err := o.Upgrade(cfg)
+		Expect(err).Should(HaveOccurred())
+		Expect(o.UnInstall(cfg)).Should(HaveOccurred())
+	})
 })

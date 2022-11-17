@@ -101,6 +101,13 @@ const (
 	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/apecloud-loadbalancer-type"
 	ServiceLBTypeAnnotationValue   = "private-ip"
 	ServiceFloatingIPAnnotationKey = "service.kubernetes.io/apecloud-loadbalancer-floating-ip"
+
+	// DataProtection definitions
+	DPGroup                = "dataprotection.kubeblocks.io"
+	DPVersion              = "v1alpha1"
+	ResourceBackupJobs     = "backupjobs"
+	ResourceRestoreJobs    = "restorejobs"
+	ResourceBackupPolicies = "backuppolicies"
 )
 
 type ClusterObjects struct {
@@ -157,6 +164,14 @@ func AppVersionGVR() schema.GroupVersionResource {
 
 func AppVersionGK() schema.GroupKind {
 	return schema.GroupKind{Group: Group, Kind: KindAppVersion}
+}
+
+func BackupJobGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceBackupJobs}
+}
+
+func RestoreJobGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceRestoreJobs}
 }
 
 func OpsGVR() schema.GroupVersionResource {

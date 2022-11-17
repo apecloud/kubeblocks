@@ -26,9 +26,9 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
-
+	
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/appversion"
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/backup"
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/backup_config"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/bench"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/clusterdefinition"
@@ -87,9 +87,9 @@ A database management tool for KubeBlocks`,
 		appversion.NewAppVersionCmd(f, ioStreams),
 		clusterdefinition.NewClusterDefinitionCmd(f, ioStreams),
 		bench.NewBenchCmd(),
-		backup.NewBackupCmd(f, ioStreams),
 		options.NewCmdOptions(ioStreams.Out),
 		version.NewVersionCmd(f),
+		backup_config.NewBackupConfigCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}

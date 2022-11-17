@@ -51,13 +51,25 @@ type installOptions struct {
 	Monitor bool
 }
 
-var example = templates.Examples(`
-		# install KubeBlocks
-		dbctl kubeblocks install
+var (
+	installExample = templates.Examples(`
+	# Install KubeBlocks
+	dbctl kubeblocks install
+	
+	# Install KubeBlocks with specified version
+	dbctl kubeblocks install --version=0.2.0
 
-		# uninstall KubeBlocks
-        dbctl kubeblocks uninstall
+	# Install KubeBlocks and enable the monitor including prometheus, grafana
+	dbctl kubeblocks install --monitor=true
+
+	# Install KubeBlocks with other settings, for example, set replicaCount to 3
+	dbctl kubeblocks install --set replicaCount=3
 `)
+
+	uninstallExample = templates.Examples(`
+		# uninstall KubeBlocks
+        dbctl kubeblocks uninstall`)
+)
 
 // NewKubeBlocksCmd creates the kubeblocks command
 func NewKubeBlocksCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -65,7 +77,6 @@ func NewKubeBlocksCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 		Use:     "kubeblocks [install | uninstall]",
 		Short:   "KubeBlocks operation commands",
 		Aliases: []string{"kb"},
-		Example: example,
 	}
 	cmd.AddCommand(
 		newInstallCmd(f, streams),
@@ -156,9 +167,10 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	}
 
 	cmd := &cobra.Command{
-		Use:   "install",
-		Short: "Install KubeBlocks",
-		Args:  cobra.NoArgs,
+		Use:     "install",
+		Short:   "Install KubeBlocks",
+		Args:    cobra.NoArgs,
+		Example: installExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.complete(f, cmd))
 			cmdutil.CheckErr(o.run())
@@ -177,8 +189,9 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		IOStreams: streams,
 	}
 	cmd := &cobra.Command{
-		Use:   "uninstall",
-		Short: "Uninstall KubeBlocks",
+		Use:     "uninstall",
+		Short:   "Uninstall KubeBlocks",
+		Example: uninstallExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.complete(f, cmd))
 			cmdutil.CheckErr(o.run())

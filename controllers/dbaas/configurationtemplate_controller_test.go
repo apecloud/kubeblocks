@@ -106,7 +106,7 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 				_, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigurationTemplate{},
 					func(tpl *dbaasv1alpha1.ConfigurationTemplate) error { return nil })
 				return err
-			}, time.Second*30, time.Second*1).Should(Succeed())
+			}, time.Second*10, time.Second*1).Should(Succeed())
 
 			// step3: delete clusterdefinition and appversion
 			logrus.Info("delete clusterdefinition and appversion.")

@@ -1586,7 +1586,7 @@ func updateConfigurationManagerWithComponent(params createParams, sts *appsv1.St
 	managerSidecar := &cfgcm.ConfigManagerSidecar{
 		ManagerName: ConfigSidecarName,
 		Image:       viper.GetString(ConfigSidecarIMAGE),
-		Args:        cfgcm.BuildReloadSidecarParams(cfgSpec.ConfigReloadType, cfgSpec.ConfigReloadTrigger, volumeDirs),
+		Args:        cfgcm.BuildReloadSidecarParams(cfgSpec.ConfigReloadType, *cfgSpec.ConfigReloadTrigger, volumeDirs),
 		Volumes:     volumeDirs,
 	}
 

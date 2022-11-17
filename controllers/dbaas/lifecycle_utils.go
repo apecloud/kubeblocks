@@ -729,6 +729,8 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				if err := cli.List(ctx, &backupPolicyTemplateList, ml); err != nil {
 					return err
 				}
+				vsList := snapshotv1.VolumeSnapshotList{}
+				getVSErr := cli.List(ctx, &vsList)
 				if len(backupPolicyTemplateList.Items) > 0 {
 					// TODO chantu: check volume snapshot support
 					backupJobName := generateName(cluster.Name + "-scaling-")
@@ -745,28 +747,30 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 							return err
 						}
 					}
-				} else if len(stsObj.Spec.VolumeClaimTemplates) > 0 {
+				} else if getVSErr == nil && len(stsObj.Spec.VolumeClaimTemplates) > 0 { // check volume snapshot available
 					snapshotName := generateName(cluster.Name + "-scaling-")
-					pvcName := strings.Join([]string{stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, "0"}, "-")
-					snapshot, err := buildVolumeSnapshot(snapshotName, pvcName, *stsObj)
-					if err != nil {
-						return err
-					}
-					if err := cli.Create(ctx, snapshot); err != nil {
-						if !apierrors.IsAlreadyExists(err) {
+					if len(stsObj.Spec.VolumeClaimTemplates) > 0 {
+						pvcName := strings.Join([]string{stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, "0"}, "-")
+						snapshot, err := buildVolumeSnapshot(snapshotName, pvcName, *stsObj)
+						if err != nil {
 							return err
 						}
-					}
-					if err := controllerutil.SetOwnerReference(cluster, snapshot, scheme); err != nil {
-						return err
-					}
-					for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
-						pvcKey := types.NamespacedName{
-							Namespace: key.Namespace,
-							Name:      fmt.Sprintf("%s-%s-%d", "data", stsObj.Name, i),
+						if err := cli.Create(ctx, snapshot); err != nil {
+							if !apierrors.IsAlreadyExists(err) {
+								return err
+							}
 						}
-						if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, snapshotName); err != nil {
+						if err := controllerutil.SetOwnerReference(cluster, snapshot, scheme); err != nil {
 							return err
+						}
+						for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
+							pvcKey := types.NamespacedName{
+								Namespace: key.Namespace,
+								Name:      fmt.Sprintf("%s-%s-%d", "data", stsObj.Name, i),
+							}
+							if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, snapshotName); err != nil {
+								return err
+							}
 						}
 					}
 				}

@@ -18,9 +18,8 @@ package dbaas
 
 import (
 	"context"
-	"os"
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"path/filepath"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"testing"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -75,12 +74,6 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: true,
 	}
 
-	if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
-		useExistingCluster := true
-		testEnv.UseExistingCluster = &useExistingCluster
-		testEnv.Config = config.GetConfigOrDie()
-	}
-
 	var err error
 	// cfg is defined in this file globally.
 	cfg, err = testEnv.Start()
@@ -91,6 +84,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = dataprotectionv1alpha1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = snapshotv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme

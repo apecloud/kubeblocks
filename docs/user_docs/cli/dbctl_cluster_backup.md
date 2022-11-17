@@ -1,25 +1,26 @@
-## dbctl cluster create
+## dbctl cluster backup
 
-Create a database cluster
+Create a backup
 
 ```
-dbctl cluster create [flags]
+dbctl cluster backup [flags]
+```
+
+### Examples
+
+```
+  # create a backup
+  dbctl cluster backup cluster-name
 ```
 
 ### Options
 
 ```
-      --app-version string           AppVersion reference (default "wesql-8.0.30")
-      --backup string                Set a source backup to restore data
-      --cluster-definition string    ClusterDefinition reference (default "apecloud-wesql")
-      --components string            Use yaml file to specify the cluster components
-      --enable-all-logs              Enable advanced application all log extraction, and true will ignore enabledLogs of component level
-  -h, --help                         help for create
-      --monitor                      Set monitor enabled (default false)
-      --node-labels stringToString   Node label selector (default [])
-      --pod-anti-affinity string     Pod anti-affinity type (default "Preferred")
-      --termination-policy string    Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
-      --topology-keys stringArray    Topology keys for affinity
+      --backup-name string   Backup name
+      --backup-type string   Backup type (default "snapshot")
+  -h, --help                 help for backup
+      --role string          backup on cluster role
+      --ttl string           Time to live (default "168h0m0s")
 ```
 
 ### Options inherited from parent commands
@@ -28,7 +29,7 @@ dbctl cluster create [flags]
       --as string                      Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
       --as-group stringArray           Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
       --as-uid string                  UID to impersonate for the operation.
-      --cache-dir string               Default cache directory (default "/Users/ldm/.kube/cache")
+      --cache-dir string               Default cache directory (default "/Users/shaojiang/.kube/cache")
       --certificate-authority string   Path to a cert file for the certificate authority
       --client-certificate string      Path to a client certificate file for TLS
       --client-key string              Path to a client key file for TLS

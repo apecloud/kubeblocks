@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 
@@ -37,6 +38,23 @@ import (
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/create"
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
+
+var example = templates.Examples(`
+	# Create a cluster using component file component.yaml and termination policy DoNotDelete that will prevent
+	# the cluster from being deleted
+	dbctl cluster create mycluster --components=component.yaml --termination-policy=DoNotDelete
+
+	# In scenarios where you want to delete resources such as sts, deploy, svc, pdb, but keep pvcs when deleting
+	# the cluster, use termination policy Halt
+	dbctl cluster create mycluster --components=component.yaml --termination-policy=Halt
+
+	# In scenarios where you want to delete resource such as sts, deploy, svc, pdb, and including pvcs when
+	# deleting the cluster, use termination policy Delete
+	dbctl cluster create mycluster --components=component.yaml --termination-policy=Delete
+
+	# In scenarios where you want to delete all resources including all snapshots and snapshot data when deleting
+	# the cluster, use termination policy WipeOut
+	dbctl cluster create mycluster --components=component.yaml --termination-policy=WipeOut`)
 
 const (
 	DefaultClusterDef = "apecloud-wesql"
@@ -117,6 +135,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	inputs := create.Inputs{
 		Use:             "create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOut --components=file-path",
 		Short:           "Create a database cluster",
+		Example:         example,
 		CueTemplateName: CueTemplateName,
 		ResourceName:    types.ResourceClusters,
 		BaseOptionsObj:  &o.BaseOptions,

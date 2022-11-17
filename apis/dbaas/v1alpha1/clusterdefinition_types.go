@@ -135,7 +135,7 @@ type ConfigurationSpec struct {
 	// ConfigTemplateRefs map[string][]ConfigTemplate `json:"configTemplateRefs,omitempty"`
 	// DefaultScene string `json:"defaultScene,omitempty"`
 
-	// ConfigRevisionHistoryLimit is number of historical versions of configuration variations submitted by users, By default, 6 versions are reserved.
+	// ConfigRevisionHistoryLimit is number of prior versions of configuration variations submitted by users, By default, 6 versions are reserved.
 	// +kubebuilder:default=6
 	// +kubebuilder:validation:Minimum=0
 	// +optional

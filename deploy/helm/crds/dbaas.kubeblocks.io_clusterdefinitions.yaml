@@ -107,7 +107,7 @@ spec:
                           type: string
                         configRevisionHistoryLimit:
                           default: 6
-                          description: ConfigRevisionHistoryLimit is number of historical
+                          description: ConfigRevisionHistoryLimit is number of prior
                             versions of configuration variations submitted by users,
                             By default, 6 versions are reserved.
                           minimum: 0

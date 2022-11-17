@@ -49,11 +49,11 @@ spec:
             description: ConfigurationTemplateSpec defines the desired state of ConfigurationTemplate
             properties:
               cfgSchemaTopLevelName:
-                description: CfgSchemaTopLevelName is cue type name, which generate
+                description: CfgSchemaTopLevelName is cue type name, which generates
                   openapi schema.
                 type: string
               configurationSchema:
-                description: ConfigurationSchema that impose restrictions on engine
+                description: ConfigurationSchema that imposes restrictions on engine
                   parameter's rule.
                 properties:
                   cue:
@@ -69,19 +69,17 @@ spec:
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
               dynamicParameters:
-                description: DynamicParameters field and StaticParameters field are
-                  the same. for the convenience of the ISVs, if there are more static
-                  parameters, it is recommended to use StaticParameters field, otherwise
-                  it is recommended to use DynamicParameters field.
+                description: DynamicParameters, list of DynamicParameter, modification
+                  of it triggers a config dynamic reload without process restart.
                 items:
                   type: string
                 type: array
               formatter:
                 default: yaml
-                description: Formatter describe the format of the configuration file,
+                description: Formatter describes the format of the configuration file,
                   the controller parses configuration file based on formatter, and
-                  analyzes the modified parameters list, and then decides what policy
-                  to use to make those modified parameters take effect.
+                  analyzes the modified parameters list, and then applies corresponding
+                  policies.
                 enum:
                 - dotenv
                 - ini
@@ -89,43 +87,21 @@ spec:
                 - json
                 - hcl
                 type: string
-              immutable:
-                description: The configuration template is common, if it is modified
-                  incorrectly, it will affect all clusters using this configuration,
-                  we do not recommend modifying the template that is already online,
-                  but modifications are inevitable during development or CICD, so
-                  this control parameter is provided. if set to true, Configmap object
-                  referenced by TplRef will also be modified to immutable. defaulted
-                  to true.
-                type: boolean
               immutableParameters:
-                description: ImmutableParameters describe parameters that prohibit
+                description: ImmutableParameters describes parameters that prohibit
                   user from modification.
                 items:
                   type: string
                 type: array
               staticParameters:
-                description: After any parameters in StaticParameters are modified,
-                  the controller need to restart the engine instance.
+                description: StaticParameters, list of StaticParameter, modification
+                  of it triggers a process restart.
                 items:
                   type: string
                 type: array
               tplRef:
                 description: TplRef is a reference to the configmap object, the configmap
                   determines how to generate the configurations.
-                type: string
-              upgradeMode:
-                default: dynamic
-                description: UpgradeMode describe parameter update mode. For ISVs,
-                  it's impossible to enumerate all parameters, and when the user modify
-                  unknown parameters, or ISVs does not configure StaticParameters
-                  or DynamicParameters field, these parameters should be treated as
-                  dynamic parameter or static parameter? if it is treated as static
-                  parameter, the engine instance will be restarted, otherwise it will
-                  be reloaded.
-                enum:
-                - dynamic
-                - static
                 type: string
             type: object
           status:
@@ -138,7 +114,7 @@ spec:
                 type: string
               observedGeneration:
                 description: observedGeneration is the most recent generation observed
-                  for this ClusterDefinition. It corresponds to the ClusterDefinition's
+                  for this ClusterDefinition. It corresponds to the ConfigurationTemplate's
                   generation, which is updated on mutation by the API Server.
                 format: int64
                 type: integer

@@ -143,7 +143,7 @@ func UpdateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl
 	}
 	cmObj.ObjectMeta.Labels[CMConfigurationTplLabelKey] = "true"
 
-	cmObj.Immutable = &tpl.Spec.Immutable
+	// cmObj.Immutable = &tpl.Spec.Immutable
 	return cli.Patch(ctx.Ctx, cmObj, patch)
 }
 

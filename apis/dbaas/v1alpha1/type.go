@@ -96,13 +96,6 @@ const (
 	DOTENV ConfigurationFormatter = "dotenv"
 )
 
-type UpdateMode string
-
-const (
-	STATIC_MODE  UpdateMode = "static"
-	DYNAMIC_MODE UpdateMode = "dynamic"
-)
-
 type UpgradePolicy string
 
 const (

@@ -113,6 +113,6 @@ func IsUpdateDynamicParameters(tpl *dbaasv1alpha1.ConfigurationTemplateSpec, cfg
 		return union.Empty(), nil
 	}
 
-	// default policy
-	return tpl.UpgradeMode == dbaasv1alpha1.DYNAMIC_MODE, nil
+	// default static parameters
+	return true, nil
 }

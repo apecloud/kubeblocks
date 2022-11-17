@@ -125,10 +125,14 @@ dataProtection:
   ## @param dataProtection.disableVolumeSnapshot - set this to true if cluster does not have snapshot.storage.k8s.io API installed
   ##
   disableVolumeSnapshot: true
-  ## @param dataProtection.backupSchedule -- set backup policy schedule time.
+  ## @param dataProtection.backupSchedule -- set backup policy schedule time
+  ## backupSchedule is in Cron format, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
+  ## Example: 0 2 * * *  -- backup job will be scheduled to start at 2:00 each day.
   ##
   backupSchedule: ""
   ## @param dataProtection.backupTTL -- set backup time to live.
+  ## backupTTL is a time.Duration-parseable string describing how long.
+  ## Example: 168h0m0s  -- the backup will expire in 7 days.
   ##
   backupTTL: ""
 

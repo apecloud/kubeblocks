@@ -745,7 +745,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 							return err
 						}
 					}
-				} else {
+				} else if len(stsObj.Spec.VolumeClaimTemplates) > 0 {
 					snapshotName := generateName(cluster.Name + "-scaling-")
 					pvcName := strings.Join([]string{stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, "0"}, "-")
 					snapshot, err := buildVolumeSnapshot(snapshotName, pvcName, *stsObj)
@@ -1501,6 +1501,9 @@ func generateName(base string) string {
 
 func prepareInjectEnvs(component *Component, cluster *dbaasv1alpha1.Cluster) []corev1.EnvVar {
 	envs := []corev1.EnvVar{}
+	if component == nil || cluster == nil {
+		return envs
+	}
 	prefix := dbaasPrefix + "_" + strings.ToUpper(component.Type) + "_"
 	svcName := strings.Join([]string{cluster.Name, component.Name, "headless"}, "-")
 	envs = append(envs, corev1.EnvVar{

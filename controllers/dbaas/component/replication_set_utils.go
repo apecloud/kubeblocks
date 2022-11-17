@@ -23,7 +23,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -96,15 +95,9 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 		if stsToDelNum == 0 {
 			break
 		}
-		// list all statefulSets by componentKey label
-		allStsList := &appsv1.StatefulSetList{}
-		selector, err := labels.Parse(intctrlutil.AppComponentLabelKey + "=" + compKey)
+		// list all statefulSets by cluster and componentKey label
+		allStsList, err := ListStatefulSetByClusterAndComponentLabels(reqCtx.Ctx, cli, cluster, compKey)
 		if err != nil {
-			return err
-		}
-		if err := cli.List(reqCtx.Ctx, allStsList,
-			&client.ListOptions{Namespace: cluster.Namespace},
-			client.MatchingLabelsSelector{Selector: selector}); err != nil {
 			return err
 		}
 		if compOwnsStsMap[compKey] != len(allStsList.Items) {
@@ -123,20 +116,13 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 		// sort the statefulSets by their ordinals
 		sort.Sort(descendingOrdinalSts(dos))
 
-		// delete statefulSets and svc, etc
+		// remove cluster status and delete sts
 		for i := 0; i < stsToDelNum; i++ {
+			err := RemoveReplicationSetClusterStatus(cli, reqCtx.Ctx, dos[i])
+			if err != nil {
+				return err
+			}
 			if err := cli.Delete(reqCtx.Ctx, dos[i]); err != nil {
-				return err
-			}
-			svc := &corev1.Service{}
-			svcKey := types.NamespacedName{
-				Namespace: cluster.Namespace,
-				Name:      fmt.Sprintf("%s-%d", dos[i].Name, 0),
-			}
-			if err := cli.Get(reqCtx.Ctx, svcKey, svc); err != nil {
-				return err
-			}
-			if err := cli.Delete(reqCtx.Ctx, svc); err != nil {
 				return err
 			}
 		}
@@ -156,7 +142,7 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 	return nil
 }
 
-// SyncReplicationSetClusterStatus Sync replicationSet status to cluster.status.component[componentName].ReplicationStatus
+// SyncReplicationSetClusterStatus Sync replicationSet pod status to cluster.status.component[componentName].ReplicationStatus
 func SyncReplicationSetClusterStatus(cli client.Client, ctx context.Context, podName types.NamespacedName, role string) error {
 	pod := &corev1.Pod{}
 	if err := cli.Get(ctx, podName, pod); err != nil {
@@ -192,6 +178,37 @@ func SyncReplicationSetClusterStatus(cli client.Client, ctx context.Context, pod
 	return nil
 }
 
+// RemoveReplicationSetClusterStatus Remove replicationSet pod status from cluster.status.component[componentName].ReplicationStatus
+func RemoveReplicationSetClusterStatus(cli client.Client, ctx context.Context, stsObj *appsv1.StatefulSet) error {
+	podList, err := GetPodListByStatefulSet(ctx, cli, stsObj)
+	if err != nil {
+		return err
+	}
+	cluster := &dbaasv1alpha1.Cluster{}
+	err = cli.Get(ctx, types.NamespacedName{
+		Namespace: stsObj.Namespace,
+		Name:      stsObj.Labels[intctrlutil.AppInstanceLabelKey],
+	}, cluster)
+	if err != nil {
+		return err
+	}
+	patch := client.MergeFrom(cluster.DeepCopy())
+	componentName := stsObj.Labels[intctrlutil.AppComponentLabelKey]
+	replicationSetStatus := cluster.Status.Components[componentName].ReplicationSetStatus
+	for _, pod := range podList {
+		needRemove, err := needRemoveReplicationSetStatus(replicationSetStatus, pod.Name)
+		if err != nil {
+			return err
+		}
+		if needRemove {
+			if err := cli.Status().Patch(ctx, cluster, patch); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func needUpdateReplicationSetStatus(replicationStatus *dbaasv1alpha1.ReplicationSetStatus, role, podName string) bool {
 	if role == string(dbaasv1alpha1.Primary) {
 		if replicationStatus.Primary.Pod == podName && replicationStatus.Primary.Role == role {
@@ -219,4 +236,19 @@ func needUpdateReplicationSetStatus(replicationStatus *dbaasv1alpha1.Replication
 		}
 		return true
 	}
+}
+
+func needRemoveReplicationSetStatus(replicationStatus *dbaasv1alpha1.ReplicationSetStatus, podName string) (bool, error) {
+	if replicationStatus.Primary.Pod == podName {
+		return false, fmt.Errorf("primary pod cannot be removed")
+	}
+	needRemove := false
+	for index, secondary := range replicationStatus.Secondaries {
+		if secondary.Pod == podName {
+			replicationStatus.Secondaries = append(replicationStatus.Secondaries[:index], replicationStatus.Secondaries[index+1:]...)
+			needRemove = true
+			break
+		}
+	}
+	return needRemove, nil
 }

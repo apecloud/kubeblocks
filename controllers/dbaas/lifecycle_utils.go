@@ -32,7 +32,6 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -1047,19 +1046,9 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx, cli client.Client, param
 	var stsList []*appsv1.StatefulSet
 
 	// get math.Max(params.component.Replicas, current exist statefulSet)
-	existStsList := &appsv1.StatefulSetList{}
-	clusterSelector, err := labels.Parse(intctrlutil.AppInstanceLabelKey + "=" + params.cluster.Name)
+	// list all statefulSets by cluster and componentKey label
+	existStsList, err := component.ListStatefulSetByClusterAndComponentLabels(reqCtx.Ctx, cli, params.cluster, params.component.Name)
 	if err != nil {
-		return stsList, err
-	}
-	compSelector, err := labels.Parse(intctrlutil.AppComponentLabelKey + "=" + params.component.Name)
-	if err != nil {
-		return stsList, err
-	}
-	if err := cli.List(reqCtx.Ctx, existStsList,
-		&client.ListOptions{Namespace: params.cluster.Namespace},
-		client.MatchingLabelsSelector{Selector: compSelector},
-		client.MatchingLabelsSelector{Selector: clusterSelector}); err != nil {
 		return stsList, err
 	}
 	replicaNum := math.Max(float64(len(existStsList.Items)), float64(params.component.Replicas))

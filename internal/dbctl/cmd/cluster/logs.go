@@ -178,9 +178,10 @@ func (o *LogsOptions) complete(args []string) error {
 		}
 	}
 	o.Command = []string{"/bin/bash", "-c", command}
-	fmt.Println(o.Command)
 	o.ContainerName = o.logOptions.Container
 	o.Pod = pod
+	// hide unnecessary output
+	o.Quiet = true
 	return nil
 }
 

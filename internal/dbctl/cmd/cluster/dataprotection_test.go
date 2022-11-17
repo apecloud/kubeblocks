@@ -158,6 +158,7 @@ var _ = Describe("DataProtection", func() {
 		cmd := NewCreateCmd(tf, streams)
 		Expect(cmd != nil).To(BeTrue())
 		_ = cmd.Flags().Set("components", "../../testdata/component.yaml")
+		_ = cmd.Flags().Set("termination-policy", "Delete")
 		cmd.Run(nil, []string{clusterName})
 
 		// create backup

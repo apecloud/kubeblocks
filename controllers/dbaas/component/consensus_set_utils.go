@@ -135,6 +135,10 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 		if err = cli.Status().Patch(ctx, cluster, patch); err != nil {
 			return false, err
 		}
+		// add consensus role annotations to pod
+		if err := updateConsensusRoleAnnotations(ctx, cli, cluster, *component, pods); err != nil {
+			return false, err
+		}
 	}
 
 	// prepare to do pods Deletion, that's the only thing we should do.
@@ -353,60 +357,8 @@ func UpdateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCt
 		return nil
 	}
 
-	patch := client.MergeFrom(pod.DeepCopy())
-	if err := cli.Status().Patch(ctx, cluster, patch); err != nil {
-		return err
-	}
-
-	followerLabel := ""
-	for _, follower := range cluster.Status.Components[componentName].ConsensusSetStatus.Followers {
-		if len(followerLabel) > 0 {
-			followerLabel += ","
-		}
-		followerLabel += follower.Pod
-	}
-	leaderLabel := cluster.Status.Components[componentName].ConsensusSetStatus.Leader.Pod
-	labelSelector, err := labels.Parse("app.kubernetes.io/instance=" + cluster.Name)
-	if err != nil {
-		return err
-	}
-	o := &client.ListOptions{LabelSelector: labelSelector}
-
-	podList := &corev1.PodList{}
-	if err := cli.List(ctx, podList, o); err != nil {
-		return err
-	}
-	for _, pod := range podList.Items {
-		patch := client.MergeFrom(pod.DeepCopy())
-		if pod.ObjectMeta.Annotations == nil {
-			pod.ObjectMeta.Annotations = map[string]string{}
-		}
-		// prevent exist pods from deletion
-		pod.ObjectMeta.Annotations["cs.dbaas.kubeblocks.io/do-not-delete"] = "true"
-		if err := cli.Patch(ctx, &pod, patch); err != nil {
-			return err
-		}
-	}
-
-	// update label in StatefulSet template
-	stsList := &appsv1.StatefulSetList{}
-	if err := cli.List(ctx, stsList, o); err != nil {
-		return err
-	}
-	for _, sts := range stsList.Items {
-		patch := client.MergeFrom(sts.DeepCopy())
-		if sts.Spec.Template.ObjectMeta.Annotations == nil {
-			sts.Spec.Template.ObjectMeta.Annotations = map[string]string{}
-		}
-		sts.Spec.Template.ObjectMeta.Annotations["cs.dbaas.kubeblocks.io/leader"] = leaderLabel
-		sts.Spec.Template.ObjectMeta.Annotations["cs.dbaas.kubeblocks.io/followers"] = followerLabel
-		if err := cli.Patch(ctx, &sts, patch); err != nil {
-			return err
-		}
-	}
-
 	// update pod role label
-	patch = client.MergeFrom(pod.DeepCopy())
+	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] = role
 	pod.Labels[intctrlutil.ConsensusSetAccessModeLabelKey] = string(roleMap[role].accessMode)
 
@@ -613,4 +565,70 @@ func isReady(pod corev1.Pod) bool {
 	}
 
 	return false
+}
+
+func updateConsensusRoleAnnotations(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, componentDef dbaasv1alpha1.ClusterDefinitionComponent, pods []corev1.Pod) error {
+	leader := ""
+	followers := ""
+	for _, pod := range pods {
+		role := pod.Labels[intctrlutil.ConsensusSetRoleLabelKey]
+		// mapping role label to consensus member
+		roleMap := composeConsensusRoleMap(componentDef)
+		memberExt, ok := roleMap[role]
+		if !ok {
+			continue
+		}
+		switch memberExt.consensusRole {
+		case Leader:
+			leader = pod.Name
+		case Follower:
+			if len(followers) > 0 {
+				followers += ","
+			}
+			followers += pod.Name
+		case Learner:
+			// TODO: CT
+		}
+	}
+
+	labelSelector, err := labels.Parse("app.kubernetes.io/instance=" + cluster.Name)
+	if err != nil {
+		return err
+	}
+	o := &client.ListOptions{LabelSelector: labelSelector}
+
+	podList := &corev1.PodList{}
+	if err := cli.List(ctx, podList, o); err != nil {
+		return err
+	}
+	for _, pod := range podList.Items {
+		patch := client.MergeFrom(pod.DeepCopy())
+		if pod.ObjectMeta.Annotations == nil {
+			pod.ObjectMeta.Annotations = map[string]string{}
+		}
+		// prevent exist pods from deletion
+		pod.ObjectMeta.Annotations["cs.dbaas.kubeblocks.io/do-not-delete"] = "true"
+		if err := cli.Patch(ctx, &pod, patch); err != nil {
+			return err
+		}
+	}
+
+	// update label in StatefulSet template
+	stsList := &appsv1.StatefulSetList{}
+	if err := cli.List(ctx, stsList, o); err != nil {
+		return err
+	}
+	for _, sts := range stsList.Items {
+		patch := client.MergeFrom(sts.DeepCopy())
+		if sts.Spec.Template.ObjectMeta.Annotations == nil {
+			sts.Spec.Template.ObjectMeta.Annotations = map[string]string{}
+		}
+		sts.Spec.Template.ObjectMeta.Annotations["cs.dbaas.kubeblocks.io/leader"] = leader
+		sts.Spec.Template.ObjectMeta.Annotations["cs.dbaas.kubeblocks.io/followers"] = followers
+		if err := cli.Patch(ctx, &sts, patch); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

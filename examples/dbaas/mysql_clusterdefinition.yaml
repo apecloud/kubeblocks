@@ -38,10 +38,13 @@ spec:
               echo $KB_POD_NAME
               echo $sub_follower
               if [ -z "$leader" -o "$KB_POD_NAME" = "$leader" -o ! -z "$sub_follower" ]; then 
-                exit 0
+                exit 0;
               else 
-                echo "kubectl exec -i $leader -c mysql -- bash -c \"mysql -e \"call dbms_consensus.add_follower('$KB_POD_NAME:13306');\" & pid=\$!; sleep 1; if ! ps \$pid > /dev/null; then wait \$pid; code=\$?; exit \$code; fi\""
-                kubectl exec -i $leader -c mysql -- bash -c "mysql -e \"call dbms_consensus.add_follower('$KB_POD_NAME:13306');\" & pid=\$!; sleep 1; if ! ps \$pid > /dev/null; then wait \$pid; code=\$?; exit \$code; fi"
+                idx=${KB_POD_NAME##*-}
+                host=$(eval echo \$KB_REPLICASETS_"$idx"_HOSTNAME)
+                echo "$host"
+                echo "kubectl exec -i $leader -c mysql -- bash -c \"mysql -e \"call dbms_consensus.add_follower('$host:13306');\" & pid=\$!; sleep 1; if ! ps \$pid > /dev/null; then wait \$pid; code=\$?; exit \$code; fi\""
+                kubectl exec -i $leader -c mysql -- bash -c "mysql -e \"call dbms_consensus.add_follower('$host:13306');\" & pid=\$!; sleep 1; if ! ps \$pid > /dev/null; then wait \$pid; code=\$?; exit \$code; fi"
               fi
             volumeMounts:
               - mountPath: /etc/podinfo
@@ -55,11 +58,14 @@ spec:
                   fi;
                   host=$(eval echo \$KB_REPLICASETS_"$i"_HOSTNAME)
                   cluster_info="$cluster_info$host:13306";
-                done; idx=0; while IFS='-' read -ra ADDR; do
+                done; 
+                idx=0; 
+                while IFS='-' read -ra ADDR; do
                     for i in "${ADDR[@]}"; do
                       idx=$i;
                     done;
                 done <<< "$KB_POD_NAME"; 
+                host=$(eval echo \$KB_REPLICASETS_"$idx"_HOSTNAME)
                 cluster_info="$cluster_info@$(($idx+1))"; 
                 echo $cluster_info; 
                 mkdir -p /data/mysql/data; 
@@ -70,11 +76,11 @@ spec:
                   echo "docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info=\"$cluster_info\" --cluster-id=$CLUSTER_ID"
                   docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$cluster_info" --cluster-id=$CLUSTER_ID
                 elif [ "$KB_POD_NAME" != "$leader" ]; then
-                  echo "docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info=\"$KB_POD_NAME:13306\" --cluster-id=$CLUSTER_ID"
-                  docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$KB_POD_NAME:13306" --cluster-id=$CLUSTER_ID
+                  echo "docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info=\"$host:13306\" --cluster-id=$CLUSTER_ID"
+                  docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$host:13306" --cluster-id=$CLUSTER_ID
                 else 
-                  echo "docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info=\"$KB_POD_NAME:13306@1\" --cluster-id=$CLUSTER_ID"
-                  docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$KB_POD_NAME:13306@1" --cluster-id=$CLUSTER_ID
+                  echo "docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info=\"$host:13306@1\" --cluster-id=$CLUSTER_ID"
+                  docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$host:13306@1" --cluster-id=$CLUSTER_ID
                 fi
             command:
               - /bin/bash

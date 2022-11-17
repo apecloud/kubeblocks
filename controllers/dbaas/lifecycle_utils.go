@@ -1008,33 +1008,12 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 		return nil, err
 	}
 	sts.Spec.Template.Spec.Containers = append(sts.Spec.Template.Spec.Containers, probeContainers...)
-	prefix := dbaasPrefix + "_" + strings.ToUpper(params.component.Type) + "_"
-	replicas := int(*sts.Spec.Replicas)
-	svcName := strings.Join([]string{params.cluster.Name, params.component.Name, "headless"}, "-")
 
 	for i := range sts.Spec.Template.Spec.Containers {
 		// inject self scope env
 		c := &sts.Spec.Template.Spec.Containers[i]
-		c.Env = append(c.Env, corev1.EnvVar{
-			Name: dbaasPrefix + "_POD_NAME",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "metadata.name",
-				},
-			},
-		})
-		// inject component scope env
-		c.Env = append(c.Env, corev1.EnvVar{
-			Name:      prefix + "N",
-			Value:     strconv.Itoa(replicas),
-			ValueFrom: nil,
-		})
-		for j := 0; j < replicas; j++ {
-			c.Env = append(c.Env, corev1.EnvVar{
-				Name:      prefix + strconv.Itoa(j) + "_HOSTNAME",
-				Value:     fmt.Sprintf("%s.%s", sts.Name+"-"+strconv.Itoa(j), svcName),
-				ValueFrom: nil,
-			})
+		if c.Env == nil {
+			c.Env = []corev1.EnvVar{}
 		}
 		envs := prepareInjectEnvs(params.component, params.cluster)
 		c.Env = append(c.Env, envs...)
@@ -1523,6 +1502,7 @@ func generateName(base string) string {
 func prepareInjectEnvs(component *Component, cluster *dbaasv1alpha1.Cluster) []corev1.EnvVar {
 	envs := []corev1.EnvVar{}
 	prefix := dbaasPrefix + "_" + strings.ToUpper(component.Type) + "_"
+	svcName := strings.Join([]string{cluster.Name, component.Name, "headless"}, "-")
 	envs = append(envs, corev1.EnvVar{
 		Name: dbaasPrefix + "_POD_NAME",
 		ValueFrom: &corev1.EnvVarSource{
@@ -1540,7 +1520,7 @@ func prepareInjectEnvs(component *Component, cluster *dbaasv1alpha1.Cluster) []c
 	for j := 0; j < int(component.Replicas); j++ {
 		envs = append(envs, corev1.EnvVar{
 			Name:      prefix + strconv.Itoa(j) + "_HOSTNAME",
-			Value:     cluster.Name + "-" + component.Name + "-" + strconv.Itoa(j),
+			Value:     fmt.Sprintf("%s.%s", cluster.Name+"-"+component.Name+"-"+strconv.Itoa(j), svcName),
 			ValueFrom: nil,
 		})
 	}

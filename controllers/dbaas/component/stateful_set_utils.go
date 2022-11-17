@@ -98,14 +98,14 @@ func GetComponentFromClusterDefinition(ctx context.Context, cli client.Client, c
 
 // StatefulSetIsReady check statefulSet is ready
 func StatefulSetIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals bool) bool {
-	var componentIsRunning = true
+	var stsIsRunning = true
 	// judge whether statefulSet is ready
 	if sts.Status.AvailableReplicas != *sts.Spec.Replicas ||
 		sts.Status.ObservedGeneration != sts.GetGeneration() ||
 		!statefulStatusRevisionIsEquals {
-		componentIsRunning = false
+		stsIsRunning = false
 	}
-	return componentIsRunning
+	return stsIsRunning
 }
 
 // descendingOrdinalSts is a sort.Interface that Sorts a list of StatefulSet based on the ordinals extracted

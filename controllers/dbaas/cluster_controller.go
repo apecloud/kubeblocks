@@ -493,10 +493,11 @@ func (r *ClusterReconciler) handleComponentStatus(ctx context.Context, cluster *
 // handleComponentStatusWithStatefulSet handle the component status with statefulSet. One statefulSet corresponds to one component.
 func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Context, cluster *dbaasv1alpha1.Cluster) (bool, error) {
 	var (
-		needSyncComponentStatus = true
+		needSyncComponentStatus bool
 		statefulSetList         = &appsv1.StatefulSetList{}
 		componentTypeMap        map[string]dbaasv1alpha1.ComponentType
 		err                     error
+		ok                      bool
 	)
 	if componentTypeMap, err = getComponentTypeMapWithCluster(ctx, r.Client, cluster); err != nil {
 		return false, err
@@ -504,12 +505,21 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 	if err = getObjectListForCluster(ctx, r.Client, cluster, statefulSetList); err != nil {
 		return false, err
 	}
+	componentRunningStatusMap := make(map[string]bool)
 	for _, sts := range statefulSetList.Items {
 		componentName := sts.GetLabels()[intctrlutil.AppComponentLabelKey]
 		if len(componentName) == 0 {
 			continue
 		}
 		componentType := componentTypeMap[componentName]
+
+		// Init status of the component as true, which is used to judge the status
+		// when there are multiple statefulsets in a component. When all the statefulsets status are running,
+		// the component running status will be set to true, otherwise it is false
+		if _, ok = componentRunningStatusMap[componentName]; !ok {
+			componentRunningStatusMap[componentName] = true
+		}
+
 		statefulStatusRevisionIsEquals := true
 		switch componentType {
 		case dbaasv1alpha1.Consensus:
@@ -523,13 +533,17 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 				statefulStatusRevisionIsEquals = false
 			}
 		case dbaasv1alpha1.Replication:
-			if sts.Status.UpdateRevision != sts.Status.CurrentRevision {
-				statefulStatusRevisionIsEquals = false
-			}
+			// TODO(xingran) check pod status normal here
 		}
-		componentIsRunning := component.StatefulSetIsReady(&sts, statefulStatusRevisionIsEquals)
-		if ok := component.NeedSyncStatusComponents(cluster, componentName, componentIsRunning); !ok {
-			needSyncComponentStatus = false
+		stsIsRunning := component.StatefulSetIsReady(&sts, statefulStatusRevisionIsEquals)
+		if !stsIsRunning {
+			componentRunningStatusMap[componentName] = false
+		}
+	}
+
+	for componentName, componentRunningStatus := range componentRunningStatusMap {
+		if ok := component.NeedSyncStatusComponents(cluster, componentName, componentRunningStatus); ok {
+			needSyncComponentStatus = true
 		}
 	}
 	return needSyncComponentStatus, nil

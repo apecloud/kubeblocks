@@ -110,7 +110,7 @@ func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 	}
 	backupType, _, _ := unstructured.NestedString(backupJobObj.Object, "spec", "backupType")
 	if backupType != "snapshot" {
-		return fmt.Errorf("Only support snapshot backup, specified backup type is '%s'.", backupType)
+		return fmt.Errorf("only support snapshot backup, specified backup type is '%v'", backupType)
 	}
 
 	dataSource := make(map[string]interface{}, 0)

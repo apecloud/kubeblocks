@@ -72,6 +72,7 @@ type probeMessage struct {
 func init() {
 	clusterDefUpdateHandlers["cluster"] = clusterUpdateHandler
 	k8score.EventHandlerMap["cluster-controller"] = &ClusterReconciler{}
+	k8score.StorageClassHandlerMap["cluster-controller"] = handleClusterVolumeExpansion
 }
 
 func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *dbaasv1alpha1.ClusterDefinition) error {
@@ -566,7 +567,7 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 	)
 	// determine whether to support volumeExpansion when creating the cluster. because volumeClaimTemplates is forbidden to update except for storage size when cluster created.
 	if cluster.Status.ObservedGeneration == 0 {
-		if volumeExpansionComponents, err = k8score.GetSupportVolumeExpansionComponents(ctx, r.Client, cluster); err != nil {
+		if volumeExpansionComponents, err = getSupportVolumeExpansionComponents(ctx, r.Client, cluster); err != nil {
 			return err
 		}
 		operations.VolumeExpandable = volumeExpansionComponents

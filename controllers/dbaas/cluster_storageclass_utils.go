@@ -1,4 +1,4 @@
-package k8score
+package dbaas
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
+	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -17,6 +18,76 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
+
+// handleClusterVolumeExpansion when StorageClass changed, we should handle the PVC of cluster whether volume expansion is supported
+func handleClusterVolumeExpansion(reqCtx intctrlutil.RequestCtx, cli client.Client, storageClass *storagev1.StorageClass) error {
+	var err error
+	clusterList := &dbaasv1alpha1.ClusterList{}
+	if err = cli.List(reqCtx.Ctx, clusterList); err != nil {
+		return err
+	}
+	// handle the created cluster
+	storageCLassName := storageClass.Name
+	for _, cluster := range clusterList.Items {
+		// if cluster not used the StorageClass, continue
+		if !clusterContainsStorageClass(&cluster, storageCLassName) {
+			continue
+		}
+		patch := client.MergeFrom(cluster.DeepCopy())
+		if needPatchClusterStatusOperations, err := needSyncClusterStatusOperations(reqCtx, cli, &cluster, storageClass); err != nil {
+			return err
+		} else if !needPatchClusterStatusOperations {
+			continue
+		}
+		if err = cli.Status().Patch(reqCtx.Ctx, &cluster, patch); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// needSyncClusterStatusOperations check cluster whether sync status.operations.volumeExpandable
+func needSyncClusterStatusOperations(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *dbaasv1alpha1.Cluster, storageClass *storagev1.StorageClass) (bool, error) {
+	// get cluster pvc list
+	inNS := client.InNamespace(cluster.Namespace)
+	ml := client.MatchingLabels{
+		intctrlutil.AppInstanceLabelKey:  cluster.GetName(),
+		intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
+	}
+	pvcList := &corev1.PersistentVolumeClaimList{}
+	if err := cli.List(reqCtx.Ctx, pvcList, inNS, ml); err != nil {
+		return false, err
+	}
+	if cluster.Status.Operations == nil {
+		cluster.Status.Operations = &dbaasv1alpha1.Operations{}
+	}
+	// if no pvc, do it
+	if len(pvcList.Items) == 0 {
+		return handleNoExistsPVC(reqCtx, cli, cluster)
+	}
+	var (
+		needSyncStatusOperations bool
+		// save the handled pvc
+		handledPVCMap = map[string]struct{}{}
+	)
+	for _, v := range pvcList.Items {
+		if *v.Spec.StorageClassName != storageClass.Name {
+			continue
+		}
+		componentName := v.Labels[intctrlutil.AppComponentLabelKey]
+		volumeClaimTemplateName := getVolumeClaimTemplateName(v.Name, cluster.Name, componentName)
+		componentVolumeClaimName := fmt.Sprintf("%s-%s", componentName, volumeClaimTemplateName)
+		if _, ok := handledPVCMap[componentVolumeClaimName]; ok {
+			continue
+		}
+		// check whether volumeExpandable changed, then sync cluster.status.operations
+		if needSync := needSyncClusterStatus(storageClass, componentName, volumeClaimTemplateName, cluster); needSync {
+			needSyncStatusOperations = true
+		}
+		handledPVCMap[componentVolumeClaimName] = struct{}{}
+	}
+	return needSyncStatusOperations, nil
+}
 
 // clusterContainsStorageClass check whether cluster used the StorageClass
 func clusterContainsStorageClass(cluster *dbaasv1alpha1.Cluster, storageClassName string) bool {
@@ -35,8 +106,8 @@ func isSupportVolumeExpansion(storageClass *storagev1.StorageClass) bool {
 	return storageClass.AllowVolumeExpansion != nil && *storageClass.AllowVolumeExpansion
 }
 
-// GetSupportVolumeExpansionComponents Get the components that support volume expansion and the volumeClaimTemplates
-func GetSupportVolumeExpansionComponents(ctx context.Context, cli client.Client,
+// getSupportVolumeExpansionComponents Get the components that support volume expansion and the volumeClaimTemplates
+func getSupportVolumeExpansionComponents(ctx context.Context, cli client.Client,
 	cluster *dbaasv1alpha1.Cluster) ([]dbaasv1alpha1.OperationComponent, error) {
 	var (
 		storageClassMap             = map[string]bool{}
@@ -227,7 +298,7 @@ func needSyncClusterStatus(storageClass *storagev1.StorageClass,
 // handleNoExistsPVC when the cluster not exists PVC, maybe the cluster is creating. so we do the same things with creating a cluster.
 func handleNoExistsPVC(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *dbaasv1alpha1.Cluster) (bool, error) {
 	var needSyncStatusOperations bool
-	volumeExpandableComponents, err := GetSupportVolumeExpansionComponents(reqCtx.Ctx, cli, cluster)
+	volumeExpandableComponents, err := getSupportVolumeExpansionComponents(reqCtx.Ctx, cli, cluster)
 	if err != nil {
 		return false, err
 	}

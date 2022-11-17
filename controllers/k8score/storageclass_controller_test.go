@@ -23,28 +23,24 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("Event Controller", func() {
 	var (
-		timeout     = time.Second * 20
-		interval    = time.Second
-		clusterName = "wesql"
-		ctx         = context.Background()
+		ctx      = context.Background()
+		timeout  = time.Second * 20
+		interval = time.Second
 	)
 
 	BeforeEach(func() {
-		// Add any setup steps that needs to be executed before each test
-		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-
-		err = k8sClient.DeleteAllOf(ctx, &storagev1.StorageClass{}, client.HasLabels{testCtx.TestObjLabelKey})
+		// Add any steup steps that needs to be executed before each test
+		err := k8sClient.DeleteAllOf(ctx, &storagev1.StorageClass{},
+			client.InNamespace(testCtx.DefaultNamespace),
+			client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -68,183 +64,25 @@ allowVolumeExpansion: %t
 `, storageClassName, allowVolumeExpansion)
 		sc := &storagev1.StorageClass{}
 		Expect(yaml.Unmarshal([]byte(scYAML), sc)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, sc)).Should(Succeed())
+		Expect(testCtx.CreateObj(ctx, sc)).Should(Succeed())
+		// wait until cluster created
+		Eventually(func() bool {
+			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: storageClassName}, &storagev1.StorageClass{})
+			return err == nil
+		}, timeout, interval).Should(BeTrue())
 		return sc
 	}
 
-	createCluster := func(storageClassName string) *dbaasv1alpha1.Cluster {
-		clusterYaml := fmt.Sprintf(`apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  annotations:
-       kubeblocks.io/ops-request: |
-          {"Updating":"wesql-restart-test"}
-       kubeblocks.io/storage-class: csi-hostpath-sc,standard
-  labels:
-    appversion.kubeblocks.io/name: app-version-consensus
-    clusterdefinition.kubeblocks.io/name: cluster-definition-consensus
-    app.kubernetes.io/managed-by: kubeblocks
-  name: %s
-  namespace: default
-spec:
-  appVersionRef: app-version-consensus
-  clusterDefinitionRef: cluster-definition-consensus
-  components:
-  - monitor: false
-    name: wesql-test
-    replicas: 3
-    type: replicasets
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-        volumeMode: Filesystem
-    - name: log
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-        volumeMode: Filesystem  
-        storageClassName: %s
-  terminationPolicy: WipeOut
-status:
-  observedGeneration: 2
-  operations:
-    horizontalScalable:
-    - name: wesql-test
-    restartable:
-    - wesql-test
-    verticalScalable:
-    - wesql-test
-  phase: Running`, clusterName, storageClassName)
-		cluster := &dbaasv1alpha1.Cluster{}
-		Expect(yaml.Unmarshal([]byte(clusterYaml), cluster)).Should(Succeed())
-		Expect(k8sClient.Create(context.Background(), cluster)).Should(Succeed())
-		// wait until cluster created
-		Eventually(func() bool {
-			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, &dbaasv1alpha1.Cluster{})
-			return err == nil
-		}, timeout, interval).Should(BeTrue())
-		return cluster
-	}
-
-	createPvc := func(pvcName, storageClassName string) {
-		pvcYaml := fmt.Sprintf(`apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  annotations:
-    pv.kubernetes.io/bind-completed: "yes"
-    pv.kubernetes.io/bound-by-controller: "yes"
-    volume.beta.kubernetes.io/storage-provisioner: hostpath.csi.k8s.io
-  labels:
-    app.kubernetes.io/component-name: wesql-test
-    app.kubernetes.io/instance: %s
-    app.kubernetes.io/managed-by: kubeblocks
-  name: %s
-  namespace: default
-spec:
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
-  storageClassName: %s
-  volumeMode: Filesystem
-  volumeName: pvc-185c837d-16ea-4bef-b5f0-e3853722407b
-`, clusterName, pvcName, storageClassName)
-		pvc := &corev1.PersistentVolumeClaim{}
-		Expect(yaml.Unmarshal([]byte(pvcYaml), pvc)).Should(Succeed())
-		Expect(k8sClient.Create(context.Background(), pvc)).Should(Succeed())
-		// wait until cluster created
-		Eventually(func() bool {
-			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, &corev1.PersistentVolumeClaim{})
-			return err == nil
-		}, timeout, interval).Should(BeTrue())
-	}
-
-	Context("When receiving role changed event", func() {
+	Context("When test creating storageClass", func() {
 		It("should handle it properly", func() {
-			By("init resources")
-			vctName1 := "data"
-			defaultStorageClassName := "standard"
-			storageClassName := "csi-hostpath-sc"
-			createCluster(storageClassName)
-			cluster := &dbaasv1alpha1.Cluster{}
-			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)
-			patch := client.MergeFrom(cluster.DeepCopy())
-			cluster.Status.Operations = &dbaasv1alpha1.Operations{}
-			Expect(k8sClient.Status().Patch(ctx, cluster, patch))
-			createStorageClassObj(defaultStorageClassName, true)
-			createStorageClassObj(storageClassName, false)
-
-			By("expect wesql-test component support volume expansion and volumeClaimTemplateNames is [data]")
-			Eventually(func() bool {
-				cluster := &dbaasv1alpha1.Cluster{}
-				_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)
-				volumeExpandable := cluster.Status.Operations.VolumeExpandable
-				return len(volumeExpandable) > 0 && volumeExpandable[0].VolumeClaimTemplateNames[0] == vctName1
-			}, timeout, interval).Should(BeTrue())
-
-			By("expect wesql-test component support volume expansion and volumeClaimTemplateNames is [data,log]")
-			createPvc("log-wesql-wesql-test", storageClassName)
-			createPvc("data-wesql-wesql-test", defaultStorageClassName)
-			// set storageClass allowVolumeExpansion to true
+			By("test storageClass changes")
+			storageClassName := "standard"
+			createStorageClassObj(storageClassName, true)
 			storageClass := &storagev1.StorageClass{}
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: storageClassName}, storageClass)).Should(Succeed())
 			allowVolumeExpansion := true
 			storageClass.AllowVolumeExpansion = &allowVolumeExpansion
-			Expect(k8sClient.Update(ctx, storageClass)).Should(Succeed())
-			Eventually(func() bool {
-				cluster := &dbaasv1alpha1.Cluster{}
-				_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)
-				componentVolumeExpandable := cluster.Status.Operations.VolumeExpandable[0]
-				return len(componentVolumeExpandable.VolumeClaimTemplateNames) > 1 && componentVolumeExpandable.VolumeClaimTemplateNames[1] == "log"
-			}, timeout, interval).Should(BeTrue())
-
-			By("expect wesql-test component support volume expansion and volumeClaimTemplateNames is [data]")
-			// set storageClass allowVolumeExpansion to false
-			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: storageClassName}, storageClass)).Should(Succeed())
-			allowVolumeExpansion = false
-			storageClass.AllowVolumeExpansion = &allowVolumeExpansion
-			Expect(k8sClient.Update(ctx, storageClass)).Should(Succeed())
-			Eventually(func() bool {
-				cluster := &dbaasv1alpha1.Cluster{}
-				_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)
-				componentVolumeExpandable := cluster.Status.Operations.VolumeExpandable[0]
-				return len(componentVolumeExpandable.VolumeClaimTemplateNames) == 1 && componentVolumeExpandable.VolumeClaimTemplateNames[0] == vctName1
-			}, timeout, interval).Should(BeTrue())
-
-			By("expect wesql-test component not support volume expansion")
-			// set defaultStorageClass allowVolumeExpansion to false
-			defaultStorageClass := &storagev1.StorageClass{}
-			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: defaultStorageClassName}, defaultStorageClass)).Should(Succeed())
-			allowVolumeExpansion = false
-			defaultStorageClass.AllowVolumeExpansion = &allowVolumeExpansion
-			Expect(k8sClient.Update(ctx, defaultStorageClass)).Should(Succeed())
-			Eventually(func() bool {
-				cluster := &dbaasv1alpha1.Cluster{}
-				_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)
-				return len(cluster.Status.Operations.VolumeExpandable) == 0
-			}, timeout, interval).Should(BeTrue())
-
-			By("expect wesql-test component support volume expansion and volumeClaimTemplateNames is [data]")
-			// set defaultStorageClass allowVolumeExpansion to true
-			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: defaultStorageClassName}, defaultStorageClass)).Should(Succeed())
-			allowVolumeExpansion = true
-			defaultStorageClass.AllowVolumeExpansion = &allowVolumeExpansion
-			Expect(k8sClient.Update(ctx, defaultStorageClass)).Should(Succeed())
-			Eventually(func() bool {
-				cluster := &dbaasv1alpha1.Cluster{}
-				_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)
-				volumeExpandable := cluster.Status.Operations.VolumeExpandable
-				return len(volumeExpandable) > 0 && volumeExpandable[0].VolumeClaimTemplateNames[0] == vctName1
-			}, timeout, interval).Should(BeTrue())
+			Expect(k8sClient.Update(ctx, storageClass))
 		})
 	})
 })

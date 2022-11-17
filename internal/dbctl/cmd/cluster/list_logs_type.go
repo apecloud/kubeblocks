@@ -19,6 +19,7 @@ package cluster
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -111,6 +112,8 @@ func (o *LogsListOptions) Complete(f cmdutil.Factory, args []string) error {
 	o.exec = exec.NewExecOptions(o.factory, o.IOStreams)
 	o.exec.Input = &exec.ExecInput{}
 	o.exec.Config = config
+	// hide unnecessary output
+	o.exec.Quiet = true
 	return err
 }
 
@@ -191,8 +194,13 @@ func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 func (o *LogsListOptions) printRealFileMessage(pod *corev1.Pod, pattern string) {
 	o.exec.Pod = pod
 	o.exec.Command = []string{"/bin/bash", "-c", "ls -al " + pattern}
+	// because tty Raw argument will set ErrOut nil in exec.Run
+	o.exec.ErrOut = os.Stdout
+	if err := o.exec.Validate(); err != nil {
+		fmt.Printf("validate fail when list log files in container by exec command, and error message : %s\n", err.Error())
+	}
 	if err := o.exec.Run(); err != nil {
-		fmt.Printf("non-existed log file in container which searched by pattern %s\n", pattern)
+		fmt.Printf("run fail when list log files in container by exec command, and error message : %s\n", err.Error())
 	}
 }
 

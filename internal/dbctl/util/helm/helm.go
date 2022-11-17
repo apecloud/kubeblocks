@@ -55,7 +55,6 @@ type InstallOpts struct {
 	Version   string
 	TryTimes  int
 	Login     bool
-	IsUpgrade bool
 }
 
 type LoginOpts struct {
@@ -397,7 +396,7 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 	signal.Notify(cSignal, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-cSignal
-		fmt.Println("Install has been cancelled")
+		fmt.Println("Upgrade has been cancelled")
 		cancel()
 	}()
 

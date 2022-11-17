@@ -112,7 +112,7 @@ func CheckConfigurationTemplate(cli client.Client, ctx intctrlutil.RequestCtx, t
 
 	// validate configuration template
 	isConfigSchemaFn := func(tpl *dbaasv1alpha1.CustomParametersValidation) (bool, error) {
-		if tpl.Cue == nil {
+		if tpl == nil || tpl.Cue == nil {
 			return true, nil
 		}
 
@@ -335,7 +335,7 @@ func GetConfigurationVersion(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, 
 
 func UpdateConfigurationSchema(tpl *dbaasv1alpha1.ConfigurationTemplateSpec) error {
 	schema := tpl.ConfigurationSchema
-	if schema.Cue != nil && len(*schema.Cue) > 0 && schema.Schema == nil {
+	if schema != nil && schema.Cue != nil && len(*schema.Cue) > 0 && schema.Schema == nil {
 		customSchema, err := cfgcore.GenerateOpenApiSchema(*schema.Cue, tpl.CfgSchemaTopLevelName)
 		if err != nil {
 			return err

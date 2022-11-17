@@ -2,15 +2,15 @@
 
 ## What is OpsRequest
 
-OpsRequest is a Kubernetes Custom Resource Definitions (CRD). You can initiate an operation request via `OpsRequest` to operate database clusters. Currently, the following operation tasks are supported: database restarting, database version upgrading, vertical scaling, horizontal scaling, and volume expansion.
+`OpsRequest` is a Kubernetes Custom Resource Definitions (CRD). You can initiate an operation request via `OpsRequest` to operate database clusters. Currently, the following operation tasks are supported: database restarting, database version upgrading, vertical scaling, horizontal scaling, and volume expansion.
 
 ## OpsRequest CRD Specifications
 
 `OpsRequest` has `TypeMeta`, `ObjectMeta`, `Spec` and `Status` sections. 
 
-The following is sample `OpsRequest` CRs for different operations:
+The following are sample `OpsRequest` CRs for different operations:
 
-### Sample `OpsRequest` for restarting database
+### Sample `OpsRequest` for restarting a cluster
 
 ```
 apiVersion: dbaas.kubeblocks.io/v1alpha1
@@ -97,7 +97,7 @@ spec:
 ```
 
 
-### Sample `OpsRequest` for upgrading database
+### Sample `OpsRequest` for upgrading a cluster
 
 ```
 apiVersion: dbaas.kubeblocks.io/v1alpha1
@@ -134,7 +134,7 @@ spec:
 
 ## OpsRequest `spec`
 
-An `OpsRequest` object has the follwoing fields in the `spec` section.
+An `OpsRequest` object has the following fields in the `spec` section.
 
 ### spec.clusterRef 
 
@@ -146,7 +146,7 @@ An `OpsRequest` object has the follwoing fields in the `spec` section.
 
 The following types of operations are allowed in `OpsRequest`.
 
-- `Upgrage`
+- `Upgrade`
 - `VerticalScaling`
 - `VolumeExpansion`
 - `HorizontalScaling`
@@ -172,7 +172,7 @@ It indicates the component-level operation. Its attribute is as follows:
 
     - verticalScaling
 
-        `verticalScaling` scales up and down the computing resources of the component. Its value is an object of k8s containeer resources. For example, the mongos component of MongoDB:
+        `verticalScaling` scales up and down the computing resources of the component. Its value is an object of k8s container resources. For example, the mongos component of MongoDB:
 
         ```
         verticalScaling:
@@ -193,7 +193,7 @@ It indicates the component-level operation. Its attribute is as follows:
 
     - horizontalScaling
 
-        `horizontalScaling` is used to add or delete the replicas of a component or roleGroup. `spec.type` shoule be `HorizontalScaling` to make it effective. Its value includes `componentName.replicas` and `componentName.roleGroups`. For example:
+        `horizontalScaling` is used to add or delete the replicas of a component or roleGroup. `spec.type` should be `HorizontalScaling` to make it effective. Its value includes `componentName.replicas` and `componentName.roleGroups`. For example:
 
         ```
         horizontalScaling:
@@ -206,11 +206,11 @@ It indicates the component-level operation. Its attribute is as follows:
 
 ## OpsRequest `status`
 
-`status` describes the current state amd progress of the `OpsRequest` opration. It has the followung fileds:
+`status` describes the current state and progress of the `OpsRequest` operation. It has the following fields:
 
 ### status.observedGenration
 
-It corresponds to `matadata.generation`.
+It corresponds to `metadata.generation`.
 
 ### status.phase
 
@@ -242,13 +242,13 @@ OpsRequest task is one-time and is deleted after the operation succeeds.
 | Upgrading             | Start Upgrading.                               |
 | Succeed               | OpsRequest is proceeded successfully.          |
 
-`condition.status` indicates whether this condition is appliable. The results of `condition.status` include `True`, `False`, and `Unkown`, respectively standing for success, failure, and unkown error. 
+`condition.status` indicates whether this condition is applicable. The results of `condition.status` include `True`, `False`, and `Unkown`, respectively standing for success, failure, and unknown error. 
 
 `condition.Reason` indicates why the current condition changes. Each reason is only one word and exclusive.
 
 | **Reason**                         | **Meanings**                                    |
 | :---                               | :---                                            |
-| OpsRequestProgressingStarted       | Controller is processing OpsRequest.            |
+| OpsRequestProgressingStarted       | Controller is processing `OpsRequest`.            |
 | ValidateOpsRequestPassed           | OpsRequest is validated.                        |              
 | OpsRequestProcessedSuccessfully    | OpsRequest is processed.                        |
 | RestartingStarted                  | Restarting started.                             |

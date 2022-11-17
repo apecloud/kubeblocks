@@ -17,12 +17,19 @@ limitations under the License.
 package probe
 
 import (
+	"io"
 	"net/http"
 	"strings"
-	"io"
 
 	"github.com/dapr/components-contrib/middleware"
 	"github.com/dapr/kit/logger"
+)
+
+const (
+	statusCheckOperation  = "statusCheck"
+	runningCheckOperation = "runningCheck"
+	roleCheckOperation    = "roleCheck"
+	bindingPath           = "/v1.0/bindings"
 )
 
 // NewProbeMiddleware returns a new probe middleware.
@@ -41,18 +48,17 @@ func (m *Middleware) GetHandler(metadata middleware.Metadata) (func(next http.Ha
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			url := r.URL
-			if r.Method == http.MethodGet && strings.HasPrefix(url.Path, "/v1.0/bindings") {
-				r.Method = http.MethodPost
+			if r.Method == http.MethodGet && strings.HasPrefix(url.Path, bindingPath) {
 				var body string
-				args := url.Query()
-				switch operation := args.Get("operation"); operation {
-				case "statusCheck":
+				r.Method = http.MethodPost
+				switch operation := url.Query().Get("operation"); operation {
+				case statusCheckOperation:
 					body = `{"operation": "statusCheck", "metadata": {"sql" : ""}}`
 					r.Body = io.NopCloser(strings.NewReader(body))
-				case "runningCheck":
+				case runningCheckOperation:
 					body = `{"operation": "runningCheck", "metadata": {"sql" : ""}}`
 					r.Body = io.NopCloser(strings.NewReader(body))
-				case "roleCheck":
+				case roleCheckOperation:
 					body = `{"operation": "roleCheck", "metadata": {"sql" : ""}}`
 					r.Body = io.NopCloser(strings.NewReader(body))
 				default:

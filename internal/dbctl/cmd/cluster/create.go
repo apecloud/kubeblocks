@@ -23,6 +23,8 @@ import (
 	"os"
 	"strings"
 
+	"k8s.io/kubectl/pkg/util/templates"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,6 +47,17 @@ const (
 	CueTemplateName = "cluster_template.cue"
 	monitorKey      = "monitor"
 )
+
+var createExample = templates.Examples(`
+		# Create a cluster forced to scatter by node
+        dbctl cluster create --topology-keys=kubernetes.io/hostname --pod-anti-affinity=Required
+
+        # Create a cluster in specific labels nodes
+        dbctl cluster create --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'
+
+        # Create a Cluster with two tolerations 
+        dbctl cluster create --tolerations='"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
+`)
 
 type CreateOptions struct {
 	// ClusterDefRef reference clusterDefinition
@@ -105,7 +118,7 @@ func (o *CreateOptions) Complete() error {
 	setMonitor(o.Monitor, components)
 	o.Components = components
 
-	// TolerationsRaw looks like ["key=engineType,value=mongo,operator=Equal,effect=NoSchedule"]
+	// TolerationsRaw looks like `["key=engineType,value=mongo,operator=Equal,effect=NoSchedule"]` after parsing by cmd
 	tolerations := make([]map[string]string, 0)
 	for _, tolerationRaw := range o.TolerationsRaw {
 		toleration := map[string]string{}
@@ -126,6 +139,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	inputs := create.Inputs{
 		Use:             "create",
 		Short:           "Create a database cluster",
+		Example:         createExample,
 		CueTemplateName: CueTemplateName,
 		ResourceName:    types.ResourceClusters,
 		BaseOptionsObj:  &o.BaseOptions,
@@ -138,12 +152,12 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 			cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", DefaultClusterDef, "ClusterDefinition reference")
 			cmd.Flags().StringVar(&o.AppVersionRef, "app-version", DefaultAppVersion, "AppVersion reference")
 			cmd.Flags().StringVar(&o.TerminationPolicy, "termination-policy", "Delete", "Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)")
-			cmd.Flags().StringVar(&o.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type")
+			cmd.Flags().StringVar(&o.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type, one of: (Preferred, Required)")
 			cmd.Flags().BoolVar(&o.Monitor, "monitor", false, "Set monitor enabled (default false)")
 			cmd.Flags().BoolVar(&o.EnableAllLogs, "enable-all-logs", false, "Enable advanced application all log extraction, and true will ignore enabledLogs of component level")
 			cmd.Flags().StringArrayVar(&o.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
-			cmd.Flags().StringToStringVar(&o.NodeLabels, "node-labels", nil, "Node label selector")
-			cmd.Flags().StringSliceVar(&o.TolerationsRaw, "tolerations", nil, "Tolerations for cluster")
+			cmd.Flags().StringToStringVar(&o.NodeLabels, "node-labels", nil, `Node label selector, such as '"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'`)
+			cmd.Flags().StringSliceVar(&o.TolerationsRaw, "tolerations", nil, `Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'`)
 			cmd.Flags().StringVar(&o.ComponentsFilePath, "components", "", "Use yaml file to specify the cluster components")
 		},
 	}

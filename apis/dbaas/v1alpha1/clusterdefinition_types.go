@@ -169,7 +169,7 @@ type ConfigurationSpec struct {
 
 	// ConfigReloadTrigger describes the configuration against reload type.
 	// +optional
-	ConfigReloadTrigger ConfigReloadTrigger `json:"configReloadTrigger,omitempty"`
+	ConfigReloadTrigger *ConfigReloadTrigger `json:"configReloadTrigger,omitempty"`
 }
 
 type ConfigReloadTrigger struct {

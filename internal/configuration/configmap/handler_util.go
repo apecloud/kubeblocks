@@ -40,9 +40,13 @@ func IsNotSupportReload(autoReload bool, reloadType dbaasv1alpha1.CfgReloadType)
 	return !autoReload || reloadType == ""
 }
 
-func NeedBuildConfigSidecar(autoReload bool, reloadType dbaasv1alpha1.CfgReloadType, configuration dbaasv1alpha1.ConfigReloadTrigger) (bool, error) {
+func NeedBuildConfigSidecar(autoReload bool, reloadType dbaasv1alpha1.CfgReloadType, configuration *dbaasv1alpha1.ConfigReloadTrigger) (bool, error) {
 	if !autoReload || reloadType == "" {
 		return false, nil
+	}
+
+	if configuration == nil {
+		return false, cfgutil.MakeError("not configure trigger reload type. [%s]", reloadType)
 	}
 
 	switch reloadType {
@@ -56,7 +60,7 @@ func NeedBuildConfigSidecar(autoReload bool, reloadType dbaasv1alpha1.CfgReloadT
 	}
 }
 
-func checkSignalType(configuration dbaasv1alpha1.ConfigReloadTrigger) (bool, error) {
+func checkSignalType(configuration *dbaasv1alpha1.ConfigReloadTrigger) (bool, error) {
 	if !IsValidUnixSignal(configuration.Signal) {
 		return false, cfgutil.MakeError("This special signal [%s] is not supported for now!", configuration.Signal)
 	}
@@ -72,6 +76,7 @@ func BuildReloadSidecarParams(reloadType dbaasv1alpha1.CfgReloadType, configurat
 		return buildSignalArgs(configuration, volumeDirs)
 	default:
 		// not walk here
+		// TODO support other type, e.g pg reload by ShellType
 		return nil
 	}
 }

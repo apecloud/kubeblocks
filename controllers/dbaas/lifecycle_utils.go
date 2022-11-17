@@ -1379,7 +1379,7 @@ func updateConfigurationManagerWithComponent(params createParams, podSpec *corev
 	managerSidecar := &cfgcm.ConfigManagerSidecar{
 		ManagerName: configSidecarName,
 		Image:       viper.GetString(configSidecarIMAGE),
-		Args:        cfgcm.BuildReloadSidecarParams(cfgSpec.ConfigReloadType, cfgSpec.ConfigReloadTrigger, volumeDirs),
+		Args:        cfgcm.BuildReloadSidecarParams(cfgSpec.ConfigReloadType, *cfgSpec.ConfigReloadTrigger, volumeDirs),
 		Volumes:     volumeDirs,
 	}
 

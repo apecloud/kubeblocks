@@ -1,6 +1,19 @@
 # `/docs`
 
-Design and user documents (in addition to your godoc generated documentation).
+Here stores the design documents, user guides, and release notes of KubeBlocks.
+
+## What is KubeBlocks
+KubeBlocks, running on K8S, offers a universal view through multi-clouds and on-premises, provides a consistent experience for fully managing multiple databases, and relieves the burden of maintaining miscellaneous operators. 
+![image](https://user-images.githubusercontent.com/110531738/202367695-babd2ebc-8b7f-4a3d-b1d7-2d7b1b69f2bc.png#width="60%")
+
+* Refer to [design_docs](https://github.com/apecloud/kubeblocks/tree/main/docs/design_docs) for our design motivation and methodology.
+* Refer to [user_docs](https://github.com/apecloud/kubeblocks/tree/main/docs/user_docs) for instruction to use KubeBlocks.
+* Refer to [release_notes](https://github.com/apecloud/kubeblocks/tree/main/docs/release_notes) for the latest updates.
+
+
+
+
+To write a design document following KubeBlocks style, refer to design document templates. (in addition to your godoc generated documentation).
 
 Examples:
 

@@ -37,11 +37,13 @@ import (
 
 	dhttp "github.com/dapr/components-contrib/bindings/http"
 	"github.com/dapr/components-contrib/bindings/localstorage"
+	"github.com/dapr/components-contrib/middleware"
 	mdns "github.com/dapr/components-contrib/nameresolution/mdns"
 
 	"go.uber.org/automaxprocs/maxprocs"
 
 	"github.com/apecloud/kubeblocks/cmd/daprd/internal/binding/mysql"
+	"github.com/apecloud/kubeblocks/cmd/daprd/internal/middleware/probe"
 )
 
 var (
@@ -54,6 +56,12 @@ func init() {
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(dhttp.NewHTTP, "http")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(localstorage.NewLocalStorage, "localstorage")
 	nrLoader.DefaultRegistry.RegisterComponent(mdns.NewResolver, "mdns")
+	httpMiddlewareLoader.DefaultRegistry.RegisterComponent(func(log logger.Logger) httpMiddlewareLoader.FactoryMethod {
+		return func(metadata middleware.Metadata) (httpMiddleware.Middleware, error) {
+			return probe.NewProbeMiddleware(log).GetHandler(metadata)
+		}
+	}, "probe")
+
 }
 
 func main() {

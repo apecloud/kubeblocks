@@ -52,7 +52,7 @@ var (
 	`)
 	deleteBackupExample = templates.Examples(`
 		# delete a backup named backup-name
-		dbctl cluster delete-backup backup-name
+		dbctl cluster delete-backup cluster-name --name backup-name
 	`)
 	listRestoreExample = templates.Examples(`
 		# list all restore
@@ -60,7 +60,7 @@ var (
 	`)
 	deleteRestoreExample = templates.Examples(`
 		# delete a restore named restore-name
-		dbctl cluster delete-restore restore-name
+		dbctl cluster delete-restore cluster-name --name restore-name
 	`)
 	createRestoreExample = templates.Examples(`
 		# restore a new cluster from a backup
@@ -172,7 +172,55 @@ func NewDeleteBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		GVR(types.BackupJobGVR()).
 		Factory(f).
 		IOStreams(streams).
+		CustomComplete(completeForDeleteBackup).
+		CustomFlags(customFlagsForDeleteBackup).
 		Build(delete.Build)
+}
+
+func customFlagsForDeleteBackup(option interface{}, cmd *cobra.Command) {
+	var (
+		o  *delete.DeleteFlags
+		ok bool
+	)
+	if o, ok = option.(*delete.DeleteFlags); !ok {
+		return
+	}
+	cmd.Flags().StringSliceVar(&o.ResourceNames, "name", []string{}, "Backup names")
+}
+
+// completeForDeleteBackup complete cmd for delete backup
+func completeForDeleteBackup(option interface{}, args []string) error {
+	var (
+		flag *delete.DeleteFlags
+		ok   bool
+	)
+	if flag, ok = option.(*delete.DeleteFlags); !ok {
+		return nil
+	}
+
+	if len(args) == 0 {
+		return errors.New("Missing cluster name")
+	}
+	if len(args) > 1 {
+		return errors.New("Only supported delete the Backup of one cluster")
+	}
+	if !*flag.Force && len(flag.ResourceNames) == 0 {
+		return errors.New("Missing --name as backup name.")
+	}
+	if *flag.Force && len(flag.ResourceNames) == 0 {
+		// do force action, if specified --force and not , all backups with the cluster will be deleted
+		flag.ClusterName = args[0]
+		// if no specify backup name and cluster name is specified. it will delete all OpsRequest with the cluster
+		labelString := fmt.Sprintf("%s=%s", types.InstanceLabelKey, flag.ClusterName)
+		if flag.LabelSelector == nil || len(*flag.LabelSelector) == 0 {
+			flag.LabelSelector = &labelString
+		} else {
+			// merge label
+			newLabelSelector := *flag.LabelSelector + "," + labelString
+			flag.LabelSelector = &newLabelSelector
+		}
+	}
+	return nil
 }
 
 type CreateRestoreOptions struct {
@@ -273,5 +321,53 @@ func NewDeleteRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		GVR(types.RestoreJobGVR()).
 		Factory(f).
 		IOStreams(streams).
+		CustomFlags(customFlagsForDeleteRestore).
+		CustomComplete(completeForDeleteRestore).
 		Build(delete.Build)
+}
+
+func customFlagsForDeleteRestore(option interface{}, cmd *cobra.Command) {
+	var (
+		o  *delete.DeleteFlags
+		ok bool
+	)
+	if o, ok = option.(*delete.DeleteFlags); !ok {
+		return
+	}
+	cmd.Flags().StringSliceVar(&o.ResourceNames, "name", []string{}, "Restore names")
+}
+
+// completeForDeleteRestore complete cmd for delete restore
+func completeForDeleteRestore(option interface{}, args []string) error {
+	var (
+		flag *delete.DeleteFlags
+		ok   bool
+	)
+	if flag, ok = option.(*delete.DeleteFlags); !ok {
+		return nil
+	}
+
+	if len(args) == 0 {
+		return errors.New("Missing cluster name")
+	}
+	if len(args) > 1 {
+		return errors.New("Only supported delete the restore of one cluster")
+	}
+	if !*flag.Force && len(flag.ResourceNames) == 0 {
+		return errors.New("Missing --name as restore name.")
+	}
+	if *flag.Force && len(flag.ResourceNames) == 0 {
+		// do force action, if specified --force and not , all restores with the cluster will be deleted
+		flag.ClusterName = args[0]
+		// if no specify restore name and cluster name is specified. it will delete all OpsRequest with the cluster
+		labelString := fmt.Sprintf("%s=%s", types.InstanceLabelKey, flag.ClusterName)
+		if flag.LabelSelector == nil || len(*flag.LabelSelector) == 0 {
+			flag.LabelSelector = &labelString
+		} else {
+			// merge label
+			newLabelSelector := *flag.LabelSelector + "," + labelString
+			flag.LabelSelector = &newLabelSelector
+		}
+	}
+	return nil
 }

@@ -119,10 +119,18 @@ dashboards:
   ##
   enabled: false
 
-# Data protection settings
+## Data protection settings
+##
 dataProtection:
-  ## disableVolumeSnapshot - set this to true if cluster does not have snapshot.storage.k8s.io API installed
+  ## @param dataProtection.disableVolumeSnapshot - set this to true if cluster does not have snapshot.storage.k8s.io API installed
+  ##
   disableVolumeSnapshot: true
+  ## @param dataProtection.backupSchedule -- set backup policy schedule time.
+  ##
+  backupSchedule: ""
+  ## @param dataProtection.backupTTL -- set backup time to live.
+  ##
+  backupTTL: ""
 
 
 # Sub-charts

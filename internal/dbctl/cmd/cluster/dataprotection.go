@@ -84,7 +84,6 @@ type CreateBackupPolicyOptions struct {
 }
 
 func (o *CreateBackupOptions) Complete() error {
-
 	// generate backupName
 	if len(o.BackupName) == 0 {
 		o.BackupName = strings.Join([]string{"backup", o.Namespace, o.Name, time.Now().Format("20060102150405")}, "-")
@@ -208,9 +207,9 @@ func completeForDeleteBackup(option interface{}, args []string) error {
 		return errors.New("Missing --name as backup name.")
 	}
 	if *flag.Force && len(flag.ResourceNames) == 0 {
-		// do force action, if specified --force and not , all backups with the cluster will be deleted
+		// do force action, if specified --force and not specified --name, all backups with the cluster will be deleted
 		flag.ClusterName = args[0]
-		// if no specify backup name and cluster name is specified. it will delete all OpsRequest with the cluster
+		// if no specify backup name and cluster name is specified. it will delete all backups with the cluster
 		labelString := fmt.Sprintf("%s=%s", types.InstanceLabelKey, flag.ClusterName)
 		if flag.LabelSelector == nil || len(*flag.LabelSelector) == 0 {
 			flag.LabelSelector = &labelString
@@ -357,9 +356,9 @@ func completeForDeleteRestore(option interface{}, args []string) error {
 		return errors.New("Missing --name as restore name.")
 	}
 	if *flag.Force && len(flag.ResourceNames) == 0 {
-		// do force action, if specified --force and not , all restores with the cluster will be deleted
+		// do force action, if specified --force and not specified --name, all restores with the cluster will be deleted
 		flag.ClusterName = args[0]
-		// if no specify restore name and cluster name is specified. it will delete all OpsRequest with the cluster
+		// if no specify restore name and cluster name is specified. it will delete all restores with the cluster
 		labelString := fmt.Sprintf("%s=%s", types.InstanceLabelKey, flag.ClusterName)
 		if flag.LabelSelector == nil || len(*flag.LabelSelector) == 0 {
 			flag.LabelSelector = &labelString

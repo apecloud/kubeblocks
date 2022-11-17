@@ -34,7 +34,6 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/create"
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package kubeblocks
 
 import (
 	"context"
@@ -69,7 +69,7 @@ func (i *Installer) Install() (string, error) {
 	return notes, nil
 }
 
-// Uninstall remove dbaas
+// Uninstall remove KubeBlocks
 func (i *Installer) Uninstall() error {
 	chart := helm.InstallOpts{
 		Name:      types.KubeBlocksChartName,

@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"net"
+	"os"
 	"os/exec"
 	"reflect"
 	"strconv"
@@ -629,36 +630,6 @@ spec:
 
 	Context("When horizontal scaling", func() {
 		It("Should create backup resources accordingly", func() {
-			//if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
-			//	useExistingCluster := true
-			//	testEnv.UseExistingCluster = &useExistingCluster
-			//	testEnv.Config = config.GetConfigOrDie()
-			//}
-			//By("Check available storageclasses")
-			//scList := &storagev1.StorageClassList{}
-			//defaultStorageClass := &storagev1.StorageClass{}
-			//hasDefaultSC := false
-			//_ = k8sClient.List(ctx, scList)
-			//if len(scList.Items) == 0 {
-			//	return
-			//}
-			//
-			//for _, sc := range scList.Items {
-			//	annot := sc.Annotations
-			//	if annot == nil {
-			//		continue
-			//	}
-			//	if v, ok := annot["storageclass.kubernetes.io/is-default-class"]; ok && v == "true" {
-			//		defaultStorageClass = &sc
-			//		hasDefaultSC = true
-			//		break
-			//	}
-			//}
-			//if !hasDefaultSC {
-			//	defaultStorageClass = &scList.Items[0]
-			//	err := assureDefaultStorageClassObj(defaultStorageClass)
-			//	Expect(err).NotTo(HaveOccurred())
-			//}
 
 			configTplKey := types.NamespacedName{Name: "test-mysql-3node-tpl-8.0", Namespace: "default"}
 			configTplYAML := fmt.Sprintf(`
@@ -928,52 +899,11 @@ spec:
         resources:
           requests:
             storage: 1Gi
+  terminationPolicy: Delete
 `, key.Name, key.Namespace, clusterDefKey.Name, appVerKey.Name)
-
 			cluster := &dbaasv1alpha1.Cluster{}
 			Expect(yaml.Unmarshal([]byte(clusterYAML), cluster)).Should(Succeed())
 			Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
-
-			fetchedG1 := &dbaasv1alpha1.Cluster{}
-			Eventually(func() bool {
-				_ = k8sClient.Get(ctx, key, fetchedG1)
-				return fetchedG1.Status.ObservedGeneration == 1
-			}, timeout, interval).Should(BeTrue())
-
-			stsList := &appsv1.StatefulSetList{}
-			Eventually(func() bool {
-				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
-				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				return len(stsList.Items) != 0
-			}, timeout, interval).Should(BeTrue())
-
-			//podList := corev1.PodList{}
-			//Eventually(func() bool {
-			//	Expect(k8sClient.List(ctx, &podList, client.MatchingLabels{
-			//		"app.kubernetes.io/instance": key.Name,
-			//	}, client.InNamespace(key.Namespace))).Should(Succeed())
-			//	return len(podList.Items) == 1
-			//}, timeout, interval).Should(BeTrue())
-
-			By("By updating replica")
-			updatedReplicas := 3
-			fetchedG1.Spec.Components[0].Replicas = int32(updatedReplicas)
-			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
-
-			fetchedG2 := &dbaasv1alpha1.Cluster{}
-			Eventually(func() bool {
-				_ = k8sClient.Get(ctx, key, fetchedG2)
-				return fetchedG2.Status.ObservedGeneration == 2
-			}, timeout*2, interval).Should(BeTrue())
-
-			Eventually(func() bool {
-				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
-				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				Expect(len(stsList.Items) != 0).Should(BeTrue())
-				return int(*stsList.Items[0].Spec.Replicas) == updatedReplicas
-			}, timeout, interval).Should(BeTrue())
 
 			backupPolicyTplKey := types.NamespacedName{Name: "backup-policy-template-mysql"}
 			backupPolicyTemplateYaml := fmt.Sprintf(`
@@ -997,7 +927,50 @@ spec:
 `, backupPolicyTplKey.Name, clusterDefKey.Name)
 			backupPolicyTemplate := v1alpha1.BackupPolicyTemplate{}
 			Expect(yaml.Unmarshal([]byte(backupPolicyTemplateYaml), &backupPolicyTemplate)).Should(Succeed())
-			Expect(testCtx.CreateObj(ctx, &backupPolicyTemplate)).Should(Succeed())
+			Expect(testCtx.CheckedCreateObj(ctx, &backupPolicyTemplate)).Should(Succeed())
+
+			fetchedG1 := &dbaasv1alpha1.Cluster{}
+			Eventually(func() bool {
+				_ = k8sClient.Get(ctx, key, fetchedG1)
+				return fetchedG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+
+			stsList := &appsv1.StatefulSetList{}
+			Eventually(func() bool {
+				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				return len(stsList.Items) != 0
+			}, timeout, interval).Should(BeTrue())
+
+			if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
+				podList := corev1.PodList{}
+				Eventually(func() bool {
+					Expect(k8sClient.List(ctx, &podList, client.MatchingLabels{
+						"app.kubernetes.io/instance": key.Name,
+					}, client.InNamespace(key.Namespace))).Should(Succeed())
+					return len(podList.Items) == 1
+				}, timeout, interval).Should(BeTrue())
+			}
+
+			By("By updating replica")
+			updatedReplicas := 3
+			fetchedG1.Spec.Components[0].Replicas = int32(updatedReplicas)
+			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
+
+			fetchedG2 := &dbaasv1alpha1.Cluster{}
+			Eventually(func() bool {
+				_ = k8sClient.Get(ctx, key, fetchedG2)
+				return fetchedG2.Status.ObservedGeneration == 2
+			}, timeout*2, interval).Should(BeTrue())
+
+			Eventually(func() bool {
+				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				Expect(len(stsList.Items) != 0).Should(BeTrue())
+				return int(*stsList.Items[0].Spec.Replicas) == updatedReplicas
+			}, timeout, interval).Should(BeTrue())
 
 			updatedReplicas = 5
 			fetchedG2.Spec.Components[0].Replicas = int32(updatedReplicas)

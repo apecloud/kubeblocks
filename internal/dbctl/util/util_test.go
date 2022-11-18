@@ -21,7 +21,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -76,6 +75,10 @@ var _ = Describe("util", func() {
 
 		spinner = Spinner(os.Stdout, "dbctl spinner test ... ")
 		spinner(false)
+	})
+
+	It("Check errors", func() {
+		CheckErr(nil)
 	})
 
 	It("Others", func() {

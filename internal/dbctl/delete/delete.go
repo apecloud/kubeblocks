@@ -47,16 +47,16 @@ func Build(c *builder.Command) *cobra.Command {
 		Example: c.Example,
 		Run: func(cmd *cobra.Command, args []string) {
 			if c.CustomComplete != nil {
-				cmdutil.CheckErr(c.CustomComplete(deleteFlags, args))
+				util.CheckErr(c.CustomComplete(deleteFlags, args))
 			}
-			cmdutil.CheckErr(validate(deleteFlags, args, c.IOStreams.In))
+			util.CheckErr(validate(deleteFlags, args, c.IOStreams.In))
 			o, err := deleteFlags.ToOptions(nil, c.IOStreams)
-			cmdutil.CheckErr(err)
+			util.CheckErr(err)
 			args = buildArgs(c, deleteFlags, args)
 			// call kubectl delete options methods
-			cmdutil.CheckErr(o.Complete(c.Factory, args, cmd))
-			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.RunDelete(c.Factory))
+			util.CheckErr(o.Complete(c.Factory, args, cmd))
+			util.CheckErr(o.Validate())
+			util.CheckErr(o.RunDelete(c.Factory))
 		},
 	}
 	if c.CustomFlags != nil {

@@ -76,13 +76,13 @@ spec:
                         parameter. 1. If Scope = ScopeMemory, db engine will make
                         the change specified by reconfigure operator for the life
                         of the instance. The next time the database is bounced, for
-                        any reason, the change will be reverted to the default value.
-                        2. If Scope = ScopeFile, the change made in reconfigure operator
-                        will take place starting from the next startup but will not
-                        affect the current instance. 3. If Scope = ScopeBoth, the
-                        operator will take effect immediately, and will make the change
-                        for the current instance and preserve it through any future
-                        bounces.
+                        any reason, the change will be reverted to the latest changed
+                        value. 2. If Scope = ScopeFile, the change made in reconfigure
+                        operator will take place starting from the next startup but
+                        will not affect the current instance. 3. If Scope = ScopeBoth,
+                        the operator will take effect immediately, and will make the
+                        change for the current instance and preserve it through any
+                        future bounces.
                       enum:
                       - ScopeBoth
                       - ScopeFile

@@ -62,9 +62,8 @@ spec:
                     type: string
                   schema:
                     description: 'TODO(zt) DAY2 support schema Schema provides a way
-                      for ISVs to validate the changed parameters through json. fix
-                      controller-gen doesn''t work with k8s.io/apiextensions-apiserver:
-                      https://github.com/kubernetes-sigs/controller-tools/issues/291'
+                      for providers to verify that the parameter is legal. fix controller-gen
+                      doesn''t work with k8s.io/apiextensions-apiserver: https://github.com/kubernetes-sigs/controller-tools/issues/291'
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
@@ -113,7 +112,7 @@ spec:
                   describes the error information.
                 type: string
               observedGeneration:
-                description: observedGeneration is the most recent generation observed
+                description: observedGeneration is the latest generation observed
                   for this ClusterDefinition. It corresponds to the ConfigurationTemplate's
                   generation, which is updated on mutation by the API Server.
                 format: int64

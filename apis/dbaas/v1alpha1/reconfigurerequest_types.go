@@ -51,46 +51,50 @@ type ReconfigureRequestStatus struct {
 	// +optional
 	Flows []ReconfigureStateInfo `json:"flows,omitempty"`
 
-	// Pods field describe information about the pod that is being upgraded or has been successfully upgraded.
+	// Pods field describes information about the pod that is being upgraded or has been successfully upgraded.
 	// +optional
 	Pods []ReconfigurePodStatus `json:"pods,omitempty"`
 
-	// WaitPods field describe which Pods are still waiting to be upgraded.
+	// WaitPods field describes which Pods are still waiting to be upgraded.
 	// +optional
 	WaitPods []corev1.ObjectReference `json:"waitPods,omitempty"`
 }
 
 type ReconfigurePodStatus struct {
-	// ProcessStartTime field describe when to start upgrade for pod.
+	// ProcessStartTime field describes when to start upgrade for pod.
 	// +optional
 	ProcessStartTime *metav1.Time `json:"processStartTime,omitempty"`
 
-	// ProcessLatency field describe how long did the upgrade take.
+	// ProcessLatency field describes how long did the upgrade take.
 	// +optional
 	ProcessLatency *metav1.Duration `json:"processLatency,omitempty"`
 
-	// PodRef field describe pod reference.
+	// PodRef field describes pod reference.
 	// +optional
 	PodRef *corev1.ObjectReference `json:"podRef,omitempty" protobuf:"bytes,4,opt,name=targetRef"`
 }
 
 type ReconfigureStateInfo struct {
-	// StartTime field describe when to start upgrade for ops.
+	// StartTime field describes when to start upgrade for ops.
 	// +optional
 	StartTime *metav1.Time `json:"startTime,omitempty"`
 
-	// Step field describe status of the upgrade process.
+	// Step field describes status of the upgrade process.
 	// +kubebuilder:validation:Required
 	Step string `json:"step,omitempty"`
 
-	// ErrorMessage field describe error detail when an error occurs.
+	// ErrorMessage field describes details of an error.
 	// +optional
 	ErrorMessage string `json:"errorMessage,omitempty"`
 }
 
 type Configuration struct {
 
-	// Scope refers to the effect range of the update parameter.
+	// Scope refers to the effective range of the updated parameter.
+	// 1. If Scope = ScopeMemory, db engine will make the change specified by reconfigure operator for the life of the instance.
+	// 	  The next time the database is bounced, for any reason, the change will be reverted to the default value.
+	// 2. If Scope = ScopeFile, the change made in reconfigure operator will take place starting from the next startup but will not affect the current instance.
+	// 3. If Scope = ScopeBoth, the operator will take effect immediately, and will make the change for the current instance and preserve it through any future bounces.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default:"ScopeBoth"
 	// +kubebuilder:validation:Enum={ScopeBoth,ScopeFile,ScopeMemory}
@@ -99,13 +103,13 @@ type Configuration struct {
 	// +optional
 	Parameters []string `json:"parameters,omitempty"`
 
-	// Files user create or update a file to configmap
+	// Files user creates or updates a file to configmap
 	// +optional
 	Files map[string]string `json:"files,omitempty"`
 
-	// Volume is a volume name which file will mount to
+	// MountPoint is a volume name which file will mount to
 	// +optional
-	VolumeName string `json:"volumeName,omitempty"`
+	MountPoint string `json:"mountPoint,omitempty"`
 }
 
 //+kubebuilder:object:root=true

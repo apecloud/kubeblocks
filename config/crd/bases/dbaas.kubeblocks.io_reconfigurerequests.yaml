@@ -61,22 +61,32 @@ spec:
                     files:
                       additionalProperties:
                         type: string
-                      description: Files user create or update a file to configmap
+                      description: Files user creates or updates a file to configmap
                       type: object
+                    mountPoint:
+                      description: MountPoint is a volume name which file will mount
+                        to
+                      type: string
                     parameters:
                       items:
                         type: string
                       type: array
                     scope:
-                      description: Scope refers to the effect range of the update
-                        parameter.
+                      description: Scope refers to the effective range of the updated
+                        parameter. 1. If Scope = ScopeMemory, db engine will make
+                        the change specified by reconfigure operator for the life
+                        of the instance. The next time the database is bounced, for
+                        any reason, the change will be reverted to the default value.
+                        2. If Scope = ScopeFile, the change made in reconfigure operator
+                        will take place starting from the next startup but will not
+                        affect the current instance. 3. If Scope = ScopeBoth, the
+                        operator will take effect immediately, and will make the change
+                        for the current instance and preserve it through any future
+                        bounces.
                       enum:
                       - ScopeBoth
                       - ScopeFile
                       - ScopeMemory
-                      type: string
-                    volumeName:
-                      description: Volume is a volume name which file will mount to
                       type: string
                   type: object
                 type: array
@@ -90,16 +100,15 @@ spec:
                 items:
                   properties:
                     errorMessage:
-                      description: ErrorMessage field describe error detail when an
-                        error occurs.
+                      description: ErrorMessage field describes details of an error.
                       type: string
                     startTime:
-                      description: StartTime field describe when to start upgrade
+                      description: StartTime field describes when to start upgrade
                         for ops.
                       format: date-time
                       type: string
                     step:
-                      description: Step field describe status of the upgrade process.
+                      description: Step field describes status of the upgrade process.
                       type: string
                   type: object
                 type: array
@@ -107,12 +116,12 @@ spec:
                 description: Phase is reconfigure request object status.
                 type: string
               pods:
-                description: Pods field describe information about the pod that is
+                description: Pods field describes information about the pod that is
                   being upgraded or has been successfully upgraded.
                 items:
                   properties:
                     podRef:
-                      description: PodRef field describe pod reference.
+                      description: PodRef field describes pod reference.
                       properties:
                         apiVersion:
                           description: API version of the referent.
@@ -149,18 +158,18 @@ spec:
                           type: string
                       type: object
                     processLatency:
-                      description: ProcessLatency field describe how long did the
+                      description: ProcessLatency field describes how long did the
                         upgrade take.
                       type: string
                     processStartTime:
-                      description: ProcessStartTime field describe when to start upgrade
-                        for pod.
+                      description: ProcessStartTime field describes when to start
+                        upgrade for pod.
                       format: date-time
                       type: string
                   type: object
                 type: array
               waitPods:
-                description: WaitPods field describe which Pods are still waiting
+                description: WaitPods field describes which Pods are still waiting
                   to be upgraded.
                 items:
                   description: 'ObjectReference contains enough information to let

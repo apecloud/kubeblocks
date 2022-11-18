@@ -680,18 +680,17 @@ spec:
 
 			By("Check internal headless services")
 			for _, item := range fetchedG1.Spec.Components {
+				c, err := component.GetComponentFromClusterDefinition(ctx, k8sClient, fetchedG1, item.Type)
+				Expect(err).ShouldNot(HaveOccurred())
+				if c.ComponentType == dbaasv1alpha1.Stateless {
+					continue
+				}
+
 				Expect(k8sClient.List(ctx, svcList, client.MatchingLabels{
 					intctrlutil.AppInstanceLabelKey:  key.Name,
 					intctrlutil.AppComponentLabelKey: item.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				Expect(len(svcList.Items) > 0).Should(BeTrue())
-
-				c, err := component.GetComponentFromClusterDefinition(ctx, k8sClient, fetchedG1, item.Type)
-				Expect(err).ShouldNot(HaveOccurred())
-
-				if c.ComponentType == dbaasv1alpha1.Stateless {
-					continue
-				}
 
 				var headlessSvcPorts []corev1.ServicePort
 				for _, container := range c.PodSpec.Containers {

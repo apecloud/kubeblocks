@@ -44,7 +44,7 @@ type OperationsOptions struct {
 	create.BaseOptions
 	ComponentNames         []string `json:"componentNames,omitempty"`
 	OpsRequestName         string   `json:"opsRequestName"`
-	TtlSecondsAfterSucceed int      `json:"ttlSecondsAfterSucceed"`
+	TTLSecondsAfterSucceed int      `json:"ttlSecondsAfterSucceed"`
 
 	// OpsType operation type
 	OpsType string `json:"type"`
@@ -56,9 +56,9 @@ type OperationsOptions struct {
 	AppVersionRef string `json:"appVersionRef"`
 
 	// VerticalScaling options
-	RequestCpu    string `json:"requestCpu"`
+	RequestCPU    string `json:"requestCpu"`
 	RequestMemory string `json:"requestMemory"`
-	LimitCpu      string `json:"limitCpu"`
+	LimitCPU      string `json:"limitCpu"`
 	LimitMemory   string `json:"limitMemory"`
 
 	// HorizontalScaling options
@@ -73,7 +73,7 @@ type OperationsOptions struct {
 // buildCommonFlags build common flags for operations command
 func (o *OperationsOptions) buildCommonFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.OpsRequestName, "name", "", "OpsRequest name. if not specified, it will be randomly generated ")
-	cmd.Flags().IntVar(&o.TtlSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")
+	cmd.Flags().IntVar(&o.TTLSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")
 	if o.OpsType != OpsTypeUpgrade {
 		cmd.Flags().StringSliceVar(&o.ComponentNames, "component-names", nil, " Component names to this operations (required)")
 	}
@@ -191,9 +191,9 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 	inputs.Short = "vertical scaling the specified components in the cluster"
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
-		cmd.Flags().StringVar(&o.RequestCpu, "requests.cpu", "", "Cpu size requested by the component")
+		cmd.Flags().StringVar(&o.RequestCPU, "requests.cpu", "", "Cpu size requested by the component")
 		cmd.Flags().StringVar(&o.RequestMemory, "requests.memory", "", "Memory size requested by the component")
-		cmd.Flags().StringVar(&o.LimitCpu, "limits.cpu", "", "Cpu size limited by the component")
+		cmd.Flags().StringVar(&o.LimitCPU, "limits.cpu", "", "Cpu size limited by the component")
 		cmd.Flags().StringVar(&o.LimitMemory, "limits.memory", "", "Memory size limited by the component")
 	}
 	return create.BuildCommand(inputs)

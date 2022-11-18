@@ -175,9 +175,9 @@ var _ = Describe("DataProtection", func() {
 			k8sapitypes.MergePatchType, patchByte, metav1.PatchOptions{})
 
 		// create restore cluster
-		cmd_restore := NewCreateRestoreCmd(tf, streams)
-		Expect(cmd_restore != nil).To(BeTrue())
-		_ = cmd_restore.Flags().Set("backup", backupName)
-		cmd_restore.Run(nil, []string{newClusterName})
+		cmdRestore := NewCreateRestoreCmd(tf, streams)
+		Expect(cmdRestore != nil).To(BeTrue())
+		_ = cmdRestore.Flags().Set("backup", backupName)
+		cmdRestore.Run(nil, []string{newClusterName})
 	})
 })

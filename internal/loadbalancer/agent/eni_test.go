@@ -67,14 +67,14 @@ const (
 
 var getDescribeAllENIResponse = func() *pb.DescribeAllENIsResponse {
 	return &pb.DescribeAllENIsResponse{
-		RequestId: util.GenRequestId(),
+		RequestId: util.GenRequestID(),
 		Enis:      getMockENIs(),
 	}
 }
 
 var getDescribeNodeInfoResponse = func() *pb.DescribeNodeInfoResponse {
 	return &pb.DescribeNodeInfoResponse{
-		RequestId: util.GenRequestId(),
+		RequestId: util.GenRequestID(),
 		Info: &pb.InstanceInfo{
 			InstanceId:       instanceId,
 			SubnetId:         subnet1Id,

@@ -101,7 +101,7 @@ func (c *eniManager) init() error {
 		options := &util.RetryOptions{MaxRetry: 10, Delay: 1 * time.Second}
 		if err = util.DoWithRetry(context.Background(), c.logger, func() error {
 			setupENIRequest := &pb.SetupNetworkForENIRequest{
-				RequestId: util.GenRequestId(),
+				RequestId: util.GenRequestID(),
 				Eni:       eni,
 			}
 			_, err = c.nc.SetupNetworkForENI(context.Background(), setupENIRequest)
@@ -169,7 +169,7 @@ func (c *eniManager) start(stop chan struct{}, reconcileInterval time.Duration, 
 }
 
 func (c *eniManager) modifyPrimaryENISourceDestCheck(enabled bool) error {
-	describeENIRequest := &pb.DescribeAllENIsRequest{RequestId: util.GenRequestId()}
+	describeENIRequest := &pb.DescribeAllENIsRequest{RequestId: util.GenRequestID()}
 	describeENIResponse, err := c.nc.DescribeAllENIs(context.Background(), describeENIRequest)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get all enis, retry later")
@@ -194,7 +194,7 @@ func (c *eniManager) modifyPrimaryENISourceDestCheck(enabled bool) error {
 }
 
 func (c *eniManager) getManagedENIs() ([]*pb.ENIMetadata, error) {
-	describeENIRequest := &pb.DescribeAllENIsRequest{RequestId: util.GenRequestId()}
+	describeENIRequest := &pb.DescribeAllENIsRequest{RequestId: util.GenRequestID()}
 	describeENIResponse, err := c.nc.DescribeAllENIs(context.Background(), describeENIRequest)
 	if err != nil {
 		return nil, errors.Wrap(err, "ipamd init: failed to retrieve attached ENIs info")
@@ -223,7 +223,7 @@ func (c *eniManager) filterManagedENIs(enis map[string]*pb.ENIMetadata) []*pb.EN
 }
 
 func (c *eniManager) ensureENI() error {
-	describeENIRequest := &pb.DescribeAllENIsRequest{RequestId: util.GenRequestId()}
+	describeENIRequest := &pb.DescribeAllENIsRequest{RequestId: util.GenRequestID()}
 	describeENIResponse, err := c.nc.DescribeAllENIs(context.Background(), describeENIRequest)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get all enis, retry later")
@@ -287,7 +287,7 @@ func (c *eniManager) tryCreateAndAttachENI() error {
 
 	// setup ENI networking stack
 	setupENIRequest := &pb.SetupNetworkForENIRequest{
-		RequestId: util.GenRequestId(),
+		RequestId: util.GenRequestID(),
 		Eni: &pb.ENIMetadata{
 			EniId: eniId,
 		},
@@ -307,7 +307,7 @@ func (c *eniManager) tryDetachAndDeleteENI(enis []*pb.ENIMetadata) error {
 			continue
 		}
 		cleanENIRequest := &pb.CleanNetworkForENIRequest{
-			RequestId: util.GenRequestId(),
+			RequestId: util.GenRequestID(),
 			Eni:       eni,
 		}
 		if _, err := c.nc.CleanNetworkForENI(context.Background(), cleanENIRequest); err != nil {
@@ -350,7 +350,7 @@ func (c *eniManager) cleanLeakedENIs() error {
 
 func (c *eniManager) waitForENIAttached(eniId string) error {
 	request := &pb.WaitForENIAttachedRequest{
-		RequestId: util.GenRequestId(),
+		RequestId: util.GenRequestID(),
 		Eni:       &pb.ENIMetadata{EniId: eniId},
 	}
 	_, err := c.nc.WaitForENIAttached(context.Background(), request)

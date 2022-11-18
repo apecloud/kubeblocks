@@ -138,7 +138,7 @@ var _ = Describe("Cluster", func() {
 		defer tf.Cleanup()
 		o := &OperationsOptions{
 			BaseOptions:            create.BaseOptions{IOStreams: streams},
-			TtlSecondsAfterSucceed: 30,
+			TTLSecondsAfterSucceed: 30,
 		}
 		By("validate o.name is null")
 		Expect(o.Validate()).To(MatchError("missing cluster name"))

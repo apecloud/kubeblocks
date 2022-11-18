@@ -1,0 +1,76 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind:       ClusterDefinition
+metadata:
+  name:     mysql-cluster-definition
+spec:
+  type: state.mysql-8
+  components:
+  - typeName: replicasets
+    characterType: mysql
+    monitor:
+      builtIn: true
+    configSpec:
+      configTemplateRefs:
+      - name: mysql-tree-node-template-8.0
+        volumeName: mysql-config
+      configReload: false
+    componentType: Consensus
+    consensusSpec:
+      leader:
+        name: leader
+        accessMode: ReadWrite
+      followers:
+        - name: follower
+          accessMode: Readonly
+    defaultReplicas: 3
+    podSpec:
+      containers:
+      - name: mysql
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3306
+          protocol: TCP
+          name: mysql
+        - containerPort: 13306
+          protocol: TCP
+          name: paxos
+        volumeMounts:
+          - mountPath: /data
+            name: data
+          - mountPath: /log
+            name: log
+          - mountPath: /data/config/mysql
+            name: mysql-config
+        env:
+          - name: "MYSQL_ROOT_PASSWORD"
+            valueFrom:
+              secretKeyRef:
+                name: $(KB_SECRET_NAME)
+                key: password
+        command: ["/usr/bin/bash", "-c"]
+        args:
+          - >
+            cluster_info="";
+            for (( i=0; i<$KB_REPLICASETS_PRIMARY_N; i++ )); do
+              if [ $i -ne 0 ]; then
+                cluster_info="$cluster_info;";
+              fi;
+              host=$(eval echo \$KB_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
+              cluster_info="$cluster_info$host:13306";
+            done;
+            idx=0;
+            while IFS='-' read -ra ADDR; do
+              for i in "${ADDR[@]}"; do
+                idx=$i;
+              done;
+            done <<< "$KB_POD_NAME";
+            echo $idx;
+            cluster_info="$cluster_info@$(($idx+1))";
+            echo $cluster_info;
+            mkdir -p /data/mysql/log;
+            mkdir -p /data/mysql/data;
+            mkdir -p /data/mysql/std_data;
+            mkdir -p /data/mysql/tmp;
+            mkdir -p /data/mysql/run;
+            chmod +777 -R /data/mysql;
+            docker-entrypoint.sh mysqld --defaults-file=/data/config/mysql/my.cnf --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1

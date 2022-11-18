@@ -28,7 +28,7 @@ Run the following command to install `kubectl` in your local host for visiting k
 - K8s cluster
 `dbctl` will visit a k8s cluster which can be specified by the `kubeconfig` condition variable or the `kubeconfig` parameter. If no k8s cluster is specified, `dbctl` reads the content in `~/.kube/config` file by default.
 
-## Deploy `dbctl`
+## Install `dbctl`
 
 Both curl installation and make installation are supported.
 

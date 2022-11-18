@@ -12,7 +12,7 @@ Description to be filled.
 
 ## Deploy `playground` on local host
 
-> **Note**
+> **Note** <br>
 > During the deployment process, files will be downloaded from image and the downloading might be slow. It is recommended to enable VPN while downloading. ***# Is this a promblem for overseas users?***
 
 Run this command to deploy `playground`.
@@ -38,7 +38,7 @@ You can also deploy `playgournd` on AWS EC2 by following the steps below.
 
 An AWS access key is required and this account should have the searching and changing permission of VPC/Internet Gateway/Subnet/Route Table/Security Group/EC2 resources. ***# This whole part is written based on the version in August. Need to be updated.***
 
-> **Caution**
+> **Caution** <br>
 > DO NOT switch your network connection during the deployment and using process. Switching network changes the IP, which results in connection failure.
 
 Replace `--access-key` and `--access-secret` with your AWS access key and run this command to deploy `playground` on AWS.
@@ -78,7 +78,7 @@ To login to remote host:              ssh -i ~/.opendbaas/ssh/id_rsa ec2-user@54
 Use "dbctl [command] --help" for more information about a command.
 ```
 
-> **Note**
+> **Note** <br>
 > If the deployment fails, run `dbctl playground destroy` to clean the environment and execute the above command again.
 > Run `dbctl playground guide` to display the installation information again.
 

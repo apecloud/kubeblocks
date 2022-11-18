@@ -199,7 +199,7 @@ func DoWithRetry(ctx context.Context, logger logr.Logger, operation func() error
 	return err
 }
 
-func GenRequestId() string {
+func GenRequestID() string {
 	return uuid.New().String()
 }
 

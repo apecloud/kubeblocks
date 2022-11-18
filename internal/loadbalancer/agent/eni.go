@@ -46,7 +46,7 @@ func (h *NodeResource) GetSparePrivateIPs() int {
 
 type ENIResource struct {
 	ENIId           string
-	SubnetId        string
+	SubnetID        string
 	TotalPrivateIPs int
 	UsedPrivateIPs  int
 }
@@ -56,8 +56,8 @@ type eniManager struct {
 	maxIPsPerENI     int
 	maxENI           int
 	minPrivateIP     int
-	instanceId       string
-	subnetId         string
+	instanceID       string
+	subnetID         string
 	securityGroupIds []string
 	resource         *NodeResource
 	cp               cloud.Provider
@@ -70,10 +70,10 @@ func newENIManager(logger logr.Logger, ip string, info *pb.InstanceInfo, nc pb.N
 		cp: cp,
 	}
 
-	c.instanceId = info.GetInstanceId()
-	c.subnetId = info.GetSubnetId()
+	c.instanceID = info.GetInstanceId()
+	c.subnetID = info.GetSubnetId()
 	c.securityGroupIds = info.GetSecurityGroupIds()
-	c.logger = logger.WithValues("ip", ip, "instance id", c.instanceId)
+	c.logger = logger.WithValues("ip", ip, "instance id", c.instanceID)
 
 	c.minPrivateIP = config.MinPrivateIP
 	c.maxIPsPerENI = cp.GetENIIPv4Limit()
@@ -132,7 +132,7 @@ func (c *eniManager) buildHostResource(enis []*pb.ENIMetadata) *NodeResource {
 		result.UsedPrivateIPs += len(eni.Ipv4Addresses)
 		result.ENIResources[eni.EniId] = &ENIResource{
 			ENIId:           eni.EniId,
-			SubnetId:        eni.SubnetId,
+			SubnetID:        eni.SubnetId,
 			TotalPrivateIPs: c.maxIPsPerENI,
 			UsedPrivateIPs:  len(eni.Ipv4Addresses),
 		}
@@ -207,7 +207,7 @@ func (c *eniManager) filterManagedENIs(enis map[string]*pb.ENIMetadata) []*pb.EN
 	var (
 		managedENIList []*pb.ENIMetadata
 	)
-	for eniId, eni := range enis {
+	for eniID, eni := range enis {
 		if _, found := eni.Tags[cloud.TagENIKubeBlocksManaged]; !found {
 			continue
 		}
@@ -217,7 +217,7 @@ func (c *eniManager) filterManagedENIs(enis map[string]*pb.ENIMetadata) []*pb.EN
 			continue
 		}
 
-		managedENIList = append(managedENIList, enis[eniId])
+		managedENIList = append(managedENIList, enis[eniID])
 	}
 	return managedENIList
 }
@@ -265,37 +265,37 @@ func (c *eniManager) tryCreateAndAttachENI() error {
 	c.logger.Info("Try to create and attach new eni")
 
 	// create ENI, use same sg and subnet as primary ENI
-	eniId, err := c.cp.CreateENI(c.instanceId, c.subnetId, c.securityGroupIds)
+	eniID, err := c.cp.CreateENI(c.instanceID, c.subnetID, c.securityGroupIds)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create ENI, retry later")
 	}
-	c.logger.Info("Successfully create new eni", "eni id", eniId)
+	c.logger.Info("Successfully create new eni", "eni id", eniID)
 
-	if _, err = c.cp.AttachENI(c.instanceId, eniId); err != nil {
-		if derr := c.cp.DeleteENI(eniId); derr != nil {
+	if _, err = c.cp.AttachENI(c.instanceID, eniID); err != nil {
+		if derr := c.cp.DeleteENI(eniID); derr != nil {
 			c.logger.Error(derr, "Failed to delete newly created untagged ENI!")
 		}
 		return errors.Wrap(err, "Failed to attach ENI")
 	}
-	c.logger.Info("Successfully attach new eni, waiting for it to take effect", "eni id", eniId)
+	c.logger.Info("Successfully attach new eni, waiting for it to take effect", "eni id", eniID)
 
 	// waiting for ENI attached
-	if err := c.waitForENIAttached(eniId); err != nil {
+	if err := c.waitForENIAttached(eniID); err != nil {
 		return errors.Wrap(err, "Unable to discover attached ENI from metadata service")
 	}
-	c.logger.Info("Successfully find eni attached", "eni id", eniId)
+	c.logger.Info("Successfully find eni attached", "eni id", eniID)
 
 	// setup ENI networking stack
 	setupENIRequest := &pb.SetupNetworkForENIRequest{
 		RequestId: util.GenRequestId(),
 		Eni: &pb.ENIMetadata{
-			EniId: eniId,
+			EniId: eniID,
 		},
 	}
 	if _, err = c.nc.SetupNetworkForENI(context.Background(), setupENIRequest); err != nil {
-		return errors.Wrapf(err, "Failed to set up network for eni %s", eniId)
+		return errors.Wrapf(err, "Failed to set up network for eni %s", eniID)
 	}
-	c.logger.Info("Successfully initialized new eni", "eni id", eniId)
+	c.logger.Info("Successfully initialized new eni", "eni id", eniID)
 	return nil
 }
 
@@ -325,7 +325,7 @@ func (c *eniManager) tryDetachAndDeleteENI(enis []*pb.ENIMetadata) error {
 func (c *eniManager) cleanLeakedENIs() error {
 	c.logger.Info("Start cleaning leaked enis")
 
-	leakedENIs, err := c.cp.FindLeakedENIs(c.instanceId)
+	leakedENIs, err := c.cp.FindLeakedENIs(c.instanceID)
 	if err != nil {
 		return errors.Wrap(err, "Failed to find leaked enis, skip")
 	}
@@ -348,10 +348,10 @@ func (c *eniManager) cleanLeakedENIs() error {
 	return nil
 }
 
-func (c *eniManager) waitForENIAttached(eniId string) error {
+func (c *eniManager) waitForENIAttached(eniID string) error {
 	request := &pb.WaitForENIAttachedRequest{
 		RequestId: util.GenRequestId(),
-		Eni:       &pb.ENIMetadata{EniId: eniId},
+		Eni:       &pb.ENIMetadata{EniId: eniID},
 	}
 	_, err := c.nc.WaitForENIAttached(context.Background(), request)
 	return err

@@ -97,8 +97,8 @@ func calMysqlPoolSizeByResource(resource *ResourceDefinition, isShared bool) str
 	return fmt.Sprintf("%dM", bufferSize)
 }
 
-// calDbPoolSize for specific engine: mysql
-func calDbPoolSize(container corev1.Container) string {
+// calDBPoolSize for specific engine: mysql
+func calDBPoolSize(container corev1.Container) string {
 	if len(container.Resources.Limits) == 0 {
 		return ""
 	}

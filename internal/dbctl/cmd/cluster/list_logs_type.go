@@ -137,9 +137,9 @@ func (o *LogsListOptions) Run() error {
 }
 
 func (o *LogsListOptions) printHeaderMessage(w cmddes.PrefixWriter, c *dbaasv1alpha1.Cluster) {
-	w.Write(describe.LEVEL_0, "ClusterName:\t\t%s\n", c.Name)
-	w.Write(describe.LEVEL_0, "Namespace:\t\t%s\n", c.Namespace)
-	w.Write(describe.LEVEL_0, "ClusterDefinition:\t%s\n", c.Spec.ClusterDefRef)
+	w.Write(describe.Level0, "ClusterName:\t\t%s\n", c.Name)
+	w.Write(describe.Level0, "Namespace:\t\t%s\n", c.Namespace)
+	w.Write(describe.Level0, "ClusterDefinition:\t%s\n", c.Spec.ClusterDefRef)
 }
 
 // printBodyMessage print message about logs file
@@ -153,8 +153,8 @@ func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 			if len(o.componentName) > 0 && !strings.EqualFold(o.componentName, componentName) {
 				continue
 			}
-			w.Write(describe.LEVEL_0, "\nInstance  Name:\t%s\n", p.Name)
-			w.Write(describe.LEVEL_0, "Component Name:\t%s\n", componentName)
+			w.Write(describe.Level0, "\nInstance  Name:\t%s\n", p.Name)
+			w.Write(describe.Level0, "Component Name:\t%s\n", componentName)
 			var comTypeName string
 			logTypeMap := make(map[string]bool)
 			for _, comCluster := range c.Spec.Components {
@@ -167,7 +167,7 @@ func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 				}
 			}
 			if len(comTypeName) == 0 {
-				w.Write(describe.LEVEL_0, "\nComponent name %s in pod labels can't find corresponding type in cluster yaml. \n", componentName)
+				w.Write(describe.Level0, "\nComponent name %s in pod labels can't find corresponding type in cluster yaml. \n", componentName)
 				continue
 			}
 			for _, com := range cd.Spec.Components {
@@ -176,7 +176,7 @@ func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 				}
 				for _, logConfig := range com.LogConfigs {
 					if _, ok := logTypeMap[logConfig.Name]; ok {
-						w.Write(describe.LEVEL_0, "Log file type :\t%s\n", logConfig.Name)
+						w.Write(describe.Level0, "Log file type :\t%s\n", logConfig.Name)
 						// todo display more log file info
 						if len(logConfig.FilePathPattern) > 0 {
 							o.printRealFileMessage(&p, logConfig.FilePathPattern)
@@ -185,7 +185,7 @@ func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 				}
 			}
 		} else {
-			w.Write(describe.LEVEL_0, "Component name in pod label %s isn't set\n", p.Name)
+			w.Write(describe.Level0, "Component name in pod label %s isn't set\n", p.Name)
 		}
 	}
 }

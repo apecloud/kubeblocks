@@ -27,7 +27,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/backup_config"
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/backupconfig"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/bench"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/kubeblocks"
@@ -85,7 +85,7 @@ A database management tool for KubeBlocks`,
 		bench.NewBenchCmd(),
 		options.NewCmdOptions(ioStreams.Out),
 		version.NewVersionCmd(f),
-		backup_config.NewBackupConfigCmd(f, ioStreams),
+		backupconfig.NewBackupConfigCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}

@@ -70,7 +70,7 @@ func NewNode(logger logr.Logger, ip string, nc pb.NodeClient, cp cloud.Provider)
 		logger: logger.WithValues("ip", ip),
 	}
 
-	resp, err := nc.DescribeNodeInfo(context.Background(), &pb.DescribeNodeInfoRequest{RequestId: util.GenRequestId()})
+	resp, err := nc.DescribeNodeInfo(context.Background(), &pb.DescribeNodeInfoRequest{RequestId: util.GenRequestID()})
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to describe node info")
 	}
@@ -134,7 +134,7 @@ func (n *node) ChooseENI() (*pb.ENIMetadata, error) {
 
 func (n *node) SetupNetworkForService(floatingIP string, eni *pb.ENIMetadata) error {
 	request := &pb.SetupNetworkForServiceRequest{
-		RequestId: util.GenRequestId(),
+		RequestId: util.GenRequestID(),
 		PrivateIp: floatingIP,
 		Eni:       eni,
 	}
@@ -144,7 +144,7 @@ func (n *node) SetupNetworkForService(floatingIP string, eni *pb.ENIMetadata) er
 
 func (n *node) CleanNetworkForService(floatingIP string, eni *pb.ENIMetadata) error {
 	request := &pb.CleanNetworkForServiceRequest{
-		RequestId: util.GenRequestId(),
+		RequestId: util.GenRequestID(),
 		PrivateIp: floatingIP,
 		Eni:       eni,
 	}

@@ -56,9 +56,9 @@ type OperationsOptions struct {
 	AppVersionRef string `json:"appVersionRef"`
 
 	// VerticalScaling options
-	RequestCPU    string `json:"requestCpu"`
+	RequestCPU    string `json:"requestCPU"`
 	RequestMemory string `json:"requestMemory"`
-	LimitCPU      string `json:"limitCpu"`
+	LimitCPU      string `json:"limitCPU"`
 	LimitMemory   string `json:"limitMemory"`
 
 	// HorizontalScaling options
@@ -191,9 +191,9 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 	inputs.Short = "vertical scaling the specified components in the cluster"
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
-		cmd.Flags().StringVar(&o.RequestCPU, "requests.cpu", "", "Cpu size requested by the component")
+		cmd.Flags().StringVar(&o.RequestCPU, "requests.cpu", "", "CPU size requested by the component")
 		cmd.Flags().StringVar(&o.RequestMemory, "requests.memory", "", "Memory size requested by the component")
-		cmd.Flags().StringVar(&o.LimitCPU, "limits.cpu", "", "Cpu size limited by the component")
+		cmd.Flags().StringVar(&o.LimitCPU, "limits.cpu", "", "CPU size limited by the component")
 		cmd.Flags().StringVar(&o.LimitMemory, "limits.memory", "", "Memory size limited by the component")
 	}
 	return create.BuildCommand(inputs)

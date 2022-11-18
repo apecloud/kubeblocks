@@ -232,7 +232,7 @@ func (d *ClusterDescriber) describeComponent(w describe.PrefixWriter) error {
 		w.Write(Level1, "Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		w.Write(Level1, "Image:\t%s\n", pods[0].Spec.Containers[0].Image)
 
-		// cpu and memory
+		// CPU and memory
 		describeResource(&c.Resources, w)
 
 		// storage

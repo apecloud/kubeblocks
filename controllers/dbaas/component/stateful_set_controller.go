@@ -62,11 +62,33 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	if err := checkComponentStatusAndSyncCluster(reqCtx, r.Client, sts, handleStatefulSetAndCheckStatus); err != nil {
+	if err := checkComponentStatusAndSyncCluster(reqCtx, r.Client, sts, handleComponentStatusWithMultiSts); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
 	return intctrlutil.Reconciled()
+}
+
+// handleComponentStatusWithMultiSts If the component contains multiple sts, you need to check that the status of multiple sts is normal
+func handleComponentStatusWithMultiSts(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *dbaasv1alpha1.Cluster, object client.Object) (bool, error) {
+	var (
+		componentStatusIsRunning = true
+		sts                      = object.(*appsv1.StatefulSet)
+	)
+	compStsList, err := ListStatefulSetByClusterAndComponentLabels(reqCtx.Ctx, cli, cluster, sts.Labels[intctrlutil.AppComponentLabelKey])
+	if err != nil {
+		return false, err
+	}
+	for _, stsObj := range compStsList.Items {
+		stsIsReady, err := handleStatefulSetAndCheckStatus(reqCtx, cli, cluster, &stsObj)
+		if err != nil {
+			return stsIsReady, err
+		}
+		if !stsIsReady {
+			componentStatusIsRunning = false
+		}
+	}
+	return componentStatusIsRunning, nil
 }
 
 func handleStatefulSetAndCheckStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *dbaasv1alpha1.Cluster, object client.Object) (bool, error) {
@@ -106,6 +128,10 @@ func handleUpdateByComponentType(reqCtx intctrlutil.RequestCtx, cli client.Clien
 			// TODO check pod is ready by role label
 		case dbaasv1alpha1.Stateful:
 			// when stateful updateStrategy is rollingUpdate, need to check revision
+			if sts.Status.UpdateRevision == sts.Status.CurrentRevision {
+				statefulStatusRevisionIsEquals = true
+			}
+		case dbaasv1alpha1.Replication:
 			if sts.Status.UpdateRevision == sts.Status.CurrentRevision {
 				statefulStatusRevisionIsEquals = true
 			}

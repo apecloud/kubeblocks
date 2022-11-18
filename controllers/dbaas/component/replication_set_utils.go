@@ -94,16 +94,16 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 			break
 		}
 		// list all statefulSets by cluster and componentKey label
-		allStsList, err := ListStatefulSetByClusterAndComponentLabels(reqCtx.Ctx, cli, cluster, compKey)
+		compStsList, err := ListStatefulSetByClusterAndComponentLabels(reqCtx.Ctx, cli, cluster, compKey)
 		if err != nil {
 			return err
 		}
-		if compOwnsStsMap[compKey] != len(allStsList.Items) {
+		if compOwnsStsMap[compKey] != len(compStsList.Items) {
 			return fmt.Errorf("statefulset total number has changed")
 		}
 		dos := make([]*appsv1.StatefulSet, 0)
-		partition := len(allStsList.Items) - stsToDelNum
-		for _, sts := range allStsList.Items {
+		partition := len(compStsList.Items) - stsToDelNum
+		for _, sts := range compStsList.Items {
 			// if current primary statefulSet ordinal is larger than target number replica, return err
 			if getOrdinalSts(&sts) > partition && checkStsIsPrimary(&sts) {
 				return fmt.Errorf("current primary statefulset ordinal is larger than target number replicas, can not be reduce, please switchover first")

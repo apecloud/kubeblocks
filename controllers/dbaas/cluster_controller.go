@@ -531,7 +531,9 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 				statefulStatusRevisionIsEquals = false
 			}
 		case dbaasv1alpha1.Replication:
-			// TODO(xingran) check pod status normal here
+			if sts.Status.UpdateRevision != sts.Status.CurrentRevision {
+				statefulStatusRevisionIsEquals = false
+			}
 		}
 		stsIsRunning := component.StatefulSetIsReady(&sts, statefulStatusRevisionIsEquals)
 		if !stsIsRunning {

@@ -19,8 +19,9 @@ package component
 import (
 	"context"
 	"encoding/json"
-	"k8s.io/apimachinery/pkg/labels"
 	"time"
+
+	"k8s.io/apimachinery/pkg/labels"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -217,7 +218,7 @@ func InitClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster,
 	}
 }
 
-func ListStatefulSetByClusterAndComponentLabels(Ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, componentName string) (*appsv1.StatefulSetList, error) {
+func ListStatefulSetByClusterAndComponentLabels(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, componentName string) (*appsv1.StatefulSetList, error) {
 	stsList := &appsv1.StatefulSetList{}
 	clusterSelector, err := labels.Parse(intctrlutil.AppInstanceLabelKey + "=" + cluster.Name)
 	if err != nil {
@@ -230,7 +231,7 @@ func ListStatefulSetByClusterAndComponentLabels(Ctx context.Context, cli client.
 	if err != nil {
 		return stsList, err
 	}
-	if err := cli.List(Ctx, stsList,
+	if err := cli.List(ctx, stsList,
 		&client.ListOptions{Namespace: cluster.Namespace},
 		client.MatchingLabelsSelector{Selector: compSelector},
 		client.MatchingLabelsSelector{Selector: clusterSelector}); err != nil {

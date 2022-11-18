@@ -21,7 +21,6 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
-	"github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"net"
 	"os"
 	"os/exec"
@@ -47,6 +46,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -925,7 +925,7 @@ spec:
     - touch /data/mysql/data/.restore; sync
   backupToolName: mysql-xtrabackup
 `, backupPolicyTplKey.Name, clusterDefKey.Name)
-			backupPolicyTemplate := v1alpha1.BackupPolicyTemplate{}
+			backupPolicyTemplate := dataprotectionv1alpha1.BackupPolicyTemplate{}
 			Expect(yaml.Unmarshal([]byte(backupPolicyTemplateYaml), &backupPolicyTemplate)).Should(Succeed())
 			Expect(testCtx.CheckedCreateObj(ctx, &backupPolicyTemplate)).Should(Succeed())
 
@@ -943,7 +943,8 @@ spec:
 				return len(stsList.Items) != 0
 			}, timeout, interval).Should(BeTrue())
 
-			if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
+			useExistingCluster, _ := strconv.ParseBool(os.Getenv("USE_EXISTING_CLUSTER"))
+			if useExistingCluster {
 				podList := corev1.PodList{}
 				Eventually(func() bool {
 					Expect(k8sClient.List(ctx, &podList, client.MatchingLabels{
@@ -984,7 +985,7 @@ spec:
 			}, timeout, interval).Should(BeTrue())
 
 			Eventually(func() bool {
-				backupJobList := v1alpha1.BackupJobList{}
+				backupJobList := dataprotectionv1alpha1.BackupJobList{}
 				Expect(k8sClient.List(ctx, &backupJobList, client.MatchingLabels{
 					"app.kubernetes.io/instance": key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())

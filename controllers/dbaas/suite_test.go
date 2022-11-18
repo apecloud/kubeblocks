@@ -18,7 +18,6 @@ package dbaas
 
 import (
 	"context"
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"path/filepath"
 	"testing"
 
@@ -42,6 +41,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/testutil"
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to

@@ -20,7 +20,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -34,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/apecloud/kubeblocks/internal/testutil"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 func TestLoadbalancer(t *testing.T) {

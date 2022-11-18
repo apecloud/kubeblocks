@@ -9,9 +9,15 @@ spec:
     characterType: mysql
     monitor:
       builtIn: true
-    configTemplateRefs:
-    - name: mysql-tree-node-template-8.0
-      volumeName: mysql-config
+    configSpec:
+      configTemplateRefs:
+      - name: mysql-tree-node-template-8.0
+        volumeName: mysql-config
+      configReload: true
+      configReloadType: signal
+        configReloadTrigger:
+          signal: SIGHUP
+          processName: mysqld
     defaultReplicas: 3
     componentType: Consensus
     podSpec:

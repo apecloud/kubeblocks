@@ -14,10 +14,16 @@ spec:
     characterType: mysql
     monitor:
       builtIn: true
-    configTemplateRefs:
-      default:
-        - name: mysql-3node-tpl-8.0
-          volumeName: mysql-config
+    configSpec:
+      configTemplateRefs:
+        default:
+          - name: mysql-3node-tpl-8.0
+            volumeName: mysql-config
+      configReload: true
+      configReloadType: signal
+      configReloadTrigger:
+        signal: SIGHUP
+        processName: mysqld
     defaultReplicas: 3
     componentType: Consensus
     consensusSpec:

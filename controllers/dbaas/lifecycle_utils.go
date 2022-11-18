@@ -60,7 +60,7 @@ const (
 
 	ConfigTemplateCueTplName   = "config_template.cue"
 	ConfigManageSidecarTplName = "config_manager_sidecar.cue"
-	ConfigSidecarIMAGE         = "config_sidecar_image"
+	ConfigSidecarImage         = "CONFIG_MANAGER_IMAGE"
 	ConfigSidecarName          = "config-manager-sidecar"
 )
 
@@ -1585,7 +1585,7 @@ func updateConfigurationManagerWithComponent(params createParams, sts *appsv1.St
 
 	managerSidecar := &cfgcm.ConfigManagerSidecar{
 		ManagerName: ConfigSidecarName,
-		Image:       viper.GetString(ConfigSidecarIMAGE),
+		Image:       viper.GetString(ConfigSidecarImage),
 		Args:        cfgcm.BuildReloadSidecarParams(cfgSpec.ConfigReloadType, *cfgSpec.ConfigReloadTrigger, volumeDirs),
 		Volumes:     volumeDirs,
 	}

@@ -1,7 +1,7 @@
 template: {
 	name: "config-manager-sidecar"
 	command: [
-		"bin/reloader",
+		"/bin/reloader",
 	]
 	args: parameter.args
 

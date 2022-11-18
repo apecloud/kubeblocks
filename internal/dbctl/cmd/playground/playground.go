@@ -32,7 +32,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cloudprovider"
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/dbaas"
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/playground/engine"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/cluster"
@@ -152,7 +152,7 @@ func (o *initOptions) local() error {
 	}
 	installer.verboseLog(o.Verbose)
 
-	// Set up K3s as dbaas control plane cluster
+	// Set up K3s as KubeBlocks control plane cluster
 	spinner := util.Spinner(o.Out, "Create playground k3d cluster: %s", clusterName)
 	defer spinner(false)
 	if err = installer.install(); err != nil {
@@ -333,7 +333,7 @@ func printGuide(cloudProvider string, hostIP string, replicas int) error {
 }
 
 func (o *initOptions) installKubeBlocks() error {
-	installer := dbaas.Installer{
+	installer := kubeblocks.Installer{
 		HelmCfg:   o.helmCfg,
 		Namespace: dbClusterNamespace,
 		Version:   version.DefaultKubeBlocksVersion,

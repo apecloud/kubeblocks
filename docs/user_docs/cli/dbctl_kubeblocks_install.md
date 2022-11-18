@@ -1,31 +1,37 @@
-## dbctl
+## dbctl kubeblocks install
 
-KubeBlocks CLI
-
-### Synopsis
+Install KubeBlocks
 
 ```
-
-=========================================
-       __ __                  __     __
-      |  \  \                |  \   |  \
-  ____| ▓▓ ▓▓____   _______ _| ▓▓_  | ▓▓
- /      ▓▓ ▓▓    \ /       \   ▓▓ \ | ▓▓
-|  ▓▓▓▓▓▓▓ ▓▓▓▓▓▓▓\  ▓▓▓▓▓▓▓\▓▓▓▓▓▓ | ▓▓
-| ▓▓  | ▓▓ ▓▓  | ▓▓ ▓▓       | ▓▓ __| ▓▓
-| ▓▓__| ▓▓ ▓▓__/ ▓▓ ▓▓_____  | ▓▓|  \ ▓▓
- \▓▓    ▓▓ ▓▓    ▓▓\▓▓     \  \▓▓  ▓▓ ▓▓
-  \▓▓▓▓▓▓▓\▓▓▓▓▓▓▓  \▓▓▓▓▓▓▓   \▓▓▓▓ \▓▓
-
-=========================================
-A database management tool for KubeBlocks
+dbctl kubeblocks install [flags]
 ```
 
+### Examples
+
 ```
-dbctl [flags]
+  # Install KubeBlocks
+  dbctl kubeblocks install
+  
+  # Install KubeBlocks with specified version
+  dbctl kubeblocks install --version=0.2.0
+  
+  # Install KubeBlocks and enable the monitor including prometheus, grafana
+  dbctl kubeblocks install --monitor=true
+  
+  # Install KubeBlocks with other settings, for example, set replicaCount to 3
+  dbctl kubeblocks install --set replicaCount=3
 ```
 
 ### Options
+
+```
+  -h, --help              help for install
+      --monitor           Set monitor enabled (default false)
+      --set stringArray   Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
+      --version string    KubeBlocks version
+```
+
+### Options inherited from parent commands
 
 ```
       --as string                      Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
@@ -37,7 +43,6 @@ dbctl [flags]
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
-  -h, --help                           help for dbctl
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
@@ -51,11 +56,5 @@ dbctl [flags]
 
 ### SEE ALSO
 
-* [dbctl backup](dbctl_backup.md)	 - backup operation command
-* [dbctl bench](dbctl_bench.md)	 - Run a benchmark
-* [dbctl cluster](dbctl_cluster.md)	 - Database cluster operation command
 * [dbctl kubeblocks](dbctl_kubeblocks.md)	 - KubeBlocks operation commands
-* [dbctl options](dbctl_options.md)	 - Print the list of flags inherited by all commands
-* [dbctl playground](dbctl_playground.md)	 - Bootstrap a KubeBlocks in local host
-* [dbctl version](dbctl_version.md)	 - Print the version information
 

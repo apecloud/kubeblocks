@@ -40,29 +40,28 @@ const (
 	nodeIP       = "172.31.1.100"
 	subnet       = "172.31.0.0/16"
 
-	instanceId      = "i-0000000000000"
-	securityGroupId = "sec-0000000000000"
-	eniId1          = "eni-01"
+	instanceID      = "i-0000000000000"
+	securityGroupID = "sec-0000000000000"
+	eniID1          = "eni-01"
 	eniMac1         = "00:00:00:00:00:01"
-	eniIp11         = "172.31.1.10"
-	eniIp12         = "172.31.1.11"
-	eniIp13         = "172.31.1.12"
+	eniIP11         = "172.31.1.10"
+	eniIP12         = "172.31.1.11"
+	eniIP13         = "172.31.1.12"
 
-	eniId2  = "eni-02"
+	eniID2  = "eni-02"
 	eniMac2 = "00:00:00:00:00:02"
-	eniIp21 = "172.31.2.10"
-	eniIp22 = "172.31.2.11"
-	eniIp23 = "172.31.2.12"
-	eniIp24 = "172.31.2.14"
+	eniIP21 = "172.31.2.10"
+	eniIP22 = "172.31.2.11"
+	eniIP23 = "172.31.2.12"
 
-	eniId3  = "eni-03"
+	eniID3  = "eni-03"
 	eniMac3 = "00:00:00:00:00:03"
-	eniIp31 = "172.31.3.10"
-	eniIp32 = "172.31.3.11"
+	eniIP31 = "172.31.3.10"
+	eniIP32 = "172.31.3.11"
 
-	eniId4  = "eni-04"
-	eniIp41 = "172.31.4.10"
-	eniId5  = "eni-05"
+	eniID4  = "eni-04"
+	eniIP41 = "172.31.4.10"
+	eniID5  = "eni-05"
 )
 
 var getDescribeAllENIResponse = func() *pb.DescribeAllENIsResponse {
@@ -76,38 +75,38 @@ var getDescribeNodeInfoResponse = func() *pb.DescribeNodeInfoResponse {
 	return &pb.DescribeNodeInfoResponse{
 		RequestId: util.GenRequestID(),
 		Info: &pb.InstanceInfo{
-			InstanceId:       instanceId,
+			InstanceId:       instanceID,
 			SubnetId:         subnet1Id,
-			SecurityGroupIds: []string{securityGroupId},
+			SecurityGroupIds: []string{securityGroupID},
 		},
 	}
 }
 
 var getMockENIs = func() map[string]*pb.ENIMetadata {
 	return map[string]*pb.ENIMetadata{
-		eniId1: {
-			EniId:          eniId1,
+		eniID1: {
+			EniId:          eniID1,
 			Mac:            eniMac1,
 			DeviceNumber:   0,
 			SubnetIpv4Cidr: subnet,
 			Ipv4Addresses: []*pb.IPv4Address{
 				{
 					Primary: true,
-					Address: eniIp11,
+					Address: eniIP11,
 				},
 				{
 					Primary: true,
-					Address: eniIp12,
+					Address: eniIP12,
 				},
 				{
 					Primary: true,
-					Address: eniIp13,
+					Address: eniIP13,
 				},
 			},
 		},
 		// busiest ENI
-		eniId2: {
-			EniId:          eniId2,
+		eniID2: {
+			EniId:          eniID2,
 			Mac:            eniMac2,
 			DeviceNumber:   1,
 			SubnetIpv4Cidr: subnet,
@@ -119,20 +118,20 @@ var getMockENIs = func() map[string]*pb.ENIMetadata {
 			Ipv4Addresses: []*pb.IPv4Address{
 				{
 					Primary: true,
-					Address: eniIp21,
+					Address: eniIP21,
 				},
 				{
 					Primary: false,
-					Address: eniIp22,
+					Address: eniIP22,
 				},
 				{
 					Primary: false,
-					Address: eniIp23,
+					Address: eniIP23,
 				},
 			},
 		},
-		eniId3: {
-			EniId:          eniId3,
+		eniID3: {
+			EniId:          eniID3,
 			Mac:            eniMac3,
 			DeviceNumber:   3,
 			SubnetIpv4Cidr: subnet,
@@ -144,16 +143,16 @@ var getMockENIs = func() map[string]*pb.ENIMetadata {
 			Ipv4Addresses: []*pb.IPv4Address{
 				{
 					Primary: true,
-					Address: eniIp31,
+					Address: eniIP31,
 				},
 				{
 					Primary: false,
-					Address: eniIp32,
+					Address: eniIP32,
 				},
 			},
 		},
-		eniId4: {
-			EniId:        eniId4,
+		eniID4: {
+			EniId:        eniID4,
 			DeviceNumber: 4,
 			Tags: map[string]string{
 				cloud.TagENIKubeBlocksManaged: "true",
@@ -163,7 +162,7 @@ var getMockENIs = func() map[string]*pb.ENIMetadata {
 			Ipv4Addresses: []*pb.IPv4Address{
 				{
 					Primary: true,
-					Address: eniIp41,
+					Address: eniIP41,
 				},
 			},
 		},
@@ -182,9 +181,9 @@ var _ = Describe("Eni", func() {
 		mockNodeClient.EXPECT().SetupNetworkForENI(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 		mockNodeClient.EXPECT().DescribeNodeInfo(gomock.Any(), gomock.Any()).Return(getDescribeNodeInfoResponse(), nil)
 		info := &pb.InstanceInfo{
-			InstanceId:       instanceId,
+			InstanceId:       instanceID,
 			SubnetId:         subnet1Id,
-			SecurityGroupIds: []string{securityGroupId},
+			SecurityGroupIds: []string{securityGroupID},
 		}
 		manager, err := newENIManager(logger, nodeIP, info, mockNodeClient, mockProvider)
 		Expect(err).Should(BeNil())
@@ -194,7 +193,7 @@ var _ = Describe("Eni", func() {
 	Context("Test start", func() {
 		It("", func() {
 			manager, mockProvider, _ := setup()
-			mockProvider.EXPECT().ModifySourceDestCheck(eniId1, gomock.Any()).Return(nil)
+			mockProvider.EXPECT().ModifySourceDestCheck(eniID1, gomock.Any()).Return(nil)
 			// we close stop channel to prevent running ensureENI
 			stop := make(chan struct{})
 			close(stop)
@@ -209,7 +208,7 @@ var _ = Describe("Eni", func() {
 			mockNodeClient.EXPECT().DescribeAllENIs(gomock.Any(), gomock.Any()).Return(getDescribeAllENIResponse(), nil)
 			manager.minPrivateIP = math.MaxInt
 
-			eni := cloud.ENIMetadata{ID: eniId5}
+			eni := cloud.ENIMetadata{ID: eniID5}
 			mockProvider.EXPECT().CreateENI(gomock.Any(), gomock.Any(), gomock.Any()).Return(eni.ID, nil)
 			mockProvider.EXPECT().AttachENI(gomock.Any(), gomock.Any()).Return(eni.ID, nil)
 			mockNodeClient.EXPECT().WaitForENIAttached(gomock.Any(), gomock.Any()).Return(nil, nil)
@@ -231,7 +230,7 @@ var _ = Describe("Eni", func() {
 			mockProvider.EXPECT().FreeENI(gomock.Any()).Return(nil).AnyTimes()
 			Expect(manager.ensureENI()).Should(Succeed())
 			Expect(len(ids)).Should(Equal(1))
-			Expect(ids[0]).Should(Equal(eniId4))
+			Expect(ids[0]).Should(Equal(eniID4))
 		})
 	})
 
@@ -240,7 +239,7 @@ var _ = Describe("Eni", func() {
 			manager, mockProvider, _ := setup()
 			enis := []*cloud.ENIMetadata{
 				{
-					ID:           eniId1,
+					ID:           eniID1,
 					DeviceNumber: 0,
 				},
 			}

@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"os"
 
 	. "github.com/onsi/ginkgo"
@@ -80,6 +81,9 @@ var _ = Describe("util", func() {
 
 	It("Check errors", func() {
 		CheckErr(nil)
+
+		err := fmt.Errorf("test error")
+		printErr(err)
 	})
 
 	It("Others", func() {

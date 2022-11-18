@@ -294,10 +294,27 @@ func CheckErr(err error) {
 	// we only check invalid api errors that can not be converted to StatusError.
 	if err != cmdutil.ErrExit && apierrors.IsInvalid(err) {
 		if _, ok := err.(*apierrors.StatusError); !ok {
-			fmt.Fprint(os.Stderr, err.Error())
+			printErr(err)
 			os.Exit(cmdutil.DefaultErrorExitCode)
 		}
 	}
 
 	cmdutil.CheckErr(err)
+}
+
+func printErr(err error) {
+	msg, ok := cmdutil.StandardErrorMessage(err)
+	if !ok {
+		msg = err.Error()
+		if !strings.HasPrefix(msg, "error: ") {
+			msg = fmt.Sprintf("error: %s", msg)
+		}
+	}
+	if len(msg) > 0 {
+		// add newline if needed
+		if !strings.HasSuffix(msg, "\n") {
+			msg += "\n"
+		}
+		fmt.Fprint(os.Stderr, msg)
+	}
 }

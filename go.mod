@@ -18,7 +18,6 @@ require (
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
-	github.com/gosuri/uitable v0.0.4
 	github.com/hashicorp/terraform v1.2.6
 	github.com/k3d-io/k3d/v5 v5.4.4
 	github.com/leaanthony/debme v1.2.1
@@ -62,6 +61,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
+	github.com/gosuri/uitable v0.0.4 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/miekg/dns v1.1.50 // indirect
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect

@@ -152,8 +152,8 @@ vet: ## Run go vet against code.
 
 .PHONY: cue-fmt
 cue-fmt: cuetool ## Run cue fmt against code.
-	find ./ -type f -name "*.cue" -exec $(CUE) fmt {} \;
-	find ./ -type f -name "*.cue" -exec $(CUE) fix {} \;
+	git ls-files | grep "\.cue$$" | xargs cue fmt
+	git ls-files | grep "\.cue$$" | xargs cue fix
 
 .PHONY: fast-lint
 fast-lint: golangci staticcheck  # [INTERNAL] fast lint

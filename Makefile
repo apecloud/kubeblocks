@@ -152,8 +152,8 @@ vet: ## Run go vet against code.
 
 .PHONY: cue-fmt
 cue-fmt: cuetool ## Run cue fmt against code.
-	$(CUE) fmt controllers/dbaas/cue/*.cue
-	$(CUE) fix controllers/dbaas/cue/*.cue
+	find ./ -type f -name "*.cue" -exec $(CUE) fmt {} \;
+	find ./ -type f -name "*.cue" -exec $(CUE) fix {} \;
 
 .PHONY: fast-lint
 fast-lint: golangci staticcheck  # [INTERNAL] fast lint

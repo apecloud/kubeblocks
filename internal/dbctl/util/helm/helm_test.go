@@ -30,8 +30,8 @@ var _ = Describe("helm util", func() {
 
 	It("add Repo", func() {
 		r := repo.Entry{
-			Name: "mysql-operator",
-			URL:  "https://mysql.github.io/mysql-operator/",
+			Name: types.KubeBlocksChartName,
+			URL:  types.KubeBlocksChartURL,
 		}
 		Expect(AddRepo(&r)).Should(Succeed())
 		Expect(RemoveRepo(&r)).Should(Succeed())

@@ -72,8 +72,8 @@ func (o *Options) Build() *cobra.Command {
 		Use:   "describe",
 		Short: o.Short,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.complete(args))
-			cmdutil.CheckErr(o.run())
+			util.CheckErr(o.complete(args))
+			util.CheckErr(o.run())
 		},
 	}
 

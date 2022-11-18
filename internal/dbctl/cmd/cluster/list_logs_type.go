@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/describe"
 	"github.com/apecloud/kubeblocks/internal/dbctl/exec"
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/cluster"
 )
 
@@ -76,9 +77,9 @@ func NewListLogsTypeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Short:   "List the supported logs file types in cluster",
 		Example: logsListExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Validate(args))
-			cmdutil.CheckErr(o.Complete(f, args))
-			cmdutil.CheckErr(o.Run())
+			util.CheckErr(o.Validate(args))
+			util.CheckErr(o.Complete(f, args))
+			util.CheckErr(o.Run())
 		},
 	}
 	cmd.Flags().StringVarP(&o.instName, "instance", "i", "", "Instance name.")

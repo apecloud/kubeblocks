@@ -28,6 +28,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
 	"github.com/apecloud/kubeblocks/version"
 )
@@ -171,8 +172,8 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Args:    cobra.NoArgs,
 		Example: installExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.complete(f, cmd))
-			cmdutil.CheckErr(o.run())
+			util.CheckErr(o.complete(f, cmd))
+			util.CheckErr(o.run())
 		},
 	}
 
@@ -193,8 +194,8 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Args:    cobra.NoArgs,
 		Example: uninstallExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.complete(f, cmd))
-			cmdutil.CheckErr(o.run())
+			util.CheckErr(o.complete(f, cmd))
+			util.CheckErr(o.run())
 		},
 	}
 	return cmd

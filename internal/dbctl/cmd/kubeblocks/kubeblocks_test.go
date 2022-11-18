@@ -17,8 +17,6 @@ limitations under the License.
 package kubeblocks
 
 import (
-	"bytes"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -33,11 +31,9 @@ import (
 var _ = Describe("kubeblocks", func() {
 	var cmd *cobra.Command
 	var streams genericclioptions.IOStreams
-	buf := new(bytes.Buffer)
-	errbuf := new(bytes.Buffer)
 
 	BeforeEach(func() {
-		streams, _, buf, errbuf = genericclioptions.NewTestIOStreams()
+		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 	})
 
 	It("kubeblocks", func() {
@@ -45,7 +41,7 @@ var _ = Describe("kubeblocks", func() {
 		defer tf.Cleanup()
 
 		cmd = NewKubeBlocksCmd(tf, streams)
-		Expect(cmd != nil).Should(BeTrue())
+		Expect(cmd).ShouldNot(BeNil())
 		Expect(cmd.HasSubCommands()).Should(BeTrue())
 	})
 
@@ -56,10 +52,8 @@ var _ = Describe("kubeblocks", func() {
 		var cfg string
 		cmd = newInstallCmd(tf, streams)
 		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
-		cmd.SetOut(buf)
-		cmd.SetErr(errbuf)
 
-		Expect(cmd != nil).Should(BeTrue())
+		Expect(cmd).ShouldNot(BeNil())
 		Expect(cmd.HasSubCommands()).Should(BeFalse())
 
 		o := &installOptions{
@@ -94,7 +88,7 @@ var _ = Describe("kubeblocks", func() {
 		cmd = newUninstallCmd(tf, streams)
 		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
 
-		Expect(cmd != nil).Should(BeTrue())
+		Expect(cmd).ShouldNot(BeNil())
 		Expect(cmd.HasSubCommands()).Should(BeFalse())
 
 		o := &options{

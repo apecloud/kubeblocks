@@ -41,17 +41,6 @@ const (
 
 	// KubeBlocksChartURL the helm chart for installing kubeblocks
 	KubeBlocksChartURL = "https://apecloud.github.io/helm-charts"
-
-	// PlaygroundSourceName is the playground default operator
-	PlaygroundSourceName = "innodbclusters"
-
-	// BackupJobSourceName is the playground default operator
-	BackupJobSourceName = "backupJobs"
-
-	// RestoreJobSourceName is the playground default operator
-	RestoreJobSourceName = "restoreJobs"
-
-	BackupSnapSourceName = "volumesnapshots"
 )
 
 const (

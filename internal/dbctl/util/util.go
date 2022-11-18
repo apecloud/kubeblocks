@@ -42,8 +42,10 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes/scheme"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -275,4 +277,44 @@ func PlaygroundDir() (string, error) {
 
 func GVRToString(gvr schema.GroupVersionResource) string {
 	return strings.Join([]string{gvr.Resource, gvr.Version, gvr.Group}, ".")
+}
+
+// CheckErr prints a user-friendly error to STDERR and exits with a non-zero exit code.
+func CheckErr(err error) {
+	// unwrap aggregates of 1
+	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) == 1 {
+		err = agg.Errors()[0]
+	}
+
+	if err == nil {
+		return
+	}
+
+	// ErrExit and other valid api errors will be checked by cmdutil.CheckErr, now
+	// we only check invalid api errors that can not be converted to StatusError.
+	if err != cmdutil.ErrExit && apierrors.IsInvalid(err) {
+		if _, ok := err.(*apierrors.StatusError); !ok {
+			printErr(err)
+			os.Exit(cmdutil.DefaultErrorExitCode)
+		}
+	}
+
+	cmdutil.CheckErr(err)
+}
+
+func printErr(err error) {
+	msg, ok := cmdutil.StandardErrorMessage(err)
+	if !ok {
+		msg = err.Error()
+		if !strings.HasPrefix(msg, "error: ") {
+			msg = fmt.Sprintf("error: %s", msg)
+		}
+	}
+	if len(msg) > 0 {
+		// add newline if needed
+		if !strings.HasSuffix(msg, "\n") {
+			msg += "\n"
+		}
+		fmt.Fprint(os.Stderr, msg)
+	}
 }

@@ -31,6 +31,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
 )
 
@@ -141,8 +142,8 @@ func NewBackupConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Example: backupConfigExample,
 		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.complete(f, cmd))
-			cmdutil.CheckErr(o.run())
+			util.CheckErr(o.complete(f, cmd))
+			util.CheckErr(o.run())
 		},
 	}
 

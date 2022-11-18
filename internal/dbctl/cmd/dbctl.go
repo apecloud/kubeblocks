@@ -30,7 +30,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/backup_config"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/bench"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/cluster"
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/dbaas"
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/options"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/playground"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/version"
@@ -80,7 +80,7 @@ A database management tool for KubeBlocks`,
 	// Add subcommands
 	cmd.AddCommand(
 		playground.NewPlaygroundCmd(ioStreams),
-		dbaas.NewDbaasCmd(f, ioStreams),
+		kubeblocks.NewKubeBlocksCmd(f, ioStreams),
 		cluster.NewClusterCmd(f, ioStreams),
 		bench.NewBenchCmd(),
 		options.NewCmdOptions(ioStreams.Out),

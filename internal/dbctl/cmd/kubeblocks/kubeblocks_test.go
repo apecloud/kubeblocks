@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package kubeblocks
 
 import (
 	"bytes"
@@ -30,7 +30,7 @@ import (
 	"github.com/apecloud/kubeblocks/version"
 )
 
-var _ = Describe("dbaas", func() {
+var _ = Describe("kubeblocks", func() {
 	var cmd *cobra.Command
 	var streams genericclioptions.IOStreams
 	buf := new(bytes.Buffer)
@@ -40,11 +40,11 @@ var _ = Describe("dbaas", func() {
 		streams, _, buf, errbuf = genericclioptions.NewTestIOStreams()
 	})
 
-	It("dbaas", func() {
+	It("kubeblocks", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace("test")
 		defer tf.Cleanup()
 
-		cmd = NewDbaasCmd(tf, streams)
+		cmd = NewKubeBlocksCmd(tf, streams)
 		Expect(cmd != nil).Should(BeTrue())
 		Expect(cmd.HasSubCommands()).Should(BeTrue())
 	})

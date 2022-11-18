@@ -21,6 +21,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"net"
 	"os/exec"
 	"reflect"
@@ -974,75 +975,56 @@ spec:
 				return int(*stsList.Items[0].Spec.Replicas) == updatedReplicas
 			}, timeout, interval).Should(BeTrue())
 
-			//			Eventually(func() bool {
-			//				vsList := v1.VolumeSnapshotList{}
-			//				Expect(k8sClient.List(ctx, &vsList, client.MatchingLabels{
-			//					"app.kubernetes.io/instance": key.Name,
-			//				}, client.InNamespace(key.Namespace))).Should(Succeed())
-			//				return len(vsList.Items) == 1
-			//			}, timeout, interval).Should(BeTrue())
-			//
-			//			backupPolicyTemplateYaml := `
-			//apiVersion: dataprotection.kubeblocks.io/v1alpha1
-			//kind: BackupPolicyTemplate
-			//metadata:
-			//  name: backup-policy-template-mysql
-			//  labels:
-			//      clusterdefinition.kubeblocks.io/name: cluster-definition
-			//spec:
-			//  schedule: "0 2 * * *"
-			//
-			//  ttl: 168h0m0s
-			//
-			//  # !!DISCUSS Number of backup retries on fail.
-			//  onFailAttempted: 3
-			//
-			//  hooks:
-			//    ContainerName: mysql
-			//    image: rancher/kubectl:v1.23.7
-			//    preCommands:
-			//    - touch /data/mysql/data/.restore; sync
-			//
-			//  backupToolName: mysql-xtrabackup
-			//`
-			//			backupPolicyTemplate := v1alpha1.BackupPolicyTemplate{}
-			//			Expect(yaml.Unmarshal([]byte(backupPolicyTemplateYaml), &backupPolicyTemplate)).Should(Succeed())
-			//			Expect(testCtx.CreateObj(ctx, &backupPolicyTemplate)).Should(Succeed())
-			//
-			//			updatedReplicas = 7
-			//			fetchedG2.Spec.Components[0].Replicas = int32(updatedReplicas)
-			//			Expect(k8sClient.Update(ctx, fetchedG2)).Should(Succeed())
-			//
-			//			fetchedG3 := &dbaasv1alpha1.Cluster{}
-			//
-			//			Eventually(func() bool {
-			//				_ = k8sClient.Get(ctx, key, fetchedG3)
-			//				return fetchedG3.Status.ObservedGeneration == 3
-			//			}, timeout, interval).Should(BeTrue())
-			//
-			//			Eventually(func() bool {
-			//				backupJobList := v1alpha1.BackupJobList{}
-			//				Expect(k8sClient.List(ctx, &backupJobList, client.MatchingLabels{
-			//					"app.kubernetes.io/instance": key.Name,
-			//				}, client.InNamespace(key.Namespace))).Should(Succeed())
-			//				return len(backupJobList.Items) == 1
-			//			}, timeout, interval).Should(BeTrue())
-			//
-			//			Eventually(func() bool {
-			//				vsList := v1.VolumeSnapshotList{}
-			//				Expect(k8sClient.List(ctx, &vsList, client.MatchingLabels{
-			//					"app.kubernetes.io/instance": key.Name,
-			//				}, client.InNamespace(key.Namespace))).Should(Succeed())
-			//				return len(vsList.Items) == 1
-			//			}, timeout, interval).Should(BeTrue())
-			//
-			//			Eventually(func() bool {
-			//				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-			//					"app.kubernetes.io/instance": key.Name,
-			//				}, client.InNamespace(key.Namespace))).Should(Succeed())
-			//				Expect(len(stsList.Items) != 0).Should(BeTrue())
-			//				return int(*stsList.Items[0].Spec.Replicas) == updatedReplicas
-			//			}, timeout, interval).Should(BeTrue())
+			backupPolicyTplKey := types.NamespacedName{Name: "backup-policy-template-mysql"}
+			backupPolicyTemplateYaml := fmt.Sprintf(`
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupPolicyTemplate
+metadata:
+  name: %s
+  labels:
+    clusterdefinition.kubeblocks.io/name: %s
+spec:
+  schedule: "0 2 * * *"
+  ttl: 168h0m0s
+  # !!DISCUSS Number of backup retries on fail.
+  onFailAttempted: 3
+  hooks:
+    ContainerName: mysql
+    image: rancher/kubectl:v1.23.7
+    preCommands:
+    - touch /data/mysql/data/.restore; sync
+  backupToolName: mysql-xtrabackup
+`, backupPolicyTplKey.Name, clusterDefKey.Name)
+			backupPolicyTemplate := v1alpha1.BackupPolicyTemplate{}
+			Expect(yaml.Unmarshal([]byte(backupPolicyTemplateYaml), &backupPolicyTemplate)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, &backupPolicyTemplate)).Should(Succeed())
+
+			updatedReplicas = 5
+			fetchedG2.Spec.Components[0].Replicas = int32(updatedReplicas)
+			Expect(k8sClient.Update(ctx, fetchedG2)).Should(Succeed())
+
+			fetchedG3 := &dbaasv1alpha1.Cluster{}
+
+			Eventually(func() bool {
+				_ = k8sClient.Get(ctx, key, fetchedG3)
+				return fetchedG3.Status.ObservedGeneration == 3
+			}, timeout, interval).Should(BeTrue())
+
+			Eventually(func() bool {
+				backupJobList := v1alpha1.BackupJobList{}
+				Expect(k8sClient.List(ctx, &backupJobList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				return len(backupJobList.Items) == 1
+			}, timeout, interval).Should(BeTrue())
+
+			Eventually(func() bool {
+				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				Expect(len(stsList.Items) != 0).Should(BeTrue())
+				return int(*stsList.Items[0].Spec.Replicas) == updatedReplicas
+			}, timeout, interval).Should(BeTrue())
 
 			By("Deleting the scope")
 			Eventually(func() error {

@@ -689,6 +689,10 @@ spec:
 				c, err := component.GetComponentFromClusterDefinition(ctx, k8sClient, fetchedG1, item.Type)
 				Expect(err).ShouldNot(HaveOccurred())
 
+				if c.ComponentType == dbaasv1alpha1.Stateless {
+					continue
+				}
+
 				var headlessSvcPorts []corev1.ServicePort
 				for _, container := range c.PodSpec.Containers {
 					for _, port := range container.Ports {

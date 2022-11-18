@@ -90,7 +90,7 @@ type ConfigurationTemplateStatus struct {
 	// +optional
 	Message string `json:"message,omitempty"`
 
-	// observedGeneration is the most recent generation observed for this
+	// observedGeneration is the latest generation observed for this
 	// ClusterDefinition. It corresponds to the ConfigurationTemplate's generation, which is
 	// updated on mutation by the API Server.
 	// +optional
@@ -99,7 +99,7 @@ type ConfigurationTemplateStatus struct {
 
 type CustomParametersValidation struct {
 	// TODO(zt) DAY2 support schema
-	// Schema provides a way for ISVs to validate the changed parameters through json.
+	// Schema provides a way for providers to verify that the parameter is legal.
 	// fix controller-gen doesn't work with k8s.io/apiextensions-apiserver: https://github.com/kubernetes-sigs/controller-tools/issues/291
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:validation:Type=object

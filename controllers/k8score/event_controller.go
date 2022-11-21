@@ -19,6 +19,9 @@ package k8score
 import (
 	"context"
 
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -77,10 +80,15 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		}
 	}
 
-	// event order is crucial in role probing, but it's not guaranteed when controller restarted, so we have to delete them
+	// event order is crucial in role probing, but it's not guaranteed when controller restarted, so we have to mark them to be filtered
 	if event.InvolvedObject.FieldPath == ProbeRoleChangedCheckPath {
-		if err := r.Client.Delete(ctx, event); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "deleteEventError")
+		patch := client.MergeFrom(event.DeepCopy())
+		if event.Annotations == nil {
+			event.Annotations = make(map[string]string, 0)
+		}
+		event.Annotations[intctrlutil.ConsensusSetRoleChangedEventHandledAnnotationKey] = "true"
+		if err := r.Client.Patch(ctx, event, patch); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "patchEventError")
 		}
 	}
 
@@ -90,6 +98,16 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 // SetupWithManager sets up the controller with the Manager.
 func (r *EventReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Event{}).
+		For(&corev1.Event{}, builder.WithPredicates(predicate.NewPredicateFuncs(filterHandledRoleChangedEvent))).
 		Complete(r)
+}
+
+func filterHandledRoleChangedEvent(object client.Object) bool {
+	annotations := object.GetAnnotations()
+	if annotations == nil {
+		return true
+	}
+
+	return annotations[intctrlutil.ConsensusSetRoleChangedEventHandledAnnotationKey] == ""
+
 }

@@ -18,9 +18,7 @@ package dbaas
 
 import (
 	"context"
-	"os"
 	"path/filepath"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"testing"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -76,11 +74,6 @@ var _ = BeforeSuite(func() {
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
 	}
-
-	useExistingCluster := true
-	testEnv.UseExistingCluster = &useExistingCluster
-	testEnv.Config = config.GetConfigOrDie()
-	os.Setenv("USE_EXISTING_CLUSTER", "true")
 
 	var err error
 	// cfg is defined in this file globally.

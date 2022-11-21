@@ -21,6 +21,7 @@ spec:
           - name: follower
             accessMode: Readonly
       defaultReplicas: 3
+      horizontalScalePolicy: Backup
       podSpec:
         serviceAccountName: kubeblocks
         initContainers:

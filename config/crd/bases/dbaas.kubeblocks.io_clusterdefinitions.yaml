@@ -214,6 +214,21 @@ spec:
                       format: int32
                       minimum: 0
                       type: integer
+                    horizontalScalePolicy:
+                      default: None
+                      description: 'None: default policy, do nothing. Snapshot: do
+                        native volume snapshot before scaling and restore to newly
+                        scaled pods. Notice that ''Snapshot'' policy will only take
+                        snapshot on the first volumeMount of first container you defined
+                        (i.e. clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]),
+                        since take multiple snapshots at one time might cause consistency
+                        problem. Backup: use backup policy in backuppolicytemplate
+                        to handle data recovery when scaling.'
+                      enum:
+                      - None
+                      - Snapshot
+                      - Backup
+                      type: string
                     logConfigs:
                       description: LogConfigs is detail log file config which provided
                         by ISV.

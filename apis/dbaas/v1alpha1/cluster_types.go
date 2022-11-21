@@ -151,14 +151,6 @@ type ClusterComponent struct {
 	// +kubebuilder:validation:Enum={ClusterIP,NodePort,LoadBalancer}
 	// +optional
 	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
-
-	// None: default policy, do nothing.
-	// Snapshot: do native volume snapshot before scaling and restore to newly scaled pods. Notice that 'Snapshot' policy will only take snapshot on the first volumeMount of first container you defined (i.e. clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]), since take multiple snapshots at one time might cause consistency problem.
-	// Backup: use backup policy in backuppolicytemplate to handle data recovery when scaling.
-	// +kubebuilder:default=None
-	// +kubebuilder:validation:Enum={None,Snapshot,Backup}
-	// +optional
-	HorizontalScalePolicy HorizontalScalePolicyType `json:"horizontalScalePolicy,omitempty"`
 }
 
 // ClusterStatusComponent record components status information

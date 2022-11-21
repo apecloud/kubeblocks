@@ -18,9 +18,8 @@ package cluster
 
 import (
 	"encoding/json"
-	"os"
-
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"os"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

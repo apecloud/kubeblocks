@@ -65,8 +65,7 @@ var example = templates.Examples(`
 	# In scenarios where you want to load components data from stdin
 	# the cluster, use termination policy Halt
 	cat << EOF | dbctl cluster create mycluster --termination-policy=Halt --components -
-	- name: wesql-test
-      type: replicasets... (omission from stdin)`)
+	- name: wesql-test... (omission from stdin)`)
 
 const (
 	DefaultClusterDef = "apecloud-wesql"

@@ -108,7 +108,7 @@ var _ = Describe("ServiceController", Ordered, func() {
 		for _, obj := range objs {
 			err := k8sClient.DeleteAllOf(context.Background(), obj,
 				client.InNamespace(namespace), client.HasLabels{testCtx.TestObjLabelKey})
-			Expect(err).Should(BeNil())
+			Expect(err).ShouldNot(HaveOccurred())
 		}
 
 	})

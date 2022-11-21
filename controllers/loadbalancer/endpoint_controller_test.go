@@ -54,7 +54,7 @@ var _ = Describe("EndpointController", func() {
 		for _, obj := range objs {
 			err := k8sClient.DeleteAllOf(context.Background(), obj,
 				client.InNamespace(namespace), client.HasLabels{testCtx.TestObjLabelKey})
-			Expect(err).Should(BeNil())
+			Expect(err).ShouldNot(HaveOccurred())
 		}
 	})
 
@@ -63,7 +63,7 @@ var _ = Describe("EndpointController", func() {
 			svc, svcKey := newSvcObj(false, node1IP)
 			ep, epKey := newEndpointsObj(svc)
 			Expect(testCtx.CreateObj(context.Background(), svc)).Should(Succeed())
-			Expect(testCtx.CreateObj(context.Background(), ep)).Should(Succeed())
+			Expect(testCtx.CheckedCreateObj(context.Background(), ep)).Should(Succeed())
 			Eventually(func() bool {
 				if err := k8sClient.Get(context.Background(), svcKey, svc); err != nil {
 					return false

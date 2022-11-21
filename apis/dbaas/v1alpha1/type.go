@@ -113,6 +113,14 @@ const (
 	WipeOut        TerminationPolicyType = "WipeOut"
 )
 
+type HorizontalScalePolicyType string
+
+const (
+	ScaleNone HorizontalScalePolicyType = "None"
+	Snapshot  HorizontalScalePolicyType = "Snapshot"
+	Backup    HorizontalScalePolicyType = "Backup"
+)
+
 // PodAntiAffinity define pod anti-affinity strategy.
 // +enum
 type PodAntiAffinity string

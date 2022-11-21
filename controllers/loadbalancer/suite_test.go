@@ -32,8 +32,9 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/apecloud/kubeblocks/internal/testutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+
+	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
 func TestLoadbalancer(t *testing.T) {

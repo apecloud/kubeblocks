@@ -984,13 +984,15 @@ spec:
 				return fetchedG3.Status.ObservedGeneration == 3
 			}, timeout, interval).Should(BeTrue())
 
-			Eventually(func() bool {
-				backupJobList := dataprotectionv1alpha1.BackupJobList{}
-				Expect(k8sClient.List(ctx, &backupJobList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
-				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				return len(backupJobList.Items) == 1
-			}, timeout, interval).Should(BeTrue())
+			if useExistingCluster {
+				Eventually(func() bool {
+					backupJobList := dataprotectionv1alpha1.BackupJobList{}
+					Expect(k8sClient.List(ctx, &backupJobList, client.MatchingLabels{
+						"app.kubernetes.io/instance": key.Name,
+					}, client.InNamespace(key.Namespace))).Should(Succeed())
+					return len(backupJobList.Items) == 1
+				}, timeout, interval).Should(BeTrue())
+			}
 
 			Eventually(func() bool {
 				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{

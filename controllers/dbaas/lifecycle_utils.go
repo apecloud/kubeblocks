@@ -21,6 +21,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	types2 "github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"strconv"
 	"strings"
 	"time"
@@ -722,45 +723,25 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			}
 			// horizontal scaling
 			if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
-				ml := client.MatchingLabels{
-					clusterDefLabelKey: cluster.Spec.ClusterDefRef,
+				var component dbaasv1alpha1.ClusterDefinitionComponent
+				for _, comp := range clusterDef.Spec.Components {
+					if comp.TypeName == stsObj.Labels[types2.ComponentLabelKey] {
+						component = comp
+					}
 				}
-				backupPolicyTemplateList := dataprotectionv1alpha1.BackupPolicyTemplateList{}
-				if err := cli.List(ctx, &backupPolicyTemplateList, ml); err != nil {
-					return err
-				}
-				vsList := snapshotv1.VolumeSnapshotList{}
-				getVSErr := cli.List(ctx, &vsList)
-				if len(backupPolicyTemplateList.Items) > 0 {
-					// TODO chantu: check volume snapshot support
-					backupJobName := generateName(cluster.Name + "-scaling-")
-					err := createBackup(ctx, cli, *stsObj, backupPolicyTemplateList.Items[0], backupJobName, cluster)
-					if err != nil {
+				switch component.HorizontalScalePolicy {
+				case dbaasv1alpha1.Backup:
+					ml := client.MatchingLabels{
+						clusterDefLabelKey: cluster.Spec.ClusterDefRef,
+					}
+					backupPolicyTemplateList := dataprotectionv1alpha1.BackupPolicyTemplateList{}
+					if err := cli.List(ctx, &backupPolicyTemplateList, ml); err != nil {
 						return err
 					}
-					for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
-						pvcKey := types.NamespacedName{
-							Namespace: key.Namespace,
-							Name:      fmt.Sprintf("%s-%s-%d", "data", stsObj.Name, i),
-						}
-						if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, backupJobName); err != nil {
-							return err
-						}
-					}
-				} else if getVSErr == nil && len(stsObj.Spec.VolumeClaimTemplates) > 0 { // check volume snapshot available
-					snapshotName := generateName(cluster.Name + "-scaling-")
-					if len(stsObj.Spec.VolumeClaimTemplates) > 0 {
-						pvcName := strings.Join([]string{stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, "0"}, "-")
-						snapshot, err := buildVolumeSnapshot(snapshotName, pvcName, *stsObj)
+					if len(backupPolicyTemplateList.Items) > 0 {
+						backupJobName := generateName(cluster.Name + "-scaling-")
+						err := createBackup(ctx, cli, *stsObj, backupPolicyTemplateList.Items[0], backupJobName, cluster)
 						if err != nil {
-							return err
-						}
-						if err := cli.Create(ctx, snapshot); err != nil {
-							if !apierrors.IsAlreadyExists(err) {
-								return err
-							}
-						}
-						if err := controllerutil.SetOwnerReference(cluster, snapshot, scheme); err != nil {
 							return err
 						}
 						for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
@@ -768,11 +749,44 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 								Namespace: key.Namespace,
 								Name:      fmt.Sprintf("%s-%s-%d", "data", stsObj.Name, i),
 							}
-							if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, snapshotName); err != nil {
+							if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, backupJobName); err != nil {
 								return err
 							}
 						}
 					}
+				case dbaasv1alpha1.Snapshot:
+					vsList := snapshotv1.VolumeSnapshotList{}
+					// check volume snapshot available
+					getVSErr := cli.List(ctx, &vsList)
+					if getVSErr == nil && len(stsObj.Spec.VolumeClaimTemplates) > 0 {
+						snapshotName := generateName(cluster.Name + "-scaling-")
+						if len(stsObj.Spec.VolumeClaimTemplates) > 0 {
+							pvcName := strings.Join([]string{stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, "0"}, "-")
+							snapshot, err := buildVolumeSnapshot(snapshotName, pvcName, *stsObj)
+							if err != nil {
+								return err
+							}
+							if err := cli.Create(ctx, snapshot); err != nil {
+								if !apierrors.IsAlreadyExists(err) {
+									return err
+								}
+							}
+							if err := controllerutil.SetOwnerReference(cluster, snapshot, scheme); err != nil {
+								return err
+							}
+							for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
+								pvcKey := types.NamespacedName{
+									Namespace: key.Namespace,
+									Name:      fmt.Sprintf("%s-%s-%d", "data", stsObj.Name, i),
+								}
+								if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, snapshotName); err != nil {
+									return err
+								}
+							}
+						}
+					}
+				case dbaasv1alpha1.ScaleNone:
+					break
 				}
 			}
 			tempAnnotations := stsObj.Spec.Template.Annotations

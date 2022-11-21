@@ -631,6 +631,8 @@ spec:
 	Context("When horizontal scaling", func() {
 		It("Should create backup resources accordingly", func() {
 
+			useExistingCluster, _ := strconv.ParseBool(os.Getenv("USE_EXISTING_CLUSTER"))
+
 			configTplKey := types.NamespacedName{Name: "test-mysql-3node-tpl-8.0", Namespace: "default"}
 			configTplYAML := fmt.Sprintf(`
 apiVersion: v1
@@ -834,6 +836,9 @@ spec:
 `, clusterDefKey.Name, configTplKey.Name)
 			clusterDef := &dbaasv1alpha1.ClusterDefinition{}
 			Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDef)).Should(Succeed())
+			if useExistingCluster {
+				clusterDef.Spec.Components[0].HorizontalScalePolicy = "Backup"
+			}
 			Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
 
 			By("Create real appversion")
@@ -943,7 +948,6 @@ spec:
 				return len(stsList.Items) != 0
 			}, timeout, interval).Should(BeTrue())
 
-			useExistingCluster, _ := strconv.ParseBool(os.Getenv("USE_EXISTING_CLUSTER"))
 			if useExistingCluster {
 				podList := corev1.PodList{}
 				Eventually(func() bool {

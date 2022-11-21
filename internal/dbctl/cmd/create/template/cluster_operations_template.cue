@@ -8,9 +8,9 @@ options: {
 	ttlSecondsAfterSucceed: int
 	appVersionRef:          string
 	componentNames: [...string]
-	requestCpu:    string
+	requestCPU:    string
 	requestMemory: string
-	limitCpu:      string
+	limitCPU:      string
 	limitMemory:   string
 	replicas:      int
 	roleGroupNames: [...string]
@@ -35,8 +35,8 @@ options: {
 					if options.requestMemory != "" {
 						memory: options.requestMemory
 					}
-					if options.requestCpu != "" {
-						cpu: options.requestCpu
+					if options.requestCPU != "" {
+						cpu: options.requestCPU
 					}
 
 				}
@@ -44,8 +44,8 @@ options: {
 					if options.limitMemory != "" {
 						memory: options.limitMemory
 					}
-					if options.limitCpu != "" {
-						cpu: options.limitCpu
+					if options.limitCPU != "" {
+						cpu: options.limitCPU
 					}
 				}
 			}

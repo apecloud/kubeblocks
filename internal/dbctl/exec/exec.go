@@ -31,6 +31,8 @@ import (
 	cmdexec "k8s.io/kubectl/pkg/cmd/exec"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/podcmd"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
 // ExecInput is used to transfer custom Complete & Validate & AddFlags
@@ -92,9 +94,9 @@ func (o *ExecOptions) Build(input *ExecInput) *cobra.Command {
 		Short:   o.Input.Short,
 		Example: o.Input.Example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(args))
-			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.Run())
+			util.CheckErr(o.Complete(args))
+			util.CheckErr(o.Validate())
+			util.CheckErr(o.Run())
 		},
 	}
 	if o.Input.AddFlags != nil {

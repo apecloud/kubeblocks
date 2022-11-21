@@ -27,8 +27,7 @@ type BackupPolicySpec struct {
 	// +optional
 	BackupPolicyTemplateName string `json:"backupPolicyTemplateName,omitempty"`
 
-	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
-	// +kubebuilder:default="0 7 * * *"
+	// The schedule in Cron format, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
 	// +optional
 	Schedule string `json:"schedule,omitempty"`
 
@@ -39,7 +38,7 @@ type BackupPolicySpec struct {
 	// TTL is a time.Duration-parseable string describing how long
 	// the Backup should be retained for.
 	// +optional
-	TTL metav1.Duration `json:"ttl,omitempty"`
+	TTL *metav1.Duration `json:"ttl,omitempty"`
 
 	// database cluster service
 	// +kubebuilder:validation:Required

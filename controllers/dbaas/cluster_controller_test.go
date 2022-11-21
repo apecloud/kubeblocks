@@ -1130,7 +1130,7 @@ spec:
 				if annot == nil {
 					continue
 				}
-				if v, ok := annot["storageclass.kubernetes.io/is-default-class"]; ok && v == "true" {
+				if isDefaultStorageClassAnnotation(&sc) {
 					defaultStorageClass = &sc
 					hasDefaultSC = true
 					break

@@ -24,7 +24,6 @@ import (
 const (
 	defaultEngine        = "wesql"
 	defaultCloudProvider = "local"
-	DefaultVersion       = "8.0.28"
 	localHost            = "127.0.0.1"
 	defaultReplicas      = 3
 

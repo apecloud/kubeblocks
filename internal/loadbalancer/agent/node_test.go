@@ -53,7 +53,7 @@ var _ = Describe("Node", func() {
 			mockNodeClient.EXPECT().DescribeAllENIs(gomock.Any(), gomock.Any()).Return(getDescribeAllENIResponse(), nil)
 			eni, err := node.ChooseENI()
 			Expect(err).Should(BeNil())
-			Expect(eni.EniId).Should(Equal(eniId2))
+			Expect(eni.EniId).Should(Equal(eniID2))
 		})
 	})
 })

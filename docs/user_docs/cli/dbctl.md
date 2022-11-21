@@ -54,7 +54,7 @@ dbctl [flags]
 * [dbctl backup](dbctl_backup.md)	 - backup operation command
 * [dbctl bench](dbctl_bench.md)	 - Run a benchmark
 * [dbctl cluster](dbctl_cluster.md)	 - Database cluster operation command
-* [dbctl dbaas](dbctl_dbaas.md)	 - DBaaS(KubeBlocks) operation commands
+* [dbctl kubeblocks](dbctl_kubeblocks.md)	 - KubeBlocks operation commands
 * [dbctl options](dbctl_options.md)	 - Print the list of flags inherited by all commands
 * [dbctl playground](dbctl_playground.md)	 - Bootstrap a KubeBlocks in local host
 * [dbctl version](dbctl_version.md)	 - Print the version information

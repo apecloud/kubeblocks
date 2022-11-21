@@ -19,6 +19,7 @@ package cluster
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -34,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/describe"
 	"github.com/apecloud/kubeblocks/internal/dbctl/exec"
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/cluster"
 )
 
@@ -75,9 +77,9 @@ func NewListLogsTypeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Short:   "List the supported logs file types in cluster",
 		Example: logsListExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Validate(args))
-			cmdutil.CheckErr(o.Complete(f, args))
-			cmdutil.CheckErr(o.Run())
+			util.CheckErr(o.Validate(args))
+			util.CheckErr(o.Complete(f, args))
+			util.CheckErr(o.Run())
 		},
 	}
 	cmd.Flags().StringVarP(&o.instName, "instance", "i", "", "Instance name.")
@@ -111,6 +113,8 @@ func (o *LogsListOptions) Complete(f cmdutil.Factory, args []string) error {
 	o.exec = exec.NewExecOptions(o.factory, o.IOStreams)
 	o.exec.Input = &exec.ExecInput{}
 	o.exec.Config = config
+	// hide unnecessary output
+	o.exec.Quiet = true
 	return err
 }
 
@@ -134,9 +138,9 @@ func (o *LogsListOptions) Run() error {
 }
 
 func (o *LogsListOptions) printHeaderMessage(w cmddes.PrefixWriter, c *dbaasv1alpha1.Cluster) {
-	w.Write(describe.LEVEL_0, "ClusterName:\t\t%s\n", c.Name)
-	w.Write(describe.LEVEL_0, "Namespace:\t\t%s\n", c.Namespace)
-	w.Write(describe.LEVEL_0, "ClusterDefinition:\t%s\n", c.Spec.ClusterDefRef)
+	w.Write(describe.Level0, "ClusterName:\t\t%s\n", c.Name)
+	w.Write(describe.Level0, "Namespace:\t\t%s\n", c.Namespace)
+	w.Write(describe.Level0, "ClusterDefinition:\t%s\n", c.Spec.ClusterDefRef)
 }
 
 // printBodyMessage print message about logs file
@@ -150,8 +154,8 @@ func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 			if len(o.componentName) > 0 && !strings.EqualFold(o.componentName, componentName) {
 				continue
 			}
-			w.Write(describe.LEVEL_0, "\nInstance  Name:\t%s\n", p.Name)
-			w.Write(describe.LEVEL_0, "Component Name:\t%s\n", componentName)
+			w.Write(describe.Level0, "\nInstance  Name:\t%s\n", p.Name)
+			w.Write(describe.Level0, "Component Name:\t%s\n", componentName)
 			var comTypeName string
 			logTypeMap := make(map[string]bool)
 			for _, comCluster := range c.Spec.Components {
@@ -164,7 +168,7 @@ func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 				}
 			}
 			if len(comTypeName) == 0 {
-				w.Write(describe.LEVEL_0, "\nComponent name %s in pod labels can't find corresponding type in cluster yaml. \n", componentName)
+				w.Write(describe.Level0, "\nComponent name %s in pod labels can't find corresponding type in cluster yaml. \n", componentName)
 				continue
 			}
 			for _, com := range cd.Spec.Components {
@@ -173,7 +177,7 @@ func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 				}
 				for _, logConfig := range com.LogConfigs {
 					if _, ok := logTypeMap[logConfig.Name]; ok {
-						w.Write(describe.LEVEL_0, "Log file type :\t%s\n", logConfig.Name)
+						w.Write(describe.Level0, "Log file type :\t%s\n", logConfig.Name)
 						// todo display more log file info
 						if len(logConfig.FilePathPattern) > 0 {
 							o.printRealFileMessage(&p, logConfig.FilePathPattern)
@@ -182,7 +186,7 @@ func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 				}
 			}
 		} else {
-			w.Write(describe.LEVEL_0, "Component name in pod label %s isn't set\n", p.Name)
+			w.Write(describe.Level0, "Component name in pod label %s isn't set\n", p.Name)
 		}
 	}
 }
@@ -191,8 +195,13 @@ func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 func (o *LogsListOptions) printRealFileMessage(pod *corev1.Pod, pattern string) {
 	o.exec.Pod = pod
 	o.exec.Command = []string{"/bin/bash", "-c", "ls -al " + pattern}
+	// because tty Raw argument will set ErrOut nil in exec.Run
+	o.exec.ErrOut = os.Stdout
+	if err := o.exec.Validate(); err != nil {
+		fmt.Printf("validate fail when list log files in container by exec command, and error message : %s\n", err.Error())
+	}
 	if err := o.exec.Run(); err != nil {
-		fmt.Printf("non-existed log file in container which searched by pattern %s\n", pattern)
+		fmt.Printf("run fail when list log files in container by exec command, and error message : %s\n", err.Error())
 	}
 }
 

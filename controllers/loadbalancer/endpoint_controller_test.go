@@ -54,7 +54,7 @@ var _ = Describe("EndpointController", func() {
 		for _, obj := range objs {
 			err := k8sClient.DeleteAllOf(context.Background(), obj,
 				client.InNamespace(namespace), client.HasLabels{testCtx.TestObjLabelKey})
-			Expect(err).Should(Succeed())
+			Expect(err).ShouldNot(HaveOccurred())
 		}
 	})
 

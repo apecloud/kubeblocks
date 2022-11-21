@@ -723,6 +723,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			}
 			// horizontal scaling
 			if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
+				reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "HorizontalScale", "Start horizontal scale")
 				var component dbaasv1alpha1.ClusterDefinitionComponent
 				for _, comp := range clusterDef.Spec.Components {
 					if comp.TypeName == stsObj.Labels[types2.ComponentLabelKey] {
@@ -736,12 +737,15 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 					}
 					backupPolicyTemplateList := dataprotectionv1alpha1.BackupPolicyTemplateList{}
 					if err := cli.List(ctx, &backupPolicyTemplateList, ml); err != nil {
+						reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeWarning, "HorizontalScaleFailed", err.Error())
 						return err
 					}
 					if len(backupPolicyTemplateList.Items) > 0 {
+						reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "BackupJobCreate", "Create backup job")
 						backupJobName := generateName(cluster.Name + "-scaling-")
 						err := createBackup(ctx, cli, *stsObj, backupPolicyTemplateList.Items[0], backupJobName, cluster)
 						if err != nil {
+							reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeWarning, "HorizontalScaleFailed", err.Error())
 							return err
 						}
 						for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
@@ -750,6 +754,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 								Name:      fmt.Sprintf("%s-%s-%d", "data", stsObj.Name, i),
 							}
 							if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, backupJobName); err != nil {
+								reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeWarning, "HorizontalScaleFailed", err.Error())
 								return err
 							}
 						}
@@ -761,17 +766,21 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 					if getVSErr == nil && len(stsObj.Spec.VolumeClaimTemplates) > 0 {
 						snapshotName := generateName(cluster.Name + "-scaling-")
 						if len(stsObj.Spec.VolumeClaimTemplates) > 0 {
+							reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create native volume snapshot")
 							pvcName := strings.Join([]string{stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, "0"}, "-")
 							snapshot, err := buildVolumeSnapshot(snapshotName, pvcName, *stsObj)
 							if err != nil {
+								reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeWarning, "HorizontalScaleFailed", err.Error())
 								return err
 							}
 							if err := cli.Create(ctx, snapshot); err != nil {
 								if !apierrors.IsAlreadyExists(err) {
+									reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeWarning, "HorizontalScaleFailed", err.Error())
 									return err
 								}
 							}
 							if err := controllerutil.SetOwnerReference(cluster, snapshot, scheme); err != nil {
+								reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeWarning, "HorizontalScaleFailed", err.Error())
 								return err
 							}
 							for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
@@ -780,6 +789,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 									Name:      fmt.Sprintf("%s-%s-%d", "data", stsObj.Name, i),
 								}
 								if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, snapshotName); err != nil {
+									reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeWarning, "HorizontalScaleFailed", err.Error())
 									return err
 								}
 							}

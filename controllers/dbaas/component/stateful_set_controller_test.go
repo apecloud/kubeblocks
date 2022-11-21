@@ -324,7 +324,7 @@ spec:
 			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: stsName, Namespace: namespace}, newSts)).Should(Succeed())
 			stsPatch := client.MergeFrom(newSts.DeepCopy())
 			newSts.Status.UpdateRevision = "wesql-wesql-test-6fdd48d9cd"
-			newSts.Status.ObservedGeneration = newSts.ObjectMeta.Generation + 1
+			newSts.Status.ObservedGeneration = 4
 			newSts.Status.AvailableReplicas = 3
 			newSts.Status.ReadyReplicas = 3
 			newSts.Status.Replicas = 3

@@ -313,17 +313,18 @@ spec:
 			}
 
 			By("mock restart cluster")
+			stsSpecPatch := client.MergeFrom(sts.DeepCopy())
 			sts.Spec.Template.Annotations = map[string]string{
 				"kubeblocks.io/restart": time.Now().Format(time.RFC3339),
 			}
-			Expect(k8sClient.Update(context.Background(), sts)).Should(Succeed())
+			Expect(k8sClient.Patch(context.Background(), sts, stsSpecPatch)).Should(Succeed())
 
 			By("mock statefulset is ready")
 			newSts := &appsv1.StatefulSet{}
 			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: stsName, Namespace: namespace}, newSts)).Should(Succeed())
 			stsPatch := client.MergeFrom(newSts.DeepCopy())
 			newSts.Status.UpdateRevision = "wesql-wesql-test-6fdd48d9cd"
-			newSts.Status.ObservedGeneration = 2
+			newSts.Status.ObservedGeneration = newSts.ObjectMeta.Generation + 1
 			newSts.Status.AvailableReplicas = 3
 			newSts.Status.ReadyReplicas = 3
 			newSts.Status.Replicas = 3

@@ -116,8 +116,8 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 	// create the initial status
 	newConsensusSetStatus := &dbaasv1alpha1.ConsensusSetStatus{
 		Leader: dbaasv1alpha1.ConsensusMemberStatus{
-			Name:       consensusSetStatusDefaultPodName,
-			Pod:        "",
+			Name:       "",
+			Pod:        consensusSetStatusDefaultPodName,
 			AccessMode: dbaasv1alpha1.None,
 		},
 	}

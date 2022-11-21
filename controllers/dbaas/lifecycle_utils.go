@@ -1555,7 +1555,7 @@ func prepareInjectEnvs(component *Component, cluster *dbaasv1alpha1.Cluster) []c
 		})
 	}
 	// inject consensusset role env
-	if cluster.Status.Components != nil {
+	if cluster.Status.Components != nil && cluster.Status.Components[component.Type] != nil {
 		consensusSetStatus := cluster.Status.Components[component.Type].ConsensusSetStatus
 		if consensusSetStatus != nil {
 			envs = append(envs, corev1.EnvVar{

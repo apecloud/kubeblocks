@@ -910,7 +910,7 @@ spec:
 			Expect(yaml.Unmarshal([]byte(clusterYAML), cluster)).Should(Succeed())
 			Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
 
-			backupPolicyTplKey := types.NamespacedName{Name: "backup-policy-template-mysql"}
+			backupPolicyTplKey := types.NamespacedName{Name: "test-backup-policy-template-mysql"}
 			backupPolicyTemplateYaml := fmt.Sprintf(`
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupPolicyTemplate

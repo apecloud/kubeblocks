@@ -19,4 +19,4 @@ Helped with the irrelevance design and equipped with abundant domain functions, 
 ### Declarative API 
 Declare the desired abilities a database needs in YAML configurations, apply it with KubeBlocks, then a state-of-art database management platform is on hand. A database provider has no need to care about workflows and struggle with the infrastructure. 
 ### Cloud-Native & Cloud-Neutral 
-KubeBlocks is designed for multi-clouds, it shields discrepancies in clouds, enables users to conduct their multi-clouds strategy. It is also open-sourced to relieve the anxiety about vendor lock-in.
+KubeBlocks is designed for multi-clouds, it shields discrepancies of clouds provided by different vendors, enables users to conduct their multi-clouds strategy. It is also open-sourced to relieve the anxiety about vendor lock-in.

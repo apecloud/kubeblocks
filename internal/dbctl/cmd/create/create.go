@@ -38,6 +38,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
 var (
@@ -108,9 +109,9 @@ func BuildCommand(inputs Inputs) *cobra.Command {
 		Example: inputs.Example,
 		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(inputs.BaseOptionsObj.Complete(inputs, args))
-			cmdutil.CheckErr(inputs.BaseOptionsObj.Validate(inputs))
-			cmdutil.CheckErr(inputs.BaseOptionsObj.Run(inputs))
+			util.CheckErr(inputs.BaseOptionsObj.Complete(inputs, args))
+			util.CheckErr(inputs.BaseOptionsObj.Validate(inputs))
+			util.CheckErr(inputs.BaseOptionsObj.Run(inputs))
 		},
 	}
 	if inputs.BuildFlags != nil {

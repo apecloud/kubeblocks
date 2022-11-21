@@ -14,32 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package backupconfig
 
 import (
+	"testing"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
-	"github.com/apecloud/kubeblocks/version"
 )
 
-var _ = Describe("installer", func() {
-	It("install", func() {
-		i := Installer{
-			HelmCfg:   helm.FakeActionConfig(),
-			Namespace: "default",
-			Version:   version.DefaultKubeBlocksVersion,
-		}
-		_, err := i.Install()
-		Expect(err).Should(Or(Succeed(), HaveOccurred()))
-	})
-
-	It("uninstall", func() {
-		i := Installer{
-			HelmCfg:   helm.FakeActionConfig(),
-			Namespace: "default",
-		}
-		Expect(i.Uninstall()).To(HaveOccurred())
-	})
-})
+func TestDbaas(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "BackupConfig Suite")
+}

@@ -1,31 +1,25 @@
-## dbctl
+## dbctl kubeblocks uninstall
 
-KubeBlocks CLI
-
-### Synopsis
+Uninstall KubeBlocks
 
 ```
-
-=========================================
-       __ __                  __     __
-      |  \  \                |  \   |  \
-  ____| ▓▓ ▓▓____   _______ _| ▓▓_  | ▓▓
- /      ▓▓ ▓▓    \ /       \   ▓▓ \ | ▓▓
-|  ▓▓▓▓▓▓▓ ▓▓▓▓▓▓▓\  ▓▓▓▓▓▓▓\▓▓▓▓▓▓ | ▓▓
-| ▓▓  | ▓▓ ▓▓  | ▓▓ ▓▓       | ▓▓ __| ▓▓
-| ▓▓__| ▓▓ ▓▓__/ ▓▓ ▓▓_____  | ▓▓|  \ ▓▓
- \▓▓    ▓▓ ▓▓    ▓▓\▓▓     \  \▓▓  ▓▓ ▓▓
-  \▓▓▓▓▓▓▓\▓▓▓▓▓▓▓  \▓▓▓▓▓▓▓   \▓▓▓▓ \▓▓
-
-=========================================
-A database management tool for KubeBlocks
+dbctl kubeblocks uninstall [flags]
 ```
 
+### Examples
+
 ```
-dbctl [flags]
+  # uninstall KubeBlocks
+  dbctl kubeblocks uninstall
 ```
 
 ### Options
+
+```
+  -h, --help   help for uninstall
+```
+
+### Options inherited from parent commands
 
 ```
       --as string                      Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
@@ -37,7 +31,6 @@ dbctl [flags]
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
-  -h, --help                           help for dbctl
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
@@ -51,11 +44,5 @@ dbctl [flags]
 
 ### SEE ALSO
 
-* [dbctl backup](dbctl_backup.md)	 - backup operation command
-* [dbctl bench](dbctl_bench.md)	 - Run a benchmark
-* [dbctl cluster](dbctl_cluster.md)	 - Database cluster operation command
 * [dbctl kubeblocks](dbctl_kubeblocks.md)	 - KubeBlocks operation commands
-* [dbctl options](dbctl_options.md)	 - Print the list of flags inherited by all commands
-* [dbctl playground](dbctl_playground.md)	 - Bootstrap a KubeBlocks in local host
-* [dbctl version](dbctl_version.md)	 - Print the version information
 

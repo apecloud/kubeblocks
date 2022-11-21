@@ -31,6 +31,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
 const (
@@ -55,9 +56,9 @@ func NewExposeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Use:   "expose",
 		Short: "Expose a database cluster",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Validate(args))
-			cmdutil.CheckErr(o.Complete(f, args))
-			cmdutil.CheckErr(o.Run())
+			util.CheckErr(o.Validate(args))
+			util.CheckErr(o.Complete(f, args))
+			util.CheckErr(o.Run())
 		},
 	}
 	cmd.Flags().BoolVar(&o.on, "on", false, "Expose a database cluster")

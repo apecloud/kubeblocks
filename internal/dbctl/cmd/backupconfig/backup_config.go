@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package backup_config
+package backupconfig
 
 import (
 	"fmt"
@@ -31,6 +31,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
 )
 
@@ -125,8 +126,8 @@ func (o *upgradeOptions) run() error {
 	return nil
 }
 
-var BackupConfigExample = templates.Examples(`
-		# Enable the snapshot-controller and volumesnapshot, to support snapshot backup.
+var backupConfigExample = templates.Examples(`
+		# Enable the snapshot-controller and volume snapshot, to support snapshot backup.
 		dbctl backup-config --set snapshot-controller.enabled=true --set dataProtection.disableVolumeSnapshot=false
 	`)
 
@@ -138,11 +139,11 @@ func NewBackupConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	cmd := &cobra.Command{
 		Use:     "backup-config",
 		Short:   "KubeBlocks backup config",
-		Example: BackupConfigExample,
+		Example: backupConfigExample,
 		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.complete(f, cmd))
-			cmdutil.CheckErr(o.run())
+			util.CheckErr(o.complete(f, cmd))
+			util.CheckErr(o.run())
 		},
 	}
 

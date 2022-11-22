@@ -185,19 +185,19 @@ mod-vendor: ## Run go mod tidy->vendor->verify against go modules.
 	$(GO) mod verify
 
 
-TEST_MODULE=
+TEST_PACKAGE=
 
 .PHONY: test-current-ctx
 test-current-ctx: manifests generate fmt vet ## Run operator controller tests with current $KUBECONFIG context.
-	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_MODULE)... -coverprofile cover.out
+	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_PACKAGE)... -coverprofile cover.out
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_MODULE)... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_PACKAGE)... -coverprofile cover.out
 
 .PHONY: test-delve
 test-delve: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" dlv --listen=:2346 --headless=true --api-version=2 --accept-multiclient test ./$(TEST_MODULE)
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" dlv --listen=:$(DEBUG_PORT) --headless=true --api-version=2 --accept-multiclient test ./$(TEST_PACKAGE)
 
 .PHONY: test-webhook-enabled
 test-webhook-enabled: ## Run tests with webhooks enabled.
@@ -286,9 +286,11 @@ endif
 
 # Run with Delve for development purposes against the configured Kubernetes cluster in ~/.kube/config
 # Delve is a debugger for the Go programming language. More info: https://github.com/go-delve/delve
+GO_PACKAGE=./cmd/manager/main.go
+ARGUMENTS=
+DEBUG_PORT=2345
 run-delve: manifests generate fmt vet  ## Run Delve debugger.
-	$(GO) build -gcflags "all=-trimpath=$(shell go env GOPATH)" -o bin/manager ./cmd/manager/main.go
-	dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./bin/manager
+	dlv --listen=:$(DEBUG_PORT) --headless=true --api-version=2 --accept-multiclient debug $(GO_PACKAGE) -- $(ARGUMENTS)
 
 
 ##@ Agamotto

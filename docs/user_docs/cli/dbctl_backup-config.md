@@ -10,7 +10,7 @@ dbctl backup-config [flags]
 
 ```
   # Enable the snapshot-controller and volumesnapshot, to support snapshot backup.
-  dbctl backup-config --set snapshot-controller.enabled=true --set dataProtection.disableVolumeSnapshot=false
+  dbctl backup-config --set snapshot-controller.enabled=true --set dataProtection.enableVolumeSnapshot=true
 ```
 
 ### Options

@@ -46,7 +46,7 @@ var _ = Describe("Client", func() {
 		loMac   = "00:00:00:00:00:01"
 		eth1Mac = "00:00:00:00:00:02"
 		svcVIP  = "172.31.1.10"
-		eniId   = "eni-01"
+		eniID   = "eni-01"
 		extraIP = "1.1.1.1"
 		subnet  = "172.31.0.0/16"
 	)
@@ -97,16 +97,16 @@ var _ = Describe("Client", func() {
 			privateIPNet := &net.IPNet{IP: net.ParseIP(svcVIP), Mask: net.IPv4Mask(255, 255, 255, 255)}
 			mockNetlink.EXPECT().AddrAdd(eth1, &netlink.Addr{IPNet: privateIPNet}).Return(errors.New("file exists"))
 
-			eni := &cloud.ENIMetadata{ID: eniId, MAC: eth1Mac, DeviceNumber: 1}
+			eni := &cloud.ENIMetadata{ID: eniID, MAC: eth1Mac, DeviceNumber: 1}
 			Expect(networkClient.SetupNetworkForService(svcVIP, eni)).Should(Succeed())
 
 			expectIptables := map[string]map[string][][]string{
 				"mangle": {
 					"PREROUTING": [][]string{
-						{"-m", "conntrack", "--ctorigdst", svcVIP, "-m", "comment", "--comment", fmt.Sprintf("KubeBlocks, %s", eniId), "-j", "CONNMARK", "--restore-mark", "--mask", fmt.Sprintf("%#x", getENIConnMark(eni))},
+						{"-m", "conntrack", "--ctorigdst", svcVIP, "-m", "comment", "--comment", fmt.Sprintf("KubeBlocks, %s", eniID), "-j", "CONNMARK", "--restore-mark", "--mask", fmt.Sprintf("%#x", getENIConnMark(eni))},
 					},
 					"OUTPUT": [][]string{
-						{"-m", "conntrack", "--ctorigdst", svcVIP, "-m", "comment", "--comment", fmt.Sprintf("KubeBlocks, %s", eniId), "-j", "CONNMARK", "--restore-mark", "--mask", fmt.Sprintf("%#x", getENIConnMark(eni))},
+						{"-m", "conntrack", "--ctorigdst", svcVIP, "-m", "comment", "--comment", fmt.Sprintf("KubeBlocks, %s", eniID), "-j", "CONNMARK", "--restore-mark", "--mask", fmt.Sprintf("%#x", getENIConnMark(eni))},
 					},
 				},
 			}
@@ -151,7 +151,7 @@ var _ = Describe("Client", func() {
 				},
 			}
 			eni := &cloud.ENIMetadata{
-				ID:             eniId,
+				ID:             eniID,
 				MAC:            eth1Mac,
 				DeviceNumber:   1,
 				SubnetIPv4CIDR: subnet,

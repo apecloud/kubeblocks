@@ -17,14 +17,19 @@ This document covers basic needs to work with KubeBlocks codebase.
 - [Basics](#basics)
   - [Kubebuilder](#kubebuilder)
   - [Makefile](#makefile)
-  - [[TODO] dbctl](#todo-dbctl)
+  - [\[TODO\] dbctl](#todo-dbctl)
   - [Code style](#code-style)
 - [Test](#test)
   - [Envtest](#envtest)
   - [Use existing Kubernetes cluster](#use-existing-kubernetes-cluster)
   - [Check test code coverage](#check-test-code-coverage)
 - [Debug](#debug)
+  - [Install Delve](#install-delve)
   - [Start a delve debug server](#start-a-delve-debug-server)
+    - [Debug specific package](#debug-specific-package)
+    - [Pass arguements](#pass-arguements)
+    - [Debug envtest](#debug-envtest)
+    - [Change debug server port](#change-debug-server-port)
   - [Connect the debug server with a frontend client](#connect-the-debug-server-with-a-frontend-client)
     - [Delve CLI](#delve-cli)
     - [JetBrains GoLand / IntelliJ IDEA with go plugin](#jetbrains-goland--intellij-idea-with-go-plugin)
@@ -188,10 +193,10 @@ Test specific packages:
 
 ```shell
 # Directory `controllers` contains many packages, it will build and run each package individually.
-make test TEST_MODULE=./controllers/
+make test TEST_PACKAGE=./controllers/
 
 # Test single package
-make test-delve TEST_MODULE=./controllers/dbaas/
+make test-delve TEST_PACKAGE=./controllers/dbaas/
 ```
 
 ### Use existing Kubernetes cluster
@@ -210,36 +215,58 @@ This command will test all packages and generate a coverage report file `cover.h
 
 
 ## Debug
+We can use [Delve](https://github.com/go-delve/delve) for Go debugging.
+
+### Install Delve
+- Follow the [General install instructions](https://github.com/go-delve/delve/tree/master/Documentation/installation).
+  > Make sure `PATH` containers `$GOPATH/bin` which will allow you to run Go binary executables without specifying the absolute path.
+- If you are using MacOS, you can install vid HomeBrew with the following command :
+    ```shell
+    brew install delve
+    ```
+- Check your installation
+    ```shell
+    dlv version
+    ```
+
 ### Start a delve debug server
-You can start a delve debug server for debuging controller or envtest.
+You can start a delve debug server for running and debuging specific package or [envtest](https://book.kubebuilder.io/reference/envtest.html).
 
-- debug for controller
-    ```shell
-    make run-delve
-    ```
-
-- debug for envtest
-    ```shell
-    make test-delve TEST_MODULE=./controllers/dbaas/
-    ```
-> Unlike `go test` supports multiple packages, `Delve` needs a single executable to work, it only support single package.
-
-
-After bug server started, it will show the listen address:
+#### Debug specific package
 ```shell
-API server listening at: [::]:2345
+make run-delve GO_PACKAGE=./cmd/manager/main.go
 ```
 
+#### Pass arguements
+```shell
+ make run-delve GO_PACKAGE=./cmd/dbctl/main.go ARGUMENTS='cluster create test-cluster --termination-policy=Halt'
+```
+
+#### Debug envtest
+```shell
+make test-delve TEST_PACKAGE=./controllers/dbaas/
+```
+> Unlike `go test` supports multiple packages, `Delve` needs a single executable to work, it only support single package.
+
+#### Change debug server port
+You can change debug server port for `make run-delve` and `make test-delve`.
+```shell
+make run-delve DEBUG_PORT=2347
+```
+After bug server started, it will show the listen address:
+```shell
+API server listening at: [::]:2347
+```
 
 ### Connect the debug server with a frontend client
-`Delve` support lots of code editors ([editor plugins for Delve]((https://github.com/go-delve/delve/blob/master/Documentation/EditorIntegration.md))), you can choose your favourite editor to connect with the listen address for debugging. [frontend client].
+`Delve` support lots of code editors ([editor plugins for Delve](https://github.com/go-delve/delve/blob/master/Documentation/EditorIntegration.md)), you can choose your favourite editor to connect with the listen address for debugging. 
 
 This section introduces how to start debugging with the Delve CLI, Goland and VSCode. Please refer to the Delve or editors documentation for more details.
 
 #### Delve CLI
 
 ```shell
-➜  ~ dlv connect 127.0.0.1:2346
+$ dlv connect 127.0.0.1:2345
 Type 'help' for list of commands.
 (dlv) break cluster_controller.go:303
 (dlv) continue

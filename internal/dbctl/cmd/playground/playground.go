@@ -29,10 +29,9 @@ import (
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v3/pkg/action"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cloudprovider"
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/dbaas"
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/playground/engine"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/cluster"
@@ -84,8 +83,8 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		Use:   "init",
 		Short: "Bootstrap a KubeBlocks for playground",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.validate())
-			cmdutil.CheckErr(o.run())
+			util.CheckErr(o.validate())
+			util.CheckErr(o.run())
 		},
 	}
 
@@ -107,7 +106,7 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		Use:   "destroy",
 		Short: "Destroy the playground cluster.",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.destroyPlayground())
+			util.CheckErr(o.destroyPlayground())
 		},
 	}
 	return cmd
@@ -118,7 +117,7 @@ func newGuideCmd() *cobra.Command {
 		Use:   "guide",
 		Short: "Display playground cluster user guide.",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(runGuide())
+			util.CheckErr(runGuide())
 		},
 	}
 	return cmd
@@ -152,7 +151,7 @@ func (o *initOptions) local() error {
 	}
 	installer.verboseLog(o.Verbose)
 
-	// Set up K3s as dbaas control plane cluster
+	// Set up K3s as KubeBlocks control plane cluster
 	spinner := util.Spinner(o.Out, "Create playground k3d cluster: %s", clusterName)
 	defer spinner(false)
 	if err = installer.install(); err != nil {
@@ -333,7 +332,7 @@ func printGuide(cloudProvider string, hostIP string, replicas int) error {
 }
 
 func (o *initOptions) installKubeBlocks() error {
-	installer := dbaas.Installer{
+	installer := kubeblocks.Installer{
 		HelmCfg:   o.helmCfg,
 		Namespace: dbClusterNamespace,
 		Version:   version.DefaultKubeBlocksVersion,

@@ -42,6 +42,7 @@ import (
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
 
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
@@ -84,14 +85,10 @@ func AddRepo(r *repo.Entry) error {
 	if f.Has(r.Name) {
 		existing := f.Get(r.Name)
 		if *r != *existing {
-
 			// The input coming in for the Name is different from what is already
 			// configured. Return an error.
 			return errors.Errorf("repository Name (%s) already exists, please specify a different Name", r.Name)
 		}
-
-		// The add is idempotent so do nothing
-		return nil
 	}
 
 	cp, err := repo.NewChartRepository(r, getter.All(settings))
@@ -325,4 +322,109 @@ func FakeActionConfig() *action.Configuration {
 		Log: func(format string, v ...interface{}) {
 		},
 	}
+}
+
+// Upgrade will upgrade a Chart
+func (i *InstallOpts) Upgrade(cfg *action.Configuration) (string, error) {
+	ctx := context.Background()
+	opts := retry.Options{
+		MaxRetry: 1 + i.TryTimes,
+	}
+
+	spinner := util.Spinner(os.Stdout, "Upgrade %s", i.Chart)
+	defer spinner(false)
+
+	var notes string
+	if err := retry.IfNecessary(ctx, func() error {
+		var err1 error
+		if notes, err1 = i.tryUpgrade(cfg); err1 != nil {
+			return err1
+		}
+		return nil
+	}, &opts); err != nil {
+		return "", errors.Errorf("Upgrade chart %s error: %s", i.Name, err.Error())
+	}
+
+	spinner(true)
+	return notes, nil
+}
+
+func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
+	res, _ := i.getInstalled(cfg)
+	if res == nil {
+		return "", errors.Errorf("%s not installed", i.Name)
+	}
+
+	settings := cli.New()
+
+	client := action.NewUpgrade(cfg)
+	client.Namespace = i.Namespace
+	client.Wait = i.Wait
+	client.Timeout = time.Second * 300
+	client.Version = res.Chart.AppVersion()
+	client.ReuseValues = true
+
+	cp, err := client.ChartPathOptions.LocateChart(i.Chart, settings)
+	if err != nil {
+		return "", err
+	}
+
+	setOpts := values.Options{
+		Values: i.Sets,
+	}
+
+	p := getter.All(settings)
+	vals, err := setOpts.MergeValues(p)
+	if err != nil {
+		return "", err
+	}
+
+	// Check Chart dependencies to make sure all are present in /charts
+	chartRequested, err := loader.Load(cp)
+	if err != nil {
+		return "", err
+	}
+
+	// Create context and prepare the handle of SIGTERM
+	ctx := context.Background()
+	_, cancel := context.WithCancel(ctx)
+
+	// Set up channel on which to send signal notifications.
+	// We must use a buffered channel or risk missing the signal
+	// if we're not ready to receive when the signal is sent.
+	cSignal := make(chan os.Signal, 2)
+	signal.Notify(cSignal, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-cSignal
+		fmt.Println("Upgrade has been cancelled")
+		cancel()
+	}()
+
+	released, err := client.RunWithContext(ctx, i.Name, chartRequested, vals)
+	if err != nil {
+		return "", err
+	}
+	return released.Info.Notes, nil
+}
+
+func AddKubeBlocksRepo() error {
+	entry := &repo.Entry{
+		Name: types.KubeBlocksChartName,
+		URL:  types.KubeBlocksChartURL,
+	}
+	if err := AddRepo(entry); err != nil {
+		return err
+	}
+	return nil
+}
+
+func RemoveKubeBlocksRepo() error {
+	entry := &repo.Entry{
+		Name: types.KubeBlocksChartName,
+		URL:  types.KubeBlocksChartURL,
+	}
+	if err := RemoveRepo(entry); err != nil {
+		return err
+	}
+	return nil
 }

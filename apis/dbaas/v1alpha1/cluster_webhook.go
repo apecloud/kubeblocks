@@ -19,7 +19,9 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
+	"reflect"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -68,6 +70,9 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	if lastCluster.Spec.ClusterDefRef != r.Spec.ClusterDefRef {
 		return newInvalidError(ClusterKind, r.Name, "spec.clusterDefinitionRef", "clusterDefinitionRef is immutable, you can not update it. ")
 	}
+	if err := r.validateVolumeClaimTemplates(lastCluster); err != nil {
+		return err
+	}
 	return r.validate()
 }
 
@@ -77,6 +82,47 @@ func (r *Cluster) ValidateDelete() error {
 
 	// TODO(user): fill in your validation logic upon object deletion.
 	return nil
+}
+
+// validateVolumeClaimTemplates volumeClaimTemplates is forbidden modification except for storage size.
+func (r *Cluster) validateVolumeClaimTemplates(lastCluster *Cluster) error {
+	var allErrs field.ErrorList
+	for i, component := range r.Spec.Components {
+		lastComponent := getLastComponentByName(lastCluster, component.Name)
+		if lastComponent == nil {
+			continue
+		}
+		setVolumeClaimStorageSizeZero(component.VolumeClaimTemplates)
+		setVolumeClaimStorageSizeZero(lastComponent.VolumeClaimTemplates)
+		if !reflect.DeepEqual(component.VolumeClaimTemplates, lastComponent.VolumeClaimTemplates) {
+			path := fmt.Sprintf("spec.components[%d].volumeClaimTemplates", i)
+			allErrs = append(allErrs, field.Invalid(field.NewPath(path),
+				nil, "volumeClaimTemplates is forbidden modification except for storage size."))
+		}
+	}
+	if len(allErrs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: APIVersion, Kind: ClusterKind},
+			r.Name, allErrs)
+	}
+	return nil
+}
+
+// getLastComponentByName the cluster maybe delete or add a component, so we get the component by name.
+func getLastComponentByName(lastCluster *Cluster, componentName string) *ClusterComponent {
+	for _, component := range lastCluster.Spec.Components {
+		if component.Name == componentName {
+			return &component
+		}
+	}
+	return nil
+}
+
+// setVolumeClaimStorageSizeZero set the volumeClaimTemplates storage size to zero. then we can diff last/current volumeClaimTemplates.
+func setVolumeClaimStorageSizeZero(volumeClaimTemplates []ClusterComponentVolumeClaimTemplate) {
+	for i := range volumeClaimTemplates {
+		volumeClaimTemplates[i].Spec.Resources = corev1.ResourceRequirements{}
+	}
 }
 
 // Validate Cluster.spec is legal

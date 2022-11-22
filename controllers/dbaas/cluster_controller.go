@@ -29,14 +29,11 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	storagev1 "k8s.io/api/storage/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubectl/pkg/util/storage"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -75,6 +72,7 @@ type probeMessage struct {
 func init() {
 	clusterDefUpdateHandlers["cluster"] = clusterUpdateHandler
 	k8score.EventHandlerMap["cluster-controller"] = &ClusterReconciler{}
+	k8score.StorageClassHandlerMap["cluster-controller"] = handleClusterVolumeExpansion
 }
 
 func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *dbaasv1alpha1.ClusterDefinition) error {
@@ -246,13 +244,13 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err = r.Client.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	if cluster.ObjectMeta.Labels == nil {
-		cluster.ObjectMeta.Labels = map[string]string{}
+	if cluster.Labels == nil {
+		cluster.Labels = map[string]string{}
 	}
-	_, ok := cluster.ObjectMeta.Labels[clusterDefLabelKey]
+	_, ok := cluster.Labels[clusterDefLabelKey]
 	if !ok {
-		cluster.ObjectMeta.Labels[clusterDefLabelKey] = clusterdefinition.Name
-		cluster.ObjectMeta.Labels[appVersionLabelKey] = appversion.Name
+		cluster.Labels[clusterDefLabelKey] = clusterdefinition.Name
+		cluster.Labels[appVersionLabelKey] = appversion.Name
 		if err = r.Client.Patch(reqCtx.Ctx, cluster, patch); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
@@ -567,12 +565,13 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 		operations                = *cluster.Status.Operations
 		appVersionList            = &dbaasv1alpha1.AppVersionList{}
 	)
-	// determine whether to support volumeExpansion
-	if volumeExpansionComponents, err = r.getSupportVolumeExpansionComponents(ctx, cluster); err != nil {
-		return err
+	// determine whether to support volumeExpansion when creating the cluster. because volumeClaimTemplates is forbidden to update except for storage size when cluster created.
+	if cluster.Status.ObservedGeneration == 0 {
+		if volumeExpansionComponents, err = getSupportVolumeExpansionComponents(ctx, r.Client, cluster); err != nil {
+			return err
+		}
+		operations.VolumeExpandable = volumeExpansionComponents
 	}
-	operations.VolumeExpandable = volumeExpansionComponents
-
 	// determine whether to support horizontalScaling
 	horizontalScalableComponents, clusterComponentNames := getSupportHorizontalScalingComponents(cluster, clusterDef)
 	operations.HorizontalScalable = horizontalScalableComponents
@@ -596,101 +595,6 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 	patch := client.MergeFrom(cluster.DeepCopy())
 	cluster.Status.Operations = &operations
 	return r.Client.Status().Patch(ctx, cluster, patch)
-}
-
-// getSupportVolumeExpansionComponents Get the components that support volume expansion and the volumeClaimTemplates
-func (r *ClusterReconciler) getSupportVolumeExpansionComponents(ctx context.Context,
-	cluster *dbaasv1alpha1.Cluster) ([]dbaasv1alpha1.OperationComponent, error) {
-	var (
-		storageClassMap             = map[string]bool{}
-		hasCheckDefaultStorageClass bool
-		// the default storageClass may not exist, so use a bool key to check
-		defaultStorageClassAllowExpansion bool
-		volumeExpansionComponents         = make([]dbaasv1alpha1.OperationComponent, 0)
-	)
-	for _, v := range cluster.Spec.Components {
-		operationComponent := dbaasv1alpha1.OperationComponent{}
-		for _, vct := range v.VolumeClaimTemplates {
-			if vct.Spec == nil {
-				continue
-			}
-			if ok, err := r.checkStorageClassIsSupportExpansion(ctx, storageClassMap, vct.Spec.StorageClassName,
-				&hasCheckDefaultStorageClass, &defaultStorageClassAllowExpansion); err != nil {
-				return nil, err
-			} else if ok {
-				operationComponent.VolumeClaimTemplateNames = append(operationComponent.VolumeClaimTemplateNames, vct.Name)
-			}
-		}
-
-		if len(operationComponent.VolumeClaimTemplateNames) > 0 {
-			operationComponent.Name = v.Name
-			volumeExpansionComponents = append(volumeExpansionComponents, operationComponent)
-		}
-	}
-	return volumeExpansionComponents, nil
-}
-
-// checkStorageClassIsSupportExpansion check whether the storageClass supports volume expansion
-func (r *ClusterReconciler) checkStorageClassIsSupportExpansion(ctx context.Context,
-	storageClassMap map[string]bool,
-	storageClassName *string,
-	hasCheckDefaultStorageClass *bool,
-	defaultStorageClassAllowExpansion *bool) (bool, error) {
-	var (
-		ok  bool
-		err error
-	)
-	if storageClassName != nil {
-		if ok, err = r.checkSpecifyStorageClass(ctx, storageClassMap, *storageClassName); err != nil {
-			return false, err
-		}
-		return ok, nil
-	} else {
-		// get the default StorageClass whether supports volume expansion for the first time
-		if !*hasCheckDefaultStorageClass {
-			if *defaultStorageClassAllowExpansion, err = r.checkDefaultStorageClass(ctx); err != nil {
-				return false, err
-			}
-			*hasCheckDefaultStorageClass = true
-		}
-		return *defaultStorageClassAllowExpansion, nil
-	}
-}
-
-// checkStorageClassIsSupportExpansion check whether the specified storageClass supports volume expansion
-func (r *ClusterReconciler) checkSpecifyStorageClass(ctx context.Context, storageClassMap map[string]bool, storageClassName string) (bool, error) {
-	var (
-		supportVolumeExpansion bool
-	)
-	if val, ok := storageClassMap[storageClassName]; ok {
-		return val, nil
-	}
-	// if storageClass is not in the storageClassMap, get it
-	storageClass := &storagev1.StorageClass{}
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: storageClassName}, storageClass); err != nil && !apierrors.IsNotFound(err) {
-		return false, err
-	}
-	// get bool value of StorageClass.AllowVolumeExpansion and put it to storageClassMap
-	if storageClass != nil && storageClass.AllowVolumeExpansion != nil {
-		supportVolumeExpansion = *storageClass.AllowVolumeExpansion
-	}
-	storageClassMap[storageClassName] = supportVolumeExpansion
-	return supportVolumeExpansion, nil
-}
-
-// checkDefaultStorageClass check whether the default storageClass supports volume expansion
-func (r *ClusterReconciler) checkDefaultStorageClass(ctx context.Context) (bool, error) {
-	storageClassList := &storagev1.StorageClassList{}
-	if err := r.Client.List(ctx, storageClassList); err != nil {
-		return false, err
-	}
-	// check the first default storageClass
-	for _, sc := range storageClassList.Items {
-		if _, ok := sc.Annotations[storage.IsDefaultStorageClassAnnotation]; ok {
-			return sc.AllowVolumeExpansion != nil && *sc.AllowVolumeExpansion, nil
-		}
-	}
-	return false, nil
 }
 
 // getSupportHorizontalScalingComponents Get the components that support horizontalScaling

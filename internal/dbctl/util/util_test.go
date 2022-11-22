@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"os"
 
 	. "github.com/onsi/ginkgo"
@@ -76,6 +77,13 @@ var _ = Describe("util", func() {
 
 		spinner = Spinner(os.Stdout, "dbctl spinner test ... ")
 		spinner(false)
+	})
+
+	It("Check errors", func() {
+		CheckErr(nil)
+
+		err := fmt.Errorf("test error")
+		printErr(err)
 	})
 
 	It("Others", func() {

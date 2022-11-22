@@ -53,50 +53,50 @@ var _ = Describe("AwsService", func() {
 		maxIPsPerENI    = 16
 		az              = "local"
 		localIP         = "172.31.0.1"
-		instanceId      = "i-0000000000000"
+		instanceID      = "i-0000000000000"
 		instanceType    = "t3.medium"
 		primaryMAC      = "00:00:00:00:00:01"
-		securityGroupId = "sg-00000000"
+		securityGroupID = "sg-00000000"
 		subnet          = "172.31.0.0/24"
-		subnetId        = "subnet-00000000"
-		attachmentId    = "eni-attach-00000000"
+		subnetID        = "subnet-00000000"
+		attachmentID    = "eni-attach-00000000"
 
-		eniId1          = "eni-01"
+		eniID1          = "eni-01"
 		eniDeviceIndex1 = "0"
 		eniMac1         = "00:00:00:00:00:01"
-		eniIp11         = "172.31.1.10"
-		eniIp12         = "172.31.1.11"
-		eniIp13         = "172.31.1.12"
+		eniIP11         = "172.31.1.10"
+		eniIP12         = "172.31.1.11"
+		eniIP13         = "172.31.1.12"
 
-		eniId2          = "eni-02"
+		eniID2          = "eni-02"
 		eniMac2         = "00:00:00:00:00:02"
 		eniDeviceIndex2 = "1"
-		eniIp21         = "172.31.2.10"
-		eniIp22         = "172.31.2.11"
-		eniIp23         = "172.31.2.12"
-		eniIp24         = "172.31.2.14"
+		eniIP21         = "172.31.2.10"
+		eniIP22         = "172.31.2.11"
+		eniIP23         = "172.31.2.12"
+		eniIP24         = "172.31.2.14"
 
-		eniId3          = "eni-03"
+		eniID3          = "eni-03"
 		eniMac3         = "00:00:00:00:00:03"
 		eniDeviceIndex3 = "2"
-		eniIp31         = "172.31.3.10"
+		eniIP31         = "172.31.3.10"
 
-		eniId4 = "eni-04"
+		eniID4 = "eni-04"
 	)
 
 	getImdsService := func(overrides map[string]interface{}) imdsService {
 		data := map[string]interface{}{
 			metadataAZ:           az,
 			metadataLocalIP:      localIP,
-			metadataInstanceID:   instanceId,
+			metadataInstanceID:   instanceID,
 			metadataInstanceType: instanceType,
 			metadataMAC:          primaryMAC,
 			metadataMACPath:      primaryMAC,
 			metadataMACPath + primaryMAC + metadataDeviceNum:  eniDeviceIndex1,
-			metadataMACPath + primaryMAC + metadataInterface:  eniId1,
-			metadataMACPath + primaryMAC + metadataSGs:        securityGroupId,
-			metadataMACPath + primaryMAC + metadataIPv4s:      strings.Join([]string{eniIp11, eniIp12, eniIp13}, " "),
-			metadataMACPath + primaryMAC + metadataSubnetID:   subnetId,
+			metadataMACPath + primaryMAC + metadataInterface:  eniID1,
+			metadataMACPath + primaryMAC + metadataSGs:        securityGroupID,
+			metadataMACPath + primaryMAC + metadataIPv4s:      strings.Join([]string{eniIP11, eniIP12, eniIP13}, " "),
+			metadataMACPath + primaryMAC + metadataSubnetID:   subnetID,
 			metadataMACPath + primaryMAC + metadataSubnetCIDR: subnet,
 			metadataMACPath + primaryMAC + metadataVPCcidrs:   subnet,
 		}
@@ -109,7 +109,7 @@ var _ = Describe("AwsService", func() {
 
 	getTags := func(t time.Time) map[string]string {
 		tags := map[string]string{
-			cloud.TagENINode:              instanceId,
+			cloud.TagENINode:              instanceID,
 			cloud.TagENIKubeBlocksManaged: "true",
 		}
 		if !t.IsZero() {
@@ -122,7 +122,7 @@ var _ = Describe("AwsService", func() {
 		ctrl := gomock.NewController(GinkgoT())
 		mockEC2 := mockaws.NewMockEC2(ctrl)
 		service := &awsService{
-			instanceID: instanceId,
+			instanceID: instanceID,
 			logger:     logger,
 			ec2Svc:     mockEC2,
 			imdsSvc:    getImdsService(overrides),
@@ -135,8 +135,8 @@ var _ = Describe("AwsService", func() {
 			_, service, _ := setup(nil)
 
 			Expect(service.initWithEC2Metadata(context.Background())).Should(Succeed())
-			Expect(service.securityGroups).Should(Equal([]string{securityGroupId}))
-			Expect(service.instanceID).Should(Equal(instanceId))
+			Expect(service.securityGroups).Should(Equal([]string{securityGroupID}))
+			Expect(service.instanceID).Should(Equal(instanceID))
 			Expect(service.primaryENImac).Should(Equal(primaryMAC))
 		})
 	})
@@ -175,16 +175,16 @@ var _ = Describe("AwsService", func() {
 			overrides := map[string]interface{}{
 				metadataMACPath: strings.Join([]string{primaryMAC, eniMac2}, " "),
 				metadataMACPath + eniMac2 + metadataDeviceNum:  eniDeviceIndex2,
-				metadataMACPath + eniMac2 + metadataInterface:  eniId2,
+				metadataMACPath + eniMac2 + metadataInterface:  eniID2,
 				metadataMACPath + eniMac2 + metadataSubnetCIDR: subnet,
-				metadataMACPath + eniMac2 + metadataIPv4s:      strings.Join([]string{eniIp21, eniIp22, eniIp23}, " "),
+				metadataMACPath + eniMac2 + metadataIPv4s:      strings.Join([]string{eniIP21, eniIP22, eniIP23}, " "),
 			}
 			_, service, mockEC2 := setup(overrides)
 
 			enis := &ec2.DescribeNetworkInterfacesOutput{
 				NetworkInterfaces: []*ec2.NetworkInterface{
 					{
-						NetworkInterfaceId: aws.String(eniId1),
+						NetworkInterfaceId: aws.String(eniID1),
 						Attachment: &ec2.NetworkInterfaceAttachment{
 							NetworkCardIndex: aws.Int64(0),
 							DeviceIndex:      aws.Int64(0),
@@ -192,21 +192,21 @@ var _ = Describe("AwsService", func() {
 						PrivateIpAddresses: []*ec2.NetworkInterfacePrivateIpAddress{
 							{
 								Primary:          aws.Bool(true),
-								PrivateIpAddress: aws.String(eniIp11),
+								PrivateIpAddress: aws.String(eniIP11),
 							},
 							{
 								Primary:          aws.Bool(false),
-								PrivateIpAddress: aws.String(eniIp12),
+								PrivateIpAddress: aws.String(eniIP12),
 							},
 							{
 								Primary:          aws.Bool(false),
-								PrivateIpAddress: aws.String(eniIp13),
+								PrivateIpAddress: aws.String(eniIP13),
 							},
 						},
 						TagSet: convertTagsToSDKTags(getTags(time.Now())),
 					},
 					{
-						NetworkInterfaceId: aws.String(eniId2),
+						NetworkInterfaceId: aws.String(eniID2),
 						Attachment: &ec2.NetworkInterfaceAttachment{
 							NetworkCardIndex: aws.Int64(0),
 							DeviceIndex:      aws.Int64(1),
@@ -214,19 +214,19 @@ var _ = Describe("AwsService", func() {
 						PrivateIpAddresses: []*ec2.NetworkInterfacePrivateIpAddress{
 							{
 								Primary:          aws.Bool(true),
-								PrivateIpAddress: aws.String(eniIp21),
+								PrivateIpAddress: aws.String(eniIP21),
 							},
 							{
 								Primary:          aws.Bool(false),
-								PrivateIpAddress: aws.String(eniIp22),
+								PrivateIpAddress: aws.String(eniIP22),
 							},
 							{
 								Primary:          aws.Bool(false),
-								PrivateIpAddress: aws.String(eniIp23),
+								PrivateIpAddress: aws.String(eniIP23),
 							},
 							{
 								Primary:          aws.Bool(false),
-								PrivateIpAddress: aws.String(eniIp24),
+								PrivateIpAddress: aws.String(eniIP24),
 							},
 						},
 						TagSet: convertTagsToSDKTags(getTags(time.Now())),
@@ -238,19 +238,19 @@ var _ = Describe("AwsService", func() {
 			result, err := service.DescribeAllENIs()
 			Expect(err).Should(BeNil())
 			Expect(len(result)).Should(Equal(2))
-			Expect(result[eniId2].PrimaryIPv4Address()).Should(Equal(eniIp21))
+			Expect(result[eniID2].PrimaryIPv4Address()).Should(Equal(eniIP21))
 
 			var eni2 cloud.ENIMetadata
 			imdsENIs, err := service.GetAttachedENIs()
 			for _, item := range imdsENIs {
-				if item.ID == eniId2 {
+				if item.ID == eniID2 {
 					eni2 = item
 					break
 				}
 			}
 			Expect(err).Should(BeNil())
 			Expect(eni2).ShouldNot(BeNil())
-			Expect(service.checkOutOfSyncState(eniId2, eni2.IPv4Addresses, enis.NetworkInterfaces[1].PrivateIpAddresses)).Should(BeFalse())
+			Expect(service.checkOutOfSyncState(eniID2, eni2.IPv4Addresses, enis.NetworkInterfaces[1].PrivateIpAddresses)).Should(BeFalse())
 		})
 	})
 
@@ -260,20 +260,20 @@ var _ = Describe("AwsService", func() {
 
 			createInterfaceOutput := &ec2.CreateNetworkInterfaceOutput{
 				NetworkInterface: &ec2.NetworkInterface{
-					NetworkInterfaceId: aws.String(eniId3),
+					NetworkInterfaceId: aws.String(eniID3),
 				},
 			}
 			mockEC2.EXPECT().CreateNetworkInterfaceWithContext(gomock.Any(), gomock.Any()).Return(createInterfaceOutput, nil)
 
 			describeInstanceInput := &ec2.DescribeInstancesInput{
-				InstanceIds: []*string{aws.String(instanceId)},
+				InstanceIds: []*string{aws.String(instanceID)},
 			}
 			describeInstanceOutput := &ec2.DescribeInstancesOutput{
 				Reservations: []*ec2.Reservation{
 					{
 						Instances: []*ec2.Instance{
 							{
-								InstanceId: aws.String(instanceId),
+								InstanceId: aws.String(instanceID),
 								NetworkInterfaces: []*ec2.InstanceNetworkInterface{
 									{
 										Attachment: &ec2.InstanceNetworkInterfaceAttachment{
@@ -302,31 +302,31 @@ var _ = Describe("AwsService", func() {
 				},
 			}
 			mockEC2.EXPECT().DescribeInstancesWithContext(gomock.Any(), describeInstanceInput).Return(describeInstanceOutput, nil).AnyTimes()
-			number, err := service.awsGetFreeDeviceNumber(instanceId)
+			number, err := service.awsGetFreeDeviceNumber(instanceID)
 			Expect(err).Should(BeNil())
 			Expect(number).Should(Equal(3))
 
 			attachInput := &ec2.AttachNetworkInterfaceInput{
 				DeviceIndex:        aws.Int64(int64(3)),
-				InstanceId:         aws.String(instanceId),
-				NetworkInterfaceId: aws.String(eniId3),
+				InstanceId:         aws.String(instanceID),
+				NetworkInterfaceId: aws.String(eniID3),
 			}
 			attachOutput := &ec2.AttachNetworkInterfaceOutput{
-				AttachmentId: aws.String(attachmentId),
+				AttachmentId: aws.String(attachmentID),
 			}
 			mockEC2.EXPECT().AttachNetworkInterfaceWithContext(gomock.Any(), attachInput).Return(attachOutput, nil)
 
 			modifyAttributeInput := &ec2.ModifyNetworkInterfaceAttributeInput{
 				Attachment: &ec2.NetworkInterfaceAttachmentChanges{
-					AttachmentId:        aws.String(attachmentId),
+					AttachmentId:        aws.String(attachmentID),
 					DeleteOnTermination: aws.Bool(true),
 				},
-				NetworkInterfaceId: aws.String(eniId3),
+				NetworkInterfaceId: aws.String(eniID3),
 			}
 			mockEC2.EXPECT().ModifyNetworkInterfaceAttributeWithContext(context.Background(), modifyAttributeInput).Return(nil, nil)
-			eniId, err := service.CreateENI(instanceId, subnetId, []string{securityGroupId})
+			eniID, err := service.CreateENI(instanceID, subnetID, []string{securityGroupID})
 			Expect(err).Should(BeNil())
-			Expect(eniId).Should(Equal(eniId3))
+			Expect(eniID).Should(Equal(eniID3))
 		})
 	})
 
@@ -335,10 +335,10 @@ var _ = Describe("AwsService", func() {
 			_, service, _ := setup(nil)
 
 			var err error
-			_, err = service.WaitForENIAttached(eniId2)
+			_, err = service.WaitForENIAttached(eniID2)
 			Expect(err).ShouldNot(BeNil())
 
-			_, err = service.WaitForENIAttached(eniId1)
+			_, err = service.WaitForENIAttached(eniID1)
 			Expect(err).Should(BeNil())
 		})
 	})
@@ -348,15 +348,15 @@ var _ = Describe("AwsService", func() {
 			_, service, mockEC2 := setup(nil)
 
 			describeInterfaceInput := &ec2.DescribeNetworkInterfacesInput{
-				NetworkInterfaceIds: []*string{aws.String(eniId2)},
+				NetworkInterfaceIds: []*string{aws.String(eniID2)},
 			}
 			describeInterfaceOutput := &ec2.DescribeNetworkInterfacesOutput{
 				NetworkInterfaces: []*ec2.NetworkInterface{
 					{
-						NetworkInterfaceId: aws.String(eniId2),
+						NetworkInterfaceId: aws.String(eniID2),
 						TagSet:             convertTagsToSDKTags(getTags(time.Now())),
 						Attachment: &ec2.NetworkInterfaceAttachment{
-							AttachmentId: aws.String(attachmentId),
+							AttachmentId: aws.String(attachmentID),
 						},
 					},
 				},
@@ -364,17 +364,17 @@ var _ = Describe("AwsService", func() {
 			mockEC2.EXPECT().DescribeNetworkInterfacesWithContext(gomock.Any(), describeInterfaceInput).Return(describeInterfaceOutput, nil)
 
 			detachInput := &ec2.DetachNetworkInterfaceInput{
-				AttachmentId: aws.String(attachmentId),
+				AttachmentId: aws.String(attachmentID),
 			}
 			mockEC2.EXPECT().DetachNetworkInterfaceWithContext(gomock.Any(), detachInput).Return(nil, errors.New("mock detach failed"))
 			mockEC2.EXPECT().DetachNetworkInterfaceWithContext(gomock.Any(), detachInput).Return(nil, nil)
 
 			deleteInput := &ec2.DeleteNetworkInterfaceInput{
-				NetworkInterfaceId: aws.String(eniId2),
+				NetworkInterfaceId: aws.String(eniID2),
 			}
 			mockEC2.EXPECT().DeleteNetworkInterfaceWithContext(gomock.Any(), deleteInput).Return(nil, errors.New("mock delete failed"))
 			mockEC2.EXPECT().DeleteNetworkInterfaceWithContext(gomock.Any(), deleteInput).Return(nil, nil)
-			Expect(service.FreeENI(eniId2)).Should(Succeed())
+			Expect(service.FreeENI(eniID2)).Should(Succeed())
 		})
 	})
 
@@ -386,12 +386,12 @@ var _ = Describe("AwsService", func() {
 			enis := &ec2.DescribeNetworkInterfacesOutput{
 				NetworkInterfaces: []*ec2.NetworkInterface{
 					{
-						NetworkInterfaceId: aws.String(eniId1),
+						NetworkInterfaceId: aws.String(eniID1),
 						Description:        aws.String("just created eni, should not be cleaned"),
 						TagSet:             convertTagsToSDKTags(getTags(time.Now())),
 					},
 					{
-						NetworkInterfaceId: aws.String(eniId2),
+						NetworkInterfaceId: aws.String(eniID2),
 						Description:        aws.String("expired leaked eni, should be cleaned"),
 						TagSet:             convertTagsToSDKTags(getTags(time.Now().Add(-1 * time.Hour))),
 					},
@@ -399,12 +399,12 @@ var _ = Describe("AwsService", func() {
 						Attachment: &ec2.NetworkInterfaceAttachment{
 							AttachmentId: aws.String("test"),
 						},
-						NetworkInterfaceId: aws.String(eniId3),
+						NetworkInterfaceId: aws.String(eniID3),
 						Description:        aws.String("eni attached to ec2, should not be cleaned"),
 						TagSet:             convertTagsToSDKTags(getTags(time.Now())),
 					},
 					{
-						NetworkInterfaceId: aws.String(eniId4),
+						NetworkInterfaceId: aws.String(eniID4),
 						Description:        aws.String("eni without created at tag, should not be cleaned"),
 						TagSet:             convertTagsToSDKTags(getTags(time.Time{})),
 					},
@@ -422,10 +422,10 @@ var _ = Describe("AwsService", func() {
 				}
 			}
 			mockEC2.EXPECT().CreateTagsWithContext(gomock.Any(), gomock.Any()).DoAndReturn(recordCreatedTagsRequest).Return(nil, nil).AnyTimes()
-			leakedENIs, err := service.FindLeakedENIs(instanceId)
+			leakedENIs, err := service.FindLeakedENIs(instanceID)
 			Expect(err).Should(BeNil())
 			Expect(len(leakedENIs)).Should(Equal(1))
-			Expect(leakedENIs[0].ID).Should(Equal(eniId2))
+			Expect(leakedENIs[0].ID).Should(Equal(eniID2))
 			_, ok := store[cloud.TagENICreatedAt]
 			Expect(ok).Should(BeTrue())
 		})
@@ -440,23 +440,23 @@ var _ = Describe("AwsService", func() {
 			assignOutput := &ec2.AssignPrivateIpAddressesOutput{
 				AssignedPrivateIpAddresses: []*ec2.AssignedPrivateIpAddress{
 					{
-						PrivateIpAddress: aws.String(eniIp22),
+						PrivateIpAddress: aws.String(eniIP22),
 					},
 				},
 			}
 			mockEC2.EXPECT().AssignPrivateIpAddressesWithContext(gomock.Any(), gomock.Any()).Return(assignOutput, nil)
-			_, err = service.AllocIPAddresses(eniId2)
+			_, err = service.AllocIPAddresses(eniID2)
 			Expect(err).Should(BeNil())
 
 			mockEC2.EXPECT().AssignPrivateIpAddressesWithContext(gomock.Any(), gomock.Any()).Return(nil, errors.New("mock assign failed"))
-			_, err = service.AllocIPAddresses(eniId2)
+			_, err = service.AllocIPAddresses(eniID2)
 			Expect(err).ShouldNot(BeNil())
 
 			mockEC2.EXPECT().UnassignPrivateIpAddressesWithContext(gomock.Any(), gomock.Any()).Return(&ec2.UnassignPrivateIpAddressesOutput{}, nil)
-			Expect(service.DeallocIPAddresses(eniId2, []string{eniIp22})).Should(Succeed())
+			Expect(service.DeallocIPAddresses(eniID2, []string{eniIP22})).Should(Succeed())
 
 			mockEC2.EXPECT().UnassignPrivateIpAddressesWithContext(gomock.Any(), gomock.Any()).Return(nil, errors.New("mock unassign failed"))
-			Expect(service.DeallocIPAddresses(eniId2, []string{eniIp22})).ShouldNot(Succeed())
+			Expect(service.DeallocIPAddresses(eniID2, []string{eniIP22})).ShouldNot(Succeed())
 		})
 	})
 })

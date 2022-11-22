@@ -158,3 +158,21 @@ func GetMemorySize(container corev1.Container) int64 {
 	}
 	return 0
 }
+
+// PodIsReady check the pod is ready
+func PodIsReady(pod *corev1.Pod) bool {
+	if pod.Status.Conditions == nil {
+		return false
+	}
+
+	if pod.DeletionTimestamp != nil {
+		return false
+	}
+
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}

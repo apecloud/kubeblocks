@@ -206,7 +206,7 @@ var _ = Describe("lifecycle_utils", func() {
 							Containers: []corev1.Container{
 								{
 									Name:            "mysql",
-									Image:           "docker.io/apecloud/wesql-server-8.0:0.1-SNAPSHOT",
+									Image:           "docker.io/apecloud/wesql-server-8.0:0.1.2",
 									ImagePullPolicy: "IfNotPresent",
 									VolumeMounts: []corev1.VolumeMount{
 										{

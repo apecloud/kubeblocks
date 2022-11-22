@@ -66,8 +66,8 @@ var _ = Describe("appVersion webhook", func() {
 			appVersion.Status.ClusterDefSyncStatus = OutOfSyncStatus
 			Expect(k8sClient.Update(ctx, appVersion)).Should(Succeed())
 
-			By("By testing update appVersion.spec ")
-			appVersion.Spec.ClusterDefinitionRef = "test"
+			By("By testing update appVersion.spec")
+			appVersion.Spec.ClusterDefinitionRef = "test1"
 			Expect(k8sClient.Update(ctx, appVersion)).ShouldNot(Succeed())
 
 		})

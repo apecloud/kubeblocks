@@ -38,7 +38,15 @@ service: {
 			"app.kubernetes.io/component-name": "\(component.name)"
 			"app.kubernetes.io/managed-by":     "kubeblocks"
 		}
-		ports: component.service.ports
+		ports: [
+			for _, container in component.podSpec.containers
+			for _, v in container.ports {
+				name:       v.name
+				protocol:   v.protocol
+				port:       v.containerPort
+				targetPort: v.containerPort
+			},
+		]
 		if component.service.type != _|_ {
 			type: component.service.type
 		}

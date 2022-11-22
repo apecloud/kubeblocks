@@ -45,8 +45,8 @@ spec:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}
           {{- if .Values.dataProtection.enableVolumeSnapshot }}
-            - name: NO_VOLUMESNAPSHOT
-              value: "false"
+            - name: VOLUMESNAPSHOT
+              value: "true"
           {{- end }}
           {{- if .Values.dataProtection.backupSchedule }}
             - name: DP_BACKUP_SCHEDULE

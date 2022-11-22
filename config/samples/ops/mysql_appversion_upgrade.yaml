@@ -9,4 +9,4 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: registry.jihulab.com/apecloud/mysql-server/mysql/wesql-server-8.0:0.1-SNAPSHOT
+        image: docker.io/apecloud/wesql-server-8.0:0.1.2

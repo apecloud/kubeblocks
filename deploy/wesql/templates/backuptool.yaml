@@ -15,7 +15,7 @@ spec:
       memory: 128Mi
   env:
     - name: DATA_DIR
-      value: /data/mysql
+      value: /data/mysql/data
   physical:
     restoreCommands:
       - >

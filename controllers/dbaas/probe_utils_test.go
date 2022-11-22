@@ -41,7 +41,7 @@ var _ = Describe("probe_utils", func() {
 
 	Context("buildProbeContainers", func() {
 		var container *corev1.Container
-		var probeServiceHttpPort, probeServiceGrpcPort int
+		var probeServiceHTTPPort, probeServiceGrpcPort int
 		var clusterDefProbe *dbaasv1alpha1.ClusterDefinitionProbe
 
 		BeforeEach(func() {
@@ -55,7 +55,7 @@ var _ = Describe("probe_utils", func() {
 			container = &corev1.Container{}
 			err = json.Unmarshal(probeContainerByte, container)
 			Expect(err).NotTo(HaveOccurred())
-			probeServiceHttpPort, probeServiceGrpcPort = 3501, 50001
+			probeServiceHTTPPort, probeServiceGrpcPort = 3501, 50001
 
 			clusterDefProbe = &dbaasv1alpha1.ClusterDefinitionProbe{}
 			clusterDefProbe.PeriodSeconds = 1
@@ -64,12 +64,12 @@ var _ = Describe("probe_utils", func() {
 		})
 
 		It("Build role changed probe container", func() {
-			buildRoleChangedProbeContainer(container, clusterDefProbe, probeServiceHttpPort)
+			buildRoleChangedProbeContainer(container, clusterDefProbe, probeServiceHTTPPort)
 			Expect(len(container.ReadinessProbe.Exec.Command)).ShouldNot(BeZero())
 		})
 
 		It("Build role service container", func() {
-			buildProbeServiceContainer(container, probeServiceHttpPort, probeServiceGrpcPort)
+			buildProbeServiceContainer(container, probeServiceHTTPPort, probeServiceGrpcPort)
 			Expect(len(container.Command)).ShouldNot(BeZero())
 		})
 	})

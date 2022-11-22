@@ -80,7 +80,7 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, restoreJob, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
 		return nil, r.deleteExternalResources(reqCtx, restoreJob)
 	})
-	if err != nil {
+	if res != nil {
 		return *res, err
 	}
 

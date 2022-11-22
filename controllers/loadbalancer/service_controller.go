@@ -47,7 +47,7 @@ const (
 	AnnotationKeyENIId        = "service.kubernetes.io/apecloud-loadbalancer-eni-id"
 	AnnotationKeyENINodeIP    = "service.kubernetes.io/apecloud-loadbalancer-eni-node-ip"
 	AnnotationKeyFloatingIP   = "service.kubernetes.io/apecloud-loadbalancer-floating-ip"
-	AnnotationKeySubnetId     = "service.kubernetes.io/apecloud-loadbalancer-subnet-id"
+	AnnotationKeySubnetID     = "service.kubernetes.io/apecloud-loadbalancer-subnet-id"
 	AnnotationKeyMasterNodeIP = "service.kubernetes.io/apecloud-loadbalancer-master-node-ip"
 
 	AnnotationKeyLoadBalancerType            = "service.kubernetes.io/apecloud-loadbalancer-type"
@@ -364,13 +364,13 @@ func (c *ServiceController) deleteFloatingIP(ctx context.Context, ctxLog logr.Lo
 	ctxLog = ctxLog.WithName("deleteFloatingIP").WithValues("ip", fip.ip, "node", fip.nodeIP)
 
 	annotations := svc.GetAnnotations()
-	eniId, ok := annotations[AnnotationKeyENIId]
+	eniID, ok := annotations[AnnotationKeyENIId]
 	if !ok {
 		return errors.New("Invalid service, private ip exists but eni id not found")
 	}
 
-	ctxLog.Info("Deleting service private ip", "eni id", eniId, "ip", fip.ip)
-	if err := c.cp.DeallocIPAddresses(eniId, []string{fip.ip}); err != nil {
+	ctxLog.Info("Deleting service private ip", "eni id", eniID, "ip", fip.ip)
+	if err := c.cp.DeallocIPAddresses(eniID, []string{fip.ip}); err != nil {
 		return errors.Wrapf(err, "Failed to dealloc private ip address %s", fip.ip)
 	}
 	ctxLog.Info("Successfully released floating ip")
@@ -418,7 +418,7 @@ func (c *ServiceController) updateService(ctx context.Context, logger logr.Logge
 	if fip.subnetID == "" {
 		return errors.New("Invalid subnet id")
 	}
-	annotations[AnnotationKeySubnetId] = fip.subnetID
+	annotations[AnnotationKeySubnetID] = fip.subnetID
 
 	svc.SetAnnotations(annotations)
 
@@ -463,7 +463,7 @@ func (c *ServiceController) tryAssignPrivateIP(ctxLog logr.Logger, ip string, no
 		return nil, errors.Wrap(err, "Failed to choose busiest ENI")
 	}
 
-	if err := c.cp.AssignPrivateIpAddresses(eni.EniId, ip); err != nil {
+	if err := c.cp.AssignPrivateIPAddresses(eni.EniId, ip); err != nil {
 		return nil, errors.Wrapf(err, "Failed to assign private ip %s on eni %s", ip, eni.EniId)
 	}
 	ctxLog.Info("Successfully assign private ip")
@@ -498,7 +498,7 @@ func (c *ServiceController) buildFIPFromAnnotation(svc *corev1.Service) *Floatin
 	annotations := svc.GetAnnotations()
 	result := &FloatingIP{
 		ip:       annotations[AnnotationKeyFloatingIP],
-		subnetID: annotations[AnnotationKeySubnetId],
+		subnetID: annotations[AnnotationKeySubnetID],
 		nodeIP:   annotations[AnnotationKeyENINodeIP],
 		eni: &pb.ENIMetadata{
 			EniId: annotations[AnnotationKeyENIId],

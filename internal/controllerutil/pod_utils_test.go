@@ -33,7 +33,7 @@ import (
 type TestResourceUnit struct {
 	container        corev1.Container
 	expectMemorySize int64
-	expectCpu        int
+	expectCPU        int
 }
 
 var _ = Describe("tpl template", func() {
@@ -76,7 +76,7 @@ var _ = Describe("tpl template", func() {
 	)
 
 	const (
-		test_containers = `
+		testContainers = `
 {
   "name": "mysql",
   "imagePullPolicy": "IfNotPresent",
@@ -132,7 +132,7 @@ var _ = Describe("tpl template", func() {
 		statefulSet.ObjectMeta.Namespace = "stateful_test_ns"
 
 		container := corev1.Container{}
-		if err := json.Unmarshal([]byte(test_containers), &container); err != nil {
+		if err := json.Unmarshal([]byte(testContainers), &container); err != nil {
 			Fail("convert container failed!")
 		}
 
@@ -255,7 +255,7 @@ var _ = Describe("tpl template", func() {
 						},
 					},
 					expectMemorySize: 10 * 1024 * 1024 * 1024,
-					expectCpu:        6,
+					expectCPU:        6,
 				},
 				// memory unit: G
 				{
@@ -269,7 +269,7 @@ var _ = Describe("tpl template", func() {
 						},
 					},
 					expectMemorySize: 10 * 1000 * 1000 * 1000,
-					expectCpu:        16,
+					expectCPU:        16,
 				},
 				// memory unit: no
 				{
@@ -283,13 +283,13 @@ var _ = Describe("tpl template", func() {
 						},
 					},
 					expectMemorySize: 1024000,
-					expectCpu:        26,
+					expectCPU:        26,
 				},
 			}
 
 			for i := range testResources {
 				Expect(GetMemorySize(testResources[i].container)).To(Equal(testResources[i].expectMemorySize))
-				Expect(GetCoreNum(testResources[i].container)).To(Equal(testResources[i].expectCpu))
+				Expect(GetCoreNum(testResources[i].container)).To(Equal(testResources[i].expectCPU))
 			}
 		})
 		It("Resource not limit", func() {

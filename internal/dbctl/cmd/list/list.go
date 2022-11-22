@@ -43,10 +43,10 @@ func Build(c *builder.Command) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			complete(o, cmd)
 			if c.CustomComplete != nil {
-				cmdutil.CheckErr(c.CustomComplete(o, args))
+				util.CheckErr(c.CustomComplete(o, args))
 			}
-			cmdutil.CheckErr(o.Complete(c.Factory))
-			cmdutil.CheckErr(o.Run(c.Factory))
+			util.CheckErr(o.Complete(c.Factory))
+			util.CheckErr(o.Run(c.Factory))
 		},
 	}
 

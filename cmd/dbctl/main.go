@@ -18,14 +18,14 @@ package main
 
 import (
 	"k8s.io/component-base/cli"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
 func main() {
 	cmd := cmd.NewDbctlCmd()
 	if err := cli.RunNoErrOutput(cmd); err != nil {
-		cmdutil.CheckErr(err)
+		util.CheckErr(err)
 	}
 }

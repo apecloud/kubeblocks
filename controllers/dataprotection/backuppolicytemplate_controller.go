@@ -72,7 +72,7 @@ func (r *BackupPolicyTemplateReconciler) Reconcile(ctx context.Context, req ctrl
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, BackupPolicyTemplate, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
 		return nil, r.deleteExternalResources(reqCtx, BackupPolicyTemplate)
 	})
-	if err != nil {
+	if res != nil {
 		return *res, err
 	}
 

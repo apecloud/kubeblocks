@@ -49,8 +49,8 @@ var _ = Describe("tpl template", func() {
 	)
 
 	const (
-		MYSQL_CFG_NAME        = "my.cfg"
-		MYSQL_CFG_TMP_CONTEXT = `
+		mysqlCfgName       = "my.cfg"
+		mysqlCfgTmpContext = `
 [mysqld]
 loose_query_cache_type          = OFF
 loose_query_cache_size          = 0
@@ -82,7 +82,7 @@ loose_rds_audit_log_buffer_size = {{ div $buffer_pool_size_tmp 100 }}
 loose_innodb_replica_log_parse_buf_size = {{ div $buffer_pool_size_tmp 10 }}
 loose_innodb_primary_flush_max_lsn_lag =  {{ div $buffer_pool_size_tmp 11 }}
 `
-		MYSQL_CFG_RENDERED_CONTEXT = `
+		mysqlCfgRenderedContext = `
 [mysqld]
 loose_query_cache_type          = OFF
 loose_query_cache_size          = 0
@@ -211,15 +211,15 @@ loose_innodb_primary_flush_max_lsn_lag =  780903144
 			}
 
 			rendered, err := cfgBuilder.Render(map[string]string{
-				MYSQL_CFG_NAME: MYSQL_CFG_TMP_CONTEXT,
+				mysqlCfgName: mysqlCfgTmpContext,
 			})
 
 			// Debug
-			fmt.Println(rendered[MYSQL_CFG_NAME])
-			fmt.Printf("%s\n", MYSQL_CFG_RENDERED_CONTEXT)
+			fmt.Println(rendered[mysqlCfgName])
+			fmt.Printf("%s\n", mysqlCfgRenderedContext)
 
 			Expect(err).Should(BeNil())
-			Expect(rendered[MYSQL_CFG_NAME]).Should(Equal(MYSQL_CFG_RENDERED_CONTEXT))
+			Expect(rendered[mysqlCfgName]).Should(Equal(mysqlCfgRenderedContext))
 		})
 		It("test built-in function", func() {
 			cfgBuilder := NewCfgTemplateBuilder(

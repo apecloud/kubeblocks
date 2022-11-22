@@ -18,8 +18,9 @@ package cluster
 
 import (
 	"encoding/json"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"os"
+
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -126,6 +127,6 @@ spec:
 		fileName = "no-existing-file"
 		bytes, err = multipleSourceComponents(fileName, streams)
 		Expect(bytes).Should(BeNil())
-		Expect(err).ShouldNot(BeNil())
+		Expect(err).Should(HaveOccurred())
 	})
 })

@@ -580,7 +580,13 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		}
 		*params.applyObjs = append(*params.applyObjs, sts)
 	case dbaasv1alpha1.Stateful:
-		sts, err := buildSts(reqCtx, *params)
+		envConfig, err := buildEnvConfig(*params)
+		if err != nil {
+			return err
+		}
+		*params.applyObjs = append(*params.applyObjs, envConfig)
+
+		sts, err := buildSts(reqCtx, *params, envConfig.Name)
 		if err != nil {
 			return err
 		}
@@ -602,7 +608,13 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		}
 		// end render config
 	case dbaasv1alpha1.Consensus:
-		css, err := buildConsensusSet(reqCtx, *params)
+		envConfig, err := buildEnvConfig(*params)
+		if err != nil {
+			return err
+		}
+		*params.applyObjs = append(*params.applyObjs, envConfig)
+
+		css, err := buildConsensusSet(reqCtx, *params, envConfig.Name)
 		if err != nil {
 			return err
 		}
@@ -882,7 +894,7 @@ func buildSecret(params createParams) (*corev1.Secret, error) {
 	return &secret, nil
 }
 
-func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.StatefulSet, error) {
+func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName string) (*appsv1.StatefulSet, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
 	cueTpl, err := params.getCacheCUETplValue("statefulset_template.cue", func() (*intctrlutil.CUETpl, error) {
@@ -943,42 +955,40 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.State
 		return nil, err
 	}
 	sts.Spec.Template.Spec.Containers = append(sts.Spec.Template.Spec.Containers, probeContainers...)
-	prefix := dbaasPrefix + "_" + strings.ToUpper(params.component.Type) + "_"
-	replicas := int(*sts.Spec.Replicas)
-	svcName := strings.Join([]string{params.cluster.Name, params.component.Name, "headless"}, "-")
 
 	for i := range sts.Spec.Template.Spec.Containers {
-		// inject self scope env
 		c := &sts.Spec.Template.Spec.Containers[i]
-		c.Env = append(c.Env, corev1.EnvVar{
-			Name: dbaasPrefix + "_POD_NAME",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "metadata.name",
+		if c.EnvFrom == nil {
+			c.EnvFrom = []corev1.EnvFromSource{}
+		}
+		c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
+			ConfigMapRef: &corev1.ConfigMapEnvSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: envConfigName,
 				},
 			},
 		})
-		// inject component scope env
-		c.Env = append(c.Env, corev1.EnvVar{
-			Name:      prefix + "N",
-			Value:     strconv.Itoa(replicas),
-			ValueFrom: nil,
-		})
-		for j := 0; j < replicas; j++ {
-			c.Env = append(c.Env, corev1.EnvVar{
-				Name:      prefix + strconv.Itoa(j) + "_HOSTNAME",
-				Value:     fmt.Sprintf("%s.%s", sts.Name+"-"+strconv.Itoa(j), svcName),
-				ValueFrom: nil,
-			})
-		}
-
 	}
+	for i := range sts.Spec.Template.Spec.InitContainers {
+		c := &sts.Spec.Template.Spec.Containers[i]
+		if c.EnvFrom == nil {
+			c.EnvFrom = []corev1.EnvFromSource{}
+		}
+		c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
+			ConfigMapRef: &corev1.ConfigMapEnvSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: envConfigName,
+				},
+			},
+		})
+	}
+
 	return &sts, nil
 }
 
 // buildConsensusSet build on a stateful set
-func buildConsensusSet(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.StatefulSet, error) {
-	sts, err := buildSts(reqCtx, params)
+func buildConsensusSet(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName string) (*appsv1.StatefulSet, error) {
+	sts, err := buildSts(reqCtx, params, envConfigName)
 	if err != nil {
 		return sts, err
 	}
@@ -1145,6 +1155,68 @@ func buildCfg(params createParams, sts *appsv1.StatefulSet, ctx context.Context,
 
 	// Generate Pod Volumes for ConfigMap objects
 	return configs, checkAndUpdatePodVolumes(sts, volumes)
+}
+
+func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
+	cueFS, _ := debme.FS(cueTemplates, "cue")
+
+	cueTpl, err := params.getCacheCUETplValue("env_config_template.cue", func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("env_config_template.cue"))
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+
+	clusterStrByte, err := params.getCacheBytesValue("cluster", func() ([]byte, error) {
+		return json.Marshal(params.cluster)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("cluster", clusterStrByte); err != nil {
+		return nil, err
+	}
+
+	componentStrByte, err := json.Marshal(params.component)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("component", componentStrByte); err != nil {
+		return nil, err
+	}
+
+	prefix := dbaasPrefix + "_" + strings.ToUpper(params.component.Type) + "_"
+	svcName := strings.Join([]string{params.cluster.Name, params.component.Name, "headless"}, "-")
+	envData := map[string]string{}
+	envData[prefix+"N"] = strconv.Itoa(int(params.component.Replicas))
+	for j := 0; j < int(params.component.Replicas); j++ {
+		envData[prefix+strconv.Itoa(j)+"_HOSTNAME"] = fmt.Sprintf("%s.%s", params.cluster.Name+"-"+params.component.Name+"-"+strconv.Itoa(j), svcName)
+	}
+	if params.cluster.Status.Components != nil && params.cluster.Status.Components[params.component.Type] != nil {
+		consensusSetStatus := params.cluster.Status.Components[params.component.Type].ConsensusSetStatus
+		envData[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
+	}
+	envDataStrByte, err := json.Marshal(envData)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("config.data", envDataStrByte); err != nil {
+		return nil, err
+	}
+
+	configStrByte, err := cueValue.Lookup("config")
+	if err != nil {
+		return nil, err
+	}
+
+	config := corev1.ConfigMap{}
+	if err = json.Unmarshal(configStrByte, &config); err != nil {
+		return nil, err
+	}
+
+	return &config, nil
 }
 
 func checkAndUpdatePodVolumes(sts *appsv1.StatefulSet, volumes map[string]dbaasv1alpha1.ConfigTemplate) error {

@@ -234,8 +234,11 @@ var _ = Describe("OpsRequest webhook", func() {
 		patchStatusPhase(opsRequest, RunningPhase)
 		Expect(k8sClient.Delete(ctx, opsRequest)).ShouldNot(Succeed())
 
-		By("test delete OpsRequest when phase is Succeed")
+		By("test patch/delete OpsRequest when phase is Succeed")
 		patchStatusPhase(opsRequest, SucceedPhase)
+		patch := client.MergeFrom(opsRequest.DeepCopy())
+		opsRequest.Labels = map[string]string{"test": "test"}
+		Expect(k8sClient.Patch(ctx, opsRequest, patch)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, opsRequest)).Should(Succeed())
 	}
 

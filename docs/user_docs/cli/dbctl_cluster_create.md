@@ -3,13 +3,34 @@
 Create a database cluster
 
 ```
-dbctl cluster create [flags]
+dbctl cluster create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOut --components=file-path [flags]
+```
+
+### Examples
+
+```
+  # Create a cluster using component file component.yaml and termination policy DoNotDelete that will prevent
+  # the cluster from being deleted
+  dbctl cluster create mycluster --components=component.yaml --termination-policy=DoNotDelete
+  
+  # In scenarios where you want to delete resources such as sts, deploy, svc, pdb, but keep pvcs when deleting
+  # the cluster, use termination policy Halt
+  dbctl cluster create mycluster --components=component.yaml --termination-policy=Halt
+  
+  # In scenarios where you want to delete resource such as sts, deploy, svc, pdb, and including pvcs when
+  # deleting the cluster, use termination policy Delete
+  dbctl cluster create mycluster --components=component.yaml --termination-policy=Delete
+  
+  # In scenarios where you want to delete all resources including all snapshots and snapshot data when deleting
+  # the cluster, use termination policy WipeOut
+  dbctl cluster create mycluster --components=component.yaml --termination-policy=WipeOut
 ```
 
 ### Options
 
 ```
       --app-version string           AppVersion reference (default "wesql-8.0.30")
+      --backup string                Set a source backup to restore data
       --cluster-definition string    ClusterDefinition reference (default "apecloud-wesql")
       --components string            Use yaml file to specify the cluster components
       --enable-all-logs              Enable advanced application all log extraction, and true will ignore enabledLogs of component level
@@ -17,7 +38,7 @@ dbctl cluster create [flags]
       --monitor                      Set monitor enabled (default false)
       --node-labels stringToString   Node label selector (default [])
       --pod-anti-affinity string     Pod anti-affinity type (default "Preferred")
-      --termination-policy string    Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
+      --termination-policy string    Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)
       --topology-keys stringArray    Topology keys for affinity
 ```
 

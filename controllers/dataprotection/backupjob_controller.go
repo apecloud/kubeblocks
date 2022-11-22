@@ -93,7 +93,7 @@ func (r *BackupJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, backupJob, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
 		return nil, r.deleteExternalResources(reqCtx, backupJob)
 	})
-	if err != nil {
+	if res != nil {
 		return *res, err
 	}
 
@@ -118,7 +118,7 @@ func (r *BackupJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}).
 		Owns(&batchv1.Job{})
 
-	if !viper.GetBool("NO_VOLUMESNAPSHOT") {
+	if viper.GetBool("VOLUMESNAPSHOT") {
 		b.Owns(&snapshotv1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
 	}
 
@@ -130,13 +130,31 @@ func (r *BackupJobReconciler) doNewPhaseAction(
 	backupJob *dataprotectionv1alpha1.BackupJob) (ctrl.Result, error) {
 
 	// HACK/TODO: ought to move following check to validation webhook
-	if backupJob.Spec.BackupType == dataprotectionv1alpha1.BackupTypeSnapshot && viper.GetBool("NO_VOLUMESNAPSHOT") {
+	if backupJob.Spec.BackupType == dataprotectionv1alpha1.BackupTypeSnapshot && !viper.GetBool("VOLUMESNAPSHOT") {
 		backupJob.Status.Phase = dataprotectionv1alpha1.BackupJobFailed
 		backupJob.Status.FailureReason = "VolumeSnapshot feature disabled."
 		if err := r.Client.Status().Update(reqCtx.Ctx, backupJob); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()
+	}
+
+	// update labels
+	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
+	backupPolicyNameSpaceName := types.NamespacedName{
+		Namespace: reqCtx.Req.Namespace,
+		Name:      backupJob.Spec.BackupPolicyName,
+	}
+	if err := r.Get(reqCtx.Ctx, backupPolicyNameSpaceName, backupPolicy); err != nil {
+		r.Recorder.Eventf(backupJob, corev1.EventTypeWarning, "CreatingBackupJob",
+			"Unable to get backupPolicy for backupJob %s.", backupPolicyNameSpaceName)
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
+	labels := backupPolicy.Spec.Target.LabelsSelector.MatchLabels
+	labels[dataProtectionLabelBackupTypeKey] = string(backupJob.Spec.BackupType)
+	if err := r.patchBackupJobLabels(reqCtx, backupJob, labels); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
 	// update Phase to InProgress
@@ -223,6 +241,25 @@ func (r *BackupJobReconciler) doInProgressPhaseAction(
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
+}
+
+// patchBackupJobLabels patch backupJob labels
+func (r *BackupJobReconciler) patchBackupJobLabels(
+	reqCtx intctrlutil.RequestCtx,
+	backupJob *dataprotectionv1alpha1.BackupJob,
+	labels map[string]string) error {
+
+	patch := client.MergeFrom(backupJob.DeepCopy())
+	if len(labels) > 0 {
+		if backupJob.Labels == nil {
+			backupJob.Labels = labels
+		} else {
+			for k, v := range labels {
+				backupJob.Labels[k] = v
+			}
+		}
+	}
+	return r.Client.Patch(reqCtx.Ctx, backupJob, patch)
 }
 
 func (r *BackupJobReconciler) createPreCommandJobAndEnsure(reqCtx intctrlutil.RequestCtx,

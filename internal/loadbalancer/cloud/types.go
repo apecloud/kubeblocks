@@ -46,7 +46,7 @@ type Provider interface {
 
 	DeallocIPAddresses(eniID string, ips []string) error
 
-	AssignPrivateIpAddresses(eniID string, ip string) error
+	AssignPrivateIPAddresses(eniID string, ip string) error
 
 	WaitForENIAttached(eniID string) (ENIMetadata, error)
 

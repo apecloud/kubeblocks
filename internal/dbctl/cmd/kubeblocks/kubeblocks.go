@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package kubeblocks
 
 import (
 	"fmt"
 
 	"k8s.io/client-go/dynamic"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
 	"github.com/apecloud/kubeblocks/version"
 )
@@ -50,11 +52,31 @@ type installOptions struct {
 	Monitor bool
 }
 
-// NewDbaasCmd creates the dbaas command
-func NewDbaasCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+var (
+	installExample = templates.Examples(`
+	# Install KubeBlocks
+	dbctl kubeblocks install
+	
+	# Install KubeBlocks with specified version
+	dbctl kubeblocks install --version=0.2.0
+
+	# Install KubeBlocks and enable the monitor including prometheus, grafana
+	dbctl kubeblocks install --monitor=true
+
+	# Install KubeBlocks with other settings, for example, set replicaCount to 3
+	dbctl kubeblocks install --set replicaCount=3
+`)
+
+	uninstallExample = templates.Examples(`
+		# uninstall KubeBlocks
+        dbctl kubeblocks uninstall`)
+)
+
+// NewKubeBlocksCmd creates the kubeblocks command
+func NewKubeBlocksCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "dbaas",
-		Short: "DBaaS(KubeBlocks) operation commands",
+		Use:   "kubeblocks [install | uninstall]",
+		Short: "KubeBlocks operation commands",
 	}
 	cmd.AddCommand(
 		newInstallCmd(f, streams),
@@ -102,7 +124,7 @@ func (o *installOptions) run() error {
 	var notes string
 	var err error
 	if notes, err = installer.Install(); err != nil {
-		return errors.Wrap(err, "Failed to install KubeBlocks")
+		return errors.Wrap(err, "failed to install KubeBlocks")
 	}
 
 	fmt.Fprintf(o.Out, `
@@ -114,7 +136,7 @@ KubeBlocks %s Install SUCCESSFULLY!
     dbctl cluster describe <cluster name>  # get cluster information
 
 -> Uninstall DBaaS:
-    dbctl dbaas uninstall
+    dbctl kubeblocks uninstall
 `, o.Version)
 	fmt.Fprint(o.Out, notes)
 	return nil
@@ -145,12 +167,13 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	}
 
 	cmd := &cobra.Command{
-		Use:   "install",
-		Short: "Install KubeBlocks",
-		Args:  cobra.NoArgs,
+		Use:     "install",
+		Short:   "Install KubeBlocks",
+		Args:    cobra.NoArgs,
+		Example: installExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.complete(f, cmd))
-			cmdutil.CheckErr(o.run())
+			util.CheckErr(o.complete(f, cmd))
+			util.CheckErr(o.run())
 		},
 	}
 
@@ -166,11 +189,13 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		IOStreams: streams,
 	}
 	cmd := &cobra.Command{
-		Use:   "uninstall",
-		Short: "Uninstall KubeBlocks",
+		Use:     "uninstall",
+		Short:   "Uninstall KubeBlocks",
+		Args:    cobra.NoArgs,
+		Example: uninstallExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.complete(f, cmd))
-			cmdutil.CheckErr(o.run())
+			util.CheckErr(o.complete(f, cmd))
+			util.CheckErr(o.run())
 		},
 	}
 	return cmd

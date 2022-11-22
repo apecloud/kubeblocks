@@ -67,9 +67,9 @@ func (mr *MockProviderMockRecorder) AllocIPAddresses(arg0 interface{}) *gomock.C
 }
 
 // AssignPrivateIpAddresses mocks base method.
-func (m *MockProvider) AssignPrivateIpAddresses(arg0, arg1 string) error {
+func (m *MockProvider) AssignPrivateIPAddresses(arg0, arg1 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AssignPrivateIpAddresses", arg0, arg1)
+	ret := m.ctrl.Call(m, "AssignPrivateIPAddresses", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
@@ -77,7 +77,7 @@ func (m *MockProvider) AssignPrivateIpAddresses(arg0, arg1 string) error {
 // AssignPrivateIpAddresses indicates an expected call of AssignPrivateIpAddresses.
 func (mr *MockProviderMockRecorder) AssignPrivateIpAddresses(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AssignPrivateIpAddresses", reflect.TypeOf((*MockProvider)(nil).AssignPrivateIpAddresses), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AssignPrivateIPAddresses", reflect.TypeOf((*MockProvider)(nil).AssignPrivateIPAddresses), arg0, arg1)
 }
 
 // AttachENI mocks base method.

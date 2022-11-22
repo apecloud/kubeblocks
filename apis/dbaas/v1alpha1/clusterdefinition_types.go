@@ -338,9 +338,9 @@ func init() {
 }
 
 // ValidateEnabledLogConfigs validate enabledLogs, and return the log names which isn't defined in ClusterDefinition
-func (cd *ClusterDefinition) ValidateEnabledLogConfigs(typeName string, enabledLogs []string) []string {
+func (r *ClusterDefinition) ValidateEnabledLogConfigs(typeName string, enabledLogs []string) []string {
 	invalidLogNames := make([]string, 0, len(enabledLogs))
-	for _, comp := range cd.Spec.Components {
+	for _, comp := range r.Spec.Components {
 		if !strings.EqualFold(typeName, comp.TypeName) {
 			continue
 		}

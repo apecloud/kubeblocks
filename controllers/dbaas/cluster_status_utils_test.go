@@ -214,7 +214,7 @@ spec:
     name: mysql`, componentName, clusterName, podRole, podName)
 		pod := &corev1.Pod{}
 		Expect(yaml.Unmarshal([]byte(podYaml), pod)).Should(Succeed())
-		Expect(k8sClient.Create(context.Background(), pod)).Should(Succeed())
+		Expect(testCtx.CreateObj(context.Background(), pod)).Should(Succeed())
 		// wait until pod created
 		Eventually(func() bool {
 			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: podName, Namespace: namespace}, &corev1.Pod{})
@@ -252,7 +252,7 @@ spec:
 `, componentName, clusterName, deployName, componentName, clusterName, componentName, clusterName)
 		deploy := &appsv1.Deployment{}
 		Expect(yaml.Unmarshal([]byte(deploymentYaml), deploy)).Should(Succeed())
-		Expect(k8sClient.Create(context.Background(), deploy)).Should(Succeed())
+		Expect(testCtx.CreateObj(context.Background(), deploy)).Should(Succeed())
 		// wait until deployment created
 		Eventually(func() bool {
 			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: deployName, Namespace: namespace}, &appsv1.Deployment{})

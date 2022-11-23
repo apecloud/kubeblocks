@@ -105,7 +105,7 @@ func CreateCfgRegexFilter(regexString string) (NotifyEventFilter, error) {
 // https://github.com/ossrs/srs/issues/1635
 func CreateValidConfigMapFilter() NotifyEventFilter {
 	return func(event fsnotify.Event) (bool, error) {
-		if event.Op&fsnotify.Create != fsnotify.Create {
+		if !event.Has(fsnotify.Create) {
 			return false, nil
 		}
 		if filepath.Base(event.Name) != "..data" {

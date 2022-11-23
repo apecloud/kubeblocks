@@ -148,7 +148,7 @@ func (c *awsService) initWithEC2Metadata(ctx context.Context) error {
 	}
 	kvs = append(kvs, "primary eni mac", c.primaryENImac)
 
-	c.primaryENI, err = c.imdsSvc.getInterfaceIdByMAC(ctx, c.primaryENImac)
+	c.primaryENI, err = c.imdsSvc.getInterfaceIDByMAC(ctx, c.primaryENImac)
 	if err != nil {
 		return err
 	}
@@ -245,21 +245,21 @@ func (c *awsService) DescribeAllENIs() (map[string]*cloud.ENIMetadata, error) {
 			"device index", aws.Int64Value(item.Attachment.DeviceIndex),
 			"eni id", aws.StringValue(item.NetworkInterfaceId))
 
-		eniId := aws.StringValue(item.NetworkInterfaceId)
+		eniID := aws.StringValue(item.NetworkInterfaceId)
 
-		eniMetadata := attachedENIMap[eniId]
+		eniMetadata := attachedENIMap[eniID]
 		eniMetadata.SubnetID = aws.StringValue(item.SubnetId)
 		eniMetadata.Tags = convertSDKTagsToTags(item.TagSet)
 
-		result[eniId] = &eniMetadata
+		result[eniID] = &eniMetadata
 
 		// Check IPv4 addresses
-		c.checkOutOfSyncState(eniId, eniMetadata.IPv4Addresses, item.PrivateIpAddresses)
+		c.checkOutOfSyncState(eniID, eniMetadata.IPv4Addresses, item.PrivateIpAddresses)
 	}
 	return result, nil
 }
 
-func (c *awsService) FindLeakedENIs(instanceId string) ([]*cloud.ENIMetadata, error) {
+func (c *awsService) FindLeakedENIs(instanceID string) ([]*cloud.ENIMetadata, error) {
 	input := &ec2.DescribeNetworkInterfacesInput{
 		Filters: []*ec2.Filter{
 			{
@@ -283,10 +283,10 @@ func (c *awsService) FindLeakedENIs(instanceId string) ([]*cloud.ENIMetadata, er
 
 		var (
 			tags  = convertSDKTagsToTags(eni.TagSet)
-			eniId = aws.StringValue(eni.NetworkInterfaceId)
+			eniID = aws.StringValue(eni.NetworkInterfaceId)
 		)
 		node, ok := tags[cloud.TagENINode]
-		if !ok || node != instanceId {
+		if !ok || node != instanceID {
 			return true
 		}
 
@@ -301,8 +301,8 @@ func (c *awsService) FindLeakedENIs(instanceId string) ([]*cloud.ENIMetadata, er
 		createdAt, ok := tags[cloud.TagENICreatedAt]
 		if !ok {
 			ctxLog.Info("Timestamp tag not exists, tag it")
-			if err := c.tagENI(eniId, retagMap); err != nil {
-				ctxLog.Error(err, "Failed to add tag for eni", "eni id", eniId)
+			if err := c.tagENI(eniID, retagMap); err != nil {
+				ctxLog.Error(err, "Failed to add tag for eni", "eni id", eniID)
 			}
 			return false
 		}
@@ -310,8 +310,8 @@ func (c *awsService) FindLeakedENIs(instanceId string) ([]*cloud.ENIMetadata, er
 		t, err := time.Parse(time.RFC3339, createdAt)
 		if err != nil {
 			ctxLog.Error(err, "Timestamp tag is wrong, retagging it with current timestamp", "time", createdAt)
-			if err := c.tagENI(eniId, retagMap); err != nil {
-				ctxLog.Error(err, "Failed to retagging for eni", "eni id", eniId)
+			if err := c.tagENI(eniID, retagMap); err != nil {
+				ctxLog.Error(err, "Failed to retagging for eni", "eni id", eniID)
 			}
 			return false
 		}
@@ -345,10 +345,10 @@ func (c *awsService) FindLeakedENIs(instanceId string) ([]*cloud.ENIMetadata, er
 	return leakedENIs, nil
 }
 
-func (c *awsService) tagENI(eniId string, tagMap map[string]string) error {
+func (c *awsService) tagENI(eniID string, tagMap map[string]string) error {
 	input := &ec2.CreateTagsInput{
 		Resources: []*string{
-			aws.String(eniId),
+			aws.String(eniID),
 		},
 		Tags: convertTagsToSDKTags(tagMap),
 	}
@@ -356,13 +356,13 @@ func (c *awsService) tagENI(eniId string, tagMap map[string]string) error {
 	return err
 }
 
-func (c *awsService) AssignPrivateIpAddresses(eniId string, privateIP string) error {
+func (c *awsService) AssignPrivateIPAddresses(eniID string, privateIP string) error {
 	input := &ec2.AssignPrivateIpAddressesInput{
-		NetworkInterfaceId: aws.String(eniId),
+		NetworkInterfaceId: aws.String(eniID),
 		PrivateIpAddresses: []*string{&privateIP},
 	}
 	if _, err := c.ec2Svc.AssignPrivateIpAddressesWithContext(context.Background(), input); err != nil {
-		return errors.Wrapf(err, "Failed to assign private ip address %s on eni %s", privateIP, eniId)
+		return errors.Wrapf(err, "Failed to assign private ip address %s on eni %s", privateIP, eniID)
 	}
 	return nil
 }
@@ -437,7 +437,7 @@ func (c *awsService) getENIMetadata(eniMAC string) (cloud.ENIMetadata, error) {
 		ctx       = context.TODO()
 	)
 
-	eniID, err := c.imdsSvc.getInterfaceIdByMAC(ctx, eniMAC)
+	eniID, err := c.imdsSvc.getInterfaceIDByMAC(ctx, eniMAC)
 	if err != nil {
 		return result, err
 	}
@@ -529,13 +529,13 @@ func (c *awsService) AllocIPAddresses(eniID string) (string, error) {
 	return aws.StringValue(output.AssignedPrivateIpAddresses[0].PrivateIpAddress), nil
 }
 
-func (c *awsService) CreateENI(instanceId, subnetId string, securityGroupIds []string) (string, error) {
-	ctxLog := c.logger.WithValues("instance Id", instanceId)
+func (c *awsService) CreateENI(instanceID, subnetID string, securityGroupIds []string) (string, error) {
+	ctxLog := c.logger.WithValues("instance id", instanceID)
 	ctxLog.Info("Trying to create ENI")
 
-	eniDescription := fmt.Sprintf("kubeblocks-lb-%s", instanceId)
+	eniDescription := fmt.Sprintf("kubeblocks-lb-%s", instanceID)
 	tags := map[string]string{
-		cloud.TagENINode:              instanceId,
+		cloud.TagENINode:              instanceID,
 		cloud.TagENICreatedAt:         time.Now().Format(time.RFC3339),
 		cloud.TagENIKubeBlocksManaged: "true",
 		ENINoManageTagKey:             "true",
@@ -550,7 +550,7 @@ func (c *awsService) CreateENI(instanceId, subnetId string, securityGroupIds []s
 	input := &ec2.CreateNetworkInterfaceInput{
 		Description:       aws.String(eniDescription),
 		Groups:            aws.StringSlice(securityGroupIds),
-		SubnetId:          aws.String(subnetId),
+		SubnetId:          aws.String(subnetID),
 		TagSpecifications: tagSpec,
 	}
 
@@ -563,18 +563,18 @@ func (c *awsService) CreateENI(instanceId, subnetId string, securityGroupIds []s
 	return aws.StringValue(result.NetworkInterface.NetworkInterfaceId), nil
 }
 
-func (c *awsService) AttachENI(instanceId string, eniID string) (string, error) {
-	ctxLog := c.logger.WithValues("instance Id", instanceId, "eni id", eniID)
+func (c *awsService) AttachENI(instanceID string, eniID string) (string, error) {
+	ctxLog := c.logger.WithValues("instance id", instanceID, "eni id", eniID)
 	ctxLog.Info("Trying to attach ENI")
 
-	freeDevice, err := c.awsGetFreeDeviceNumber(instanceId)
+	freeDevice, err := c.awsGetFreeDeviceNumber(instanceID)
 	if err != nil {
 		return "", errors.Wrap(err, "Failed to get a free device number")
 	}
 
 	attachInput := &ec2.AttachNetworkInterfaceInput{
 		DeviceIndex:        aws.Int64(int64(freeDevice)),
-		InstanceId:         aws.String(instanceId),
+		InstanceId:         aws.String(instanceID),
 		NetworkInterfaceId: aws.String(eniID),
 	}
 	attachOutput, err := c.ec2Svc.AttachNetworkInterfaceWithContext(context.Background(), attachInput)
@@ -582,11 +582,11 @@ func (c *awsService) AttachENI(instanceId string, eniID string) (string, error) 
 		return "", errors.Wrap(err, "Failed to attach ENI")
 	}
 
-	attachmentId := aws.StringValue(attachOutput.AttachmentId)
+	attachmentID := aws.StringValue(attachOutput.AttachmentId)
 	// Also change the ENI's attribute so that the ENI will be deleted when the instance is deleted.
 	attributeInput := &ec2.ModifyNetworkInterfaceAttributeInput{
 		Attachment: &ec2.NetworkInterfaceAttachmentChanges{
-			AttachmentId:        aws.String(attachmentId),
+			AttachmentId:        aws.String(attachmentID),
 			DeleteOnTermination: aws.Bool(true),
 		},
 		NetworkInterfaceId: aws.String(eniID),
@@ -598,12 +598,12 @@ func (c *awsService) AttachENI(instanceId string, eniID string) (string, error) 
 		}
 		return "", errors.Wrap(err, "Failed to change the ENI's attribute")
 	}
-	return attachmentId, err
+	return attachmentID, err
 }
 
-func (c *awsService) awsGetFreeDeviceNumber(instanceId string) (int, error) {
+func (c *awsService) awsGetFreeDeviceNumber(instanceID string) (int, error) {
 	input := &ec2.DescribeInstancesInput{
-		InstanceIds: []*string{aws.String(instanceId)},
+		InstanceIds: []*string{aws.String(instanceID)},
 	}
 
 	result, err := c.ec2Svc.DescribeInstancesWithContext(context.Background(), input)
@@ -612,7 +612,7 @@ func (c *awsService) awsGetFreeDeviceNumber(instanceId string) (int, error) {
 	}
 
 	if len(result.Reservations) != 1 {
-		return 0, errors.New(fmt.Sprintf("invalid instance id %s", instanceId))
+		return 0, errors.New(fmt.Sprintf("invalid instance id %s", instanceID))
 	}
 
 	// TODO race condition with vpc cni
@@ -631,12 +631,12 @@ func (c *awsService) awsGetFreeDeviceNumber(instanceId string) (int, error) {
 	return 0, errors.New("no available device number")
 }
 
-func (c *awsService) DeleteENI(eniId string) error {
-	ctxLog := c.logger.WithValues("eni id", eniId)
+func (c *awsService) DeleteENI(eniID string) error {
+	ctxLog := c.logger.WithValues("eni id", eniID)
 	ctxLog.Info("Trying to delete ENI")
 
 	deleteInput := &ec2.DeleteNetworkInterfaceInput{
-		NetworkInterfaceId: aws.String(eniId),
+		NetworkInterfaceId: aws.String(eniID),
 	}
 	f := func() error {
 		if _, err := c.ec2Svc.DeleteNetworkInterfaceWithContext(context.Background(), deleteInput); err != nil {
@@ -654,16 +654,16 @@ func (c *awsService) DeleteENI(eniId string) error {
 	return util.DoWithRetry(context.Background(), c.logger, f, &util.RetryOptions{MaxRetry: 10, Delay: 3 * time.Second})
 }
 
-func (c *awsService) FreeENI(eniId string) error {
-	return c.freeENI(eniId, 2*time.Second)
+func (c *awsService) FreeENI(eniID string) error {
+	return c.freeENI(eniID, 2*time.Second)
 }
 
-func (c *awsService) freeENI(eniId string, sleepDelayAfterDetach time.Duration) error {
-	ctxLog := c.logger.WithName("freeENI").WithValues("eni id", eniId)
+func (c *awsService) freeENI(eniID string, sleepDelayAfterDetach time.Duration) error {
+	ctxLog := c.logger.WithName("freeENI").WithValues("eni id", eniID)
 	ctxLog.Info("Trying to free eni")
 
 	// Find out attachment
-	attachID, err := c.getENIAttachmentID(ctxLog, eniId)
+	attachID, err := c.getENIAttachmentID(ctxLog, eniID)
 	if err != nil {
 		if err == ErrENINotFound {
 			ctxLog.Info("ENI not found. It seems to be already freed")
@@ -693,9 +693,9 @@ func (c *awsService) freeENI(eniId string, sleepDelayAfterDetach time.Duration) 
 
 	// It does take awhile for EC2 to detach ENI from instance, so we wait 2s before trying the delete.
 	time.Sleep(sleepDelayAfterDetach)
-	err = c.DeleteENI(eniId)
+	err = c.DeleteENI(eniID)
 	if err != nil {
-		return errors.Wrapf(err, "FreeENI: failed to free ENI: %s", eniId)
+		return errors.Wrapf(err, "FreeENI: failed to free ENI: %s", eniID)
 	}
 
 	ctxLog.Info("Successfully freed ENI")
@@ -739,7 +739,7 @@ func (c *awsService) getENIAttachmentID(ctxLog logr.Logger, eniID string) (*stri
 	return attachID, nil
 }
 
-func (c *awsService) WaitForENIAttached(eniId string) (eniMetadata cloud.ENIMetadata, err error) {
+func (c *awsService) WaitForENIAttached(eniID string) (eniMetadata cloud.ENIMetadata, err error) {
 	var result cloud.ENIMetadata
 	f := func() error {
 		enis, err := c.GetAttachedENIs()
@@ -748,7 +748,7 @@ func (c *awsService) WaitForENIAttached(eniId string) (eniMetadata cloud.ENIMeta
 			return ErrNoNetworkInterfaces
 		}
 		for _, eni := range enis {
-			if eniId == eni.ID {
+			if eniID == eni.ID {
 				result = eni
 				return nil
 			}
@@ -761,9 +761,9 @@ func (c *awsService) WaitForENIAttached(eniId string) (eniMetadata cloud.ENIMeta
 	return result, nil
 }
 
-func (c *awsService) ModifySourceDestCheck(eniId string, enabled bool) error {
+func (c *awsService) ModifySourceDestCheck(eniID string, enabled bool) error {
 	input := &ec2.ModifyNetworkInterfaceAttributeInput{
-		NetworkInterfaceId: aws.String(eniId),
+		NetworkInterfaceId: aws.String(eniID),
 		SourceDestCheck:    &ec2.AttributeBooleanValue{Value: aws.Bool(enabled)},
 	}
 	_, err := c.ec2Svc.ModifyNetworkInterfaceAttributeWithContext(context.Background(), input)

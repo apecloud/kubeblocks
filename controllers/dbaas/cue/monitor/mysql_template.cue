@@ -1,7 +1,7 @@
 monitor: {
-	secretName:   string
-	internalPort: int
-	image: string
+	secretName:      string
+	internalPort:    int
+	image:           string
 	imagePullPolicy: string
 }
 
@@ -32,14 +32,14 @@ container: {
 		{
 			"name":  "DATA_SOURCE_NAME"
 			"value": "$(MYSQL_USER):$(MYSQL_PASSWORD)@(localhost:3306)/"
-		}
+		},
 	]
 	"ports": [
 		{
 			"containerPort": monitor.internalPort
 			"name":          "scrape"
 			"protocol":      "TCP"
-		}
+		},
 	]
 	"livenessProbe": {
 		"failureThreshold": 3

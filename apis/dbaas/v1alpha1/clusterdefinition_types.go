@@ -73,7 +73,6 @@ type ConfigTemplate struct {
 
 	// VolumeName is the volume name of PodTemplate, which the configuration file produced through the configuration template will be mounted to the corresponding volume.
 	// The volume name must be defined in podSpec.containers[*].volumeMounts.
-	// reference example: https://github.com/apecloud/kubeblocks/blob/main/examples/dbaas/mysql_clusterdefinition.yaml#L12
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32
 	VolumeName string `json:"volumeName"`
@@ -338,9 +337,9 @@ func init() {
 }
 
 // ValidateEnabledLogConfigs validate enabledLogs, and return the log names which isn't defined in ClusterDefinition
-func (cd *ClusterDefinition) ValidateEnabledLogConfigs(typeName string, enabledLogs []string) []string {
+func (r *ClusterDefinition) ValidateEnabledLogConfigs(typeName string, enabledLogs []string) []string {
 	invalidLogNames := make([]string, 0, len(enabledLogs))
-	for _, comp := range cd.Spec.Components {
+	for _, comp := range r.Spec.Components {
 		if !strings.EqualFold(typeName, comp.TypeName) {
 			continue
 		}

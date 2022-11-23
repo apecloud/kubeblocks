@@ -14,11 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package kubeblocks
 
 import (
-	"bytes"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -30,22 +28,20 @@ import (
 	"github.com/apecloud/kubeblocks/version"
 )
 
-var _ = Describe("dbaas", func() {
+var _ = Describe("kubeblocks", func() {
 	var cmd *cobra.Command
 	var streams genericclioptions.IOStreams
-	buf := new(bytes.Buffer)
-	errbuf := new(bytes.Buffer)
 
 	BeforeEach(func() {
-		streams, _, buf, errbuf = genericclioptions.NewTestIOStreams()
+		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 	})
 
-	It("dbaas", func() {
+	It("kubeblocks", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace("test")
 		defer tf.Cleanup()
 
-		cmd = NewDbaasCmd(tf, streams)
-		Expect(cmd != nil).Should(BeTrue())
+		cmd = NewKubeBlocksCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
 		Expect(cmd.HasSubCommands()).Should(BeTrue())
 	})
 
@@ -56,10 +52,8 @@ var _ = Describe("dbaas", func() {
 		var cfg string
 		cmd = newInstallCmd(tf, streams)
 		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
-		cmd.SetOut(buf)
-		cmd.SetErr(errbuf)
 
-		Expect(cmd != nil).Should(BeTrue())
+		Expect(cmd).ShouldNot(BeNil())
 		Expect(cmd.HasSubCommands()).Should(BeFalse())
 
 		o := &installOptions{
@@ -94,7 +88,7 @@ var _ = Describe("dbaas", func() {
 		cmd = newUninstallCmd(tf, streams)
 		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
 
-		Expect(cmd != nil).Should(BeTrue())
+		Expect(cmd).ShouldNot(BeNil())
 		Expect(cmd.HasSubCommands()).Should(BeFalse())
 
 		o := &options{

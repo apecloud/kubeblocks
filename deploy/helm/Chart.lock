@@ -11,5 +11,11 @@ dependencies:
 - name: loadbalancer
   repository: file://../loadbalancer
   version: 0.1.0
-digest: sha256:fc0b571376e25586d164f0ccdd8decdc44212ecfe5b20806e96dbf4a0e9582e1
-generated: "2022-11-15T21:43:49.288593+08:00"
+- name: snapshot-controller
+  repository: https://piraeus.io/helm-charts
+  version: 1.6.1
+- name: csi-s3
+  repository: https://github.com/CloudVE/helm-charts/raw/master
+  version: 0.31.3
+digest: sha256:4a3ccb1fb4f4428ab49e21fb3107ec37539fba1aa7c4cd328ff41fbefb779863
+generated: "2022-11-22T22:57:00.392293+08:00"

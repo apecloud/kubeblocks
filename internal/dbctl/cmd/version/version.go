@@ -31,6 +31,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/version"
 )
 
@@ -49,7 +50,7 @@ func NewVersionCmd(f cmdutil.Factory) *cobra.Command {
 		Use:   "version",
 		Short: "Print the version information",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f))
+			util.CheckErr(o.Complete(f))
 			o.Run()
 		},
 	}

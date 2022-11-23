@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -78,7 +79,7 @@ var _ = Describe("Cluster Controller", func() {
 		err = k8sClient.DeleteAllOf(ctx, &corev1.PersistentVolumeClaim{},
 			client.InNamespace(testCtx.DefaultNamespace),
 			client.MatchingLabels{
-				"app.kubernetes.io/name": "state.mysql-8-cluster-definition",
+				intctrlutil.AppNameLabelKey: "state.mysql-8-cluster-definition",
 			})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &corev1.ConfigMap{},
@@ -402,7 +403,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: docker.io/apecloud/wesql-server-8.0:0.1-SNAPSHOT
+        image: docker.io/apecloud/wesql-server-8.0:0.1.2
         imagePullPolicy: IfNotPresent
 `
 		appVersion := &dbaasv1alpha1.AppVersion{}
@@ -549,7 +550,7 @@ spec:
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
 				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
+					intctrlutil.AppInstanceLabelKey: key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(stsList.Items) != 0
 			}, timeout, interval).Should(BeTrue())
@@ -574,7 +575,7 @@ spec:
 
 			Eventually(func() bool {
 				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
+					intctrlutil.AppInstanceLabelKey: key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				Expect(len(stsList.Items) != 0).Should(BeTrue())
 				return int(*stsList.Items[0].Spec.Replicas) == updatedReplicas
@@ -603,7 +604,7 @@ spec:
 			deployList := &appsv1.DeploymentList{}
 			Eventually(func() bool {
 				Expect(k8sClient.List(ctx, deployList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
+					intctrlutil.AppInstanceLabelKey: key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(deployList.Items) != 0
 			}, timeout, interval).Should(BeTrue())
@@ -631,7 +632,7 @@ spec:
 			pdbList := &policyv1.PodDisruptionBudgetList{}
 			Eventually(func() bool {
 				Expect(k8sClient.List(ctx, pdbList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
+					intctrlutil.AppInstanceLabelKey: key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(pdbList.Items) == 0
 			}, timeout, interval).Should(BeTrue())
@@ -662,10 +663,11 @@ spec:
 				return fetchedG1.Status.ObservedGeneration == 1
 			}, timeout, interval).Should(BeTrue())
 
+			By("Check external ClusterIP services")
 			svcList := &corev1.ServiceList{}
 			Eventually(func() bool {
 				Expect(k8sClient.List(ctx, svcList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
+					intctrlutil.AppInstanceLabelKey: key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				for _, svc := range svcList.Items {
 					if svc.Spec.Type == "LoadBalancer" {
@@ -675,7 +677,44 @@ spec:
 				return false
 			}, timeout, interval).Should(BeTrue())
 
-			By("Deleting the cluster")
+			By("Check internal headless services")
+			for _, item := range fetchedG1.Spec.Components {
+				c, err := component.GetComponentFromClusterDefinition(ctx, k8sClient, fetchedG1, item.Type)
+				Expect(err).ShouldNot(HaveOccurred())
+				if c.ComponentType == dbaasv1alpha1.Stateless {
+					continue
+				}
+
+				Expect(k8sClient.List(ctx, svcList, client.MatchingLabels{
+					intctrlutil.AppInstanceLabelKey:  key.Name,
+					intctrlutil.AppComponentLabelKey: item.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				Expect(len(svcList.Items) > 0).Should(BeTrue())
+
+				var headlessSvcPorts []corev1.ServicePort
+				for _, container := range c.PodSpec.Containers {
+					for _, port := range container.Ports {
+						// be consistent with headless_service_template.cue
+						headlessSvcPorts = append(headlessSvcPorts, corev1.ServicePort{
+							Name:       port.Name,
+							Protocol:   port.Protocol,
+							Port:       port.ContainerPort,
+							TargetPort: intstr.FromInt(int(port.ContainerPort)),
+						})
+					}
+				}
+				var exists bool
+				for _, svc := range svcList.Items {
+					if svc.Spec.ClusterIP != corev1.ClusterIPNone {
+						continue
+					}
+					exists = true
+					Expect(reflect.DeepEqual(svc.Spec.Ports, headlessSvcPorts)).Should(BeTrue())
+				}
+				Expect(exists).Should(BeTrue())
+			}
+
+			By("Deleting the scope")
 			Eventually(func() error {
 				return deleteClusterNWait(key)
 			}, timeout, interval).Should(Succeed())
@@ -698,7 +737,7 @@ spec:
 				if annot == nil {
 					continue
 				}
-				if v, ok := annot["storageclass.kubernetes.io/is-default-class"]; ok && v == "true" {
+				if isDefaultStorageClassAnnotation(&sc) {
 					defaultStorageClass = &sc
 					hasDefaultSC = true
 					break
@@ -765,7 +804,7 @@ spec:
 			Eventually(func() bool {
 				stsList := &appsv1.StatefulSetList{}
 				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
+					intctrlutil.AppInstanceLabelKey: key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 
 				Expect(len(stsList.Items) == 1).Should(BeTrue())
@@ -806,7 +845,7 @@ spec:
 
 			stsList := &appsv1.StatefulSetList{}
 			Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-				"app.kubernetes.io/instance": key.Name,
+				intctrlutil.AppInstanceLabelKey: key.Name,
 			}, client.InNamespace(key.Namespace))).Should(Succeed())
 
 			for _, sts := range stsList.Items {
@@ -906,7 +945,7 @@ spec:
 
 			stsList := &appsv1.StatefulSetList{}
 			Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-				"app.kubernetes.io/instance": key.Name,
+				intctrlutil.AppInstanceLabelKey: key.Name,
 			}, client.InNamespace(key.Namespace))).Should(Succeed())
 			Expect(len(stsList.Items)).Should(Equal(1))
 			sts := &stsList.Items[0]
@@ -939,7 +978,7 @@ spec:
 			// we should have 1 services
 			svcList := &corev1.ServiceList{}
 			Expect(k8sClient.List(ctx, svcList, client.MatchingLabels{
-				"app.kubernetes.io/instance": key.Name,
+				intctrlutil.AppInstanceLabelKey: key.Name,
 			}, client.InNamespace(key.Namespace))).Should(Succeed())
 			Expect(len(svcList.Items)).Should(Equal(1))
 			svc := svcList.Items[0]
@@ -984,7 +1023,7 @@ spec:
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
 				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
+					intctrlutil.AppInstanceLabelKey: key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(stsList.Items) == 1
 			}, timeout, interval).Should(BeTrue())
@@ -1020,7 +1059,7 @@ spec:
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
 				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
+					intctrlutil.AppInstanceLabelKey: key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(stsList.Items) == 1
 			}, timeout, interval).Should(BeTrue())
@@ -1063,7 +1102,7 @@ spec:
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
 				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
+					intctrlutil.AppInstanceLabelKey: key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(stsList.Items) == 1
 			}, timeout, interval).Should(BeTrue())
@@ -1071,7 +1110,7 @@ spec:
 			podSpec := stsList.Items[0].Spec.Template.Spec
 			Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.ScheduleAnyway))
 			Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(compTopologyKey))
-			Expect(podSpec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight).ShouldNot(BeNil())
+			Expect(podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight).ShouldNot(BeNil())
 
 			By("Deleting the cluster")
 			Eventually(func() error {
@@ -1123,7 +1162,7 @@ spec:
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
 				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
+					intctrlutil.AppInstanceLabelKey: key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(stsList.Items) == 1
 			}, timeout, interval).Should(BeTrue())
@@ -1175,7 +1214,7 @@ spec:
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
 				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
+					intctrlutil.AppInstanceLabelKey: key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(stsList.Items) == 1
 			}, timeout, interval).Should(BeTrue())
@@ -1255,7 +1294,7 @@ spec:
       value: clusterepuglf-wesql-test-1
     - name: KB_REPLICASETS_2_HOSTNAME
       value: clusterepuglf-wesql-test-2
-    image: docker.io/apecloud/wesql-server-8.0:0.1-SNAPSHOT
+    image: docker.io/apecloud/wesql-server-8.0:0.1.2
     imagePullPolicy: IfNotPresent
     name: mysql
     ports:

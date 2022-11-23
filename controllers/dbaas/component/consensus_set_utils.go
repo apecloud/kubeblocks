@@ -21,8 +21,6 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/labels"
-
 	"github.com/google/go-cmp/cmp"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -135,10 +133,6 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 		if err = cli.Status().Patch(ctx, cluster, patch); err != nil {
 			return false, err
 		}
-		// add consensus role annotations to pod
-		if err := updateConsensusRoleAnnotations(ctx, cli, cluster, *component, pods); err != nil {
-			return false, err
-		}
 	}
 
 	// prepare to do pods Deletion, that's the only thing we should do.
@@ -173,29 +167,21 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 		if !ok {
 			return false, errors.New("wrong type: obj not Pod")
 		}
-		// if pod is the latest version, we do nothing
-		if len(stsObj.Status.UpdateRevision) == 0 || GetPodRevision(&pod) == stsObj.Status.UpdateRevision {
-			// wait until ready
-			return !isReady(pod), nil
-		}
+
 		// if DeletionTimestamp is not nil, it is terminating.
 		if pod.DeletionTimestamp != nil {
 			return true, nil
 		}
-		if pod.Annotations == nil || len(pod.Annotations["cs.dbaas.kubeblocks.io/do-not-delete"]) == 0 {
-			// delete the pod to trigger associate StatefulSet to re-create it
-			if err := cli.Delete(ctx, &pod); err != nil && !apierrors.IsNotFound(err) {
-				return false, err
-			}
-		} else {
-			patch := client.MergeFrom(pod.DeepCopy())
-			delete(pod.Annotations, "cs.dbaas.kubeblocks.io/do-not-delete")
-			if pod.Labels != nil {
-				pod.Labels[appsv1.StatefulSetRevisionLabel] = stsObj.Status.UpdateRevision
-			}
-			if err := cli.Patch(ctx, &pod, patch); err != nil && !apierrors.IsNotFound(err) {
-				return false, err
-			}
+
+		// if pod is the latest version, we do nothing
+		if GetPodRevision(&pod) == stsObj.Status.UpdateRevision {
+			// wait until ready
+			return !isReady(pod), nil
+		}
+
+		// delete the pod to trigger associate StatefulSet to re-create it
+		if err := cli.Delete(ctx, &pod); err != nil && !apierrors.IsNotFound(err) {
+			return false, err
 		}
 
 		return true, nil
@@ -565,70 +551,4 @@ func isReady(pod corev1.Pod) bool {
 	}
 
 	return false
-}
-
-func updateConsensusRoleAnnotations(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, componentDef dbaasv1alpha1.ClusterDefinitionComponent, pods []corev1.Pod) error {
-	leader := ""
-	followers := ""
-	for _, pod := range pods {
-		role := pod.Labels[intctrlutil.ConsensusSetRoleLabelKey]
-		// mapping role label to consensus member
-		roleMap := composeConsensusRoleMap(componentDef)
-		memberExt, ok := roleMap[role]
-		if !ok {
-			continue
-		}
-		switch memberExt.consensusRole {
-		case Leader:
-			leader = pod.Name
-		case Follower:
-			if len(followers) > 0 {
-				followers += ","
-			}
-			followers += pod.Name
-		case Learner:
-			// TODO: CT
-		}
-	}
-
-	labelSelector, err := labels.Parse("app.kubernetes.io/instance=" + cluster.Name)
-	if err != nil {
-		return err
-	}
-	o := &client.ListOptions{LabelSelector: labelSelector}
-
-	podList := &corev1.PodList{}
-	if err := cli.List(ctx, podList, o); err != nil {
-		return err
-	}
-	for _, pod := range podList.Items {
-		patch := client.MergeFrom(pod.DeepCopy())
-		if pod.ObjectMeta.Annotations == nil {
-			pod.ObjectMeta.Annotations = map[string]string{}
-		}
-		// prevent exist pods from deletion
-		pod.ObjectMeta.Annotations["cs.dbaas.kubeblocks.io/do-not-delete"] = "true"
-		if err := cli.Patch(ctx, &pod, patch); err != nil {
-			return err
-		}
-	}
-
-	// update label in StatefulSet template
-	stsList := &appsv1.StatefulSetList{}
-	if err := cli.List(ctx, stsList, o); err != nil {
-		return err
-	}
-	for _, sts := range stsList.Items {
-		patch := client.MergeFrom(sts.DeepCopy())
-		if sts.Spec.Template.ObjectMeta.Annotations == nil {
-			sts.Spec.Template.ObjectMeta.Annotations = map[string]string{}
-		}
-		sts.Spec.Template.ObjectMeta.Annotations["cs.dbaas.kubeblocks.io/leader"] = leader
-		sts.Spec.Template.ObjectMeta.Annotations["cs.dbaas.kubeblocks.io/followers"] = followers
-		if err := cli.Patch(ctx, &sts, patch); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }

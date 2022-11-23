@@ -179,12 +179,14 @@ func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 			w.Write(describe.Level0, "No logs type found. \nTips: You can enable the log feature when creating a cluster with option of \"--enable-all-logs=true\"\n")
 			continue
 		}
+		var validCount int
 		for _, com := range cd.Spec.Components {
 			if !strings.EqualFold(com.TypeName, comTypeName) {
 				continue
 			}
 			for _, logConfig := range com.LogConfigs {
 				if _, ok := logTypeMap[logConfig.Name]; ok {
+					validCount++
 					w.Write(describe.Level0, "Log file type :\t%s\n", logConfig.Name)
 					// todo display more log file info
 					if len(logConfig.FilePathPattern) > 0 {
@@ -192,6 +194,9 @@ func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 					}
 				}
 			}
+		}
+		if len(logTypeMap) != validCount {
+			w.Write(describe.Level0, "Tips: EnabledLogs have invalid logTypes, please look up cluster Status.Conditions by `kubectl describe cluster <cluster-name>`\n")
 		}
 	}
 }

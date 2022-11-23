@@ -132,8 +132,8 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 		if err = cli.Status().Patch(ctx, cluster, patch); err != nil {
 			return false, err
 		}
-		// add consensus role annotations to pod
-		if err := updateConsensusRoleAnnotations(ctx, cli, cluster, *component, componentName, pods); err != nil {
+		// add consensus role info to pod env
+		if err := updateConsensusRoleInfo(ctx, cli, cluster, *component, componentName, pods); err != nil {
 			return false, err
 		}
 	}
@@ -556,7 +556,7 @@ func isReady(pod corev1.Pod) bool {
 	return false
 }
 
-func updateConsensusRoleAnnotations(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, componentDef dbaasv1alpha1.ClusterDefinitionComponent, componentName string, pods []corev1.Pod) error {
+func updateConsensusRoleInfo(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, componentDef dbaasv1alpha1.ClusterDefinitionComponent, componentName string, pods []corev1.Pod) error {
 	leader := ""
 	followers := ""
 	for _, pod := range pods {

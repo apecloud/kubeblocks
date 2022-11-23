@@ -26,9 +26,8 @@ spec:
         {{- end }}
       configSpec:
         configTemplateRefs:
-          default:
-            - name: mysql-3node-tpl-8.0
-              volumeName: mysql-config
+          - name: mysql-3node-tpl-8.0
+            volumeName: mysql-config
         configReload: true
         configReloadType: signal
         configReloadTrigger:

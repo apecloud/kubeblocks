@@ -416,7 +416,7 @@ configTemplate:
         // Compress the mysql.gtid_executed table each time this many transactions have taken place.
         gtid_executed_compression_period?: int & >= 0 & <= 4294967295
 
-        gtid_mode: string & "0" | "OFF_PERMISSIVE" | "ON_PERMISSIVE" | "1" | *"0"
+        gtid_mode: string & "0" | "OFF" | "ON" | "1" | *"OFF"
 
         // Controls whether GTID based logging is enabled and what type of transactions the logs can contain
         "gtid-mode": string & "OFF" | "OFF_PERMISSIVE" | "ON_PERMISSIVE" | "ON" | *"OFF_PERMISSIVE"
@@ -1292,7 +1292,7 @@ configTemplate:
         plugin_dir?: string
 
         // The number of the port on which the server listens for TCP/IP connections.
-        port?: int
+        port?: int | string
 
         // The size of the buffer that is allocated when preloading indexes.
         preload_buffer_size?: int & >= 1024 & <= 1073741824

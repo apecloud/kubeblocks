@@ -355,7 +355,7 @@ spec:
 			componentName = "nginx"
 			setInvolvedObject(event, DeploymentKind, deploymentName)
 			createDeployment(componentName, deploymentName)
-			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, true)
+			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, false)
 		})
 	})
 

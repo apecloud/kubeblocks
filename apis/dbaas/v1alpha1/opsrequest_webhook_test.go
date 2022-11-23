@@ -251,31 +251,20 @@ var _ = Describe("OpsRequest webhook", func() {
 
 	}
 
-	patchStatusPhase := func(opsRequest *OpsRequest, phase Phase) {
-		patch := client.MergeFrom(opsRequest.DeepCopy())
-		opsRequest.Status.Phase = phase
-		Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).Should(Succeed())
-		Eventually(func() bool {
-			newOpsRequest := &OpsRequest{}
-			_ = k8sClient.Get(ctx, client.ObjectKey{Name: opsRequest.Name, Namespace: opsRequest.Namespace}, newOpsRequest)
-			return newOpsRequest.Status.Phase == phase
-		}, timeout, interval).Should(BeTrue())
-	}
+	testWhenClusterDeleted := func(cluster *Cluster, opsRequest *OpsRequest) {
+		By("delete cluster")
+		newCluster := &Cluster{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: cluster.Namespace}, newCluster)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, newCluster)).Should(Succeed())
 
-	testDelete := func(opsRequest *OpsRequest) {
-		By("test delete OpsRequest when phase is Running")
-		patchStatusPhase(opsRequest, RunningPhase)
-		Expect(k8sClient.Delete(ctx, opsRequest)).ShouldNot(Succeed())
-
-		By("test patch/delete OpsRequest when phase is Succeed")
-		patchStatusPhase(opsRequest, SucceedPhase)
+		By("test path labels")
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: cluster.Namespace}, &Cluster{})).ShouldNot(Succeed())
 		patch := client.MergeFrom(opsRequest.DeepCopy())
 		opsRequest.Labels = map[string]string{"test": "test"}
 		Expect(k8sClient.Patch(ctx, opsRequest, patch)).Should(Succeed())
-		Expect(k8sClient.Delete(ctx, opsRequest)).Should(Succeed())
 	}
 
-	testRestart := func(cluster *Cluster) {
+	testRestart := func(cluster *Cluster) *OpsRequest {
 		// set cluster support restart
 		patch := client.MergeFrom(cluster.DeepCopy())
 		cluster.Status.Operations.Restartable = []string{"replicaSets"}
@@ -300,8 +289,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			err := testCtx.CheckedCreateObj(ctx, opsRequest)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
-
-		testDelete(opsRequest)
+		return opsRequest
 	}
 
 	Context("When appVersion create and update", func() {
@@ -338,7 +326,9 @@ var _ = Describe("OpsRequest webhook", func() {
 
 			testHorizontalScaling(cluster)
 
-			testRestart(cluster)
+			opsRequest = testRestart(cluster)
+
+			testWhenClusterDeleted(cluster, opsRequest)
 
 		})
 	})

@@ -61,7 +61,7 @@ func (r *OpsRequest) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-dbaas-kubeblocks-io-v1alpha1-opsrequest,mutating=false,failurePolicy=fail,sideEffects=None,groups=dbaas.kubeblocks.io,resources=opsrequests,verbs=create;update;delete,versions=v1alpha1,name=vopsrequest.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-dbaas-kubeblocks-io-v1alpha1-opsrequest,mutating=false,failurePolicy=fail,sideEffects=None,groups=dbaas.kubeblocks.io,resources=opsrequests,verbs=create;update,versions=v1alpha1,name=vopsrequest.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &OpsRequest{}
 
@@ -78,6 +78,11 @@ func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 	if r.Status.Phase == SucceedPhase && !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
 		return newInvalidError(OpsRequestKind, r.Name, "spec", fmt.Sprintf("update OpsRequest is forbidden when status.Phase is %s", r.Status.Phase))
 	}
+	// we can not delete the OpsRequest when cluster has been deleted. because can not edit the finalizer when cluster not existed.
+	// so if no spec updated, skip validation.
+	if reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
+		return nil
+	}
 	return r.validate(false)
 }
 
@@ -85,9 +90,6 @@ func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 func (r *OpsRequest) ValidateDelete() error {
 	opsrequestlog.Info("validate delete", "name", r.Name)
 
-	if r.Status.Phase == RunningPhase {
-		return newInvalidError(OpsRequestKind, r.Name, "status.phase", fmt.Sprintf("delete OpsRequest is forbidden when status.Phase is %s", r.Status.Phase))
-	}
 	return nil
 }
 
@@ -190,14 +192,14 @@ func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *
 }
 
 // invalidReplicas verify whether the replicas is invalid
-func invalidReplicas(replicas int32, operationComponent *OperationComponent) bool {
+func invalidReplicas(replicas int32, operationComponent *OperationComponent) string {
 	if operationComponent.Min != 0 && replicas < operationComponent.Min {
-		return true
+		return fmt.Sprintf("replicas must greater than %d", operationComponent.Min)
 	}
 	if operationComponent.Max != 0 && replicas > operationComponent.Max {
-		return true
+		return fmt.Sprintf("replicas must less than %d", operationComponent.Max)
 	}
-	return false
+	return ""
 }
 
 // validateHorizontalScaling validate api is legal when spec.type is HorizontalScaling
@@ -208,9 +210,9 @@ func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.
 			return field.NotFound(field.NewPath(fmt.Sprintf("spec.componentOps[%d].horizontalScaling", index)), "can not be empty")
 		}
 		replicas := componentOps.HorizontalScaling.Replicas
-		if invalidReplicas(replicas, operationComponent) {
-			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].horizontalScaling.replicas", index)), replicas,
-				fmt.Sprintf("replicas must in [%d,%d]", operationComponent.Min, operationComponent.Max))
+		replicasMsg := invalidReplicas(replicas, operationComponent)
+		if replicasMsg != "" {
+			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].horizontalScaling.replicas", index)), replicas, replicasMsg)
 		}
 		return nil
 	}

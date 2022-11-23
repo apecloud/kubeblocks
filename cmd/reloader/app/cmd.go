@@ -100,6 +100,7 @@ func initLog(level string) {
 }
 
 func createHandlerWithWatchType(opt *VolumeWatcherOpts) cfgcore.WatchEventHandler {
+	logrus.Tracef("access info: [%d] [%s]", opt.NotifyHandType, opt.ProcessName)
 	switch opt.NotifyHandType {
 	case UnixSignal:
 		return cfgcore.CreateSignalHandler(opt.Signal, opt.ProcessName)

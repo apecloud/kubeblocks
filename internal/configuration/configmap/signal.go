@@ -18,7 +18,11 @@ limitations under the License.
 
 package configmap
 
-import "os"
+import (
+	"os"
+
+	"github.com/sirupsen/logrus"
+)
 
 type PID int32
 
@@ -32,6 +36,7 @@ func sendSignal(pid PID, sig os.Signal) error {
 		return err
 	}
 
+	logrus.Tracef("send pid[%d] to signal: %s", pid, sig.String())
 	err = process.Signal(sig)
 	if err != nil {
 		return err

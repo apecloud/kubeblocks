@@ -19,6 +19,7 @@ package dbaas
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -189,6 +190,11 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	if !versionMeta.IsModify {
 		return r.updateCfgStatus(reqCtx, config, dbaasconfig.ReconfigureNoChangeType)
 	}
+
+	reqCtx.Log.Info(fmt.Sprintf("reconfigure params: \n\tadd: %s\n\tdelete: %s\n\tupdate: %s",
+		versionMeta.AddConfig,
+		versionMeta.DeleteConfig,
+		versionMeta.UpdateConfig))
 
 	// Find Cluster CR
 	if err := r.Client.Get(reqCtx.Ctx, clusterKey, &cluster); err != nil {

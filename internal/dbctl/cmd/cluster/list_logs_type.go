@@ -143,50 +143,55 @@ func (o *LogsListOptions) printHeaderMessage(w cmddes.PrefixWriter, c *dbaasv1al
 	w.Write(describe.Level0, "ClusterDefinition:\t%s\n", c.Spec.ClusterDefRef)
 }
 
-// printBodyMessage print message about logs file
+// printBodyMessage print message about logs file.
 func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinition, pods *corev1.PodList) {
 	for _, p := range pods.Items {
 		if len(o.instName) > 0 && !strings.EqualFold(p.Name, o.instName) {
 			continue
 		}
 		componentName, ok := p.Labels[types.ComponentLabelKey]
-		if ok {
-			if len(o.componentName) > 0 && !strings.EqualFold(o.componentName, componentName) {
+		if !ok {
+			w.Write(describe.Level0, "label key %s in pod %s isn't set \n", types.ComponentLabelKey, p.Name)
+			continue
+		}
+		if len(o.componentName) > 0 && !strings.EqualFold(o.componentName, componentName) {
+			continue
+		}
+		w.Write(describe.Level0, "\nInstance  Name:\t%s\n", p.Name)
+		w.Write(describe.Level0, "Component Name:\t%s\n", componentName)
+		var comTypeName string
+		logTypeMap := make(map[string]bool)
+		// find component typeName and enabledLogs config according to componentName in pod's label.
+		for _, comCluster := range c.Spec.Components {
+			if !strings.EqualFold(comCluster.Name, componentName) {
 				continue
 			}
-			w.Write(describe.Level0, "\nInstance  Name:\t%s\n", p.Name)
-			w.Write(describe.Level0, "Component Name:\t%s\n", componentName)
-			var comTypeName string
-			logTypeMap := make(map[string]bool)
-			for _, comCluster := range c.Spec.Components {
-				if !strings.EqualFold(comCluster.Name, componentName) {
-					continue
-				}
-				comTypeName = comCluster.Type
-				for _, logType := range comCluster.EnabledLogs {
-					logTypeMap[logType] = true
-				}
+			comTypeName = comCluster.Type
+			for _, logType := range comCluster.EnabledLogs {
+				logTypeMap[logType] = true
 			}
-			if len(comTypeName) == 0 {
-				w.Write(describe.Level0, "\nComponent name %s in pod labels can't find corresponding type in cluster yaml. \n", componentName)
+		}
+		if len(comTypeName) == 0 {
+			w.Write(describe.Level0, "\nComponent name %s in pod's label can't find corresponding typeName, please check cluster.yaml. \n", componentName)
+			continue
+		}
+		if len(logTypeMap) == 0 {
+			w.Write(describe.Level0, "\nNo logs type found. You can enable the log feature when creating a cluster with option of \" --enable-all-logs=true \", or set enabledLogs in cluster.yaml")
+			continue
+		}
+		for _, com := range cd.Spec.Components {
+			if !strings.EqualFold(com.TypeName, comTypeName) {
 				continue
 			}
-			for _, com := range cd.Spec.Components {
-				if !strings.EqualFold(com.TypeName, comTypeName) {
-					continue
-				}
-				for _, logConfig := range com.LogConfigs {
-					if _, ok := logTypeMap[logConfig.Name]; ok {
-						w.Write(describe.Level0, "Log file type :\t%s\n", logConfig.Name)
-						// todo display more log file info
-						if len(logConfig.FilePathPattern) > 0 {
-							o.printRealFileMessage(&p, logConfig.FilePathPattern)
-						}
+			for _, logConfig := range com.LogConfigs {
+				if _, ok := logTypeMap[logConfig.Name]; ok {
+					w.Write(describe.Level0, "Log file type :\t%s\n", logConfig.Name)
+					// todo display more log file info
+					if len(logConfig.FilePathPattern) > 0 {
+						o.printRealFileMessage(&p, logConfig.FilePathPattern)
 					}
 				}
 			}
-		} else {
-			w.Write(describe.Level0, "Component name in pod label %s isn't set\n", p.Name)
 		}
 	}
 }

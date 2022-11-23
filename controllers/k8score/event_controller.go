@@ -20,6 +20,7 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -72,8 +73,9 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	for _, handler := range EventHandlerMap {
-		if err := handler.Handle(r.Client, reqCtx, r.Recorder, event); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "handleEventError")
+		// ignores the not found error.
+		if err := handler.Handle(r.Client, reqCtx, r.Recorder, event); err != nil && !apierrors.IsNotFound(err) {
+			return intctrlutil.RequeueWithError(err, reqCtx.Log, "handleEventError")
 		}
 	}
 

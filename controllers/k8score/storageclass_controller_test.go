@@ -30,7 +30,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-var _ = Describe("Event Controller", func() {
+var _ = Describe("StorageClass Controller", func() {
 	var (
 		ctx      = context.Background()
 		timeout  = time.Second * 20

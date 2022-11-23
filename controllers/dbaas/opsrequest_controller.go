@@ -109,8 +109,11 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	if opsRequest.Status.ObservedGeneration == opsRequest.GetGeneration() {
 		// waiting until OpsRequest.status.phase is Succeed
-		if err = operations.GetOpsManager().Reconcile(opsRes); err != nil {
+		if requeueAfter, err := operations.GetOpsManager().Reconcile(opsRes); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		} else if requeueAfter != 0 {
+			// if the reconcileAction need requeue, do it
+			return intctrlutil.RequeueAfter(requeueAfter, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()
 	}
@@ -120,7 +123,7 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// process opsRequest entry function
-	if err = r.processOpsRequest(opsRes); res != nil {
+	if err = r.processOpsRequest(opsRes); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 

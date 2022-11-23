@@ -612,6 +612,7 @@ spec:
                       - Updating
                       - Deleting
                       - Deleted
+                      - VolumeExpanding
                       type: string
                     type:
                       description: Type of component.
@@ -776,10 +777,11 @@ spec:
                   information of phase is as follows: Creating: creating cluster.
                   Running: cluster is running, all components is available. Updating:
                   cluster changes, such as horizontal-scaling/vertical-scaling/restart.
-                  Deleting/Deleted: deleting cluster/cluster is deleted. Failed: cluster
-                  not available. Abnormal: cluster available but some component is
-                  not Abnormal. if the component type is Consensus/Replication, the
-                  Leader/Primary pod is must ready in Abnormal phase.'
+                  VolumeExpanding: volume expansion operation is running. Deleting/Deleted:
+                  deleting cluster/cluster is deleted. Failed: cluster not available.
+                  Abnormal: cluster available but some component is not Abnormal.
+                  if the component type is Consensus/Replication, the Leader/Primary
+                  pod is must ready in Abnormal phase.'
                 enum:
                 - Running
                 - Failed
@@ -788,6 +790,7 @@ spec:
                 - Updating
                 - Deleting
                 - Deleted
+                - VolumeExpanding
                 type: string
             type: object
         type: object

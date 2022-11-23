@@ -19,29 +19,31 @@ package k8score
 import (
 	"context"
 
-	storagev1 "k8s.io/api/storage/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type HandleStorageClass func(reqCtx intctrlutil.RequestCtx, cli client.Client, storageClass *storagev1.StorageClass) error
+type HandlePersistentVolumeClaim func(reqCtx intctrlutil.RequestCtx, cli client.Client, pvc *corev1.PersistentVolumeClaim) error
 
-var StorageClassHandlerMap = map[string]HandleStorageClass{}
+var PersistentVolumeClaimHandlerMap = map[string]HandlePersistentVolumeClaim{}
 
-// StorageClassReconciler reconciles a StorageClass object
-type StorageClassReconciler struct {
+// PvcReconciler reconciles a PersistentVolumeClaim object
+type PvcReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
+//+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -52,32 +54,32 @@ type StorageClassReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.2/pkg/reconcile
-func (r *StorageClassReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *PvcReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx: ctx,
 		Req: req,
-		Log: log.FromContext(ctx).WithValues("StorageClass", req.NamespacedName),
+		Log: log.FromContext(ctx).WithValues("PersistentVolumeClaim", req.NamespacedName),
 	}
 
-	reqCtx.Log.V(1).Info("StorageClass watcher")
+	reqCtx.Log.V(1).Info("PersistentVolumeClaim watcher")
 
-	storageClass := &storagev1.StorageClass{}
-	if err := r.Client.Get(ctx, req.NamespacedName, storageClass); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "getStorageClassError")
+	pvc := &corev1.PersistentVolumeClaim{}
+	if err := r.Client.Get(ctx, req.NamespacedName, pvc); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "getPvcError")
 	}
 
-	for _, handleStorageClass := range StorageClassHandlerMap {
+	for _, handlePvc := range PersistentVolumeClaimHandlerMap {
 		// ignores the not found error.
-		if err := handleStorageClass(reqCtx, r.Client, storageClass); err != nil && !apierrors.IsNotFound(err) {
-			return intctrlutil.RequeueWithError(err, reqCtx.Log, "handleStorageClassError")
+		if err := handlePvc(reqCtx, r.Client, pvc); err != nil && !apierrors.IsNotFound(err) {
+			return intctrlutil.RequeueWithError(err, reqCtx.Log, "handlePvCError")
 		}
 	}
 	return intctrlutil.Reconciled()
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *StorageClassReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *PvcReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&storagev1.StorageClass{}).
+		For(&corev1.PersistentVolumeClaim{}, builder.WithPredicates(predicate.NewPredicateFuncs(intctrlutil.WorkloadFilterPredicate))).
 		Complete(r)
 }

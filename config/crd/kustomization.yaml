@@ -11,6 +11,8 @@ resources:
 - bases/dataprotection.kubeblocks.io_restorejobs.yaml
 - bases/dataprotection.kubeblocks.io_backuppolicytemplates.yaml
 - bases/dbaas.kubeblocks.io_opsrequests.yaml
+- bases/dbaas.kubeblocks.io_configurationtemplates.yaml
+- bases/dbaas.kubeblocks.io_reconfigurerequests.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

@@ -44,8 +44,10 @@ spec:
           env:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}
-            - name: NO_VOLUMESNAPSHOT
-              value: "{{ .Values.dataProtection.disableVolumeSnapshot }}"
+          {{- if .Values.dataProtection.enableVolumeSnapshot }}
+            - name: VOLUMESNAPSHOT
+              value: "true"
+          {{- end }}
           {{- if .Values.dataProtection.backupSchedule }}
             - name: DP_BACKUP_SCHEDULE
               value: {{ .Values.dataProtection.backupSchedule }}

@@ -118,7 +118,7 @@ func (r *BackupJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}).
 		Owns(&batchv1.Job{})
 
-	if !viper.GetBool("NO_VOLUMESNAPSHOT") {
+	if viper.GetBool("VOLUMESNAPSHOT") {
 		b.Owns(&snapshotv1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
 	}
 
@@ -130,7 +130,7 @@ func (r *BackupJobReconciler) doNewPhaseAction(
 	backupJob *dataprotectionv1alpha1.BackupJob) (ctrl.Result, error) {
 
 	// HACK/TODO: ought to move following check to validation webhook
-	if backupJob.Spec.BackupType == dataprotectionv1alpha1.BackupTypeSnapshot && viper.GetBool("NO_VOLUMESNAPSHOT") {
+	if backupJob.Spec.BackupType == dataprotectionv1alpha1.BackupTypeSnapshot && !viper.GetBool("VOLUMESNAPSHOT") {
 		backupJob.Status.Phase = dataprotectionv1alpha1.BackupJobFailed
 		backupJob.Status.FailureReason = "VolumeSnapshot feature disabled."
 		if err := r.Client.Status().Update(reqCtx.Ctx, backupJob); err != nil {

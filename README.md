@@ -84,7 +84,10 @@ Contributor
 Helm Chart Tasks
   bump-chart-ver   Bump helm chart version.
   helm-package     Do helm package.
-  helm-push        Do helm package and push.
+
+WeSQL Cluster Helm Chart Tasks
+  bump-chart-ver-wqsql-cluster  Bump WeSQL Cluster helm chart version.
+  helm-package-wqsql-cluster  Do WeSQL Cluster helm package.
 
 Build Dependencies
   kustomize        Download kustomize locally if necessary.

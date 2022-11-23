@@ -107,7 +107,6 @@ func BuildCommand(inputs Inputs) *cobra.Command {
 		Use:     inputs.Use,
 		Short:   inputs.Short,
 		Example: inputs.Example,
-		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(inputs.BaseOptionsObj.Complete(inputs, args))
 			util.CheckErr(inputs.BaseOptionsObj.Validate(inputs))

@@ -19,6 +19,7 @@ package testutil
 import (
 	"context"
 
+	"github.com/sethvargo/go-password/password"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -53,4 +54,9 @@ func NewDefaultTestContext(cli client.Client) TestContext {
 		return nil
 	}
 	return t
+}
+
+func (testCtx TestContext) GetRandomStr() string {
+	seq, _ := password.Generate(6, 2, 0, true, true)
+	return seq
 }

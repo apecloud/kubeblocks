@@ -116,7 +116,7 @@ spec:
   terminationPolicy: WipeOut`, clusterName, storageClassName)
 		cluster := &dbaasv1alpha1.Cluster{}
 		Expect(yaml.Unmarshal([]byte(clusterYaml), cluster)).Should(Succeed())
-		Expect(k8sClient.Create(context.Background(), cluster)).Should(Succeed())
+		Expect(testCtx.CreateObj(context.Background(), cluster)).Should(Succeed())
 		// wait until cluster created
 		Eventually(func() bool {
 			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, &dbaasv1alpha1.Cluster{})
@@ -151,7 +151,7 @@ spec:
 `, clusterName, pvcName, storageClassName)
 		pvc := &corev1.PersistentVolumeClaim{}
 		Expect(yaml.Unmarshal([]byte(pvcYaml), pvc)).Should(Succeed())
-		Expect(k8sClient.Create(context.Background(), pvc)).Should(Succeed())
+		Expect(testCtx.CreateObj(context.Background(), pvc)).Should(Succeed())
 		// wait until cluster created
 		Eventually(func() bool {
 			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, &corev1.PersistentVolumeClaim{})

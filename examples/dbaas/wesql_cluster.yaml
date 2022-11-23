@@ -3,8 +3,8 @@ kind: Cluster
 metadata:
   name: wesql
 spec:
-  appVersionRef: app-version-consensus
-  clusterDefinitionRef: cluster-definition-consensus
+  appVersionRef: wesql-8.0.30
+  clusterDefinitionRef: apecloud-wesql
   components:
     - name: wesql-test
       type: replicasets

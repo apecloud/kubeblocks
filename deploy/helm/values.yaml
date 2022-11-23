@@ -122,9 +122,9 @@ dashboards:
 ## Data protection settings
 ##
 dataProtection:
-  ## @param dataProtection.disableVolumeSnapshot - set this to true if cluster does not have snapshot.storage.k8s.io API installed
+  ## @param dataProtection.enableVolumeSnapshot - set this to true if cluster does have snapshot.storage.k8s.io API installed
   ##
-  disableVolumeSnapshot: true
+  enableVolumeSnapshot: false
   ## @param dataProtection.backupSchedule -- set backup policy schedule time
   ## backupSchedule is in Cron format, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
   ## Example: 0 2 * * *  -- backup job will be scheduled to start at 2:00 each day.

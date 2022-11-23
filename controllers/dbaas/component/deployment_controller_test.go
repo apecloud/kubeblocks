@@ -32,19 +32,29 @@ import (
 
 var _ = Describe("Deployment Controller", func() {
 	var (
+		randomStr   = testCtx.GetRandomStr()
 		timeout     = time.Second * 20
 		interval    = time.Second
-		clusterName = "wesql-stateless"
-		deployName  = "wesql-nginx"
+		clusterName = "wesql-stateless-" + randomStr
+		deployName  = "wesql-nginx-" + randomStr
 		namespace   = "default"
 	)
 
+	cleanWorkloads := func() {
+		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &appsv1.Deployment{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+	}
+
 	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
+		// Add any setup steps that needs to be executed before each test
+		cleanWorkloads()
 	})
 
 	AfterEach(func() {
 		// Add any teardown steps that needs to be executed after each test
+		cleanWorkloads()
 	})
 
 	createCluster := func() *dbaasv1alpha1.Cluster {
@@ -82,7 +92,7 @@ status:
   phase: Running`, clusterName)
 		cluster := &dbaasv1alpha1.Cluster{}
 		Expect(yaml.Unmarshal([]byte(clusterYaml), cluster)).Should(Succeed())
-		Expect(k8sClient.Create(context.Background(), cluster)).Should(Succeed())
+		Expect(testCtx.CreateObj(context.Background(), cluster)).Should(Succeed())
 		// wait until cluster created
 		Eventually(func() bool {
 			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: namespace}, &dbaasv1alpha1.Cluster{})
@@ -108,13 +118,13 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/component-name: nginx
-      app.kubernetes.io/instance: wesql
+      app.kubernetes.io/instance: %s
       app.kubernetes.io/name: state.mysql-8-cluster-definition-consensus
   template:
     metadata:
       labels:
         app.kubernetes.io/component-name: nginx
-        app.kubernetes.io/instance: wesql
+        app.kubernetes.io/instance: %s
         app.kubernetes.io/name: state.mysql-8-cluster-definition-consensus
     spec:
       containers:
@@ -124,10 +134,10 @@ spec:
         ports:
         - containerPort: 80
           protocol: TCP
-`, clusterName, deployName)
+`, clusterName, deployName, clusterName, clusterName)
 		deploy := &appsv1.Deployment{}
 		Expect(yaml.Unmarshal([]byte(deploymentYaml), deploy)).Should(Succeed())
-		Expect(k8sClient.Create(context.Background(), deploy)).Should(Succeed())
+		Expect(testCtx.CreateObj(context.Background(), deploy)).Should(Succeed())
 		// wait until deployment created
 		Eventually(func() bool {
 			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: deployName, Namespace: namespace}, &appsv1.Deployment{})

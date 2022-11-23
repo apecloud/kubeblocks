@@ -1,7 +1,7 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: cluster-definition-consensus
+  name: apecloud-wesql
 spec:
   type: state.mysql-8
   components:

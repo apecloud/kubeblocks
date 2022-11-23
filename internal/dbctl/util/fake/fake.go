@@ -229,6 +229,6 @@ func NewClientSet(objects ...runtime.Object) *kubefakeclient.Clientset {
 }
 
 func NewDynamicClient(objects ...runtime.Object) *dynamicfakeclient.FakeDynamicClient {
-	dbaasv1alpha1.AddToScheme(scheme.Scheme)
+	_ = dbaasv1alpha1.AddToScheme(scheme.Scheme)
 	return dynamicfakeclient.NewSimpleDynamicClient(scheme.Scheme, objects...)
 }

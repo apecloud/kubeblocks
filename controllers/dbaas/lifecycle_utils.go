@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/leaanthony/debme"
+	"github.com/sethvargo/go-password/password"
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -848,6 +849,11 @@ func buildSvc(params createParams, headless bool) (*corev1.Service, error) {
 	return &svc, nil
 }
 
+func randomString(length int) string {
+	res, _ := password.Generate(length, 0, 0, false, false)
+	return res
+}
+
 func buildSecret(params createParams) (*corev1.Secret, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
@@ -878,6 +884,10 @@ func buildSecret(params createParams) (*corev1.Secret, error) {
 	}
 
 	if err = cueValue.Fill("cluster", clusterStrByte); err != nil {
+		return nil, err
+	}
+
+	if err = cueValue.FillRaw("secret.stringData.password", randomString(8)); err != nil {
 		return nil, err
 	}
 

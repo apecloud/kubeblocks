@@ -338,22 +338,24 @@ func mergeComponents(
 	if clusterDefComp == nil {
 		return nil
 	}
+
+	clusterDefCompObj := clusterDefComp.DeepCopy()
 	component := &Component{
 		ClusterDefName:  clusterDef.Name,
 		ClusterType:     clusterDef.Spec.Type,
-		Name:            clusterDefComp.TypeName,
-		Type:            clusterDefComp.TypeName,
-		MinReplicas:     clusterDefComp.MinReplicas,
-		MaxReplicas:     clusterDefComp.MaxReplicas,
-		DefaultReplicas: clusterDefComp.DefaultReplicas,
-		Replicas:        clusterDefComp.DefaultReplicas,
-		AntiAffinity:    clusterDefComp.AntiAffinity,
-		ComponentType:   clusterDefComp.ComponentType,
-		ConsensusSpec:   clusterDefComp.ConsensusSpec,
-		PodSpec:         clusterDefComp.PodSpec,
-		Service:         clusterDefComp.Service,
-		Probes:          clusterDefComp.Probes,
-		LogConfigs:      clusterDefComp.LogConfigs,
+		Name:            clusterDefCompObj.TypeName,
+		Type:            clusterDefCompObj.TypeName,
+		MinReplicas:     clusterDefCompObj.MinReplicas,
+		MaxReplicas:     clusterDefCompObj.MaxReplicas,
+		DefaultReplicas: clusterDefCompObj.DefaultReplicas,
+		Replicas:        clusterDefCompObj.DefaultReplicas,
+		AntiAffinity:    clusterDefCompObj.AntiAffinity,
+		ComponentType:   clusterDefCompObj.ComponentType,
+		ConsensusSpec:   clusterDefCompObj.ConsensusSpec,
+		PodSpec:         clusterDefCompObj.PodSpec,
+		Service:         clusterDefCompObj.Service,
+		Probes:          clusterDefCompObj.Probes,
+		LogConfigs:      clusterDefCompObj.LogConfigs,
 	}
 
 	if appVerComp != nil && appVerComp.PodSpec != nil {
@@ -449,13 +451,11 @@ func mergeComponents(
 			tolerations = clusterComp.Tolerations
 		}
 	}
-	if component.PodSpec.Affinity == nil && affinity != nil {
+	if affinity != nil {
 		component.PodSpec.Affinity = buildPodAffinity(cluster, affinity, component)
-	}
-	if len(component.PodSpec.TopologySpreadConstraints) == 0 && affinity != nil {
 		component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(cluster, affinity, component)
 	}
-	if len(component.PodSpec.Tolerations) == 0 && tolerations != nil {
+	if tolerations != nil {
 		component.PodSpec.Tolerations = tolerations
 	}
 

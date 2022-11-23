@@ -1214,15 +1214,17 @@ func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
 	// build consensus env from cluster.status
 	if params.cluster.Status.Components != nil && params.cluster.Status.Components[params.component.Type] != nil {
 		consensusSetStatus := params.cluster.Status.Components[params.component.Type].ConsensusSetStatus
-		envData[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
-		followers := ""
-		for _, follower := range consensusSetStatus.Followers {
-			if len(followers) > 0 {
-				followers += ","
+		if consensusSetStatus != nil {
+			envData[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
+			followers := ""
+			for _, follower := range consensusSetStatus.Followers {
+				if len(followers) > 0 {
+					followers += ","
+				}
+				followers += follower.Pod
 			}
-			followers += follower.Pod
+			envData[prefix+"FOLLOWERS"] = followers
 		}
-		envData[prefix+"FOLLOWERS"] = followers
 	}
 	envDataStrByte, err := json.Marshal(envData)
 	if err != nil {

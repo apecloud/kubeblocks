@@ -172,11 +172,11 @@ func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 			}
 		}
 		if len(comTypeName) == 0 {
-			w.Write(describe.Level0, "\nComponent name %s in pod's label can't find corresponding typeName, please check cluster.yaml. \n", componentName)
+			w.Write(describe.Level0, "Component name %s in pod's label can't find corresponding typeName, please check cluster.yaml. \n", componentName)
 			continue
 		}
 		if len(logTypeMap) == 0 {
-			w.Write(describe.Level0, "\nNo logs type found. You can enable the log feature when creating a cluster with option of \" --enable-all-logs=true \", or set enabledLogs in cluster.yaml")
+			w.Write(describe.Level0, "No logs type found. \nTips: You can enable the log feature when creating a cluster with option of \"--enable-all-logs=true\"\n")
 			continue
 		}
 		for _, com := range cd.Spec.Components {

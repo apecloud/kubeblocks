@@ -6,7 +6,6 @@ clusterdefinition: {
 		type: string
 		connectionCredential: {
 			user:     string
-			password: string
 		}
 	}
 }

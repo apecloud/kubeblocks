@@ -940,8 +940,6 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 
 	sts := appsv1.StatefulSet{}
 
-	stsStrByte = injectEnv(stsStrByte, dbaasPrefix+"_SECRET_NAME", params.cluster.Name)
-
 	if err = json.Unmarshal(stsStrByte, &sts); err != nil {
 		return nil, err
 	}
@@ -978,6 +976,13 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 				},
 			},
 		})
+		c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
+			SecretRef: &corev1.SecretEnvSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: params.cluster.Name,
+				},
+			},
+		})
 	}
 	for i := range sts.Spec.Template.Spec.InitContainers {
 		c := &sts.Spec.Template.Spec.Containers[i]
@@ -988,6 +993,13 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 			ConfigMapRef: &corev1.ConfigMapEnvSource{
 				LocalObjectReference: corev1.LocalObjectReference{
 					Name: envConfigName,
+				},
+			},
+		})
+		c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
+			SecretRef: &corev1.SecretEnvSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: params.cluster.Name,
 				},
 			},
 		})
@@ -1046,8 +1058,6 @@ func buildDeploy(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.De
 		return nil, err
 	}
 
-	stsStrByte = injectEnv(stsStrByte, dbaasPrefix+"_SECRET_NAME", params.cluster.Name)
-
 	if err = json.Unmarshal(stsStrByte, &deploy); err != nil {
 		return nil, err
 	}
@@ -1104,12 +1114,6 @@ func buildPDB(params createParams) (*policyv1.PodDisruptionBudget, error) {
 	}
 
 	return &pdb, nil
-}
-
-func injectEnv(strByte []byte, key string, value string) []byte {
-	str := string(strByte)
-	str = strings.ReplaceAll(str, "$("+key+")", value)
-	return []byte(str)
 }
 
 // buildCfg generate volumes for PodTemplate, volumeMount for container, and configmap for config files

@@ -81,6 +81,7 @@ func CreateSignalHandler(sig string, processName string) WatchEventHandler {
 		if err != nil {
 			return err
 		}
+		logrus.Tracef("find pid: %d from process name[%s]", pid, processName)
 		return sendSignal(pid, signal)
 	}
 }

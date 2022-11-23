@@ -9,6 +9,9 @@ template: {
 	image:           parameter.sidecarImage
 	imagePullPolicy: "IfNotPresent"
 	volumeMounts:    parameter.volumes
+	securityContext:
+		runAsUser: 0
+		defaultAllowPrivilegeEscalation: false
 }
 
 #ArgType: string

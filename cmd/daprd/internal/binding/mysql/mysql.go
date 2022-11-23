@@ -32,6 +32,8 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 
+	"github.com/apecloud/kubeblocks/cmd/daprd/internal"
+
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 )
@@ -72,10 +74,13 @@ const (
 	respRowsAffectedKey = "rows-affected"
 	respEndTimeKey      = "end-time"
 	respDurationKey     = "duration"
+	statusCode          = "status-code"
 )
 
 var oriRole = ""
 var bootTime = time.Now()
+var roleCheckFailedCount = 0
+var roleCheckCount = 0
 
 // Mysql represents MySQL output bindings.
 type Mysql struct {
@@ -202,7 +207,7 @@ func (m *Mysql) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindi
 		resp.Data = d
 
 	case roleCheckOperation:
-		d, err := m.roleCheck(ctx, s)
+		d, err := m.roleCheck(ctx, s, resp)
 		if err != nil {
 			return nil, err
 		}
@@ -293,23 +298,24 @@ func (m *Mysql) statusCheck(ctx context.Context, sql string) ([]byte, error) {
 	var serverId string
 	for rows.Next() {
 		if err := rows.Scan(&curLeader, &role, &serverId); err != nil {
-			m.logger.Errorf("checkRole error: %", err)
+			m.logger.Errorf("checkRole error: %v", err)
 		}
 	}
 	return []byte(role), nil
 }
 
-func (m *Mysql) roleCheck(ctx context.Context, sql string) ([]byte, error) {
+func (m *Mysql) getRole(ctx context.Context, sql string) (string, error) {
 	m.logger.Debugf("query: %s", sql)
 	if sql == "" {
 		sql = "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
 	}
 
-	ctx1, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx1, cancel := context.WithTimeout(context.Background(), 900*time.Millisecond)
 	defer cancel()
 	rows, err := m.db.QueryContext(ctx1, sql)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error executing %s", sql)
+		m.logger.Infof("error executing %s: %v", sql, err)
+		return "", errors.Wrapf(err, "error executing %s", sql)
 	}
 
 	defer func() {
@@ -325,17 +331,42 @@ func (m *Mysql) roleCheck(ctx context.Context, sql string) ([]byte, error) {
 			m.logger.Errorf("checkRole error: %", err)
 		}
 	}
-	if oriRole != role {
-		result := map[string]string{}
-		result["event"] = "roleChanged"
-		result["originalRole"] = oriRole
-		result["role"] = role
+	return role, nil
+}
+
+func (m *Mysql) roleCheck(ctx context.Context, sql string, resp *bindings.InvokeResponse) ([]byte, error) {
+	result := internal.ProbeMessage{}
+	result.OriginalRole = oriRole
+	role, err := m.getRole(ctx, sql)
+	if err != nil {
+		m.logger.Infof("error executing roleCheck: %v", err)
+		result.Event = "roleCheckFailed"
+		result.Message = err.Error()
+		if roleCheckFailedCount++; roleCheckFailedCount%10 == 1 {
+			m.logger.Infof("role checks failed %v times continuously", roleCheckFailedCount)
+			resp.Metadata[statusCode] = "451"
+		}
 		msg, _ := json.Marshal(result)
-		m.logger.Infof(string(msg))
-		oriRole = role
-		return nil, errors.Errorf(string(msg))
+		return msg, nil
 	}
-	return []byte(role), nil
+
+	result.Role = role
+	if oriRole != role {
+		result.Event = "roleChanged"
+		oriRole = role
+		roleCheckCount = 0
+	} else {
+		result.Event = "roleUnchanged"
+	}
+
+	// reporting role event periodly to get pod's role lable updating accurately
+	// in case of event losing.
+	if roleCheckCount++; roleCheckCount%60 == 1 {
+		resp.Metadata[statusCode] = "451"
+	}
+	msg, _ := json.Marshal(result)
+	m.logger.Infof(string(msg))
+	return msg, nil
 }
 
 func propertyToInt(props map[string]string, key string, setter func(int)) error {

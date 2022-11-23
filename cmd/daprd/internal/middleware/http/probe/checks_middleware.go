@@ -19,6 +19,7 @@ package probe
 import (
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/dapr/components-contrib/middleware"
@@ -29,6 +30,7 @@ const (
 	statusCheckOperation  = "statusCheck"
 	runningCheckOperation = "runningCheck"
 	roleCheckOperation    = "roleCheck"
+	statusCodeHeader      = "Metadata.status-Code"
 	bindingPath           = "/v1.0/bindings"
 )
 
@@ -40,6 +42,22 @@ func NewProbeMiddleware(log logger.Logger) middleware.Middleware {
 // Middleware is an probe middleware.
 type Middleware struct {
 	logger logger.Logger
+}
+
+type statusCodeWriter struct {
+	http.ResponseWriter
+	logger logger.Logger
+}
+
+func (scw *statusCodeWriter) WriteHeader(statusCode int) {
+	header := scw.ResponseWriter.Header()
+	scw.logger.Debugf("response header: %v", header)
+	if v, ok := header[statusCodeHeader]; ok {
+		scw.logger.Debugf("set statusCode: %v", v)
+		statusCode, _ = strconv.Atoi(v[0])
+		delete(header, statusCodeHeader)
+	}
+	scw.ResponseWriter.WriteHeader(statusCode)
 }
 
 // GetHandler returns the HTTP handler provided by the middleware.
@@ -67,7 +85,8 @@ func (m *Middleware) GetHandler(metadata middleware.Metadata) (func(next http.Ha
 			}
 
 			m.logger.Infof("request: %v", r)
-			next.ServeHTTP(w, r)
+			scw := &statusCodeWriter{ResponseWriter: w, logger: m.logger}
+			next.ServeHTTP(scw, r)
 		})
 	}, nil
 }

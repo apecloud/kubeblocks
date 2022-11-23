@@ -712,7 +712,13 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		//
 		// TODO(zhixu.zt): Check whether the configmap object is a config file of component
 		// Label check: ConfigMap.Labels["app.kubernetes.io/ins-configure"]
-		if _, ok := obj.(*corev1.ConfigMap); ok {
+		if cm, ok := obj.(*corev1.ConfigMap); ok {
+			// if configmap is env config, should update
+			if len(cm.Labels[intctrlutil.AppConfigTypeLabelKey]) > 0 {
+				if err := cli.Update(ctx, cm); err != nil {
+					return err
+				}
+			}
 			continue
 		}
 
@@ -964,8 +970,18 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 	}
 	sts.Spec.Template.Spec.Containers = append(sts.Spec.Template.Spec.Containers, probeContainers...)
 
-	for i := range sts.Spec.Template.Spec.Containers {
-		c := &sts.Spec.Template.Spec.Containers[i]
+	injectEnv := func(c *corev1.Container) {
+		if c.Env == nil {
+			c.Env = []corev1.EnvVar{}
+		}
+		c.Env = append(c.Env, corev1.EnvVar{
+			Name: dbaasPrefix + "_POD_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.name",
+				},
+			},
+		})
 		if c.EnvFrom == nil {
 			c.EnvFrom = []corev1.EnvFromSource{}
 		}
@@ -984,25 +1000,12 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 			},
 		})
 	}
+
+	for i := range sts.Spec.Template.Spec.Containers {
+		injectEnv(&sts.Spec.Template.Spec.Containers[i])
+	}
 	for i := range sts.Spec.Template.Spec.InitContainers {
-		c := &sts.Spec.Template.Spec.Containers[i]
-		if c.EnvFrom == nil {
-			c.EnvFrom = []corev1.EnvFromSource{}
-		}
-		c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
-			ConfigMapRef: &corev1.ConfigMapEnvSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: envConfigName,
-				},
-			},
-		})
-		c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
-			SecretRef: &corev1.SecretEnvSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: params.cluster.Name,
-				},
-			},
-		})
+		injectEnv(&sts.Spec.Template.Spec.InitContainers[i])
 	}
 
 	return &sts, nil
@@ -1208,9 +1211,18 @@ func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
 	for j := 0; j < int(params.component.Replicas); j++ {
 		envData[prefix+strconv.Itoa(j)+"_HOSTNAME"] = fmt.Sprintf("%s.%s", params.cluster.Name+"-"+params.component.Name+"-"+strconv.Itoa(j), svcName)
 	}
+	// build consensus env from cluster.status
 	if params.cluster.Status.Components != nil && params.cluster.Status.Components[params.component.Type] != nil {
 		consensusSetStatus := params.cluster.Status.Components[params.component.Type].ConsensusSetStatus
 		envData[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
+		followers := ""
+		for _, follower := range consensusSetStatus.Followers {
+			if len(followers) > 0 {
+				followers += ","
+			}
+			followers += follower.Pod
+		}
+		envData[prefix+"FOLLOWERS"] = followers
 	}
 	envDataStrByte, err := json.Marshal(envData)
 	if err != nil {

@@ -594,8 +594,8 @@ func updateConsensusRoleAnnotations(ctx context.Context, cli client.Client, clus
 	if len(configList.Items) > 0 {
 		for _, config := range configList.Items {
 			patch := client.MergeFrom(config.DeepCopy())
-			config.Data["KB_"+componentName+"_LEADER"] = leader
-			config.Data["KB_"+componentName+"_FOLLOWERS"] = followers
+			config.Data["KB_"+strings.ToUpper(componentName)+"_LEADER"] = leader
+			config.Data["KB_"+strings.ToUpper(componentName)+"_FOLLOWERS"] = followers
 			if err := cli.Patch(ctx, &config, patch); err != nil {
 				return err
 			}

@@ -1,6 +1,6 @@
 apiVersion: v2
 name: wesqlcluster
-description: A wesql Helm chart for Kubernetes
+description: A WeSQL Helm chart for KubeBlocks.
 
 # A chart can be either an 'application' or a 'library' chart.
 #

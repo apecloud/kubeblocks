@@ -57,7 +57,7 @@ func Build(c *builder.Command) *cobra.Command {
 			// should fill the ResourceName or construct the label selector based
 			// on the ClusterName
 			if c.CustomComplete != nil {
-				cmdutil.CheckErr(c.CustomComplete(deleteFlags, args))
+				util.CheckErr(c.CustomComplete(deleteFlags, args))
 			}
 
 			util.CheckErr(validate(deleteFlags, args, c.IOStreams.In))

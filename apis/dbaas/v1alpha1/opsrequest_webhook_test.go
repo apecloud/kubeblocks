@@ -89,6 +89,15 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("By creating a appVersion for upgrade")
 		newAppVersion := createTestAppVersionObj(clusterDefinitionName, appVersionNameForUpgrade)
 		Expect(testCtx.CreateObj(ctx, newAppVersion)).Should(Succeed())
+
+		By("Test Cluster Phase")
+		ClusterPhasesMapperForOps[UpgradeType] = []Phase{RunningPhase}
+		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
+		// update cluster phase to Running
+		clusterPatch := client.MergeFrom(cluster.DeepCopy())
+		cluster.Status.Phase = RunningPhase
+		Expect(k8sClient.Status().Patch(ctx, cluster, clusterPatch)).Should(Succeed())
+
 		By("By creating a upgrade opsRequest, it should be succeed")
 		Eventually(func() bool {
 			opsRequest.Spec.ClusterOps.Upgrade.AppVersionRef = newAppVersion.Name
@@ -102,8 +111,9 @@ var _ = Describe("OpsRequest webhook", func() {
 				Namespace: opsRequest.Namespace}, &OpsRequest{})
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
-		By("By testing Immutable when status.phase in (Running,Succeed)")
-		opsRequest.Status.Phase = RunningPhase
+
+		By("By testing Immutable when status.phase in Succeed")
+		opsRequest.Status.Phase = SucceedPhase
 		Expect(k8sClient.Status().Update(ctx, opsRequest)).Should(Succeed())
 		opsRequest.Spec.ClusterRef = "test"
 		Expect(k8sClient.Update(ctx, opsRequest)).ShouldNot(Succeed())
@@ -215,6 +225,29 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("By testing horizontalScaling replica is not in [min,max]")
 		opsRequest.Spec.ComponentOpsList[0].HorizontalScaling.Replicas = 4
 		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
+
+		By("test min, max is zero")
+		tmpCluster := &Cluster{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: cluster.Namespace}, tmpCluster)).Should(Succeed())
+		patch = client.MergeFrom(tmpCluster.DeepCopy())
+		tmpCluster.Status.Operations.HorizontalScalable = []OperationComponent{
+			{
+				Name: "proxy",
+			},
+		}
+		Expect(k8sClient.Status().Patch(ctx, tmpCluster, patch)).Should(Succeed())
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
+		Eventually(func() bool {
+			opsRequest.Spec.ComponentOpsList = []ComponentOps{
+				{ComponentNames: []string{"proxy"},
+					HorizontalScaling: &HorizontalScaling{
+						Replicas: 5,
+					},
+				},
+			}
+			err := testCtx.CheckedCreateObj(ctx, opsRequest)
+			return err == nil
+		}, timeout, interval).Should(BeTrue())
 
 	}
 

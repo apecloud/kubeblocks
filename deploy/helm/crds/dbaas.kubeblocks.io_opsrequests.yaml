@@ -57,12 +57,13 @@ spec:
             description: OpsRequestSpec defines the desired state of OpsRequest
             properties:
               clusterOps:
-                description: ClusterOps defines cluster level operations, like Upgrade
+                description: ClusterOps defines operations in cluster scope, such
+                  as Upgrade.
                 properties:
                   upgrade:
                     properties:
                       appVersionRef:
-                        description: AppVersionRef reference AppVersion.
+                        description: AppVersionRef reference AppVersion name.
                         type: string
                     required:
                     - appVersionRef
@@ -71,11 +72,11 @@ spec:
                 - upgrade
                 type: object
               clusterRef:
-                description: ClusterRef reference clusterDefinition resource
+                description: ClusterRef reference clusterDefinition.
                 type: string
               componentOps:
                 description: ComponentOpsList defines operations in component scope,
-                  like VolumeExpansion,VerticalScaling,HorizontalScaling
+                  such as VolumeExpansion,VerticalScaling,HorizontalScaling.
                 items:
                   properties:
                     componentNames:
@@ -87,7 +88,7 @@ spec:
                       type: array
                     horizontalScaling:
                       description: HorizontalScaling defines the variables that need
-                        to be input when scaling replicas.
+                        to input when scaling replicas.
                       properties:
                         replicas:
                           description: Replicas for the workloads.
@@ -96,7 +97,7 @@ spec:
                       type: object
                     verticalScaling:
                       description: VerticalScaling defines the variables that need
-                        to be input when scaling compute resources.
+                        to input when scaling compute resources.
                       properties:
                         limits:
                           additionalProperties:
@@ -124,17 +125,18 @@ spec:
                       type: object
                     volumeExpansion:
                       description: VolumeExpansion defines the variables that need
-                        to be input when expanding a volume.
+                        to input when expanding a volume.
                       items:
                         properties:
                           name:
-                            description: ClusterComponentVolumeClaimTemplate.Name
+                            description: Name reference volumeClaimTemplate name from
+                              cluster components.
                             type: string
                           storage:
                             anyOf:
                             - type: integer
                             - type: string
-                            description: The request storage size.
+                            description: Storage the request storage size.
                             pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                             x-kubernetes-int-or-string: true
                         required:
@@ -148,11 +150,11 @@ spec:
                 type: array
               ttlSecondsAfterSucceed:
                 description: TTLSecondsAfterSucceed OpsRequest will be deleted after
-                  TTLSecondsAfterSucceed second when OpsRequest.status.phase is Running
+                  TTLSecondsAfterSucceed second when OpsRequest.status.phase is Succeed.
                 format: int32
                 type: integer
               type:
-                description: Type defines the operation type
+                description: Type defines the operation type.
                 enum:
                 - Upgrade
                 - VerticalScaling
@@ -168,19 +170,18 @@ spec:
             description: OpsRequestStatus defines the observed state of OpsRequest
             properties:
               StartTimestamp:
-                description: this means when start processing OpsRequest, status.Phase
-                  is Running
+                description: StartTimestamp The time when the OpsRequest started processing.
                 format: date-time
                 type: string
               completionTimestamp:
-                description: the OpsRequest completion time
+                description: CompletionTimestamp the OpsRequest completion time.
                 format: date-time
                 type: string
               components:
                 additionalProperties:
                   properties:
                     phase:
-                      description: Phase describe the component phase, Reference ClusterDefinition.status.component.phase.
+                      description: Phase describe the component phase, reference ClusterDefinition.status.component.phase.
                       enum:
                       - Running
                       - Failed
@@ -192,10 +193,10 @@ spec:
                       type: string
                   type: object
                 description: Components record the status information of components
-                  with spec.componentOps.componentNames
+                  with spec.componentOps.componentNames.
                 type: object
               conditions:
-                description: describe opsRequest detail status
+                description: Conditions describe opsRequest detail status.
                 items:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource. --- This struct is intended for direct
@@ -270,7 +271,7 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: Phase defines the CR .Status.Phase
+                description: Phase describe OpsRequest phase.
                 enum:
                 - Pending
                 - Running

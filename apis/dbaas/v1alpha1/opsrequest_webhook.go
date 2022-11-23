@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strings"
 
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -35,7 +36,12 @@ import (
 )
 
 // log is for logging in this package.
-var opsrequestlog = logf.Log.WithName("opsrequest-resource")
+var (
+	opsrequestlog = logf.Log.WithName("opsrequest-resource")
+
+	// ClusterPhasesMapperForOps records in which cluster phases OpsRequest can run
+	ClusterPhasesMapperForOps = map[OpsType][]Phase{}
+)
 
 func (r *OpsRequest) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
@@ -62,7 +68,7 @@ var _ webhook.Validator = &OpsRequest{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *OpsRequest) ValidateCreate() error {
 	opsrequestlog.Info("validate create", "name", r.Name)
-	return r.validate()
+	return r.validate(true)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
@@ -72,7 +78,7 @@ func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 	if r.Status.Phase == SucceedPhase && !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
 		return newInvalidError(OpsRequestKind, r.Name, "spec", fmt.Sprintf("update OpsRequest is forbidden when status.Phase is %s", r.Status.Phase))
 	}
-	return r.validate()
+	return r.validate(false)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
@@ -85,7 +91,20 @@ func (r *OpsRequest) ValidateDelete() error {
 	return nil
 }
 
-func (r *OpsRequest) validate() error {
+// validateClusterPhase validate whether the current cluster state supports the OpsRequest
+func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
+	clusterPhases := ClusterPhasesMapperForOps[r.Spec.Type]
+	// if the OpsType is no cluster phases, ignores it
+	if len(clusterPhases) == 0 {
+		return nil
+	}
+	if !slices.Contains(clusterPhases, cluster.Status.Phase) {
+		return newInvalidError(OpsRequestKind, r.Name, "spec.type", fmt.Sprintf("%s is forbidden when Cluster.status.Phase is %s", r.Spec.Type, cluster.Status.Phase))
+	}
+	return nil
+}
+
+func (r *OpsRequest) validate(isCreate bool) error {
 	var (
 		allErrs field.ErrorList
 		ctx     = context.Background()
@@ -96,10 +115,14 @@ func (r *OpsRequest) validate() error {
 	}
 	// get cluster resource
 	if err := webhookMgr.client.Get(ctx, types.NamespacedName{Namespace: r.Namespace, Name: r.Spec.ClusterRef}, cluster); err != nil {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterRef"), r.Spec.ClusterRef, err.Error()))
-	} else {
-		r.validateOps(ctx, cluster, &allErrs)
+		return newInvalidError(OpsRequestKind, r.Name, "spec.clusterRef", err.Error())
 	}
+	if isCreate {
+		if err := r.validateClusterPhase(cluster); err != nil {
+			return err
+		}
+	}
+	r.validateOps(ctx, cluster, &allErrs)
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(schema.GroupKind{Group: APIVersion, Kind: OpsRequestKind}, r.Name, allErrs)
 	}
@@ -168,10 +191,13 @@ func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *
 
 // invalidReplicas verify whether the replicas is invalid
 func invalidReplicas(replicas int32, operationComponent *OperationComponent) bool {
-	if operationComponent.Min == 0 || operationComponent.Max == 0 {
+	if operationComponent.Min != 0 && replicas < operationComponent.Min {
 		return true
 	}
-	return replicas < operationComponent.Min || replicas > operationComponent.Max
+	if operationComponent.Max != 0 && replicas > operationComponent.Max {
+		return true
+	}
+	return false
 }
 
 // validateHorizontalScaling validate api is legal when spec.type is HorizontalScaling

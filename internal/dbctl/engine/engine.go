@@ -22,6 +22,8 @@ import "fmt"
 const (
 	stateMysql  = "state.mysql"
 	stateMysql8 = "state.mysql-8"
+	stateRedis  = "state.redis"
+	stateRedis7 = "state.redis-7"
 )
 
 type ExecInfo struct {
@@ -39,6 +41,8 @@ func New(typeName string) (Interface, error) {
 	switch typeName {
 	case stateMysql, stateMysql8:
 		return &mysql{}, nil
+	case stateRedis, stateRedis7:
+		return &redis{}, nil
 	}
 	return nil, fmt.Errorf("unsupported engine type: %s", typeName)
 }

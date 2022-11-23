@@ -13,9 +13,9 @@ dependencies:
   version: 0.1.0
 - name: snapshot-controller
   repository: https://piraeus.io/helm-charts
-  version: 1.6.0
+  version: 1.6.1
 - name: csi-s3
   repository: https://github.com/CloudVE/helm-charts/raw/master
   version: 0.31.3
-digest: sha256:fb201e298427125d2fcee678f0afb59ca288b820c35c7e211911075a1550e6e9
-generated: "2022-11-16T14:22:39.699826+08:00"
+digest: sha256:4a3ccb1fb4f4428ab49e21fb3107ec37539fba1aa7c4cd328ff41fbefb779863
+generated: "2022-11-22T22:57:00.392293+08:00"

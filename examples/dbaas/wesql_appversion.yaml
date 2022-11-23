@@ -1,9 +1,9 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       AppVersion
 metadata:
-  name:     app-version-consensus
+  name:     wesql-8.0.30
 spec:
-  clusterDefinitionRef: cluster-definition-consensus
+  clusterDefinitionRef: apecloud-wesql
   components:
     - type: replicasets
       podSpec:

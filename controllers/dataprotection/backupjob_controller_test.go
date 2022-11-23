@@ -280,7 +280,7 @@ spec:
         command:
         - /bin/bash
         - -c
-        image: docker.io/apecloud/wesql-server-8.0:0.1-SNAPSHOT
+        image: docker.io/apecloud/wesql-server-8.0:0.1.2
         imagePullPolicy: IfNotPresent
         name: mysql
         ports:
@@ -345,7 +345,7 @@ spec:
           value: '1'
         - name: KB_REPLICASETS_PRIMARY_0_HOSTNAME
           value: wesql-cluster-replicasets-primary-0
-      image: 'docker.io/apecloud/wesql-server-8.0:0.1-SNAPSHOT'
+      image: 'docker.io/apecloud/wesql-server-8.0:0.1.2'
       imagePullPolicy: IfNotPresent
       name: mysql
       ports:

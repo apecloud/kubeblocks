@@ -26,21 +26,18 @@ import (
 	"time"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-
 	"github.com/leaanthony/debme"
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	types2 "github.com/apecloud/kubeblocks/internal/dbctl/types"
@@ -737,27 +734,26 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 					}
 					backupPolicyTemplateList := dataprotectionv1alpha1.BackupPolicyTemplateList{}
 					if err := cli.List(ctx, &backupPolicyTemplateList, ml); err != nil {
-						reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeWarning, "HorizontalScaleFailed", err.Error())
 						return err
 					}
 					if len(backupPolicyTemplateList.Items) > 0 {
-						reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "BackupJobCreate", "Create backup job")
 						backupJobName := generateName(cluster.Name + "-scaling-")
 						err := createBackup(ctx, cli, *stsObj, backupPolicyTemplateList.Items[0], backupJobName, cluster)
 						if err != nil {
-							reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeWarning, "HorizontalScaleFailed", err.Error())
 							return err
 						}
+						reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "BackupJobCreate", "Create backup job")
 						for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
 							pvcKey := types.NamespacedName{
 								Namespace: key.Namespace,
 								Name:      fmt.Sprintf("%s-%s-%d", "data", stsObj.Name, i),
 							}
 							if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, backupJobName); err != nil {
-								reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeWarning, "HorizontalScaleFailed", err.Error())
 								return err
 							}
 						}
+					} else {
+						reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeWarning, "HorizontalScaleFailed", "backup policy template not found for clusterdefinition %s", cluster.Spec.ClusterDefRef)
 					}
 				case dbaasv1alpha1.Snapshot:
 					vsList := snapshotv1.VolumeSnapshotList{}

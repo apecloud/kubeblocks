@@ -35,9 +35,6 @@ type BackupPolicyTemplateSpec struct {
 	// +optional
 	TTL metav1.Duration `json:"ttl,omitempty"`
 
-	// execute hook commands for backup.
-	Hooks BackupPolicyHook `json:"hooks"`
-
 	// limit count of backup stop retries on fail.
 	// if unset, retry unlimit attempted.
 	// +optional

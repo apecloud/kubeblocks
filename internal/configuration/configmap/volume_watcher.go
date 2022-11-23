@@ -118,11 +118,11 @@ func (w *ConfigMapVolumeWatcher) loopNotifyEvent(watcher *fsnotify.Watcher, ctx 
 	for {
 		select {
 		case event := <-watcher.Events:
-			logrus.Tracef("watch fsnotify event: [%s]", event.String())
+			logrus.Tracef("watch fsnotify event: %s, path: %s", event.Op.String(), event.Name)
 			if !doFilter(w.filters, event) {
 				continue
 			}
-			logrus.Debugf("volume configmap updated. [%s]", event.String())
+			logrus.Debugf("volume configmap updated. event: %s, path: %s", event.Op.String(), event.Name)
 			runWithRetry(w.handler, event, w.retryCount)
 		case err := <-watcher.Errors:
 			logrus.Error(err)

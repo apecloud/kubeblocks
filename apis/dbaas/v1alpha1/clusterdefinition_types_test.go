@@ -55,7 +55,7 @@ spec:
 		t.Error("Expected invalidLogNames are [slow-test, audit-test]")
 	}
 	// corner case
-	invalidLogNames2 := clusterDef.ValidateEnabledLogConfigs("no-exist-type", []string{"error", "slow", "audit"})
+	invalidLogNames2 := clusterDef.ValidateEnabledLogConfigs("non-exist-type", []string{"error", "slow", "audit"})
 	if len(invalidLogNames2) != 3 {
 		t.Error("Expected invalidLogNames are [error, slow, audit]")
 	}

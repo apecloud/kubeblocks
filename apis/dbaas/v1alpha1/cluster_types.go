@@ -305,7 +305,7 @@ func init() {
 	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
 }
 
-// ValidateEnabledLogs validate enabledLogs config in cluster.yaml, and return metav1.Condition when detect invalid value.
+// ValidateEnabledLogs validates enabledLogs config in cluster.yaml, and returns metav1.Condition when detect invalid values.
 func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) []*metav1.Condition {
 	conditionList := make([]*metav1.Condition, 0, len(r.Spec.Components))
 	for _, comp := range r.Spec.Components {

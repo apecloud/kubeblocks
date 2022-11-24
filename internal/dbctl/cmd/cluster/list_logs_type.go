@@ -51,8 +51,8 @@ var (
 		dbctl cluster list-logs-type my-cluster --instance my-instance-0`)
 )
 
-// LogsListOptions declare the arguments accepted by the logs-list-type command
-type LogsListOptions struct {
+// ListLogsOptions declares the arguments accepted by the list-logs-type command
+type ListLogsOptions struct {
 	namespace     string
 	clusterName   string
 	componentName string
@@ -65,9 +65,9 @@ type LogsListOptions struct {
 	exec *exec.ExecOptions
 }
 
-// NewListLogsTypeCmd return logs list type cmd
+// NewListLogsTypeCmd returns list logs type cmd
 func NewListLogsTypeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &LogsListOptions{
+	o := &ListLogsOptions{
 		factory:   f,
 		IOStreams: streams,
 	}
@@ -87,14 +87,14 @@ func NewListLogsTypeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	return cmd
 }
 
-func (o *LogsListOptions) Validate(args []string) error {
+func (o *ListLogsOptions) Validate(args []string) error {
 	if len(args) < 1 {
 		return fmt.Errorf("must specify the cluster name")
 	}
 	return nil
 }
 
-func (o *LogsListOptions) Complete(f cmdutil.Factory, args []string) error {
+func (o *ListLogsOptions) Complete(f cmdutil.Factory, args []string) error {
 	// set cluster name from args
 	o.clusterName = args[0]
 	config, err := o.factory.ToRESTConfig()
@@ -118,7 +118,7 @@ func (o *LogsListOptions) Complete(f cmdutil.Factory, args []string) error {
 	return err
 }
 
-func (o *LogsListOptions) Run() error {
+func (o *ListLogsOptions) Run() error {
 	dataObj := cluster.NewClusterObjects()
 	clusterGetter := cluster.ObjectsGetter{
 		ClientSet:      o.clientSet,
@@ -137,14 +137,14 @@ func (o *LogsListOptions) Run() error {
 	return nil
 }
 
-func (o *LogsListOptions) printHeaderMessage(w cmddes.PrefixWriter, c *dbaasv1alpha1.Cluster) {
+func (o *ListLogsOptions) printHeaderMessage(w cmddes.PrefixWriter, c *dbaasv1alpha1.Cluster) {
 	w.Write(describe.Level0, "ClusterName:\t\t%s\n", c.Name)
 	w.Write(describe.Level0, "Namespace:\t\t%s\n", c.Namespace)
 	w.Write(describe.Level0, "ClusterDefinition:\t%s\n", c.Spec.ClusterDefRef)
 }
 
-// printBodyMessage print message about logs file.
-func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinition, pods *corev1.PodList) {
+// printBodyMessage prints message about log files.
+func (o *ListLogsOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinition, pods *corev1.PodList) {
 	for _, p := range pods.Items {
 		if len(o.instName) > 0 && !strings.EqualFold(p.Name, o.instName) {
 			continue
@@ -201,8 +201,8 @@ func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 	}
 }
 
-// printRealFileMessage in container
-func (o *LogsListOptions) printRealFileMessage(pod *corev1.Pod, pattern string) {
+// printRealFileMessage prints real files in container
+func (o *ListLogsOptions) printRealFileMessage(pod *corev1.Pod, pattern string) {
 	o.exec.Pod = pod
 	o.exec.Command = []string{"/bin/bash", "-c", "ls -al " + pattern}
 	// because tty Raw argument will set ErrOut nil in exec.Run
@@ -215,8 +215,8 @@ func (o *LogsListOptions) printRealFileMessage(pod *corev1.Pod, pattern string) 
 	}
 }
 
-// printLogsContext print logs list type info
-func (o *LogsListOptions) printListLogsMessage(dataObj *types.ClusterObjects, out io.Writer) error {
+// printLogsContext prints list-logs-type info
+func (o *ListLogsOptions) printListLogsMessage(dataObj *types.ClusterObjects, out io.Writer) error {
 	w := cmddes.NewPrefixWriter(out)
 	o.printHeaderMessage(w, dataObj.Cluster)
 	o.printBodyMessage(w, dataObj.Cluster, dataObj.ClusterDef, dataObj.Pods)

@@ -37,11 +37,6 @@ type ClusterDefinitionSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	Components []ClusterDefinitionComponent `json:"components"`
 
-	// Default termination policy if no termination policy defined in cluster.
-	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
-	// +optional
-	DefaultTerminationPolicy string `json:"defaultTerminationPolicy,omitempty"`
-
 	// Credential used for connecting database.
 	// +optional
 	ConnectionCredential *ClusterDefinitionConnectionCredential `json:"connectionCredential,omitempty"`

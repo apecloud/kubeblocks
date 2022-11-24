@@ -26,24 +26,22 @@ import (
 
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
-	// ref ClusterDefinition, immutable.
+	// Cluster referenced ClusterDefinition name, this is an immutable attribute.
 	// +kubebuilder:validation:Required
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
-	// ref AppVersion
+	// Cluster referenced AppVersion name.
 	// +kubebuilder:validation:Required
 	AppVersionRef string `json:"appVersionRef"`
 
-	// One of DoNotTerminate, Halt, Delete, WipeOut.
-	// Defaults to Halt.
-	// DoNotTerminate means block delete operation.
-	// Halt means delete resources such as sts,deploy,svc,pdb, but keep pvcs.
-	// Delete is based on Halt and delete pvcs.
-	// WipeOut is based on Delete and wipe out all snapshots and snapshot data from bucket.
-	// +kubebuilder:default=Halt
+	// Cluster termination policy. One of DoNotTerminate, Halt, Delete, WipeOut.
+	// DoNotTerminate will block delete operation.
+	// Halt will delete workload resources such as statefulset, deployment workloads but keep PVCs.
+	// Delete is based on Halt and deletes PVCs.
+	// WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.
+	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
-	// +optional
-	TerminationPolicy TerminationPolicyType `json:"terminationPolicy,omitempty"`
+	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
 
 	// List of components you want to replace in ClusterDefinition and AppVersion. It will replace the field in ClusterDefinition's and AppVersion's component if type is matching.
 	// +optional

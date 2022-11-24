@@ -75,10 +75,11 @@ spec:
                     type: array
                 type: object
               appVersionRef:
-                description: ref AppVersion
+                description: Cluster referenced AppVersion name.
                 type: string
               clusterDefinitionRef:
-                description: ref ClusterDefinition, immutable.
+                description: Cluster referenced ClusterDefinition name, this is an
+                  immutable attribute.
                 type: string
               components:
                 description: List of components you want to replace in ClusterDefinition
@@ -426,12 +427,12 @@ spec:
                   type: object
                 type: array
               terminationPolicy:
-                default: Halt
-                description: One of DoNotTerminate, Halt, Delete, WipeOut. Defaults
-                  to Halt. DoNotTerminate means block delete operation. Halt means
-                  delete resources such as sts,deploy,svc,pdb, but keep pvcs. Delete
-                  is based on Halt and delete pvcs. WipeOut is based on Delete and
-                  wipe out all snapshots and snapshot data from bucket.
+                description: Cluster termination policy. One of DoNotTerminate, Halt,
+                  Delete, WipeOut. DoNotTerminate will block delete operation. Halt
+                  will delete workload resources such as statefulset, deployment workloads
+                  but keep PVCs. Delete is based on Halt and deletes PVCs. WipeOut
+                  is based on Delete and wipe out all volume snapshots and snapshot
+                  data from backup storage location.
                 enum:
                 - DoNotTerminate
                 - Halt
@@ -483,6 +484,7 @@ spec:
             required:
             - appVersionRef
             - clusterDefinitionRef
+            - terminationPolicy
             type: object
           status:
             description: ClusterStatus defines the observed state of Cluster

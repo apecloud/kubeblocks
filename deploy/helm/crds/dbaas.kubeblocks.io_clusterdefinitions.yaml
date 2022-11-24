@@ -8115,15 +8115,6 @@ spec:
                 required:
                 - user
                 type: object
-              defaultTerminationPolicy:
-                description: Default termination policy if no termination policy defined
-                  in cluster.
-                enum:
-                - DoNotTerminate
-                - Halt
-                - Delete
-                - WipeOut
-                type: string
               type:
                 description: Type define well known cluster types. Valid values are
                   in-list of [state.redis, mq.mqtt, mq.kafka, state.mysql-8, state.mysql-5.7,

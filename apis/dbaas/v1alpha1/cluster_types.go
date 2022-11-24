@@ -52,6 +52,10 @@ type ClusterSpec struct {
 	// Affinity describes affinities which specific by users.
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
+
+	// Cluster Tolerations are attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster
@@ -124,6 +128,10 @@ type ClusterComponent struct {
 	// Affinity describes affinities which specific by users.
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
+
+	// Component tolerations will override ClusterSpec.Tolerations if specified.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
 	// Resources requests and limits of workload.
 	// +optional

@@ -5,7 +5,7 @@ clusterdefinition: {
 	spec: {
 		type: string
 		connectionCredential: {
-			user:     string
+			user: string
 		}
 	}
 }

@@ -44,7 +44,7 @@ type ConfigTemplateBuilder struct {
 
 	// Global Var
 	componentValues  *ComponentTemplateValues
-	buildinFunctions *intctrlutil.BuiltinObjectsFunc
+	builtInFunctions *intctrlutil.BuiltInObjectsFunc
 
 	// DBaas cluster object
 	component  *Component
@@ -64,7 +64,7 @@ func NewCfgTemplateBuilder(clusterName, namespace string, cluster *dbaasv1alpha1
 
 func (c *ConfigTemplateBuilder) Render(configs map[string]string) (map[string]string, error) {
 	rendered := make(map[string]string, len(configs))
-	engine := intctrlutil.NewTplEngine(c.builtinObjects(), c.buildinFunctions)
+	engine := intctrlutil.NewTplEngine(c.builtinObjects(), c.builtInFunctions)
 	for file, configContext := range configs {
 		newContext, err := engine.Render(configContext)
 		if err != nil {
@@ -78,11 +78,11 @@ func (c *ConfigTemplateBuilder) Render(configs map[string]string) (map[string]st
 
 // General Built-in objects
 const (
-	BuiltinClusterObject           = "Cluster"
-	BuiltinComponentObject         = "Component"
-	BuiltinPodObject               = "PodSpec"
-	BuiltinAppVersionObject        = "Version"
-	BuiltinComponentResourceObject = "ComponentResource"
+	BuiltinClusterObject           = "cluster"
+	BuiltinComponentObject         = "component"
+	BuiltinPodObject               = "podSpec"
+	BuiltinAppVersionObject        = "version"
+	BuiltinComponentResourceObject = "componentResource"
 )
 
 func (c *ConfigTemplateBuilder) builtinObjects() *intctrlutil.TplValues {
@@ -108,28 +108,28 @@ func (c *ConfigTemplateBuilder) InjectBuiltInObjectsAndFunctions(podTemplate *co
 
 // General Built-in functions
 const (
-	BuiltinGetVolumeFunctionName    = "getVolumePathByName"
-	BuiltinGetPvcFunctionName       = "getPvcByName"
-	BuiltinGetEnvFunctionName       = "getEnvByName"
-	BuiltinGetArgFunctionName       = "getArgByName"
-	BuiltinGetPortFunctionName      = "getPortByName"
-	BuiltinGetContainerFunctionName = "getContainerByName"
+	BuiltInGetVolumeFunctionName    = "getVolumePathByName"
+	BuiltInGetPvcFunctionName       = "getPVCByName"
+	BuiltInGetEnvFunctionName       = "getEnvByName"
+	BuiltInGetArgFunctionName       = "getArgByName"
+	BuiltInGetPortFunctionName      = "getPortByName"
+	BuiltInGetContainerFunctionName = "getContainerByName"
 
 	// BuiltinMysqlCalBufferFunctionName Mysql Built-in
 	// TODO: This function migrate to configuration template
-	BuiltinMysqlCalBufferFunctionName = "callBufferSizeByResource"
+	BuiltInMysqlCalBufferFunctionName = "callBufferSizeByResource"
 )
 
 func injectBuiltInFunctions(tplBuilder *ConfigTemplateBuilder, podTemplate *corev1.PodTemplateSpec, component *Component) error {
 	// TODO add built-in function
-	tplBuilder.buildinFunctions = &intctrlutil.BuiltinObjectsFunc{
-		BuiltinMysqlCalBufferFunctionName: calDBPoolSize,
-		BuiltinGetVolumeFunctionName:      getVolumeMountPathByName,
-		BuiltinGetPvcFunctionName:         getPvcByName,
-		BuiltinGetEnvFunctionName:         getEnvByName,
-		BuiltinGetPortFunctionName:        getPortByName,
-		BuiltinGetArgFunctionName:         getArgByName,
-		BuiltinGetContainerFunctionName:   getPodContainerByName,
+	tplBuilder.builtInFunctions = &intctrlutil.BuiltInObjectsFunc{
+		BuiltInMysqlCalBufferFunctionName: calDBPoolSize,
+		BuiltInGetVolumeFunctionName:      getVolumeMountPathByName,
+		BuiltInGetPvcFunctionName:         getPVCByName,
+		BuiltInGetEnvFunctionName:         getEnvByName,
+		BuiltInGetPortFunctionName:        getPortByName,
+		BuiltInGetArgFunctionName:         getArgByName,
+		BuiltInGetContainerFunctionName:   getPodContainerByName,
 	}
 	return nil
 }

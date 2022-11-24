@@ -275,7 +275,7 @@ func buildPodAffinity(
 }
 
 func disableMonitor(component *Component) {
-	component.Monitor = MonitorConfig{
+	component.Monitor = &MonitorConfig{
 		Enable: false,
 	}
 }
@@ -302,7 +302,7 @@ func mergeMonitorConfig(
 			disableMonitor(component)
 			return
 		}
-		component.Monitor = MonitorConfig{
+		component.Monitor = &MonitorConfig{
 			Enable:     true,
 			ScrapePath: monitorConfig.Exporter.ScrapePath,
 			ScrapePort: monitorConfig.Exporter.ScrapePort,
@@ -428,7 +428,6 @@ func mergeComponents(
 		component.Name = clusterComp.Name
 		component.EnabledLogs = clusterComp.EnabledLogs
 
-		// respect user's declaration
 		if clusterComp.Replicas > 0 {
 			component.Replicas = clusterComp.Replicas
 		}
@@ -436,12 +435,15 @@ func mergeComponents(
 		if clusterComp.VolumeClaimTemplates != nil {
 			component.VolumeClaimTemplates = toK8sVolumeClaimTemplates(clusterComp.VolumeClaimTemplates)
 		}
+
 		if clusterComp.Resources.Requests != nil || clusterComp.Resources.Limits != nil {
 			component.PodSpec.Containers[0].Resources = clusterComp.Resources
 		}
 
-		// respect user's declaration
 		if clusterComp.ServiceType != "" {
+			if component.Service == nil {
+				component.Service = &corev1.ServiceSpec{}
+			}
 			component.Service.Type = clusterComp.ServiceType
 		}
 
@@ -653,7 +655,7 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		*params.applyObjs = append(*params.applyObjs, pdb)
 	}
 
-	if params.component.Service.Ports != nil {
+	if params.component.Service != nil && len(params.component.Service.Ports) > 0 {
 		svc, err := buildSvc(*params, false)
 		if err != nil {
 			return err
@@ -715,7 +717,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		// ConfigMap kind objects should only be applied once
 		//
 		// The Config is not allowed to be modified.
-		// Once ISV adjusts the ConfigTemplateRef field of CusterDefinition, or ISV modifies the wrong config file, it may cause the application cluster may fail.
+		// Once ClusterDefinition provider adjusts the ConfigTemplateRef field of CusterDefinition, or provider modifies the wrong config file, it may cause the application cluster may fail.
 		//
 		// TODO(zhixu.zt): Check whether the configmap object is a config file of component
 		// Label check: ConfigMap.Labels["app.kubernetes.io/ins-configure"]

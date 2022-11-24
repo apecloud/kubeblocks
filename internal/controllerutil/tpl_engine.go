@@ -30,7 +30,7 @@ const (
 )
 
 type TplValues map[string]interface{}
-type BuiltinObjectsFunc map[string]interface{}
+type BuiltInObjectsFunc map[string]interface{}
 
 type TplEngine struct {
 	tpl       *template.Template
@@ -48,7 +48,7 @@ func (t TplEngine) Render(context string) (string, error) {
 	return buf.String(), nil
 }
 
-func NewTplEngine(values *TplValues, funcs *BuiltinObjectsFunc) *TplEngine {
+func NewTplEngine(values *TplValues, funcs *BuiltInObjectsFunc) *TplEngine {
 	coreBuiltinFuncs := sprig.TxtFuncMap()
 
 	// custom funcs

@@ -70,6 +70,7 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
+	golang.org/x/tools v0.2.0 // indirect
 )
 
 require (

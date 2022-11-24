@@ -1081,6 +1081,34 @@ spec:
 	})
 
 	Context("When creating cluster", func() {
+		It("Should create env configmap", func() {
+			By("By creating a cluster")
+			toCreate, _, _, key := newClusterObj(nil, nil)
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
+
+			fetchedG1 := &dbaasv1alpha1.Cluster{}
+
+			Eventually(func() bool {
+				_ = k8sClient.Get(ctx, key, fetchedG1)
+				return fetchedG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+
+			cmList := &corev1.ConfigMapList{}
+			Eventually(func() bool {
+				Expect(k8sClient.List(ctx, cmList, client.MatchingLabels{
+					intctrlutil.AppInstanceLabelKey: key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				return len(cmList.Items) == 2
+			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting the scope")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	Context("When creating cluster", func() {
 		It("Should create service if service configured", func() {
 			By("By creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)

@@ -65,7 +65,7 @@ var (
 		dbctl cluster logs my-cluster --instance my-instance-0 -c my-container --file-path=/var/log/yum.log`)
 )
 
-// LogsOptions declare the arguments accepted by the logs command
+// LogsOptions declares the arguments accepted by the logs command
 type LogsOptions struct {
 	clusterName string
 	instName    string
@@ -75,7 +75,7 @@ type LogsOptions struct {
 	logOptions cmdlogs.LogsOptions
 }
 
-// NewLogsCmd return the logic of accessing up-to-date server log file
+// NewLogsCmd returns the logic of accessing cluster log file
 func NewLogsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	l := &LogsOptions{
 		ExecOptions: exec.NewExecOptions(f, streams),
@@ -85,7 +85,7 @@ func NewLogsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	}
 	input := &exec.ExecInput{
 		Use:      "logs",
-		Short:    "Access up-to-date cluster log file",
+		Short:    "Access cluster log file",
 		Example:  logsExample,
 		Validate: l.validate,
 		Complete: l.complete,
@@ -115,7 +115,7 @@ func (o *LogsOptions) addFlags(cmd *cobra.Command) {
 	cmd.MarkFlagsMutuallyExclusive("since", "since-time")
 }
 
-// run custom run logic for logs
+// run customs logic for logs
 func (o *LogsOptions) run() (bool, error) {
 	if o.isStdoutForContainer() {
 		return false, o.runLogs()
@@ -123,7 +123,7 @@ func (o *LogsOptions) run() (bool, error) {
 	return true, nil
 }
 
-// complete custom complete function for logs
+// complete customs complete function for logs
 func (o *LogsOptions) complete(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("you must specify the cluster name to retrieve logs")
@@ -215,7 +215,7 @@ func (o *LogsOptions) validate() error {
 	return nil
 }
 
-// createFileTypeCommand create file type case and assemble command
+// createFileTypeCommand creates command against log file type
 func (o *LogsOptions) createFileTypeCommand(pod *corev1.Pod, obj *types.ClusterObjects) (string, error) {
 	var command string
 	componentName, ok := pod.Labels[types.ComponentLabelKey]
@@ -252,7 +252,7 @@ func (o *LogsOptions) createFileTypeCommand(pod *corev1.Pod, obj *types.ClusterO
 	return command, nil
 }
 
-// assembleCommand assemble tail command for log file
+// assembleCommand assembles tail command for log file
 func assembleTail(follow bool, tail int64, limitBytes int64) string {
 	command := make([]string, 0, 5)
 	command = append(command, "tail")
@@ -277,7 +277,7 @@ func (o *LogsOptions) isStdoutForContainer() bool {
 	return false
 }
 
-// runLogs retrieve stdout/stderr logs
+// runLogs retrieves stdout/stderr logs
 func (o *LogsOptions) runLogs() error {
 	requests, err := o.logOptions.LogsForObject(o.logOptions.RESTClientGetter, o.logOptions.Object, o.logOptions.Options, 60*time.Second, false)
 	if err != nil {

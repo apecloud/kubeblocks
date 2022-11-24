@@ -151,7 +151,7 @@ func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 		}
 		componentName, ok := p.Labels[types.ComponentLabelKey]
 		if !ok {
-			w.Write(describe.Level0, "label key %s in pod %s isn't set \n", types.ComponentLabelKey, p.Name)
+			w.Write(describe.Level0, "\nLabel key %s in pod %s isn't set \n", types.ComponentLabelKey, p.Name)
 			continue
 		}
 		if len(o.componentName) > 0 && !strings.EqualFold(o.componentName, componentName) {
@@ -172,11 +172,11 @@ func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 			}
 		}
 		if len(comTypeName) == 0 {
-			w.Write(describe.Level0, "Component name %s in pod's label can't find corresponding typeName, please check cluster.yaml. \n", componentName)
+			w.Write(describe.Level0, "Component name %s in pod's label can't find corresponding typeName, please check cluster.yaml \n", componentName)
 			continue
 		}
 		if len(logTypeMap) == 0 {
-			w.Write(describe.Level0, "No logs type found. \nTips: You can enable the log feature when creating a cluster with option of \"--enable-all-logs=true\"\n")
+			w.Write(describe.Level0, "No logs type found. \nYou can enable the log feature when creating a cluster with option of \"--enable-all-logs=true\"\n")
 			continue
 		}
 		var validCount int
@@ -196,7 +196,7 @@ func (o *LogsListOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 			}
 		}
 		if len(logTypeMap) != validCount {
-			w.Write(describe.Level0, "Tips: EnabledLogs have invalid logTypes, please look up cluster Status.Conditions by `kubectl describe cluster <cluster-name>`\n")
+			w.Write(describe.Level0, "EnabledLogs have invalid logTypes, please look up cluster Status.Conditions by `kubectl describe cluster <cluster-name>`\n")
 		}
 	}
 }

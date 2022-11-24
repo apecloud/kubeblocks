@@ -336,7 +336,7 @@ func init() {
 	SchemeBuilder.Register(&ClusterDefinition{}, &ClusterDefinitionList{})
 }
 
-// ValidateEnabledLogConfigs validate enabledLogs according to component typeName, and return the invalid logNames which aren't defined in ClusterDefinition.
+// ValidateEnabledLogConfigs validate enabledLogs against component typeName, and return the invalid logNames which aren't defined in ClusterDefinition.
 func (r *ClusterDefinition) ValidateEnabledLogConfigs(typeName string, enabledLogs []string) []string {
 	invalidLogNames := make([]string, 0, len(enabledLogs))
 	logTypes := make(map[string]bool)

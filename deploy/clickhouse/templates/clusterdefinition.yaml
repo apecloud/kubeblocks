@@ -12,7 +12,6 @@ metadata:
   {{- end }}
 spec:
   type: state.clickhouse
-  defaultTerminationPolicy: {{ .Values.defaultTerminationPolicy }}
   connectionCredential:
     user: {{ .Values.auth.rootUser }}
     password: {{ .Values.auth.rootPassword }}

@@ -227,14 +227,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	task, err := buildClusterCreationTasks(clusterdefinition, appversion, cluster)
-	if err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-	if err = task.Exec(reqCtx, r.Client); err != nil {
-		// record the event when the execution task reports an error.
-		r.Recorder.Event(cluster, corev1.EventTypeWarning, intctrlutil.EventReasonRunTaskFailed, err.Error())
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	res, err = createCluster(reqCtx, r.Client, clusterdefinition, appversion, cluster)
+	if err != nil || res != nil {
+		if err != nil {
+			r.Recorder.Event(cluster, corev1.EventTypeWarning, intctrlutil.EventReasonRunTaskFailed, err.Error())
+		}
+		return *res, err
 	}
 
 	// update observed generation

@@ -35,6 +35,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -472,17 +473,15 @@ func mergeComponents(
 	return component
 }
 
-func buildClusterCreationTasks(
+func createCluster(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
 	clusterDefinition *dbaasv1alpha1.ClusterDefinition,
 	appVersion *dbaasv1alpha1.AppVersion,
-	cluster *dbaasv1alpha1.Cluster) (*intctrlutil.Task, error) {
-	rootTask := intctrlutil.NewTask()
+	cluster *dbaasv1alpha1.Cluster) (*ctrl.Result, error) {
 
 	applyObjs := make([]client.Object, 0, 3)
 	cacheCtx := map[string]interface{}{}
-
-	prepareSecretsTask := intctrlutil.NewTask()
-	prepareSecretsTask.ExecFunction = prepareSecretObjs
 	params := createParams{
 		cluster:           cluster,
 		clusterDefinition: clusterDefinition,
@@ -490,16 +489,9 @@ func buildClusterCreationTasks(
 		cacheCtx:          &cacheCtx,
 		appVersion:        appVersion,
 	}
-	prepareSecretsTask.Context["exec"] = &params
-	rootTask.SubTasks = append(rootTask.SubTasks, prepareSecretsTask)
-
-	buildTask := func(component *Component) {
-		componentTask := intctrlutil.NewTask()
-		componentTask.ExecFunction = prepareComponentObjs
-		iParams := params
-		iParams.component = component
-		componentTask.Context["exec"] = &iParams
-		rootTask.SubTasks = append(rootTask.SubTasks, componentTask)
+	if err := prepareSecretObjs(reqCtx, cli, &params); err != nil {
+		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return &res, err
 	}
 
 	components := clusterDefinition.Spec.Components
@@ -508,33 +500,39 @@ func buildClusterCreationTasks(
 		componentName := component.TypeName
 		appVersionComponent := getAppVersionComponentByType(appVersion.Spec.Components, componentName)
 
+		prepareComp := func(component *Component) error {
+			iParams := params
+			iParams.component = component
+			return prepareComponentObjs(reqCtx, cli, &iParams)
+		}
+
 		if useDefaultComp {
-			buildTask(mergeComponents(cluster, clusterDefinition, &component, appVersionComponent, nil))
+			if err := prepareComp(mergeComponents(cluster, clusterDefinition, &component, appVersionComponent, nil)); err != nil {
+				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+				return &res, err
+			}
 		} else {
 			clusterComps := getClusterComponentsByType(cluster.Spec.Components, componentName)
 			for _, clusterComp := range clusterComps {
-				buildTask(mergeComponents(cluster, clusterDefinition, &component, appVersionComponent, &clusterComp))
+				if err := prepareComp(mergeComponents(cluster, clusterDefinition, &component, appVersionComponent, &clusterComp)); err != nil {
+					res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+					return &res, err
+				}
 			}
 		}
 	}
 
-	createObjsTask := intctrlutil.NewTask()
-	createObjsTask.ExecFunction = checkedCreateObjs
-	createObjsTask.Context["exec"] = &params
-	rootTask.SubTasks = append(rootTask.SubTasks, createObjsTask)
-	return &rootTask, nil
+	return checkedCreateObjs(reqCtx, cli, &params)
 }
 
-func checkedCreateObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) error {
+func checkedCreateObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) (*ctrl.Result, error) {
 	params, ok := obj.(*createParams)
 	if !ok {
-		return fmt.Errorf("invalid arg")
+		res, err := intctrlutil.CheckedRequeueWithError(fmt.Errorf("invalid arg"), reqCtx.Log, "")
+		return &res, err
 	}
 
-	if err := createOrReplaceResources(reqCtx, cli, params.cluster, params.clusterDefinition, *params.applyObjs); err != nil {
-		return err
-	}
-	return nil
+	return createOrReplaceResources(reqCtx, cli, params.cluster, params.clusterDefinition, *params.applyObjs)
 }
 
 func prepareSecretObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) error {
@@ -686,19 +684,22 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition,
-	objs []client.Object) error {
+	objs []client.Object) (*ctrl.Result, error) {
 	ctx := reqCtx.Ctx
 	logger := reqCtx.Log
 	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
+	var result *ctrl.Result
 	for _, obj := range objs {
 		logger.Info("create or update", "objs", obj)
 		if err := controllerutil.SetOwnerReference(cluster, obj, scheme); err != nil {
-			return err
+			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return &res, err
 		}
 		if err := cli.Create(ctx, obj); err == nil {
 			continue
 		} else if !apierrors.IsAlreadyExists(err) {
-			return err
+			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return &res, err
 		}
 
 		if !controllerutil.ContainsFinalizer(obj, dbClusterFinalizerName) {
@@ -721,7 +722,8 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			// if configmap is env config, should update
 			if len(cm.Labels[intctrlutil.AppConfigTypeLabelKey]) > 0 {
 				if err := cli.Update(ctx, cm); err != nil {
-					return err
+					res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+					return &res, err
 				}
 			}
 			continue
@@ -735,7 +737,8 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		if ok {
 			stsObj := &appsv1.StatefulSet{}
 			if err := cli.Get(ctx, key, stsObj); err != nil {
-				return err
+				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+				return &res, err
 			}
 			// when horizontal scaling up
 			if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
@@ -761,48 +764,101 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 					getVSErr := cli.List(ctx, &vsList)
 					// check volume snapshot available
 					if getVSErr == nil && len(stsObj.Spec.VolumeClaimTemplates) > 0 {
-						ml := client.MatchingLabels{
-							clusterDefLabelKey: cluster.Spec.ClusterDefRef,
+						snapshotKey := types.NamespacedName{
+							Namespace: stsObj.Namespace,
+							Name:      stsObj.Name + "-scaling",
 						}
-						backupPolicyTemplateList := dataprotectionv1alpha1.BackupPolicyTemplateList{}
-						// find backuppolicytemplate by clusterdefinition
-						if err := cli.List(ctx, &backupPolicyTemplateList, ml); err != nil {
-							return err
+						// check snapshot existence
+						vsNotFound := false
+						vs := snapshotv1.VolumeSnapshot{}
+						if err := cli.Get(ctx, snapshotKey, &vs); err != nil {
+							if apierrors.IsNotFound(err) {
+								vsNotFound = true
+							} else {
+								res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+								return &res, err
+							}
 						}
-						var snapshotName string
-						// if there is backuppolicytemplate created by provider
-						if len(backupPolicyTemplateList.Items) > 0 {
-							snapshotName = generateName(cluster.Name + "-scaling-")
-							// create backupjob CR
-							err := createBackup(ctx, cli, *stsObj, backupPolicyTemplateList.Items[0], snapshotName, cluster)
-							if err != nil {
-								return err
+						if vsNotFound {
+							ml := client.MatchingLabels{
+								clusterDefLabelKey: cluster.Spec.ClusterDefRef,
 							}
-							reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "BackupJobCreate", "Create backup job")
-						} else { // no backuppolicytemplate, then try native volumesnapshot
-							snapshotName = generateName(cluster.Name + "-scaling-")
-							pvcName := strings.Join([]string{stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, "0"}, "-")
-							snapshot, err := buildVolumeSnapshot(snapshotName, pvcName, *stsObj)
-							if err != nil {
-								return err
+							backupPolicyTemplateList := dataprotectionv1alpha1.BackupPolicyTemplateList{}
+							// find backuppolicytemplate by clusterdefinition
+							if err := cli.List(ctx, &backupPolicyTemplateList, ml); err != nil {
+								res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+								return &res, err
 							}
-							if err := cli.Create(ctx, snapshot); err != nil {
-								if !apierrors.IsAlreadyExists(err) {
-									return err
+							if len(backupPolicyTemplateList.Items) > 0 {
+								// if there is backuppolicytemplate created by provider
+								// create backupjob CR, will ignore error if already exists
+								err := createBackup(ctx, cli, *stsObj, backupPolicyTemplateList.Items[0], snapshotKey.Name, cluster)
+								if err != nil {
+									res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+									return &res, err
+								}
+								reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "BackupJobCreate", "Create backup job")
+							} else {
+								// no backuppolicytemplate, then try native volumesnapshot
+								pvcName := strings.Join([]string{stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, "0"}, "-")
+								snapshot, err := buildVolumeSnapshot(snapshotKey.Name, pvcName, *stsObj)
+								if err != nil {
+									res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+									return &res, err
+								}
+								if err := cli.Create(ctx, snapshot); err != nil {
+									if !apierrors.IsAlreadyExists(err) {
+										res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+										return &res, err
+									}
+								}
+								if err := controllerutil.SetOwnerReference(cluster, snapshot, scheme); err != nil {
+									res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+									return &res, err
+								}
+								reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create native volume snapshot")
+							}
+							res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
+							if err != nil {
+								return &res, err
+							}
+							result = &res
+							continue
+						} else {
+							shouldScale := false
+							// check snapshot status
+							if *vs.Status.ReadyToUse {
+								vct := stsObj.Spec.VolumeClaimTemplates[0]
+								shouldScale = true
+								// create pvc from snapshot
+								for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
+									pvcKey := types.NamespacedName{
+										Namespace: key.Namespace,
+										Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
+									}
+									pvc := corev1.PersistentVolumeClaim{}
+									// check pvc existence
+									if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
+										if apierrors.IsNotFound(err) {
+											shouldScale = false
+											if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, snapshotKey.Name); err != nil {
+												res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+												return &res, err
+											}
+										} else {
+											res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+											return &res, err
+										}
+									}
 								}
 							}
-							if err := controllerutil.SetOwnerReference(cluster, snapshot, scheme); err != nil {
-								return err
-							}
-							reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create native volume snapshot")
-						}
-						for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
-							pvcKey := types.NamespacedName{
-								Namespace: key.Namespace,
-								Name:      fmt.Sprintf("%s-%s-%d", "data", stsObj.Name, i),
-							}
-							if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, snapshotName); err != nil {
-								return err
+							if !shouldScale {
+								res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
+								if err != nil {
+									return &res, err
+								}
+								result = &res
+								continue
 							}
 						}
 					} else {
@@ -821,7 +877,8 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			stsObj.Spec.Replicas = stsProto.Spec.Replicas
 			stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
 			if err := cli.Update(ctx, stsObj); err != nil {
-				return err
+				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+				return &res, err
 			}
 			// check stsObj.Spec.VolumeClaimTemplates storage
 			// request size and find attached PVC and patch request
@@ -852,7 +909,8 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 							continue
 						}
 						if !apierrors.IsNotFound(err) {
-							return err
+							res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+							return &res, err
 						}
 					}
 					if pvc.Spec.Resources.Requests[corev1.ResourceStorage] == vctProto.Spec.Resources.Requests[corev1.ResourceStorage] {
@@ -861,7 +919,8 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 					patch := client.MergeFrom(pvc.DeepCopy())
 					pvc.Spec.Resources.Requests[corev1.ResourceStorage] = vctProto.Spec.Resources.Requests[corev1.ResourceStorage]
 					if err := cli.Patch(ctx, pvc, patch); err != nil {
-						return err
+						res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+						return &res, err
 					}
 				}
 			}
@@ -871,11 +930,13 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		if ok {
 			deployObj := &appsv1.Deployment{}
 			if err := cli.Get(ctx, key, deployObj); err != nil {
-				return err
+				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+				return &res, err
 			}
 			deployObj.Spec = deployProto.Spec
 			if err := cli.Update(ctx, deployObj); err != nil {
-				return err
+				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+				return &res, err
 			}
 			continue
 		}
@@ -883,16 +944,18 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		if ok {
 			svcObj := &corev1.Service{}
 			if err := cli.Get(ctx, key, svcObj); err != nil {
-				return err
+				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+				return &res, err
 			}
 			svcObj.Spec = svcProto.Spec
 			if err := cli.Update(ctx, svcObj); err != nil {
-				return err
+				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+				return &res, err
 			}
 			continue
 		}
 	}
-	return nil
+	return result, nil
 }
 
 func buildSvc(params createParams, headless bool) (*corev1.Service, error) {

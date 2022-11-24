@@ -21,7 +21,7 @@ spec:
           - name: follower
             accessMode: Readonly
       defaultReplicas: 3
-      horizontalScalePolicy: Backup
+      horizontalScalePolicy: Snapshot
       probes:
         roleChangedProbe:
           periodSeconds: 1

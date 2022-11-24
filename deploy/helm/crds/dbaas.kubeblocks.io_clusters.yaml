@@ -183,7 +183,7 @@ spec:
                       - LoadBalancer
                       type: string
                     tolerations:
-                      description: ClusterComponent Tolerations will override ClusterSpec.Tolerations
+                      description: Component tolerations will override ClusterSpec.Tolerations
                         if specified.
                       items:
                         description: The pod this Toleration is attached to tolerates

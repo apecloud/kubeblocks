@@ -95,12 +95,12 @@ type ExporterConfig struct {
 type MonitorConfig struct {
 	// BuiltIn is a switch to enable DBaas builtIn monitoring.
 	// If BuiltIn is true and CharacterType is wellknown, ExporterConfig and Sidecar container will generate automatically.
-	// Otherwise, ISV should set BuiltIn to false and provide ExporterConfig and Sidecar container own.
+	// Otherwise, provider should set BuiltIn to false and provide ExporterConfig and Sidecar container own.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:default=true
+	// +kubebuilder:default=false
 	BuiltIn bool `json:"builtIn"`
 
-	// Exporter provided by ISV, which specify necessary information to Time Series Database.
+	// Exporter provided by provider, which specify necessary information to Time Series Database.
 	// ExporterConfig is valid when BuiltIn is false.
 	// +optional
 	Exporter *ExporterConfig `json:"exporterConfig,omitempty"`
@@ -125,6 +125,12 @@ type ClusterDefinitionComponent struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
 	TypeName string `json:"typeName"`
+
+	// componentType defines type of the component. On of Stateful, Stateless, Consensus.
+	// Default to Stateless.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus}
+	ComponentType ComponentType `json:"componentType"`
 
 	// CharacterType defines well-known database component name, such as mongos(mongodb), proxy(redis), wesql(mysql)
 	// DBaas will generate proper monitor configs for wellknown CharacterType when BuiltIn is true.
@@ -152,16 +158,16 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	PDBSpec *policyv1.PodDisruptionBudgetSpec `json:"pdbSpec,omitempty"`
 
-	// The configTemplateRefs field provided by ISV, and
+	// The configTemplateRefs field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
 	// +optional
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
 
-	// Monitor is monitoring config which provided by ISV.
+	// Monitor is monitoring config which provided by provider.
 	// +optional
 	Monitor *MonitorConfig `json:"monitor,omitempty"`
 
-	// LogConfigs is detail log file config which provided by ISV.
+	// LogConfigs is detail log file config which provided by provider.
 	// +optional
 	LogConfigs []LogConfig `json:"logConfigs,omitempty"`
 
@@ -178,17 +184,11 @@ type ClusterDefinitionComponent struct {
 	// provide read-write service when ComponentType is Consensus.
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
-	Service corev1.ServiceSpec `json:"service,omitempty"`
+	Service *corev1.ServiceSpec `json:"service,omitempty"`
 
 	// Probes setting for db healthy checks.
 	// +optional
 	Probes *ClusterDefinitionProbes `json:"probes,omitempty"`
-
-	// ComponentType defines type of the component.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=Stateless
-	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus}
-	ComponentType ComponentType `json:"componentType"`
 
 	// ConsensusSpec defines consensus related spec if componentType is Consensus.
 	// CAN'T be empty if componentType is Consensus.
@@ -244,7 +244,7 @@ type ClusterDefinitionProbe struct {
 	// +kubebuilder:validation:Minimum=1
 	SuccessThreshold int32 `json:"successThreshold,omitempty"`
 
-	// Cmds used to execute for probe.
+	// commands used to execute for probe.
 	// +optional
 	Commands *ClusterDefinitionProbeCMDs `json:"commands,omitempty"`
 }
@@ -253,9 +253,11 @@ type ClusterDefinitionProbes struct {
 	// Probe for db running check.
 	// +optional
 	RunningProbe *ClusterDefinitionProbe `json:"runningProbe,omitempty"`
+
 	// Probe for db status check.
 	// +optional
 	StatusProbe *ClusterDefinitionProbe `json:"statusProbe,omitempty"`
+
 	// Probe for db role changed check.
 	// +optional
 	RoleChangedProbe *ClusterDefinitionProbe `json:"roleChangedProbe,omitempty"`

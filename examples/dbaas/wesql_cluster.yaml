@@ -6,7 +6,7 @@ spec:
   appVersionRef: wesql-8.0.30
   clusterDefinitionRef: apecloud-wesql
   components:
-    - name: wesql-test
+    - name: main
       type: replicasets
       monitor: false
       volumeClaimTemplates:
@@ -17,4 +17,3 @@ spec:
             resources:
               requests:
                 storage: 1Gi
-            volumeMode: Filesystem

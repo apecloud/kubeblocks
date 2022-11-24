@@ -92,17 +92,19 @@ type ClusterStatus struct {
 
 	ClusterDefinitionStatusGeneration `json:",inline"`
 
-	// describe current state of cluster API Resource, like warning.
+	// Describe current state of cluster API Resource, like warning.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 type ClusterComponent struct {
+
+	// name defines cluster's component name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
 	Name string `json:"name"`
 
-	// component name in ClusterDefinition.
+	// Component type name defined in ClusterDefinition spec.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
 	Type string `json:"type"`
@@ -121,7 +123,7 @@ type ClusterComponent struct {
 	// +optional
 	EnabledLogs []string `json:"enabledLogs,omitempty"`
 
-	// Component replicas, use default value in ClusterDefinition if not specified.
+	// Component replicas, use default value in ClusterDefinition spec. if not specified.
 	// +optional
 	Replicas int32 `json:"replicas,omitempty"`
 

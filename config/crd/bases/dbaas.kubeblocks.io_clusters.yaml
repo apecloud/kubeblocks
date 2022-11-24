@@ -128,11 +128,12 @@ spec:
                         to Time Series Database.
                       type: boolean
                     name:
+                      description: name defines cluster's component name.
                       maxLength: 12
                       type: string
                     replicas:
                       description: Component replicas, use default value in ClusterDefinition
-                        if not specified.
+                        spec. if not specified.
                       format: int32
                       type: integer
                     resources:
@@ -226,7 +227,8 @@ spec:
                         type: object
                       type: array
                     type:
-                      description: component name in ClusterDefinition.
+                      description: Component type name defined in ClusterDefinition
+                        spec.
                       maxLength: 12
                       type: string
                     volumeClaimTemplates:
@@ -611,7 +613,7 @@ spec:
                   components of the cluster.
                 type: object
               conditions:
-                description: describe current state of cluster API Resource, like
+                description: Describe current state of cluster API Resource, like
                   warning.
                 items:
                   description: "Condition contains details for one aspect of the current

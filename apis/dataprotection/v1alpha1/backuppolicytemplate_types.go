@@ -69,7 +69,7 @@ type BackupPolicyTemplateStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={dbaas},scope=Cluster
 
-// BackupPolicyTemplate is the Schema for the BackupPolicyTemplates API (defined by ISV)
+// BackupPolicyTemplate is the Schema for the BackupPolicyTemplates API (defined by provider)
 type BackupPolicyTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

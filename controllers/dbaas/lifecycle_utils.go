@@ -737,79 +737,78 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			if err := cli.Get(ctx, key, stsObj); err != nil {
 				return err
 			}
-			// horizontal scaling
+			// when horizontal scaling up
 			if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
 				reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "HorizontalScale", "Start horizontal scale")
 				var component dbaasv1alpha1.ClusterDefinitionComponent
+				// find component of current statefulset
 				for _, comp := range clusterDef.Spec.Components {
 					if comp.TypeName == stsObj.Labels[types2.ComponentLabelKey] {
 						component = comp
+						break
 					}
 				}
+				// do backup according to component's horizontal scale policy
 				switch component.HorizontalScalePolicy {
+				// use backup tool such as xtrabackup
 				case dbaasv1alpha1.Backup:
-					ml := client.MatchingLabels{
-						clusterDefLabelKey: cluster.Spec.ClusterDefRef,
-					}
-					backupPolicyTemplateList := dataprotectionv1alpha1.BackupPolicyTemplateList{}
-					if err := cli.List(ctx, &backupPolicyTemplateList, ml); err != nil {
-						return err
-					}
-					if len(backupPolicyTemplateList.Items) > 0 {
-						backupJobName := generateName(cluster.Name + "-scaling-")
-						err := createBackup(ctx, cli, *stsObj, backupPolicyTemplateList.Items[0], backupJobName, cluster)
-						if err != nil {
+					// TODO: db core not support yet, leave it empty
+					reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeWarning, "HorizontalScaleFailed", "scale with backup tool not support yet")
+					break
+				// use volume snapshot
+				case dbaasv1alpha1.Snapshot:
+					vsList := snapshotv1.VolumeSnapshotList{}
+					getVSErr := cli.List(ctx, &vsList)
+					// check volume snapshot available
+					if getVSErr == nil && len(stsObj.Spec.VolumeClaimTemplates) > 0 {
+						ml := client.MatchingLabels{
+							clusterDefLabelKey: cluster.Spec.ClusterDefRef,
+						}
+						backupPolicyTemplateList := dataprotectionv1alpha1.BackupPolicyTemplateList{}
+						// find backuppolicytemplate by clusterdefinition
+						if err := cli.List(ctx, &backupPolicyTemplateList, ml); err != nil {
 							return err
 						}
-						reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "BackupJobCreate", "Create backup job")
+						var snapshotName string
+						// if there is backuppolicytemplate created by provider
+						if len(backupPolicyTemplateList.Items) > 0 {
+							snapshotName = generateName(cluster.Name + "-scaling-")
+							// create backupjob CR
+							err := createBackup(ctx, cli, *stsObj, backupPolicyTemplateList.Items[0], snapshotName, cluster)
+							if err != nil {
+								return err
+							}
+							reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "BackupJobCreate", "Create backup job")
+						} else { // no backuppolicytemplate, then try native volumesnapshot
+							snapshotName = generateName(cluster.Name + "-scaling-")
+							pvcName := strings.Join([]string{stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, "0"}, "-")
+							snapshot, err := buildVolumeSnapshot(snapshotName, pvcName, *stsObj)
+							if err != nil {
+								return err
+							}
+							if err := cli.Create(ctx, snapshot); err != nil {
+								if !apierrors.IsAlreadyExists(err) {
+									return err
+								}
+							}
+							if err := controllerutil.SetOwnerReference(cluster, snapshot, scheme); err != nil {
+								return err
+							}
+							reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create native volume snapshot")
+						}
 						for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
 							pvcKey := types.NamespacedName{
 								Namespace: key.Namespace,
 								Name:      fmt.Sprintf("%s-%s-%d", "data", stsObj.Name, i),
 							}
-							if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, backupJobName); err != nil {
+							if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, snapshotName); err != nil {
 								return err
 							}
 						}
 					} else {
-						reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeWarning, "HorizontalScaleFailed", "backup policy template not found for clusterdefinition %s", cluster.Spec.ClusterDefRef)
+						reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeWarning, "HorizontalScaleFailed", "volume snapshot not support")
 					}
-				case dbaasv1alpha1.Snapshot:
-					vsList := snapshotv1.VolumeSnapshotList{}
-					// check volume snapshot available
-					getVSErr := cli.List(ctx, &vsList)
-					if getVSErr == nil && len(stsObj.Spec.VolumeClaimTemplates) > 0 {
-						snapshotName := generateName(cluster.Name + "-scaling-")
-						if len(stsObj.Spec.VolumeClaimTemplates) > 0 {
-							reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create native volume snapshot")
-							pvcName := strings.Join([]string{stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, "0"}, "-")
-							snapshot, err := buildVolumeSnapshot(snapshotName, pvcName, *stsObj)
-							if err != nil {
-								reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeWarning, "HorizontalScaleFailed", err.Error())
-								return err
-							}
-							if err := cli.Create(ctx, snapshot); err != nil {
-								if !apierrors.IsAlreadyExists(err) {
-									reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeWarning, "HorizontalScaleFailed", err.Error())
-									return err
-								}
-							}
-							if err := controllerutil.SetOwnerReference(cluster, snapshot, scheme); err != nil {
-								reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeWarning, "HorizontalScaleFailed", err.Error())
-								return err
-							}
-							for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
-								pvcKey := types.NamespacedName{
-									Namespace: key.Namespace,
-									Name:      fmt.Sprintf("%s-%s-%d", "data", stsObj.Name, i),
-								}
-								if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, snapshotName); err != nil {
-									reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeWarning, "HorizontalScaleFailed", err.Error())
-									return err
-								}
-							}
-						}
-					}
+				// do nothing when horizontal scaling
 				case dbaasv1alpha1.ScaleNone:
 					break
 				}

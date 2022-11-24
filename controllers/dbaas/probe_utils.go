@@ -72,16 +72,28 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams,
 		probeContainers = append(probeContainers, *roleChangedContainer)
 	}
 
+	if componentProbes.StatusProbe != nil {
+		statusProbeContainer := container.DeepCopy()
+		buildStatusProbeContainer(statusProbeContainer, componentProbes.StatusProbe, int(probeServiceHTTPPort))
+		probeContainers = append(probeContainers, *statusProbeContainer)
+	}
+
+	if componentProbes.RunningProbe != nil {
+		runningProbeContainer := container.DeepCopy()
+		buildRunningProbeContainer(runningProbeContainer, componentProbes.RunningProbe, int(probeServiceHTTPPort))
+		probeContainers = append(probeContainers, *runningProbeContainer)
+	}
+
 	if len(probeContainers) >= 1 {
 		container := &probeContainers[0]
-		buildProbeServiceContainer(container, int(probeServiceHTTPPort), int(probeServiceGrpcPort))
+		buildProbeServiceContainer(params.component, container, int(probeServiceHTTPPort), int(probeServiceGrpcPort))
 	}
 
 	reqCtx.Log.Info("probe", "containers", probeContainers)
 	return probeContainers, nil
 }
 
-func buildProbeServiceContainer(container *corev1.Container, probeServiceHTTPPort int, probeServiceGrpcPort int) {
+func buildProbeServiceContainer(component *Component, container *corev1.Container, probeServiceHTTPPort int, probeServiceGrpcPort int) {
 	container.Image = viper.GetString("KUBEBLOCKS_IMAGE")
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString("KUBEBLOCKS_IMAGE_PULL_POLICY"))
 	logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
@@ -93,24 +105,24 @@ func buildProbeServiceContainer(container *corev1.Container, probeServiceHTTPPor
 		"--config", "/config/dapr/config.yaml",
 		"--components-path", "/config/dapr/components"}
 
-	// set pod name and namespace, for role label updating inside pod
-	podName := corev1.EnvVar{
-		Name: "MY_POD_NAME",
-		ValueFrom: &corev1.EnvVarSource{
-			FieldRef: &corev1.ObjectFieldSelector{
-				FieldPath: "metadata.name",
-			},
-		},
+	if len(component.Service.Ports) >= 0 {
+		port := component.Service.Ports[0]
+		dbPort := port.TargetPort.IntValue()
+		if dbPort == 0 {
+			dbPort = int(port.Port)
+		}
+		container.Env = append(container.Env, corev1.EnvVar{
+			Name:      dbaasPrefix + "_DB_PORT",
+			Value:     strconv.Itoa(dbPort),
+			ValueFrom: nil,
+		})
 	}
-	podNamespace := corev1.EnvVar{
-		Name: "MY_POD_NAMESPACE",
-		ValueFrom: &corev1.EnvVarSource{
-			FieldRef: &corev1.ObjectFieldSelector{
-				FieldPath: "metadata.namespace",
-			},
-		},
-	}
-	container.Env = append(container.Env, podName, podNamespace)
+
+	container.Env = append(container.Env, corev1.EnvVar{
+		Name:      dbaasPrefix + "_DB_CHARACTER_TYPE",
+		Value:     component.CharacterType,
+		ValueFrom: nil,
+	})
 
 	container.Ports = []corev1.ContainerPort{{
 		ContainerPort: int32(probeServiceHTTPPort),
@@ -121,7 +133,7 @@ func buildProbeServiceContainer(container *corev1.Container, probeServiceHTTPPor
 
 func buildRoleChangedProbeContainer(roleChangedContainer *corev1.Container,
 	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeServiceHTTPPort int) {
-	roleChangedContainer.Name = "kbprobe-rolechangedcheck"
+	roleChangedContainer.Name = "kb-rolechangedcheck"
 	probe := roleChangedContainer.ReadinessProbe
 	probe.Exec.Command = []string{"curl", "-X", "POST",
 		"--fail-with-body", "--silent",
@@ -129,7 +141,31 @@ func buildRoleChangedProbeContainer(roleChangedContainer *corev1.Container,
 		"http://localhost:" + strconv.Itoa(probeServiceHTTPPort) + "/v1.0/bindings/probe",
 		"-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
-	probe.SuccessThreshold = probeSetting.SuccessThreshold
-	probe.FailureThreshold = probeSetting.FailureThreshold
 	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeServiceHTTPPort)
+}
+
+func buildStatusProbeContainer(statusProbeContainer *corev1.Container,
+	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeServiceHTTPPort int) {
+	statusProbeContainer.Name = "kb-statuscheck"
+	probe := statusProbeContainer.ReadinessProbe
+	httpGet := &corev1.HTTPGetAction{}
+	httpGet.Path = "/v1.0/bindings/probe?operation=statusCheck"
+	httpGet.Port = intstr.FromInt(probeServiceHTTPPort)
+	probe.Exec = nil
+	probe.HTTPGet = httpGet
+	probe.PeriodSeconds = probeSetting.PeriodSeconds
+	statusProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeServiceHTTPPort)
+}
+
+func buildRunningProbeContainer(runningProbeContainer *corev1.Container,
+	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeServiceHTTPPort int) {
+	runningProbeContainer.Name = "kb-runningcheck"
+	probe := runningProbeContainer.ReadinessProbe
+	httpGet := &corev1.HTTPGetAction{}
+	httpGet.Path = "/v1.0/bindings/probe?operation=runningCheck"
+	httpGet.Port = intstr.FromInt(probeServiceHTTPPort)
+	probe.Exec = nil
+	probe.HTTPGet = httpGet
+	probe.PeriodSeconds = probeSetting.PeriodSeconds
+	runningProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeServiceHTTPPort)
 }

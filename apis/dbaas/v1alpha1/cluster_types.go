@@ -129,7 +129,7 @@ type ClusterComponent struct {
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
-	// ClusterComponent Tolerations will override ClusterSpec.Tolerations if specified.
+	// Component tolerations will override ClusterSpec.Tolerations if specified.
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 

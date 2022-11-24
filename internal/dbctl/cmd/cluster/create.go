@@ -195,7 +195,7 @@ func (o *CreateOptions) Complete() error {
 	for _, tolerationRaw := range o.TolerationsRaw {
 		toleration := map[string]string{}
 		for _, entries := range strings.Split(tolerationRaw, ",") {
-			parts := strings.Split(entries, "=")
+			parts := strings.SplitN(entries, "=", 2)
 			toleration[parts[0]] = parts[1]
 		}
 		tolerations = append(tolerations, toleration)

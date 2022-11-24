@@ -28,7 +28,7 @@ content: {
 			topologyKeys:    options.topologyKeys
 			nodeLabels:      options.nodeLabels
 		}
-		tolerations: options.tolerations
+		tolerations:       options.tolerations
 		components:        options.components
 		terminationPolicy: options.terminationPolicy
 	}

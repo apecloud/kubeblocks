@@ -4,6 +4,8 @@
 
 replicaCount: 3
 
+terminationPolicy: Halt
+
 appVersionOverride: ""
 
 monitor:
@@ -49,3 +51,6 @@ persistence:
 enabledLogs:
   - slow
   - error
+
+topologyKeys:
+  - kubernetes.io/hostname

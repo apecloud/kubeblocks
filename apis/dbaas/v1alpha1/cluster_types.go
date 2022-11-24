@@ -26,24 +26,22 @@ import (
 
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
-	// ref ClusterDefinition, immutable.
+	// Cluster referenced ClusterDefinition name, this is an immutable attribute.
 	// +kubebuilder:validation:Required
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
-	// ref AppVersion
+	// Cluster referenced AppVersion name.
 	// +kubebuilder:validation:Required
 	AppVersionRef string `json:"appVersionRef"`
 
-	// One of DoNotTerminate, Halt, Delete, WipeOut.
-	// Defaults to Halt.
-	// DoNotTerminate means block delete operation.
-	// Halt means delete resources such as sts,deploy,svc,pdb, but keep pvcs.
-	// Delete is based on Halt and delete pvcs.
-	// WipeOut is based on Delete and wipe out all snapshots and snapshot data from bucket.
-	// +kubebuilder:default=Halt
+	// Cluster termination policy. One of DoNotTerminate, Halt, Delete, WipeOut.
+	// DoNotTerminate will block delete operation.
+	// Halt will delete workload resources such as statefulset, deployment workloads but keep PVCs.
+	// Delete is based on Halt and deletes PVCs.
+	// WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.
+	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
-	// +optional
-	TerminationPolicy TerminationPolicyType `json:"terminationPolicy,omitempty"`
+	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
 
 	// List of components you want to replace in ClusterDefinition and AppVersion. It will replace the field in ClusterDefinition's and AppVersion's component if type is matching.
 	// +optional
@@ -315,15 +313,15 @@ func init() {
 	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
 }
 
-// ValidateEnabledLogs validate enabledLogs config, and return metav1.Condition when detect invalid value
+// ValidateEnabledLogs validates enabledLogs config in cluster.yaml, and returns metav1.Condition when detect invalid values.
 func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) []*metav1.Condition {
-	conditionList := make([]*metav1.Condition, 0)
+	conditionList := make([]*metav1.Condition, 0, len(r.Spec.Components))
 	for _, comp := range r.Spec.Components {
 		invalidLogNames := cd.ValidateEnabledLogConfigs(comp.Type, comp.EnabledLogs)
 		if len(invalidLogNames) == 0 {
 			continue
 		}
-		message := fmt.Sprintf("EnabledLogs of cluster component %s has invalid value %s which isn't definded in cluster definition", comp.Name, invalidLogNames)
+		message := fmt.Sprintf("EnabledLogs config of cluster component %s has invalid value %s which isn't definded in clusterDefinition", comp.Name, invalidLogNames)
 		conditionList = append(conditionList, &metav1.Condition{
 			Type:               "ValidateEnabledLogs",
 			Status:             metav1.ConditionFalse,

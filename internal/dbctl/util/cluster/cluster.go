@@ -314,6 +314,10 @@ func (o *ClusterObjects) GetInstanceInfo() []*InstanceInfo {
 			Age:        duration.HumanDuration(time.Since(pod.CreationTimestamp.Time)),
 		}
 
+		if instance.Role == valueNone {
+			instance.Role = getLabelVal(pod.Labels, types.ReplicationSetRoleLabelKey)
+		}
+
 		var component *dbaasv1alpha1.ClusterComponent
 		for i, c := range o.Cluster.Spec.Components {
 			if c.Name == instance.Component {

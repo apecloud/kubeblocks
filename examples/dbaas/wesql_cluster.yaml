@@ -5,6 +5,7 @@ metadata:
 spec:
   appVersionRef: wesql-8.0.30
   clusterDefinitionRef: apecloud-wesql
+  terminationPolicy: WipeOut
   components:
     - name: wesql-test
       type: replicasets

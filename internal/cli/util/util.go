@@ -27,6 +27,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -353,4 +354,20 @@ func GetPodStatus(pods []*corev1.Pod) (running, waiting, succeeded, failed int) 
 		}
 	}
 	return
+}
+
+// OpenBrowser will open browser by url in different OS system
+func OpenBrowser(url string) error {
+	var err error
+	switch runtime.GOOS {
+	case "linux":
+		err = exec.Command("xdg-open", url).Start()
+	case "windows":
+		err = exec.Command("cmd", "/C", "start", url).Run()
+	case "darwin":
+		err = exec.Command("open", url).Start()
+	default:
+		err = fmt.Errorf("unsupported platform")
+	}
+	return err
 }

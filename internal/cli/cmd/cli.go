@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/options"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/version"
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/dashboard"
 )
 
 var cfgFile string
@@ -87,6 +88,7 @@ A Command Line Interface for KubeBlocks`,
 		options.NewCmdOptions(ioStreams.Out),
 		version.NewVersionCmd(f),
 		backupconfig.NewBackupConfigCmd(f, ioStreams),
+		dashboard.NewDashboardCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}

@@ -249,8 +249,8 @@ clean-dbctl: ## Clean bin/dbctl* CLI tools.
 	rm -f bin/dbctl*
 
 .PHONY: doc
-dbctl-doc: ## generate dbctl command reference manual.
-	go run ./hack/docgen/dbctl/main.go ./docs/user_docs/cli
+dbctl-doc: build-checks ## generate dbctl command reference manual.
+	$(GO) run ./hack/docgen/dbctl/main.go ./docs/user_docs/cli
 
 ##@ Load Balancer
 

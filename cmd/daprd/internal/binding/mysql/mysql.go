@@ -24,6 +24,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"reflect"
 	"strconv"
@@ -40,11 +41,12 @@ import (
 
 const (
 	// list of operations.
-	execOperation        bindings.OperationKind = "exec"
-	statusCheckOperation bindings.OperationKind = "statusCheck"
-	roleCheckOperation   bindings.OperationKind = "roleCheck"
-	queryOperation       bindings.OperationKind = "query"
-	closeOperation       bindings.OperationKind = "close"
+	execOperation         bindings.OperationKind = "exec"
+	runningCheckOperation bindings.OperationKind = "runningCheck"
+	statusCheckOperation  bindings.OperationKind = "statusCheck"
+	roleCheckOperation    bindings.OperationKind = "roleCheck"
+	queryOperation        bindings.OperationKind = "query"
+	closeOperation        bindings.OperationKind = "close"
 
 	// configurations to connect to Mysql, either a data source name represent by URL.
 	connectionURLKey = "url"
@@ -79,6 +81,8 @@ const (
 
 var oriRole = ""
 var bootTime = time.Now()
+var runningCheckFailedCount = 0
+var statusCheckFailedCount = 0
 var roleCheckFailedCount = 0
 var roleCheckCount = 0
 
@@ -199,8 +203,15 @@ func (m *Mysql) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindi
 		}
 		resp.Data = d
 
+	case runningCheckOperation:
+		d, err := m.runningCheck(ctx, resp)
+		if err != nil {
+			return nil, err
+		}
+		resp.Data = d
+
 	case statusCheckOperation:
-		d, err := m.statusCheck(ctx, s)
+		d, err := m.statusCheck(ctx, s, resp)
 		if err != nil {
 			return nil, err
 		}
@@ -231,6 +242,7 @@ func (m *Mysql) Operations() []bindings.OperationKind {
 		execOperation,
 		queryOperation,
 		closeOperation,
+		runningCheckOperation,
 		statusCheckOperation,
 		roleCheckOperation,
 	}
@@ -277,31 +289,65 @@ func (m *Mysql) exec(ctx context.Context, sql string) (int64, error) {
 	return res.RowsAffected()
 }
 
-func (m *Mysql) statusCheck(ctx context.Context, sql string) ([]byte, error) {
-	m.logger.Debugf("status Check exec: %s", sql)
-	if sql == "" {
-		sql = "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
-	}
-
-	rows, err := m.db.QueryContext(ctx, sql)
+func (m *Mysql) runningCheck(ctx context.Context, resp *bindings.InvokeResponse) ([]byte, error) {
+	host := fmt.Sprintf("127.0.0.1:%s", os.Getenv("KB_DB_PORT"))
+	conn, err := net.DialTimeout("tcp", host, 900*time.Millisecond)
+	message := ""
+	result := internal.ProbeMessage{}
 	if err != nil {
-		return nil, errors.Wrapf(err, "error executing %s", sql)
-	}
-
-	defer func() {
-		_ = rows.Close()
-		_ = rows.Err()
-	}()
-
-	var curLeader string
-	var role string
-	var serverId string
-	for rows.Next() {
-		if err := rows.Scan(&curLeader, &role, &serverId); err != nil {
-			m.logger.Errorf("checkRole error: %v", err)
+		message = fmt.Sprintf("running check %s error: %v", host, err)
+		result.Event = "runningCheckFailed"
+		m.logger.Errorf(message)
+		if runningCheckFailedCount++; runningCheckFailedCount%10 == 1 {
+			m.logger.Infof("running checks failed %v times continuously", runningCheckFailedCount)
+			resp.Metadata[statusCode] = "451"
 		}
+	} else {
+		runningCheckFailedCount = 0
+		message = "TCP Connection Established Successfully!"
+		if tcpCon, ok := conn.(*net.TCPConn); ok {
+			tcpCon.SetLinger(0)
+		}
+		defer conn.Close()
 	}
-	return []byte(role), nil
+	result.Message = message
+	msg, _ := json.Marshal(result)
+	return msg, nil
+}
+
+func (m *Mysql) statusCheck(ctx context.Context, sql string, resp *bindings.InvokeResponse) ([]byte, error) {
+	leaderSql := `begin;
+   create table if not exists kb_health_check(type int, id bigint, primary key(type));
+   insert into kb_health_check values(1, now()) on duplicate key update id = now();
+   commit;
+	select id from kb_health_check;`
+	followerSql := `select id from kb_health_check limit 1;`
+	var err error
+	var count int64
+	var data []byte
+	oriRole = "leader"
+	if oriRole == "leader" {
+		count, err = m.exec(ctx, leaderSql)
+		data = []byte(strconv.FormatInt(count, 10))
+	} else {
+		data, err = m.query(ctx, followerSql)
+	}
+	result := internal.ProbeMessage{}
+	if err != nil {
+		m.logger.Infof("statusCheck error: %v", err)
+		result.Event = "statusCheckFailed"
+		result.Message = err.Error()
+		if statusCheckFailedCount++; statusCheckFailedCount%10 == 1 {
+			m.logger.Infof("status checks failed %v times continuously", statusCheckFailedCount)
+			resp.Metadata[statusCode] = "451"
+		}
+	} else {
+		result.Message = string(data)
+		statusCheckFailedCount = 0
+	}
+	msg, _ := json.Marshal(result)
+	return msg, nil
+
 }
 
 func (m *Mysql) getRole(ctx context.Context, sql string) (string, error) {

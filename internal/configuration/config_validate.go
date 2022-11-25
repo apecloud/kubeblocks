@@ -18,6 +18,10 @@ package configuration
 
 import (
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/kube-openapi/pkg/validation/errors"
+	kubeopenapispec "k8s.io/kube-openapi/pkg/validation/spec"
+	"k8s.io/kube-openapi/pkg/validation/strfmt"
+	"k8s.io/kube-openapi/pkg/validation/validate"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
@@ -47,11 +51,26 @@ func (c *configCueValidator) Validate(cfg map[string]string) error {
 type schemaValidator struct {
 	typeName string
 	schema   *apiext.JSONSchemaProps
+	cfgType  dbaasv1alpha1.ConfigurationFormatter
 }
 
 func (s schemaValidator) Validate(cfg map[string]string) error {
 	// TODO implement me
-	return MakeError("not support schema validate.")
+
+	openAPITypes := &kubeopenapispec.Schema{}
+	validator := validate.NewSchemaValidator(openAPITypes, nil, "", strfmt.Default)
+	for key, data := range cfg {
+		cfg, err := LoadConfiguration(s.cfgType, data)
+		if err != nil {
+			return err
+		}
+		res := validator.Validate(cfg)
+		if res.HasErrors() {
+			return WrapError(errors.CompositeValidationError(res.Errors...), "failed to schema validate for cfg: %s", key)
+		}
+	}
+
+	return nil
 }
 
 type EmptyValidator struct {
@@ -78,6 +97,7 @@ func NewConfigValidator(configTemplate *dbaasv1alpha1.ConfigurationTemplateSpec)
 	case meta.Schema != nil:
 		validator = &schemaValidator{
 			typeName: configTemplate.CfgSchemaTopLevelName,
+			cfgType:  configTemplate.Formatter,
 			schema:   meta.Schema,
 		}
 	default:

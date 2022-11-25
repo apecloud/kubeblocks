@@ -40,7 +40,7 @@ func TestGenerateOpenApiSchema(t *testing.T) {
 		{
 			name: "normal_test",
 			args: args{
-				cueFile:    "mysql.cue",
+				cueFile:    "mysql_openapi.cue",
 				schemaType: "MysqlParameter",
 			},
 			want:    "mysql_openapi.json",
@@ -49,7 +49,7 @@ func TestGenerateOpenApiSchema(t *testing.T) {
 		{
 			name: "normal_with_not_empty",
 			args: args{
-				cueFile:    "mysql.cue",
+				cueFile:    "mysql_openapi.cue",
 				schemaType: "",
 			},
 			want:    "mysql_openapi.json",

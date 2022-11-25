@@ -18,6 +18,7 @@ package policy
 
 import (
 	"encoding/json"
+	"reflect"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
@@ -30,58 +31,17 @@ func GetUpdateParameterList(cfg *cfgcore.ConfigDiffInformation) ([]string, error
 		if err := json.Unmarshal(diff, &updatedParams); err != nil {
 			return nil, err
 		}
-		switch updatedParams.(type) {
-		case map[string]interface{}:
-			params = append(params, extractUpdatedParams(updatedParams)...)
-		default:
-			return nil, cfgcore.MakeError("expect to map json. actual: [%s]", diff)
+		if err := cfgcore.UnstructuredObjectWalk(updatedParams,
+			func(parent, cur string, v reflect.Value, fn cfgcore.UpdateFn) error {
+				if cur != "" {
+					params = append(params, cur)
+				}
+				return nil
+			}, true); err != nil {
+			return nil, cfgcore.WrapError(err, "failed to walk params: [%s]", diff)
 		}
 	}
 	return params, nil
-}
-
-func extractUpdatedParams(params interface{}) []string {
-	return extractMapParameters(params.(map[string]interface{}))
-}
-
-func extractMapParameters(object map[string]interface{}) []string {
-	params := make([]string, 0)
-	for key, value := range object {
-		switch val := value.(type) {
-		case []interface{}:
-			// val := value.([]interface{})
-			params = append(params, extractListParameters(key, val)...)
-		case map[string]interface{}:
-			// val := value.(map[string]interface{})
-			params = append(params, extractMapParameters(val)...)
-		default:
-			params = append(params, key)
-		}
-	}
-	return params
-}
-
-func extractListParameters(prefix string, objects []interface{}) []string {
-	if len(objects) == 0 {
-		return []string{prefix}
-	}
-
-	params := make([]string, 0)
-	for _, value := range objects {
-		switch val := value.(type) {
-		case []interface{}:
-			// val := value.([]interface{})
-			params = append(params, extractListParameters(prefix, val)...)
-		case map[string]interface{}:
-			// val := value.(map[string]interface{})
-			params = append(params, extractMapParameters(val)...)
-		default:
-			if prefix != "" {
-				params = append(params, prefix)
-			}
-		}
-	}
-	return params
 }
 
 func IsUpdateDynamicParameters(tpl *dbaasv1alpha1.ConfigurationTemplateSpec, cfg *cfgcore.ConfigDiffInformation) (bool, error) {

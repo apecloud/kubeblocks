@@ -17,7 +17,6 @@ limitations under the License.
 package policy
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -49,14 +48,21 @@ func TestGetUpdateParameterList(t *testing.T) {
 	}
 }
 `
-	var obj any
-	err := json.Unmarshal([]byte(testData), &obj)
+	params, err := extractUpdatedParams(testData)
 	require.Nil(t, err)
-
-	params := extractUpdatedParams(obj)
 	require.Equal(t, cfgcore.NewSetFromList(
 		[]string{
-			"a", "c", "msld", "cd", "f", "test1", "test2", "d",
+			"a", "c_1", "c_0", "msld", "cd", "f", "test1", "test2",
 		}),
 		cfgcore.NewSetFromList(params))
+}
+
+func extractUpdatedParams(testData string) ([]string, error) {
+	cfg := cfgcore.ConfigDiffInformation{
+		UpdateConfig: map[string][]byte{
+			"k": []byte(testData),
+		},
+	}
+
+	return GetUpdateParameterList(&cfg)
 }

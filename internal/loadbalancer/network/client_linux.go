@@ -159,9 +159,9 @@ func (c *networkClient) SetupNetworkForENI(eni *cloud.ENIMetadata) error {
 		return errors.Wrap(err, "Failed to calculate gateway ip")
 	}
 
-	expectedIPMap := make(map[string]bool, len(eni.IPv4Addresses))
+	expectedIPMap := make(map[string]struct{}, len(eni.IPv4Addresses))
 	for _, ip := range eni.IPv4Addresses {
-		expectedIPMap[ip.Address] = true
+		expectedIPMap[ip.Address] = struct{}{}
 	}
 
 	addrs, err := c.nl.AddrList(link, unix.AF_INET)
@@ -170,10 +170,10 @@ func (c *networkClient) SetupNetworkForENI(eni *cloud.ENIMetadata) error {
 	}
 
 	// 1. remove unknown private ip, may be added by user
-	assignedAddrs := make(map[string]bool)
+	assignedAddrs := make(map[string]struct{})
 	for _, addr := range addrs {
 		if _, ok := expectedIPMap[addr.IP.String()]; ok {
-			assignedAddrs[addr.IP.String()] = true
+			assignedAddrs[addr.IP.String()] = struct{}{}
 			continue
 		}
 		c.logger.Info("Deleting unknown ip address", "ip", addr.String())

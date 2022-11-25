@@ -100,7 +100,7 @@ func (nm *nodeManager) refreshNodes() error {
 	if err := nm.Client.List(context.Background(), nodeList, opts...); err != nil {
 		return errors.Wrap(err, "Failed to list cluster nodes")
 	}
-	nodesLatest := make(map[string]bool)
+	nodesLatest := make(map[string]struct{})
 	for _, item := range nodeList.Items {
 		var nodeIP string
 		for _, addr := range item.Status.Addresses {
@@ -113,7 +113,7 @@ func (nm *nodeManager) refreshNodes() error {
 			nm.logger.Error(fmt.Errorf("invalid cluster node %v", item), "Skip init node")
 			continue
 		}
-		nodesLatest[nodeIP] = true
+		nodesLatest[nodeIP] = struct{}{}
 
 		cachedNode, err := nm.GetNode(nodeIP)
 		if err == nil && cachedNode != nil {

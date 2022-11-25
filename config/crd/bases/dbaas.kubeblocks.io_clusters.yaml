@@ -19,9 +19,17 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - description: ClusterDefinition referenced by cluster.
+      jsonPath: .spec.clusterDefinitionRef
+      name: CLUSTER-DEFINITION
+      type: string
     - description: Cluster Application Version.
       jsonPath: .spec.appVersionRef
       name: APP-VERSION
+      type: string
+    - description: Cluster termination policy.
+      jsonPath: .spec.terminationPolicy
+      name: TERMINATION-POLICY
       type: string
     - description: Cluster Status.
       jsonPath: .status.phase

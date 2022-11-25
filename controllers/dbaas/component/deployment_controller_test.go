@@ -40,7 +40,7 @@ var _ = Describe("Deployment Controller", func() {
 		namespace   = "default"
 	)
 
-	cleanWorkloads := func() {
+	cleanupObjects := func() {
 		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &appsv1.Deployment{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
@@ -49,12 +49,12 @@ var _ = Describe("Deployment Controller", func() {
 
 	BeforeEach(func() {
 		// Add any setup steps that needs to be executed before each test
-		cleanWorkloads()
+		cleanupObjects()
 	})
 
 	AfterEach(func() {
 		// Add any teardown steps that needs to be executed after each test
-		cleanWorkloads()
+		cleanupObjects()
 	})
 
 	createCluster := func() *dbaasv1alpha1.Cluster {

@@ -37,7 +37,7 @@ var _ = Describe("Event Controller", func() {
 		interval = time.Second
 	)
 
-	cleanWorkloads := func() {
+	cleanupObjects := func() {
 		err := k8sClient.DeleteAllOf(ctx, &storagev1.StorageClass{},
 			client.InNamespace(testCtx.DefaultNamespace),
 			client.HasLabels{testCtx.TestObjLabelKey})
@@ -46,12 +46,12 @@ var _ = Describe("Event Controller", func() {
 
 	BeforeEach(func() {
 		// Add any steup steps that needs to be executed before each test
-		cleanWorkloads()
+		cleanupObjects()
 	})
 
 	AfterEach(func() {
 		// Add any teardown steps that needs to be executed after each test
-		cleanWorkloads()
+		cleanupObjects()
 	})
 
 	createStorageClassObj := func(storageClassName string, allowVolumeExpansion bool) *storagev1.StorageClass {

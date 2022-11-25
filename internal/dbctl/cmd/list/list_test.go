@@ -17,6 +17,7 @@ limitations under the License.
 package list
 
 import (
+	"fmt"
 	"net/http"
 
 	. "github.com/onsi/ginkgo"
@@ -32,6 +33,7 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
+	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/get"
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
 )
@@ -70,5 +72,36 @@ foo    <unknown>
 bar    <unknown>
 `
 		Expect(buf.String()).To(Equal(expected))
+	})
+
+	It("build list args", func() {
+		cmd := &builder.Command{
+			GVR:  types.ClusterGVR(),
+			Args: []string{},
+		}
+		o := &get.Options{}
+		buildListArgs(cmd, o)
+		Expect(len(o.BuildArgs)).Should(Equal(0))
+
+		By("list cluster with args")
+		cmd.Args = []string{"test"}
+		buildListArgs(cmd, o)
+		Expect(len(o.BuildArgs)).Should(Equal(1))
+
+		By("list ops with args")
+		cmd = &builder.Command{
+			GVR:  types.OpsGVR(),
+			Args: []string{"test"},
+		}
+		buildListArgs(cmd, o)
+		clusterLabel := fmt.Sprintf("%s in (%s)", types.InstanceLabelKey, "test")
+		Expect(len(o.BuildArgs)).Should(Equal(1))
+		Expect(o.LabelSelector).Should(Equal(clusterLabel))
+
+		By("test list with cluster and custom label")
+		testLabel := "kubeblocks.io/test=test"
+		o.LabelSelector = testLabel
+		buildListArgs(cmd, o)
+		Expect(o.LabelSelector).Should(Equal(fmt.Sprintf("%s,%s", testLabel, clusterLabel)))
 	})
 })

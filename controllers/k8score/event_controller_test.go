@@ -89,7 +89,7 @@ var _ = Describe("Event Controller", func() {
 					return err.Error()
 				}
 				return event.InvolvedObject.Name
-			}, time.Second*30, time.Second).Should(Equal(sndEvent.InvolvedObject.Name))
+			}, time.Second*60, time.Second).Should(Equal(sndEvent.InvolvedObject.Name))
 
 			// TODO: an interesting bug
 			// event := <-eventChan

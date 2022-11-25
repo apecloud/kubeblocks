@@ -71,4 +71,5 @@ type Component struct {
 	Monitor                 *MonitorConfig                         `json:"monitor,omitempty"`
 	EnabledLogs             []string                               `json:"enabledLogs,omitempty"`
 	LogConfigs              []dbaasv1alpha1.LogConfig              `json:"logConfigs,omitempty"`
+	ConfigTemplates         []dbaasv1alpha1.ConfigTemplate         `json:"configTemplates,omitempty"`
 }

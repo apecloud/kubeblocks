@@ -17,7 +17,7 @@ limitations under the License.
 package playground
 
 import (
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/cluster"
 	"github.com/apecloud/kubeblocks/version"
 )
 
@@ -49,7 +49,7 @@ var (
 )
 
 type clusterInfo struct {
-	*types.ClusterObjects
+	*cluster.ClusterObjects
 
 	HostPorts     []string
 	HostIP        string

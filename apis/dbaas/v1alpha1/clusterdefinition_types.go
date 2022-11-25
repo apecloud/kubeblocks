@@ -336,13 +336,13 @@ func init() {
 // ValidateEnabledLogConfigs validates enabledLogs against component typeName, and returns the invalid logNames undefined in ClusterDefinition.
 func (r *ClusterDefinition) ValidateEnabledLogConfigs(typeName string, enabledLogs []string) []string {
 	invalidLogNames := make([]string, 0, len(enabledLogs))
-	logTypes := make(map[string]bool)
+	logTypes := make(map[string]struct{})
 	for _, comp := range r.Spec.Components {
 		if !strings.EqualFold(typeName, comp.TypeName) {
 			continue
 		}
 		for _, logConfig := range comp.LogConfigs {
-			logTypes[logConfig.Name] = true
+			logTypes[logConfig.Name] = struct{}{}
 		}
 	}
 	// imply that all values in enabledLogs config are invalid.

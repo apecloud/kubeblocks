@@ -202,8 +202,8 @@ spec:
 			Eventually(func() bool {
 				newCluster := &dbaasv1alpha1.Cluster{}
 				_ = k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, newCluster)
-				componentVolumeExpandable := newCluster.Status.Operations.VolumeExpandable[0]
-				return len(componentVolumeExpandable.VolumeClaimTemplateNames) > 1 && componentVolumeExpandable.VolumeClaimTemplateNames[1] == "log"
+				volumeExpandable := newCluster.Status.Operations.VolumeExpandable
+				return len(volumeExpandable) > 0 && len(volumeExpandable[0].VolumeClaimTemplateNames) > 1 && volumeExpandable[0].VolumeClaimTemplateNames[1] == "log"
 			}, timeout, interval).Should(BeTrue())
 
 			By("expect wesql-test component support volume expansion and volumeClaimTemplateNames is [data]")

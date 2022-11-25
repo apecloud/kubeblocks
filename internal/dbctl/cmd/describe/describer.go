@@ -244,6 +244,10 @@ func (d *ClusterDescriber) describeComponent(w describe.PrefixWriter) error {
 		describeNetwork(Level2, d.Services, c, w)
 
 		// instance
+		if len(pods) > 0 {
+			w.Write(Level2, "\n")
+			w.Write(Level2, "Instance:\t\n")
+		}
 		for _, pod := range pods {
 			d.describeInstance(Level2, pod, w)
 		}
@@ -284,10 +288,7 @@ func describeStorage(vcTmpls []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate
 }
 
 func (d *ClusterDescriber) describeInstance(level int, pod *corev1.Pod, w describe.PrefixWriter) {
-	w.Write(level, "\n")
-	w.Write(level, "Instance:\t\n")
 	w.Write(level+1, "%s:\n", pod.Name)
-
 	role := pod.Labels[types.ConsensusSetRoleLabelKey]
 	if len(role) == 0 {
 		role = valueNone
@@ -312,19 +313,19 @@ func (d *ClusterDescriber) describeInstance(level int, pod *corev1.Pod, w descri
 	w.Write(level+2, "AccessMode:\t%s\n", accessMode)
 
 	// describe node information
-	describeNode(d.Nodes, pod, w)
+	describeNode(level+2, d.Nodes, pod, w)
 
 	w.Write(level+2, "CreationTimestamp:\t%s\n", pod.CreationTimestamp.Time.Format(time.RFC1123Z))
 }
 
 // describeNode describe node information include its region and AZ
-func describeNode(nodes []*corev1.Node, pod *corev1.Pod, w describe.PrefixWriter) {
+func describeNode(level int, nodes []*corev1.Node, pod *corev1.Pod, w describe.PrefixWriter) {
 	var node *corev1.Node
 
 	if pod.Spec.NodeName == "" {
-		w.Write(Level3, "Node:\t%s\n", valueNone)
+		w.Write(level, "Node:\t%s\n", valueNone)
 	} else {
-		w.Write(Level3, "Node:\t%s\n", pod.Spec.NodeName+"/"+pod.Status.HostIP)
+		w.Write(level, "Node:\t%s\n", pod.Spec.NodeName+"/"+pod.Status.HostIP)
 		node = util.GetNodeByName(nodes, pod.Spec.NodeName)
 	}
 
@@ -333,10 +334,10 @@ func describeNode(nodes []*corev1.Node, pod *corev1.Pod, w describe.PrefixWriter
 	}
 
 	if region, ok := node.Labels[types.RegionLabelKey]; ok {
-		w.Write(Level3, "Region:\t%s\n", region)
+		w.Write(level, "Region:\t%s\n", region)
 	}
 	if zone, ok := node.Labels[types.ZoneLabelKey]; ok {
-		w.Write(Level3, "AZ:\t%s\n", zone)
+		w.Write(level, "AZ:\t%s\n", zone)
 	}
 }
 

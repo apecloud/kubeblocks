@@ -47,7 +47,7 @@ var _ = Describe("StatefulSet Controller", func() {
 		opsRequestName = "wesql-restart-test-" + randomStr
 	)
 
-	cleanWorkloads := func() {
+	cleanupObjects := func() {
 		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
@@ -65,12 +65,12 @@ var _ = Describe("StatefulSet Controller", func() {
 
 	BeforeEach(func() {
 		// Add any setup steps that needs to be executed before each test
-		cleanWorkloads()
+		cleanupObjects()
 	})
 
 	AfterEach(func() {
 		// Add any teardown steps that needs to be executed after each test
-		cleanWorkloads()
+		cleanupObjects()
 	})
 
 	createCluster := func() *dbaasv1alpha1.Cluster {

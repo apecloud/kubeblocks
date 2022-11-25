@@ -6,13 +6,17 @@ sts: {
 		namespace: string
 	}
 }
+backup_key: {
+	Name: string
+	Namespace: string
+}
 template: string
 backup_policy: {
 	apiVersion: "dataprotection.infracreate.com/v1alpha1"
 	kind:       "BackupPolicy"
 	metadata: {
-		name:      "\(sts.metadata.labels."app.kubernetes.io/instance")-scaling"
-		namespace: sts.metadata.namespace
+		name:      backup_key.Name
+		namespace: backup_key.Namespace
 	}
 	spec: {
 		"schedule":                 "0 3 * * *"

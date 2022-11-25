@@ -740,6 +740,10 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 				return &res, err
 			}
+			snapshotKey := types.NamespacedName{
+				Namespace: stsObj.Namespace,
+				Name:      stsObj.Name + "-scaling",
+			}
 			// when horizontal scaling up
 			if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
 				reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "HorizontalScale", "Start horizontal scale")
@@ -764,10 +768,6 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 					getVSErr := cli.List(ctx, &vsList)
 					// check volume snapshot available
 					if getVSErr == nil && len(stsObj.Spec.VolumeClaimTemplates) > 0 {
-						snapshotKey := types.NamespacedName{
-							Namespace: stsObj.Namespace,
-							Name:      stsObj.Name + "-scaling",
-						}
 						// check snapshot existence
 						vsNotFound := false
 						vs := snapshotv1.VolumeSnapshot{}
@@ -792,7 +792,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 							if len(backupPolicyTemplateList.Items) > 0 {
 								// if there is backuppolicytemplate created by provider
 								// create backupjob CR, will ignore error if already exists
-								err := createBackup(ctx, cli, *stsObj, backupPolicyTemplateList.Items[0], snapshotKey.Name, cluster)
+								err := createBackup(ctx, cli, *stsObj, backupPolicyTemplateList.Items[0], snapshotKey, cluster)
 								if err != nil {
 									res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 									return &res, err
@@ -801,7 +801,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 							} else {
 								// no backuppolicytemplate, then try native volumesnapshot
 								pvcName := strings.Join([]string{stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, "0"}, "-")
-								snapshot, err := buildVolumeSnapshot(snapshotKey.Name, pvcName, *stsObj)
+								snapshot, err := buildVolumeSnapshot(snapshotKey, pvcName, *stsObj)
 								if err != nil {
 									res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 									return &res, err
@@ -825,11 +825,9 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 							result = &res
 							continue
 						} else {
-							shouldScale := false
 							// check snapshot status
 							if *vs.Status.ReadyToUse {
 								vct := stsObj.Spec.VolumeClaimTemplates[0]
-								shouldScale = true
 								// create pvc from snapshot
 								for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
 									pvcKey := types.NamespacedName{
@@ -840,7 +838,6 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 									// check pvc existence
 									if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
 										if apierrors.IsNotFound(err) {
-											shouldScale = false
 											if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, snapshotKey.Name); err != nil {
 												res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 												return &res, err
@@ -851,8 +848,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 										}
 									}
 								}
-							}
-							if !shouldScale {
+							} else {
 								res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
 								if err != nil {
 									return &res, err
@@ -880,6 +876,56 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 				return &res, err
 			}
+			vct := stsObj.Spec.VolumeClaimTemplates[0]
+			// check pvc ready
+			allPVCBound := true
+			for i := 0; i < int(*stsObj.Spec.Replicas); i++ {
+				pvcKey := types.NamespacedName{
+					Namespace: key.Namespace,
+					Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
+				}
+				pvc := corev1.PersistentVolumeClaim{}
+				// check pvc existence
+				if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
+					res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+					return &res, err
+				}
+				if pvc.Status.Phase != corev1.ClaimBound {
+					allPVCBound = false
+				}
+			}
+			if allPVCBound {
+				// clean backup resources
+				if err := deleteBackup(ctx, cli, snapshotKey); err != nil {
+					if !apierrors.IsNotFound(err) {
+						res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+						return &res, err
+					}
+				}
+				vs := snapshotv1.VolumeSnapshot{}
+				if err := cli.Get(ctx, snapshotKey, &vs); err != nil {
+					if !apierrors.IsNotFound(err) {
+						res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+						return &res, err
+					}
+				} else {
+					if err := cli.Delete(ctx, &vs); err != nil {
+						if !apierrors.IsNotFound(err) {
+							res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+							return &res, err
+						}
+					}
+				}
+			} else {
+				// requeue waiting pvc phase bound
+				res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
+				if err != nil {
+					return &res, err
+				}
+				result = &res
+				continue
+			}
+
 			// check stsObj.Spec.VolumeClaimTemplates storage
 			// request size and find attached PVC and patch request
 			// storage size
@@ -1533,8 +1579,8 @@ func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder
 	return tplBuilder.Render(cmObj.Data)
 }
 
-func createBackup(ctx context.Context, cli client.Client, sts appsv1.StatefulSet, backupPolicyTemplate dataprotectionv1alpha1.BackupPolicyTemplate, backupJobName string, cluster *dbaasv1alpha1.Cluster) error {
-	backupPolicy, err := buildBackupPolicy(sts, backupPolicyTemplate)
+func createBackup(ctx context.Context, cli client.Client, sts appsv1.StatefulSet, backupPolicyTemplate dataprotectionv1alpha1.BackupPolicyTemplate, backupKey types.NamespacedName, cluster *dbaasv1alpha1.Cluster) error {
+	backupPolicy, err := buildBackupPolicy(sts, backupPolicyTemplate, backupKey)
 	if err != nil {
 		return err
 	}
@@ -1543,7 +1589,7 @@ func createBackup(ctx context.Context, cli client.Client, sts appsv1.StatefulSet
 			return err
 		}
 	}
-	backupJob, err := buildBackupJob(sts, backupJobName)
+	backupJob, err := buildBackupJob(sts, backupKey)
 	if err != nil {
 		return err
 	}
@@ -1559,7 +1605,38 @@ func createBackup(ctx context.Context, cli client.Client, sts appsv1.StatefulSet
 	return nil
 }
 
-func buildBackupPolicy(sts appsv1.StatefulSet, template dataprotectionv1alpha1.BackupPolicyTemplate) (*dataprotectionv1alpha1.BackupPolicy, error) {
+func deleteBackup(ctx context.Context, cli client.Client, backupJobKey types.NamespacedName) error {
+
+	backupPolicy := dataprotectionv1alpha1.BackupPolicy{}
+	if err := cli.Get(ctx, backupJobKey, &backupPolicy); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+	} else {
+		if err = cli.Delete(ctx, &backupPolicy); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return err
+			}
+		}
+	}
+
+	backupJob := dataprotectionv1alpha1.BackupJob{}
+	if err := cli.Get(ctx, backupJobKey, &backupJob); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+	} else {
+		if err = cli.Delete(ctx, &backupJob); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func buildBackupPolicy(sts appsv1.StatefulSet, template dataprotectionv1alpha1.BackupPolicyTemplate, backupKey types.NamespacedName) (*dataprotectionv1alpha1.BackupPolicy, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
 	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("backup_policy_template.cue"))
@@ -1573,6 +1650,14 @@ func buildBackupPolicy(sts appsv1.StatefulSet, template dataprotectionv1alpha1.B
 		return nil, err
 	}
 	if err = cueValue.Fill("sts", stsStrByte); err != nil {
+		return nil, err
+	}
+
+	keyStrByte, err := json.Marshal(backupKey)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("backup_key", keyStrByte); err != nil {
 		return nil, err
 	}
 
@@ -1593,7 +1678,7 @@ func buildBackupPolicy(sts appsv1.StatefulSet, template dataprotectionv1alpha1.B
 	return &backupPolicy, nil
 }
 
-func buildBackupJob(sts appsv1.StatefulSet, backupJobName string) (*dataprotectionv1alpha1.BackupJob, error) {
+func buildBackupJob(sts appsv1.StatefulSet, backupJobKey types.NamespacedName) (*dataprotectionv1alpha1.BackupJob, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
 	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("backup_job_template.cue"))
@@ -1611,7 +1696,11 @@ func buildBackupJob(sts appsv1.StatefulSet, backupJobName string) (*dataprotecti
 		return nil, err
 	}
 
-	if err = cueValue.FillRaw("backup_job_name", backupJobName); err != nil {
+	keyStrByte, err := json.Marshal(backupJobKey)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("backup_job_key", keyStrByte); err != nil {
 		return nil, err
 	}
 
@@ -1737,7 +1826,7 @@ func prepareInjectEnvs(component *Component, cluster *dbaasv1alpha1.Cluster) []c
 	return envs
 }
 
-func buildVolumeSnapshot(snapshotName string, pvcName string, sts appsv1.StatefulSet) (*snapshotv1.VolumeSnapshot, error) {
+func buildVolumeSnapshot(snapshotKey types.NamespacedName, pvcName string, sts appsv1.StatefulSet) (*snapshotv1.VolumeSnapshot, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
 	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("snapshot_template.cue"))
@@ -1747,7 +1836,11 @@ func buildVolumeSnapshot(snapshotName string, pvcName string, sts appsv1.Statefu
 
 	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
 
-	if err := cueValue.FillRaw("snapshot_name", snapshotName); err != nil {
+	keyStrByte, err := json.Marshal(snapshotKey)
+	if err != nil {
+		return nil, err
+	}
+	if err = cueValue.Fill("snapshot_key", keyStrByte); err != nil {
 		return nil, err
 	}
 

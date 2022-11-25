@@ -1,4 +1,7 @@
-snapshot_name: string
+snapshot_key: {
+	Name: string
+	Namespace: string
+}
 pvc_name:      string
 sts: {
 	metadata: {
@@ -11,8 +14,8 @@ snapshot: {
 	apiVersion: "snapshot.storage.k8s.io/v1"
 	kind:       "VolumeSnapshot"
 	metadata: {
-		name:      snapshot_name
-		namespace: sts.metadata.namespace
+		name:      snapshot_key.Name
+		namespace: snapshot_key.Namespace
 		labels:    sts.metadata.labels
 	}
 	spec: {

@@ -743,7 +743,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				Namespace: stsObj.Namespace,
 				Name:      stsObj.Name + "-scaling",
 			}
-			// when horizontal scaling up
+			// when horizontal scaling up, sometimes db needs backup to sync data from master, log is not reliable enough since it can be recycled
 			if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
 				reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "HorizontalScale", "Start horizontal scale from %d to %d", *stsObj.Spec.Replicas, *stsProto.Spec.Replicas)
 				var component dbaasv1alpha1.ClusterDefinitionComponent

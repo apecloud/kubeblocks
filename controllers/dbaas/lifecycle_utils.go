@@ -42,7 +42,6 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	types2 "github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
 type createParams struct {
@@ -750,7 +749,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				var component dbaasv1alpha1.ClusterDefinitionComponent
 				// find component of current statefulset
 				for _, comp := range clusterDef.Spec.Components {
-					if comp.TypeName == stsObj.Labels[types2.ComponentLabelKey] {
+					if comp.TypeName == stsObj.Labels[intctrlutil.AppComponentLabelKey] {
 						component = comp
 						break
 					}

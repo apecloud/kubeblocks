@@ -55,7 +55,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 
 			By("By creating a new clusterDefinition")
 			clusterDef, _ = createTestClusterDefinitionObj3(clusterDefinitionName3)
-			Expect(k8sClient.Create(ctx, clusterDef)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 			// wait until ClusterDefinition created
 			Eventually(func() bool {
 				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName3}, clusterDef)

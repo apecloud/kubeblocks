@@ -51,7 +51,7 @@ var _ = Describe("DataProtection", func() {
 			defer tf.Cleanup()
 			tf.ClientConfigVal = cfg
 			cmd := NewCreateBackupCmd(tf, streams)
-			Expect(cmd != nil).To(BeTrue())
+			Expect(cmd).ShouldNot(BeNil())
 			// must succeed otherwise exit 1 and make test fails
 			_ = cmd.Flags().Set("backup-type", "snapshot")
 			cmd.Run(nil, []string{"test1"})
@@ -63,7 +63,7 @@ var _ = Describe("DataProtection", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace("default")
 		defer tf.Cleanup()
 		cmd := NewDeleteBackupCmd(tf, streams)
-		Expect(cmd != nil).To(BeTrue())
+		Expect(cmd).ShouldNot(BeNil())
 
 		clusterName := "test1"
 		clusterLabel := fmt.Sprintf("%s=%s", types.InstanceLabelKey, clusterName)
@@ -98,7 +98,7 @@ var _ = Describe("DataProtection", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace("default")
 		defer tf.Cleanup()
 		cmd := NewListBackupCmd(tf, streams)
-		Expect(cmd != nil).To(BeTrue())
+		Expect(cmd).ShouldNot(BeNil())
 	})
 
 	It("delete-restore", func() {
@@ -107,7 +107,7 @@ var _ = Describe("DataProtection", func() {
 
 		By("test delete-restore cmd")
 		cmd := NewDeleteRestoreCmd(tf, streams)
-		Expect(cmd != nil).To(BeTrue())
+		Expect(cmd).ShouldNot(BeNil())
 
 		clusterName := "test1"
 		clusterLabel := fmt.Sprintf("%s=%s", types.InstanceLabelKey, clusterName)
@@ -142,7 +142,7 @@ var _ = Describe("DataProtection", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace("default")
 		defer tf.Cleanup()
 		cmd := NewListRestoreCmd(tf, streams)
-		Expect(cmd != nil).To(BeTrue())
+		Expect(cmd).ShouldNot(BeNil())
 	})
 
 	It("restore", func() {
@@ -156,14 +156,14 @@ var _ = Describe("DataProtection", func() {
 
 		// create test cluster
 		cmd := NewCreateCmd(tf, streams)
-		Expect(cmd != nil).To(BeTrue())
+		Expect(cmd).ShouldNot(BeNil())
 		_ = cmd.Flags().Set("components", "../../testdata/component.yaml")
 		_ = cmd.Flags().Set("termination-policy", "Delete")
 		cmd.Run(nil, []string{clusterName})
 
 		// create backup
 		cmd = NewCreateBackupCmd(tf, streams)
-		Expect(cmd != nil).To(BeTrue())
+		Expect(cmd).ShouldNot(BeNil())
 		_ = cmd.Flags().Set("backup-type", "snapshot")
 		_ = cmd.Flags().Set("backup-name", backupName)
 		cmd.Run(nil, []string{clusterName})

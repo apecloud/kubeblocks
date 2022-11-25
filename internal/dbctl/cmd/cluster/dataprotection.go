@@ -176,7 +176,7 @@ func NewDeleteBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Build(delete.Build)
 }
 
-func customFlagsForDeleteBackup(option interface{}, cmd *cobra.Command) {
+func customFlagsForDeleteBackup(option builder.Options, cmd *cobra.Command) {
 	var (
 		o  *delete.DeleteFlags
 		ok bool
@@ -188,7 +188,7 @@ func customFlagsForDeleteBackup(option interface{}, cmd *cobra.Command) {
 }
 
 // completeForDeleteBackup complete cmd for delete backup
-func completeForDeleteBackup(option interface{}, args []string) error {
+func completeForDeleteBackup(option builder.Options, args []string) error {
 	var (
 		flag *delete.DeleteFlags
 		ok   bool
@@ -325,7 +325,7 @@ func NewDeleteRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Build(delete.Build)
 }
 
-func customFlagsForDeleteRestore(option interface{}, cmd *cobra.Command) {
+func customFlagsForDeleteRestore(option builder.Options, cmd *cobra.Command) {
 	var (
 		o  *delete.DeleteFlags
 		ok bool
@@ -337,7 +337,7 @@ func customFlagsForDeleteRestore(option interface{}, cmd *cobra.Command) {
 }
 
 // completeForDeleteRestore complete cmd for delete restore
-func completeForDeleteRestore(option interface{}, args []string) error {
+func completeForDeleteRestore(option builder.Options, args []string) error {
 	var (
 		flag *delete.DeleteFlags
 		ok   bool

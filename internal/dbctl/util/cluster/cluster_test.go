@@ -17,160 +17,44 @@ limitations under the License.
 package cluster
 
 import (
-	"net/http"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/cli-runtime/pkg/resource"
-	dynamicfake "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest/fake"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/fake"
 )
 
 var _ = Describe("cluster util", func() {
-	clusterName := "test-cluster"
-	namespace := "test"
+	client := fake.NewClientSet(
+		fake.Pods(3, fake.Namespace, fake.ClusterName),
+		fake.Node(),
+		fake.Secrets(fake.Namespace, fake.ClusterName),
+		fake.Services())
 
-	mockClient := func(data runtime.Object) *cmdtesting.TestFactory {
-		tf := cmdtesting.NewTestFactory().WithNamespace(namespace)
-		defer tf.Cleanup()
-
-		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-		tf.Client = &fake.RESTClient{
-			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-			Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, data)},
-		}
-		return tf
-	}
+	dynamic := fake.NewDynamicClient(
+		fake.Cluster(fake.ClusterName, fake.Namespace),
+		fake.ClusterDef(),
+		fake.Appversion())
 
 	It("get cluster objects", func() {
-		clusterName := "test-cluster"
-		objs := &types.ClusterObjects{}
-		tf := mockClient(&corev1.ConfigMap{})
-
-		// test builder
-		builder := &builder{}
-		builder.namespace = namespace
-		builder.name = clusterName
-		clientSet, err := tf.KubernetesClientSet()
-		Expect(err).Should(BeNil())
-		builder.clientSet = clientSet
-
-		dynamicClient, err := tf.DynamicClient()
-		Expect(err).Should(BeNil())
-		builder.dynamicClient = dynamicClient
-
-		// get cluster
-		builder.withGK(types.ClusterGK())
-		Expect(builder.do(objs)).Should(HaveOccurred())
-
-		// get clusterDefinition
-		builder.withGK(types.ClusterDefGK())
-		Expect(builder.do(objs)).Should(HaveOccurred())
-
-		// get appVersion
-		builder.withGK(types.AppVersionGK())
-		Expect(builder.do(objs)).Should(HaveOccurred())
-
-		// get service
-		builder.withGK(schema.GroupKind{Kind: "Service"})
-		Expect(builder.do(objs)).Should(HaveOccurred())
-
-		// get secret
-		builder.withGK(schema.GroupKind{Kind: "Secret"})
-		Expect(builder.do(objs)).Should(HaveOccurred())
-
-		// get pod
-		builder.withGK(schema.GroupKind{Kind: "Pod"})
-		Expect(builder.do(objs)).Should(HaveOccurred())
-
-		// get node
-		builder.withGK(schema.GroupKind{Kind: "Node"})
-		Expect(builder.do(objs)).Should(HaveOccurred())
-
-		// get node that name is empty
-		builder.name = ""
-		builder.withGK(schema.GroupKind{Kind: "Node"})
-		Expect(builder.do(objs)).Should(Succeed())
-	})
-
-	It("get all objects", func() {
-		objs := &types.ClusterObjects{}
-		tf := mockClient(&corev1.ConfigMap{})
-		clientSet, _ := tf.KubernetesClientSet()
-		dynamicClient, _ := tf.DynamicClient()
+		clusterName := fake.ClusterName
+		objs := NewClusterObjects()
 		getter := ObjectsGetter{
-			ClientSet:     clientSet,
-			DynamicClient: dynamicClient,
-			Namespace:     namespace,
-			Name:          clusterName,
-		}
-		Expect(getter.Get(objs)).Should(HaveOccurred())
-	})
-
-	It("Get type from pod", func() {
-		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:            "foo",
-				Namespace:       "test",
-				ResourceVersion: "10",
-				Labels: map[string]string{
-					"app.kubernetes.io/name": "state.mysql-apecloud-wesql",
-				},
-			},
-		}
-		typeName, err := GetClusterTypeByPod(pod)
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(typeName).Should(Equal("state.mysql"))
-
-		pod.Labels = map[string]string{}
-		typeName, err = GetClusterTypeByPod(pod)
-		Expect(err).Should(HaveOccurred())
-		Expect(typeName).Should(Equal(""))
-	})
-
-	It("get default pod from cluster", func() {
-		const (
-			podName     = "test-custer-leader"
-			clusterName = "test-cluster"
-			namespace   = "test"
-		)
-
-		cluster := &dbaasv1alpha1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      clusterName,
-				Namespace: namespace,
-			},
-			Spec: dbaasv1alpha1.ClusterSpec{},
-			Status: dbaasv1alpha1.ClusterStatus{
-				Components: map[string]*dbaasv1alpha1.ClusterStatusComponent{
-					"test-component": {
-						Type: (string)(dbaasv1alpha1.Consensus),
-						ConsensusSetStatus: &dbaasv1alpha1.ConsensusSetStatus{
-							Leader: dbaasv1alpha1.ConsensusMemberStatus{
-								Pod: podName,
-							},
-						},
-					},
-				},
-			},
+			ClientSet:      client,
+			DynamicClient:  dynamic,
+			Name:           clusterName,
+			Namespace:      fake.Namespace,
+			WithConfigMap:  true,
+			WithAppVersion: true,
 		}
 
-		scheme := runtime.NewScheme()
-		utilruntime.Must(dbaasv1alpha1.AddToScheme(scheme))
-		client := dynamicfake.NewSimpleDynamicClient(scheme, cluster)
-		pod, err := GetDefaultPodName(client, clusterName, namespace)
-		Expect(pod).Should(Equal(podName))
-		Expect(err).ShouldNot(HaveOccurred())
+		Expect(getter.Get(objs)).Should(Succeed())
+		Expect(objs.Cluster.Name).Should(Equal(clusterName))
+		Expect(objs.ClusterDef.Name).Should(Equal(fake.ClusterDefName))
+		Expect(objs.AppVersion.Name).Should(Equal(fake.AppVersionName))
+
+		Expect(len(objs.Pods.Items)).Should(Equal(3))
+		Expect(len(objs.Nodes)).Should(Equal(1))
+		Expect(len(objs.Secrets.Items)).Should(Equal(1))
+		Expect(objs.Services).ShouldNot(BeNil())
 	})
 })

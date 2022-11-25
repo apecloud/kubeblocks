@@ -37,11 +37,6 @@ type ClusterDefinitionSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	Components []ClusterDefinitionComponent `json:"components"`
 
-	// Default termination policy if no termination policy defined in cluster.
-	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
-	// +optional
-	DefaultTerminationPolicy string `json:"defaultTerminationPolicy,omitempty"`
-
 	// Credential used for connecting database.
 	// +optional
 	ConnectionCredential *ClusterDefinitionConnectionCredential `json:"connectionCredential,omitempty"`
@@ -73,7 +68,6 @@ type ConfigTemplate struct {
 
 	// VolumeName is the volume name of PodTemplate, which the configuration file produced through the configuration template will be mounted to the corresponding volume.
 	// The volume name must be defined in podSpec.containers[*].volumeMounts.
-	// reference example: https://github.com/apecloud/kubeblocks/blob/main/examples/dbaas/mysql_clusterdefinition.yaml#L12
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32
 	VolumeName string `json:"volumeName"`
@@ -337,21 +331,25 @@ func init() {
 	SchemeBuilder.Register(&ClusterDefinition{}, &ClusterDefinitionList{})
 }
 
-// ValidateEnabledLogConfigs validate enabledLogs, and return the log names which isn't defined in ClusterDefinition
+// ValidateEnabledLogConfigs validates enabledLogs against component typeName, and returns the invalid logNames undefined in ClusterDefinition.
 func (r *ClusterDefinition) ValidateEnabledLogConfigs(typeName string, enabledLogs []string) []string {
 	invalidLogNames := make([]string, 0, len(enabledLogs))
+	logTypes := make(map[string]bool)
 	for _, comp := range r.Spec.Components {
 		if !strings.EqualFold(typeName, comp.TypeName) {
 			continue
 		}
-		logTypes := make(map[string]bool)
 		for _, logConfig := range comp.LogConfigs {
 			logTypes[logConfig.Name] = true
 		}
-		for _, name := range enabledLogs {
-			if _, ok := logTypes[name]; !ok {
-				invalidLogNames = append(invalidLogNames, name)
-			}
+	}
+	// imply that all values in enabledLogs config are invalid.
+	if len(logTypes) == 0 {
+		return enabledLogs
+	}
+	for _, name := range enabledLogs {
+		if _, ok := logTypes[name]; !ok {
+			invalidLogNames = append(invalidLogNames, name)
 		}
 	}
 	return invalidLogNames

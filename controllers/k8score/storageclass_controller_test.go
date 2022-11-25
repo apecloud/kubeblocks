@@ -25,8 +25,9 @@ import (
 	. "github.com/onsi/gomega"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var _ = Describe("Event Controller", func() {
@@ -36,16 +37,21 @@ var _ = Describe("Event Controller", func() {
 		interval = time.Second
 	)
 
-	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
+	cleanupObjects := func() {
 		err := k8sClient.DeleteAllOf(ctx, &storagev1.StorageClass{},
 			client.InNamespace(testCtx.DefaultNamespace),
 			client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
+	}
+
+	BeforeEach(func() {
+		// Add any steup steps that needs to be executed before each test
+		cleanupObjects()
 	})
 
 	AfterEach(func() {
 		// Add any teardown steps that needs to be executed after each test
+		cleanupObjects()
 	})
 
 	createStorageClassObj := func(storageClassName string, allowVolumeExpansion bool) *storagev1.StorageClass {
@@ -73,16 +79,31 @@ allowVolumeExpansion: %t
 		return sc
 	}
 
+	handleStorageClass := func(reqCtx intctrlutil.RequestCtx, cli client.Client, storageClass *storagev1.StorageClass) error {
+		patch := client.MergeFrom(storageClass.DeepCopy())
+		storageClass.Annotations["kubeblocks.io/test"] = "test"
+		Expect(cli.Patch(ctx, storageClass, patch)).Should(Succeed())
+		return nil
+	}
+
 	Context("When test creating storageClass", func() {
 		It("should handle it properly", func() {
 			By("test storageClass changes")
-			storageClassName := "standard"
+			StorageClassHandlerMap["test-controller"] = handleStorageClass
+			storageClassName := fmt.Sprintf("standard-%s", testCtx.GetRandomStr())
 			createStorageClassObj(storageClassName, true)
 			storageClass := &storagev1.StorageClass{}
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: storageClassName}, storageClass)).Should(Succeed())
 			allowVolumeExpansion := true
 			storageClass.AllowVolumeExpansion = &allowVolumeExpansion
 			Expect(k8sClient.Update(ctx, storageClass))
+
+			// wait until storageClass patched
+			Eventually(func() bool {
+				tempStorageClass := &storagev1.StorageClass{}
+				_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: storageClass.Name}, tempStorageClass)
+				return tempStorageClass.Annotations["kubeblocks.io/test"] == "test"
+			}, timeout, interval).Should(BeTrue())
 		})
 	})
 })

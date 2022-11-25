@@ -37,8 +37,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/cluster"
 )
 
-var _ = Describe("logs_list_type test", func() {
-	It("logs_list_type", func() {
+var _ = Describe("listLogsType test", func() {
+	It("listLogsType", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace("test")
 		defer tf.Cleanup()
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -54,7 +54,7 @@ var _ = Describe("logs_list_type test", func() {
 		tf.ClientConfigVal = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: scheme.Codecs, GroupVersion: &schema.GroupVersion{Version: "v1"}}}
 
 		stream := genericclioptions.NewTestIOStreamsDiscard()
-		o := &LogsListOptions{
+		o := &ListLogsOptions{
 			factory:   tf,
 			IOStreams: stream,
 		}
@@ -109,7 +109,7 @@ var _ = Describe("logs_list_type test", func() {
 			},
 		}
 		dataObj.Pods.Items = append(dataObj.Pods.Items, pod)
-		o := &LogsListOptions{}
+		o := &ListLogsOptions{}
 		Expect(o.printListLogsMessage(dataObj, os.Stdout)).Should(BeNil())
 	})
 })

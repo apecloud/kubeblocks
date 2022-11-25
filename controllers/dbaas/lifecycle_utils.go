@@ -745,7 +745,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			}
 			// when horizontal scaling up
 			if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
-				reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "HorizontalScale", "Start horizontal scale")
+				reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "HorizontalScale", "Start horizontal scale from %d to %d", *stsObj.Spec.Replicas, *stsProto.Spec.Replicas)
 				var component dbaasv1alpha1.ClusterDefinitionComponent
 				// find component of current statefulset
 				for _, comp := range clusterDef.Spec.Components {

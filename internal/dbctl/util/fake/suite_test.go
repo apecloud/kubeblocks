@@ -14,24 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cluster
+package fake
 
 import (
-	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"testing"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/list"
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
-	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
-func NewListOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	return builder.NewCmdBuilder().
-		Use("list-ops").
-		Short("List all opsRequest.").
-		Factory(f).
-		GVR(types.OpsGVR()).
-		IOStreams(streams).
-		Build(list.Build)
+func TestFake(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Fake Suite")
 }

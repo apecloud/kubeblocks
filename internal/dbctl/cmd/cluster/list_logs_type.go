@@ -216,7 +216,7 @@ func (o *ListLogsOptions) printRealFileMessage(pod *corev1.Pod, pattern string) 
 }
 
 // printLogsContext prints list-logs-type info
-func (o *ListLogsOptions) printListLogsMessage(dataObj *types.ClusterObjects, out io.Writer) error {
+func (o *ListLogsOptions) printListLogsMessage(dataObj *cluster.ClusterObjects, out io.Writer) error {
 	w := cmddes.NewPrefixWriter(out)
 	o.printHeaderMessage(w, dataObj.Cluster)
 	o.printBodyMessage(w, dataObj.Cluster, dataObj.ClusterDef, dataObj.Pods)

@@ -23,11 +23,15 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
+type Options interface{}
+
 type BuildFn func(cmd *Command) *cobra.Command
 
-type CustomCompleteFn func(o interface{}, args []string) error
+type CustomCompleteFn func(o Options, args []string) error
 
-type CustomFlags func(o interface{}, cmd *cobra.Command)
+type CustomFlags func(o Options, cmd *cobra.Command)
+
+type CustomRunFn func(cmd *Command) (bool, error)
 
 // Command records the command info
 type Command struct {
@@ -36,10 +40,25 @@ type Command struct {
 	Example string
 	GVR     schema.GroupVersionResource
 	Factory cmdutil.Factory
+
+	// Args parsed from command line
+	Args []string
+
+	// Options custom other options
+	Options Options
+
 	// CustomComplete custom complete function for cmd
 	CustomComplete CustomCompleteFn
+
 	// CustomFlags custom flags for cmd, return args
 	CustomFlags CustomFlags
+
+	// CustomRun custom run function for cmd
+	CustomRun CustomRunFn
+
+	// Cmd is the cobra command
+	Cmd *cobra.Command
+
 	genericclioptions.IOStreams
 }
 
@@ -89,6 +108,16 @@ func (b *CmdBuilder) CustomComplete(fn CustomCompleteFn) *CmdBuilder {
 
 func (b *CmdBuilder) CustomFlags(fn CustomFlags) *CmdBuilder {
 	b.cmd.CustomFlags = fn
+	return b
+}
+
+func (b *CmdBuilder) CustomRun(fn CustomRunFn) *CmdBuilder {
+	b.cmd.CustomRun = fn
+	return b
+}
+
+func (b *CmdBuilder) Options(o Options) *CmdBuilder {
+	b.cmd.Options = o
 	return b
 }
 

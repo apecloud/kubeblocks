@@ -28,6 +28,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
@@ -89,6 +90,7 @@ var roleCheckCount = 0
 // Mysql represents MySQL output bindings.
 type Mysql struct {
 	db       *sql.DB
+	mu       sync.Mutex
 	logger   logger.Logger
 	metadata bindings.Metadata
 }
@@ -107,6 +109,8 @@ func (m *Mysql) Init(metadata bindings.Metadata) error {
 
 // InitDelay TODO add mutex lock to resolve concurrency problem
 func (m *Mysql) InitDelay() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if m.db != nil {
 		return nil
 	}
@@ -155,6 +159,8 @@ func (m *Mysql) InitDelay() error {
 
 // Invoke handles all invoke operations.
 func (m *Mysql) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
+	var sql string
+	var ok bool
 	startTime := time.Now()
 	resp := &bindings.InvokeResponse{
 		Metadata: map[string]string{
@@ -168,10 +174,19 @@ func (m *Mysql) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindi
 		return nil, errors.Errorf("invoke request required")
 	}
 
+	if req.Operation == runningCheckOperation {
+		d, err := m.runningCheck(ctx, resp)
+		if err != nil {
+			return nil, err
+		}
+		resp.Data = d
+		goto ret
+	}
+
 	if m.db == nil {
 		go m.InitDelay()
 		resp.Data = []byte("db not ready")
-		return resp, nil
+		goto ret
 	}
 
 	if req.Operation == closeOperation {
@@ -183,42 +198,35 @@ func (m *Mysql) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindi
 	}
 	m.logger.Debugf("operation: %v", req.Operation)
 
-	s, ok := req.Metadata[commandSQLKey]
+	sql, ok = req.Metadata[commandSQLKey]
 	if !ok {
 		return nil, errors.Errorf("required metadata not set: %s", commandSQLKey)
 	}
 
 	switch req.Operation { //nolint:exhaustive
 	case execOperation:
-		r, err := m.exec(ctx, s)
+		r, err := m.exec(ctx, sql)
 		if err != nil {
 			return nil, err
 		}
 		resp.Metadata[respRowsAffectedKey] = strconv.FormatInt(r, 10)
 
 	case queryOperation:
-		d, err := m.query(ctx, s)
-		if err != nil {
-			return nil, err
-		}
-		resp.Data = d
-
-	case runningCheckOperation:
-		d, err := m.runningCheck(ctx, resp)
+		d, err := m.query(ctx, sql)
 		if err != nil {
 			return nil, err
 		}
 		resp.Data = d
 
 	case statusCheckOperation:
-		d, err := m.statusCheck(ctx, s, resp)
+		d, err := m.statusCheck(ctx, sql, resp)
 		if err != nil {
 			return nil, err
 		}
 		resp.Data = d
 
 	case roleCheckOperation:
-		d, err := m.roleCheck(ctx, s, resp)
+		d, err := m.roleCheck(ctx, sql, resp)
 		if err != nil {
 			return nil, err
 		}
@@ -229,6 +237,7 @@ func (m *Mysql) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindi
 			req.Operation, execOperation, queryOperation, closeOperation)
 	}
 
+ret:
 	endTime := time.Now()
 	resp.Metadata[respEndTimeKey] = endTime.Format(time.RFC3339Nano)
 	resp.Metadata[respDurationKey] = endTime.Sub(startTime).String()

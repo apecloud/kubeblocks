@@ -26,18 +26,13 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
-func Test_schemaValidator_Validate(t *testing.T) {
-
-	formString := func(str string) *string {
-		return &str
+var toMap = func(str string) map[string]string {
+	return map[string]string{
+		"noKey": str,
 	}
+}
 
-	toMap := func(str string) map[string]string {
-		return map[string]string{
-			"noKey": str,
-		}
-	}
-
+func TestSchemaValidatorWithCue(t *testing.T) {
 	// not config validate
 	{
 		validator := NewConfigValidator(&dbaasv1alpha1.ConfigurationTemplateSpec{})
@@ -47,34 +42,46 @@ func Test_schemaValidator_Validate(t *testing.T) {
 
 	// cue validate for ini
 	{
-		validator := NewConfigValidator(&dbaasv1alpha1.ConfigurationTemplateSpec{
-			ConfigurationSchema: &dbaasv1alpha1.CustomParametersValidation{
-				Cue: formString(loadTestData("./testdata/mysql.cue")),
-			},
-			Formatter: dbaasv1alpha1.INI,
-		})
-
+		validator := NewConfigValidator(fakeConfigurationTpl("./testdata/mysql.cue", dbaasv1alpha1.INI))
 		require.Nil(t, validator.Validate(toMap(loadTestData("./testdata/mysql.cnf"))))
-		expectErr := errors.New(`failed to cue template render configure: [configuration: field not allowed: notsection:
-    2:18
-    30:16
-    30:34
+		expectErr := errors.New(`failed to cue template render configure: [mysqld.innodb_autoinc_lock_mode: 3 errors in empty disjunction:
+mysqld.innodb_autoinc_lock_mode: conflicting values "100" and 1 (mismatched types string and int):
+    14:39
+mysqld.innodb_autoinc_lock_mode: conflicting values "100" and 2 (mismatched types string and int):
+    14:43
+mysqld.innodb_autoinc_lock_mode: conflicting values "100" and int (mismatched types string and int):
+    14:29
 ]`)
 		require.Equal(t, expectErr, validator.Validate(toMap(loadTestData("./testdata/mysql_err.cnf"))))
 	}
 
 	// cue validate for xml
 	{
-		validator := NewConfigValidator(&dbaasv1alpha1.ConfigurationTemplateSpec{
-			ConfigurationSchema: &dbaasv1alpha1.CustomParametersValidation{
-				Cue: formString(loadTestData("./testdata/clickhouse.cue")),
-			},
-			Formatter: dbaasv1alpha1.XML,
-		})
-
+		validator := NewConfigValidator(fakeConfigurationTpl("./testdata/clickhouse.cue", dbaasv1alpha1.XML))
 		require.Nil(t, validator.Validate(toMap(loadTestData("./testdata/clickhouse.xml"))))
 	}
 
+}
+
+func TestSchemaValidatorWithOpenSchema(t *testing.T) {
+	tpl := fakeConfigurationTpl("./testdata/mysql.cue", dbaasv1alpha1.INI)
+	validator := &schemaValidator{
+		typeName: tpl.CfgSchemaTopLevelName,
+		cfgType:  tpl.Formatter,
+		schema:   tpl.ConfigurationSchema.Schema,
+	}
+
+	require.Nil(t, validator.Validate(toMap(loadTestData("./testdata/mysql.cnf"))))
+}
+
+func fakeConfigurationTpl(cuefile string, cfgFormatter dbaasv1alpha1.ConfigurationFormatter) *dbaasv1alpha1.ConfigurationTemplateSpec {
+	cueContext := loadTestData(cuefile)
+	return &dbaasv1alpha1.ConfigurationTemplateSpec{
+		ConfigurationSchema: &dbaasv1alpha1.CustomParametersValidation{
+			Cue: &cueContext,
+		},
+		Formatter: cfgFormatter,
+	}
 }
 
 func loadTestData(fileName string) string {

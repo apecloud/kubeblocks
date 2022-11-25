@@ -61,7 +61,7 @@ loose_log_bin_use_v1_row_events = off
 loose_binlog_checksum           = crc32
 
 #test
-cluster_name = {{ .Cluster.Name }}
+cluster_name = {{ $.Cluster.Name }}
 cluster_namespace = {{ .Cluster.Namespace }}
 component_name = {{ .Component.Name }}
 component_replica = {{ .Component.Replicas }}

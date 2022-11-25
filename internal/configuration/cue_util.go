@@ -19,7 +19,6 @@ package configuration
 import (
 	"strings"
 
-	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 	mxjv2 "github.com/clbanning/mxj/v2"
 	"github.com/spf13/viper"
@@ -27,9 +26,17 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
-func init() {
-	mxjv2.CastValuesToInt(true)
-}
+type CueType string
+
+const (
+	NullableType CueType = "nullable"
+	FloatType    CueType = "float"
+	IntType      CueType = "integer"
+	BoolType     CueType = "boolean"
+	StringType   CueType = "string"
+	StructType   CueType = "object"
+	ListType     CueType = "array"
+)
 
 // CueValidate cue validate
 func CueValidate(cueTpl string) error {
@@ -43,56 +50,48 @@ func CueValidate(cueTpl string) error {
 }
 
 func ValidateConfigurationWithCue(cueTpl string, cfgType dbaasv1alpha1.ConfigurationFormatter, rawData string) error {
-	cfg := LoadConfiguration(cfgType, rawData)
-	if cfg == nil {
-		return MakeError("failed to load configuration. [%s]", rawData)
+	cfg, err := LoadConfiguration(cfgType, rawData)
+	if err != nil {
+		return WrapError(err, "failed to load configuration. [%s]", rawData)
 	}
 
 	return CfgDataValidateByCue(cueTpl, cfg)
 }
 
-func LoadConfiguration(cfgType dbaasv1alpha1.ConfigurationFormatter, rawData string) interface{} {
+func LoadConfiguration(cfgType dbaasv1alpha1.ConfigurationFormatter, rawData string) (map[string]interface{}, error) {
 	// viper not support xml
 	if cfgType == dbaasv1alpha1.XML {
 		xmlMap, err := mxjv2.NewMapXml([]byte(rawData), true)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		return xmlMap
+		return xmlMap, nil
 	}
 	v := viper.New()
 	v.SetConfigType(string(cfgType))
+	v.SetTypeByDefaultValue(true)
 	if err := v.ReadConfig(strings.NewReader(rawData)); err != nil {
-		return nil
+		return nil, err
 	}
 
-	return v.AllSettings()
+	return v.AllSettings(), nil
 }
 
-func CfgDataValidateByCue(cueTpl string, config interface{}) error {
-	const (
-		ConfigurationCueVariableName = "configuration"
-	)
-
-	// yamlData, err := json.Marshal(config)
-	// if err != nil {
-	//	return false, err
-	// }
-
+func CfgDataValidateByCue(cueTpl string, data interface{}) error {
 	context := cuecontext.New()
 	tpl := context.CompileString(cueTpl)
 	if err := tpl.Err(); err != nil {
 		return err
 	}
 
-	cfgPath := cue.ParsePath(ConfigurationCueVariableName)
-	tpl = tpl.FillPath(cfgPath, config)
+	if err := processCfgNotStringParam(data, context, tpl); err != nil {
+		return err
+	}
+
+	tpl = tpl.Fill(data)
 	if err := tpl.Err(); err != nil {
 		return WrapError(err, "failed to cue template render configure")
 	}
 
-	cfg := tpl.LookupPath(cfgPath)
-	// debug, _ := cfg.MarshalJSON()
-	// fmt.Println(debug)
-	return cfg.Validate()
+	return tpl.Validate()
 }

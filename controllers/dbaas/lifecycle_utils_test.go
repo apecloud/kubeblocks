@@ -350,7 +350,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: apecloud/wesql-server:8.0.30-4.alpha4.20221117.gba56235
+        image: apecloud/wesql-server:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3306

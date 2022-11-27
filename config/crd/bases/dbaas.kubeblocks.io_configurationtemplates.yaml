@@ -107,8 +107,7 @@ spec:
               ConfigurationTemplate.
             properties:
               message:
-                description: If the configuration template is incorrect, Message field
-                  describes the error information.
+                description: Message field describes the reasons of abnormal status.
                 type: string
               observedGeneration:
                 description: observedGeneration is the latest generation observed
@@ -117,9 +116,8 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: Phase is configuration template status, if it is set
-                  to AvailablePhase, ConfigurationTemplate be used by ClusterDefinition
-                  or AppVersion.
+                description: Phase is status of configuration template, when set to
+                  AvailablePhase, it can be referenced by ClusterDefinition or AppVersion.
                 enum:
                 - Available
                 - Unavailable

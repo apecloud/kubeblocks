@@ -130,11 +130,6 @@ type ConfigurationSpec struct {
 	// +optional
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
 
-	// Support multi scene, Different scenarios use different configuration templates.
-	// User modify scene in cluster field or reconfigure ops.
-	// ConfigTemplateRefs map[string][]ConfigTemplate `json:"configTemplateRefs,omitempty"`
-	// DefaultScene string `json:"defaultScene,omitempty"`
-
 	// ConfigRevisionHistoryLimit is number of prior configuration versions, By default, 6 versions are reserved.
 	// +kubebuilder:default=6
 	// +kubebuilder:validation:Minimum=0

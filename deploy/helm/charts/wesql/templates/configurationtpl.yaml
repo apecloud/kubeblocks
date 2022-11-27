@@ -18,7 +18,9 @@ spec:
 
   #  require db instance restart
   staticParameters:
-    {{ .Values.configTemplate.staticParameters }}
+    {{- range .Values.configTemplate.staticParameters }}
+    - {{ . }}
+    {{- end }}
 
   # mysql configuration file format
   formatter: ini

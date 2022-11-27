@@ -53,32 +53,31 @@ spec:
                   openapi schema.
                 type: string
               configurationSchema:
-                description: ConfigurationSchema that imposes restrictions on engine
+                description: ConfigurationSchema imposes restrictions on database
                   parameter's rule.
                 properties:
                   cue:
-                    description: Cue that to let ISV verify user configuration through
-                      cue language.
+                    description: Cue that to let provider verify user configuration
+                      through cue language.
                     type: string
                   schema:
-                    description: 'TODO(zt) DAY2 support schema Schema provides a way
-                      for providers to verify that the parameter is legal. fix controller-gen
-                      doesn''t work with k8s.io/apiextensions-apiserver: https://github.com/kubernetes-sigs/controller-tools/issues/291'
+                    description: 'Schema provides a way for providers to verify that
+                      the parameter is legal. fix controller-gen doesn''t work with
+                      k8s.io/apiextensions-apiserver: https://github.com/kubernetes-sigs/controller-tools/issues/291'
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
               dynamicParameters:
-                description: DynamicParameters, list of DynamicParameter, modification
-                  of it triggers a config dynamic reload without process restart.
+                description: DynamicParameters, list of DynamicParameter, modifications
+                  of them trigger a config dynamic reload without process restart.
                 items:
                   type: string
                 type: array
               formatter:
                 default: yaml
                 description: Formatter describes the format of the configuration file,
-                  the controller parses configuration file based on formatter, and
-                  analyzes the modified parameters list, and then applies corresponding
-                  policies.
+                  the controller 1. parses configuration file 2. analyzes the modified
+                  parameters 3. applies corresponding policies.
                 enum:
                 - dotenv
                 - ini
@@ -94,7 +93,7 @@ spec:
                 type: array
               staticParameters:
                 description: StaticParameters, list of StaticParameter, modification
-                  of it triggers a process restart.
+                  of them triggers a process restart.
                 items:
                   type: string
                 type: array
@@ -113,8 +112,8 @@ spec:
                 type: string
               observedGeneration:
                 description: observedGeneration is the latest generation observed
-                  for this ClusterDefinition. It corresponds to the ConfigurationTemplate's
-                  generation, which is updated on mutation by the API Server.
+                  for this ClusterDefinition. It refers to the ConfigurationTemplate's
+                  generation, which is updated by the API Server.
                 format: int64
                 type: integer
               phase:

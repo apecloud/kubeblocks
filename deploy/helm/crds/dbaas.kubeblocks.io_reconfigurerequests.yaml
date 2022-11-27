@@ -50,10 +50,10 @@ spec:
             description: ReconfigureRequestSpec defines the desired state of ReconfigureRequest
             properties:
               clusterRef:
-                description: reference Cluster resource.
+                description: reference of Cluster resource.
                 type: string
               componentRef:
-                description: reference ClusterDefinition resource.
+                description: reference of ClusterDefinition resource.
                 type: string
               configurations:
                 items:
@@ -95,8 +95,8 @@ spec:
             description: ReconfigureRequestStatus defines the observed state of ReconfigureRequest
             properties:
               flows:
-                description: 'Flows field defines the detailed process flow that is
-                  executed during reconfigure. reference url: https://infracreate.feishu.cn/wiki/wikcn24AWAgXXBedVZZ0YgvjGuc'
+                description: 'Flows field defines the detailed process flow executed
+                  during reconfigure. reference url: https://infracreate.feishu.cn/wiki/wikcn24AWAgXXBedVZZ0YgvjGuc'
                 items:
                   properties:
                     errorMessage:
@@ -113,11 +113,11 @@ spec:
                   type: object
                 type: array
               phase:
-                description: Phase is reconfigure request object status.
+                description: Phase is status of reconfigure request object.
                 type: string
               pods:
-                description: Pods field describes information about the pod that is
-                  being upgraded or has been successfully upgraded.
+                description: Pods field describes information about the pod in upgrading
+                  or been upgraded.
                 items:
                   properties:
                     podRef:
@@ -169,8 +169,7 @@ spec:
                   type: object
                 type: array
               waitPods:
-                description: WaitPods field describes which Pods are still waiting
-                  to be upgraded.
+                description: WaitPods field describes the Pods waiting to be upgraded.
                 items:
                   description: 'ObjectReference contains enough information to let
                     you inspect or modify the referred object. --- New uses of this

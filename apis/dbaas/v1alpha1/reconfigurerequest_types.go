@@ -25,11 +25,11 @@ import (
 type ReconfigureRequestSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 
-	// reference Cluster resource.
+	// reference of Cluster resource.
 	// +kubebuilder:validation:Required
 	ClusterRef string `json:"clusterRef,omitempty"`
 
-	// reference ClusterDefinition resource.
+	// reference of ClusterDefinition resource.
 	// +kubebuilder:validation:Required
 	ComponentRef string `json:"componentRef,omitempty"`
 
@@ -42,20 +42,20 @@ type ReconfigureRequestStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Phase is reconfigure request object status.
+	// Phase is status of reconfigure request object.
 	// +optional
 	Phase string `json:"phase,omitempty"`
 
-	// Flows field defines the detailed process flow that is executed during reconfigure.
+	// Flows field defines the detailed process flow executed during reconfigure.
 	// reference url: https://infracreate.feishu.cn/wiki/wikcn24AWAgXXBedVZZ0YgvjGuc
 	// +optional
 	Flows []ReconfigureStateInfo `json:"flows,omitempty"`
 
-	// Pods field describes information about the pod that is being upgraded or has been successfully upgraded.
+	// Pods field describes information about the pod in upgrading or been upgraded.
 	// +optional
 	Pods []ReconfigurePodStatus `json:"pods,omitempty"`
 
-	// WaitPods field describes which Pods are still waiting to be upgraded.
+	// WaitPods field describes the Pods waiting to be upgraded.
 	// +optional
 	WaitPods []corev1.ObjectReference `json:"waitPods,omitempty"`
 }

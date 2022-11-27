@@ -63,13 +63,12 @@ type ConfigurationTemplateStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Phase is configuration template status, if it is set to AvailablePhase,
-	// ConfigurationTemplate be used by ClusterDefinition or AppVersion.
+	// Phase is status of configuration template, when set to AvailablePhase, it can be referenced by ClusterDefinition or AppVersion.
 	// +kubebuilder:validation:Enum={Available,Unavailable,Deleting}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
-	// If the configuration template is incorrect, Message field describes the error information.
+	// Message field describes the reasons of abnormal status.
 	// +optional
 	Message string `json:"message,omitempty"`
 

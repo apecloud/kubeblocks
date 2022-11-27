@@ -56,13 +56,13 @@ spec:
                     antiAffinity:
                       default: false
                       description: antiAffinity defines components should have anti-affinity
-                        constraint to same component type
+                        constraint for pods with same component type.
                       type: boolean
                     characterType:
                       description: CharacterType defines well-known database component
-                        name, such as mongos(mongodb), proxy(redis), wesql(mysql)
-                        DBaas will generate proper monitor configs for wellknown CharacterType
-                        when BuiltIn is true.
+                        name, such as mongos(mongodb), proxy(redis), mariadb(mysql)
+                        DBaas will generate proper monitor configs for well-known
+                        CharacterType when BuiltIn is true.
                       type: string
                     componentType:
                       default: Stateless
@@ -248,8 +248,7 @@ spec:
                       type: object
                     defaultReplicas:
                       default: 0
-                      description: Default replicas in this component if user not
-                        specify
+                      description: Default replicas in this component when not specified.
                       minimum: 0
                       type: integer
                     maxAvailable:
@@ -7703,7 +7702,7 @@ spec:
                         builtin ENV variables: self: KB_SELF_{builtin_properties}
                         rule: KB_{conponent_name}[n]-{builtin_properties} builtin_properties:
                         - ID # which shows in Cluster.status - HOST # e.g. example-mongodb2-0.example-mongodb2-svc.default.svc.cluster.local
-                        - PORT - N # number of current component'
+                        - PORT - N # number of current components'
                       properties:
                         create:
                           description: Scripts executed before and after creation

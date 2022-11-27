@@ -180,8 +180,8 @@ type ClusterDefinitionComponent struct {
 	// +kubebuilder:validation:MaxLength=12
 	TypeName string `json:"typeName,omitempty"`
 
-	// CharacterType defines well-known database component name, such as mongos(mongodb), proxy(redis), wesql(mysql)
-	// DBaas will generate proper monitor configs for wellknown CharacterType when BuiltIn is true.
+	// CharacterType defines well-known database component name, such as mongos(mongodb), proxy(redis), mariadb(mysql)
+	// DBaas will generate proper monitor configs for well-known CharacterType when BuiltIn is true.
 	// +optional
 	CharacterType string `json:"characterType,omitempty"`
 
@@ -194,7 +194,7 @@ type ClusterDefinitionComponent struct {
 	// +kubebuilder:validation:Minimum=0
 	MaxAvailable int `json:"maxAvailable,omitempty"`
 
-	// Default replicas in this component if user not specify
+	// Default replicas in this component when not specified.
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	DefaultReplicas int `json:"defaultReplicas,omitempty"`
@@ -207,7 +207,7 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Monitor *MonitorConfig `json:"monitor,omitempty"`
 
-	// antiAffinity defines components should have anti-affinity constraint to same component type
+	// antiAffinity defines components should have anti-affinity constraint for pods with same component type.
 	// +kubebuilder:default=false
 	AntiAffinity bool `json:"antiAffinity,omitempty"`
 
@@ -230,7 +230,7 @@ type ClusterDefinitionComponent struct {
 	// - ID # which shows in Cluster.status
 	// - HOST # e.g. example-mongodb2-0.example-mongodb2-svc.default.svc.cluster.local
 	// - PORT
-	// - N # number of current component
+	// - N # number of current components
 	// +optional
 	Scripts ClusterDefinitionScripts `json:"scripts,omitempty"`
 

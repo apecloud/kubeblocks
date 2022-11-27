@@ -60,13 +60,13 @@ spec:
                     antiAffinity:
                       default: false
                       description: antiAffinity defines components should have anti-affinity
-                        constraint to same component type.
+                        constraint for pods with same component type.
                       type: boolean
                     characterType:
                       description: CharacterType defines well-known database component
-                        name, such as mongos(mongodb), proxy(redis), wesql(mysql)
-                        DBaas will generate proper monitor configs for wellknown CharacterType
-                        when BuiltIn is true.
+                        name, such as mongos(mongodb), proxy(redis), mariadb(mysql)
+                        DBaas will generate proper monitor configs for well-known
+                        CharacterType when BuiltIn is true.
                       type: string
                     componentType:
                       default: Stateless
@@ -118,7 +118,7 @@ spec:
                           minimum: 0
                           type: integer
                         configTemplateRefs:
-                          description: The configTemplateRefs field provided by ISV,
+                          description: The configTemplateRefs field provided by Provider,
                             and finally this configTemplateRefs will be rendered into
                             the user's own configuration file against the user's cluster.
                           items:
@@ -275,7 +275,7 @@ spec:
                     defaultReplicas:
                       default: 0
                       description: DefaultReplicas default replicas in this component
-                        if user not specify.
+                        when not specified.
                       format: int32
                       minimum: 0
                       type: integer
@@ -324,7 +324,7 @@ spec:
                         builtIn:
                           default: false
                           description: BuiltIn is a switch to enable DBaas builtIn
-                            monitoring. If BuiltIn is true and CharacterType is wellknown,
+                            monitoring. If BuiltIn is true and CharacterType is well-known,
                             ExporterConfig and Sidecar container will generate automatically.
                             Otherwise, provider should set BuiltIn to false and provide
                             ExporterConfig and Sidecar container own.

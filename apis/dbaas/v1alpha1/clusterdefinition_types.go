@@ -112,7 +112,7 @@ type ExporterConfig struct {
 
 type MonitorConfig struct {
 	// BuiltIn is a switch to enable DBaas builtIn monitoring.
-	// If BuiltIn is true and CharacterType is wellknown, ExporterConfig and Sidecar container will generate automatically.
+	// If BuiltIn is true and CharacterType is well-known, ExporterConfig and Sidecar container will generate automatically.
 	// Otherwise, provider should set BuiltIn to false and provide ExporterConfig and Sidecar container own.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=false
@@ -138,7 +138,7 @@ type LogConfig struct {
 }
 
 type ConfigurationSpec struct {
-	// The configTemplateRefs field provided by ISV, and
+	// The configTemplateRefs field provided by Provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file against the user's cluster.
 	// +optional
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
@@ -201,8 +201,8 @@ type ClusterDefinitionComponent struct {
 	// +kubebuilder:default=Stateless
 	ComponentType ComponentType `json:"componentType"`
 
-	// CharacterType defines well-known database component name, such as mongos(mongodb), proxy(redis), wesql(mysql)
-	// DBaas will generate proper monitor configs for wellknown CharacterType when BuiltIn is true.
+	// CharacterType defines well-known database component name, such as mongos(mongodb), proxy(redis), mariadb(mysql)
+	// DBaas will generate proper monitor configs for well-known CharacterType when BuiltIn is true.
 	// +optional
 	CharacterType string `json:"characterType,omitempty"`
 
@@ -217,7 +217,7 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	MaxReplicas int32 `json:"maxReplicas,omitempty"`
 
-	// DefaultReplicas default replicas in this component if user not specify.
+	// DefaultReplicas default replicas in this component when not specified.
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
@@ -243,7 +243,7 @@ type ClusterDefinitionComponent struct {
 	// +listMapKey=name
 	LogConfigs []LogConfig `json:"logConfigs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// antiAffinity defines components should have anti-affinity constraint to same component type.
+	// antiAffinity defines components should have anti-affinity constraint for pods with same component type.
 	// +kubebuilder:default=false
 	// +optional
 	AntiAffinity bool `json:"antiAffinity,omitempty"`

@@ -51,7 +51,7 @@ spec:
                 description: List of components belonging to the cluster
                 items:
                   description: ClusterDefinitionComponent is a group of pods, pods
-                    in one component usually share the same data
+                    belong to same component usually share the same data
                   properties:
                     antiAffinity:
                       default: false
@@ -77,19 +77,19 @@ spec:
                       properties:
                         configReload:
                           default: false
-                          description: ConfigReload indicates whether the engine supports
-                            reload. if false, the controller will restart the engine
-                            instance. if true, the controller will determine the behavior
-                            of the engine instance based on the configuration templates,
-                            restart or reload depending on whether any parameters
-                            in the StaticParameters have been modified.
+                          description: ConfigReload indicates whether the process
+                            supports reload. if false, the controller will restart
+                            the process. if true, the controller will determine the
+                            behavior of the engine instance based on the configuration
+                            templates, restart or reload depending on whether any
+                            parameters in the StaticParameters have been modified.
                           type: boolean
                         configReloadTrigger:
                           description: ConfigReloadTrigger describes the configuration
                             against reload type.
                           properties:
                             processName:
-                              description: ProcessName is process name,sends unix
+                              description: ProcessName is process name, sends unix
                                 signal to proc.
                               type: string
                             signal:
@@ -108,14 +108,13 @@ spec:
                         configRevisionHistoryLimit:
                           default: 6
                           description: ConfigRevisionHistoryLimit is number of prior
-                            versions of configuration variations submitted by users,
-                            By default, 6 versions are reserved.
+                            configuration versions, By default, 6 versions are reserved.
                           minimum: 0
                           type: integer
                         configTemplateRefs:
-                          description: The configTemplateRefs field provided by ISV,
+                          description: The configTemplateRefs field provided by Provider,
                             and finally this configTemplateRefs will be rendered into
-                            the user's own configuration file against the user's cluster.
+                            the user's configuration file against the user's cluster.
                           items:
                             properties:
                               name:

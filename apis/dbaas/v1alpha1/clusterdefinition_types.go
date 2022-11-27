@@ -125,24 +125,24 @@ type MonitorConfig struct {
 }
 
 type ConfigurationSpec struct {
-	// The configTemplateRefs field provided by ISV, and
-	// finally this configTemplateRefs will be rendered into the user's own configuration file against the user's cluster.
+	// The configTemplateRefs field provided by Provider, and
+	// finally this configTemplateRefs will be rendered into the user's configuration file against the user's cluster.
 	// +optional
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
 
-	// TODO(zt) support multi scene, Different scenarios use different configuration templates.
+	// Support multi scene, Different scenarios use different configuration templates.
 	// User modify scene in cluster field or reconfigure ops.
 	// ConfigTemplateRefs map[string][]ConfigTemplate `json:"configTemplateRefs,omitempty"`
 	// DefaultScene string `json:"defaultScene,omitempty"`
 
-	// ConfigRevisionHistoryLimit is number of prior versions of configuration variations submitted by users, By default, 6 versions are reserved.
+	// ConfigRevisionHistoryLimit is number of prior configuration versions, By default, 6 versions are reserved.
 	// +kubebuilder:default=6
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	ConfigRevisionHistoryLimit int `json:"configRevisionHistoryLimit,omitempty"`
 
-	// ConfigReload indicates whether the engine supports reload.
-	// if false, the controller will restart the engine instance.
+	// ConfigReload indicates whether the process supports reload.
+	// if false, the controller will restart the process.
 	// if true, the controller will determine the behavior of the engine instance based on the configuration templates,
 	// restart or reload depending on whether any parameters in the StaticParameters have been modified.
 	// +kubebuilder:default=false
@@ -166,14 +166,12 @@ type ConfigReloadTrigger struct {
 	// +optional
 	Signal string `json:"signal,omitempty"`
 
-	// ProcessName is process name,sends unix signal to proc.
+	// ProcessName is process name, sends unix signal to proc.
 	// +optional
 	ProcessName string `json:"processName,omitempty"`
-
-	// TODO support reload way
 }
 
-// ClusterDefinitionComponent is a group of pods, pods in one component usually share the same data
+// ClusterDefinitionComponent is a group of pods, pods belong to same component usually share the same data
 type ClusterDefinitionComponent struct {
 	// Type name of the component, it can be any valid string
 	// +kubebuilder:validation:Required

@@ -17,40 +17,87 @@ limitations under the License.
 package builder
 
 import (
-	"testing"
+	"fmt"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
-func Test(t *testing.T) {
-	buildFn := func(cmd *Command) *cobra.Command {
-		return &cobra.Command{
-			Use: cmd.Use,
-		}
+type testOptions struct {
+	a string
+}
+
+var _ = Describe("builder", func() {
+	It("build command", func() {
+		cmd := NewCmdBuilder().
+			IOStreams(genericclioptions.NewTestIOStreamsDiscard()).
+			Factory(nil).
+			Use("test").
+			Short("test command short description").
+			Example("test command examples").
+			Options(&testOptions{}).
+			CustomComplete(customCompleteFn).
+			CustomFlags(customFlags).
+			CustomRun(customRunFn).
+			Example("test command example").
+			GVR(types.ClusterGVR()).Build(buildFn)
+
+		Expect(cmd).ShouldNot(BeNil())
+		Expect(cmd.Use).Should(Equal("test"))
+		Expect(cmd.Flags().Lookup("a").Value.String()).Should(Equal("a"))
+	})
+})
+
+func buildFn(c *Command) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     c.Use,
+		Short:   c.Short,
+		Example: c.Example,
+		Run: func(cmd *cobra.Command, args []string) {
+			var (
+				goon = true
+				err  error
+			)
+			if c.CustomComplete != nil {
+				util.CheckErr(c.CustomComplete(c.Options, args))
+			}
+
+			if c.CustomRun != nil {
+				goon, err = c.CustomRun(c)
+			}
+
+			if goon && err == nil {
+				fmt.Fprint(c.Out, "run")
+			}
+		},
 	}
-
-	customCompleteFn := func(o interface{}, args []string) error {
-		return nil
+	if c.CustomFlags != nil {
+		c.CustomFlags(c.Options, cmd)
 	}
+	return cmd
+}
 
-	customFlags := func(o interface{}, cmd *cobra.Command) {
-
+func customCompleteFn(options Options, args []string) error {
+	o := options.(*testOptions)
+	if len(o.a) == 0 {
+		o.a = "auto complete"
 	}
+	return nil
+}
 
-	cmd := NewCmdBuilder().
-		IOStreams(genericclioptions.NewTestIOStreamsDiscard()).
-		Factory(nil).
-		Use("test").
-		Short("test command short description").
-		CustomComplete(customCompleteFn).
-		CustomFlags(customFlags).
-		Example("test command example").
-		GVR(types.ClusterGVR()).Build(buildFn)
+func customFlags(options Options, cmd *cobra.Command) {
+	o := options.(*testOptions)
+	cmd.Flags().StringVar(&o.a, "a", "a", "a test flag")
+}
 
-	if cmd == nil {
-		t.Errorf("cmd is nil")
-	}
+func customRunFn(c *Command) (bool, error) {
+	o := c.Options.(*testOptions)
+	fmt.Fprint(c.Out, o.a)
+	return true, nil
 }

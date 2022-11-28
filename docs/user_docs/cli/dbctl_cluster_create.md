@@ -24,6 +24,15 @@ dbctl cluster create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOu
   # In scenarios where you want to delete all resources including all snapshots and snapshot data when deleting
   # the cluster, use termination policy WipeOut
   dbctl cluster create mycluster --components=component.yaml --termination-policy=WipeOut
+  
+  # In scenarios where you want to load components data from website URL
+  # the cluster, use termination policy Halt
+  dbctl cluster create mycluster --components=http://kubeblocks.io/yamls/wesql_single.yaml --termination-policy=Halt
+  
+  # In scenarios where you want to load components data from stdin
+  # the cluster, use termination policy Halt
+  cat << EOF | dbctl cluster create mycluster --termination-policy=Halt --components -
+  - name: wesql-test... (omission from stdin)
 ```
 
 ### Options
@@ -32,7 +41,7 @@ dbctl cluster create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOu
       --app-version string           AppVersion reference (default "wesql-8.0.30")
       --backup string                Set a source backup to restore data
       --cluster-definition string    ClusterDefinition reference (default "apecloud-wesql")
-      --components string            Use yaml file to specify the cluster components
+      --components string            Use yaml file, URL, or stdin to specify the cluster components
       --enable-all-logs              Enable advanced application all log extraction, and true will ignore enabledLogs of component level
   -h, --help                         help for create
       --monitor                      Set monitor enabled (default false)
@@ -48,7 +57,7 @@ dbctl cluster create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOu
       --as string                      Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
       --as-group stringArray           Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
       --as-uid string                  UID to impersonate for the operation.
-      --cache-dir string               Default cache directory (default "/Users/ldm/.kube/cache")
+      --cache-dir string               Default cache directory (default "$HOME/.kube/cache")
       --certificate-authority string   Path to a cert file for the certificate authority
       --client-certificate string      Path to a client certificate file for TLS
       --client-key string              Path to a client key file for TLS

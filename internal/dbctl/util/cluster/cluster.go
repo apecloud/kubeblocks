@@ -128,8 +128,6 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 	// get PVCs
 	if o.WithPVC {
 		if objs.PVCs, err = corev1.PersistentVolumeClaims(o.Namespace).List(ctx, listOpts()); err != nil {
-		}
-		if err != nil {
 			return nil, err
 		}
 	}

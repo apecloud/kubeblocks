@@ -240,7 +240,8 @@ func (d *ClusterDescriber) describeComponent(w describe.PrefixWriter) error {
 		describeResource(&c.Resources, w)
 
 		// storage
-		describeStorage(c.VolumeClaimTemplates, w)
+		sc := d.Cluster.Annotations[types.StorageClassAnnotationKey]
+		describeStorage(c.VolumeClaimTemplates, sc, w)
 
 		// network
 		describeNetwork(Level2, d.Services, c, w)
@@ -272,18 +273,24 @@ func describeResource(resources *corev1.ResourceRequirements, w describe.PrefixW
 	}
 }
 
-func describeStorage(vcTmpls []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate, w describe.PrefixWriter) {
+func describeStorage(vcTmpls []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate, sc string, w describe.PrefixWriter) {
 	if len(vcTmpls) > 0 {
 		w.Write(Level2, "Storage:\n")
 	}
 	for _, vcTmpl := range vcTmpls {
 		w.Write(Level3, "%s:\n", vcTmpl.Name)
 		val := vcTmpl.Spec.Resources.Requests[corev1.ResourceStorage]
-		if vcTmpl.Spec.StorageClassName == nil {
-			w.Write(Level4, "StorageClass:\t%s\n", valueNone)
-		} else {
+		scName := vcTmpl.Spec.StorageClassName
+
+		switch {
+		case scName != nil && len(*scName) > 0:
 			w.Write(Level4, "StorageClass:\t%s\n", *vcTmpl.Spec.StorageClassName)
+		case sc != "":
+			w.Write(Level4, "StorageClass:\t%s\n", sc)
+		default:
+			w.Write(Level4, "StorageClass:\t%s\n", valueNone)
 		}
+
 		w.Write(Level4, "Access Modes:\t%s\n", getAccessModes(vcTmpl.Spec.AccessModes))
 		w.Write(Level4, "Size:\t%s\n", val.String())
 	}

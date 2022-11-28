@@ -64,7 +64,6 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams,
 		reqCtx.Log.Info("get probe container port failed", "error", err)
 		return nil, err
 	}
-	// TODO: support status and running probes
 
 	if componentProbes.RoleChangedProbe != nil {
 		roleChangedContainer := container.DeepCopy()
@@ -105,7 +104,7 @@ func buildProbeServiceContainer(component *Component, container *corev1.Containe
 		"--config", "/config/dapr/config.yaml",
 		"--components-path", "/config/dapr/components"}
 
-	if len(component.Service.Ports) >= 0 {
+	if len(component.Service.Ports) > 0 {
 		port := component.Service.Ports[0]
 		dbPort := port.TargetPort.IntValue()
 		if dbPort == 0 {

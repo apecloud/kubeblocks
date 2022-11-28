@@ -31,13 +31,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dapr/components-contrib/bindings"
+	"github.com/dapr/kit/logger"
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/cmd/daprd/internal"
-
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
 )
 
 const (
@@ -78,6 +77,8 @@ const (
 	respEndTimeKey      = "end-time"
 	respDurationKey     = "duration"
 	statusCode          = "status-code"
+	//451 Unavailable For Legal Reasons, used to indicate check failed and trigger kubelet events
+	checkFailedHTTPCode = "451"
 )
 
 var oriRole = ""
@@ -107,7 +108,6 @@ func (m *Mysql) Init(metadata bindings.Metadata) error {
 	return nil
 }
 
-// InitDelay TODO add mutex lock to resolve concurrency problem
 func (m *Mysql) InitDelay() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -159,6 +159,10 @@ func (m *Mysql) InitDelay() error {
 
 // Invoke handles all invoke operations.
 func (m *Mysql) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
+	if req == nil {
+		return nil, errors.Errorf("invoke request required")
+	}
+
 	var sql string
 	var ok bool
 	startTime := time.Now()
@@ -170,8 +174,11 @@ func (m *Mysql) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindi
 		},
 	}
 
-	if req == nil {
-		return nil, errors.Errorf("invoke request required")
+	updateRespMetadata := func() (*bindings.InvokeResponse, error) {
+		endTime := time.Now()
+		resp.Metadata[respEndTimeKey] = endTime.Format(time.RFC3339Nano)
+		resp.Metadata[respDurationKey] = endTime.Sub(startTime).String()
+		return resp, nil
 	}
 
 	if req.Operation == runningCheckOperation {
@@ -180,13 +187,13 @@ func (m *Mysql) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindi
 			return nil, err
 		}
 		resp.Data = d
-		goto ret
+		return updateRespMetadata()
 	}
 
 	if m.db == nil {
 		go m.InitDelay()
 		resp.Data = []byte("db not ready")
-		goto ret
+		return updateRespMetadata()
 	}
 
 	if req.Operation == closeOperation {
@@ -237,12 +244,7 @@ func (m *Mysql) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindi
 			req.Operation, execOperation, queryOperation, closeOperation)
 	}
 
-ret:
-	endTime := time.Now()
-	resp.Metadata[respEndTimeKey] = endTime.Format(time.RFC3339Nano)
-	resp.Metadata[respDurationKey] = endTime.Sub(startTime).String()
-
-	return resp, nil
+	return updateRespMetadata()
 }
 
 // Operations returns list of operations supported by Mysql binding.
@@ -309,7 +311,7 @@ func (m *Mysql) runningCheck(ctx context.Context, resp *bindings.InvokeResponse)
 		m.logger.Errorf(message)
 		if runningCheckFailedCount++; runningCheckFailedCount%10 == 1 {
 			m.logger.Infof("running checks failed %v times continuously", runningCheckFailedCount)
-			resp.Metadata[statusCode] = "451"
+			resp.Metadata[statusCode] = checkFailedHTTPCode
 		}
 	} else {
 		runningCheckFailedCount = 0
@@ -326,11 +328,11 @@ func (m *Mysql) runningCheck(ctx context.Context, resp *bindings.InvokeResponse)
 
 func (m *Mysql) statusCheck(ctx context.Context, sql string, resp *bindings.InvokeResponse) ([]byte, error) {
 	leaderSql := `begin;
-   create table if not exists kb_health_check(type int, id bigint, primary key(type));
-   insert into kb_health_check values(1, now()) on duplicate key update id = now();
-   commit;
-	select id from kb_health_check;`
-	followerSql := `select id from kb_health_check limit 1;`
+    create table if not exists kb_health_check(type int, check_ts bigint, primary key(type));
+    insert into kb_health_check values(1, now()) on duplicate key update check_ts = now();
+    commit;
+	select check_ts from kb_health_check limit 1;`
+	followerSql := `select check_ts from kb_health_check limit 1;`
 	var err error
 	var count int64
 	var data []byte
@@ -348,7 +350,7 @@ func (m *Mysql) statusCheck(ctx context.Context, sql string, resp *bindings.Invo
 		result.Message = err.Error()
 		if statusCheckFailedCount++; statusCheckFailedCount%10 == 1 {
 			m.logger.Infof("status checks failed %v times continuously", statusCheckFailedCount)
-			resp.Metadata[statusCode] = "451"
+			resp.Metadata[statusCode] = checkFailedHTTPCode
 		}
 	} else {
 		result.Message = string(data)
@@ -399,7 +401,7 @@ func (m *Mysql) roleCheck(ctx context.Context, sql string, resp *bindings.Invoke
 		result.Message = err.Error()
 		if roleCheckFailedCount++; roleCheckFailedCount%10 == 1 {
 			m.logger.Infof("role checks failed %v times continuously", roleCheckFailedCount)
-			resp.Metadata[statusCode] = "451"
+			resp.Metadata[statusCode] = checkFailedHTTPCode
 		}
 		msg, _ := json.Marshal(result)
 		return msg, nil
@@ -417,7 +419,7 @@ func (m *Mysql) roleCheck(ctx context.Context, sql string, resp *bindings.Invoke
 	// reporting role event periodly to get pod's role lable updating accurately
 	// in case of event losing.
 	if roleCheckCount++; roleCheckCount%60 == 1 {
-		resp.Metadata[statusCode] = "451"
+		resp.Metadata[statusCode] = checkFailedHTTPCode
 	}
 	msg, _ := json.Marshal(result)
 	m.logger.Infof(string(msg))

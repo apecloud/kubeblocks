@@ -37,7 +37,7 @@ type ConfigurationTemplateSpec struct {
 	// +optional
 	ConfigurationSchema *CustomParametersValidation `json:"configurationSchema,omitempty"`
 
-	// StaticParameters, list of StaticParameter, modification of them triggers a process restart.
+	// StaticParameters, list of StaticParameter, modifications of them trigger a process restart.
 	// +optional
 	StaticParameters []string `json:"staticParameters,omitempty"`
 

@@ -81,6 +81,12 @@ const (
 	checkFailedHTTPCode = "451"
 )
 
+const (
+	runningCheckType = iota
+	statusCheckType
+	roleChangedCheckType
+)
+
 var oriRole = ""
 var bootTime = time.Now()
 var runningCheckFailedCount = 0
@@ -346,12 +352,12 @@ func (m *Mysql) runningCheck(ctx context.Context, resp *bindings.InvokeResponse)
 }
 
 func (m *Mysql) statusCheck(ctx context.Context, sql string, resp *bindings.InvokeResponse) ([]byte, error) {
-	leaderSql := `begin;
+	leaderSql := fmt.Sprintf(`begin;
     create table if not exists kb_health_check(type int, check_ts bigint, primary key(type));
-    insert into kb_health_check values(1, now()) on duplicate key update check_ts = now();
+    insert into kb_health_check values(%d, now()) on duplicate key update check_ts = now();
     commit;
-	select check_ts from kb_health_check limit 1;`
-	followerSql := `select check_ts from kb_health_check limit 1;`
+	select check_ts from kb_health_check where type=%d limit 1;`, statusCheckType, statusCheckType)
+	followerSql := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, statusCheckType)
 	var err error
 	var count int64
 	var data []byte

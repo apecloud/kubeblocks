@@ -876,7 +876,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				return &res, err
 			}
 			vct := stsObj.Spec.VolumeClaimTemplates[0]
-			// check pvc ready
+			// check all pvc ready
 			allPVCBound := true
 			for i := 0; i < int(*stsObj.Spec.Replicas); i++ {
 				pvcKey := types.NamespacedName{
@@ -900,6 +900,8 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 						res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 						return &res, err
 					}
+				} else {
+					reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "BackupJobDelete", "")
 				}
 				vs := snapshotv1.VolumeSnapshot{}
 				if err := cli.Get(ctx, snapshotKey, &vs); err != nil {
@@ -913,6 +915,8 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 							res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 							return &res, err
 						}
+					} else {
+						reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "VolumeSnapshotDelete", "")
 					}
 				}
 			} else {

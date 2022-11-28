@@ -21,6 +21,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1099,7 +1100,7 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 		if c.Env == nil {
 			c.Env = []corev1.EnvVar{}
 		}
-		for suf, fp := range map[string]string{
+		envMap := map[string]string{
 			"_POD_NAME":  "metadata.name",
 			"_NAMESPACE": "metadata.namespace",
 			"_SA_NAME":   "spec.serviceAccountName",
@@ -1107,7 +1108,15 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 			"_HOSTIP":    "status.hostIP",
 			"_PODIP":     "status.podIP",
 			"_PODIPS":    "status.podIPs",
-		} {
+		}
+		// sort the map keys, different order of envs will cause pods restart
+		var keyArr []string
+		for k, _ := range envMap {
+			keyArr = append(keyArr, k)
+		}
+		sort.Strings(keyArr)
+		for _, suf := range keyArr {
+			fp := envMap[suf]
 			c.Env = append(c.Env, corev1.EnvVar{
 				Name: dbaasPrefix + suf,
 				ValueFrom: &corev1.EnvVarSource{

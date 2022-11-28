@@ -39,13 +39,19 @@ import (
 const valueNone = "<none>"
 
 type ObjectsGetter struct {
-	Name          string
-	Namespace     string
 	ClientSet     clientset.Interface
 	DynamicClient dynamic.Interface
 
+	Name      string
+	Namespace string
+
+	WithClusterDef bool
 	WithAppVersion bool
 	WithConfigMap  bool
+	WithPVC        bool
+	WithService    bool
+	WithSecret     bool
+	WithPod        bool
 }
 
 func NewClusterObjects() *ClusterObjects {
@@ -53,70 +59,86 @@ func NewClusterObjects() *ClusterObjects {
 		Cluster:    &dbaasv1alpha1.Cluster{},
 		ClusterDef: &dbaasv1alpha1.ClusterDefinition{},
 		AppVersion: &dbaasv1alpha1.AppVersion{},
-
-		Nodes: []*corev1.Node{},
+		Nodes:      []*corev1.Node{},
 	}
 }
 
 // Get all kubernetes objects belonging to the database cluster
-func (o *ObjectsGetter) Get(objs *ClusterObjects) error {
+func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 	var err error
-	builder := &builder{
-		namespace:     o.Namespace,
-		name:          o.Name,
-		clientSet:     o.ClientSet,
-		dynamicClient: o.DynamicClient,
+	objs := NewClusterObjects()
+	ctx := context.TODO()
+	corev1 := o.ClientSet.CoreV1()
+	getResource := func(gvr schema.GroupVersionResource, name string, ns string, res interface{}) error {
+		obj, err := o.DynamicClient.Resource(gvr).Namespace(ns).Get(ctx, name, metav1.GetOptions{}, "")
+		if err != nil {
+			return err
+		}
+		return runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, res)
 	}
 
-	if err = builder.withGK(types.ClusterGK()).
-		do(objs); err != nil {
-		return err
+	listOpts := func() metav1.ListOptions {
+		return metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s", types.InstanceLabelKey, o.Name),
+		}
+	}
+
+	// get cluster
+	if err = getResource(types.ClusterGVR(), o.Name, o.Namespace, objs.Cluster); err != nil {
+		return nil, err
 	}
 
 	// get cluster definition
-	if err = builder.withGK(types.ClusterDefGK()).
-		withName(objs.Cluster.Spec.ClusterDefRef).
-		do(objs); err != nil {
-		return err
+	if o.WithClusterDef {
+		if err = getResource(types.ClusterDefGVR(), objs.Cluster.Spec.ClusterDefRef, "",
+			objs.ClusterDef); err != nil {
+			return nil, err
+		}
 	}
 
-	// get appversion
+	// get app version
 	if o.WithAppVersion {
-		if err = builder.withGK(types.AppVersionGK()).
-			withName(objs.Cluster.Spec.AppVersionRef).
-			do(objs); err != nil {
-			return err
+		if err = getResource(types.AppVersionGVR(), objs.Cluster.Spec.AppVersionRef, "",
+			objs.AppVersion); err != nil {
+			return nil, err
 		}
 	}
 
-	// get service
-	if err = builder.withLabel(InstanceLabel(o.Name)).
-		withGK(schema.GroupKind{Kind: "Service"}).
-		do(objs); err != nil {
-		return err
+	// get services
+	if o.WithService {
+		if objs.Services, err = corev1.Services(o.Namespace).List(ctx, listOpts()); err != nil {
+			return nil, err
+		}
 	}
 
-	// get secret
-	if err = builder.withLabel(InstanceLabel(o.Name)).
-		withGK(schema.GroupKind{Kind: "Secret"}).
-		do(objs); err != nil {
-		return err
+	// get secrets
+	if o.WithSecret {
+		if objs.Secrets, err = corev1.Secrets(o.Namespace).List(ctx, listOpts()); err != nil {
+			return nil, err
+		}
 	}
 
-	// get configmap
+	// get configmaps
 	if o.WithConfigMap {
-		if err = builder.withLabel(InstanceLabel(o.Name)).
-			withGK(schema.GroupKind{Kind: "ConfigMap"}).
-			do(objs); err != nil {
-			return err
+		if objs.ConfigMaps, err = corev1.ConfigMaps(o.Namespace).List(ctx, listOpts()); err != nil {
+			return nil, err
 		}
 	}
 
-	// get pod
-	if err = builder.withLabel(InstanceLabel(o.Name)).
-		withGK(schema.GroupKind{Kind: "Pod"}).
-		do(objs); err != nil {
-		return err
+	// get PVCs
+	if o.WithPVC {
+		if objs.PVCs, err = corev1.PersistentVolumeClaims(o.Namespace).List(ctx, listOpts()); err != nil {
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// get pods
+	if o.WithPod {
+		if objs.Pods, err = corev1.Pods(o.Namespace).List(ctx, listOpts()); err != nil {
+			return nil, err
+		}
 	}
 
 	// get nodes where the pods are located
@@ -132,107 +154,19 @@ func (o *ObjectsGetter) Get(objs *ClusterObjects) error {
 			break
 		}
 
-		if err = builder.withName(pod.Spec.NodeName).
-			withGK(schema.GroupKind{Kind: "Node"}).
-			do(objs); err != nil {
-			return err
+		nodeName := pod.Spec.NodeName
+		if len(nodeName) == 0 {
+			continue
 		}
+
+		node, err := corev1.Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		objs.Nodes = append(objs.Nodes, node)
 	}
 
-	return nil
-}
-
-func InstanceLabel(name string) string {
-	return fmt.Sprintf("%s=%s", types.InstanceLabelKey, name)
-}
-
-type builder struct {
-	namespace string
-	label     string
-	name      string
-
-	clientSet     clientset.Interface
-	dynamicClient dynamic.Interface
-	groupKind     schema.GroupKind
-}
-
-// Do get kubernetes object belonging to the database cluster
-func (b *builder) do(clusterObjs *ClusterObjects) error {
-	var err error
-	ctx := context.TODO()
-	listOpts := metav1.ListOptions{
-		LabelSelector: b.label,
-	}
-
-	kind := b.groupKind.Kind
-	switch kind {
-	case "Pod":
-		clusterObjs.Pods, err = b.clientSet.CoreV1().Pods(b.namespace).List(ctx, listOpts)
-		if err != nil {
-			return err
-		}
-	case "Service":
-		clusterObjs.Services, err = b.clientSet.CoreV1().Services(b.namespace).List(ctx, listOpts)
-		if err != nil {
-			return err
-		}
-	case "Secret":
-		clusterObjs.Secrets, err = b.clientSet.CoreV1().Secrets(b.namespace).List(ctx, listOpts)
-		if err != nil {
-			return err
-		}
-	case "ConfigMap":
-		clusterObjs.ConfigMaps, err = b.clientSet.CoreV1().ConfigMaps(b.namespace).List(ctx, listOpts)
-		if err != nil {
-			return err
-		}
-	case "Node":
-		if len(b.name) == 0 {
-			return nil
-		}
-		node, err := b.clientSet.CoreV1().Nodes().Get(ctx, b.name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		clusterObjs.Nodes = append(clusterObjs.Nodes, node)
-	case types.KindCluster:
-		return getClusterResource(b.dynamicClient, types.ClusterGVR(), b.namespace, b.name, clusterObjs.Cluster)
-	case types.KindClusterDef:
-		// ClusterDefinition is cluster scope, so namespace is empty
-		return getClusterResource(b.dynamicClient, types.ClusterDefGVR(), "", b.name, clusterObjs.ClusterDef)
-	case types.KindAppVersion:
-		// AppVersion is cluster scope, so namespace is empty
-		return getClusterResource(b.dynamicClient, types.AppVersionGVR(), "", b.name, clusterObjs.AppVersion)
-	}
-
-	return nil
-}
-
-func (b *builder) withLabel(l string) *builder {
-	b.label = l
-	return b
-}
-
-func (b *builder) withGK(gk schema.GroupKind) *builder {
-	b.groupKind = gk
-	return b
-}
-
-func (b *builder) withName(name string) *builder {
-	b.name = name
-	return b
-}
-
-func getClusterResource(client dynamic.Interface, gvr schema.GroupVersionResource, namespace string, name string, res interface{}) error {
-	obj, err := client.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{}, "")
-	if err != nil {
-		return err
-	}
-
-	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, res); err != nil {
-		return err
-	}
-	return nil
+	return objs, nil
 }
 
 func (o *ClusterObjects) GetClusterInfo() *ClusterInfo {

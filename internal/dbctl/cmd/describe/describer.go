@@ -123,16 +123,18 @@ type ClusterDescriber struct {
 func (d *ClusterDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
 	var err error
 	d.describerSettings = describerSettings
-	d.ClusterObjects = cluster.NewClusterObjects()
-
 	clusterGetter := cluster.ObjectsGetter{
 		ClientSet:      d.client,
 		DynamicClient:  d.dynamic,
 		Name:           name,
 		Namespace:      namespace,
-		WithAppVersion: false,
+		WithClusterDef: true,
+		WithPVC:        true,
+		WithService:    true,
+		WithSecret:     true,
+		WithPod:        true,
 	}
-	if err = clusterGetter.Get(d.ClusterObjects); err != nil {
+	if d.ClusterObjects, err = clusterGetter.Get(); err != nil {
 		return "", err
 	}
 

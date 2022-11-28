@@ -1315,6 +1315,7 @@ func buildCfg(params createParams,
 	if sts, ok := obj.(*appsv1.StatefulSet); ok {
 		updateStatefulLabelsWithTemplate(sts, cfgLables)
 	}
+	updateStatefulLabelsWithTemplate(sts, cfgLables)
 
 	// Generate Pod Volumes for ConfigMap objects
 	if err := checkAndUpdatePodVolumes(podSpec, volumes); err != nil {
@@ -1564,7 +1565,6 @@ func GetComponentCfgName(clusterName, componentName, tplName string) string {
 func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder, cmName string, tplCfg dbaasv1alpha1.ConfigTemplate, params createParams, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
 	// Render config template by TplEngine
 	// The template namespace must be the same as the ClusterDefinition namespace
-	// TODO(zt) using dbaasconfig.GetConfigMapByName
 	configs, err := processConfigMapTemplate(ctx, cli, tplBuilder, client.ObjectKey{
 		Namespace: tplCfg.Namespace,
 		Name:      tplCfg.Name,

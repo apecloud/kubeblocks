@@ -189,12 +189,12 @@ var _ = Describe("tpl template", func() {
 		// found name: mysql3
 		It("Should success with no error", func() {
 			podSpec := &statefulSet.Spec.Template.Spec
-			Expect(GetContainerUsingConfig(podSpec, configTemplates)).To(Equal(podSpec.Containers[2]))
+			Expect(GetContainerUsingConfig(podSpec, configTemplates)).To(Equal(&podSpec.Containers[2]))
 		})
 		// found name: init_mysql
 		It("Should success with no error", func() {
 			podSpec := &statefulSet.Spec.Template.Spec
-			Expect(GetContainerUsingConfig(podSpec, foundInitContainerConfigTemplates)).To(Equal(podSpec.InitContainers[0]))
+			Expect(GetContainerUsingConfig(podSpec, foundInitContainerConfigTemplates)).To(Equal(&podSpec.InitContainers[0]))
 		})
 		// not found container
 		It("Should failed", func() {

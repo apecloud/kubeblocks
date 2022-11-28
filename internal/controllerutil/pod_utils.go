@@ -78,16 +78,15 @@ func GetVolumeMountName(volumes []corev1.Volume, resourceName string) *corev1.Vo
 		if volumes[i].ConfigMap != nil && volumes[i].ConfigMap.Name == resourceName {
 			return &volumes[i]
 		}
-
-		if volumes[i].Projected != nil {
-			for j := range volumes[i].Projected.Sources {
-				if volumes[i].Projected.Sources[j].ConfigMap != nil && volumes[i].Projected.Sources[j].ConfigMap.Name == resourceName {
-					return &volumes[i]
-				}
+		if volumes[i].Projected == nil {
+			continue
+		}
+		for j := range volumes[i].Projected.Sources {
+			if volumes[i].Projected.Sources[j].ConfigMap != nil && volumes[i].Projected.Sources[j].ConfigMap.Name == resourceName {
+				return &volumes[i]
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -95,43 +94,39 @@ func getContainerWithTplList(containers []corev1.Container, configs []dbaasv1alp
 	if len(containers) == 0 {
 		return nil
 	}
-
-	for i := range containers {
-		volumeMounts := containers[i].VolumeMounts
+	for i, c := range containers {
+		volumeMounts := c.VolumeMounts
 		if len(volumeMounts) > 0 && checkContainerWithVolumeMount(volumeMounts, configs) {
 			return &containers[i]
 		}
 	}
-
 	return nil
 }
 
 func checkContainerWithVolumeMount(volumeMounts []corev1.VolumeMount, configs []dbaasv1alpha1.ConfigTemplate) bool {
 	volumes := make(map[string]int)
-	for i := range configs {
-		for j := range volumeMounts {
-			if volumeMounts[j].Name == configs[i].VolumeName {
-				volumes[volumeMounts[j].Name] = j
+	for _, c := range configs {
+		for j, vm := range volumeMounts {
+			if vm.Name == c.VolumeName {
+				volumes[vm.Name] = j
 				break
 			}
 		}
 	}
-
 	return len(configs) == len(volumes)
 }
 
 func getContainerWithVolumeMount(containers []corev1.Container, volumeName string) []*corev1.Container {
 	mountContainers := make([]*corev1.Container, 0, len(containers))
-	for i := range containers {
-		volumeMounts := containers[i].VolumeMounts
-		for j := range volumeMounts {
-			if volumeMounts[j].Name == volumeName {
+	for i, c := range containers {
+		volumeMounts := c.VolumeMounts
+		for _, vm := range volumeMounts {
+			if vm.Name == volumeName {
 				mountContainers = append(mountContainers, &containers[i])
 				break
 			}
 		}
 	}
-
 	return mountContainers
 }
 

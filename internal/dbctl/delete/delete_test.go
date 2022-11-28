@@ -17,6 +17,7 @@ limitations under the License.
 package delete
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -78,5 +79,13 @@ var _ = Describe("Delete", func() {
 		_, _ = in.Write([]byte("foo\n"))
 		cmd.Run(cmd, []string{"foo"})
 		Expect(buf.String()).Should(Equal("pod \"foo\" deleted\n"))
+	})
+
+	It("test", func() {
+		test := []string{}
+		fmt.Printf("%d\n", len(test))
+
+		test = nil
+		fmt.Printf("%d\n", len(test))
 	})
 })

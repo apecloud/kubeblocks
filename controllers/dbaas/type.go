@@ -39,10 +39,13 @@ const (
 	clusterDefLabelKey         = "clusterdefinition.kubeblocks.io/name"
 	appVersionLabelKey         = "appversion.kubeblocks.io/name"
 	statefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
+	CSRoleChangedAnnotKey      = "cs.kubeblocks.io/event-handled"
 
 	DeploymentKind  = "Deployment"
 	StatefulSetKind = "StatefulSet"
 	PodKind         = "Pod"
+
+	CSRoleChangedAnnotHandled = "true"
 )
 
 type MonitorConfig struct {
@@ -73,4 +76,5 @@ type Component struct {
 	Monitor                 MonitorConfig                          `json:"monitor,omitempty"`
 	EnabledLogs             []string                               `json:"enabledLogs,omitempty"`
 	LogConfigs              []dbaasv1alpha1.LogConfig              `json:"logConfigs,omitempty"`
+	ConfigTemplates         []dbaasv1alpha1.ConfigTemplate         `json:"configTemplates,omitempty"`
 }

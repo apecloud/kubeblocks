@@ -287,7 +287,7 @@ spec:
 					newCluster.Status.Phase == expectPhase
 			}
 			return statusComponents[componentName].Phase == expectPhase
-		}, timeout*3, interval).Should(BeTrue())
+		}, timeout*5, interval).Should(BeTrue())
 
 	}
 
@@ -355,7 +355,7 @@ spec:
 			componentName = "nginx"
 			setInvolvedObject(event, DeploymentKind, deploymentName)
 			createDeployment(componentName, deploymentName)
-			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, true)
+			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, false)
 		})
 	})
 

@@ -42,7 +42,7 @@ var _ = Describe("OpsRequest Controller", func() {
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
 
-	cleanWorkloads := func() {
+	cleanupObjects := func() {
 		err := k8sClient.DeleteAllOf(ctx, &storagev1.StorageClass{},
 			client.InNamespace(testCtx.DefaultNamespace),
 			client.HasLabels{testCtx.TestObjLabelKey})
@@ -59,12 +59,12 @@ var _ = Describe("OpsRequest Controller", func() {
 
 	BeforeEach(func() {
 		// Add any steup steps that needs to be executed before each test
-		cleanWorkloads()
+		cleanupObjects()
 	})
 
 	AfterEach(func() {
 		// Add any teardown steps that needs to be executed after each test
-		cleanWorkloads()
+		cleanupObjects()
 	})
 
 	assureDefaultStorageClassObj := func(randomStr string) *storagev1.StorageClass {

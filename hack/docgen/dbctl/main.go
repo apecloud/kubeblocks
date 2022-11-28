@@ -35,6 +35,11 @@ func main() {
 	dbctl := cmd.NewDbctlCmd()
 	dbctl.DisableAutoGenTag = true
 	dbctl.Long = fmt.Sprintf("```\n%s\n```", dbctl.Long)
+
+	if cacheDirFlag := dbctl.Flag("cache-dir"); cacheDirFlag != nil {
+		cacheDirFlag.DefValue = "$HOME/.kube/cache"
+	}
+
 	err := doc.GenMarkdownTree(dbctl, rootPath)
 	if err != nil {
 		log.Fatal(err)

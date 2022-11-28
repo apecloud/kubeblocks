@@ -35,12 +35,12 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	kubectlget "k8s.io/kubectl/pkg/cmd/get"
+	cmdget "k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 type Options struct {
-	PrintFlags             *kubectlget.PrintFlags
+	PrintFlags             *cmdget.PrintFlags
 	ToPrinter              func(*meta.RESTMapping, bool) (printers.ResourcePrinterFunc, error)
 	IsHumanReadablePrinter bool
 
@@ -60,7 +60,7 @@ type Options struct {
 
 func NewOptions(streams genericclioptions.IOStreams, args []string) *Options {
 	return &Options{
-		PrintFlags:  kubectlget.NewGetPrintFlags(),
+		PrintFlags:  cmdget.NewGetPrintFlags(),
 		BuildArgs:   args,
 		IOStreams:   streams,
 		ServerPrint: true,
@@ -100,7 +100,7 @@ func (o *Options) Complete(f cmdutil.Factory) error {
 		}
 
 		if o.ServerPrint {
-			printer = &kubectlget.TablePrinter{Delegate: printer}
+			printer = &cmdget.TablePrinter{Delegate: printer}
 		}
 		return printer.PrintObj, nil
 	}

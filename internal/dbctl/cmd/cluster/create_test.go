@@ -20,11 +20,11 @@ import (
 	"encoding/json"
 	"os"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )

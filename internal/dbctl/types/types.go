@@ -17,10 +17,7 @@ limitations under the License.
 package types
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
 const (
@@ -98,18 +95,6 @@ const (
 	ResourceRestoreJobs    = "restorejobs"
 	ResourceBackupPolicies = "backuppolicies"
 )
-
-type ClusterObjects struct {
-	Cluster    *dbaasv1alpha1.Cluster
-	ClusterDef *dbaasv1alpha1.ClusterDefinition
-	AppVersion *dbaasv1alpha1.AppVersion
-
-	Pods       *corev1.PodList
-	Services   *corev1.ServiceList
-	Secrets    *corev1.SecretList
-	Nodes      []*corev1.Node
-	ConfigMaps *corev1.ConfigMapList
-}
 
 type BackupJobInfo struct {
 	Name           string

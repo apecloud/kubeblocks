@@ -28,7 +28,6 @@ import (
 	"golang.org/x/text/language"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/duration"
@@ -42,6 +41,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/cluster"
 )
 
@@ -51,6 +51,7 @@ const (
 	Level1
 	Level2
 	Level3
+	Level4
 
 	valueNone = "<none>"
 )
@@ -116,7 +117,7 @@ type ClusterDescriber struct {
 	dynamic dynamic.Interface
 
 	describerSettings describe.DescriberSettings
-	*types.ClusterObjects
+	*cluster.ClusterObjects
 }
 
 func (d *ClusterDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
@@ -148,18 +149,18 @@ func (d *ClusterDescriber) Describe(namespace, name string, describerSettings de
 
 func (d *ClusterDescriber) describeCluster(events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
-		cluster := d.ClusterObjects.Cluster
+		c := d.ClusterObjects.Cluster
 		w := describe.NewPrefixWriter(out)
-		w.Write(Level0, "Name:\t%s\n", cluster.Name)
-		w.Write(Level0, "Namespace:\t%s\n", cluster.Namespace)
-		w.Write(Level0, "Status:\t%s\n", cluster.Status.Phase)
-		w.Write(Level0, "AppVersion:\t%s\n", cluster.Spec.AppVersionRef)
-		w.Write(Level0, "ClusterDefinition:\t%s\n", cluster.Spec.ClusterDefRef)
-		w.Write(Level0, "TerminationPolicy:\t%s\n", cluster.Spec.TerminationPolicy)
-		w.Write(Level0, "CreationTimestamp:\t%s\n", cluster.CreationTimestamp.Time.Format(time.RFC1123Z))
+		w.Write(Level0, "Name:\t%s\n", c.Name)
+		w.Write(Level0, "Namespace:\t%s\n", c.Namespace)
+		w.Write(Level0, "Status:\t%s\n", c.Status.Phase)
+		w.Write(Level0, "AppVersion:\t%s\n", c.Spec.AppVersionRef)
+		w.Write(Level0, "ClusterDefinition:\t%s\n", c.Spec.ClusterDefRef)
+		w.Write(Level0, "TerminationPolicy:\t%s\n", c.Spec.TerminationPolicy)
+		w.Write(Level0, "CreationTimestamp:\t%s\n", c.CreationTimestamp.Time.Format(time.RFC1123Z))
 
 		// consider first component as primary component, use it's endpoints as cluster endpoints
-		primaryComponent := findCompInCluster(d.Cluster, d.ClusterDef.Spec.Components[0].TypeName)
+		primaryComponent := cluster.FindCompInCluster(d.Cluster, d.ClusterDef.Spec.Components[0].TypeName)
 		describeNetwork(Level0, d.Services, primaryComponent, w)
 
 		// topology
@@ -188,7 +189,7 @@ func (d *ClusterDescriber) describeCluster(events *corev1.EventList) (string, er
 func (d *ClusterDescriber) describeTopology(w describe.PrefixWriter) error {
 	w.Write(Level0, "\nTopology:\n")
 	for _, compInClusterDef := range d.ClusterDef.Spec.Components {
-		c := findCompInCluster(d.Cluster, compInClusterDef.TypeName)
+		c := cluster.FindCompInCluster(d.Cluster, compInClusterDef.TypeName)
 		if c == nil {
 			return fmt.Errorf("failed to find componnet in cluster")
 		}
@@ -218,7 +219,7 @@ func (d *ClusterDescriber) describeTopology(w describe.PrefixWriter) error {
 
 func (d *ClusterDescriber) describeComponent(w describe.PrefixWriter) error {
 	for _, compInClusterDef := range d.ClusterDef.Spec.Components {
-		c := findCompInCluster(d.Cluster, compInClusterDef.TypeName)
+		c := cluster.FindCompInCluster(d.Cluster, compInClusterDef.TypeName)
 		if c == nil {
 			return fmt.Errorf("failed to find componnet in cluster \"%s\"", d.Cluster.Name)
 		}
@@ -231,12 +232,13 @@ func (d *ClusterDescriber) describeComponent(w describe.PrefixWriter) error {
 		if len(pods) == 0 {
 			return fmt.Errorf("failed to find any instance belonging to component \"%s\"", c.Name)
 		}
-		running, waiting, succeeded, failed := getPodStatus(pods)
+		running, waiting, succeeded, failed := util.GetPodStatus(pods)
 		w.Write(Level0, "\nComponent:\n")
-		w.Write(Level1, "Type:\t%s\n", c.Type)
-		w.Write(Level1, "Replicas:\t%d desired | %d total\n", replicas, len(pods))
-		w.Write(Level1, "Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
-		w.Write(Level1, "Image:\t%s\n", pods[0].Spec.Containers[0].Image)
+		w.Write(Level1, "%s\n", c.Name)
+		w.Write(Level2, "Type:\t%s\n", c.Type)
+		w.Write(Level2, "Replicas:\t%d desired | %d total\n", replicas, len(pods))
+		w.Write(Level2, "Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
+		w.Write(Level2, "Image:\t%s\n", pods[0].Spec.Containers[0].Image)
 
 		// CPU and memory
 		describeResource(&c.Resources, w)
@@ -245,11 +247,11 @@ func (d *ClusterDescriber) describeComponent(w describe.PrefixWriter) error {
 		describeStorage(c.VolumeClaimTemplates, w)
 
 		// network
-		describeNetwork(Level1, d.Services, c, w)
+		describeNetwork(Level2, d.Services, c, w)
 
 		// instance
 		for _, pod := range pods {
-			d.describeInstance(pod, w, compInClusterDef)
+			d.describeInstance(Level2, pod, w, compInClusterDef)
 		}
 	}
 	return nil
@@ -262,46 +264,39 @@ func describeResource(resources *corev1.ResourceRequirements, w describe.PrefixW
 		request := resources.Requests[name]
 		resName := cases.Title(language.Und, cases.NoLower).String(name.String())
 
-		if resourceIsEmpty(&limit) && resourceIsEmpty(&request) {
-			w.Write(Level1, "%s:\t%s\n", resName, valueNone)
+		if util.ResourceIsEmpty(&limit) && util.ResourceIsEmpty(&request) {
+			w.Write(Level2, "%s:\t%s\n", resName, valueNone)
 		} else {
-			w.Write(Level1, "%s:\t%s / %s (request / limit)\n", resName, request.String(), limit.String())
+			w.Write(Level2, "%s:\t%s / %s (request / limit)\n", resName, request.String(), limit.String())
 		}
 	}
-}
-
-func resourceIsEmpty(res *resource.Quantity) bool {
-	resStr := res.String()
-	if resStr == "0" || resStr == "<nil>" {
-		return true
-	}
-	return false
 }
 
 func describeStorage(vcTmpls []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate, w describe.PrefixWriter) {
 	if len(vcTmpls) > 0 {
-		w.Write(Level1, "Storage:\n")
+		w.Write(Level2, "Storage:\n")
 	}
 	for _, vcTmpl := range vcTmpls {
-		w.Write(Level2, "%s:\n", vcTmpl.Name)
+		w.Write(Level3, "%s:\n", vcTmpl.Name)
 		val := vcTmpl.Spec.Resources.Requests[corev1.ResourceStorage]
 		if vcTmpl.Spec.StorageClassName == nil {
-			w.Write(Level3, "StorageClass:\t%s\n", valueNone)
+			w.Write(Level4, "StorageClass:\t%s\n", valueNone)
 		} else {
-			w.Write(Level3, "StorageClass:\t%s\n", *vcTmpl.Spec.StorageClassName)
+			w.Write(Level4, "StorageClass:\t%s\n", *vcTmpl.Spec.StorageClassName)
 		}
-		w.Write(Level3, "Access Modes:\t%s\n", getAccessModes(vcTmpl.Spec.AccessModes))
-		w.Write(Level3, "Size:\t%s\n", val.String())
+		w.Write(Level4, "Access Modes:\t%s\n", getAccessModes(vcTmpl.Spec.AccessModes))
+		w.Write(Level4, "Size:\t%s\n", val.String())
 	}
 }
 
 func (d *ClusterDescriber) describeInstance(
+	level int,
 	pod *corev1.Pod,
 	w describe.PrefixWriter,
 	component dbaasv1alpha1.ClusterDefinitionComponent) {
-	w.Write(Level1, "\n")
-	w.Write(Level1, "Instance:\t\n")
-	w.Write(Level1, "%s:\n", pod.Name)
+	w.Write(level, "\n")
+	w.Write(level, "Instance:\t\n")
+	w.Write(level+1, "%s:\n", pod.Name)
 
 	var role string
 	switch component.ComponentType {
@@ -313,17 +308,17 @@ func (d *ClusterDescriber) describeInstance(
 	if len(role) == 0 {
 		role = valueNone
 	}
-	w.Write(Level3, "Role:\t%s\n", role)
+	w.Write(level+2, "Role:\t%s\n", role)
 
 	// status and reason
 	if pod.DeletionTimestamp != nil {
-		w.Write(Level3, "Status:\tTerminating (lasts %s)\n", translateTimestampSince(*pod.DeletionTimestamp))
-		w.Write(Level3, "Termination Grace Period:\t%ds\n", *pod.DeletionGracePeriodSeconds)
+		w.Write(level+2, "Status:\tTerminating (lasts %s)\n", translateTimestampSince(*pod.DeletionTimestamp))
+		w.Write(level+2, "Termination Grace Period:\t%ds\n", *pod.DeletionGracePeriodSeconds)
 	} else {
-		w.Write(Level3, "Status:\t%s\n", string(pod.Status.Phase))
+		w.Write(level+2, "Status:\t%s\n", string(pod.Status.Phase))
 	}
 	if len(pod.Status.Reason) > 0 {
-		w.Write(Level3, "Reason:\t%s\n", pod.Status.Reason)
+		w.Write(level+2, "Reason:\t%s\n", pod.Status.Reason)
 	}
 
 	if component.ComponentType == dbaasv1alpha1.Consensus {
@@ -334,21 +329,33 @@ func (d *ClusterDescriber) describeInstance(
 		w.Write(Level3, "AccessMode:\t%s\n", accessMode)
 	}
 
-	// node information include its region and AZ
+	// describe node information
+	describeNode(d.Nodes, pod, w)
+
+	w.Write(level+2, "CreationTimestamp:\t%s\n", pod.CreationTimestamp.Time.Format(time.RFC1123Z))
+}
+
+// describeNode describe node information include its region and AZ
+func describeNode(nodes []*corev1.Node, pod *corev1.Pod, w describe.PrefixWriter) {
+	var node *corev1.Node
+
 	if pod.Spec.NodeName == "" {
 		w.Write(Level3, "Node:\t%s\n", valueNone)
 	} else {
 		w.Write(Level3, "Node:\t%s\n", pod.Spec.NodeName+"/"+pod.Status.HostIP)
-		node := getNodeByName(d.Nodes, pod.Spec.NodeName)
-		if region, ok := node.Labels[types.RegionLabelKey]; ok {
-			w.Write(Level3, "Region:\t%s\n", region)
-		}
-		if zone, ok := node.Labels[types.ZoneLabelKey]; ok {
-			w.Write(Level3, "AZ:\t%s\n", zone)
-		}
+		node = util.GetNodeByName(nodes, pod.Spec.NodeName)
 	}
 
-	w.Write(Level3, "CreationTimestamp:\t%s\n", pod.CreationTimestamp.Time.Format(time.RFC1123Z))
+	if node == nil {
+		return
+	}
+
+	if region, ok := node.Labels[types.RegionLabelKey]; ok {
+		w.Write(Level3, "Region:\t%s\n", region)
+	}
+	if zone, ok := node.Labels[types.ZoneLabelKey]; ok {
+		w.Write(Level3, "AZ:\t%s\n", zone)
+	}
 }
 
 func describeSecret(secrets *corev1.SecretList, w describe.PrefixWriter) {
@@ -369,42 +376,7 @@ func describeSecret(secrets *corev1.SecretList, w describe.PrefixWriter) {
 }
 
 func describeNetwork(baseLevel int, svcList *corev1.ServiceList, c *dbaasv1alpha1.ClusterComponent, w describe.PrefixWriter) {
-	var (
-		internalEndpoints []string
-		externalEndpoints []string
-	)
-
-	getEndpoints := func(ip string, ports []corev1.ServicePort) []string {
-		var result []string
-		for _, port := range ports {
-			result = append(result, fmt.Sprintf("%s:%d", ip, port.Port))
-		}
-		return result
-	}
-
-	getExternalIP := func(svc *corev1.Service) string {
-		if svc.GetAnnotations()[types.ServiceLBTypeAnnotationKey] != types.ServiceLBTypeAnnotationValue {
-			return ""
-		}
-		return svc.GetAnnotations()[types.ServiceFloatingIPAnnotationKey]
-	}
-
-	for _, svc := range svcList.Items {
-		if svc.GetLabels()[types.ComponentLabelKey] != c.Name {
-			continue
-		}
-		var (
-			internalIP = svc.Spec.ClusterIP
-			externalIP = getExternalIP(&svc)
-		)
-		if internalIP != "" {
-			internalEndpoints = append(internalEndpoints, getEndpoints(internalIP, svc.Spec.Ports)...)
-		}
-		if externalIP != "" {
-			externalEndpoints = append(externalEndpoints, getEndpoints(externalIP, svc.Spec.Ports)...)
-		}
-	}
-
+	internalEndpoints, externalEndpoints := cluster.GetClusterEndpoints(svcList, c)
 	if len(internalEndpoints) == 0 && len(externalEndpoints) == 0 {
 		return
 	}
@@ -421,15 +393,6 @@ func describeNetwork(baseLevel int, svcList *corev1.ServiceList, c *dbaasv1alpha
 	}
 }
 
-func findCompInCluster(cluster *dbaasv1alpha1.Cluster, typeName string) *dbaasv1alpha1.ClusterComponent {
-	for i, c := range cluster.Spec.Components {
-		if c.Type == typeName {
-			return &cluster.Spec.Components[i]
-		}
-	}
-	return nil
-}
-
 func (d *ClusterDescriber) getPodsOfComponent(name string) []*corev1.Pod {
 	var pods []*corev1.Pod
 	for i, p := range d.Pods.Items {
@@ -438,15 +401,6 @@ func (d *ClusterDescriber) getPodsOfComponent(name string) []*corev1.Pod {
 		}
 	}
 	return pods
-}
-
-func getNodeByName(nodes []*corev1.Node, name string) *corev1.Node {
-	for _, node := range nodes {
-		if node.Name == name {
-			return node
-		}
-	}
-	return nil
 }
 
 func tabbedString(f func(io.Writer) error) (string, error) {
@@ -462,22 +416,6 @@ func tabbedString(f func(io.Writer) error) (string, error) {
 	out.Flush()
 	str := buf.String()
 	return str, nil
-}
-
-func getPodStatus(pods []*corev1.Pod) (running, waiting, succeeded, failed int) {
-	for _, pod := range pods {
-		switch pod.Status.Phase {
-		case corev1.PodRunning:
-			running++
-		case corev1.PodPending:
-			waiting++
-		case corev1.PodSucceeded:
-			succeeded++
-		case corev1.PodFailed:
-			failed++
-		}
-	}
-	return
 }
 
 func getAccessModes(modes []corev1.PersistentVolumeAccessMode) string {

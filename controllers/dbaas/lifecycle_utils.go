@@ -1783,48 +1783,6 @@ func generateName(base string) string {
 	return fmt.Sprintf("%s%s", base, time.Now().Format("20060102150405"))
 }
 
-func prepareInjectEnvs(component *Component, cluster *dbaasv1alpha1.Cluster) []corev1.EnvVar {
-	envs := []corev1.EnvVar{}
-	if component == nil || cluster == nil {
-		return envs
-	}
-	prefix := dbaasPrefix + "_" + strings.ToUpper(component.Type) + "_"
-	svcName := strings.Join([]string{cluster.Name, component.Name, "headless"}, "-")
-	envs = append(envs, corev1.EnvVar{
-		Name: dbaasPrefix + "_POD_NAME",
-		ValueFrom: &corev1.EnvVarSource{
-			FieldRef: &corev1.ObjectFieldSelector{
-				FieldPath: "metadata.name",
-			},
-		},
-	})
-	// inject component scope env
-	envs = append(envs, corev1.EnvVar{
-		Name:      prefix + "N",
-		Value:     strconv.Itoa(int(component.Replicas)),
-		ValueFrom: nil,
-	})
-	for j := int32(0); j < component.Replicas; j++ {
-		envs = append(envs, corev1.EnvVar{
-			Name:      prefix + strconv.Itoa(int(j)) + "_HOSTNAME",
-			Value:     fmt.Sprintf("%s.%s", cluster.Name+"-"+component.Name+"-"+strconv.Itoa(int(j)), svcName),
-			ValueFrom: nil,
-		})
-	}
-	// inject consensusset role env
-	if cluster.Status.Components != nil && cluster.Status.Components[component.Type] != nil {
-		consensusSetStatus := cluster.Status.Components[component.Type].ConsensusSetStatus
-		if consensusSetStatus != nil {
-			envs = append(envs, corev1.EnvVar{
-				Name:      prefix + "LEADER",
-				Value:     consensusSetStatus.Leader.Pod,
-				ValueFrom: nil,
-			})
-		}
-	}
-	return envs
-}
-
 func buildVolumeSnapshot(snapshotKey types.NamespacedName, pvcName string, sts appsv1.StatefulSet) (*snapshotv1.VolumeSnapshot, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 

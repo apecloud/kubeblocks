@@ -92,8 +92,8 @@ spec:
                   type: string
                 type: array
               staticParameters:
-                description: StaticParameters, list of StaticParameter, modification
-                  of them triggers a process restart.
+                description: StaticParameters, list of StaticParameter, modifications
+                  of them trigger a process restart.
                 items:
                   type: string
                 type: array

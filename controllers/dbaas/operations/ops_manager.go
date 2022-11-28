@@ -30,6 +30,7 @@ var (
 // RegisterOps register operation with OpsType and OpsBehaviour
 func (opsMgr *OpsManager) RegisterOps(opsType dbaasv1alpha1.OpsType, opsBehaviour *OpsBehaviour) {
 	opsManager.OpsMap[opsType] = opsBehaviour
+	dbaasv1alpha1.ClusterPhasesMapperForOps[opsType] = opsBehaviour.FromClusterPhases
 }
 
 // Do the common entry function for handling OpsRequest
@@ -74,10 +75,11 @@ func (opsMgr *OpsManager) Do(opsRes *OpsResource) error {
 // loop until the operation is completed.
 func (opsMgr *OpsManager) Reconcile(opsRes *OpsResource) error {
 	var (
-		opsBehaviour *OpsBehaviour
-		ok           bool
-		err          error
-		opsRequest   = opsRes.OpsRequest
+		opsBehaviour    *OpsBehaviour
+		ok              bool
+		err             error
+		opsRequestPhase dbaasv1alpha1.Phase
+		opsRequest      = opsRes.OpsRequest
 	)
 
 	if opsRes.OpsRequest.Status.Phase != dbaasv1alpha1.RunningPhase {
@@ -91,10 +93,17 @@ func (opsMgr *OpsManager) Reconcile(opsRes *OpsResource) error {
 	if opsBehaviour == nil || opsBehaviour.ReconcileAction == nil {
 		return nil
 	}
-	if ok, err = opsBehaviour.ReconcileAction(opsRes); err != nil || !ok {
+	if opsRequestPhase, err = opsBehaviour.ReconcileAction(opsRes); err != nil {
 		return err
 	}
-	return PatchOpsStatus(opsRes, dbaasv1alpha1.SucceedPhase, dbaasv1alpha1.NewSucceedCondition(opsRequest))
+	switch opsRequestPhase {
+	case dbaasv1alpha1.SucceedPhase:
+		return PatchOpsStatus(opsRes, opsRequestPhase, dbaasv1alpha1.NewSucceedCondition(opsRequest))
+	case dbaasv1alpha1.FailedPhase:
+		return PatchOpsStatus(opsRes, opsRequestPhase, dbaasv1alpha1.NewFailedCondition(opsRequest))
+	default:
+		return nil
+	}
 }
 
 // validateClusterPhase validate Cluster.status.phase is in opsBehaviour.FromClusterPhases or OpsRequest is reentry

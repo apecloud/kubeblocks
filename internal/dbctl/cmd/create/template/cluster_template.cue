@@ -9,6 +9,7 @@ options: {
 	podAntiAffinity:   string
 	topologyKeys: [...]
 	nodeLabels: {}
+	tolerations: [...]
 }
 
 // required, k8s api resource content
@@ -27,6 +28,7 @@ content: {
 			topologyKeys:    options.topologyKeys
 			nodeLabels:      options.nodeLabels
 		}
+		tolerations:       options.tolerations
 		components:        options.components
 		terminationPolicy: options.terminationPolicy
 	}

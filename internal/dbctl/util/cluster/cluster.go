@@ -20,65 +20,23 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubectl/pkg/util/resource"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
-// GetClusterTypeByPod gets the cluster type from pod label
-func GetClusterTypeByPod(pod *corev1.Pod) (string, error) {
-	var clusterType string
-
-	if name, ok := pod.Labels["app.kubernetes.io/name"]; ok {
-		clusterType = strings.Split(name, "-")[0]
-	}
-
-	if clusterType == "" {
-		return "", fmt.Errorf("failed to get the cluster type")
-	}
-
-	return clusterType, nil
-}
-
-// GetDefaultPodName get the default pod in the cluster
-func GetDefaultPodName(dynamic dynamic.Interface, name string, namespace string) (string, error) {
-	obj, err := dynamic.Resource(types.ClusterGVR()).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-
-	cluster := &dbaasv1alpha1.Cluster{}
-	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cluster); err != nil {
-		return "", err
-	}
-
-	// travel all components, check type
-	for _, c := range cluster.Status.Components {
-		if c.ConsensusSetStatus != nil {
-			return c.ConsensusSetStatus.Leader.Pod, nil
-		}
-		// TODO: now we only support consensus set
-	}
-
-	return "", fmt.Errorf("failed to find the pod to exec command")
-}
-
-func NewClusterObjects() *types.ClusterObjects {
-	return &types.ClusterObjects{
-		Cluster:    &dbaasv1alpha1.Cluster{},
-		ClusterDef: &dbaasv1alpha1.ClusterDefinition{},
-		AppVersion: &dbaasv1alpha1.AppVersion{},
-
-		Nodes: []*corev1.Node{},
-	}
-}
+const valueNone = "<none>"
 
 type ObjectsGetter struct {
 	Name          string
@@ -87,10 +45,21 @@ type ObjectsGetter struct {
 	DynamicClient dynamic.Interface
 
 	WithAppVersion bool
+	WithConfigMap  bool
+}
+
+func NewClusterObjects() *ClusterObjects {
+	return &ClusterObjects{
+		Cluster:    &dbaasv1alpha1.Cluster{},
+		ClusterDef: &dbaasv1alpha1.ClusterDefinition{},
+		AppVersion: &dbaasv1alpha1.AppVersion{},
+
+		Nodes: []*corev1.Node{},
+	}
 }
 
 // Get all kubernetes objects belonging to the database cluster
-func (o *ObjectsGetter) Get(objs *types.ClusterObjects) error {
+func (o *ObjectsGetter) Get(objs *ClusterObjects) error {
 	var err error
 	builder := &builder{
 		namespace:     o.Namespace,
@@ -99,7 +68,6 @@ func (o *ObjectsGetter) Get(objs *types.ClusterObjects) error {
 		dynamicClient: o.DynamicClient,
 	}
 
-	// get cluster
 	if err = builder.withGK(types.ClusterGK()).
 		do(objs); err != nil {
 		return err
@@ -133,6 +101,15 @@ func (o *ObjectsGetter) Get(objs *types.ClusterObjects) error {
 		withGK(schema.GroupKind{Kind: "Secret"}).
 		do(objs); err != nil {
 		return err
+	}
+
+	// get configmap
+	if o.WithConfigMap {
+		if err = builder.withLabel(InstanceLabel(o.Name)).
+			withGK(schema.GroupKind{Kind: "ConfigMap"}).
+			do(objs); err != nil {
+			return err
+		}
 	}
 
 	// get pod
@@ -180,7 +157,7 @@ type builder struct {
 }
 
 // Do get kubernetes object belonging to the database cluster
-func (b *builder) do(clusterObjs *types.ClusterObjects) error {
+func (b *builder) do(clusterObjs *ClusterObjects) error {
 	var err error
 	ctx := context.TODO()
 	listOpts := metav1.ListOptions{
@@ -204,7 +181,15 @@ func (b *builder) do(clusterObjs *types.ClusterObjects) error {
 		if err != nil {
 			return err
 		}
+	case "ConfigMap":
+		clusterObjs.ConfigMaps, err = b.clientSet.CoreV1().ConfigMaps(b.namespace).List(ctx, listOpts)
+		if err != nil {
+			return err
+		}
 	case "Node":
+		if len(b.name) == 0 {
+			return nil
+		}
 		node, err := b.clientSet.CoreV1().Nodes().Get(ctx, b.name, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -248,4 +233,161 @@ func getClusterResource(client dynamic.Interface, gvr schema.GroupVersionResourc
 		return err
 	}
 	return nil
+}
+
+func (o *ClusterObjects) GetClusterInfo() *ClusterInfo {
+	c := o.Cluster
+	cluster := &ClusterInfo{
+		Name:              c.Name,
+		Namespace:         c.Namespace,
+		AppVersion:        c.Spec.AppVersionRef,
+		ClusterDefinition: c.Spec.ClusterDefRef,
+		TerminationPolicy: string(c.Spec.TerminationPolicy),
+		Status:            string(c.Status.Phase),
+		Age:               duration.HumanDuration(time.Since(c.CreationTimestamp.Time)),
+		InternalEP:        valueNone,
+		ExternalEP:        valueNone,
+	}
+
+	primaryComponent := FindCompInCluster(o.Cluster, o.ClusterDef.Spec.Components[0].TypeName)
+	internalEndpoints, externalEndpoints := GetClusterEndpoints(o.Services, primaryComponent)
+	if len(internalEndpoints) > 0 {
+		cluster.InternalEP = strings.Join(internalEndpoints, ",")
+	}
+	if len(externalEndpoints) > 0 {
+		cluster.ExternalEP = strings.Join(externalEndpoints, ",")
+	}
+	return cluster
+}
+
+func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
+	var comps []*ComponentInfo
+
+	for _, compInClusterDef := range o.ClusterDef.Spec.Components {
+		c := FindCompInCluster(o.Cluster, compInClusterDef.TypeName)
+		if c == nil {
+			return nil
+		}
+
+		replicas := c.Replicas
+		if replicas == 0 {
+			replicas = compInClusterDef.DefaultReplicas
+		}
+
+		var pods []*corev1.Pod
+		for _, p := range o.Pods.Items {
+			if n, ok := p.Labels[types.ComponentLabelKey]; ok && n == c.Name {
+				pods = append(pods, &p)
+			}
+		}
+
+		image := valueNone
+		if len(pods) > 0 {
+			image = pods[0].Spec.Containers[0].Image
+		}
+
+		running, waiting, succeeded, failed := util.GetPodStatus(pods)
+		comp := &ComponentInfo{
+			Name:     c.Name,
+			Type:     c.Type,
+			Cluster:  o.Cluster.Name,
+			Replicas: fmt.Sprintf("%d / %d", replicas, len(pods)),
+			Status:   fmt.Sprintf("%d / %d / %d / %d ", running, waiting, succeeded, failed),
+			Image:    image,
+		}
+		comps = append(comps, comp)
+	}
+	return comps
+}
+
+func (o *ClusterObjects) GetInstanceInfo() []*InstanceInfo {
+	var instances []*InstanceInfo
+
+	for _, pod := range o.Pods.Items {
+		instance := &InstanceInfo{
+			Name:       pod.Name,
+			Cluster:    getLabelVal(pod.Labels, types.InstanceLabelKey),
+			Component:  getLabelVal(pod.Labels, types.ComponentLabelKey),
+			Status:     string(pod.Status.Phase),
+			Role:       getLabelVal(pod.Labels, types.ConsensusSetRoleLabelKey),
+			AccessMode: getLabelVal(pod.Labels, types.ConsensusSetAccessModeLabelKey),
+			Age:        duration.HumanDuration(time.Since(pod.CreationTimestamp.Time)),
+		}
+
+		var component *dbaasv1alpha1.ClusterComponent
+		for i, c := range o.Cluster.Spec.Components {
+			if c.Name == instance.Component {
+				component = &o.Cluster.Spec.Components[i]
+			}
+		}
+		getInstanceStorageInfo(component, instance)
+		getInstanceNodeInfo(o.Nodes, &pod, instance)
+		getInstanceResourceInfo(&pod, instance)
+		instances = append(instances, instance)
+	}
+	return instances
+}
+
+func getInstanceStorageInfo(component *dbaasv1alpha1.ClusterComponent, i *InstanceInfo) {
+	if component == nil {
+		i.Storage = valueNone
+		return
+	}
+
+	var volumes []string
+	vcTmpls := component.VolumeClaimTemplates
+	for _, vcTmpl := range vcTmpls {
+		val := vcTmpl.Spec.Resources.Requests[corev1.ResourceStorage]
+		volumes = append(volumes, fmt.Sprintf("%s/%s", vcTmpl.Name, val.String()))
+	}
+	i.Storage = strings.Join(volumes, ",")
+}
+
+func getInstanceNodeInfo(nodes []*corev1.Node, pod *corev1.Pod, i *InstanceInfo) {
+	i.Node = valueNone
+	i.Region = valueNone
+	i.AZ = valueNone
+
+	if pod.Spec.NodeName == "" {
+		return
+	}
+
+	i.Node = strings.Join([]string{pod.Spec.NodeName, pod.Status.HostIP}, "/")
+	node := util.GetNodeByName(nodes, pod.Spec.NodeName)
+	if node == nil {
+		return
+	}
+
+	i.Region = getLabelVal(node.Labels, types.RegionLabelKey)
+	i.AZ = getLabelVal(node.Labels, types.ZoneLabelKey)
+}
+
+func getInstanceResourceInfo(pod *corev1.Pod, i *InstanceInfo) {
+	reqs, limits := resource.PodRequestsAndLimits(pod)
+	names := []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory}
+	for _, name := range names {
+		res := valueNone
+		limit := limits[name]
+		req := reqs[name]
+
+		// if both limit and request are empty, only output none
+		if !util.ResourceIsEmpty(&limit) || !util.ResourceIsEmpty(&req) {
+			res = fmt.Sprintf("%s / %s", req.String(), limit.String())
+		}
+
+		switch name {
+		case corev1.ResourceCPU:
+			i.CPU = res
+		case corev1.ResourceMemory:
+			i.Memory = res
+		}
+	}
+}
+
+func getLabelVal(labels map[string]string, key string) string {
+	val := labels[key]
+	if len(val) == 0 {
+		return valueNone
+	}
+	return val
 }

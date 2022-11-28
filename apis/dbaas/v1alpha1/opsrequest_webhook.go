@@ -19,8 +19,10 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -34,7 +36,12 @@ import (
 )
 
 // log is for logging in this package.
-var opsrequestlog = logf.Log.WithName("opsrequest-resource")
+var (
+	opsrequestlog = logf.Log.WithName("opsrequest-resource")
+
+	// ClusterPhasesMapperForOps records in which cluster phases OpsRequest can run
+	ClusterPhasesMapperForOps = map[OpsType][]Phase{}
+)
 
 func (r *OpsRequest) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
@@ -61,27 +68,45 @@ var _ webhook.Validator = &OpsRequest{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *OpsRequest) ValidateCreate() error {
 	opsrequestlog.Info("validate create", "name", r.Name)
-	return r.validate()
+	return r.validate(true)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 	opsrequestlog.Info("validate update", "name", r.Name)
-	if r.Status.Phase == SucceedPhase {
-		return newInvalidError(OpsRequestKind, r.Name, "status.phase", fmt.Sprintf("can not update OpsRequest when status.Phase is %s", r.Status.Phase))
+	lastOpsRequest := old.(*OpsRequest)
+	if r.Status.Phase == SucceedPhase && !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
+		return newInvalidError(OpsRequestKind, r.Name, "spec", fmt.Sprintf("update OpsRequest is forbidden when status.Phase is %s", r.Status.Phase))
 	}
-	return r.validate()
+	// we can not delete the OpsRequest when cluster has been deleted. because can not edit the finalizer when cluster not existed.
+	// so if no spec updated, skip validation.
+	if reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
+		return nil
+	}
+	return r.validate(false)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *OpsRequest) ValidateDelete() error {
 	opsrequestlog.Info("validate delete", "name", r.Name)
 
-	// TODO(user): fill in your validation logic upon object deletion.
 	return nil
 }
 
-func (r *OpsRequest) validate() error {
+// validateClusterPhase validate whether the current cluster state supports the OpsRequest
+func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
+	clusterPhases := ClusterPhasesMapperForOps[r.Spec.Type]
+	// if the OpsType is no cluster phases, ignores it
+	if len(clusterPhases) == 0 {
+		return nil
+	}
+	if !slices.Contains(clusterPhases, cluster.Status.Phase) {
+		return newInvalidError(OpsRequestKind, r.Name, "spec.type", fmt.Sprintf("%s is forbidden when Cluster.status.Phase is %s", r.Spec.Type, cluster.Status.Phase))
+	}
+	return nil
+}
+
+func (r *OpsRequest) validate(isCreate bool) error {
 	var (
 		allErrs field.ErrorList
 		ctx     = context.Background()
@@ -92,10 +117,14 @@ func (r *OpsRequest) validate() error {
 	}
 	// get cluster resource
 	if err := webhookMgr.client.Get(ctx, types.NamespacedName{Namespace: r.Namespace, Name: r.Spec.ClusterRef}, cluster); err != nil {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterRef"), r.Spec.ClusterRef, err.Error()))
-	} else {
-		r.validateOps(ctx, cluster, &allErrs)
+		return newInvalidError(OpsRequestKind, r.Name, "spec.clusterRef", err.Error())
 	}
+	if isCreate {
+		if err := r.validateClusterPhase(cluster); err != nil {
+			return err
+		}
+	}
+	r.validateOps(ctx, cluster, &allErrs)
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(schema.GroupKind{Group: APIVersion, Kind: OpsRequestKind}, r.Name, allErrs)
 	}
@@ -104,6 +133,10 @@ func (r *OpsRequest) validate() error {
 
 // validateOps validate ops attributes is legal
 func (r *OpsRequest) validateOps(ctx context.Context, cluster *Cluster, allErrs *field.ErrorList) {
+	if cluster.Status.Operations == nil {
+		cluster.Status.Operations = &Operations{}
+	}
+
 	// Check whether the corresponding attribute is legal according to the operation type
 	switch r.Spec.Type {
 	case UpgradeType:
@@ -158,7 +191,18 @@ func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *
 	r.commonValidationWithComponentOps(allErrs, cluster, supportedComponentMap, customValidate)
 }
 
-// validateVolumeExpansion validate api is legal when spec.type is HorizontalScaling
+// invalidReplicas verify whether the replicas is invalid
+func invalidReplicas(replicas int32, operationComponent *OperationComponent) string {
+	if operationComponent.Min != 0 && replicas < operationComponent.Min {
+		return fmt.Sprintf("replicas must greater than %d", operationComponent.Min)
+	}
+	if operationComponent.Max != 0 && replicas > operationComponent.Max {
+		return fmt.Sprintf("replicas must less than %d", operationComponent.Max)
+	}
+	return ""
+}
+
+// validateHorizontalScaling validate api is legal when spec.type is HorizontalScaling
 func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.ErrorList) {
 	supportedComponentMap := covertOperationComponentsToMap(cluster.Status.Operations.HorizontalScalable)
 	customValidate := func(componentOps *ComponentOps, index int, operationComponent *OperationComponent) *field.Error {
@@ -166,9 +210,9 @@ func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.
 			return field.NotFound(field.NewPath(fmt.Sprintf("spec.componentOps[%d].horizontalScaling", index)), "can not be empty")
 		}
 		replicas := componentOps.HorizontalScaling.Replicas
-		if replicas < operationComponent.Min || replicas > operationComponent.Max {
-			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].horizontalScaling.replicas", index)), replicas,
-				fmt.Sprintf("replicas must in [%d,%d]", operationComponent.Min, operationComponent.Max))
+		replicasMsg := invalidReplicas(replicas, operationComponent)
+		if replicasMsg != "" {
+			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].horizontalScaling.replicas", index)), replicas, replicasMsg)
 		}
 		return nil
 	}
@@ -197,7 +241,7 @@ func (r *OpsRequest) validateVolumeExpansion(allErrs *field.ErrorList, cluster *
 			}
 		}
 		if len(invalidVctNames) > 0 {
-			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].volumeExpansion[*].name", index)), invalidVctNames, "not support volume expansion")
+			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].volumeExpansion[*].name", index)), invalidVctNames, "not support volume expansion, check the StorageClass whether allow volume expansion.")
 		}
 		return nil
 	}
@@ -219,7 +263,12 @@ func (r *OpsRequest) commonValidationWithComponentOps(allErrs *field.ErrorList, 
 	)
 	// check whether cluster support the operation when it in component scope
 	if len(supportedComponentMap) == 0 {
-		addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s", r.Spec.ClusterRef))
+		switch r.Spec.Type {
+		case VolumeExpansionType:
+			addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s, check the StorageClass whether allow volume expansion.", r.Spec.ClusterRef))
+		default:
+			addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s", r.Spec.ClusterRef))
+		}
 		return false
 	}
 	if len(r.Spec.ComponentOpsList) == 0 {
@@ -255,7 +304,7 @@ func (r *OpsRequest) commonValidationWithComponentOps(allErrs *field.ErrorList, 
 			if customValidate == nil {
 				continue
 			}
-			if err := customValidate(componentOps, index, operationComponent); err != nil {
+			if err := customValidate(&componentOps, index, operationComponent); err != nil {
 				*allErrs = append(*allErrs, err)
 			}
 		}
@@ -285,10 +334,10 @@ func covertComponentNamesToMap(componentNames []string) map[string]*OperationCom
 }
 
 // covertOperationComponentsToMap covert supportedOperationComponent slice to map
-func covertOperationComponentsToMap(componentNames []*OperationComponent) map[string]*OperationComponent {
+func covertOperationComponentsToMap(componentNames []OperationComponent) map[string]*OperationComponent {
 	supportedComponentMap := map[string]*OperationComponent{}
 	for _, v := range componentNames {
-		supportedComponentMap[v.Name] = v
+		supportedComponentMap[v.Name] = &v
 	}
 	return supportedComponentMap
 }

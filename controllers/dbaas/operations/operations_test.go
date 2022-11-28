@@ -23,7 +23,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/sethvargo/go-password/password"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -43,32 +42,57 @@ var _ = Describe("OpsRequest Controller", func() {
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
 
-	assureDefaultStorageClassObj := func() *storagev1.StorageClass {
+	cleanupObjects := func() {
+		err := k8sClient.DeleteAllOf(ctx, &storagev1.StorageClass{},
+			client.InNamespace(testCtx.DefaultNamespace),
+			client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.OpsRequest{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	BeforeEach(func() {
+		// Add any steup steps that needs to be executed before each test
+		cleanupObjects()
+	})
+
+	AfterEach(func() {
+		// Add any teardown steps that needs to be executed after each test
+		cleanupObjects()
+	})
+
+	assureDefaultStorageClassObj := func(randomStr string) *storagev1.StorageClass {
 		By("By assure an default storageClass")
-		scYAML := `
+		scYAML := fmt.Sprintf(`
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: csi-hostpath-sc
+  name: csi-hostpath-sc-%s
   annotations:
     storageclass.kubernetes.io/is-default-class: "true"
 provisioner: hostpath.csi.k8s.io
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
-`
+`, randomStr)
 		sc := &storagev1.StorageClass{}
 		Expect(yaml.Unmarshal([]byte(scYAML), sc)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, sc)).Should(Succeed())
+		Expect(testCtx.CreateObj(ctx, sc)).Should(Succeed())
 		return sc
 	}
 
-	assureClusterDefObj := func() *dbaasv1alpha1.ClusterDefinition {
+	assureClusterDefObj := func(randomStr string) *dbaasv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
-		clusterDefYAML := `
+		clusterDefYAML := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: cluster-definition-for-operations
+  name: cluster-definition-for-operations-%s
 spec:
   type: state.mysql-8
   components:
@@ -124,20 +148,20 @@ spec:
     podSpec:
       containers:
       - name: nginx
-`
+`, randomStr)
 		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, clusterDefinition)).Should(Succeed())
+		Expect(testCtx.CreateObj(ctx, clusterDefinition)).Should(Succeed())
 		return clusterDefinition
 	}
 
-	assureAppVersionObj := func() *dbaasv1alpha1.AppVersion {
+	assureAppVersionObj := func(randomStr string) *dbaasv1alpha1.AppVersion {
 		By("By assure an appVersion obj")
-		appVerYAML := `
+		appVerYAML := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       AppVersion
 metadata:
-  name:     app-version-operations
+  name:     app-version-operations-%s
 spec:
   clusterDefinitionRef: cluster-definition
   components:
@@ -145,50 +169,46 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: registry.jihulab.com/apecloud/mysql-server/mysql/wesql-server-arm:latest
+        image: docker.io/apecloud/wesql-server-8.0:0.1.2
   - type: proxy
     podSpec: 
       containers:
       - name: nginx
         image: nginx
-`
+`, randomStr)
 		appVersion := &dbaasv1alpha1.AppVersion{}
 		Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, appVersion)).Should(Succeed())
+		Expect(testCtx.CreateObj(ctx, appVersion)).Should(Succeed())
 		return appVersion
 	}
 
 	newClusterObj := func(
 		clusterDefObj *dbaasv1alpha1.ClusterDefinition,
 		appVersionObj *dbaasv1alpha1.AppVersion,
+		randomStr string,
 	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.AppVersion, types.NamespacedName) {
 		// setup Cluster obj required default ClusterDefinition and AppVersion objects if not provided
 		if clusterDefObj == nil {
-			clusterDefObj = assureClusterDefObj()
+			clusterDefObj = assureClusterDefObj(randomStr)
 		}
 		if appVersionObj == nil {
-			appVersionObj = assureAppVersionObj()
+			appVersionObj = assureAppVersionObj(randomStr)
 		}
-
-		randomStr, _ := password.Generate(6, 0, 0, true, false)
 		key := types.NamespacedName{
 			Name:      "cluster" + randomStr,
 			Namespace: "default",
 		}
-		storageClassName := "csi-hostpath-sc"
+		storageClassName := "csi-hostpath-sc-" + randomStr
 
 		return &dbaasv1alpha1.Cluster{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "dbaas.kubeblocks.io/v1alpha1",
-				Kind:       "Cluster",
-			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      key.Name,
 				Namespace: key.Namespace,
 			},
 			Spec: dbaasv1alpha1.ClusterSpec{
-				ClusterDefRef: clusterDefObj.GetName(),
-				AppVersionRef: appVersionObj.GetName(),
+				ClusterDefRef:     clusterDefObj.GetName(),
+				AppVersionRef:     appVersionObj.GetName(),
+				TerminationPolicy: dbaasv1alpha1.WipeOut,
 				Components: []dbaasv1alpha1.ClusterComponent{
 					{
 						Name: "replicasets",
@@ -520,12 +540,13 @@ spec:
 
 	Context("Test OpsRequest", func() {
 		It("Should Test all OpsRequest", func() {
-			clusterObject, _, _, key := newClusterObj(nil, nil)
+			randomStr := testCtx.GetRandomStr()
+			clusterObject, _, _, key := newClusterObj(nil, nil, randomStr)
 			Expect(testCtx.CreateObj(ctx, clusterObject)).Should(Succeed())
 
 			By("Test Upgrade Ops")
 			ops := createOpsRequest("upgrade_ops", clusterObject.Name, dbaasv1alpha1.UpgradeType)
-			ops.Spec.ClusterOps = &dbaasv1alpha1.ClusterOps{Upgrade: &dbaasv1alpha1.Upgrade{AppVersionRef: "appversion-test"}}
+			ops.Spec.ClusterOps = &dbaasv1alpha1.ClusterOps{Upgrade: &dbaasv1alpha1.Upgrade{AppVersionRef: "appversion-test-" + randomStr}}
 			opsRes := &OpsResource{
 				Ctx:        context.Background(),
 				Cluster:    clusterObject,
@@ -537,26 +558,27 @@ spec:
 
 			By("Test OpsManager.MainEnter function with ClusterOps")
 			opsRes.Cluster.Status.Phase = dbaasv1alpha1.RunningPhase
+			patch := client.MergeFrom(clusterObject.DeepCopy())
 			clusterObject.Status.Components = map[string]*dbaasv1alpha1.ClusterStatusComponent{
 				"replicasets": {
 					Phase: dbaasv1alpha1.RunningPhase,
 				},
 			}
-			Expect(k8sClient.Status().Update(context.Background(), clusterObject)).Should(Succeed())
+			Expect(k8sClient.Status().Patch(context.Background(), clusterObject, patch)).Should(Succeed())
 			opsRes.OpsRequest.Status.Phase = dbaasv1alpha1.RunningPhase
 			_ = GetOpsManager().Reconcile(opsRes)
 
 			By("Test VolumeExpansion")
 			// create storageClass
-			assureDefaultStorageClassObj()
-			ops = createOpsRequest("volumeexpansion_ops", clusterObject.Name, dbaasv1alpha1.VolumeExpansionType)
-			ops.Spec.ComponentOpsList = []*dbaasv1alpha1.ComponentOps{
+			assureDefaultStorageClassObj(randomStr)
+			ops = createOpsRequest("volumeexpansion_ops_"+randomStr, clusterObject.Name, dbaasv1alpha1.VolumeExpansionType)
+			ops.Spec.ComponentOpsList = []dbaasv1alpha1.ComponentOps{
 				{
 					ComponentNames: []string{"replicasets"},
 					VolumeExpansion: []dbaasv1alpha1.VolumeExpansion{
 						{
 							Name:    "log",
-							Storage: "2Gi",
+							Storage: resource.MustParse("2Gi"),
 						},
 					},
 				},
@@ -565,8 +587,8 @@ spec:
 			_ = VolumeExpansionAction(opsRes)
 
 			By("Test VerticalScaling")
-			ops = createOpsRequest("verticalscaling_ops", clusterObject.Name, dbaasv1alpha1.VerticalScalingType)
-			ops.Spec.ComponentOpsList = []*dbaasv1alpha1.ComponentOps{
+			ops = createOpsRequest("verticalscaling_ops_"+randomStr, clusterObject.Name, dbaasv1alpha1.VerticalScalingType)
+			ops.Spec.ComponentOpsList = []dbaasv1alpha1.ComponentOps{
 				{ComponentNames: []string{"replicasets"},
 					VerticalScaling: &corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
@@ -584,8 +606,8 @@ spec:
 			_ = VerticalScalingAction(opsRes)
 
 			By("Test Restart")
-			ops = createOpsRequest("restart_ops", clusterObject.Name, dbaasv1alpha1.RestartType)
-			ops.Spec.ComponentOpsList = []*dbaasv1alpha1.ComponentOps{
+			ops = createOpsRequest("restart_ops_"+randomStr, clusterObject.Name, dbaasv1alpha1.RestartType)
+			ops.Spec.ComponentOpsList = []dbaasv1alpha1.ComponentOps{
 				{ComponentNames: []string{"replicasets"}},
 			}
 			ops.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
@@ -594,8 +616,8 @@ spec:
 			_ = RestartAction(opsRes)
 
 			By("Test HorizontalScaling")
-			ops = createOpsRequest("horizontalscaling_ops", clusterObject.Name, dbaasv1alpha1.HorizontalScalingType)
-			ops.Spec.ComponentOpsList = []*dbaasv1alpha1.ComponentOps{
+			ops = createOpsRequest("horizontalscaling_ops_"+randomStr, clusterObject.Name, dbaasv1alpha1.HorizontalScalingType)
+			ops.Spec.ComponentOpsList = []dbaasv1alpha1.ComponentOps{
 				{
 					ComponentNames: []string{"replicasets"},
 					HorizontalScaling: &dbaasv1alpha1.HorizontalScaling{
@@ -614,7 +636,7 @@ spec:
 			_ = GetOpsManager().Reconcile(opsRes)
 			// test getOpsRequestAnnotation function
 			opsRes.Cluster.Annotations = map[string]string{
-				intctrlutil.OpsRequestAnnotationKey: `{"Updating":"horizontalscaling_ops"}`,
+				intctrlutil.OpsRequestAnnotationKey: fmt.Sprintf(`{"Updating":"horizontalscaling_ops_%s"}`, randomStr),
 			}
 			_ = GetOpsManager().Do(opsRes)
 
@@ -630,7 +652,7 @@ spec:
 			By("Test the functions in ops_util.go")
 			_ = patchOpsBehaviourNotFound(opsRes)
 			_ = patchClusterPhaseMisMatch(opsRes)
-			_ = patchClusterExistOtherOperation(opsRes, "horizontalscaling_ops")
+			_ = patchClusterExistOtherOperation(opsRes, "horizontalscaling_ops_"+randomStr)
 			_ = PatchClusterNotFound(opsRes)
 			_ = patchClusterPhaseWhenExistsOtherOps(opsRes, map[dbaasv1alpha1.Phase]string{
 				dbaasv1alpha1.PendingPhase: "mysql-restart",

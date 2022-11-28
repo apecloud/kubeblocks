@@ -31,7 +31,7 @@ type ResourceDefinition struct {
 type ComponentTemplateValues struct {
 	Name        string
 	ServiceName string
-	Replicas    int
+	Replicas    int32
 
 	// Container *corev1.Container
 	Resource  *ResourceDefinition
@@ -123,7 +123,7 @@ const (
 func injectBuiltInFunctions(tplBuilder *ConfigTemplateBuilder, podTemplate *corev1.PodTemplateSpec, component *Component) error {
 	// TODO add built-in function
 	tplBuilder.buildinFunctions = &intctrlutil.BuiltinObjectsFunc{
-		BuiltinMysqlCalBufferFunctionName: calDbPoolSize,
+		BuiltinMysqlCalBufferFunctionName: calDBPoolSize,
 		BuiltinGetVolumeFunctionName:      getVolumeMountPathByName,
 		BuiltinGetPvcFunctionName:         getPvcByName,
 		BuiltinGetEnvFunctionName:         getEnvByName,

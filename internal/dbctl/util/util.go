@@ -30,6 +30,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"text/template"
 	"time"
@@ -38,10 +39,16 @@ import (
 	"github.com/fatih/color"
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
+	"github.com/gosuri/uitable"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
+	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes/scheme"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -195,7 +202,7 @@ func DoWithRetry(ctx context.Context, logger logr.Logger, operation func() error
 	return err
 }
 
-func GenRequestId() string {
+func GenRequestID() string {
 	return uuid.New().String()
 }
 
@@ -269,4 +276,93 @@ func PlaygroundDir() (string, error) {
 	}
 
 	return filepath.Join(cliPath, "playground"), nil
+}
+
+func GVRToString(gvr schema.GroupVersionResource) string {
+	return strings.Join([]string{gvr.Resource, gvr.Version, gvr.Group}, ".")
+}
+
+// CheckErr prints a user-friendly error to STDERR and exits with a non-zero exit code.
+func CheckErr(err error) {
+	// unwrap aggregates of 1
+	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) == 1 {
+		err = agg.Errors()[0]
+	}
+
+	if err == nil {
+		return
+	}
+
+	// ErrExit and other valid api errors will be checked by cmdutil.CheckErr, now
+	// we only check invalid api errors that can not be converted to StatusError.
+	if err != cmdutil.ErrExit && apierrors.IsInvalid(err) {
+		if _, ok := err.(*apierrors.StatusError); !ok {
+			printErr(err)
+			os.Exit(cmdutil.DefaultErrorExitCode)
+		}
+	}
+
+	cmdutil.CheckErr(err)
+}
+
+func printErr(err error) {
+	msg, ok := cmdutil.StandardErrorMessage(err)
+	if !ok {
+		msg = err.Error()
+		if !strings.HasPrefix(msg, "error: ") {
+			msg = fmt.Sprintf("error: %s", msg)
+		}
+	}
+	if len(msg) > 0 {
+		// add newline if needed
+		if !strings.HasSuffix(msg, "\n") {
+			msg += "\n"
+		}
+		fmt.Fprint(os.Stderr, msg)
+	}
+}
+
+func PrintTable(out io.Writer, table *uitable.Table) error {
+	raw := table.Bytes()
+	raw = append(raw, []byte("\n")...)
+	_, err := out.Write(raw)
+	if err != nil {
+		return errors.Wrap(err, "unable to write table output")
+	}
+	return nil
+}
+
+// GetNodeByName choose node by name from a node array
+func GetNodeByName(nodes []*corev1.Node, name string) *corev1.Node {
+	for _, node := range nodes {
+		if node.Name == name {
+			return node
+		}
+	}
+	return nil
+}
+
+// ResourceIsEmpty check if resource is empty or not
+func ResourceIsEmpty(res *resource.Quantity) bool {
+	resStr := res.String()
+	if resStr == "0" || resStr == "<nil>" {
+		return true
+	}
+	return false
+}
+
+func GetPodStatus(pods []*corev1.Pod) (running, waiting, succeeded, failed int) {
+	for _, pod := range pods {
+		switch pod.Status.Phase {
+		case corev1.PodRunning:
+			running++
+		case corev1.PodPending:
+			waiting++
+		case corev1.PodSucceeded:
+			succeeded++
+		case corev1.PodFailed:
+			failed++
+		}
+	}
+	return
 }

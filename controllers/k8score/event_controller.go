@@ -36,7 +36,7 @@ const (
 var EventHandlerMap = map[string]EventHandler{}
 
 type EventHandler interface {
-	Handle(client.Client, intctrlutil.RequestCtx, *corev1.Event) error
+	Handle(client.Client, intctrlutil.RequestCtx, record.EventRecorder, *corev1.Event) error
 }
 
 // EventReconciler reconciles an Event object
@@ -72,9 +72,8 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	for _, handler := range EventHandlerMap {
-		err := handler.Handle(r.Client, reqCtx, event)
-		if err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "handleRoleChangedEventError")
+		if err := handler.Handle(r.Client, reqCtx, r.Recorder, event); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "handleEventError")
 		}
 	}
 

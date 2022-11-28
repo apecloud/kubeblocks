@@ -31,6 +31,8 @@ import (
 	cmdexec "k8s.io/kubectl/pkg/cmd/exec"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/podcmd"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
 // ExecInput is used to transfer custom Complete & Validate & AddFlags
@@ -41,14 +43,20 @@ type ExecInput struct {
 	// Short is the short description shown in the 'help' output.
 	Short string
 
+	// Example use example for cluster logs
+	Example string
+
 	// CompleteFunc optional, custom Complete options
 	Complete func(args []string) error
 
 	// ValidateFunc optional, custom Validate func
 	Validate func() error
 
-	// AddFlags func optional, custom build flags
+	// AddFlags Func optional, custom build flags
 	AddFlags func(*cobra.Command)
+
+	// RunFunc optional, custom Run logic and return false or error means no need to exec, conversely return true will continue run exec
+	Run func() (bool, error)
 }
 
 type ExecOptions struct {
@@ -82,12 +90,13 @@ func NewExecOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *Exe
 func (o *ExecOptions) Build(input *ExecInput) *cobra.Command {
 	o.Input = input
 	cmd := &cobra.Command{
-		Use:   o.Input.Use,
-		Short: o.Input.Short,
+		Use:     o.Input.Use,
+		Short:   o.Input.Short,
+		Example: o.Input.Example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(args))
-			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.Run())
+			util.CheckErr(o.Complete(args))
+			util.CheckErr(o.Validate())
+			util.CheckErr(o.Run())
 		},
 	}
 	if o.Input.AddFlags != nil {
@@ -145,7 +154,7 @@ func (o *ExecOptions) Validate() error {
 	if o.Pod == nil {
 		return fmt.Errorf("failed to get the pod to execute")
 	}
-	if len(o.Command) == 0 {
+	if len(o.Command) == 0 && o.Input.Run == nil {
 		return fmt.Errorf("you must specify at least one command for the container")
 	}
 	if o.Out == nil || o.ErrOut == nil {
@@ -172,6 +181,12 @@ func (o *ExecOptions) Validate() error {
 }
 
 func (o *ExecOptions) Run() error {
+	// custom run logic and direct return
+	if o.Input.Run != nil {
+		if continueExec, err := o.Input.Run(); err != nil || !continueExec {
+			return err
+		}
+	}
 	// ensure we can recover the terminal while attached
 	t := o.SetupTTY()
 

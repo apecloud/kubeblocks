@@ -71,7 +71,7 @@ func (i *imdsService) getPrimaryMAC(ctx context.Context) (string, error) {
 	return i.GetMetadataWithContext(ctx, "mac")
 }
 
-func (i *imdsService) getInterfaceIdByMAC(ctx context.Context, mac string) (string, error) {
+func (i *imdsService) getInterfaceIDByMAC(ctx context.Context, mac string) (string, error) {
 	key := fmt.Sprintf("network/interfaces/macs/%s/interface-id", mac)
 	return i.GetMetadataWithContext(ctx, key)
 }

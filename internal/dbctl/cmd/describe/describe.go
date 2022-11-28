@@ -29,6 +29,8 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/describe"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
 // Options used to construct a describe command
@@ -41,8 +43,8 @@ type Options struct {
 	Describer func(*meta.RESTMapping) (describe.ResourceDescriber, error)
 	Builder   func() *resource.Builder
 
-	GroupKind schema.GroupKind
-	Name      string
+	GVR  schema.GroupVersionResource
+	Name string
 
 	EnforceNamespace bool
 	AllNamespaces    bool
@@ -51,12 +53,12 @@ type Options struct {
 	genericclioptions.IOStreams
 }
 
-func NewOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, short string, gk schema.GroupKind) *Options {
+func NewOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, short string, gvr schema.GroupVersionResource) *Options {
 	return &Options{
 		Factory:   f,
 		IOStreams: streams,
 		Short:     short,
-		GroupKind: gk,
+		GVR:       gvr,
 		DescriberSettings: &describe.DescriberSettings{
 			ShowEvents: true,
 			ChunkSize:  cmdutil.DefaultChunkSize,
@@ -70,8 +72,8 @@ func (o *Options) Build() *cobra.Command {
 		Use:   "describe",
 		Short: o.Short,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.complete(args))
-			cmdutil.CheckErr(o.run())
+			util.CheckErr(o.complete(args))
+			util.CheckErr(o.run())
 		},
 	}
 
@@ -84,7 +86,7 @@ func (o *Options) Build() *cobra.Command {
 
 func (o *Options) complete(args []string) error {
 	var err error
-	if len(args) == 0 || o.GroupKind.Empty() {
+	if len(args) == 0 || o.GVR.Empty() {
 		return errors.New("You must specify the name of resource to describe.")
 	}
 	o.Name = args[0]
@@ -108,7 +110,7 @@ func (o *Options) run() error {
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
 		LabelSelectorParam(o.Selector).
-		ResourceTypeOrNameArgs(true, o.GroupKind.String(), o.Name).
+		ResourceTypeOrNameArgs(true, util.GVRToString(o.GVR), o.Name).
 		Flatten().
 		Do()
 	err := r.Err()

@@ -46,12 +46,12 @@ spec:
             description: AppVersionSpec defines the desired state of AppVersion
             properties:
               clusterDefinitionRef:
-                description: ref ClusterDefinition
+                description: ref ClusterDefinition.
                 type: string
               components:
                 description: List of components in current AppVersion. Component will
                   replace the field in ClusterDefinition's component if type is matching
-                  typeName
+                  typeName.
                 items:
                   description: AppVersionComponent is an application version component
                     spec.
@@ -61,27 +61,29 @@ spec:
                         mechanism to handle configuration differences between versions,
                         the configTemplateRefs field, together with configTemplateRefs
                         in the ClusterDefinition, determines the final configuration
-                        file
+                        file.
                       items:
                         properties:
                           name:
                             description: Specify the name of the referenced configuration
-                              template, which is a configmap object
+                              template, which is a configmap object.
                             maxLength: 128
                             type: string
                           volumeName:
-                            description: 'VolumeName is the volume name of PodTemplate,
+                            description: VolumeName is the volume name of PodTemplate,
                               which the configuration file produced through the configuration
                               template will be mounted to the corresponding volume.
                               The volume name must be defined in podSpec.containers[*].volumeMounts.
-                              reference example: https://github.com/apecloud/kubeblocks/blob/main/examples/dbaas/mysql_clusterdefinition.yaml#L12'
                             maxLength: 32
                             type: string
+                        required:
+                        - name
+                        - volumeName
                         type: object
                       type: array
                     podSpec:
                       description: PodSpec is pod spec, if not nil, will replace ClusterDefinitionSpec.PodSpec
-                        in ClusterDefinition
+                        in ClusterDefinition.
                       properties:
                         activeDeadlineSeconds:
                           description: Optional duration in seconds the pod may be
@@ -7697,6 +7699,9 @@ spec:
                   type: object
                 minItems: 1
                 type: array
+            required:
+            - clusterDefinitionRef
+            - components
             type: object
           status:
             description: AppVersionStatus defines the observed state of AppVersion

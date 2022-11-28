@@ -19,9 +19,17 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - description: ClusterDefinition referenced by cluster.
+      jsonPath: .spec.clusterDefinitionRef
+      name: CLUSTER-DEFINITION
+      type: string
     - description: Cluster Application Version.
       jsonPath: .spec.appVersionRef
       name: APP-VERSION
+      type: string
+    - description: Cluster termination policy.
+      jsonPath: .spec.terminationPolicy
+      name: TERMINATION-POLICY
       type: string
     - description: Cluster Status.
       jsonPath: .status.phase
@@ -51,16 +59,16 @@ spec:
             description: ClusterSpec defines the desired state of Cluster
             properties:
               affinity:
-                description: Affinity describes affinities which specific by users
+                description: Affinity describes affinities which specific by users.
                 properties:
                   nodeLabels:
                     additionalProperties:
                       type: string
                     description: NodeLabels describe constrain which nodes pod can
-                      be scheduled on based on node labels
+                      be scheduled on based on node labels.
                     type: object
                   podAntiAffinity:
-                    description: PodAntiAffinity defines pods of component anti-affnity
+                    description: PodAntiAffinity defines pods of component anti-affnity.
                       Defaults to Preferred Preferred means try spread pods by topologyKey
                       Required means must spread pods by topologyKey
                     enum:
@@ -69,35 +77,36 @@ spec:
                     type: string
                   topologyKeys:
                     description: TopologyKeys describe topologyKeys for `topologySpreadConstraint`
-                      and `podAntiAffinity` in ClusterDefinition API
+                      and `podAntiAffinity` in ClusterDefinition API.
                     items:
                       type: string
                     type: array
                 type: object
               appVersionRef:
-                description: ref AppVersion
+                description: Cluster referenced AppVersion name.
                 type: string
               clusterDefinitionRef:
-                description: ref ClusterDefinition, immutable
+                description: Cluster referenced ClusterDefinition name, this is an
+                  immutable attribute.
                 type: string
               components:
                 description: List of components you want to replace in ClusterDefinition
                   and AppVersion. It will replace the field in ClusterDefinition's
-                  and AppVersion's component if type is matching
+                  and AppVersion's component if type is matching.
                 items:
                   properties:
                     affinity:
                       description: Affinity describes affinities which specific by
-                        users
+                        users.
                       properties:
                         nodeLabels:
                           additionalProperties:
                             type: string
                           description: NodeLabels describe constrain which nodes pod
-                            can be scheduled on based on node labels
+                            can be scheduled on based on node labels.
                           type: object
                         podAntiAffinity:
-                          description: PodAntiAffinity defines pods of component anti-affnity
+                          description: PodAntiAffinity defines pods of component anti-affnity.
                             Defaults to Preferred Preferred means try spread pods
                             by topologyKey Required means must spread pods by topologyKey
                           enum:
@@ -106,11 +115,19 @@ spec:
                           type: string
                         topologyKeys:
                           description: TopologyKeys describe topologyKeys for `topologySpreadConstraint`
-                            and `podAntiAffinity` in ClusterDefinition API
+                            and `podAntiAffinity` in ClusterDefinition API.
                           items:
                             type: string
                           type: array
                       type: object
+                    enabledLogs:
+                      description: EnabledLogs indicate which log file takes effect
+                        in database cluster element is the log type which defined
+                        in cluster definition logConfig.name, and will set relative
+                        variables about this log type in database kernel.
+                      items:
+                        type: string
+                      type: array
                     monitor:
                       default: false
                       description: Monitor which is a switch to enable monitoring,
@@ -123,10 +140,12 @@ spec:
                       maxLength: 12
                       type: string
                     replicas:
-                      description: default value in ClusterDefinition
+                      description: Component replicas, use default value in ClusterDefinition
+                        if not specified.
+                      format: int32
                       type: integer
                     resources:
-                      description: Resources requests and limits of workload
+                      description: Resources requests and limits of workload.
                       properties:
                         limits:
                           additionalProperties:
@@ -172,12 +191,55 @@ spec:
                       - NodePort
                       - LoadBalancer
                       type: string
+                    tolerations:
+                      description: Component tolerations will override ClusterSpec.Tolerations
+                        if specified.
+                      items:
+                        description: The pod this Toleration is attached to tolerates
+                          any taint that matches the triple <key,value,effect> using
+                          the matching operator <operator>.
+                        properties:
+                          effect:
+                            description: Effect indicates the taint effect to match.
+                              Empty means match all taint effects. When specified,
+                              allowed values are NoSchedule, PreferNoSchedule and
+                              NoExecute.
+                            type: string
+                          key:
+                            description: Key is the taint key that the toleration
+                              applies to. Empty means match all taint keys. If the
+                              key is empty, operator must be Exists; this combination
+                              means to match all values and all keys.
+                            type: string
+                          operator:
+                            description: Operator represents a key's relationship
+                              to the value. Valid operators are Exists and Equal.
+                              Defaults to Equal. Exists is equivalent to wildcard
+                              for value, so that a pod can tolerate all taints of
+                              a particular category.
+                            type: string
+                          tolerationSeconds:
+                            description: TolerationSeconds represents the period of
+                              time the toleration (which must be of effect NoExecute,
+                              otherwise this field is ignored) tolerates the taint.
+                              By default, it is not set, which means tolerate the
+                              taint forever (do not evict). Zero and negative values
+                              will be treated as 0 (evict immediately) by the system.
+                            format: int64
+                            type: integer
+                          value:
+                            description: Value is the taint value the toleration matches
+                              to. If the operator is Exists, the value should be empty,
+                              otherwise just a regular string.
+                            type: string
+                        type: object
+                      type: array
                     type:
-                      description: component name in ClusterDefinition
+                      description: component name in ClusterDefinition.
                       maxLength: 12
                       type: string
                     volumeClaimTemplates:
-                      description: VolumeClaimTemplates information for statefulset.spec.volumeClaimTemplates
+                      description: VolumeClaimTemplates information for statefulset.spec.volumeClaimTemplates.
                       items:
                         properties:
                           name:
@@ -185,7 +247,7 @@ spec:
                             type: string
                           spec:
                             description: Spec defines the desired characteristics
-                              of a volume requested by a pod author
+                              of a volume requested by a pod author.
                             properties:
                               accessModes:
                                 description: 'accessModes contains the desired access
@@ -373,21 +435,64 @@ spec:
                   type: object
                 type: array
               terminationPolicy:
-                default: Halt
-                description: One of DoNotTerminate, Halt, Delete, WipeOut. Defaults
-                  to Halt. DoNotTerminate means block delete operation. Halt means
-                  delete resources such as sts,deploy,svc,pdb, but keep pvcs. Delete
-                  is based on Halt and delete pvcs. WipeOut is based on Delete and
-                  wipe out all snapshots and snapshot data from bucket.
+                description: Cluster termination policy. One of DoNotTerminate, Halt,
+                  Delete, WipeOut. DoNotTerminate will block delete operation. Halt
+                  will delete workload resources such as statefulset, deployment workloads
+                  but keep PVCs. Delete is based on Halt and deletes PVCs. WipeOut
+                  is based on Delete and wipe out all volume snapshots and snapshot
+                  data from backup storage location.
                 enum:
                 - DoNotTerminate
                 - Halt
                 - Delete
                 - WipeOut
                 type: string
+              tolerations:
+                description: Cluster Tolerations are attached to tolerate any taint
+                  that matches the triple <key,value,effect> using the matching operator
+                  <operator>.
+                items:
+                  description: The pod this Toleration is attached to tolerates any
+                    taint that matches the triple <key,value,effect> using the matching
+                    operator <operator>.
+                  properties:
+                    effect:
+                      description: Effect indicates the taint effect to match. Empty
+                        means match all taint effects. When specified, allowed values
+                        are NoSchedule, PreferNoSchedule and NoExecute.
+                      type: string
+                    key:
+                      description: Key is the taint key that the toleration applies
+                        to. Empty means match all taint keys. If the key is empty,
+                        operator must be Exists; this combination means to match all
+                        values and all keys.
+                      type: string
+                    operator:
+                      description: Operator represents a key's relationship to the
+                        value. Valid operators are Exists and Equal. Defaults to Equal.
+                        Exists is equivalent to wildcard for value, so that a pod
+                        can tolerate all taints of a particular category.
+                      type: string
+                    tolerationSeconds:
+                      description: TolerationSeconds represents the period of time
+                        the toleration (which must be of effect NoExecute, otherwise
+                        this field is ignored) tolerates the taint. By default, it
+                        is not set, which means tolerate the taint forever (do not
+                        evict). Zero and negative values will be treated as 0 (evict
+                        immediately) by the system.
+                      format: int64
+                      type: integer
+                    value:
+                      description: Value is the taint value the toleration matches
+                        to. If the operator is Exists, the value should be empty,
+                        otherwise just a regular string.
+                      type: string
+                  type: object
+                type: array
             required:
             - appVersionRef
             - clusterDefinitionRef
+            - terminationPolicy
             type: object
           status:
             description: ClusterStatus defines the observed state of Cluster
@@ -407,15 +512,15 @@ spec:
                   description: ClusterStatusComponent record components status information
                   properties:
                     consensusSetStatus:
-                      description: ConsensusSetStatus role and pod name mapping
+                      description: ConsensusSetStatus role and pod name mapping.
                       properties:
                         followers:
-                          description: Followers status
+                          description: Followers status.
                           items:
                             properties:
                               accessMode:
                                 default: ReadWrite
-                                description: AccessMode, what service this pod provides
+                                description: AccessMode, what service this pod provides.
                                 enum:
                                 - None
                                 - Readonly
@@ -423,11 +528,11 @@ spec:
                                 type: string
                               name:
                                 default: leader
-                                description: Name role name
+                                description: Name role name.
                                 type: string
                               pod:
                                 default: Unknown
-                                description: Pod name
+                                description: Pod name.
                                 type: string
                             required:
                             - accessMode
@@ -436,11 +541,11 @@ spec:
                             type: object
                           type: array
                         leader:
-                          description: Leader status
+                          description: Leader status.
                           properties:
                             accessMode:
                               default: ReadWrite
-                              description: AccessMode, what service this pod provides
+                              description: AccessMode, what service this pod provides.
                               enum:
                               - None
                               - Readonly
@@ -448,11 +553,11 @@ spec:
                               type: string
                             name:
                               default: leader
-                              description: Name role name
+                              description: Name role name.
                               type: string
                             pod:
                               default: Unknown
-                              description: Pod name
+                              description: Pod name.
                               type: string
                           required:
                           - accessMode
@@ -460,11 +565,11 @@ spec:
                           - pod
                           type: object
                         learner:
-                          description: Learner status
+                          description: Learner status.
                           properties:
                             accessMode:
                               default: ReadWrite
-                              description: AccessMode, what service this pod provides
+                              description: AccessMode, what service this pod provides.
                               enum:
                               - None
                               - Readonly
@@ -472,11 +577,11 @@ spec:
                               type: string
                             name:
                               default: leader
-                              description: Name role name
+                              description: Name role name.
                               type: string
                             pod:
                               default: Unknown
-                              description: Pod name
+                              description: Pod name.
                               type: string
                           required:
                           - accessMode
@@ -488,28 +593,105 @@ spec:
                       type: object
                     message:
                       description: Message record the component details message in
-                        current phase
+                        current phase.
                       type: string
                     phase:
-                      description: Phase - in list of [Running, Failed, Creating,
-                        Updating, Deleting, Deleted]
+                      description: 'Phase describe the phase of the cluster. the detail
+                        information of phase is as follows: Failed: component not
+                        available, i.e, all pod is not ready for Stateless/Stateful
+                        component; Leader/Primary pod is not ready for Consensus/Replication
+                        component. Abnormal: component available but some pod is not
+                        ready. If the component type is Consensus/Replication, the
+                        Leader/Primary pod is must ready in Abnormal phase. Other
+                        phases behave the same as the cluster phase.'
                       enum:
                       - Running
                       - Failed
+                      - Abnormal
                       - Creating
                       - Updating
                       - Deleting
                       - Deleted
                       type: string
                     type:
-                      description: Type component type
+                      description: Type of component.
                       type: string
                   type: object
                 description: Components record the current status information of all
-                  components of the cluster
+                  components of the cluster.
                 type: object
+              conditions:
+                description: describe current state of cluster API Resource, like
+                  warning.
+                items:
+                  description: "Condition contains details for one aspect of the current
+                    state of this API Resource. --- This struct is intended for direct
+                    use as an array at the field path .status.conditions.  For example,
+                    type FooStatus struct{ // Represents the observations of a foo's
+                    current state. // Known .status.conditions.type are: \"Available\",
+                    \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge
+                    // +listType=map // +listMapKey=type Conditions []metav1.Condition
+                    `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\"
+                    protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
+                  properties:
+                    lastTransitionTime:
+                      description: lastTransitionTime is the last time the condition
+                        transitioned from one status to another. This should be when
+                        the underlying condition changed.  If that is not known, then
+                        using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: message is a human readable message indicating
+                        details about the transition. This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: observedGeneration represents the .metadata.generation
+                        that the condition was set based upon. For instance, if .metadata.generation
+                        is currently 12, but the .status.conditions[x].observedGeneration
+                        is 9, the condition is out of date with respect to the current
+                        state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: reason contains a programmatic identifier indicating
+                        the reason for the condition's last transition. Producers
+                        of specific condition types may define expected values and
+                        meanings for this field, and whether the values are considered
+                        a guaranteed API. The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                        --- Many .condition.type values are consistent across resources
+                        like Available, but because arbitrary conditions can be useful
+                        (see .node.status.conditions), the ability to deconflict is
+                        important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
               message:
-                description: Message cluster details message in current phase
+                description: Message cluster details message in current phase.
                 type: string
               observedGeneration:
                 description: observedGeneration is the most recent generation observed
@@ -518,7 +700,7 @@ spec:
                 format: int64
                 type: integer
               operations:
-                description: Operations declares which operations the cluster supports
+                description: Operations declares which operations the cluster supports.
                 properties:
                   horizontalScalable:
                     description: HorizontalScalable which components of the cluster
@@ -526,20 +708,24 @@ spec:
                     items:
                       properties:
                         max:
-                          description: Max maximum of replicas when operation is horizontalScaling
+                          description: Max maximum of replicas when operation is horizontalScaling.
+                          format: int32
                           type: integer
                         min:
-                          description: Min minimum of replicas when operation is horizontalScaling,
+                          description: Min minimum of replicas when operation is horizontalScaling.
+                          format: int32
                           type: integer
                         name:
-                          description: Name component name
+                          description: Name reference component name.
                           type: string
                         volumeClaimTemplateNames:
                           description: VolumeClaimTemplateNames which VolumeClaimTemplate
-                            of the component support volumeExpansion
+                            of the component support volumeExpansion.
                           items:
                             type: string
                           type: array
+                      required:
+                      - name
                       type: object
                     type: array
                   restartable:
@@ -550,7 +736,7 @@ spec:
                     type: array
                   upgradable:
                     description: Upgradable whether the cluster supports upgrade.
-                      if multiple appVersions existed, it is true
+                      if multiple appVersions existed, it is true.
                     type: boolean
                   verticalScalable:
                     description: VerticalScalable which components of the cluster
@@ -564,29 +750,40 @@ spec:
                     items:
                       properties:
                         max:
-                          description: Max maximum of replicas when operation is horizontalScaling
+                          description: Max maximum of replicas when operation is horizontalScaling.
+                          format: int32
                           type: integer
                         min:
-                          description: Min minimum of replicas when operation is horizontalScaling,
+                          description: Min minimum of replicas when operation is horizontalScaling.
+                          format: int32
                           type: integer
                         name:
-                          description: Name component name
+                          description: Name reference component name.
                           type: string
                         volumeClaimTemplateNames:
                           description: VolumeClaimTemplateNames which VolumeClaimTemplate
-                            of the component support volumeExpansion
+                            of the component support volumeExpansion.
                           items:
                             type: string
                           type: array
+                      required:
+                      - name
                       type: object
                     type: array
                 type: object
               phase:
-                description: phase - in list of [Running, Failed, Creating, Updating,
-                  Deleting, Deleted]
+                description: 'Phase describe the phase of the cluster. the detail
+                  information of phase is as follows: Creating: creating cluster.
+                  Running: cluster is running, all components is available. Updating:
+                  cluster changes, such as horizontal-scaling/vertical-scaling/restart.
+                  Deleting/Deleted: deleting cluster/cluster is deleted. Failed: cluster
+                  not available. Abnormal: cluster available but some component is
+                  not Abnormal. if the component type is Consensus/Replication, the
+                  Leader/Primary pod is must ready in Abnormal phase.'
                 enum:
                 - Running
                 - Failed
+                - Abnormal
                 - Creating
                 - Updating
                 - Deleting

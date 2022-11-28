@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
@@ -37,7 +38,8 @@ import (
 	//+kubebuilder:scaffold:imports
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	testutil "github.com/apecloud/kubeblocks/internal/testutil"
+	"github.com/apecloud/kubeblocks/controllers/k8score"
+	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -49,6 +51,7 @@ var testEnv *envtest.Environment
 var ctx context.Context
 var cancel context.CancelFunc
 var testCtx testutil.TestContext
+var clusterRecorder record.EventRecorder
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -91,10 +94,11 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
+	clusterRecorder = k8sManager.GetEventRecorderFor("db-cluster-controller")
 	err = (&ClusterReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("db-cluster-controller"),
+		Recorder: clusterRecorder,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -116,6 +120,13 @@ var _ = BeforeSuite(func() {
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("ops-request-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&k8score.StorageClassReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("storage-class-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

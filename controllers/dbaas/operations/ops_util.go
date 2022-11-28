@@ -30,13 +30,14 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// ReconcileActionWithCluster it will be performed when action is done and loop util OpsRequest.status.phase is Succeed.
+// ReconcileActionWithCluster it will be performed when action is done and loop util OpsRequest.status.phase is Succeed/Failed.
 // if OpsRequest.spec.clusterOps is not null, you can use it to OpsBehaviour.ReconcileAction.
-// if true, the operation is execution completed. otherwise, the operation is running.
-func ReconcileActionWithCluster(opsRes *OpsResource) (bool, error) {
+// return the OpsRequest.status.phase
+func ReconcileActionWithCluster(opsRes *OpsResource) (dbaasv1alpha1.Phase, error) {
 	var (
-		opsRequest = opsRes.OpsRequest
-		isChanged  bool
+		opsRequest      = opsRes.OpsRequest
+		isChanged       bool
+		opsRequestPhase = dbaasv1alpha1.RunningPhase
 	)
 	patch := client.MergeFrom(opsRequest.DeepCopy())
 	if opsRequest.Status.Components == nil {
@@ -54,20 +55,28 @@ func ReconcileActionWithCluster(opsRes *OpsResource) (bool, error) {
 	}
 	if isChanged {
 		if err := opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch); err != nil {
-			return false, err
+			return opsRequestPhase, err
 		}
 	}
-	return opsRes.Cluster.Status.Phase == dbaasv1alpha1.RunningPhase, nil
+	switch opsRes.Cluster.Status.Phase {
+	case dbaasv1alpha1.RunningPhase:
+		opsRequestPhase = dbaasv1alpha1.SucceedPhase
+	case dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase:
+		opsRequestPhase = dbaasv1alpha1.FailedPhase
+	}
+	return opsRequestPhase, nil
 }
 
-// ReconcileActionWithComponentOps it will be performed when action is done and loop util OpsRequest.status.phase is Succeed.
+// ReconcileActionWithComponentOps it will be performed when action is done and loop util OpsRequest.status.phase is Succeed/Failed.
 // if OpsRequest.spec.componentOps is not null, you can use it to OpsBehaviour.ReconcileAction.
-// if true, the operation is execution completed. otherwise, the operation is running.
-func ReconcileActionWithComponentOps(opsRes *OpsResource) (bool, error) {
+// return the OpsRequest.status.phase
+func ReconcileActionWithComponentOps(opsRes *OpsResource) (dbaasv1alpha1.Phase, error) {
 	var (
-		opsRequest = opsRes.OpsRequest
-		isOk       = true
-		isChanged  bool
+		opsRequest      = opsRes.OpsRequest
+		isCompleted     = true
+		isChanged       bool
+		isFailed        bool
+		opsRequestPhase = dbaasv1alpha1.RunningPhase
 	)
 	componentNameMap := getAllComponentsNameMap(opsRequest)
 	patch := client.MergeFrom(opsRequest.DeepCopy())
@@ -78,8 +87,11 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource) (bool, error) {
 		if _, ok := componentNameMap[k]; !ok {
 			continue
 		}
-		if v.Phase != dbaasv1alpha1.RunningPhase {
-			isOk = false
+		if !componentIsCompleted(v.Phase) {
+			isCompleted = false
+		}
+		if isFailedPhase(v.Phase) {
+			isFailed = true
 		}
 		if statusComponent, ok := opsRequest.Status.Components[k]; !ok || statusComponent.Phase != v.Phase {
 			isChanged = true
@@ -89,27 +101,47 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource) (bool, error) {
 	}
 	if isChanged {
 		if err := opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch); err != nil {
-			return false, err
+			return opsRequestPhase, err
 		}
 	}
-	return isOk, nil
+	if isFailed {
+		opsRequestPhase = dbaasv1alpha1.FailedPhase
+	} else if isCompleted {
+		opsRequestPhase = dbaasv1alpha1.SucceedPhase
+	}
+	return opsRequestPhase, nil
+}
+
+// componentIsCompleted check whether the component has completed the operation
+func componentIsCompleted(phase dbaasv1alpha1.Phase) bool {
+	return slices.Index([]dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase}, phase) != -1
+}
+
+func isFailedPhase(phase dbaasv1alpha1.Phase) bool {
+	return slices.Index([]dbaasv1alpha1.Phase{dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase}, phase) != -1
 }
 
 // sendEventWhenComponentStatusChanged send an event when OpsRequest.status.components[*].phase is changed
 func sendEventWhenComponentPhaseChanged(opsRes *OpsResource, componentName string, phase dbaasv1alpha1.Phase) {
 	var (
-		tip    string
-		reason string
+		tip       string
+		reason    = dbaasv1alpha1.ReasonStarting
+		eventType = corev1.EventTypeNormal
 	)
-	if phase == dbaasv1alpha1.RunningPhase {
+	switch phase {
+	// component is running
+	case dbaasv1alpha1.RunningPhase:
 		tip = "Successfully"
 		reason = dbaasv1alpha1.ReasonSuccessful
-	} else {
-		reason = dbaasv1alpha1.ReasonStarting
+		// component is failed
+	case dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase:
+		tip = "Failed"
+		reason = dbaasv1alpha1.ReasonComponentFailed
+		eventType = corev1.EventTypeWarning
 	}
 	message := fmt.Sprintf("%s %s component: %s in Cluster: %s",
 		tip, opsRes.OpsRequest.Spec.Type, componentName, opsRes.OpsRequest.Spec.ClusterRef)
-	opsRes.Recorder.Event(opsRes.OpsRequest, corev1.EventTypeNormal, reason, message)
+	opsRes.Recorder.Event(opsRes.OpsRequest, eventType, reason, message)
 }
 
 // PatchOpsStatus patch OpsRequest.status
@@ -212,7 +244,7 @@ func getAllComponentsNameMap(opsRequest *dbaasv1alpha1.OpsRequest) map[string]*d
 	componentNameMap := make(map[string]*dbaasv1alpha1.ComponentOps)
 	for _, componentOps := range opsRequest.Spec.ComponentOpsList {
 		for _, v := range componentOps.ComponentNames {
-			componentNameMap[v] = componentOps
+			componentNameMap[v] = &componentOps
 		}
 	}
 	return componentNameMap

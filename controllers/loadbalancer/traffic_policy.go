@@ -47,8 +47,8 @@ func (c ClusterTrafficPolicy) ChooseNode(svc *corev1.Service) (string, error) {
 		return nodeIP, nil
 	}
 
-	subnetId := annotations[AnnotationKeySubnetId]
-	node, err := c.nm.ChooseSpareNode(subnetId)
+	subnetID := annotations[AnnotationKeySubnetID]
+	node, err := c.nm.ChooseSpareNode(subnetID)
 	if err != nil {
 		return "", errors.Wrap(err, "Failed to choose spare node")
 	}
@@ -91,12 +91,12 @@ func (l LocalTrafficPolicy) ChooseNode(svc *corev1.Service) (string, error) {
 	}
 
 	var (
-		svcSubnetId  = svc.GetAnnotations()[AnnotationKeySubnetId]
-		nodeSubnetId = node.GetNodeInfo().GetSubnetId()
+		svcSubnetID  = svc.GetAnnotations()[AnnotationKeySubnetID]
+		nodeSubnetID = node.GetNodeInfo().GetSubnetId()
 	)
 	ctxLog.Info("Choose master pod", "name", getObjectFullName(pod),
-		"svc subnetID", svcSubnetId, "node subnetID", node.GetNodeInfo().GetSubnetId())
-	if svcSubnetId == "" || svcSubnetId == nodeSubnetId {
+		"svc subnet id", svcSubnetID, "node subnet id", node.GetNodeInfo().GetSubnetId())
+	if svcSubnetID == "" || svcSubnetID == nodeSubnetID {
 		return pod.Status.HostIP, nil
 	}
 

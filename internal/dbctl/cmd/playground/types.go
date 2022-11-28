@@ -17,14 +17,13 @@ limitations under the License.
 package playground
 
 import (
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/cluster"
 	"github.com/apecloud/kubeblocks/version"
 )
 
 const (
 	defaultEngine        = "wesql"
 	defaultCloudProvider = "local"
-	DefaultVersion       = "8.0.28"
 	localHost            = "127.0.0.1"
 	defaultReplicas      = 3
 
@@ -50,7 +49,7 @@ var (
 )
 
 type clusterInfo struct {
-	*types.ClusterObjects
+	*cluster.ClusterObjects
 
 	HostPorts     []string
 	HostIP        string

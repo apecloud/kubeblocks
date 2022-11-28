@@ -17,10 +17,7 @@ limitations under the License.
 package types
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
 const (
@@ -41,17 +38,6 @@ const (
 
 	// KubeBlocksChartURL the helm chart for installing kubeblocks
 	KubeBlocksChartURL = "https://apecloud.github.io/helm-charts"
-
-	// PlaygroundSourceName is the playground default operator
-	PlaygroundSourceName = "innodbclusters"
-
-	// BackupJobSourceName is the playground default operator
-	BackupJobSourceName = "backupJobs"
-
-	// RestoreJobSourceName is the playground default operator
-	RestoreJobSourceName = "restoreJobs"
-
-	BackupSnapSourceName = "volumesnapshots"
 )
 
 const (
@@ -100,18 +86,14 @@ const (
 	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/apecloud-loadbalancer-type"
 	ServiceLBTypeAnnotationValue   = "private-ip"
 	ServiceFloatingIPAnnotationKey = "service.kubernetes.io/apecloud-loadbalancer-floating-ip"
+
+	// DataProtection definitions
+	DPGroup                = "dataprotection.kubeblocks.io"
+	DPVersion              = "v1alpha1"
+	ResourceBackupJobs     = "backupjobs"
+	ResourceRestoreJobs    = "restorejobs"
+	ResourceBackupPolicies = "backuppolicies"
 )
-
-type ClusterObjects struct {
-	Cluster    *dbaasv1alpha1.Cluster
-	ClusterDef *dbaasv1alpha1.ClusterDefinition
-	AppVersion *dbaasv1alpha1.AppVersion
-
-	Pods     *corev1.PodList
-	Services *corev1.ServiceList
-	Secrets  *corev1.SecretList
-	Nodes    []*corev1.Node
-}
 
 type BackupJobInfo struct {
 	Name           string
@@ -155,4 +137,16 @@ func AppVersionGVR() schema.GroupVersionResource {
 
 func AppVersionGK() schema.GroupKind {
 	return schema.GroupKind{Group: Group, Kind: KindAppVersion}
+}
+
+func BackupJobGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceBackupJobs}
+}
+
+func RestoreJobGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceRestoreJobs}
+}
+
+func OpsGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceOpsRequests}
 }

@@ -104,10 +104,10 @@ var _ = Describe("lifecycle_utils", func() {
 			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeFalse())
-			Expect(monitorConfig.ScrapePort).To(Equal(0))
+			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(0))
 			Expect(monitorConfig.ScrapePath).To(Equal(""))
 			if component.PodSpec != nil {
-				Expect(len(component.PodSpec.Containers)).To(Equal(0))
+				Expect(len(component.PodSpec.Containers)).To(BeEquivalentTo(0))
 			}
 		})
 
@@ -118,10 +118,10 @@ var _ = Describe("lifecycle_utils", func() {
 			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeTrue())
-			Expect(monitorConfig.ScrapePort).To(Equal(9144))
+			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(9144))
 			Expect(monitorConfig.ScrapePath).To(Equal("/metrics"))
 			if component.PodSpec != nil {
-				Expect(len(component.PodSpec.Containers)).To(Equal(0))
+				Expect(len(component.PodSpec.Containers)).To(BeEquivalentTo(0))
 			}
 		})
 
@@ -133,7 +133,7 @@ var _ = Describe("lifecycle_utils", func() {
 			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeFalse())
-			Expect(monitorConfig.ScrapePort).To(Equal(0))
+			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(0))
 			Expect(monitorConfig.ScrapePath).To(Equal(""))
 			if component.PodSpec != nil {
 				Expect(len(component.PodSpec.Containers)).To(Equal(0))
@@ -148,7 +148,7 @@ var _ = Describe("lifecycle_utils", func() {
 			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeFalse())
-			Expect(monitorConfig.ScrapePort).To(Equal(0))
+			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(0))
 			Expect(monitorConfig.ScrapePath).To(Equal(""))
 			if component.PodSpec != nil {
 				Expect(len(component.PodSpec.Containers)).To(Equal(0))
@@ -164,7 +164,7 @@ var _ = Describe("lifecycle_utils", func() {
 			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeFalse())
-			Expect(monitorConfig.ScrapePort).To(Equal(0))
+			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(0))
 			Expect(monitorConfig.ScrapePath).To(Equal(""))
 			if component.PodSpec != nil {
 				Expect(len(component.PodSpec.Containers)).To(Equal(0))
@@ -180,7 +180,7 @@ var _ = Describe("lifecycle_utils", func() {
 			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeTrue())
-			Expect(monitorConfig.ScrapePort).To(Equal(9104))
+			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(9104))
 			Expect(monitorConfig.ScrapePath).To(Equal("/metrics"))
 			Expect(len(component.PodSpec.Containers)).To(Equal(1))
 			Expect(strings.HasPrefix(component.PodSpec.Containers[0].Name, "inject-")).To(BeTrue())
@@ -206,7 +206,7 @@ var _ = Describe("lifecycle_utils", func() {
 							Containers: []corev1.Container{
 								{
 									Name:            "mysql",
-									Image:           "docker.io/apecloud/wesql-server-8.0:0.1-SNAPSHOT",
+									Image:           "docker.io/apecloud/wesql-server-8.0:0.1.2",
 									ImagePullPolicy: "IfNotPresent",
 									VolumeMounts: []corev1.VolumeMount{
 										{
@@ -258,7 +258,7 @@ var _ = Describe("lifecycle_utils", func() {
 	allFieldsClusterDefObj := func() *dbaasv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
 		clusterDefYAML := `
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
   name: cluster-definition
@@ -336,7 +336,7 @@ spec:
 	allFieldsAppVersionObj := func() *dbaasv1alpha1.AppVersion {
 		By("By assure an appVersion obj")
 		appVerYAML := `
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       AppVersion
 metadata:
   name:     app-version
@@ -350,7 +350,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: registry.jihulab.com/infracreate/mysql-server/mysql/wesql-server-arm:latest
+        image: apecloud/wesql-server:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3306
@@ -471,7 +471,7 @@ spec:
 		}
 
 		clusterYaml := fmt.Sprintf(`
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: %s
@@ -479,6 +479,7 @@ metadata:
 spec:
   clusterDefinitionRef: %s
   appVersionRef: %s
+  terminationPolicy: WipeOut
   components:
   - name: replicasets
     type: replicasets

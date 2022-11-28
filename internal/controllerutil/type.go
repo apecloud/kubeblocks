@@ -32,11 +32,14 @@ const (
 	AppComponentLabelKey           = "app.kubernetes.io/component-name"
 	AppNameLabelKey                = "app.kubernetes.io/name"
 	AppManagedByLabelKey           = "app.kubernetes.io/managed-by"
+	AppConfigTypeLabelKey          = "app.kubernetes.io/config-type"
 	ConsensusSetRoleLabelKey       = "cs.dbaas.kubeblocks.io/role"
 	ConsensusSetAccessModeLabelKey = "cs.dbaas.kubeblocks.io/access-mode"
 
 	// OpsRequestAnnotationKey OpsRequest annotation key in Cluster
 	OpsRequestAnnotationKey = "kubeblocks.io/ops-request"
+	// StorageClassAnnotationKey StorageClass annotation key in Cluster
+	StorageClassAnnotationKey = "kubeblocks.io/storage-class"
 )
 
 const (

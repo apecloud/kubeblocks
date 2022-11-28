@@ -76,15 +76,32 @@ var _ = Describe("Expose", func() {
 	}
 
 	Context("Expose cluster and reverse", func() {
-		It("", func() {
-			tf := cmdtesting.NewTestFactory().WithNamespace(namespace)
-			defer tf.Cleanup()
+		var tf *cmdtesting.TestFactory
+		var streams genericclioptions.IOStreams
 
+		BeforeEach(func() {
+			tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
+			streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		})
+
+		AfterEach(func() {
+			defer tf.Cleanup()
+		})
+
+		It("expose command", func() {
+			cmd := NewExposeCmd(tf, streams)
+			Expect(cmd).ShouldNot(BeNil())
+		})
+
+		It("Expose cluster and reverse", func() {
 			var (
-				streams, _, _, _ = genericclioptions.NewTestIOStreams()
-				o                = &ExposeOptions{IOStreams: streams}
-				objs             []runtime.Object
+				o    = &ExposeOptions{IOStreams: streams}
+				objs []runtime.Object
 			)
+			Expect(o.Validate([]string{})).Should(HaveOccurred())
+			Expect(o.Validate([]string{clusterName})).Should(HaveOccurred())
+			o.on = true
+			Expect(o.Validate([]string{clusterName})).Should(Succeed())
 			Expect(o.Complete(tf, []string{clusterName})).Should(Succeed())
 
 			clusterObj := newUnstructured(fmt.Sprintf("%s/%s", types.Group, types.Version), types.KindCluster, namespace, clusterName, nil, nil)

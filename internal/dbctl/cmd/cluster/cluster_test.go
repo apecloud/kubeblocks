@@ -47,7 +47,6 @@ var _ = Describe("Cluster", func() {
 		It("new command", func() {
 			tf := cmdtesting.NewTestFactory().WithNamespace("default")
 			defer tf.Cleanup()
-			tf.ClientConfigVal = cfg
 			cmd := NewCreateCmd(tf, streams)
 			Expect(cmd).ShouldNot(BeNil())
 			Expect(cmd.Flags().GetString("termination-policy")).Should(Equal(""))
@@ -61,7 +60,6 @@ var _ = Describe("Cluster", func() {
 		It("run", func() {
 			tf := cmdtesting.NewTestFactory().WithNamespace("default")
 			defer tf.Cleanup()
-			tf.ClientConfigVal = cfg
 
 			o := &CreateOptions{
 				BaseOptions:        create.BaseOptions{IOStreams: streams, Name: "test"},
@@ -119,7 +117,6 @@ var _ = Describe("Cluster", func() {
 
 	It("operations", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		tf.ClientConfigVal = cfg
 		defer tf.Cleanup()
 		o := &OperationsOptions{
 			BaseOptions:            create.BaseOptions{IOStreams: streams},
@@ -159,7 +156,6 @@ var _ = Describe("Cluster", func() {
 
 	It("list and delete operations", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		tf.ClientConfigVal = cfg
 		defer tf.Cleanup()
 
 		clusterName := "wesql"

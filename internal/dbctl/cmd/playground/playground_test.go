@@ -71,6 +71,7 @@ var _ = Describe("playground", func() {
 			IOStreams: streams,
 		}
 		Expect(o.destroyPlayground()).Should(HaveOccurred())
+		_, _ = removePlaygroundDir()
 	})
 
 	It("guide", func() {

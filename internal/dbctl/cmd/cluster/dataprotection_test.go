@@ -17,6 +17,7 @@ limitations under the License.
 package cluster
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -49,7 +50,6 @@ var _ = Describe("DataProtection", func() {
 		It("new command", func() {
 			tf := cmdtesting.NewTestFactory().WithNamespace("default")
 			defer tf.Cleanup()
-			tf.ClientConfigVal = cfg
 			cmd := NewCreateBackupCmd(tf, streams)
 			Expect(cmd).ShouldNot(BeNil())
 			// must succeed otherwise exit 1 and make test fails
@@ -171,7 +171,7 @@ var _ = Describe("DataProtection", func() {
 		// mock labels backup
 		labels := fmt.Sprintf(`{"metadata":{"labels": {"app.kubernetes.io/instance":"%s"}}}`, clusterName)
 		patchByte := []byte(labels)
-		_, _ = tf.FakeDynamicClient.Resource(types.BackupJobGVR()).Namespace("default").Patch(ctx, backupName,
+		_, _ = tf.FakeDynamicClient.Resource(types.BackupJobGVR()).Namespace("default").Patch(context.TODO(), backupName,
 			k8sapitypes.MergePatchType, patchByte, metav1.PatchOptions{})
 
 		// create restore cluster

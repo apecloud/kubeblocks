@@ -54,12 +54,11 @@ func (w *WeSQL) Install(replicas int, name string, namespace string) error {
 		return err
 	}
 	componentPath := filepath.Join(playgroundDir, "component.yaml")
-	if err := os.WriteFile(componentPath, []byte(fmt.Sprintf(component, replicas)), 0600); err != nil {
+	if err = os.WriteFile(componentPath, []byte(fmt.Sprintf(component, replicas)), 0600); err != nil {
 		return err
 	}
 
-	factory := util.NewFactory()
-	dynamicClient, err := factory.DynamicClient()
+	dynamicClient, err := util.NewFactory().DynamicClient()
 	if err != nil {
 		return err
 	}
@@ -76,7 +75,7 @@ func (w *WeSQL) Install(replicas int, name string, namespace string) error {
 		ComponentsFilePath: componentPath,
 	}
 
-	if err := options.Complete(); err != nil {
+	if err = options.Complete(); err != nil {
 		return err
 	}
 

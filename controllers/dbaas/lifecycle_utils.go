@@ -1110,6 +1110,7 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 			"_PODIPS":    "status.podIPs",
 		}
 		// sort the map keys, different order of envs will cause pods restart
+		// TODO: should add testcase to test pod restart
 		var keyArr []string
 		for k, _ := range envMap {
 			keyArr = append(keyArr, k)

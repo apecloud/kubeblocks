@@ -100,8 +100,9 @@ func (w *TestWrapper) CreateCluster(name string) *dbaasv1alpha1.Cluster {
 			Namespace: w.testEnv.Namespace,
 		},
 		Spec: dbaasv1alpha1.ClusterSpec{
-			ClusterDefRef: w.testEnv.CdName,
-			AppVersionRef: w.testEnv.AvName,
+			ClusterDefRef:     w.testEnv.CdName,
+			AppVersionRef:     w.testEnv.AvName,
+			TerminationPolicy: dbaasv1alpha1.Delete,
 		},
 	}
 

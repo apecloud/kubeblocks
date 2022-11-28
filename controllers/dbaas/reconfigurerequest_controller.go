@@ -28,7 +28,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -114,45 +113,13 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 	return r.sync(reqCtx, config, tpl)
 }
 
-type ResourceConfigMapWithLabelPredicate struct {
-	// hook default interface func
-	predicate.Funcs
-}
-
-func (r *ResourceConfigMapWithLabelPredicate) Create(createEvent event.CreateEvent) bool {
-	return checkConfigurationObject(createEvent.Object)
-}
-
-func (r *ResourceConfigMapWithLabelPredicate) Update(updateEvent event.UpdateEvent) bool {
-	return checkConfigurationObject(updateEvent.ObjectNew)
-}
-
-func (r *ResourceConfigMapWithLabelPredicate) Delete(deleteEvent event.DeleteEvent) bool {
-	return checkConfigurationObject(deleteEvent.Object)
-}
-
-func (r *ResourceConfigMapWithLabelPredicate) Generic(genericEvent event.GenericEvent) bool {
-	return checkConfigurationObject(genericEvent.Object)
-}
-
-// type EnqueueRequestForConfigmap struct {
-//	// hook default interface func
-//	handler.Funcs
-// }
-//
-//// Update process reconfigure
-// func (e *EnqueueRequestForConfigmap) Update(event event.UpdateEvent, limitingInterface workqueue.RateLimitingInterface) {
-//	//TODO implement me
-//	panic("implement me")
-// }
-
 // SetupWithManager sets up the controller with the Manager.
 func (r *ReconfigureRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.ConfigMap{}).
 		// Watches(&source.Kind{Type: &dbaasv1alpha1.ReconfigureRequest{}},
 		//	&handler.EnqueueRequestForOwner{}).
-		WithEventFilter(&ResourceConfigMapWithLabelPredicate{}).
+		WithEventFilter(predicate.NewPredicateFuncs(checkConfigurationObject)).
 		Complete(r)
 }
 

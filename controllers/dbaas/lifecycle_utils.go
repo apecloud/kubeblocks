@@ -765,7 +765,6 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				case dbaasv1alpha1.Backup:
 					// TODO: db core not support yet, leave it empty
 					reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeWarning, "HorizontalScaleFailed", "scale with backup tool not support yet")
-					break
 				// use volume snapshot
 				case dbaasv1alpha1.Snapshot:
 					if isSnapshotAvailable(cli, ctx) && len(stsObj.Spec.VolumeClaimTemplates) > 0 {
@@ -835,29 +834,27 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 				return &res, err
 			}
-			switch component.HorizontalScalePolicy {
-			case dbaasv1alpha1.Snapshot:
-				if isSnapshotAvailable(cli, ctx) {
-					allPVCBound, err := isAllPVCBound(cli, ctx, stsObj)
-					if err != nil {
+			if component.HorizontalScalePolicy == dbaasv1alpha1.Snapshot &&
+				isSnapshotAvailable(cli, ctx) {
+				allPVCBound, err := isAllPVCBound(cli, ctx, stsObj)
+				if err != nil {
+					res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+					return &res, err
+				}
+				if allPVCBound {
+					// if all pvc bounded, clean backup resources
+					if err := deleteSnapshot(cli, reqCtx, snapshotKey, stsObj); err != nil {
 						res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 						return &res, err
 					}
-					if allPVCBound {
-						// if all pvc bounded, clean backup resources
-						if err := deleteSnapshot(cli, reqCtx, snapshotKey, stsObj); err != nil {
-							res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-							return &res, err
-						}
-					} else {
-						// requeue waiting pvc phase become bound
-						res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
-						if err != nil {
-							return &res, err
-						}
-						result = &res
-						continue
+				} else {
+					// requeue waiting pvc phase become bound
+					res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
+					if err != nil {
+						return &res, err
 					}
+					result = &res
+					continue
 				}
 			}
 
@@ -1117,7 +1114,7 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 		// sort the map keys, different order of envs will cause pods restart
 		// TODO: should add testcase to test pod restart
 		var keyArr []string
-		for k, _ := range envMap {
+		for k := range envMap {
 			keyArr = append(keyArr, k)
 		}
 		sort.Strings(keyArr)
@@ -1756,13 +1753,6 @@ const (
 	MaxGeneratedNameLength = maxNameLength - randomLength
 )
 
-func generateName(base string) string {
-	if len(base) > MaxGeneratedNameLength {
-		base = base[:MaxGeneratedNameLength]
-	}
-	return fmt.Sprintf("%s%s", base, time.Now().Format("20060102150405"))
-}
-
 func buildVolumeSnapshot(snapshotKey types.NamespacedName, pvcName string, sts appsv1.StatefulSet) (*snapshotv1.VolumeSnapshot, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
@@ -1810,10 +1800,7 @@ func buildVolumeSnapshot(snapshotKey types.NamespacedName, pvcName string, sts a
 func isSnapshotAvailable(cli client.Client, ctx context.Context) bool {
 	vsList := snapshotv1.VolumeSnapshotList{}
 	getVSErr := cli.List(ctx, &vsList)
-	if getVSErr != nil {
-		return false
-	}
-	return true
+	return getVSErr == nil
 }
 
 // check snapshot existence
@@ -1823,7 +1810,7 @@ func isVolumeSnapshotExists(cli client.Client, ctx context.Context, snapshotKey 
 		if apierrors.IsNotFound(err) {
 			return false, nil
 		} else {
-			return false, nil
+			return false, err
 		}
 	}
 	return true, nil
@@ -1836,7 +1823,7 @@ func isVolumeSnapshotReadyToUse(cli client.Client, ctx context.Context, snapshot
 		if apierrors.IsNotFound(err) {
 			return false, nil
 		} else {
-			return false, nil
+			return false, err
 		}
 	}
 	return *vs.Status.ReadyToUse, nil

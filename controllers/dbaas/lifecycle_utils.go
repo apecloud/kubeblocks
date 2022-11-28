@@ -767,59 +767,17 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 					break
 				// use volume snapshot
 				case dbaasv1alpha1.Snapshot:
-					vsList := snapshotv1.VolumeSnapshotList{}
-					getVSErr := cli.List(ctx, &vsList)
-					// check volume snapshot available
-					if getVSErr == nil && len(stsObj.Spec.VolumeClaimTemplates) > 0 {
-						// check snapshot existence
-						vsNotFound := false
-						vs := snapshotv1.VolumeSnapshot{}
-						if err := cli.Get(ctx, snapshotKey, &vs); err != nil {
-							if apierrors.IsNotFound(err) {
-								vsNotFound = true
-							} else {
-								res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-								return &res, err
-							}
+					if isSnapshotAvailable(cli, ctx) && len(stsObj.Spec.VolumeClaimTemplates) > 0 {
+						vsExists, err := isVolumeSnapshotExists(cli, ctx, snapshotKey)
+						if err != nil {
+							res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+							return &res, err
 						}
-						if vsNotFound {
-							ml := client.MatchingLabels{
-								clusterDefLabelKey: cluster.Spec.ClusterDefRef,
-							}
-							backupPolicyTemplateList := dataprotectionv1alpha1.BackupPolicyTemplateList{}
-							// find backuppolicytemplate by clusterdefinition
-							if err := cli.List(ctx, &backupPolicyTemplateList, ml); err != nil {
+						if !vsExists {
+							// if volumesnapshot not exist, do snapshot to create it.
+							if err := doSnapshot(cli, reqCtx, cluster, snapshotKey, stsObj); err != nil {
 								res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 								return &res, err
-							}
-							if len(backupPolicyTemplateList.Items) > 0 {
-								// if there is backuppolicytemplate created by provider
-								// create backupjob CR, will ignore error if already exists
-								err := createBackup(ctx, cli, *stsObj, backupPolicyTemplateList.Items[0], snapshotKey, cluster)
-								if err != nil {
-									res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-									return &res, err
-								}
-								reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "BackupJobCreate", "Create backup job")
-							} else {
-								// no backuppolicytemplate, then try native volumesnapshot
-								pvcName := strings.Join([]string{stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, "0"}, "-")
-								snapshot, err := buildVolumeSnapshot(snapshotKey, pvcName, *stsObj)
-								if err != nil {
-									res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-									return &res, err
-								}
-								if err := cli.Create(ctx, snapshot); err != nil {
-									if !apierrors.IsAlreadyExists(err) {
-										res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-										return &res, err
-									}
-								}
-								if err := controllerutil.SetOwnerReference(cluster, snapshot, scheme); err != nil {
-									res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-									return &res, err
-								}
-								reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create native volume snapshot")
 							}
 							res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
 							if err != nil {
@@ -828,30 +786,27 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 							result = &res
 							continue
 						} else {
-							// check snapshot status
-							if *vs.Status.ReadyToUse {
-								vct := stsObj.Spec.VolumeClaimTemplates[0]
-								// create pvc from snapshot
+							// volumesnapshot exists, then check if it is ready to use.
+							ready, err := isVolumeSnapshotReadyToUse(cli, ctx, snapshotKey)
+							if err != nil {
+								res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+								return &res, err
+							}
+							if ready {
+								// if volumesnapshot ready
+								// create pvc from snapshot for every new pod
 								for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
 									pvcKey := types.NamespacedName{
 										Namespace: key.Namespace,
-										Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
+										Name:      fmt.Sprintf("%s-%s-%d", stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, i),
 									}
-									pvc := corev1.PersistentVolumeClaim{}
-									// check pvc existence
-									if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
-										if apierrors.IsNotFound(err) {
-											if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, snapshotKey.Name); err != nil {
-												res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-												return &res, err
-											}
-										} else {
-											res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-											return &res, err
-										}
+									if err := checkedCreatePVCFromSnapshot(cli, ctx, pvcKey, snapshotKey, stsObj); err != nil {
+										res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+										return &res, err
 									}
 								}
 							} else {
+								// volumesnapshot not ready, wait for it to be ready by reconciling.
 								res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
 								if err != nil {
 									return &res, err
@@ -879,52 +834,19 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 				return &res, err
 			}
-			vct := stsObj.Spec.VolumeClaimTemplates[0]
-			// check all pvc ready
-			allPVCBound := true
-			for i := 0; i < int(*stsObj.Spec.Replicas); i++ {
-				pvcKey := types.NamespacedName{
-					Namespace: key.Namespace,
-					Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
-				}
-				pvc := corev1.PersistentVolumeClaim{}
-				// check pvc existence
-				if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
+			allPVCBound, err := isAllPVCBound(cli, ctx, stsObj)
+			if err != nil {
+				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+				return &res, err
+			}
+			if allPVCBound {
+				// if all pvc bounded, clean backup resources
+				if err := deleteSnapshot(cli, reqCtx, snapshotKey, stsObj); err != nil {
 					res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 					return &res, err
 				}
-				if pvc.Status.Phase != corev1.ClaimBound {
-					allPVCBound = false
-				}
-			}
-			if allPVCBound {
-				// clean backup resources
-				if err := deleteBackup(ctx, cli, snapshotKey); err != nil {
-					if !apierrors.IsNotFound(err) {
-						res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-						return &res, err
-					}
-				} else {
-					reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "BackupJobDelete", "")
-				}
-				vs := snapshotv1.VolumeSnapshot{}
-				if err := cli.Get(ctx, snapshotKey, &vs); err != nil {
-					if !apierrors.IsNotFound(err) {
-						res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-						return &res, err
-					}
-				} else {
-					if err := cli.Delete(ctx, &vs); err != nil {
-						if !apierrors.IsNotFound(err) {
-							res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-							return &res, err
-						}
-					} else {
-						reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "VolumeSnapshotDelete", "")
-					}
-				}
 			} else {
-				// requeue waiting pvc phase bound
+				// requeue waiting pvc phase become bound
 				res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
 				if err != nil {
 					return &res, err
@@ -1867,4 +1789,141 @@ func buildVolumeSnapshot(snapshotKey types.NamespacedName, pvcName string, sts a
 	}
 
 	return &snapshot, nil
+}
+
+// check volume snapshot available
+func isSnapshotAvailable(cli client.Client, ctx context.Context) bool {
+	vsList := snapshotv1.VolumeSnapshotList{}
+	getVSErr := cli.List(ctx, &vsList)
+	if getVSErr != nil {
+		return false
+	}
+	return true
+}
+
+// check snapshot existence
+func isVolumeSnapshotExists(cli client.Client, ctx context.Context, snapshotKey types.NamespacedName) (bool, error) {
+	vs := snapshotv1.VolumeSnapshot{}
+	if err := cli.Get(ctx, snapshotKey, &vs); err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		} else {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+// check snapshot ready to use
+func isVolumeSnapshotReadyToUse(cli client.Client, ctx context.Context, snapshotKey types.NamespacedName) (bool, error) {
+	vs := snapshotv1.VolumeSnapshot{}
+	if err := cli.Get(ctx, snapshotKey, &vs); err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		} else {
+			return false, nil
+		}
+	}
+	return *vs.Status.ReadyToUse, nil
+}
+
+func doSnapshot(cli client.Client, reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster, snapshotKey types.NamespacedName, stsObj *appsv1.StatefulSet) error {
+
+	ctx := reqCtx.Ctx
+
+	ml := client.MatchingLabels{
+		clusterDefLabelKey: cluster.Spec.ClusterDefRef,
+	}
+	backupPolicyTemplateList := dataprotectionv1alpha1.BackupPolicyTemplateList{}
+	// find backuppolicytemplate by clusterdefinition
+	if err := cli.List(ctx, &backupPolicyTemplateList, ml); err != nil {
+		return err
+	}
+	if len(backupPolicyTemplateList.Items) > 0 {
+		// if there is backuppolicytemplate created by provider
+		// create backupjob CR, will ignore error if already exists
+		err := createBackup(ctx, cli, *stsObj, backupPolicyTemplateList.Items[0], snapshotKey, cluster)
+		if err != nil {
+			return err
+		}
+		reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "BackupJobCreate", "Create backup job")
+	} else {
+		// no backuppolicytemplate, then try native volumesnapshot
+		pvcName := strings.Join([]string{stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, "0"}, "-")
+		snapshot, err := buildVolumeSnapshot(snapshotKey, pvcName, *stsObj)
+		if err != nil {
+			return err
+		}
+		if err := cli.Create(ctx, snapshot); err != nil {
+			if !apierrors.IsAlreadyExists(err) {
+				return err
+			}
+		}
+		scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
+		if err := controllerutil.SetOwnerReference(cluster, snapshot, scheme); err != nil {
+			return err
+		}
+		reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create native volume snapshot")
+	}
+	return nil
+}
+
+func checkedCreatePVCFromSnapshot(cli client.Client, ctx context.Context, pvcKey types.NamespacedName, snapshotKey types.NamespacedName, stsObj *appsv1.StatefulSet) error {
+	pvc := corev1.PersistentVolumeClaim{}
+	// check pvc existence
+	if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
+		if apierrors.IsNotFound(err) {
+			if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, snapshotKey.Name); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	return nil
+}
+
+func isAllPVCBound(cli client.Client, ctx context.Context, stsObj *appsv1.StatefulSet) (bool, error) {
+	allPVCBound := true
+	for i := 0; i < int(*stsObj.Spec.Replicas); i++ {
+		pvcKey := types.NamespacedName{
+			Namespace: stsObj.Namespace,
+			Name:      fmt.Sprintf("%s-%s-%d", stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, i),
+		}
+		pvc := corev1.PersistentVolumeClaim{}
+		// check pvc existence
+		if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
+			return false, err
+		}
+		if pvc.Status.Phase != corev1.ClaimBound {
+			allPVCBound = false
+		}
+	}
+	return allPVCBound, nil
+}
+
+func deleteSnapshot(cli client.Client, reqCtx intctrlutil.RequestCtx, snapshotKey types.NamespacedName, stsObj *appsv1.StatefulSet) error {
+	ctx := reqCtx.Ctx
+	if err := deleteBackup(ctx, cli, snapshotKey); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+	} else {
+		reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "BackupJobDelete", "")
+	}
+	vs := snapshotv1.VolumeSnapshot{}
+	if err := cli.Get(ctx, snapshotKey, &vs); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+	} else {
+		if err := cli.Delete(ctx, &vs); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return err
+			}
+		} else {
+			reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "VolumeSnapshotDelete", "")
+		}
+	}
+	return nil
 }

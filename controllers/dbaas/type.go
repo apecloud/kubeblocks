@@ -39,10 +39,13 @@ const (
 	clusterDefLabelKey         = "clusterdefinition.kubeblocks.io/name"
 	appVersionLabelKey         = "appversion.kubeblocks.io/name"
 	statefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
+	CSRoleChangedAnnotKey      = "cs.kubeblocks.io/event-handled"
 
 	DeploymentKind  = "Deployment"
 	StatefulSetKind = "StatefulSet"
 	PodKind         = "Pod"
+
+	CSRoleChangedAnnotHandled = "true"
 )
 
 type MonitorConfig struct {

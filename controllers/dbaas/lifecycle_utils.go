@@ -748,17 +748,17 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				Namespace: stsObj.Namespace,
 				Name:      stsObj.Name + "-scaling",
 			}
+			// find component of current statefulset
+			var component dbaasv1alpha1.ClusterDefinitionComponent
+			for _, comp := range clusterDef.Spec.Components {
+				if comp.TypeName == stsObj.Labels[intctrlutil.AppComponentLabelKey] {
+					component = comp
+					break
+				}
+			}
 			// when horizontal scaling up, sometimes db needs backup to sync data from master, log is not reliable enough since it can be recycled
 			if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
 				reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "HorizontalScale", "Start horizontal scale from %d to %d", *stsObj.Spec.Replicas, *stsProto.Spec.Replicas)
-				var component dbaasv1alpha1.ClusterDefinitionComponent
-				// find component of current statefulset
-				for _, comp := range clusterDef.Spec.Components {
-					if comp.TypeName == stsObj.Labels[intctrlutil.AppComponentLabelKey] {
-						component = comp
-						break
-					}
-				}
 				// do backup according to component's horizontal scale policy
 				switch component.HorizontalScalePolicy {
 				// use backup tool such as xtrabackup
@@ -835,25 +835,30 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 				return &res, err
 			}
-			allPVCBound, err := isAllPVCBound(cli, ctx, stsObj)
-			if err != nil {
-				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-				return &res, err
-			}
-			if allPVCBound {
-				// if all pvc bounded, clean backup resources
-				if err := deleteSnapshot(cli, reqCtx, snapshotKey, stsObj); err != nil {
-					res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-					return &res, err
+			switch component.HorizontalScalePolicy {
+			case dbaasv1alpha1.Snapshot:
+				if isSnapshotAvailable(cli, ctx) {
+					allPVCBound, err := isAllPVCBound(cli, ctx, stsObj)
+					if err != nil {
+						res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+						return &res, err
+					}
+					if allPVCBound {
+						// if all pvc bounded, clean backup resources
+						if err := deleteSnapshot(cli, reqCtx, snapshotKey, stsObj); err != nil {
+							res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+							return &res, err
+						}
+					} else {
+						// requeue waiting pvc phase become bound
+						res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
+						if err != nil {
+							return &res, err
+						}
+						result = &res
+						continue
+					}
 				}
-			} else {
-				// requeue waiting pvc phase become bound
-				res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
-				if err != nil {
-					return &res, err
-				}
-				result = &res
-				continue
 			}
 
 			// check stsObj.Spec.VolumeClaimTemplates storage
@@ -1895,6 +1900,9 @@ func checkedCreatePVCFromSnapshot(cli client.Client, ctx context.Context, pvcKey
 
 func isAllPVCBound(cli client.Client, ctx context.Context, stsObj *appsv1.StatefulSet) (bool, error) {
 	allPVCBound := true
+	if len(stsObj.Spec.VolumeClaimTemplates) == 0 {
+		return true, nil
+	}
 	for i := 0; i < int(*stsObj.Spec.Replicas); i++ {
 		pvcKey := types.NamespacedName{
 			Namespace: stsObj.Namespace,

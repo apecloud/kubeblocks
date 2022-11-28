@@ -215,14 +215,18 @@ spec:
                       type: integer
                     horizontalScalePolicy:
                       default: None
-                      description: 'None: default policy, do nothing. Snapshot: do
-                        native volume snapshot before scaling and restore to newly
-                        scaled pods. Notice that ''Snapshot'' policy will only take
-                        snapshot on the first volumeMount of first container you defined
-                        (i.e. clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]),
+                      description: 'horizontalScalePolicy controls what kind of data
+                        synchronization do when component scale up. Policy is in enum
+                        of {None, Snapshot, Backup}. The default policy is `None`.
+                        None: Default policy, do nothing. Snapshot: Do native volume
+                        snapshot before scaling and restore to newly scaled pods.
+                        Notice that ''Snapshot'' policy will only take snapshot on
+                        the first volumeMount of first container you defined (i.e.
+                        clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]),
                         since take multiple snapshots at one time might cause consistency
-                        problem. Backup: use backup policy in backuppolicytemplate
-                        to handle data recovery when scaling.'
+                        problem. Backup: Use backup policy in backuppolicytemplate
+                        to handle data recovery when scaling. Not support yet. Do
+                        not use it.'
                       enum:
                       - None
                       - Snapshot

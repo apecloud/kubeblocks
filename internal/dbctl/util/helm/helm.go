@@ -361,7 +361,7 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 	client.Namespace = i.Namespace
 	client.Wait = i.Wait
 	client.Timeout = time.Second * 300
-	client.Version = i.Version
+	client.Version = res.Chart.AppVersion()
 	client.ReuseValues = true
 
 	cp, err := client.ChartPathOptions.LocateChart(i.Chart, settings)

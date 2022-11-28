@@ -11,10 +11,10 @@ dbctl cluster vertical-scaling [flags]
 ```
       --component-names strings       Component names to this operations (required)
   -h, --help                         help for vertical-scaling
-      --limits.cpu string            Cpu size limited by the component
+      --limits.cpu string            CPU size limited by the component
       --limits.memory string         Memory size limited by the component
       --name string                  OpsRequest name. if not specified, it will be randomly generated 
-      --requests.cpu string          Cpu size requested by the component
+      --requests.cpu string          CPU size requested by the component
       --requests.memory string       Memory size requested by the component
       --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
 ```
@@ -25,7 +25,7 @@ dbctl cluster vertical-scaling [flags]
       --as string                      Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
       --as-group stringArray           Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
       --as-uid string                  UID to impersonate for the operation.
-      --cache-dir string               Default cache directory (default "/Users/ldm/.kube/cache")
+      --cache-dir string               Default cache directory (default "$HOME/.kube/cache")
       --certificate-authority string   Path to a cert file for the certificate authority
       --client-certificate string      Path to a client certificate file for TLS
       --client-key string              Path to a client key file for TLS

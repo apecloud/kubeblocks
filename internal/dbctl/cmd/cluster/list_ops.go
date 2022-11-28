@@ -17,50 +17,21 @@ limitations under the License.
 package cluster
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/get"
 	"github.com/apecloud/kubeblocks/internal/dbctl/cmd/list"
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/builder"
 )
 
-func NewOpsListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewListOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	return builder.NewCmdBuilder().
 		Use("list-ops").
 		Short("List all opsRequest.").
 		Factory(f).
 		GVR(types.OpsGVR()).
-		CustomComplete(completeForListOps).
 		IOStreams(streams).
 		Build(list.Build)
-}
-
-// completeForListOps complete the cmd for list OpsRequest
-func completeForListOps(option interface{}, args []string) error {
-	var (
-		o  *get.Options
-		ok bool
-	)
-	if o, ok = option.(*get.Options); !ok {
-		return nil
-	}
-	if len(args) == 0 {
-		return nil
-	}
-	if len(args) > 1 {
-		return fmt.Errorf("only supported list the OpsRequests of one cluster")
-	}
-	// if cluster name is not nil, covert to label for list OpsRequest
-	labelString := fmt.Sprintf("%s=%s", types.InstanceLabelKey, args[0])
-	if len(o.LabelSelector) == 0 {
-		o.LabelSelector = labelString
-	} else {
-		o.LabelSelector += "," + labelString
-	}
-	return nil
 }

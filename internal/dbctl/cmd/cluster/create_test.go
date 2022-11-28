@@ -18,10 +18,13 @@ package cluster
 
 import (
 	"encoding/json"
+	"os"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
@@ -108,5 +111,22 @@ spec:
 		_ = yaml.Unmarshal([]byte(clusterByte), cluster)
 		setEnableAllLogs(cluster, clusterDef)
 		Expect(len(cluster.Spec.Components[0].EnabledLogs)).Should(Equal(2))
+	})
+	Context("multipleSourceComponent Test", func() {
+		defer GinkgoRecover()
+		fileName := "https://kubernetes.io/docs/tasks/debug/"
+		streams := genericclioptions.IOStreams{
+			In:     os.Stdin,
+			Out:    os.Stdout,
+			ErrOut: os.Stdout,
+		}
+		bytes, err := multipleSourceComponents(fileName, streams)
+		Expect(bytes).ShouldNot(BeNil())
+		Expect(err).ShouldNot(HaveOccurred())
+		// corner case for no existing local file
+		fileName = "no-existing-file"
+		bytes, err = multipleSourceComponents(fileName, streams)
+		Expect(bytes).Should(BeNil())
+		Expect(err).Should(HaveOccurred())
 	})
 })

@@ -30,6 +30,7 @@ var (
 // RegisterOps register operation with OpsType and OpsBehaviour
 func (opsMgr *OpsManager) RegisterOps(opsType dbaasv1alpha1.OpsType, opsBehaviour *OpsBehaviour) {
 	opsManager.OpsMap[opsType] = opsBehaviour
+	dbaasv1alpha1.ClusterPhasesMapperForOps[opsType] = opsBehaviour.FromClusterPhases
 }
 
 // Do the common entry function for handling OpsRequest

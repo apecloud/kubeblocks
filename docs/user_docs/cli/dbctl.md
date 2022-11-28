@@ -31,7 +31,7 @@ dbctl [flags]
       --as string                      Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
       --as-group stringArray           Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
       --as-uid string                  UID to impersonate for the operation.
-      --cache-dir string               Default cache directory (default "/Users/ldm/.kube/cache")
+      --cache-dir string               Default cache directory (default "$HOME/.kube/cache")
       --certificate-authority string   Path to a cert file for the certificate authority
       --client-certificate string      Path to a client certificate file for TLS
       --client-key string              Path to a client key file for TLS
@@ -51,7 +51,7 @@ dbctl [flags]
 
 ### SEE ALSO
 
-* [dbctl backup](dbctl_backup.md)	 - backup operation command
+* [dbctl backup-config](dbctl_backup-config.md)	 - KubeBlocks backup config
 * [dbctl bench](dbctl_bench.md)	 - Run a benchmark
 * [dbctl cluster](dbctl_cluster.md)	 - Database cluster operation command
 * [dbctl kubeblocks](dbctl_kubeblocks.md)	 - KubeBlocks operation commands

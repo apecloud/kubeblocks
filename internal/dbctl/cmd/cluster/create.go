@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strings"
 
@@ -54,7 +56,27 @@ var example = templates.Examples(`
 
 	# In scenarios where you want to delete all resources including all snapshots and snapshot data when deleting
 	# the cluster, use termination policy WipeOut
-	dbctl cluster create mycluster --components=component.yaml --termination-policy=WipeOut`)
+	dbctl cluster create mycluster --components=component.yaml --termination-policy=WipeOut
+
+	# In scenarios where you want to load components data from website URL
+	# the cluster, use termination policy Halt
+	dbctl cluster create mycluster --components=http://kubeblocks.io/yamls/wesql_single.yaml --termination-policy=Halt
+
+	# In scenarios where you want to load components data from stdin
+	# the cluster, use termination policy Halt
+	cat << EOF | dbctl cluster create mycluster --termination-policy=Halt --components -
+	- name: wesql-test... (omission from stdin)
+
+	# Create a cluster forced to scatter by node
+	dbctl cluster create --topology-keys=kubernetes.io/hostname --pod-anti-affinity=Required
+
+	# Create a cluster in specific labels nodes
+	dbctl cluster create --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'
+
+	# Create a Cluster with two tolerations 
+	dbctl cluster create --tolerations='"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
+
+`)
 
 const (
 	DefaultClusterDef = "apecloud-wesql"
@@ -76,13 +98,13 @@ type CreateOptions struct {
 	// because CueLang can not covert null to list.
 	TopologyKeys []string                 `json:"topologyKeys,omitempty"`
 	NodeLabels   map[string]string        `json:"nodeLabels,omitempty"`
+	Tolerations  []map[string]string      `json:"tolerations,omitempty"`
 	Components   []map[string]interface{} `json:"components"`
 	// ComponentsFilePath components file path
-	ComponentsFilePath string `json:"-"`
-
+	ComponentsFilePath string   `json:"-"`
+	TolerationsRaw     []string `json:"-"`
 	// backup name to restore in creation
 	Backup string `json:"backup,omitempty"`
-
 	create.BaseOptions
 }
 
@@ -139,7 +161,7 @@ func (o *CreateOptions) Validate() error {
 	}
 
 	if len(o.ComponentsFilePath) == 0 {
-		return fmt.Errorf("a valid component file path is needed")
+		return fmt.Errorf("a valid component local file path, URL, or stdin is needed")
 	}
 	return nil
 }
@@ -152,7 +174,7 @@ func (o *CreateOptions) Complete() error {
 	)
 
 	if len(o.ComponentsFilePath) > 0 {
-		if componentByte, err = os.ReadFile(o.ComponentsFilePath); err != nil {
+		if componentByte, err = multipleSourceComponents(o.ComponentsFilePath, o.IOStreams); err != nil {
 			return err
 		}
 		if componentByte, err = yaml.YAMLToJSON(componentByte); err != nil {
@@ -167,7 +189,45 @@ func (o *CreateOptions) Complete() error {
 		return err
 	}
 	o.Components = components
+
+	// TolerationsRaw looks like `["key=engineType,value=mongo,operator=Equal,effect=NoSchedule"]` after parsing by cmd
+	tolerations := make([]map[string]string, 0)
+	for _, tolerationRaw := range o.TolerationsRaw {
+		toleration := map[string]string{}
+		for _, entries := range strings.Split(tolerationRaw, ",") {
+			parts := strings.SplitN(entries, "=", 2)
+			toleration[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+		}
+		tolerations = append(tolerations, toleration)
+	}
+	if len(tolerations) > 0 {
+		o.Tolerations = tolerations
+	}
 	return nil
+}
+
+// multipleSourceComponent get component data from multiple source, such as stdin, URI and local file
+func multipleSourceComponents(fileName string, streams genericclioptions.IOStreams) ([]byte, error) {
+	var data io.Reader
+	switch {
+	case fileName == "-":
+		data = streams.In
+	case strings.Index(fileName, "http://") == 0 || strings.Index(fileName, "https://") == 0:
+		resp, err := http.Get(fileName)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+		data = resp.Body
+	default:
+		f, err := os.Open(fileName)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+		data = f
+	}
+	return io.ReadAll(data)
 }
 
 func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -197,8 +257,8 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 			cmd.Flags().BoolVar(&o.EnableAllLogs, "enable-all-logs", false, "Enable advanced application all log extraction, and true will ignore enabledLogs of component level")
 			cmd.Flags().StringArrayVar(&o.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
 			cmd.Flags().StringToStringVar(&o.NodeLabels, "node-labels", nil, "Node label selector")
-
-			cmd.Flags().StringVar(&o.ComponentsFilePath, "components", "", "Use yaml file to specify the cluster components")
+			cmd.Flags().StringSliceVar(&o.TolerationsRaw, "tolerations", nil, `Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'`)
+			cmd.Flags().StringVar(&o.ComponentsFilePath, "components", "", "Use yaml file, URL, or stdin to specify the cluster components")
 			util.CheckErr(cmd.MarkFlagRequired("components"))
 			cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 		},

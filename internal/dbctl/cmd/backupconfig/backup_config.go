@@ -128,7 +128,7 @@ func (o *upgradeOptions) run() error {
 
 var backupConfigExample = templates.Examples(`
 		# Enable the snapshot-controller and volume snapshot, to support snapshot backup.
-		dbctl backup-config --set snapshot-controller.enabled=true --set dataProtection.disableVolumeSnapshot=false
+		dbctl backup-config --set snapshot-controller.enabled=true --set dataProtection.enableVolumeSnapshot=true
 	`)
 
 // NewBackupConfigCmd creates the backup-config command

@@ -216,14 +216,14 @@ func newHandler(metrics collector.Metrics, scrapers []collector.Scraper, logger 
 
 		// Check if we have some "collect[]" query parameters.
 		if len(params) > 0 {
-			filters := make(map[string]bool)
+			filters := make(map[string]struct{})
 			for _, param := range params {
-				filters[param] = true
+				filters[param] = struct{}{}
 			}
 
 			filteredScrapers = nil
 			for _, scraper := range scrapers {
-				if filters[scraper.Name()] {
+				if _, ok := filters[scraper.Name()]; ok {
 					filteredScrapers = append(filteredScrapers, scraper)
 				}
 			}

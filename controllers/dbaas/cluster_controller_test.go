@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -51,7 +52,6 @@ import (
 )
 
 var _ = Describe("Cluster Controller", func() {
-
 	const timeout = time.Second * 20
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
@@ -64,7 +64,7 @@ var _ = Describe("Cluster Controller", func() {
 		Namespace: "default",
 	}
 	var deleteClusterNWait func(key types.NamespacedName) error
-	var ctx = context.Background()
+	ctx := context.Background()
 
 	BeforeEach(func() {
 		// Add any steup steps that needs to be executed before each test
@@ -79,7 +79,7 @@ var _ = Describe("Cluster Controller", func() {
 		err = k8sClient.DeleteAllOf(ctx, &corev1.PersistentVolumeClaim{},
 			client.InNamespace(testCtx.DefaultNamespace),
 			client.MatchingLabels{
-				"app.kubernetes.io/name": "state.mysql-8-cluster-definition",
+				intctrlutil.AppNameLabelKey: "state.mysql-8-cluster-definition",
 			})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &corev1.ConfigMap{},
@@ -96,7 +96,7 @@ var _ = Describe("Cluster Controller", func() {
 	})
 
 	assureDefaultStorageClassObj := func(sc *storagev1.StorageClass) error {
-		By("By assure an default storageClass")
+		By("Assuring an default storageClass")
 		patch := client.MergeFrom(sc)
 		if sc.Annotations == nil {
 			sc.Annotations = map[string]string{}
@@ -106,7 +106,7 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	assureCfgTplConfigMapObj := func(cmName string) *corev1.ConfigMap {
-		By("By assure an cm obj")
+		By("Assuring an cm obj")
 		appVerYAML := `
 apiVersion: v1
 kind: ConfigMap
@@ -140,7 +140,7 @@ data:
 	}
 
 	assureClusterDefObj := func() *dbaasv1alpha1.ClusterDefinition {
-		By("By assure an clusterDefinition obj")
+		By("Assuring an clusterDefinition obj")
 		clusterDefYAML := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
@@ -218,12 +218,12 @@ spec:
 	}
 
 	assureAppVersionObj := func() *dbaasv1alpha1.AppVersion {
-		By("By assure an appVersion obj")
+		By("Assuring an appVersion obj")
 		appVerYAML := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       AppVersion
+kind: AppVersion
 metadata:
-  name:     app-version
+  name: app-version
 spec:
   clusterDefinitionRef: cluster-definition
   components:
@@ -300,7 +300,7 @@ spec:
 	// Consensus associate objs
 	// ClusterDefinition with componentType = Consensus
 	assureClusterDefWithConsensusObj := func() *dbaasv1alpha1.ClusterDefinition {
-		By("By assure an clusterDefinition obj with componentType = Consensus")
+		By("Assuring an clusterDefinition obj with componentType = Consensus")
 		clusterDefYAML := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
@@ -390,12 +390,12 @@ spec:
 	}
 
 	assureAppVersionWithConsensusObj := func() *dbaasv1alpha1.AppVersion {
-		By("By assure an appVersion obj with componentType = Consensus")
+		By("Assuring an appVersion obj with componentType = Consensus")
 		appVerYAML := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       AppVersion
+kind: AppVersion
 metadata:
-  name:     app-version-consensus
+  name: app-version-consensus
 spec:
   clusterDefinitionRef: cluster-definition-consensus
   components:
@@ -403,7 +403,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: docker.io/apecloud/wesql-server-8.0:0.1-SNAPSHOT
+        image: docker.io/apecloud/wesql-server-8.0:0.1.2
         imagePullPolicy: IfNotPresent
 `
 		appVersion := &dbaasv1alpha1.AppVersion{}
@@ -483,13 +483,95 @@ spec:
 		return isCMAvailable
 	}
 
-	Context("When creating cluster", func() {
-		It("Should success with no error", func() {
-			By("By creating a cluster")
-			toCreate, _, _, key := newClusterObj(nil, nil)
-			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
+	listAndCheckStatefulSet := func(key types.NamespacedName) *appsv1.StatefulSetList {
+		By("Check statefulset workload has been created")
+		stsList := &appsv1.StatefulSetList{}
+		Eventually(func() bool {
+			Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
+				intctrlutil.AppInstanceLabelKey: key.Name,
+			}, client.InNamespace(key.Namespace))).Should(Succeed())
+			return len(stsList.Items) > 0
+		}, timeout, interval).Should(BeTrue())
+		return stsList
+	}
 
-			By("Deleting the scope")
+	createClusterNCheck := func() (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.AppVersion, types.NamespacedName) {
+		By("Creating a cluster")
+		toCreate, cd, appVer, key := newClusterObj(nil, nil)
+		Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
+
+		fetchedG1 := &dbaasv1alpha1.Cluster{}
+		Eventually(func() bool {
+			_ = k8sClient.Get(ctx, key, fetchedG1)
+			return fetchedG1.Status.ObservedGeneration == 1
+		}, timeout, interval).Should(BeTrue())
+
+		return fetchedG1, cd, appVer, key
+	}
+
+	Context("When creating cluster", func() {
+		It("Should create cluster successfully", func() {
+			_, _, _, key := createClusterNCheck()
+
+			By("Check deployment workload has been created")
+			Eventually(func() bool {
+				deployList := &appsv1.DeploymentList{}
+				Expect(k8sClient.List(ctx, deployList, client.MatchingLabels{
+					intctrlutil.AppInstanceLabelKey: key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				return len(deployList.Items) != 0
+			}, timeout, interval).Should(BeTrue())
+
+			stsList := listAndCheckStatefulSet(key)
+
+			By("Check statefulset pod's volumes")
+			for _, sts := range stsList.Items {
+				podSpec := sts.Spec.Template
+				volumeNames := map[string]struct{}{}
+				for _, v := range podSpec.Spec.Volumes {
+					volumeNames[v.Name] = struct{}{}
+				}
+
+				for _, cc := range [][]corev1.Container{
+					podSpec.Spec.Containers,
+					podSpec.Spec.InitContainers,
+				} {
+					for _, c := range cc {
+						for _, vm := range c.VolumeMounts {
+							_, ok := volumeNames[vm.Name]
+							Expect(ok).Should(BeTrue())
+						}
+					}
+				}
+			}
+
+			By("Check associated PDB has been created")
+			Eventually(func() bool {
+				pdbList := &policyv1.PodDisruptionBudgetList{}
+				Expect(k8sClient.List(ctx, pdbList, client.MatchingLabels{
+					intctrlutil.AppInstanceLabelKey: key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				return len(pdbList.Items) == 0
+			}, timeout, interval).Should(BeTrue())
+
+			By("Check created sts pods template without tolerations")
+			Expect(len(stsList.Items[0].Spec.Template.Spec.Tolerations) == 0).Should(BeTrue())
+
+			By("Checking the Affinity and the TopologySpreadConstraints")
+			podSpec := stsList.Items[0].Spec.Template.Spec
+			Expect(podSpec.Affinity).Should(BeNil())
+			Expect(len(podSpec.TopologySpreadConstraints) == 0).Should(BeTrue())
+
+			By("Check should create env configmap")
+			cmList := &corev1.ConfigMapList{}
+			Eventually(func() bool {
+				Expect(k8sClient.List(ctx, cmList, client.MatchingLabels{
+					intctrlutil.AppInstanceLabelKey: key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				return len(cmList.Items) == 2
+			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting the cluster")
 			Eventually(func() error {
 				return deleteClusterNWait(key)
 			}, timeout, interval).Should(Succeed())
@@ -498,15 +580,12 @@ spec:
 
 	Context("When deleting cluster", func() {
 		It("Should delete cluster resources according to termination policy", func() {
-			By("By creating a cluster")
+			By("Creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
-
 			toCreate.Spec.TerminationPolicy = dbaasv1alpha1.DoNotTerminate
-
 			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
 			fetchedG1 := &dbaasv1alpha1.Cluster{}
-
 			Eventually(func() bool {
 				_ = k8sClient.Get(ctx, key, fetchedG1)
 				return fetchedG1.Status.ObservedGeneration == 1
@@ -516,7 +595,6 @@ spec:
 			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
 
 			fetchedG2 := &dbaasv1alpha1.Cluster{}
-
 			Eventually(func() bool {
 				_ = k8sClient.Get(ctx, key, fetchedG2)
 				return fetchedG2.Status.ObservedGeneration == 2
@@ -535,27 +613,14 @@ spec:
 	})
 
 	Context("When updating cluster replicas", func() {
-		It("Should create/delete pod to the replicas number", func() {
-			By("By creating a cluster")
-			toCreate, _, _, key := newClusterObj(nil, nil)
-			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
+		It("Should create/delete pod to match the replicas number", func() {
+			By("Creating a cluster")
+			fetchedG1, _, _, key := createClusterNCheck()
 
-			fetchedG1 := &dbaasv1alpha1.Cluster{}
+			By("Checking the StatefulSet")
+			listAndCheckStatefulSet(key)
 
-			Eventually(func() bool {
-				_ = k8sClient.Get(ctx, key, fetchedG1)
-				return fetchedG1.Status.ObservedGeneration == 1
-			}, timeout, interval).Should(BeTrue())
-
-			stsList := &appsv1.StatefulSetList{}
-			Eventually(func() bool {
-				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
-				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				return len(stsList.Items) != 0
-			}, timeout, interval).Should(BeTrue())
-
-			By("By updating replica")
+			By("Updating replicas")
 			if fetchedG1.Spec.Components == nil {
 				fetchedG1.Spec.Components = []dbaasv1alpha1.ClusterComponent{}
 			}
@@ -573,80 +638,20 @@ spec:
 				return fetchedG2.Status.ObservedGeneration == 2
 			}, timeout*2, interval).Should(BeTrue())
 
-			Eventually(func() bool {
-				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
-				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				Expect(len(stsList.Items) != 0).Should(BeTrue())
-				return int(*stsList.Items[0].Spec.Replicas) == updatedReplicas
-			}, timeout, interval).Should(BeTrue())
+			By("Checking the replicas")
+			stsList := listAndCheckStatefulSet(key)
+			Expect(int(*stsList.Items[0].Spec.Replicas)).To(Equal(updatedReplicas))
 
-			By("Deleting the scope")
+			By("Deleting the cluster")
 			Eventually(func() error {
 				return deleteClusterNWait(key)
 			}, timeout, interval).Should(Succeed())
 		})
 	})
 
-	Context("When creating cluster", func() {
-		It("Should create deployment if component is stateless", func() {
-			By("By creating a cluster")
-			toCreate, _, _, key := newClusterObj(nil, nil)
-			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
-
-			fetchedG1 := &dbaasv1alpha1.Cluster{}
-
-			Eventually(func() bool {
-				_ = k8sClient.Get(ctx, key, fetchedG1)
-				return fetchedG1.Status.ObservedGeneration == 1
-			}, timeout, interval).Should(BeTrue())
-
-			deployList := &appsv1.DeploymentList{}
-			Eventually(func() bool {
-				Expect(k8sClient.List(ctx, deployList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
-				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				return len(deployList.Items) != 0
-			}, timeout, interval).Should(BeTrue())
-
-			By("Deleting the scope")
-			Eventually(func() error {
-				return deleteClusterNWait(key)
-			}, timeout, interval).Should(Succeed())
-		})
-	})
-
-	Context("When creating cluster", func() {
-		It("Should create pdb if updateStrategy exists", func() {
-			By("By creating a cluster")
-			toCreate, _, _, key := newClusterObj(nil, nil)
-			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
-
-			fetchedG1 := &dbaasv1alpha1.Cluster{}
-
-			Eventually(func() bool {
-				_ = k8sClient.Get(ctx, key, fetchedG1)
-				return fetchedG1.Status.ObservedGeneration == 1
-			}, timeout, interval).Should(BeTrue())
-
-			pdbList := &policyv1.PodDisruptionBudgetList{}
-			Eventually(func() bool {
-				Expect(k8sClient.List(ctx, pdbList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
-				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				return len(pdbList.Items) == 0
-			}, timeout, interval).Should(BeTrue())
-
-			By("Deleting the scope")
-			Eventually(func() error {
-				return deleteClusterNWait(key)
-			}, timeout, interval).Should(Succeed())
-		})
-	})
-
-	Context("When creating cluster", func() {
-		It("Should create service if service configured", func() {
-			By("By creating a cluster")
+	Context("When creating cluster with services", func() {
+		It("Should create services", func() {
+			By("Creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
 			toCreate.Spec.Components = append(toCreate.Spec.Components, dbaasv1alpha1.ClusterComponent{
 				Name: "proxy",
@@ -663,10 +668,11 @@ spec:
 				return fetchedG1.Status.ObservedGeneration == 1
 			}, timeout, interval).Should(BeTrue())
 
+			By("Checking external ClusterIP services")
 			svcList := &corev1.ServiceList{}
 			Eventually(func() bool {
 				Expect(k8sClient.List(ctx, svcList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
+					intctrlutil.AppInstanceLabelKey: key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				for _, svc := range svcList.Items {
 					if svc.Spec.Type == "LoadBalancer" {
@@ -676,16 +682,53 @@ spec:
 				return false
 			}, timeout, interval).Should(BeTrue())
 
-			By("Deleting the scope")
+			By("Checking internal headless services")
+			for _, item := range fetchedG1.Spec.Components {
+				c, err := component.GetComponentFromClusterDefinition(ctx, k8sClient, fetchedG1, item.Type)
+				Expect(err).ShouldNot(HaveOccurred())
+				if c.ComponentType == dbaasv1alpha1.Stateless {
+					continue
+				}
+
+				Expect(k8sClient.List(ctx, svcList, client.MatchingLabels{
+					intctrlutil.AppInstanceLabelKey:  key.Name,
+					intctrlutil.AppComponentLabelKey: item.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				Expect(len(svcList.Items) > 0).Should(BeTrue())
+
+				var headlessSvcPorts []corev1.ServicePort
+				for _, container := range c.PodSpec.Containers {
+					for _, port := range container.Ports {
+						// be consistent with headless_service_template.cue
+						headlessSvcPorts = append(headlessSvcPorts, corev1.ServicePort{
+							Name:       port.Name,
+							Protocol:   port.Protocol,
+							Port:       port.ContainerPort,
+							TargetPort: intstr.FromInt(int(port.ContainerPort)),
+						})
+					}
+				}
+				var exists bool
+				for _, svc := range svcList.Items {
+					if svc.Spec.ClusterIP != corev1.ClusterIPNone {
+						continue
+					}
+					exists = true
+					Expect(reflect.DeepEqual(svc.Spec.Ports, headlessSvcPorts)).Should(BeTrue())
+				}
+				Expect(exists).Should(BeTrue())
+			}
+
+			By("Deleting the cluster")
 			Eventually(func() error {
 				return deleteClusterNWait(key)
 			}, timeout, interval).Should(Succeed())
 		})
 	})
 
-	Context("When updating cluster", func() {
+	Context("When updating cluster PVC storage size", func() {
 		It("Should update PVC request storage size accordingly", func() {
-			By("Check available storageclasses")
+			By("Checking available storageclasses")
 			scList := &storagev1.StorageClassList{}
 			defaultStorageClass := &storagev1.StorageClass{}
 			hasDefaultSC := false
@@ -711,7 +754,7 @@ spec:
 				Expect(err).NotTo(HaveOccurred())
 			}
 
-			By("By creating a cluster with volume claim")
+			By("Creating a cluster with volume claim")
 			toCreate, _, _, key := newClusterObj(nil, nil)
 			toCreate.Spec.Components = make([]dbaasv1alpha1.ClusterComponent, 1)
 			toCreate.Spec.Components[0] = dbaasv1alpha1.ClusterComponent{
@@ -757,24 +800,17 @@ spec:
 			}, timeout, interval).Should(BeTrue())
 
 			// this test required controller-manager component
-			By("Check available controller-manager status")
+			By("Checking controller-manager status")
 			if !isCMAvailable() {
 				By("The controller-manager is not available, test skipped")
 				return
 			}
 			// TODO test the following contents in a real K8S cluster. testEnv is no controller-manager and scheduler components
-			Eventually(func() bool {
-				stsList := &appsv1.StatefulSetList{}
-				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
-				}, client.InNamespace(key.Namespace))).Should(Succeed())
-
-				Expect(len(stsList.Items) == 1).Should(BeTrue())
-
-				sts := &stsList.Items[0]
-				Expect(sts.Spec.Replicas).ShouldNot(BeNil())
-				return sts.Status.AvailableReplicas == *sts.Spec.Replicas
-			}, timeout*6, interval).Should(BeTrue())
+			By("Checking the replicas")
+			stsList := listAndCheckStatefulSet(key)
+			sts := &stsList.Items[0]
+			Expect(sts.Spec.Replicas).ShouldNot(BeNil())
+			Expect(sts.Status.AvailableReplicas).To(Equal(*sts.Spec.Replicas))
 
 			Eventually(func() bool {
 				pvcList := &corev1.PersistentVolumeClaimList{}
@@ -805,11 +841,8 @@ spec:
 			// }
 			// Expect(k8sClient.Get(ctx, stsKey, sts)).Should(Succeed())
 
-			stsList := &appsv1.StatefulSetList{}
-			Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-				"app.kubernetes.io/instance": key.Name,
-			}, client.InNamespace(key.Namespace))).Should(Succeed())
-
+			By("Checking the PVC")
+			stsList = listAndCheckStatefulSet(key)
 			for _, sts := range stsList.Items {
 				for _, vct := range sts.Spec.VolumeClaimTemplates {
 					for i := *sts.Spec.Replicas - 1; i >= 0; i-- {
@@ -824,7 +857,7 @@ spec:
 				}
 			}
 
-			By("Deleting the scope")
+			By("Deleting the cluster")
 			Eventually(func() error {
 				return deleteClusterNWait(key)
 			}, timeout*2, interval).Should(Succeed())
@@ -837,11 +870,11 @@ spec:
 			"1 pod with 'leader' role label set, "+
 			"2 pods with 'follower' role label set,"+
 			"1 service routes to 'leader' pod", func() {
-			By("By creating a cluster with componentType = Consensus")
+			By("Creating a cluster with componentType = Consensus")
 			toCreate, _, _, key := newClusterWithConsensusObj(nil, nil)
 			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
-			By("By waiting the cluster is created")
+			By("Waiting the cluster is created")
 			cluster := &dbaasv1alpha1.Cluster{}
 
 			// TODO: testEnv doesn't support pod creation yet. remove the following codes when it does
@@ -876,7 +909,7 @@ spec:
 				return cluster.Status.Phase == dbaasv1alpha1.RunningPhase
 			}, timeout*3, interval*5).Should(BeTrue())
 
-			By("By checking pods' role label")
+			By("Checking pods' role label")
 			ip := getLocalIP()
 			Expect(ip).ShouldNot(BeEmpty())
 
@@ -905,11 +938,7 @@ spec:
 				return role
 			}
 
-			stsList := &appsv1.StatefulSetList{}
-			Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-				"app.kubernetes.io/instance": key.Name,
-			}, client.InNamespace(key.Namespace))).Should(Succeed())
-			Expect(len(stsList.Items)).Should(Equal(1))
+			stsList := listAndCheckStatefulSet(key)
 			sts := &stsList.Items[0]
 			podList := &corev1.PodList{}
 			Expect(k8sClient.List(ctx, podList, client.InNamespace(key.Namespace))).Should(Succeed())
@@ -936,18 +965,18 @@ spec:
 			Expect(leaderCount).Should(Equal(1))
 			Expect(followerCount).Should(Equal(2))
 
-			By("By checking services' status")
+			By("Checking services status")
 			// we should have 1 services
 			svcList := &corev1.ServiceList{}
 			Expect(k8sClient.List(ctx, svcList, client.MatchingLabels{
-				"app.kubernetes.io/instance": key.Name,
+				intctrlutil.AppInstanceLabelKey: key.Name,
 			}, client.InNamespace(key.Namespace))).Should(Succeed())
 			Expect(len(svcList.Items)).Should(Equal(1))
 			svc := svcList.Items[0]
 			// getRole should be leader through service
 			Expect(observeRoleOfServiceLoop(&svc)).Should(Equal(leader))
 
-			By("By deleting leader pod")
+			By("Deleting leader pod")
 			leaderPod := &corev1.Pod{}
 			for _, pod := range pods {
 				if pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] == leader {
@@ -975,193 +1004,160 @@ spec:
 		})
 	})
 
-	Context("When creating cluster", func() {
-		It("Should PodSpec affinity be nil if cluster affinity is nil", func() {
-			By("By creating a cluster")
-			toCreate, _, _, key := newClusterObj(nil, nil)
-
-			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
-
-			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
-			Eventually(func() bool {
-				_ = k8sClient.Get(ctx, key, fetchedClusterG1)
-				return fetchedClusterG1.Status.ObservedGeneration == 1
-			}, timeout, interval).Should(BeTrue())
-
-			stsList := &appsv1.StatefulSetList{}
-			Eventually(func() bool {
-				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
-				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				Expect(len(stsList.Items) == 1).Should(BeTrue())
-				sts := stsList.Items[0]
-				return sts.Spec.Template.Spec.Affinity == nil
-			}, timeout, interval).Should(BeTrue())
-
-			By("Deleting the scope")
-			Eventually(func() error {
-				return deleteClusterNWait(key)
-			}, timeout, interval).Should(Succeed())
-		})
-	})
-
-	Context("When creating cluster", func() {
-		It("Should RequiredDuringSchedulingIgnoredDuringExecution and NoSchedule exist if podAntiAffinity is required", func() {
-			By("By creating a cluster")
+	Context("When creating cluster with cluster affinity", func() {
+		It("Should hanle pod affinity correctly", func() {
+			By("Creating a cluster")
+			topologyKey := "testTopologyKey"
+			lableKey := "testNodeLabelKey"
+			labelValue := "testLabelValue"
 			toCreate, _, _, key := newClusterObj(nil, nil)
 			toCreate.Spec.Affinity = &dbaasv1alpha1.Affinity{
 				PodAntiAffinity: dbaasv1alpha1.Required,
-				TopologyKeys:    []string{"testTopologyKey"},
+				TopologyKeys:    []string{topologyKey},
 				NodeLabels: map[string]string{
-					"testNodeKey": "testLabelValue",
+					lableKey: labelValue,
 				},
 			}
 			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
-			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
-			Eventually(func() bool {
-				_ = k8sClient.Get(ctx, key, fetchedClusterG1)
-				return fetchedClusterG1.Status.ObservedGeneration == 1
-			}, timeout, interval).Should(BeTrue())
+			By("Checking the Affinity and TopologySpreadConstraints")
+			stsList := listAndCheckStatefulSet(key)
+			podSpec := stsList.Items[0].Spec.Template.Spec
+			Expect(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).To(Equal(lableKey))
+			Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.DoNotSchedule))
+			Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(topologyKey))
+			Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).To(Equal(topologyKey))
 
-			stsList := &appsv1.StatefulSetList{}
-			Eventually(func() bool {
-				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
-				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				Expect(len(stsList.Items) == 1).Should(BeTrue())
-				podSpec := stsList.Items[0].Spec.Template.Spec
-				Expect(podSpec.Affinity.NodeAffinity).ShouldNot(BeNil())
-				Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable == corev1.DoNotSchedule).Should(BeTrue())
-				return len(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0
-			}, timeout, interval).Should(BeTrue())
-
-			By("Deleting the scope")
+			By("Deleting the cluster")
 			Eventually(func() error {
 				return deleteClusterNWait(key)
 			}, timeout, interval).Should(Succeed())
 		})
 	})
 
-	Context("When creating cluster", func() {
-		It("Should PreferredDuringSchedulingIgnoredDuringExecution and ScheduleAnyway exist if podAntiAffinity is preferred", func() {
-			By("By creating a cluster")
+	Context("When creating cluster with cluster affinity and component affinity", func() {
+		It("Should use compoment affinity", func() {
+			By("Creating a cluster")
+			clusterTopologyKey := "testClusterTopologyKey"
 			toCreate, _, _, key := newClusterObj(nil, nil)
 			toCreate.Spec.Affinity = &dbaasv1alpha1.Affinity{
-				PodAntiAffinity: dbaasv1alpha1.Preferred,
-				TopologyKeys:    []string{"testTopologyKey"},
+				PodAntiAffinity: dbaasv1alpha1.Required,
+				TopologyKeys:    []string{clusterTopologyKey},
 			}
-			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
-
-			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
-			Eventually(func() bool {
-				_ = k8sClient.Get(ctx, key, fetchedClusterG1)
-				return fetchedClusterG1.Status.ObservedGeneration == 1
-			}, timeout, interval).Should(BeTrue())
-
-			stsList := &appsv1.StatefulSetList{}
-			Eventually(func() bool {
-				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
-				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				Expect(len(stsList.Items) == 1).Should(BeTrue())
-				podSpec := stsList.Items[0].Spec.Template.Spec
-				Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable == corev1.ScheduleAnyway).Should(BeTrue())
-				return len(podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution) != 0
-			}, timeout, interval).Should(BeTrue())
-
-			By("Deleting the scope")
-			Eventually(func() error {
-				return deleteClusterNWait(key)
-			}, timeout, interval).Should(Succeed())
-		})
-	})
-
-	Context("When creating cluster", func() {
-		It("Should PreferredDuringSchedulingIgnoredDuringExecution and ScheduleAnyway exist if podAntiAffinity is preferred", func() {
-			By("By creating a cluster")
-			toCreate, _, _, key := newClusterObj(nil, nil)
-			toCreate.Spec.Affinity = &dbaasv1alpha1.Affinity{
-				PodAntiAffinity: dbaasv1alpha1.Preferred,
-				TopologyKeys:    []string{"testTopologyKey"},
-			}
-			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
-
-			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
-			Eventually(func() bool {
-				_ = k8sClient.Get(ctx, key, fetchedClusterG1)
-				return fetchedClusterG1.Status.ObservedGeneration == 1
-			}, timeout, interval).Should(BeTrue())
-
-			stsList := &appsv1.StatefulSetList{}
-			Eventually(func() bool {
-				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
-				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				Expect(len(stsList.Items) == 1).Should(BeTrue())
-				podSpec := stsList.Items[0].Spec.Template.Spec
-				Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable == corev1.ScheduleAnyway).Should(BeTrue())
-				return len(podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution) != 0
-			}, timeout, interval).Should(BeTrue())
-
-			By("Deleting the scope")
-			Eventually(func() error {
-				return deleteClusterNWait(key)
-			}, timeout, interval).Should(Succeed())
-		})
-	})
-
-	Context("When creating cluster", func() {
-		It("Should compoment affinity overrider cluster affinity if component affinity exists", func() {
-			By("By creating a cluster")
-			toCreate, _, _, key := newClusterObj(nil, nil)
-			toCreate.Spec.Affinity = &dbaasv1alpha1.Affinity{
-				PodAntiAffinity: dbaasv1alpha1.Preferred,
-				TopologyKeys:    []string{"testTopologyKey"},
-			}
+			compTopologyKey := "testComponentTopologyKey"
 			toCreate.Spec.Components = []dbaasv1alpha1.ClusterComponent{}
 			toCreate.Spec.Components = append(toCreate.Spec.Components, dbaasv1alpha1.ClusterComponent{
 				Name: "replicasets",
 				Type: "replicasets",
 				Affinity: &dbaasv1alpha1.Affinity{
-					PodAntiAffinity: dbaasv1alpha1.Required,
-					TopologyKeys:    []string{"testTopologyKey"},
+					PodAntiAffinity: dbaasv1alpha1.Preferred,
+					TopologyKeys:    []string{compTopologyKey},
 				},
 			})
 			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
-			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
-			Eventually(func() bool {
-				_ = k8sClient.Get(ctx, key, fetchedClusterG1)
-				return fetchedClusterG1.Status.ObservedGeneration == 1
-			}, timeout, interval).Should(BeTrue())
+			By("Checking the Affinity and the TopologySpreadConstraints")
+			stsList := listAndCheckStatefulSet(key)
+			podSpec := stsList.Items[0].Spec.Template.Spec
+			Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.ScheduleAnyway))
+			Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(compTopologyKey))
+			Expect(podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight).ShouldNot(BeNil())
 
-			stsList := &appsv1.StatefulSetList{}
-			Eventually(func() bool {
-				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
-				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				Expect(len(stsList.Items) == 1).Should(BeTrue())
-				podSpec := stsList.Items[0].Spec.Template.Spec
-				Expect(len(podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution) == 0).Should(BeTrue())
-				Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable == corev1.DoNotSchedule).Should(BeTrue())
-				return len(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0
-			}, timeout, interval).Should(BeTrue())
-
-			By("Deleting the scope")
+			By("Deleting the cluster")
 			Eventually(func() error {
 				return deleteClusterNWait(key)
 			}, timeout, interval).Should(Succeed())
 		})
 	})
 
-	Context("testing cluster status", func() {
-		It("this test required controller-manager component", func() {
+	Context("When creating cluster with cluster tolerations", func() {
+		It("Should create pods with tolerations", func() {
+			By("Creating a cluster")
+			toCreate, _, _, key := newClusterObj(nil, nil)
+			var tolerations []corev1.Toleration
+			tolerationKey := "testClusterTolerationKey"
+			tolerationValue := "testClusterTolerationValue"
+			toCreate.Spec.Tolerations = append(tolerations, corev1.Toleration{
+				Key:      tolerationKey,
+				Value:    tolerationValue,
+				Operator: corev1.TolerationOpEqual,
+				Effect:   corev1.TaintEffectNoSchedule,
+			})
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
+
+			By("Checking the tolerations")
+			stsList := listAndCheckStatefulSet(key)
+			podSpec := stsList.Items[0].Spec.Template.Spec
+			Expect(len(podSpec.Tolerations) > 0).Should(BeTrue())
+			toleration := podSpec.Tolerations[0]
+			Expect(toleration.Key == tolerationKey &&
+				toleration.Value == tolerationValue).Should(BeTrue())
+			Expect(toleration.Operator == corev1.TolerationOpEqual &&
+				toleration.Effect == corev1.TaintEffectNoSchedule).Should(BeTrue())
+
+			By("Deleting the cluster")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	Context("When creating cluster with cluster tolerations and component tolerations", func() {
+		It("Should use component tolerations", func() {
+			By("Creating a cluster")
+			toCreate, _, _, key := newClusterObj(nil, nil)
+			var clusterTolerations []corev1.Toleration
+			clusterTolerationKey := "testClusterTolerationKey"
+			toCreate.Spec.Tolerations = append(clusterTolerations, corev1.Toleration{
+				Key:      clusterTolerationKey,
+				Operator: corev1.TolerationOpExists,
+				Effect:   corev1.TaintEffectNoExecute,
+			})
+
+			var compTolerations []corev1.Toleration
+			compTolerationKey := "testcompTolerationKey"
+			compTolerationValue := "testcompTolerationValue"
+			compTolerations = append(compTolerations, corev1.Toleration{
+				Key:      compTolerationKey,
+				Value:    compTolerationValue,
+				Operator: corev1.TolerationOpEqual,
+				Effect:   corev1.TaintEffectNoSchedule,
+			})
+
+			toCreate.Spec.Components = []dbaasv1alpha1.ClusterComponent{}
+			toCreate.Spec.Components = append(toCreate.Spec.Components, dbaasv1alpha1.ClusterComponent{
+				Name:        "replicasets",
+				Type:        "replicasets",
+				Tolerations: compTolerations,
+			})
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
+
+			By("Checking the tolerations")
+			stsList := listAndCheckStatefulSet(key)
+			podSpec := stsList.Items[0].Spec.Template.Spec
+			Expect(len(podSpec.Tolerations) > 0).Should(BeTrue())
+			toleration := podSpec.Tolerations[0]
+			Expect(toleration.Key == compTolerationKey &&
+				toleration.Value == compTolerationValue).Should(BeTrue())
+			Expect(toleration.Operator == corev1.TolerationOpEqual &&
+				toleration.Effect == corev1.TaintEffectNoSchedule).Should(BeTrue())
+
+			By("Deleting the cluster")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	Context("When creating cluster with components", func() {
+		It("Should create cluster with running status", func() {
+			By("Checking the controller-manager status")
 			if !isCMAvailable() {
 				By("The controller-manager is not available, test skipped")
 				return
 			}
 			// TODO test the following contents in a real K8S cluster. testEnv is no controller-manager and scheduler components
+			By("Creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
 			toCreate.Spec.Components = []dbaasv1alpha1.ClusterComponent{}
 			toCreate.Spec.Components = append(toCreate.Spec.Components, dbaasv1alpha1.ClusterComponent{
@@ -1169,18 +1165,20 @@ spec:
 				Type: "replicasets",
 			})
 			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
+
 			fetchedClusterG1 := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
 				_ = k8sClient.Get(ctx, key, fetchedClusterG1)
 				return fetchedClusterG1.Status.ObservedGeneration == 1
 			}, timeout, interval).Should(BeTrue())
+
 			Eventually(func() bool {
 				_ = k8sClient.Get(ctx, key, fetchedClusterG1)
 				return fetchedClusterG1.Status.Components["replicasets"].Phase == dbaasv1alpha1.RunningPhase &&
 					fetchedClusterG1.Status.Phase == dbaasv1alpha1.RunningPhase
 			}, timeout, interval).Should(BeTrue())
 
-			By("Deleting the scope")
+			By("Deleting the Cluster")
 			Eventually(func() error {
 				return deleteClusterNWait(key)
 			}, timeout, interval).Should(Succeed())
@@ -1217,7 +1215,7 @@ spec:
       value: clusterepuglf-wesql-test-1
     - name: KB_REPLICASETS_2_HOSTNAME
       value: clusterepuglf-wesql-test-2
-    image: docker.io/apecloud/wesql-server-8.0:0.1-SNAPSHOT
+    image: docker.io/apecloud/wesql-server-8.0:0.1.2
     imagePullPolicy: IfNotPresent
     name: mysql
     ports:

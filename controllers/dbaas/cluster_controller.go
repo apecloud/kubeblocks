@@ -118,7 +118,6 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 	if len(matches) != 2 {
 		return nil
 	}
-	//msg := strings.ReplaceAll(matches[1], "\\", "")
 	msg := matches[1]
 	err := json.Unmarshal([]byte(msg), message)
 	if err != nil {

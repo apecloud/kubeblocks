@@ -87,6 +87,25 @@ var runningCheckFailedCount = 0
 var statusCheckFailedCount = 0
 var roleCheckFailedCount = 0
 var roleCheckCount = 0
+var eventAggregationNum = 10
+var eventIntervalNum = 60
+var dbPort = "3306"
+
+func init() {
+	val, ok := os.LookupEnv("KB_AGGREGATION_COUNT")
+	if ok {
+		num, err := strconv.Atoi(val)
+		if err == nil {
+			eventAggregationNum = num
+		}
+	}
+
+	val, ok = os.LookupEnv("KB_DB_PORT")
+	if ok {
+		dbPort = val
+	}
+
+}
 
 // Mysql represents MySQL output bindings.
 type Mysql struct {
@@ -301,7 +320,7 @@ func (m *Mysql) exec(ctx context.Context, sql string) (int64, error) {
 }
 
 func (m *Mysql) runningCheck(ctx context.Context, resp *bindings.InvokeResponse) ([]byte, error) {
-	host := fmt.Sprintf("127.0.0.1:%s", os.Getenv("KB_DB_PORT"))
+	host := fmt.Sprintf("127.0.0.1:%s", dbPort)
 	conn, err := net.DialTimeout("tcp", host, 900*time.Millisecond)
 	message := ""
 	result := internal.ProbeMessage{}
@@ -309,7 +328,7 @@ func (m *Mysql) runningCheck(ctx context.Context, resp *bindings.InvokeResponse)
 		message = fmt.Sprintf("running check %s error: %v", host, err)
 		result.Event = "runningCheckFailed"
 		m.logger.Errorf(message)
-		if runningCheckFailedCount++; runningCheckFailedCount%10 == 1 {
+		if runningCheckFailedCount++; runningCheckFailedCount%eventAggregationNum == 1 {
 			m.logger.Infof("running checks failed %v times continuously", runningCheckFailedCount)
 			resp.Metadata[statusCode] = checkFailedHTTPCode
 		}
@@ -348,7 +367,7 @@ func (m *Mysql) statusCheck(ctx context.Context, sql string, resp *bindings.Invo
 		m.logger.Infof("statusCheck error: %v", err)
 		result.Event = "statusCheckFailed"
 		result.Message = err.Error()
-		if statusCheckFailedCount++; statusCheckFailedCount%10 == 1 {
+		if statusCheckFailedCount++; statusCheckFailedCount%eventAggregationNum == 1 {
 			m.logger.Infof("status checks failed %v times continuously", statusCheckFailedCount)
 			resp.Metadata[statusCode] = checkFailedHTTPCode
 		}
@@ -399,7 +418,7 @@ func (m *Mysql) roleCheck(ctx context.Context, sql string, resp *bindings.Invoke
 		m.logger.Infof("error executing roleCheck: %v", err)
 		result.Event = "roleCheckFailed"
 		result.Message = err.Error()
-		if roleCheckFailedCount++; roleCheckFailedCount%10 == 1 {
+		if roleCheckFailedCount++; roleCheckFailedCount%eventAggregationNum == 1 {
 			m.logger.Infof("role checks failed %v times continuously", roleCheckFailedCount)
 			resp.Metadata[statusCode] = checkFailedHTTPCode
 		}
@@ -418,7 +437,7 @@ func (m *Mysql) roleCheck(ctx context.Context, sql string, resp *bindings.Invoke
 
 	// reporting role event periodly to get pod's role lable updating accurately
 	// in case of event losing.
-	if roleCheckCount++; roleCheckCount%60 == 1 {
+	if roleCheckCount++; roleCheckCount%eventIntervalNum == 1 {
 		resp.Metadata[statusCode] = checkFailedHTTPCode
 	}
 	msg, _ := json.Marshal(result)

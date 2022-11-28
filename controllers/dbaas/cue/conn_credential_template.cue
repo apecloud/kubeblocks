@@ -3,10 +3,8 @@ clusterdefinition: {
 		name: string
 	}
 	spec: {
-		type: string
-		connectionCredential: {
-			user: string
-		}
+		type:                 string
+		connectionCredential: {...}
 	}
 }
 cluster: {
@@ -17,13 +15,10 @@ cluster: {
 }
 secret: {
 	apiVersion: "v1"
-	stringData: {
-		username: clusterdefinition.spec.connectionCredential.user | *"root"
-		password: string
-	}
-	kind: "Secret"
+	stringData: clusterdefinition.spec.connectionCredential
+	kind:       "Secret"
 	metadata: {
-		name:      cluster.metadata.name
+		name:      "\(cluster.metadata.name)-conn-credential"
 		namespace: cluster.metadata.namespace
 		labels: {
 			"app.kubernetes.io/name":       "\(clusterdefinition.spec.type)-\(clusterdefinition.metadata.name)"

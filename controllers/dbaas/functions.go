@@ -26,18 +26,17 @@ import (
 )
 
 // calReverseRebaseBuffer Cal reserved memory for system
-func calReverseRebaseBuffer(memSizeMB int64, cpuNum int) int64 {
+func calReverseRebaseBuffer(memSizeMB, cpuNum int64) int64 {
 	const (
-		RebaseMemorySize        = int64(2048)
-		ReverseRebaseBufferSize = 285
+		rebaseMemorySize        = int64(2048)
+		reverseRebaseBufferSize = 285
 	)
 
 	// MIN(RDS ins class for mem / 2, 2048)
-	r1 := int64(math.Min(float64(memSizeMB>>1), float64(RebaseMemorySize)))
+	r1 := int64(math.Min(float64(memSizeMB>>1), float64(rebaseMemorySize)))
 	// MAX(RDS ins class for CPU * 64, RDS ins class for mem / 64)
 	r2 := int64(math.Max(float64(cpuNum<<6), float64(memSizeMB>>6)))
-
-	return r1 + r2 + memSizeMB>>6 + ReverseRebaseBufferSize
+	return r1 + r2 + memSizeMB>>6 + reverseRebaseBufferSize
 }
 
 // https://help.aliyun.com/document_detail/162326.html?utm_content=g_1000230851&spm=5176.20966629.toubu.3.f2991ddcpxxvD1#title-rey-j7j-4dt
@@ -45,20 +44,20 @@ func calReverseRebaseBuffer(memSizeMB int64, cpuNum int) int64 {
 // calMysqlPoolSizeByResource Cal mysql buffer size
 func calMysqlPoolSizeByResource(resource *ResourceDefinition, isShared bool) string {
 	const (
-		DefaultPoolSize      = "128M"
-		MinBufferSizeMB      = 128
-		SmallClassMemorySize = int64(1024 * 1024 * 1024)
+		defaultPoolSize      = "128M"
+		minBufferSizeMB      = 128
+		smallClassMemorySize = int64(1024 * 1024 * 1024)
 	)
 
 	if resource == nil || resource.CoreNum == 0 || resource.MemorySize == 0 {
-		return DefaultPoolSize
+		return defaultPoolSize
 	}
 
 	// small instance class
 	// mem_size <= 1G or
 	// core <= 2
-	if resource.MemorySize <= SmallClassMemorySize {
-		return DefaultPoolSize
+	if resource.MemorySize <= smallClassMemorySize {
+		return defaultPoolSize
 	}
 
 	memSizeMB := resource.MemorySize / 1024 / 1024
@@ -75,8 +74,8 @@ func calMysqlPoolSizeByResource(resource *ResourceDefinition, isShared bool) str
 		}
 	}
 
-	if totalMemorySize <= MinBufferSizeMB {
-		return DefaultPoolSize
+	if totalMemorySize <= minBufferSizeMB {
+		return defaultPoolSize
 	}
 
 	// (total_memory - reverseBuffer) * 75

@@ -40,19 +40,16 @@ import (
 //		   name: data
 //		 - mountPath: /log
 //		   name: log
-func GetContainerUsingConfig(podTemplate corev1.PodTemplateSpec, configs []dbaasv1alpha1.ConfigTemplate) *corev1.Container {
-	// volumes := sts.Spec.Template.Spec.Volumes
-	containers := podTemplate.Spec.Containers
-	initContainers := podTemplate.Spec.InitContainers
-
+func GetContainerUsingConfig(podSpec *corev1.PodSpec, configs []dbaasv1alpha1.ConfigTemplate) *corev1.Container {
+	// volumes := podSpec.Volumes
+	containers := podSpec.Containers
+	initContainers := podSpec.InitContainers
 	if container := getContainerWithTplList(containers, configs); container != nil {
 		return container
 	}
-
 	if container := getContainerWithTplList(initContainers, configs); container != nil {
 		return container
 	}
-
 	return nil
 }
 
@@ -140,12 +137,11 @@ func getContainerWithVolumeMount(containers []corev1.Container, volumeName strin
 
 // GetCoreNum function description:
 // if not Resource field return 0 else Resources.Limits.cpu
-func GetCoreNum(container corev1.Container) int {
+func GetCoreNum(container corev1.Container) int64 {
 	limits := container.Resources.Limits
 	if val, ok := (limits)[corev1.ResourceCPU]; ok {
-		return int(val.Value())
+		return val.Value()
 	}
-
 	return 0
 }
 

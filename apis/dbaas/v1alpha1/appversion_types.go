@@ -30,7 +30,9 @@ type AppVersionSpec struct {
 	// List of components in current AppVersion. Component will replace the field in ClusterDefinition's component if type is matching typeName.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
-	Components []AppVersionComponent `json:"components"`
+	// +patchMergeKey=type
+	// +patchStrategy=merge,retainKeys
+	Components []AppVersionComponent `json:"components" patchStrategy:"merge,retainKeys" patchMergeKey:"type"`
 }
 
 // AppVersionStatus defines the observed state of AppVersion
@@ -62,7 +64,9 @@ type AppVersionComponent struct {
 	// the configTemplateRefs field, together with configTemplateRefs in the ClusterDefinition,
 	// determines the final configuration file.
 	// +optional
-	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// PodSpec is pod spec, if not nil, will replace ClusterDefinitionSpec.PodSpec in ClusterDefinition.
 	// +optional
@@ -99,4 +103,13 @@ type AppVersionList struct {
 
 func init() {
 	SchemeBuilder.Register(&AppVersion{}, &AppVersionList{})
+}
+
+// GetTypeMappingComponents return Type name mapping AppVersionComponent.
+func (r *AppVersion) GetTypeMappingComponents() map[string]*AppVersionComponent {
+	m := map[string]*AppVersionComponent{}
+	for i, c := range r.Spec.Components {
+		m[c.Type] = &r.Spec.Components[i]
+	}
+	return m
 }

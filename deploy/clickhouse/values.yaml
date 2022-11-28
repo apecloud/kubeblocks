@@ -14,6 +14,11 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
+
+## @param commonLabels Labels to add to all deployed objects
+##
+commonLabels: {}
+
 serviceAccount:
   # Specifies whether a service account should be created
   create: true
@@ -86,12 +91,14 @@ logConfigs: {}
 ## @param defaultConfigurationOverrides [string] Default configuration overrides (evaluated as a template)
 ##
 defaultConfigurationOverrides: |
+  {{ $clusterName := $.cluster.metadata.name }}
+  {{ $namespace := $.cluster.metadata.namespace }}
   <clickhouse>
     <!-- Macros -->
     <macros>
       <shard from_env="CLICKHOUSE_SHARD_ID"></shard>
       <replica from_env="CLICKHOUSE_REPLICA_ID"></replica>
-      <layer>{{ include "common.names.fullname" . }}</layer>
+      <layer>{{ $clusterName }}</layer>
     </macros>
     <!-- Log Level -->
     <logger>
@@ -106,7 +113,7 @@ defaultConfigurationOverrides: |
             {{- $replicas := .replicas | int }}
             {{- range $i, $_e := until $replicas }}
             <replica>
-                <host>{{ $.cluster.metadata.name }}-{{ .name }}-{{ $i }}.{{ $.cluster.metadata.name }}-{{ .name }}-headless.{{ $.cluster.metadata.namespace }}.{{ .svc }}</host>
+                <host>{{ $clusterName }}-{{ .name }}-{{ $i }}.{{ $clusterName }}-{{ .name }}-headless.{{ $namespace }}.{{ .svc }}</host>
                 <port>9000</port>
             </replica>
             {{- end }}
@@ -122,24 +129,12 @@ defaultConfigurationOverrides: |
         {{- $replicas := .replicas | int }}
         {{- range $i, $_e := until $replicas }}
       <node>
-        <host>{{ $.cluster.metadata.name }}-{{ .name }}-{{ $i }}.{{ $.cluster.metadata.name }}-{{ .name }}-headless.{{ $.cluster.metadata.namespace }}.{{ .svc }}</host>
+        <host>{{ $clusterName }}-{{ .name }}-{{ $i }}.{{ $clusterName }}-{{ .name }}-headless.{{ $namespace }}.{{ .svc }}</host>
         <port>2181</port>
       </node>
         {{- end }}
     </zookeeper>
       {{- end }}
-    {{- end }}
-    {{- with $.cluster.spec.values.externalZookeeper }}
-    <!-- Zookeeper configuration -->
-    <zookeeper>
-      {{/* Zookeeper configuration using an external instance */}}
-      {{- range $node := .servers }}
-      <node>
-        <host>{{ $node }}</host>
-        <port>{{ .port }}</port>
-      </node>
-      {{- end }}
-    </zookeeper>
     {{- end }}
     {{- if $.component.monitor.enable }}
     <!-- Prometheus metrics -->
@@ -156,10 +151,12 @@ defaultConfigurationOverrides: |
 
 clickHouseKeeper:
   configuration: |
+    {{ $clusterName := $.cluster.metadata.name }}
+    {{ $namespace := $.cluster.metadata.namespace }}
     <clickhouse>
       <listen_host>0.0.0.0</listen_host>
       <keeper_server>
-          <tcp_port>9181</tcp_port>
+          <tcp_port from_env="CLICKHOUSE_KEEPER_TCP_PORT"></tcp_port>
           <server_id>1</server_id>
           <log_storage_path>/var/lib/clickhouse/coordination/log</log_storage_path>
           <snapshot_storage_path>/var/lib/clickhouse/coordination/snapshots</snapshot_storage_path>
@@ -170,12 +167,12 @@ clickHouseKeeper:
               <raft_logs_level>warning</raft_logs_level>
           </coordination_settings>
           <raft_configuration>
-            {{- $replicas := .component.replicas | int }}
+            {{- $replicas := $.component.replicas | int }}
             {{- range $i, $e := until $replicas }}
             <server>
               <id>{{ $i + 1 }}</id>
-              <hostname>{{ $.cluster.metadata.name }}-{{ .name }}-{{ $i }}.{{ $.cluster.metadata.name }}-{{ .name }}-headless.{{ $.cluster.metadata.namespace }}.{{ .svc }}</hostname>
-              <port>9444</port>
+              <hostname>{{ $clusterName }}-{{ .name }}-{{ $i }}.{{ $clusterName }}-{{ .name }}-headless.{{ $namespace }}.{{ .svc }}</hostname>
+              <port from_env="CLICKHOUSE_KEEPER_RAFT_PORT"></port>
             </server>
             {{- end }}
           </raft_configuration>

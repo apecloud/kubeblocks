@@ -35,11 +35,13 @@ type ClusterDefinitionSpec struct {
 	// List of components belonging to the cluster.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
-	Components []ClusterDefinitionComponent `json:"components"`
+	// +patchMergeKey=typeName
+	// +patchStrategy=merge,retainKeys
+	Components []ClusterDefinitionComponent `json:"components" patchStrategy:"merge,retainKeys" patchMergeKey:"typeName"`
 
-	// Credential used for connecting database.
+	// Default connection credential used for connecting to cluster service.
 	// +optional
-	ConnectionCredential *ClusterDefinitionConnectionCredential `json:"connectionCredential,omitempty"`
+	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
 }
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
@@ -71,6 +73,16 @@ type ConfigTemplate struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32
 	VolumeName string `json:"volumeName"`
+
+	// defaultMode is optional: mode bits used to set permissions on created files by default.
+	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
+	// Defaults to 0644.
+	// Directories within the path are not affected by this setting.
+	// This might be in conflict with other options that affect the file
+	// mode, like fsGroup, and the result can be other mode bits set.
+	// +optional
+	DefaultMode *int32 `json:"defaultMode,omitempty"`
 }
 
 type ExporterConfig struct {
@@ -156,7 +168,9 @@ type ClusterDefinitionComponent struct {
 	// The configTemplateRefs field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
 	// +optional
-	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Monitor is monitoring config which provided by provider.
 	// +optional
@@ -164,7 +178,9 @@ type ClusterDefinitionComponent struct {
 
 	// LogConfigs is detail log file config which provided by provider.
 	// +optional
-	LogConfigs []LogConfig `json:"logConfigs,omitempty"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	LogConfigs []LogConfig `json:"logConfigs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// antiAffinity defines components should have anti-affinity constraint to same component type.
 	// +kubebuilder:default=false
@@ -175,7 +191,7 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	PodSpec *corev1.PodSpec `json:"podSpec,omitempty"`
 
-	// Service defines the behavior of a service spec.
+	// service defines the behavior of a service spec.
 	// provide read-write service when ComponentType is Consensus.
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
@@ -185,22 +201,49 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Probes *ClusterDefinitionProbes `json:"probes,omitempty"`
 
-	// ConsensusSpec defines consensus related spec if componentType is Consensus.
-	// CAN'T be empty if componentType is Consensus.
+	// consensusSpec defines consensus related spec if componentType is Consensus, required if componentType is Consensus.
 	// +optional
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
+
+	// // credentialRefs provides credential secrets injected to pod's container's env.
+	// // +optional
+	// // +patchMergeKey=name
+	// // +patchStrategy=merge
+	// CredentialsRefs []Credentials `json:"credentialRefs,omitempty"`
 }
 
-type ClusterDefinitionConnectionCredential struct {
-	// User defines system credential username.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=root
-	User string `json:"user"`
+// type Credentials struct {
+// 	// containerName defines associated containers name in .spec.components[].podSpec{ .initContainers[] | .containers[] }.
+// 	// +kubebuilder:validation:Required
+// 	ContainerName string `json:"containerName"`
 
-	// Password defines system credential password.
-	// +optional
-	Password string `json:"password,omitempty"`
-}
+// 	// List of environment variables to set in the container.
+// 	// Cannot be updated.
+// 	// +optional
+// 	// +patchMergeKey=name
+// 	// +patchStrategy=merge
+// 	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+
+// 	// List of sources to populate environment variables in the container.
+// 	// The keys defined within a source must be a C_IDENTIFIER. All invalid keys
+// 	// will be reported as an event when the container is starting. When a key exists in multiple
+// 	// sources, the value associated with the last source will take precedence.
+// 	// Values defined by an Env with a duplicate key will take precedence.
+// 	// Cannot be updated (yet supported).
+// 	// +optional
+// 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
+// }
+
+// type ClusterDefinitionConnectionCredential struct {
+// 	// User defines system credential username.
+// 	// +kubebuilder:validation:Required
+// 	// +kubebuilder:default=root
+// 	User string `json:"user"`
+
+// 	// Password defines system credential password.
+// 	// +optional
+// 	Password string `json:"password,omitempty"`
+// }
 
 type ClusterDefinitionStatusGeneration struct {
 	// ClusterDefinition generation number.
@@ -245,15 +288,15 @@ type ClusterDefinitionProbe struct {
 }
 
 type ClusterDefinitionProbes struct {
-	// Probe for db running check.
+	// Probe for DB running check.
 	// +optional
 	RunningProbe *ClusterDefinitionProbe `json:"runningProbe,omitempty"`
 
-	// Probe for db status check.
+	// Probe for DB status check.
 	// +optional
 	StatusProbe *ClusterDefinitionProbe `json:"statusProbe,omitempty"`
 
-	// Probe for db role changed check.
+	// Probe for DB role changed check.
 	// +optional
 	RoleChangedProbe *ClusterDefinitionProbe `json:"roleChangedProbe,omitempty"`
 }
@@ -308,6 +351,7 @@ type ConsensusMember struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:categories={dbaas},scope=Cluster,shortName=cd
+//+kubebuilder:printcolumn:name="MAIN-COMPONENT-TYPE",type="string",JSONPath=".spec.components[0].typeName",description="main component types"
 //+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 

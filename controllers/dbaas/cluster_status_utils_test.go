@@ -279,9 +279,13 @@ spec:
 				return false
 			}
 			statusComponents := newCluster.Status.Components
-			if statusComponents == nil || statusComponents[componentName] == nil {
+			if statusComponents == nil {
 				return false
 			}
+			if _, ok := statusComponents[componentName]; !ok {
+				return false
+			}
+
 			if checkClusterPhase {
 				return statusComponents[componentName].Phase == expectPhase &&
 					newCluster.Status.Phase == expectPhase

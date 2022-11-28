@@ -20,6 +20,10 @@ spec:
   scope: Cluster
   versions:
   - additionalPrinterColumns:
+    - description: main component types
+      jsonPath: .spec.components[0].typeName
+      name: MAIN-COMPONENT-TYPE
+      type: string
     - description: status phase
       jsonPath: .status.phase
       name: PHASE
@@ -79,6 +83,18 @@ spec:
                         cluster.
                       items:
                         properties:
+                          defaultMode:
+                            description: 'defaultMode is optional: mode bits used
+                              to set permissions on created files by default. Must
+                              be an octal value between 0000 and 0777 or a decimal
+                              value between 0 and 511. YAML accepts both octal and
+                              decimal values, JSON requires decimal values for mode
+                              bits. Defaults to 0644. Directories within the path
+                              are not affected by this setting. This might be in conflict
+                              with other options that affect the file mode, like fsGroup,
+                              and the result can be other mode bits set.'
+                            format: int32
+                            type: integer
                           name:
                             description: Specify the name of the referenced configuration
                               template, which is a configmap object.
@@ -97,9 +113,8 @@ spec:
                         type: object
                       type: array
                     consensusSpec:
-                      description: ConsensusSpec defines consensus related spec if
-                        componentType is Consensus. CAN'T be empty if componentType
-                        is Consensus.
+                      description: consensusSpec defines consensus related spec if
+                        componentType is Consensus, required if componentType is Consensus.
                       properties:
                         followers:
                           description: Followers, has voting right but not Leader.
@@ -7640,7 +7655,7 @@ spec:
                       description: Probes setting for db healthy checks.
                       properties:
                         roleChangedProbe:
-                          description: Probe for db role changed check.
+                          description: Probe for DB role changed check.
                           properties:
                             commands:
                               description: commands used to execute for probe.
@@ -7680,7 +7695,7 @@ spec:
                               type: integer
                           type: object
                         runningProbe:
-                          description: Probe for db running check.
+                          description: Probe for DB running check.
                           properties:
                             commands:
                               description: commands used to execute for probe.
@@ -7720,7 +7735,7 @@ spec:
                               type: integer
                           type: object
                         statusProbe:
-                          description: Probe for db status check.
+                          description: Probe for DB status check.
                           properties:
                             commands:
                               description: commands used to execute for probe.
@@ -7761,7 +7776,7 @@ spec:
                           type: object
                       type: object
                     service:
-                      description: Service defines the behavior of a service spec.
+                      description: service defines the behavior of a service spec.
                         provide read-write service when ComponentType is Consensus.
                         https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
                       properties:
@@ -8104,17 +8119,10 @@ spec:
                 minItems: 1
                 type: array
               connectionCredential:
-                description: Credential used for connecting database.
-                properties:
-                  password:
-                    description: Password defines system credential password.
-                    type: string
-                  user:
-                    default: root
-                    description: User defines system credential username.
-                    type: string
-                required:
-                - user
+                additionalProperties:
+                  type: string
+                description: Default connection credential used for connecting to
+                  cluster service.
                 type: object
               type:
                 description: Type define well known cluster types. Valid values are

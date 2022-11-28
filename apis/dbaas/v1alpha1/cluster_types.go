@@ -45,7 +45,9 @@ type ClusterSpec struct {
 
 	// List of components you want to replace in ClusterDefinition and AppVersion. It will replace the field in ClusterDefinition's and AppVersion's component if type is matching.
 	// +optional
-	Components []ClusterComponent `json:"components,omitempty"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	Components []ClusterComponent `json:"components,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Affinity describes affinities which specific by users.
 	// +optional
@@ -82,7 +84,7 @@ type ClusterStatus struct {
 
 	// Components record the current status information of all components of the cluster.
 	// +optional
-	Components map[string]*ClusterStatusComponent `json:"components,omitempty"`
+	Components map[string]ClusterStatusComponent `json:"components,omitempty"`
 
 	// Operations declares which operations the cluster supports.
 	// +optional
@@ -96,7 +98,6 @@ type ClusterStatus struct {
 }
 
 type ClusterComponent struct {
-
 	// name defines cluster's component name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
@@ -139,7 +140,9 @@ type ClusterComponent struct {
 
 	// VolumeClaimTemplates information for statefulset.spec.volumeClaimTemplates.
 	// +optional
-	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// serviceType determines how the Service is exposed. Valid
 	// options are ClusterIP, NodePort, and LoadBalancer.
@@ -333,4 +336,15 @@ func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) []*metav1.Condition
 		})
 	}
 	return conditionList
+}
+
+// GetTypeMappingComponents return Type name mapping ClusterComponents.
+func (r *Cluster) GetTypeMappingComponents() map[string][]ClusterComponent {
+	m := map[string][]ClusterComponent{}
+	for _, c := range r.Spec.Components {
+		v := m[c.Type]
+		v = append(v, c)
+		m[c.Type] = v
+	}
+	return m
 }

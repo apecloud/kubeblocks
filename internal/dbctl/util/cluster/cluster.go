@@ -90,14 +90,15 @@ func (o *ObjectsGetter) Get(objs *ClusterObjects) error {
 	}
 
 	// get service
-	if err = builder.withLabel(InstanceLabel(o.Name)).
+	instLabel := makeInstanceLabel(o.Name)
+	if err = builder.withLabel(instLabel).
 		withGK(schema.GroupKind{Kind: "Service"}).
 		do(objs); err != nil {
 		return err
 	}
 
 	// get secret
-	if err = builder.withLabel(InstanceLabel(o.Name)).
+	if err = builder.withLabel(instLabel).
 		withGK(schema.GroupKind{Kind: "Secret"}).
 		do(objs); err != nil {
 		return err
@@ -105,7 +106,7 @@ func (o *ObjectsGetter) Get(objs *ClusterObjects) error {
 
 	// get configmap
 	if o.WithConfigMap {
-		if err = builder.withLabel(InstanceLabel(o.Name)).
+		if err = builder.withLabel(instLabel).
 			withGK(schema.GroupKind{Kind: "ConfigMap"}).
 			do(objs); err != nil {
 			return err
@@ -113,23 +114,19 @@ func (o *ObjectsGetter) Get(objs *ClusterObjects) error {
 	}
 
 	// get pod
-	if err = builder.withLabel(InstanceLabel(o.Name)).
+	if err = builder.withLabel(instLabel).
 		withGK(schema.GroupKind{Kind: "Pod"}).
 		do(objs); err != nil {
 		return err
 	}
 
 	// get nodes where the pods are located
+podLoop:
 	for _, pod := range objs.Pods.Items {
-		found := false
 		for _, node := range objs.Nodes {
 			if node.Name == pod.Spec.NodeName {
-				found = true
-				break
+				break podLoop
 			}
-		}
-		if found {
-			break
 		}
 
 		if err = builder.withName(pod.Spec.NodeName).
@@ -142,7 +139,7 @@ func (o *ObjectsGetter) Get(objs *ClusterObjects) error {
 	return nil
 }
 
-func InstanceLabel(name string) string {
+func makeInstanceLabel(name string) string {
 	return fmt.Sprintf("%s=%s", types.InstanceLabelKey, name)
 }
 

@@ -8,7 +8,7 @@ spec:
   type: state.mysql
   connectionCredential:
     user: {{ .Values.auth.rootUser }}
-    password: {{ .Values.auth.rootPassword }}
+    password: "$(RANDOM_PASSWORD)"
   components:
     - typeName: replicasets
       characterType: mysql
@@ -40,6 +40,7 @@ spec:
         ports:
           - protocol: TCP
             port: 3306
+            targetPort: mysql
       podSpec:
         containers:
           - name: mysql
@@ -53,10 +54,8 @@ spec:
                 name: mysql-config
             ports:
               - containerPort: 3306
-                protocol: TCP
                 name: mysql
               - containerPort: 13306
-                protocol: TCP
                 name: paxos
             env:
               - name: MYSQL_ROOT_HOST

@@ -230,17 +230,17 @@ func isExistsEventMsg(statusComponentMessage string, event *corev1.Event) bool {
 // needSyncComponentStatusForEvent check whether the component status needs to be synchronized the cluster status by event
 func needSyncComponentStatusForEvent(cluster *dbaasv1alpha1.Cluster, componentName string, phase dbaasv1alpha1.Phase, event *corev1.Event) bool {
 	var (
-		statusComponent *dbaasv1alpha1.ClusterStatusComponent
+		statusComponent dbaasv1alpha1.ClusterStatusComponent
 		ok              bool
 	)
 	if phase == "" {
 		return false
 	}
 	if cluster.Status.Components == nil {
-		cluster.Status.Components = map[string]*dbaasv1alpha1.ClusterStatusComponent{}
+		cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{}
 	}
 	if statusComponent, ok = cluster.Status.Components[componentName]; !ok {
-		cluster.Status.Components[componentName] = &dbaasv1alpha1.ClusterStatusComponent{Phase: phase, Message: event.Message}
+		cluster.Status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{Phase: phase, Message: event.Message}
 		return true
 	}
 	if statusComponent.Phase != phase {

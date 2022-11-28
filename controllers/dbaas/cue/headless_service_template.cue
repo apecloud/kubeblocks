@@ -44,7 +44,7 @@ service: {
 				name:       v.name
 				protocol:   v.protocol
 				port:       v.containerPort
-				targetPort: v.containerPort
+				targetPort: v.name
 			},
 		]
 		if component.service.type != _|_ {

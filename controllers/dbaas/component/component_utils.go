@@ -39,13 +39,13 @@ type handleComponentAndCheckStatus func(reqCtx intctrlutil.RequestCtx, cli clien
 func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster, componentName string, componentIsRunning bool) bool {
 	var (
 		ok              bool
-		statusComponent *dbaasv1alpha1.ClusterStatusComponent
+		statusComponent dbaasv1alpha1.ClusterStatusComponent
 	)
 	if cluster.Status.Components == nil {
-		cluster.Status.Components = map[string]*dbaasv1alpha1.ClusterStatusComponent{}
+		cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{}
 	}
 	if statusComponent, ok = cluster.Status.Components[componentName]; !ok {
-		cluster.Status.Components[componentName] = &dbaasv1alpha1.ClusterStatusComponent{Phase: cluster.Status.Phase}
+		cluster.Status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{Phase: cluster.Status.Phase}
 		return true
 	}
 	if !componentIsRunning {

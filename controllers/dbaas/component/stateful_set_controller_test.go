@@ -498,7 +498,7 @@ spec:
 			componentName := "wesql-test"
 			patch := client.MergeFrom(cluster.DeepCopy())
 			cluster.Status.Phase = dbaasv1alpha1.UpdatingPhase
-			cluster.Status.Components = map[string]*dbaasv1alpha1.ClusterStatusComponent{
+			cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
 				componentName: {
 					Phase: dbaasv1alpha1.UpdatingPhase,
 				},

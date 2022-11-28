@@ -2,7 +2,7 @@ apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: AppVersion
 metadata:
   name: clickhouse-{{ default .Chart.AppVersion .Values.appVersionOverride }}
-  labels: {{- include "common.labels.standard" . | nindent 4 }}
+  labels:
     {{- include "clickhouse.labels" . | nindent 4 }}
     {{- if .Values.commonLabels }}
     {{- include "common.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 4 }}
@@ -13,7 +13,13 @@ metadata:
 spec:
   clusterDefinitionRef: apecloud-clickhouse
   components:
-    - type: shard
+    - type: clickhouse
+      podSpec:
+        containers:
+          - name: clickhouse
+            image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+    - type: ch-keeper
       podSpec:
         containers:
           - name: clickhouse

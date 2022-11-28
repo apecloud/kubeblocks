@@ -21,6 +21,7 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 const (
@@ -72,4 +73,34 @@ type Component struct {
 	EnabledLogs             []string                               `json:"enabledLogs,omitempty"`
 	LogConfigs              []dbaasv1alpha1.LogConfig              `json:"logConfigs,omitempty"`
 	ConfigTemplates         []dbaasv1alpha1.ConfigTemplate         `json:"configTemplates,omitempty"`
+}
+
+type ResourceDefinition struct {
+	MemorySize int64 `json:"memorySize,omitempty"`
+	CoreNum    int64 `json:"coreNum,omitempty"`
+}
+
+type componentTemplateValues struct {
+	TypeName    string
+	ServiceName string
+	Replicas    int32
+
+	// Container *corev1.Container
+	Resource  *ResourceDefinition
+	ConfigTpl []dbaasv1alpha1.ConfigTemplate
+}
+
+type configTemplateBuilder struct {
+	namespace   string
+	clusterName string
+
+	// Global Var
+	componentValues  *componentTemplateValues
+	builtInFunctions *intctrlutil.BuiltInObjectsFunc
+
+	// DBaas cluster object
+	component  *Component
+	appVersion *dbaasv1alpha1.AppVersion
+	cluster    *dbaasv1alpha1.Cluster
+	podSpec    *corev1.PodSpec
 }

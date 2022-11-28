@@ -50,7 +50,7 @@ func Cluster(name string, namespace string) *dbaasv1alpha1.Cluster {
 		},
 		Status: dbaasv1alpha1.ClusterStatus{
 			Phase: dbaasv1alpha1.RunningPhase,
-			Components: map[string]*dbaasv1alpha1.ClusterStatusComponent{
+			Components: map[string]dbaasv1alpha1.ClusterStatusComponent{
 				ComponentName: {
 					ConsensusSetStatus: &dbaasv1alpha1.ConsensusSetStatus{
 						Leader: dbaasv1alpha1.ConsensusMemberStatus{

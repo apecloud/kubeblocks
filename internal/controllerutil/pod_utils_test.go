@@ -188,15 +188,18 @@ var _ = Describe("tpl template", func() {
 	Context("GetContainerUsingConfig test", func() {
 		// found name: mysql3
 		It("Should success with no error", func() {
-			Expect(GetContainerUsingConfig(statefulSet.Spec.Template, configTemplates)).To(Equal(&statefulSet.Spec.Template.Spec.Containers[2]))
+			podSpec := &statefulSet.Spec.Template.Spec
+			Expect(GetContainerUsingConfig(podSpec, configTemplates)).To(Equal(podSpec.Containers[2]))
 		})
 		// found name: init_mysql
 		It("Should success with no error", func() {
-			Expect(GetContainerUsingConfig(statefulSet.Spec.Template, foundInitContainerConfigTemplates)).To(Equal(&statefulSet.Spec.Template.Spec.InitContainers[0]))
+			podSpec := &statefulSet.Spec.Template.Spec
+			Expect(GetContainerUsingConfig(podSpec, foundInitContainerConfigTemplates)).To(Equal(podSpec.InitContainers[0]))
 		})
 		// not found container
 		It("Should failed", func() {
-			Expect(GetContainerUsingConfig(statefulSet.Spec.Template, notFoundConfigTemplates)).To(BeNil(), "get container is nil!")
+			podSpec := &statefulSet.Spec.Template.Spec
+			Expect(GetContainerUsingConfig(podSpec, notFoundConfigTemplates)).To(BeNil(), "get container is nil!")
 		})
 	})
 
@@ -288,14 +291,14 @@ var _ = Describe("tpl template", func() {
 			}
 
 			for i := range testResources {
-				Expect(GetMemorySize(testResources[i].container)).To(Equal(testResources[i].expectMemorySize))
-				Expect(GetCoreNum(testResources[i].container)).To(Equal(testResources[i].expectCPU))
+				Expect(GetMemorySize(testResources[i].container)).To(BeEquivalentTo(testResources[i].expectMemorySize))
+				Expect(GetCoreNum(testResources[i].container)).To(BeEquivalentTo(testResources[i].expectCPU))
 			}
 		})
 		It("Resource not limit", func() {
 			container := corev1.Container{}
-			Expect(GetMemorySize(container)).To(Equal(int64(0)))
-			Expect(GetCoreNum(container)).To(Equal(0))
+			Expect(GetMemorySize(container)).To(BeEquivalentTo(0))
+			Expect(GetCoreNum(container)).To(BeEquivalentTo(0))
 		})
 	})
 

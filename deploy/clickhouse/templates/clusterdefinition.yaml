@@ -2,7 +2,7 @@ apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
   name: apecloud-clickhouse
-  labels: {{- include "common.labels.standard" . | nindent 4 }}
+  labels:
     {{- include "clickhouse.labels" . | nindent 4 }}
     {{- if .Values.commonLabels }}
     {{- include "common.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 4 }}
@@ -13,8 +13,9 @@ metadata:
 spec:
   type: state.clickhouse
   connectionCredential:
-    user: {{ .Values.auth.rootUser }}
-    password: {{ .Values.auth.rootPassword }}
+    username: "admin-password" 
+    password: "$(RANDOM_PASSWD)"
+    "$(CONN_CREDENTIAL).username": "$(CONN_CREDENTIAL).password"
   components:
     - typeName: clickhouse
       componentType: Stateful
@@ -40,32 +41,26 @@ spec:
           - name: http
             targetPort: http
             port: 8123
-            protocol: TCP
             nodePort: null
           - name: tcp
             targetPort: tcp
             port: 9000
-            protocol: TCP
             nodePort: null
           - name: tcp-mysql
             targetPort: tcp-mysql
             port: 9004
-            protocol: TCP
             nodePort: null
           - name: tcp-postgresql
             targetPort: tcp-postgresql
             port: 9005
-            protocol: TCP
             nodePort: null
           - name: http-intersrv
             targetPort: http-intersrv
             port: 9009
-            protocol: TCP
             nodePort: null
           - name: http-metrics
             targetPort: http-metrics
             port: 8001
-            protocol: TCP
             nodePort: null
       podSpec:
         securityContext:
@@ -82,6 +77,11 @@ spec:
               runAsNonRoot: true
               runAsUser: 1001
             env:
+              - name: CLICKHOUSE_ADMIN_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: admin-password
               - name: BITNAMI_DEBUG
                 value: "false"
               - name: CLICKHOUSE_HTTP_PORT
@@ -99,29 +99,30 @@ spec:
               - name: CLICKHOUSE_ADMIN_USER
                 value: "default"
               - name: CLICKHOUSE_SHARD_ID
-                value: "$(KB_COMPONENT_NAME)"
+                value: "$(KB_COMP_NAME)"
               - name: CLICKHOUSE_REPLICA_ID
                 valueFrom:
                   fieldRef:
                     fieldPath: metadata.name
-              - name: CLICKHOUSE_ADMIN_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    name: myck-clickhouse
-                    key: admin-password
             ports:
               - name: http
                 containerPort: 8123
+                # protocol: TCP
               - name: tcp
                 containerPort: 9000
+                # protocol: TCP
               - name: tcp-postgresql
                 containerPort: 9005
+                # protocol: TCP
               - name: tcp-mysql
                 containerPort: 9004
+                # protocol: TCP
               - name: http-intersrv
                 containerPort: 9009
+                # protocol: TCP
               - name: http-metrics
                 containerPort: 8001
+                # protocol: TCP
             livenessProbe:
               failureThreshold: 3
               initialDelaySeconds: 10
@@ -147,7 +148,7 @@ spec:
                 mountPath: /bitnami/clickhouse/etc/conf.d/default
 
     - typeName: ch-keeper
-      componentType: Stateful
+      componentType: Stateful # Consensus
       characterType: zookeeper
       defaultReplicas: 0
       minReplicas: 0
@@ -167,29 +168,9 @@ spec:
           volumeName: config
       service:
         ports:
-          - name: http
-            targetPort: http
-            port: 8123
-            protocol: TCP
-            nodePort: null
           - name: tcp
             targetPort: tcp
-            port: 9000
-            protocol: TCP
-            nodePort: null
-          - name: tcp-mysql
-            targetPort: tcp-mysql
-            port: 9004
-            protocol: TCP
-            nodePort: null
-          - name: tcp-postgresql
-            targetPort: tcp-postgresql
-            port: 9005
-            protocol: TCP
-            nodePort: null
-          - name: http-intersrv
-            targetPort: http-intersrv
-            port: 9009
+            port: 2181
             protocol: TCP
             nodePort: null
           - name: http-metrics
@@ -214,44 +195,22 @@ spec:
             env:
               - name: BITNAMI_DEBUG
                 value: "false"
-              - name: CLICKHOUSE_HTTP_PORT
-                value: "8123"
-              - name: CLICKHOUSE_TCP_PORT
-                value: "9000"
-              - name: CLICKHOUSE_MYSQL_PORT
-                value: "9004"
-              - name: CLICKHOUSE_POSTGRESQL_PORT
-                value: "9005"
-              - name: CLICKHOUSE_INTERSERVER_HTTP_PORT
-                value: "9009"
+              - name: CLICKHOUSE_KEEPER_TCP_PORT
+                value: "2181"
+              - name: CLICKHOUSE_KEEPER_RAFT_PORT
+                value: "9181"
               - name: CLICKHOUSE_METRICS_PORT
                 value: "8001"
-              - name: CLICKHOUSE_ADMIN_USER
-                value: "default"
-              - name: CLICKHOUSE_SHARD_ID
-                value: "shard1"
-              - name: CLICKHOUSE_REPLICA_ID
-                valueFrom:
-                  fieldRef:
-                    fieldPath: metadata.name
-              - name: CLICKHOUSE_ADMIN_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    name: myck-clickhouse
-                    key: admin-password
             ports:
-              - name: http
-                containerPort: 8123
               - name: tcp
-                containerPort: 9000
-              - name: tcp-postgresql
-                containerPort: 9005
-              - name: tcp-mysql
-                containerPort: 9004
-              - name: http-intersrv
-                containerPort: 9009
+                containerPort: 2181
+                # protocol: TCP
+              - name: raft
+                containerPort: 9444
+                # protocol: TCP
               - name: http-metrics
                 containerPort: 8001
+                # protocol: TCP
             livenessProbe:
               failureThreshold: 3
               initialDelaySeconds: 10
@@ -277,7 +236,7 @@ spec:
                 mountPath: /bitnami/clickhouse/etc/conf.d/default
 
     - typeName: zookeeper
-      componentType: Stateful # consensus
+      componentType: Stateful #Consensus
       characterType: zookeeper
       defaultReplicas: 1
       minReplicas: 0
@@ -291,34 +250,33 @@ spec:
         builtIn: false
         exporterConfig:
           scrapePath: /metrics
-          scrapePort: 8001
+          scrapePort: 9141
       logConfigs:
         {{- range $name,$pattern := .Values.zookeeper.logConfigs }}
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
-      {{- if .Values.zookeeper.configuration }}
       configTemplateRefs:
+      {{- if .Values.zookeeper.configuration }}
         - name: zookeeper-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: config
       {{- end }}
-        - name: zookeeper-script-tpl
+        - name: zookeeper-scripts-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: script 
-          defaultMode: 0755
+          defaultMode: 755 #0755
       defaultReplicas: 1
       service:
-        - name: tcp-client
-          port: 2181
-          targetPort: client
-          nodePort: null
-        - name: tcp-follower
-          port: 2888
-          targetPort: follower
-        - name: tcp-election
-          port: 3888
-          targetPort: election
+        ports:
+          - name: tcp-client
+            port: 2181
+            targetPort: client
+            nodePort: null
+          - name: metrics
+            port: 9141
+            targetPort: metrics
+            nodePort: null
       podSpec:
         securityContext:
           fsGroup: 1001
@@ -342,10 +300,6 @@ spec:
                   fieldRef:
                     apiVersion: v1
                     fieldPath: metadata.name
-              - name: POD_NAMESPACE
-                valueFrom:
-                  fieldRef:
-                    fieldPath: metadata.namespace
               - name: BITNAMI_DEBUG
                 value: "false"
               - name: ZOO_DATA_LOG_DIR
@@ -374,8 +328,9 @@ spec:
                 value: "3"
               - name: ZOO_MAX_SESSION_TIMEOUT
                 value: "40000"
+              # HACK: hack for single ZK node only
               - name: ZOO_SERVERS
-                value: $(KB_POD_NAME).$(KB_HEADLESS_SVC_NAME).$(KB_NAMESPACE).svc:2888:3888::1
+                value: "$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc:2888:3888::1"
                 # value: myck-zookeeper-0.myck-zookeeper-headless.$(POD_NAMESPACE).svc:2888:3888::1 myck-zookeeper-1.myck-zookeeper-headless.$(POD_NAMESPACE).svc:2888:3888::2 myck-zookeeper-2.myck-zookeeper-headless.$(POD_NAMESPACE).svc:2888:3888::3 
               - name: ZOO_ENABLE_AUTH
                 value: "no"
@@ -387,14 +342,27 @@ spec:
                 value: "ERROR"
               - name: ALLOW_ANONYMOUS_LOGIN
                 value: "yes"
-
+              - name: ZOO_ENABLE_PROMETHEUS_METRICS
+                value: "yes"
+              - name: ZOO_PROMETHEUS_METRICS_PORT_NUMBER
+                value: "9141"
+              - name: POD_NAME
+                value: "$(KB_POD_NAME)"
+              - name: POD_NAMESPACE
+                value: "$(KB_NAMESPACE)"
             ports:
               - name: client
                 containerPort: 2181
+                # protocol: TCP
               - name: follower
                 containerPort: 2888
+                # protocol: TCP
               - name: election
                 containerPort: 3888
+                # protocol: TCP
+              - name: metrics
+                containerPort: 9141
+                # protocol: TCP
             livenessProbe:
               failureThreshold: 6
               initialDelaySeconds: 30

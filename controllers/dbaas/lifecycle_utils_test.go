@@ -49,11 +49,9 @@ func TestReadCUETplFromEmbeddedFS(t *testing.T) {
 		t.Error("Expected no error", err)
 	}
 	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("secret_template.cue"))
-
 	if err != nil {
 		t.Error("Expected no error", err)
 	}
-
 	tlog.Info("", "cueValue", cueTpl)
 }
 
@@ -225,9 +223,10 @@ var _ = Describe("lifecycle_utils", func() {
 		})
 
 		It("Corner case volume is nil, and add no volume", func() {
-			err := checkAndUpdatePodVolumes(&sts, volumes)
+			ps := &sts.Spec.Template.Spec
+			err := checkAndUpdatePodVolumes(ps, volumes)
 			Expect(err).Should(BeNil())
-			Expect(len(sts.Spec.Template.Spec.Volumes)).To(Equal(1))
+			Expect(len(ps.Volumes)).To(Equal(1))
 		})
 
 		It("Normal test case, and add one volume", func() {
@@ -235,9 +234,10 @@ var _ = Describe("lifecycle_utils", func() {
 				Name:       "myConfig",
 				VolumeName: "myConfigVolume",
 			}
-			err := checkAndUpdatePodVolumes(&sts, volumes)
+			ps := &sts.Spec.Template.Spec
+			err := checkAndUpdatePodVolumes(ps, volumes)
 			Expect(err).Should(BeNil())
-			Expect(len(sts.Spec.Template.Spec.Volumes)).To(Equal(2))
+			Expect(len(ps.Volumes)).To(Equal(2))
 		})
 
 		It("Normal test case, and add two volume", func() {
@@ -249,9 +249,10 @@ var _ = Describe("lifecycle_utils", func() {
 				Name:       "myConfig",
 				VolumeName: "myConfigVolume",
 			}
-			err := checkAndUpdatePodVolumes(&sts, volumes)
+			ps := &sts.Spec.Template.Spec
+			err := checkAndUpdatePodVolumes(ps, volumes)
 			Expect(err).Should(BeNil())
-			Expect(len(sts.Spec.Template.Spec.Volumes)).To(Equal(3))
+			Expect(len(ps.Volumes)).To(Equal(3))
 		})
 	})
 

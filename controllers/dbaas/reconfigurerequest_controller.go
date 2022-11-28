@@ -119,7 +119,7 @@ type ResourceConfigMapWithLabelPredicate struct {
 	predicate.Funcs
 }
 
-func (c *ResourceConfigMapWithLabelPredicate) Create(createEvent event.CreateEvent) bool {
+func (r *ResourceConfigMapWithLabelPredicate) Create(createEvent event.CreateEvent) bool {
 	return checkConfigurationObject(createEvent.Object)
 }
 
@@ -287,11 +287,11 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params cfgpolicy.Reconfigu
 	}
 
 	switch execStatus {
-	case cfgpolicy.ES_Retry:
+	case cfgpolicy.ESRetry:
 		return intctrlutil.RequeueAfter(dbaasconfig.ConfigReconcileInterval, params.Ctx.Log, "")
-	case cfgpolicy.ES_None:
+	case cfgpolicy.ESNone:
 		return r.updateCfgStatus(params.Ctx, params.Cfg, policy.GetPolicyName())
-	case cfgpolicy.ES_Failed:
+	case cfgpolicy.ESFailed:
 		if err := dbaasconfig.SetCfgUpgradeFlag(params.Client, params.Ctx, params.Cfg, false); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, params.Ctx.Log, "")
 		}

@@ -63,7 +63,7 @@ host=localhost
 func TestRawConfig(t *testing.T) {
 
 	cfg, err := NewConfigLoader(CfgOption{
-		Type:    CFG_RAW,
+		Type:    CfgRawType,
 		Log:     log.FromContext(context.Background()),
 		CfgType: dbaasv1alpha1.INI,
 		RawData: []byte(iniConfig),
@@ -124,7 +124,7 @@ func TestRawConfig(t *testing.T) {
 
 func TestConfigMapConfig(t *testing.T) {
 	cfg, err := NewConfigLoader(CfgOption{
-		Type:    CFG_CM,
+		Type:    CfgCmType,
 		Log:     log.FromContext(context.Background()),
 		CfgType: dbaasv1alpha1.INI,
 		K8sKey: &K8sConfig{

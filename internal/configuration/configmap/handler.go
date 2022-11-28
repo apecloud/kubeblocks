@@ -43,21 +43,21 @@ var allUnixSignals = map[string]os.Signal{
 func findParentPidFromProcessName(processName string) (PID, error) {
 	allProcess, err := process.Processes()
 	if err != nil {
-		return INVALID_PID, err
+		return InvalidPid, err
 	}
 
 	psGraph := map[PID]int32{}
 	for _, proc := range allProcess {
 		name, err := proc.Name()
 		if err != nil {
-			return INVALID_PID, cfgutil.WrapError(err, "failed to get process name from pid[%d]", proc.Pid)
+			return InvalidPid, cfgutil.WrapError(err, "failed to get process name from pid[%d]", proc.Pid)
 		}
 		if name != processName {
 			continue
 		}
 		ppid, err := proc.Ppid()
 		if err != nil {
-			return INVALID_PID, cfgutil.WrapError(err, "failed to get parent pid from pid[%d]", proc.Pid)
+			return InvalidPid, cfgutil.WrapError(err, "failed to get parent pid from pid[%d]", proc.Pid)
 		}
 		psGraph[PID(proc.Pid)] = ppid
 	}
@@ -68,7 +68,7 @@ func findParentPidFromProcessName(processName string) (PID, error) {
 		}
 	}
 
-	return INVALID_PID, cfgutil.MakeError("not find pid fo process name: [%s]", processName)
+	return InvalidPid, cfgutil.MakeError("not find pid fo process name: [%s]", processName)
 }
 
 func CreateSignalHandler(sig string, processName string) WatchEventHandler {

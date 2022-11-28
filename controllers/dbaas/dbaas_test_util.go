@@ -34,12 +34,12 @@ import (
 )
 
 const (
-	ISV_CLUSTER_SCOPE = "default"
+	ISVClusterScope = "default"
 
-	ISV_TEST_CD_PREFIX  = "test-clusterdefinition-"
-	ISV_TEST_AV_PREFIX  = "test-appversion-"
-	ISV_TEST_TPL_PREFIX = "test-cfgtpl-"
-	TEST_CLUSTER_PREFIX = "test-cluster-"
+	ISVTestCdPrefix   = "test-clusterdefinition-"
+	ISVTestAvPrefix   = "test-appversion-"
+	ISVTestTplPrefix  = "test-cfgtpl-"
+	TestClusterPrefix = "test-cluster-"
 )
 
 type FakeTest struct {
@@ -186,7 +186,7 @@ func (w *TestWrapper) DeleteAllCR() error {
 	// step5: delete config cm cr
 	if err := k8sClient.DeleteAllOf(ctx,
 		&corev1.ConfigMap{},
-		client.InNamespace(ISV_CLUSTER_SCOPE),
+		client.InNamespace(ISVClusterScope),
 		client.HasLabels{
 			testCtx.TestObjLabelKey,
 			configuration.CMConfigurationTplNameLabelKey,
@@ -256,19 +256,19 @@ func (w *TestWrapper) updateCrObject(obj client.Object, patch client.Patch) erro
 }
 
 func GenRandomCDName() string {
-	return ISV_TEST_CD_PREFIX + BuildRandomString()
+	return ISVTestCdPrefix + BuildRandomString()
 }
 
 func GenRandomAVName() string {
-	return ISV_TEST_AV_PREFIX + BuildRandomString()
+	return ISVTestAvPrefix + BuildRandomString()
 }
 
 func GenRandomClusterName() string {
-	return TEST_CLUSTER_PREFIX + BuildRandomString()
+	return TestClusterPrefix + BuildRandomString()
 }
 
 func GenRandomTplName() string {
-	return ISV_TEST_TPL_PREFIX + BuildRandomString()
+	return ISVTestTplPrefix + BuildRandomString()
 }
 
 func BuildRandomString() string {
@@ -347,7 +347,7 @@ func createCRFromISVWithT(t *TestWrapper, tplName string, fileName string, crTyp
 	}
 
 	crObj.SetName(tplName)
-	crObj.SetNamespace(ISV_CLUSTER_SCOPE)
+	crObj.SetNamespace(ISVClusterScope)
 	t.createCrObject(crObj)
 }
 
@@ -388,22 +388,22 @@ func ValidateISVCR[T any, OBJECT K8sResource](test *TestWrapper, obj client.Obje
 	switch obj.(type) {
 	case *dbaasv1alpha1.AppVersion:
 		objKey = client.ObjectKey{
-			Namespace: ISV_CLUSTER_SCOPE,
+			Namespace: ISVClusterScope,
 			Name:      test.testEnv.AvName,
 		}
 	case *dbaasv1alpha1.ClusterDefinition:
 		objKey = client.ObjectKey{
-			Namespace: ISV_CLUSTER_SCOPE,
+			Namespace: ISVClusterScope,
 			Name:      test.testEnv.CdName,
 		}
 	case *dbaasv1alpha1.ConfigurationTemplate:
 		objKey = client.ObjectKey{
-			Namespace: ISV_CLUSTER_SCOPE,
+			Namespace: ISVClusterScope,
 			Name:      test.testEnv.CfgTplName,
 		}
 	case *corev1.ConfigMap:
 		objKey = client.ObjectKey{
-			Namespace: ISV_CLUSTER_SCOPE,
+			Namespace: ISVClusterScope,
 			Name:      test.testEnv.CfgTplName,
 		}
 	default:

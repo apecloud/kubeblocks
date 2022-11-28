@@ -315,7 +315,7 @@ func GetConfigurationVersion(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, 
 	}
 
 	option := cfgcore.CfgOption{
-		Type:    cfgcore.CFG_TPL,
+		Type:    cfgcore.CfgTplType,
 		CfgType: tpl.Formatter,
 		Log:     ctx.Log,
 	}
@@ -332,7 +332,7 @@ func GetConfigurationVersion(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, 
 func UpdateConfigurationSchema(tpl *dbaasv1alpha1.ConfigurationTemplateSpec) error {
 	schema := tpl.ConfigurationSchema
 	if schema != nil && schema.Cue != nil && len(*schema.Cue) > 0 && schema.Schema == nil {
-		customSchema, err := cfgcore.GenerateOpenApiSchema(*schema.Cue, tpl.CfgSchemaTopLevelName)
+		customSchema, err := cfgcore.GenerateOpenAPISchema(*schema.Cue, tpl.CfgSchemaTopLevelName)
 		if err != nil {
 			return err
 		}

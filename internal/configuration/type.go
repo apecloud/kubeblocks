@@ -26,10 +26,10 @@ import (
 type ConfigType string
 
 const (
-	CFG_CM    ConfigType = "configmap"
-	CFG_TPL   ConfigType = "configurationTemplate"
-	CFG_LOCAL ConfigType = "local"
-	CFG_RAW   ConfigType = "raw"
+	CfgCmType    ConfigType = "configmap"
+	CfgTplType   ConfigType = "configurationTemplate"
+	CfgLocalType ConfigType = "local"
+	CfgRawType   ConfigType = "raw"
 )
 
 type RawConfig struct {
@@ -43,8 +43,8 @@ type IniContext struct {
 	SectionName string
 }
 
-// XmlContext TODO(zt) Support Xml config
-type XmlContext struct {
+// XMLContext TODO(zt) Support Xml config
+type XMLContext struct {
 }
 
 type CfgOpOption struct {
@@ -60,7 +60,7 @@ type CfgOpOption struct {
 	// optional
 	IniContext *IniContext
 	// optional
-	XmlContext *XmlContext
+	XMLContext *XMLContext
 }
 
 type ConfigOperator interface {
@@ -95,7 +95,7 @@ type CfgOption struct {
 	// formatter
 	CfgType dbaasv1alpha1.ConfigurationFormatter
 
-	// Path for CFG_LOCAL test
+	// Path for CfgLocalType test
 	Path    string
 	RawData []byte
 

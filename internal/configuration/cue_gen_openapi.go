@@ -30,9 +30,9 @@ import (
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 )
 
-func GenerateOpenApiSchema(cueTpl string, schemaType string) (*apiextv1.JSONSchemaProps, error) {
+func GenerateOpenAPISchema(cueTpl string, schemaType string) (*apiextv1.JSONSchemaProps, error) {
 	const (
-		OpenApiVersion = "3.1.0"
+		OpenAPIVersion = "3.1.0"
 	)
 
 	cfg := &load.Config{
@@ -50,12 +50,12 @@ func GenerateOpenApiSchema(cueTpl string, schemaType string) (*apiextv1.JSONSche
 	}
 
 	openapicfg := openapi.Config{
-		Version:       OpenApiVersion,
+		Version:       OpenAPIVersion,
 		SelfContained: true,
 		// ExpandReferences: true,
 		Info: ast.NewStruct(
 			"title", ast.NewString(fmt.Sprintf("%s configuration schema", schemaType)),
-			"version", ast.NewString(OpenApiVersion),
+			"version", ast.NewString(OpenAPIVersion),
 		),
 	}
 

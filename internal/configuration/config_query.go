@@ -38,7 +38,7 @@ func GetParameterFromConfiguration(configMap *corev1.ConfigMap, allFiles bool, f
 
 	// Load configmap
 	wrapCfg, err := NewConfigLoader(CfgOption{
-		Type:    CFG_CM,
+		Type:    CfgCmType,
 		Log:     log.FromContext(context.Background()),
 		CfgType: dbaasv1alpha1.INI,
 		K8sKey: &K8sConfig{

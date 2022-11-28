@@ -29,10 +29,10 @@ import (
 type ExecStatus int
 
 const (
-	ES_None ExecStatus = iota
-	ES_Retry
-	ES_Failed
-	ES_NotSpport
+	ESNone ExecStatus = iota
+	ESRetry
+	ESFailed
+	ESNotSupport
 )
 
 func init() {
@@ -92,7 +92,7 @@ type AutoReloadPolicy struct{}
 
 func (receiver AutoReloadPolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
 	_ = params
-	return ES_None, nil
+	return ESNone, nil
 }
 
 func (receiver AutoReloadPolicy) GetPolicyName() string {

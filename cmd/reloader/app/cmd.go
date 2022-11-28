@@ -104,7 +104,7 @@ func createHandlerWithWatchType(opt *VolumeWatcherOpts) cfgcore.WatchEventHandle
 	switch opt.NotifyHandType {
 	case UnixSignal:
 		return cfgcore.CreateSignalHandler(opt.Signal, opt.ProcessName)
-	case Sql, ShellTool, WebHook:
+	case SQL, ShellTool, WebHook:
 		logrus.Fatalf("event type[%s]: not yet, but in the future", opt.NotifyHandType.String())
 	default:
 		logrus.Fatal("not support event type.")

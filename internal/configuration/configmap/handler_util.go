@@ -52,7 +52,7 @@ func NeedBuildConfigSidecar(autoReload bool, reloadType dbaasv1alpha1.CfgReloadT
 	switch reloadType {
 	case dbaasv1alpha1.UnixSignalType:
 		return checkSignalType(configuration)
-	case dbaasv1alpha1.SqlType, dbaasv1alpha1.ShellType, dbaasv1alpha1.HttpType:
+	case dbaasv1alpha1.SQLType, dbaasv1alpha1.ShellType, dbaasv1alpha1.HTTPType:
 		// TODO support other method
 		return false, cfgutil.MakeError("This special reload type [%s] is not supported for now!", reloadType)
 	default:

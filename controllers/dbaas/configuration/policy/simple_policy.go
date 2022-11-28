@@ -37,7 +37,7 @@ func (s *SimplePolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
 		return rollingStatefulSets(params)
 		// process consensus
 	default:
-		return ES_NotSpport, cfgcore.MakeError("not support component type:[%s]", params.ComponentType())
+		return ESNotSupport, cfgcore.MakeError("not support component type:[%s]", params.ComponentType())
 	}
 }
 
@@ -54,14 +54,14 @@ func rollingStatefulSets(param ReconfigureParams) (ExecStatus, error) {
 	)
 
 	if configKey == "" {
-		return ES_Failed, cfgcore.MakeError("failed to found config meta. configmap : %s", param.TplName)
+		return ESFailed, cfgcore.MakeError("failed to found config meta. configmap : %s", param.TplName)
 	}
 
 	for _, sts := range units {
 		if err := dbaascfg.RestartStsWithRolling(client, param.Ctx, sts, configKey, newVersion); err != nil {
 			param.Ctx.Log.Error(err, "failed to restart statefulSet.", "stsName", sts.GetName())
-			return ES_Retry, nil
+			return ESRetry, nil
 		}
 	}
-	return ES_None, nil
+	return ESNone, nil
 }

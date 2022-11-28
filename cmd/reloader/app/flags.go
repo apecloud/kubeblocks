@@ -30,14 +30,14 @@ const (
 	UnixSignal NotifyEventType = iota // "signal"
 	WebHook                           // "http"
 	ShellTool                         // "exec"
-	Sql                               // "sql"
+	SQL                               // "sql"
 )
 
 var allNotifyType = map[NotifyEventType]dbaasv1alpha1.CfgReloadType{
 	UnixSignal: dbaasv1alpha1.UnixSignalType,
-	WebHook:    dbaasv1alpha1.HttpType,
+	WebHook:    dbaasv1alpha1.HTTPType,
 	ShellTool:  dbaasv1alpha1.ShellType,
-	Sql:        dbaasv1alpha1.SqlType,
+	SQL:        dbaasv1alpha1.SQLType,
 }
 
 func (f *NotifyEventType) Type() string {

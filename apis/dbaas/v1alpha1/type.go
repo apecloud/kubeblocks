@@ -161,9 +161,9 @@ type CfgReloadType string
 
 const (
 	UnixSignalType CfgReloadType = "signal"
-	SqlType        CfgReloadType = "sql"
+	SQLType        CfgReloadType = "sql"
 	ShellType      CfgReloadType = "exec"
-	HttpType       CfgReloadType = "http"
+	HTTPType       CfgReloadType = "http"
 )
 
 func RegisterWebhookManager(mgr manager.Manager) {

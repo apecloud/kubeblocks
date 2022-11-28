@@ -67,14 +67,14 @@ func TestGenerateOpenApiSchema(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := runOpenApiTest(tt.args.cueFile, tt.args.schemaType)
+			got, err := runOpenAPITest(tt.args.cueFile, tt.args.schemaType)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("GenerateOpenApiSchema() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("GenerateOpenAPISchema() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			wantContent := getContentFromFile(tt.want)
 			if !reflect.DeepEqual(got, wantContent) {
-				t.Errorf("GenerateOpenApiSchema() diff: %s", cmp.Diff(wantContent, got))
+				t.Errorf("GenerateOpenAPISchema() diff: %s", cmp.Diff(wantContent, got))
 			}
 		})
 	}
@@ -88,13 +88,13 @@ func getContentFromFile(file string) []byte {
 	return content
 }
 
-func runOpenApiTest(cueFile string, typeName string) ([]byte, error) {
+func runOpenAPITest(cueFile string, typeName string) ([]byte, error) {
 	cueTpl := getContentFromFile(cueFile)
 	if cueTpl == nil {
 		return nil, MakeError("not open file[%s]", cueTpl)
 	}
 
-	schema, err := GenerateOpenApiSchema(string(cueTpl), typeName)
+	schema, err := GenerateOpenAPISchema(string(cueTpl), typeName)
 	if err != nil {
 		return nil, err
 	}

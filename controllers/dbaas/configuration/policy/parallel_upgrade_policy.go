@@ -31,13 +31,13 @@ type ParallelUpgradePolicy struct {
 func (p *ParallelUpgradePolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
 	finished, err := p.restartPods(params)
 	if err != nil {
-		return ES_Failed, err
+		return ESFailed, err
 	}
 
 	if finished {
-		return ES_None, nil
+		return ESNone, nil
 	}
-	return ES_Retry, nil
+	return ESRetry, nil
 }
 
 func (p *ParallelUpgradePolicy) GetPolicyName() string {

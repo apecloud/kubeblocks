@@ -39,7 +39,7 @@ var (
 
 func init() {
 	// For RAW
-	loaderProvider[CFG_RAW] = func(option CfgOption) (*CfgWrapper, error) {
+	loaderProvider[CfgRawType] = func(option CfgOption) (*CfgWrapper, error) {
 		if len(option.RawData) == 0 {
 			return nil, MakeError("rawdata not empty! [%v]", option)
 		}
@@ -64,7 +64,7 @@ func init() {
 	}
 
 	// For local
-	loaderProvider[CFG_LOCAL] = func(option CfgOption) (*CfgWrapper, error) {
+	loaderProvider[CfgLocalType] = func(option CfgOption) (*CfgWrapper, error) {
 		if _, err := os.Stat(option.Path); err != nil {
 			return nil, MakeError("configuration file path[%s] not exist", option.Path)
 		}
@@ -88,7 +88,7 @@ func init() {
 	}
 
 	// For CM
-	loaderProvider[CFG_CM] = func(option CfgOption) (*CfgWrapper, error) {
+	loaderProvider[CfgCmType] = func(option CfgOption) (*CfgWrapper, error) {
 		if option.K8sKey == nil {
 			return nil, MakeError("invalid k8s resource[%v]", option)
 		}
@@ -126,7 +126,7 @@ func init() {
 	}
 
 	// For TPL
-	loaderProvider[CFG_TPL] = loaderProvider[CFG_CM]
+	loaderProvider[CfgTplType] = loaderProvider[CfgCmType]
 }
 
 type CfgWrapper struct {
@@ -299,7 +299,7 @@ func (c *CfgWrapper) Query(jsonpath string, option CfgOpOption) ([]byte, error) 
 	// if err := cfg.Unmarshal(&jsonString); err != nil {
 	//	 return nil, WrapError(err, "failed to unmarshalled configure! [%v]", cfg)
 	// }
-	return RetrievalWithJsonPath(cfg.AllSettings(), jsonpath)
+	return RetrievalWithJSONPath(cfg.AllSettings(), jsonpath)
 }
 
 func (c *CfgWrapper) queryAllCfg(jsonpath string, option CfgOpOption) ([]byte, error) {
@@ -308,7 +308,7 @@ func (c *CfgWrapper) queryAllCfg(jsonpath string, option CfgOpOption) ([]byte, e
 	for filename, v := range c.Indexer {
 		tops[filename] = v.AllSettings()
 	}
-	return RetrievalWithJsonPath(tops, jsonpath)
+	return RetrievalWithJSONPath(tops, jsonpath)
 }
 
 func (c CfgWrapper) getCfgViper(option CfgOpOption) *viper.Viper {

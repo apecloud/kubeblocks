@@ -27,7 +27,7 @@ import (
 type PID int32
 
 const (
-	INVALID_PID PID = 0
+	InvalidPid PID = 0
 )
 
 func sendSignal(pid PID, sig os.Signal) error {

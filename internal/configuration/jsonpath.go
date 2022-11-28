@@ -23,7 +23,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 )
 
-func RetrievalWithJsonPath(jsonobj interface{}, jsonpath string) ([]byte, error) {
+func RetrievalWithJSONPath(jsonobj interface{}, jsonpath string) ([]byte, error) {
 
 	jsonbytes, err := json.Marshal(&jsonobj)
 	if err != nil {

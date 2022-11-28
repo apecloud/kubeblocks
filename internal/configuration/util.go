@@ -23,17 +23,17 @@ import (
 
 func compareWithConfig(left, right interface{}, option CfgOption) (bool, error) {
 	switch option.Type {
-	case CFG_RAW:
+	case CfgRawType:
 		if !TypeMatch([]byte{}, left, right) {
 			return false, MakeError("invalid []byte data type!")
 		}
 		return bytes.Equal(left.([]byte), right.([]byte)), nil
-	case CFG_LOCAL:
+	case CfgLocalType:
 		if !TypeMatch(string(""), left, right) {
 			return false, MakeError("invalid string data type!")
 		}
 		return left.(string) == right.(string), nil
-	case CFG_CM, CFG_TPL:
+	case CfgCmType, CfgTplType:
 		if !TypeMatch(&K8sConfig{}, left, right) {
 			return false, MakeError("invalid data type!")
 		}
@@ -46,11 +46,11 @@ func compareWithConfig(left, right interface{}, option CfgOption) (bool, error) 
 func withOption(option CfgOption, data interface{}) CfgOption {
 	op := option
 	switch option.Type {
-	case CFG_RAW:
+	case CfgRawType:
 		op.RawData = data.([]byte)
-	case CFG_LOCAL:
+	case CfgLocalType:
 		op.Path = data.(string)
-	case CFG_CM, CFG_TPL:
+	case CfgCmType, CfgTplType:
 		op.K8sKey = data.(*K8sConfig)
 	default:
 		// TODO(zt) process error

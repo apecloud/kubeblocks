@@ -195,6 +195,8 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
 
+	// horizontalScalePolicy controls what kind of data synchronization do when component scale up.
+	// Policy is in enum of {None, Snapshot, Backup}. The default policy is `None`.
 	// None: Default policy, do nothing.
 	// Snapshot: Do native volume snapshot before scaling and restore to newly scaled pods.
 	//           Notice that 'Snapshot' policy will only take snapshot on the first volumeMount of first container you defined

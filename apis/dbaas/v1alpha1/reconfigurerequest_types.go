@@ -102,11 +102,11 @@ type Configuration struct {
 	// +optional
 	Parameters []string `json:"parameters,omitempty"`
 
-	// Files user creates or updates a file to configmap
+	// Files user creates or updates a file to configmap.
 	// +optional
 	Files map[string]string `json:"files,omitempty"`
 
-	// MountPoint is a volume name which file will mount to
+	// MountPoint is a volume name which file will mount to.
 	// +optional
 	MountPoint string `json:"mountPoint,omitempty"`
 }

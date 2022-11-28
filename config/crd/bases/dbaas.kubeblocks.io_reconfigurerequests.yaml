@@ -61,11 +61,11 @@ spec:
                     files:
                       additionalProperties:
                         type: string
-                      description: Files user creates or updates a file to configmap
+                      description: Files user creates or updates a file to configmap.
                       type: object
                     mountPoint:
                       description: MountPoint is a volume name which file will mount
-                        to
+                        to.
                       type: string
                     parameters:
                       items:

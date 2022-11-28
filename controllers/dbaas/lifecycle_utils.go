@@ -1804,10 +1804,10 @@ func prepareInjectEnvs(component *Component, cluster *dbaasv1alpha1.Cluster) []c
 		Value:     strconv.Itoa(int(component.Replicas)),
 		ValueFrom: nil,
 	})
-	for j := 0; j < int(component.Replicas); j++ {
+	for j := int32(0); j < component.Replicas; j++ {
 		envs = append(envs, corev1.EnvVar{
-			Name:      prefix + strconv.Itoa(j) + "_HOSTNAME",
-			Value:     fmt.Sprintf("%s.%s", cluster.Name+"-"+component.Name+"-"+strconv.Itoa(j), svcName),
+			Name:      prefix + strconv.Itoa(int(j)) + "_HOSTNAME",
+			Value:     fmt.Sprintf("%s.%s", cluster.Name+"-"+component.Name+"-"+strconv.Itoa(int(j)), svcName),
 			ValueFrom: nil,
 		})
 	}

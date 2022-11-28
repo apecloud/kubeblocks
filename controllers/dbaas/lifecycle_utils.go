@@ -125,15 +125,6 @@ func mergeConfigTemplates(appVersionTpl []dbaasv1alpha1.ConfigTemplate, cdTpl []
 	return mergedCfgTpl
 }
 
-func getClusterComponentsByName(components []dbaasv1alpha1.ClusterComponent, componentName string) *dbaasv1alpha1.ClusterComponent {
-	for _, component := range components {
-		if component.Name == componentName {
-			return &component
-		}
-	}
-	return nil
-}
-
 func getContainerByName(containers []corev1.Container, name string) (int, *corev1.Container) {
 	for i, container := range containers {
 		if container.Name == name {

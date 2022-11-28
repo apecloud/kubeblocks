@@ -40,12 +40,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-const (
-	appInstanceLabelKey  = "app.kubernetes.io/instance"
-	appComponentLabelKey = "app.kubernetes.io/component-name"
-	appNameLabelKey      = "app.kubernetes.io/name"
-)
-
 // ReconfigureRequestReconciler reconciles a ReconfigureRequest object
 type ReconfigureRequestReconciler struct {
 	client.Client
@@ -54,9 +48,9 @@ type ReconfigureRequestReconciler struct {
 }
 
 var ConfigurationRequiredLabels = []string{
-	appNameLabelKey,
-	appInstanceLabelKey,
-	appComponentLabelKey,
+	intctrlutil.AppNameLabelKey,
+	intctrlutil.AppInstanceLabelKey,
+	intctrlutil.AppComponentLabelKey,
 	dbaasconfig.CMConfigurationTplNameLabelKey,
 	dbaasconfig.CMInsConfigurationLabelKey,
 }
@@ -134,7 +128,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		cluster    = dbaasv1alpha1.Cluster{}
 		clusterKey = client.ObjectKey{
 			Namespace: config.GetNamespace(),
-			Name:      config.Labels[appInstanceLabelKey],
+			Name:      config.Labels[intctrlutil.AppInstanceLabelKey],
 		}
 
 		configTplName     = config.Labels[dbaasconfig.CMConfigurationTplNameLabelKey]
@@ -142,10 +136,10 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	)
 
 	componentLabels := map[string]string{
-		appNameLabelKey:      config.Labels[appNameLabelKey],
-		appInstanceLabelKey:  config.Labels[appInstanceLabelKey],
-		appComponentLabelKey: config.Labels[appComponentLabelKey],
-		configTplLabelKey:    config.Labels[dbaasconfig.CMConfigurationTplNameLabelKey],
+		intctrlutil.AppNameLabelKey:      config.Labels[intctrlutil.AppNameLabelKey],
+		intctrlutil.AppInstanceLabelKey:  config.Labels[intctrlutil.AppInstanceLabelKey],
+		intctrlutil.AppComponentLabelKey: config.Labels[intctrlutil.AppComponentLabelKey],
+		configTplLabelKey:                config.Labels[dbaasconfig.CMConfigurationTplNameLabelKey],
 	}
 
 	versionMeta, err := dbaasconfig.GetConfigurationVersion(config, reqCtx, &tpl.Spec)
@@ -173,8 +167,8 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	}
 
 	// Find ClusterComponent from cluster cr
-	componentName := config.Labels[appComponentLabelKey]
-	clusterComponent := getClusterComponentsByName(cluster.Spec.Components, componentName)
+	componentName := config.Labels[intctrlutil.AppComponentLabelKey]
+	clusterComponent := dbaasconfig.GetClusterComponentsByName(cluster.Spec.Components, componentName)
 	// fix cluster maybe not any component
 	if clusterComponent == nil {
 		reqCtx.Log.Info("not found component.", "componentName", componentName,

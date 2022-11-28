@@ -308,6 +308,15 @@ func GetComponentByUsingCM(stsList *appv1.StatefulSetList, cfg client.ObjectKey)
 	return sts
 }
 
+func GetClusterComponentsByName(components []dbaasv1alpha1.ClusterComponent, componentName string) *dbaasv1alpha1.ClusterComponent {
+	for _, component := range components {
+		if component.Name == componentName {
+			return &component
+		}
+	}
+	return nil
+}
+
 func GetConfigurationVersion(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplateSpec) (*cfgcore.ConfigDiffInformation, error) {
 	lastConfig, err := GetLastVersionConfig(cfg)
 	if err != nil {

@@ -29,6 +29,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var _ = Describe("Reconfigure Controller", func() {
@@ -105,7 +106,7 @@ var _ = Describe("Reconfigure Controller", func() {
 					testWrapper.WithCRName(insCfgCMName),
 					func(cm *corev1.ConfigMap) bool {
 						configHash = cm.Labels[configuration.CMInsConfigurationHashLabelKey]
-						return cm.Labels[appInstanceLabelKey] == clusterName &&
+						return cm.Labels[intctrlutil.AppInstanceLabelKey] == clusterName &&
 							cm.Labels[configuration.CMConfigurationTplNameLabelKey] == testWrapper.testEnv.CfgTplName &&
 							cm.Labels[configuration.CMInsConfigurationLabelKey] != "" &&
 							cm.Labels[configuration.CMInsLastReconfigureMethodLabelKey] == configuration.ReconfigureFirstConfigType &&

@@ -77,8 +77,14 @@ spec:
                             format: int32
                             type: integer
                           name:
-                            description: Specify the name of the referenced configuration
-                              template, which is a configmap object.
+                            description: Specify the name of the referenced the configuration
+                              template ConfigMap object.
+                            maxLength: 128
+                            type: string
+                          namespace:
+                            description: Specify the namespace of the referenced the
+                              configuration template ConfigMap object. An empty namespace
+                              is equivalent to the "default" namespace. (Yet support)
                             maxLength: 128
                             type: string
                           volumeName:

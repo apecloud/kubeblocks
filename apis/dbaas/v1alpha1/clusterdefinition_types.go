@@ -63,10 +63,16 @@ type ClusterDefinitionStatus struct {
 }
 
 type ConfigTemplate struct {
-	// Specify the name of the referenced configuration template, which is a configmap object.
+	// Specify the name of the referenced the configuration template ConfigMap object.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=128
 	Name string `json:"name"`
+
+	// Specify the namespace of the referenced the configuration template ConfigMap object.
+	// An empty namespace is equivalent to the "default" namespace. (Yet support)
+	// +kubebuilder:validation:MaxLength=128
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
 
 	// VolumeName is the volume name of PodTemplate, which the configuration file produced through the configuration template will be mounted to the corresponding volume.
 	// The volume name must be defined in podSpec.containers[*].volumeMounts.

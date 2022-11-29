@@ -19,6 +19,7 @@ package dbaas
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
 
 	"github.com/leaanthony/debme"
 	"github.com/spf13/viper"
@@ -117,6 +118,14 @@ func buildProbeServiceContainer(component *Component, container *corev1.Containe
 		})
 	}
 
+	roles := getComponentRoles(component)
+	rolesJson, _ := json.Marshal(roles)
+	container.Env = append(container.Env, corev1.EnvVar{
+		Name:      dbaasPrefix + "_DB_ROLES",
+		Value:     string(rolesJson),
+		ValueFrom: nil,
+	})
+
 	container.Env = append(container.Env, corev1.EnvVar{
 		Name:      dbaasPrefix + "_DB_CHARACTER_TYPE",
 		Value:     component.CharacterType,
@@ -128,6 +137,23 @@ func buildProbeServiceContainer(component *Component, container *corev1.Containe
 		Name:          "probe-port",
 		Protocol:      "TCP",
 	}}
+}
+
+func getComponentRoles(component *Component) map[string]string {
+	var roles = map[string]string{}
+	if component.ConsensusSpec == nil {
+		return roles
+	}
+
+	consensus := component.ConsensusSpec
+	roles[strings.ToLower(consensus.Leader.Name)] = string(consensus.Leader.AccessMode)
+	for _, follower := range consensus.Followers {
+		roles[strings.ToLower(follower.Name)] = string(follower.AccessMode)
+	}
+	if consensus.Learner != nil {
+		roles[strings.ToLower(consensus.Learner.Name)] = string(consensus.Learner.AccessMode)
+	}
+	return roles
 }
 
 func buildRoleChangedProbeContainer(roleChangedContainer *corev1.Container,

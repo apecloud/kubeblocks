@@ -28,6 +28,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -96,6 +97,7 @@ var roleCheckCount = 0
 var eventAggregationNum = 10
 var eventIntervalNum = 60
 var dbPort = "3306"
+var dbRoles = map[string]internal.AccessMode{}
 
 func init() {
 	val, ok := os.LookupEnv("KB_AGGREGATION_COUNT")
@@ -111,6 +113,12 @@ func init() {
 		dbPort = val
 	}
 
+	val, ok = os.LookupEnv("KB_DB_ROLES")
+	if ok {
+		if err := json.Unmarshal([]byte(val), &dbRoles); err != nil {
+			fmt.Println(errors.Wrap(err, "KB_DB_ROLES env format error").Error())
+		}
+	}
 }
 
 // Mysql represents MySQL output bindings.
@@ -128,7 +136,7 @@ func NewMysql(logger logger.Logger) bindings.OutputBinding {
 
 // Init initializes the MySQL binding.
 func (m *Mysql) Init(metadata bindings.Metadata) error {
-	m.logger.Debug("Initializing MySql binding")
+	m.logger.Debug("Initializing MySQL binding")
 	m.metadata = metadata
 	return nil
 }
@@ -359,14 +367,18 @@ func (m *Mysql) statusCheck(ctx context.Context, sql string, resp *bindings.Invo
 	select check_ts from kb_health_check where type=%d limit 1;`, statusCheckType, statusCheckType)
 	followerSql := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, statusCheckType)
 	var err error
-	var count int64
 	var data []byte
-	oriRole = "leader"
-	if oriRole == "leader" {
+	switch dbRoles[strings.ToLower(oriRole)] {
+	case internal.ReadWrite:
+		var count int64
 		count, err = m.exec(ctx, leaderSql)
 		data = []byte(strconv.FormatInt(count, 10))
-	} else {
+	case internal.Readonly:
 		data, err = m.query(ctx, followerSql)
+	default:
+		msg := fmt.Sprintf("unknown access mode for role %s: %v", oriRole, dbRoles)
+		m.logger.Info(msg)
+		data = []byte(msg)
 	}
 	result := internal.ProbeMessage{}
 	if err != nil {

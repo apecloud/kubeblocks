@@ -1,4 +1,4 @@
-name: issues-handle User doc label
+name: ISSUES-HANDLE-USER-DOC
 on:
   issues:
     types: [labeled]

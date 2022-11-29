@@ -758,7 +758,6 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			}
 			// when horizontal scaling up, sometimes db needs backup to sync data from master, log is not reliable enough since it can be recycled
 			if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
-				reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "HorizontalScale", "Start horizontal scale from %d to %d", *stsObj.Spec.Replicas, *stsProto.Spec.Replicas)
 				// do backup according to component's horizontal scale policy
 				switch component.HorizontalScalePolicy {
 				// use backup tool such as xtrabackup
@@ -833,6 +832,8 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			if err := cli.Update(ctx, stsObj); err != nil {
 				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 				return &res, err
+			} else {
+				reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "HorizontalScale", "Start horizontal scale from %d to %d", *stsObj.Spec.Replicas, *stsProto.Spec.Replicas)
 			}
 			// clean backup resources
 			if component.HorizontalScalePolicy == dbaasv1alpha1.Snapshot &&
@@ -1556,7 +1557,8 @@ func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder
 	return tplBuilder.Render(cmObj.Data)
 }
 
-func createBackup(ctx context.Context, cli client.Client, sts appsv1.StatefulSet, backupPolicyTemplate dataprotectionv1alpha1.BackupPolicyTemplate, backupKey types.NamespacedName, cluster *dbaasv1alpha1.Cluster) error {
+func createBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, sts appsv1.StatefulSet, backupPolicyTemplate dataprotectionv1alpha1.BackupPolicyTemplate, backupKey types.NamespacedName, cluster *dbaasv1alpha1.Cluster) error {
+	ctx := reqCtx.Ctx
 	backupPolicy, err := buildBackupPolicy(sts, backupPolicyTemplate, backupKey)
 	if err != nil {
 		return err
@@ -1578,6 +1580,8 @@ func createBackup(ctx context.Context, cli client.Client, sts appsv1.StatefulSet
 		if !apierrors.IsAlreadyExists(err) {
 			return err
 		}
+	} else {
+		reqCtx.Recorder.Eventf(&sts, corev1.EventTypeNormal, "BackupJobCreate", "Create backup job")
 	}
 	return nil
 }
@@ -1843,11 +1847,10 @@ func doSnapshot(cli client.Client, reqCtx intctrlutil.RequestCtx, cluster *dbaas
 	if len(backupPolicyTemplateList.Items) > 0 {
 		// if there is backuppolicytemplate created by provider
 		// create backupjob CR, will ignore error if already exists
-		err := createBackup(ctx, cli, *stsObj, backupPolicyTemplateList.Items[0], snapshotKey, cluster)
+		err := createBackup(reqCtx, cli, *stsObj, backupPolicyTemplateList.Items[0], snapshotKey, cluster)
 		if err != nil {
 			return err
 		}
-		reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "BackupJobCreate", "Create backup job")
 	} else {
 		// no backuppolicytemplate, then try native volumesnapshot
 		pvcName := strings.Join([]string{stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, "0"}, "-")

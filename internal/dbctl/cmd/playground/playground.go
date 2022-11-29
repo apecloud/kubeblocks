@@ -275,13 +275,12 @@ func runGuide() error {
 func printGuide(cloudProvider string, hostIP string, replicas int) error {
 	var (
 		clusterInfo = &clusterInfo{
-			HostIP:         hostIP,
-			CloudProvider:  cloudProvider,
-			KubeConfig:     util.ConfigPath(clusterName),
-			GrafanaPort:    "9100",
-			GrafanaUser:    "admin",
-			GrafanaPasswd:  "prom-operator",
-			ClusterObjects: cluster.NewClusterObjects(),
+			HostIP:        hostIP,
+			CloudProvider: cloudProvider,
+			KubeConfig:    util.ConfigPath(clusterName),
+			GrafanaPort:   "9100",
+			GrafanaUser:   "admin",
+			GrafanaPasswd: "prom-operator",
 		}
 		err error
 	)
@@ -309,7 +308,7 @@ func printGuide(cloudProvider string, hostIP string, replicas int) error {
 		Namespace:     dbClusterNamespace,
 		Name:          dbClusterName,
 	}
-	if err = clusterGetter.Get(clusterInfo.ClusterObjects); err != nil {
+	if clusterInfo.ClusterObjects, err = clusterGetter.Get(); err != nil {
 		return err
 	}
 

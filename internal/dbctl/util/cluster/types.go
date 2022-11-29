@@ -30,6 +30,7 @@ type ClusterObjects struct {
 	Pods       *corev1.PodList
 	Services   *corev1.ServiceList
 	Secrets    *corev1.SecretList
+	PVCs       *corev1.PersistentVolumeClaimList
 	Nodes      []*corev1.Node
 	ConfigMaps *corev1.ConfigMapList
 }

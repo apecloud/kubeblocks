@@ -171,15 +171,19 @@ func show(d dynamic.Interface, client *kubernetes.Clientset, namespace string, n
 }
 
 func addRow(d dynamic.Interface, client *kubernetes.Clientset, namespace string, name string, printer cluster.Printer) error {
-	clusterObjs := cluster.NewClusterObjects()
 	getter := &cluster.ObjectsGetter{
-		Name:          name,
-		Namespace:     namespace,
-		ClientSet:     client,
-		DynamicClient: d,
+		Name:           name,
+		Namespace:      namespace,
+		ClientSet:      client,
+		DynamicClient:  d,
+		WithClusterDef: true,
+		WithSecret:     true,
+		WithService:    true,
+		WithPod:        true,
 	}
 
-	if err := getter.Get(clusterObjs); err != nil {
+	clusterObjs, err := getter.Get()
+	if err != nil {
 		return err
 	}
 

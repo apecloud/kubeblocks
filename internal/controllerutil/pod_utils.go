@@ -70,31 +70,34 @@ func GetPodContainerWithVolumeMount(pod *corev1.Pod, volumeName string) []*corev
 	return getContainerWithVolumeMount(containers, volumeName)
 }
 
-// GetVolumeMountName function description:
+// FindVolumeWithCMName function description:
 // Find the volume of pod using name of cm
 //
 // Case: When the configmap object of configuration is modified by user, we need to query whose volumeName
 //
 // Return: The volume pointer of pod
-func GetVolumeMountName(volumes []corev1.Volume, resourceName string) *corev1.Volume {
-	for i := range volumes {
-		if volumes[i].ConfigMap != nil && volumes[i].ConfigMap.Name == resourceName {
-			return &volumes[i]
+func FindVolumeWithCMName(volumes []corev1.Volume, resourceName string) *corev1.Volume {
+	for _, itr := range volumes {
+		if itr.ConfigMap != nil && itr.ConfigMap.Name == resourceName {
+			return &itr
 		}
-
-		if volumes[i].Projected != nil {
-			for j := range volumes[i].Projected.Sources {
-				if volumes[i].Projected.Sources[j].ConfigMap != nil && volumes[i].Projected.Sources[j].ConfigMap.Name == resourceName {
-					return &volumes[i]
+		if itr.Projected != nil {
+			for _, itr2 := range itr.Projected.Sources {
+				if itr2.ConfigMap != nil && itr2.ConfigMap.Name == resourceName {
+					return &itr
 				}
 			}
 		}
+	}
+	return nil
+}
 
-		if volumes[i].Name == resourceName {
-			return &volumes[i]
+func FindVolumeWithVolumeName(volumes []corev1.Volume, volumeName string) *corev1.Volume {
+	for _, itr := range volumes {
+		if itr.Name == volumeName {
+			return &itr
 		}
 	}
-
 	return nil
 }
 

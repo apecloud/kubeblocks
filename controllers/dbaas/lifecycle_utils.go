@@ -1297,7 +1297,7 @@ func checkAndUpdatePodVolumes(sts *appsv1.StatefulSet, volumes map[string]dbaasv
 	}
 	for cmName, tpl := range volumes {
 		// not cm volume
-		volumeMounted := intctrlutil.GetVolumeMountName(podVolumes, tpl.VolumeName)
+		volumeMounted := intctrlutil.FindVolumeWithVolumeName(podVolumes, tpl.VolumeName)
 		// Update ConfigMap Volume
 		switch {
 		case volumeMounted == nil: // new volume

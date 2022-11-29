@@ -200,7 +200,7 @@ var _ = Describe("tpl template", func() {
 		})
 	})
 
-	// for test GetVolumeMountName
+	// for test FindVolumeWithCMName
 	Context("GetPodContainerWithVolumeMount test", func() {
 		It("Should success with no error", func() {
 			mountedContainers := GetPodContainerWithVolumeMount(pod, "config1")
@@ -226,16 +226,16 @@ var _ = Describe("tpl template", func() {
 	})
 
 	// for test GetContainerWithVolumeMount
-	Context("GetVolumeMountName test", func() {
+	Context("FindVolumeWithCMName test", func() {
 		It("Should success with no error", func() {
-			volume := GetVolumeMountName(pod.Spec.Volumes, "stateful_test-config1-config")
+			volume := FindVolumeWithCMName(pod.Spec.Volumes, "stateful_test-config1-config")
 			Expect(volume).NotTo(BeNil())
 			Expect(volume.Name).To(Equal("config1"))
 
-			Expect(GetVolumeMountName(pod.Spec.Volumes, "stateful_test-config1-config")).To(Equal(&pod.Spec.Volumes[0]))
+			Expect(FindVolumeWithCMName(pod.Spec.Volumes, "stateful_test-config1-config")).To(Equal(&pod.Spec.Volumes[0]))
 		})
 		It("Should failed", func() {
-			Expect(GetVolumeMountName(pod.Spec.Volumes, "not_exist_resource")).To(BeNil())
+			Expect(FindVolumeWithCMName(pod.Spec.Volumes, "not_exist_resource")).To(BeNil())
 		})
 	})
 

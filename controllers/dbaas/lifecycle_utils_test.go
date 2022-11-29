@@ -21,14 +21,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sethvargo/go-password/password"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/yaml"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	"github.com/leaanthony/debme"
+	"github.com/sethvargo/go-password/password"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/yaml"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -243,7 +243,7 @@ var _ = Describe("lifecycle_utils", func() {
 		It("Normal test case, and add two volume", func() {
 			volumes["my_config"] = dbaasv1alpha1.ConfigTemplate{
 				Name:       "myConfig",
-				VolumeName: "myConfigVolume",
+				VolumeName: "myConfigVolume3",
 			}
 			volumes["my_config1"] = dbaasv1alpha1.ConfigTemplate{
 				Name:       "myConfig",
@@ -253,6 +253,27 @@ var _ = Describe("lifecycle_utils", func() {
 			Expect(err).Should(BeNil())
 			Expect(len(sts.Spec.Template.Spec.Volumes)).To(Equal(3))
 		})
+
+		// bug: https://github.com/apecloud/kubeblocks/issues/716
+		It("replica configmap volumes test case", func() {
+			replicaVolumeName := "mytest-cm-volume"
+			sts.Spec.Template.Spec.Volumes = append(sts.Spec.Template.Spec.Volumes,
+				corev1.Volume{
+					Name: replicaVolumeName,
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				})
+			volumes["my_config"] = dbaasv1alpha1.ConfigTemplate{
+				Name:       "myConfig",
+				VolumeName: replicaVolumeName,
+			}
+			err := checkAndUpdatePodVolumes(&sts, volumes)
+			Expect(err).Should(BeNil())
+			Expect(len(sts.Spec.Template.Spec.Volumes)).To(Equal(2))
+			Expect(intctrlutil.GetVolumeMountName(sts.Spec.Template.Spec.Volumes, replicaVolumeName).ConfigMap).ShouldNot(BeNil())
+		})
+
 	})
 
 	allFieldsClusterDefObj := func() *dbaasv1alpha1.ClusterDefinition {

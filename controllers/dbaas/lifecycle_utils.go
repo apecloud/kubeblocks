@@ -1287,31 +1287,45 @@ func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
 }
 
 func checkAndUpdatePodVolumes(sts *appsv1.StatefulSet, volumes map[string]dbaasv1alpha1.ConfigTemplate) error {
-	podVolumes := make([]corev1.Volume, 0, len(volumes))
+	stsVolumeLen := len(sts.Spec.Template.Spec.Volumes)
+	podVolumes := make([]corev1.Volume, 0, len(volumes)+stsVolumeLen)
+	volumeIndex := make(map[string]int, stsVolumeLen)
+	for i := 0; i < stsVolumeLen; i++ {
+		volume := sts.Spec.Template.Spec.Volumes[i]
+		volumeIndex[volume.Name] = i
+		podVolumes = append(podVolumes, volume)
+	}
 	for cmName, tpl := range volumes {
 		// not cm volume
-		volumeMounted := intctrlutil.GetVolumeMountName(podVolumes, cmName)
+		volumeMounted := intctrlutil.GetVolumeMountName(podVolumes, tpl.VolumeName)
 		// Update ConfigMap Volume
-		if volumeMounted != nil {
-			configMapVolume := volumeMounted.ConfigMap
-			if configMapVolume == nil {
-				return fmt.Errorf("mount volume[%s] type require ConfigMap: [%+v]", volumeMounted.Name, volumeMounted)
-			}
-			configMapVolume.Name = cmName
-			continue
-		}
-		// Add New ConfigMap Volume
-		podVolumes = append(podVolumes, corev1.Volume{
-			Name: tpl.VolumeName,
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
+		switch {
+		case volumeMounted == nil: // new volume
+			podVolumes = append(podVolumes, corev1.Volume{
+				Name: tpl.VolumeName,
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
+					},
 				},
-			},
-		})
+			})
+		case volumeMounted.EmptyDir != nil:
+			// update original volume
+			podVolumes[volumeIndex[tpl.VolumeName]] = corev1.Volume{
+				Name: tpl.VolumeName,
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
+					},
+				},
+			}
+		case volumeMounted.ConfigMap != nil: // exist cm volume
+			volumeMounted.ConfigMap.Name = cmName
+		default:
+			return fmt.Errorf("mount volume[%s] type require ConfigMap: [%+v]", volumeMounted.Name, volumeMounted)
+		}
 	}
-	// Update PodTemplate Volumes
-	sts.Spec.Template.Spec.Volumes = append(sts.Spec.Template.Spec.Volumes, podVolumes...)
+	sts.Spec.Template.Spec.Volumes = podVolumes
 	return nil
 }
 

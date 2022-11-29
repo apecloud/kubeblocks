@@ -89,6 +89,10 @@ func GetVolumeMountName(volumes []corev1.Volume, resourceName string) *corev1.Vo
 				}
 			}
 		}
+
+		if volumes[i].Name == resourceName {
+			return &volumes[i]
+		}
 	}
 
 	return nil

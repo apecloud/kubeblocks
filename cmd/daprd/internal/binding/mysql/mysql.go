@@ -360,26 +360,27 @@ func (m *Mysql) runningCheck(ctx context.Context, resp *bindings.InvokeResponse)
 }
 
 func (m *Mysql) statusCheck(ctx context.Context, sql string, resp *bindings.InvokeResponse) ([]byte, error) {
-	leaderSql := fmt.Sprintf(`begin;
+	rwSql := fmt.Sprintf(`begin;
     create table if not exists kb_health_check(type int, check_ts bigint, primary key(type));
     insert into kb_health_check values(%d, now()) on duplicate key update check_ts = now();
     commit;
 	select check_ts from kb_health_check where type=%d limit 1;`, statusCheckType, statusCheckType)
-	followerSql := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, statusCheckType)
+	roSql := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, statusCheckType)
 	var err error
 	var data []byte
 	switch dbRoles[strings.ToLower(oriRole)] {
 	case internal.ReadWrite:
 		var count int64
-		count, err = m.exec(ctx, leaderSql)
+		count, err = m.exec(ctx, rwSql)
 		data = []byte(strconv.FormatInt(count, 10))
 	case internal.Readonly:
-		data, err = m.query(ctx, followerSql)
+		data, err = m.query(ctx, roSql)
 	default:
 		msg := fmt.Sprintf("unknown access mode for role %s: %v", oriRole, dbRoles)
 		m.logger.Info(msg)
 		data = []byte(msg)
 	}
+
 	result := internal.ProbeMessage{}
 	if err != nil {
 		m.logger.Infof("statusCheck error: %v", err)

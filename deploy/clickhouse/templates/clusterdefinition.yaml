@@ -216,24 +216,22 @@ spec:
               - name: http-metrics
                 containerPort: 8001
                 # protocol: TCP
-            livenessProbe:
-              failureThreshold: 3
-              initialDelaySeconds: 10
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 1
-              httpGet:
-                path: /ping
-                port: http
-            readinessProbe:
-              failureThreshold: 3
-              initialDelaySeconds: 10
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 1
-              httpGet:
-                path: /ping
-                port: http
+            # livenessProbe:
+            #   failureThreshold: 6
+            #   initialDelaySeconds: 30
+            #   periodSeconds: 10
+            #   successThreshold: 1
+            #   timeoutSeconds: 5
+            #   exec:
+            #     command: ['/bin/bash', '-c', 'echo "ruok" | timeout 2 nc -w 2 localhost 2181 | grep imok']
+            # readinessProbe:
+            #   failureThreshold: 6
+            #   initialDelaySeconds: 5
+            #   periodSeconds: 10
+            #   successThreshold: 1
+            #   timeoutSeconds: 5
+            #   exec:
+            #     command: ['/bin/bash', '-c', 'echo "ruok" | timeout 2 nc -w 2 localhost 2181 | grep imok']
             volumeMounts:
               - name: data
                 mountPath: /bitnami/clickhouse

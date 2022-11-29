@@ -123,16 +123,18 @@ type ClusterDescriber struct {
 func (d *ClusterDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
 	var err error
 	d.describerSettings = describerSettings
-	d.ClusterObjects = cluster.NewClusterObjects()
-
 	clusterGetter := cluster.ObjectsGetter{
 		ClientSet:      d.client,
 		DynamicClient:  d.dynamic,
 		Name:           name,
 		Namespace:      namespace,
-		WithAppVersion: false,
+		WithClusterDef: true,
+		WithPVC:        true,
+		WithService:    true,
+		WithSecret:     true,
+		WithPod:        true,
 	}
-	if err = clusterGetter.Get(d.ClusterObjects); err != nil {
+	if d.ClusterObjects, err = clusterGetter.Get(); err != nil {
 		return "", err
 	}
 
@@ -238,12 +240,17 @@ func (d *ClusterDescriber) describeComponent(w describe.PrefixWriter) error {
 		describeResource(&c.Resources, w)
 
 		// storage
-		describeStorage(c.VolumeClaimTemplates, w)
+		sc := d.Cluster.Annotations[types.StorageClassAnnotationKey]
+		describeStorage(c.VolumeClaimTemplates, sc, w)
 
 		// network
 		describeNetwork(Level2, d.Services, c, w)
 
 		// instance
+		if len(pods) > 0 {
+			w.Write(Level2, "\n")
+			w.Write(Level2, "Instance:\t\n")
+		}
 		for _, pod := range pods {
 			d.describeInstance(Level2, pod, w)
 		}
@@ -266,28 +273,31 @@ func describeResource(resources *corev1.ResourceRequirements, w describe.PrefixW
 	}
 }
 
-func describeStorage(vcTmpls []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate, w describe.PrefixWriter) {
+func describeStorage(vcTmpls []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate, sc string, w describe.PrefixWriter) {
 	if len(vcTmpls) > 0 {
 		w.Write(Level2, "Storage:\n")
 	}
 	for _, vcTmpl := range vcTmpls {
 		w.Write(Level3, "%s:\n", vcTmpl.Name)
 		val := vcTmpl.Spec.Resources.Requests[corev1.ResourceStorage]
-		if vcTmpl.Spec.StorageClassName == nil {
-			w.Write(Level4, "StorageClass:\t%s\n", valueNone)
-		} else {
+		scName := vcTmpl.Spec.StorageClassName
+
+		switch {
+		case scName != nil && len(*scName) > 0:
 			w.Write(Level4, "StorageClass:\t%s\n", *vcTmpl.Spec.StorageClassName)
+		case sc != "":
+			w.Write(Level4, "StorageClass:\t%s\n", sc)
+		default:
+			w.Write(Level4, "StorageClass:\t%s\n", valueNone)
 		}
+
 		w.Write(Level4, "Access Modes:\t%s\n", getAccessModes(vcTmpl.Spec.AccessModes))
 		w.Write(Level4, "Size:\t%s\n", val.String())
 	}
 }
 
 func (d *ClusterDescriber) describeInstance(level int, pod *corev1.Pod, w describe.PrefixWriter) {
-	w.Write(level, "\n")
-	w.Write(level, "Instance:\t\n")
 	w.Write(level+1, "%s:\n", pod.Name)
-
 	role := pod.Labels[types.ConsensusSetRoleLabelKey]
 	if len(role) == 0 {
 		role = valueNone
@@ -312,19 +322,19 @@ func (d *ClusterDescriber) describeInstance(level int, pod *corev1.Pod, w descri
 	w.Write(level+2, "AccessMode:\t%s\n", accessMode)
 
 	// describe node information
-	describeNode(d.Nodes, pod, w)
+	describeNode(level+2, d.Nodes, pod, w)
 
 	w.Write(level+2, "CreationTimestamp:\t%s\n", pod.CreationTimestamp.Time.Format(time.RFC1123Z))
 }
 
 // describeNode describe node information include its region and AZ
-func describeNode(nodes []*corev1.Node, pod *corev1.Pod, w describe.PrefixWriter) {
+func describeNode(level int, nodes []*corev1.Node, pod *corev1.Pod, w describe.PrefixWriter) {
 	var node *corev1.Node
 
 	if pod.Spec.NodeName == "" {
-		w.Write(Level3, "Node:\t%s\n", valueNone)
+		w.Write(level, "Node:\t%s\n", valueNone)
 	} else {
-		w.Write(Level3, "Node:\t%s\n", pod.Spec.NodeName+"/"+pod.Status.HostIP)
+		w.Write(level, "Node:\t%s\n", pod.Spec.NodeName+"/"+pod.Status.HostIP)
 		node = util.GetNodeByName(nodes, pod.Spec.NodeName)
 	}
 
@@ -333,10 +343,10 @@ func describeNode(nodes []*corev1.Node, pod *corev1.Pod, w describe.PrefixWriter
 	}
 
 	if region, ok := node.Labels[types.RegionLabelKey]; ok {
-		w.Write(Level3, "Region:\t%s\n", region)
+		w.Write(level, "Region:\t%s\n", region)
 	}
 	if zone, ok := node.Labels[types.ZoneLabelKey]; ok {
-		w.Write(Level3, "AZ:\t%s\n", zone)
+		w.Write(level, "AZ:\t%s\n", zone)
 	}
 }
 

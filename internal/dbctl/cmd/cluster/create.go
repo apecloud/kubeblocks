@@ -127,26 +127,13 @@ func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 	}
 
 	gvr := schema.GroupVersionResource{Group: types.DPGroup, Version: types.DPVersion, Resource: types.ResourceBackupJobs}
-	backupJobObj, err := o.Client.Resource(gvr).Namespace(o.Namespace).Get(context.TODO(), backup, metav1.GetOptions{})
+	_, err := o.Client.Resource(gvr).Namespace(o.Namespace).Get(context.TODO(), backup, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	backupType, _, _ := unstructured.NestedString(backupJobObj.Object, "spec", "backupType")
-	if backupType != "snapshot" {
-		return fmt.Errorf("only support snapshot backup, specified backup type is '%v'", backupType)
-	}
-
-	dataSource := make(map[string]interface{}, 0)
-	_ = unstructured.SetNestedField(dataSource, backup, "name")
-	_ = unstructured.SetNestedField(dataSource, "VolumeSnapshot", "kind")
-	_ = unstructured.SetNestedField(dataSource, "snapshot.storage.k8s.io", "apiGroup")
 
 	for _, component := range components {
-		templates := component["volumeClaimTemplates"].([]interface{})
-		for _, t := range templates {
-			templateMap := t.(map[string]interface{})
-			_ = unstructured.SetNestedField(templateMap, dataSource, "spec", "dataSource")
-		}
+		component["backupSource"] = backup
 	}
 	return nil
 }

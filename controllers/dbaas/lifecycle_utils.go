@@ -453,8 +453,8 @@ func mergeComponents(
 			tolerations = clusterComp.Tolerations
 		}
 
-		if clusterComp.SourceBackup != "" {
-			component.SourceBackup = clusterComp.SourceBackup
+		if clusterComp.BackupSource != "" {
+			component.BackupSource = clusterComp.BackupSource
 		}
 	}
 	if affinity != nil {
@@ -972,8 +972,8 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 		}
 	}
 
-	// build restore init container.
-	err = buildTemplatePodSpecForRestore(reqCtx, params, cli, &sts.Spec.Template.Spec)
+	// build restore init container or volumeClaimTemplate.
+	err = buildSpecForRestore(reqCtx, params, cli, &sts.Spec.Template.Spec, sts.Spec.VolumeClaimTemplates)
 	if err != nil {
 		return nil, err
 	}

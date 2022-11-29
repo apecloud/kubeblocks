@@ -120,6 +120,10 @@ spec:
                             type: string
                           type: array
                       type: object
+                    backupSource:
+                      description: 'BackupSource determines restores a new instance
+                        based on the specified backup name. ref to: "https://github.com/apecloud/kubeblocks/blob/main/apis/dataprotection/v1alpha1/backupjob_types.go"'
+                      type: string
                     enabledLogs:
                       description: EnabledLogs indicate which log file takes effect
                         in database cluster element is the log type which defined
@@ -190,10 +194,6 @@ spec:
                       - ClusterIP
                       - NodePort
                       - LoadBalancer
-                      type: string
-                    sourceBackup:
-                      description: 'sourceBackup determines restores a new instance
-                        based on the specified backup set. ref to: "https://github.com/apecloud/kubeblocks/blob/main/apis/dataprotection/v1alpha1/backupjob_types.go"'
                       type: string
                     tolerations:
                       description: Component tolerations will override ClusterSpec.Tolerations

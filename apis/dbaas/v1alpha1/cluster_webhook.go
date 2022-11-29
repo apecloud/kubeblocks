@@ -196,7 +196,7 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 			duplicateComponentNames[v.Name] = struct{}{}
 		}
 		componentNameMap[v.Name] = struct{}{}
-		r.validateSourceBackup(allErrs, &v)
+		r.validateBackupSource(allErrs, &v)
 	}
 	if len(invalidComponentTypes) > 0 {
 		*allErrs = append(*allErrs, field.NotFound(field.NewPath("spec.components[*].type"),
@@ -219,22 +219,22 @@ func (r *Cluster) getDuplicateMapKeys(m map[string]struct{}) []string {
 	return keys
 }
 
-// validateSourceBackup validate spec.sourceBackup is legal
-func (r *Cluster) validateSourceBackup(allErrs *field.ErrorList, component *ClusterComponent) {
-	if len(component.SourceBackup) == 0 {
+// validateSourceBackup validate spec.backupSource is legal
+func (r *Cluster) validateBackupSource(allErrs *field.ErrorList, component *ClusterComponent) {
+	if len(component.BackupSource) == 0 {
 		return
 	}
 	backupJob := &dpv1alpha1.BackupJob{}
 	err := webhookMgr.client.Get(context.Background(), types.NamespacedName{
 		Namespace: r.Namespace,
-		Name:      component.SourceBackup,
+		Name:      component.BackupSource,
 	}, backupJob)
 	if err != nil {
-		*allErrs = append(*allErrs, field.Invalid(field.NewPath("spec.component[*].sourceBackup"),
-			component.SourceBackup, err.Error()))
+		*allErrs = append(*allErrs, field.Invalid(field.NewPath("spec.component[*].backupSource"),
+			component.BackupSource, err.Error()))
 	}
 	if backupJob.Status.Phase != dpv1alpha1.BackupJobCompleted {
-		*allErrs = append(*allErrs, field.Invalid(field.NewPath("spec.component[*].sourceBackup"),
-			component.SourceBackup, "sourceBackup is not ready yet."))
+		*allErrs = append(*allErrs, field.Invalid(field.NewPath("spec.component[*].backupSource"),
+			component.BackupSource, "BackupSource is not ready yet."))
 	}
 }

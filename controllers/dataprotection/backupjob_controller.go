@@ -694,16 +694,16 @@ func (r *BackupJobReconciler) BuildBackupToolPodSpec(reqCtx intctrlutil.RequestC
 
 	// build pod dns string
 	// ref: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/
-	hostDns := []string{clusterPod.Name}
+	hostDNS := []string{clusterPod.Name}
 	if clusterPod.Spec.Hostname != "" {
-		hostDns[0] = clusterPod.Spec.Hostname
+		hostDNS[0] = clusterPod.Spec.Hostname
 	}
 	if clusterPod.Spec.Subdomain != "" {
-		hostDns = append(hostDns, clusterPod.Spec.Subdomain)
+		hostDNS = append(hostDNS, clusterPod.Spec.Subdomain)
 	}
 	envDBHost := corev1.EnvVar{
 		Name:  "DB_HOST",
-		Value: strings.Join(hostDns, "."),
+		Value: strings.Join(hostDNS, "."),
 	}
 
 	envDBUser := corev1.EnvVar{

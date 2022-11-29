@@ -158,9 +158,9 @@ type ClusterComponent struct {
 	// +optional
 	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
 
-	// sourceBackup determines restores a new instance based on the specified backup set.
+	// BackupSource determines restores a new instance based on the specified backup name.
 	// ref to: "https://github.com/apecloud/kubeblocks/blob/main/apis/dataprotection/v1alpha1/backupjob_types.go"
-	SourceBackup string `json:"sourceBackup,omitempty"`
+	BackupSource string `json:"backupSource,omitempty"`
 }
 
 // ClusterStatusComponent record components status information

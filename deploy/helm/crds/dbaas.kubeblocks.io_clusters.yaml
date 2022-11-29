@@ -191,6 +191,10 @@ spec:
                       - NodePort
                       - LoadBalancer
                       type: string
+                    sourceBackup:
+                      description: 'sourceBackup determines restores a new instance
+                        based on the specified backup set. ref to: "https://github.com/apecloud/kubeblocks/blob/main/apis/dataprotection/v1alpha1/backupjob_types.go"'
+                      type: string
                     tolerations:
                       description: Component tolerations will override ClusterSpec.Tolerations
                         if specified.

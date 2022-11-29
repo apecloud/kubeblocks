@@ -452,6 +452,10 @@ func mergeComponents(
 		if len(clusterComp.Tolerations) != 0 {
 			tolerations = clusterComp.Tolerations
 		}
+
+		if clusterComp.SourceBackup != "" {
+			component.SourceBackup = clusterComp.SourceBackup
+		}
 	}
 	if affinity != nil {
 		component.PodSpec.Affinity = buildPodAffinity(cluster, affinity, component)
@@ -621,7 +625,7 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 	case dbaasv1alpha1.Stateful:
 		if err := statefulSetProcessor(
 			func(envConfig *corev1.ConfigMap) (*appsv1.StatefulSet, error) {
-				sts, err := buildSts(reqCtx, *params, envConfig.Name)
+				sts, err := buildSts(reqCtx, *params, envConfig.Name, cli)
 				if err != nil {
 					return nil, err
 				}
@@ -632,7 +636,7 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 	case dbaasv1alpha1.Consensus:
 		if err := statefulSetProcessor(
 			func(envConfig *corev1.ConfigMap) (*appsv1.StatefulSet, error) {
-				css, err := buildConsensusSet(reqCtx, *params, envConfig.Name)
+				css, err := buildConsensusSet(reqCtx, *params, envConfig.Name, cli)
 				if err != nil {
 					return nil, err
 				}
@@ -914,7 +918,7 @@ func buildSecret(params createParams) (*corev1.Secret, error) {
 	return &secret, nil
 }
 
-func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName string) (*appsv1.StatefulSet, error) {
+func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName string, cli client.Client) (*appsv1.StatefulSet, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
 	cueTpl, err := params.getCacheCUETplValue("statefulset_template.cue", func() (*intctrlutil.CUETpl, error) {
@@ -966,6 +970,12 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 				}
 			}
 		}
+	}
+
+	// build restore init container.
+	err = buildTemplatePodSpecForRestore(reqCtx, params, cli, &sts.Spec.Template.Spec)
+	if err != nil {
+		return nil, err
 	}
 
 	probeContainers, err := buildProbeContainers(reqCtx, params, sts.Spec.Template.Spec.Containers)
@@ -1051,8 +1061,8 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 }
 
 // buildConsensusSet build on a stateful set
-func buildConsensusSet(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName string) (*appsv1.StatefulSet, error) {
-	sts, err := buildSts(reqCtx, params, envConfigName)
+func buildConsensusSet(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName string, cli client.Client) (*appsv1.StatefulSet, error) {
+	sts, err := buildSts(reqCtx, params, envConfigName, cli)
 	if err != nil {
 		return sts, err
 	}

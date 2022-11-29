@@ -44,7 +44,7 @@ spec:
           env:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}
-          {{- if .Values.dataProtection.enableVolumeSnapshot }}
+          {{- if or .Values.dataProtection.enableVolumeSnapshot (index .Values "snapshot-controller" "enabled") }}
             - name: VOLUMESNAPSHOT
               value: "true"
           {{- end }}

@@ -157,6 +157,10 @@ type ClusterComponent struct {
 	// +kubebuilder:validation:Enum={ClusterIP,NodePort,LoadBalancer}
 	// +optional
 	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
+
+	// sourceBackup determines restores a new instance based on the specified backup set.
+	// ref to: "https://github.com/apecloud/kubeblocks/blob/main/apis/dataprotection/v1alpha1/backupjob_types.go"
+	SourceBackup string `json:"sourceBackup,omitempty"`
 }
 
 // ClusterStatusComponent record components status information

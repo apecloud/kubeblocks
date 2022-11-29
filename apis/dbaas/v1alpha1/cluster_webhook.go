@@ -30,6 +30,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
 // log is for logging in this package.
@@ -194,6 +196,7 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 			duplicateComponentNames[v.Name] = struct{}{}
 		}
 		componentNameMap[v.Name] = struct{}{}
+		r.validateSourceBackup(allErrs, &v)
 	}
 	if len(invalidComponentTypes) > 0 {
 		*allErrs = append(*allErrs, field.NotFound(field.NewPath("spec.components[*].type"),
@@ -214,4 +217,24 @@ func (r *Cluster) getDuplicateMapKeys(m map[string]struct{}) []string {
 		i++
 	}
 	return keys
+}
+
+// validateSourceBackup validate spec.sourceBackup is legal
+func (r *Cluster) validateSourceBackup(allErrs *field.ErrorList, component *ClusterComponent) {
+	if len(component.SourceBackup) == 0 {
+		return
+	}
+	backupJob := &dpv1alpha1.BackupJob{}
+	err := webhookMgr.client.Get(context.Background(), types.NamespacedName{
+		Namespace: r.Namespace,
+		Name:      component.SourceBackup,
+	}, backupJob)
+	if err != nil {
+		*allErrs = append(*allErrs, field.Invalid(field.NewPath("spec.component[*].sourceBackup"),
+			component.SourceBackup, err.Error()))
+	}
+	if backupJob.Status.Phase != dpv1alpha1.BackupJobCompleted {
+		*allErrs = append(*allErrs, field.Invalid(field.NewPath("spec.component[*].sourceBackup"),
+			component.SourceBackup, "sourceBackup is not ready yet."))
+	}
 }

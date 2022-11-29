@@ -28,12 +28,12 @@ spec:
     # ref definition is more general, but need to integrate with dbaas, define labelsSelector instead.
     labelsSelector:
       matchLabels:
-        app.kubernetes.io/instance: wesql-cluster
+        app.kubernetes.io/instance: wesql
 
     # the target database secret that backup tool can connect.
     secret:
       # the secret name
-      name: wesql-cluster
+      name: wesql
       # which key name for user
       keyUser: username
       # which key name for password

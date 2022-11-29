@@ -11,7 +11,7 @@ spec:
       cpu: "1"
       memory: 2Gi
     requests:
-      cpu: "1"
+      cpu: 100m
       memory: 128Mi
   env:
     - name: DATA_DIR
@@ -20,18 +20,22 @@ spec:
     restoreCommands:
       - >
         set -e;
-        mkdir -p /tmp/data/ && cd /tmp/data;
-        xbstream -x < /${BACKUP_DIR}/${BACKUP_NAME}.xbstream;
-        xtrabackup --decompress  --target-dir=/tmp/data/;
-        find . -name "*.qp"|xargs rm -f;
+        [[ ${DATA_DIR} == "" ]] && (echo "Empty string for env DATA_DIR, exiting restore"; exit 0);
+        mkdir -p ${DATA_DIR} && cd ${DATA_DIR};
         rm -rf ${DATA_DIR}/*;
-        rsync -avrP /tmp/data/ ${DATA_DIR}/;
-        rm -rf /tmp/data/;
+        xbstream -x < /${BACKUP_DIR}/${BACKUP_NAME}.xbstream;
+        xtrabackup --decompress  --target-dir=${DATA_DIR};
+        find . -name "*.qp"|xargs rm -f;
+        xtrabackup --prepare --target-dir=${DATA_DIR};
         chmod -R 0777 ${DATA_DIR};
     incrementalRestoreCommands: []
   logical:
     restoreCommands: []
     incrementalRestoreCommands: []
   backupCommands:
-    - xtrabackup --compress --backup  --safe-slave-backup --slave-info --stream=xbstream --host=${DB_HOST} --user=${DB_USER} --password=${DB_PASSWORD} --datadir=${DATA_DIR} > /${BACKUP_DIR}/${BACKUP_NAME}.xbstream
+    - |
+      mkdir -p ${BACKUP_DIR};
+      xtrabackup --compress --backup  --safe-slave-backup --slave-info --stream=xbstream \
+      --host=${DB_HOST} --user=${DB_USER} --password=${DB_PASSWORD} --datadir=${DATA_DIR} \
+      > /${BACKUP_DIR}/${BACKUP_NAME}.xbstream
   incrementalBackupCommands: []

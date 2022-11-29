@@ -403,7 +403,7 @@ configTemplate:
       ft_stopword_file?: string & "/dev/null"
 
       // Whether the general query log is enabled
-      general_log?: int & 0 | 1
+      general_log?: string & "0" | "OFF" | "ON" | "1"
 
       // Location of mysql general log.
       general_log_file?: string
@@ -1502,7 +1502,7 @@ configTemplate:
       slow_launch_time?: int & >= 0 & <= 31536000
 
       // Enable or disable the slow query log
-      slow_query_log?: int & 0 | 1
+      slow_query_log?: string & "0" | "1" | "ON" | "OFF"
 
       // Location of the mysql slow query log file.
       slow_query_log_file?: string

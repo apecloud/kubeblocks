@@ -18,6 +18,7 @@ package configuration
 
 import (
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"reflect"
 	"strconv"
 
@@ -52,70 +53,63 @@ func (c *CueTypeExtractor) Visit(val cue.Value) error {
 		}
 		v := itr.Value()
 		label := itr.Label()
-		if err := c.visitValue(v, label); err != nil {
-			return err
-		}
+		c.visitValue(v, label)
 	}
 	return nil
 }
 
-func (c *CueTypeExtractor) visitValue(x cue.Value, path string) error {
-	switch k := x.IncompleteKind(); k {
-	case cue.NullKind:
+func (c *CueTypeExtractor) visitValue(x cue.Value, path string) {
+	k := x.IncompleteKind()
+	if k&cue.NullKind == cue.NullKind {
 		c.addFieldType(path, NullableType)
-	case cue.BytesKind:
+	} else if k&cue.BytesKind == cue.BytesKind {
 		c.addFieldType(path, StringType)
-	case cue.StringKind:
+	} else if k&cue.StringKind == cue.StringKind {
 		c.addFieldType(path, StringType)
-	case cue.BoolKind:
-		c.addFieldType(path, BoolType)
-	case cue.IntKind:
+	} else if k&cue.FloatKind == cue.FloatKind {
+		c.addFieldType(path, FloatType)
+	} else if k&cue.IntKind == cue.IntKind {
 		c.addFieldType(path, IntType)
-	case cue.ListKind:
+	} else if k&cue.ListKind == cue.ListKind {
 		c.addFieldType(path, ListType)
-		return c.visitList(x, path)
-	case cue.StructKind:
+		c.visitList(x, path)
+	} else if k&cue.StructKind == cue.StructKind {
 		c.addFieldType(path, StructType)
-		return c.visitStruct(x)
-	default:
-		return MakeError("cannot convert value of type %T", x)
+		c.visitStruct(x)
+	} else {
+		logrus.Warnf("cannot convert value of type %s", k.String())
 	}
 
-	return nil
 }
 
-func (c *CueTypeExtractor) visitStruct(v cue.Value) error {
-	switch op, _ := v.Expr(); op {
-	case cue.NoOp:
+func (c *CueTypeExtractor) visitStruct(v cue.Value) {
+	switch op, v := v.Expr(); op {
+	// SelectorOp refer of other struct type
+	case cue.NoOp, cue.SelectorOp:
 		// pass
 	default:
-		return MakeError("unsupported op %v for object type (%v)", op, v)
+		logrus.Warnf("unsupported op %v for object type (%v)", op, v)
+		return
 	}
 
 	for itr, _ := v.Fields(cue.Optional(true), cue.Definitions(true)); itr.Next(); {
 		name := itr.Label()
-		if err := c.visitValue(itr.Value(), name); err != nil {
-			return err
-		}
+		c.visitValue(itr.Value(), name)
 	}
-	return nil
 }
 
-func (c *CueTypeExtractor) visitList(v cue.Value, path string) error {
+func (c *CueTypeExtractor) visitList(v cue.Value, path string) {
 	switch op, _ := v.Expr(); op {
-	case cue.NoOp:
+	case cue.NoOp, cue.SelectorOp:
 		// pass
 	default:
-		return MakeError("unsupported op %v for object type (%v)", op, v)
+		logrus.Warnf("unsupported op %v for object type (%v)", op, v)
 	}
 
 	count := 0
 	for i, _ := v.List(); i.Next(); count++ {
-		if err := c.visitValue(i.Value(), fmt.Sprintf("%s_%d", path, count)); err != nil {
-			return err
-		}
+		c.visitValue(i.Value(), fmt.Sprintf("%s_%d", path, count))
 	}
-	return nil
 }
 
 func (c *CueTypeExtractor) addFieldType(fieldName string, cueType CueType) {
@@ -153,7 +147,7 @@ func processTypeTrans[T int | float64 | float32 | bool](obj reflect.Value, trans
 	return nil
 }
 
-func processCfgNotStringParam(data interface{}, context *cue.Context, tpl cue.Value) error {
+func ProcessCfgNotStringParam(data interface{}, context *cue.Context, tpl cue.Value) error {
 	if disableAutoTransfer {
 		return nil
 	}

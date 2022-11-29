@@ -84,7 +84,7 @@ func CfgDataValidateByCue(cueTpl string, data interface{}) error {
 		return err
 	}
 
-	if err := processCfgNotStringParam(data, context, tpl); err != nil {
+	if err := ProcessCfgNotStringParam(data, context, tpl); err != nil {
 		return err
 	}
 

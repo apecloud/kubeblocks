@@ -55,8 +55,6 @@ type schemaValidator struct {
 }
 
 func (s schemaValidator) Validate(cfg map[string]string) error {
-	// TODO implement me
-
 	openAPITypes := &kubeopenapispec.Schema{}
 	validator := validate.NewSchemaValidator(openAPITypes, nil, "", strfmt.Default)
 	for key, data := range cfg {

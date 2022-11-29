@@ -431,7 +431,6 @@ spec:
                         type: object
                       type: array
                   required:
-                  - monitor
                   - name
                   - type
                   type: object

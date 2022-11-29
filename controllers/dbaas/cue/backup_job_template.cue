@@ -7,7 +7,7 @@ sts: {
 	}
 }
 backup_job_key: {
-	Name: string
+	Name:      string
 	Namespace: string
 }
 backup_job: {

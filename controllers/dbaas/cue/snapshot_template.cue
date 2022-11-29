@@ -1,8 +1,8 @@
 snapshot_key: {
-	Name: string
+	Name:      string
 	Namespace: string
 }
-pvc_name:      string
+pvc_name: string
 sts: {
 	metadata: {
 		labels: [string]: string

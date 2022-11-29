@@ -22,6 +22,8 @@ spec:
             accessMode: Readonly
       defaultReplicas: 3
       horizontalScalePolicy: Snapshot
+      backupTemplateSelectLabels:
+        "clusterdefinition.kubeblocks.io/name": apecloud-wesql
       probes:
         roleChangedProbe:
           periodSeconds: 1

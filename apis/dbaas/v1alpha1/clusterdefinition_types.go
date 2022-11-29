@@ -194,14 +194,19 @@ type ClusterDefinitionComponent struct {
 	// Policy is in enum of {None, Snapshot, Backup}. The default policy is `None`.
 	// None: Default policy, do nothing.
 	// Snapshot: Do native volume snapshot before scaling and restore to newly scaled pods.
+	//           Prefer backup job to create snapshot if `BackupTemplateSelectLabels` can find a template.
 	//           Notice that 'Snapshot' policy will only take snapshot on the first volumeMount of first container you defined
 	//           (i.e. clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]),
 	//           since take multiple snapshots at one time might cause consistency problem.
-	// Backup: Use backup policy in backuppolicytemplate to handle data recovery when scaling. Not support yet. Do not use it.
+	// Backup: Use backup tool in backuppolicytemplate to handle data recovery when scaling. Not support yet. Do not use it.
 	// +kubebuilder:default=None
 	// +kubebuilder:validation:Enum={None,Snapshot,Backup}
 	// +optional
 	HorizontalScalePolicy HorizontalScalePolicyType `json:"horizontalScalePolicy,omitempty"`
+
+	// Lifecycle use these labels to find backup templates when backup is needed.
+	// +optional
+	BackupTemplateSelectLabels map[string]string `json:"backupTemplateSelectLabels,omitempty"`
 }
 
 type ClusterDefinitionConnectionCredential struct {

@@ -775,7 +775,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 						}
 						if !vsExists {
 							// if volumesnapshot not exist, do snapshot to create it.
-							if err := doSnapshot(cli, reqCtx, cluster, snapshotKey, stsObj); err != nil {
+							if err := doSnapshot(cli, reqCtx, cluster, snapshotKey, stsObj, component.BackupTemplateSelectLabels); err != nil {
 								res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 								return &res, err
 							}
@@ -834,6 +834,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 				return &res, err
 			}
+			// clean backup resources
 			if component.HorizontalScalePolicy == dbaasv1alpha1.Snapshot &&
 				isSnapshotAvailable(cli, ctx) {
 				allPVCBound, err := isAllPVCBound(cli, ctx, stsObj)
@@ -1829,13 +1830,11 @@ func isVolumeSnapshotReadyToUse(cli client.Client, ctx context.Context, snapshot
 	return *vs.Status.ReadyToUse, nil
 }
 
-func doSnapshot(cli client.Client, reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster, snapshotKey types.NamespacedName, stsObj *appsv1.StatefulSet) error {
+func doSnapshot(cli client.Client, reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster, snapshotKey types.NamespacedName, stsObj *appsv1.StatefulSet, backupTemplateSelectLabels map[string]string) error {
 
 	ctx := reqCtx.Ctx
 
-	ml := client.MatchingLabels{
-		clusterDefLabelKey: cluster.Spec.ClusterDefRef,
-	}
+	ml := client.MatchingLabels(backupTemplateSelectLabels)
 	backupPolicyTemplateList := dataprotectionv1alpha1.BackupPolicyTemplateList{}
 	// find backuppolicytemplate by clusterdefinition
 	if err := cli.List(ctx, &backupPolicyTemplateList, ml); err != nil {

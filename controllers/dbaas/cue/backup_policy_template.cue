@@ -7,7 +7,7 @@ sts: {
 	}
 }
 backup_key: {
-	Name: string
+	Name:      string
 	Namespace: string
 }
 template: string

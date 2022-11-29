@@ -119,10 +119,7 @@ func (o *InstallOptions) Run() error {
 	}
 
 	// Add repo, if exists, will update it
-	if err := helm.AddRepo(&repo.Entry{
-		Name: types.KubeBlocksChartName,
-		URL:  types.KubeBlocksChartURL,
-	}); err != nil {
+	if err := helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}); err != nil {
 		return err
 	}
 
@@ -191,10 +188,7 @@ func (o *Options) run() error {
 	}
 
 	// remove repo
-	if err := helm.RemoveRepo(&repo.Entry{
-		Name: types.KubeBlocksChartName,
-		URL:  types.KubeBlocksChartURL,
-	}); err != nil {
+	if err := helm.RemoveRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}); err != nil {
 		return err
 	}
 

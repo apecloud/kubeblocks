@@ -1,4 +1,4 @@
-name: Add issues to project
+name: ISSUES-ADD-TO-PROJECT
 
 on:
   issues:

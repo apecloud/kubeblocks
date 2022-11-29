@@ -127,7 +127,7 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 		event.Annotations = make(map[string]string, 0)
 	}
 	event.Annotations[CSRoleChangedAnnotKey] = CSRoleChangedAnnotHandled
-	return r.Client.Patch(reqCtx.Ctx, event, patch)
+	return cli.Patch(reqCtx.Ctx, event, patch)
 }
 
 func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {

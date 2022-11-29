@@ -87,6 +87,7 @@ const (
 	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/apecloud-loadbalancer-type"
 	ServiceLBTypeAnnotationValue   = "private-ip"
 	ServiceFloatingIPAnnotationKey = "service.kubernetes.io/apecloud-loadbalancer-floating-ip"
+	StorageClassAnnotationKey      = "kubeblocks.io/storage-class"
 
 	// DataProtection definitions
 	DPGroup                = "dataprotection.kubeblocks.io"

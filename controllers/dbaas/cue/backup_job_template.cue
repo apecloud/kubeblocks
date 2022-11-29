@@ -26,6 +26,5 @@ backup_job: {
 	spec: {
 		"backupPolicyName": backup_job_key.Name
 		"backupType":       "snapshot"
-		"ttl":              "168h0m0s"
 	}
 }

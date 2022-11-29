@@ -19,8 +19,6 @@ backup_policy: {
 		namespace: backup_key.Namespace
 	}
 	spec: {
-		"schedule":                 "0 3 * * *"
-		"ttl":                      "168h0m0s"
 		"backupToolName":           "xtrabackup-mysql"
 		"backupPolicyTemplateName": template
 		"target": {

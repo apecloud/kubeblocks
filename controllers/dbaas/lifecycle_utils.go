@@ -821,6 +821,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				case dbaasv1alpha1.ScaleNone:
 					break
 				}
+				reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "HorizontalScale", "Start horizontal scale from %d to %d", *stsObj.Spec.Replicas, *stsProto.Spec.Replicas)
 			}
 			tempAnnotations := stsObj.Spec.Template.Annotations
 			stsObj.Spec.Template = stsProto.Spec.Template
@@ -832,8 +833,6 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			if err := cli.Update(ctx, stsObj); err != nil {
 				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 				return &res, err
-			} else {
-				reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "HorizontalScale", "Start horizontal scale from %d to %d", *stsObj.Spec.Replicas, *stsProto.Spec.Replicas)
 			}
 			// clean backup resources
 			if component.HorizontalScalePolicy == dbaasv1alpha1.Snapshot &&

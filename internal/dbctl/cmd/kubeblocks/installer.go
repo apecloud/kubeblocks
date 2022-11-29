@@ -84,8 +84,8 @@ func (i *Installer) Uninstall() error {
 		return err
 	}
 
-	// patch clusterdefinition and appversion's finalizer
 	ctx := context.Background()
+	// patch clusterdefinition and appversion's finalizer
 	clusterDefGVR := schema.GroupVersionResource{Group: types.Group, Version: types.Version, Resource: types.ResourceClusterDefinitions}
 	cdList, err := i.client.Resource(clusterDefGVR).List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -106,6 +106,24 @@ func (i *Installer) Uninstall() error {
 		_, err := i.client.Resource(appVerGVR).Patch(ctx, appVer.GetName(), k8sapitypes.JSONPatchType, []byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{})
 		if err != nil {
 			return err
+		}
+	}
+
+	// delete crds
+	crdGVR := schema.GroupVersionResource{
+		Group:    "apiextensions.k8s.io",
+		Version:  types.VersionV1,
+		Resource: "customresourcedefinitions",
+	}
+	crdList, err := i.client.Resource(crdGVR).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, crd := range crdList.Items {
+		if strings.Contains(crd.GetName(), "kubeblocks.io") {
+			if err := i.client.Resource(crdGVR).Delete(ctx, crd.GetName(), metav1.DeleteOptions{}); err != nil {
+				return err
+			}
 		}
 	}
 

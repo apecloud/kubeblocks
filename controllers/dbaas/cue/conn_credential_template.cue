@@ -3,7 +3,7 @@ clusterdefinition: {
 		name: string
 	}
 	spec: {
-		type:                 string
+		type: string
 		connectionCredential: {...}
 	}
 }

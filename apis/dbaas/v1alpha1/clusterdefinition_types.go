@@ -137,6 +137,7 @@ type ClusterDefinitionComponent struct {
 	// Default to Stateless.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus}
+	// +kubebuilder:default=Stateless
 	ComponentType ComponentType `json:"componentType"`
 
 	// CharacterType defines well-known database component name, such as mongos(mongodb), proxy(redis), wesql(mysql)
@@ -204,46 +205,7 @@ type ClusterDefinitionComponent struct {
 	// consensusSpec defines consensus related spec if componentType is Consensus, required if componentType is Consensus.
 	// +optional
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
-
-	// // credentialRefs provides credential secrets injected to pod's container's env.
-	// // +optional
-	// // +patchMergeKey=name
-	// // +patchStrategy=merge
-	// CredentialsRefs []Credentials `json:"credentialRefs,omitempty"`
 }
-
-// type Credentials struct {
-// 	// containerName defines associated containers name in .spec.components[].podSpec{ .initContainers[] | .containers[] }.
-// 	// +kubebuilder:validation:Required
-// 	ContainerName string `json:"containerName"`
-
-// 	// List of environment variables to set in the container.
-// 	// Cannot be updated.
-// 	// +optional
-// 	// +patchMergeKey=name
-// 	// +patchStrategy=merge
-// 	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
-
-// 	// List of sources to populate environment variables in the container.
-// 	// The keys defined within a source must be a C_IDENTIFIER. All invalid keys
-// 	// will be reported as an event when the container is starting. When a key exists in multiple
-// 	// sources, the value associated with the last source will take precedence.
-// 	// Values defined by an Env with a duplicate key will take precedence.
-// 	// Cannot be updated (yet supported).
-// 	// +optional
-// 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
-// }
-
-// type ClusterDefinitionConnectionCredential struct {
-// 	// User defines system credential username.
-// 	// +kubebuilder:validation:Required
-// 	// +kubebuilder:default=root
-// 	User string `json:"user"`
-
-// 	// Password defines system credential password.
-// 	// +optional
-// 	Password string `json:"password,omitempty"`
-// }
 
 type ClusterDefinitionStatusGeneration struct {
 	// ClusterDefinition generation number.

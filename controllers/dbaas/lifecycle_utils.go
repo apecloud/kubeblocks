@@ -454,14 +454,12 @@ func mergeComponents(
 	// }
 
 	mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
-	relaceValues(cluster, component)
+	replaceValues(cluster, component)
 
 	return component
 }
 
-func relaceValues(cluster *dbaasv1alpha1.Cluster, component *Component) {
-
-	// $(CONN_CREDENTIAL_SECRET_NAME)
+func replaceValues(cluster *dbaasv1alpha1.Cluster, component *Component) {
 	namedValues := map[string]string{
 		"$(CONN_CREDENTIAL_SECRET_NAME)": fmt.Sprintf("%s-conn-credential", cluster.GetName()),
 	}
@@ -518,20 +516,36 @@ func buildClusterCreationTasks(
 		rootTask.SubTasks = append(rootTask.SubTasks, componentTask)
 	}
 
-	components := clusterDefinition.Spec.Components
-	appCompTypes := appVersion.GetTypeMappingComponents()
+	clusterDefComp := clusterDefinition.Spec.Components
 	clusterCompTypes := cluster.GetTypeMappingComponents()
 
-	for _, component := range components {
-		typeName := component.TypeName
+	// add default component if unspecified in Cluster.spec.components
+	for _, c := range clusterDefComp {
+		if c.DefaultReplicas <= 0 {
+			continue
+		}
+		clusterComps := clusterCompTypes[c.TypeName]
+		if len(clusterComps) == 0 {
+			cluster.Spec.Components = append(cluster.Spec.Components, dbaasv1alpha1.ClusterComponent{
+				Name:     c.TypeName,
+				Type:     c.TypeName,
+				Replicas: c.DefaultReplicas,
+			})
+		}
+	}
+
+	appCompTypes := appVersion.GetTypeMappingComponents()
+	clusterCompTypes = cluster.GetTypeMappingComponents()
+	for _, c := range clusterDefComp {
+		typeName := c.TypeName
 		appVersionComponent := appCompTypes[typeName]
 		clusterComps := clusterCompTypes[typeName]
-		if len(clusterComps) == 0 && component.DefaultReplicas > 0 {
-			buildTask(mergeComponents(cluster, clusterDefinition, &component, appVersionComponent, nil))
+		if len(clusterComps) == 0 && c.DefaultReplicas > 0 {
+			buildTask(mergeComponents(cluster, clusterDefinition, &c, appVersionComponent, nil))
 			continue
 		}
 		for _, clusterComp := range clusterComps {
-			buildTask(mergeComponents(cluster, clusterDefinition, &component, appVersionComponent, &clusterComp))
+			buildTask(mergeComponents(cluster, clusterDefinition, &c, appVersionComponent, &clusterComp))
 		}
 	}
 
@@ -594,17 +608,22 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		return fmt.Errorf("invalid arg")
 	}
 
-	statefulSetProcessor := func(customSetup func(*corev1.ConfigMap) (*appsv1.StatefulSet, error)) error {
+	workloadProcessor := func(customSetup func(*corev1.ConfigMap) (client.Object, error)) error {
 		envConfig, err := buildEnvConfig(*params)
 		if err != nil {
 			return err
 		}
 		*params.applyObjs = append(*params.applyObjs, envConfig)
-		sts, err := customSetup(envConfig)
+
+		workload, err := customSetup(envConfig)
 		if err != nil {
 			return err
 		}
-		*params.applyObjs = append(*params.applyObjs, sts)
+
+		defer func() {
+			// workload object should be append last
+			*params.applyObjs = append(*params.applyObjs, workload)
+		}()
 
 		svc, err := buildSvc(*params, true)
 		if err != nil {
@@ -612,8 +631,56 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		}
 		*params.applyObjs = append(*params.applyObjs, svc)
 
-		// render config
-		configs, err := buildCfg(*params, sts, &sts.Spec.Template.Spec, reqCtx.Ctx, cli)
+		var podSpec *corev1.PodSpec
+		sts, ok := workload.(*appsv1.StatefulSet)
+		if ok {
+			podSpec = &sts.Spec.Template.Spec
+		} else {
+			deploy, ok := workload.(*appsv1.Deployment)
+			if ok {
+				podSpec = &deploy.Spec.Template.Spec
+			}
+		}
+		if podSpec == nil {
+			return nil
+		}
+
+		defer func() {
+			// verify missing volumes
+			volumesNames := map[string]struct{}{}
+			for _, v := range podSpec.Volumes {
+				volumesNames[v.Name] = struct{}{}
+			}
+
+			for _, t := range params.component.ConfigTemplates {
+				volumesNames[t.VolumeName] = struct{}{}
+			}
+
+			for _, cc := range []*[]corev1.Container{
+				&podSpec.Containers,
+				&podSpec.InitContainers,
+			} {
+				for _, c := range *cc {
+					for _, v := range c.VolumeMounts {
+						if _, ok := volumesNames[v.Name]; ok {
+							continue
+						}
+						// if persistence is not found, add emptyDir pod.spec.volumes[]
+						podSpec.Volumes = append(podSpec.Volumes,
+							corev1.Volume{
+								Name: v.Name,
+								VolumeSource: corev1.VolumeSource{
+									EmptyDir: &corev1.EmptyDirVolumeSource{},
+								},
+							})
+						volumesNames[v.Name] = struct{}{}
+					}
+				}
+			}
+		}()
+
+		// render config template
+		configs, err := buildCfg(*params, workload, podSpec, reqCtx.Ctx, cli)
 		if err != nil {
 			return err
 		}
@@ -626,14 +693,19 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 
 	switch params.component.ComponentType {
 	case dbaasv1alpha1.Stateless:
-		deploy, err := buildDeploy(reqCtx, *params)
-		if err != nil {
+		if err := workloadProcessor(
+			func(envConfig *corev1.ConfigMap) (client.Object, error) {
+				deploy, err := buildDeploy(reqCtx, *params, envConfig.Name)
+				if err != nil {
+					return nil, err
+				}
+				return deploy, nil
+			}); err != nil {
 			return err
 		}
-		*params.applyObjs = append(*params.applyObjs, deploy)
 	case dbaasv1alpha1.Stateful:
-		if err := statefulSetProcessor(
-			func(envConfig *corev1.ConfigMap) (*appsv1.StatefulSet, error) {
+		if err := workloadProcessor(
+			func(envConfig *corev1.ConfigMap) (client.Object, error) {
 				sts, err := buildSts(reqCtx, *params, envConfig.Name)
 				if err != nil {
 					return nil, err
@@ -643,8 +715,8 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 			return err
 		}
 	case dbaasv1alpha1.Consensus:
-		if err := statefulSetProcessor(
-			func(envConfig *corev1.ConfigMap) (*appsv1.StatefulSet, error) {
+		if err := workloadProcessor(
+			func(envConfig *corev1.ConfigMap) (client.Object, error) {
 				css, err := buildConsensusSet(reqCtx, *params, envConfig.Name)
 				if err != nil {
 					return nil, err
@@ -1019,107 +1091,93 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 		}
 	}
 
-	probeContainers, err := buildProbeContainers(reqCtx, params, sts.Spec.Template.Spec.Containers)
-	if err != nil {
+	if err = processContainersInjection(reqCtx, params, envConfigName, &sts.Spec.Template.Spec); err != nil {
 		return nil, err
 	}
-	sts.Spec.Template.Spec.Containers = append(sts.Spec.Template.Spec.Containers, probeContainers...)
+	return &sts, nil
+}
 
-	injectEnv := func(c *corev1.Container) {
-		envFieldPathMap := map[string]string{
-			"_POD_NAME":  "metadata.name",
-			"_NAMESPACE": "metadata.namespace",
-			"_SA_NAME":   "spec.serviceAccountName",
-			"_NODENAME":  "spec.nodeName",
-			"_HOSTIP":    "status.hostIP",
-			"_PODIP":     "status.podIP",
-			"_PODIPS":    "status.podIPs",
-		}
+func processContainersInjection(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName string, podSpec *corev1.PodSpec) error {
+	probeContainers, err := buildProbeContainers(reqCtx, params, podSpec.Containers)
+	if err != nil {
+		return err
+	}
+	podSpec.Containers = append(podSpec.Containers, probeContainers...)
 
-		clusterEnv := map[string]string{
-			"_CLUSTER_NAME":      params.cluster.Name,
-			"_COMP_NAME":         params.component.Name,
-			"_CLUSTER_COMP_NAME": params.cluster.Name + "-" + params.component.Name,
+	for _, cc := range []*[]corev1.Container{
+		&podSpec.Containers,
+		&podSpec.InitContainers,
+	} {
+		for i := range *cc {
+			injectEnvs(params, envConfigName, &(*cc)[i])
 		}
+	}
+	return nil
+}
 
-		injectEnv := make([]corev1.EnvVar, 0, len(envFieldPathMap)+len(c.Env))
-		for suf, fp := range envFieldPathMap {
-			injectEnv = append(injectEnv, corev1.EnvVar{
-				Name: dbaasPrefix + suf,
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						FieldPath: fp,
-					},
-				},
-			})
-		}
+func injectEnvs(params createParams, envConfigName string, c *corev1.Container) {
+	envFieldPathMap := map[string]string{
+		"_POD_NAME":  "metadata.name",
+		"_NAMESPACE": "metadata.namespace",
+		"_SA_NAME":   "spec.serviceAccountName",
+		"_NODENAME":  "spec.nodeName",
+		"_HOSTIP":    "status.hostIP",
+		"_PODIP":     "status.podIP",
+		"_PODIPS":    "status.podIPs",
+	}
 
-		for k, v := range clusterEnv {
-			injectEnv = append(injectEnv, corev1.EnvVar{
-				Name:  dbaasPrefix + k,
-				Value: v,
-			})
-		}
+	clusterEnv := map[string]string{
+		"_CLUSTER_NAME":      params.cluster.Name,
+		"_COMP_NAME":         params.component.Name,
+		"_CLUSTER_COMP_NAME": params.cluster.Name + "-" + params.component.Name,
+	}
 
-		// have injected variables placed at the front of the slice
-		if c.Env == nil {
-			c.Env = injectEnv
-		} else {
-			c.Env = append(injectEnv, c.Env...)
-		}
-
-		if c.EnvFrom == nil {
-			c.EnvFrom = []corev1.EnvFromSource{}
-		}
-		c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
-			ConfigMapRef: &corev1.ConfigMapEnvSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: envConfigName,
+	toInjectEnv := make([]corev1.EnvVar, 0, len(envFieldPathMap)+len(c.Env))
+	for suf, fp := range envFieldPathMap {
+		toInjectEnv = append(toInjectEnv, corev1.EnvVar{
+			Name: dbaasPrefix + suf,
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: fp,
 				},
 			},
 		})
-		// c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
-		// 	SecretRef: &corev1.SecretEnvSource{
-		// 		LocalObjectReference: corev1.LocalObjectReference{
-		// 			Name: params.cluster.Name,
-		// 		},
-		// 	},
-		// })
 	}
 
-	volumesNames := map[string]struct{}{}
-	for _, v := range sts.Spec.Template.Spec.Volumes {
-		volumesNames[v.Name] = struct{}{}
+	for k, v := range clusterEnv {
+		toInjectEnv = append(toInjectEnv, corev1.EnvVar{
+			Name:  dbaasPrefix + k,
+			Value: v,
+		})
 	}
 
-	for _, t := range params.component.ConfigTemplates {
-		volumesNames[t.VolumeName] = struct{}{}
+	// have injected variables placed at the front of the slice
+	if c.Env == nil {
+		c.Env = toInjectEnv
+	} else {
+		c.Env = append(toInjectEnv, c.Env...)
 	}
 
-	for _, cc := range []*[]corev1.Container{
-		&sts.Spec.Template.Spec.Containers,
-		&sts.Spec.Template.Spec.InitContainers,
-	} {
-		for i, c := range *cc {
-			injectEnv(&(*cc)[i])
-			for _, v := range c.VolumeMounts {
-				if _, ok := volumesNames[v.Name]; ok {
-					continue
-				}
-				// if persistence is not found, add emptyDir pod.spec.volumes[]
-				sts.Spec.Template.Spec.Volumes = append(
-					sts.Spec.Template.Spec.Volumes, corev1.Volume{
-						Name: v.Name,
-						VolumeSource: corev1.VolumeSource{
-							EmptyDir: &corev1.EmptyDirVolumeSource{},
-						},
-					})
-				volumesNames[v.Name] = struct{}{}
-			}
-		}
+	if envConfigName == "" {
+		return
 	}
-
-	return &sts, nil
+	if c.EnvFrom == nil {
+		c.EnvFrom = []corev1.EnvFromSource{}
+	}
+	c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
+		ConfigMapRef: &corev1.ConfigMapEnvSource{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: envConfigName,
+			},
+		},
+	})
+	// c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
+	// 	SecretRef: &corev1.SecretEnvSource{
+	// 		LocalObjectReference: corev1.LocalObjectReference{
+	// 			Name: params.cluster.Name,
+	// 		},
+	// 	},
+	// })
 }
 
 // buildConsensusSet build on a stateful set
@@ -1133,7 +1191,7 @@ func buildConsensusSet(reqCtx intctrlutil.RequestCtx, params createParams, envCo
 	return sts, err
 }
 
-func buildDeploy(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.Deployment, error) {
+func buildDeploy(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName string) (*appsv1.Deployment, error) {
 	const tplFile = "deployment_template.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := params.getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
@@ -1162,28 +1220,23 @@ func buildDeploy(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.De
 		return nil, err
 	}
 
-	stsStrByte, err := cueValue.Lookup("deployment")
+	deployStrByte, err := cueValue.Lookup("deployment")
 	if err != nil {
 		return nil, err
 	}
 
 	deploy := appsv1.Deployment{}
-	if err = json.Unmarshal(stsStrByte, &deploy); err != nil {
+	if err = json.Unmarshal(deployStrByte, &deploy); err != nil {
 		return nil, err
 	}
 
-	if err = json.Unmarshal(stsStrByte, &deploy); err != nil {
+	if err = json.Unmarshal(deployStrByte, &deploy); err != nil {
 		return nil, err
 	}
 
-	probeContainers, err := buildProbeContainers(reqCtx, params, deploy.Spec.Template.Spec.Containers)
-	if err != nil {
+	if err = processContainersInjection(reqCtx, params, "", &deploy.Spec.Template.Spec); err != nil {
 		return nil, err
 	}
-	deploy.Spec.Template.Spec.Containers = append(deploy.Spec.Template.Spec.Containers, probeContainers...)
-
-	// TODO: inject environment
-
 	return &deploy, nil
 }
 

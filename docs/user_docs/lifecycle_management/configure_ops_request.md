@@ -2,15 +2,15 @@
 
 ## What is OpsRequest
 
-`OpsRequest` is a Kubernetes Custom Resource Definitions (CRD). You can initiate an operation request via `OpsRequest` to operate database clusters. Currently, the following operation tasks are supported: database restarting, database version upgrading, vertical scaling, horizontal scaling, and volume expansion.
+`OpsRequest` is a Kubernetes Custom Resource Definitions (CRD). You can initiate an operation request via `OpsRequest` to operate database clusters. KubeBlocks supports the following operation tasks: database restarting, database version upgrading, vertical scaling, horizontal scaling, and volume expansion.
 
 ## OpsRequest CRD Specifications
 
-`OpsRequest` has `TypeMeta`, `ObjectMeta`, `Spec` and `Status` sections. 
+`OpsRequest` has `TypeMeta`, `ObjectMeta`, `Spec`, and `Status` sections. 
 
 The following are sample `OpsRequest` CRs for different operations:
 
-### Sample `OpsRequest` for restarting a cluster
+### Sample `OpsRequest` for restarting a KubeBlocks cluster
 
 ```
 apiVersion: dbaas.kubeblocks.io/v1alpha1
@@ -97,7 +97,7 @@ spec:
 ```
 
 
-### Sample `OpsRequest` for upgrading a cluster
+### Sample `OpsRequest` for upgrading a KubeBlocks cluster
 
 ```
 apiVersion: dbaas.kubeblocks.io/v1alpha1
@@ -142,7 +142,7 @@ An `OpsRequest` object has the following fields in the `spec` section.
 
 ### spec.type 
 
-`spec.type` is a required field. It points to which operation OpsRequest uses and decides which operation OpsRequest performs now.
+`spec.type` is a required field. It points to the operation OpsRequest uses and decides the operation OpsRequest performs.
 
 The following types of operations are allowed in `OpsRequest`.
 
@@ -158,51 +158,47 @@ It indicates the cluster-level operation. Its attribute is as follows:
 
 - Upgrade
 
-    It specifies the information for upgrading appversion and `spec.type` should be `Upgrade` to make it effective. Its attribute is as follows:
-    - `appVersion` specifies the appVersion object that will be used in the current upgrading operation.
+    It specifies the information for upgrading appVersion and `spec.type` should be `Upgrade` to make it valid. Its attribute is as follows:
+    - `appVersion` specifies the appVersion object that is used in the current upgrading operation.
         Value: `AppVersion.metadata.name`
 
 ### spec.componentOps
 
-It indicates the component-level operation. Its attribute is as follows:
+It indicates the component-level operation and is an array that supports operations of different parameters. Its attribute is as follows:
 
 - componentNames
 
-    It is a required field and specifies the component to which the operation is applied and is a `cluster.component.name` array.
+  It is a required field and specifies the component to which the operation is applied and is a `cluster.component.name` array.
 
-    - verticalScaling
+- verticalScaling
 
-        `verticalScaling` scales up and down the computing resources of the component. Its value is an object of k8s container resources. For example, the mongos component of MongoDB:
+  `verticalScaling` scales up and down the computing resources of a component. Its value is an object of Kubernetes container resources. For example, the mongos component of MongoDB:
 
-        ```
-        verticalScaling:
-            requests:
-                memory: "200Mi"
-                cpu: "0.1"
-            limits:
-                memory: "300Mi"
-                cpu: "0.2"
-        ```
+    ```
+    verticalScaling:
+      requests:
+        memory: "200Mi"
+        cpu: "0.1"
+      limits:
+        memory: "300Mi"
+        cpu: "0.2"
+    ```
 
-    - volumeExpansion
+- volumeExpansion
 
-        `volumeExpansion`, a volume array, indicates the storage resources that apply to each component database engine. `spec.type` should be `VolumeExpansion` to make it effective. Its attributes are as follows:
+  `volumeExpansion`, a volume array, indicates the storage resources that apply to each component database engine. `spec.type` should be `VolumeExpansion` to make it effective. Its attributes are as follows:
 
-        - storage: the storage space
-        - name: the name of volumeClaimTemplates.
+    - storage: the storage space
+    - name: the name of volumeClaimTemplates.
 
-    - horizontalScaling
+- horizontalScaling
 
-        `horizontalScaling` is used to add or delete the replicas of a component or roleGroup. `spec.type` should be `HorizontalScaling` to make it effective. Its value includes `componentName.replicas` and `componentName.roleGroups`. For example:
+  `horizontalScaling` is the replicas amount of the current component. `spec.type` should be `HorizontalScaling` to make it effective. Its value includes `componentName.replicas`. For example:
 
-        ```
-        horizontalScaling:
-            replicas: 3
-            # roleGroups is an array and its data element structure is: 
-            roleGroups:
-            - name: secondary
-              replicas: 2
-        ```
+    ```
+    horizontalScaling:
+      replicas: 3
+    ```
 
 ## OpsRequest `status`
 
@@ -225,9 +221,9 @@ OpsRequest task is one-time and is deleted after the operation succeeds.
 | Pending                | OpsRequest is waiting for processing.                      |
 | Failed                 | OpsRequest failed.                                         |
 
-### status.condition
+### status.conditions
 
-`conditions` is the general data structure provided by k8s, indicating the resource state. It can provide more detailed information (such as state switch time and upgrading time) than `status` does and functions as an extension mechanism.
+`status.conditions` is the general data structure provided by Kubernetes, indicating the resource state. It can provide more detailed information (such as state switch time and upgrading time) than `status` does and functions as an extension mechanism.
 
 `condition.type` indicates the type of the last OpsRequest status. 
 
@@ -235,12 +231,13 @@ OpsRequest task is one-time and is deleted after the operation succeeds.
 |:---                   | :---                                           | 
 | Progressing           | OpsRequest is under controller procesing.      |
 | Validated             | OpsRequest is validated.                       |
-| Restarting            | Start Restarting.                              |
-| VerticalScaling       | Start VerticalScaling.                         |
-| HorizontalScaling     | Start HorizontalScaling.                       |
-|VolumeExpanding        | Start VolumeExpanding.                         |
-| Upgrading             | Start Upgrading.                               |
-| Succeed               | OpsRequest is proceeded successfully.          |
+| Restarting            | Start processing restart ops.                  |
+| VerticalScaling       | Start scaling resources vertically.            |
+| HorizontalScaling     | Start scaling nodes horizontally.              |
+| VolumeExpanding       | Start process volume expansion.                |
+| Upgrading             | Start upgrading.                               |
+| Succeed               | Operation is proceeded successfully.           |
+| Failed                | Operation failed.                              |
 
 `condition.status` indicates whether this condition is applicable. The results of `condition.status` include `True`, `False`, and `Unkown`, respectively standing for success, failure, and unknown error. 
 
@@ -248,7 +245,8 @@ OpsRequest task is one-time and is deleted after the operation succeeds.
 
 | **Reason**                         | **Meanings**                                    |
 | :---                               | :---                                            |
-| OpsRequestProgressingStarted       | Controller is processing `OpsRequest`.            |
+| OpsRequestProgressingStarted       | Controller is processing operations.            |
+| Starting                           | Controller starts running operations.           |
 | ValidateOpsRequestPassed           | OpsRequest is validated.                        |              
 | OpsRequestProcessedSuccessfully    | OpsRequest is processed.                        |
 | RestartingStarted                  | Restarting started.                             |
@@ -258,6 +256,6 @@ OpsRequest task is one-time and is deleted after the operation succeeds.
 | UpgradingStarted                   | Upgrade started.                                |
 | ClusterPhaseMisMatch               | The cluster status mismatches.                  |
 | OpsTypeNotSupported                | The cluster does not support this operation.    |
-| ClusterExistOtherOperation         | Another operation is running.                   |
+| ClusterExistOtherOperation         | Another mutually exclusive operation is running.|
 | ClusterNotFound                    | The specified cluster is not found.             |
 | VolumeExpansionValidateError       | Volume expansion validation failed.             |

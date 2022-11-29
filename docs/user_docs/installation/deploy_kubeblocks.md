@@ -1,14 +1,18 @@
 # Deploy KubeBlocks
 
-`KubeBlocks` is managed via `dbass` command.
+`kubeblocks` command is used to manage KubeBlocks.
 
-## Dependencies
+> **Note** <br>
+> `kubeblocks` command is named as `dbaas` in v0.2.0-alpha.3 and below versions.
 
-- K8s 
-  K8s is installed.
+## Before you start
+
+- Kubernetes 
+  Kubernetes is installed.
 
 - Storageclass
-  This k8s cluster should have `storageclass` by default. Run the following command to check whether `storageclass` exists in this k8s cluster. 
+  This Kubernetes cluster should have `storageclass` by default. Run the following command to check whether `storageclass` exists in this Kubernetes cluster. 
+  
   ```
   $ kubectl get storageclass
     NAME               PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
@@ -17,85 +21,34 @@
 
 ## Install KubeBlocks
 
-Run this command to install `KubeBlocks`. ***#Whether the version in this command is required for installation?***
+Run this command to install KubeBlocks.
 
 ```
-$ dbctl dbass install --version=0.2.0-alpha.0 
-Installing KubeBlocks v0.2.0-alpha.0 ...
-⡿  Install oci://yimeisun.azurecr.io/helm-chart/kubeblocks W1024 14:05:05.028500  ... 50779 warnings.go:70] policy/v1beta1 PodSecurityPolicy is deprecated in v1.21+, unavailable in v1.25+
-⣻  Install oci://yimeisun.azurecr.io/helm-chart/kubeblocks W1024 14:05:46.753450  ... 50779 warnings.go:70] policy/v1beta1 PodSecurityPolicy is deprecated in v1.21+, unavailable in v1.25+
-Install oci://yimeisun.azurecr.io/helm-chart/kubeblocks  ...OK
-
-KubeBlocks v0.2.0-alpha.0 Install SUCCESSFULLY!
-You can now create a database cluster by running the following command:
-        dbctl cluster create <you cluster name>
-        
-        
-KubeBlocks v0.2.0-alpha.0 Install SUCCESSFULLY!
-
-1. Basic commands for cluster:
-    dbctl cluster create -h     # help information about creating a database cluster
-    dbctl cluster list          # list all database clusters
-    dbctl cluster describe <cluster-name>  # get cluster information
-    
-2. Uninstall DBaaS:
-    dbctl dbaas uninstall
+dbctl kubeblocks install 
 ```
 
-If you need to enable the monitor by default when installing `KubeBlocks`, run the following command.
+To enable monitor for database observability, run the following command. For detailed information, see _Monitor database_. ***Links to be added.***
 
 ```
-$ dbctl dbaas install --version=0.2.0-alpha.0 --monitor=true
-Installing KubeBlocks v0.2.0-alpha.0 ...
-⡿  Install oci://yimeisun.azurecr.io/helm-chart/kubeblocks W1024 14:05:05.028500  ... 50779 warnings.go:70] policy/v1beta1 PodSecurityPolicy is deprecated in v1.21+, unavailable in v1.25+
-⣻  Install oci://yimeisun.azurecr.io/helm-chart/kubeblocks W1024 14:05:46.753450  ... 50779 warnings.go:70] policy/v1beta1 PodSecurityPolicy is deprecated in v1.21+, unavailable in v1.25+
-Install oci://yimeisun.azurecr.io/helm-chart/kubeblocks  ...OK
-
-KubeBlocks v0.2.0-alpha.0 Install SUCCESSFULLY!
-You can now create a database cluster by running the following command:
-        dbctl cluster create <you cluster name>
-        
-        
-KubeBlocks v0.2.0-alpha.0 Install SUCCESSFULLY!
-
-1. Basic commands for cluster:
-    dbctl cluster create -h     # help information about creating a database cluster
-    dbctl cluster list          # list all database clusters
-    dbctl cluster describe <cluster-name>  # get cluster information
-    
-2. Uninstall DBaaS:
-    dbctl dbaas uninstall
-
-3. To view the Grafana console:
-    export POD_NAME=...
-    kubectl -A port-forward $POD_NAME 3000
-    open http://127.0.0.1:3000
-    User: admin, Password: abc
-
-4. To view the Prometheus console
-    export POD_NAME=...
-    kubectl -A port-forward $POD_NAME 9090
-    open http://127.0.0.1:9090
-    
-5. To view the Prometheus AlertManager console
-    export ...
-    kubectl -A port-forward $POD_NAME 9093
-    open http://127.0.0.1:9093
+dbctl kubeblocks install --monitor=true
 ```
 
-## Unistall KubeBlocks
 
-Run this command to unistall `KubeBlocks`.
+## Uninstall KubeBlocks
+
+Run this command to uninstall `KubeBlocks`.
 
 ```
-dbctl dbass unistall
+dbctl kubeblocks unistall
 ```
 
 ## Reference
 
 Refer to the following links to find detailed information about the CLIs used above.
 
+- [`dbctl kubeblocks`](cli/../../cli/dbctl_kubeblocks.md)
+- [`dbctl kubeblocks install`](cli/../../cli/dbctl_kubeblocks_install.md)
+- [`dbctl kubeblocks uninstall`](cli/../../cli/dbctl_kubeblocks_uninstall.md)
 - [`dbctl dbass`](../cli/dbctl_dbaas.md)
 - [`dbctl dbass install`](../cli/dbctl_dbaas_install.md)
-- [`dbctl dbass unistall`](../cli/dbctl_dbaas_uninstall.md)
-
+- [`dbctl dbass uninstall`](../cli/dbctl_dbaas_uninstall.md)

@@ -1,46 +1,38 @@
 # Deploy `dbctl`
 
-`dbctl` is the command line tool of `KubeBlocks`. This section introduces how to install `dbctl`. 
+`dbctl` is the KubeBlocks CLI. This section introduces how to install and uninstall `dbctl`. 
 
-For more information of CLI, refer to [KubeBlocks commands overview](../cli/kubeblocks%20commands%20overview.md).
+For more information on the KubeBlocks CLIs, refer to [KubeBlocks commands overview](../cli/kubeblocks%20commands%20overview.md).
 
-## Install dependencies
+## Before you start
 
 The following dependencies are required for deploying `dbctl`.
 
 - MySQL Shell
 Install MySQL Shell in your local host to visit MySQL instances. Refer to [Install MySQL Shell on macOS](https://dev.mysql.com/doc/mysql-shell/8.0/en/mysql-shell-install-macos-quick.html) for details.
-  Note:
-  Installation steps:
-
-  1. Download the package from http://dev.mysql.com/downloads/shell/. 
-  2. Double-click the downloaded DMG to mount it. Finder opens.
-  3. Double-click the .pkg file shown in the Finder window.
-  4. Follow the steps in the installation wizard.
-  5. When the installer finishes, eject the DMG. (It can be deleted.)
 
 - `kubectl`
-Run the following command to install `kubectl` in your local host for visiting k8s clusters. Refer to [Install and Set Up kubectl on macOS](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) for details.
+Run the following command to install `kubectl` in your local host for visiting Kubernetes clusters. Refer to [Install and Set Up kubectl on macOS](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) for details.
+
   ```
   curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/darwin/arm64/kubectl"
   ```
 
-- K8s cluster
-`dbctl` will visit a k8s cluster which can be specified by the `kubeconfig` condition variable or the `kubeconfig` parameter. If no k8s cluster is specified, `dbctl` reads the content in `~/.kube/config` file by default.
+- Kubernetes cluster
+`dbctl` visits a Kubernetes cluster which can be specified by the `kubeconfig` condition variable or the `kubeconfig` parameter. If no Kubernetes cluster is specified, `dbctl` reads the content in `~/.kube/config` file by default.
 
 ## Install `dbctl`
 
-Both curl installation and make installation are supported.
+Installing `dbctl` by curl and make are supported.
 
 - curl
-`dbctl` can be run on macOS, Linux, and Windows. Copy and run the command below.
-
+`dbctl` can run on macOS, Linux, and Windows. Copy and run the command below.
 ```
 curl -fsSL http://161.189.136.182:8000/apecloud/kubeblocks/install_dbctl.sh |bash
 ```
 
 - make
-Downlod source code and execute the following commands under the root directory of the source code. Make and generate `dbctl` executive file. Make sure the executive file under `bin/dbctl`.
+Download the source code and execute the following commands under the root directory of the source code. Make and generate `dbctl` executive file. Make sure the executive file is under the `bin/dbctl` path.
 
   ```
   # Switch to the `main` branch
@@ -53,7 +45,7 @@ Downlod source code and execute the following commands under the root directory 
   make dbctl
   ```
 
-Run the command below to view version after installation.
+Run the command below to check the version after installation.
 
 ```
 dbctl version
@@ -61,7 +53,7 @@ dbctl version
 
 ## Uninstall `dbctl`
 
-Run the following command to unistall `dbctl`.
+Run the following command to uninstall `dbctl`.
 
 ```
 sudo rm /usr/local/bin/dbctl
@@ -72,3 +64,20 @@ If you install `dbctl` by make, run the command below to clean the generated `db
 ```
 make clean-dbctl
 ```
+
+## FAQ
+
+- Q1: What should I do when an error, `- dial unix /var/run/docker.sock: connect: permission denied`, occurs?
+  
+  A1: 
+  Docker is installed by root. If you do not use `sudo` when running `dbctl`, calling Docker will trigger this error.
+  You can authorize this operation manually by executing this command.
+
+  ```
+  sudo chown user_name /var/run/docker.sock
+  ```
+
+- Q2: Installing `dbctl` is very slow, and an error, `unexpected end of file，tar: linux-arm64`, occurs with the timestamp showing 2022-09-18 22:47:51, which is 406436.949402453s earlier from now.
+  
+  A2:
+  Check whether the system time is set correctly.

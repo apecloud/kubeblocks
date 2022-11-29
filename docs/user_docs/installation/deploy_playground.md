@@ -1,57 +1,69 @@
-# Deploy Playground
+# Deploy playground
 
-Description to be filled.
+KuebBlocks Playground creates an easy-to-use database environment for Kubernetes users.
 
-## Install dependency
+# Before you start
+
+Deploy [`dbctl`](deploy_dbctl.md) first.
+
+## Before you start
 
 - Docker
 
-  Install and run Docker before running `playground`. Docker version should be V20.10.5 or above.
+  Install and run Docker before running `playground`. The Docker version should be v20.10.5 or above.
 
   Refer to [Install Docker Desktop on Mac](https://docs.docker.com/desktop/install/mac-install/) for details.
 
-## Deploy `playground` on local host
+## Deploy `playground` on a local host
 
 > **Note** <br>
-> During the deployment process, files will be downloaded from image and the downloading might be slow. It is recommended to enable VPN while downloading. ***# Is this a promblem for overseas users?***
+> During the deployment process, files will be downloaded from image and downloading might be slow. It is recommended to enable VPN while downloading. ***# Is this a promblem for overseas users?***
 
-Run this command to deploy `playground`.
+_Steps_:
+
+1. Run this command to deploy `playground`.
 
 ```
 dbctl playground init
 ```
 
-Run the following command to view the deployed database instance status.
+2. Run the following command to view the deployed database instance status.
 
 ```
 export KUBECONFIG=~/.kube/dbctl-playground
 dbctl cluster list
 ```
 
-When the instance changes to `ONLINE` status, the instance is deployed successfully.
+When the instance status changes to `ONLINE`, the instance is deployed successfully.
 
 ## Deploy `playground` on AWS EC2
 
-You can also deploy `playgournd` on AWS EC2 by following the steps below.
+You can also deploy `playground` on AWS EC2 by following the steps below.
 
-### Dependency
+### Before you start
 
-An AWS access key is required and this account should have the searching and changing permission of VPC/Internet Gateway/Subnet/Route Table/Security Group/EC2 resources. ***# This whole part is written based on the version in August. Need to be updated.***
+Make sure the following requirements are met.
+
+- AWS access key: An AWS access key is required and this account should have the searching and changing permission of VPC/Internet Gateway/Subnet/Route Table/Security Group/EC2 resources. ***#Environment dependencies are required. Need to be confirmed and added. ***
+- EKS
+- Self-owned Kubernetes
+- A fresh and clean start
 
 > **Caution** <br>
-> DO NOT switch your network connection during the deployment and using process. Switching network changes the IP, which results in connection failure.
+> DO NOT switch your network during the deployment and using process. Switching network will change the IP address, which results in connection failure.
 
 Replace `--access-key` and `--access-secret` with your AWS access key and run this command to deploy `playground` on AWS.
 
 ```
-dbctl playground init --access-key xxx --acces-secret xxx --cloud-provider aws
+dbctl playground init --access-key xxx --access-secret xxx --cloud-provider aws
 ```
 
-The following information wil be displayed when `playground` is deployed successfully.
+_Result_:
+The following information will be displayed when `playground` is deployed successfully.
 
 ```
 Notes:
-Open DBaaS Playground v0.2.0 Start SUCCESSFULLY!
+KubeBlocks Playground v0.2.0 Start SUCCESSFULLY!
 MySQL Standalone Cluster "mycluster" has been CREATED!
 
 1. Basic commands for dbcluster:
@@ -72,9 +84,9 @@ MySQL Standalone Cluster "mycluster" has been CREATED!
   dbctl playground destroy
 
 --------------------------------------------------------------------
-To view this guide next time:         opencli playground guide
-To get more help information:         opencli help
-To login to remote host:              ssh -i ~/.opendbaas/ssh/id_rsa ec2-user@54.222.159.218
+To view this guide next time:         dbctl playground guide
+To get more help information:         dbctl help
+To login to remote host:              ssh -i ~/.kubeblocks/ssh/id_rsa ec2-user@54.222.159.218
 Use "dbctl [command] --help" for more information about a command.
 ```
 
@@ -86,7 +98,7 @@ Use "dbctl [command] --help" for more information about a command.
 
 TBD
 
-## Destory
+## Destroy
 
 Run this command to destroy the instance created by `playground`.
 

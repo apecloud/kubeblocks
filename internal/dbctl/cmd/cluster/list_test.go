@@ -72,7 +72,7 @@ var _ = Describe("list", func() {
 		}
 
 		tf.Client = tf.UnstructuredClient
-		tf.FakeDynamicClient = fake.NewDynamicClient(cluster, fake.ClusterDef(), fake.Appversion())
+		tf.FakeDynamicClient = fake.NewDynamicClient(cluster, fake.ClusterDef(), fake.AppVersion())
 	})
 
 	AfterEach(func() {

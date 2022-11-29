@@ -128,7 +128,7 @@ var _ = Describe("kubeblocks", func() {
 	It("remove finalizer", func() {
 		clusterDef := fake.ClusterDef()
 		clusterDef.Finalizers = []string{"test"}
-		appVer := fake.Appversion()
+		appVer := fake.AppVersion()
 		appVer.Finalizers = []string{"test"}
 
 		testCases := []struct {
@@ -138,12 +138,12 @@ var _ = Describe("kubeblocks", func() {
 		}{
 			{
 				clusterDef: fake.ClusterDef(),
-				appVersion: fake.Appversion(),
+				appVersion: fake.AppVersion(),
 				expected:   "Unable to remove nonexistent key: finalizers",
 			},
 			{
 				clusterDef: clusterDef,
-				appVersion: fake.Appversion(),
+				appVersion: fake.AppVersion(),
 				expected:   "Unable to remove nonexistent key: finalizers",
 			},
 			{

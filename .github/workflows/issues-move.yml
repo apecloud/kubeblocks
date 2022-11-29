@@ -1,4 +1,4 @@
-name: Move issues
+name: ISSUES-MOVE
 on:
   issues:
     types: [ assigned ]

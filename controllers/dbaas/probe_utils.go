@@ -122,11 +122,24 @@ func buildRoleChangedProbeContainer(roleChangedContainer *corev1.Container,
 	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeServiceHTTPPort int) {
 	roleChangedContainer.Name = "kbprobe-rolechangedcheck"
 	probe := roleChangedContainer.ReadinessProbe
+	// wesql
+	// probe.Exec.Command = []string{"curl", "-X", "POST",
+	//	"--fail-with-body", "--silent",
+	//	"-H", "Content-Type: application/json",
+	//	"http://localhost:" + strconv.Itoa(probeServiceHTTPPort) + "/v1.0/bindings/probe",
+	//	"-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
+	// etcd
+	// probe.Exec.Command = []string{"curl", "-X", "POST",
+	//	"--fail-with-body", "--silent",
+	//	"-H", "Content-Type: application/json",
+	//	"http://localhost:" + strconv.Itoa(probeServiceHTTPPort) + "/v1.0/bindings/etcd",
+	//	"-d", "{\"operation\": \"query\"}"}
+	// mongodb
 	probe.Exec.Command = []string{"curl", "-X", "POST",
 		"--fail-with-body", "--silent",
 		"-H", "Content-Type: application/json",
-		"http://localhost:" + strconv.Itoa(probeServiceHTTPPort) + "/v1.0/bindings/probe",
-		"-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
+		"http://localhost:" + strconv.Itoa(probeServiceHTTPPort) + "/v1.0/bindings/mongodb",
+		"-d", "{\"operation\": \"query\"}"}
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
 	probe.SuccessThreshold = probeSetting.SuccessThreshold
 	probe.FailureThreshold = probeSetting.FailureThreshold

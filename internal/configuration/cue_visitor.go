@@ -18,11 +18,11 @@ package configuration
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"reflect"
 	"strconv"
 
 	"cuelang.org/go/cue"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -60,26 +60,26 @@ func (c *CueTypeExtractor) Visit(val cue.Value) error {
 
 func (c *CueTypeExtractor) visitValue(x cue.Value, path string) {
 	k := x.IncompleteKind()
-	if k&cue.NullKind == cue.NullKind {
+	switch {
+	case k&cue.NullKind == cue.NullKind:
 		c.addFieldType(path, NullableType)
-	} else if k&cue.BytesKind == cue.BytesKind {
+	case k&cue.BytesKind == cue.BytesKind:
 		c.addFieldType(path, StringType)
-	} else if k&cue.StringKind == cue.StringKind {
+	case k&cue.StringKind == cue.StringKind:
 		c.addFieldType(path, StringType)
-	} else if k&cue.FloatKind == cue.FloatKind {
+	case k&cue.FloatKind == cue.FloatKind:
 		c.addFieldType(path, FloatType)
-	} else if k&cue.IntKind == cue.IntKind {
+	case k&cue.IntKind == cue.IntKind:
 		c.addFieldType(path, IntType)
-	} else if k&cue.ListKind == cue.ListKind {
+	case k&cue.ListKind == cue.ListKind:
 		c.addFieldType(path, ListType)
 		c.visitList(x, path)
-	} else if k&cue.StructKind == cue.StructKind {
+	case k&cue.StructKind == cue.StructKind:
 		c.addFieldType(path, StructType)
 		c.visitStruct(x)
-	} else {
+	default:
 		logrus.Warnf("cannot convert value of type %s", k.String())
 	}
-
 }
 
 func (c *CueTypeExtractor) visitStruct(v cue.Value) {

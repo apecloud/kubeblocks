@@ -18,9 +18,10 @@ package configuration
 
 import (
 	"encoding/json"
-	"github.com/stretchr/testify/require"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 type testStruct struct {

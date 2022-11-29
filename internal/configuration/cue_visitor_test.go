@@ -17,10 +17,11 @@ limitations under the License.
 package configuration
 
 import (
-	"cuelang.org/go/cue/cuecontext"
-	"github.com/stretchr/testify/require"
 	"reflect"
 	"testing"
+
+	"cuelang.org/go/cue/cuecontext"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCueTypeExtractorVisit(t *testing.T) {

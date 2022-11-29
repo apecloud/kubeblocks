@@ -19,7 +19,6 @@ backup_policy: {
 		namespace: backup_key.Namespace
 	}
 	spec: {
-		"backupToolName":           "xtrabackup-mysql"
 		"backupPolicyTemplateName": template
 		"target": {
 			"databaseEngine": "mysql"

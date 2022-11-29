@@ -52,8 +52,8 @@ var _ = Describe("Cluster", func() {
 			Expect(cmd.Flags().GetString("termination-policy")).Should(Equal(""))
 
 			// must succeed otherwise exit 1 and make test fails
-			_ = cmd.Flags().Set("components", "../../testdata/component.yaml")
-			_ = cmd.Flags().Set("termination-policy", "Delete")
+			Expect(cmd.Flags().Set("components", "../../testdata/component.yaml")).Should(Succeed())
+			Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
 			cmd.Run(nil, []string{"test1"})
 		})
 

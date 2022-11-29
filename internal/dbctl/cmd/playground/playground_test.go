@@ -51,7 +51,7 @@ var _ = Describe("playground", func() {
 
 		o.Replicas = 1
 		Expect(o.validate()).Should(Succeed())
-		Expect(o.run()).To(MatchError(MatchRegexp("Fail to set up k3d cluster")))
+		Expect(o.run()).To(MatchError(MatchRegexp("failed to set up k3d cluster")))
 	})
 
 	It("init at remote cloud", func() {
@@ -60,7 +60,7 @@ var _ = Describe("playground", func() {
 			IOStreams:     streams,
 			CloudProvider: cloudprovider.AWS,
 		}
-		Expect(o.run()).To(MatchError(MatchRegexp("Failed to create cloud provider")))
+		Expect(o.run()).Should(HaveOccurred())
 	})
 
 	It("destroy command", func() {

@@ -39,17 +39,24 @@ import (
 )
 
 var _ = Describe("list", func() {
-	var streams genericclioptions.IOStreams
-	var out *bytes.Buffer
-	var tf *cmdtesting.TestFactory
+	var (
+		streams genericclioptions.IOStreams
+		out     *bytes.Buffer
+		tf      *cmdtesting.TestFactory
+	)
+
+	const (
+		namespace   = "test"
+		clusterName = "test"
+	)
 
 	BeforeEach(func() {
 		streams, _, out, _ = genericclioptions.NewTestIOStreams()
-		tf = util.NewTestFactory().WithNamespace("default")
+		tf = util.NewTestFactory(namespace)
 
 		_ = dbaasv1alpha1.AddToScheme(scheme.Scheme)
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-		cluster := fake.Cluster("test", "default")
+		cluster := fake.Cluster(clusterName, namespace)
 		httpResp := func(obj runtime.Object) *http.Response {
 			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}
 		}
@@ -61,12 +68,13 @@ var _ = Describe("list", func() {
 				if req.Method != "GET" {
 					return nil, nil
 				}
+				urlPrefix := "/api/v1/namespaces/" + namespace
 				return map[string]*http.Response{
-					"/namespaces/default/clusters":        httpResp(&dbaasv1alpha1.ClusterList{Items: []dbaasv1alpha1.Cluster{*cluster}}),
-					"/namespaces/default/clusters/test":   httpResp(cluster),
-					"/api/v1/namespaces/default/services": httpResp(&corev1.ServiceList{}),
-					"/api/v1/namespaces/default/secrets":  httpResp(&corev1.SecretList{}),
-					"/api/v1/namespaces/default/pods":     httpResp(&corev1.PodList{}),
+					"/namespaces/" + namespace + "/clusters":      httpResp(&dbaasv1alpha1.ClusterList{Items: []dbaasv1alpha1.Cluster{*cluster}}),
+					"/namespaces/" + namespace + "/clusters/test": httpResp(cluster),
+					urlPrefix + "/services":                       httpResp(&corev1.ServiceList{}),
+					urlPrefix + "/secrets":                        httpResp(&corev1.SecretList{}),
+					urlPrefix + "/pods":                           httpResp(&corev1.PodList{}),
 				}[req.URL.Path], nil
 			}),
 		}

@@ -31,13 +31,21 @@ import (
 )
 
 // NewTestFactory like cmdtesting.NewTestFactory, register KubeBlocks custom objects
-func NewTestFactory() *cmdtesting.TestFactory {
+func NewTestFactory(namespace string) *cmdtesting.TestFactory {
 	tf := cmdtesting.NewTestFactory()
 	mapper := restmapper.NewDiscoveryRESTMapper(testDynamicResources())
-	cf := genericclioptions.NewTestConfigFlags().WithRESTMapper(mapper).WithClientConfig(testClientConfig())
+	clientConfig := testClientConfig()
+	cf := genericclioptions.NewTestConfigFlags().WithRESTMapper(mapper).
+		WithClientConfig(clientConfig).WithNamespace(namespace)
 	tf.Factory = cmdutil.NewFactory(cf)
-	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-	return tf
+
+	restConfig, err := clientConfig.ClientConfig()
+	if err != nil {
+		panic(fmt.Sprintf("unable to create a fake restclient config: %v", err))
+	}
+	tf.ClientConfigVal = restConfig
+
+	return tf.WithClientConfig(clientConfig).WithNamespace(namespace)
 }
 
 func testClientConfig() clientcmd.ClientConfig {

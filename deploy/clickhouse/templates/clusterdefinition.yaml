@@ -193,6 +193,11 @@ spec:
               runAsNonRoot: true
               runAsUser: 1001
             env:
+              - name: CLICKHOUSE_ADMIN_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: admin-password
               - name: BITNAMI_DEBUG
                 value: "false"
               - name: CLICKHOUSE_KEEPER_TCP_PORT

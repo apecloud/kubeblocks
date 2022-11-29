@@ -29,7 +29,7 @@ import (
 //
 //	e.g.:
 //	ClusterDefinition.configTemplateRef:
-//		 - Name: "mysql-8.0-config"
+//		 - Name: "mysql-8.0"
 //		   VolumeName: "mysql_config"
 //
 //

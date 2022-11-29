@@ -91,8 +91,8 @@ logConfigs: {}
 ## @param defaultConfigurationOverrides [string] Default configuration overrides (evaluated as a template)
 ##
 defaultConfigurationOverrides: |
-  {{ $clusterName := $.cluster.metadata.name }}
-  {{ $namespace := $.cluster.metadata.namespace }}
+  {{- $clusterName := $.cluster.metadata.name }}
+  {{- $namespace := $.cluster.metadata.namespace }}
   <clickhouse>
     <!-- Macros -->
     <macros>
@@ -108,12 +108,13 @@ defaultConfigurationOverrides: |
     <remote_servers>
       <default>
         {{- range $.cluster.spec.components }}
-          {{- if eq .type "shard" }}
+          {{ $compIter := . }}
+          {{- if eq $compIter.type "clickhouse" }}
         <shard>
-            {{- $replicas := .replicas | int }}
+            {{- $replicas := $compIter.replicas | int }}
             {{- range $i, $_e := until $replicas }}
             <replica>
-                <host>{{ $clusterName }}-{{ .name }}-{{ $i }}.{{ $clusterName }}-{{ .name }}-headless.{{ $namespace }}.{{ .svc }}</host>
+                <host>{{ $clusterName }}-{{ $compIter.name }}-{{ $i }}.{{ $clusterName }}-{{ $compIter.name }}-headless.{{ $namespace }}.svc</host>
                 <port>9000</port>
             </replica>
             {{- end }}
@@ -123,13 +124,14 @@ defaultConfigurationOverrides: |
       </default>
     </remote_servers>
     {{- range $.cluster.spec.components }}
-      {{- if or (eq .type "zookeeper") (eq .type "ch-keeper") }}
+      {{ $compIter := . }}
+      {{- if or (eq $compIter.type "zookeeper") (eq $compIter.type "ch-keeper") }}
     <!-- Zookeeper configuration -->
     <zookeeper>
-        {{- $replicas := .replicas | int }}
+        {{- $replicas := $compIter.replicas | int }}
         {{- range $i, $_e := until $replicas }}
       <node>
-        <host>{{ $clusterName }}-{{ .name }}-{{ $i }}.{{ $clusterName }}-{{ .name }}-headless.{{ $namespace }}.{{ .svc }}</host>
+        <host>{{ $clusterName }}-{{ $compIter.name }}-{{ $i }}.{{ $clusterName }}-{{ $compIter.name }}-headless.{{ $namespace }}.svc</host>
         <port>2181</port>
       </node>
         {{- end }}
@@ -151,8 +153,8 @@ defaultConfigurationOverrides: |
 
 clickHouseKeeper:
   configuration: |
-    {{ $clusterName := $.cluster.metadata.name }}
-    {{ $namespace := $.cluster.metadata.namespace }}
+    {{- $clusterName := $.cluster.metadata.name }}
+    {{- $namespace := $.cluster.metadata.namespace }}
     <clickhouse>
       <listen_host>0.0.0.0</listen_host>
       <keeper_server>
@@ -160,7 +162,6 @@ clickHouseKeeper:
           <server_id>1</server_id>
           <log_storage_path>/var/lib/clickhouse/coordination/log</log_storage_path>
           <snapshot_storage_path>/var/lib/clickhouse/coordination/snapshots</snapshot_storage_path>
-      
           <coordination_settings>
               <operation_timeout_ms>10000</operation_timeout_ms>
               <session_timeout_ms>30000</session_timeout_ms>
@@ -170,14 +171,14 @@ clickHouseKeeper:
             {{- $replicas := $.component.replicas | int }}
             {{- range $i, $e := until $replicas }}
             <server>
-              <id>{{ $i + 1 }}</id>
-              <hostname>{{ $clusterName }}-{{ .name }}-{{ $i }}.{{ $clusterName }}-{{ .name }}-headless.{{ $namespace }}.{{ .svc }}</hostname>
+              <id>{{ $i | int | add1 }}</id>
+              <hostname>{{ $clusterName }}-{{ $.component.name }}-{{ $i }}.{{ $clusterName }}-{{ $.component.name }}-headless.{{ $namespace }}.svc</hostname>
               <port from_env="CLICKHOUSE_KEEPER_RAFT_PORT"></port>
             </server>
             {{- end }}
           </raft_configuration>
       </keeper_server>
-    {{- if .component.monitor.enable }}
+    {{- if $.component.monitor.enable }}
        <!-- Prometheus metrics -->
        <prometheus>
           <endpoint>/metrics</endpoint>

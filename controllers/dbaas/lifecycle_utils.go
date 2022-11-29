@@ -1001,7 +1001,6 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 	}
 
 	sts := appsv1.StatefulSet{}
-
 	if err = json.Unmarshal(stsStrByte, &sts); err != nil {
 		return nil, err
 	}
@@ -1418,7 +1417,7 @@ func isAlreadyExists(cmName string, namespace string, ctx context.Context, cli c
 
 // {{statefull.Name}}-{{appVersion.Name}}-{{tpl.Name}}-"config"
 func getInstanceCMName(obj client.Object, tpl *dbaasv1alpha1.ConfigTemplate) string {
-	return fmt.Sprintf("%s-%s-config", obj.GetName(), tpl.VolumeName)
+	return fmt.Sprintf("%s-%s", obj.GetName(), tpl.VolumeName)
 }
 
 // generateConfigMapFromTpl render config file by config template provided ISV

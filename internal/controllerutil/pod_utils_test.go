@@ -168,7 +168,7 @@ var _ = Describe("tpl template", func() {
 				Name: "config1",
 				VolumeSource: corev1.VolumeSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{Name: "stateful_test-config1-config"},
+						LocalObjectReference: corev1.LocalObjectReference{Name: "stateful_test-config1"},
 					},
 				},
 			},
@@ -176,7 +176,7 @@ var _ = Describe("tpl template", func() {
 				Name: "config2",
 				VolumeSource: corev1.VolumeSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{Name: "stateful_test-config2-config"},
+						LocalObjectReference: corev1.LocalObjectReference{Name: "stateful_test-config2"},
 					},
 				},
 			},
@@ -231,11 +231,11 @@ var _ = Describe("tpl template", func() {
 	// for test GetContainerWithVolumeMount
 	Context("GetVolumeMountName test", func() {
 		It("Should success with no error", func() {
-			volume := GetVolumeMountName(pod.Spec.Volumes, "stateful_test-config1-config")
+			volume := GetVolumeMountName(pod.Spec.Volumes, "stateful_test-config1")
 			Expect(volume).NotTo(BeNil())
 			Expect(volume.Name).To(Equal("config1"))
 
-			Expect(GetVolumeMountName(pod.Spec.Volumes, "stateful_test-config1-config")).To(Equal(&pod.Spec.Volumes[0]))
+			Expect(GetVolumeMountName(pod.Spec.Volumes, "stateful_test-config1")).To(Equal(&pod.Spec.Volumes[0]))
 		})
 		It("Should failed", func() {
 			Expect(GetVolumeMountName(pod.Spec.Volumes, "not_exist_resource")).To(BeNil())

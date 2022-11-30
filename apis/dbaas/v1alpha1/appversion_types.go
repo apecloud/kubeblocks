@@ -58,7 +58,7 @@ type AppVersionComponent struct {
 	// Type is a component type in ClusterDefinition.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
-	/// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
+	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
 	Type string `json:"type"`
 
 	// ConfigTemplateRefs defines a configuration extension mechanism to handle configuration differences between versions,

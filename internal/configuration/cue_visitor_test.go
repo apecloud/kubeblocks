@@ -38,7 +38,7 @@ func TestCueTypeExtractorVisit(t *testing.T) {
 			name: "test_without_type",
 			args: args{
 				cue:        `a:int`,
-				fieldTypes: map[string]CueType{},
+				fieldTypes: map[string]CueType{"a": IntType},
 			},
 		},
 		{
@@ -54,26 +54,26 @@ func TestCueTypeExtractorVisit(t *testing.T) {
 			name: "complex_test",
 			args: args{
 				cue: `#a: {
-b : #c
-g : #j
-
-#j : {
-		"x": string
-		"y": int & > 100
-		"m": #n
-	}
-}
-
-#n : {
-	"d" : {}
-	"j" : null
-}
-
-#c : {
-	e: int
-	f: string|float|int & 2000 | "100.10" | 200 | * "100.10"
-}
-`,
+		b : #c
+		g : #j
+		
+		#j : {
+				"x": string
+				"y": int & > 100
+				"m": #n
+			}
+		}
+		
+		#n : {
+			"d" : {}
+			"j" : null
+		}
+		
+		#c : {
+			e: int
+			f: string|float|int & 2000 | "100.10" | 200 | * "100.10"
+		}
+		`,
 				fieldTypes: map[string]CueType{
 					"#a": StructType,
 					"b":  StructType,
@@ -95,17 +95,17 @@ g : #j
 			name: "map_list_test",
 			args: args{
 				cue: `#a: {
-b: int
-c: string|int
-d: string & "a" | "b"
-e: string & "a" | "b" | *"a"
-g: [string]: {
-	"ga": string
-	"zz": int
-	"xxx": [...int]
-}
-i:[int]
-}`,
+		b: int
+		c: string|int
+		d: string & "a" | "b"
+		e: string & "a" | "b" | *"a"
+		g: [string]: {
+			"ga": string
+			"zz": int
+			"xxx": [...int]
+		}
+		i:[int]
+		}`,
 				fieldTypes: map[string]CueType{
 					"#a":  StructType,
 					"b":   IntType,
@@ -122,15 +122,26 @@ i:[int]
 			name: "invalid_test",
 			args: args{
 				cue: `
-a : 100
-b : 20.10
-#c : {
-	g : a + b
-}
-`,
+		a : 100
+		b : 20.10
+		#c : {
+			g : a + b
+		}
+		`,
 				fieldTypes: map[string]CueType{
 					"#c": StructType,
 					"g":  FloatType,
+					"a":  IntType,
+					"b":  FloatType,
+				},
+			},
+		},
+		{
+			name: "attr_test",
+			args: args{
+				cue: `a : int @k8sResource(quantity)`,
+				fieldTypes: map[string]CueType{
+					"a": K8SQuantityType,
 				},
 			},
 		},
@@ -218,6 +229,15 @@ func TestTransNumberOrBoolType(t *testing.T) {
 				expected: []interface{}{100.1, -100.2, 0, -1.11, 5},
 			},
 			wantErr: true,
+		},
+		{
+			name: "testMemoryType",
+			args: args{
+				t:        K8SQuantityType,
+				objs:     []string{"1Gi", "1G", "10M", "100", "1000m"},
+				expected: []interface{}{1024 * 1024 * 1024, 1000 * 1000 * 1000, 10 * 1000 * 1000, 100, 1},
+			},
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {

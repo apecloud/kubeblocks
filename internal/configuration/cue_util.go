@@ -29,13 +29,15 @@ import (
 type CueType string
 
 const (
-	NullableType CueType = "nullable"
-	FloatType    CueType = "float"
-	IntType      CueType = "integer"
-	BoolType     CueType = "boolean"
-	StringType   CueType = "string"
-	StructType   CueType = "object"
-	ListType     CueType = "array"
+	NullableType    CueType = "nullable"
+	FloatType       CueType = "float"
+	IntType         CueType = "integer"
+	BoolType        CueType = "boolean"
+	StringType      CueType = "string"
+	StructType      CueType = "object"
+	ListType        CueType = "array"
+	K8SQuantityType CueType = "quantity"
+	K8SCpuType      CueType = "k8sCpu"
 )
 
 // CueValidate cue validate

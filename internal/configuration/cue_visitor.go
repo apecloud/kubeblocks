@@ -18,6 +18,7 @@ package configuration
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"reflect"
 	"strconv"
 
@@ -27,6 +28,11 @@ import (
 )
 
 var disableAutoTransfer = viper.GetBool("DISABLE_AUTO_TRANSFER")
+
+const (
+	k8sResourceAttr   = "k8sResource"
+	attrQuantityValue = "quantity"
+)
 
 type WalkVisitor interface {
 	Visit(val cue.Value) error
@@ -48,9 +54,9 @@ func (c *CueTypeExtractor) Visit(val cue.Value) error {
 	}
 
 	for itr.Next() {
-		if !itr.IsDefinition() {
-			continue
-		}
+		// if !itr.IsDefinition() {
+		//	continue
+		// }
 		v := itr.Value()
 		label := itr.Label()
 		c.visitValue(v, label)
@@ -70,7 +76,13 @@ func (c *CueTypeExtractor) visitValue(x cue.Value, path string) {
 	case k&cue.FloatKind == cue.FloatKind:
 		c.addFieldType(path, FloatType)
 	case k&cue.IntKind == cue.IntKind:
-		c.addFieldType(path, IntType)
+		attr := x.Attribute(k8sResourceAttr)
+		v, err := attr.String(0)
+		if err == nil && v == attrQuantityValue {
+			c.addFieldType(path, K8SQuantityType)
+		} else {
+			c.addFieldType(path, IntType)
+		}
 	case k&cue.ListKind == cue.ListKind:
 		c.addFieldType(path, ListType)
 		c.visitList(x, path)
@@ -126,13 +138,21 @@ func transNumberOrBoolType(t CueType, obj reflect.Value, fn UpdateFn) error {
 		return processTypeTrans[float64](obj, func(s string) (float64, error) {
 			return strconv.ParseFloat(s, 64)
 		}, fn)
+	case K8SQuantityType:
+		return processTypeTrans[int64](obj, func(s string) (int64, error) {
+			quantity, err := resource.ParseQuantity(s)
+			if err != nil {
+				return 0, err
+			}
+			return quantity.Value(), nil
+		}, fn)
 	default:
 		// pass
 	}
 	return nil
 }
 
-func processTypeTrans[T int | float64 | float32 | bool](obj reflect.Value, transFn func(s string) (T, error), updateFn UpdateFn) error {
+func processTypeTrans[T int | int64 | float64 | float32 | bool](obj reflect.Value, transFn func(s string) (T, error), updateFn UpdateFn) error {
 	switch obj.Type().Kind() {
 	case reflect.String:
 		v, err := transFn(obj.String())

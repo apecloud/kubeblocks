@@ -45,12 +45,12 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		validator := NewConfigValidator(fakeConfigurationTpl("./testdata/mysql.cue", dbaasv1alpha1.INI))
 		require.Nil(t, validator.Validate(toMap(loadTestData("./testdata/mysql.cnf"))))
 		expectErr := errors.New(`failed to cue template render configure: [mysqld.innodb_autoinc_lock_mode: 3 errors in empty disjunction:
-mysqld.innodb_autoinc_lock_mode: conflicting values "100" and 1 (mismatched types string and int):
+mysqld.innodb_autoinc_lock_mode: conflicting values 0 and 100:
+    14:35
+mysqld.innodb_autoinc_lock_mode: conflicting values 1 and 100:
     14:39
-mysqld.innodb_autoinc_lock_mode: conflicting values "100" and 2 (mismatched types string and int):
+mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
     14:43
-mysqld.innodb_autoinc_lock_mode: conflicting values "100" and int (mismatched types string and int):
-    14:29
 ]`)
 		require.Equal(t, expectErr, validator.Validate(toMap(loadTestData("./testdata/mysql_err.cnf"))))
 	}

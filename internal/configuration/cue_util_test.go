@@ -53,6 +53,7 @@ func TestCueLang(t *testing.T) {
 	loose-caching_sha2_password_auto_generate_rsa_keys=0
 	secure-file-priv=/data/mysql
 	auto_increment_increment = 100
+	innodb_buffer_pool_size = 512M
 
 	[client]
 	socket=/data/mysql/tmp/mysqld.sock
@@ -68,6 +69,8 @@ func TestCueLang(t *testing.T) {
 
     // [1~65535] default ON
     auto_increment_increment: int & >= 1 & <= 65535 | *1
+
+    innodb_buffer_pool_size?: int & >= 5242880 & <= 18446744073709551615 @k8sResource(quantity)
 
     binlog_stmt_cache_size?: int & >= 4096 & <= 16777216 | *2097152
     // [0|1|2] default: 2

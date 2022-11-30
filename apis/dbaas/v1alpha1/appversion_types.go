@@ -25,7 +25,7 @@ import (
 type AppVersionSpec struct {
 	// ref ClusterDefinition.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ClusterDefinitionRef string `json:"clusterDefinitionRef"`
 
 	// List of components in current AppVersion. Component will replace the field in ClusterDefinition's component if type is matching typeName.
@@ -61,7 +61,7 @@ type AppVersionComponent struct {
 	// Type is a component type in ClusterDefinition.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
-	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Type string `json:"type"`
 
 	// ConfigTemplateRefs defines a configuration extension mechanism to handle configuration differences between versions,

@@ -30,6 +30,7 @@ type ClusterDefinitionSpec struct {
 	// [state.redis, mq.mqtt, mq.kafka, state.mysql-8, state.mysql-5.7, state.mysql-5.6, state-mongodb].
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=24
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Type string `json:"type"`
 
 	// List of components belonging to the cluster.
@@ -68,7 +69,7 @@ type ConfigTemplate struct {
 	// Specify the name of the referenced the configuration template ConfigMap object.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
 	// Specify the namespace of the referenced the configuration template ConfigMap object.
@@ -141,7 +142,7 @@ type ClusterDefinitionComponent struct {
 	// Type name of the component, it can be any valid string.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
-	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	TypeName string `json:"typeName"`
 
 	// componentType defines type of the component. On of Stateful, Stateless, Consensus.

@@ -100,7 +100,7 @@ spec:
                             description: Specify the name of the referenced the configuration
                               template ConfigMap object.
                             maxLength: 63
-                            pattern: ^[a-z0-9-]+$
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           namespace:
                             default: default
@@ -8126,7 +8126,7 @@ spec:
                       description: Type name of the component, it can be any valid
                         string.
                       maxLength: 12
-                      pattern: ^[a-z0-9-]+$
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                   required:
                   - componentType
@@ -8148,6 +8148,7 @@ spec:
                   in-list of [state.redis, mq.mqtt, mq.kafka, state.mysql-8, state.mysql-5.7,
                   state.mysql-5.6, state-mongodb].
                 maxLength: 24
+                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
             required:
             - components

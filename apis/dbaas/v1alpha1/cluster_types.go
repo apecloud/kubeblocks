@@ -28,12 +28,12 @@ import (
 type ClusterSpec struct {
 	// Cluster referenced ClusterDefinition name, this is an immutable attribute.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
 	// Cluster referenced AppVersion name.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	AppVersionRef string `json:"appVersionRef"`
 
 	// Cluster termination policy. One of DoNotTerminate, Halt, Delete, WipeOut.
@@ -105,13 +105,13 @@ type ClusterComponent struct {
 	// name defines cluster's component name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
-	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
 	// Component type name defined in ClusterDefinition spec.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
-	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Type string `json:"type"`
 
 	// Monitor which is a switch to enable monitoring, default is false

@@ -24,7 +24,7 @@ import (
 type BackupJobSpec struct {
 	// which backupPolicy to perform this backupJob
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	BackupPolicyName string `json:"backupPolicyName"`
 
 	// Backup Type. full or incremental or snapshot. if unset, default is full.

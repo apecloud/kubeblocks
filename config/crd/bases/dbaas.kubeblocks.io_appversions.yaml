@@ -47,7 +47,7 @@ spec:
             properties:
               clusterDefinitionRef:
                 description: ref ClusterDefinition.
-                pattern: ^[a-z0-9-]+$
+                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               components:
                 description: List of components in current AppVersion. Component will
@@ -81,7 +81,7 @@ spec:
                             description: Specify the name of the referenced the configuration
                               template ConfigMap object.
                             maxLength: 63
-                            pattern: ^[a-z0-9-]+$
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           namespace:
                             default: default
@@ -7717,7 +7717,7 @@ spec:
                     type:
                       description: Type is a component type in ClusterDefinition.
                       maxLength: 12
-                      pattern: ^[a-z0-9-]+$
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                   required:
                   - type

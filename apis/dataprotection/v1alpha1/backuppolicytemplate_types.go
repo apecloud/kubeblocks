@@ -28,7 +28,7 @@ type BackupPolicyTemplateSpec struct {
 
 	// which backup tool to perform database backup, only support one tool.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	BackupToolName string `json:"backupToolName"`
 
 	// TTL is a time.Duration-parseable string describing how long

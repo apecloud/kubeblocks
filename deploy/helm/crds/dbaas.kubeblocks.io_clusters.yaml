@@ -84,12 +84,12 @@ spec:
                 type: object
               appVersionRef:
                 description: Cluster referenced AppVersion name.
-                pattern: ^[a-z0-9-]+$
+                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               clusterDefinitionRef:
                 description: Cluster referenced ClusterDefinition name, this is an
                   immutable attribute.
-                pattern: ^[a-z0-9-]+$
+                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               components:
                 description: List of components you want to replace in ClusterDefinition
@@ -141,7 +141,7 @@ spec:
                     name:
                       description: name defines cluster's component name.
                       maxLength: 12
-                      pattern: ^[a-z0-9-]+$
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     replicas:
                       description: Component replicas, use default value in ClusterDefinition
@@ -242,7 +242,7 @@ spec:
                       description: Component type name defined in ClusterDefinition
                         spec.
                       maxLength: 12
-                      pattern: ^[a-z0-9-]+$
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     volumeClaimTemplates:
                       description: VolumeClaimTemplates information for statefulset.spec.volumeClaimTemplates.

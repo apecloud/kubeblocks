@@ -24,7 +24,7 @@ import (
 // BackupPolicySpec defines the desired state of BackupPolicy
 type BackupPolicySpec struct {
 	// policy can inherit from backup config and override some fields.
-	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	BackupPolicyTemplateName string `json:"backupPolicyTemplateName,omitempty"`
 
@@ -33,7 +33,7 @@ type BackupPolicySpec struct {
 	Schedule string `json:"schedule,omitempty"`
 
 	// which backup tool to perform database backup, only support one tool.
-	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	BackupToolName string `json:"backupToolName,omitempty"`
 
@@ -85,7 +85,7 @@ type TargetCluster struct {
 type BackupPolicySecret struct {
 	// the secret name
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
 	// which key name for user

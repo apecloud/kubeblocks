@@ -17,41 +17,22 @@ limitations under the License.
 package create
 
 import (
-	"net/http"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	"github.com/spf13/cobra"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
 var _ = Describe("Create", func() {
-	mockClient := func(data runtime.Object) *cmdtesting.TestFactory {
-		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		defer tf.Cleanup()
-
-		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-		tf.UnstructuredClient = &fake.RESTClient{
-			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-			Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, data)},
-		}
-		return tf
-	}
-
 	Context("Create Objects", func() {
 		It("test Create run", func() {
-			tf := mockClient(&corev1.ConfigMap{})
+			tf := cmdtesting.NewTestFactory().WithNamespace("default")
+			defer tf.Cleanup()
 			streams, _, _, _ := genericclioptions.NewTestIOStreams()
-			tf.ClientConfigVal = cfg
 			baseOptions := BaseOptions{
 				Name:      "test",
 				IOStreams: streams,
@@ -78,13 +59,16 @@ var _ = Describe("Create", func() {
 					return nil
 				},
 				BuildFlags: func(cmd *cobra.Command) {
-					cmd.Flags().StringVar(&baseOptions.Namespace, "namespace", "", "ClusterDefinition reference")
+					cmd.Flags().StringVar(&baseOptions.Namespace, "clusterDefRef", "", "cluster definition")
 				},
 			}
-			BuildCommand(inputs)
+			cmd := BuildCommand(inputs)
+			Expect(cmd).ShouldNot(BeNil())
+			Expect(cmd.Flags().Lookup("clusterDefRef")).ShouldNot(BeNil())
+
 			Expect(baseOptions.Complete(inputs, []string{})).Should(Succeed())
+			Expect(baseOptions.Validate(inputs)).Should(Succeed())
 			Expect(baseOptions.Run(inputs)).Should(Succeed())
-			Expect(baseOptions.Run(inputs)).Should(HaveOccurred())
 		})
 	})
 })

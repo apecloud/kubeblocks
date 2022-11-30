@@ -87,8 +87,7 @@ func GetCliHomeDir() (string, error) {
 		cliHome = filepath.Join(home, types.DBCtlDefaultHome)
 	}
 	if _, err := os.Stat(cliHome); err != nil && os.IsNotExist(err) {
-		err := os.MkdirAll(cliHome, 0750)
-		if err != nil {
+		if err = os.MkdirAll(cliHome, 0750); err != nil {
 			return "", errors.Wrap(err, "error when create dbctl home directory")
 		}
 	}

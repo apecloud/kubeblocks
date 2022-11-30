@@ -21,6 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/client-go/kubernetes/scheme"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -68,7 +69,7 @@ var _ = Describe("Expose", func() {
 		labels := map[string]interface{}{
 			"app.kubernetes.io/instance": clusterName,
 		}
-		obj := newUnstructured(svcVersion, svcKind, svcResource, name, annotations, labels)
+		obj := newUnstructured(svcVersion, svcKind, namespace, name, annotations, labels)
 		if clusterIP != "" {
 			_ = unstructured.SetNestedField(obj.Object, clusterIP, "spec", "clusterIP")
 		}
@@ -76,15 +77,32 @@ var _ = Describe("Expose", func() {
 	}
 
 	Context("Expose cluster and reverse", func() {
-		It("", func() {
-			tf := cmdtesting.NewTestFactory().WithNamespace(namespace)
-			defer tf.Cleanup()
+		var tf *cmdtesting.TestFactory
+		var streams genericclioptions.IOStreams
 
+		BeforeEach(func() {
+			tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
+			streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		})
+
+		AfterEach(func() {
+			defer tf.Cleanup()
+		})
+
+		It("expose command", func() {
+			cmd := NewExposeCmd(tf, streams)
+			Expect(cmd).ShouldNot(BeNil())
+		})
+
+		It("Expose cluster and reverse", func() {
 			var (
-				streams, _, _, _ = genericclioptions.NewTestIOStreams()
-				o                = &ExposeOptions{IOStreams: streams}
-				objs             []runtime.Object
+				o    = &ExposeOptions{IOStreams: streams}
+				objs []runtime.Object
 			)
+			Expect(o.Validate([]string{})).Should(HaveOccurred())
+			Expect(o.Validate([]string{clusterName})).Should(HaveOccurred())
+			o.on = true
+			Expect(o.Validate([]string{clusterName})).Should(Succeed())
 			Expect(o.Complete(tf, []string{clusterName})).Should(Succeed())
 
 			clusterObj := newUnstructured(fmt.Sprintf("%s/%s", types.Group, types.Version), types.KindCluster, namespace, clusterName, nil, nil)
@@ -112,7 +130,7 @@ var _ = Describe("Expose", func() {
 				objs = append(objs, obj)
 			}
 
-			o.client = fake.NewSimpleDynamicClient(runtime.NewScheme(), objs...)
+			o.client = fake.NewSimpleDynamicClient(scheme.Scheme, objs...)
 
 			Expect(o.Run()).Should(Succeed())
 		})

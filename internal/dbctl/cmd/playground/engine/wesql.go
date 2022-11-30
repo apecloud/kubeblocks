@@ -49,34 +49,13 @@ var component = `- name: wesql-test
 `
 
 func (w *WeSQL) Install(replicas int, name string, namespace string) error {
-	playgroundDir, err := util.PlaygroundDir()
+	path, err := componentPath(replicas)
 	if err != nil {
 		return err
 	}
-	componentPath := filepath.Join(playgroundDir, "component.yaml")
-	if err := os.WriteFile(componentPath, []byte(fmt.Sprintf(component, replicas)), 0600); err != nil {
-		return err
-	}
 
-	factory := util.NewFactory()
-	dynamicClient, err := factory.DynamicClient()
+	options, err := newCreateOptions(name, namespace, path)
 	if err != nil {
-		return err
-	}
-	options := cluster.CreateOptions{
-		BaseOptions: create.BaseOptions{
-			IOStreams: genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr},
-			Namespace: namespace,
-			Name:      name,
-			Client:    dynamicClient,
-		},
-		ClusterDefRef:      cluster.DefaultClusterDef,
-		AppVersionRef:      cluster.DefaultAppVersion,
-		TerminationPolicy:  "WipeOut",
-		ComponentsFilePath: componentPath,
-	}
-
-	if err := options.Complete(); err != nil {
 		return err
 	}
 
@@ -88,4 +67,41 @@ func (w *WeSQL) Install(replicas int, name string, namespace string) error {
 	}
 
 	return options.Run(inputs)
+}
+
+func componentPath(replicas int) (string, error) {
+	playgroundDir, err := util.PlaygroundDir()
+	if err != nil {
+		return "", err
+	}
+
+	path := filepath.Join(playgroundDir, "component.yaml")
+	if err = os.WriteFile(path, []byte(fmt.Sprintf(component, replicas)), 0600); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func newCreateOptions(name string, namespace string, component string) (*cluster.CreateOptions, error) {
+	dynamicClient, err := util.NewFactory().DynamicClient()
+	if err != nil {
+		return nil, err
+	}
+	options := &cluster.CreateOptions{
+		BaseOptions: create.BaseOptions{
+			IOStreams: genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr},
+			Namespace: namespace,
+			Name:      name,
+			Client:    dynamicClient,
+		},
+		ClusterDefRef:      cluster.DefaultClusterDef,
+		AppVersionRef:      cluster.DefaultAppVersion,
+		TerminationPolicy:  "WipeOut",
+		ComponentsFilePath: component,
+	}
+
+	if err = options.Complete(); err != nil {
+		return nil, err
+	}
+	return options, nil
 }

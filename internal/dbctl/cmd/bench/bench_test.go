@@ -58,6 +58,8 @@ var _ = Describe("bench", func() {
 
 	It("util", func() {
 		Expect(openDB()).Should(HaveOccurred())
+		Expect(ping()).Should(Succeed())
+		Expect(createDB()).Should(HaveOccurred())
 		Expect(closeDB()).Should(Succeed())
 	})
 })

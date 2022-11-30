@@ -21,46 +21,48 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"k8s.io/kubectl/pkg/util/templates"
-
-	"github.com/ghodss/yaml"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-	"helm.sh/helm/v3/pkg/action"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/dynamic"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
 	"github.com/apecloud/kubeblocks/version"
+	"github.com/ghodss/yaml"
+	"github.com/spf13/cobra"
+	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/repo"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	k8sapitypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 const (
 	kMonitorParam = "prometheus.enabled=true,grafana.enabled=true,dashboards.enabled=true"
 )
 
-type options struct {
+type Options struct {
 	genericclioptions.IOStreams
 
-	cfg       *action.Configuration
+	HelmCfg   *action.Configuration
 	Namespace string
 	client    dynamic.Interface
 }
 
-type installOptions struct {
-	options
+type InstallOptions struct {
+	Options
 	Version string
 	Sets    []string
 	Monitor bool
+	Quiet   bool
 }
 
 type addEngineOptions struct {
-	options             options
+	options             Options
 	AppVersionsByte     []byte
 	ClusterDefsByte     []byte
 	AppVersionsFilePath string
@@ -101,11 +103,10 @@ func NewKubeBlocksCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	return cmd
 }
 
-func (o *options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *Options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
 
-	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
+	if o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace(); err != nil {
 		return err
 	}
 
@@ -114,8 +115,7 @@ func (o *options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	o.cfg, err = helm.NewActionConfig(o.Namespace, kubeconfig)
-	if err != nil {
+	if o.HelmCfg, err = helm.NewActionConfig(o.Namespace, kubeconfig); err != nil {
 		return err
 	}
 
@@ -123,26 +123,56 @@ func (o *options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	return err
 }
 
-func (o *installOptions) run() error {
-	fmt.Fprintf(o.Out, "Installing KubeBlocks %s\n", o.Version)
+func (o *InstallOptions) Run() error {
+	fmt.Fprintf(o.Out, "Install KubeBlocks %s\n", o.Version)
 
 	if o.Monitor {
 		o.Sets = append(o.Sets, kMonitorParam)
 	}
 
-	installer := Installer{
-		HelmCfg:   o.cfg,
-		Namespace: o.Namespace,
+	// Add repo, if exists, will update it
+	if err := helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}); err != nil {
+		return err
+	}
+
+	// install KubeBlocks chart
+	notes, err := o.installChart()
+	if err != nil {
+		return err
+	}
+
+	// print notes
+	if !o.Quiet {
+		o.printNotes(notes)
+	}
+
+	return nil
+}
+
+func (o *InstallOptions) installChart() (string, error) {
+	var sets []string
+	for _, set := range o.Sets {
+		splitSet := strings.Split(set, ",")
+		sets = append(sets, splitSet...)
+	}
+	chart := helm.InstallOpts{
+		Name:      types.KubeBlocksChartName,
+		Chart:     types.KubeBlocksChartName + "/" + types.KubeBlocksChartName,
+		Wait:      true,
 		Version:   o.Version,
-		Sets:      o.Sets,
+		Namespace: o.Namespace,
+		Sets:      sets,
+		Login:     true,
+		TryTimes:  2,
 	}
-
-	var notes string
-	var err error
-	if notes, err = installer.Install(); err != nil {
-		return errors.Wrap(err, "failed to install KubeBlocks")
+	notes, err := chart.Install(o.HelmCfg)
+	if err != nil {
+		return "", err
 	}
+	return notes, nil
+}
 
+func (o *InstallOptions) printNotes(notes string) {
 	fmt.Fprintf(o.Out, `
 KubeBlocks %s Install SUCCESSFULLY!
 
@@ -155,29 +185,65 @@ KubeBlocks %s Install SUCCESSFULLY!
     dbctl kubeblocks uninstall
 `, o.Version)
 	fmt.Fprint(o.Out, notes)
-	return nil
 }
 
-func (o *options) run() error {
-	fmt.Fprintln(o.Out, "Uninstalling KubeBlocks")
+func (o *Options) run() error {
+	fmt.Fprintln(o.Out, "Uninstall KubeBlocks")
 
-	installer := Installer{
-		HelmCfg:   o.cfg,
+	// uninstall chart
+	chart := helm.InstallOpts{
+		Name:      types.KubeBlocksChartName,
 		Namespace: o.Namespace,
-		client:    o.client,
+	}
+	if err := chart.UnInstall(o.HelmCfg); err != nil {
+		return err
 	}
 
-	if err := installer.Uninstall(); err != nil {
-		return errors.Wrap(err, "Failed to uninstall KubeBlocks")
+	// remove repo
+	if err := helm.RemoveRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}); err != nil {
+		return err
+	}
+
+	// remove finalizers
+	if err := removeFinalizers(o.client); err != nil {
+		return err
 	}
 
 	fmt.Fprintln(o.Out, "Successfully uninstall KubeBlocks")
 	return nil
 }
 
+func removeFinalizers(client dynamic.Interface) error {
+	// patch clusterdefinition finalizer
+	ctx := context.Background()
+	cdList, err := client.Resource(types.ClusterDefGVR()).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, cd := range cdList.Items {
+		if _, err = client.Resource(types.ClusterDefGVR()).Patch(ctx, cd.GetName(), k8sapitypes.JSONPatchType,
+			[]byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{}); err != nil {
+			return err
+		}
+	}
+
+	// patch appversion's finalizer
+	appVerList, err := client.Resource(types.AppVersionGVR()).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, appVer := range appVerList.Items {
+		if _, err = client.Resource(types.AppVersionGVR()).Patch(ctx, appVer.GetName(), k8sapitypes.JSONPatchType,
+			[]byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &installOptions{
-		options: options{
+	o := &InstallOptions{
+		Options: Options{
 			IOStreams: streams,
 		},
 	}
@@ -189,7 +255,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Example: installExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f, cmd))
-			util.CheckErr(o.run())
+			util.CheckErr(o.Run())
 		},
 	}
 
@@ -201,7 +267,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 }
 
 func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &options{
+	o := &Options{
 		IOStreams: streams,
 	}
 	cmd := &cobra.Command{
@@ -219,7 +285,7 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 
 func newAddEngineCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &addEngineOptions{
-		options: options{
+		options: Options{
 			IOStreams: streams,
 		},
 	}

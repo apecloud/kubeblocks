@@ -10,19 +10,19 @@
 [![Artifact HUB](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/apecloud)](https://artifacthub.io/packages/search?repo=apecloud)
 
 ![image](https://github.com/apecloud/kubeblocks/blob/support/rewrite_kb_introduction/docs/img/banner:-image-with:-ape-space.jpg)
-## Overview
+## What is KubeBlocks
 
 KubeBlocks, running on Kubernetes, offers a universal view for multicloud and on-premises databases, provides a consistent experience, thus relieves the burden of maintaining miscellaneous operators.
 ***
 
-### Features
+### Why you use KubeBlocks
 - Cloud-neutral
   - Greatly simplifies the process of deploying databases on Kubernetes. You can create and use database clusters within minutes without a deep knowledge of Kubernetes.
   - Runs on a Kubernetes base and supports AWS EKS, GCP GKE, Azure AKS and other cloud environments.
 - Database as code
   - Defines each supported database engine through a declarative API, extending the Kubernetes statefulset to better adapt to stateful services as databases. 
   - Developers can use Kubernetes CLI or API to interact with KubeBlocks database clusters, integrate into DevOps tools and processes.
-- Multiple database engine support
+- Multiple database engine supported
   - Built-in MySQL, PostgreSQL, Redis, MongoDB and other database engines
   - You can also access and manage any new database engines or Plugins by defining CRD (Kubenetes custom resource definition)
 - High availability

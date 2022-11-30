@@ -72,7 +72,7 @@ func (c *ConfigTemplateBuilder) setTplName(tplName string) {
 }
 
 func (c *ConfigTemplateBuilder) formatError(file string, err error) error {
-	return fmt.Errorf("faild to configuration template[cm:%s][key:%s] rendered, error: [%v]", c.tplName, file, err)
+	return fmt.Errorf("failed to render configuration template[cm:%s][key:%s], error: [%v]", c.tplName, file, err)
 }
 
 func (c *ConfigTemplateBuilder) Render(configs map[string]string) (map[string]string, error) {

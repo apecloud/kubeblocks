@@ -78,14 +78,15 @@ spec:
                             type: integer
                           name:
                             description: Specify the name of the referenced the configuration
-                              template ConfigMap object.
-                            maxLength: 128
+                              template ConfigMap object. / +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
+                            maxLength: 63
                             type: string
                           namespace:
+                            default: default
                             description: Specify the namespace of the referenced the
                               configuration template ConfigMap object. An empty namespace
-                              is equivalent to the "default" namespace. (Yet support)
-                            maxLength: 128
+                              is equivalent to the "default" namespace.
+                            maxLength: 63
                             type: string
                           volumeName:
                             description: VolumeName is the volume name of PodTemplate,
@@ -99,6 +100,9 @@ spec:
                         - volumeName
                         type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                     podSpec:
                       description: PodSpec is pod spec, if not nil, will replace ClusterDefinitionSpec.PodSpec
                         in ClusterDefinition.
@@ -7710,6 +7714,7 @@ spec:
                       type: object
                     type:
                       description: Type is a component type in ClusterDefinition.
+                        / +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
                       maxLength: 12
                       type: string
                   required:

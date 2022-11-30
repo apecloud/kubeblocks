@@ -58,6 +58,7 @@ type AppVersionComponent struct {
 	// Type is a component type in ClusterDefinition.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
+	/// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
 	Type string `json:"type"`
 
 	// ConfigTemplateRefs defines a configuration extension mechanism to handle configuration differences between versions,
@@ -66,6 +67,8 @@ type AppVersionComponent struct {
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// PodSpec is pod spec, if not nil, will replace ClusterDefinitionSpec.PodSpec in ClusterDefinition.

@@ -98,14 +98,15 @@ spec:
                             type: integer
                           name:
                             description: Specify the name of the referenced the configuration
-                              template ConfigMap object.
-                            maxLength: 128
+                              template ConfigMap object. / +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
+                            maxLength: 63
                             type: string
                           namespace:
+                            default: default
                             description: Specify the namespace of the referenced the
                               configuration template ConfigMap object. An empty namespace
-                              is equivalent to the "default" namespace. (Yet support)
-                            maxLength: 128
+                              is equivalent to the "default" namespace.
+                            maxLength: 63
                             type: string
                           volumeName:
                             description: VolumeName is the volume name of PodTemplate,
@@ -119,6 +120,9 @@ spec:
                         - volumeName
                         type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                     consensusSpec:
                       description: consensusSpec defines consensus related spec if
                         componentType is Consensus, required if componentType is Consensus.
@@ -258,6 +262,9 @@ spec:
                         - name
                         type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                     maxReplicas:
                       description: MaxReplicas maximum replicas pod for component
                         pod count.
@@ -8116,7 +8123,7 @@ spec:
                       type: object
                     typeName:
                       description: Type name of the component, it can be any valid
-                        string.
+                        string. / +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
                       maxLength: 12
                       type: string
                   required:
@@ -8125,6 +8132,9 @@ spec:
                   type: object
                 minItems: 1
                 type: array
+                x-kubernetes-list-map-keys:
+                - typeName
+                x-kubernetes-list-type: map
               connectionCredential:
                 additionalProperties:
                   type: string
@@ -8134,7 +8144,7 @@ spec:
               type:
                 description: Type define well known cluster types. Valid values are
                   in-list of [state.redis, mq.mqtt, mq.kafka, state.mysql-8, state.mysql-5.7,
-                  state.mysql-5.6, state-mongodb].
+                  state.mysql-5.6, state-mongodb]. / +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
                 maxLength: 24
                 type: string
             required:

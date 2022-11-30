@@ -268,7 +268,7 @@ spec:
         - name: zookeeper-scripts-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: script 
-          defaultMode: 755 #0755
+          defaultMode: 493
       defaultReplicas: 1
       service:
         ports:

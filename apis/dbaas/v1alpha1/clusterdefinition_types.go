@@ -30,6 +30,7 @@ type ClusterDefinitionSpec struct {
 	// [state.redis, mq.mqtt, mq.kafka, state.mysql-8, state.mysql-5.7, state.mysql-5.6, state-mongodb].
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=24
+	/// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
 	Type string `json:"type"`
 
 	// List of components belonging to the cluster.
@@ -37,6 +38,8 @@ type ClusterDefinitionSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	// +patchMergeKey=typeName
 	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=typeName
 	Components []ClusterDefinitionComponent `json:"components" patchStrategy:"merge,retainKeys" patchMergeKey:"typeName"`
 
 	// Default connection credential used for connecting to cluster service.
@@ -65,12 +68,14 @@ type ClusterDefinitionStatus struct {
 type ConfigTemplate struct {
 	// Specify the name of the referenced the configuration template ConfigMap object.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=128
+	// +kubebuilder:validation:MaxLength=63
+	/// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
 	Name string `json:"name"`
 
 	// Specify the namespace of the referenced the configuration template ConfigMap object.
-	// An empty namespace is equivalent to the "default" namespace. (Yet support)
-	// +kubebuilder:validation:MaxLength=128
+	// An empty namespace is equivalent to the "default" namespace.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:default="default"
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 
@@ -88,7 +93,7 @@ type ConfigTemplate struct {
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
-	DefaultMode *int32 `json:"defaultMode,omitempty"`
+	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
 }
 
 type ExporterConfig struct {
@@ -137,6 +142,7 @@ type ClusterDefinitionComponent struct {
 	// Type name of the component, it can be any valid string.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
+	/// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
 	TypeName string `json:"typeName"`
 
 	// componentType defines type of the component. On of Stateful, Stateless, Consensus.
@@ -177,6 +183,8 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Monitor is monitoring config which provided by provider.
@@ -187,6 +195,8 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
 	LogConfigs []LogConfig `json:"logConfigs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// antiAffinity defines components should have anti-affinity constraint to same component type.

@@ -1474,7 +1474,7 @@ func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder, cmName string, 
 	// Render config template by TplEngine
 	// The template namespace must be the same as the ClusterDefinition namespace
 	configs, err := processConfigMapTemplate(ctx, cli, tplBuilder, client.ObjectKey{
-		Namespace: viper.GetString(cmNamespaceKey),
+		Namespace: tplCfg.Namespace,
 		Name:      tplCfg.Name,
 	})
 	if err != nil {

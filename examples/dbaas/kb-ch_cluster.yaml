@@ -17,7 +17,7 @@ spec:
     #   type: zookeeper
       # replicas: 0 # hack
     
-    # Hack
+    # hack
     - name: ch-keeper
       type: ch-keeper
       replicas: 1

@@ -47,6 +47,8 @@ type ClusterSpec struct {
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
 	Components []ClusterComponent `json:"components,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Affinity describes affinities which specific by users.
@@ -101,11 +103,13 @@ type ClusterComponent struct {
 	// name defines cluster's component name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
+	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
 	Name string `json:"name"`
 
 	// Component type name defined in ClusterDefinition spec.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
+	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
 	Type string `json:"type"`
 
 	// Monitor which is a switch to enable monitoring, default is false

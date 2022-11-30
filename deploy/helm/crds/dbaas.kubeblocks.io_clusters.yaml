@@ -139,6 +139,7 @@ spec:
                     name:
                       description: name defines cluster's component name.
                       maxLength: 12
+                      pattern: ^[a-z0-9-]+$
                       type: string
                     replicas:
                       description: Component replicas, use default value in ClusterDefinition
@@ -239,6 +240,7 @@ spec:
                       description: Component type name defined in ClusterDefinition
                         spec.
                       maxLength: 12
+                      pattern: ^[a-z0-9-]+$
                       type: string
                     volumeClaimTemplates:
                       description: VolumeClaimTemplates information for statefulset.spec.volumeClaimTemplates.
@@ -435,6 +437,9 @@ spec:
                   - type
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               terminationPolicy:
                 description: Cluster termination policy. One of DoNotTerminate, Halt,
                   Delete, WipeOut. DoNotTerminate will block delete operation. Halt

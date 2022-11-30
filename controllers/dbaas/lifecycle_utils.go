@@ -110,14 +110,14 @@ func mergeConfigTemplates(appVersionTpl []dbaasv1alpha1.ConfigTemplate, cdTpl []
 	}
 
 	mergedCfgTpl := make([]dbaasv1alpha1.ConfigTemplate, 0, len(appVersionTpl)+len(cdTpl))
-	mergedTplMap := make(map[string]bool, cap(mergedCfgTpl))
+	mergedTplMap := make(map[string]struct{}, cap(mergedCfgTpl))
 
 	for i := range appVersionTpl {
 		if _, ok := (mergedTplMap)[appVersionTpl[i].VolumeName]; ok {
 			return nil, fmt.Errorf("ConfigTemplate require not same volumeName [%s]", appVersionTpl[i].Name)
 		}
 		mergedCfgTpl = append(mergedCfgTpl, appVersionTpl[i])
-		mergedTplMap[appVersionTpl[i].VolumeName] = true
+		mergedTplMap[appVersionTpl[i].VolumeName] = struct{}{}
 	}
 
 	for i := range cdTpl {
@@ -126,7 +126,7 @@ func mergeConfigTemplates(appVersionTpl []dbaasv1alpha1.ConfigTemplate, cdTpl []
 			continue
 		}
 		mergedCfgTpl = append(mergedCfgTpl, cdTpl[i])
-		mergedTplMap[cdTpl[i].VolumeName] = true
+		mergedTplMap[cdTpl[i].VolumeName] = struct{}{}
 	}
 
 	return mergedCfgTpl, nil
@@ -358,6 +358,7 @@ func mergeComponents(
 		Service:         clusterDefCompObj.Service,
 		Probes:          clusterDefCompObj.Probes,
 		LogConfigs:      clusterDefCompObj.LogConfigs,
+		ConfigTemplates: clusterDefCompObj.ConfigTemplateRefs,
 	}
 
 	if appVerComp != nil && appVerComp.PodSpec != nil {
@@ -581,21 +582,13 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		return fmt.Errorf("invalid arg")
 	}
 
-	switch params.component.ComponentType {
-	case dbaasv1alpha1.Stateless:
-		sts, err := buildDeploy(reqCtx, *params)
-		if err != nil {
-			return err
-		}
-		*params.applyObjs = append(*params.applyObjs, sts)
-	case dbaasv1alpha1.Stateful:
+	statefulSetProcessor := func(customSetup func(*corev1.ConfigMap) (*appsv1.StatefulSet, error)) error {
 		envConfig, err := buildEnvConfig(*params)
 		if err != nil {
 			return err
 		}
 		*params.applyObjs = append(*params.applyObjs, envConfig)
-
-		sts, err := buildSts(reqCtx, *params, envConfig.Name)
+		sts, err := customSetup(envConfig)
 		if err != nil {
 			return err
 		}
@@ -616,34 +609,38 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 			*params.applyObjs = append(*params.applyObjs, configs...)
 		}
 		// end render config
+		return nil
+	}
+
+	switch params.component.ComponentType {
+	case dbaasv1alpha1.Stateless:
+		deploy, err := buildDeploy(reqCtx, *params)
+		if err != nil {
+			return err
+		}
+		*params.applyObjs = append(*params.applyObjs, deploy)
+	case dbaasv1alpha1.Stateful:
+		if err := statefulSetProcessor(
+			func(envConfig *corev1.ConfigMap) (*appsv1.StatefulSet, error) {
+				sts, err := buildSts(reqCtx, *params, envConfig.Name)
+				if err != nil {
+					return nil, err
+				}
+				return sts, nil
+			}); err != nil {
+			return err
+		}
 	case dbaasv1alpha1.Consensus:
-		envConfig, err := buildEnvConfig(*params)
-		if err != nil {
+		if err := statefulSetProcessor(
+			func(envConfig *corev1.ConfigMap) (*appsv1.StatefulSet, error) {
+				css, err := buildConsensusSet(reqCtx, *params, envConfig.Name)
+				if err != nil {
+					return nil, err
+				}
+				return css, nil
+			}); err != nil {
 			return err
 		}
-		*params.applyObjs = append(*params.applyObjs, envConfig)
-
-		css, err := buildConsensusSet(reqCtx, *params, envConfig.Name)
-		if err != nil {
-			return err
-		}
-		*params.applyObjs = append(*params.applyObjs, css)
-
-		svc, err := buildSvc(*params, true)
-		if err != nil {
-			return err
-		}
-		*params.applyObjs = append(*params.applyObjs, svc)
-
-		// render config
-		configs, err := buildCfg(*params, css, reqCtx.Ctx, cli)
-		if err != nil {
-			return err
-		}
-		if configs != nil {
-			*params.applyObjs = append(*params.applyObjs, configs...)
-		}
-		// end render config
 	}
 
 	if needBuildPDB(params) {
@@ -982,14 +979,24 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 		if c.Env == nil {
 			c.Env = []corev1.EnvVar{}
 		}
-		c.Env = append(c.Env, corev1.EnvVar{
-			Name: dbaasPrefix + "_POD_NAME",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "metadata.name",
+		for suf, fp := range map[string]string{
+			"_POD_NAME":  "metadata.name",
+			"_NAMESPACE": "metadata.namespace",
+			"_SA_NAME":   "spec.serviceAccountName",
+			"_NODENAME":  "spec.nodeName",
+			"_HOSTIP":    "status.hostIP",
+			"_PODIP":     "status.podIP",
+			"_PODIPS":    "status.podIPs",
+		} {
+			c.Env = append(c.Env, corev1.EnvVar{
+				Name: dbaasPrefix + suf,
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						FieldPath: fp,
+					},
 				},
-			},
-		})
+			})
+		}
 		if c.EnvFrom == nil {
 			c.EnvFrom = []corev1.EnvFromSource{}
 		}
@@ -1009,11 +1016,36 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 		})
 	}
 
-	for i := range sts.Spec.Template.Spec.Containers {
-		injectEnv(&sts.Spec.Template.Spec.Containers[i])
+	volumesNames := map[string]struct{}{}
+	for _, v := range sts.Spec.Template.Spec.Volumes {
+		volumesNames[v.Name] = struct{}{}
 	}
-	for i := range sts.Spec.Template.Spec.InitContainers {
-		injectEnv(&sts.Spec.Template.Spec.InitContainers[i])
+
+	for _, t := range params.component.ConfigTemplates {
+		volumesNames[t.VolumeName] = struct{}{}
+	}
+
+	for _, cc := range []*[]corev1.Container{
+		&sts.Spec.Template.Spec.Containers,
+		&sts.Spec.Template.Spec.InitContainers,
+	} {
+		for i, c := range *cc {
+			injectEnv(&(*cc)[i])
+			for _, v := range c.VolumeMounts {
+				if _, ok := volumesNames[v.Name]; ok {
+					continue
+				}
+				// if persistence is not found, add emptyDir pod.spec.volumes[]
+				sts.Spec.Template.Spec.Volumes = append(
+					sts.Spec.Template.Spec.Volumes, corev1.Volume{
+						Name: v.Name,
+						VolumeSource: corev1.VolumeSource{
+							EmptyDir: &corev1.EmptyDirVolumeSource{},
+						},
+					})
+				volumesNames[v.Name] = struct{}{}
+			}
+		}
 	}
 
 	return &sts, nil

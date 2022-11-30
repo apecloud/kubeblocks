@@ -1,7 +1,7 @@
 dependencies:
 - name: wesql
   repository: file://../wesql
-  version: 0.1.3
+  version: 0.1.4
 - name: grafana
   repository: https://grafana.github.io/helm-charts
   version: 6.43.5
@@ -13,9 +13,9 @@ dependencies:
   version: 0.1.0
 - name: snapshot-controller
   repository: https://piraeus.io/helm-charts
-  version: 1.6.1
+  version: 1.6.2
 - name: csi-s3
   repository: https://github.com/CloudVE/helm-charts/raw/master
   version: 0.31.3
-digest: sha256:4a3ccb1fb4f4428ab49e21fb3107ec37539fba1aa7c4cd328ff41fbefb779863
-generated: "2022-11-22T22:57:00.392293+08:00"
+digest: sha256:126814d29a6124d4ea05daad4e87acbf2ba085ce806a62f310da80dd252e7f2d
+generated: "2022-11-29T15:14:26.428527+08:00"

@@ -111,6 +111,26 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
 	}
 
+	// filter role changed event that has been handled
+	annotations := event.GetAnnotations()
+	if annotations != nil && annotations[CSRoleChangedAnnotKey] == CSRoleChangedAnnotHandled {
+		return nil
+	}
+
+	if err := handleRoleChangedEvent(cli, reqCtx, recorder, event); err != nil {
+		return err
+	}
+
+	// event order is crucial in role probing, but it's not guaranteed when controller restarted, so we have to mark them to be filtered
+	patch := client.MergeFrom(event.DeepCopy())
+	if event.Annotations == nil {
+		event.Annotations = make(map[string]string, 0)
+	}
+	event.Annotations[CSRoleChangedAnnotKey] = CSRoleChangedAnnotHandled
+	return cli.Patch(reqCtx.Ctx, event, patch)
+}
+
+func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
 	// get role
 	message := &probeMessage{}
 	re := regexp.MustCompile(`Readiness probe failed: ({.*})`)

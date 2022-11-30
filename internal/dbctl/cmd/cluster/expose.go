@@ -94,8 +94,7 @@ func (o *ExposeOptions) Complete(f cmdutil.Factory, args []string) error {
 }
 
 func (o *ExposeOptions) Run() error {
-	clusterGVR := schema.GroupVersionResource{Group: types.Group, Version: types.Version, Resource: types.ResourceClusters}
-	_, err := o.client.Resource(clusterGVR).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
+	_, err := o.client.Resource(types.ClusterGVR()).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -106,14 +105,14 @@ func (o *ExposeOptions) Run() error {
 	}
 	svcList, err := o.client.Resource(serviceGVR).Namespace(o.Namespace).List(context.TODO(), opts)
 	if err != nil {
-		return errors.Wrap(err, "Failed to find related services")
+		return errors.Wrap(err, "failed to find related services")
 	}
 
 	for _, item := range svcList.Items {
 
 		svc := &corev1.Service{}
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, svc); err != nil {
-			return errors.Wrap(err, "Failed to convert service")
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, svc); err != nil {
+			return errors.Wrap(err, "failed to convert service")
 		}
 		// ignore headless service
 		if svc.Spec.ClusterIP == corev1.ClusterIPNone {
@@ -130,16 +129,16 @@ func (o *ExposeOptions) Run() error {
 			delete(annotations, ServiceLBTypeAnnotationKey)
 		}
 		item.SetAnnotations(annotations)
-		_, err := o.client.Resource(serviceGVR).Namespace(o.Namespace).Update(context.TODO(), &item, metav1.UpdateOptions{})
+		_, err = o.client.Resource(serviceGVR).Namespace(o.Namespace).Update(context.TODO(), &item, metav1.UpdateOptions{})
 		if err != nil {
-			return errors.Wrapf(err, "Failed to update service %s/%s", item.GetNamespace(), svc.GetName())
+			return errors.Wrapf(err, "failed to update service %s/%s", item.GetNamespace(), svc.GetName())
 		}
 	}
 
 	if o.on {
-		_, _ = fmt.Fprintf(o.Out, "Cluster %s is exposed\n", o.Name)
+		fmt.Fprintf(o.Out, "Cluster %s is exposed\n", o.Name)
 	} else if o.off {
-		_, _ = fmt.Fprintf(o.Out, "Cluster %s stopped exposing\n", o.Name)
+		fmt.Fprintf(o.Out, "Cluster %s stopped exposing\n", o.Name)
 	}
 	return nil
 }

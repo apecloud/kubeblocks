@@ -23,10 +23,17 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/cloudprovider"
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/fake"
 )
 
 var _ = Describe("playground", func() {
 	var streams genericclioptions.IOStreams
+
+	// use a fake URL to test
+	types.KubeBlocksChartName = fake.KubeBlocksChartName
+	types.KubeBlocksChartURL = fake.KubeBlocksChartURL
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
@@ -51,7 +58,10 @@ var _ = Describe("playground", func() {
 
 		o.Replicas = 1
 		Expect(o.validate()).Should(Succeed())
-		Expect(o.run()).To(MatchError(MatchRegexp("Fail to set up k3d cluster")))
+		Expect(o.run()).To(MatchError(MatchRegexp("failed to set up k3d cluster")))
+
+		Expect(o.installKubeBlocks()).Should(HaveOccurred())
+		Expect(o.installCluster()).Should(HaveOccurred())
 	})
 
 	It("init at remote cloud", func() {
@@ -60,7 +70,7 @@ var _ = Describe("playground", func() {
 			IOStreams:     streams,
 			CloudProvider: cloudprovider.AWS,
 		}
-		Expect(o.run()).To(MatchError(MatchRegexp("Failed to create cloud provider")))
+		Expect(o.run()).Should(HaveOccurred())
 	})
 
 	It("destroy command", func() {
@@ -71,11 +81,20 @@ var _ = Describe("playground", func() {
 			IOStreams: streams,
 		}
 		Expect(o.destroyPlayground()).Should(HaveOccurred())
+		_, _ = removePlaygroundDir()
 	})
 
 	It("guide", func() {
 		cmd := newGuideCmd()
 		Expect(cmd).ShouldNot(BeNil())
 		Expect(runGuide()).Should(HaveOccurred())
+
+		getter, err := newObjectsGetter(util.ConfigPath("test"))
+		Expect(getter).ShouldNot(BeNil())
+		Expect(err).Should(Succeed())
+
+		objs, err := getter.Get()
+		Expect(objs).Should(BeNil())
+		Expect(err).Should(HaveOccurred())
 	})
 })

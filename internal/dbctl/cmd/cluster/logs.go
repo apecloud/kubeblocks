@@ -160,16 +160,15 @@ func (o *LogsOptions) complete(args []string) error {
 		}
 	default: // find corresponding file path by file type
 		{
-			obj := cluster.NewClusterObjects()
 			clusterGetter := cluster.ObjectsGetter{
 				ClientSet:      o.ClientSet,
 				DynamicClient:  dynamicClient,
 				Name:           o.clusterName,
 				Namespace:      o.Namespace,
-				WithAppVersion: false,
-				WithConfigMap:  false,
+				WithClusterDef: true,
 			}
-			if err := clusterGetter.Get(obj); err != nil {
+			obj, err := clusterGetter.Get()
+			if err != nil {
 				return err
 			}
 			if command, err = o.createFileTypeCommand(pod, obj); err != nil {

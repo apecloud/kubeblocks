@@ -119,16 +119,16 @@ func (o *ListLogsOptions) Complete(f cmdutil.Factory, args []string) error {
 }
 
 func (o *ListLogsOptions) Run() error {
-	dataObj := cluster.NewClusterObjects()
 	clusterGetter := cluster.ObjectsGetter{
 		ClientSet:      o.clientSet,
 		DynamicClient:  o.dynamicClient,
 		Name:           o.clusterName,
 		Namespace:      o.namespace,
-		WithAppVersion: false,
-		WithConfigMap:  false,
+		WithClusterDef: true,
+		WithPod:        true,
 	}
-	if err := clusterGetter.Get(dataObj); err != nil {
+	dataObj, err := clusterGetter.Get()
+	if err != nil {
 		return err
 	}
 	if err := o.printListLogsMessage(dataObj, o.Out); err != nil {
@@ -160,7 +160,7 @@ func (o *ListLogsOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 		w.Write(describe.Level0, "\nInstance  Name:\t%s\n", p.Name)
 		w.Write(describe.Level0, "Component Name:\t%s\n", componentName)
 		var comTypeName string
-		logTypeMap := make(map[string]bool)
+		logTypeMap := make(map[string]struct{})
 		// find component typeName and enabledLogs config according to componentName in pod's label.
 		for _, comCluster := range c.Spec.Components {
 			if !strings.EqualFold(comCluster.Name, componentName) {
@@ -168,7 +168,7 @@ func (o *ListLogsOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 			}
 			comTypeName = comCluster.Type
 			for _, logType := range comCluster.EnabledLogs {
-				logTypeMap[logType] = true
+				logTypeMap[logType] = struct{}{}
 			}
 		}
 		if len(comTypeName) == 0 {

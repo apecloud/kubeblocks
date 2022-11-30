@@ -32,25 +32,28 @@ const (
 
 func openDB() error {
 	var (
-		tmpDB *sql.DB
-		err   error
-		ds    = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", user, password, host, port, dbName)
+		err error
+		ds  = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", user, password, host, port, dbName)
 	)
+
 	// allow multiple statements in one query to allow q15 on the TPC-H
 	fullDsn := fmt.Sprintf("%s?multiStatements=true", ds)
 	globalDB, err = sql.Open(mysqlDriver, fullDsn)
 	if err != nil {
 		return err
 	}
+
+	return ping()
+}
+
+func ping() error {
+	if globalDB == nil {
+		return nil
+	}
 	if err := globalDB.Ping(); err != nil {
 		errString := err.Error()
 		if strings.Contains(errString, unknownDB) {
-			tmpDs := fmt.Sprintf("%s:%s@tcp(%s:%d)/", user, password, host, port)
-			tmpDB, _ = sql.Open(mysqlDriver, tmpDs)
-			defer tmpDB.Close()
-			if _, err := tmpDB.Exec(createDBDDL + dbName); err != nil {
-				return fmt.Errorf("failed to create database, err %v", err)
-			}
+			return createDB()
 		} else {
 			globalDB = nil
 		}
@@ -59,12 +62,19 @@ func openDB() error {
 	return nil
 }
 
-func closeDB() error {
-	if globalDB != nil {
-		err := globalDB.Close()
-		if err != nil {
-			return err
-		}
+func createDB() error {
+	tmpDs := fmt.Sprintf("%s:%s@tcp(%s:%d)/", user, password, host, port)
+	tmpDB, _ := sql.Open(mysqlDriver, tmpDs)
+	defer tmpDB.Close()
+	if _, err := tmpDB.Exec(createDBDDL + dbName); err != nil {
+		return fmt.Errorf("failed to create database, err %v", err)
 	}
 	return nil
+}
+
+func closeDB() error {
+	if globalDB == nil {
+		return nil
+	}
+	return globalDB.Close()
 }

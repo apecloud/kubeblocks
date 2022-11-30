@@ -258,7 +258,7 @@ var _ = Describe("lifecycle_utils", func() {
 	allFieldsClusterDefObj := func() *dbaasv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
 		clusterDefYAML := `
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
   name: cluster-definition
@@ -336,7 +336,7 @@ spec:
 	allFieldsAppVersionObj := func() *dbaasv1alpha1.AppVersion {
 		By("By assure an appVersion obj")
 		appVerYAML := `
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       AppVersion
 metadata:
   name:     app-version
@@ -350,7 +350,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: registry.jihulab.com/infracreate/mysql-server/mysql/wesql-server-arm:latest
+        image: apecloud/wesql-server:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3306
@@ -471,7 +471,7 @@ spec:
 		}
 
 		clusterYaml := fmt.Sprintf(`
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: %s

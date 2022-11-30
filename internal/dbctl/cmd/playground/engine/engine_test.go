@@ -31,5 +31,12 @@ var _ = Describe("playground", func() {
 		engine, err = New("test")
 		Expect(engine).Should(BeNil())
 		Expect(err).Should(HaveOccurred())
+
+		path, err := componentPath(3)
+		Expect(path).Should(Equal(""))
+
+		options, err := newCreateOptions("test", "test", path)
+		Expect(options).ShouldNot(BeNil())
+		Expect(err).Should(Succeed())
 	})
 })

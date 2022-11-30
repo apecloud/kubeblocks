@@ -9,13 +9,13 @@ spec:
   components:
     - name: shard-0
       type: clickhouse
-      replicas: 2 # hack
+      # replicas: 2 # hack
     - name: shard-1
       type: clickhouse
-      replicas: 2 # hack
-    - name: zookeeper
-      type: zookeeper
-      replicas: 0 # hack
+      # replicas: 2 # hack
+    # - name: zookeeper
+    #   type: zookeeper
+      # replicas: 0 # hack
     
     # Hack
     - name: ch-keeper

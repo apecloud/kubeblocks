@@ -524,14 +524,14 @@ func buildClusterCreationTasks(
 		if c.DefaultReplicas <= 0 {
 			continue
 		}
-		clusterComps := clusterCompTypes[c.TypeName]
-		if len(clusterComps) == 0 {
-			cluster.Spec.Components = append(cluster.Spec.Components, dbaasv1alpha1.ClusterComponent{
-				Name:     c.TypeName,
-				Type:     c.TypeName,
-				Replicas: c.DefaultReplicas,
-			})
+		if _, ok := clusterCompTypes[c.TypeName]; ok {
+			continue
 		}
+		cluster.Spec.Components = append(cluster.Spec.Components, dbaasv1alpha1.ClusterComponent{
+			Name:     c.TypeName,
+			Type:     c.TypeName,
+			Replicas: c.DefaultReplicas,
+		})
 	}
 
 	appCompTypes := appVersion.GetTypeMappingComponents()
@@ -540,10 +540,6 @@ func buildClusterCreationTasks(
 		typeName := c.TypeName
 		appVersionComponent := appCompTypes[typeName]
 		clusterComps := clusterCompTypes[typeName]
-		if len(clusterComps) == 0 && c.DefaultReplicas > 0 {
-			buildTask(mergeComponents(cluster, clusterDefinition, &c, appVersionComponent, nil))
-			continue
-		}
 		for _, clusterComp := range clusterComps {
 			buildTask(mergeComponents(cluster, clusterDefinition, &c, appVersionComponent, &clusterComp))
 		}

@@ -34,6 +34,7 @@ var _ = Describe("playground", func() {
 
 		path, err := componentPath(3)
 		Expect(path).Should(Equal(""))
+		Expect(err).Should(HaveOccurred())
 
 		options, err := newCreateOptions("test", "test", path)
 		Expect(options).ShouldNot(BeNil())

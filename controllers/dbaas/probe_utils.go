@@ -119,10 +119,10 @@ func buildProbeServiceContainer(component *Component, container *corev1.Containe
 	}
 
 	roles := getComponentRoles(component)
-	rolesJson, _ := json.Marshal(roles)
+	rolesJSON, _ := json.Marshal(roles)
 	container.Env = append(container.Env, corev1.EnvVar{
 		Name:      dbaasPrefix + "_DB_ROLES",
-		Value:     string(rolesJson),
+		Value:     string(rolesJSON),
 		ValueFrom: nil,
 	})
 

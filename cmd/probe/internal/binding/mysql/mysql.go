@@ -28,7 +28,6 @@ import (
 	"os"
 	"reflect"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -361,42 +360,43 @@ func (m *Mysql) runningCheck(ctx context.Context, resp *bindings.InvokeResponse)
 
 // design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 func (m *Mysql) statusCheck(ctx context.Context, sql string, resp *bindings.InvokeResponse) ([]byte, error) {
-	rwSql := fmt.Sprintf(`begin;
-    create table if not exists kb_health_check(type int, check_ts bigint, primary key(type));
-    insert into kb_health_check values(%d, now()) on duplicate key update check_ts = now();
-    commit;
-	select check_ts from kb_health_check where type=%d limit 1;`, statusCheckType, statusCheckType)
-	roSql := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, statusCheckType)
-	var err error
-	var data []byte
-	switch dbRoles[strings.ToLower(oriRole)] {
-	case internal.ReadWrite:
-		var count int64
-		count, err = m.exec(ctx, rwSql)
-		data = []byte(strconv.FormatInt(count, 10))
-	case internal.Readonly:
-		data, err = m.query(ctx, roSql)
-	default:
-		msg := fmt.Sprintf("unknown access mode for role %s: %v", oriRole, dbRoles)
-		m.logger.Info(msg)
-		data = []byte(msg)
-	}
+	// rwSql := fmt.Sprintf(`begin;
+	// create table if not exists kb_health_check(type int, check_ts bigint, primary key(type));
+	// insert into kb_health_check values(%d, now()) on duplicate key update check_ts = now();
+	// commit;
+	// select check_ts from kb_health_check where type=%d limit 1;`, statusCheckType, statusCheckType)
+	// roSql := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, statusCheckType)
+	// var err error
+	// var data []byte
+	// switch dbRoles[strings.ToLower(oriRole)] {
+	// case internal.ReadWrite:
+	// 	var count int64
+	// 	count, err = m.exec(ctx, rwSql)
+	// 	data = []byte(strconv.FormatInt(count, 10))
+	// case internal.Readonly:
+	// 	data, err = m.query(ctx, roSql)
+	// default:
+	// 	msg := fmt.Sprintf("unknown access mode for role %s: %v", oriRole, dbRoles)
+	// 	m.logger.Info(msg)
+	// 	data = []byte(msg)
+	// }
 
-	result := internal.ProbeMessage{}
-	if err != nil {
-		m.logger.Infof("statusCheck error: %v", err)
-		result.Event = "statusCheckFailed"
-		result.Message = err.Error()
-		if statusCheckFailedCount++; statusCheckFailedCount%eventAggregationNum == 1 {
-			m.logger.Infof("status checks failed %v times continuously", statusCheckFailedCount)
-			resp.Metadata[statusCode] = checkFailedHTTPCode
-		}
-	} else {
-		result.Message = string(data)
-		statusCheckFailedCount = 0
-	}
-	msg, _ := json.Marshal(result)
-	return msg, nil
+	// result := internal.ProbeMessage{}
+	// if err != nil {
+	// 	m.logger.Infof("statusCheck error: %v", err)
+	// 	result.Event = "statusCheckFailed"
+	// 	result.Message = err.Error()
+	// 	if statusCheckFailedCount++; statusCheckFailedCount%eventAggregationNum == 1 {
+	// 		m.logger.Infof("status checks failed %v times continuously", statusCheckFailedCount)
+	// 		resp.Metadata[statusCode] = checkFailedHTTPCode
+	// 	}
+	// } else {
+	// 	result.Message = string(data)
+	// 	statusCheckFailedCount = 0
+	// }
+	// msg, _ := json.Marshal(result)
+	// return msg, nil
+	return []byte("not support yet"), nil
 
 }
 

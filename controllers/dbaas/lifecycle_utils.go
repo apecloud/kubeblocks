@@ -326,6 +326,7 @@ func mergeComponents(
 	doContainerAttrOverride := func(container corev1.Container) {
 		i, c := getContainerByName(component.PodSpec.Containers, container.Name)
 		if c == nil {
+			component.PodSpec.Containers = append(component.PodSpec.Containers, container)
 			return
 		}
 		if container.Image != "" {

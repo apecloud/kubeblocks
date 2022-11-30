@@ -30,6 +30,9 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+type pvcEventHandler struct {
+}
+
 const (
 	// PvcEventTimeOut timeout of the pvc event
 	PvcEventTimeOut = 30 * time.Second
@@ -63,9 +66,6 @@ func handleVolumeExpansionWithPvc(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	}
 	// notice the OpsRequest to reconcile
 	return PatchOpsRequestAnnotation(reqCtx.Ctx, cli, cluster, *opsRequestName)
-}
-
-type pvcEventHandler struct {
 }
 
 // Handle the warning events on pvcs. if the events is resize failed events, update the OpsRequest.status.

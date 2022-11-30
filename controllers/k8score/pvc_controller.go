@@ -34,14 +34,14 @@ import (
 
 type HandlePersistentVolumeClaim func(reqCtx intctrlutil.RequestCtx, cli client.Client, pvc *corev1.PersistentVolumeClaim) error
 
-var PersistentVolumeClaimHandlerMap = map[string]HandlePersistentVolumeClaim{}
-
-// PvcReconciler reconciles a PersistentVolumeClaim object
-type PvcReconciler struct {
+// PersistentVolumeClaimReconciler reconciles a PersistentVolumeClaim object
+type PersistentVolumeClaimReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
+
+var PersistentVolumeClaimHandlerMap = map[string]HandlePersistentVolumeClaim{}
 
 //+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 
@@ -54,7 +54,7 @@ type PvcReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.2/pkg/reconcile
-func (r *PvcReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx: ctx,
 		Req: req,
@@ -78,7 +78,7 @@ func (r *PvcReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *PvcReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *PersistentVolumeClaimReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.PersistentVolumeClaim{}, builder.WithPredicates(predicate.NewPredicateFuncs(intctrlutil.WorkloadFilterPredicate))).
 		Complete(r)

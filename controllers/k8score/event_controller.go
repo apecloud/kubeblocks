@@ -30,12 +30,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-const (
-	ProbeRoleChangedCheckPath = "spec.containers{kbprobe-rolechangedcheck}"
-)
-
-var EventHandlerMap = map[string]EventHandler{}
-
 type EventHandler interface {
 	Handle(client.Client, intctrlutil.RequestCtx, record.EventRecorder, *corev1.Event) error
 }
@@ -46,6 +40,12 @@ type EventReconciler struct {
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
+
+const (
+	ProbeRoleChangedCheckPath = "spec.containers{kbprobe-rolechangedcheck}"
+)
+
+var EventHandlerMap = map[string]EventHandler{}
 
 // NOTES: controller-gen RBAC marker is maintained at rbac.go
 

@@ -32,14 +32,14 @@ import (
 
 type HandleStorageClass func(reqCtx intctrlutil.RequestCtx, cli client.Client, storageClass *storagev1.StorageClass) error
 
-var StorageClassHandlerMap = map[string]HandleStorageClass{}
-
 // StorageClassReconciler reconciles a StorageClass object
 type StorageClassReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
+
+var StorageClassHandlerMap = map[string]HandleStorageClass{}
 
 //+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 

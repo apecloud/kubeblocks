@@ -18,13 +18,13 @@ package configuration
 
 import (
 	"fmt"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"reflect"
 	"strconv"
 
 	"cuelang.org/go/cue"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 var disableAutoTransfer = viper.GetBool("DISABLE_AUTO_TRANSFER")

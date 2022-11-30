@@ -102,10 +102,10 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 
 		job := &batchv1.Job{
-			//TypeMeta:   metav1.TypeMeta{Kind: "Job", APIVersion: "batch/v1"},
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: restoreJob.Namespace,
 				Name:      restoreJob.Name,
+				Labels:    buildRestoreJobLabels(restoreJob.Name),
 			},
 			Spec: batchv1.JobSpec{
 				Template: corev1.PodTemplateSpec{
@@ -329,4 +329,11 @@ func (r *RestoreJobReconciler) patchTargetCluster(reqCtx intctrlutil.RequestCtx,
 		return err
 	}
 	return nil
+}
+
+func buildRestoreJobLabels(jobName string) map[string]string {
+	return map[string]string{
+		"restorejobs.dataprotection.kubeblocks.io/name": jobName,
+		intctrlutil.AppManagedByLabelKey:                intctrlutil.AppName,
+	}
 }

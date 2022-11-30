@@ -494,6 +494,7 @@ func (r *BackupJobReconciler) createHooksCommandJob(
 func buildBackupJobLabels(backupJobName string) map[string]string {
 	return map[string]string{
 		"backupjobs.dataprotection.kubeblocks.io/name": backupJobName,
+		intctrlutil.AppManagedByLabelKey:               intctrlutil.AppName,
 	}
 }
 

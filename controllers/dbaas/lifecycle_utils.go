@@ -822,6 +822,31 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 					break
 				}
 				reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "HorizontalScale", "Start horizontal scale from %d to %d", *stsObj.Spec.Replicas, *stsProto.Spec.Replicas)
+			} else if *stsObj.Spec.Replicas > *stsProto.Spec.Replicas {
+				// scale down, if scale down to 0, do not delete pvc
+				if *stsProto.Spec.Replicas > 0 && len(stsObj.Spec.VolumeClaimTemplates) > 0 {
+					for i := *stsProto.Spec.Replicas; i < *stsObj.Spec.Replicas; i++ {
+						pvcKey := types.NamespacedName{
+							Namespace: key.Namespace,
+							Name:      fmt.Sprintf("%s-%s-%d", stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, i),
+						}
+						// delete pvc
+						pvc := corev1.PersistentVolumeClaim{}
+						if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
+							if !apierrors.IsNotFound(err) {
+								res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+								return &res, err
+							}
+						} else {
+							if err := cli.Delete(ctx, &pvc); err != nil {
+								if !apierrors.IsNotFound(err) {
+									res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+									return &res, err
+								}
+							}
+						}
+					}
+				}
 			}
 			tempAnnotations := stsObj.Spec.Template.Annotations
 			stsObj.Spec.Template = stsProto.Spec.Template

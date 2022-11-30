@@ -130,7 +130,7 @@ type ClusterComponent struct {
 
 	// Component replicas, use default value in ClusterDefinition spec. if not specified.
 	// +optional
-	Replicas int32 `json:"replicas,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
 
 	// Affinity describes affinities which specific by users.
 	// +optional

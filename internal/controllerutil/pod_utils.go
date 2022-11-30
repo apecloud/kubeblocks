@@ -41,7 +41,6 @@ import (
 //		 - mountPath: /log
 //		   name: log
 func GetContainerUsingConfig(podSpec *corev1.PodSpec, configs []dbaasv1alpha1.ConfigTemplate) *corev1.Container {
-	// volumes := podSpec.Volumes
 	containers := podSpec.Containers
 	initContainers := podSpec.InitContainers
 	if container := getContainerWithTplList(containers, configs); container != nil {

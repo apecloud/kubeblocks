@@ -197,9 +197,9 @@ func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 			return nil
 		}
 
-		replicas := c.Replicas
-		if replicas == 0 {
-			replicas = compInClusterDef.DefaultReplicas
+		if c.Replicas == nil {
+			r := compInClusterDef.DefaultReplicas
+			c.Replicas = &r
 		}
 
 		var pods []*corev1.Pod
@@ -219,7 +219,7 @@ func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 			Name:     c.Name,
 			Type:     c.Type,
 			Cluster:  o.Cluster.Name,
-			Replicas: fmt.Sprintf("%d / %d", replicas, len(pods)),
+			Replicas: fmt.Sprintf("%d / %d", *c.Replicas, len(pods)),
 			Status:   fmt.Sprintf("%d / %d / %d / %d ", running, waiting, succeeded, failed),
 			Image:    image,
 		}

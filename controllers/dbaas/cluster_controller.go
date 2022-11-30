@@ -304,7 +304,6 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// TODO: add filter predicate for core API objects
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dbaasv1alpha1.Cluster{}).
-		//
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).

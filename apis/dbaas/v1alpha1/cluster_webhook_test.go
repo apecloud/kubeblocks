@@ -104,10 +104,11 @@ var _ = Describe("cluster webhook", func() {
 			Expect(k8sClient.Update(ctx, cluster)).Should(Succeed())
 
 			By("By add a component, expect succeed")
+			r := int32(1)
 			cluster.Spec.Components = append(cluster.Spec.Components, ClusterComponent{
 				Name:     "replicaSets2",
 				Type:     "replicaSets",
-				Replicas: 1,
+				Replicas: &r,
 				VolumeClaimTemplates: []ClusterComponentVolumeClaimTemplate{
 					{
 						Name: "log",

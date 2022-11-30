@@ -398,8 +398,8 @@ func mergeComponents(
 		component.Name = clusterComp.Name // component name gets overrided
 		component.EnabledLogs = clusterComp.EnabledLogs
 
-		if clusterComp.Replicas > 0 {
-			component.Replicas = clusterComp.Replicas
+		if clusterComp.Replicas != nil && *clusterComp.Replicas > 0 {
+			component.Replicas = *clusterComp.Replicas
 		}
 
 		if clusterComp.VolumeClaimTemplates != nil {
@@ -516,10 +516,11 @@ func buildClusterCreationTasks(
 		if _, ok := clusterCompTypes[c.TypeName]; ok {
 			continue
 		}
+		r := c.DefaultReplicas
 		cluster.Spec.Components = append(cluster.Spec.Components, dbaasv1alpha1.ClusterComponent{
 			Name:     c.TypeName,
 			Type:     c.TypeName,
-			Replicas: c.DefaultReplicas,
+			Replicas: &r,
 		})
 	}
 
@@ -680,33 +681,21 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 	case dbaasv1alpha1.Stateless:
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				deploy, err := buildDeploy(reqCtx, *params, envConfig.Name)
-				if err != nil {
-					return nil, err
-				}
-				return deploy, nil
+				return buildDeploy(reqCtx, *params, envConfig.Name)
 			}); err != nil {
 			return err
 		}
 	case dbaasv1alpha1.Stateful:
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				sts, err := buildSts(reqCtx, *params, envConfig.Name)
-				if err != nil {
-					return nil, err
-				}
-				return sts, nil
+				return buildSts(reqCtx, *params, envConfig.Name)
 			}); err != nil {
 			return err
 		}
 	case dbaasv1alpha1.Consensus:
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				css, err := buildConsensusSet(reqCtx, *params, envConfig.Name)
-				if err != nil {
-					return nil, err
-				}
-				return css, nil
+				return buildConsensusSet(reqCtx, *params, envConfig.Name)
 			}); err != nil {
 			return err
 		}
@@ -782,7 +771,8 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		// ConfigMap kind objects should only be applied once
 		//
 		// The Config is not allowed to be modified.
-		// Once ClusterDefinition provider adjusts the ConfigTemplateRef field of CusterDefinition, or provider modifies the wrong config file, it may cause the application cluster may fail.
+		// Once ClusterDefinition provider adjusts the ConfigTemplateRef field of CusterDefinition,
+		// or provider modifies the wrong config file, it may cause the application cluster may fail.
 		//
 		// TODO(zhixu.zt): Check whether the configmap object is a config file of component
 		// Label check: ConfigMap.Labels["app.kubernetes.io/ins-configure"]
@@ -1156,13 +1146,6 @@ func injectEnvs(params createParams, envConfigName string, c *corev1.Container) 
 			},
 		},
 	})
-	// c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
-	// 	SecretRef: &corev1.SecretEnvSource{
-	// 		LocalObjectReference: corev1.LocalObjectReference{
-	// 			Name: params.cluster.Name,
-	// 		},
-	// 	},
-	// })
 }
 
 // buildConsensusSet build on a stateful set
@@ -1455,7 +1438,7 @@ func getInstanceCMName(obj client.Object, tpl *dbaasv1alpha1.ConfigTemplate) str
 	return fmt.Sprintf("%s-%s", obj.GetName(), tpl.VolumeName)
 }
 
-// generateConfigMapFromTpl render config file by config template provided ISV
+// generateConfigMapFromTpl render config file by config template provided by provider.
 func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder, cmName string, tplCfg dbaasv1alpha1.ConfigTemplate, params createParams, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
 	// Render config template by TplEngine
 	// The template namespace must be the same as the ClusterDefinition namespace

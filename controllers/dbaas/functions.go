@@ -39,8 +39,7 @@ func calReverseRebaseBuffer(memSizeMB, cpuNum int64) int64 {
 	return r1 + r2 + memSizeMB>>6 + reverseRebaseBufferSize
 }
 
-// https://help.aliyun.com/document_detail/162326.html?utm_content=g_1000230851&spm=5176.20966629.toubu.3.f2991ddcpxxvD1#title-rey-j7j-4dt
-// build-in function
+// template built-in functions
 // calMysqlPoolSizeByResource Cal mysql buffer size
 func calMysqlPoolSizeByResource(resource *ResourceDefinition, isShared bool) string {
 	const (

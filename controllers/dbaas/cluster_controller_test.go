@@ -624,11 +624,11 @@ spec:
 			if fetchedG1.Spec.Components == nil {
 				fetchedG1.Spec.Components = []dbaasv1alpha1.ClusterComponent{}
 			}
-			updatedReplicas := 5
+			updatedReplicas := int32(5)
 			fetchedG1.Spec.Components = append(fetchedG1.Spec.Components, dbaasv1alpha1.ClusterComponent{
 				Name:     "replicasets",
 				Type:     "replicasets",
-				Replicas: int32(updatedReplicas),
+				Replicas: &updatedReplicas,
 			})
 			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
 

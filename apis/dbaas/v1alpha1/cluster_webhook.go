@@ -70,10 +70,10 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	if lastCluster.Spec.ClusterDefRef != r.Spec.ClusterDefRef {
 		return newInvalidError(ClusterKind, r.Name, "spec.clusterDefinitionRef", "clusterDefinitionRef is immutable, you can not update it. ")
 	}
-	if err := r.validateVolumeClaimTemplates(lastCluster); err != nil {
+	if err := r.validate(); err != nil {
 		return err
 	}
-	return r.validate()
+	return r.validateVolumeClaimTemplates(lastCluster)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
@@ -121,6 +121,9 @@ func getLastComponentByName(lastCluster *Cluster, componentName string) *Cluster
 // setVolumeClaimStorageSizeZero set the volumeClaimTemplates storage size to zero. then we can diff last/current volumeClaimTemplates.
 func setVolumeClaimStorageSizeZero(volumeClaimTemplates []ClusterComponentVolumeClaimTemplate) {
 	for i := range volumeClaimTemplates {
+		if volumeClaimTemplates[i].Spec == nil {
+			continue
+		}
 		volumeClaimTemplates[i].Spec.Resources = corev1.ResourceRequirements{}
 	}
 }
@@ -185,7 +188,7 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 		componentMap[v.TypeName] = v
 	}
 
-	for _, v := range r.Spec.Components {
+	for index, v := range r.Spec.Components {
 		if _, ok := componentTypeMap[v.Type]; !ok {
 			invalidComponentTypes = append(invalidComponentTypes, v.Type)
 		}
@@ -194,6 +197,8 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 			duplicateComponentNames[v.Name] = struct{}{}
 		}
 		componentNameMap[v.Name] = struct{}{}
+		r.validateComponentResources(allErrs, v.Resources, index)
+
 	}
 	if len(invalidComponentTypes) > 0 {
 		*allErrs = append(*allErrs, field.NotFound(field.NewPath("spec.components[*].type"),
@@ -203,6 +208,19 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 	if len(duplicateComponentNames) > 0 {
 		*allErrs = append(*allErrs, field.Duplicate(field.NewPath("spec.components[*].name"),
 			fmt.Sprintf(" %v is duplicated", r.getDuplicateMapKeys(duplicateComponentNames))))
+	}
+}
+
+// validateComponentResources validate component resources
+func (r *Cluster) validateComponentResources(allErrs *field.ErrorList, resources corev1.ResourceRequirements, index int) {
+	if invalidValue, err := validateVerticalResourceList(resources.Requests); err != nil {
+		*allErrs = append(*allErrs, field.Invalid(field.NewPath(fmt.Sprintf("spec.components[%d].resources.requests", index)), invalidValue, err.Error()))
+	}
+	if invalidValue, err := validateVerticalResourceList(resources.Limits); err != nil {
+		*allErrs = append(*allErrs, field.Invalid(field.NewPath(fmt.Sprintf("spec.components[%d].resources.limits", index)), invalidValue, err.Error()))
+	}
+	if invalidValue, err := compareRequestsAndLimits(resources); err != nil {
+		*allErrs = append(*allErrs, field.Invalid(field.NewPath(fmt.Sprintf("spec.components[%d].resources.requests", index)), invalidValue, err.Error()))
 	}
 }
 

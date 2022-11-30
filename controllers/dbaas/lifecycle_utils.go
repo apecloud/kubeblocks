@@ -399,7 +399,8 @@ func mergeComponents(
 		component.Name = clusterComp.Name // component name gets overrided
 		component.EnabledLogs = clusterComp.EnabledLogs
 
-		if clusterComp.Replicas != nil && *clusterComp.Replicas > 0 {
+		// respect user's declaration
+		if clusterComp.Replicas != nil {
 			component.Replicas = *clusterComp.Replicas
 		}
 

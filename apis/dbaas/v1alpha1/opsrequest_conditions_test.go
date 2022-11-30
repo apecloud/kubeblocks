@@ -16,7 +16,11 @@ limitations under the License.
 
 package v1alpha1
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/pkg/errors"
+)
 
 func TestNewAllCondition(t *testing.T) {
 	opsRequest := createTestOpsRequest("mysql-test", "mysql-restart", RestartType)
@@ -29,4 +33,6 @@ func TestNewAllCondition(t *testing.T) {
 	NewVerticalScalingCondition(opsRequest)
 	NewUpgradingCondition(opsRequest)
 	NewValidateFailedCondition(ReasonClusterPhaseMisMatch, "fail")
+	NewFailedCondition(opsRequest, nil)
+	NewFailedCondition(opsRequest, errors.New("opsRequest run failed"))
 }

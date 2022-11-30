@@ -94,8 +94,7 @@ func (o *ExposeOptions) Complete(f cmdutil.Factory, args []string) error {
 }
 
 func (o *ExposeOptions) Run() error {
-	clusterGVR := schema.GroupVersionResource{Group: types.Group, Version: types.Version, Resource: types.ResourceClusters}
-	_, err := o.client.Resource(clusterGVR).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
+	_, err := o.client.Resource(types.ClusterGVR()).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -106,14 +105,14 @@ func (o *ExposeOptions) Run() error {
 	}
 	svcList, err := o.client.Resource(serviceGVR).Namespace(o.Namespace).List(context.TODO(), opts)
 	if err != nil {
-		return errors.Wrap(err, "Failed to find related services")
+		return errors.Wrap(err, "failed to find related services")
 	}
 
 	for _, item := range svcList.Items {
 
 		svc := &corev1.Service{}
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, svc); err != nil {
-			return errors.Wrap(err, "Failed to convert service")
+			return errors.Wrap(err, "failed to convert service")
 		}
 		// ignore headless service
 		if svc.Spec.ClusterIP == corev1.ClusterIPNone {

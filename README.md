@@ -9,8 +9,7 @@
 [![TODOs](https://img.shields.io/endpoint?url=https://api.tickgit.com/badge?repo=github.com/apecloud/kubeblocks)](https://www.tickgit.com/browse?repo=github.com/apecloud/kubeblocks)
 [![Artifact HUB](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/apecloud)](https://artifacthub.io/packages/search?repo=apecloud)
 
-image
-/Users/crystaljccz/Documents/内容体系/用户文档forKubeblocks/kubeblocks/docs/img/banner_image.jpg
+![image](https://github.com/apecloud/kubeblocks/blob/support/rewrite_kb_introduction/docs/img/banner:-image-with:-ape-space.jpg)
 ## Overview
 
 KubeBlocks, running on Kubernetes, offers a universal view for multicloud and on-premises databases, provides a consistent experience, and relieves the burden of maintaining miscellaneous operators.
@@ -29,6 +28,14 @@ Features/Enhancement:
   - Self-signed certificates for admission webhook configurations
 - [Configuration template guides](docs/configuration/configuration_tpl_developer.md)
 
-## Quick start
+## Documents
+
+### Introduction
+### Release notes
+### Installation
+### User doc
+### Design proposal
+
+
 
 

@@ -25,6 +25,7 @@ import (
 type AppVersionSpec struct {
 	// ref ClusterDefinition.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
 	ClusterDefinitionRef string `json:"clusterDefinitionRef"`
 
 	// List of components in current AppVersion. Component will replace the field in ClusterDefinition's component if type is matching typeName.
@@ -32,6 +33,8 @@ type AppVersionSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	// +patchMergeKey=type
 	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=type
 	Components []AppVersionComponent `json:"components" patchStrategy:"merge,retainKeys" patchMergeKey:"type"`
 }
 

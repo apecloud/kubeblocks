@@ -84,10 +84,12 @@ spec:
                 type: object
               appVersionRef:
                 description: Cluster referenced AppVersion name.
+                pattern: ^[a-z0-9-]+$
                 type: string
               clusterDefinitionRef:
                 description: Cluster referenced ClusterDefinition name, this is an
                   immutable attribute.
+                pattern: ^[a-z0-9-]+$
                 type: string
               components:
                 description: List of components you want to replace in ClusterDefinition

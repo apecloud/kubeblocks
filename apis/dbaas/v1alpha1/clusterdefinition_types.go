@@ -30,7 +30,6 @@ type ClusterDefinitionSpec struct {
 	// [state.redis, mq.mqtt, mq.kafka, state.mysql-8, state.mysql-5.7, state.mysql-5.6, state-mongodb].
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=24
-	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
 	Type string `json:"type"`
 
 	// List of components belonging to the cluster.

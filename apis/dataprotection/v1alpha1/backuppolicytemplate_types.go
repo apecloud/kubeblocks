@@ -28,12 +28,13 @@ type BackupPolicyTemplateSpec struct {
 
 	// which backup tool to perform database backup, only support one tool.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
 	BackupToolName string `json:"backupToolName"`
 
 	// TTL is a time.Duration-parseable string describing how long
 	// the Backup should be retained for.
 	// +optional
-	TTL metav1.Duration `json:"ttl,omitempty"`
+	TTL *metav1.Duration `json:"ttl,omitempty"`
 
 	// limit count of backup stop retries on fail.
 	// if unset, retry unlimit attempted.

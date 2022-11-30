@@ -47,6 +47,7 @@ spec:
             properties:
               clusterDefinitionRef:
                 description: ref ClusterDefinition.
+                pattern: ^[a-z0-9-]+$
                 type: string
               components:
                 description: List of components in current AppVersion. Component will
@@ -7723,6 +7724,9 @@ spec:
                   type: object
                 minItems: 1
                 type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
             required:
             - clusterDefinitionRef
             - components

@@ -24,6 +24,7 @@ import (
 type BackupJobSpec struct {
 	// which backupPolicy to perform this backupJob
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
 	BackupPolicyName string `json:"backupPolicyName"`
 
 	// Backup Type. full or incremental or snapshot. if unset, default is full.
@@ -38,7 +39,7 @@ type BackupJobSpec struct {
 	// TTL is a time.Duration-parsable string describing how long
 	// the Backup should be retained for.
 	// +optional
-	TTL metav1.Duration `json:"ttl,omitempty"`
+	TTL *metav1.Duration `json:"ttl,omitempty"`
 }
 
 // BackupJobPhase The current phase. Valid values are New, InProgress, Completed, Failed.

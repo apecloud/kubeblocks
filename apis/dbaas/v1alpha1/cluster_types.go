@@ -28,10 +28,12 @@ import (
 type ClusterSpec struct {
 	// Cluster referenced ClusterDefinition name, this is an immutable attribute.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
 	// Cluster referenced AppVersion name.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
 	AppVersionRef string `json:"appVersionRef"`
 
 	// Cluster termination policy. One of DoNotTerminate, Halt, Delete, WipeOut.

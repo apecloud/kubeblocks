@@ -41,6 +41,7 @@ spec:
               backupToolName:
                 description: which backup tool to perform database backup, only support
                   one tool.
+                pattern: ^[a-z0-9-]+$
                 type: string
               onFailAttempted:
                 description: limit count of backup stop retries on fail. if unset,

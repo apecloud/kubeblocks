@@ -50,28 +50,28 @@ func expectEqual(expectComponents []map[string]interface{}, actualComponents []m
 }
 
 var _ = Describe("create", func() {
-	Context("setMonitor", func() {
-		var actualComponents []map[string]interface{}
-		var expectComponents []map[string]interface{}
+	// Context("setMonitor", func() {
+	// 	var actualComponents []map[string]interface{}
+	// 	var expectComponents []map[string]interface{}
 
-		BeforeEach(func() {
-			var component dbaasv1alpha1.ClusterComponent
-			component.Monitor = true
-			actualComponents = generateComponents(component, 3)
-			component.Monitor = false
-			expectComponents = generateComponents(component, 3)
-		})
+	// 	BeforeEach(func() {
+	// 		var component dbaasv1alpha1.ClusterComponent
+	// 		component.Monitor = true
+	// 		actualComponents = generateComponents(component, 3)
+	// 		component.Monitor = false
+	// 		expectComponents = generateComponents(component, 3)
+	// 	})
 
-		It("set monitor param to false", func() {
-			setMonitor(false, actualComponents)
-			expectEqual(expectComponents, actualComponents)
-		})
+	// 	It("set monitor param to false", func() {
+	// 		setMonitor(false, actualComponents)
+	// 		expectEqual(expectComponents, actualComponents)
+	// 	})
 
-		It("set monitor param to true", func() {
-			setMonitor(true, actualComponents)
-			expectEqual(actualComponents, actualComponents)
-		})
-	})
+	// 	It("set monitor param to true", func() {
+	// 		setMonitor(true, actualComponents)
+	// 		expectEqual(actualComponents, actualComponents)
+	// 	})
+	// })
 
 	Context("setEnableAllLogs Test", func() {
 		cluster := &dbaasv1alpha1.Cluster{}
@@ -112,6 +112,7 @@ spec:
 		setEnableAllLogs(cluster, clusterDef)
 		Expect(len(cluster.Spec.Components[0].EnabledLogs)).Should(Equal(2))
 	})
+
 	Context("multipleSourceComponent Test", func() {
 		defer GinkgoRecover()
 		fileName := "https://kubernetes.io/docs/tasks/debug/"

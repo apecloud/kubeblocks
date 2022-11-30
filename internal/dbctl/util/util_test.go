@@ -31,6 +31,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
 var _ = Describe("util", func() {
@@ -164,5 +166,8 @@ var _ = Describe("util", func() {
 		Expect(ResourceIsEmpty(&res)).Should(BeTrue())
 		res.Set(20)
 		Expect(ResourceIsEmpty(&res)).Should(BeFalse())
+
+		By("GVRToString")
+		Expect(len(GVRToString(types.ClusterGVR())) > 0).Should(BeTrue())
 	})
 })

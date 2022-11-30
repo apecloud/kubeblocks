@@ -659,7 +659,7 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		}
 		replicaNum := math.Max(float64(len(existStsList.Items)), float64(params.component.Replicas))
 
-		for index := 0; index < int(replicaNum); index++ {
+		for index := int32(0); index < int32(replicaNum); index++ {
 			if err := statefulSetProcessor(
 				func(envConfig *corev1.ConfigMap) (*appsv1.StatefulSet, error) {
 					rss, err := buildReplicationSet(reqCtx, *params, envConfig.Name, index)
@@ -1115,7 +1115,7 @@ func buildConsensusSet(reqCtx intctrlutil.RequestCtx, params createParams, envCo
 }
 
 // buildReplicationSet build on stateful set of replication
-func buildReplicationSet(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName string, stsIndex int) (*appsv1.StatefulSet, error) {
+func buildReplicationSet(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName string, stsIndex int32) (*appsv1.StatefulSet, error) {
 	sts, err := buildSts(reqCtx, params, envConfigName)
 	if err != nil {
 		return nil, err
@@ -1134,7 +1134,7 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx, params createParams, env
 	return sts, nil
 }
 
-func injectReplicationSetPodEnvAndLabel(params createParams, sts *appsv1.StatefulSet, index int) (*appsv1.StatefulSet, error) {
+func injectReplicationSetPodEnvAndLabel(params createParams, sts *appsv1.StatefulSet, index int32) (*appsv1.StatefulSet, error) {
 	for _, comp := range params.cluster.Spec.Components {
 		if index != *comp.PrimaryStsIndex {
 			svcName := strings.Join([]string{params.cluster.Name, params.component.Name, "headless"}, "-")

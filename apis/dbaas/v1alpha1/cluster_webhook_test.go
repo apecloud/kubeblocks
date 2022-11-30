@@ -33,12 +33,15 @@ import (
 
 var _ = Describe("cluster webhook", func() {
 	var (
-		clusterName               = "cluster-webhook-mysql"
-		clusterDefinitionName     = "cluster-webhook-mysql-definition"
-		sencondeClusterDefinition = "cluster-webhook-mysql-definition2"
-		appVersionName            = "cluster-webhook-mysql-appversion"
-		timeout                   = time.Second * 10
-		interval                  = time.Second
+		clusterName                     = "cluster-webhook-mysql"
+		replicationSetClusterName       = "cluster-webhook-rs"
+		clusterDefinitionName           = "cluster-webhook-mysql-definition"
+		secondClusterDefinition         = "cluster-webhook-mysql-definition2"
+		replicationSetClusterDefinition = "cluster-webhook-rs-definition"
+		appVersionName                  = "cluster-webhook-mysql-appversion"
+		replicationSetAppVersionName    = "cluster-webhook-rs-appversion"
+		timeout                         = time.Second * 10
+		interval                        = time.Second
 	)
 	BeforeEach(func() {
 		// Add any setup steps that needs to be executed before each test
@@ -59,7 +62,7 @@ var _ = Describe("cluster webhook", func() {
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
 			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 
-			clusterDefSecond, _ := createTestClusterDefinitionObj(sencondeClusterDefinition)
+			clusterDefSecond, _ := createTestClusterDefinitionObj(secondClusterDefinition)
 			Expect(testCtx.CreateObj(ctx, clusterDefSecond)).Should(Succeed())
 
 			// wait until ClusterDefinition created
@@ -82,7 +85,7 @@ var _ = Describe("cluster webhook", func() {
 			Expect(testCtx.CreateObj(ctx, cluster)).Should(Succeed())
 
 			By("By testing update spec.clusterDefinitionRef")
-			cluster.Spec.ClusterDefRef = sencondeClusterDefinition
+			cluster.Spec.ClusterDefRef = secondClusterDefinition
 			Expect(k8sClient.Update(ctx, cluster)).ShouldNot(Succeed())
 			// restore
 			cluster.Spec.ClusterDefRef = clusterDefinitionName
@@ -120,6 +123,28 @@ var _ = Describe("cluster webhook", func() {
 			cluster.Spec.Components[0].VolumeClaimTemplates[0].Name = "test"
 			Expect(k8sClient.Update(ctx, cluster)).ShouldNot(Succeed())
 
+			// A series of tests on clusters when componentType=replication
+			By("By creating a new clusterDefinition when componentType=replication")
+			rsClusterDef, _ := createTestReplicationSetClusterDefinitionObj(replicationSetClusterDefinition)
+			Expect(testCtx.CreateObj(ctx, rsClusterDef)).Should(Succeed())
+
+			By("By creating a new appVersion when componentType=replication")
+			rsAppVersion := createTestReplicationSetAppVersionObj(replicationSetClusterDefinition, replicationSetAppVersionName)
+			Expect(testCtx.CreateObj(ctx, rsAppVersion)).Should(Succeed())
+
+			By("By creating a new cluster when componentType=replication")
+			rsCluster, _ := createTestReplicationSetCluster(replicationSetClusterDefinition, replicationSetAppVersionName, replicationSetClusterName)
+			Expect(testCtx.CreateObj(ctx, rsCluster)).Should(Succeed())
+
+			By("By updating cluster.Spec.Components[0].PrimaryStsIndex larger than cluster.Spec.Components[0].Replicas, expect not succeed")
+			*rsCluster.Spec.Components[0].PrimaryStsIndex = int32(3)
+			rsCluster.Spec.Components[0].Replicas = int32(3)
+			Expect(k8sClient.Update(ctx, cluster)).ShouldNot(Succeed())
+
+			By("By updating cluster.Spec.Components[0].PrimaryStsIndex less than cluster.Spec.Components[0].Replicas, expect succeed")
+			*rsCluster.Spec.Components[0].PrimaryStsIndex = int32(1)
+			rsCluster.Spec.Components[0].Replicas = int32(2)
+			Expect(k8sClient.Update(ctx, cluster)).ShouldNot(Succeed())
 		})
 	})
 })
@@ -147,6 +172,37 @@ spec:
   - name: proxy
     type: proxy
     replicas: 1
+`, clusterName, clusterDefinitionName, appVersionName)
+	cluster := &Cluster{}
+	err := yaml.Unmarshal([]byte(clusterYaml), cluster)
+	cluster.Spec.TerminationPolicy = WipeOut
+	return cluster, err
+}
+
+func createTestReplicationSetCluster(clusterDefinitionName, appVersionName, clusterName string) (*Cluster, error) {
+	clusterYaml := fmt.Sprintf(`
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: %s
+  namespace: default
+spec:
+  clusterDefinitionRef: %s
+  appVersionRef: %s
+  components:
+  - name: replication
+    type: replication
+    monitor: false
+    primaryStsIndex: 0
+    replicas: 2
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
 `, clusterName, clusterDefinitionName, appVersionName)
 	cluster := &Cluster{}
 	err := yaml.Unmarshal([]byte(clusterYaml), cluster)

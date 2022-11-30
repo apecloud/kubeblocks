@@ -142,6 +142,7 @@ spec:
                     primaryStsIndex:
                       description: PrimaryStsIndex determines which statefulset is
                         primary when Type is Replication
+                      format: int32
                       type: integer
                     replicas:
                       description: Component replicas, use default value in ClusterDefinition

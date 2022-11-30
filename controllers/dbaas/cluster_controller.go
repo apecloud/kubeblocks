@@ -551,9 +551,8 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 				statefulStatusRevisionIsEquals = false
 			}
 		case dbaasv1alpha1.Replication:
-			if sts.Status.UpdateRevision != sts.Status.CurrentRevision {
-				statefulStatusRevisionIsEquals = false
-			}
+			// ReplicationSet do not judge whether the revisions are consistent
+			statefulStatusRevisionIsEquals = true
 		}
 		stsIsRunning := component.StatefulSetIsReady(&sts, statefulStatusRevisionIsEquals)
 		if !stsIsRunning {

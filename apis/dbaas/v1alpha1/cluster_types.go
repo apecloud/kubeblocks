@@ -160,7 +160,7 @@ type ClusterComponent struct {
 
 	// PrimaryStsIndex determines which statefulset is primary when Type is Replication
 	// +optional
-	PrimaryStsIndex *int `json:"primaryStsIndex,omitempty"`
+	PrimaryStsIndex *int32 `json:"primaryStsIndex,omitempty"`
 }
 
 // ClusterStatusComponent record components status information

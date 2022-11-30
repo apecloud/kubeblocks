@@ -48,7 +48,9 @@ func GetDefaultPodName(dynamic dynamic.Interface, name string, namespace string)
 		if c.ConsensusSetStatus != nil {
 			return c.ConsensusSetStatus.Leader.Pod, nil
 		}
-		// TODO: now we only support consensus set
+		if c.ReplicationSetStatus != nil {
+			return c.ReplicationSetStatus.Primary.Pod, nil
+		}
 	}
 
 	return "", fmt.Errorf("failed to find the pod to exec command")

@@ -132,9 +132,8 @@ func handleUpdateByComponentType(reqCtx intctrlutil.RequestCtx, cli client.Clien
 				statefulStatusRevisionIsEquals = true
 			}
 		case dbaasv1alpha1.Replication:
-			if sts.Status.UpdateRevision == sts.Status.CurrentRevision {
-				statefulStatusRevisionIsEquals = true
-			}
+			// ReplicationSet do not judge whether the revisions are consistent
+			statefulStatusRevisionIsEquals = true
 		}
 		break
 	}

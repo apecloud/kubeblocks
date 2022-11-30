@@ -7640,6 +7640,7 @@ spec:
                       default: 0
                       description: PrimaryStsIndex determines which statefulset is
                         primary when Type is Replication
+                      format: int32
                       type: integer
                     probes:
                       description: Probes setting for db healthy checks.

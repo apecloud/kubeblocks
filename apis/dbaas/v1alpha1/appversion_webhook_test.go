@@ -95,3 +95,22 @@ func createTestAppVersionObj(clusterDefinitionName, appVersionName string) *AppV
 	}
 	return appVersion
 }
+
+func createTestReplicationSetAppVersionObj(clusterDefinitionName, appVersionName string) *AppVersion {
+	appVersion := &AppVersion{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      appVersionName,
+			Namespace: "default",
+		},
+		Spec: AppVersionSpec{
+			ClusterDefinitionRef: clusterDefinitionName,
+			Components: []AppVersionComponent{
+				{Type: "replication", PodSpec: &corev1.PodSpec{Containers: []corev1.Container{
+					{Name: "main"},
+				}}},
+			},
+		},
+		Status: AppVersionStatus{},
+	}
+	return appVersion
+}

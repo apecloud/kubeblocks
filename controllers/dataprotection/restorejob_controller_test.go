@@ -80,6 +80,8 @@ spec:
     labelsSelector:
       matchLabels:
         mysql.oracle.com/cluster: mycluster
+    secret:
+      name: mycluster-cluster-secret
   targetVolumes:
     - name: mysql-restore-storage
       persistentVolumeClaim:
@@ -187,7 +189,8 @@ spec:
     labelsSelector:
       matchLabels:
         mysql.oracle.com/cluster: mycluster
-    secretName: mycluster-cluster-secret
+    secret:
+      name: mycluster-cluster-secret
   targetVolume:
     name: mysql-persistent-storage
     persistentVolumeClaim:

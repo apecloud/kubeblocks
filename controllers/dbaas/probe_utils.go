@@ -102,8 +102,8 @@ func buildProbeServiceContainer(component *Component, container *corev1.Containe
 		"--dapr-grpc-port", strconv.Itoa(probeServiceGrpcPort),
 		"--app-protocol", "http",
 		"--log-level", logLevel,
-		"--config", "/config/dapr/config.yaml",
-		"--components-path", "/config/dapr/components"}
+		"--config", "/config/probe/config.yaml",
+		"--components-path", "/config/probe/components"}
 
 	if len(component.Service.Ports) > 0 {
 		port := component.Service.Ports[0]

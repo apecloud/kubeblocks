@@ -1,4 +1,4 @@
-module github.com/apecloud/kubeblocks/cmd/daprd
+module github.com/apecloud/kubeblocks/cmd/probe
 
 go 1.19
 
@@ -12,7 +12,6 @@ require (
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.8.1
-	github.com/valyala/fasthttp v1.41.0
 	go.uber.org/automaxprocs v1.5.1
 )
 
@@ -83,6 +82,7 @@ require (
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/tidwall/transform v0.0.0-20201103190739-32f242e2dbde // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
+	github.com/valyala/fasthttp v1.41.0 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.opentelemetry.io/otel v1.11.1 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.11.1 // indirect

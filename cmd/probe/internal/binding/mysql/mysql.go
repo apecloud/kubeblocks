@@ -37,8 +37,16 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 
-	"github.com/apecloud/kubeblocks/cmd/daprd/internal"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 )
+
+// Mysql represents MySQL output bindings.
+type Mysql struct {
+	db       *sql.DB
+	mu       sync.Mutex
+	logger   logger.Logger
+	metadata bindings.Metadata
+}
 
 const (
 	// list of operations.
@@ -119,14 +127,6 @@ func init() {
 			fmt.Println(errors.Wrap(err, "KB_DB_ROLES env format error").Error())
 		}
 	}
-}
-
-// Mysql represents MySQL output bindings.
-type Mysql struct {
-	db       *sql.DB
-	mu       sync.Mutex
-	logger   logger.Logger
-	metadata bindings.Metadata
 }
 
 // NewMysql returns a new MySQL output binding.
@@ -359,6 +359,7 @@ func (m *Mysql) runningCheck(ctx context.Context, resp *bindings.InvokeResponse)
 	return msg, nil
 }
 
+// design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 func (m *Mysql) statusCheck(ctx context.Context, sql string, resp *bindings.InvokeResponse) ([]byte, error) {
 	rwSql := fmt.Sprintf(`begin;
     create table if not exists kb_health_check(type int, check_ts bigint, primary key(type));

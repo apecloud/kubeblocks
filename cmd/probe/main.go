@@ -43,8 +43,8 @@ import (
 
 	"go.uber.org/automaxprocs/maxprocs"
 
-	"github.com/apecloud/kubeblocks/cmd/daprd/internal/binding/mysql"
-	"github.com/apecloud/kubeblocks/cmd/daprd/internal/middleware/http/probe"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mysql"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/middleware/http/probe"
 )
 
 var (

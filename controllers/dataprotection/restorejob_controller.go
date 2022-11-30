@@ -333,7 +333,7 @@ func (r *RestoreJobReconciler) patchTargetCluster(reqCtx intctrlutil.RequestCtx,
 
 func buildRestoreJobLabels(jobName string) map[string]string {
 	return map[string]string{
-		"restorejobs.dataprotection.kubeblocks.io/name": jobName,
-		intctrlutil.AppManagedByLabelKey:                intctrlutil.AppName,
+		dataProtectionLabelRestoreJobNameKey: jobName,
+		intctrlutil.AppManagedByLabelKey:     intctrlutil.AppName,
 	}
 }

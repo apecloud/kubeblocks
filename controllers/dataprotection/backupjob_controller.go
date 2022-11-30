@@ -245,7 +245,7 @@ func (r *BackupJobReconciler) doInProgressPhaseAction(
 
 func (r *BackupJobReconciler) updateStatusIfJobFailed(reqCtx intctrlutil.RequestCtx,
 	backupJob *dataprotectionv1alpha1.BackupJob, err error) (ctrl.Result, error) {
-	if err.Error() == "JobFailed" {
+	if err.Error() == errorJobFailed {
 		r.Recorder.Event(backupJob, corev1.EventTypeWarning, "FailedCreatedBackupJob", "Failed creating backupJob.")
 		backupJob.Status.Phase = dataprotectionv1alpha1.BackupJobFailed
 		backupJob.Status.FailureReason = err.Error()
@@ -326,7 +326,7 @@ func (r *BackupJobReconciler) ensureBatchV1JobCompleted(
 			if jobStatusConditions[0].Type == batchv1.JobComplete {
 				return true, nil
 			} else if jobStatusConditions[0].Type == batchv1.JobFailed {
-				return false, errors.New("JobFailed")
+				return false, errors.New(errorJobFailed)
 			}
 		}
 	}
@@ -507,8 +507,8 @@ func (r *BackupJobReconciler) createHooksCommandJob(
 
 func buildBackupJobLabels(backupJobName string) map[string]string {
 	return map[string]string{
-		"backupjobs.dataprotection.kubeblocks.io/name": backupJobName,
-		intctrlutil.AppManagedByLabelKey:               intctrlutil.AppName,
+		dataProtectionLabelBackupJobNameKey: backupJobName,
+		intctrlutil.AppManagedByLabelKey:    intctrlutil.AppName,
 	}
 }
 

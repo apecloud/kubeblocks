@@ -12,7 +12,7 @@
 ![image](https://github.com/apecloud/kubeblocks/blob/support/rewrite_kb_introduction/docs/img/banner:-image-with:-ape-space.jpg)
 ## What is KubeBlocks
 
-KubeBlocks, running on Kubernetes, is an open source data manangement platforms. KubeBlocks greatly simplifies the process of deploying databases on Kubernetes. You can create and use database clusters within minutes without a deep knowledge of Kubernetes. It offers an universal view for multicloud and on-premises databases, provides a consistent experience, thus relieves the burden of maintaining miscellaneous operators.
+KubeBlocks, running on Kubernetes, is an open source data manangement platform. KubeBlocks greatly simplifies the process of deploying databases on Kubernetes. You can create and use database clusters within minutes without a deep knowledge of Kubernetes. It offers an universal view for multicloud and on-premises databases, provides a consistent experience, thus relieves the burden of maintaining miscellaneous operators.
 ***
 
 ### Why you use KubeBlocks

@@ -111,7 +111,7 @@ func (o *ExposeOptions) Run() error {
 	for _, item := range svcList.Items {
 
 		svc := &corev1.Service{}
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, svc); err != nil {
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, svc); err != nil {
 			return errors.Wrap(err, "failed to convert service")
 		}
 		// ignore headless service
@@ -129,16 +129,16 @@ func (o *ExposeOptions) Run() error {
 			delete(annotations, ServiceLBTypeAnnotationKey)
 		}
 		item.SetAnnotations(annotations)
-		_, err := o.client.Resource(serviceGVR).Namespace(o.Namespace).Update(context.TODO(), &item, metav1.UpdateOptions{})
+		_, err = o.client.Resource(serviceGVR).Namespace(o.Namespace).Update(context.TODO(), &item, metav1.UpdateOptions{})
 		if err != nil {
-			return errors.Wrapf(err, "Failed to update service %s/%s", item.GetNamespace(), svc.GetName())
+			return errors.Wrapf(err, "failed to update service %s/%s", item.GetNamespace(), svc.GetName())
 		}
 	}
 
 	if o.on {
-		_, _ = fmt.Fprintf(o.Out, "Cluster %s is exposed\n", o.Name)
+		fmt.Fprintf(o.Out, "Cluster %s is exposed\n", o.Name)
 	} else if o.off {
-		_, _ = fmt.Fprintf(o.Out, "Cluster %s stopped exposing\n", o.Name)
+		fmt.Fprintf(o.Out, "Cluster %s stopped exposing\n", o.Name)
 	}
 	return nil
 }

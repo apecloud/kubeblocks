@@ -43,8 +43,8 @@ var _ = Describe("kubeblocks", func() {
 		tf = cmdtesting.NewTestFactory().WithNamespace(nameSpace)
 
 		// use a fake URL to test
-		types.KubeBlocksChartName = "kubeblocks-test"
-		types.KubeBlocksChartURL = "https://apecloud.github.io/helm-charts-test"
+		types.KubeBlocksChartName = fake.KubeBlocksChartName
+		types.KubeBlocksChartURL = fake.KubeBlocksChartURL
 	})
 
 	AfterEach(func() {

@@ -21,6 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/client-go/kubernetes/scheme"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -68,7 +69,7 @@ var _ = Describe("Expose", func() {
 		labels := map[string]interface{}{
 			"app.kubernetes.io/instance": clusterName,
 		}
-		obj := newUnstructured(svcVersion, svcKind, svcResource, name, annotations, labels)
+		obj := newUnstructured(svcVersion, svcKind, namespace, name, annotations, labels)
 		if clusterIP != "" {
 			_ = unstructured.SetNestedField(obj.Object, clusterIP, "spec", "clusterIP")
 		}
@@ -129,7 +130,7 @@ var _ = Describe("Expose", func() {
 				objs = append(objs, obj)
 			}
 
-			o.client = fake.NewSimpleDynamicClient(runtime.NewScheme(), objs...)
+			o.client = fake.NewSimpleDynamicClient(scheme.Scheme, objs...)
 
 			Expect(o.Run()).Should(Succeed())
 		})

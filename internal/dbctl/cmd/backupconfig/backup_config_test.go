@@ -25,6 +25,7 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/fake"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
 )
 
@@ -67,8 +68,8 @@ var _ = Describe("backup_config", func() {
 
 	It("run backup_config", func() {
 		// use a fake URL to test
-		types.KubeBlocksChartName = "kubeblocks-test"
-		types.KubeBlocksChartURL = "https://apecloud.github.io/helm-charts-test"
+		types.KubeBlocksChartName = fake.KubeBlocksChartName
+		types.KubeBlocksChartURL = fake.KubeBlocksChartURL
 
 		o := &upgradeOptions{
 			IOStreams: streams,

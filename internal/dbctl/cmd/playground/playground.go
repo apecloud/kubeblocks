@@ -288,21 +288,32 @@ func printGuide(cloudProvider string, hostIP string) error {
 		return err
 	}
 
-	// set env KUBECONFIG to playground kubernetes cluster config
-	if err = util.SetKubeConfig(clusterInfo.KubeConfig); err != nil {
+	clusterGetter, err := newObjectsGetter(clusterInfo.KubeConfig)
+	if err != nil {
 		return err
+	}
+
+	if clusterInfo.ClusterObjects, err = clusterGetter.Get(); err != nil {
+		return err
+	}
+	return util.PrintGoTemplate(os.Stdout, guideTmpl, clusterInfo)
+}
+
+func newObjectsGetter(cfg string) (*cluster.ObjectsGetter, error) {
+	// set env KUBECONFIG to playground kubernetes cluster config
+	if err := util.SetKubeConfig(cfg); err != nil {
+		return nil, err
 	}
 
 	f := util.NewFactory()
 	clientSet, err := f.KubernetesClientSet()
 	if err != nil {
-
-		return err
+		return nil, err
 	}
 
 	dynamicClient, err := f.DynamicClient()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// get cluster info that will be used to render the guide template
@@ -312,11 +323,7 @@ func printGuide(cloudProvider string, hostIP string) error {
 		Namespace:     dbClusterNamespace,
 		Name:          dbClusterName,
 	}
-	if clusterInfo.ClusterObjects, err = clusterGetter.Get(); err != nil {
-		return err
-	}
-
-	return util.PrintGoTemplate(os.Stdout, guideTmpl, clusterInfo)
+	return clusterGetter, nil
 }
 
 func (o *initOptions) installKubeBlocks() error {

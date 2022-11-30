@@ -17,7 +17,6 @@ KubeBlocks, running on Kubernetes, is an open source data manangement platforms.
 
 ### Why you use KubeBlocks
 - Cloud-neutral
-  - 
   - Runs on a Kubernetes base and supports AWS EKS, GCP GKE, Azure AKS and other cloud environments.
 - Database as code
   - Defines each supported database engine through a declarative API, extending the Kubernetes statefulset to better adapt to stateful services as databases. 

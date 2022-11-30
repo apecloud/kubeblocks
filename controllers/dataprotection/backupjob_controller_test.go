@@ -70,7 +70,7 @@ var _ = Describe("BackupJob Controller", func() {
 		randomStr, _ := password.Generate(6, 0, 0, true, false)
 		key := types.NamespacedName{
 			Name:      prefix + randomStr,
-			Namespace: "default",
+			Namespace: testCtx.DefaultNamespace,
 		}
 		return key
 	}
@@ -140,10 +140,9 @@ spec:
 
 		var err error
 		f := &dataprotectionv1alpha1.BackupJob{}
-		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
-			f = &dataprotectionv1alpha1.BackupJob{}
-		}
+		Eventually(func() error {
+			return k8sClient.Get(ctx, key, f)
+		}, timeout, interval).Should(Succeed())
 		return client.IgnoreNotFound(err)
 	}
 
@@ -429,13 +428,9 @@ spec:
 
 	patchK8sJobStatus := func(jobStatus batchv1.JobConditionType, key types.NamespacedName) {
 		k8sJob := batchv1.Job{}
-
-		delta := time.Now().Add(timeout)
-		for err := k8sClient.Get(ctx, key, &k8sJob); err != nil && time.Now().Before(delta); err = k8sClient.Get(ctx, key, &k8sJob) {
-			k8sJob = batchv1.Job{}
-			time.Sleep(interval)
-		}
-		Expect(k8sClient.Get(ctx, key, &k8sJob)).Should(Succeed())
+		Eventually(func() error {
+			return k8sClient.Get(ctx, key, &k8sJob)
+		}, timeout, interval).Should(Succeed())
 
 		patch := client.MergeFrom(k8sJob.DeepCopy())
 		jobCondition := batchv1.JobCondition{Type: jobStatus}
@@ -445,11 +440,9 @@ spec:
 
 	patchVolumeSnapshotStatus := func(key Key, readyToUse bool) {
 		snap := snapshotv1.VolumeSnapshot{}
-		delta := time.Now().Add(timeout)
-		for err := k8sClient.Get(ctx, key, &snap); err != nil && time.Now().Before(delta); err = k8sClient.Get(ctx, key, &snap) {
-			snap = snapshotv1.VolumeSnapshot{}
-			time.Sleep(interval)
-		}
+		Eventually(func() error {
+			return k8sClient.Get(ctx, key, &snap)
+		}, timeout, interval).Should(Succeed())
 
 		Expect(k8sClient.Get(ctx, key, &snap)).Should(Succeed())
 
@@ -482,16 +475,11 @@ spec:
 
 			result := &dataprotectionv1alpha1.BackupJob{}
 			Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
-
-			delta := time.Now().Add(timeout)
-			for err := k8sClient.Get(ctx, key, result); err == nil && time.Now().Before(delta); err = k8sClient.Get(ctx, key, result) {
-				if result.Status.Phase == dataprotectionv1alpha1.BackupJobFailed ||
-					result.Status.Phase == dataprotectionv1alpha1.BackupJobCompleted {
-					break
-				}
-				result = &dataprotectionv1alpha1.BackupJob{}
-				time.Sleep(time.Second)
-			}
+			Eventually(func() bool {
+				Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
+				return result.Status.Phase == dataprotectionv1alpha1.BackupJobFailed ||
+					result.Status.Phase == dataprotectionv1alpha1.BackupJobCompleted
+			}, timeout, interval).Should(BeTrue())
 			Expect(result.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupJobCompleted))
 
 			By("Deleting the scope")
@@ -541,15 +529,11 @@ spec:
 			result := &dataprotectionv1alpha1.BackupJob{}
 			Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
 
-			delta := time.Now().Add(timeout)
-			for err := k8sClient.Get(ctx, key, result); err == nil && time.Now().Before(delta); err = k8sClient.Get(ctx, key, result) {
-				if result.Status.Phase == dataprotectionv1alpha1.BackupJobFailed ||
-					result.Status.Phase == dataprotectionv1alpha1.BackupJobCompleted {
-					break
-				}
-				result = &dataprotectionv1alpha1.BackupJob{}
-				time.Sleep(time.Second)
-			}
+			Eventually(func() bool {
+				Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
+				return result.Status.Phase == dataprotectionv1alpha1.BackupJobFailed ||
+					result.Status.Phase == dataprotectionv1alpha1.BackupJobCompleted
+			}, timeout, interval).Should(BeTrue())
 			Expect(result.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupJobFailed))
 
 			By("Deleting the scope")
@@ -575,8 +559,62 @@ spec:
 		})
 	})
 
-	Context("When failed creating backupJob with snapshot", func() {
-		It("Should failed with no error", func() {
+	Context("When creating backupJob with snapshot", func() {
+		It("Should success with no error", func() {
+			viper.Set("VOLUMESNAPSHOT", "true")
+			By("By creating a statefulset")
+			_ = assureStatefulSetObj()
+
+			By("By creating a backupTool")
+			backupTool := assureBackupToolObj()
+
+			By("By creating a backupPolicy from backupTool: " + backupTool.Name)
+			backupPolicy := assureBackupPolicyObj(backupTool.Name)
+
+			By("By creating a backupJob from backupPolicy: " + backupPolicy.Name)
+			toCreate := assureBackupJobSnapshotObj(backupPolicy.Name)
+			key := types.NamespacedName{
+				Name:      toCreate.Name,
+				Namespace: toCreate.Namespace,
+			}
+
+			patchK8sJobStatus(batchv1.JobComplete, Key{Name: toCreate.Name + "-pre", Namespace: toCreate.Namespace})
+			patchVolumeSnapshotStatus(key, true)
+			patchK8sJobStatus(batchv1.JobComplete, Key{Name: toCreate.Name + "-post", Namespace: toCreate.Namespace})
+
+			result := &dataprotectionv1alpha1.BackupJob{}
+			Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
+
+			Eventually(func() bool {
+				Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
+				return result.Status.Phase == dataprotectionv1alpha1.BackupJobFailed ||
+					result.Status.Phase == dataprotectionv1alpha1.BackupJobCompleted
+			}, timeout, interval).Should(BeTrue())
+			Expect(result.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupJobCompleted))
+
+			By("Deleting the scope")
+
+			Eventually(func() error {
+				key = types.NamespacedName{
+					Name:      backupPolicy.Name,
+					Namespace: backupPolicy.Namespace,
+				}
+				_ = deleteBackupPolicyNWait(key)
+				key = types.NamespacedName{
+					Name:      backupTool.Name,
+					Namespace: backupTool.Namespace,
+				}
+				_ = deleteBackupToolNWait(key)
+
+				key = types.NamespacedName{
+					Name:      toCreate.Name,
+					Namespace: toCreate.Namespace,
+				}
+				return deleteBackupJobNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("Should failed", func() {
 			viper.Set("VOLUMESNAPSHOT", "true")
 			By("By creating a statefulset")
 			_ = assureStatefulSetObj()
@@ -595,22 +633,16 @@ spec:
 			}
 
 			patchK8sJobStatus(batchv1.JobFailed, Key{Name: toCreate.Name + "-pre", Namespace: toCreate.Namespace})
-			patchVolumeSnapshotStatus(key, true)
-			patchK8sJobStatus(batchv1.JobFailed, Key{Name: toCreate.Name + "-post", Namespace: toCreate.Namespace})
 
 			result := &dataprotectionv1alpha1.BackupJob{}
 			Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
 
-			delta := time.Now().Add(timeout)
-			for err := k8sClient.Get(ctx, key, result); err == nil && time.Now().Before(delta); err = k8sClient.Get(ctx, key, result) {
-				if result.Status.Phase == dataprotectionv1alpha1.BackupJobFailed ||
-					result.Status.Phase == dataprotectionv1alpha1.BackupJobCompleted {
-					break
-				}
-				result = &dataprotectionv1alpha1.BackupJob{}
-				time.Sleep(time.Second)
-			}
-			Expect(result.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupJobCompleted))
+			Eventually(func() bool {
+				Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
+				return result.Status.Phase == dataprotectionv1alpha1.BackupJobFailed ||
+					result.Status.Phase == dataprotectionv1alpha1.BackupJobCompleted
+			}, timeout, interval).Should(BeTrue())
+			Expect(result.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupJobFailed))
 
 			By("Deleting the scope")
 

@@ -176,7 +176,7 @@ func (r *BackupJobReconciler) doInProgressPhaseAction(
 		// 3. create and ensure post-command job completed
 		isOK, err := r.createPreCommandJobAndEnsure(reqCtx, backupJob)
 		if err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return r.updateStatusIfJobFailed(reqCtx, backupJob, err)
 		}
 		if !isOK {
 			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
@@ -197,7 +197,7 @@ func (r *BackupJobReconciler) doInProgressPhaseAction(
 
 		isOK, err = r.createPostCommandJobAndEnsure(reqCtx, backupJob)
 		if err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return r.updateStatusIfJobFailed(reqCtx, backupJob, err)
 		}
 		if !isOK {
 			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
@@ -215,7 +215,7 @@ func (r *BackupJobReconciler) doInProgressPhaseAction(
 		key := types.NamespacedName{Namespace: backupJob.Namespace, Name: backupJob.Name}
 		isOK, err := r.ensureBatchV1JobCompleted(reqCtx, key)
 		if err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return r.updateStatusIfJobFailed(reqCtx, backupJob, err)
 		}
 		if !isOK {
 			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
@@ -241,6 +241,19 @@ func (r *BackupJobReconciler) doInProgressPhaseAction(
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
+}
+
+func (r *BackupJobReconciler) updateStatusIfJobFailed(reqCtx intctrlutil.RequestCtx,
+	backupJob *dataprotectionv1alpha1.BackupJob, err error) (ctrl.Result, error) {
+	if err.Error() == "JobFailed" {
+		r.Recorder.Event(backupJob, corev1.EventTypeWarning, "FailedCreatedBackupJob", "Failed creating backupJob.")
+		backupJob.Status.Phase = dataprotectionv1alpha1.BackupJobFailed
+		backupJob.Status.FailureReason = err.Error()
+		if err := r.Client.Status().Update(reqCtx.Ctx, backupJob); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+	}
+	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 }
 
 // patchBackupJobLabels patch backupJob labels
@@ -310,9 +323,10 @@ func (r *BackupJobReconciler) ensureBatchV1JobCompleted(
 	if exists {
 		jobStatusConditions := job.Status.Conditions
 		if len(jobStatusConditions) > 0 {
-			if jobStatusConditions[0].Type == batchv1.JobComplete ||
-				jobStatusConditions[0].Type == batchv1.JobFailed {
+			if jobStatusConditions[0].Type == batchv1.JobComplete {
 				return true, nil
+			} else if jobStatusConditions[0].Type == batchv1.JobFailed {
+				return false, errors.New("JobFailed")
 			}
 		}
 	}

@@ -98,8 +98,9 @@ spec:
                             type: integer
                           name:
                             description: Specify the name of the referenced the configuration
-                              template ConfigMap object. / +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
+                              template ConfigMap object.
                             maxLength: 63
+                            pattern: ^[a-z0-9-]+$
                             type: string
                           namespace:
                             default: default
@@ -8123,8 +8124,9 @@ spec:
                       type: object
                     typeName:
                       description: Type name of the component, it can be any valid
-                        string. / +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
+                        string.
                       maxLength: 12
+                      pattern: ^[a-z0-9-]+$
                       type: string
                   required:
                   - componentType
@@ -8144,8 +8146,9 @@ spec:
               type:
                 description: Type define well known cluster types. Valid values are
                   in-list of [state.redis, mq.mqtt, mq.kafka, state.mysql-8, state.mysql-5.7,
-                  state.mysql-5.6, state-mongodb]. / +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
+                  state.mysql-5.6, state-mongodb].
                 maxLength: 24
+                pattern: ^[a-z0-9-]+$
                 type: string
             required:
             - components

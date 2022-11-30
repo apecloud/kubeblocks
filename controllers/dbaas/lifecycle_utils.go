@@ -88,25 +88,14 @@ func (c createParams) getCacheCUETplValue(key string, valueCreator func() (*intc
 	return v, err
 }
 
-func (c createParams) getConfigTemplates() ([]dbaasv1alpha1.ConfigTemplate, error) {
-	var appVersionTpl []dbaasv1alpha1.ConfigTemplate
-	for _, component := range c.appVersion.Spec.Components {
-		if component.Type == c.component.Type {
-			appVersionTpl = component.ConfigTemplateRefs
-			break
-		}
-	}
-	return mergeConfigTemplates(appVersionTpl, c.getComponentConfigTemplates())
-}
-
 // mergeConfigTemplates merge AppVersion.Components[*].ConfigTemplateRefs and ClusterDefinition.Components[*].ConfigTemplateRefs
-func mergeConfigTemplates(appVersionTpl []dbaasv1alpha1.ConfigTemplate, cdTpl []dbaasv1alpha1.ConfigTemplate) ([]dbaasv1alpha1.ConfigTemplate, error) {
+func mergeConfigTemplates(appVersionTpl []dbaasv1alpha1.ConfigTemplate, cdTpl []dbaasv1alpha1.ConfigTemplate) []dbaasv1alpha1.ConfigTemplate {
 	if len(appVersionTpl) == 0 {
-		return cdTpl, nil
+		return cdTpl
 	}
 
 	if len(cdTpl) == 0 {
-		return appVersionTpl, nil
+		return appVersionTpl
 	}
 
 	mergedCfgTpl := make([]dbaasv1alpha1.ConfigTemplate, 0, len(appVersionTpl)+len(cdTpl))
@@ -114,7 +103,9 @@ func mergeConfigTemplates(appVersionTpl []dbaasv1alpha1.ConfigTemplate, cdTpl []
 
 	for i := range appVersionTpl {
 		if _, ok := (mergedTplMap)[appVersionTpl[i].VolumeName]; ok {
-			return nil, fmt.Errorf("ConfigTemplate require not same volumeName [%s]", appVersionTpl[i].Name)
+			// TODO: following error should be checked in validation webhook and record Warning event
+			// return nil, fmt.Errorf("ConfigTemplate require not same volumeName [%s]", appVersionTpl[i].Name)
+			continue
 		}
 		mergedCfgTpl = append(mergedCfgTpl, appVersionTpl[i])
 		mergedTplMap[appVersionTpl[i].VolumeName] = struct{}{}
@@ -129,16 +120,7 @@ func mergeConfigTemplates(appVersionTpl []dbaasv1alpha1.ConfigTemplate, cdTpl []
 		mergedTplMap[cdTpl[i].VolumeName] = struct{}{}
 	}
 
-	return mergedCfgTpl, nil
-}
-
-func (c createParams) getComponentConfigTemplates() []dbaasv1alpha1.ConfigTemplate {
-	for _, component := range c.clusterDefinition.Spec.Components {
-		if component.TypeName == c.component.Type {
-			return component.ConfigTemplateRefs
-		}
-	}
-	return nil
+	return mergedCfgTpl
 }
 
 func getContainerByName(containers []corev1.Container, name string) (int, *corev1.Container) {
@@ -341,65 +323,72 @@ func mergeComponents(
 		ConfigTemplates: clusterDefCompObj.ConfigTemplateRefs,
 	}
 
-	if appVerComp != nil && appVerComp.PodSpec != nil {
-		for _, container := range appVerComp.PodSpec.Containers {
-			i, c := getContainerByName(component.PodSpec.Containers, container.Name)
-			if c == nil {
-				continue
-			}
-			if container.Image != "" {
-				component.PodSpec.Containers[i].Image = container.Image
-			}
-			if len(container.Command) != 0 {
-				component.PodSpec.Containers[i].Command = container.Command
-			}
-			if len(container.Args) != 0 {
-				component.PodSpec.Containers[i].Args = container.Args
-			}
-			if container.WorkingDir != "" {
-				component.PodSpec.Containers[i].WorkingDir = container.WorkingDir
-			}
-			if len(container.Ports) != 0 {
-				component.PodSpec.Containers[i].Ports = container.Ports
-			}
-			if len(container.EnvFrom) != 0 {
-				component.PodSpec.Containers[i].EnvFrom = container.EnvFrom
-			}
-			if len(container.Env) != 0 {
-				component.PodSpec.Containers[i].Env = container.Env
-			}
-			if container.Resources.Limits != nil || container.Resources.Requests != nil {
-				component.PodSpec.Containers[i].Resources = container.Resources
-			}
-			if len(container.VolumeMounts) != 0 {
-				component.PodSpec.Containers[i].VolumeMounts = container.VolumeMounts
-			}
-			if len(container.VolumeDevices) != 0 {
-				component.PodSpec.Containers[i].VolumeDevices = container.VolumeDevices
-			}
-			if container.LivenessProbe != nil {
-				component.PodSpec.Containers[i].LivenessProbe = container.LivenessProbe
-			}
-			if container.ReadinessProbe != nil {
-				component.PodSpec.Containers[i].ReadinessProbe = container.ReadinessProbe
-			}
-			if container.StartupProbe != nil {
-				component.PodSpec.Containers[i].StartupProbe = container.StartupProbe
-			}
-			if container.Lifecycle != nil {
-				component.PodSpec.Containers[i].Lifecycle = container.Lifecycle
-			}
-			if container.TerminationMessagePath != "" {
-				component.PodSpec.Containers[i].TerminationMessagePath = container.TerminationMessagePath
-			}
-			if container.TerminationMessagePolicy != "" {
-				component.PodSpec.Containers[i].TerminationMessagePolicy = container.TerminationMessagePolicy
-			}
-			if container.ImagePullPolicy != "" {
-				component.PodSpec.Containers[i].ImagePullPolicy = container.ImagePullPolicy
-			}
-			if container.SecurityContext != nil {
-				component.PodSpec.Containers[i].SecurityContext = container.SecurityContext
+	doContainerAttrOverride := func(container corev1.Container) {
+		i, c := getContainerByName(component.PodSpec.Containers, container.Name)
+		if c == nil {
+			return
+		}
+		if container.Image != "" {
+			component.PodSpec.Containers[i].Image = container.Image
+		}
+		if len(container.Command) != 0 {
+			component.PodSpec.Containers[i].Command = container.Command
+		}
+		if len(container.Args) != 0 {
+			component.PodSpec.Containers[i].Args = container.Args
+		}
+		if container.WorkingDir != "" {
+			component.PodSpec.Containers[i].WorkingDir = container.WorkingDir
+		}
+		if len(container.Ports) != 0 {
+			component.PodSpec.Containers[i].Ports = container.Ports
+		}
+		if len(container.EnvFrom) != 0 {
+			component.PodSpec.Containers[i].EnvFrom = container.EnvFrom
+		}
+		if len(container.Env) != 0 {
+			component.PodSpec.Containers[i].Env = container.Env
+		}
+		if container.Resources.Limits != nil || container.Resources.Requests != nil {
+			component.PodSpec.Containers[i].Resources = container.Resources
+		}
+		if len(container.VolumeMounts) != 0 {
+			component.PodSpec.Containers[i].VolumeMounts = container.VolumeMounts
+		}
+		if len(container.VolumeDevices) != 0 {
+			component.PodSpec.Containers[i].VolumeDevices = container.VolumeDevices
+		}
+		if container.LivenessProbe != nil {
+			component.PodSpec.Containers[i].LivenessProbe = container.LivenessProbe
+		}
+		if container.ReadinessProbe != nil {
+			component.PodSpec.Containers[i].ReadinessProbe = container.ReadinessProbe
+		}
+		if container.StartupProbe != nil {
+			component.PodSpec.Containers[i].StartupProbe = container.StartupProbe
+		}
+		if container.Lifecycle != nil {
+			component.PodSpec.Containers[i].Lifecycle = container.Lifecycle
+		}
+		if container.TerminationMessagePath != "" {
+			component.PodSpec.Containers[i].TerminationMessagePath = container.TerminationMessagePath
+		}
+		if container.TerminationMessagePolicy != "" {
+			component.PodSpec.Containers[i].TerminationMessagePolicy = container.TerminationMessagePolicy
+		}
+		if container.ImagePullPolicy != "" {
+			component.PodSpec.Containers[i].ImagePullPolicy = container.ImagePullPolicy
+		}
+		if container.SecurityContext != nil {
+			component.PodSpec.Containers[i].SecurityContext = container.SecurityContext
+		}
+	}
+
+	if appVerComp != nil {
+		component.ConfigTemplates = mergeConfigTemplates(appVerComp.ConfigTemplateRefs, component.ConfigTemplates)
+		if appVerComp.PodSpec != nil {
+			for _, c := range appVerComp.PodSpec.Containers {
+				doContainerAttrOverride(c)
 			}
 		}
 	}
@@ -1287,10 +1276,7 @@ func buildCfg(params createParams,
 	cli client.Client) ([]client.Object, error) {
 	// Need to merge configTemplateRef of AppVersion.Components[*].ConfigTemplateRefs and
 	// ClusterDefinition.Components[*].ConfigTemplateRefs
-	tpls, err := params.getConfigTemplates()
-	if err != nil {
-		return nil, err
-	}
+	tpls := params.component.ConfigTemplates
 	if len(tpls) == 0 {
 		return nil, nil
 	}

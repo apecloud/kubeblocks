@@ -78,8 +78,9 @@ spec:
                             type: integer
                           name:
                             description: Specify the name of the referenced the configuration
-                              template ConfigMap object. / +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
+                              template ConfigMap object.
                             maxLength: 63
+                            pattern: ^[a-z0-9-]+$
                             type: string
                           namespace:
                             default: default
@@ -7714,8 +7715,8 @@ spec:
                       type: object
                     type:
                       description: Type is a component type in ClusterDefinition.
-                        / +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
                       maxLength: 12
+                      pattern: ^[a-z0-9-]+$
                       type: string
                   required:
                   - type

@@ -42,7 +42,6 @@ import (
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util"
 )
 
@@ -73,7 +72,7 @@ func AddRepo(r *repo.Entry) error {
 	}
 
 	var f repo.File
-	if err := yaml.Unmarshal(b, &f); err != nil {
+	if err = yaml.Unmarshal(b, &f); err != nil {
 		return err
 	}
 
@@ -118,13 +117,13 @@ func RemoveRepo(r *repo.Entry) error {
 	}
 
 	var f repo.File
-	if err := yaml.Unmarshal(b, &f); err != nil {
+	if err = yaml.Unmarshal(b, &f); err != nil {
 		return err
 	}
 
 	if f.Has(r.Name) {
 		f.Remove(r.Name)
-		if err := f.WriteFile(repoFile, 0644); err != nil {
+		if err = f.WriteFile(repoFile, 0644); err != nil {
 			return err
 		}
 	}
@@ -133,8 +132,7 @@ func RemoveRepo(r *repo.Entry) error {
 
 // getInstalled get helm package if installed.
 func (i *InstallOpts) getInstalled(cfg *action.Configuration) (*release.Release, error) {
-	getClient := action.NewGet(cfg)
-	res, err := getClient.Run(i.Name)
+	res, err := action.NewGet(cfg).Run(i.Name)
 	if err != nil {
 		if strings.Contains(err.Error(), "release: not found") {
 			return nil, nil
@@ -162,7 +160,7 @@ func (i *InstallOpts) Install(cfg *action.Configuration) (string, error) {
 		}
 		return nil
 	}, &opts); err != nil {
-		return "", errors.Errorf("Install chart %s error: %s", i.Name, err.Error())
+		return "", errors.Errorf("install chart %s error: %s", i.Name, err.Error())
 	}
 
 	spinner(true)
@@ -251,7 +249,7 @@ func (i *InstallOpts) UnInstall(cfg *action.Configuration) error {
 		}
 		return nil
 	}, &opts); err != nil {
-		return errors.Errorf("UnInstall chart %s error: %s", i.Name, err.Error())
+		return errors.Errorf("uninstall chart %s error: %s", i.Name, err.Error())
 	}
 
 	spinner(true)
@@ -278,31 +276,30 @@ func (i *InstallOpts) tryUnInstall(cfg *action.Configuration) error {
 		cancel()
 	}()
 
-	_, err := client.Run(i.Name)
-	if err != nil {
+	if _, err := client.Run(i.Name); err != nil {
 		return err
 	}
 	return nil
 }
 
 func NewActionConfig(ns string, config string) (*action.Configuration, error) {
+	var err error
 	settings := cli.New()
 	cfg := new(action.Configuration)
 
 	settings.SetNamespace(ns)
 	settings.KubeConfig = config
-	registryClient, err := registry.NewClient(
+	if cfg.RegistryClient, err = registry.NewClient(
 		registry.ClientOptDebug(settings.Debug),
 		registry.ClientOptEnableCache(true),
 		registry.ClientOptWriter(io.Discard),
 		registry.ClientOptCredentialsFile(settings.RegistryConfig),
-	)
-	if err != nil {
+	); err != nil {
 		return nil, err
 	}
-	cfg.RegistryClient = registryClient
-	err = cfg.Init(settings.RESTClientGetter(), settings.Namespace(), os.Getenv("HELM_DRIVER"), func(format string, v ...interface{}) {})
-	if err != nil {
+	if err = cfg.Init(settings.RESTClientGetter(), settings.Namespace(),
+		os.Getenv("HELM_DRIVER"),
+		func(format string, v ...interface{}) {}); err != nil {
 		return nil, err
 	}
 	return cfg, nil
@@ -319,8 +316,7 @@ func FakeActionConfig() *action.Configuration {
 		KubeClient:     &kubefake.FailingKubeClient{PrintingKubeClient: kubefake.PrintingKubeClient{Out: io.Discard}},
 		Capabilities:   chartutil.DefaultCapabilities,
 		RegistryClient: registryClient,
-		Log: func(format string, v ...interface{}) {
-		},
+		Log:            func(format string, v ...interface{}) {},
 	}
 }
 
@@ -405,26 +401,4 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 		return "", err
 	}
 	return released.Info.Notes, nil
-}
-
-func AddKubeBlocksRepo() error {
-	entry := &repo.Entry{
-		Name: types.KubeBlocksChartName,
-		URL:  types.KubeBlocksChartURL,
-	}
-	if err := AddRepo(entry); err != nil {
-		return err
-	}
-	return nil
-}
-
-func RemoveKubeBlocksRepo() error {
-	entry := &repo.Entry{
-		Name: types.KubeBlocksChartName,
-		URL:  types.KubeBlocksChartURL,
-	}
-	if err := RemoveRepo(entry); err != nil {
-		return err
-	}
-	return nil
 }

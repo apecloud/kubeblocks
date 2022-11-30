@@ -119,16 +119,16 @@ func (o *ListLogsOptions) Complete(f cmdutil.Factory, args []string) error {
 }
 
 func (o *ListLogsOptions) Run() error {
-	dataObj := cluster.NewClusterObjects()
 	clusterGetter := cluster.ObjectsGetter{
 		ClientSet:      o.clientSet,
 		DynamicClient:  o.dynamicClient,
 		Name:           o.clusterName,
 		Namespace:      o.namespace,
-		WithAppVersion: false,
-		WithConfigMap:  false,
+		WithClusterDef: true,
+		WithPod:        true,
 	}
-	if err := clusterGetter.Get(dataObj); err != nil {
+	dataObj, err := clusterGetter.Get()
+	if err != nil {
 		return err
 	}
 	if err := o.printListLogsMessage(dataObj, o.Out); err != nil {

@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"strconv"
 	"strings"
 
 	"github.com/docker/docker/pkg/ioutils"
@@ -155,7 +154,7 @@ func (o *initOptions) local() error {
 	spinner := util.Spinner(o.Out, "Create playground k3d cluster: %s", clusterName)
 	defer spinner(false)
 	if err = installer.install(); err != nil {
-		return errors.Wrap(err, "Fail to set up k3d cluster")
+		return errors.Wrap(err, "failed to set up k3d cluster")
 	}
 	spinner(true)
 
@@ -164,34 +163,33 @@ func (o *initOptions) local() error {
 	spinner = util.Spinner(o.Out, "Generate kubernetes config %s", configPath)
 	defer spinner(false)
 	if err = installer.genKubeconfig(); err != nil {
-		return errors.Wrap(err, "Fail to generate kubeconfig")
+		return errors.Wrap(err, "failed to generate kubeconfig")
 	}
 
 	if err = util.SetKubeConfig(configPath); err != nil {
-		return errors.Wrap(err, "Fail to set KUBECONFIG env")
+		return errors.Wrap(err, "failed to set KUBECONFIG env")
 	}
 	spinner(true)
 
 	// Init helm client
 	if o.helmCfg, err = helm.NewActionConfig("", util.ConfigPath(clusterName)); err != nil {
-		return errors.Wrap(err, "Failed to init helm client")
+		return errors.Wrap(err, "failed to init helm client")
 	}
 
 	// Install KubeBlocks
-	fmt.Fprintf(o.Out, "Install KubeBlocks %s\n", version.DefaultKubeBlocksVersion)
 	if err = o.installKubeBlocks(); err != nil {
-		return errors.Wrap(err, "Failed to install KubeBlocks")
+		return errors.Wrap(err, "failed to install KubeBlocks")
 	}
 
 	// Install database cluster
-	fmt.Fprintf(o.Out, "Install playground cluster %s\n", dbClusterName)
+	fmt.Fprintf(o.Out, "Install database cluster %s\n", dbClusterName)
 	if err = o.installCluster(); err != nil {
-		return errors.Wrap(err, "Failed to install WeSQL")
+		return errors.Wrap(err, "failed to install database cluster")
 	}
 
 	// Print guide information
-	if err = printGuide(defaultCloudProvider, localHost, o.Replicas); err != nil {
-		return errors.Wrap(err, "Failed to print user guide")
+	if err = printGuide(defaultCloudProvider, localHost); err != nil {
+		return errors.Wrap(err, "failed to print user guide")
 	}
 
 	return nil
@@ -202,22 +200,22 @@ func (o *initOptions) remote() error {
 	// apply changes
 	cp, err := cloudprovider.InitProvider(o.CloudProvider, o.AccessKey, o.AccessSecret, o.Region)
 	if err != nil {
-		return errors.Wrap(err, "Failed to create cloud provider")
+		return errors.Wrap(err, "failed to create cloud provider")
 	}
 	if err = cp.Apply(false); err != nil {
-		return errors.Wrap(err, "Failed to apply changes")
+		return errors.Wrap(err, "failed to apply changes")
 	}
 	instance, err := cp.Instance()
 	if err != nil {
-		return errors.Wrap(err, "Failed to query cloud instance")
+		return errors.Wrap(err, "failed to query cloud instance")
 	}
 	kubeConfig := strings.ReplaceAll(kubeConfig, "${KUBERNETES_API_SERVER_ADDRESS}", instance.GetIP())
 	kubeConfigPath := path.Join(util.GetKubeconfigDir(), "dbctl-playground")
 	if err = ioutils.AtomicWriteFile(kubeConfigPath, []byte(kubeConfig), 0700); err != nil {
-		return errors.Wrap(err, "Failed to update kube config")
+		return errors.Wrap(err, "failed to update kube config")
 	}
-	if err = printGuide(cp.Name(), instance.GetIP(), o.Replicas); err != nil {
-		return errors.Wrap(err, "Failed to print user guide")
+	if err = printGuide(cp.Name(), instance.GetIP()); err != nil {
+		return errors.Wrap(err, "failed to print user guide")
 	}
 	return nil
 }
@@ -238,7 +236,7 @@ func (o *destroyOptions) destroyPlayground() error {
 		var err error
 		// remove playground cluster kubeconfig
 		if err = util.RemoveConfig(clusterName); err != nil {
-			return errors.Wrap(err, "Failed to remove playground kubeconfig file")
+			return errors.Wrap(err, "failed to remove playground kubeconfig file")
 		}
 		if cp, err = cloudprovider.Get(); err != nil {
 			return err
@@ -269,37 +267,53 @@ func runGuide() error {
 	if err != nil {
 		return err
 	}
-	return printGuide(cp.Name(), instance.GetIP(), 0)
+	return printGuide(cp.Name(), instance.GetIP())
 }
 
-func printGuide(cloudProvider string, hostIP string, replicas int) error {
+func printGuide(cloudProvider string, hostIP string) error {
 	var (
 		clusterInfo = &clusterInfo{
 			HostIP:         hostIP,
 			CloudProvider:  cloudProvider,
 			KubeConfig:     util.ConfigPath(clusterName),
-			GrafanaPort:    "9100",
-			GrafanaUser:    "admin",
-			GrafanaPasswd:  "prom-operator",
 			ClusterObjects: cluster.NewClusterObjects(),
 		}
 		err error
 	)
 
-	// set env KUBECONFIG to playground kubernetes cluster config
-	if err = util.SetKubeConfig(util.ConfigPath(clusterName)); err != nil {
+	// check if config file exists
+	if _, err = os.Stat(clusterInfo.KubeConfig); err != nil && os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "Try to initialize a playground cluster by running:\n"+
+			"\tdbctl playground init\n")
 		return err
+	}
+
+	clusterGetter, err := newObjectsGetter(clusterInfo.KubeConfig)
+	if err != nil {
+		return err
+	}
+
+	if clusterInfo.ClusterObjects, err = clusterGetter.Get(); err != nil {
+		return err
+	}
+	return util.PrintGoTemplate(os.Stdout, guideTmpl, clusterInfo)
+}
+
+func newObjectsGetter(cfg string) (*cluster.ObjectsGetter, error) {
+	// set env KUBECONFIG to playground kubernetes cluster config
+	if err := util.SetKubeConfig(cfg); err != nil {
+		return nil, err
 	}
 
 	f := util.NewFactory()
 	clientSet, err := f.KubernetesClientSet()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	dynamicClient, err := f.DynamicClient()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// get cluster info that will be used to render the guide template
@@ -309,37 +323,21 @@ func printGuide(cloudProvider string, hostIP string, replicas int) error {
 		Namespace:     dbClusterNamespace,
 		Name:          dbClusterName,
 	}
-	if err = clusterGetter.Get(clusterInfo.ClusterObjects); err != nil {
-		return err
-	}
-
-	// get the real number of replica for existed database cluster
-	if replicas == 0 {
-		cluster := clusterInfo.Cluster
-		if cluster == nil {
-			return fmt.Errorf("failed to get cluster \"%s\" info", dbClusterName)
-		}
-		replicas = int(cluster.Spec.Components[0].Replicas)
-	}
-
-	// build host port to access database
-	clusterInfo.HostPorts = make([]string, replicas)
-	for i := 0; i < replicas; i++ {
-		clusterInfo.HostPorts[i] = strconv.Itoa(3306 + i)
-	}
-
-	return util.PrintGoTemplate(os.Stdout, guideTmpl, clusterInfo)
+	return clusterGetter, nil
 }
 
 func (o *initOptions) installKubeBlocks() error {
-	installer := kubeblocks.Installer{
-		HelmCfg:   o.helmCfg,
-		Namespace: dbClusterNamespace,
-		Version:   version.DefaultKubeBlocksVersion,
+	installer := kubeblocks.InstallOptions{
+		Options: kubeblocks.Options{
+			HelmCfg:   o.helmCfg,
+			Namespace: dbClusterNamespace,
+			IOStreams: o.IOStreams,
+		},
+		Version: version.DefaultKubeBlocksVersion,
+		Monitor: true,
+		Quiet:   true,
 	}
-
-	_, err := installer.Install()
-	return err
+	return installer.Run()
 }
 
 func (o *initOptions) installCluster() error {
@@ -357,9 +355,8 @@ func initPlaygroundDir() error {
 		return err
 	}
 
-	if _, err := os.Stat(playgroundDir); err != nil && os.IsNotExist(err) {
-		err := os.MkdirAll(playgroundDir, 0750)
-		return err
+	if _, err = os.Stat(playgroundDir); err != nil && os.IsNotExist(err) {
+		return os.MkdirAll(playgroundDir, 0750)
 	}
 
 	return nil
@@ -371,13 +368,9 @@ func removePlaygroundDir() (string, error) {
 		return playgroundDir, err
 	}
 
-	if _, err := os.Stat(playgroundDir); err != nil && os.IsNotExist(err) {
+	if _, err = os.Stat(playgroundDir); err != nil && os.IsNotExist(err) {
 		return playgroundDir, nil
 	}
 
-	if err := os.RemoveAll(playgroundDir); err != nil {
-		return playgroundDir, err
-	}
-
-	return playgroundDir, nil
+	return playgroundDir, os.RemoveAll(playgroundDir)
 }

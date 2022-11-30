@@ -26,20 +26,26 @@ import (
 	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
 	kubefakeclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/pointer"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
 const (
-	ClusterName    = "fake-cluster-name"
-	Namespace      = "fake-namespace"
-	AppVersionName = "fake-appversion"
-	ClusterDefName = "fake-cluster-definition"
-	ComponentName  = "fake-component-name"
-	ComponentType  = "fake-component-type"
-	NodeName       = "fake-node-name"
-	SecretName     = "fake-secret-name"
+	ClusterName      = "fake-cluster-name"
+	Namespace        = "fake-namespace"
+	AppVersionName   = "fake-appversion"
+	ClusterDefName   = "fake-cluster-definition"
+	ComponentName    = "fake-component-name"
+	ComponentType    = "fake-component-type"
+	NodeName         = "fake-node-name"
+	SecretName       = "fake-secret-name"
+	StorageClassName = "fake-storage-class"
+	PVCName          = "fake-pvc"
+
+	KubeBlocksChartName = "fake-kubeblocks"
+	KubeBlocksChartURL  = "https://apecloud.github.io/fake-kubeblocks"
 )
 
 func Cluster(name string, namespace string) *dbaasv1alpha1.Cluster {
@@ -169,7 +175,7 @@ func ClusterDef() *dbaasv1alpha1.ClusterDefinition {
 	return clusterDef
 }
 
-func Appversion() *dbaasv1alpha1.AppVersion {
+func AppVersion() *dbaasv1alpha1.AppVersion {
 	appversion := &dbaasv1alpha1.AppVersion{}
 	appversion.Name = AppVersionName
 	appversion.Spec.ClusterDefinitionRef = ClusterDefName
@@ -192,7 +198,8 @@ func Services() *corev1.ServiceList {
 	for idx, item := range cases {
 		svc := corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("svc-%d", idx),
+				Name:      fmt.Sprintf("svc-%d", idx),
+				Namespace: Namespace,
 				Labels: map[string]string{
 					types.InstanceLabelKey:  ClusterName,
 					types.ComponentLabelKey: ComponentName,
@@ -222,6 +229,31 @@ func Services() *corev1.ServiceList {
 		services = append(services, svc)
 	}
 	return &corev1.ServiceList{Items: services}
+}
+
+func PVCs() *corev1.PersistentVolumeClaimList {
+	pvcs := &corev1.PersistentVolumeClaimList{}
+	pvc := corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: Namespace,
+			Name:      PVCName,
+			Labels: map[string]string{
+				types.InstanceLabelKey:  ClusterName,
+				types.ComponentLabelKey: ComponentName,
+			},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			StorageClassName: pointer.String(StorageClassName),
+			AccessModes:      []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse("1Gi"),
+				},
+			},
+		},
+	}
+	pvcs.Items = append(pvcs.Items, pvc)
+	return pvcs
 }
 
 func NewClientSet(objects ...runtime.Object) *kubefakeclient.Clientset {

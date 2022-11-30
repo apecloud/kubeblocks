@@ -35,7 +35,7 @@ var _ = Describe("test fake", func() {
 	})
 
 	It("cluster definition", func() {
-		appVersion := Appversion()
+		appVersion := AppVersion()
 		Expect(appVersion).ShouldNot(BeNil())
 		Expect(appVersion.Name).Should(Equal(AppVersionName))
 	})

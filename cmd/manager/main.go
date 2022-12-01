@@ -266,7 +266,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&k8scorecontrollers.PvcReconciler{
+	if err = (&k8scorecontrollers.PersistentVolumeClaimReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("pvc-controller"),

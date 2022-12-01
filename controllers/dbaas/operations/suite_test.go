@@ -95,7 +95,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	eventRecorder = k8sManager.GetEventRecorderFor("event-controller")
-	err = (&k8score.PvcReconciler{
+	err = (&k8score.PersistentVolumeClaimReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("pvc-controller"),

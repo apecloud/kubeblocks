@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-# Implemented based on Dapr Cli https://github.com/dapr/cli/tree/master/install
-
-# kbcli location
 : ${CLI_INSTALL_DIR:="/usr/local/bin"}
 : ${CLI_BREW_INSTALL_DIR:="/opt/homebrew/bin"}
 

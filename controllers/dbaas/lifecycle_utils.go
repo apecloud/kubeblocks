@@ -764,7 +764,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 					// use backup tool such as xtrabackup
 					case dbaasv1alpha1.Backup:
 						// TODO: db core not support yet, leave it empty
-						reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeWarning, "HorizontalScaleFailed", "scale with backup tool not support yet")
+						reqCtx.Recorder.Eventf(cluster, corev1.EventTypeWarning, "HorizontalScaleFailed", "scale with backup tool not support yet")
 					// use volume snapshot
 					case dbaasv1alpha1.Snapshot:
 						if isSnapshotAvailable(cli, ctx) && len(stsObj.Spec.VolumeClaimTemplates) > 0 {
@@ -816,14 +816,14 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 								}
 							}
 						} else {
-							reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeWarning, "HorizontalScaleFailed", "volume snapshot not support")
+							reqCtx.Recorder.Eventf(cluster, corev1.EventTypeWarning, "HorizontalScaleFailed", "volume snapshot not support")
 						}
 					// do nothing when horizontal scaling
 					case dbaasv1alpha1.ScaleNone:
 						break
 					}
 				}
-				reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "HorizontalScale", "Start horizontal scale from %d to %d", *stsObj.Spec.Replicas, *stsProto.Spec.Replicas)
+				reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "HorizontalScale", "Start horizontal scale from %d to %d", *stsObj.Spec.Replicas, *stsProto.Spec.Replicas)
 			} else if *stsObj.Spec.Replicas > *stsProto.Spec.Replicas {
 				// scale down, if scale down to 0, do not delete pvc
 				if *stsProto.Spec.Replicas > 0 && len(stsObj.Spec.VolumeClaimTemplates) > 0 {
@@ -872,7 +872,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				}
 				if allPVCBound {
 					// if all pvc bounded, clean backup resources
-					if err := deleteSnapshot(cli, reqCtx, snapshotKey, stsObj); err != nil {
+					if err := deleteSnapshot(cli, reqCtx, snapshotKey, cluster); err != nil {
 						res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 						return &res, err
 					}
@@ -1608,7 +1608,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, sts appsv1.S
 			return err
 		}
 	} else {
-		reqCtx.Recorder.Eventf(&sts, corev1.EventTypeNormal, "BackupJobCreate", "Create backup job")
+		reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobCreate", "Create backupjob/%s", backupKey.Name)
 	}
 	return nil
 }
@@ -1894,7 +1894,7 @@ func doSnapshot(cli client.Client, reqCtx intctrlutil.RequestCtx, cluster *dbaas
 		if err := controllerutil.SetOwnerReference(cluster, snapshot, scheme); err != nil {
 			return err
 		}
-		reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create native volume snapshot")
+		reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create volumesnapshot/%s", snapshotKey.Name)
 	}
 	return nil
 }
@@ -1936,14 +1936,14 @@ func isAllPVCBound(cli client.Client, ctx context.Context, stsObj *appsv1.Statef
 	return allPVCBound, nil
 }
 
-func deleteSnapshot(cli client.Client, reqCtx intctrlutil.RequestCtx, snapshotKey types.NamespacedName, stsObj *appsv1.StatefulSet) error {
+func deleteSnapshot(cli client.Client, reqCtx intctrlutil.RequestCtx, snapshotKey types.NamespacedName, cluster *dbaasv1alpha1.Cluster) error {
 	ctx := reqCtx.Ctx
 	if err := deleteBackup(ctx, cli, snapshotKey); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
 	} else {
-		reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "BackupJobDelete", "")
+		reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupjob/%s", snapshotKey.Name)
 	}
 	vs := snapshotv1.VolumeSnapshot{}
 	if err := cli.Get(ctx, snapshotKey, &vs); err != nil {
@@ -1956,7 +1956,7 @@ func deleteSnapshot(cli client.Client, reqCtx intctrlutil.RequestCtx, snapshotKe
 				return err
 			}
 		} else {
-			reqCtx.Recorder.Eventf(stsObj, corev1.EventTypeNormal, "VolumeSnapshotDelete", "")
+			reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotDelete", "Delete volumesnapshot/%s", snapshotKey.Name)
 		}
 	}
 	return nil

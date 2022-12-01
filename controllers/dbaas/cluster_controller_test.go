@@ -641,7 +641,7 @@ spec:
 
 			By("Checking the replicas")
 			stsList := listAndCheckStatefulSet(key)
-			Expect(int(*stsList.Items[0].Spec.Replicas)).To(Equal(updatedReplicas))
+			Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(updatedReplicas))
 
 			By("Deleting the cluster")
 			Eventually(func() error {

@@ -55,7 +55,7 @@ var _ = Describe("PersistentVolumeClaim Controller", func() {
 		cleanupObjects()
 	})
 
-	createPvc := func(pvcName string) *corev1.PersistentVolumeClaim {
+	createPVC := func(pvcName string) *corev1.PersistentVolumeClaim {
 		By("By assure an default storageClass")
 		pvcYAML := fmt.Sprintf(`apiVersion: v1
 kind: PersistentVolumeClaim
@@ -103,7 +103,7 @@ spec:
 			By("test PersistentVolumeClaim changes")
 			PersistentVolumeClaimHandlerMap["pvc-controller"] = handlePersistentVolumeClaim
 			pvcName := fmt.Sprintf("pvc-%s", testCtx.GetRandomStr())
-			createPvc(pvcName)
+			createPVC(pvcName)
 			pvc := &corev1.PersistentVolumeClaim{}
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, pvc)).Should(Succeed())
 			pvc.Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
@@ -111,9 +111,9 @@ spec:
 
 			// wait until storageClass patched
 			Eventually(func() bool {
-				tmpPvc := &corev1.PersistentVolumeClaim{}
-				_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, tmpPvc)
-				return tmpPvc.Annotations["kubeblocks.io/test"] == "test_pvc"
+				tmpPVC := &corev1.PersistentVolumeClaim{}
+				_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, tmpPVC)
+				return tmpPVC.Annotations["kubeblocks.io/test"] == "test_pvc"
 			}, timeout, interval).Should(BeTrue())
 		})
 	})

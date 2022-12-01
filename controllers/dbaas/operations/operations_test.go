@@ -184,7 +184,7 @@ spec:
 		return appVersion
 	}
 
-	createPvc := func(clusterName, scName, vctName, pvcName string) {
+	createPVC := func(clusterName, scName, vctName, pvcName string) {
 		pvcYaml := fmt.Sprintf(`apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -625,7 +625,7 @@ spec:
 
 		// create-pvc
 		pvcName := fmt.Sprintf("log-%s-replicasets-0", clusterObject.Name+randomStr)
-		createPvc(clusterObject.Name, sc.Name, "log", pvcName)
+		createPVC(clusterObject.Name, sc.Name, "log", pvcName)
 		// waiting pvc controller mark annotation to OpsRequest
 		Eventually(func() bool {
 			tmpOps := &dbaasv1alpha1.OpsRequest{}
@@ -656,7 +656,7 @@ spec:
 		}, timeout, interval).Should(BeTrue())
 	}
 
-	testWarningEventOnPvc := func(clusterObject *dbaasv1alpha1.Cluster, opsRes *OpsResource) {
+	testWarningEventOnPVC := func(clusterObject *dbaasv1alpha1.Cluster, opsRes *OpsResource) {
 
 		randomStr := testCtx.GetRandomStr()
 		// init resources for volume expansion
@@ -724,9 +724,9 @@ spec:
 		}
 		Expect(k8sClient.Status().Patch(ctx, pvc, patch)).Should(Succeed())
 		Eventually(func() bool {
-			tmpPvc := &corev1.PersistentVolumeClaim{}
-			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, tmpPvc)).Should(Succeed())
-			conditions := tmpPvc.Status.Conditions
+			tmpPVC := &corev1.PersistentVolumeClaim{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, tmpPVC)).Should(Succeed())
+			conditions := tmpPVC.Status.Conditions
 			return len(conditions) > 0 && conditions[0].Type == corev1.PersistentVolumeClaimResizing
 		}, timeout, interval).Should(BeTrue())
 		// waiting OpsRequest.status.components["replicasets"].vct["log"] is running
@@ -746,9 +746,9 @@ spec:
 		pvc.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("2Gi")}
 		Expect(k8sClient.Status().Patch(ctx, pvc, patch)).Should(Succeed())
 		Eventually(func() bool {
-			tmpPvc := &corev1.PersistentVolumeClaim{}
-			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, tmpPvc)).Should(Succeed())
-			return tmpPvc.Status.Capacity[corev1.ResourceStorage] == resource.MustParse("2Gi")
+			tmpPVC := &corev1.PersistentVolumeClaim{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, tmpPVC)).Should(Succeed())
+			return tmpPVC.Status.Capacity[corev1.ResourceStorage] == resource.MustParse("2Gi")
 		}, timeout, interval).Should(BeTrue())
 		// waiting OpsRequest.status.phase is succeed
 		_, _ = GetOpsManager().Reconcile(opsRes)
@@ -758,7 +758,7 @@ spec:
 			return tmpOps.Status.Phase == dbaasv1alpha1.SucceedPhase
 		}, timeout, interval).Should(BeTrue())
 
-		testWarningEventOnPvc(clusterObject, opsRes)
+		testWarningEventOnPVC(clusterObject, opsRes)
 	}
 
 	Context("Test OpsRequest", func() {

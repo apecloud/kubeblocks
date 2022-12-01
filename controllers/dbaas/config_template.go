@@ -109,7 +109,7 @@ func (c *ConfigTemplateBuilder) InjectBuiltInObjectsAndFunctions(podTemplate *co
 // General Built-in functions
 const (
 	BuiltinGetVolumeFunctionName    = "getVolumePathByName"
-	BuiltinGetPvcFunctionName       = "getPvcByName"
+	BuiltinGetPVCFunctionName       = "getPVCByName"
 	BuiltinGetEnvFunctionName       = "getEnvByName"
 	BuiltinGetArgFunctionName       = "getArgByName"
 	BuiltinGetPortFunctionName      = "getPortByName"
@@ -125,7 +125,7 @@ func injectBuiltInFunctions(tplBuilder *ConfigTemplateBuilder, podTemplate *core
 	tplBuilder.buildinFunctions = &intctrlutil.BuiltinObjectsFunc{
 		BuiltinMysqlCalBufferFunctionName: calDBPoolSize,
 		BuiltinGetVolumeFunctionName:      getVolumeMountPathByName,
-		BuiltinGetPvcFunctionName:         getPvcByName,
+		BuiltinGetPVCFunctionName:         getPVCByName,
 		BuiltinGetEnvFunctionName:         getEnvByName,
 		BuiltinGetPortFunctionName:        getPortByName,
 		BuiltinGetArgFunctionName:         getArgByName,

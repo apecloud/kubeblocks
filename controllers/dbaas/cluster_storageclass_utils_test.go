@@ -131,7 +131,7 @@ spec:
 		return cluster
 	}
 
-	createPvc := func(pvcName, storageClassName string) {
+	createPVC := func(pvcName, storageClassName string) {
 		pvcYaml := fmt.Sprintf(`apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -196,8 +196,8 @@ spec:
 
 			createStorageClassObj(storageClassName, false)
 			By("expect wesql-test component support volume expansion and volumeClaimTemplateNames is [data,log]")
-			createPvc(fmt.Sprintf("log-%s-wesql-test", clusterName), storageClassName)
-			createPvc(fmt.Sprintf("data-%s-wesql-test", clusterName), defaultStorageClassName)
+			createPVC(fmt.Sprintf("log-%s-wesql-test", clusterName), storageClassName)
+			createPVC(fmt.Sprintf("data-%s-wesql-test", clusterName), defaultStorageClassName)
 			// set storageClass allowVolumeExpansion to true
 			storageClass := &storagev1.StorageClass{}
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: storageClassName}, storageClass)).Should(Succeed())

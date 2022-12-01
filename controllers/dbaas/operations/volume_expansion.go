@@ -181,7 +181,10 @@ func (ve volumeExpansion) checkIsTimeOut(opsRequest *dbaasv1alpha1.OpsRequest, a
 }
 
 // setClusterComponentPhaseToRunning when component expand volume completed, check whether change the component status.
-func (ve volumeExpansion) setComponentPhaseForClusterAndOpsRequest(component *dbaasv1alpha1.OpsRequestStatusComponent, cluster *dbaasv1alpha1.Cluster, componentName string, completedOnComponent bool) {
+func (ve volumeExpansion) setComponentPhaseForClusterAndOpsRequest(component *dbaasv1alpha1.OpsRequestStatusComponent,
+	cluster *dbaasv1alpha1.Cluster,
+	componentName string,
+	completedOnComponent bool) {
 	if !completedOnComponent {
 		return
 	}
@@ -199,7 +202,10 @@ func (ve volumeExpansion) isExpansionCompleted(phase dbaasv1alpha1.Phase) bool {
 }
 
 // patchClusterStatus patch cluster status
-func (ve volumeExpansion) patchClusterStatus(opsRes *OpsResource, opsRequestPhase dbaasv1alpha1.Phase, oldClusterStatus *dbaasv1alpha1.ClusterStatus, clusterPatch client.Patch) error {
+func (ve volumeExpansion) patchClusterStatus(opsRes *OpsResource,
+	opsRequestPhase dbaasv1alpha1.Phase,
+	oldClusterStatus *dbaasv1alpha1.ClusterStatus,
+	clusterPatch client.Patch) error {
 	// when the OpsRequest.status.phase is Succeed or Failed, do it
 	if opsRequestIsCompleted(opsRequestPhase) && opsRes.Cluster.Status.Phase == dbaasv1alpha1.VolumeExpandingPhase {
 		opsRes.Cluster.Status.Phase = dbaasv1alpha1.RunningPhase
@@ -235,7 +241,10 @@ func (ve volumeExpansion) initStatusComponents(opsRequest *dbaasv1alpha1.OpsRequ
 	}
 	// update status.components
 	for k, volumeExpansion := range componentMap {
-		componentStatus := dbaasv1alpha1.OpsRequestStatusComponent{Phase: dbaasv1alpha1.VolumeExpandingPhase, VolumeClaimTemplates: map[string]*dbaasv1alpha1.VolumeClaimTemplateStatus{}}
+		componentStatus := dbaasv1alpha1.OpsRequestStatusComponent{
+			Phase:                dbaasv1alpha1.VolumeExpandingPhase,
+			VolumeClaimTemplates: map[string]*dbaasv1alpha1.VolumeClaimTemplateStatus{},
+		}
 		for _, v := range volumeExpansion {
 			vctStatus := &dbaasv1alpha1.VolumeClaimTemplateStatus{RequestStorage: v.Storage}
 			vctStatus.StatusMessage.Status = dbaasv1alpha1.PendingPhase

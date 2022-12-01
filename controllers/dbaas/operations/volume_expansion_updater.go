@@ -34,11 +34,11 @@ type PersistentVolumeClaimEventHandler struct {
 }
 
 const (
-	// PvcEventTimeOut timeout of the pvc event
-	PvcEventTimeOut = 30 * time.Second
+	// PVCEventTimeOut timeout of the pvc event
+	PVCEventTimeOut = 30 * time.Second
 
-	// PvcEventOccursTimes occurs times of the pvc event
-	PvcEventOccursTimes int32 = 5
+	// PVCEventOccursTimes occurs times of the pvc event
+	PVCEventOccursTimes int32 = 5
 
 	// VolumeResizeFailed the event reason of volume resize failed on external-resizer(the csi driver sidecar)
 	VolumeResizeFailed = "VolumeResizeFailed"
@@ -47,13 +47,13 @@ const (
 )
 
 func init() {
-	k8score.PersistentVolumeClaimHandlerMap["volume-expansion"] = handleVolumeExpansionWithPvc
+	k8score.PersistentVolumeClaimHandlerMap["volume-expansion"] = handleVolumeExpansionWithPVC
 	k8score.EventHandlerMap["volume-expansion"] = PersistentVolumeClaimEventHandler{}
 }
 
 // handleVolumeExpansionOperation handle the pvc for the volume expansion OpsRequest.
 // it will be triggered when the PersistentVolumeClaim has changed.
-func handleVolumeExpansionWithPvc(reqCtx intctrlutil.RequestCtx, cli client.Client, pvc *corev1.PersistentVolumeClaim) error {
+func handleVolumeExpansionWithPVC(reqCtx intctrlutil.RequestCtx, cli client.Client, pvc *corev1.PersistentVolumeClaim) error {
 	clusterName := pvc.Labels[intctrlutil.AppInstanceLabelKey]
 	cluster := &dbaasv1alpha1.Cluster{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: clusterName, Namespace: pvc.Namespace}, cluster); err != nil {
@@ -69,11 +69,14 @@ func handleVolumeExpansionWithPvc(reqCtx intctrlutil.RequestCtx, cli client.Clie
 }
 
 // Handle the warning events on pvcs. if the events is resize failed events, update the OpsRequest.status.
-func (pvcEventHandler PersistentVolumeClaimEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
+func (pvcEventHandler PersistentVolumeClaimEventHandler) Handle(cli client.Client,
+	reqCtx intctrlutil.RequestCtx,
+	recorder record.EventRecorder,
+	event *corev1.Event) error {
 	if !pvcEventHandler.isTargetResizeFailedEvents(event) {
 		return nil
 	}
-	if !k8score.IsOvertimeAndOccursTimesForEvent(event, PvcEventTimeOut, PvcEventOccursTimes) {
+	if !k8score.IsOvertimeAndOccursTimesForEvent(event, PVCEventTimeOut, PVCEventOccursTimes) {
 		return nil
 	}
 	var (
@@ -105,7 +108,11 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) isTargetResizeFailedEve
 }
 
 // handlePVCFailedStatusOnOpsRequest if the volume expansion ops is running. we will change the pvc status to Failed on the OpsRequest,
-func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOnOpsRequest(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event, pvc *corev1.PersistentVolumeClaim) error {
+func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOnOpsRequest(cli client.Client,
+	reqCtx intctrlutil.RequestCtx,
+	recorder record.EventRecorder,
+	event *corev1.Event,
+	pvc *corev1.PersistentVolumeClaim) error {
 	var (
 		cluster = &dbaasv1alpha1.Cluster{}
 		err     error

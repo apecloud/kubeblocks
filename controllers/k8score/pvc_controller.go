@@ -65,13 +65,13 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 
 	pvc := &corev1.PersistentVolumeClaim{}
 	if err := r.Client.Get(ctx, req.NamespacedName, pvc); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "getPvcError")
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "getPVCError")
 	}
 
-	for _, handlePvc := range PersistentVolumeClaimHandlerMap {
+	for _, handlePVC := range PersistentVolumeClaimHandlerMap {
 		// ignores the not found error.
-		if err := handlePvc(reqCtx, r.Client, pvc); err != nil && !apierrors.IsNotFound(err) {
-			return intctrlutil.RequeueWithError(err, reqCtx.Log, "handlePvCError")
+		if err := handlePVC(reqCtx, r.Client, pvc); err != nil && !apierrors.IsNotFound(err) {
+			return intctrlutil.RequeueWithError(err, reqCtx.Log, "handlePVCError")
 		}
 	}
 	return intctrlutil.Reconciled()

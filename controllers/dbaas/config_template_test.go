@@ -244,13 +244,13 @@ loose_innodb_primary_flush_max_lsn_lag =  780903144
 				"e":                 "{{ getArgByName ( index .PodSpec.Containers 0 ) \"User\" }}",
 				"f":                 "{{ getVolumePathByName ( getContainerByName .PodSpec.Containers \"mytest\") \"data\" }}",
 				"i":                 "{{ getEnvByName ( index .PodSpec.Containers 0 ) \"a\" }}",
-				"j":                 "{{ ( getPvcByName .PodSpec.Volumes \"config\" ).ConfigMap.Name }}",
+				"j":                 "{{ ( getPVCByName .PodSpec.Volumes \"config\" ).ConfigMap.Name }}",
 				"invalid_volume":    "{{ getVolumePathByName ( index .PodSpec.Containers 0 ) \"invalid\" }}",
 				"invalid_port":      "{{ getPortByName ( index .PodSpec.Containers 0 ) \"invalid\" }}",
 				"invalid_container": "{{ getContainerByName .PodSpec.Containers  \"invalid\" }}",
 				"invalid_resource":  "{{ callBufferSizeByResource ( index .PodSpec.Containers 1 ) }}",
 				"invalid_env":       "{{ getEnvByName ( index .PodSpec.Containers 0 ) \"invalid\" }}",
-				"invalid_pvc":       "{{ getPvcByName .PodSpec.Volumes \"invalid\" }}",
+				"invalid_pvc":       "{{ getPVCByName .PodSpec.Volumes \"invalid\" }}",
 			})
 
 			Expect(err).Should(BeNil())

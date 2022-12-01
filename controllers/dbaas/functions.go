@@ -132,8 +132,8 @@ func getVolumeMountPathByName(container *corev1.Container, volumeName string) st
 	return ""
 }
 
-// getPvcByName for general built-in
-func getPvcByName(volumes []corev1.Volume, volumeName string) *corev1.VolumeSource {
+// getPVCByName for general built-in
+func getPVCByName(volumes []corev1.Volume, volumeName string) *corev1.VolumeSource {
 	for _, v := range volumes {
 		if v.Name == volumeName {
 			return &v.VolumeSource

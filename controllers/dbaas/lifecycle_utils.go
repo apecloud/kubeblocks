@@ -326,6 +326,7 @@ func mergeComponents(
 	doContainerAttrOverride := func(container corev1.Container) {
 		i, c := getContainerByName(component.PodSpec.Containers, container.Name)
 		if c == nil {
+			component.PodSpec.Containers = append(component.PodSpec.Containers, container)
 			return
 		}
 		if container.Image != "" {
@@ -632,36 +633,25 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		}
 
 		defer func() {
-			// verify missing volumes
-			volumesNames := map[string]struct{}{}
-			for _, v := range podSpec.Volumes {
-				volumesNames[v.Name] = struct{}{}
-			}
-
-			for _, t := range params.component.ConfigTemplates {
-				volumesNames[t.VolumeName] = struct{}{}
-			}
-
 			for _, cc := range []*[]corev1.Container{
 				&podSpec.Containers,
 				&podSpec.InitContainers,
 			} {
+				volumes := podSpec.Volumes
 				for _, c := range *cc {
 					for _, v := range c.VolumeMounts {
-						if _, ok := volumesNames[v.Name]; ok {
-							continue
-						}
 						// if persistence is not found, add emptyDir pod.spec.volumes[]
-						podSpec.Volumes = append(podSpec.Volumes,
-							corev1.Volume{
+						volumes, _ = intctrlutil.CheckAndUpdateVolume(volumes, v.Name, func(volumeName string) corev1.Volume {
+							return corev1.Volume{
 								Name: v.Name,
 								VolumeSource: corev1.VolumeSource{
 									EmptyDir: &corev1.EmptyDirVolumeSource{},
 								},
-							})
-						volumesNames[v.Name] = struct{}{}
+							}
+						}, nil)
 					}
 				}
+				podSpec.Volumes = volumes
 			}
 		}()
 
@@ -1384,32 +1374,35 @@ func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
 }
 
 func checkAndUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]dbaasv1alpha1.ConfigTemplate) error {
-	podVolumes := make([]corev1.Volume, 0, len(volumes))
-	for cmName, tpl := range volumes {
-		// not cm volume
-		volumeMounted := intctrlutil.GetVolumeMountName(podVolumes, cmName)
-		// Update ConfigMap Volume
-		if volumeMounted != nil {
-			configMapVolume := volumeMounted.ConfigMap
-			if configMapVolume == nil {
-				return fmt.Errorf("mount volume[%s] type require ConfigMap: [%+v]", volumeMounted.Name, volumeMounted)
-			}
-			configMapVolume.Name = cmName
-			continue
-		}
-		// Add New ConfigMap Volume
-		podVolumes = append(podVolumes, corev1.Volume{
-			Name: tpl.VolumeName,
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
-					DefaultMode:          tpl.DefaultMode,
-				},
-			},
-		})
-	}
+	var (
+		err        error
+		podVolumes = podSpec.Volumes
+	)
+
 	// Update PodTemplate Volumes
-	podSpec.Volumes = append(podSpec.Volumes, podVolumes...)
+	for cmName, tpl := range volumes {
+		if podVolumes, err = intctrlutil.CheckAndUpdateVolume(podVolumes, tpl.VolumeName, func(volumeName string) corev1.Volume {
+			return corev1.Volume{
+				Name: volumeName,
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
+						DefaultMode:          tpl.DefaultMode,
+					},
+				},
+			}
+		}, func(volume *corev1.Volume) error {
+			configMap := volume.ConfigMap
+			if configMap == nil {
+				return fmt.Errorf("mount volume[%s] type require ConfigMap: [%+v]", volume.Name, volume)
+			}
+			configMap.Name = cmName
+			return nil
+		}); err != nil {
+			return err
+		}
+	}
+	podSpec.Volumes = podVolumes
 	return nil
 }
 

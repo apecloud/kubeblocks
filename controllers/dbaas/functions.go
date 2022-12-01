@@ -17,6 +17,7 @@ limitations under the License.
 package dbaas
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 
@@ -24,6 +25,8 @@ import (
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
+
+const emptyString = ""
 
 // calReverseRebaseBuffer Cal reserved memory for system
 func calReverseRebaseBuffer(memSizeMB, cpuNum int64) int64 {
@@ -96,13 +99,17 @@ func calMysqlPoolSizeByResource(resource *ResourceDefinition, isShared bool) str
 }
 
 // calDBPoolSize for specific engine: mysql
-func calDBPoolSize(container corev1.Container) string {
+func calDBPoolSize(args interface{}) string {
+	container, err := fromJSONObject[corev1.Container](args)
+	if err != nil {
+		return emptyString
+	}
 	if len(container.Resources.Limits) == 0 {
-		return ""
+		return emptyString
 	}
 	resource := ResourceDefinition{
-		MemorySize: intctrlutil.GetMemorySize(container),
-		CoreNum:    intctrlutil.GetCoreNum(container),
+		MemorySize: intctrlutil.GetMemorySize(*container),
+		CoreNum:    intctrlutil.GetCoreNum(*container),
 	}
 	return calMysqlPoolSizeByResource(&resource, false)
 
@@ -111,56 +118,76 @@ func calDBPoolSize(container corev1.Container) string {
 // getPodContainerByName for general built-in
 // User overwrite podSpec of Cluster CR, the correctness of access via index cannot be guaranteed
 // if User modify name of container, pray users don't
-func getPodContainerByName(containers []corev1.Container, containerName string) *corev1.Container {
+func getPodContainerByName(args []interface{}, containerName string) interface{} {
+	containers, err := fromJSONArray[corev1.Container](args)
+	if err != nil {
+		return nil
+	}
 	for _, v := range containers {
 		if v.Name == containerName {
-			return &v
+			return toJSONObject(v)
 		}
 	}
 	return nil
 }
 
 // getVolumeMountPathByName for general built-in
-func getVolumeMountPathByName(container *corev1.Container, volumeName string) string {
+func getVolumeMountPathByName(args interface{}, volumeName string) string {
+	container, err := fromJSONObject[corev1.Container](args)
+	if err != nil {
+		return emptyString
+	}
 	for _, v := range container.VolumeMounts {
 		if v.Name == volumeName {
 			return v.MountPath
 		}
 	}
-	return ""
+	return emptyString
 }
 
 // getPVCByName for general built-in
-func getPVCByName(volumes []corev1.Volume, volumeName string) *corev1.VolumeSource {
+func getPVCByName(args []interface{}, volumeName string) interface{} {
+	volumes, err := fromJSONArray[corev1.Volume](args)
+	if err != nil {
+		return nil
+	}
 	for _, v := range volumes {
 		if v.Name == volumeName {
-			return &v.VolumeSource
+			return toJSONObject(v.VolumeSource)
 		}
 	}
 	return nil
 }
 
 // getEnvByName for general built-in
-func getEnvByName(container *corev1.Container, envName string) string {
+func getEnvByName(args interface{}, envName string) string {
+	container, err := fromJSONObject[corev1.Container](args)
+	if err != nil {
+		return emptyString
+	}
 	for _, v := range container.Env {
 		if v.Name == envName {
 			return v.Value
 		}
 	}
-	return ""
+	return emptyString
 }
 
 // getArgByName for general built-in
-func getArgByName(container *corev1.Container, argName string) string {
+func getArgByName(args interface{}, argName string) string {
 	// TODO Support parse command args
-	return ""
+	return emptyString
 }
 
 // getPortByName for general built-in
-func getPortByName(container *corev1.Container, portName string) *corev1.ContainerPort {
+func getPortByName(args interface{}, portName string) interface{} {
+	container, err := fromJSONObject[corev1.Container](args)
+	if err != nil {
+		return nil
+	}
 	for _, v := range container.Ports {
 		if v.Name == portName {
-			return &v
+			return toJSONObject(v)
 		}
 	}
 
@@ -206,4 +233,46 @@ func getAvailableContainerPorts(containers []corev1.Container, containerPorts []
 		containerPorts[i] = iterAvailPort(p)
 	}
 	return containerPorts, nil
+}
+
+func toJSONObject[T corev1.VolumeSource | corev1.Container | corev1.ContainerPort](obj T) interface{} {
+	b, err := json.Marshal(obj)
+	if err != nil {
+		return nil
+	}
+
+	var jsonObj any
+	if err := json.Unmarshal(b, &jsonObj); err != nil {
+		return nil
+	}
+
+	return jsonObj
+}
+
+func fromJSONObject[T any](args interface{}) (*T, error) {
+	b, err := json.Marshal(args)
+	if err != nil {
+		return nil, err
+	}
+
+	var container T
+	if err := json.Unmarshal(b, &container); err != nil {
+		return nil, err
+	}
+
+	return &container, nil
+}
+
+func fromJSONArray[T corev1.Container | corev1.Volume](args interface{}) ([]T, error) {
+	b, err := json.Marshal(args)
+	if err != nil {
+		return nil, err
+	}
+
+	var list []T
+	if err := json.Unmarshal(b, &list); err != nil {
+		return nil, err
+	}
+
+	return list, nil
 }

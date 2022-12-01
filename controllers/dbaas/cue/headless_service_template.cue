@@ -39,7 +39,7 @@ service: {
 			"app.kubernetes.io/managed-by":     "kubeblocks"
 		}
 		ports: [
-			for _, container in component.podSpec.containers
+			for _, container in component.podSpec.containers if container.ports != _|_
 			for _, v in container.ports {
 				name:       v.name
 				protocol:   v.protocol

@@ -1,0 +1,14 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: mongodb
+spec:
+  clusterDefinitionRef: mongodb-cluster-definition
+  appVersionRef: mongodb-app-version
+  components:
+    - name: mongos
+      type: mongos
+    - name: config-server
+      type: config-server
+    - name: shard1
+      type: shard

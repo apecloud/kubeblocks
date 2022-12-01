@@ -1,0 +1,115 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: mongodb-cluster-definition
+spec:
+  type: state.mongodb
+  components:
+    - name: mongos
+      maxAvailable: 16
+      minAvailable: 1
+      defaultReplicas: 1
+      componentType: Stateless
+      podSpec:
+        containers:
+          - name: mongos
+            image: mongo:5.0.14
+            command:
+              - bin/sh
+              - -c
+              - |
+                mongos --config /etc/mongodb/config.yaml
+            volumeMounts:
+              - name: config
+                mountPath: /etc/mongodb
+        initContainers:
+          - name: kb-mongodb-agent
+            image: apecloud/kb-mongodb-agent:0.1.0-alpha1
+            command:
+              - bin/sh
+              - -c
+              - init-mongos-config
+            volumeMounts:
+              - name: config
+                mountPath: /etc/mongodb
+        volumes:
+          - name: config
+            emptyDir: { }
+    - name: config-server
+      maxAvailable: 1
+      minAvailable: 1
+      defaultReplicas: 3
+      componentType: Consensus
+      consensusSpec:
+        leader:
+          name: "primary"
+          accessMode: ReadWrite
+        followers:
+          - name: "secondary"
+            accessMode: ReadWrite
+        updateStrategy: Serial
+      podSpec:
+        containers:
+          - name: config-server
+            image: mongo:5.0.14
+            command:
+              - bin/sh
+              - -c
+              - |
+                mongod --config /etc/mongodb/config.yaml
+            volumeMounts:
+              - name: config
+                mountPath: /etc/mongodb
+        initContainers:
+          - name: kb-mongodb-agent
+            image: apecloud/kb-mongodb-agent:0.1.0-alpha1
+            command:
+              - bin/sh
+              - -c
+              - |
+                init-config-server-config
+            volumeMounts:
+              - name: config
+                mountPath: /etc/mongodb
+        volumes:
+          - name: config
+            emptyDir: {}
+    - name: shard
+      maxAvailable: 16
+      minAvailable: 1
+      defaultReplicas: 3
+      componentType: Consensus
+      consensusSpec:
+        leader:
+          name: "primary"
+          accessMode: ReadWrite
+        followers:
+          - name: "secondary"
+            accessMode: ReadWrite
+        updateStrategy: BestEffortParallel
+      podSpec:
+        containers:
+          - name: shard
+            image: mongo:5.0.14
+            command:
+              - bin/sh
+              - -c
+              - |
+                mongod --config /etc/mongodb/config.yaml
+            volumeMounts:
+              - name: config
+                mountPath: /etc/mongodb
+        initContainers:
+          - name: kb-mongodb-agent
+            image: apecloud/kb-mongodb-agent:0.1.0-alpha1
+            command:
+              - bin/sh
+              - -c
+              - |
+                init-shard-config
+            volumeMounts:
+              - name: config
+                mountPath: /etc/mongodb
+        volumes:
+          - name: config
+            emptyDir: { }

@@ -99,78 +99,78 @@ func calMysqlPoolSizeByResource(resource *ResourceDefinition, isShared bool) str
 }
 
 // calDBPoolSize for specific engine: mysql
-func calDBPoolSize(args interface{}) string {
+func calDBPoolSize(args interface{}) (string, error) {
 	container, err := fromJSONObject[corev1.Container](args)
 	if err != nil {
-		return emptyString
+		return "", err
 	}
 	if len(container.Resources.Limits) == 0 {
-		return emptyString
+		return "", nil
 	}
 	resource := ResourceDefinition{
 		MemorySize: intctrlutil.GetMemorySize(*container),
 		CoreNum:    intctrlutil.GetCoreNum(*container),
 	}
-	return calMysqlPoolSizeByResource(&resource, false)
+	return calMysqlPoolSizeByResource(&resource, false), nil
 
 }
 
 // getPodContainerByName for general built-in
 // User overwrite podSpec of Cluster CR, the correctness of access via index cannot be guaranteed
 // if User modify name of container, pray users don't
-func getPodContainerByName(args []interface{}, containerName string) interface{} {
+func getPodContainerByName(args []interface{}, containerName string) (interface{}, error) {
 	containers, err := fromJSONArray[corev1.Container](args)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	for _, v := range containers {
 		if v.Name == containerName {
 			return toJSONObject(v)
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 // getVolumeMountPathByName for general built-in
-func getVolumeMountPathByName(args interface{}, volumeName string) string {
+func getVolumeMountPathByName(args interface{}, volumeName string) (string, error) {
 	container, err := fromJSONObject[corev1.Container](args)
 	if err != nil {
-		return emptyString
+		return "", err
 	}
 	for _, v := range container.VolumeMounts {
 		if v.Name == volumeName {
-			return v.MountPath
+			return v.MountPath, nil
 		}
 	}
-	return emptyString
+	return "", nil
 }
 
 // getPVCByName for general built-in
-func getPVCByName(args []interface{}, volumeName string) interface{} {
+func getPVCByName(args []interface{}, volumeName string) (interface{}, error) {
 	volumes, err := fromJSONArray[corev1.Volume](args)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	for _, v := range volumes {
 		if v.Name == volumeName {
 			return toJSONObject(v.VolumeSource)
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 // getEnvByName for general built-in
-func getEnvByName(args interface{}, envName string) string {
+func getEnvByName(args interface{}, envName string) (string, error) {
 	container, err := fromJSONObject[corev1.Container](args)
 	if err != nil {
-		return emptyString
+		return "", err
 	}
 	for _, v := range container.Env {
 		if v.Name == envName {
-			return v.Value
+			return v.Value, nil
 		}
 	}
-	return emptyString
+	return "", nil
 }
 
 // getArgByName for general built-in
@@ -180,10 +180,10 @@ func getArgByName(args interface{}, argName string) string {
 }
 
 // getPortByName for general built-in
-func getPortByName(args interface{}, portName string) interface{} {
+func getPortByName(args interface{}, portName string) (interface{}, error) {
 	container, err := fromJSONObject[corev1.Container](args)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	for _, v := range container.Ports {
 		if v.Name == portName {
@@ -191,7 +191,7 @@ func getPortByName(args interface{}, portName string) interface{} {
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 func getAllContainerPorts(containers []corev1.Container) (map[int32]bool, error) {
@@ -235,18 +235,18 @@ func getAvailableContainerPorts(containers []corev1.Container, containerPorts []
 	return containerPorts, nil
 }
 
-func toJSONObject[T corev1.VolumeSource | corev1.Container | corev1.ContainerPort](obj T) interface{} {
+func toJSONObject[T corev1.VolumeSource | corev1.Container | corev1.ContainerPort](obj T) (interface{}, error) {
 	b, err := json.Marshal(obj)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	var jsonObj any
 	if err := json.Unmarshal(b, &jsonObj); err != nil {
-		return nil
+		return nil, err
 	}
 
-	return jsonObj
+	return jsonObj, nil
 }
 
 func fromJSONObject[T any](args interface{}) (*T, error) {

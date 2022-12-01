@@ -230,6 +230,7 @@ func isExistsEventMsg(statusComponentMessage string, event *corev1.Event) bool {
 // needSyncComponentStatusForEvent check whether the component status needs to be synchronized the cluster status by event
 func needSyncComponentStatusForEvent(cluster *dbaasv1alpha1.Cluster, componentName string, phase dbaasv1alpha1.Phase, event *corev1.Event) bool {
 	var (
+		status          = &cluster.Status
 		statusComponent dbaasv1alpha1.ClusterStatusComponent
 		ok              bool
 	)
@@ -237,20 +238,22 @@ func needSyncComponentStatusForEvent(cluster *dbaasv1alpha1.Cluster, componentNa
 		return false
 	}
 	if cluster.Status.Components == nil {
-		cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{}
+		status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{}
 	}
 	if statusComponent, ok = cluster.Status.Components[componentName]; !ok {
-		cluster.Status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{Phase: phase, Message: event.Message}
+		status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{Phase: phase, Message: event.Message}
 		return true
 	}
 	if statusComponent.Phase != phase {
 		statusComponent.Phase = phase
 		statusComponent.Message = getStatusComponentMessage(statusComponent.Message, event)
+		status.Components[componentName] = statusComponent
 		return true
 	}
 	// check whether it is a new warning event and the component phase is running
 	if !isExistsEventMsg(statusComponent.Message, event) && phase != dbaasv1alpha1.RunningPhase {
 		statusComponent.Message = getStatusComponentMessage(statusComponent.Message, event)
+		status.Components[componentName] = statusComponent
 		return true
 	}
 	return false

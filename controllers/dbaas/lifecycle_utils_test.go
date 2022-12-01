@@ -47,7 +47,7 @@ func TestReadCUETplFromEmbeddedFS(t *testing.T) {
 	if err != nil {
 		t.Error("Expected no error", err)
 	}
-	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("secret_template.cue"))
+	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("conn_credential_template.cue"))
 	if err != nil {
 		t.Error("Expected no error", err)
 	}

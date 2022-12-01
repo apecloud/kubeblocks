@@ -566,7 +566,8 @@ spec:
 			cmList := &corev1.ConfigMapList{}
 			Eventually(func() bool {
 				Expect(k8sClient.List(ctx, cmList, client.MatchingLabels{
-					intctrlutil.AppInstanceLabelKey: key.Name,
+					intctrlutil.AppInstanceLabelKey:    key.Name,
+					intctrlutil.AppInstanceEnvLabelKey: "true",
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(cmList.Items) == 2
 			}, timeout, interval).Should(BeTrue())

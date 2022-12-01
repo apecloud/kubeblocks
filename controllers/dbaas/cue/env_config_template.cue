@@ -20,6 +20,7 @@ config: {
 			"app.kubernetes.io/instance":       cluster.metadata.name
 			"app.kubernetes.io/component-name": component.name
 			"app.kubernetes.io/component":      "\(component.type)-\(component.name)"
+			"app.kubernetes.io/ins-env":        "true"
 			"app.kubernetes.io/managed-by":     "kubeblocks"
 			// configmap selector for env update
 			"app.kubernetes.io/config-type": "kubeblocks-env"

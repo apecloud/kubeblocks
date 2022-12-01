@@ -24,8 +24,6 @@ import (
 )
 
 const (
-	DBaaSTpl = "dbaas_tpl"
-
 	DefaultTemplateOps = "missingkey=error"
 )
 
@@ -48,7 +46,7 @@ func (t TplEngine) Render(context string) (string, error) {
 	return buf.String(), nil
 }
 
-func NewTplEngine(values *TplValues, funcs *BuiltinObjectsFunc) *TplEngine {
+func NewTplEngine(values *TplValues, funcs *BuiltinObjectsFunc, tplName string) *TplEngine {
 	coreBuiltinFuncs := sprig.TxtFuncMap()
 
 	// custom funcs
@@ -59,7 +57,7 @@ func NewTplEngine(values *TplValues, funcs *BuiltinObjectsFunc) *TplEngine {
 	}
 
 	engine := TplEngine{
-		tpl:       template.New(DBaaSTpl),
+		tpl:       template.New(tplName),
 		tplValues: values,
 	}
 

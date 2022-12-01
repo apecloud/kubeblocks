@@ -33,14 +33,6 @@ const (
 	// GoosWindows is os.GOOS windows string
 	GoosWindows = "windows"
 
-	// KubeBlocksChartName helm name for installing kubeblocks
-	KubeBlocksChartName = "kubeblocks"
-
-	// KubeBlocksChartURL the helm chart for installing kubeblocks
-	KubeBlocksChartURL = "https://apecloud.github.io/helm-charts"
-)
-
-const (
 	// Group api group
 	Group = "dbaas.kubeblocks.io"
 
@@ -54,27 +46,21 @@ const (
 
 	// ResourceClusters clusters resource
 	ResourceClusters = "clusters"
-
-	ResourceClusterDefinitions = "clusterdefinitions"
-
-	ResourceAppVersions = "appversions"
-
-	// ResourceOpsRequests opsrequests resource
-	ResourceOpsRequests = "opsrequests"
-
-	ResourceDeployments = "deployments"
-
-	// KindCluster kind of cluster
-	KindCluster = "Cluster"
-
 	// ResourceClusterDefs clusterDefinition resource
 	ResourceClusterDefs = "clusterdefinitions"
+	// ResourceAppVersions appVersion resource
+	ResourceAppVersions = "appversions"
+	// ResourceOpsRequests opsrequests resource
+	ResourceOpsRequests = "opsrequests"
+	// ResourceDeployments deployment resource
+	ResourceDeployments = "deployments"
 
-	// KindClusterDef kind of clusterDefinition
+	// KindCluster cluster king
+	KindCluster = "Cluster"
+	// KindClusterDef clusterDefinition kine
 	KindClusterDef = "ClusterDefinition"
-
-	ResourceAppVersion = "appversions"
-	KindAppVersion     = "AppVersion"
+	// KindAppVersion appVersion kind
+	KindAppVersion = "AppVersion"
 
 	InstanceLabelKey               = "app.kubernetes.io/instance"
 	ConsensusSetRoleLabelKey       = "cs.dbaas.kubeblocks.io/role"
@@ -94,6 +80,14 @@ const (
 	ResourceBackupJobs     = "backupjobs"
 	ResourceRestoreJobs    = "restorejobs"
 	ResourceBackupPolicies = "backuppolicies"
+)
+
+var (
+	// KubeBlocksChartName helm name for installing kubeblocks
+	KubeBlocksChartName = "kubeblocks"
+
+	// KubeBlocksChartURL the helm chart for installing kubeblocks
+	KubeBlocksChartURL = "https://apecloud.github.io/helm-charts"
 )
 
 type BackupJobInfo struct {
@@ -133,7 +127,7 @@ func ClusterDefGK() schema.GroupKind {
 }
 
 func AppVersionGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceAppVersion}
+	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceAppVersions}
 }
 
 func AppVersionGK() schema.GroupKind {

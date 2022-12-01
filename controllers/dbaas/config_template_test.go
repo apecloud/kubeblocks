@@ -210,6 +210,7 @@ loose_innodb_primary_flush_max_lsn_lag =  780903144
 				CoreNum:    4,
 			}
 
+			cfgBuilder.setTplName("for_test")
 			rendered, err := cfgBuilder.Render(map[string]string{
 				mysqlCfgName: mysqlCfgTmpContext,
 			})

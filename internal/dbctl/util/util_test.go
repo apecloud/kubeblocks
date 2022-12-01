@@ -17,13 +17,22 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"github.com/go-logr/logr"
+	"github.com/gosuri/uitable"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
 )
 
 var _ = Describe("util", func() {
@@ -36,6 +45,14 @@ var _ = Describe("util", func() {
 	It("Get kubeconfig dir", func() {
 		dir := GetKubeconfigDir()
 		Expect(len(dir) > 0).Should(BeTrue())
+	})
+
+	It("DoWithRetry", func() {
+		op := func() error {
+			return fmt.Errorf("test DowithRetry")
+		}
+		logger := logr.New(log.NullLogSink{})
+		Expect(DoWithRetry(context.TODO(), logger, op, &RetryOptions{MaxRetry: 2})).Should(HaveOccurred())
 	})
 
 	It("Config path", func() {
@@ -86,6 +103,50 @@ var _ = Describe("util", func() {
 		printErr(err)
 	})
 
+	It("PrintTable", func() {
+		tbl := uitable.New()
+		tbl.AddRow("TEST")
+		tbl.AddRow("test")
+		Expect(PrintTable(os.Stdout, tbl)).Should(Succeed())
+	})
+
+	It("GetNodeByName", func() {
+		nodes := []*corev1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+			},
+		}
+		Expect(GetNodeByName(nodes, "test")).ShouldNot(BeNil())
+		Expect(GetNodeByName(nodes, "non-exists")).Should(BeNil())
+	})
+
+	It("GetPodStatus", func() {
+		newPod := func(phase corev1.PodPhase) *corev1.Pod {
+			return &corev1.Pod{
+				Status: corev1.PodStatus{
+					Phase: phase,
+				}}
+		}
+
+		var pods []*corev1.Pod
+		for _, p := range []corev1.PodPhase{corev1.PodRunning, corev1.PodPending, corev1.PodSucceeded, corev1.PodFailed} {
+			pods = append(pods, newPod(p))
+		}
+
+		r, w, s, f := GetPodStatus(pods)
+		Expect(r).Should(Equal(1))
+		Expect(w).Should(Equal(1))
+		Expect(s).Should(Equal(1))
+		Expect(f).Should(Equal(1))
+	})
+
+	It("NewTestFactory", func() {
+		tf := NewTestFactory("")
+		Expect(tf).ShouldNot(BeNil())
+	})
+
 	It("Others", func() {
 		if os.Getenv("TEST_GET_PUBLIC_IP") != "" {
 			_, err := GetPublicIP()
@@ -94,8 +155,19 @@ var _ = Describe("util", func() {
 		Expect(MakeSSHKeyPair("", "")).Should(HaveOccurred())
 		Expect(SetKubeConfig("test")).Should(Succeed())
 		Expect(NewFactory()).ShouldNot(BeNil())
+
+		By("playground dir")
 		dir, err := PlaygroundDir()
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(dir).ShouldNot(Equal(""))
+
+		By("resource is empty")
+		res := resource.Quantity{}
+		Expect(ResourceIsEmpty(&res)).Should(BeTrue())
+		res.Set(20)
+		Expect(ResourceIsEmpty(&res)).Should(BeFalse())
+
+		By("GVRToString")
+		Expect(len(GVRToString(types.ClusterGVR())) > 0).Should(BeTrue())
 	})
 })

@@ -47,21 +47,19 @@ var _ = Describe("Cluster", func() {
 		It("new command", func() {
 			tf := cmdtesting.NewTestFactory().WithNamespace("default")
 			defer tf.Cleanup()
-			tf.ClientConfigVal = cfg
 			cmd := NewCreateCmd(tf, streams)
 			Expect(cmd).ShouldNot(BeNil())
 			Expect(cmd.Flags().GetString("termination-policy")).Should(Equal(""))
 
 			// must succeed otherwise exit 1 and make test fails
-			_ = cmd.Flags().Set("components", "../../testdata/component.yaml")
-			_ = cmd.Flags().Set("termination-policy", "Delete")
+			Expect(cmd.Flags().Set("components", "../../testdata/component.yaml")).Should(Succeed())
+			Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
 			cmd.Run(nil, []string{"test1"})
 		})
 
 		It("run", func() {
 			tf := cmdtesting.NewTestFactory().WithNamespace("default")
 			defer tf.Cleanup()
-			tf.ClientConfigVal = cfg
 
 			o := &CreateOptions{
 				BaseOptions:        create.BaseOptions{IOStreams: streams, Name: "test"},
@@ -119,7 +117,6 @@ var _ = Describe("Cluster", func() {
 
 	It("operations", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		tf.ClientConfigVal = cfg
 		defer tf.Cleanup()
 		o := &OperationsOptions{
 			BaseOptions:            create.BaseOptions{IOStreams: streams},
@@ -159,7 +156,6 @@ var _ = Describe("Cluster", func() {
 
 	It("list and delete operations", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		tf.ClientConfigVal = cfg
 		defer tf.Cleanup()
 
 		clusterName := "wesql"

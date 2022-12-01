@@ -189,61 +189,62 @@ innodb_buffer_pool_size = 8589934592
 			Expect(err).Should(BeNil())
 			Expect(rendered[mysqlCfgName]).Should(Equal(mysqlCfgRenderedContext))
 		})
-		// 	It("test built-in function", func() {
-		// 		cfgBuilder := newCfgTemplateBuilder(
-		// 			"my_test",
-		// 			"default",
-		// 			&dbaasv1alpha1.Cluster{
-		// 				ObjectMeta: metav1.ObjectMeta{
-		// 					Name:      "my_test",
-		// 					Namespace: "default",
-		// 				},
-		// 			},
-		// 			nil,
-		// 		)
+		It("test built-in function", func() {
+			cfgBuilder := newCfgTemplateBuilder(
+				"my_test",
+				"default",
+				&dbaasv1alpha1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my_test",
+						Namespace: "default",
+					},
+				},
+				nil,
+			)
 
-		// 		Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podTemplate, cfgTemplate, component)).Should(BeNil())
+			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component)).Should(BeNil())
 
-		// 		rendered, err := cfgBuilder.render(map[string]string{
-		// 			"a":                 "{{ getVolumePathByName ( index $.podSpec.containers 0 ) \"log\" }}",
-		// 			"b":                 "{{ getVolumePathByName ( index $.podSpec.containers 0 ) \"data\" }}",
-		// 			"c":                 "{{ ( getPortByName ( index $.podSpec.containers 0 ) \"mysql\" ).ContainerPort }}",
-		// 			"d":                 "{{ callBufferSizeByResource ( index $.podSpec.containers 0 ) }}",
-		// 			"e":                 "{{ getArgByName ( index $.podSpec.containers 0 ) \"User\" }}",
-		// 			"f":                 "{{ getVolumePathByName ( getContainerByName $.podSpec.containers \"mytest\") \"data\" }}",
-		// 			"i":                 "{{ getEnvByName ( index $.podSpec.containers 0 ) \"a\" }}",
-		// 			"j":                 "{{ ( getPVCByName $.podSpec.Volumes \"config\" ).configMap.name }}",
-		// 			"invalid_volume":    "{{ getVolumePathByName ( index $.podSpec.containers 0 ) \"invalid\" }}",
-		// 			"invalid_port":      "{{ getPortByName ( index $.podSpec.containers 0 ) \"invalid\" }}",
-		// 			"invalid_container": "{{ getContainerByName $.podSpec.containers  \"invalid\" }}",
-		// 			"invalid_resource":  "{{ callBufferSizeByResource ( index $.podSpec.containers 1 ) }}",
-		// 			"invalid_env":       "{{ getEnvByName ( index $.podSpec.containers 0 ) \"invalid\" }}",
-		// 			"invalid_pvc":       "{{ getPVCByName $.podSpec.Volumes \"invalid\" }}",
-		// 		})
+			rendered, err := cfgBuilder.render(map[string]string{
+				"a":                 "{{ getVolumePathByName ( index $.podSpec.containers 0 ) \"log\" }}",
+				"b":                 "{{ getVolumePathByName ( index $.podSpec.containers 0 ) \"data\" }}",
+				"c":                 "{{ ( getPortByName ( index $.podSpec.containers 0 ) \"mysql\" ).containerPort }}",
+				"d":                 "{{ callBufferSizeByResource ( index $.podSpec.containers 0 ) }}",
+				"e":                 "{{ getArgByName ( index $.podSpec.containers 0 ) \"User\" }}",
+				"f":                 "{{ getVolumePathByName ( getContainerByName $.podSpec.containers \"mytest\") \"data\" }}",
+				"i":                 "{{ getEnvByName ( index $.podSpec.containers 0 ) \"a\" }}",
+				"j":                 "{{ ( getPVCByName $.podSpec.volumes \"config\" ).configMap.name }}",
+				"invalid_volume":    "{{ getVolumePathByName ( index $.podSpec.containers 0 ) \"invalid\" }}",
+				"invalid_port":      "{{ getPortByName ( index $.podSpec.containers 0 ) \"invalid\" }}",
+				"invalid_container": "{{ getContainerByName $.podSpec.containers  \"invalid\" }}",
+				"invalid_resource":  "{{ callBufferSizeByResource ( index $.podSpec.containers 1 ) }}",
+				"invalid_env":       "{{ getEnvByName ( index $.podSpec.containers 0 ) \"invalid\" }}",
+				"invalid_pvc":       "{{ getPVCByName $.podSpec.volumes \"invalid\" }}",
+			})
 
-		// 		Expect(err).Should(BeNil())
-		// 		// for test volumeMounts
-		// 		Expect(rendered["a"]).Should(Equal("/log/mysql"))
-		// 		// for test volumeMounts
-		// 		Expect(rendered["b"]).Should(Equal("/data/mysql"))
-		// 		// for test port
-		// 		Expect(rendered["c"]).Should(Equal("3356"))
-		// 		// for test resource
-		// 		Expect(rendered["d"]).Should(Equal("4096M"))
-		// 		// for test args
-		// 		Expect(rendered["e"]).Should(Equal(""))
-		// 		// for test volumeMounts
-		// 		Expect(rendered["f"]).Should(Equal("/data/mysql"))
-		// 		// for test env
-		// 		Expect(rendered["i"]).Should(Equal("b"))
-		// 		// for test volume
-		// 		Expect(rendered["j"]).Should(Equal("cluster_name_for_test"))
-		// 		Expect(rendered["invalid_volume"]).Should(Equal(""))
-		// 		Expect(rendered["invalid_port"]).Should(Equal("nil"))
-		// 		Expect(rendered["invalid_container"]).Should(Equal("nil"))
-		// 		Expect(rendered["invalid_env"]).Should(Equal(""))
-		// 		Expect(rendered["invalid_pvc"]).Should(Equal("nil"))
-		// 	})
+			Expect(err).Should(BeNil())
+			// for test volumeMounts
+			Expect(rendered["a"]).Should(BeEquivalentTo("/log/mysql"))
+			// for test volumeMounts
+			Expect(rendered["b"]).Should(BeEquivalentTo("/data/mysql"))
+			// for test port
+			Expect(rendered["c"]).Should(BeEquivalentTo("3356"))
+			// for test resource
+			Expect(rendered["d"]).Should(BeEquivalentTo("4096M"))
+			// for test args
+			Expect(rendered["e"]).Should(BeEquivalentTo(""))
+			// for test volumeMounts
+			Expect(rendered["f"]).Should(BeEquivalentTo("/data/mysql"))
+			// for test env
+			Expect(rendered["i"]).Should(BeEquivalentTo("b"))
+			// for test volume
+			Expect(rendered["j"]).Should(BeEquivalentTo("cluster_name_for_test"))
+			Expect(rendered["invalid_volume"]).Should(BeEquivalentTo(""))
+			Expect(rendered["invalid_port"]).Should(BeEquivalentTo("<no value>"))
+			Expect(rendered["invalid_container"]).Should(BeEquivalentTo("<no value>"))
+			Expect(rendered["invalid_env"]).Should(BeEquivalentTo(""))
+			Expect(rendered["invalid_pvc"]).Should(BeEquivalentTo("<no value>"))
+			Expect(rendered["invalid_resource"]).Should(BeEquivalentTo(""))
+		})
 	})
 
 	Context("calMysqlPoolSizeByResource test", func() {

@@ -33,7 +33,7 @@ import (
 var _ = Describe("Deployment Controller", func() {
 	var (
 		randomStr   = testCtx.GetRandomStr()
-		timeout     = time.Second * 20
+		timeout     = time.Second * 10
 		interval    = time.Second
 		clusterName = "wesql-stateless-" + randomStr
 		deployName  = "wesql-nginx-" + randomStr
@@ -164,13 +164,25 @@ spec:
 
 			By("mock deployment is ready")
 			newDeployment := &appsv1.Deployment{}
-			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: deployName, Namespace: namespace}, newDeployment)).Should(Succeed())
+			newDeploymentKey := client.ObjectKey{Name: deployName, Namespace: namespace}
+			Expect(k8sClient.Get(context.Background(), newDeploymentKey, newDeployment)).Should(Succeed())
 			deployPatch := client.MergeFrom(newDeployment.DeepCopy())
 			newDeployment.Status.ObservedGeneration = 1
 			newDeployment.Status.AvailableReplicas = 3
 			newDeployment.Status.ReadyReplicas = 3
 			newDeployment.Status.Replicas = 3
 			Expect(k8sClient.Status().Patch(context.Background(), newDeployment, deployPatch)).Should(Succeed())
+
+			By("check deployment status")
+			Eventually(func() bool {
+				deploy := &appsv1.Deployment{}
+				if err := k8sClient.Get(context.Background(), newDeploymentKey, deploy); err != nil {
+					return false
+				}
+				return deploy.Status.AvailableReplicas == newDeployment.Status.AvailableReplicas &&
+					deploy.Status.ReadyReplicas == newDeployment.Status.ReadyReplicas &&
+					deploy.Status.Replicas == newDeployment.Status.Replicas
+			}, timeout, interval).Should(BeTrue())
 
 			By("waiting the component is Running")
 			Eventually(func() bool {

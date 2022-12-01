@@ -33,7 +33,7 @@ import (
 
 var _ = Describe("Event Controller", func() {
 	var (
-		timeout     = time.Second * 20
+		timeout     = time.Second * 10
 		interval    = time.Second
 		clusterName = "wesql-for-storageclass-" + testCtx.GetRandomStr()
 		ctx         = context.Background()

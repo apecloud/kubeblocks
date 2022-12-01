@@ -37,7 +37,7 @@ var _ = Describe("StatefulSet Controller", func() {
 
 	var (
 		randomStr      = testCtx.GetRandomStr()
-		timeout        = time.Second * 20
+		timeout        = time.Second * 10
 		interval       = time.Second
 		clusterName    = "wesql-" + randomStr
 		clusterDefName = "cluster-definition-consensus-" + randomStr

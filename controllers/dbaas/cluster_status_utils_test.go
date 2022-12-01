@@ -39,7 +39,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		ctx         = context.Background()
 		clusterName = "cluster-for-status"
 		namespace   = "default"
-		timeout     = time.Second * 20
+		timeout     = time.Second * 10
 		interval    = time.Second
 	)
 
@@ -271,7 +271,7 @@ spec:
 		return stsName
 	}
 
-	handleAndCheckComponentStatus := func(componentName string, event *corev1.Event, expectPhase dbaasv1alpha1.Phase, checkClusterPhase bool) {
+	handleAndCheckComponentStatus := func(componentName string, event *corev1.Event, expectPhase dbaasv1alpha1.Phase, checkClusterPhase bool, ltimeout time.Duration) {
 		Expect(handleEventForClusterStatus(ctx, k8sClient, clusterRecorder, event)).Should(Succeed())
 		Eventually(func() bool {
 			newCluster := &dbaasv1alpha1.Cluster{}
@@ -291,7 +291,7 @@ spec:
 					newCluster.Status.Phase == expectPhase
 			}
 			return statusComponents[componentName].Phase == expectPhase
-		}, timeout*5, interval).Should(BeTrue())
+		}, ltimeout, interval).Should(BeTrue())
 
 	}
 
@@ -332,7 +332,7 @@ spec:
 			event.Count = 3
 			event.FirstTimestamp = metav1.Time{Time: time.Now()}
 			event.LastTimestamp = metav1.Time{Time: time.Now().Add(31 * time.Second)}
-			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, false)
+			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, false, time.Second*10)
 
 			By("watch warning event from Pod and component type is Consensus")
 			// create statefulSet for consensus component
@@ -342,24 +342,24 @@ spec:
 			podName := stsName + "-0"
 			createStsPod(podName, "", componentName)
 			setInvolvedObject(event, PodKind, podName)
-			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, false)
+			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, false, timeout)
 
 			By("test merge pod event message")
 			event.Message = "0/1 nodes can scheduled, cpu insufficient"
-			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, false)
+			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, false, timeout)
 
 			By("test Abnormal phase for consensus component")
 			setInvolvedObject(event, StatefulSetKind, stsName)
 			podName1 := stsName + "-1"
 			createStsPod(podName1, "leader", componentName)
-			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.AbnormalPhase, false)
+			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.AbnormalPhase, false, timeout)
 
 			By("watch warning event from Deployment and component type is Stateless")
 			deploymentName := "nginx-deploy"
 			componentName = "nginx"
 			setInvolvedObject(event, DeploymentKind, deploymentName)
 			createDeployment(componentName, deploymentName)
-			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, false)
+			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, false, timeout)
 		})
 	})
 

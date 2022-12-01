@@ -23,21 +23,29 @@ import (
 	"net"
 	"reflect"
 
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/golang/mock/gomock"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"github.com/vishvananda/netlink"
+	"go.uber.org/zap/zapcore"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
 	mocknetlink "github.com/apecloud/kubeblocks/internal/loadbalancer/netlink/mocks"
 	mockprocfs "github.com/apecloud/kubeblocks/internal/loadbalancer/procfs/mocks"
 )
 
+func init() {
+	viper.AutomaticEnv()
+}
+
 var (
-	logger = zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	logger = zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true), func(o *zap.Options) {
+		o.TimeEncoder = zapcore.ISO8601TimeEncoder
+	})
 )
 
 var _ = Describe("Client", func() {

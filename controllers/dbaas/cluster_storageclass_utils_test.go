@@ -179,6 +179,11 @@ spec:
 			cluster.Status.Phase = dbaasv1alpha1.RunningPhase
 			cluster.Status.ObservedGeneration = 1
 			Expect(k8sClient.Status().Patch(ctx, cluster, patch))
+			Eventually(func() bool {
+				tmpCluster := &dbaasv1alpha1.Cluster{}
+				_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, tmpCluster)
+				return tmpCluster.Status.Operations != nil
+			}, timeout, interval).Should(BeTrue())
 			createStorageClassObj(defaultStorageClassName, true)
 
 			By("expect wesql-test component support volume expansion and volumeClaimTemplateNames is [data]")
@@ -200,6 +205,13 @@ spec:
 			storageClass.AllowVolumeExpansion = &allowVolumeExpansion
 			Expect(k8sClient.Update(ctx, storageClass)).Should(Succeed())
 			Eventually(func() bool {
+				tmpSc := &storagev1.StorageClass{}
+				_ = k8sClient.Get(ctx, client.ObjectKey{Name: storageClassName}, tmpSc)
+				allowExpansion := tmpSc.AllowVolumeExpansion
+				return *allowExpansion == true
+			}, timeout, interval).Should(BeTrue())
+
+			Eventually(func() bool {
 				newCluster := &dbaasv1alpha1.Cluster{}
 				_ = k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, newCluster)
 				volumeExpandable := newCluster.Status.Operations.VolumeExpandable
@@ -213,6 +225,12 @@ spec:
 			allowVolumeExpansion = false
 			storageClass.AllowVolumeExpansion = &allowVolumeExpansion
 			Expect(k8sClient.Update(ctx, storageClass)).Should(Succeed())
+			Eventually(func() bool {
+				tmpSc := &storagev1.StorageClass{}
+				_ = k8sClient.Get(ctx, client.ObjectKey{Name: storageClassName}, tmpSc)
+				allowExpansion := tmpSc.AllowVolumeExpansion
+				return *allowExpansion == false
+			}, timeout, interval).Should(BeTrue())
 			Eventually(func() bool {
 				newCluster := &dbaasv1alpha1.Cluster{}
 				_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, newCluster)
@@ -228,6 +246,12 @@ spec:
 			defaultStorageClass.AllowVolumeExpansion = &allowVolumeExpansion
 			Expect(k8sClient.Update(ctx, defaultStorageClass)).Should(Succeed())
 			Eventually(func() bool {
+				tmpSc := &storagev1.StorageClass{}
+				_ = k8sClient.Get(ctx, client.ObjectKey{Name: defaultStorageClassName}, tmpSc)
+				allowExpansion := tmpSc.AllowVolumeExpansion
+				return *allowExpansion == false
+			}, timeout, interval).Should(BeTrue())
+			Eventually(func() bool {
 				newCluster := &dbaasv1alpha1.Cluster{}
 				_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, newCluster)
 				return len(newCluster.Status.Operations.VolumeExpandable) == 0
@@ -240,6 +264,12 @@ spec:
 			allowVolumeExpansion = true
 			defaultStorageClass.AllowVolumeExpansion = &allowVolumeExpansion
 			Expect(k8sClient.Update(ctx, defaultStorageClass)).Should(Succeed())
+			Eventually(func() bool {
+				tmpSc := &storagev1.StorageClass{}
+				_ = k8sClient.Get(ctx, client.ObjectKey{Name: defaultStorageClassName}, tmpSc)
+				allowExpansion := tmpSc.AllowVolumeExpansion
+				return *allowExpansion == true
+			}, timeout, interval).Should(BeTrue())
 			Eventually(func() bool {
 				newCluster := &dbaasv1alpha1.Cluster{}
 				_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, newCluster)

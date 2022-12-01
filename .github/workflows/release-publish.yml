@@ -62,9 +62,9 @@ jobs:
           
           CLI_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ matrix.os }}`
           
-          make bin/{{ env.CLI_NAME }}.$CLI_OS_ARCH
+          make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
           
-          mv bin/{{ env.CLI_NAME }}.$CLI_OS_ARCH ${{ matrix.os }}/{{ env.CLI_NAME }}
+          mv bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH ${{ matrix.os }}/${{ env.CLI_NAME }}
           
           tar -zcvf ${{ env.CLI_BINARY }} ${{ matrix.os }}
           

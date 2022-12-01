@@ -70,7 +70,6 @@ KubeBlocks, running on Kubernetes, is an open-source data manangement platform. 
   - Support command line automatic completion
 
 ## Documents
-***
 ### Quick start with KubeBlocks
 待完成
 ### Introduction
@@ -85,7 +84,6 @@ KubeBlocks, running on Kubernetes, is an open-source data manangement platform. 
 [design_docs](https://github.com/apecloud/kubeblocks/tree/main/docs/design_docs) for design motivation and methodology.
 
 ## Community
-***
 
 
 - [Slack Channel](https://kubeblocks.slack.com/ssb/redirect)
@@ -98,7 +96,7 @@ Your contributions and suggestions are welcomed and appreciated.
 - Guidelines for contributing -需要做how to 文档 内容包括如何report a issue 如何contribute code 如何review Pull Request 如何写文档 coding风格指南 等等
 - 
 
-
+## Code of Conduct
 
 
 

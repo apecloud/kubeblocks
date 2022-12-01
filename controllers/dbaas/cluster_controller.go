@@ -41,6 +41,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -432,26 +433,40 @@ func (r *ClusterReconciler) checkReferencedCRStatus(reqCtx intctrlutil.RequestCt
 }
 
 func (r *ClusterReconciler) needCheckClusterForReady(cluster *dbaasv1alpha1.Cluster) bool {
-	return slices.Index([]dbaasv1alpha1.Phase{"", dbaasv1alpha1.RunningPhase, dbaasv1alpha1.DeletingPhase},
+	return slices.Index([]dbaasv1alpha1.Phase{"", dbaasv1alpha1.RunningPhase, dbaasv1alpha1.DeletingPhase, dbaasv1alpha1.VolumeExpandingPhase},
 		cluster.Status.Phase) == -1
+}
+
+// existsOperations check the cluster are doing operations
+func (r *ClusterReconciler) existsOperations(cluster *dbaasv1alpha1.Cluster) bool {
+	opsRequestMap, _ := operations.GetOpsRequestMapFromCluster(cluster)
+	return len(opsRequestMap) > 0
 }
 
 // updateClusterPhase update cluster.status.phase
 func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster) error {
-	if slices.Index([]dbaasv1alpha1.Phase{dbaasv1alpha1.CreatingPhase, dbaasv1alpha1.UpdatingPhase},
-		cluster.Status.Phase) != -1 {
-		return nil
-	}
+	needPatch := false
 	patch := client.MergeFrom(cluster.DeepCopy())
 	if cluster.Status.Phase == "" {
+		needPatch = true
 		cluster.Status.Phase = dbaasv1alpha1.CreatingPhase
-	} else {
+	} else if slices.Index([]dbaasv1alpha1.Phase{
+		dbaasv1alpha1.RunningPhase,
+		dbaasv1alpha1.FailedPhase,
+		dbaasv1alpha1.AbnormalPhase}, cluster.Status.Phase) != -1 && !r.existsOperations(cluster) {
+		needPatch = true
 		cluster.Status.Phase = dbaasv1alpha1.UpdatingPhase
+	}
+	if !needPatch {
+		return nil
+	}
+	if err := r.Client.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
+		return err
 	}
 	// send an event when cluster perform operations
 	r.Recorder.Eventf(cluster, corev1.EventTypeNormal, string(cluster.Status.Phase),
 		"Start %s in Cluster: %s", cluster.Status.Phase, cluster.Name)
-	return r.Client.Status().Patch(reqCtx.Ctx, cluster, patch)
+	return nil
 }
 
 // checkAndPatchToRunning patch Cluster.status.phase to Running
@@ -466,6 +481,7 @@ func (r *ClusterReconciler) checkAndPatchToRunning(ctx context.Context, cluster 
 	if cluster.Status.Components == nil {
 		return nil
 	}
+	// TODO handle when component phase is Failed/Abnormal.
 	for _, v := range cluster.Status.Components {
 		if v.Phase != dbaasv1alpha1.RunningPhase {
 			return nil

@@ -190,7 +190,49 @@ spec:
                       - Updating
                       - Deleting
                       - Deleted
+                      - VolumeExpanding
                       type: string
+                    volumeClaimTemplates:
+                      additionalProperties:
+                        properties:
+                          message:
+                            type: string
+                          persistentVolumeClaims:
+                            additionalProperties:
+                              properties:
+                                message:
+                                  type: string
+                                status:
+                                  description: Phase defines the CR .Status.Phase
+                                  enum:
+                                  - Running
+                                  - Pending
+                                  - Failed
+                                  - Succeed
+                                  type: string
+                              type: object
+                            description: PersistentVolumeClaimStatus describe the
+                              persistentVolumeClaim status
+                            type: object
+                          requestStorage:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            description: RequestStorage the request storage size.
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          status:
+                            description: Phase defines the CR .Status.Phase
+                            enum:
+                            - Running
+                            - Pending
+                            - Failed
+                            - Succeed
+                            type: string
+                        type: object
+                      description: VolumeClaimTemplates describe the volumeClaimTemplates
+                        status when spec.type is VolumeExpansion
+                      type: object
                   type: object
                 description: Components record the status information of components
                   with spec.componentOps.componentNames.

@@ -59,7 +59,6 @@ rules:
   - ""
   resources:
   - configmaps
-  - persistentvolumeclaims
   - resourcequotas
   - secrets
   - services
@@ -110,6 +109,18 @@ rules:
   - get
   - list
   - patch
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - ""

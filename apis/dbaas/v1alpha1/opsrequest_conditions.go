@@ -89,7 +89,7 @@ func NewValidateFailedCondition(reason, message string) *metav1.Condition {
 
 // NewFailedCondition new a condition that the OpsRequest processing failed
 func NewFailedCondition(ops *OpsRequest, err error) *metav1.Condition {
-	msg := fmt.Sprintf("The OpsRequest: %s in Cluster: %s processing failed", ops.Name, ops.Spec.ClusterRef)
+	msg := fmt.Sprintf("Failed to process OpsRequest: %s in cluster: %s", ops.Name, ops.Spec.ClusterRef)
 	if err != nil {
 		msg = err.Error()
 	}

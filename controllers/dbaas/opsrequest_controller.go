@@ -98,7 +98,7 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// patch cluster label to OpsRequest
-	if err = r.patchOpsRequestWithClusterLabel(reqCtx, opsRequest); res != nil {
+	if err = r.patchOpsRequestWithClusterLabel(reqCtx, opsRequest); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 

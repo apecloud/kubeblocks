@@ -94,7 +94,7 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) Handle(cli client.Clien
 	}
 
 	// here, if the volume expansion ops is running. we will change the pvc status to Failed on the OpsRequest.
-	return pvcEventHandler.handlePvcFailedStatusOnOpsRequest(cli, reqCtx, recorder, event, pvc)
+	return pvcEventHandler.handlePVCFailedStatusOnOpsRequest(cli, reqCtx, recorder, event, pvc)
 }
 
 // isTargetResizeFailedEvents check the event is the resize failed events.
@@ -104,8 +104,8 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) isTargetResizeFailedEve
 		slices.Index([]string{VolumeResizeFailed, FileSystemResizeFailed}, event.Reason) != -1
 }
 
-// handlePvcFailedStatusOnOpsRequest if the volume expansion ops is running. we will change the pvc status to Failed on the OpsRequest,
-func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePvcFailedStatusOnOpsRequest(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event, pvc *corev1.PersistentVolumeClaim) error {
+// handlePVCFailedStatusOnOpsRequest if the volume expansion ops is running. we will change the pvc status to Failed on the OpsRequest,
+func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOnOpsRequest(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event, pvc *corev1.PersistentVolumeClaim) error {
 	var (
 		cluster = &dbaasv1alpha1.Cluster{}
 		err     error

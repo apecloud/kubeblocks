@@ -107,7 +107,7 @@ var dbPort = "3306"
 var dbRoles = map[string]internal.AccessMode{}
 
 func init() {
-	val, ok := os.LookupEnv("KB_AGGREGATION_COUNT")
+	val, ok := os.LookupEnv("KB_AGGREGATION_NUMBER")
 	if ok {
 		num, err := strconv.Atoi(val)
 		if err == nil {

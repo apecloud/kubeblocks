@@ -94,8 +94,7 @@ spec:
 	handlePersistentVolumeClaim := func(reqCtx intctrlutil.RequestCtx, cli client.Client, pvc *corev1.PersistentVolumeClaim) error {
 		patch := client.MergeFrom(pvc.DeepCopy())
 		pvc.Annotations["kubeblocks.io/test"] = "test_pvc"
-		Expect(cli.Patch(ctx, pvc, patch)).Should(Succeed())
-		return nil
+		return cli.Patch(ctx, pvc, patch)
 	}
 
 	Context("test creating PersistentVolumeClaim", func() {

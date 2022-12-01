@@ -82,8 +82,7 @@ allowVolumeExpansion: %t
 	handleStorageClass := func(reqCtx intctrlutil.RequestCtx, cli client.Client, storageClass *storagev1.StorageClass) error {
 		patch := client.MergeFrom(storageClass.DeepCopy())
 		storageClass.Annotations["kubeblocks.io/test"] = "test"
-		Expect(cli.Patch(ctx, storageClass, patch)).Should(Succeed())
-		return nil
+		return cli.Patch(ctx, storageClass, patch)
 	}
 
 	Context("When test creating storageClass", func() {

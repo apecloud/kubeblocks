@@ -33,10 +33,12 @@ import (
 
 var _ = Describe("Event Controller", func() {
 	var (
-		timeout     = time.Second * 20
-		interval    = time.Second
-		clusterName = "wesql-for-storageclass-" + testCtx.GetRandomStr()
-		ctx         = context.Background()
+		timeout        = time.Second * 20
+		interval       = time.Second
+		clusterDefName = "cluster-def-" + testCtx.GetRandomStr()
+		appVersionName = "app-versoion-" + testCtx.GetRandomStr()
+		clusterName    = "wesql-for-storageclass-" + testCtx.GetRandomStr()
+		ctx            = context.Background()
 	)
 
 	cleanupObjects := func() {
@@ -55,6 +57,61 @@ var _ = Describe("Event Controller", func() {
 		// Add any teardown steps that needs to be executed after each test
 		cleanupObjects()
 	})
+
+	createClusterDef := func() {
+		clusterDefYaml := fmt.Sprintf(`
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind:       ClusterDefinition
+metadata:
+  name:     %s
+spec:
+  type: state.mysql-8
+  components:
+  - typeName: consensus
+    componentType: Consensus
+    defaultReplicas: 3
+    consensusSpec:
+      leader:
+        name: "leader"
+        accessMode: ReadWrite
+      followers:
+      - name: "follower"
+        accessMode: Readonly
+    podSpec:
+      containers:
+      - name: mysql
+        ports:
+        - containerPort: 3306
+          name: mysql
+          protocol: TCP
+        - containerPort: 13306
+          name: paxos
+          protocol: TCP
+`, clusterDefName)
+		clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+		Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDef)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
+	}
+
+	createAppversion := func() {
+		appVerYaml := fmt.Sprintf(`
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind:       AppVersion
+metadata:
+  name:     %s
+spec:
+  clusterDefinitionRef: %s
+  components:
+  - type: consensus
+    podSpec:
+      containers:
+      - name: mysql
+        image: registry.jihulab.com/apecloud/mysql-server/mysql/wesql-server-arm:latest
+`, appVersionName, clusterDefName)
+		appVersion := &dbaasv1alpha1.AppVersion{}
+		Expect(yaml.Unmarshal([]byte(appVerYaml), appVersion)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, appVersion)).Should(Succeed())
+	}
 
 	createStorageClassObj := func(storageClassName string, allowVolumeExpansion bool) {
 		By("By assure an default storageClass")
@@ -171,6 +228,8 @@ spec:
 			vctName1 := "data"
 			defaultStorageClassName := "standard-" + testCtx.GetRandomStr()
 			storageClassName := "csi-hostpath-sc-" + testCtx.GetRandomStr()
+			createClusterDef()
+			createAppversion()
 			createCluster(defaultStorageClassName, storageClassName)
 			cluster := &dbaasv1alpha1.Cluster{}
 			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)

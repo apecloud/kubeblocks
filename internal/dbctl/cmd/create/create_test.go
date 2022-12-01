@@ -70,5 +70,50 @@ var _ = Describe("Create", func() {
 			Expect(baseOptions.Validate(inputs)).Should(Succeed())
 			Expect(baseOptions.Run(inputs)).Should(Succeed())
 		})
+
+		It("test Create runAsApply", func() {
+			tf := cmdtesting.NewTestFactory().WithNamespace("default")
+			defer tf.Cleanup()
+			streams, _, _, _ := genericclioptions.NewTestIOStreams()
+			baseOptions := BaseOptions{
+				Name:      "test",
+				IOStreams: streams,
+			}
+			clusterOptions := map[string]interface{}{
+				"name":              "test-apply",
+				"namespace":         "default",
+				"clusterDefRef":     "test-def",
+				"appVersionRef":     "test-appversion-ref",
+				"components":        []string{},
+				"terminationPolicy": "Halt",
+			}
+
+			inputs := Inputs{
+				CueTemplateName: "create_template_test.cue",
+				ResourceName:    types.ResourceClusters,
+				BaseOptionsObj:  &baseOptions,
+				Options:         clusterOptions,
+				Factory:         tf,
+				Validate: func() error {
+					return nil
+				},
+				Complete: func() error {
+					return nil
+				},
+				BuildFlags: func(cmd *cobra.Command) {
+					cmd.Flags().StringVar(&baseOptions.Namespace, "clusterDefRef", "", "cluster definition")
+				},
+			}
+			cmd := BuildCommand(inputs)
+			Expect(cmd).ShouldNot(BeNil())
+			Expect(cmd.Flags().Lookup("clusterDefRef")).ShouldNot(BeNil())
+
+			Expect(baseOptions.Complete(inputs, []string{})).Should(Succeed())
+			Expect(baseOptions.Validate(inputs)).Should(Succeed())
+			// create
+			Expect(baseOptions.RunAsApply(inputs)).Should(Succeed())
+			// apply if exists
+			Expect(baseOptions.RunAsApply(inputs)).Should(Succeed())
+		})
 	})
 })

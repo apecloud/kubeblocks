@@ -34,7 +34,7 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
 )
 

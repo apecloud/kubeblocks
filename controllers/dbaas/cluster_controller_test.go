@@ -509,7 +509,7 @@ spec:
 		return fetchedG1, cd, appVer, key
 	}
 
-	Context("When creating cluster", func() {
+	Context("When creating cluster with normal", func() {
 		It("Should create cluster successfully", func() {
 			_, _, _, key := createClusterNCheck()
 

@@ -234,7 +234,7 @@ CLI_LD_FLAGS ="-s -w \
 
 
 
-bin/kbcli.%: ## Cross build bin/kbcli.$(OS).$(ARCH) CLI.
+bin/kbcli.%: ## Cross build bin/kbcli.$(OS).$(ARCH).
 	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${CLI_LD_FLAGS} -o $@ cmd/cli/main.go
 
 .PHONY: kbcli
@@ -249,7 +249,7 @@ clean-kbcli: ## Clean bin/kbcli*.
 	rm -f bin/kbcli*
 
 .PHONY: doc
-kbcli-doc: build-checks ## generate kbcli command reference manual.
+kbcli-doc: build-checks ## generate CLI command reference manual.
 	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
 ##@ Load Balancer

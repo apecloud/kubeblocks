@@ -196,13 +196,14 @@ spec:
 			return k8sClient.Delete(ctx, f)
 		}()).Should(Succeed())
 
-		var err error
 		f := &dataprotectionv1alpha1.BackupPolicy{}
-		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
-			f = &dataprotectionv1alpha1.BackupPolicy{}
-		}
-		return client.IgnoreNotFound(err)
+		Eventually(func() error {
+			if err := k8sClient.Get(ctx, key, f); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+			return nil
+		}, timeout, interval).Should(Succeed())
+		return nil
 	}
 
 	assureBackupToolObj := func() *dataprotectionv1alpha1.BackupTool {
@@ -264,13 +265,14 @@ spec:
 			return k8sClient.Delete(ctx, f)
 		}()).Should(Succeed())
 
-		var err error
 		f := &dataprotectionv1alpha1.BackupTool{}
-		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
-			f = &dataprotectionv1alpha1.BackupTool{}
-		}
-		return client.IgnoreNotFound(err)
+		Eventually(func() error {
+			if err := k8sClient.Get(ctx, key, f); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+			return nil
+		}, timeout, interval).Should(Succeed())
+		return nil
 	}
 
 	assureStatefulSetObj := func() *appv1.StatefulSet {

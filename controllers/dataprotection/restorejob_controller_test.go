@@ -109,13 +109,14 @@ spec:
 			return k8sClient.Delete(ctx, f)
 		}()).Should(Succeed())
 
-		var err error
 		f := &dataprotectionv1alpha1.RestoreJob{}
-		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
-			f = &dataprotectionv1alpha1.RestoreJob{}
-		}
-		return client.IgnoreNotFound(err)
+		Eventually(func() error {
+			if err := k8sClient.Get(ctx, key, f); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+			return nil
+		}, timeout, interval).Should(Succeed())
+		return nil
 	}
 
 	assureBackupJobObj := func(backupPolicy string) *dataprotectionv1alpha1.BackupJob {
@@ -160,13 +161,14 @@ status:
 			return k8sClient.Delete(ctx, f)
 		}()).Should(Succeed())
 
-		var err error
 		f := &dataprotectionv1alpha1.BackupJob{}
-		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
-			f = &dataprotectionv1alpha1.BackupJob{}
-		}
-		return client.IgnoreNotFound(err)
+		Eventually(func() error {
+			if err := k8sClient.Get(ctx, key, f); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+			return nil
+		}, timeout, interval).Should(Succeed())
+		return nil
 	}
 
 	assureBackupPolicyObj := func(backupTool string) *dataprotectionv1alpha1.BackupPolicy {
@@ -217,13 +219,14 @@ spec:
 			return k8sClient.Delete(ctx, f)
 		}()).Should(Succeed())
 
-		var err error
 		f := &dataprotectionv1alpha1.BackupPolicy{}
-		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
-			f = &dataprotectionv1alpha1.BackupPolicy{}
-		}
-		return client.IgnoreNotFound(err)
+		Eventually(func() error {
+			if err := k8sClient.Get(ctx, key, f); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+			return nil
+		}, timeout, interval).Should(Succeed())
+		return nil
 	}
 
 	assureBackupToolObj := func() *dataprotectionv1alpha1.BackupTool {
@@ -286,21 +289,14 @@ spec:
 	}
 
 	deleteBackupToolWait := func(key types.NamespacedName) error {
-		Expect(func() error {
-			f := &dataprotectionv1alpha1.BackupTool{}
+		f := &dataprotectionv1alpha1.BackupTool{}
+		Eventually(func() error {
 			if err := k8sClient.Get(ctx, key, f); err != nil {
 				return client.IgnoreNotFound(err)
 			}
-			return k8sClient.Delete(ctx, f)
-		}()).Should(Succeed())
-
-		var err error
-		f := &dataprotectionv1alpha1.BackupTool{}
-		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
-			f = &dataprotectionv1alpha1.BackupTool{}
-		}
-		return client.IgnoreNotFound(err)
+			return nil
+		}, timeout, interval).Should(Succeed())
+		return nil
 	}
 
 	assureStatefulSetObj := func() *appv1.StatefulSet {
@@ -575,11 +571,9 @@ spec:
 
 	patchBackupJobStatus := func(phase dataprotectionv1alpha1.BackupJobPhase, key types.NamespacedName) {
 		backupJob := dataprotectionv1alpha1.BackupJob{}
-		delta := time.Now().Add(timeout)
-		for err := k8sClient.Get(ctx, key, &backupJob); err != nil && time.Now().Before(delta); err = k8sClient.Get(ctx, key, &backupJob) {
-			backupJob = dataprotectionv1alpha1.BackupJob{}
-			time.Sleep(interval)
-		}
+		Eventually(func() error {
+			return k8sClient.Get(ctx, key, &backupJob)
+		}, timeout, interval).Should(Succeed())
 		Expect(k8sClient.Get(ctx, key, &backupJob)).Should(Succeed())
 
 		patch := client.MergeFrom(backupJob.DeepCopy())
@@ -589,11 +583,9 @@ spec:
 
 	patchK8sJobStatus := func(jobStatus batchv1.JobConditionType, key types.NamespacedName) {
 		k8sJob := batchv1.Job{}
-		delta := time.Now().Add(timeout)
-		for err := k8sClient.Get(ctx, key, &k8sJob); err != nil && time.Now().Before(delta); err = k8sClient.Get(ctx, key, &k8sJob) {
-			k8sJob = batchv1.Job{}
-			time.Sleep(interval)
-		}
+		Eventually(func() error {
+			return k8sClient.Get(ctx, key, &k8sJob)
+		}, timeout, interval).Should(Succeed())
 		Expect(k8sClient.Get(ctx, key, &k8sJob)).Should(Succeed())
 
 		patch := client.MergeFrom(k8sJob.DeepCopy())
@@ -629,14 +621,11 @@ spec:
 			patchK8sJobStatus(batchv1.JobComplete, types.NamespacedName{Name: toCreate.Name, Namespace: toCreate.Namespace})
 
 			result := &dataprotectionv1alpha1.RestoreJob{}
-			delta := time.Now().Add(timeout)
-			for err := k8sClient.Get(ctx, key, result); err == nil && time.Now().Before(delta); err = k8sClient.Get(ctx, key, result) {
-				if result.Status.Phase == dataprotectionv1alpha1.RestoreJobCompleted {
-					break
-				}
-				result = &dataprotectionv1alpha1.RestoreJob{}
-				time.Sleep(interval)
-			}
+			Eventually(func() bool {
+				Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
+				return result.Status.Phase == dataprotectionv1alpha1.RestoreJobCompleted ||
+					result.Status.Phase == dataprotectionv1alpha1.RestoreJobFailed
+			}, timeout, interval).Should(BeTrue())
 			Expect(result.Status.Phase).Should(Equal(dataprotectionv1alpha1.RestoreJobCompleted))
 
 			By("Deleting the scope")

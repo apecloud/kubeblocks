@@ -17,7 +17,6 @@ limitations under the License.
 package cluster
 
 import (
-	"encoding/json"
 	"os"
 
 	. "github.com/onsi/ginkgo"
@@ -29,25 +28,25 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
-func generateComponents(component dbaasv1alpha1.ClusterComponent, count int) []map[string]interface{} {
-	var componentVals []map[string]interface{}
-	byteVal, err := json.Marshal(component)
-	Expect(err == nil).Should(BeTrue())
-	for i := 0; i < count; i++ {
-		var componentVal map[string]interface{}
-		err = json.Unmarshal(byteVal, &componentVal)
-		Expect(err == nil).Should(BeTrue())
-		componentVals = append(componentVals, componentVal)
-	}
-	Expect(len(componentVals)).To(Equal(count))
-	return componentVals
-}
+// func generateComponents(component dbaasv1alpha1.ClusterComponent, count int) []map[string]interface{} {
+// 	var componentVals []map[string]interface{}
+// 	byteVal, err := json.Marshal(component)
+// 	Expect(err == nil).Should(BeTrue())
+// 	for i := 0; i < count; i++ {
+// 		var componentVal map[string]interface{}
+// 		err = json.Unmarshal(byteVal, &componentVal)
+// 		Expect(err == nil).Should(BeTrue())
+// 		componentVals = append(componentVals, componentVal)
+// 	}
+// 	Expect(len(componentVals)).To(Equal(count))
+// 	return componentVals
+// }
 
-func expectEqual(expectComponents []map[string]interface{}, actualComponents []map[string]interface{}) {
-	expectByte, _ := json.Marshal(expectComponents)
-	actualByte, _ := json.Marshal(actualComponents)
-	Expect(string(actualByte)).To(Equal(string(expectByte)))
-}
+// func expectEqual(expectComponents []map[string]interface{}, actualComponents []map[string]interface{}) {
+// 	expectByte, _ := json.Marshal(expectComponents)
+// 	actualByte, _ := json.Marshal(actualComponents)
+// 	Expect(string(actualByte)).To(Equal(string(expectByte)))
+// }
 
 var _ = Describe("create", func() {
 	// Context("setMonitor", func() {

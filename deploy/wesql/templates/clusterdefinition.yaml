@@ -56,9 +56,9 @@ spec:
               sub_follower=`echo "$followers" | grep "$KB_POD_NAME"`
               echo $KB_POD_NAME
               echo $sub_follower
-              if [ -z "$leader" -o "$KB_POD_NAME" = "$leader" -o ! -z "$sub_follower" ]; then 
+              if [ -z "$leader" -o "$KB_POD_NAME" = "$leader" -o ! -z "$sub_follower" ]; then
                 exit 0;
-              else 
+              else
                 idx=${KB_POD_NAME##*-}
                 host=$(eval echo \$KB_REPLICASETS_"$idx"_HOSTNAME)
                 echo "$host"
@@ -66,13 +66,11 @@ spec:
                 kubectl exec -i $leader -c mysql -- bash -c "mysql -e \"call dbms_consensus.add_follower('$host:13306');\" & pid=\$!; sleep 1; if ! ps \$pid > /dev/null; then wait \$pid; code=\$?; exit \$code; fi"
               fi
       containers:
-        - name: mysql
-          imagePullPolicy: IfNotPresent
+      - name: mysql
+        imagePullPolicy: IfNotPresent
         volumeMounts:
         - mountPath: /data/mysql
           name: data
-#        - mountPath: /log/mysql
-#          name: log
         - mountPath: /opt/mysql
           name: mysql-config
         ports:
@@ -120,14 +118,14 @@ spec:
             fi;
             host=$(eval echo \$KB_REPLICASETS_"$i"_HOSTNAME)
             cluster_info="$cluster_info$host:13306";
-          done; 
+          done;
           idx=${KB_POD_NAME##*-}
           echo $idx
           host=$(eval echo \$KB_REPLICASETS_"$idx"_HOSTNAME)
-          cluster_info="$cluster_info@$(($idx+1))"; 
-          echo $cluster_info; 
-          mkdir -p /data/mysql/data; 
-          chmod +777 -R /data/mysql; 
+          cluster_info="$cluster_info@$(($idx+1))";
+          echo $cluster_info;
+          mkdir -p /data/mysql/data;
+          chmod +777 -R /data/mysql;
           leader=$KB_REPLICASETS_LEADER
           echo $leader
           if [ -z $leader ]; then
@@ -136,7 +134,7 @@ spec:
           elif [ "$KB_POD_NAME" != "$leader" ]; then
             echo "docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info=\"$host:13306\" --cluster-id=$CLUSTER_ID"
             docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$host:13306" --cluster-id=$CLUSTER_ID
-          else 
+          else
             echo "docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info=\"$host:13306@1\" --cluster-id=$CLUSTER_ID"
             docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$host:13306@1" --cluster-id=$CLUSTER_ID
           fi

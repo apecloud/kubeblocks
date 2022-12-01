@@ -566,8 +566,8 @@ spec:
 			cmList := &corev1.ConfigMapList{}
 			Eventually(func() bool {
 				Expect(k8sClient.List(ctx, cmList, client.MatchingLabels{
-					intctrlutil.AppInstanceLabelKey:    key.Name,
-					intctrlutil.AppInstanceEnvLabelKey: "true",
+					intctrlutil.AppInstanceLabelKey:   key.Name,
+					intctrlutil.AppConfigTypeLabelKey: "kubeblocks-env",
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(cmList.Items) == 2
 			}, timeout, interval).Should(BeTrue())
@@ -653,12 +653,13 @@ spec:
 	Context("When creating cluster with services", func() {
 		It("Should create services", func() {
 			By("Creating a cluster")
+			testServiceType := corev1.ServiceTypeClusterIP
 			toCreate, _, _, key := newClusterObj(nil, nil)
 			toCreate.Spec.Components = append(toCreate.Spec.Components, dbaasv1alpha1.ClusterComponent{
 				Name: "proxy",
 				Type: "proxy",
 
-				ServiceType: "LoadBalancer",
+				ServiceType: testServiceType,
 			})
 			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
@@ -676,7 +677,7 @@ spec:
 					intctrlutil.AppInstanceLabelKey: key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				for _, svc := range svcList.Items {
-					if svc.Spec.Type == "LoadBalancer" {
+					if svc.Spec.Type == testServiceType {
 						return true
 					}
 				}

@@ -28,7 +28,6 @@ const (
 	AppName = "kubeblocks"
 	// common label and annotation keys
 
-	AppInstanceEnvLabelKey         = "app.kubernetes.io/ins-env"
 	AppInstanceLabelKey            = "app.kubernetes.io/instance"
 	AppComponentLabelKey           = "app.kubernetes.io/component-name"
 	AppNameLabelKey                = "app.kubernetes.io/name"

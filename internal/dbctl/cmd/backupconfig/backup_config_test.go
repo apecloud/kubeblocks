@@ -17,8 +17,6 @@ limitations under the License.
 package backupconfig
 
 import (
-	"bytes"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -26,38 +24,38 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	"github.com/apecloud/kubeblocks/internal/dbctl/types"
+	"github.com/apecloud/kubeblocks/internal/dbctl/util/fake"
 	"github.com/apecloud/kubeblocks/internal/dbctl/util/helm"
 )
 
 var _ = Describe("backup_config", func() {
-	var cmd *cobra.Command
-	var streams genericclioptions.IOStreams
-	buf := new(bytes.Buffer)
-	errbuf := new(bytes.Buffer)
+	var (
+		cmd     *cobra.Command
+		streams genericclioptions.IOStreams
+		tf      *cmdtesting.TestFactory
+	)
 
 	BeforeEach(func() {
-		streams, _, buf, errbuf = genericclioptions.NewTestIOStreams()
+		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		tf = cmdtesting.NewTestFactory().WithNamespace("test")
+	})
+
+	AfterEach(func() {
+		tf.Cleanup()
 	})
 
 	It("backup_config", func() {
-		tf := cmdtesting.NewTestFactory().WithNamespace("test")
-		defer tf.Cleanup()
-
 		cmd = NewBackupConfigCmd(tf, streams)
-		Expect(cmd != nil).Should(BeTrue())
+		Expect(cmd).ShouldNot(BeNil())
 	})
 
 	It("check backup_config", func() {
-		tf := cmdtesting.NewTestFactory().WithNamespace("test")
-		defer tf.Cleanup()
-
 		var cfg string
 		cmd = NewBackupConfigCmd(tf, streams)
 		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
-		cmd.SetOut(buf)
-		cmd.SetErr(errbuf)
 
-		Expect(cmd != nil).Should(BeTrue())
+		Expect(cmd).ShouldNot(BeNil())
 		Expect(cmd.HasSubCommands()).Should(BeFalse())
 
 		o := &upgradeOptions{
@@ -65,16 +63,21 @@ var _ = Describe("backup_config", func() {
 		}
 		Expect(o.complete(tf, cmd)).To(Succeed())
 		Expect(o.Namespace).To(Equal("test"))
+		Expect(o.cfg).ShouldNot(BeNil())
 	})
 
 	It("run backup_config", func() {
+		// use a fake URL to test
+		types.KubeBlocksChartName = fake.KubeBlocksChartName
+		types.KubeBlocksChartURL = fake.KubeBlocksChartURL
+
 		o := &upgradeOptions{
 			IOStreams: streams,
 			cfg:       helm.FakeActionConfig(),
 			Namespace: "default",
 			Sets:      []string{"dataProtection=test"},
 		}
-		Expect(o.run()).To(Or(Succeed(), HaveOccurred()))
+		Expect(o.run()).Should(HaveOccurred())
 		Expect(len(o.Sets)).To(Equal(1))
 		Expect(o.Sets[0]).To(Equal("dataProtection=test"))
 	})

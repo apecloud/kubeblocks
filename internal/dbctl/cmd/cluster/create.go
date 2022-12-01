@@ -60,7 +60,7 @@ var example = templates.Examples(`
 
 	# In scenarios where you want to load components data from website URL
 	# the cluster, use termination policy Halt
-	dbctl cluster create mycluster --components=http://kubeblocks.io/yamls/wesql_single.yaml --termination-policy=Halt
+	dbctl cluster create mycluster --components=https://kubeblocks.io/yamls/wesql_single.yaml --termination-policy=Halt
 
 	# In scenarios where you want to load components data from stdin
 	# the cluster, use termination policy Halt

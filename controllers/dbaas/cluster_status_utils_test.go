@@ -31,19 +31,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 	var (
-		ctx         = context.Background()
-		clusterName = "cluster-for-status"
-		namespace   = "default"
-		timeout     = time.Second * 10
-		interval    = time.Second
+		ctx            = context.Background()
+		clusterName    = "cluster-for-status-" + testCtx.GetRandomStr()
+		clusterDefName = "clusterdef-for-status-" + testCtx.GetRandomStr()
+		appVersionName = "app-version-for-status-" + testCtx.GetRandomStr()
+		namespace      = "default"
+		timeout        = time.Second * 10
+		interval       = time.Second
 	)
-
-	BeforeEach(func() {
+	cleanupObjects := func() {
 		// Add any setup steps that needs to be executed before each test
 		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -51,18 +53,28 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &appsv1.StatefulSet{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &appsv1.Deployment{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &corev1.Pod{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+	}
+	BeforeEach(func() {
+		cleanupObjects()
 	})
 
 	AfterEach(func() {
 		// Add any teardown steps that needs to be executed after each test
+		cleanupObjects()
 	})
 
 	createClusterDef := func() {
-		clusterDefYaml := `
+		clusterDefYaml := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       ClusterDefinition
 metadata:
-  name:     cluster-definition-for-status
+  name:     %s
 spec:
   type: state.mysql-8
   components:
@@ -74,6 +86,13 @@ spec:
     podSpec:
       containers:
       - name: mysql
+        ports:
+        - containerPort: 3306
+          name: mysql
+          protocol: TCP
+        - containerPort: 13306
+          name: paxos
+          protocol: TCP
   - typeName: consensus
     componentType: Consensus
     defaultReplicas: 3
@@ -87,26 +106,37 @@ spec:
     podSpec:
       containers:
       - name: mysql
+        ports:
+        - containerPort: 3306
+          name: mysql
+          protocol: TCP
+        - containerPort: 13306
+          name: paxos
+          protocol: TCP
   - typeName: proxy
     defaultReplicas: 3
     componentType: Stateless
     podSpec:
       containers:
-      - name: nginx
-`
+      - name: nginx 
+        ports:
+        - containerPort: 8080
+          name: nginx
+          protocol: TCP
+`, clusterDefName)
 		clusterDef := &dbaasv1alpha1.ClusterDefinition{}
 		Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDef)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
 	}
 
 	createAppversion := func() {
-		appVerYaml := `
+		appVerYaml := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       AppVersion
 metadata:
-  name:     app-version-for-status
+  name:     %s
 spec:
-  clusterDefinitionRef: cluster-definition-for-status
+  clusterDefinitionRef: %s
   components:
   - type: consensus
     podSpec:
@@ -123,7 +153,7 @@ spec:
       containers:
       - name: mysql
         image: registry.jihulab.com/apecloud/mysql-server/mysql/wesql-server-arm:latest
-`
+`, appVersionName, clusterDefName)
 		appVersion := &dbaasv1alpha1.AppVersion{}
 		Expect(yaml.Unmarshal([]byte(appVerYaml), appVersion)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, appVersion)).Should(Succeed())
@@ -136,8 +166,8 @@ metadata:
   name: %s
   namespace: default
 spec:
-  appVersionRef: app-version-for-status
-  clusterDefinitionRef: cluster-definition-for-status
+  appVersionRef: %s
+  clusterDefinitionRef: %s
   components:
   - monitor: false
     name: replicasets
@@ -150,7 +180,7 @@ spec:
     name: consensus
     type: consensus
   terminationPolicy: WipeOut
-`, clusterName)
+`, clusterName, appVersionName, clusterDefName)
 		cluster := &dbaasv1alpha1.Cluster{}
 		Expect(yaml.Unmarshal([]byte(clusterYaml), cluster)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
@@ -265,15 +295,18 @@ spec:
 		sts := createSts(stsName, componentName)
 		// wait until statefulSet created
 		Eventually(func() bool {
-			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: stsName, Namespace: sts.Namespace}, &appsv1.StatefulSet{})
+			err := k8sClient.Get(context.Background(),
+				client.ObjectKey{Name: stsName, Namespace: sts.Namespace},
+				&appsv1.StatefulSet{})
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
 		return stsName
 	}
 
-	handleAndCheckComponentStatus := func(componentName string, event *corev1.Event, expectPhase dbaasv1alpha1.Phase, checkClusterPhase bool, ltimeout time.Duration) {
-		Expect(handleEventForClusterStatus(ctx, k8sClient, clusterRecorder, event)).Should(Succeed())
+	handleAndCheckComponentStatus := func(componentName string, event *corev1.Event,
+		expectPhase dbaasv1alpha1.Phase, checkClusterPhase bool, ltimeout time.Duration) {
 		Eventually(func() bool {
+			Expect(handleEventForClusterStatus(ctx, k8sClient, clusterRecorder, event)).Should(Succeed())
 			newCluster := &dbaasv1alpha1.Cluster{}
 			if err := k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: namespace}, newCluster); err != nil {
 				return false
@@ -321,7 +354,7 @@ spec:
 			stsName := initComponentStatefulSet(componentName)
 			stsInvolvedObject := corev1.ObjectReference{
 				Name:      stsName,
-				Kind:      StatefulSetKind,
+				Kind:      intctrlutil.StatefulSetKind,
 				Namespace: "default",
 			}
 			event.InvolvedObject = stsInvolvedObject
@@ -341,7 +374,7 @@ spec:
 			// create a failed pod
 			podName := stsName + "-0"
 			createStsPod(podName, "", componentName)
-			setInvolvedObject(event, PodKind, podName)
+			setInvolvedObject(event, intctrlutil.PodKind, podName)
 			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, false, timeout)
 
 			By("test merge pod event message")
@@ -349,7 +382,7 @@ spec:
 			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, false, timeout)
 
 			By("test Abnormal phase for consensus component")
-			setInvolvedObject(event, StatefulSetKind, stsName)
+			setInvolvedObject(event, intctrlutil.StatefulSetKind, stsName)
 			podName1 := stsName + "-1"
 			createStsPod(podName1, "leader", componentName)
 			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.AbnormalPhase, false, timeout)
@@ -357,7 +390,7 @@ spec:
 			By("watch warning event from Deployment and component type is Stateless")
 			deploymentName := "nginx-deploy"
 			componentName = "nginx"
-			setInvolvedObject(event, DeploymentKind, deploymentName)
+			setInvolvedObject(event, intctrlutil.DeploymentKind, deploymentName)
 			createDeployment(componentName, deploymentName)
 			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, false, timeout)
 		})

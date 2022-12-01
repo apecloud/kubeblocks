@@ -74,11 +74,12 @@ type ClusterStatus struct {
 	// Creating: creating cluster.
 	// Running: cluster is running, all components is available.
 	// Updating: cluster changes, such as horizontal-scaling/vertical-scaling/restart.
+	// VolumeExpanding: volume expansion operation is running.
 	// Deleting/Deleted: deleting cluster/cluster is deleted.
 	// Failed: cluster not available.
 	// Abnormal: cluster available but some component is not Abnormal.
 	// if the component type is Consensus/Replication, the Leader/Primary pod is must ready in Abnormal phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted}
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted,VolumeExpanding}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
@@ -182,7 +183,7 @@ type ClusterStatusComponent struct {
 	// Abnormal: component available but some pod is not ready.
 	// If the component type is Consensus/Replication, the Leader/Primary pod is must ready in Abnormal phase.
 	// Other phases behave the same as the cluster phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted}
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted,VolumeExpanding}
 	Phase Phase `json:"phase,omitempty"`
 
 	// Message record the component details message in current phase.

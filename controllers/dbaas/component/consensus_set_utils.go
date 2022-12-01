@@ -411,7 +411,7 @@ func initClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster, componentN
 		typeName := GetComponentTypeName(*cluster, componentName)
 		cluster.Status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{
 			Type:  typeName,
-			Phase: dbaasv1alpha1.RunningPhase,
+			Phase: cluster.Status.Phase,
 		}
 	}
 	componentStatus := cluster.Status.Components[componentName]

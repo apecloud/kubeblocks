@@ -14,19 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package create
+package k8score
 
 import (
-	"testing"
+	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 )
 
-// These tests use Ginkgo (BDD-style Go testing framework). Refer to
-// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
-
-func TestCreate(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Create Suite")
+// IsOvertimeAndOccursTimesForEvent check whether the duration and number of events reach the threshold
+func IsOvertimeAndOccursTimesForEvent(event *corev1.Event, timeout time.Duration, eventOccursTimes int32) bool {
+	return event.LastTimestamp.After(event.FirstTimestamp.Add(timeout)) &&
+		event.Count >= eventOccursTimes
 }

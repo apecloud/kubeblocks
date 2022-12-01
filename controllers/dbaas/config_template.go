@@ -18,6 +18,7 @@ package dbaas
 
 import (
 	"encoding/json"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -54,7 +55,16 @@ func newCfgTemplateBuilder(clusterName, namespace string, cluster *dbaasv1alpha1
 		clusterName: clusterName,
 		cluster:     cluster,
 		appVersion:  version,
+		tplName:     "DBaasTpl",
 	}
+}
+
+func (c *configTemplateBuilder) setTplName(tplName string) {
+	c.tplName = tplName
+}
+
+func (c *configTemplateBuilder) formatError(file string, err error) error {
+	return fmt.Errorf("failed to render configuration template[cm:%s][key:%s], error: [%v]", c.tplName, file, err)
 }
 
 func (c *configTemplateBuilder) render(configs map[string]string) (map[string]string, error) {
@@ -63,11 +73,11 @@ func (c *configTemplateBuilder) render(configs map[string]string) (map[string]st
 	if err != nil {
 		return nil, err
 	}
-	engine := intctrlutil.NewTplEngine(o, c.builtInFunctions)
+	engine := intctrlutil.NewTplEngine(o, c.builtInFunctions, c.tplName)
 	for file, configContext := range configs {
 		newContext, err := engine.Render(configContext)
 		if err != nil {
-			return nil, err
+			return nil, c.formatError(file, err)
 		}
 		rendered[file] = newContext
 	}

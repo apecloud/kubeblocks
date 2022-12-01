@@ -80,6 +80,6 @@ func checkDeploymentStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, clu
 // SetupWithManager sets up the controller with the Manager.
 func (r *DeploymentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1.Deployment{}, builder.WithPredicates(predicate.NewPredicateFuncs(WorkloadFilterPredicate))).
+		For(&appsv1.Deployment{}, builder.WithPredicates(predicate.NewPredicateFuncs(intctrlutil.WorkloadFilterPredicate))).
 		Complete(r)
 }

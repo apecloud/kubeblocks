@@ -43,6 +43,9 @@ const (
 	SecretName       = "fake-secret-name"
 	StorageClassName = "fake-storage-class"
 	PVCName          = "fake-pvc"
+
+	KubeBlocksChartName = "fake-kubeblocks"
+	KubeBlocksChartURL  = "https://apecloud.github.io/fake-kubeblocks"
 )
 
 func Cluster(name string, namespace string) *dbaasv1alpha1.Cluster {
@@ -195,7 +198,8 @@ func Services() *corev1.ServiceList {
 	for idx, item := range cases {
 		svc := corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("svc-%d", idx),
+				Name:      fmt.Sprintf("svc-%d", idx),
+				Namespace: Namespace,
 				Labels: map[string]string{
 					types.InstanceLabelKey:  ClusterName,
 					types.ComponentLabelKey: ComponentName,

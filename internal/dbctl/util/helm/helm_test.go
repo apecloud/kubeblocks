@@ -27,20 +27,19 @@ import (
 )
 
 var _ = Describe("helm util", func() {
-
-	It("add Repo", func() {
+	It("repo", func() {
 		r := repo.Entry{
-			Name: types.KubeBlocksChartName,
-			URL:  types.KubeBlocksChartURL,
+			Name: "test-repo",
+			URL:  "https://test-kubebllcks.com/test-repo",
 		}
-		Expect(AddRepo(&r)).Should(Succeed())
+		Expect(AddRepo(&r)).Should(HaveOccurred())
 		Expect(RemoveRepo(&r)).Should(Succeed())
 	})
 
 	It("Action Config", func() {
 		cfg, err := NewActionConfig("test", "config")
-		Expect(err == nil).To(BeTrue())
-		Expect(cfg != nil).To(BeTrue())
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(cfg).ShouldNot(BeNil())
 	})
 
 	It("Install", func() {
@@ -51,7 +50,7 @@ var _ = Describe("helm util", func() {
 			Version:   version.DefaultKubeBlocksVersion,
 		}
 		cfg := FakeActionConfig()
-		Expect(cfg != nil).Should(BeTrue())
+		Expect(cfg).ShouldNot(BeNil())
 		_, err := o.Install(cfg)
 		Expect(err).Should(HaveOccurred())
 		Expect(o.UnInstall(cfg)).Should(HaveOccurred())
@@ -65,7 +64,7 @@ var _ = Describe("helm util", func() {
 			Version:   version.DefaultKubeBlocksVersion,
 		}
 		cfg := FakeActionConfig()
-		Expect(cfg != nil).Should(BeTrue())
+		Expect(cfg).ShouldNot(BeNil())
 		_, err := o.Upgrade(cfg)
 		Expect(err).Should(HaveOccurred())
 		Expect(o.UnInstall(cfg)).Should(HaveOccurred())

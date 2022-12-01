@@ -1044,15 +1044,17 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 
 	// update sts.spec.volumeClaimTemplates[].metadata.labels
 	if len(sts.Spec.VolumeClaimTemplates) > 0 && len(sts.GetLabels()) > 0 {
-		for _, vct := range sts.Spec.VolumeClaimTemplates {
+		for index, vct := range sts.Spec.VolumeClaimTemplates {
 			if vct.Labels == nil {
 				vct.Labels = make(map[string]string)
 			}
+			vct.Labels[intctrlutil.VolumeClaimTemplateNameLabelKey] = vct.Name
 			for k, v := range sts.Labels {
 				if _, ok := vct.Labels[k]; !ok {
 					vct.Labels[k] = v
 				}
 			}
+			sts.Spec.VolumeClaimTemplates[index] = vct
 		}
 	}
 
@@ -1508,6 +1510,10 @@ func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder
 		return nil, err
 	}
 
-	// TODO process invalid data: e.g empty data
+	if len(cmObj.Data) == 0 {
+		return map[string]string{}, nil
+	}
+
+	tplBuilder.setTplName(cmKey.Name)
 	return tplBuilder.render(cmObj.Data)
 }

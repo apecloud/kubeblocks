@@ -41,12 +41,7 @@ const (
 	appVersionLabelKey         = "appversion.kubeblocks.io/name"
 	statefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
 	CSRoleChangedAnnotKey      = "cs.kubeblocks.io/event-handled"
-
-	DeploymentKind  = "Deployment"
-	StatefulSetKind = "StatefulSet"
-	PodKind         = "Pod"
-
-	CSRoleChangedAnnotHandled = "true"
+	CSRoleChangedAnnotHandled  = "true"
 )
 
 type MonitorConfig struct {
@@ -96,6 +91,7 @@ type componentTemplateValues struct {
 type configTemplateBuilder struct {
 	namespace   string
 	clusterName string
+	tplName     string
 
 	// Global Var
 	componentValues  *componentTemplateValues

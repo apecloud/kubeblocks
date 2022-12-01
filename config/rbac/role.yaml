@@ -80,7 +80,6 @@ rules:
   - ""
   resources:
   - configmaps
-  - persistentvolumeclaims
   - resourcequotas
   - secrets
   - services
@@ -96,7 +95,6 @@ rules:
   - ""
   resources:
   - configmaps/finalizers
-  - persistentvolumeclaims/finalizers
   - resourcequotas/finalizers
   - secrets/finalizers
   - services/finalizers
@@ -125,9 +123,25 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - persistentvolumeclaims
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
   - persistentvolumeclaims/status
-  - resourcequotas/status
-  - services/status
   verbs:
   - get
 - apiGroups:
@@ -147,6 +161,13 @@ rules:
   - pods/exec
   verbs:
   - create
+- apiGroups:
+  - ""
+  resources:
+  - resourcequotas/status
+  - services/status
+  verbs:
+  - get
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:

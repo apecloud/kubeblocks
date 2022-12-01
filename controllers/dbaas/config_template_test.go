@@ -178,6 +178,7 @@ innodb_buffer_pool_size = 8589934592
 				CoreNum:    4,
 			}
 
+			cfgBuilder.setTplName("for_test")
 			rendered, err := cfgBuilder.render(map[string]string{
 				mysqlCfgName: mysqlCfgTmpContext,
 			})

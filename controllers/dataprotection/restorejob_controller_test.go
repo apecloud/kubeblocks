@@ -20,17 +20,17 @@ import (
 	"context"
 	"time"
 
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+
 	"github.com/sethvargo/go-password/password"
 	appv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-
-	. "github.com/onsi/ginkgo"
-
-	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
 var _ = Describe("RestoreJob Controller", func() {
@@ -111,13 +111,14 @@ spec:
 			return k8sClient.Delete(ctx, f)
 		}()).Should(Succeed())
 
-		var err error
 		f := &dataprotectionv1alpha1.RestoreJob{}
-		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
-			f = &dataprotectionv1alpha1.RestoreJob{}
-		}
-		return client.IgnoreNotFound(err)
+		Eventually(func() error {
+			if err := k8sClient.Get(ctx, key, f); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+			return nil
+		}, waitDuration, interval).Should(Succeed())
+		return nil
 	}
 
 	assureBackupJobObj := func(backupPolicy string) *dataprotectionv1alpha1.BackupJob {
@@ -162,13 +163,14 @@ status:
 			return k8sClient.Delete(ctx, f)
 		}()).Should(Succeed())
 
-		var err error
 		f := &dataprotectionv1alpha1.BackupJob{}
-		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
-			f = &dataprotectionv1alpha1.BackupJob{}
-		}
-		return client.IgnoreNotFound(err)
+		Eventually(func() error {
+			if err := k8sClient.Get(ctx, key, f); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+			return nil
+		}, waitDuration, interval).Should(Succeed())
+		return nil
 	}
 
 	assureBackupPolicyObj := func(backupTool string) *dataprotectionv1alpha1.BackupPolicy {
@@ -195,10 +197,10 @@ spec:
     name: mysql-persistent-storage
     persistentVolumeClaim:
       claimName: datadir-mycluster-0
-  remoteVolumes:
-    - name: backup-remote-volume
-      persistentVolumeClaim:
-        claimName: backup-host-path-pvc
+  remoteVolume:
+    name: backup-remote-volume
+    persistentVolumeClaim:
+      claimName: backup-host-path-pvc
   onFailAttempted: 3
 `
 		backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
@@ -220,13 +222,14 @@ spec:
 			return k8sClient.Delete(ctx, f)
 		}()).Should(Succeed())
 
-		var err error
 		f := &dataprotectionv1alpha1.BackupPolicy{}
-		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
-			f = &dataprotectionv1alpha1.BackupPolicy{}
-		}
-		return client.IgnoreNotFound(err)
+		Eventually(func() error {
+			if err := k8sClient.Get(ctx, key, f); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+			return nil
+		}, waitDuration, interval).Should(Succeed())
+		return nil
 	}
 
 	assureBackupToolObj := func() *dataprotectionv1alpha1.BackupTool {
@@ -289,21 +292,14 @@ spec:
 	}
 
 	deleteBackupToolWait := func(key types.NamespacedName) error {
-		Expect(func() error {
-			f := &dataprotectionv1alpha1.BackupTool{}
+		f := &dataprotectionv1alpha1.BackupTool{}
+		Eventually(func() error {
 			if err := k8sClient.Get(ctx, key, f); err != nil {
 				return client.IgnoreNotFound(err)
 			}
-			return k8sClient.Delete(ctx, f)
-		}()).Should(Succeed())
-
-		var err error
-		f := &dataprotectionv1alpha1.BackupTool{}
-		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
-			f = &dataprotectionv1alpha1.BackupTool{}
-		}
-		return client.IgnoreNotFound(err)
+			return nil
+		}, waitDuration, interval).Should(Succeed())
+		return nil
 	}
 
 	assureStatefulSetObj := func() *appv1.StatefulSet {
@@ -577,12 +573,28 @@ spec:
 	}
 
 	patchBackupJobStatus := func(phase dataprotectionv1alpha1.BackupJobPhase, key types.NamespacedName) {
-		backupJob := &dataprotectionv1alpha1.BackupJob{}
-		Expect(k8sClient.Get(ctx, key, backupJob)).Should(Succeed())
+		backupJob := dataprotectionv1alpha1.BackupJob{}
+		Eventually(func() error {
+			return k8sClient.Get(ctx, key, &backupJob)
+		}, timeout, interval).Should(Succeed())
+		Expect(k8sClient.Get(ctx, key, &backupJob)).Should(Succeed())
 
 		patch := client.MergeFrom(backupJob.DeepCopy())
 		backupJob.Status.Phase = phase
-		Expect(k8sClient.Status().Patch(ctx, backupJob, patch)).Should(Succeed())
+		Expect(k8sClient.Status().Patch(ctx, &backupJob, patch)).Should(Succeed())
+	}
+
+	patchK8sJobStatus := func(jobStatus batchv1.JobConditionType, key types.NamespacedName) {
+		k8sJob := batchv1.Job{}
+		Eventually(func() error {
+			return k8sClient.Get(ctx, key, &k8sJob)
+		}, timeout, interval).Should(Succeed())
+		Expect(k8sClient.Get(ctx, key, &k8sJob)).Should(Succeed())
+
+		patch := client.MergeFrom(k8sJob.DeepCopy())
+		jobCondition := batchv1.JobCondition{Type: jobStatus}
+		k8sJob.Status.Conditions = append(k8sJob.Status.Conditions, jobCondition)
+		Expect(k8sClient.Status().Patch(ctx, &k8sJob, patch)).Should(Succeed())
 	}
 
 	Context("When creating restoreJob", func() {
@@ -608,10 +620,16 @@ spec:
 			}
 
 			patchBackupJobStatus(dataprotectionv1alpha1.BackupJobCompleted, types.NamespacedName{Name: backupJob.Name, Namespace: backupJob.Namespace})
-			time.Sleep(waitDuration)
+
+			patchK8sJobStatus(batchv1.JobComplete, types.NamespacedName{Name: toCreate.Name, Namespace: toCreate.Namespace})
 
 			result := &dataprotectionv1alpha1.RestoreJob{}
-			Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
+			Eventually(func() bool {
+				Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
+				return result.Status.Phase == dataprotectionv1alpha1.RestoreJobCompleted ||
+					result.Status.Phase == dataprotectionv1alpha1.RestoreJobFailed
+			}, timeout, interval).Should(BeTrue())
+			Expect(result.Status.Phase).Should(Equal(dataprotectionv1alpha1.RestoreJobCompleted))
 
 			By("Deleting the scope")
 

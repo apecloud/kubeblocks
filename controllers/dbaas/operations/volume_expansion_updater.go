@@ -30,7 +30,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type pvcEventHandler struct {
+type PersistentVolumeClaimEventHandler struct {
 }
 
 const (
@@ -48,7 +48,7 @@ const (
 
 func init() {
 	k8score.PersistentVolumeClaimHandlerMap["volume-expansion"] = handleVolumeExpansionWithPvc
-	k8score.EventHandlerMap["volume-expansion"] = pvcEventHandler{}
+	k8score.EventHandlerMap["volume-expansion"] = PersistentVolumeClaimEventHandler{}
 }
 
 // handleVolumeExpansionOperation handle the pvc for the volume expansion OpsRequest.
@@ -69,7 +69,7 @@ func handleVolumeExpansionWithPvc(reqCtx intctrlutil.RequestCtx, cli client.Clie
 }
 
 // Handle the warning events on pvcs. if the events is resize failed events, update the OpsRequest.status.
-func (pvcEventHandler pvcEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
+func (pvcEventHandler PersistentVolumeClaimEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
 	if !pvcEventHandler.isTargetResizeFailedEvents(event) {
 		return nil
 	}
@@ -98,14 +98,14 @@ func (pvcEventHandler pvcEventHandler) Handle(cli client.Client, reqCtx intctrlu
 }
 
 // isTargetResizeFailedEvents check the event is the resize failed events.
-func (pvcEventHandler pvcEventHandler) isTargetResizeFailedEvents(event *corev1.Event) bool {
+func (pvcEventHandler PersistentVolumeClaimEventHandler) isTargetResizeFailedEvents(event *corev1.Event) bool {
 	// ignores ExternalExpanding event, this event is always exists when using csi driver.
 	return event.Type == corev1.EventTypeWarning && event.InvolvedObject.Kind == intctrlutil.PersistentVolumeClaimKind &&
 		slices.Index([]string{VolumeResizeFailed, FileSystemResizeFailed}, event.Reason) != -1
 }
 
 // handlePvcFailedStatusOnOpsRequest if the volume expansion ops is running. we will change the pvc status to Failed on the OpsRequest,
-func (pvcEventHandler pvcEventHandler) handlePvcFailedStatusOnOpsRequest(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event, pvc *corev1.PersistentVolumeClaim) error {
+func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePvcFailedStatusOnOpsRequest(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event, pvc *corev1.PersistentVolumeClaim) error {
 	var (
 		cluster = &dbaasv1alpha1.Cluster{}
 		err     error

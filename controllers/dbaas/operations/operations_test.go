@@ -679,7 +679,7 @@ spec:
 			Namespace: "default",
 		}
 		event.InvolvedObject = stsInvolvedObject
-		pvcEventHandler := pvcEventHandler{}
+		pvcEventHandler := PersistentVolumeClaimEventHandler{}
 		reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 		Expect(pvcEventHandler.Handle(k8sClient, reqCtx, eventRecorder, event)).Should(Succeed())
 		Eventually(func() bool {

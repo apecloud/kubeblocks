@@ -142,7 +142,7 @@ spec:
 		f := &dataprotectionv1alpha1.BackupJob{}
 		Eventually(func() error {
 			return k8sClient.Get(ctx, key, f)
-		}, timeout, interval).Should(Succeed())
+		}, waitDuration, interval).Should(Succeed())
 		return client.IgnoreNotFound(err)
 	}
 
@@ -202,7 +202,7 @@ spec:
 				return client.IgnoreNotFound(err)
 			}
 			return nil
-		}, timeout, interval).Should(Succeed())
+		}, waitDuration, interval).Should(Succeed())
 		return nil
 	}
 
@@ -271,7 +271,7 @@ spec:
 				return client.IgnoreNotFound(err)
 			}
 			return nil
-		}, timeout, interval).Should(Succeed())
+		}, waitDuration, interval).Should(Succeed())
 		return nil
 	}
 

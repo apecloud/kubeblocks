@@ -115,7 +115,7 @@ spec:
 				return client.IgnoreNotFound(err)
 			}
 			return nil
-		}, timeout, interval).Should(Succeed())
+		}, waitDuration, interval).Should(Succeed())
 		return nil
 	}
 
@@ -167,7 +167,7 @@ status:
 				return client.IgnoreNotFound(err)
 			}
 			return nil
-		}, timeout, interval).Should(Succeed())
+		}, waitDuration, interval).Should(Succeed())
 		return nil
 	}
 
@@ -225,7 +225,7 @@ spec:
 				return client.IgnoreNotFound(err)
 			}
 			return nil
-		}, timeout, interval).Should(Succeed())
+		}, waitDuration, interval).Should(Succeed())
 		return nil
 	}
 
@@ -295,7 +295,7 @@ spec:
 				return client.IgnoreNotFound(err)
 			}
 			return nil
-		}, timeout, interval).Should(Succeed())
+		}, waitDuration, interval).Should(Succeed())
 		return nil
 	}
 

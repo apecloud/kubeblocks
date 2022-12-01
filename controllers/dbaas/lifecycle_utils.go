@@ -1518,6 +1518,10 @@ func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder
 		return nil, err
 	}
 
-	// TODO process invalid data: e.g empty data
+	if len(cmObj.Data) == 0 {
+		return map[string]string{}, nil
+	}
+
+	tplBuilder.setTplName(cmKey.Name)
 	return tplBuilder.Render(cmObj.Data)
 }

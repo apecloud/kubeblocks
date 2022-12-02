@@ -23,17 +23,17 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/cli/util/fake"
 )
 
 var _ = Describe("playground", func() {
 	var streams genericclioptions.IOStreams
 
 	// use a fake URL to test
-	types.KubeBlocksChartName = fake.KubeBlocksChartName
-	types.KubeBlocksChartURL = fake.KubeBlocksChartURL
+	types.KubeBlocksChartName = testing.KubeBlocksChartName
+	types.KubeBlocksChartURL = testing.KubeBlocksChartURL
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()

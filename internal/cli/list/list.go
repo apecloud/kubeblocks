@@ -23,10 +23,10 @@ import (
 	"github.com/spf13/cobra"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/get"
+	"github.com/apecloud/kubeblocks/internal/cli/builder"
+	"github.com/apecloud/kubeblocks/internal/cli/get"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/cli/util/builder"
 )
 
 // Build return a list command, if the resource is not cluster, construct a label

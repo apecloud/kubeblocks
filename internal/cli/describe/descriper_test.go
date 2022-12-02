@@ -28,9 +28,9 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/describe"
 
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util/cluster"
-	"github.com/apecloud/kubeblocks/internal/cli/util/fake"
 )
 
 var _ = Describe("Describer", func() {
@@ -63,7 +63,7 @@ var _ = Describe("Describer", func() {
 	Context("describe cluster", func() {
 		It("describe return error", func() {
 			describer := &ClusterDescriber{
-				client: fake.NewClientSet(&corev1.Pod{
+				client: testing.FakeClientSet(&corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "bar",
 						Namespace: "foo",
@@ -72,7 +72,7 @@ var _ = Describe("Describer", func() {
 						ServiceAccountName: "fooaccount",
 					},
 				}),
-				dynamic: fake.NewDynamicClient(),
+				dynamic: testing.FakeDynamicClient(),
 			}
 			describerSettings := describe.DescriberSettings{ShowEvents: true, ChunkSize: cmdutil.DefaultChunkSize}
 			res, err := describer.Describe("test", "test", describerSettings)

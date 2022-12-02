@@ -20,29 +20,29 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/apecloud/kubeblocks/internal/cli/util/fake"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 )
 
 var _ = Describe("cluster util", func() {
-	client := fake.NewClientSet(
-		fake.Pods(3, fake.Namespace, fake.ClusterName),
-		fake.Node(),
-		fake.Secrets(fake.Namespace, fake.ClusterName),
-		fake.Services(),
-		fake.PVCs())
+	client := testing.FakeClientSet(
+		testing.FakePods(3, testing.Namespace, testing.ClusterName),
+		testing.FakeNode(),
+		testing.FakeSecrets(testing.Namespace, testing.ClusterName),
+		testing.FakeServices(),
+		testing.FakePVCs())
 
-	dynamic := fake.NewDynamicClient(
-		fake.Cluster(fake.ClusterName, fake.Namespace),
-		fake.ClusterDef(),
-		fake.AppVersion())
+	dynamic := testing.FakeDynamicClient(
+		testing.FakeCluster(testing.ClusterName, testing.Namespace),
+		testing.FakeClusterDef(),
+		testing.FakeAppVersion())
 
 	It("get cluster objects", func() {
-		clusterName := fake.ClusterName
+		clusterName := testing.ClusterName
 		getter := ObjectsGetter{
 			ClientSet:      client,
 			DynamicClient:  dynamic,
 			Name:           clusterName,
-			Namespace:      fake.Namespace,
+			Namespace:      testing.Namespace,
 			WithClusterDef: true,
 			WithAppVersion: true,
 			WithConfigMap:  true,
@@ -56,8 +56,8 @@ var _ = Describe("cluster util", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(objs).ShouldNot(BeNil())
 		Expect(objs.Cluster.Name).Should(Equal(clusterName))
-		Expect(objs.ClusterDef.Name).Should(Equal(fake.ClusterDefName))
-		Expect(objs.AppVersion.Name).Should(Equal(fake.AppVersionName))
+		Expect(objs.ClusterDef.Name).Should(Equal(testing.ClusterDefName))
+		Expect(objs.AppVersion.Name).Should(Equal(testing.AppVersionName))
 
 		Expect(len(objs.Pods.Items)).Should(Equal(3))
 		Expect(len(objs.Nodes)).Should(Equal(1))

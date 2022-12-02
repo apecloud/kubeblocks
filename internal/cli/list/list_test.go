@@ -33,9 +33,9 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/get"
+	"github.com/apecloud/kubeblocks/internal/cli/builder"
+	"github.com/apecloud/kubeblocks/internal/cli/get"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util/builder"
 )
 
 var _ = Describe("Describe", func() {

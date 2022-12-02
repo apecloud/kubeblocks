@@ -27,8 +27,8 @@ import (
 	"k8s.io/client-go/dynamic"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util/fake"
 )
 
 // GetDefaultPodName get the default pod in the cluster
@@ -131,11 +131,11 @@ func GetClusterEndpoints(svcList *corev1.ServiceList, c *dbaasv1alpha1.ClusterCo
 
 func FakeClusterObjs() *ClusterObjects {
 	clusterObjs := NewClusterObjects()
-	clusterObjs.Cluster = fake.Cluster(fake.ClusterName, fake.Namespace)
-	clusterObjs.ClusterDef = fake.ClusterDef()
-	clusterObjs.Pods = fake.Pods(3, fake.Namespace, fake.ClusterName)
-	clusterObjs.Secrets = fake.Secrets(fake.Namespace, fake.ClusterName)
-	clusterObjs.Nodes = []*corev1.Node{fake.Node()}
-	clusterObjs.Services = fake.Services()
+	clusterObjs.Cluster = testing.FakeCluster(testing.ClusterName, testing.Namespace)
+	clusterObjs.ClusterDef = testing.FakeClusterDef()
+	clusterObjs.Pods = testing.FakePods(3, testing.Namespace, testing.ClusterName)
+	clusterObjs.Secrets = testing.FakeSecrets(testing.Namespace, testing.ClusterName)
+	clusterObjs.Nodes = []*corev1.Node{testing.FakeNode()}
+	clusterObjs.Services = testing.FakeServices()
 	return clusterObjs
 }

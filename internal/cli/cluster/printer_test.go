@@ -21,8 +21,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"github.com/gosuri/uitable"
 )
 
 var _ = Describe("printer", func() {
@@ -30,21 +28,21 @@ var _ = Describe("printer", func() {
 		objs := FakeClusterObjs()
 
 		printObjs := func(printer Printer, objs *ClusterObjects) error {
-			printer.AddHeader()
 			printer.AddRow(objs)
-			return printer.Print(os.Stdout)
+			printer.Print()
+			return nil
 		}
 
 		It("print cluster info", func() {
-			Expect(printObjs(&ClusterPrinter{uitable.New()}, objs)).Should(Succeed())
+			Expect(printObjs(NewClusterPrinter(os.Stdout), objs)).Should(Succeed())
 		})
 
 		It("print component info", func() {
-			Expect(printObjs(&ComponentPrinter{uitable.New()}, objs)).Should(Succeed())
+			Expect(printObjs(NewComponentPrinter(os.Stdout), objs)).Should(Succeed())
 		})
 
 		It("print instance info", func() {
-			Expect(printObjs(&InstancePrinter{uitable.New()}, objs)).Should(Succeed())
+			Expect(printObjs(NewInstancePrinter(os.Stdout), objs)).Should(Succeed())
 		})
 	})
 })

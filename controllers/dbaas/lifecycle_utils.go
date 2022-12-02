@@ -956,15 +956,17 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 
 	// update sts.spec.volumeClaimTemplates[].metadata.labels
 	if len(sts.Spec.VolumeClaimTemplates) > 0 && len(sts.GetLabels()) > 0 {
-		for _, vct := range sts.Spec.VolumeClaimTemplates {
+		for index, vct := range sts.Spec.VolumeClaimTemplates {
 			if vct.Labels == nil {
 				vct.Labels = make(map[string]string)
 			}
+			vct.Labels[intctrlutil.VolumeClaimTemplateNameLabelKey] = vct.Name
 			for k, v := range sts.Labels {
 				if _, ok := vct.Labels[k]; !ok {
 					vct.Labels[k] = v
 				}
 			}
+			sts.Spec.VolumeClaimTemplates[index] = vct
 		}
 	}
 
@@ -978,20 +980,22 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 		if c.Env == nil {
 			c.Env = []corev1.EnvVar{}
 		}
-		for suf, fp := range map[string]string{
-			"_POD_NAME":  "metadata.name",
-			"_NAMESPACE": "metadata.namespace",
-			"_SA_NAME":   "spec.serviceAccountName",
-			"_NODENAME":  "spec.nodeName",
-			"_HOSTIP":    "status.hostIP",
-			"_PODIP":     "status.podIP",
-			"_PODIPS":    "status.podIPs",
-		} {
+
+		valueFromEnvSlice := []valueFromEnv{
+			{name: "_POD_NAME", fieldPath: "metadata.name"},
+			{name: "_NAMESPACE", fieldPath: "metadata.namespace"},
+			{name: "_SA_NAME", fieldPath: "spec.serviceAccountName"},
+			{name: "_NODENAME", fieldPath: "spec.nodeName"},
+			{name: "_HOSTIP", fieldPath: "status.hostIP"},
+			{name: "_PODIP", fieldPath: "status.podIP"},
+			{name: "_PODIPS", fieldPath: "status.podIPs"},
+		}
+		for _, v := range valueFromEnvSlice {
 			c.Env = append(c.Env, corev1.EnvVar{
-				Name: dbaasPrefix + suf,
+				Name: dbaasPrefix + v.name,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{
-						FieldPath: fp,
+						FieldPath: v.fieldPath,
 					},
 				},
 			})

@@ -17,7 +17,7 @@ limitations under the License.
 package k8score
 
 // full access on core API resources
-//+kubebuilder:rbac:groups=core,resources=secrets;configmaps;services;resourcequotas;persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=secrets;configmaps;services;resourcequotas,verbs=get;list;watch;create;update;patch;delete
 
 //+kubebuilder:rbac:groups=core,resources=services/status;resourcequotas/status;persistentvolumeclaims/status,verbs=get
 //+kubebuilder:rbac:groups=core,resources=services/finalizers;secrets/finalizers;configmaps/finalizers;resourcequotas/finalizers;persistentvolumeclaims/finalizers,verbs=update

@@ -28,13 +28,14 @@ const (
 	AppName = "kubeblocks"
 	// common label and annotation keys
 
-	AppInstanceLabelKey            = "app.kubernetes.io/instance"
-	AppComponentLabelKey           = "app.kubernetes.io/component-name"
-	AppNameLabelKey                = "app.kubernetes.io/name"
-	AppManagedByLabelKey           = "app.kubernetes.io/managed-by"
-	AppConfigTypeLabelKey          = "app.kubernetes.io/config-type"
-	ConsensusSetRoleLabelKey       = "cs.dbaas.kubeblocks.io/role"
-	ConsensusSetAccessModeLabelKey = "cs.dbaas.kubeblocks.io/access-mode"
+	AppInstanceLabelKey             = "app.kubernetes.io/instance"
+	AppComponentLabelKey            = "app.kubernetes.io/component-name"
+	AppNameLabelKey                 = "app.kubernetes.io/name"
+	AppManagedByLabelKey            = "app.kubernetes.io/managed-by"
+	AppConfigTypeLabelKey           = "app.kubernetes.io/config-type"
+	ConsensusSetRoleLabelKey        = "cs.dbaas.kubeblocks.io/role"
+	ConsensusSetAccessModeLabelKey  = "cs.dbaas.kubeblocks.io/access-mode"
+	VolumeClaimTemplateNameLabelKey = "vct.kubeblocks.io/name"
 
 	// OpsRequestAnnotationKey OpsRequest annotation key in Cluster
 	OpsRequestAnnotationKey = "kubeblocks.io/ops-request"
@@ -55,6 +56,13 @@ const (
 	EventReasonCreatedCR = "CreatedCR"
 	// EventReasonRunTaskFailed run task failed
 	EventReasonRunTaskFailed = "RunTaskFailed"
+)
+
+const (
+	DeploymentKind            = "Deployment"
+	StatefulSetKind           = "StatefulSet"
+	PodKind                   = "Pod"
+	PersistentVolumeClaimKind = "PersistentVolumeClaim"
 )
 
 // RequestCtx wrapper for reconcile procedure context parameters

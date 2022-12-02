@@ -5,7 +5,7 @@ metadata:
 spec:
   type: state.mongodb
   components:
-    - name: mongos
+    - typeName: mongos
       maxAvailable: 16
       minAvailable: 1
       defaultReplicas: 1
@@ -19,23 +19,7 @@ spec:
               - -c
               - |
                 mongos --config /etc/mongodb/config.yaml
-            volumeMounts:
-              - name: config
-                mountPath: /etc/mongodb
-        initContainers:
-          - name: kb-mongodb-agent
-            image: apecloud/kb-mongodb-agent:0.1.0-alpha1
-            command:
-              - bin/sh
-              - -c
-              - init-mongos-config
-            volumeMounts:
-              - name: config
-                mountPath: /etc/mongodb
-        volumes:
-          - name: config
-            emptyDir: { }
-    - name: config-server
+    - typeName: config-server
       maxAvailable: 1
       minAvailable: 1
       defaultReplicas: 3
@@ -52,29 +36,34 @@ spec:
         containers:
           - name: config-server
             image: mongo:5.0.14
+            env:
+              - name: POD_NAME
+                valueFrom:
+                  fieldPathRef:
+                    fieldPath: metadata.name
             command:
               - bin/sh
               - -c
               - |
-                mongod --config /etc/mongodb/config.yaml
-            volumeMounts:
-              - name: config
-                mountPath: /etc/mongodb
-        initContainers:
-          - name: kb-mongodb-agent
-            image: apecloud/kb-mongodb-agent:0.1.0-alpha1
-            command:
-              - bin/sh
-              - -c
-              - |
-                init-config-server-config
-            volumeMounts:
-              - name: config
-                mountPath: /etc/mongodb
-        volumes:
-          - name: config
-            emptyDir: {}
-    - name: shard
+                RPL_SET_NAME=$(echo $POD_NAME | grep -o ".*-");
+                RPL_SET_NAME=${RPL_SET_NAME%-};
+                mongod --configsvr --replSet $RPL_SET_NAME
+        lifecycle:
+          postStart:
+            exec:
+              command:
+                - bin/sh
+                - -c
+                - |
+                  INDEX=$(echo $POD_NAME | grep -o "-[0-9]\+");
+                  INDEX=${INDEX#-};
+                  if [ $INDEX -eq 0 ]; then
+                    status=$(mongosh --eval "rs.status().ok")
+                    if [ $status -eq 0 ]; then
+                      # TODO rs.initiate()
+                    fi;
+                  fi;
+    - typeName: shard
       maxAvailable: 16
       minAvailable: 1
       defaultReplicas: 3
@@ -91,25 +80,15 @@ spec:
         containers:
           - name: shard
             image: mongo:5.0.14
+            env:
+              - name: POD_NAME
+                valueFrom:
+                  fieldPathRef:
+                    fieldPath: metadata.name
             command:
               - bin/sh
               - -c
               - |
-                mongod --config /etc/mongodb/config.yaml
-            volumeMounts:
-              - name: config
-                mountPath: /etc/mongodb
-        initContainers:
-          - name: kb-mongodb-agent
-            image: apecloud/kb-mongodb-agent:0.1.0-alpha1
-            command:
-              - bin/sh
-              - -c
-              - |
-                init-shard-config
-            volumeMounts:
-              - name: config
-                mountPath: /etc/mongodb
-        volumes:
-          - name: config
-            emptyDir: { }
+                RPL_SET_NAME=$(echo $POD_NAME | grep -o ".*-");
+                RPL_SET_NAME=${RPL_SET_NAME%-};
+                mongod --shardsvr --replSet $RPL_SET_NAME

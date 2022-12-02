@@ -13,9 +13,9 @@ metadata:
 spec:
   type: state.clickhouse
   connectionCredential:
-    username: "admin-password" 
+    username: "admin"
     password: "$(RANDOM_PASSWD)"
-    "$(CONN_CREDENTIAL).username": "$(CONN_CREDENTIAL).password"
+    admin-password: "$(CONN_CREDENTIAL).password"
   components:
     - typeName: clickhouse
       componentType: Stateful
@@ -80,6 +80,8 @@ spec:
               - name: CLICKHOUSE_ADMIN_PASSWORD
                 valueFrom:
                   secretKeyRef:
+                    # notes: could also reference the secret's 'password' key,
+                    # just keeping the same secret keys as bitnami Clickhouse chart
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: admin-password
               - name: BITNAMI_DEBUG

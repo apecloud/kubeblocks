@@ -25,7 +25,7 @@ spec:
       type: string
     - description: Cluster Application Version.
       jsonPath: .spec.appVersionRef
-      name: APP-VERSION
+      name: VERSION
       type: string
     - description: Cluster termination policy.
       jsonPath: .spec.terminationPolicy
@@ -33,7 +33,7 @@ spec:
       type: string
     - description: Cluster Status.
       jsonPath: .status.phase
-      name: PHASE
+      name: STATUS
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: AGE

@@ -36,7 +36,7 @@ var _ Printer = &ClusterPrinter{}
 
 func NewClusterPrinter(out io.Writer) *ClusterPrinter {
 	p := &ClusterPrinter{tbl: printer.NewTablePrinter().Out(out)}
-	p.tbl.SetHeader("NAME", "NAMESPACE", "APP-VERSION", "CLUSTER-DEFINITION", "TERMINATION-POLICY", "STATUS", "INTERNAL-ENDPOINTS", "EXTERNAL-ENDPOINTS", "AGE")
+	p.tbl.SetHeader("NAME", "NAMESPACE", "VERSION", "CLUSTER-DEFINITION", "TERMINATION-POLICY", "STATUS", "INTERNAL-ENDPOINTS", "EXTERNAL-ENDPOINTS", "AGE")
 	return p
 }
 

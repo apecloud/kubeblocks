@@ -27,7 +27,7 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/config"
 	pb "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol"

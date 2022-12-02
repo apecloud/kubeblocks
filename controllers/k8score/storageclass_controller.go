@@ -20,6 +20,7 @@ import (
 	"context"
 
 	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -31,14 +32,14 @@ import (
 
 type HandleStorageClass func(reqCtx intctrlutil.RequestCtx, cli client.Client, storageClass *storagev1.StorageClass) error
 
-var StorageClassHandlerMap = map[string]HandleStorageClass{}
-
 // StorageClassReconciler reconciles a StorageClass object
 type StorageClassReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
+
+var StorageClassHandlerMap = map[string]HandleStorageClass{}
 
 //+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 
@@ -66,8 +67,9 @@ func (r *StorageClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	for _, handleStorageClass := range StorageClassHandlerMap {
-		if err := handleStorageClass(reqCtx, r.Client, storageClass); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "handleEventError")
+		// ignores the not found error.
+		if err := handleStorageClass(reqCtx, r.Client, storageClass); err != nil && !apierrors.IsNotFound(err) {
+			return intctrlutil.RequeueWithError(err, reqCtx.Log, "handleStorageClassError")
 		}
 	}
 	return intctrlutil.Reconciled()

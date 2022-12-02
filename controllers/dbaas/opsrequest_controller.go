@@ -54,24 +54,31 @@ type OpsRequestReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
 func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	var (
+		err error
+		res *ctrl.Result
+	)
+
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
 		Log:      log.FromContext(ctx).WithValues("opsRequest", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
-
 	opsRequest := &dbaasv1alpha1.OpsRequest{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, opsRequest); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, opsRequest, opsRequestFinalizerName, func() (*ctrl.Result, error) {
-		return nil, r.deleteExternalResources(reqCtx, opsRequest)
-	})
-	if res != nil {
-		return *res, err
+	// when the opsRequest is Running, we can not delete it until user deletes the finalizer.
+	if opsRequest.Status.Phase != dbaasv1alpha1.RunningPhase {
+		res, err = intctrlutil.HandleCRDeletion(reqCtx, r, opsRequest, opsRequestFinalizerName, func() (*ctrl.Result, error) {
+			return nil, r.deleteExternalResources(reqCtx, opsRequest)
+		})
+		if res != nil {
+			return *res, err
+		}
 	}
+
 	opsRes := &operations.OpsResource{
 		Ctx:        ctx,
 		OpsRequest: opsRequest,
@@ -91,7 +98,7 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// patch cluster label to OpsRequest
-	if err = r.patchOpsRequestWithClusterLabel(reqCtx, opsRequest); res != nil {
+	if err = r.patchOpsRequestWithClusterLabel(reqCtx, opsRequest); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
@@ -102,8 +109,11 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	if opsRequest.Status.ObservedGeneration == opsRequest.GetGeneration() {
 		// waiting until OpsRequest.status.phase is Succeed
-		if err = operations.GetOpsManager().Reconcile(opsRes); err != nil {
+		if requeueAfter, err := operations.GetOpsManager().Reconcile(opsRes); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		} else if requeueAfter != 0 {
+			// if the reconcileAction need requeue, do it
+			return intctrlutil.RequeueAfter(requeueAfter, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()
 	}
@@ -113,7 +123,7 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// process opsRequest entry function
-	if err = r.processOpsRequest(opsRes); res != nil {
+	if err = r.processOpsRequest(opsRes); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 

@@ -52,6 +52,11 @@ spec:
 	// corner case
 	invalidLogNames1 := clusterDef.ValidateEnabledLogConfigs("replicasets", []string{"error", "slow-test", "audit-test"})
 	if len(invalidLogNames1) != 2 {
-		t.Error("Expected [slow-test, audit-test] element conditionList")
+		t.Error("Expected invalidLogNames are [slow-test, audit-test]")
+	}
+	// corner case
+	invalidLogNames2 := clusterDef.ValidateEnabledLogConfigs("non-exist-type", []string{"error", "slow", "audit"})
+	if len(invalidLogNames2) != 3 {
+		t.Error("Expected invalidLogNames are [error, slow, audit]")
 	}
 }

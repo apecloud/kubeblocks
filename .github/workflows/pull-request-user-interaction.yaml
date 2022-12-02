@@ -1,0 +1,54 @@
+name: PULL-REQUEST-USER-INTERACT
+
+on:
+  pull_request_target:
+    types: [ edited, opened ]
+
+env:
+  GITHUB_TOKEN: ${{ secrets.KUBEBLOCKS_TOKEN }}
+  REVIEWERS: 'realzyy,fireworm2002'
+  REPO: 'kubeblocks'
+  ISINTERACTION: ''
+
+jobs:
+  get-issue-label:
+    name: GET PR Issue Label
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: get issue link
+        run: |
+          gh api graphql -f query='
+            query($org: String!,$repo: String!,$number: Int!){
+              repository(owner: $org, name: $repo) {
+                pullRequest(number: $number) {
+                  id
+                  closingIssuesReferences (first: 10) {
+                    edges {
+                      node {
+                        number
+                        labels (first: 10)  { edges{ node {name}} }
+                      }
+                    }
+                  }
+                }
+              }
+            }' -f org=${{ github.repository_owner }} -f repo=${{ env.REPO }} -F number=${{ github.event.pull_request.number }}  > label_data.json
+          echo 'ISINTERACTION='$(jq '.data.repository.pullRequest.closingIssuesReferences.edges[].node.labels.edges[].node | select(.name== "area/user-interaction")' label_data.json) >> $GITHUB_ENV 
+         
+
+      - name: Add labels
+        if: ${{ env.ISINTERACTION != null }}
+        uses: actions-cool/issues-helper@v3
+        with:
+          actions: 'add-labels'
+          token: ${{ secrets.KUBEBLOCKS_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          labels: 'area/user-interaction'
+
+      - name: Add Pull Request Reviewers
+        uses: sakhnovict/add-reviewers-action@1.0.0
+        if: ${{ env.ISINTERACTION != null }}
+        with:
+          reviewers: ${{ env.REVIEWERS }}
+          token: ${{ secrets.KUBEBLOCKS_TOKEN }}

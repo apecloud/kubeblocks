@@ -82,7 +82,7 @@ spec:
 ### Sample `OpsRequest` for horizontal scaling
 
 ```
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: ops-xxxx

@@ -18,6 +18,7 @@ package operations
 
 import (
 	"sync"
+	"time"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
@@ -30,6 +31,7 @@ var (
 // RegisterOps register operation with OpsType and OpsBehaviour
 func (opsMgr *OpsManager) RegisterOps(opsType dbaasv1alpha1.OpsType, opsBehaviour *OpsBehaviour) {
 	opsManager.OpsMap[opsType] = opsBehaviour
+	dbaasv1alpha1.ClusterPhasesMapperForOps[opsType] = opsBehaviour.FromClusterPhases
 }
 
 // Do the common entry function for handling OpsRequest
@@ -72,36 +74,38 @@ func (opsMgr *OpsManager) Do(opsRes *OpsResource) error {
 
 // Reconcile entry function when OpsRequest.status.phase is Running.
 // loop until the operation is completed.
-func (opsMgr *OpsManager) Reconcile(opsRes *OpsResource) error {
+func (opsMgr *OpsManager) Reconcile(opsRes *OpsResource) (time.Duration, error) {
 	var (
 		opsBehaviour    *OpsBehaviour
 		ok              bool
 		err             error
+		requeueAfter    time.Duration
 		opsRequestPhase dbaasv1alpha1.Phase
 		opsRequest      = opsRes.OpsRequest
 	)
 
 	if opsRes.OpsRequest.Status.Phase != dbaasv1alpha1.RunningPhase {
-		return nil
+		return requeueAfter, nil
 	}
 
 	if opsBehaviour, ok = opsMgr.OpsMap[opsRes.OpsRequest.Spec.Type]; !ok {
-		return patchOpsBehaviourNotFound(opsRes)
+		return requeueAfter, patchOpsBehaviourNotFound(opsRes)
 	}
 
 	if opsBehaviour == nil || opsBehaviour.ReconcileAction == nil {
-		return nil
+		return requeueAfter, nil
 	}
-	if opsRequestPhase, err = opsBehaviour.ReconcileAction(opsRes); err != nil {
-		return err
+	if opsRequestPhase, requeueAfter, err = opsBehaviour.ReconcileAction(opsRes); err != nil && !isOpsRequestFailedPhase(opsRequestPhase) {
+		// if the opsRequest phase is Failed, skipped
+		return requeueAfter, err
 	}
 	switch opsRequestPhase {
 	case dbaasv1alpha1.SucceedPhase:
-		return PatchOpsStatus(opsRes, opsRequestPhase, dbaasv1alpha1.NewSucceedCondition(opsRequest))
+		return requeueAfter, PatchOpsStatus(opsRes, opsRequestPhase, dbaasv1alpha1.NewSucceedCondition(opsRequest))
 	case dbaasv1alpha1.FailedPhase:
-		return PatchOpsStatus(opsRes, opsRequestPhase, dbaasv1alpha1.NewFailedCondition(opsRequest))
+		return requeueAfter, PatchOpsStatus(opsRes, opsRequestPhase, dbaasv1alpha1.NewFailedCondition(opsRequest, err))
 	default:
-		return nil
+		return requeueAfter, nil
 	}
 }
 
@@ -115,7 +119,7 @@ func (opsMgr *OpsManager) validateClusterPhaseAndOperations(opsRes *OpsResource,
 		isOkClusterPhase = true
 		break
 	}
-	opsRequestAnnotation := getOpsRequestAnnotation(opsRes.Cluster, behaviour.ToClusterPhase)
+	opsRequestAnnotation := getOpsRequestNameFromAnnotation(opsRes.Cluster, behaviour.ToClusterPhase)
 	if behaviour.ToClusterPhase != "" && opsRequestAnnotation != nil {
 		// OpsRequest is reentry
 		if *opsRequestAnnotation == opsRes.OpsRequest.Name {

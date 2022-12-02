@@ -20,6 +20,7 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -28,12 +29,6 @@ import (
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
-
-const (
-	ProbeRoleChangedCheckPath = "spec.containers{kbprobe-rolechangedcheck}"
-)
-
-var EventHandlerMap = map[string]EventHandler{}
 
 type EventHandler interface {
 	Handle(client.Client, intctrlutil.RequestCtx, record.EventRecorder, *corev1.Event) error
@@ -45,6 +40,12 @@ type EventReconciler struct {
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
+
+const (
+	ProbeRoleChangedCheckPath = "spec.containers{kbprobe-rolechangedcheck}"
+)
+
+var EventHandlerMap = map[string]EventHandler{}
 
 // NOTES: controller-gen RBAC marker is maintained at rbac.go
 
@@ -72,15 +73,9 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	for _, handler := range EventHandlerMap {
-		if err := handler.Handle(r.Client, reqCtx, r.Recorder, event); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "handleEventError")
-		}
-	}
-
-	// event order is crucial in role probing, but it's not guaranteed when controller restarted, so we have to delete them
-	if event.InvolvedObject.FieldPath == ProbeRoleChangedCheckPath {
-		if err := r.Client.Delete(ctx, event); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "deleteEventError")
+		// ignores the not found error.
+		if err := handler.Handle(r.Client, reqCtx, r.Recorder, event); err != nil && !apierrors.IsNotFound(err) {
+			return intctrlutil.RequeueWithError(err, reqCtx.Log, "handleEventError")
 		}
 	}
 

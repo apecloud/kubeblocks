@@ -26,24 +26,22 @@ import (
 
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
-	// ref ClusterDefinition, immutable.
+	// Cluster referenced ClusterDefinition name, this is an immutable attribute.
 	// +kubebuilder:validation:Required
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
-	// ref AppVersion
+	// Cluster referenced AppVersion name.
 	// +kubebuilder:validation:Required
 	AppVersionRef string `json:"appVersionRef"`
 
-	// One of DoNotTerminate, Halt, Delete, WipeOut.
-	// Defaults to Halt.
-	// DoNotTerminate means block delete operation.
-	// Halt means delete resources such as sts,deploy,svc,pdb, but keep pvcs.
-	// Delete is based on Halt and delete pvcs.
-	// WipeOut is based on Delete and wipe out all snapshots and snapshot data from bucket.
-	// +kubebuilder:default=Halt
+	// Cluster termination policy. One of DoNotTerminate, Halt, Delete, WipeOut.
+	// DoNotTerminate will block delete operation.
+	// Halt will delete workload resources such as statefulset, deployment workloads but keep PVCs.
+	// Delete is based on Halt and deletes PVCs.
+	// WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.
+	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
-	// +optional
-	TerminationPolicy TerminationPolicyType `json:"terminationPolicy,omitempty"`
+	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
 
 	// List of components you want to replace in ClusterDefinition and AppVersion. It will replace the field in ClusterDefinition's and AppVersion's component if type is matching.
 	// +optional
@@ -52,6 +50,10 @@ type ClusterSpec struct {
 	// Affinity describes affinities which specific by users.
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
+
+	// Cluster Tolerations are attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster
@@ -66,11 +68,12 @@ type ClusterStatus struct {
 	// Creating: creating cluster.
 	// Running: cluster is running, all components is available.
 	// Updating: cluster changes, such as horizontal-scaling/vertical-scaling/restart.
+	// VolumeExpanding: volume expansion operation is running.
 	// Deleting/Deleted: deleting cluster/cluster is deleted.
 	// Failed: cluster not available.
 	// Abnormal: cluster available but some component is not Abnormal.
 	// if the component type is Consensus/Replication, the Leader/Primary pod is must ready in Abnormal phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted}
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted,VolumeExpanding}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
@@ -125,6 +128,10 @@ type ClusterComponent struct {
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
+	// Component tolerations will override ClusterSpec.Tolerations if specified.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
 	// Resources requests and limits of workload.
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
@@ -165,7 +172,7 @@ type ClusterStatusComponent struct {
 	// Abnormal: component available but some pod is not ready.
 	// If the component type is Consensus/Replication, the Leader/Primary pod is must ready in Abnormal phase.
 	// Other phases behave the same as the cluster phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted}
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted,VolumeExpanding}
 	Phase Phase `json:"phase,omitempty"`
 
 	// Message record the component details message in current phase.
@@ -279,7 +286,9 @@ type OperationComponent struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:categories={dbaas,all}
+//+kubebuilder:printcolumn:name="CLUSTER-DEFINITION",type="string",JSONPath=".spec.clusterDefinitionRef",description="ClusterDefinition referenced by cluster."
 //+kubebuilder:printcolumn:name="APP-VERSION",type="string",JSONPath=".spec.appVersionRef",description="Cluster Application Version."
+//+kubebuilder:printcolumn:name="TERMINATION-POLICY",type="string",JSONPath=".spec.terminationPolicy",description="Cluster termination policy."
 //+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="Cluster Status."
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
@@ -305,15 +314,15 @@ func init() {
 	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
 }
 
-// ValidateEnabledLogs validate enabledLogs config, and return metav1.Condition when detect invalid value
+// ValidateEnabledLogs validates enabledLogs config in cluster.yaml, and returns metav1.Condition when detect invalid values.
 func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) []*metav1.Condition {
-	conditionList := make([]*metav1.Condition, 0)
+	conditionList := make([]*metav1.Condition, 0, len(r.Spec.Components))
 	for _, comp := range r.Spec.Components {
 		invalidLogNames := cd.ValidateEnabledLogConfigs(comp.Type, comp.EnabledLogs)
 		if len(invalidLogNames) == 0 {
 			continue
 		}
-		message := fmt.Sprintf("EnabledLogs of cluster component %s has invalid value %s which isn't definded in cluster definition", comp.Name, invalidLogNames)
+		message := fmt.Sprintf("EnabledLogs config of cluster component %s has invalid value %s which isn't definded in clusterDefinition", comp.Name, invalidLogNames)
 		conditionList = append(conditionList, &metav1.Condition{
 			Type:               "ValidateEnabledLogs",
 			Status:             metav1.ConditionFalse,

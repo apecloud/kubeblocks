@@ -128,7 +128,7 @@ help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 .PHONY: all
-all: manager dbctl agamotto ## Make all cmd binaries.
+all: manager kbcli agamotto ## Make all cmd binaries.
 
 ##@ Development
 
@@ -234,23 +234,23 @@ CLI_LD_FLAGS ="-s -w \
 
 
 
-bin/dbctl.%: ## Cross build bin/dbctl.$(OS).$(ARCH) CLI.
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${CLI_LD_FLAGS} -o $@ cmd/dbctl/main.go
+bin/kbcli.%: ## Cross build bin/kbcli.$(OS).$(ARCH).
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${CLI_LD_FLAGS} -o $@ cmd/cli/main.go
 
-.PHONY: dbctl
-dbctl: OS=$(shell $(GO) env GOOS)
-dbctl: ARCH=$(shell $(GO) env GOARCH)
-dbctl: build-checks ## Build bin/dbctl CLI.
-	$(MAKE) bin/dbctl.$(OS).$(ARCH)
-	mv bin/dbctl.$(OS).$(ARCH) bin/dbctl
+.PHONY: kbcli
+kbcli: OS=$(shell $(GO) env GOOS)
+kbcli: ARCH=$(shell $(GO) env GOARCH)
+kbcli: build-checks ## Build bin/kbcli.
+	$(MAKE) bin/kbcli.$(OS).$(ARCH)
+	mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
 
 .PHONY: clean
-clean-dbctl: ## Clean bin/dbctl* CLI tools.
-	rm -f bin/dbctl*
+clean-kbcli: ## Clean bin/kbcli*.
+	rm -f bin/kbcli*
 
 .PHONY: doc
-dbctl-doc: ## generate dbctl command reference manual.
-	go run ./hack/docgen/dbctl/main.go ./docs/user_docs/cli
+kbcli-doc: build-checks ## generate CLI command reference manual.
+	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
 ##@ Load Balancer
 
@@ -378,13 +378,13 @@ intstall-git-hooks: githookstool ## Install git hooks.
 	git hooks
 
 .PHONY: ci-test-pre
-ci-test-pre: dbctl ## Prepare CI test environment.
-	bin/dbctl playground destroy
-	bin/dbctl playground init
+ci-test-pre: kbcli ## Prepare CI test environment.
+	bin/kbcli playground destroy
+	bin/kbcli playground init
 
 .PHONY: ci-test
 ci-test: ci-test-pre test ## Run CI tests.
-	bin/dbctl playground destroy
+	bin/kbcli playground destroy
 	$(GO) tool cover -html=cover.out -o cover.html
 
 ##@ Contributor
@@ -424,6 +424,23 @@ endif
 helm-package: bump-chart-ver ## Do helm package.
 	$(HELM) package $(CHART_PATH) --dependency-update
 
+##@ WeSQL Cluster Helm Chart Tasks
+
+WESQL_CLUSTER_CHART_PATH = deploy/wesqlcluster
+WESQL_CLUSTER_CHART_NAME = wesqlcluster
+WESQL_CLUSTER_CHART_VERSION ?= 0.1.1
+
+.PHONY: bump-chart-ver-wqsql-cluster
+bump-chart-ver-wqsql-cluster: ## Bump WeSQL Cluster helm chart version.
+ifeq ($(GOOS), darwin)
+	sed -i '' "s/^version:.*/version: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
+else
+	sed -i "s/^version:.*/version: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
+endif
+
+.PHONY: helm-package-wqsql-cluster
+helm-package-wqsql-cluster: bump-chart-ver-wqsql-cluster ## Do WeSQL Cluster helm package.
+	$(HELM) package $(WESQL_CLUSTER_CHART_PATH)
 
 ##@ Build Dependencies
 

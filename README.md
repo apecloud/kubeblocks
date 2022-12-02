@@ -57,8 +57,8 @@ Development
   goimports        Run goimports against code.
 
 CLI
-  dbctl            Build bin/dbctl CLI.
-  clean-dbctl      Clean bin/dbctl* CLI tools.
+  kbcli            Build bin/kbcli CLI.
+  clean-kbcli      Clean bin/kbcli* CLI tools.
 
 Operator Controller Manager
   manager          Build manager binary.
@@ -84,7 +84,10 @@ Contributor
 Helm Chart Tasks
   bump-chart-ver   Bump helm chart version.
   helm-package     Do helm package.
-  helm-push        Do helm package and push.
+
+WeSQL Cluster Helm Chart Tasks
+  bump-chart-ver-wqsql-cluster  Bump WeSQL Cluster helm chart version.
+  helm-package-wqsql-cluster  Do WeSQL Cluster helm package.
 
 Build Dependencies
   kustomize        Download kustomize locally if necessary.
@@ -108,8 +111,8 @@ Minikube
 Docker containers 
   build-dev-container  Build dev container image.
   push-dev-container  Push dev container image.
-  build-cli-container  Build dbctl CLI container image.
-  push-cli-container  Push dbctl CLI container image.
+  build-cli-container  Build kbcli CLI container image.
+  push-cli-container  Push kbcli CLI container image.
   build-manager-container  Build Operator manager container image.
   push-manager-container  Push Operator manager container image.
 ```

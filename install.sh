@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 
-APP_NAME="dbctl"
+APP_NAME="kbcli"
 REPO_URL=""
 

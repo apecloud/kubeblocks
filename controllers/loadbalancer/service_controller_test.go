@@ -246,7 +246,7 @@ var _ = Describe("ServiceController", Ordered, func() {
 			mockNewNode.EXPECT().ChooseENI().Return(newENI, nil).AnyTimes()
 			mockNewNode.EXPECT().SetupNetworkForService(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 			mockNodeManager.EXPECT().GetNode(newNodeIP).Return(mockNewNode, nil).AnyTimes()
-			mockCloud.EXPECT().AssignPrivateIpAddresses(newENIId, floatingIP).Return(nil).AnyTimes()
+			mockCloud.EXPECT().AssignPrivateIPAddresses(newENIId, floatingIP).Return(nil).AnyTimes()
 			mockOldNode.EXPECT().CleanNetworkForService(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 			svc.GetAnnotations()[AnnotationKeyMasterNodeIP] = newNodeIP
@@ -315,7 +315,7 @@ var _ = Describe("ServiceController", Ordered, func() {
 			}
 			mockNode.EXPECT().ChooseENI().Return(eni, nil).AnyTimes()
 			mockProvider.EXPECT().AllocIPAddresses(eni.EniId).Return(eniIP12, nil).AnyTimes()
-			mockProvider.EXPECT().AssignPrivateIpAddresses(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+			mockProvider.EXPECT().AssignPrivateIPAddresses(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 			mockNode.EXPECT().SetupNetworkForService(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 			svc, svcKey := newSvcObj(true, "")

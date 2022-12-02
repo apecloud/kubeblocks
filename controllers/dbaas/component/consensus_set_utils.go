@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/google/go-cmp/cmp"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -131,6 +130,10 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 		oldConsensusSetStatus = cluster.Status.Components[componentName].ConsensusSetStatus
 		setConsensusSetStatusRoles(oldConsensusSetStatus, *component, pods)
 		if err = cli.Status().Patch(ctx, cluster, patch); err != nil {
+			return false, err
+		}
+		// add consensus role info to pod env
+		if err := updateConsensusRoleInfo(ctx, cli, cluster, *component, componentName, pods); err != nil {
 			return false, err
 		}
 	}
@@ -402,7 +405,7 @@ func initClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster, componentN
 
 		cluster.Status.Components[componentName] = &dbaasv1alpha1.ClusterStatusComponent{
 			Type:  typeName,
-			Phase: dbaasv1alpha1.RunningPhase,
+			Phase: cluster.Status.Phase,
 		}
 	}
 	componentStatus := cluster.Status.Components[componentName]
@@ -551,4 +554,53 @@ func isReady(pod corev1.Pod) bool {
 	}
 
 	return false
+}
+
+func updateConsensusRoleInfo(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, componentDef dbaasv1alpha1.ClusterDefinitionComponent, componentName string, pods []corev1.Pod) error {
+	leader := ""
+	followers := ""
+	for _, pod := range pods {
+		role := pod.Labels[intctrlutil.ConsensusSetRoleLabelKey]
+		// mapping role label to consensus member
+		roleMap := composeConsensusRoleMap(componentDef)
+		memberExt, ok := roleMap[role]
+		if !ok {
+			continue
+		}
+		switch memberExt.consensusRole {
+		case Leader:
+			leader = pod.Name
+		case Follower:
+			if len(followers) > 0 {
+				followers += ","
+			}
+			followers += pod.Name
+		case Learner:
+			// TODO: CT
+		}
+	}
+
+	ml := client.MatchingLabels{
+		intctrlutil.AppInstanceLabelKey:   cluster.GetName(),
+		intctrlutil.AppComponentLabelKey:  componentName,
+		intctrlutil.AppConfigTypeLabelKey: "kubeblocks-env",
+	}
+
+	configList := &corev1.ConfigMapList{}
+	if err := cli.List(ctx, configList, ml); err != nil {
+		return err
+	}
+
+	if len(configList.Items) > 0 {
+		for _, config := range configList.Items {
+			patch := client.MergeFrom(config.DeepCopy())
+			config.Data["KB_"+strings.ToUpper(componentName)+"_LEADER"] = leader
+			config.Data["KB_"+strings.ToUpper(componentName)+"_FOLLOWERS"] = followers
+			if err := cli.Patch(ctx, &config, patch); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

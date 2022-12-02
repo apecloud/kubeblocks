@@ -17,6 +17,8 @@ limitations under the License.
 package dbaas
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -41,6 +43,7 @@ type ComponentTemplateValues struct {
 type ConfigTemplateBuilder struct {
 	namespace   string
 	clusterName string
+	tplName     string
 
 	// Global Var
 	componentValues  *ComponentTemplateValues
@@ -54,21 +57,31 @@ type ConfigTemplateBuilder struct {
 }
 
 func NewCfgTemplateBuilder(clusterName, namespace string, cluster *dbaasv1alpha1.Cluster, version *dbaasv1alpha1.AppVersion) *ConfigTemplateBuilder {
+	const DefaultTplName = "DBaasTpl"
 	return &ConfigTemplateBuilder{
 		namespace:   namespace,
 		clusterName: clusterName,
 		cluster:     cluster,
 		appVersion:  version,
+		tplName:     DefaultTplName,
 	}
+}
+
+func (c *ConfigTemplateBuilder) setTplName(tplName string) {
+	c.tplName = tplName
+}
+
+func (c *ConfigTemplateBuilder) formatError(file string, err error) error {
+	return fmt.Errorf("failed to render configuration template[cm:%s][key:%s], error: [%v]", c.tplName, file, err)
 }
 
 func (c *ConfigTemplateBuilder) Render(configs map[string]string) (map[string]string, error) {
 	rendered := make(map[string]string, len(configs))
-	engine := intctrlutil.NewTplEngine(c.builtinObjects(), c.buildinFunctions)
+	engine := intctrlutil.NewTplEngine(c.builtinObjects(), c.buildinFunctions, c.tplName)
 	for file, configContext := range configs {
 		newContext, err := engine.Render(configContext)
 		if err != nil {
-			return nil, err
+			return nil, c.formatError(file, err)
 		}
 		rendered[file] = newContext
 	}
@@ -109,7 +122,7 @@ func (c *ConfigTemplateBuilder) InjectBuiltInObjectsAndFunctions(podTemplate *co
 // General Built-in functions
 const (
 	BuiltinGetVolumeFunctionName    = "getVolumePathByName"
-	BuiltinGetPvcFunctionName       = "getPvcByName"
+	BuiltinGetPVCFunctionName       = "getPVCByName"
 	BuiltinGetEnvFunctionName       = "getEnvByName"
 	BuiltinGetArgFunctionName       = "getArgByName"
 	BuiltinGetPortFunctionName      = "getPortByName"
@@ -125,7 +138,7 @@ func injectBuiltInFunctions(tplBuilder *ConfigTemplateBuilder, podTemplate *core
 	tplBuilder.buildinFunctions = &intctrlutil.BuiltinObjectsFunc{
 		BuiltinMysqlCalBufferFunctionName: calDBPoolSize,
 		BuiltinGetVolumeFunctionName:      getVolumeMountPathByName,
-		BuiltinGetPvcFunctionName:         getPvcByName,
+		BuiltinGetPVCFunctionName:         getPVCByName,
 		BuiltinGetEnvFunctionName:         getEnvByName,
 		BuiltinGetPortFunctionName:        getPortByName,
 		BuiltinGetArgFunctionName:         getArgByName,

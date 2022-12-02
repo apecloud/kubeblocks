@@ -89,6 +89,15 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("By creating a appVersion for upgrade")
 		newAppVersion := createTestAppVersionObj(clusterDefinitionName, appVersionNameForUpgrade)
 		Expect(testCtx.CreateObj(ctx, newAppVersion)).Should(Succeed())
+
+		By("Test Cluster Phase")
+		ClusterPhasesMapperForOps[UpgradeType] = []Phase{RunningPhase}
+		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
+		// update cluster phase to Running
+		clusterPatch := client.MergeFrom(cluster.DeepCopy())
+		cluster.Status.Phase = RunningPhase
+		Expect(k8sClient.Status().Patch(ctx, cluster, clusterPatch)).Should(Succeed())
+
 		By("By creating a upgrade opsRequest, it should be succeed")
 		Eventually(func() bool {
 			opsRequest.Spec.ClusterOps.Upgrade.AppVersionRef = newAppVersion.Name
@@ -102,8 +111,9 @@ var _ = Describe("OpsRequest webhook", func() {
 				Namespace: opsRequest.Namespace}, &OpsRequest{})
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
-		By("By testing Immutable when status.phase in (Running,Succeed)")
-		opsRequest.Status.Phase = RunningPhase
+
+		By("By testing Immutable when status.phase in Succeed")
+		opsRequest.Status.Phase = SucceedPhase
 		Expect(k8sClient.Status().Update(ctx, opsRequest)).Should(Succeed())
 		opsRequest.Spec.ClusterRef = "test"
 		Expect(k8sClient.Update(ctx, opsRequest)).ShouldNot(Succeed())
@@ -216,33 +226,45 @@ var _ = Describe("OpsRequest webhook", func() {
 		opsRequest.Spec.ComponentOpsList[0].HorizontalScaling.Replicas = 4
 		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
 
-	}
-
-	patchStatusPhase := func(opsRequest *OpsRequest, phase Phase) {
-		patch := client.MergeFrom(opsRequest.DeepCopy())
-		opsRequest.Status.Phase = phase
-		Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).Should(Succeed())
+		By("test min, max is zero")
+		tmpCluster := &Cluster{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: cluster.Namespace}, tmpCluster)).Should(Succeed())
+		patch = client.MergeFrom(tmpCluster.DeepCopy())
+		tmpCluster.Status.Operations.HorizontalScalable = []OperationComponent{
+			{
+				Name: "proxy",
+			},
+		}
+		Expect(k8sClient.Status().Patch(ctx, tmpCluster, patch)).Should(Succeed())
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
 		Eventually(func() bool {
-			newOpsRequest := &OpsRequest{}
-			_ = k8sClient.Get(ctx, client.ObjectKey{Name: opsRequest.Name, Namespace: opsRequest.Namespace}, newOpsRequest)
-			return newOpsRequest.Status.Phase == phase
+			opsRequest.Spec.ComponentOpsList = []ComponentOps{
+				{ComponentNames: []string{"proxy"},
+					HorizontalScaling: &HorizontalScaling{
+						Replicas: 5,
+					},
+				},
+			}
+			err := testCtx.CheckedCreateObj(ctx, opsRequest)
+			return err == nil
 		}, timeout, interval).Should(BeTrue())
+
 	}
 
-	testDelete := func(opsRequest *OpsRequest) {
-		By("test delete OpsRequest when phase is Running")
-		patchStatusPhase(opsRequest, RunningPhase)
-		Expect(k8sClient.Delete(ctx, opsRequest)).ShouldNot(Succeed())
+	testWhenClusterDeleted := func(cluster *Cluster, opsRequest *OpsRequest) {
+		By("delete cluster")
+		newCluster := &Cluster{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: cluster.Namespace}, newCluster)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, newCluster)).Should(Succeed())
 
-		By("test patch/delete OpsRequest when phase is Succeed")
-		patchStatusPhase(opsRequest, SucceedPhase)
+		By("test path labels")
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: cluster.Namespace}, &Cluster{})).ShouldNot(Succeed())
 		patch := client.MergeFrom(opsRequest.DeepCopy())
 		opsRequest.Labels = map[string]string{"test": "test"}
 		Expect(k8sClient.Patch(ctx, opsRequest, patch)).Should(Succeed())
-		Expect(k8sClient.Delete(ctx, opsRequest)).Should(Succeed())
 	}
 
-	testRestart := func(cluster *Cluster) {
+	testRestart := func(cluster *Cluster) *OpsRequest {
 		// set cluster support restart
 		patch := client.MergeFrom(cluster.DeepCopy())
 		cluster.Status.Operations.Restartable = []string{"replicaSets"}
@@ -267,8 +289,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			err := testCtx.CheckedCreateObj(ctx, opsRequest)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
-
-		testDelete(opsRequest)
+		return opsRequest
 	}
 
 	Context("When appVersion create and update", func() {
@@ -305,7 +326,9 @@ var _ = Describe("OpsRequest webhook", func() {
 
 			testHorizontalScaling(cluster)
 
-			testRestart(cluster)
+			opsRequest = testRestart(cluster)
+
+			testWhenClusterDeleted(cluster, opsRequest)
 
 		})
 	})

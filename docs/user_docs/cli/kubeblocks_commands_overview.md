@@ -6,6 +6,7 @@ This section lists all the KubeBlocks commands for configuring and managing a da
 
 | **Command**                                                               |  **Usage**                                       |
 | :--                                                                       | :--                                              |
+| [`dbctl`](dbctl.md)                                                       | KubeBlocks CLI.                                  |
 | [`dbctl_backup_create`](dbctl_backup_create.md)                           | Create a new backup job.                         |
 | [`dbctl_backup_list`](dbctl_backup_list.md)                               | List all database backup jobs.                   |
 | [`dbctl_backup_restore`](dbctl_backup_restore.md)                         | Restore the specified database.                  |
@@ -53,4 +54,3 @@ This section lists all the KubeBlocks commands for configuring and managing a da
 | [`dbctl_playground_init`](dbctl_playground_init.md)                       | Bootstrap a KubeBlocks for playground.           |
 | [`dbctl_playground`](dbctl_playground.md)                                 | Bootstrap a KubeBlocks in local host.            |
 | [`dbctl_version`](dbctl_version.md)                                       | Print the dbctl version.                         |
-| [`dbctl`](dbctl.md)                                                       | KubeBlocks CLI.                                  |

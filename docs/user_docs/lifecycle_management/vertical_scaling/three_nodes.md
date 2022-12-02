@@ -73,7 +73,7 @@ kubectl apply -f cluster_three_nodes.yaml
 cluster.dbaas.kubeblocks.io/wesql-3nodes created
 ```
 
-Wait for a few seconds and when the cluster is running, which means the cluster is deployed successfully.
+  Wait for a few seconds and when the cluster is running, which means the cluster is deployed successfully.
 
 ```
 $ kubectl get cluster
@@ -111,7 +111,7 @@ When the `status.phase` is `Running`, you can run `OpsRequest` to restart this c
 
 _Steps_:
 
-Prepare a YAML file for vertically scaling a three-node cluster. Below is the YAML file of the `OpsRequest` CR:
+1. Prepare a YAML file for vertically scaling a three-node cluster. Below is the YAML file of the `OpsRequest` CR:
 
 ```
 apiVersion: dbaas.kubeblocks.io/v1alpha1

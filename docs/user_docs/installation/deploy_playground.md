@@ -2,11 +2,11 @@
 
 KuebBlocks Playground creates an easy-to-use database environment for Kubernetes users.
 
-# Before you start
-
-Deploy [`dbctl`](deploy_dbctl.md) first.
-
 ## Before you start
+
+- `dbctl`
+  
+  Deploy [`dbctl`](deploy_dbctl.md) first.
 
 - Docker
 
@@ -44,7 +44,7 @@ You can also deploy `playground` on AWS EC2 by following the steps below.
 
 Make sure the following requirements are met.
 
-- AWS access key: An AWS access key is required and this account should have the searching and changing permission of VPC/Internet Gateway/Subnet/Route Table/Security Group/EC2 resources. ***#Environment dependencies are required. Need to be confirmed and added. ***
+- AWS access key: An AWS access key is required and this account should have the searching and changing permission of VPC/Internet Gateway/Subnet/Route Table/Security Group/EC2 resources. ***Environment dependencies are required. Need to be confirmed and added. ***
 - EKS
 - Self-owned Kubernetes
 - A fresh and clean start
@@ -59,7 +59,7 @@ dbctl playground init --access-key xxx --access-secret xxx --cloud-provider aws
 ```
 
 _Result_:
-The following information will be displayed when `playground` is deployed successfully.
+  The following information will be displayed when `playground` is deployed successfully.
 
 ```
 Notes:

@@ -16,7 +16,7 @@ This guide describes the details of KubeBlocks lifecycle API. KubeBlocks API is 
 
 `spec.componentType` stands for the component type. KubeBlocks supports `stateless`, `stateful`, and `consensus`. `stateless` is set as default.
 
-### spec.consensusSpec
+#### spec.consensusSpec
 
 When the `spec.componentType` is set as `consensus`, `spec.consensusSpec` is required.
 
@@ -25,16 +25,23 @@ When the `spec.componentType` is set as `consensus`, `spec.consensusSpec` is req
     `leader` stands for the leader node and provides write capability. 
 
     - `name`
+      
         `name` stands for the role name and comes from the result of `roleObserveQuery`.
+    
     - `accessMode`
+        
         `accessMode` stands for the service capability. There are three types available, namely `readWrite`, `readonly`, and `none`. `readWrite` provides read and write services. `readonly` provides write service. `none` does not provide any service.
+  
 - `followers`
+    
     `followers` participates in the election. Its name and access mode are defined by default.
 
 - `learner`
+    
     `learner` does not participate in the election. Its name and access mode are defined by default. Its `replicas` stands for the pod amount and it is non-overridable in the cluster.
 
 - `updateStrategy`
+    
     `updateStrategy` stands for the updating strategy. `serial`, `bestEffortParallel` and `parallel` are selectable. `serial` is set as the default.
     
     - `serial` stands for the serial executor. For example, when MySQL three-node cluster is upgrading, this process will be executed following this order, `learner1 -> learner2 -> logger -> follower -> leader`.
@@ -226,40 +233,40 @@ It refers to AppVersion and its value should be the same as `AppVersion`.
 
 The YAML file of `Cluster` can be found in GitHub repository `kubeblocks\examples\dbass`.
 
-Standard version:
+- Standard version:
 
-```
-apiVersion: dbaas.infracrate.com/v1alpha1
-kind: Cluster
-metadata:
+  ```
+  apiVersion: dbaas.infracrate.com/v1alpha1
+  kind: Cluster
+  metadata:
     name: mysql-a-series-standard
-spec:
-    clusterDefinitionRef: wesql
-    appVersionRef: wesql-8.0.18
-    components:
-      - name: "mysql-a-1"
-        type: mysql-a
-```
+  spec:
+      clusterDefinitionRef: wesql
+      appVersionRef: wesql-8.0.18
+      components:
+        - name: "mysql-a-1"
+          type: mysql-a
+  ```
 
-Enterprise version:
+- Enterprise version:
 
-```
-apiVersion: dbaas.infracrate.com/v1alpha1
-kind: Cluster
-metadata:
-    name: mysql-a-series-enterprise
-spec:
-    clusterDefinitionRef: wesql
-    appVersionRef: wesql-8.0.18
-    components:
-      - name: "mysql-a-2"
-        type: mysql-a
-        replicas: 3
-        resoures:
-            requests:
-                cpu: 32
-                memory: 128Gi
-            limits:
-                cpu: 32
-                memory: 128Gi
-```
+  ```
+  apiVersion: dbaas.infracrate.com/v1alpha1
+  kind: Cluster
+  metadata:
+      name: mysql-a-series-enterprise
+  spec:
+      clusterDefinitionRef: wesql
+      appVersionRef: wesql-8.0.18
+      components:
+        - name: "mysql-a-2"
+          type: mysql-a
+          replicas: 3
+          resoures:
+              requests:
+                  cpu: 32
+                  memory: 128Gi
+              limits:
+                  cpu: 32
+                  memory: 128Gi
+  ```

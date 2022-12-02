@@ -19,7 +19,7 @@ spec:
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.phase
-      name: PHASE
+      name: STATUS
       type: string
     - jsonPath: .status.completionTimestamp
       name: COMPLETIONTIME

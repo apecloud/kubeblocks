@@ -31,7 +31,7 @@ spec:
       type: string
     - description: Operation status phase.
       jsonPath: .status.phase
-      name: PHASE
+      name: STATUS
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: AGE

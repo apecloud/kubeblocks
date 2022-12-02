@@ -30,7 +30,7 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
 	iptableswrapper "github.com/apecloud/kubeblocks/internal/loadbalancer/iptables"
 	netlinkwrapper "github.com/apecloud/kubeblocks/internal/loadbalancer/netlink"

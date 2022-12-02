@@ -17,7 +17,7 @@ This document covers basic needs to work with KubeBlocks codebase.
 - [Basics](#basics)
   - [Kubebuilder](#kubebuilder)
   - [Makefile](#makefile)
-  - [\[TODO\] dbctl](#todo-dbctl)
+  - [\[TODO\] kbcli](#todo-kbcli)
   - [Code style](#code-style)
 - [Test](#test)
   - [Envtest](#envtest)
@@ -168,7 +168,7 @@ You can use cloud Kubernetes service, such as [`EKS`](https://aws.amazon.com/eks
 
 ### Makefile
 `KubeBlocks` includes a [Makefile](../Makefile) in the root of the repo. This serves as a high-level interface for common commands. Running `make help` will produce a list of make targets with descriptions. These targets will be referenced throughout this document.
-### [TODO] dbctl
+### [TODO] kbcli
 
 ### Code style
 First, read the Go (Golang) coding guidelines again, looking for any style violations. It's easier to remember a style rule once you've violated it.
@@ -239,7 +239,7 @@ make run-delve GO_PACKAGE=./cmd/manager/main.go
 
 #### Pass arguements
 ```shell
- make run-delve GO_PACKAGE=./cmd/dbctl/main.go ARGUMENTS='cluster create test-cluster --termination-policy=Halt'
+ make run-delve GO_PACKAGE=./cmd/cli/main.go ARGUMENTS='cluster create test-cluster --termination-policy=Halt'
 ```
 
 #### Debug envtest

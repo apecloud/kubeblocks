@@ -275,6 +275,12 @@ spec:
 				ClusterDefRef:     clusterDefObj.GetName(),
 				AppVersionRef:     appVersionObj.GetName(),
 				TerminationPolicy: dbaasv1alpha1.WipeOut,
+				Components: []dbaasv1alpha1.ClusterComponent{
+					{
+						Name: "proxy1",
+						Type: "proxy",
+					},
+				},
 			},
 		}, clusterDefObj, appVersionObj, key
 	}

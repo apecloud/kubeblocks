@@ -432,6 +432,7 @@ spec:
                             type: object
                         required:
                         - name
+                        - spec
                         type: object
                       type: array
                   required:
@@ -500,6 +501,7 @@ spec:
             required:
             - appVersionRef
             - clusterDefinitionRef
+            - components
             - terminationPolicy
             type: object
           status:

@@ -110,7 +110,32 @@ var _ = Describe("cluster webhook", func() {
 			cluster.Spec.Components[0].VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
 			Expect(k8sClient.Update(ctx, cluster)).Should(Succeed())
 
-			By("By updating spec.components[?].volumeClaimTemplates[?].name, expect not succeed")
+			By("By add a component, expect succeed")
+			cluster.Spec.Components = append(cluster.Spec.Components, ClusterComponent{
+				Name: "replicasets2",
+				Type: "replicasets",
+				VolumeClaimTemplates: []ClusterComponentVolumeClaimTemplate{
+					{
+						Name: "log",
+						Spec: &corev1.PersistentVolumeClaimSpec{},
+					},
+				},
+			})
+			Expect(k8sClient.Update(ctx, cluster).Error()).To(ContainSubstring("requests.resources.storage is required"))
+			cluster.Spec.Components[2].VolumeClaimTemplates[0].Spec.Resources = corev1.ResourceRequirements{
+				Requests: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceStorage: resource.MustParse("2Gi"),
+				},
+			}
+			Expect(k8sClient.Update(ctx, cluster)).Should(Succeed())
+			By("test requests.storage with smaller value")
+			cluster.Spec.Components[2].VolumeClaimTemplates[0].
+				Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("1Gi")
+			Expect(k8sClient.Update(ctx, cluster).Error()).To(ContainSubstring("requests.resources.storage cannot less than last value"))
+
+			By("updating spec.components[?].volumeClaimTemplates[?].name, expect not succeed")
+			cluster.Spec.Components[2].VolumeClaimTemplates[0].
+				Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("3Gi")
 			cluster.Spec.Components[0].VolumeClaimTemplates[0].Name = "test"
 			Expect(k8sClient.Update(ctx, cluster).Error()).To(ContainSubstring("volumeClaimTemplates is forbidden modification except for storage size."))
 
@@ -167,7 +192,7 @@ spec:
       spec:
         resources:
           requests:
-            storage: 1Gi
+            storage: 2Gi
   - name: proxy
     type: proxy
     replicas: 1

@@ -23,6 +23,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -60,20 +61,23 @@ var _ webhook.Validator = &Cluster{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *Cluster) ValidateCreate() error {
 	clusterlog.Info("validate create", "name", r.Name)
-	return r.validate()
+	if err := r.validate(); err != nil {
+		return err
+	}
+	return r.validateVolumeClaimTemplates(nil)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	clusterlog.Info("validate update", "name", r.Name)
-	lastCluster := old.(*Cluster)
-	if lastCluster.Spec.ClusterDefRef != r.Spec.ClusterDefRef {
+	oldCluster := old.(*Cluster)
+	if oldCluster.Spec.ClusterDefRef != r.Spec.ClusterDefRef {
 		return newInvalidError(ClusterKind, r.Name, "spec.clusterDefinitionRef", "clusterDefinitionRef is immutable, you can not update it. ")
 	}
 	if err := r.validate(); err != nil {
 		return err
 	}
-	return r.validateVolumeClaimTemplates(lastCluster)
+	return r.validateVolumeClaimTemplates(oldCluster)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
@@ -85,16 +89,21 @@ func (r *Cluster) ValidateDelete() error {
 }
 
 // validateVolumeClaimTemplates volumeClaimTemplates is forbidden modification except for storage size.
-func (r *Cluster) validateVolumeClaimTemplates(lastCluster *Cluster) error {
+func (r *Cluster) validateVolumeClaimTemplates(oldCluster *Cluster) error {
 	var allErrs field.ErrorList
 	for i, component := range r.Spec.Components {
-		lastComponent := getLastComponentByName(lastCluster, component.Name)
-		if lastComponent == nil {
+		oldComponent := getLastComponentByName(oldCluster, component.Name)
+		currVCTs := component.VolumeClaimTemplates
+		if oldComponent == nil {
+			// if no old component, do it
+			validateVolumeClaimStorage(&allErrs, nil, currVCTs, i)
 			continue
 		}
-		setVolumeClaimStorageSizeZero(component.VolumeClaimTemplates)
-		setVolumeClaimStorageSizeZero(lastComponent.VolumeClaimTemplates)
-		if !reflect.DeepEqual(component.VolumeClaimTemplates, lastComponent.VolumeClaimTemplates) {
+		oldVCTs := oldComponent.VolumeClaimTemplates
+		validateVolumeClaimStorage(&allErrs, oldVCTs, currVCTs, i)
+		setVolumeClaimStorageSizeZero(oldVCTs)
+		setVolumeClaimStorageSizeZero(currVCTs)
+		if !reflect.DeepEqual(oldVCTs, currVCTs) {
 			path := fmt.Sprintf("spec.components[%d].volumeClaimTemplates", i)
 			allErrs = append(allErrs, field.Invalid(field.NewPath(path),
 				nil, "volumeClaimTemplates is forbidden modification except for storage size."))
@@ -109,8 +118,11 @@ func (r *Cluster) validateVolumeClaimTemplates(lastCluster *Cluster) error {
 }
 
 // getLastComponentByName the cluster maybe delete or add a component, so we get the component by name.
-func getLastComponentByName(lastCluster *Cluster, componentName string) *ClusterComponent {
-	for _, component := range lastCluster.Spec.Components {
+func getLastComponentByName(oldCluster *Cluster, componentName string) *ClusterComponent {
+	if oldCluster == nil {
+		return nil
+	}
+	for _, component := range oldCluster.Spec.Components {
 		if component.Name == componentName {
 			return &component
 		}
@@ -121,10 +133,43 @@ func getLastComponentByName(lastCluster *Cluster, componentName string) *Cluster
 // setVolumeClaimStorageSizeZero set the volumeClaimTemplates storage size to zero. then we can diff last/current volumeClaimTemplates.
 func setVolumeClaimStorageSizeZero(volumeClaimTemplates []ClusterComponentVolumeClaimTemplate) {
 	for i := range volumeClaimTemplates {
-		if volumeClaimTemplates[i].Spec == nil {
+		volumeClaimTemplates[i].Spec.Resources = corev1.ResourceRequirements{}
+	}
+}
+
+// getVCTMaps covert volume claim templates slice to map
+func getVCTMaps(oldVCTs []ClusterComponentVolumeClaimTemplate) map[string]resource.Quantity {
+	var oldVctMaps = map[string]resource.Quantity{}
+	for _, v := range oldVCTs {
+		if v.Spec == nil {
 			continue
 		}
-		volumeClaimTemplates[i].Spec.Resources = corev1.ResourceRequirements{}
+		// if the request is nil, set the default value to 0
+		storageSize := resource.MustParse("0")
+		if v.Spec.Resources.Requests != nil {
+			storageSize = v.Spec.Resources.Requests[corev1.ResourceStorage]
+		}
+		oldVctMaps[v.Name] = storageSize
+	}
+	return oldVctMaps
+}
+
+// validateVolumeClaimStorage check whether the requests.storage has a value and greater than the last value.
+func validateVolumeClaimStorage(allErrs *field.ErrorList, oldVCTs, currVCTs []ClusterComponentVolumeClaimTemplate, index int) {
+	oldVctMaps := getVCTMaps(oldVCTs)
+	for i, v := range currVCTs {
+		if v.Spec == nil {
+			continue
+		}
+		requests := v.Spec.Resources.Requests
+		path := fmt.Sprintf("spec.components[%d].volumeClaimTemplates[%d]", index, i)
+		if requests == nil || requests.Storage() == nil {
+			addInvalidError(allErrs, path, "", "requests.resources.storage is required")
+			continue
+		}
+		if lastStorageSize, ok := oldVctMaps[v.Name]; ok && requests.Storage().Cmp(lastStorageSize) < 0 {
+			addInvalidError(allErrs, path, "", "requests.resources.storage cannot less than last value")
+		}
 	}
 }
 

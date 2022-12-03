@@ -183,6 +183,12 @@ spec:
 				ClusterDefRef:     clusterDefObj.GetName(),
 				AppVersionRef:     appVersionObj.GetName(),
 				TerminationPolicy: dbaasv1alpha1.WipeOut,
+				Components: []dbaasv1alpha1.ClusterComponent{
+					{
+						Name: "replicasets",
+						Type: "replicasets",
+					},
+				},
 			},
 		}, clusterDefObj, appVersionObj, key
 	}

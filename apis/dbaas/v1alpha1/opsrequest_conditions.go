@@ -119,7 +119,7 @@ func NewRestartingCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeRestarting,
 		Status:             metav1.ConditionTrue,
-		Reason:             "RestartingStarted",
+		Reason:             "RestartStarted",
 		LastTransitionTime: metav1.NewTime(time.Now()),
 		Message:            fmt.Sprintf("start restarting database in Cluster: %s", ops.Spec.ClusterRef),
 	}
@@ -152,7 +152,7 @@ func NewVolumeExpandingCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeVolumeExpanding,
 		Status:             metav1.ConditionTrue,
-		Reason:             "VolumeExpandingStarted",
+		Reason:             "VolumeExpansionStarted",
 		LastTransitionTime: metav1.NewTime(time.Now()),
 		Message:            fmt.Sprintf("start expanding the volume in Cluster: %s", ops.Spec.ClusterRef),
 	}
@@ -163,7 +163,7 @@ func NewUpgradingCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeUpgrading,
 		Status:             metav1.ConditionTrue,
-		Reason:             "UpgradingStarted",
+		Reason:             "UpgradeStarted",
 		LastTransitionTime: metav1.NewTime(time.Now()),
 		Message:            fmt.Sprintf("start upgrading in Cluster: %s", ops.Spec.ClusterRef),
 	}

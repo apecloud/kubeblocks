@@ -212,13 +212,29 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("By testing volumeExpansion volumeClaimTemplate name is not consistent")
 		opsRequest.Spec.ComponentOpsList[0].VolumeExpansion[0].Name = "data1"
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not support volume expansion"))
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, VolumeExpansionType)
+		opsRequest.Spec.ComponentOpsList = []ComponentOps{
+			{ComponentNames: []string{"replicasets"},
+				VolumeExpansion: []VolumeExpansion{
+					{
+						Name:    "data1",
+						Storage: resource.MustParse("3Gi"),
+					},
+				},
+			},
+		}
+		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(Succeed())
 
 		By("By testing volumeExpansion. if api is legal, it will create successfully")
-		Eventually(func() bool {
-			opsRequest.Spec.ComponentOpsList[0].VolumeExpansion[0].Name = "data"
-			err := testCtx.CheckedCreateObj(ctx, opsRequest)
-			return err == nil
-		}, timeout, interval).Should(BeTrue())
+		opsRequest.Spec.ComponentOpsList[0].VolumeExpansion = []VolumeExpansion{
+			{
+				Name:    "data",
+				Storage: resource.MustParse("2Gi"),
+			},
+		}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("must greater than last value in Component"))
+		opsRequest.Spec.ComponentOpsList[0].VolumeExpansion[0].Storage = resource.MustParse("3Gi")
+		Expect(testCtx.CreateObj(ctx, opsRequest)).Should(Succeed())
 	}
 
 	testHorizontalScaling := func(cluster *Cluster) {

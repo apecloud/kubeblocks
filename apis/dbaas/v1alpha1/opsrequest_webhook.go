@@ -177,7 +177,7 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context, allErrs *field.ErrorLi
 // validateVerticalScaling validate api is legal when spec.type is VerticalScaling
 func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *Cluster) {
 	supportedComponentMap := covertComponentNamesToMap(cluster.Status.Operations.VerticalScalable)
-	customValidate := func(componentOps *ComponentOps, index int, operationComponent *OperationComponent) *field.Error {
+	customValidate := func(cluster *Cluster, componentOps *ComponentOps, index int, operationComponent *OperationComponent) *field.Error {
 		if componentOps.VerticalScaling == nil {
 			return field.NotFound(field.NewPath(fmt.Sprintf("spec.componentOps[%d].verticalScaling", index)), "can not be empty")
 		}
@@ -231,7 +231,7 @@ func invalidReplicas(replicas int32, operationComponent *OperationComponent) str
 // validateHorizontalScaling validate api is legal when spec.type is HorizontalScaling
 func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.ErrorList) {
 	supportedComponentMap := covertOperationComponentsToMap(cluster.Status.Operations.HorizontalScalable)
-	customValidate := func(componentOps *ComponentOps, index int, operationComponent *OperationComponent) *field.Error {
+	customValidate := func(cluster *Cluster, componentOps *ComponentOps, index int, operationComponent *OperationComponent) *field.Error {
 		if componentOps.HorizontalScaling == nil {
 			return field.NotFound(field.NewPath(fmt.Sprintf("spec.componentOps[%d].horizontalScaling", index)), "can not be empty")
 		}
@@ -248,10 +248,10 @@ func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.
 // validateVolumeExpansion validate volumeExpansion api is legal when spec.type is VolumeExpansion
 func (r *OpsRequest) validateVolumeExpansion(allErrs *field.ErrorList, cluster *Cluster) {
 	supportedComponentMap := covertOperationComponentsToMap(cluster.Status.Operations.VolumeExpandable)
-	customValidate := func(componentOps *ComponentOps, index int, operationComponent *OperationComponent) *field.Error {
+	customValidate := func(cluster *Cluster, componentOps *ComponentOps, index int, operationComponent *OperationComponent) *field.Error {
 		var (
 			supportedVctMap = map[string]struct{}{}
-			invalidVctNames []string
+			invalidVCTNames []string
 		)
 		if componentOps.VolumeExpansion == nil {
 			return field.NotFound(field.NewPath(fmt.Sprintf("spec.componentOps[%d].volumeExpansion", index)), "can not be empty")
@@ -263,21 +263,42 @@ func (r *OpsRequest) validateVolumeExpansion(allErrs *field.ErrorList, cluster *
 		// check the volumeClaimTemplate is support volumeExpansion
 		for _, v := range componentOps.VolumeExpansion {
 			if _, ok := supportedVctMap[v.Name]; !ok {
-				invalidVctNames = append(invalidVctNames, v.Name)
+				invalidVCTNames = append(invalidVCTNames, v.Name)
 			}
 		}
-		if len(invalidVctNames) > 0 {
-			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].volumeExpansion[*].name", index)), invalidVctNames, "not support volume expansion, check the StorageClass whether allow volume expansion.")
+		if len(invalidVCTNames) > 0 {
+			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].volumeExpansion[*].name", index)), invalidVCTNames, "not support volume expansion, check the StorageClass whether allow volume expansion.")
 		}
-		return nil
+		return validateVolumeExpansionStorage(cluster, componentOps, index)
 	}
 	r.commonValidationWithComponentOps(allErrs, cluster, supportedComponentMap, customValidate)
+}
+
+// validateVolumeExpansionStorage validate volume expansion storage size is greater than last value.
+func validateVolumeExpansionStorage(cluster *Cluster, componentOps *ComponentOps, index int) *field.Error {
+	for _, v := range cluster.Spec.Components {
+		if !slices.Contains(componentOps.ComponentNames, v.Name) {
+			continue
+		}
+		oldVctMaps := getVCTMaps(v.VolumeClaimTemplates)
+		invalidVCTNames := make([]string, 0)
+		for _, expansionInfo := range componentOps.VolumeExpansion {
+			if oldStorage, ok := oldVctMaps[expansionInfo.Name]; ok && expansionInfo.Storage.Cmp(oldStorage) <= 0 {
+				invalidVCTNames = append(invalidVCTNames, expansionInfo.Name)
+			}
+		}
+		if len(invalidVCTNames) > 0 {
+			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].volumeExpansion[*].name",
+				index)), invalidVCTNames, fmt.Sprintf("must greater than last value in Component: %s", v.Name))
+		}
+	}
+	return nil
 }
 
 // commonValidateWithComponentOps do common validation, when the operation in componentOps scope
 func (r *OpsRequest) commonValidationWithComponentOps(allErrs *field.ErrorList, cluster *Cluster,
 	supportedComponentMap map[string]*OperationComponent,
-	customValidate func(*ComponentOps, int, *OperationComponent) *field.Error) bool {
+	customValidate func(*Cluster, *ComponentOps, int, *OperationComponent) *field.Error) bool {
 	var (
 		clusterComponentNameMap    = map[string]struct{}{}
 		tmpComponentNameMap        = map[string]int{}
@@ -330,7 +351,7 @@ func (r *OpsRequest) commonValidationWithComponentOps(allErrs *field.ErrorList, 
 			if customValidate == nil {
 				continue
 			}
-			if err := customValidate(&componentOps, index, operationComponent); err != nil {
+			if err := customValidate(cluster, &componentOps, index, operationComponent); err != nil {
 				*allErrs = append(*allErrs, err)
 			}
 		}

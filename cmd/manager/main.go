@@ -38,6 +38,7 @@ import (
 	dataprotectioncontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	dbaascontrollers "github.com/apecloud/kubeblocks/controllers/dbaas"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/internal/webhook"
 	//+kubebuilder:scaffold:imports
@@ -246,7 +247,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "OpsRequest")
 		os.Exit(1)
 	}
-	if err = (&dbaascontrollers.ReconfigureRequestReconciler{
+	if err = (&configuration.ReconfigureRequestReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
@@ -254,7 +255,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
 		os.Exit(1)
 	}
-	if err = (&dbaascontrollers.ConfigurationTemplateReconciler{
+	if err = (&configuration.ConfigurationTemplateReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("configuration-template-controller"),

@@ -14,22 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package configuration
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path"
 
 	"github.com/sethvargo/go-password/password"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
@@ -47,16 +49,18 @@ type FakeTest struct {
 	AvName     string
 	CfgTplName string
 	Namespace  string
+	MockSts    bool
 
 	// for yaml file
 	CdYaml          string
 	AvYaml          string
 	CfgCMYaml       string
 	CfgTemplateYaml string
+	StsYaml         string
 }
 
 type ISVResource interface {
-	corev1.ConfigMap | dbaasv1alpha1.ClusterDefinition | dbaasv1alpha1.AppVersion | dbaasv1alpha1.ConfigurationTemplate
+	corev1.ConfigMap | appsv1.StatefulSet | dbaasv1alpha1.ClusterDefinition | dbaasv1alpha1.AppVersion | dbaasv1alpha1.ConfigurationTemplate
 }
 
 type K8sResource interface {
@@ -130,7 +134,7 @@ func (w *TestWrapper) updateAvComTplMeta(appVer *dbaasv1alpha1.AppVersion) {
 
 func (w *TestWrapper) updateComTplMeta(cd *dbaasv1alpha1.ClusterDefinition) {
 	// fix return value of xxx func is not checked (errcheck)
-	ok, _ := configuration.HandleConfigTemplate(cd,
+	ok, _ := HandleConfigTemplate(cd,
 		func(templates []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 			return true, nil
 		},
@@ -190,7 +194,7 @@ func (w *TestWrapper) DeleteAllCR() error {
 		client.InNamespace(ISVClusterScope),
 		client.HasLabels{
 			testCtx.TestObjLabelKey,
-			configuration.CMConfigurationTplNameLabelKey,
+			CMConfigurationTplNameLabelKey,
 		}); err != nil {
 		return err
 	}
@@ -240,6 +244,36 @@ func (w *TestWrapper) DeleteCluster(objKey client.ObjectKey) error {
 	return k8sClient.Delete(ctx, f)
 }
 
+func (w *TestWrapper) CreateCfgOnCluster(cfgFile string, cluster *dbaasv1alpha1.Cluster, componentName string) (*corev1.ConfigMap, error) {
+	insCfgCMName := cfgcore.GetComponentCfgName(cluster.Name, componentName, w.testEnv.CfgTplName)
+	if w.testEnv.MockSts {
+		if err := w.createStsFromFile(cluster, componentName, insCfgCMName); err != nil {
+			return nil, err
+		}
+	}
+
+	cmObj := &corev1.ConfigMap{}
+	cmObj, err := createISVCrFromFile(path.Join(w.testRootPath, cfgFile), cmObj, func(cm *corev1.ConfigMap) {
+		if cm.Labels == nil {
+			cm.Labels = make(map[string]string)
+		}
+		cm.Labels[intctrlutil.AppNameLabelKey] = cluster.Name
+		cm.Labels[intctrlutil.AppInstanceLabelKey] = cluster.Name
+		cm.Labels[intctrlutil.AppComponentLabelKey] = componentName
+		cm.Labels[CMConfigurationTplNameLabelKey] = w.testEnv.CfgTplName
+		cm.Labels[CMInsConfigurationLabelKey] = "true"
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	cmObj.Name = insCfgCMName
+	cmObj.Namespace = w.testEnv.Namespace
+
+	w.createCrObject(cmObj)
+	return cmObj, nil
+}
+
 func (w *TestWrapper) WithCRName(name string) client.ObjectKey {
 	return client.ObjectKey{
 		Namespace: w.testEnv.Namespace,
@@ -254,6 +288,44 @@ func (w *TestWrapper) updateCrObject(obj client.Object, patch client.Patch) erro
 	)
 
 	return k8sClient.Patch(ctx, obj, patch)
+}
+
+func (w *TestWrapper) createStsFromFile(cluster *dbaasv1alpha1.Cluster, componentName string, cmName string) error {
+	if w.testEnv.StsYaml == "" {
+		return cfgcore.MakeError("require statefuleset cr yaml.")
+	}
+
+	sts := &appsv1.StatefulSet{}
+	cmObj, err := createISVCrFromFile(path.Join(w.testRootPath, w.testEnv.StsYaml), sts, func(cm *appsv1.StatefulSet) {
+		if cm.Labels == nil {
+			cm.Labels = make(map[string]string)
+		}
+		cm.Labels[intctrlutil.AppNameLabelKey] = cluster.Name
+		cm.Labels[intctrlutil.AppInstanceLabelKey] = cluster.Name
+		cm.Labels[intctrlutil.AppComponentLabelKey] = componentName
+		cm.Labels[cfgcore.GenerateUniqLabelKeyWithConfig(w.testEnv.CfgTplName)] = w.testEnv.CfgTplName
+
+		sts.Spec.Template.Spec.Volumes = []corev1.Volume{
+			{
+				Name: "for_test",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
+					},
+				},
+			},
+		}
+
+	})
+	if err != nil {
+		return err
+	}
+
+	cmObj.Name = fmt.Sprintf("%s-%s", cluster.Name, componentName)
+	cmObj.Namespace = w.testEnv.Namespace
+
+	w.createCrObject(cmObj)
+	return nil
 }
 
 func GenRandomCDName() string {

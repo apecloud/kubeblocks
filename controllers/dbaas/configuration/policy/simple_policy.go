@@ -17,9 +17,12 @@ limitations under the License.
 package policy
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	dbaascfg "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 func init() {
@@ -58,10 +61,36 @@ func rollingStatefulSets(param ReconfigureParams) (ExecStatus, error) {
 	}
 
 	for _, sts := range units {
-		if err := dbaascfg.RestartStsWithRolling(client, param.Ctx, sts, configKey, newVersion); err != nil {
+		if err := restartStsWithRolling(client, param.Ctx, sts, configKey, newVersion); err != nil {
 			param.Ctx.Log.Error(err, "failed to restart statefulSet.", "stsName", sts.GetName())
 			return ESRetry, nil
 		}
 	}
 	return ESNone, nil
+}
+
+func restartStsWithRolling(cli client.Client, ctx intctrlutil.RequestCtx, sts appsv1.StatefulSet, configKey string, newVersion string) error {
+	// cfgAnnotationKey := fmt.Sprintf("%s-%s", UpgradeRestartAnnotationKey, strings.ReplaceAll(configKey, "_", "-"))
+	cfgAnnotationKey := cfgcore.GenerateUniqKeyWithConfig(cfgcore.UpgradeRestartAnnotationKey, configKey)
+
+	if sts.Spec.Template.Annotations == nil {
+		sts.Spec.Template.Annotations = map[string]string{}
+	}
+
+	lastVersion := ""
+	if updatedVersion, ok := sts.Spec.Template.Annotations[cfgAnnotationKey]; ok {
+		lastVersion = updatedVersion
+	}
+
+	// updated UpgradeRestartAnnotationKey
+	if lastVersion == newVersion {
+		return nil
+	}
+
+	sts.Spec.Template.Annotations[cfgAnnotationKey] = newVersion
+	if err := cli.Update(ctx.Ctx, &sts); err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -17,10 +17,23 @@ limitations under the License.
 package configuration
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+)
+
+const (
+	// ConfigurationTplLabelPrefixKey appVersion or clusterdefinition using tpl
+	ConfigurationTplLabelPrefixKey = "configuration.kubeblocks.io/tpl"
+
+	LastAppliedConfigAnnotation          = "configuration.kubeblocks.io/last-applied-configuration"
+	UpgradeInsConfigurationAnnotationKey = "configuration.kubeblocks.io/rolling-upgrade"
+	UpgradePolicyAnnotationKey           = "configuration.kubeblocks.io/reconfigure-policy"
+	UpgradeRestartAnnotationKey          = "configuration.kubeblocks.io/restart"
 )
 
 type ConfigType string
@@ -101,4 +114,26 @@ type CfgOption struct {
 
 	// K8sKey for k8s resource
 	K8sKey *K8sConfig
+}
+
+func GenerateUniqLabelKeyWithConfig(configKey string) string {
+	return GenerateUniqKeyWithConfig(ConfigurationTplLabelPrefixKey, configKey)
+}
+
+func GenerateUniqKeyWithConfig(label string, configKey string) string {
+	return fmt.Sprintf("%s-%s", label, strings.ReplaceAll(configKey, "_", "-"))
+}
+
+// GetInstanceCmName  {{statefull.Name}}-{{appVersion.Name}}-{{tpl.Name}}-"config"
+func GetInstanceCMName(obj client.Object, tpl *dbaasv1alpha1.ConfigTemplate) string {
+	return getInstanceCfgCMName(obj.GetName(), tpl.VolumeName)
+	// return fmt.Sprintf("%s-%s-config", sts.GetName(), tpl.VolumeName)
+}
+
+func getInstanceCfgCMName(objName, tplName string) string {
+	return fmt.Sprintf("%s-%s", objName, tplName)
+}
+
+func GetComponentCfgName(clusterName, componentName, tplName string) string {
+	return getInstanceCfgCMName(fmt.Sprintf("%s-%s", clusterName, componentName), tplName)
 }

@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package configuration
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 
+	"github.com/sirupsen/logrus"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,7 +34,6 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
-	dbaasconfig "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	cfgpolicy "github.com/apecloud/kubeblocks/controllers/dbaas/configuration/policy"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
@@ -51,8 +51,8 @@ var ConfigurationRequiredLabels = []string{
 	intctrlutil.AppNameLabelKey,
 	intctrlutil.AppInstanceLabelKey,
 	intctrlutil.AppComponentLabelKey,
-	dbaasconfig.CMConfigurationTplNameLabelKey,
-	dbaasconfig.CMInsConfigurationLabelKey,
+	CMConfigurationTplNameLabelKey,
+	CMInsConfigurationLabelKey,
 }
 
 //+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=reconfigurerequests,verbs=get;list;watch;create;update;patch;delete
@@ -85,11 +85,11 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return intctrlutil.Reconciled()
 	}
 
-	if hash, ok := config.Labels[dbaasconfig.CMInsConfigurationHashLabelKey]; ok && hash == config.ResourceVersion {
+	if hash, ok := config.Labels[CMInsConfigurationHashLabelKey]; ok && hash == config.ResourceVersion {
 		return intctrlutil.Reconciled()
 	}
 
-	isAppliedCfg, err := dbaasconfig.ApplyConfigurationChange(r.Client, reqCtx, config)
+	isAppliedCfg, err := ApplyConfigurationChange(r.Client, reqCtx, config)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to check last-applied-configuration")
 	} else if isAppliedCfg {
@@ -99,7 +99,7 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 	tpl := &dbaasv1alpha1.ConfigurationTemplate{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: config.Namespace,
-		Name:      config.Labels[dbaasconfig.CMConfigurationTplNameLabelKey],
+		Name:      config.Labels[CMConfigurationTplNameLabelKey],
 	}, tpl); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
@@ -118,7 +118,7 @@ func (r *ReconfigureRequestReconciler) SetupWithManager(mgr ctrl.Manager) error 
 }
 
 func checkConfigurationObject(object client.Object) bool {
-	return dbaasconfig.CheckConfigurationLabels(object, ConfigurationRequiredLabels)
+	return CheckConfigurationLabels(object, ConfigurationRequiredLabels)
 }
 
 func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, config *corev1.ConfigMap, tpl *dbaasv1alpha1.ConfigurationTemplate) (ctrl.Result, error) {
@@ -131,25 +131,25 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 			Name:      config.Labels[intctrlutil.AppInstanceLabelKey],
 		}
 
-		configTplName     = config.Labels[dbaasconfig.CMConfigurationTplNameLabelKey]
-		configTplLabelKey = dbaasconfig.GenerateUniqLabelKeyWithConfig(configTplName)
+		configTplName     = config.Labels[CMConfigurationTplNameLabelKey]
+		configTplLabelKey = cfgcore.GenerateUniqLabelKeyWithConfig(configTplName)
 	)
 
 	componentLabels := map[string]string{
 		intctrlutil.AppNameLabelKey:      config.Labels[intctrlutil.AppNameLabelKey],
 		intctrlutil.AppInstanceLabelKey:  config.Labels[intctrlutil.AppInstanceLabelKey],
 		intctrlutil.AppComponentLabelKey: config.Labels[intctrlutil.AppComponentLabelKey],
-		configTplLabelKey:                config.Labels[dbaasconfig.CMConfigurationTplNameLabelKey],
+		configTplLabelKey:                config.Labels[CMConfigurationTplNameLabelKey],
 	}
 
-	versionMeta, err := dbaasconfig.GetConfigurationVersion(config, reqCtx, &tpl.Spec)
+	versionMeta, err := GetConfigurationVersion(config, reqCtx, &tpl.Spec)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
 
 	// Not any parameters updated
 	if !versionMeta.IsModify {
-		return r.updateCfgStatus(reqCtx, config, dbaasconfig.ReconfigureNoChangeType)
+		return r.updateCfgStatus(reqCtx, config, ReconfigureNoChangeType)
 	}
 
 	reqCtx.Log.Info(fmt.Sprintf("reconfigure params: \n\tadd: %s\n\tdelete: %s\n\tupdate: %s",
@@ -168,7 +168,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 
 	// Find ClusterComponent from cluster cr
 	componentName := config.Labels[intctrlutil.AppComponentLabelKey]
-	clusterComponent := dbaasconfig.GetClusterComponentsByName(cluster.Spec.Components, componentName)
+	clusterComponent := GetClusterComponentsByName(cluster.Spec.Components, componentName)
 	// fix cluster maybe not any component
 	if clusterComponent == nil {
 		reqCtx.Log.Info("not found component.", "componentName", componentName,
@@ -185,6 +185,9 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 			cfgcore.WrapError(err,
 				"failed to get component from cluster definition. type[%s]", componentName),
 			reqCtx.Log)
+	} else if component == nil {
+		logrus.Warnf("failed to found component which the configuration is associated, component name: %s", componentName)
+		return intctrlutil.Reconciled()
 	}
 
 	cfgSpec := component.ConfigSpec
@@ -203,7 +206,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	}
 
 	// configmap has never been used
-	sts := dbaasconfig.GetComponentByUsingCM(&stsLists, client.ObjectKeyFromObject(config))
+	sts := GetComponentByUsingCM(&stsLists, client.ObjectKeyFromObject(config))
 	if len(sts) == 0 {
 		return intctrlutil.Reconciled()
 	}
@@ -229,15 +232,15 @@ func (r *ReconfigureRequestReconciler) updateCfgStatus(reqCtx intctrlutil.Reques
 		return intctrlutil.RequeueWithErrorAndRecordEvent(cfg, r.Recorder, err, reqCtx.Log)
 	}
 
-	if ok, err := dbaasconfig.UpdateAppliedConfiguration(r.Client, reqCtx, cfg, configData, reconfigureType); err != nil || !ok {
-		return intctrlutil.RequeueAfter(dbaasconfig.ConfigReconcileInterval, reqCtx.Log, "failed to patch status and retry...", "error", err)
+	if ok, err := UpdateAppliedConfiguration(r.Client, reqCtx, cfg, configData, reconfigureType); err != nil || !ok {
+		return intctrlutil.RequeueAfter(ConfigReconcileInterval, reqCtx.Log, "failed to patch status and retry...", "error", err)
 	}
 
 	return intctrlutil.Reconciled()
 }
 
 func (r *ReconfigureRequestReconciler) performUpgrade(params cfgpolicy.ReconfigureParams) (ctrl.Result, error) {
-	policy, err := cfgpolicy.NewReconfigurePolicy(params.Tpl, params.Meta, dbaasconfig.GetUpgradePolicy(params.Cfg), params.Restart)
+	policy, err := cfgpolicy.NewReconfigurePolicy(params.Tpl, params.Meta, GetUpgradePolicy(params.Cfg), params.Restart)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(params.Cfg, r.Recorder, err, params.Ctx.Log)
 	}
@@ -249,11 +252,11 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params cfgpolicy.Reconfigu
 
 	switch execStatus {
 	case cfgpolicy.ESRetry:
-		return intctrlutil.RequeueAfter(dbaasconfig.ConfigReconcileInterval, params.Ctx.Log, "")
+		return intctrlutil.RequeueAfter(ConfigReconcileInterval, params.Ctx.Log, "")
 	case cfgpolicy.ESNone:
 		return r.updateCfgStatus(params.Ctx, params.Cfg, policy.GetPolicyName())
 	case cfgpolicy.ESFailed:
-		if err := dbaasconfig.SetCfgUpgradeFlag(params.Client, params.Ctx, params.Cfg, false); err != nil {
+		if err := SetCfgUpgradeFlag(params.Client, params.Ctx, params.Cfg, false); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, params.Ctx.Log, "")
 		}
 		return intctrlutil.Reconciled()

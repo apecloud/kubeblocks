@@ -37,7 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	dbaasconfig "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -1279,9 +1278,9 @@ func buildCfg(params createParams,
 	cfgLables := make(map[string]string, len(tpls))
 	for _, tpl := range tpls {
 		// Check config cm already exists
-		cmName := getInstanceCMName(obj, &tpl)
+		cmName := cfgcore.GetInstanceCMName(obj, &tpl)
 		volumes[cmName] = tpl
-		cfgLables[dbaasconfig.GenerateUniqLabelKeyWithConfig(tpl.Name)] = tpl.Name
+		cfgLables[cfgcore.GenerateUniqLabelKeyWithConfig(tpl.Name)] = tpl.Name
 		isExist, err := isAlreadyExists(cmName, params.cluster.Namespace, ctx, cli)
 		if err != nil {
 			return nil, err
@@ -1306,7 +1305,6 @@ func buildCfg(params createParams,
 	if sts, ok := obj.(*appsv1.StatefulSet); ok {
 		updateStatefulLabelsWithTemplate(sts, cfgLables)
 	}
-	updateStatefulLabelsWithTemplate(sts, cfgLables)
 
 	// Generate Pod Volumes for ConfigMap objects
 	if err := checkAndUpdatePodVolumes(podSpec, volumes); err != nil {
@@ -1395,7 +1393,7 @@ func updateStatefulLabelsWithTemplate(sts *appsv1.StatefulSet, allLabels map[str
 	// full configmap upgrade
 	existLabels := make(map[string]string)
 	for key, val := range sts.Labels {
-		if strings.HasPrefix(key, dbaasconfig.ConfigurationTplLabelPrefixKey) {
+		if strings.HasPrefix(key, cfgcore.ConfigurationTplLabelPrefixKey) {
 			existLabels[key] = val
 		}
 	}
@@ -1537,19 +1535,6 @@ func isAlreadyExists(cmName string, namespace string, ctx context.Context, cli c
 	}
 
 	return true, nil
-}
-
-// {{statefull.Name}}-{{appVersion.Name}}-{{tpl.Name}}-"config"
-func getInstanceCMName(obj client.Object, tpl *dbaasv1alpha1.ConfigTemplate) string {
-	return getInstanceCfgCMName(obj.GetName(), tpl.VolumeName)
-}
-
-func getInstanceCfgCMName(objName, tplName string) string {
-	return fmt.Sprintf("%s-%s", objName, tplName)
-}
-
-func GetComponentCfgName(clusterName, componentName, tplName string) string {
-	return getInstanceCfgCMName(fmt.Sprintf("%s-%s", clusterName, componentName), tplName)
 }
 
 // generateConfigMapFromTpl render config file by config template provided by provider.

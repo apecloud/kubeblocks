@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package configuration
 
 import (
 	"context"
@@ -29,7 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 )
 
 var _ = Describe("ConfigurationTemplate Controller", func() {
@@ -44,7 +43,7 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 	})
 
 	validateFinalizerFlag := func(crObj client.Object) bool {
-		return controllerutil.ContainsFinalizer(crObj, configuration.ConfigurationTemplateFinalizerName)
+		return controllerutil.ContainsFinalizer(crObj, ConfigurationTemplateFinalizerName)
 	}
 
 	Context("Create config tpl with cue validate", func() {
@@ -60,7 +59,7 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 					CfgTemplateYaml: "mysql_config_template.yaml",
 					CdYaml:          "mysql_cd.yaml",
 					AvYaml:          "mysql_av.yaml",
-					CfgCMYaml:       "mysql_configmap.yaml",
+					CfgCMYaml:       "mysql_config_cm.yaml",
 				}, true)
 			Expect(testWrapper.HasError()).Should(Succeed())
 
@@ -69,7 +68,7 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 			Eventually(func() bool {
 				ok, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigurationTemplate{},
 					func(tpl *dbaasv1alpha1.ConfigurationTemplate) bool {
-						return configuration.ValidateConfTplStatus(tpl.Status) &&
+						return ValidateConfTplStatus(tpl.Status) &&
 							validateFinalizerFlag(tpl)
 					})
 				return err == nil && ok
@@ -84,18 +83,6 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 					})
 				return err == nil && ok
 			}, time.Second*10, time.Second*1).Should(BeTrue())
-
-			// check cd
-			logrus.Info("check clusterdefinition labels: configuration.GenerateUniqLabelKeyWithConfig(testWrapper.TplName()")
-			Eventually(func() bool {
-				ok, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ClusterDefinition{},
-					func(cd *dbaasv1alpha1.ClusterDefinition) bool {
-						configLabel := configuration.GenerateUniqLabelKeyWithConfig(testWrapper.TplName())
-						tplName, ok := cd.Labels[configLabel]
-						return ok && tplName == testWrapper.TplName()
-					})
-				return err == nil && ok
-			}, time.Second*30, time.Second*1).Should(BeTrue())
 
 			logrus.Info("delete configuration template cr.")
 			Expect(testWrapper.DeleteTpl()).Should(Succeed())
@@ -133,14 +120,14 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 					CfgTemplateYaml: "mysql_config_tpl_not_validate.yaml",
 					CdYaml:          "mysql_cd.yaml",
 					AvYaml:          "mysql_av.yaml",
-					CfgCMYaml:       "mysql_configmap.yaml",
+					CfgCMYaml:       "mysql_config_cm.yaml",
 				}, true)
 			Expect(testWrapper.HasError()).Should(Succeed())
 
 			Eventually(func() bool {
 				ok, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigurationTemplate{},
 					func(tpl *dbaasv1alpha1.ConfigurationTemplate) bool {
-						return configuration.ValidateConfTplStatus(tpl.Status)
+						return ValidateConfTplStatus(tpl.Status)
 					})
 				return err == nil && ok
 			}, time.Second*30, time.Second*1).Should(BeTrue())

@@ -24,13 +24,14 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	dbaasconfig "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
 var _ = Describe("ClusterDefinition Controller", func() {
@@ -157,10 +158,10 @@ spec:
 	assureCfgTplConfigMapObj := func(cmName, cmNs string) *corev1.ConfigMap {
 		By("By assure an cm obj")
 
-		configmapYAML, err := os.ReadFile("./testdata/mysql_configmap.yaml")
+		configmapYAML, err := os.ReadFile("./testdata/configcm.yaml")
 		Expect(err).Should(BeNil())
 		Expect(configmapYAML).ShouldNot(BeNil())
-		configTemplateYaml, err := os.ReadFile("./testdata/mysql_config_template.yaml")
+		configTemplateYaml, err := os.ReadFile("./testdata/configtpl.yaml")
 		Expect(err).Should(BeNil())
 		Expect(configTemplateYaml).ShouldNot(BeNil())
 
@@ -176,6 +177,12 @@ spec:
 		cfgTpl.Name = cmName
 		cfgTpl.Spec.TplRef = cmName
 		Expect(testCtx.CheckedCreateObj(ctx, cfgTpl)).Should(Succeed())
+
+		// update phase
+		patch := client.MergeFrom(cfgTpl.DeepCopy())
+		cfgTpl.Status.Phase = dbaasv1alpha1.AvailablePhase
+		Expect(k8sClient.Status().Patch(context.Background(), cfgTpl, patch)).Should(Succeed())
+
 		return cfgCM
 	}
 
@@ -283,6 +290,21 @@ spec:
 				}
 				return len(createdClusterDef.Finalizers) > 0 &&
 					createdClusterDef.Status.ObservedGeneration == 1
+			}, time.Second*10, time.Second*1).Should(BeTrue())
+
+			logrus.Info("check clusterdefinition labels: configuration.GenerateUniqLabelKeyWithConfig(testWrapper.TplName()")
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{
+					Namespace: clusterDefinition.Namespace,
+					Name:      clusterDefinition.Name,
+				}, createdClusterDef)
+				if err != nil {
+					return false
+				}
+
+				configLabel := cfgcore.GenerateUniqLabelKeyWithConfig(cmName)
+				tplName, ok := createdClusterDef.Labels[configLabel]
+				return ok && tplName == cmName
 			}, time.Second*10, time.Second*1).Should(BeTrue())
 
 			Expect(k8sClient.Delete(ctx, createdClusterDef)).Should(Succeed())

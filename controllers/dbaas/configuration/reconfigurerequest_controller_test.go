@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package configuration
 
 import (
 	"context"
@@ -28,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -55,7 +54,9 @@ var _ = Describe("Reconfigure Controller", func() {
 					CfgTemplateYaml: "mysql_config_template.yaml",
 					CdYaml:          "mysql_cd.yaml",
 					AvYaml:          "mysql_av.yaml",
-					CfgCMYaml:       "mysql_configmap.yaml",
+					CfgCMYaml:       "mysql_config_cm.yaml",
+					StsYaml:         "mysql_sts.yaml",
+					MockSts:         true,
 				}, true)
 			Expect(testWrapper.HasError()).Should(Succeed())
 
@@ -68,36 +69,19 @@ var _ = Describe("Reconfigure Controller", func() {
 			Eventually(func() bool {
 				ok, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigurationTemplate{},
 					func(tpl *dbaasv1alpha1.ConfigurationTemplate) bool {
-						return configuration.ValidateConfTplStatus(tpl.Status)
+						return ValidateConfTplStatus(tpl.Status)
 					})
 				return err == nil && ok
 			}, time.Second*30, time.Second*1).Should(BeTrue())
 
-			// step3: Check cluster definition status
-			Eventually(func() bool {
-				ok, _ := ValidateISVCR(testWrapper, &dbaasv1alpha1.ClusterDefinition{},
-					func(cd *dbaasv1alpha1.ClusterDefinition) bool {
-						return cd.Status.Phase == dbaasv1alpha1.AvailablePhase
-					})
-				return ok
-			}, time.Second*10, time.Second*1).Should(BeTrue())
-
-			// step4: Create Cluster
+			// step3: Create Cluster
 			clusterName := GenRandomClusterName()
 			clusterObject := CreateCluster(testWrapper, clusterName)
 			Expect(testWrapper.HasError()).Should(Succeed())
 
-			// step5: Check cluster definition status
-			Eventually(func() bool {
-				ok, err := ValidateCR(testWrapper, &dbaasv1alpha1.Cluster{},
-					testWrapper.WithCRName(clusterName),
-					func(obj *dbaasv1alpha1.Cluster) bool {
-						return obj.Status.Phase == dbaasv1alpha1.CreatingPhase
-					})
-				return err == nil && ok
-			}, time.Second*30, time.Second*1).Should(BeTrue())
-
-			insCfgCMName := GetComponentCfgName(clusterName, "replicasets", "mysql-config")
+			cfgObj, err := testWrapper.CreateCfgOnCluster("mysql_config_cm.yaml", clusterObject, "replicasets")
+			Expect(err).Should(Succeed())
+			insCfgCMName := cfgObj.Name
 
 			// step5 Check config for instance
 			var configHash string
@@ -105,11 +89,11 @@ var _ = Describe("Reconfigure Controller", func() {
 				ok, _ := ValidateCR(testWrapper, &corev1.ConfigMap{},
 					testWrapper.WithCRName(insCfgCMName),
 					func(cm *corev1.ConfigMap) bool {
-						configHash = cm.Labels[configuration.CMInsConfigurationHashLabelKey]
+						configHash = cm.Labels[CMInsConfigurationHashLabelKey]
 						return cm.Labels[intctrlutil.AppInstanceLabelKey] == clusterName &&
-							cm.Labels[configuration.CMConfigurationTplNameLabelKey] == testWrapper.testEnv.CfgTplName &&
-							cm.Labels[configuration.CMInsConfigurationLabelKey] != "" &&
-							cm.Labels[configuration.CMInsLastReconfigureMethodLabelKey] == configuration.ReconfigureFirstConfigType &&
+							cm.Labels[CMConfigurationTplNameLabelKey] == testWrapper.testEnv.CfgTplName &&
+							cm.Labels[CMInsConfigurationLabelKey] != "" &&
+							cm.Labels[CMInsLastReconfigureMethodLabelKey] == ReconfigureFirstConfigType &&
 							configHash != ""
 					})
 				return ok
@@ -133,14 +117,14 @@ var _ = Describe("Reconfigure Controller", func() {
 				ok, _ := ValidateCR(testWrapper, &corev1.ConfigMap{},
 					testWrapper.WithCRName(insCfgCMName),
 					func(cm *corev1.ConfigMap) bool {
-						newHash := cm.Labels[configuration.CMInsConfigurationHashLabelKey]
+						newHash := cm.Labels[CMInsConfigurationHashLabelKey]
 						fmt.Println("------------------------------------------")
 						fmt.Printf("old config hash: %s\n", configHash)
 						fmt.Printf("new config hash: %s\n", newHash)
-						fmt.Printf("last reconfigure: %s : %s\n", cm.Labels[configuration.CMInsLastReconfigureMethodLabelKey], configuration.ReconfigureAutoReloadType)
+						fmt.Printf("last reconfigure: %s : %s\n", cm.Labels[CMInsLastReconfigureMethodLabelKey], ReconfigureAutoReloadType)
 						fmt.Println("------------------------------------------")
 						return newHash != configHash &&
-							cm.Labels[configuration.CMInsLastReconfigureMethodLabelKey] == configuration.ReconfigureAutoReloadType
+							cm.Labels[CMInsLastReconfigureMethodLabelKey] == ReconfigureAutoReloadType
 					})
 				return ok
 			}, time.Second*30, time.Second*1).Should(BeTrue())
@@ -160,11 +144,11 @@ var _ = Describe("Reconfigure Controller", func() {
 				ok, _ := ValidateCR(testWrapper, &corev1.ConfigMap{},
 					testWrapper.WithCRName(insCfgCMName),
 					func(cm *corev1.ConfigMap) bool {
-						newHash := cm.Labels[configuration.CMInsConfigurationHashLabelKey]
+						newHash := cm.Labels[CMInsConfigurationHashLabelKey]
 						fmt.Println("------------------------------------------")
 						fmt.Printf("new config hash: %s\n", newHash)
 						fmt.Println("------------------------------------------")
-						return cm.Labels[configuration.CMInsLastReconfigureMethodLabelKey] == configuration.ReconfigureNoChangeType
+						return cm.Labels[CMInsLastReconfigureMethodLabelKey] == ReconfigureNoChangeType
 					})
 				return ok
 			}, time.Second*30, time.Second*1).Should(BeTrue())
@@ -184,11 +168,11 @@ var _ = Describe("Reconfigure Controller", func() {
 				ok, _ := ValidateCR(testWrapper, &corev1.ConfigMap{},
 					testWrapper.WithCRName(insCfgCMName),
 					func(cm *corev1.ConfigMap) bool {
-						newHash := cm.Labels[configuration.CMInsConfigurationHashLabelKey]
+						newHash := cm.Labels[CMInsConfigurationHashLabelKey]
 						fmt.Println("------------------------------------------")
 						fmt.Printf("new config hash: %s\n", newHash)
 						fmt.Println("------------------------------------------")
-						return cm.Labels[configuration.CMInsLastReconfigureMethodLabelKey] == configuration.ReconfigureSimpleType
+						return cm.Labels[CMInsLastReconfigureMethodLabelKey] == ReconfigureSimpleType
 					})
 				return ok
 			}, time.Second*70, time.Second*1).Should(BeTrue())

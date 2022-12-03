@@ -108,10 +108,10 @@ var _ = Describe("Cluster Controller", func() {
 
 	assureCfgTplConfigMapObj := func(cmName string) *corev1.ConfigMap {
 		By("Assuring an cm obj")
-		configmapYAML, err := os.ReadFile("./testdata/mysql_configmap.yaml")
+		configmapYAML, err := os.ReadFile("./testdata/configcm.yaml")
 		Expect(err).Should(BeNil())
 		Expect(configmapYAML).ShouldNot(BeNil())
-		configTemplateYaml, err := os.ReadFile("./testdata/mysql_config_template.yaml")
+		configTemplateYaml, err := os.ReadFile("./testdata/configtpl.yaml")
 		Expect(err).Should(BeNil())
 		Expect(configTemplateYaml).ShouldNot(BeNil())
 
@@ -121,6 +121,11 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(yaml.Unmarshal(configTemplateYaml, cfgTpl)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, cfgTpl)).Should(Succeed())
+
+		// update phase status
+		patch := client.MergeFrom(cfgTpl.DeepCopy())
+		cfgTpl.Status.Phase = dbaasv1alpha1.AvailablePhase
+		Expect(k8sClient.Status().Patch(context.Background(), cfgTpl, patch)).Should(Succeed())
 		return cfgCM
 	}
 

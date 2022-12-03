@@ -39,9 +39,6 @@ const (
 
 	ConfigurationTemplateFinalizerName = "configuration.kubeblocks.io/finalizer"
 
-	// ConfigurationTplLabelPrefixKey appVersion or clusterdefinition using tpl
-	ConfigurationTplLabelPrefixKey = "configuration.kubeblocks.io/tpl"
-
 	// CMConfigurationTplLabelKey  configmap is config template
 	CMConfigurationTplLabelKey     = "configuration.kubeblocks.io/configuration-template"
 	CMConfigurationTplNameLabelKey = "app.kubernetes.io/configurationtpl-name"
@@ -230,7 +227,7 @@ func UpdateCDLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.Req
 	return HandleConfigTemplate(cd, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 		patch := client.MergeFrom(cd.DeepCopy())
 		for _, tpl := range tpls {
-			cd.Labels[GenerateUniqLabelKeyWithConfig(tpl.Name)] = tpl.Name
+			cd.Labels[cfgcore.GenerateUniqLabelKeyWithConfig(tpl.Name)] = tpl.Name
 		}
 		return true, cli.Patch(ctx.Ctx, cd, patch)
 	})
@@ -246,7 +243,7 @@ func UpdateAVLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.Req
 	return HandleConfigTemplate(appVer, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 		patch := client.MergeFrom(appVer.DeepCopy())
 		for _, tpl := range tpls {
-			appVer.Labels[GenerateUniqLabelKeyWithConfig(tpl.Name)] = tpl.Name
+			appVer.Labels[cfgcore.GenerateUniqLabelKeyWithConfig(tpl.Name)] = tpl.Name
 		}
 		return true, cli.Patch(ctx.Ctx, appVer, patch)
 	})

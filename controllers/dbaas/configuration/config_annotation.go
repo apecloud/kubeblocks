@@ -18,11 +18,8 @@ package configuration
 
 import (
 	"encoding/json"
-	"fmt"
 	"strconv"
-	"strings"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -31,20 +28,11 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-const (
-	LastAppliedConfigAnnotation          = "configuration.kubeblocks.io/last-applied-configuration"
-	UpgradeInsConfigurationAnnotationKey = "configuration.kubeblocks.io/rolling-upgrade"
-	UpgradePolicyAnnotationKey           = "configuration.kubeblocks.io/reconfigure-policy"
-	UpgradeRestartAnnotationKey          = "configuration.kubeblocks.io/restart"
-
-	DefaultUpgradePolicy = dbaasv1alpha1.NormalPolicy
-)
-
 func CheckEnableCfgUpgrade(object client.Object) bool {
 	// check user disable upgrade
 	// configuration.kubeblocks.io/rolling-upgrade = "false"
 	annotations := object.GetAnnotations()
-	value, ok := annotations[UpgradeInsConfigurationAnnotationKey]
+	value, ok := annotations[cfgcore.UpgradeInsConfigurationAnnotationKey]
 	if !ok {
 		return true
 	}
@@ -63,7 +51,7 @@ func SetCfgUpgradeFlag(cli client.Client, ctx intctrlutil.RequestCtx, config *co
 		config.ObjectMeta.Annotations = map[string]string{}
 	}
 
-	config.ObjectMeta.Annotations[UpgradeInsConfigurationAnnotationKey] = strconv.FormatBool(flag)
+	config.ObjectMeta.Annotations[cfgcore.UpgradeInsConfigurationAnnotationKey] = strconv.FormatBool(flag)
 	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
 		return err
 	}
@@ -80,7 +68,7 @@ func ApplyConfigurationChange(client client.Client, ctx intctrlutil.RequestCtx, 
 		return false, err
 	}
 
-	lastConfig, ok := annotations[LastAppliedConfigAnnotation]
+	lastConfig, ok := annotations[cfgcore.LastAppliedConfigAnnotation]
 	if !ok {
 		return UpdateAppliedConfiguration(client, ctx, config, configData, ReconfigureFirstConfigType)
 	}
@@ -96,7 +84,7 @@ func UpdateAppliedConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, c
 		config.ObjectMeta.Annotations = map[string]string{}
 	}
 
-	config.ObjectMeta.Annotations[LastAppliedConfigAnnotation] = string(configData)
+	config.ObjectMeta.Annotations[cfgcore.LastAppliedConfigAnnotation] = string(configData)
 	hash, err := cfgcore.ComputeHash(config.Data)
 	if err != nil {
 		return false, err
@@ -105,7 +93,7 @@ func UpdateAppliedConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, c
 	config.ObjectMeta.Labels[CMInsLastReconfigureMethodLabelKey] = reconfigureType
 
 	// delete reconfigure-policy
-	delete(config.ObjectMeta.Annotations, UpgradePolicyAnnotationKey)
+	delete(config.ObjectMeta.Annotations, cfgcore.UpgradePolicyAnnotationKey)
 	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
 		return false, err
 	}
@@ -115,7 +103,7 @@ func UpdateAppliedConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, c
 
 func GetLastVersionConfig(cfg *corev1.ConfigMap) (map[string]string, error) {
 	data := make(map[string]string, 0)
-	cfgContent, ok := cfg.GetAnnotations()[LastAppliedConfigAnnotation]
+	cfgContent, ok := cfg.GetAnnotations()[cfgcore.LastAppliedConfigAnnotation]
 	if !ok {
 		return data, nil
 	}
@@ -128,47 +116,15 @@ func GetLastVersionConfig(cfg *corev1.ConfigMap) (map[string]string, error) {
 }
 
 func GetUpgradePolicy(cfg *corev1.ConfigMap) dbaasv1alpha1.UpgradePolicy {
-	// TODO(zt)
+	const (
+		DefaultUpgradePolicy = dbaasv1alpha1.NormalPolicy
+	)
 
 	annotations := cfg.GetAnnotations()
-	value, ok := annotations[UpgradePolicyAnnotationKey]
+	value, ok := annotations[cfgcore.UpgradePolicyAnnotationKey]
 	if !ok {
 		return DefaultUpgradePolicy
 	}
 
 	return dbaasv1alpha1.UpgradePolicy(value)
-}
-
-func RestartStsWithRolling(cli client.Client, ctx intctrlutil.RequestCtx, sts appsv1.StatefulSet, configKey string, newVersion string) error {
-	// cfgAnnotationKey := fmt.Sprintf("%s-%s", UpgradeRestartAnnotationKey, strings.ReplaceAll(configKey, "_", "-"))
-	cfgAnnotationKey := GenerateUniqKeyWithConfig(UpgradeRestartAnnotationKey, configKey)
-
-	if sts.Spec.Template.Annotations == nil {
-		sts.Spec.Template.Annotations = map[string]string{}
-	}
-
-	lastVersion := ""
-	if updatedVersion, ok := sts.Spec.Template.Annotations[cfgAnnotationKey]; ok {
-		lastVersion = updatedVersion
-	}
-
-	// updated UpgradeRestartAnnotationKey
-	if lastVersion == newVersion {
-		return nil
-	}
-
-	sts.Spec.Template.Annotations[cfgAnnotationKey] = newVersion
-	if err := cli.Update(ctx.Ctx, &sts); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func GenerateUniqLabelKeyWithConfig(configKey string) string {
-	return GenerateUniqKeyWithConfig(ConfigurationTplLabelPrefixKey, configKey)
-}
-
-func GenerateUniqKeyWithConfig(label string, configKey string) string {
-	return fmt.Sprintf("%s-%s", label, strings.ReplaceAll(configKey, "_", "-"))
 }

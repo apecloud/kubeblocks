@@ -36,35 +36,31 @@ func TestGenerateOpenApiSchema(t *testing.T) {
 		args    args
 		want    string
 		wantErr bool
-	}{
-		{
-			name: "normal_test",
-			args: args{
-				cueFile:    "mysql_openapi.cue",
-				schemaType: "MysqlParameter",
-			},
-			want:    "mysql_openapi.json",
-			wantErr: false,
+	}{{
+		name: "normal_test",
+		args: args{
+			cueFile:    "mysql_openapi.cue",
+			schemaType: "MysqlParameter",
 		},
-		{
-			name: "normal_with_not_empty",
-			args: args{
-				cueFile:    "mysql_openapi.cue",
-				schemaType: "",
-			},
-			want:    "mysql_openapi.json",
-			wantErr: false,
+		want:    "mysql_openapi.json",
+		wantErr: false,
+	}, {
+		name: "normal_with_not_empty",
+		args: args{
+			cueFile:    "mysql_openapi.cue",
+			schemaType: "",
 		},
-		{
-			name: "failed_test",
-			args: args{
-				cueFile:    "mysql.cue",
-				schemaType: "NotType",
-			},
-			want:    "mysql_openapi_failed_not_exist",
-			wantErr: true,
+		want:    "mysql_openapi.json",
+		wantErr: false,
+	}, {
+		name: "failed_test",
+		args: args{
+			cueFile:    "mysql.cue",
+			schemaType: "NotType",
 		},
-	}
+		want:    "mysql_openapi_failed_not_exist",
+		wantErr: true,
+	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := runOpenAPITest(tt.args.cueFile, tt.args.schemaType)
@@ -97,6 +93,10 @@ func runOpenAPITest(cueFile string, typeName string) ([]byte, error) {
 	schema, err := GenerateOpenAPISchema(string(cueTpl), typeName)
 	if err != nil {
 		return nil, err
+	}
+
+	if schema == nil {
+		return nil, MakeError("Cannot found schema.")
 	}
 
 	b, _ := json.Marshal(schema)

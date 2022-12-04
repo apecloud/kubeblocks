@@ -49,7 +49,7 @@ func GenerateOpenAPISchema(cueTpl string, schemaType string) (*apiextv1.JSONSche
 		return nil, MakeError("failed to create cue.Instances. [%s]", cueTpl)
 	}
 
-	openapicfg := openapi.Config{
+	openapicfg := &openapi.Config{
 		Version:       OpenAPIVersion,
 		SelfContained: true,
 		// ExpandReferences: true,
@@ -59,6 +59,7 @@ func GenerateOpenAPISchema(cueTpl string, schemaType string) (*apiextv1.JSONSche
 		),
 	}
 
+	// schema, err := openapicfg.All(cue.Build(insts)[0]) //nolint:staticcheck
 	schema, err := openapicfg.Schemas(cue.Build(insts)[0]) //nolint:staticcheck
 	if err != nil {
 		return nil, err

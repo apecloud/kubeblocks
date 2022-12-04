@@ -30,30 +30,26 @@ func TestCueTypeExtractorVisit(t *testing.T) {
 		fieldTypes map[string]CueType
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "test_without_type",
-			args: args{
-				cue:        `a:int`,
-				fieldTypes: map[string]CueType{"a": IntType},
+		name string
+		args args
+	}{{
+		name: "test_without_type",
+		args: args{
+			cue:        `a:int`,
+			fieldTypes: map[string]CueType{"a": IntType},
+		},
+	}, {
+		name: "normal_test",
+		args: args{
+			cue: `#a:int`,
+			fieldTypes: map[string]CueType{
+				"#a": IntType,
 			},
 		},
-		{
-			name: "normal_test",
-			args: args{
-				cue: `#a:int`,
-				fieldTypes: map[string]CueType{
-					"#a": IntType,
-				},
-			},
-		},
-		{
-			name: "complex_test",
-			args: args{
-				cue: `#a: {
+	}, {
+		name: "complex_test",
+		args: args{
+			cue: `#a: {
 		b : #c
 		g : #j
 		
@@ -74,27 +70,26 @@ func TestCueTypeExtractorVisit(t *testing.T) {
 			f: string|float|int & 2000 | "100.10" | 200 | * "100.10"
 		}
 		`,
-				fieldTypes: map[string]CueType{
-					"#a": StructType,
-					"b":  StructType,
-					"g":  StructType,
-					"#c": StructType,
-					"e":  IntType,
-					"f":  StringType,
-					"#j": StructType,
-					"x":  StringType,
-					"y":  IntType,
-					"#n": StructType,
-					"m":  StructType,
-					"d":  StructType,
-					"j":  NullableType,
-				},
+			fieldTypes: map[string]CueType{
+				"#a": StructType,
+				"b":  StructType,
+				"g":  StructType,
+				"#c": StructType,
+				"e":  IntType,
+				"f":  StringType,
+				"#j": StructType,
+				"x":  StringType,
+				"y":  IntType,
+				"#n": StructType,
+				"m":  StructType,
+				"d":  StructType,
+				"j":  NullableType,
 			},
 		},
-		{
-			name: "map_list_test",
-			args: args{
-				cue: `#a: {
+	}, {
+		name: "map_list_test",
+		args: args{
+			cue: `#a: {
 		b: int
 		c: string|int
 		d: string & "a" | "b"
@@ -106,46 +101,43 @@ func TestCueTypeExtractorVisit(t *testing.T) {
 		}
 		i:[int]
 		}`,
-				fieldTypes: map[string]CueType{
-					"#a":  StructType,
-					"b":   IntType,
-					"c":   StringType,
-					"d":   StringType,
-					"e":   StringType,
-					"g":   StructType,
-					"i":   ListType,
-					"i_0": IntType,
-				},
+			fieldTypes: map[string]CueType{
+				"#a":  StructType,
+				"b":   IntType,
+				"c":   StringType,
+				"d":   StringType,
+				"e":   StringType,
+				"g":   StructType,
+				"i":   ListType,
+				"i_0": IntType,
 			},
 		},
-		{
-			name: "invalid_test",
-			args: args{
-				cue: `
+	}, {
+		name: "invalid_test",
+		args: args{
+			cue: `
 		a : 100
 		b : 20.10
 		#c : {
 			g : a + b
 		}
 		`,
-				fieldTypes: map[string]CueType{
-					"#c": StructType,
-					"g":  FloatType,
-					"a":  IntType,
-					"b":  FloatType,
-				},
+			fieldTypes: map[string]CueType{
+				"#c": StructType,
+				"g":  FloatType,
+				"a":  IntType,
+				"b":  FloatType,
 			},
 		},
-		{
-			name: "attr_test",
-			args: args{
-				cue: `a : int @k8sResource(quantity)`,
-				fieldTypes: map[string]CueType{
-					"a": K8SQuantityType,
-				},
+	}, {
+		name: "attr_test",
+		args: args{
+			cue: `a : int @k8sResource(quantity)`,
+			fieldTypes: map[string]CueType{
+				"a": K8SQuantityType,
 			},
 		},
-	}
+	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			context := cuecontext.New()
@@ -154,10 +146,7 @@ func TestCueTypeExtractorVisit(t *testing.T) {
 			c := &CueTypeExtractor{
 				context: context,
 			}
-			if err := c.Visit(tpl); (err != nil) != tt.wantErr {
-				t.Errorf("Visit() error = %v, wantErr %v", err, tt.wantErr)
-			}
-
+			c.Visit(tpl)
 			require.EqualValues(t, tt.args.fieldTypes, c.fieldTypes)
 		})
 	}
@@ -175,71 +164,63 @@ func TestTransNumberOrBoolType(t *testing.T) {
 		name    string
 		args    args
 		wantErr bool
-	}{
-		{
-			name: "testInt",
-			args: args{
-				t:        IntType,
-				objs:     []string{"100", "-100", "0", "-1", "1"},
-				expected: []interface{}{100, -100, 0, -1, 1},
-			},
-			wantErr: false,
+	}{{
+		name: "testInt",
+		args: args{
+			t:        IntType,
+			objs:     []string{"100", "-100", "0", "-1", "1"},
+			expected: []interface{}{100, -100, 0, -1, 1},
 		},
-		{
-			name: "testFloat",
-			args: args{
-				t:        FloatType,
-				objs:     []string{"100.1", "-100.2", "0", "-1.11", "1.11", "1000"},
-				expected: []interface{}{100.1, -100.2, 0, -1.11, 1.11, 1000.0},
-			},
-			wantErr: false,
+		wantErr: false,
+	}, {
+		name: "testFloat",
+		args: args{
+			t:        FloatType,
+			objs:     []string{"100.1", "-100.2", "0", "-1.11", "1.11", "1000"},
+			expected: []interface{}{100.1, -100.2, 0, -1.11, 1.11, 1000.0},
 		},
-		{
-			name: "testBool",
-			args: args{
-				t:        BoolType,
-				objs:     []string{"true", "1", "0", "false", "t", "f"},
-				expected: []interface{}{true, true, false, false, true, false},
-			},
-			wantErr: false,
+		wantErr: false,
+	}, {
+		name: "testBool",
+		args: args{
+			t:        BoolType,
+			objs:     []string{"true", "1", "0", "false", "t", "f"},
+			expected: []interface{}{true, true, false, false, true, false},
 		},
-		{
-			name: "testBoolFail",
-			args: args{
-				t:        BoolType,
-				objs:     []string{"2.0", "5.6", "abcd", " "},
-				expected: []interface{}{true, true, false, false},
-			},
-			wantErr: true,
+		wantErr: false,
+	}, {
+		name: "testBoolFail",
+		args: args{
+			t:        BoolType,
+			objs:     []string{"2.0", "5.6", "abcd", " "},
+			expected: []interface{}{true, true, false, false},
 		},
-		{
-			name: "testIntFail",
-			args: args{
-				t:        IntType,
-				objs:     []string{"100.0", "abc", "@", "-1.0"},
-				expected: []interface{}{100, -100, 0, -1},
-			},
-			wantErr: true,
+		wantErr: true,
+	}, {
+		name: "testIntFail",
+		args: args{
+			t:        IntType,
+			objs:     []string{"100.0", "abc", "@", "-1.0"},
+			expected: []interface{}{100, -100, 0, -1},
 		},
-		{
-			name: "testFloatFail",
-			args: args{
-				t:        FloatType,
-				objs:     []string{"abc", " ", "--0.", "a-1.11", " 5"},
-				expected: []interface{}{100.1, -100.2, 0, -1.11, 5},
-			},
-			wantErr: true,
+		wantErr: true,
+	}, {
+		name: "testFloatFail",
+		args: args{
+			t:        FloatType,
+			objs:     []string{"abc", " ", "--0.", "a-1.11", " 5"},
+			expected: []interface{}{100.1, -100.2, 0, -1.11, 5},
 		},
-		{
-			name: "testMemoryType",
-			args: args{
-				t:        K8SQuantityType,
-				objs:     []string{"1Gi", "1G", "10M", "100", "1000m"},
-				expected: []interface{}{1024 * 1024 * 1024, 1000 * 1000 * 1000, 10 * 1000 * 1000, 100, 1},
-			},
-			wantErr: false,
+		wantErr: true,
+	}, {
+		name: "testMemoryType",
+		args: args{
+			t:        K8SQuantityType,
+			objs:     []string{"1Gi", "1G", "10M", "100", "1000m"},
+			expected: []interface{}{1024 * 1024 * 1024, 1000 * 1000 * 1000, 10 * 1000 * 1000, 100, 1},
 		},
-	}
+		wantErr: false,
+	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for i := 0; i < len(tt.args.objs); i++ {

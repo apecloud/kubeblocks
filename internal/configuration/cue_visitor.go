@@ -44,24 +44,11 @@ type CueTypeExtractor struct {
 	fieldTypes map[string]CueType
 }
 
-func (c *CueTypeExtractor) Visit(val cue.Value) error {
+func (c *CueTypeExtractor) Visit(val cue.Value) {
 	if c.fieldTypes == nil {
 		c.fieldTypes = make(map[string]CueType)
 	}
-	itr, err := val.Fields(cue.Definitions(true))
-	if err != nil {
-		return err
-	}
-
-	for itr.Next() {
-		// if !itr.IsDefinition() {
-		//	continue
-		// }
-		v := itr.Value()
-		label := itr.Label()
-		c.visitValue(v, label)
-	}
-	return nil
+	c.visitStruct(val)
 }
 
 func (c *CueTypeExtractor) visitValue(x cue.Value, path string) {
@@ -175,10 +162,7 @@ func ProcessCfgNotStringParam(data interface{}, context *cue.Context, tpl cue.Va
 		data:    data,
 		context: context,
 	}
-	if err := typeTransformer.Visit(tpl); err != nil {
-		return err
-	}
-
+	typeTransformer.Visit(tpl)
 	return UnstructuredObjectWalk(typeTransformer.data,
 		func(parent, cur string, obj reflect.Value, fn UpdateFn) error {
 			if fn == nil || cur == "" || !obj.IsValid() {

@@ -3,11 +3,11 @@ kind: ClusterDefinition
 metadata:
   name: mongodb-cluster-definition
 spec:
-  type: state.mongodb
+  type: mongodb
   components:
     - typeName: mongos
       maxAvailable: 16
-      minAvailable: 1
+      minAvailable: 0
       defaultReplicas: 1
       componentType: Stateless
       podSpec:
@@ -19,7 +19,7 @@ spec:
               - -c
               - |
                 mongos --config /etc/mongodb/config.yaml
-    - typeName: config-server
+    - typeName: config_server
       maxAvailable: 1
       minAvailable: 1
       defaultReplicas: 3
@@ -34,7 +34,7 @@ spec:
         updateStrategy: Serial
       podSpec:
         containers:
-          - name: config-server
+          - name: config_server
             image: mongo:5.0.14
             env:
               - name: POD_NAME
@@ -57,15 +57,30 @@ spec:
                 - |
                   INDEX=$(echo $POD_NAME | grep -o "-[0-9]\+");
                   INDEX=${INDEX#-};
-                  if [ $INDEX -eq 0 ]; then
-                    status=$(mongosh --eval "rs.status().ok")
-                    if [ $status -eq 0 ]; then
-                      # TODO rs.initiate()
-                    fi;
+                  if [ $INDEX -ne 0 ]; then exit 0; fi
+                  
+                  until mongosh --eval "rs.status().ok"; do sleep 1; done
+                  
+                  status=$(mongosh --eval "rs.status().ok")
+                  if [ $status -ne 0 ]; then exit 0; fi
+                  
+                  RPL_SET_NAME=$(echo $POD_NAME | grep -o ".*-");
+                  RPL_SET_NAME=${RPL_SET_NAME%-};
+                  
+                  MEMBERS=""
+                  i=0
+                  while [ $i -lt $KB_CONFIG_SERVER_N ]; do
+                  if [ $i -ne 0 ]; then
+                  MEMBERS="$MEMBERS,";
                   fi;
+                  host=$(eval echo \$KB_CONFIG_SERVER_"$i"_HOSTNAME)
+                  MEMBERS="$MEMBERS{_id: $i, host: \"$host\"}"
+                  i=$(( i + 1))
+                  done
+                  mongosh --eval "rs.initiate({_id: \"$RPL_SET_NAME\", configsvr: true, members: [$MEMBERS]})"
     - typeName: shard
       maxAvailable: 16
-      minAvailable: 1
+      minAvailable: 0
       defaultReplicas: 3
       componentType: Consensus
       consensusSpec:

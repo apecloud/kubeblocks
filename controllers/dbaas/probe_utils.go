@@ -19,6 +19,7 @@ package dbaas
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
 
 	"github.com/leaanthony/debme"
 	"github.com/spf13/viper"
@@ -68,7 +69,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams,
 
 	if componentProbes.RoleChangedProbe != nil {
 		roleChangedContainer := container.DeepCopy()
-		buildRoleChangedProbeContainer(roleChangedContainer, componentProbes.RoleChangedProbe, int(probeServiceHTTPPort))
+		buildRoleChangedProbeContainer(params.clusterDefinition.Spec.Type, roleChangedContainer, componentProbes.RoleChangedProbe, int(probeServiceHTTPPort))
 		probeContainers = append(probeContainers, *roleChangedContainer)
 	}
 
@@ -118,28 +119,30 @@ func buildProbeServiceContainer(container *corev1.Container, probeServiceHTTPPor
 	}}
 }
 
-func buildRoleChangedProbeContainer(roleChangedContainer *corev1.Container,
+func buildRoleChangedProbeContainer(clusterType string, roleChangedContainer *corev1.Container,
 	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeServiceHTTPPort int) {
 	roleChangedContainer.Name = "kbprobe-rolechangedcheck"
 	probe := roleChangedContainer.ReadinessProbe
-	// wesql
-	// probe.Exec.Command = []string{"curl", "-X", "POST",
-	//	"--fail-with-body", "--silent",
-	//	"-H", "Content-Type: application/json",
-	//	"http://localhost:" + strconv.Itoa(probeServiceHTTPPort) + "/v1.0/bindings/probe",
-	//	"-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
-	// etcd
-	// probe.Exec.Command = []string{"curl", "-X", "POST",
-	//	"--fail-with-body", "--silent",
-	//	"-H", "Content-Type: application/json",
-	//	"http://localhost:" + strconv.Itoa(probeServiceHTTPPort) + "/v1.0/bindings/etcd",
-	//	"-d", "{\"operation\": \"query\"}"}
-	// mongodb
-	probe.Exec.Command = []string{"curl", "-X", "POST",
-		"--fail-with-body", "--silent",
-		"-H", "Content-Type: application/json",
-		"http://localhost:" + strconv.Itoa(probeServiceHTTPPort) + "/v1.0/bindings/mongodb",
-		"-d", "{\"operation\": \"query\"}"}
+	switch strings.ToLower(clusterType) {
+	case "wesql":
+		probe.Exec.Command = []string{"curl", "-X", "POST",
+			"--fail-with-body", "--silent",
+			"-H", "Content-Type: application/json",
+			"http://localhost:" + strconv.Itoa(probeServiceHTTPPort) + "/v1.0/bindings/probe",
+			"-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
+	case "etcd":
+		probe.Exec.Command = []string{"curl", "-X", "POST",
+			"--fail-with-body", "--silent",
+			"-H", "Content-Type: application/json",
+			"http://localhost:" + strconv.Itoa(probeServiceHTTPPort) + "/v1.0/bindings/etcd",
+			"-d", "{\"operation\": \"query\"}"}
+	case "mongodb":
+		probe.Exec.Command = []string{"curl", "-X", "POST",
+			"--fail-with-body", "--silent",
+			"-H", "Content-Type: application/json",
+			"http://localhost:" + strconv.Itoa(probeServiceHTTPPort) + "/v1.0/bindings/mongodb",
+			"-d", "{\"operation\": \"query\"}"}
+	}
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
 	probe.SuccessThreshold = probeSetting.SuccessThreshold
 	probe.FailureThreshold = probeSetting.FailureThreshold

@@ -34,24 +34,24 @@ const (
 	attrQuantityValue = "quantity"
 )
 
-type WalkVisitor interface {
-	Visit(val cue.Value) error
+type CueWalkVisitor interface {
+	Visit(val cue.Value)
 }
 
-type CueTypeExtractor struct {
+type cueTypeExtractor struct {
 	data       interface{}
 	context    *cue.Context
 	fieldTypes map[string]CueType
 }
 
-func (c *CueTypeExtractor) Visit(val cue.Value) {
+func (c *cueTypeExtractor) Visit(val cue.Value) {
 	if c.fieldTypes == nil {
 		c.fieldTypes = make(map[string]CueType)
 	}
 	c.visitStruct(val)
 }
 
-func (c *CueTypeExtractor) visitValue(x cue.Value, path string) {
+func (c *cueTypeExtractor) visitValue(x cue.Value, path string) {
 	k := x.IncompleteKind()
 	switch {
 	case k&cue.NullKind == cue.NullKind:
@@ -81,7 +81,7 @@ func (c *CueTypeExtractor) visitValue(x cue.Value, path string) {
 	}
 }
 
-func (c *CueTypeExtractor) visitStruct(v cue.Value) {
+func (c *cueTypeExtractor) visitStruct(v cue.Value) {
 	switch op, v := v.Expr(); op {
 	// SelectorOp refer of other struct type
 	case cue.NoOp, cue.SelectorOp:
@@ -97,7 +97,7 @@ func (c *CueTypeExtractor) visitStruct(v cue.Value) {
 	}
 }
 
-func (c *CueTypeExtractor) visitList(v cue.Value, path string) {
+func (c *cueTypeExtractor) visitList(v cue.Value, path string) {
 	switch op, _ := v.Expr(); op {
 	case cue.NoOp, cue.SelectorOp:
 		// pass
@@ -111,7 +111,7 @@ func (c *CueTypeExtractor) visitList(v cue.Value, path string) {
 	}
 }
 
-func (c *CueTypeExtractor) addFieldType(fieldName string, cueType CueType) {
+func (c *cueTypeExtractor) addFieldType(fieldName string, cueType CueType) {
 	c.fieldTypes[fieldName] = cueType
 }
 
@@ -154,11 +154,11 @@ func processTypeTrans[T int | int64 | float64 | float32 | bool](obj reflect.Valu
 	return nil
 }
 
-func ProcessCfgNotStringParam(data interface{}, context *cue.Context, tpl cue.Value) error {
+func processCfgNotStringParam(data interface{}, context *cue.Context, tpl cue.Value) error {
 	if disableAutoTransfer {
 		return nil
 	}
-	typeTransformer := &CueTypeExtractor{
+	typeTransformer := &cueTypeExtractor{
 		data:    data,
 		context: context,
 	}

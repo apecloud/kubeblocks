@@ -52,15 +52,15 @@ func CueValidate(cueTpl string) error {
 }
 
 func ValidateConfigurationWithCue(cueTpl string, cfgType dbaasv1alpha1.ConfigurationFormatter, rawData string) error {
-	cfg, err := LoadConfiguration(cfgType, rawData)
+	cfg, err := loadConfiguration(cfgType, rawData)
 	if err != nil {
 		return WrapError(err, "failed to load configuration. [%s]", rawData)
 	}
 
-	return CfgDataValidateByCue(cueTpl, cfg)
+	return cfgDataValidateByCue(cueTpl, cfg)
 }
 
-func LoadConfiguration(cfgType dbaasv1alpha1.ConfigurationFormatter, rawData string) (map[string]interface{}, error) {
+func loadConfiguration(cfgType dbaasv1alpha1.ConfigurationFormatter, rawData string) (map[string]interface{}, error) {
 	// viper not support xml
 	if cfgType == dbaasv1alpha1.XML {
 		xmlMap, err := mxjv2.NewMapXml([]byte(rawData), true)
@@ -79,14 +79,14 @@ func LoadConfiguration(cfgType dbaasv1alpha1.ConfigurationFormatter, rawData str
 	return v.AllSettings(), nil
 }
 
-func CfgDataValidateByCue(cueTpl string, data interface{}) error {
+func cfgDataValidateByCue(cueTpl string, data interface{}) error {
 	context := cuecontext.New()
 	tpl := context.CompileString(cueTpl)
 	if err := tpl.Err(); err != nil {
 		return err
 	}
 
-	if err := ProcessCfgNotStringParam(data, context, tpl); err != nil {
+	if err := processCfgNotStringParam(data, context, tpl); err != nil {
 		return err
 	}
 

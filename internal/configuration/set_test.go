@@ -32,66 +32,60 @@ func TestDifference(t *testing.T) {
 		name string
 		args args
 		want *Set
-	}{
-		{
-			name: "test1",
-			args: args{
-				left: NewSetFromList([]string{
-					"a", "b", "e", "g",
-				}),
-				right: NewSetFromList([]string{}),
-			},
-			want: NewSetFromList([]string{
-				"b", "a", "e", "g",
+	}{{
+		name: "test1",
+		args: args{
+			left: NewSetFromList([]string{
+				"a", "b", "e", "g",
+			}),
+			right: NewSetFromList([]string{}),
+		},
+		want: NewSetFromList([]string{
+			"b", "a", "e", "g",
+		}),
+	}, {
+		name: "empty_test",
+		args: args{
+			left:  NewSetFromList([]string{}),
+			right: NewSetFromList([]string{}),
+		},
+		want: NewSetFromList([]string{}),
+	}, {
+		name: "test2",
+		args: args{
+			left: NewSetFromList([]string{
+				"a", "b", "e", "g",
+			}),
+			right: NewSetFromList([]string{
+				"a", "g", "x", "z",
 			}),
 		},
-		{
-			name: "empty_test",
-			args: args{
-				left:  NewSetFromList([]string{}),
-				right: NewSetFromList([]string{}),
-			},
-			want: NewSetFromList([]string{}),
-		},
-		{
-			name: "test2",
-			args: args{
-				left: NewSetFromList([]string{
-					"a", "b", "e", "g",
-				}),
-				right: NewSetFromList([]string{
-					"a", "g", "x", "z",
-				}),
-			},
-			want: NewSetFromList([]string{
-				"b", "e",
+		want: NewSetFromList([]string{
+			"b", "e",
+		}),
+	}, {
+		name: "test_contained",
+		args: args{
+			left: NewSetFromList([]string{
+				"a", "b", "e", "g",
+			}),
+			right: NewSetFromList([]string{
+				"a", "g",
 			}),
 		},
-		{
-			name: "test_contained",
-			args: args{
-				left: NewSetFromList([]string{
-					"a", "b", "e", "g",
-				}),
-				right: NewSetFromList([]string{
-					"a", "g",
-				}),
-			},
-			want: NewSetFromList([]string{
-				"b", "e",
+		want: NewSetFromList([]string{
+			"b", "e",
+		}),
+	}, {
+		name: "test_contained2",
+		args: args{
+			left: NewSetFromList([]string{"a"}),
+			right: NewSetFromList([]string{
+				"a", "g",
 			}),
 		},
-		{
-			name: "test_contained2",
-			args: args{
-				left: NewSetFromList([]string{"a"}),
-				right: NewSetFromList([]string{
-					"a", "g",
-				}),
-			},
-			want: NewSetFromList([]string{}),
-		},
-	}
+		want: NewSetFromList([]string{}),
+	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := Difference(tt.args.left, tt.args.right); !reflect.DeepEqual(got, tt.want) {
@@ -110,25 +104,22 @@ func TestMapKeyDifference(t *testing.T) {
 		name string
 		args args
 		want *Set
-	}{
-		// for map
-		{
-			name: "test_map",
-			args: args{
-				left: map[string]interface{}{
-					"a": 2,
-					"b": 3,
-					"c": 5,
-				},
-				right: map[string]interface{}{
-					"a": 2,
-					"e": 3,
-					"f": 5,
-				},
+	}{{
+		name: "test_map",
+		args: args{
+			left: map[string]interface{}{
+				"a": 2,
+				"b": 3,
+				"c": 5,
 			},
-			want: NewSetFromList([]string{"b", "c"}),
+			right: map[string]interface{}{
+				"a": 2,
+				"e": 3,
+				"f": 5,
+			},
 		},
-	}
+		want: NewSetFromList([]string{"b", "c"}),
+	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := MapKeyDifference(tt.args.left, tt.args.right); !reflect.DeepEqual(got, tt.want) {

@@ -87,8 +87,8 @@ type ConfigOperator interface {
 	// Query get parameter
 	Query(jsonpath string, option CfgOpOption) ([]byte, error)
 
-	// ToCfgFileContent to configuration file content
-	ToCfgFileContent() (map[string]string, error)
+	// ToCfgContent to configuration file content
+	ToCfgContent() (map[string]string, error)
 }
 
 type GetResourceFn func(key client.ObjectKey) (map[string]string, error)

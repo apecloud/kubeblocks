@@ -176,8 +176,8 @@ func TestCfgDataValidateByCue(t *testing.T) {
 			for _, v := range tt.args.data {
 				var unstructedObj any
 				require.Nil(t, json.Unmarshal([]byte(v), &unstructedObj))
-				if err := CfgDataValidateByCue(tt.args.cueTpl, unstructedObj); (err != nil) != tt.wantErr {
-					t.Errorf("CfgDataValidateByCue() error = %v, wantErr %v", err, tt.wantErr)
+				if err := cfgDataValidateByCue(tt.args.cueTpl, unstructedObj); (err != nil) != tt.wantErr {
+					t.Errorf("cfgDataValidateByCue() error = %v, wantErr %v", err, tt.wantErr)
 				}
 			}
 		})

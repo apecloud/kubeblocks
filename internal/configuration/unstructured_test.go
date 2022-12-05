@@ -40,27 +40,24 @@ func TestUnstructuredObjectWalk(t *testing.T) {
 		name    string
 		args    args
 		wantErr bool
-	}{
-		{
-			name: "test",
-			args: args{
-				data:     `"a"`,
-				expected: []string{},
-				isStruct: false,
-			},
+	}{{
+		name: "test",
+		args: args{
+			data:     `"a"`,
+			expected: []string{},
+			isStruct: false,
 		},
-		{
-			name: "test",
-			args: args{
-				data:     `{"a": "b"}`,
-				expected: []string{"a"},
-				isStruct: false,
-			},
+	}, {
+		name: "test",
+		args: args{
+			data:     `{"a": "b"}`,
+			expected: []string{"a"},
+			isStruct: false,
 		},
-		{
-			name: "test",
-			args: args{
-				data: `{"a": 
+	}, {
+		name: "test",
+		args: args{
+			data: `{"a": 
 { "b" : { "e": {
 				"c" : 10,
 				"d" : "abcd"
@@ -78,24 +75,22 @@ func TestUnstructuredObjectWalk(t *testing.T) {
   "g" : [ "e1","e2","e3"],
   "x" : [ 20,30] 
 }}`,
-				expected: []string{"c", "d", "f", "x1", "x2", "x3", "x4"},
-				isStruct: false,
+			expected: []string{"c", "d", "f", "x1", "x2", "x3", "x4"},
+			isStruct: false,
+		},
+	}, {
+		name: "testStruct",
+		args: args{
+			data:     "",
+			expected: []string{},
+			isStruct: true,
+			sdata: testStruct{
+				a: 10,
+				b: "for_test",
 			},
 		},
-		{
-			name: "testStruct",
-			args: args{
-				data:     "",
-				expected: []string{},
-				isStruct: true,
-				sdata: testStruct{
-					a: 10,
-					b: "for_test",
-				},
-			},
-			wantErr: true,
-		},
-	}
+		wantErr: true,
+	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var (

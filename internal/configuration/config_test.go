@@ -95,7 +95,7 @@ func TestRawConfig(t *testing.T) {
 			"socket":         "xxxxxxxxxxxxxxx",
 		}, ctx))
 
-	content, err := cfg.ToCfgFileContent()
+	content, err := cfg.ToCfgContent()
 	require.NotNil(t, content)
 	require.Nil(t, err)
 
@@ -111,7 +111,7 @@ func TestRawConfig(t *testing.T) {
 				"server-id": 1,
 				"socket":    "/data/mysql/tmp/mysqld.sock",
 			}, ctx))
-		content, err := cfg.ToCfgFileContent()
+		content, err := cfg.ToCfgContent()
 		require.Nil(t, err)
 		newContent := content[cfg.Name]
 		// CreateMergePatch([]byte(iniConfig), []byte(newContent), cfg.Option)
@@ -170,7 +170,7 @@ func TestConfigMapConfig(t *testing.T) {
 				"general_log":    0,
 			}, ctx))
 
-		content, _ := cfg.ToCfgFileContent()
+		content, _ := cfg.ToCfgContent()
 
 		patchs, err := CreateMergePatch(&K8sConfig{
 			Configurations: map[string]string{

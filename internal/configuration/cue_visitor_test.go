@@ -143,7 +143,7 @@ func TestCueTypeExtractorVisit(t *testing.T) {
 			context := cuecontext.New()
 			tpl := context.CompileString(tt.args.cue)
 			require.Nil(t, tpl.Err())
-			c := &CueTypeExtractor{
+			c := &cueTypeExtractor{
 				context: context,
 			}
 			c.Visit(tpl)

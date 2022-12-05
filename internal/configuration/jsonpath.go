@@ -23,9 +23,9 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 )
 
-func RetrievalWithJSONPath(jsonobj interface{}, jsonpath string) ([]byte, error) {
+func retrievalWithJSONPath(jsonObj interface{}, jsonpath string) ([]byte, error) {
 
-	jsonbytes, err := json.Marshal(&jsonobj)
+	jsonbytes, err := json.Marshal(&jsonObj)
 	if err != nil {
 		return nil, err
 	}
@@ -35,9 +35,9 @@ func RetrievalWithJSONPath(jsonobj interface{}, jsonpath string) ([]byte, error)
 		return res, err
 	}
 
-	reslen := len(res)
-	if reslen > 2 && res[0] == '"' && res[reslen-1] == '"' {
-		res = res[1 : reslen-1]
+	resLen := len(res)
+	if resLen > 2 && res[0] == '"' && res[resLen-1] == '"' {
+		res = res[1 : resLen-1]
 	}
 
 	return res, err

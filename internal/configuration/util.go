@@ -24,17 +24,17 @@ import (
 func compareWithConfig(left, right interface{}, option CfgOption) (bool, error) {
 	switch option.Type {
 	case CfgRawType:
-		if !TypeMatch([]byte{}, left, right) {
+		if !typeMatch([]byte{}, left, right) {
 			return false, MakeError("invalid []byte data type!")
 		}
 		return bytes.Equal(left.([]byte), right.([]byte)), nil
 	case CfgLocalType:
-		if !TypeMatch(string(""), left, right) {
+		if !typeMatch("", left, right) {
 			return false, MakeError("invalid string data type!")
 		}
 		return left.(string) == right.(string), nil
 	case CfgCmType, CfgTplType:
-		if !TypeMatch(&K8sConfig{}, left, right) {
+		if !typeMatch(&K8sConfig{}, left, right) {
 			return false, MakeError("invalid data type!")
 		}
 		return left.(*K8sConfig) == right.(*K8sConfig), nil
@@ -52,17 +52,14 @@ func withOption(option CfgOption, data interface{}) CfgOption {
 		op.Path = data.(string)
 	case CfgCmType, CfgTplType:
 		op.K8sKey = data.(*K8sConfig)
-	default:
-		// TODO(zt) process error
 	}
 	return op
 }
 
-func TypeMatch(expected interface{}, values ...interface{}) bool {
-	matcher := NewMatcherWithType(expected)
-
+func typeMatch(expected interface{}, values ...interface{}) bool {
+	matcher := newMatcherWithType(expected)
 	for _, v := range values {
-		if ok, err := matcher.Match(v); !ok || err != nil {
+		if ok, err := matcher.match(v); !ok || err != nil {
 			return false
 		}
 	}
@@ -73,13 +70,13 @@ type typeMatcher struct {
 	expected interface{}
 }
 
-func NewMatcherWithType(expected interface{}) typeMatcher {
+func newMatcherWithType(expected interface{}) typeMatcher {
 	return typeMatcher{
 		expected: expected,
 	}
 }
 
-func (matcher *typeMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *typeMatcher) match(actual interface{}) (success bool, err error) {
 	switch {
 	case actual == nil && matcher.expected == nil:
 		return false, MakeError("type is <nil> to <nil>.")

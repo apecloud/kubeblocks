@@ -31,84 +31,74 @@ func TestTypeMatch(t *testing.T) {
 		name string
 		args args
 		want bool
-	}{
-		{
-			"string_type_test",
-			args{
-				expected: "",
-				values:   []interface{}{"", "xxxx"},
-			},
-			true,
+	}{{
+		"string_type_test",
+		args{
+			expected: "",
+			values:   []interface{}{"", "xxxx"},
 		},
-		{
-			"byte_type_test_failed",
-			args{
-				expected: []byte{},
-				values:   []interface{}{[]byte("abcd")},
-			},
-			true,
+		true,
+	}, {
+		"byte_type_test_failed",
+		args{
+			expected: []byte{},
+			values:   []interface{}{[]byte("abcd")},
 		},
-		{
-			"byte_type_test_failed_without_match",
-			args{
-				expected: []byte{},
-				values:   []interface{}{"abcd"},
-			},
-			false,
+		true,
+	}, {
+		"byte_type_test_failed_without_match",
+		args{
+			expected: []byte{},
+			values:   []interface{}{"abcd"},
 		},
-		{
-			"byte_type_test_failed_with_null",
-			args{
-				expected: []byte{},
-				values:   []interface{}{nil},
-			},
-			false,
+		false,
+	}, {
+		"byte_type_test_failed_with_null",
+		args{
+			expected: []byte{},
+			values:   []interface{}{nil},
 		},
-		{
-			"byte_type_test_failed_with_null",
-			args{
-				expected: nil,
-				values:   []interface{}{nil},
-			},
-			false,
+		false,
+	}, {
+		"byte_type_test_failed_with_null",
+		args{
+			expected: nil,
+			values:   []interface{}{nil},
 		},
-		{
-			"byte_type_test_failed_with_null2",
-			args{
-				expected: nil,
-				values:   []interface{}{[]byte("abcd")},
-			},
-			false,
+		false,
+	}, {
+		"byte_type_test_failed_with_null2",
+		args{
+			expected: nil,
+			values:   []interface{}{[]byte("abcd")},
 		},
-		{
-			"custom_type",
-			args{
-				expected: testType{},
-				values:   []interface{}{testType{name: "abcd"}},
-			},
-			true,
+		false,
+	}, {
+		"custom_type",
+		args{
+			expected: testType{},
+			values:   []interface{}{testType{name: "abcd"}},
 		},
-		{
-			"custom_type2",
-			args{
-				expected: &testType{},
-				values:   []interface{}{testType{name: "abcd"}},
-			},
-			false,
+		true,
+	}, {
+		"custom_type2",
+		args{
+			expected: &testType{},
+			values:   []interface{}{testType{name: "abcd"}},
 		},
-		{
-			"custom_type_with_pointer",
-			args{
-				expected: &testType{},
-				values:   []interface{}{&testType{name: "abcd"}},
-			},
-			true,
+		false,
+	}, {
+		"custom_type_with_pointer",
+		args{
+			expected: &testType{},
+			values:   []interface{}{&testType{name: "abcd"}},
 		},
-	}
+		true,
+	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := TypeMatch(tt.args.expected, tt.args.values...); got != tt.want {
-				t.Errorf("TypeMatch() = %v, want %v", got, tt.want)
+			if got := typeMatch(tt.args.expected, tt.args.values...); got != tt.want {
+				t.Errorf("typeMatch() = %v, want %v", got, tt.want)
 			}
 		})
 	}

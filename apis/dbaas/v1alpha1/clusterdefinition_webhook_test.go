@@ -109,7 +109,7 @@ metadata:
 spec:
   type: state.mysql-8
   components:
-  - typeName: replicaSets
+  - typeName: replicasets
     componentType: Stateful
   - typeName: proxy
     componentType: Stateless

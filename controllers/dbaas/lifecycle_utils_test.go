@@ -21,16 +21,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sethvargo/go-password/password"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/yaml"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	"github.com/leaanthony/debme"
+	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -48,12 +47,10 @@ func TestReadCUETplFromEmbeddedFS(t *testing.T) {
 	if err != nil {
 		t.Error("Expected no error", err)
 	}
-	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("secret_template.cue"))
-
+	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("conn_credential_template.cue"))
 	if err != nil {
 		t.Error("Expected no error", err)
 	}
-
 	tlog.Info("", "cueValue", cueTpl)
 }
 
@@ -225,9 +222,10 @@ var _ = Describe("lifecycle_utils", func() {
 		})
 
 		It("Corner case volume is nil, and add no volume", func() {
-			err := checkAndUpdatePodVolumes(&sts, volumes)
+			ps := &sts.Spec.Template.Spec
+			err := checkAndUpdatePodVolumes(ps, volumes)
 			Expect(err).Should(BeNil())
-			Expect(len(sts.Spec.Template.Spec.Volumes)).To(Equal(1))
+			Expect(len(ps.Volumes)).To(Equal(1))
 		})
 
 		It("Normal test case, and add one volume", func() {
@@ -235,9 +233,10 @@ var _ = Describe("lifecycle_utils", func() {
 				Name:       "myConfig",
 				VolumeName: "myConfigVolume",
 			}
-			err := checkAndUpdatePodVolumes(&sts, volumes)
+			ps := &sts.Spec.Template.Spec
+			err := checkAndUpdatePodVolumes(ps, volumes)
 			Expect(err).Should(BeNil())
-			Expect(len(sts.Spec.Template.Spec.Volumes)).To(Equal(2))
+			Expect(len(ps.Volumes)).To(Equal(2))
 		})
 
 		It("Normal test case, and add two volume", func() {
@@ -247,12 +246,66 @@ var _ = Describe("lifecycle_utils", func() {
 			}
 			volumes["my_config1"] = dbaasv1alpha1.ConfigTemplate{
 				Name:       "myConfig",
-				VolumeName: "myConfigVolume",
+				VolumeName: "myConfigVolume2",
 			}
-			err := checkAndUpdatePodVolumes(&sts, volumes)
+			ps := &sts.Spec.Template.Spec
+			err := checkAndUpdatePodVolumes(ps, volumes)
 			Expect(err).Should(BeNil())
-			Expect(len(sts.Spec.Template.Spec.Volumes)).To(Equal(3))
+			Expect(len(ps.Volumes)).To(Equal(3))
 		})
+
+		It("replica configmap volumes test case", func() {
+			const (
+				cmName            = "my_config_for_test"
+				replicaVolumeName = "mytest-cm-volume_for_test"
+			)
+			sts.Spec.Template.Spec.Volumes = append(sts.Spec.Template.Spec.Volumes,
+				corev1.Volume{
+					Name: replicaVolumeName,
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				})
+			volumes[cmName] = dbaasv1alpha1.ConfigTemplate{
+				Name:       "configTplName",
+				VolumeName: replicaVolumeName,
+			}
+			ps := &sts.Spec.Template.Spec
+			Expect(checkAndUpdatePodVolumes(ps, volumes)).ShouldNot(Succeed())
+		})
+
+		It("ISV config volumes test case", func() {
+			const (
+				cmName            = "my_config_for_isv"
+				replicaVolumeName = "mytest-cm-volume_for_isv"
+			)
+
+			// mock clusterdefinition has volume
+			sts.Spec.Template.Spec.Volumes = append(sts.Spec.Template.Spec.Volumes,
+				corev1.Volume{
+					Name: replicaVolumeName,
+					VolumeSource: corev1.VolumeSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{Name: "anything"},
+						},
+					},
+				})
+
+			volumes[cmName] = dbaasv1alpha1.ConfigTemplate{
+				Name:       "configTplName",
+				VolumeName: replicaVolumeName,
+			}
+			ps := &sts.Spec.Template.Spec
+			err := checkAndUpdatePodVolumes(ps, volumes)
+			Expect(err).Should(BeNil())
+			Expect(len(sts.Spec.Template.Spec.Volumes)).To(Equal(2))
+			volume := intctrlutil.GetVolumeMountName(sts.Spec.Template.Spec.Volumes, cmName)
+			Expect(volume).ShouldNot(BeNil())
+			Expect(volume.ConfigMap).ShouldNot(BeNil())
+			Expect(volume.ConfigMap.Name).Should(BeEquivalentTo(cmName))
+			Expect(volume.Name).Should(BeEquivalentTo(replicaVolumeName))
+		})
+
 	})
 
 	allFieldsClusterDefObj := func() *dbaasv1alpha1.ClusterDefinition {

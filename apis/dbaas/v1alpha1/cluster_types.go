@@ -28,10 +28,12 @@ import (
 type ClusterSpec struct {
 	// Cluster referenced ClusterDefinition name, this is an immutable attribute.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
 	// Cluster referenced AppVersion name.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	AppVersionRef string `json:"appVersionRef"`
 
 	// Cluster termination policy. One of DoNotTerminate, Halt, Delete, WipeOut.
@@ -45,7 +47,11 @@ type ClusterSpec struct {
 
 	// List of components you want to replace in ClusterDefinition and AppVersion. It will replace the field in ClusterDefinition's and AppVersion's component if type is matching.
 	// +optional
-	Components []ClusterComponent `json:"components,omitempty"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	Components []ClusterComponent `json:"components,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Affinity describes affinities which specific by users.
 	// +optional
@@ -68,11 +74,12 @@ type ClusterStatus struct {
 	// Creating: creating cluster.
 	// Running: cluster is running, all components is available.
 	// Updating: cluster changes, such as horizontal-scaling/vertical-scaling/restart.
+	// VolumeExpanding: volume expansion operation is running.
 	// Deleting/Deleted: deleting cluster/cluster is deleted.
 	// Failed: cluster not available.
 	// Abnormal: cluster available but some component is not Abnormal.
 	// if the component type is Consensus/Replication, the Leader/Primary pod is must ready in Abnormal phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted}
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted,VolumeExpanding}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
@@ -82,7 +89,7 @@ type ClusterStatus struct {
 
 	// Components record the current status information of all components of the cluster.
 	// +optional
-	Components map[string]*ClusterStatusComponent `json:"components,omitempty"`
+	Components map[string]ClusterStatusComponent `json:"components,omitempty"`
 
 	// Operations declares which operations the cluster supports.
 	// +optional
@@ -90,28 +97,31 @@ type ClusterStatus struct {
 
 	ClusterDefinitionStatusGeneration `json:",inline"`
 
-	// describe current state of cluster API Resource, like warning.
+	// Describe current state of cluster API Resource, like warning.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 type ClusterComponent struct {
+	// name defines cluster's component name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// component name in ClusterDefinition.
+	// Component type name defined in ClusterDefinition spec.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Type string `json:"type"`
 
 	// Monitor which is a switch to enable monitoring, default is false
 	// DBaas provides an extension mechanism to support component level monitoring,
 	// which will scrape metrics auto or manually from servers in component and export
 	// metrics to Time Series Database.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:default=false
-	Monitor bool `json:"monitor"`
+	// +optional
+	Monitor bool `json:"monitor,omitempty"`
 
 	// EnabledLogs indicate which log file takes effect in database cluster
 	// element is the log type which defined in cluster definition logConfig.name,
@@ -119,9 +129,9 @@ type ClusterComponent struct {
 	// +optional
 	EnabledLogs []string `json:"enabledLogs,omitempty"`
 
-	// Component replicas, use default value in ClusterDefinition if not specified.
+	// Component replicas, use default value in ClusterDefinition spec. if not specified.
 	// +optional
-	Replicas int32 `json:"replicas,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
 
 	// Affinity describes affinities which specific by users.
 	// +optional
@@ -137,7 +147,9 @@ type ClusterComponent struct {
 
 	// VolumeClaimTemplates information for statefulset.spec.volumeClaimTemplates.
 	// +optional
-	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// serviceType determines how the Service is exposed. Valid
 	// options are ClusterIP, NodePort, and LoadBalancer.
@@ -171,7 +183,7 @@ type ClusterStatusComponent struct {
 	// Abnormal: component available but some pod is not ready.
 	// If the component type is Consensus/Replication, the Leader/Primary pod is must ready in Abnormal phase.
 	// Other phases behave the same as the cluster phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted}
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted,VolumeExpanding}
 	Phase Phase `json:"phase,omitempty"`
 
 	// Message record the component details message in current phase.
@@ -288,7 +300,7 @@ type OperationComponent struct {
 //+kubebuilder:printcolumn:name="CLUSTER-DEFINITION",type="string",JSONPath=".spec.clusterDefinitionRef",description="ClusterDefinition referenced by cluster."
 //+kubebuilder:printcolumn:name="APP-VERSION",type="string",JSONPath=".spec.appVersionRef",description="Cluster Application Version."
 //+kubebuilder:printcolumn:name="TERMINATION-POLICY",type="string",JSONPath=".spec.terminationPolicy",description="Cluster termination policy."
-//+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="Cluster Status."
+//+kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="Cluster Status."
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Cluster is the Schema for the clusters API
@@ -331,4 +343,15 @@ func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) []*metav1.Condition
 		})
 	}
 	return conditionList
+}
+
+// GetTypeMappingComponents return Type name mapping ClusterComponents.
+func (r *Cluster) GetTypeMappingComponents() map[string][]ClusterComponent {
+	m := map[string][]ClusterComponent{}
+	for _, c := range r.Spec.Components {
+		v := m[c.Type]
+		v = append(v, c)
+		m[c.Type] = v
+	}
+	return m
 }

@@ -8,24 +8,37 @@ image:
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
 
-replicaCount: 1
+controller:
+  replicaCount: 1
+  resources: {}
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # TODO(user): Configure the resources accordingly based on the project requirements.
+    # More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+    # limits:
+    #   cpu: 500m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 10m
+  #   memory: 64Mi
 
 agent:
   rpcPort: 19200
-
-resources: {}
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-  # TODO(user): Configure the resources accordingly based on the project requirements.
-  # More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
-  # limits:
-  #   cpu: 500m
+  resources: {}
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # TODO(user): Configure the resources accordingly based on the project requirements.
+    # More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+    # limits:
+    #   cpu: 500m
   #   memory: 128Mi
   # requests:
-#   cpu: 10m
-#   memory: 64Mi
+  #   cpu: 10m
+  #   memory: 64Mi
 
 nameOverride: ""
 fullnameOverride: ""

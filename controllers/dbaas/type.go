@@ -21,6 +21,7 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 const (
@@ -40,12 +41,7 @@ const (
 	appVersionLabelKey         = "appversion.kubeblocks.io/name"
 	statefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
 	CSRoleChangedAnnotKey      = "cs.kubeblocks.io/event-handled"
-
-	DeploymentKind  = "Deployment"
-	StatefulSetKind = "StatefulSet"
-	PodKind         = "Pod"
-
-	CSRoleChangedAnnotHandled = "true"
+	CSRoleChangedAnnotHandled  = "true"
 )
 
 type MonitorConfig struct {
@@ -69,11 +65,42 @@ type Component struct {
 	ComponentType           dbaasv1alpha1.ComponentType            `json:"componentType,omitempty"`
 	ConsensusSpec           *dbaasv1alpha1.ConsensusSetSpec        `json:"consensusSpec,omitempty"`
 	PodSpec                 *corev1.PodSpec                        `json:"podSpec,omitempty"`
-	Service                 corev1.ServiceSpec                     `json:"service,omitempty"`
+	Service                 *corev1.ServiceSpec                    `json:"service,omitempty"`
 	Probes                  *dbaasv1alpha1.ClusterDefinitionProbes `json:"probes,omitempty"`
 	VolumeClaimTemplates    []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
-	Monitor                 MonitorConfig                          `json:"monitor,omitempty"`
+	Monitor                 *MonitorConfig                         `json:"monitor,omitempty"`
 	EnabledLogs             []string                               `json:"enabledLogs,omitempty"`
 	LogConfigs              []dbaasv1alpha1.LogConfig              `json:"logConfigs,omitempty"`
 	ConfigTemplates         []dbaasv1alpha1.ConfigTemplate         `json:"configTemplates,omitempty"`
+}
+
+type ResourceDefinition struct {
+	MemorySize int64 `json:"memorySize,omitempty"`
+	CoreNum    int64 `json:"coreNum,omitempty"`
+}
+
+type componentTemplateValues struct {
+	TypeName    string
+	ServiceName string
+	Replicas    int32
+
+	// Container *corev1.Container
+	Resource  *ResourceDefinition
+	ConfigTpl []dbaasv1alpha1.ConfigTemplate
+}
+
+type configTemplateBuilder struct {
+	namespace   string
+	clusterName string
+	tplName     string
+
+	// Global Var
+	componentValues  *componentTemplateValues
+	builtInFunctions *intctrlutil.BuiltInObjectsFunc
+
+	// DBaas cluster object
+	component  *Component
+	appVersion *dbaasv1alpha1.AppVersion
+	cluster    *dbaasv1alpha1.Cluster
+	podSpec    *corev1.PodSpec
 }

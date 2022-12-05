@@ -116,7 +116,7 @@ type ClusterComponent struct {
 	Type string `json:"type"`
 
 	// Monitor which is a switch to enable monitoring, default is true
-	// Kubeblocks provides an extension mechanism to support component level monitoring,
+	// KubeBlocks provides an extension mechanism to support component level monitoring,
 	// which will scrape metrics auto or manually from servers in component and export
 	// metrics to Time Series Database.
 	// +kubebuilder:default=true

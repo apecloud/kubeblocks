@@ -285,7 +285,7 @@ spec:
                       properties:
                         builtIn:
                           default: false
-                          description: BuiltIn is a switch to enable Kubeblocks builtIn
+                          description: BuiltIn is a switch to enable KubeBlocks builtIn
                             monitoring. If BuiltIn is true and CharacterType is wellknown,
                             ExporterConfig and Sidecar container will generate automatically.
                             Otherwise, provider should set BuiltIn to false and provide

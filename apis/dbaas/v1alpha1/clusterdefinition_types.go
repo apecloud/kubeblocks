@@ -111,7 +111,7 @@ type ExporterConfig struct {
 }
 
 type MonitorConfig struct {
-	// BuiltIn is a switch to enable Kubeblocks builtIn monitoring.
+	// BuiltIn is a switch to enable KubeBlocks builtIn monitoring.
 	// If BuiltIn is true and CharacterType is wellknown, ExporterConfig and Sidecar container will generate automatically.
 	// Otherwise, provider should set BuiltIn to false and provide ExporterConfig and Sidecar container own.
 	// +kubebuilder:default=false

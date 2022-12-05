@@ -61,9 +61,8 @@ spec:
                       through cue language.
                     type: string
                   schema:
-                    description: 'Schema provides a way for providers to verify that
-                      the parameter is legal. fix controller-gen doesn''t work with
-                      k8s.io/apiextensions-apiserver: https://github.com/kubernetes-sigs/controller-tools/issues/291'
+                    description: Schema provides a way for providers to validate the
+                      changed parameters through json.
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                 type: object

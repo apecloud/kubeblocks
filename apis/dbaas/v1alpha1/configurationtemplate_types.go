@@ -80,8 +80,7 @@ type ConfigurationTemplateStatus struct {
 }
 
 type CustomParametersValidation struct {
-	// Schema provides a way for providers to verify that the parameter is legal.
-	// fix controller-gen doesn't work with k8s.io/apiextensions-apiserver: https://github.com/kubernetes-sigs/controller-tools/issues/291
+	// Schema provides a way for providers to validate the changed parameters through json.
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:validation:Type=object
 	// +kubebuilder:pruning:PreserveUnknownFields

@@ -368,6 +368,12 @@ prometheus:
             - action: labelmap
               regex: __meta_kubernetes_pod_annotation_prometheus_io_param_(.+)
               replacement: __param_$1
+            - action: labeldrop
+              regex: __meta_kubernetes_pod_label_controller_(.+)
+            - action: labeldrop
+              regex: __meta_kubernetes_pod_label_statefulset_(.+)
+            - action: labeldrop
+              regex: __meta_kubernetes_pod_label_cs_(.+)
             - action: labelmap
               regex: __meta_kubernetes_pod_label_(.+)
             - source_labels: [ __meta_kubernetes_namespace ]
@@ -420,6 +426,12 @@ prometheus:
             - action: labelmap
               regex: __meta_kubernetes_pod_annotation_prometheus_io_param_(.+)
               replacement: __param_$1
+            - action: labeldrop
+              regex: __meta_kubernetes_pod_label_controller_(.+)
+            - action: labeldrop
+              regex: __meta_kubernetes_pod_label_statefulset_(.+)
+            - action: labeldrop
+              regex: __meta_kubernetes_pod_label_cs_(.+)
             - action: labelmap
               regex: __meta_kubernetes_pod_label_(.+)
             - source_labels: [ __meta_kubernetes_namespace ]

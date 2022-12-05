@@ -116,7 +116,7 @@ type MonitorConfig struct {
 	// Otherwise, provider should set BuiltIn to false and provide ExporterConfig and Sidecar container own.
 	// +kubebuilder:default=false
 	// +optional
-	BuiltIn bool `json:"builtIn"`
+	BuiltIn bool `json:"builtIn,omitempty"`
 
 	// Exporter provided by provider, which specify necessary information to Time Series Database.
 	// ExporterConfig is valid when BuiltIn is false.

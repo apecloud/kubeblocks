@@ -33,7 +33,7 @@ import (
 var _ = Describe("StorageClass Controller", func() {
 	var (
 		ctx      = context.Background()
-		timeout  = time.Second * 20
+		timeout  = time.Second * 10
 		interval = time.Second
 	)
 

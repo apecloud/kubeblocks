@@ -1,3 +1,6 @@
+#!/bin/env python3
+# -*- coding:utf-8 -*-
+
 # generate release note for milestone
 # 1. get the open issue that named 'v** Release Planning'
 # 2. get the milestone URL

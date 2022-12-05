@@ -47,6 +47,7 @@ spec:
             properties:
               clusterDefinitionRef:
                 description: ref ClusterDefinition.
+                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               components:
                 description: List of components in current AppVersion. Component will
@@ -64,10 +65,30 @@ spec:
                         file.
                       items:
                         properties:
+                          defaultMode:
+                            description: 'defaultMode is optional: mode bits used
+                              to set permissions on created files by default. Must
+                              be an octal value between 0000 and 0777 or a decimal
+                              value between 0 and 511. YAML accepts both octal and
+                              decimal values, JSON requires decimal values for mode
+                              bits. Defaults to 0644. Directories within the path
+                              are not affected by this setting. This might be in conflict
+                              with other options that affect the file mode, like fsGroup,
+                              and the result can be other mode bits set.'
+                            format: int32
+                            type: integer
                           name:
-                            description: Specify the name of the referenced configuration
-                              template, which is a configmap object.
-                            maxLength: 128
+                            description: Specify the name of the referenced the configuration
+                              template ConfigMap object.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          namespace:
+                            default: default
+                            description: Specify the namespace of the referenced the
+                              configuration template ConfigMap object. An empty namespace
+                              is equivalent to the "default" namespace.
+                            maxLength: 63
                             type: string
                           volumeName:
                             description: VolumeName is the volume name of PodTemplate,
@@ -81,6 +102,9 @@ spec:
                         - volumeName
                         type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                     podSpec:
                       description: PodSpec is pod spec, if not nil, will replace ClusterDefinitionSpec.PodSpec
                         in ClusterDefinition.
@@ -7693,12 +7717,16 @@ spec:
                     type:
                       description: Type is a component type in ClusterDefinition.
                       maxLength: 12
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                   required:
                   - type
                   type: object
                 minItems: 1
                 type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
             required:
             - clusterDefinitionRef
             - components

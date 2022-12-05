@@ -217,12 +217,12 @@ func (d *ClusterDescriber) describeComponent(w describe.PrefixWriter) error {
 	for _, compInClusterDef := range d.ClusterDef.Spec.Components {
 		c := cluster.FindCompInCluster(d.Cluster, compInClusterDef.TypeName)
 		if c == nil {
-			return fmt.Errorf("failed to find componnet in cluster \"%s\"", d.Cluster.Name)
+			return fmt.Errorf("failed to find component in cluster \"%s\"", d.Cluster.Name)
 		}
 
-		replicas := c.Replicas
-		if replicas == 0 {
-			replicas = compInClusterDef.DefaultReplicas
+		if c.Replicas == nil {
+			r := compInClusterDef.DefaultReplicas
+			c.Replicas = &r
 		}
 		pods := d.getPodsOfComponent(c.Name)
 		if len(pods) == 0 {
@@ -232,7 +232,7 @@ func (d *ClusterDescriber) describeComponent(w describe.PrefixWriter) error {
 		w.Write(Level0, "\nComponent:\n")
 		w.Write(Level1, "%s\n", c.Name)
 		w.Write(Level2, "Type:\t%s\n", c.Type)
-		w.Write(Level2, "Replicas:\t%d desired | %d total\n", replicas, len(pods))
+		w.Write(Level2, "Replicas:\t%d desired | %d total\n", *c.Replicas, len(pods))
 		w.Write(Level2, "Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		w.Write(Level2, "Image:\t%s\n", pods[0].Spec.Containers[0].Image)
 

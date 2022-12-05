@@ -99,7 +99,7 @@ type BackupToolStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={dbaas},scope=Cluster
 
-// BackupTool is the Schema for the backuptools API (defined by ISV)
+// BackupTool is the Schema for the backuptools API (defined by provider)
 type BackupTool struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

@@ -34,6 +34,8 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update;patch;delete
+
 type ConsensusRole string
 
 type consensusMemberExt struct {
@@ -107,8 +109,10 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 
 	// first, get the old status
 	var oldConsensusSetStatus *dbaasv1alpha1.ConsensusSetStatus
-	if cluster.Status.Components != nil && cluster.Status.Components[componentName] != nil {
-		oldConsensusSetStatus = cluster.Status.Components[componentName].ConsensusSetStatus
+	if cluster.Status.Components != nil {
+		if v, ok := cluster.Status.Components[componentName]; ok {
+			oldConsensusSetStatus = v.ConsensusSetStatus
+		}
 	}
 	// create the initial status
 	newConsensusSetStatus := &dbaasv1alpha1.ConsensusSetStatus{
@@ -124,7 +128,10 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 	if !cmp.Equal(newConsensusSetStatus, oldConsensusSetStatus) {
 		patch := client.MergeFrom(cluster.DeepCopy())
 		if oldConsensusSetStatus != nil {
-			cluster.Status.Components[componentName].ConsensusSetStatus = nil
+			if v, ok := cluster.Status.Components[componentName]; ok {
+				v.ConsensusSetStatus = nil
+				cluster.Status.Components[componentName] = v
+			}
 		}
 		initClusterComponentStatusIfNeed(cluster, componentName)
 		oldConsensusSetStatus = cluster.Status.Components[componentName].ConsensusSetStatus
@@ -398,12 +405,11 @@ func composeConsensusRoleMap(componentDef dbaasv1alpha1.ClusterDefinitionCompone
 
 func initClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster, componentName string) {
 	if cluster.Status.Components == nil {
-		cluster.Status.Components = make(map[string]*dbaasv1alpha1.ClusterStatusComponent)
+		cluster.Status.Components = make(map[string]dbaasv1alpha1.ClusterStatusComponent)
 	}
-	if cluster.Status.Components[componentName] == nil {
+	if _, ok := cluster.Status.Components[componentName]; !ok {
 		typeName := GetComponentTypeName(*cluster, componentName)
-
-		cluster.Status.Components[componentName] = &dbaasv1alpha1.ClusterStatusComponent{
+		cluster.Status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{
 			Type:  typeName,
 			Phase: cluster.Status.Phase,
 		}

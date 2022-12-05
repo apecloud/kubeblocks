@@ -57,9 +57,9 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams,
 		return probeContainers, nil
 	}
 
-	probeServiceHTTPPort := viper.GetInt32("PROBE_SERVICE_PORT")
-	availablePorts, err := getAvailableContainerPorts(containers, []int32{probeServiceHTTPPort, 50001})
-	probeServiceHTTPPort = availablePorts[0]
+	probeSvcHTTPPort := viper.GetInt32("PROBE_SERVICE_PORT")
+	availablePorts, err := getAvailableContainerPorts(containers, []int32{probeSvcHTTPPort, 50001})
+	probeSvcHTTPPort = availablePorts[0]
 	probeServiceGrpcPort := availablePorts[1]
 	if err != nil {
 		reqCtx.Log.Info("get probe container port failed", "error", err)
@@ -68,37 +68,37 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams,
 
 	if componentProbes.RoleChangedProbe != nil {
 		roleChangedContainer := container.DeepCopy()
-		buildRoleChangedProbeContainer(roleChangedContainer, componentProbes.RoleChangedProbe, int(probeServiceHTTPPort))
+		buildRoleChangedProbeContainer(roleChangedContainer, componentProbes.RoleChangedProbe, int(probeSvcHTTPPort))
 		probeContainers = append(probeContainers, *roleChangedContainer)
 	}
 
 	if componentProbes.StatusProbe != nil {
 		statusProbeContainer := container.DeepCopy()
-		buildStatusProbeContainer(statusProbeContainer, componentProbes.StatusProbe, int(probeServiceHTTPPort))
+		buildStatusProbeContainer(statusProbeContainer, componentProbes.StatusProbe, int(probeSvcHTTPPort))
 		probeContainers = append(probeContainers, *statusProbeContainer)
 	}
 
 	if componentProbes.RunningProbe != nil {
 		runningProbeContainer := container.DeepCopy()
-		buildRunningProbeContainer(runningProbeContainer, componentProbes.RunningProbe, int(probeServiceHTTPPort))
+		buildRunningProbeContainer(runningProbeContainer, componentProbes.RunningProbe, int(probeSvcHTTPPort))
 		probeContainers = append(probeContainers, *runningProbeContainer)
 	}
 
 	if len(probeContainers) >= 1 {
 		container := &probeContainers[0]
-		buildProbeServiceContainer(params.component, container, int(probeServiceHTTPPort), int(probeServiceGrpcPort))
+		buildProbeServiceContainer(params.component, container, int(probeSvcHTTPPort), int(probeServiceGrpcPort))
 	}
 
 	reqCtx.Log.Info("probe", "containers", probeContainers)
 	return probeContainers, nil
 }
 
-func buildProbeServiceContainer(component *Component, container *corev1.Container, probeServiceHTTPPort int, probeServiceGrpcPort int) {
+func buildProbeServiceContainer(component *Component, container *corev1.Container, probeSvcHTTPPort int, probeServiceGrpcPort int) {
 	container.Image = viper.GetString("KUBEBLOCKS_IMAGE")
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString("KUBEBLOCKS_IMAGE_PULL_POLICY"))
 	logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
 	container.Command = []string{"probe", "--app-id", "batch-sdk",
-		"--dapr-http-port", strconv.Itoa(probeServiceHTTPPort),
+		"--dapr-http-port", strconv.Itoa(probeSvcHTTPPort),
 		"--dapr-grpc-port", strconv.Itoa(probeServiceGrpcPort),
 		"--app-protocol", "http",
 		"--log-level", logLevel,
@@ -133,7 +133,7 @@ func buildProbeServiceContainer(component *Component, container *corev1.Containe
 	})
 
 	container.Ports = []corev1.ContainerPort{{
-		ContainerPort: int32(probeServiceHTTPPort),
+		ContainerPort: int32(probeSvcHTTPPort),
 		Name:          "probe-port",
 		Protocol:      "TCP",
 	}}
@@ -157,40 +157,40 @@ func getComponentRoles(component *Component) map[string]string {
 }
 
 func buildRoleChangedProbeContainer(roleChangedContainer *corev1.Container,
-	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeServiceHTTPPort int) {
+	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	roleChangedContainer.Name = "kb-rolechangedcheck"
 	probe := roleChangedContainer.ReadinessProbe
 	probe.Exec.Command = []string{"curl", "-X", "POST",
 		"--fail-with-body", "--silent",
 		"-H", "Content-Type: application/json",
-		"http://localhost:" + strconv.Itoa(probeServiceHTTPPort) + "/v1.0/bindings/probe",
+		"http://localhost:" + strconv.Itoa(probeSvcHTTPPort) + "/v1.0/bindings/probe",
 		"-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
-	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeServiceHTTPPort)
+	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
 func buildStatusProbeContainer(statusProbeContainer *corev1.Container,
-	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeServiceHTTPPort int) {
+	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	statusProbeContainer.Name = "kb-statuscheck"
 	probe := statusProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = "/v1.0/bindings/probe?operation=statusCheck"
-	httpGet.Port = intstr.FromInt(probeServiceHTTPPort)
+	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
 	probe.Exec = nil
 	probe.HTTPGet = httpGet
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
-	statusProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeServiceHTTPPort)
+	statusProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
 func buildRunningProbeContainer(runningProbeContainer *corev1.Container,
-	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeServiceHTTPPort int) {
+	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	runningProbeContainer.Name = "kb-runningcheck"
 	probe := runningProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = "/v1.0/bindings/probe?operation=runningCheck"
-	httpGet.Port = intstr.FromInt(probeServiceHTTPPort)
+	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
 	probe.Exec = nil
 	probe.HTTPGet = httpGet
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
-	runningProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeServiceHTTPPort)
+	runningProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }

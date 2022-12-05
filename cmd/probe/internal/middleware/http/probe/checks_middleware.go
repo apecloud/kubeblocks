@@ -62,13 +62,13 @@ func (scw *statusCodeWriter) WriteHeader(statusCode int) {
 
 // GetHandler returns the HTTP handler provided by the middleware.
 func (m *Middleware) GetHandler(metadata middleware.Metadata) (func(next http.Handler) http.Handler, error) {
-
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			url := r.URL
 			if r.Method == http.MethodGet && strings.HasPrefix(url.Path, bindingPath) {
 				var body string
 				r.Method = http.MethodPost
+				r.Body.Close()
 				switch operation := url.Query().Get("operation"); operation {
 				case statusCheckOperation:
 					body = `{"operation": "statusCheck", "metadata": {"sql" : ""}}`

@@ -103,7 +103,7 @@ var roleCheckFailedCount = 0
 var roleCheckCount = 0
 var eventAggregationNum = 10
 var eventIntervalNum = 60
-var dbPort = "3306"
+var dbPort = 3306
 var dbRoles = map[string]internal.AccessMode{}
 
 func init() {
@@ -117,7 +117,10 @@ func init() {
 
 	val, ok = os.LookupEnv("KB_DB_PORT")
 	if ok {
-		dbPort = val
+		num, err := strconv.Atoi(val)
+		if err == nil {
+			dbPort = num
+		}
 	}
 
 	val, ok = os.LookupEnv("KB_DB_ROLES")
@@ -333,7 +336,7 @@ func (m *Mysql) exec(ctx context.Context, sql string) (int64, error) {
 }
 
 func (m *Mysql) runningCheck(ctx context.Context, resp *bindings.InvokeResponse) ([]byte, error) {
-	host := fmt.Sprintf("127.0.0.1:%s", dbPort)
+	host := fmt.Sprintf("127.0.0.1:%d", dbPort)
 	conn, err := net.DialTimeout("tcp", host, 900*time.Millisecond)
 	message := ""
 	result := internal.ProbeMessage{}
@@ -396,7 +399,7 @@ func (m *Mysql) statusCheck(ctx context.Context, sql string, resp *bindings.Invo
 	// }
 	// msg, _ := json.Marshal(result)
 	// return msg, nil
-	return []byte("not support yet"), nil
+	return []byte("Not supported yet"), nil
 
 }
 
@@ -406,6 +409,7 @@ func (m *Mysql) getRole(ctx context.Context, sql string) (string, error) {
 		sql = "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
 	}
 
+	// sql exec timeout need to be less than httpget's timeout which default is 1s.
 	ctx1, cancel := context.WithTimeout(context.Background(), 900*time.Millisecond)
 	defer cancel()
 	rows, err := m.db.QueryContext(ctx1, sql)

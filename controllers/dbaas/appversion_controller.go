@@ -181,7 +181,6 @@ func checkAppVersionTemplate(client client.Client, ctx intctrlutil.RequestCtx, a
 		if len(component.ConfigTemplateRefs) == 0 {
 			continue
 		}
-
 		if ok, err := checkValidConfTpls(client, ctx, component.ConfigTemplateRefs); !ok || err != nil {
 			return ok, err
 		}

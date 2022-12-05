@@ -1,0 +1,23 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: kb-ch
+spec:
+  appVersionRef: clickhouse-22.9.4
+  clusterDefinitionRef: apecloud-clickhouse
+  terminationPolicy: WipeOut
+  components:
+    - name: shard-0
+      type: clickhouse
+      replicas: 2 # hack
+    - name: shard-1
+      type: clickhouse
+      replicas: 2 # hack
+    - name: zookeeper
+      type: zookeeper
+      replicas: 0 # hack
+    
+    # hack
+    - name: ch-keeper
+      type: ch-keeper
+      replicas: 1

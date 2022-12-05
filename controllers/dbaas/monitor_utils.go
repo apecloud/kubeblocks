@@ -108,7 +108,7 @@ func setMysqlComponent(cluster *dbaasv1alpha1.Cluster, component *Component) err
 	}
 
 	component.PodSpec.Containers = append(component.PodSpec.Containers, *container)
-	component.Monitor = MonitorConfig{
+	component.Monitor = &MonitorConfig{
 		Enable:     true,
 		ScrapePath: "/metrics",
 		ScrapePort: mysqlMonitor.InternalPort,

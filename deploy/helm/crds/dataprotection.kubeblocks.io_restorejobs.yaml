@@ -131,6 +131,7 @@ spec:
                         type: string
                       name:
                         description: the secret name
+                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                     required:
                     - name

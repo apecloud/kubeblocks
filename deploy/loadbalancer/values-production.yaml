@@ -2,17 +2,17 @@ controller:
   replicaCount: 2
   resources:
     limits:
-      cpu: 1000m
-      memory: 2Gi
+      cpu: 100m
+      memory: 50Mi
     requests:
-      cpu: 200m
-      memory: 500Mi
+      cpu: 100m
+      memory: 50Mi
 
 agent:
   resources:
     limits:
-      cpu: 1000m
-      memory: 2Gi
+      cpu: 100m
+      memory: 30Mi
     requests:
       cpu: 100m
-      memory: 100Mi
+      memory: 30Mi

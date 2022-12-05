@@ -6,22 +6,17 @@ spec:
   type: mongodb
   components:
     - typeName: mongos
-      maxAvailable: 16
-      minAvailable: 0
       defaultReplicas: 1
       componentType: Stateless
       podSpec:
         containers:
           - name: mongos
-            image: mongo:5.0.14
             command:
               - bin/sh
               - -c
               - |
                 mongos --config /etc/mongodb/config.yaml
-    - typeName: config_server
-      maxAvailable: 1
-      minAvailable: 1
+    - typeName: configsvr
       defaultReplicas: 3
       componentType: Consensus
       consensusSpec:
@@ -32,14 +27,21 @@ spec:
           - name: "secondary"
             accessMode: ReadWrite
         updateStrategy: Serial
+      service:
+        ports:
+          - protocol: TCP
+            port: 27019
       podSpec:
         containers:
-          - name: config_server
-            image: mongo:5.0.14
+          - name: configsvr
+            ports:
+              - name: configsvr
+                protocol: TCP
+                containerPort: 27019
             env:
               - name: POD_NAME
                 valueFrom:
-                  fieldPathRef:
+                  fieldRef:
                     fieldPath: metadata.name
             command:
               - bin/sh
@@ -47,40 +49,36 @@ spec:
               - |
                 RPL_SET_NAME=$(echo $POD_NAME | grep -o ".*-");
                 RPL_SET_NAME=${RPL_SET_NAME%-};
-                mongod --configsvr --replSet $RPL_SET_NAME
-        lifecycle:
-          postStart:
-            exec:
-              command:
-                - bin/sh
-                - -c
-                - |
-                  INDEX=$(echo $POD_NAME | grep -o "-[0-9]\+");
-                  INDEX=${INDEX#-};
-                  if [ $INDEX -ne 0 ]; then exit 0; fi
-                  
-                  until mongosh --eval "rs.status().ok"; do sleep 1; done
-                  
-                  status=$(mongosh --eval "rs.status().ok")
-                  if [ $status -ne 0 ]; then exit 0; fi
-                  
-                  RPL_SET_NAME=$(echo $POD_NAME | grep -o ".*-");
-                  RPL_SET_NAME=${RPL_SET_NAME%-};
-                  
-                  MEMBERS=""
-                  i=0
-                  while [ $i -lt $KB_CONFIG_SERVER_N ]; do
-                  if [ $i -ne 0 ]; then
-                  MEMBERS="$MEMBERS,";
-                  fi;
-                  host=$(eval echo \$KB_CONFIG_SERVER_"$i"_HOSTNAME)
-                  MEMBERS="$MEMBERS{_id: $i, host: \"$host\"}"
-                  i=$(( i + 1))
-                  done
-                  mongosh --eval "rs.initiate({_id: \"$RPL_SET_NAME\", configsvr: true, members: [$MEMBERS]})"
+                mongod --configsvr --bind_ip_all --replSet $RPL_SET_NAME
+            lifecycle:
+              postStart:
+                exec:
+                  command:
+                    - bin/sh
+                    - -c
+                    - |
+                      PORT=27019
+                      INDEX=$(echo $POD_NAME | grep -o "\-[0-9]\+");
+                      INDEX=${INDEX#-};
+                      if [ $INDEX -ne 0 ]; then exit 0; fi
+                      
+                      until mongosh --port $PORT --eval "print('ready')"; do sleep 1; done
+                      
+                      RPL_SET_NAME=$(echo $POD_NAME | grep -o ".*-");
+                      RPL_SET_NAME=${RPL_SET_NAME%-};
+                      
+                      MEMBERS=""
+                      i=0
+                      while [ $i -lt $KB_CONFIGSVR_N ]; do
+                        if [ $i -ne 0 ]; then MEMBERS="$MEMBERS,"; fi
+                        host=$(eval echo \$KB_CONFIGSVR_"$i"_HOSTNAME)
+                        host=$host"."$KB_NAMESPACE".svc.cluster.local"
+                        until mongosh --port $PORT --host $host --eval "print('peer is ready')"; do sleep 1; done
+                        MEMBERS="$MEMBERS{_id: $i, host: \"$host:$PORT\"}"
+                        i=$(( i + 1))
+                      done
+                      mongosh --port $PORT --eval "rs.initiate({_id: \"$RPL_SET_NAME\", configsvr: true, members: [$MEMBERS]})"
     - typeName: shard
-      maxAvailable: 16
-      minAvailable: 0
       defaultReplicas: 3
       componentType: Consensus
       consensusSpec:
@@ -91,14 +89,21 @@ spec:
           - name: "secondary"
             accessMode: ReadWrite
         updateStrategy: BestEffortParallel
+      service:
+        ports:
+          - protocol: TCP
+            port: 27018
       podSpec:
         containers:
           - name: shard
-            image: mongo:5.0.14
+            ports:
+              - name: shard
+                protocol: TCP
+                containerPort: 27018
             env:
               - name: POD_NAME
                 valueFrom:
-                  fieldPathRef:
+                  fieldRef:
                     fieldPath: metadata.name
             command:
               - bin/sh
@@ -106,4 +111,32 @@ spec:
               - |
                 RPL_SET_NAME=$(echo $POD_NAME | grep -o ".*-");
                 RPL_SET_NAME=${RPL_SET_NAME%-};
-                mongod --shardsvr --replSet $RPL_SET_NAME
+                mongod --shardsvr --bind_ip_all --replSet $RPL_SET_NAME
+            lifecycle:
+              postStart:
+                exec:
+                  command:
+                    - bin/sh
+                    - -c
+                    - |
+                      PORT=27018
+                      INDEX=$(echo $POD_NAME | grep -o "\-[0-9]\+");
+                      INDEX=${INDEX#-};
+                      if [ $INDEX -ne 0 ]; then exit 0; fi
+
+                      until mongosh --port $PORT --eval "print('ready')"; do sleep 1; done
+
+                      RPL_SET_NAME=$(echo $POD_NAME | grep -o ".*-");
+                      RPL_SET_NAME=${RPL_SET_NAME%-};
+
+                      MEMBERS=""
+                      i=0
+                      while [ $i -lt $KB_SHARD_N ]; do
+                        if [ $i -ne 0 ]; then MEMBERS="$MEMBERS,"; fi
+                        host=$(eval echo \$KB_SHARD_"$i"_HOSTNAME)
+                        host=$host"."$KB_NAMESPACE".svc.cluster.local"
+                        until mongosh --port $PORT --host $host --eval "print('peer is ready')"; do sleep 1; done
+                        MEMBERS="$MEMBERS{_id: $i, host: \"$host:$PORT\"}"
+                        i=$(( i + 1))
+                      done
+                      mongosh --port $PORT --eval "rs.initiate({_id: \"$RPL_SET_NAME\", members: [$MEMBERS]})"

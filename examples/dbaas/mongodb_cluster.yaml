@@ -5,6 +5,7 @@ metadata:
 spec:
   clusterDefinitionRef: mongodb-cluster-definition
   appVersionRef: mongodb-app-version
+  terminationPolicy: WipeOut
   components:
-    - name: config-server
-      type: config-server
+    - name: configsvr
+      type: configsvr

@@ -1,6 +1,6 @@
-# Vertical scale a single-node cluster
+# Vertically scale a single-node cluster
 
-This section shows you how to use KubeBlocks to increase the capacity of a cluster.
+This section shows you how to use KubeBlocks to scales up a cluster.
 
 ## Before you start
 
@@ -32,14 +32,10 @@ This section shows you how to use KubeBlocks to increase the capacity of a clust
   - [KubeBlocks OpsRequest](../configure_ops_request.md)
   - [Vertical scaling overview](Overview.md) 
 
-## Vertically scale a single-node cluster
-
-This guide shows how to deploy a single-node `WeSQL` cluster and then vertically scale it.
-
-### Deploy a single-node cluster
+## Create a single-node cluster for demo
 
 _Steps_:
-1. Deploy a single-node cluster. Below is the YAML file of the cluster:
+1. Prepare a YAML file for a single-node cluster. Below is the YAML file of the single-node cluster. You can find this demo file in `kubeblocks/example/dbaas`.
 
   ```
   apiVersion: dbaas.kubeblocks.io/v1alpha1
@@ -72,6 +68,8 @@ _Steps_:
   $ kubectl apply -f cluster.yaml
   cluster.dbaas.infracreate.com/wesql created
   ```
+
+### Result 
 
 Wait a few seconds and when the cluster phase changes to  `Running`, which means the cluster is deployed successfully.
 
@@ -107,9 +105,10 @@ Wait a few seconds and when the cluster phase changes to  `Running`, which means
     Phase:  Running
   ```
 
+### Result
 When the `status.phase` is `Running`, you can run `OpsRequest` to restart this cluster.
 
-### Vertical scaling
+## Vertically scale a cluster
 
 _Steps_:
 
@@ -155,24 +154,24 @@ _Steps_:
   wesql           wesql-8.0.18   Updating   8m46s
   ```
 
-  _Results_:
-  When the `ops` phase changes to `Succeed`, this `OpsRequest` is applied successfully.
+### Results
+When the `ops` phase changes to `Succeed`, this `OpsRequest` is applied successfully.
 
-    ```
-    $ kubectl get ops
-    NAME                        PHASE     AGE
-    ops-vertical-scaling-demo   Succeed   52s
-    ```
+  ```
+  $ kubectl get ops
+  NAME                        PHASE     AGE
+  ops-vertical-scaling-demo   Succeed   52s
+  ```
 
-  And the cluster also changes:
+And the cluster also changes:
 
-    ```
-    $ kubectl get cluster
-    NAME            APP-VERSION    PHASE      AGE
-    wesql           wesql-8.0.18   Running  9m16s
-    ```
+  ```
+  $ kubectl get cluster
+  NAME            APP-VERSION    PHASE      AGE
+  wesql           wesql-8.0.18   Running  9m16s
+  ```
 
-4. (Optional) View the details of `OpsRequest`.
+4. View the details of `OpsRequest`.
 
   ```
   $ kubectl describe ops ops-vertical-scaling-demo

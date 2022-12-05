@@ -1,21 +1,21 @@
 # Vertical scaling
 
-This section gives you an overview of how KubeBlocks scales a WeSQL database cluster.
+This section gives you an overview of how KubeBlocks scales up a WeSQL database cluster.
 
 ## Before you start
 
-You should be familiar with the following `KubeBlocks` concepts:
+Make sure you are familiar with the following `KubeBlocks` concepts:
 
 - KubeBlocks #links to be completed
 - [KubeBlocks OpsRequest](../configure_ops_request.md)
   
-## How vertical scaling works
+## How KubeBlocks vertically scales a cluster
 
-The diagram below illustrates how KubeBlocks scales a WeSQL database cluster.
+The diagram below illustrates how KubeBlocks scales up a WeSQL database cluster.
 
 ![Vertical scaling process](../../../img/docs_vertical_scaling_process.jpg)
 
-The vertical scaling consists of the following steps:
+The vertical scaling process consists of the following steps:
 1. A user creates a vertical scaling opsRequest `CR`.
 2. This OpsRequest `CR` passes webhook validation.
 3. The OpsRequest applies to the specified components.

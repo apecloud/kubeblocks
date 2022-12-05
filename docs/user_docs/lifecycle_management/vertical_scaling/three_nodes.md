@@ -1,8 +1,8 @@
-# Vertical scale a three-node cluster
+# Vertically scale a three-node cluster
 
-This guide shows you how to use KubeBlocks to increase the capacity of a three-node cluster.
+This guide shows you how to use KubeBlocks to scale up a three-node cluster.
 
-## Before you begin
+## Before you start
 
 - [Install KubeBlocks](../../installation/deploy_kubeblocks.md). 
 - Run the commands below to check whether the KubeBlocks is installed successfully and the cluster-related CR (custom resources) are created.
@@ -32,14 +32,10 @@ This guide shows you how to use KubeBlocks to increase the capacity of a three-n
   - [KubeBlocks OpsRequest](../configure_ops_request.md)
   - [Vertical scaling overview](Overview.md) 
 
-## Apply vertical scaling on a three-node cluster
-
-This guide shows how to deploy a three-node `WeSQL` cluster and then vertically scale it.
-
-### Deploy a three-node cluster
+### Create a three-node cluster
 
 _Steps_:
-1. Deploy a three-node cluster. Below is the YAML file of the cluster:
+1. Prepare a YAML file for a single-node cluster. Below is the YAML file of the three-node cluster. You can find this demo file in `kubeblocks/example/dbaas`.
 
 ```
 apiVersion: dbaas.kubeblocks.io/v1alpha1
@@ -73,7 +69,7 @@ kubectl apply -f cluster_three_nodes.yaml
 cluster.dbaas.kubeblocks.io/wesql-3nodes created
 ```
 
-  Wait for a few seconds and when the cluster is running, which means the cluster is deployed successfully.
+Wait for a few seconds and when the cluster is running, which means the cluster is deployed successfully.
 
 ```
 $ kubectl get cluster
@@ -104,10 +100,11 @@ Status:
           Pod:          wesql-3nodes-wesql-demo-0
       Phase:            Running
 ```
+### Result
 
 When the `status.phase` is `Running`, you can run `OpsRequest` to restart this cluster.
 
-### Vertical scaling
+## Vertically scale a cluster
 
 _Steps_:
 
@@ -152,6 +149,7 @@ $ kubectl get cluster
 NAME                   APP-VERSION    PHASE      AGE
 wesql-3nodes           wesql-8.0.18   Updating   2m46s
 ```
+### Result
 
 When the phase changes to `Succeed`, the `OpsRequest` is applied successfully.
 
@@ -169,7 +167,7 @@ NAME                   APP-VERSION    PHASE      AGE
 wesql-3nodes           wesql-8.0.18   Running  4m25s
 ```
 
-4. (Optional) View the details of `OpsRequest`.
+4. View the details of `OpsRequest`.
 
 ```
 Name:         ops-vertical-scaling-threenodes-demo

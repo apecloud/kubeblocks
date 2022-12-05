@@ -2,10 +2,10 @@
 
 This guide introduces how to use KubeBlocks to restart a single-node cluster.
 
-## Before you begin
+## Before you start
 
 - [Install KubeBlocks](../../installation/deploy_kubeblocks.md). 
-- Run the commands below to check whether the KubeBlocks is installed successfully and the cluster-related CR (custom resources) are created.
+- Run the commands below to check whether the KubeBlocks is installed successfully and the cluster-related `CR` (custom resources) are created.
   - Run the commands to check whether KubeBlocks is installed successfully.
   ```
   $ kubectl get pod
@@ -16,7 +16,7 @@ This guide introduces how to use KubeBlocks to restart a single-node cluster.
     kubeblocks   ClusterIP   10.111.120.68   <none>        9443/TCP   7m3s
     kubernetes   ClusterIP   10.96.0.1       <none>        443/TCP    3d22h
   ```
-  - Run the commands below to check whether the cluster-related CR is installed successfully.
+  - Run the commands below to check whether the cluster-related `CR` is installed successfully.
   ```
   $ kubectl get cd 
     NAME             PHASE       AGE
@@ -32,14 +32,10 @@ This guide introduces how to use KubeBlocks to restart a single-node cluster.
   - [KubeBlocks OpsRequest](../configure_ops_request.md) 
   - [Restarting overview](Overview.md) 
 
-## Restart a single-node cluster
-
-This guide shows how to deploy a single-node `WeSQL` cluster and then restart it.
-
-### Deploy a single-node cluster
+## Create a single-node cluster for demo
 
 _Steps_:
-1. Deploy a single-node cluster. Below is the YAML file of the single-node cluster:
+1. Prepare a YAML file for a single-node cluster. Below is the YAML file of the single-node cluster. You can find this demo file in `kubeblocks/example/dbaas`.
 
 ```
 apiVersion: dbaas.kubeblocks.io/v1alpha1
@@ -73,7 +69,7 @@ $ kubectl apply -f cluster.yaml
 cluster.dbaas.infracreate.com/wesql created
 ```
 
-Wait a few seconds and when the cluster phase changes to  `Running`, which means the cluster is deployed successfully.
+Wait a few seconds and when the cluster phase changes to  `Running`, which means the cluster is created successfully.
 
 ```
 $ kubectl get cluster
@@ -107,9 +103,10 @@ Status:
   Phase:  Running
 ```
 
+### Result
 When the `status.phase` is `Running`, you can run `OpsRequest` to restart this cluster.
 
-### Restart a single-node cluster
+## Restart a single-node cluster
 
 _Steps_:
 
@@ -134,7 +131,7 @@ $ kubectl apply -f restart.yaml
 opsrequest.dbaas.kubeblocks.io/ops-restart created
 ```
 
-1. View the `OpsRequest` phase and cluster phase:
+3. View the `OpsRequest` phase and cluster phase:
 
 ```
 $ kubectl get ops
@@ -148,7 +145,7 @@ NAME            APP-VERSION    PHASE      AGE
 wesql           wesql-8.0.18   Updating   11m46s 
 ```
 
-_Results_:
+### Result
 When the phase changes to `Succeed`, the `OpsRequest` is applied successfully.
 
 ```

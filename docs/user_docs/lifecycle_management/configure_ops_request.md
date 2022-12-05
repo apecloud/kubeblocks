@@ -96,7 +96,6 @@ spec:
       replicas: 3
 ```
 
-
 ### Sample `OpsRequest` for upgrading a KubeBlocks cluster
 
 ```

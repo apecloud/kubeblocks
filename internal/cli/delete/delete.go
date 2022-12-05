@@ -27,6 +27,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	comp "github.com/apecloud/kubeblocks/internal/cli/util/completion"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 )
 
@@ -49,9 +50,10 @@ type DeleteFlags struct {
 func Build(c *builder.Command) *cobra.Command {
 	deleteFlags := newDeleteCommandFlags()
 	cmd := &cobra.Command{
-		Use:     c.Use,
-		Short:   c.Short,
-		Example: c.Example,
+		Use:               c.Use,
+		Short:             c.Short,
+		Example:           c.Example,
+		ValidArgsFunction: comp.ResourceNameCompletionFunc(c.Factory, util.GVRToString(c.GVR)),
 		Run: func(cmd *cobra.Command, args []string) {
 			// If delete resources belonging to cluster, custom complete function
 			// should fill the ResourceName or construct the label selector based

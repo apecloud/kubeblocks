@@ -68,6 +68,7 @@ const (
 	ComponentLabelKey              = "app.kubernetes.io/component-name"
 	RegionLabelKey                 = "topology.kubernetes.io/region"
 	ZoneLabelKey                   = "topology.kubernetes.io/zone"
+	ClusterDefLabelKey             = "clusterdefinition.kubeblocks.io/name"
 
 	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/apecloud-loadbalancer-type"
 	ServiceLBTypeAnnotationValue   = "private-ip"

@@ -17,6 +17,8 @@ limitations under the License.
 package cluster
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -102,5 +104,16 @@ var _ = Describe("helper", func() {
 	It("fake cluster objects", func() {
 		objs := FakeClusterObjs()
 		Expect(objs).ShouldNot(BeNil())
+	})
+
+	It("get version by cluster def", func() {
+		oldVersion := testing.FakeAppVersion()
+		oldVersion.Name = "test-old-version"
+		oldVersion.SetCreationTimestamp(metav1.NewTime(time.Now().AddDate(0, 0, -1)))
+		dynamic := testing.FakeDynamicClient(testing.FakeAppVersion(), oldVersion)
+		version, err := GetVersionByClusterDef(dynamic, testing.ClusterDefName)
+		Expect(err).Should(Succeed())
+		Expect(version).ShouldNot(BeNil())
+		Expect(len(version.Items)).Should(Equal(2))
 	})
 })

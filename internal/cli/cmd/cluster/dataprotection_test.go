@@ -157,8 +157,10 @@ var _ = Describe("DataProtection", func() {
 		// create test cluster
 		cmd := NewCreateCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
-		_ = cmd.Flags().Set("components", "../../testing/testdata/component.yaml")
-		_ = cmd.Flags().Set("termination-policy", "Delete")
+		Expect(cmd.Flags().Set("cluster-definition", "test-cd")).Should(Succeed())
+		Expect(cmd.Flags().Set("version", "test-version")).Should(Succeed())
+		Expect(cmd.Flags().Set("components", "../../testing/testdata/component.yaml")).Should(Succeed())
+		Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
 		cmd.Run(nil, []string{clusterName})
 
 		// create backup

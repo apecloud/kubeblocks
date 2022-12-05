@@ -129,6 +129,24 @@ func GetClusterEndpoints(svcList *corev1.ServiceList, c *dbaasv1alpha1.ClusterCo
 	return internalEndpoints, externalEndpoints
 }
 
+func GetVersionByClusterDef(dynamic dynamic.Interface, clusterDef string) (*dbaasv1alpha1.AppVersionList, error) {
+	versionList := &dbaasv1alpha1.AppVersionList{}
+	objList, err := dynamic.Resource(types.AppVersionGVR()).Namespace("").
+		List(context.TODO(), metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s", types.ClusterDefLabelKey, clusterDef),
+		})
+	if err != nil {
+		return nil, err
+	}
+	if objList == nil {
+		return nil, fmt.Errorf("failed to find component version referencing cluster definition %s", clusterDef)
+	}
+	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(objList.UnstructuredContent(), versionList); err != nil {
+		return nil, err
+	}
+	return versionList, nil
+}
+
 func FakeClusterObjs() *ClusterObjects {
 	clusterObjs := NewClusterObjects()
 	clusterObjs.Cluster = testing.FakeCluster(testing.ClusterName, testing.Namespace)

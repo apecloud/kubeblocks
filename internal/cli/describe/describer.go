@@ -193,7 +193,7 @@ func (d *ClusterDescriber) describeTopology(w describe.PrefixWriter) error {
 	for _, compInClusterDef := range d.ClusterDef.Spec.Components {
 		c := cluster.FindCompInCluster(d.Cluster, compInClusterDef.TypeName)
 		if c == nil {
-			return fmt.Errorf("failed to find componnet in cluster")
+			continue
 		}
 
 		w.Write(Level1, "%s:\n", c.Name)
@@ -217,7 +217,7 @@ func (d *ClusterDescriber) describeComponent(w describe.PrefixWriter) error {
 	for _, compInClusterDef := range d.ClusterDef.Spec.Components {
 		c := cluster.FindCompInCluster(d.Cluster, compInClusterDef.TypeName)
 		if c == nil {
-			return fmt.Errorf("failed to find component in cluster \"%s\"", d.Cluster.Name)
+			continue
 		}
 
 		if c.Replicas == nil {

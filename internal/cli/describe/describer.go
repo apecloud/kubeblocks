@@ -40,9 +40,9 @@ import (
 	"k8s.io/kubectl/pkg/describe"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/cli/util/cluster"
 )
 
 // Each level has 2 spaces for PrefixWriter

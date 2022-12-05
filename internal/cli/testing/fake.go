@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fake
+package testing
 
 import (
 	"fmt"
@@ -22,10 +22,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
-	kubefakeclient "k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -48,7 +44,7 @@ const (
 	KubeBlocksChartURL  = "https://apecloud.github.io/fake-kubeblocks"
 )
 
-func Cluster(name string, namespace string) *dbaasv1alpha1.Cluster {
+func FakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
 	return &dbaasv1alpha1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -107,7 +103,7 @@ func Cluster(name string, namespace string) *dbaasv1alpha1.Cluster {
 	}
 }
 
-func Pods(replicas int, namespace string, cluster string) *corev1.PodList {
+func FakePods(replicas int, namespace string, cluster string) *corev1.PodList {
 	pods := &corev1.PodList{}
 	for i := 0; i < replicas; i++ {
 		role := "follower"
@@ -137,7 +133,7 @@ func Pods(replicas int, namespace string, cluster string) *corev1.PodList {
 	return pods
 }
 
-func Secrets(namespace string, cluster string) *corev1.SecretList {
+func FakeSecrets(namespace string, cluster string) *corev1.SecretList {
 	secret := corev1.Secret{}
 	secret.Name = SecretName
 	secret.Namespace = namespace
@@ -153,7 +149,7 @@ func Secrets(namespace string, cluster string) *corev1.SecretList {
 	return &corev1.SecretList{Items: []corev1.Secret{secret}}
 }
 
-func Node() *corev1.Node {
+func FakeNode() *corev1.Node {
 	node := &corev1.Node{}
 	node.Name = NodeName
 	node.Labels = map[string]string{
@@ -163,7 +159,7 @@ func Node() *corev1.Node {
 	return node
 }
 
-func ClusterDef() *dbaasv1alpha1.ClusterDefinition {
+func FakeClusterDef() *dbaasv1alpha1.ClusterDefinition {
 	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
 	clusterDef.Name = ClusterDefName
 	clusterDef.Spec.Components = []dbaasv1alpha1.ClusterDefinitionComponent{
@@ -175,14 +171,14 @@ func ClusterDef() *dbaasv1alpha1.ClusterDefinition {
 	return clusterDef
 }
 
-func AppVersion() *dbaasv1alpha1.AppVersion {
+func FakeAppVersion() *dbaasv1alpha1.AppVersion {
 	appversion := &dbaasv1alpha1.AppVersion{}
 	appversion.Name = AppVersionName
 	appversion.Spec.ClusterDefinitionRef = ClusterDefName
 	return appversion
 }
 
-func Services() *corev1.ServiceList {
+func FakeServices() *corev1.ServiceList {
 	cases := []struct {
 		exposed    bool
 		clusterIP  string
@@ -231,7 +227,7 @@ func Services() *corev1.ServiceList {
 	return &corev1.ServiceList{Items: services}
 }
 
-func PVCs() *corev1.PersistentVolumeClaimList {
+func FakePVCs() *corev1.PersistentVolumeClaimList {
 	pvcs := &corev1.PersistentVolumeClaimList{}
 	pvc := corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -254,13 +250,4 @@ func PVCs() *corev1.PersistentVolumeClaimList {
 	}
 	pvcs.Items = append(pvcs.Items, pvc)
 	return pvcs
-}
-
-func NewClientSet(objects ...runtime.Object) *kubefakeclient.Clientset {
-	return kubefakeclient.NewSimpleClientset(objects...)
-}
-
-func NewDynamicClient(objects ...runtime.Object) *dynamicfakeclient.FakeDynamicClient {
-	_ = dbaasv1alpha1.AddToScheme(scheme.Scheme)
-	return dynamicfakeclient.NewSimpleDynamicClient(scheme.Scheme, objects...)
 }

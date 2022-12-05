@@ -30,10 +30,10 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground/engine"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/cli/util/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 	"github.com/apecloud/kubeblocks/version"
 )

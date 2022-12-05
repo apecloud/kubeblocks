@@ -26,7 +26,7 @@ import (
 	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/create"
+	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
@@ -52,7 +52,7 @@ var _ = Describe("Cluster", func() {
 			Expect(cmd.Flags().GetString("termination-policy")).Should(Equal(""))
 
 			// must succeed otherwise exit 1 and make test fails
-			Expect(cmd.Flags().Set("components", "../../testdata/component.yaml")).Should(Succeed())
+			Expect(cmd.Flags().Set("components", "../../testing/testdata/component.yaml")).Should(Succeed())
 			Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
 			cmd.Run(nil, []string{"test1"})
 		})
@@ -81,7 +81,7 @@ var _ = Describe("Cluster", func() {
 			Expect(o.Complete()).Should(Succeed())
 			Expect(o.Validate()).ShouldNot(Succeed())
 
-			o.ComponentsFilePath = "../../testdata/component.yaml"
+			o.ComponentsFilePath = "../../testing/testdata/component.yaml"
 			Expect(o.Complete()).Should(Succeed())
 			Expect(o.Validate()).Should(Succeed())
 

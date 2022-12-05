@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fake
+package testing
 
 import (
 	. "github.com/onsi/ginkgo"
@@ -23,54 +23,54 @@ import (
 
 var _ = Describe("test fake", func() {
 	It("cluster", func() {
-		cluster := Cluster(ClusterName, Namespace)
+		cluster := FakeCluster(ClusterName, Namespace)
 		Expect(cluster).ShouldNot(BeNil())
 		Expect(cluster.Name).Should(Equal(ClusterName))
 	})
 
 	It("cluster definition", func() {
-		clusterDef := ClusterDef()
+		clusterDef := FakeClusterDef()
 		Expect(clusterDef).ShouldNot(BeNil())
 		Expect(clusterDef.Name).Should(Equal(ClusterDefName))
 	})
 
 	It("cluster definition", func() {
-		appVersion := AppVersion()
+		appVersion := FakeAppVersion()
 		Expect(appVersion).ShouldNot(BeNil())
 		Expect(appVersion.Name).Should(Equal(AppVersionName))
 	})
 
 	It("pods", func() {
-		pods := Pods(3, Namespace, ClusterName)
+		pods := FakePods(3, Namespace, ClusterName)
 		Expect(pods).ShouldNot(BeNil())
 		Expect(len(pods.Items)).Should(Equal(3))
 	})
 
 	It("secrets", func() {
-		secrets := Secrets(Namespace, ClusterName)
+		secrets := FakeSecrets(Namespace, ClusterName)
 		Expect(secrets).ShouldNot(BeNil())
 		Expect(len(secrets.Items)).Should(Equal(1))
 	})
 
 	It("services", func() {
-		svcs := Services()
+		svcs := FakeServices()
 		Expect(svcs).ShouldNot(BeNil())
 		Expect(len(svcs.Items)).Should(Equal(4))
 	})
 
 	It("node", func() {
-		node := Node()
+		node := FakeNode()
 		Expect(node).ShouldNot(BeNil())
 		Expect(node.Name).Should(Equal(NodeName))
 	})
 
 	It("fake client set", func() {
-		client := NewClientSet()
+		client := FakeClientSet()
 		Expect(client).ShouldNot(BeNil())
 	})
 
 	It("fake dynamic set", func() {
-		dynamic := NewDynamicClient()
+		dynamic := FakeDynamicClient()
 		Expect(dynamic).ShouldNot(BeNil())
 	})
 })

@@ -33,7 +33,7 @@ spec:
       type: string
     - description: Cluster Status.
       jsonPath: .status.phase
-      name: PHASE
+      name: STATUS
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: AGE

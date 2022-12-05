@@ -176,11 +176,9 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 	var (
 		// invalid component type slice
 		invalidComponentTypes = make([]string, 0)
-		// duplicate component name map
-		duplicateComponentNames = make(map[string]struct{})
-		componentNameMap        = make(map[string]struct{})
-		componentTypeMap        = make(map[string]struct{})
-		componentMap            = make(map[string]ClusterDefinitionComponent)
+		componentNameMap      = make(map[string]struct{})
+		componentTypeMap      = make(map[string]struct{})
+		componentMap          = make(map[string]ClusterDefinitionComponent)
 	)
 
 	for _, v := range clusterDef.Spec.Components {
@@ -193,21 +191,12 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 			invalidComponentTypes = append(invalidComponentTypes, v.Type)
 		}
 
-		if _, ok := componentNameMap[v.Name]; ok {
-			duplicateComponentNames[v.Name] = struct{}{}
-		}
 		componentNameMap[v.Name] = struct{}{}
 		r.validateComponentResources(allErrs, v.Resources, index)
-
 	}
 	if len(invalidComponentTypes) > 0 {
 		*allErrs = append(*allErrs, field.NotFound(field.NewPath("spec.components[*].type"),
 			getComponentTypeNotFoundMsg(invalidComponentTypes, r.Spec.ClusterDefRef)))
-	}
-
-	if len(duplicateComponentNames) > 0 {
-		*allErrs = append(*allErrs, field.Duplicate(field.NewPath("spec.components[*].name"),
-			fmt.Sprintf(" %v is duplicated", r.getDuplicateMapKeys(duplicateComponentNames))))
 	}
 }
 

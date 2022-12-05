@@ -178,7 +178,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("test not support volume expansion")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VolumeExpansionType)
 		opsRequest.Spec.ComponentOpsList = []ComponentOps{
-			{ComponentNames: []string{"replicaSets"},
+			{ComponentNames: []string{"replicasets"},
 				VolumeExpansion: []VolumeExpansion{
 					{
 						Name:    "data",
@@ -192,7 +192,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		patch := client.MergeFrom(cluster.DeepCopy())
 		cluster.Status.Operations.VolumeExpandable = []OperationComponent{
 			{
-				Name:                     "replicaSets",
+				Name:                     "replicasets",
 				VolumeClaimTemplateNames: []string{"data"},
 			},
 		}
@@ -221,7 +221,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		patch := client.MergeFrom(cluster.DeepCopy())
 		cluster.Status.Operations.HorizontalScalable = []OperationComponent{
 			{
-				Name: "replicaSets",
+				Name: "replicasets",
 				Min:  1,
 				Max:  3,
 			},
@@ -238,7 +238,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
 		Eventually(func() bool {
 			opsRequest.Spec.ComponentOpsList = []ComponentOps{
-				{ComponentNames: []string{"replicaSets"},
+				{ComponentNames: []string{"replicasets"},
 					HorizontalScaling: &HorizontalScaling{
 						Replicas: 2,
 					},
@@ -293,7 +293,7 @@ var _ = Describe("OpsRequest webhook", func() {
 	testRestart := func(cluster *Cluster) *OpsRequest {
 		// set cluster support restart
 		patch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Status.Operations.Restartable = []string{"replicaSets"}
+		cluster.Status.Operations.Restartable = []string{"replicasets"}
 		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
 		// wait until patch succeed
 		Eventually(func() bool {

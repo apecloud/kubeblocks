@@ -52,7 +52,7 @@ func ReconcileActionWithCluster(opsRes *OpsResource) (dbaasv1alpha1.Phase, time.
 		if statusComponent, ok := opsRequest.Status.Components[k]; (!ok && v.Phase == dbaasv1alpha1.UpdatingPhase) || statusComponent.Phase != v.Phase {
 			isChanged = true
 			opsRequest.Status.Components[k] = dbaasv1alpha1.OpsRequestStatusComponent{Phase: v.Phase}
-			sendEventWhenComponentPhaseChanged(opsRes, k, v)
+			sendEventWhenComponentPhaseChanged(opsRes, k, &v)
 		}
 	}
 	if isChanged {
@@ -99,7 +99,7 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource) (dbaasv1alpha1.Phase, 
 		if statusComponent, ok := opsRequest.Status.Components[k]; !ok || statusComponent.Phase != v.Phase {
 			isChanged = true
 			opsRequest.Status.Components[k] = dbaasv1alpha1.OpsRequestStatusComponent{Phase: v.Phase}
-			sendEventWhenComponentPhaseChanged(opsRes, k, v)
+			sendEventWhenComponentPhaseChanged(opsRes, k, &v)
 		}
 	}
 	if isChanged {

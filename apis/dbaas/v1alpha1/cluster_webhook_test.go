@@ -93,9 +93,6 @@ var _ = Describe("cluster webhook", func() {
 			// restore
 			cluster.Spec.Components[0].Type = "replicasets"
 
-			By("By testing spec.components[?].name is duplicated")
-			cluster.Spec.Components[0].Name = "proxy"
-			Expect(k8sClient.Update(ctx, cluster).Error()).To(ContainSubstring("is duplicated"))
 			// restore
 			cluster.Spec.Components[0].Name = "replicasets"
 

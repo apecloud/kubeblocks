@@ -46,16 +46,40 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters/finalizers,verbs=update
-//+kubebuilder:rbac:groups=apps,resources=deployments;statefulsets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=apps,resources=deployments/status;statefulsets/status,verbs=get
-//+kubebuilder:rbac:groups=apps,resources=deployments/finalizers;statefulsets/finalizers,verbs=update
-//+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets/finalizers,verbs=update
-//+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
-// NOTES: owned K8s core API resources controller-gen RBAC marker is maintained at {REPO}/controllers/k8score/rbac.go
+// +kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters/finalizers,verbs=update
+
+// owned K8s core API resources controller-gen RBAC marker
+// full access on core API resources
+// +kubebuilder:rbac:groups=core,resources=secrets;configmaps;services;resourcequotas,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=services/status;resourcequotas/status,verbs=get
+// +kubebuilder:rbac:groups=core,resources=services/finalizers;secrets/finalizers;configmaps/finalizers;resourcequotas/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/status,verbs=get
+// +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/finalizers,verbs=update
+
+// read + update access
+// +kubebuilder:rbac:groups=core,resources=endpoints,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=core,resources=pods/exec,verbs=create
+
+// read only + watch access
+// +kubebuilder:rbac:groups=core,resources=endpoints,verbs=get;list;watch
+
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get
+// +kubebuilder:rbac:groups=apps,resources=deployments/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=statefulsets/status,verbs=get
+// +kubebuilder:rbac:groups=apps,resources=statefulsets/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
@@ -77,7 +101,6 @@ func init() {
 }
 
 func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *dbaasv1alpha1.ClusterDefinition) error {
-
 	labelSelector, err := labels.Parse("clusterdefinition.kubeblocks.io/name=" + clusterDef.GetName())
 	if err != nil {
 		return err
@@ -103,7 +126,6 @@ func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *db
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -241,10 +263,13 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		patch := client.MergeFrom(cluster.DeepCopy())
 		for _, cond := range conditionList {
 			meta.SetStatusCondition(&cluster.Status.Conditions, *cond)
-			r.Recorder.Event(cluster, corev1.EventTypeWarning, cond.Reason, cond.Message)
 		}
 		if err = r.Client.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+		// send events after status patched
+		for _, cond := range conditionList {
+			r.Recorder.Event(cluster, corev1.EventTypeWarning, cond.Reason, cond.Message)
 		}
 	}
 
@@ -252,8 +277,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
+
 	if err = task.Exec(reqCtx, r.Client); err != nil {
-		// record the event when the execution task reports an error.
 		r.Recorder.Event(cluster, corev1.EventTypeWarning, intctrlutil.EventReasonRunTaskFailed, err.Error())
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -281,9 +306,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// TODO: add filter predicate for core API objects
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dbaasv1alpha1.Cluster{}).
-		//
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).

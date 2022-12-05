@@ -84,10 +84,12 @@ spec:
                 type: object
               appVersionRef:
                 description: Cluster referenced AppVersion name.
+                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               clusterDefinitionRef:
                 description: Cluster referenced ClusterDefinition name, this is an
                   immutable attribute.
+                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               components:
                 description: List of components you want to replace in ClusterDefinition
@@ -137,11 +139,13 @@ spec:
                         to Time Series Database.
                       type: boolean
                     name:
+                      description: name defines cluster's component name.
                       maxLength: 12
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     replicas:
                       description: Component replicas, use default value in ClusterDefinition
-                        if not specified.
+                        spec. if not specified.
                       format: int32
                       type: integer
                     resources:
@@ -235,8 +239,10 @@ spec:
                         type: object
                       type: array
                     type:
-                      description: component name in ClusterDefinition.
+                      description: Component type name defined in ClusterDefinition
+                        spec.
                       maxLength: 12
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     volumeClaimTemplates:
                       description: VolumeClaimTemplates information for statefulset.spec.volumeClaimTemplates.
@@ -429,11 +435,13 @@ spec:
                         type: object
                       type: array
                   required:
-                  - monitor
                   - name
                   - type
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               terminationPolicy:
                 description: Cluster termination policy. One of DoNotTerminate, Halt,
                   Delete, WipeOut. DoNotTerminate will block delete operation. Halt
@@ -622,7 +630,7 @@ spec:
                   components of the cluster.
                 type: object
               conditions:
-                description: describe current state of cluster API Resource, like
+                description: Describe current state of cluster API Resource, like
                   warning.
                 items:
                   description: "Condition contains details for one aspect of the current

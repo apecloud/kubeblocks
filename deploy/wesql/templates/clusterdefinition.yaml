@@ -8,106 +8,105 @@ spec:
   type: state.mysql
   connectionCredential:
     user: {{ .Values.auth.rootUser }}
-    password: {{ .Values.auth.rootPassword }}
+    password: "$(RANDOM_PASSWORD)"
   components:
-  - typeName: replicasets
-    characterType: mysql
-    probes:
-      roleChangedProbe:
-        failureThreshold: {{ .Values.roleChangedProbe.failureThreshold }}
-        periodSeconds: {{ .Values.roleChangedProbe.periodSeconds }}
-        successThreshold: {{ .Values.roleChangedProbe.successThreshold }}
-    monitor:
-      builtIn: true
-    logConfigs:
-      {{- range $name,$pattern := .Values.logConfigs }}
-      - name: {{ $name }}
-        filePathPattern: {{ $pattern }}
-      {{- end }}
-    configTemplateRefs:
-    - name: mysql-3node-tpl-8.0
-      volumeName: mysql-config
-    defaultReplicas: 3
-    componentType: Consensus
-    consensusSpec:
-      leader:
-        name: leader
-        accessMode: ReadWrite
-      followers:
-        - name: follower
-          accessMode: Readonly
-    service:
-      ports:
-        - protocol: TCP
-          port: 3306
-    podSpec:
-      containers:
-      - name: mysql
-        imagePullPolicy: IfNotPresent
-        volumeMounts:
-        - mountPath: /data/mysql
-          name: data
-#        - mountPath: /log/mysql
-#          name: log
-        - mountPath: /opt/mysql
-          name: mysql-config
+    - typeName: replicasets
+      characterType: mysql
+      probes:
+        roleChangedProbe:
+          failureThreshold: {{ .Values.roleChangedProbe.failureThreshold }}
+          periodSeconds: {{ .Values.roleChangedProbe.periodSeconds }}
+          successThreshold: {{ .Values.roleChangedProbe.successThreshold }}
+      monitor:
+        builtIn: true
+      logConfigs:
+        {{- range $name,$pattern := .Values.logConfigs }}
+        - name: {{ $name }}
+          filePathPattern: {{ $pattern }}
+        {{- end }}
+      configTemplateRefs:
+        - name: mysql-3node-tpl-8.0
+          volumeName: mysql-config
+      defaultReplicas: 3
+      componentType: Consensus
+      consensusSpec:
+        leader:
+          name: leader
+          accessMode: ReadWrite
+        followers:
+          - name: follower
+            accessMode: Readonly
+      service:
         ports:
-        - containerPort: 3306
-          protocol: TCP
-          name: mysql
-        - containerPort: 13306
-          protocol: TCP
-          name: paxos
-        env:
-        - name: MYSQL_ROOT_HOST
-          value: {{ .Values.auth.rootHost | default "%" | quote }}
-        - name: MYSQL_ROOT_USER
-          value: {{ .Values.auth.rootUser | default "root" | quote }}
-        - name: MYSQL_ROOT_PASSWORD
-          value: {{ .Values.auth.rootPassword | quote }}
-        - name: MYSQL_ALLOW_EMPTY_PASSWORD
-          value: {{- if not .Values.auth.rootPassword }} "yes" {{- else }} "no" {{- end }}
-        - name: MYSQL_DATABASE
-          value: {{- if .Values.auth.createDatabase }} {{ .Values.auth.database | quote }}  {{- else }} "" {{- end }}
-        - name: MYSQL_USER
-          value: {{ .Values.auth.username | default "" | quote }}
-        - name: MYSQL_PASSWORD
-          value: {{ .Values.auth.password | default "" | quote }}
-        - name: CLUSTER_ID
-          value: {{ .Values.cluster.clusterId | default "1" | quote }}
-        - name: CLUSTER_START_INDEX
-          value: {{ .Values.cluster.clusterStartIndex | default "1" | quote }}
-        - name: REPLICATIONUSER
-          value: {{ .Values.auth.replicationUser | default "replicator" | quote }}
-        - name: REPLICATION_PASSWORD
-          value: {{ .Values.auth.replicationPassword | default "" | quote }}
-        - name: MYSQL_TEMPLATE_CONFIG
-          values: {{ if .Values.cluster.templateConfig }}{{ .Values.cluster.templateConfig }}{{ end }}
-        - name: MYSQL_CUSTOM_CONFIG
-          values: {{ if .Values.cluster.customConfig }}{{ .Values.cluster.customConfig }}{{ end }}
-        - name: MYSQL_DYNAMIC_CONFIG
-          values: {{ if .Values.cluster.dynamicConfig }}{{ .Values.cluster.dynamicConfig }}{{ end }}
-        command: ["/bin/bash", "-c"]
-        args:
-        - >
-          cluster_info="";
-          for (( i=0; i< $KB_REPLICASETS_N; i++ )); do
-            if [ $i -ne 0 ]; then
-              cluster_info="$cluster_info;";
-            fi;
-            host=$(eval echo \$KB_REPLICASETS_"$i"_HOSTNAME)
-            cluster_info="$cluster_info$host:13306";
-          done;
-          idx=0;
-          while IFS='-' read -ra ADDR; do
-              for i in "${ADDR[@]}"; do
-                idx=$i;
-              done;
-          done <<< "$KB_POD_NAME";
-          echo $idx;
-          cluster_info="$cluster_info@$(($idx+1))";
-          echo $cluster_info; echo {{ .Values.cluster.replicaSetCount }};
-          mkdir -p /data/mysql/data;
-          mkdir -p /data/mysql/log;
-          chmod +777 -R /data/mysql;
-          docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$cluster_info" --cluster-id=$CLUSTER_ID
+          - protocol: TCP
+            port: 3306
+            targetPort: mysql
+      podSpec:
+        containers:
+          - name: mysql
+            imagePullPolicy: IfNotPresent
+            volumeMounts:
+              - mountPath: /data/mysql
+                name: data
+#              - mountPath: /log/mysql
+#                name: log
+              - mountPath: /opt/mysql
+                name: mysql-config
+            ports:
+              - containerPort: 3306
+                name: mysql
+              - containerPort: 13306
+                name: paxos
+            env:
+              - name: MYSQL_ROOT_HOST
+                value: {{ .Values.auth.rootHost | default "%" | quote }}
+              - name: MYSQL_ROOT_USER
+                value: {{ .Values.auth.rootUser | default "root" | quote }}
+              - name: MYSQL_ROOT_PASSWORD
+                value: {{ .Values.auth.rootPassword | quote }}
+              - name: MYSQL_ALLOW_EMPTY_PASSWORD
+                value: {{- if not .Values.auth.rootPassword }} "yes" {{- else }} "no" {{- end }}
+              - name: MYSQL_DATABASE
+                value: {{- if .Values.auth.createDatabase }} {{ .Values.auth.database | quote }}  {{- else }} "" {{- end }}
+              - name: MYSQL_USER
+                value: {{ .Values.auth.username | default "" | quote }}
+              - name: MYSQL_PASSWORD
+                value: {{ .Values.auth.password | default "" | quote }}
+              - name: CLUSTER_ID
+                value: {{ .Values.cluster.clusterId | default "1" | quote }}
+              - name: CLUSTER_START_INDEX
+                value: {{ .Values.cluster.clusterStartIndex | default "1" | quote }}
+              - name: REPLICATIONUSER
+                value: {{ .Values.auth.replicationUser | default "replicator" | quote }}
+              - name: REPLICATION_PASSWORD
+                value: {{ .Values.auth.replicationPassword | default "" | quote }}
+              - name: MYSQL_TEMPLATE_CONFIG
+                values: {{ if .Values.cluster.templateConfig }}{{ .Values.cluster.templateConfig }}{{ end }}
+              - name: MYSQL_CUSTOM_CONFIG
+                values: {{ if .Values.cluster.customConfig }}{{ .Values.cluster.customConfig }}{{ end }}
+              - name: MYSQL_DYNAMIC_CONFIG
+                values: {{ if .Values.cluster.dynamicConfig }}{{ .Values.cluster.dynamicConfig }}{{ end }}
+            command: ["/bin/bash", "-c"]
+            args:
+              - >
+                cluster_info="";
+                for (( i=0; i< $KB_REPLICASETS_N; i++ )); do
+                  if [ $i -ne 0 ]; then
+                    cluster_info="$cluster_info;";
+                  fi;
+                  host=$(eval echo \$KB_REPLICASETS_"$i"_HOSTNAME)
+                  cluster_info="$cluster_info$host:13306";
+                done;
+                idx=0;
+                while IFS='-' read -ra ADDR; do
+                    for i in "${ADDR[@]}"; do
+                      idx=$i;
+                    done;
+                done <<< "$KB_POD_NAME";
+                echo $idx;
+                cluster_info="$cluster_info@$(($idx+1))";
+                echo $cluster_info; echo {{ .Values.cluster.replicaSetCount }};
+                mkdir -p /data/mysql/data;
+                mkdir -p /data/mysql/log;
+                chmod +777 -R /data/mysql;
+                docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$cluster_info" --cluster-id=$CLUSTER_ID

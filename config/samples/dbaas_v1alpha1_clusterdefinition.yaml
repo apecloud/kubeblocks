@@ -175,6 +175,3 @@ spec:
               name: data
             - mountPath: /log
               name: log
-
-  # defaultTerminatingPolicy: Delete | <string> # [DoNotTerminate, Halt, Delete, WipeOut]
-  defaultTerminationPolicy: DoNotTerminate

@@ -33,7 +33,7 @@ import (
 
 var _ = Describe("Event Controller", func() {
 	var (
-		timeout        = time.Second * 20
+		timeout        = time.Second * 10
 		interval       = time.Second
 		clusterDefName = "cluster-def-" + testCtx.GetRandomStr()
 		appVersionName = "app-versoion-" + testCtx.GetRandomStr()

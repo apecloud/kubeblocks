@@ -10,7 +10,6 @@ rules:
   - apps
   resources:
   - deployments
-  - statefulsets
   verbs:
   - create
   - delete
@@ -23,13 +22,35 @@ rules:
   - apps
   resources:
   - deployments/finalizers
-  - statefulsets/finalizers
   verbs:
   - update
 - apiGroups:
   - apps
   resources:
   - deployments/status
+  verbs:
+  - get
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps
+  resources:
   - statefulsets/status
   verbs:
   - get
@@ -60,7 +81,6 @@ rules:
   - ""
   resources:
   - configmaps
-  - persistentvolumeclaims
   - resourcequotas
   - secrets
   - services
@@ -76,7 +96,6 @@ rules:
   - ""
   resources:
   - configmaps/finalizers
-  - persistentvolumeclaims/finalizers
   - resourcequotas/finalizers
   - secrets/finalizers
   - services/finalizers
@@ -87,16 +106,6 @@ rules:
   resources:
   - endpoints
   verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - endpoints
-  - pods
-  verbs:
-  - delete
   - get
   - list
   - patch
@@ -115,17 +124,51 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - persistentvolumeclaims
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
   - persistentvolumeclaims/status
-  - resourcequotas/status
-  - services/status
   verbs:
   - get
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - ""
   resources:
   - pods/exec
   verbs:
   - create
+- apiGroups:
+  - ""
+  resources:
+  - resourcequotas/status
+  - services/status
+  verbs:
+  - get
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:

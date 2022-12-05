@@ -140,16 +140,12 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 	}
 
 	// get nodes where the pods are located
+podLoop:
 	for _, pod := range objs.Pods.Items {
-		found := false
 		for _, node := range objs.Nodes {
 			if node.Name == pod.Spec.NodeName {
-				found = true
-				break
+				break podLoop
 			}
-		}
-		if found {
-			break
 		}
 
 		nodeName := pod.Spec.NodeName
@@ -201,9 +197,9 @@ func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 			return nil
 		}
 
-		replicas := c.Replicas
-		if replicas == 0 {
-			replicas = compInClusterDef.DefaultReplicas
+		if c.Replicas == nil {
+			r := compInClusterDef.DefaultReplicas
+			c.Replicas = &r
 		}
 
 		var pods []*corev1.Pod
@@ -223,7 +219,7 @@ func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 			Name:     c.Name,
 			Type:     c.Type,
 			Cluster:  o.Cluster.Name,
-			Replicas: fmt.Sprintf("%d / %d", replicas, len(pods)),
+			Replicas: fmt.Sprintf("%d / %d", *c.Replicas, len(pods)),
 			Status:   fmt.Sprintf("%d / %d / %d / %d ", running, waiting, succeeded, failed),
 			Image:    image,
 		}

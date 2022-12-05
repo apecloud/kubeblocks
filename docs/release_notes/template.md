@@ -6,6 +6,43 @@ We would like to extend our thanks to all the new and existing contributors who 
 
 **Highlights**
 
+* Automatic pod container environment variables:
+  * KB_POD_NAME - Pod Name
+  * KB_NAMESPACE - Namespace
+  * KB_SA_NAME - Service Account Name
+  * KB_NODENAME - Node Name
+  * KB_HOSTIP - Host IP address
+  * KB_PODIP -  Pod IP address
+  * KB_PODIPS - Pod IP addresses
+  * KB_CLUSTER_NAME - KubeBlock Cluster API object name
+  * KB_COMP_NAME - Running pod's KubeBlock Cluster API object's `.spec.components.name`
+  * KB_CLUSTER_COMP_NAME - Running pod's KubeBlock Cluster API object's `<.metadata.name>-<.spec.components..name>`, same name is used for Deployment or StatefulSet workload name, and Service object name
+* ClusterDefinition API support following placeholder name:
+  * under `.spec.connectionCredential`:
+    * random 8 characters `$(RANDOM_PASSWD)` placeholder, 
+    * self reference map object `$(CONN_CREDENTIAL)[.<map key>])`
+    * example usage:
+  
+```yaml
+spec:
+  connectionCredential:
+    username: "admin-password" 
+    password: "$(RANDOM_PASSWD)"
+    "$(CONN_CREDENTIAL).username": "$(CONN_CREDENTIAL).password"
+
+# output:
+spec:
+  connectionCredential:
+    username: "admin-password" 
+    password: "<some random 8 characters password>"
+    "admin-password": "<value of above password>"
+```
+
+  * Connection credential secret name place holder `$(CONN_CREDENTIAL_SECRET_NAME)`
+
+
+
+
 If you're new to KubeBlocks, visit the [getting started](https://kubeblocks.io) page and
 familiarize yourself with KubeBlocks.
 

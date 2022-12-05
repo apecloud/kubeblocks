@@ -41,13 +41,14 @@ type EventReconciler struct {
 	Recorder record.EventRecorder
 }
 
+// events API only allows ready-only, create, patch
+// +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;patch
+
 const (
 	ProbeRoleChangedCheckPath = "spec.containers{kbprobe-rolechangedcheck}"
 )
 
 var EventHandlerMap = map[string]EventHandler{}
-
-// NOTES: controller-gen RBAC marker is maintained at rbac.go
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

@@ -39,6 +39,7 @@ import (
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
+	"go.uber.org/zap/zapcore"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/testutil"
@@ -54,6 +55,10 @@ var ctx context.Context
 var cancel context.CancelFunc
 var testCtx testutil.TestContext
 
+func init() {
+	viper.AutomaticEnv()
+}
+
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
@@ -63,7 +68,11 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	if viper.GetBool("ENABLE_DEBUG_LOG") {
+		logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true), func(o *zap.Options) {
+			o.TimeEncoder = zapcore.ISO8601TimeEncoder
+		}))
+	}
 
 	ctx, cancel = context.WithCancel(context.TODO())
 

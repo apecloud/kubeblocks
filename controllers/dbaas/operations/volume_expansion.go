@@ -188,12 +188,17 @@ func (ve volumeExpansion) setComponentPhaseForClusterAndOpsRequest(component *db
 	if !completedOnComponent {
 		return
 	}
-	componentPhase := cluster.Status.Components[componentName].Phase
-	if componentPhase == dbaasv1alpha1.VolumeExpandingPhase {
-		componentPhase = dbaasv1alpha1.RunningPhase
+	c, ok := cluster.Status.Components[componentName]
+	if !ok {
+		return
 	}
-	cluster.Status.Components[componentName].Phase = componentPhase
-	component.Phase = componentPhase
+	p := c.Phase
+	if p == dbaasv1alpha1.VolumeExpandingPhase {
+		p = dbaasv1alpha1.RunningPhase
+	}
+	c.Phase = p
+	cluster.Status.Components[componentName] = c
+	component.Phase = p
 }
 
 // isExpansionCompleted check the expansion is completed

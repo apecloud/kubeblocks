@@ -188,3 +188,12 @@ func RecordCreatedEvent(r record.EventRecorder, cr client.Object) {
 		r.Eventf(cr, corev1.EventTypeNormal, EventReasonCreatedCR, "Created %s: %s", strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
 	}
 }
+
+// WorkloadFilterPredicate provide filter predicate for workload objects, i.e., deployment/statefulset/pod/pvc.
+func WorkloadFilterPredicate(object client.Object) bool {
+	objLabels := object.GetLabels()
+	if objLabels == nil {
+		return false
+	}
+	return objLabels[AppManagedByLabelKey] == AppName
+}

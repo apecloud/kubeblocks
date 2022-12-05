@@ -41,10 +41,12 @@ spec:
               backupPolicyTemplateName:
                 description: policy can inherit from backup config and override some
                   fields.
+                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               backupToolName:
                 description: which backup tool to perform database backup, only support
                   one tool.
+                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               hooks:
                 description: execute hook commands for backup.
@@ -1638,6 +1640,7 @@ spec:
                         type: string
                       name:
                         description: the secret name
+                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                     required:
                     - name

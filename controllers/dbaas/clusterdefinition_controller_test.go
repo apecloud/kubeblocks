@@ -23,7 +23,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -259,6 +258,7 @@ data:
 			clusterDefinition.Spec.Components[0].ConfigTemplateRefs = []dbaasv1alpha1.ConfigTemplate{
 				{
 					Name:       cmName,
+					Namespace:  testCtx.DefaultNamespace,
 					VolumeName: "xxx",
 				},
 			}
@@ -279,7 +279,7 @@ data:
 			}, time.Second*10, time.Second*1).Should(BeFalse())
 
 			// create configmap
-			assureCfgTplConfigMapObj(cmName, viper.GetString(cmNamespaceKey))
+			assureCfgTplConfigMapObj(cmName, testCtx.DefaultNamespace)
 
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{
@@ -308,12 +308,12 @@ data:
 			clusterDefinition.Spec.Components[0].ConfigTemplateRefs = []dbaasv1alpha1.ConfigTemplate{
 				{
 					Name:       cmName,
-					VolumeName: "",
+					VolumeName: testCtx.DefaultNamespace,
 				},
 			}
 
 			// create configmap
-			assureCfgTplConfigMapObj(cmName, viper.GetString(cmNamespaceKey))
+			assureCfgTplConfigMapObj(cmName, testCtx.DefaultNamespace)
 
 			Expect(testCtx.CreateObj(ctx, clusterDefinition)).Should(Succeed())
 			createdClusterDef := &dbaasv1alpha1.ClusterDefinition{}

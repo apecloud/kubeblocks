@@ -30,25 +30,24 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
+	"github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+)
+
+const (
+	// EventTimeOut timeout of the event
+	EventTimeOut = 30 * time.Second
+
+	// EventOccursTimes occurs times of the event
+	EventOccursTimes int32 = 3
 )
 
 // isTargetKindForEvent check the event involve object is the target resources
 func isTargetKindForEvent(event *corev1.Event) bool {
-	return slices.Index([]string{PodKind, DeploymentKind, StatefulSetKind}, event.InvolvedObject.Kind) != -1
+	return slices.Index([]string{intctrlutil.PodKind, intctrlutil.DeploymentKind, intctrlutil.StatefulSetKind}, event.InvolvedObject.Kind) != -1
 }
 
-// isOvertimeAndOccursTimesForEvent check whether the duration and number of events reach the threshold
-func isOvertimeAndOccursTimesForEvent(event *corev1.Event) bool {
-	var (
-		intervalTime           = 30 * time.Second
-		occursEventTimes int32 = 3
-	)
-	return event.LastTimestamp.After(event.FirstTimestamp.Add(intervalTime)) &&
-		event.Count >= occursEventTimes
-}
-
-// isOperationsPhaseForCluster determine whether operations are in progress according to the cluster status
+// isOperationsPhaseForCluster determine whether operations are in progress according to the cluster status.
 func isOperationsPhaseForCluster(phase dbaasv1alpha1.Phase) bool {
 	return slices.Index([]dbaasv1alpha1.Phase{dbaasv1alpha1.CreatingPhase, dbaasv1alpha1.UpdatingPhase}, phase) != -1
 }
@@ -175,7 +174,7 @@ func getConsensusPhaseForEvent(ctx context.Context, cli client.Client, cluster *
 
 // getFinalEventMessageForRecorder get final event message by event involved object kind for recorded it
 func getFinalEventMessageForRecorder(event *corev1.Event) string {
-	if event.InvolvedObject.Kind == PodKind {
+	if event.InvolvedObject.Kind == intctrlutil.PodKind {
 		return fmt.Sprintf("Pod %s: %s", event.InvolvedObject.Name, event.Message)
 	}
 	return event.Message
@@ -184,7 +183,7 @@ func getFinalEventMessageForRecorder(event *corev1.Event) string {
 // getStatusComponentMessage get component status message
 func getStatusComponentMessage(statusComponentMessage string, event *corev1.Event) string {
 	message := event.Message
-	if event.InvolvedObject.Kind == PodKind {
+	if event.InvolvedObject.Kind == intctrlutil.PodKind {
 		message = mergePodEventMessage(statusComponentMessage, event)
 	}
 	return message
@@ -221,7 +220,7 @@ func mergePodEventMessage(statusComponentMessage string, event *corev1.Event) st
 func isExistsEventMsg(statusComponentMessage string, event *corev1.Event) bool {
 	isExists := strings.Contains(statusComponentMessage, event.Message)
 	// if involved object kind is Pod, we should check whether the pod name has merged into the component status message
-	if event.InvolvedObject.Kind == PodKind {
+	if event.InvolvedObject.Kind == intctrlutil.PodKind {
 		return isExists && strings.Contains(statusComponentMessage, event.InvolvedObject.Name)
 	}
 	return isExists
@@ -230,27 +229,30 @@ func isExistsEventMsg(statusComponentMessage string, event *corev1.Event) bool {
 // needSyncComponentStatusForEvent check whether the component status needs to be synchronized the cluster status by event
 func needSyncComponentStatusForEvent(cluster *dbaasv1alpha1.Cluster, componentName string, phase dbaasv1alpha1.Phase, event *corev1.Event) bool {
 	var (
-		statusComponent *dbaasv1alpha1.ClusterStatusComponent
+		status          = &cluster.Status
+		statusComponent dbaasv1alpha1.ClusterStatusComponent
 		ok              bool
 	)
 	if phase == "" {
 		return false
 	}
 	if cluster.Status.Components == nil {
-		cluster.Status.Components = map[string]*dbaasv1alpha1.ClusterStatusComponent{}
+		status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{}
 	}
 	if statusComponent, ok = cluster.Status.Components[componentName]; !ok {
-		cluster.Status.Components[componentName] = &dbaasv1alpha1.ClusterStatusComponent{Phase: phase, Message: event.Message}
+		status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{Phase: phase, Message: event.Message}
 		return true
 	}
 	if statusComponent.Phase != phase {
 		statusComponent.Phase = phase
 		statusComponent.Message = getStatusComponentMessage(statusComponent.Message, event)
+		status.Components[componentName] = statusComponent
 		return true
 	}
 	// check whether it is a new warning event and the component phase is running
 	if !isExistsEventMsg(statusComponent.Message, event) && phase != dbaasv1alpha1.RunningPhase {
 		statusComponent.Message = getStatusComponentMessage(statusComponent.Message, event)
+		status.Components[componentName] = statusComponent
 		return true
 	}
 	return false
@@ -263,16 +265,18 @@ func getEventInvolvedObject(ctx context.Context, cli client.Client, event *corev
 		Namespace: event.InvolvedObject.Namespace,
 	}
 	var err error
+	// If client.object interface object is used as a parameter, it will not return an error when the object is not found.
+	// so we should specify the object type to get the object.
 	switch event.InvolvedObject.Kind {
-	case PodKind:
+	case intctrlutil.PodKind:
 		pod := &corev1.Pod{}
 		err = cli.Get(ctx, objectKey, pod)
 		return pod, err
-	case StatefulSetKind:
+	case intctrlutil.StatefulSetKind:
 		sts := &appsv1.StatefulSet{}
 		err = cli.Get(ctx, objectKey, sts)
 		return sts, err
-	case DeploymentKind:
+	case intctrlutil.DeploymentKind:
 		deployment := &appsv1.Deployment{}
 		err = cli.Get(ctx, objectKey, deployment)
 		return deployment, err
@@ -293,7 +297,8 @@ func handleClusterStatusPhaseByEvent(cluster *dbaasv1alpha1.Cluster, componentMa
 		if clusterAvailabilityEffect && v.Phase == dbaasv1alpha1.FailedPhase {
 			isFailed = true
 		}
-		// determine whether other components are still operation, i.e., create/restart/scaling
+		// determine whether other components are still doing operation, i.e., create/restart/scaling.
+		// if exists operations, it will be handled by cluster controller to sync Cluster.status.phase.
 		if isOperationsPhaseForCluster(v.Phase) {
 			needSyncClusterPhase = false
 		}
@@ -396,13 +401,13 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 	if event.Type != corev1.EventTypeWarning || !isTargetKindForEvent(event) {
 		return nil
 	}
-	if !isOvertimeAndOccursTimesForEvent(event) {
+	if !k8score.IsOvertimeAndOccursTimesForEvent(event, EventTimeOut, EventOccursTimes) {
 		return nil
 	}
 	if object, err = getEventInvolvedObject(ctx, cli, event); err != nil {
 		return err
 	}
-	if object == nil || !component.WorkloadFilterPredicate(object) {
+	if object == nil || !intctrlutil.WorkloadFilterPredicate(object) {
 		return nil
 	}
 	return handleClusterStatusByEvent(ctx, cli, recorder, object, event)

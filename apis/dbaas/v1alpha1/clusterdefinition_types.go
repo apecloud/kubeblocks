@@ -30,16 +30,21 @@ type ClusterDefinitionSpec struct {
 	// [state.redis, mq.mqtt, mq.kafka, state.mysql-8, state.mysql-5.7, state.mysql-5.6, state-mongodb].
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=24
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Type string `json:"type"`
 
 	// List of components belonging to the cluster.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
-	Components []ClusterDefinitionComponent `json:"components"`
+	// +patchMergeKey=typeName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=typeName
+	Components []ClusterDefinitionComponent `json:"components" patchStrategy:"merge,retainKeys" patchMergeKey:"typeName"`
 
-	// Credential used for connecting database.
+	// Default connection credential used for connecting to cluster service.
 	// +optional
-	ConnectionCredential *ClusterDefinitionConnectionCredential `json:"connectionCredential,omitempty"`
+	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
 }
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
@@ -61,16 +66,34 @@ type ClusterDefinitionStatus struct {
 }
 
 type ConfigTemplate struct {
-	// Specify the name of the referenced configuration template, which is a configmap object.
+	// Specify the name of the referenced the configuration template ConfigMap object.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=128
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
+
+	// Specify the namespace of the referenced the configuration template ConfigMap object.
+	// An empty namespace is equivalent to the "default" namespace.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:default="default"
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
 
 	// VolumeName is the volume name of PodTemplate, which the configuration file produced through the configuration template will be mounted to the corresponding volume.
 	// The volume name must be defined in podSpec.containers[*].volumeMounts.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32
 	VolumeName string `json:"volumeName"`
+
+	// defaultMode is optional: mode bits used to set permissions on created files by default.
+	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
+	// Defaults to 0644.
+	// Directories within the path are not affected by this setting.
+	// This might be in conflict with other options that affect the file
+	// mode, like fsGroup, and the result can be other mode bits set.
+	// +optional
+	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
 }
 
 type ExporterConfig struct {
@@ -90,12 +113,12 @@ type ExporterConfig struct {
 type MonitorConfig struct {
 	// BuiltIn is a switch to enable DBaas builtIn monitoring.
 	// If BuiltIn is true and CharacterType is wellknown, ExporterConfig and Sidecar container will generate automatically.
-	// Otherwise, ISV should set BuiltIn to false and provide ExporterConfig and Sidecar container own.
+	// Otherwise, provider should set BuiltIn to false and provide ExporterConfig and Sidecar container own.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:default=true
+	// +kubebuilder:default=false
 	BuiltIn bool `json:"builtIn"`
 
-	// Exporter provided by ISV, which specify necessary information to Time Series Database.
+	// Exporter provided by provider, which specify necessary information to Time Series Database.
 	// ExporterConfig is valid when BuiltIn is false.
 	// +optional
 	Exporter *ExporterConfig `json:"exporterConfig,omitempty"`
@@ -119,7 +142,15 @@ type ClusterDefinitionComponent struct {
 	// Type name of the component, it can be any valid string.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	TypeName string `json:"typeName"`
+
+	// componentType defines type of the component. On of Stateful, Stateless, Consensus.
+	// Default to Stateless.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus}
+	// +kubebuilder:default=Stateless
+	ComponentType ComponentType `json:"componentType"`
 
 	// CharacterType defines well-known database component name, such as mongos(mongodb), proxy(redis), wesql(mysql)
 	// DBaas will generate proper monitor configs for wellknown CharacterType when BuiltIn is true.
@@ -147,18 +178,26 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	PDBSpec *policyv1.PodDisruptionBudgetSpec `json:"pdbSpec,omitempty"`
 
-	// The configTemplateRefs field provided by ISV, and
+	// The configTemplateRefs field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
 	// +optional
-	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// Monitor is monitoring config which provided by ISV.
+	// Monitor is monitoring config which provided by provider.
 	// +optional
 	Monitor *MonitorConfig `json:"monitor,omitempty"`
 
-	// LogConfigs is detail log file config which provided by ISV.
+	// LogConfigs is detail log file config which provided by provider.
 	// +optional
-	LogConfigs []LogConfig `json:"logConfigs,omitempty"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	LogConfigs []LogConfig `json:"logConfigs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// antiAffinity defines components should have anti-affinity constraint to same component type.
 	// +kubebuilder:default=false
@@ -169,37 +208,19 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	PodSpec *corev1.PodSpec `json:"podSpec,omitempty"`
 
-	// Service defines the behavior of a service spec.
+	// service defines the behavior of a service spec.
 	// provide read-write service when ComponentType is Consensus.
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
-	Service corev1.ServiceSpec `json:"service,omitempty"`
+	Service *corev1.ServiceSpec `json:"service,omitempty"`
 
 	// Probes setting for db healthy checks.
 	// +optional
 	Probes *ClusterDefinitionProbes `json:"probes,omitempty"`
 
-	// ComponentType defines type of the component.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=Stateless
-	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus}
-	ComponentType ComponentType `json:"componentType"`
-
-	// ConsensusSpec defines consensus related spec if componentType is Consensus.
-	// CAN'T be empty if componentType is Consensus.
+	// consensusSpec defines consensus related spec if componentType is Consensus, required if componentType is Consensus.
 	// +optional
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
-}
-
-type ClusterDefinitionConnectionCredential struct {
-	// User defines system credential username.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=root
-	User string `json:"user"`
-
-	// Password defines system credential password.
-	// +optional
-	Password string `json:"password,omitempty"`
 }
 
 type ClusterDefinitionStatusGeneration struct {
@@ -239,19 +260,21 @@ type ClusterDefinitionProbe struct {
 	// +kubebuilder:validation:Minimum=1
 	SuccessThreshold int32 `json:"successThreshold,omitempty"`
 
-	// Cmds used to execute for probe.
+	// commands used to execute for probe.
 	// +optional
 	Commands *ClusterDefinitionProbeCMDs `json:"commands,omitempty"`
 }
 
 type ClusterDefinitionProbes struct {
-	// Probe for db running check.
+	// Probe for DB running check.
 	// +optional
 	RunningProbe *ClusterDefinitionProbe `json:"runningProbe,omitempty"`
-	// Probe for db status check.
+
+	// Probe for DB status check.
 	// +optional
 	StatusProbe *ClusterDefinitionProbe `json:"statusProbe,omitempty"`
-	// Probe for db role changed check.
+
+	// Probe for DB role changed check.
 	// +optional
 	RoleChangedProbe *ClusterDefinitionProbe `json:"roleChangedProbe,omitempty"`
 }
@@ -306,6 +329,7 @@ type ConsensusMember struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:categories={dbaas},scope=Cluster,shortName=cd
+//+kubebuilder:printcolumn:name="MAIN-COMPONENT-TYPE",type="string",JSONPath=".spec.components[0].typeName",description="main component types"
 //+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 

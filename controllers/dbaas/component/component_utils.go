@@ -19,18 +19,13 @@ package component
 import (
 	"context"
 	"encoding/json"
-	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-)
-
-const (
-	// OpsRequestReconcileAnnotationKey Notify OpsRequest to reconcile
-	OpsRequestReconcileAnnotationKey = "kubeblocks.io/reconcile"
 )
 
 type handleComponentAndCheckStatus func(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *dbaasv1alpha1.Cluster, object client.Object) (bool, error)
@@ -38,29 +33,34 @@ type handleComponentAndCheckStatus func(reqCtx intctrlutil.RequestCtx, cli clien
 // NeedSyncStatusComponents Determine whether the component status needs to be modified
 func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster, componentName string, componentIsRunning bool) bool {
 	var (
+		status          = &cluster.Status
 		ok              bool
-		statusComponent *dbaasv1alpha1.ClusterStatusComponent
+		statusComponent dbaasv1alpha1.ClusterStatusComponent
 	)
-	if cluster.Status.Components == nil {
-		cluster.Status.Components = map[string]*dbaasv1alpha1.ClusterStatusComponent{}
+	if status.Components == nil {
+		status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{}
 	}
-	if statusComponent, ok = cluster.Status.Components[componentName]; !ok {
-		cluster.Status.Components[componentName] = &dbaasv1alpha1.ClusterStatusComponent{Phase: cluster.Status.Phase}
+	if statusComponent, ok = status.Components[componentName]; !ok {
+		status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{Phase: cluster.Status.Phase}
 		return true
 	}
+
 	if !componentIsRunning {
-		// if componentIsRunning is false, means the cluster has an operation running.
-		// so we sync the cluster phase to component phase when cluster phase is not Running.
-		if cluster.Status.Phase != dbaasv1alpha1.RunningPhase && statusComponent.Phase == dbaasv1alpha1.RunningPhase {
+		// if cluster.status.phase is Updating, means the cluster has an operation running.
+		// so we sync the cluster phase to component phase.
+		if cluster.Status.Phase == dbaasv1alpha1.UpdatingPhase && statusComponent.Phase == dbaasv1alpha1.RunningPhase {
 			statusComponent.Phase = cluster.Status.Phase
+			status.Components[componentName] = statusComponent
 			return true
 		}
+		// TODO handle when the deployment/statefulSet/pod is deleted by k8s controller or users.
 	} else {
 		// if componentIsRunning is true and component status is not Running.
 		// we should change component phase to Running
 		if statusComponent.Phase != dbaasv1alpha1.RunningPhase {
 			statusComponent.Phase = dbaasv1alpha1.RunningPhase
 			statusComponent.Message = ""
+			status.Components[componentName] = statusComponent
 			return true
 		}
 	}
@@ -82,20 +82,6 @@ func patchClusterComponentStatus(reqCtx intctrlutil.RequestCtx,
 	return cli.Status().Patch(reqCtx.Ctx, cluster, patch)
 }
 
-// patchOpsRequestAnnotation patch the reconcile annotation to OpsRequest
-func patchOpsRequestAnnotation(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, opsRequestName string) error {
-	opsRequest := &dbaasv1alpha1.OpsRequest{}
-	if err := cli.Get(ctx, client.ObjectKey{Name: opsRequestName, Namespace: cluster.Namespace}, opsRequest); err != nil {
-		return err
-	}
-	patch := client.MergeFrom(opsRequest.DeepCopy())
-	if opsRequest.Annotations == nil {
-		opsRequest.Annotations = map[string]string{}
-	}
-	opsRequest.Annotations[OpsRequestReconcileAnnotationKey] = time.Now().Format(time.RFC3339)
-	return cli.Patch(ctx, opsRequest, patch)
-}
-
 // MarkRunningOpsRequestAnnotation mark reconcile annotation to the OpsRequest which is running in the cluster.
 // then the related OpsRequest can reconcile
 func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster) error {
@@ -114,12 +100,9 @@ func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, clu
 	if err = json.Unmarshal([]byte(opsRequestValue), &opsRequestMap); err != nil {
 		return err
 	}
-	// mark annotation for updating operations
-	for k, v := range opsRequestMap {
-		if k != dbaasv1alpha1.UpdatingPhase {
-			continue
-		}
-		if err = patchOpsRequestAnnotation(ctx, cli, cluster, v); err != nil {
+	// mark annotation for operations
+	for _, v := range opsRequestMap {
+		if err = operations.PatchOpsRequestAnnotation(ctx, cli, cluster, v); err != nil {
 			return err
 		}
 	}
@@ -157,15 +140,6 @@ func checkComponentStatusAndSyncCluster(reqCtx intctrlutil.RequestCtx,
 		return MarkRunningOpsRequestAnnotation(reqCtx.Ctx, cli, cluster)
 	}
 	return nil
-}
-
-// WorkloadFilterPredicate provide filter predicate for workload objects, i.e., deployment/statefulset/pod.
-func WorkloadFilterPredicate(object client.Object) bool {
-	objLabels := object.GetLabels()
-	if objLabels == nil {
-		return false
-	}
-	return objLabels[intctrlutil.AppManagedByLabelKey] == intctrlutil.AppName
 }
 
 // DeploymentIsReady check deployment is ready

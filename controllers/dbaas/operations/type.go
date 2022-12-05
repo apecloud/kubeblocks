@@ -18,6 +18,7 @@ package operations
 
 import (
 	"context"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
@@ -30,6 +31,9 @@ const (
 	// annotation keys
 
 	RestartAnnotationKey = "kubeblocks.io/restart"
+
+	// OpsRequestReconcileAnnotationKey Notify OpsRequest to reconcile
+	OpsRequestReconcileAnnotationKey = "kubeblocks.io/reconcile"
 )
 
 type OpsBehaviour struct {
@@ -40,8 +44,8 @@ type OpsBehaviour struct {
 	// you need to call PatchOpsStatus function in ops_util.go and set OpsRequest.status.phase to Failed
 	Action func(opsResource *OpsResource) error
 	// ReconcileAction loop until the operation is completed.
-	// return OpsRequest.status.phase
-	ReconcileAction func(opsResource *OpsResource) (dbaasv1alpha1.Phase, error)
+	// return OpsRequest.status.phase and requeueAfter time
+	ReconcileAction func(opsResource *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error)
 	// ActionStartedCondition append to OpsRequest.status.conditions when start performing Action function
 	ActionStartedCondition func(opsRequest *dbaasv1alpha1.OpsRequest) *metav1.Condition
 }

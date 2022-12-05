@@ -23,7 +23,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 	pb "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol"
 
 	"github.com/golang/mock/gomock"

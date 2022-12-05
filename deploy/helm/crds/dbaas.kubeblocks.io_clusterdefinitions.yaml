@@ -20,6 +20,10 @@ spec:
   scope: Cluster
   versions:
   - additionalPrinterColumns:
+    - description: main component types
+      jsonPath: .spec.components[0].typeName
+      name: MAIN-COMPONENT-TYPE
+      type: string
     - description: status phase
       jsonPath: .status.phase
       name: PHASE
@@ -66,22 +70,44 @@ spec:
                       type: string
                     componentType:
                       default: Stateless
-                      description: ComponentType defines type of the component.
+                      description: componentType defines type of the component. On
+                        of Stateful, Stateless, Consensus. Default to Stateless.
                       enum:
                       - Stateless
                       - Stateful
                       - Consensus
                       type: string
                     configTemplateRefs:
-                      description: The configTemplateRefs field provided by ISV, and
-                        finally this configTemplateRefs will be rendered into the
-                        user's own configuration file according to the user's cluster.
+                      description: The configTemplateRefs field provided by provider,
+                        and finally this configTemplateRefs will be rendered into
+                        the user's own configuration file according to the user's
+                        cluster.
                       items:
                         properties:
+                          defaultMode:
+                            description: 'defaultMode is optional: mode bits used
+                              to set permissions on created files by default. Must
+                              be an octal value between 0000 and 0777 or a decimal
+                              value between 0 and 511. YAML accepts both octal and
+                              decimal values, JSON requires decimal values for mode
+                              bits. Defaults to 0644. Directories within the path
+                              are not affected by this setting. This might be in conflict
+                              with other options that affect the file mode, like fsGroup,
+                              and the result can be other mode bits set.'
+                            format: int32
+                            type: integer
                           name:
-                            description: Specify the name of the referenced configuration
-                              template, which is a configmap object.
-                            maxLength: 128
+                            description: Specify the name of the referenced the configuration
+                              template ConfigMap object.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          namespace:
+                            default: default
+                            description: Specify the namespace of the referenced the
+                              configuration template ConfigMap object. An empty namespace
+                              is equivalent to the "default" namespace.
+                            maxLength: 63
                             type: string
                           volumeName:
                             description: VolumeName is the volume name of PodTemplate,
@@ -95,10 +121,12 @@ spec:
                         - volumeName
                         type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                     consensusSpec:
-                      description: ConsensusSpec defines consensus related spec if
-                        componentType is Consensus. CAN'T be empty if componentType
-                        is Consensus.
+                      description: consensusSpec defines consensus related spec if
+                        componentType is Consensus, required if componentType is Consensus.
                       properties:
                         followers:
                           description: Followers, has voting right but not Leader.
@@ -215,7 +243,7 @@ spec:
                       type: integer
                     logConfigs:
                       description: LogConfigs is detail log file config which provided
-                        by ISV.
+                        by provider.
                       items:
                         properties:
                           filePathPattern:
@@ -235,6 +263,9 @@ spec:
                         - name
                         type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                     maxReplicas:
                       description: MaxReplicas maximum replicas pod for component
                         pod count.
@@ -250,20 +281,20 @@ spec:
                       type: integer
                     monitor:
                       description: Monitor is monitoring config which provided by
-                        ISV.
+                        provider.
                       properties:
                         builtIn:
-                          default: true
+                          default: false
                           description: BuiltIn is a switch to enable DBaas builtIn
                             monitoring. If BuiltIn is true and CharacterType is wellknown,
                             ExporterConfig and Sidecar container will generate automatically.
-                            Otherwise, ISV should set BuiltIn to false and provide
+                            Otherwise, provider should set BuiltIn to false and provide
                             ExporterConfig and Sidecar container own.
                           type: boolean
                         exporterConfig:
-                          description: Exporter provided by ISV, which specify necessary
-                            information to Time Series Database. ExporterConfig is
-                            valid when BuiltIn is false.
+                          description: Exporter provided by provider, which specify
+                            necessary information to Time Series Database. ExporterConfig
+                            is valid when BuiltIn is false.
                           properties:
                             scrapePath:
                               default: /metrics
@@ -7639,10 +7670,10 @@ spec:
                       description: Probes setting for db healthy checks.
                       properties:
                         roleChangedProbe:
-                          description: Probe for db role changed check.
+                          description: Probe for DB role changed check.
                           properties:
                             commands:
-                              description: Cmds used to execute for probe.
+                              description: commands used to execute for probe.
                               properties:
                                 queries:
                                   description: Read check executed on probe sidecar,
@@ -7679,10 +7710,10 @@ spec:
                               type: integer
                           type: object
                         runningProbe:
-                          description: Probe for db running check.
+                          description: Probe for DB running check.
                           properties:
                             commands:
-                              description: Cmds used to execute for probe.
+                              description: commands used to execute for probe.
                               properties:
                                 queries:
                                   description: Read check executed on probe sidecar,
@@ -7719,10 +7750,10 @@ spec:
                               type: integer
                           type: object
                         statusProbe:
-                          description: Probe for db status check.
+                          description: Probe for DB status check.
                           properties:
                             commands:
-                              description: Cmds used to execute for probe.
+                              description: commands used to execute for probe.
                               properties:
                                 queries:
                                   description: Read check executed on probe sidecar,
@@ -7760,7 +7791,7 @@ spec:
                           type: object
                       type: object
                     service:
-                      description: Service defines the behavior of a service spec.
+                      description: service defines the behavior of a service spec.
                         provide read-write service when ComponentType is Consensus.
                         https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
                       properties:
@@ -8095,6 +8126,7 @@ spec:
                       description: Type name of the component, it can be any valid
                         string.
                       maxLength: 12
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                   required:
                   - componentType
@@ -8102,24 +8134,21 @@ spec:
                   type: object
                 minItems: 1
                 type: array
+                x-kubernetes-list-map-keys:
+                - typeName
+                x-kubernetes-list-type: map
               connectionCredential:
-                description: Credential used for connecting database.
-                properties:
-                  password:
-                    description: Password defines system credential password.
-                    type: string
-                  user:
-                    default: root
-                    description: User defines system credential username.
-                    type: string
-                required:
-                - user
+                additionalProperties:
+                  type: string
+                description: Default connection credential used for connecting to
+                  cluster service.
                 type: object
               type:
                 description: Type define well known cluster types. Valid values are
                   in-list of [state.redis, mq.mqtt, mq.kafka, state.mysql-8, state.mysql-5.7,
                   state.mysql-5.6, state-mongodb].
                 maxLength: 24
+                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
             required:
             - components

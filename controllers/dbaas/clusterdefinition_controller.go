@@ -155,7 +155,7 @@ func checkValidConfTpls(cli client.Client, ctx intctrlutil.RequestCtx, configTpl
 		}
 
 		cmKey := client.ObjectKey{
-			Namespace: viper.GetString(cmNamespaceKey),
+			Namespace: configTpl.Namespace,
 			Name:      configTpl.Name,
 		}
 		cmObj := &corev1.ConfigMap{}

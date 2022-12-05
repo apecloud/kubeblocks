@@ -347,22 +347,24 @@ func mergeComponents(
 
 	clusterDefCompObj := clusterDefComp.DeepCopy()
 	component := &Component{
-		ClusterDefName:  clusterDef.Name,
-		ClusterType:     clusterDef.Spec.Type,
-		Name:            clusterDefCompObj.TypeName,
-		Type:            clusterDefCompObj.TypeName,
-		MinReplicas:     clusterDefCompObj.MinReplicas,
-		MaxReplicas:     clusterDefCompObj.MaxReplicas,
-		DefaultReplicas: clusterDefCompObj.DefaultReplicas,
-		Replicas:        clusterDefCompObj.DefaultReplicas,
-		AntiAffinity:    clusterDefCompObj.AntiAffinity,
-		ComponentType:   clusterDefCompObj.ComponentType,
-		ConsensusSpec:   clusterDefCompObj.ConsensusSpec,
-		PodSpec:         clusterDefCompObj.PodSpec,
-		Service:         clusterDefCompObj.Service,
-		Probes:          clusterDefCompObj.Probes,
-		LogConfigs:      clusterDefCompObj.LogConfigs,
-		ConfigTemplates: clusterDefCompObj.ConfigTemplateRefs,
+		ClusterDefName:             clusterDef.Name,
+		ClusterType:                clusterDef.Spec.Type,
+		Name:                       clusterDefCompObj.TypeName,
+		Type:                       clusterDefCompObj.TypeName,
+		MinReplicas:                clusterDefCompObj.MinReplicas,
+		MaxReplicas:                clusterDefCompObj.MaxReplicas,
+		DefaultReplicas:            clusterDefCompObj.DefaultReplicas,
+		Replicas:                   clusterDefCompObj.DefaultReplicas,
+		AntiAffinity:               clusterDefCompObj.AntiAffinity,
+		ComponentType:              clusterDefCompObj.ComponentType,
+		ConsensusSpec:              clusterDefCompObj.ConsensusSpec,
+		PodSpec:                    clusterDefCompObj.PodSpec,
+		Service:                    clusterDefCompObj.Service,
+		Probes:                     clusterDefCompObj.Probes,
+		LogConfigs:                 clusterDefCompObj.LogConfigs,
+		ConfigTemplates:            clusterDefCompObj.ConfigTemplateRefs,
+		HorizontalScalePolicy:      clusterDefCompObj.HorizontalScalePolicy,
+		BackupTemplateSelectLabels: clusterDefCompObj.BackupTemplateSelectLabels,
 	}
 
 	if appVerComp != nil && appVerComp.PodSpec != nil {
@@ -479,6 +481,30 @@ func mergeComponents(
 	mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
 
 	return component
+}
+
+func mergeComponentsList(cluster *dbaasv1alpha1.Cluster, clusterDef *dbaasv1alpha1.ClusterDefinition, clusterDefCompList []dbaasv1alpha1.ClusterDefinitionComponent, clusterCompList []dbaasv1alpha1.ClusterComponent) []Component {
+	var compList []Component
+	for _, clusterDefComp := range clusterDefCompList {
+		var matchClusterComp dbaasv1alpha1.ClusterComponent
+		for _, clusterComp := range clusterCompList {
+			if clusterComp.Type == clusterDefComp.TypeName {
+				matchClusterComp = clusterComp
+			}
+		}
+		comp := mergeComponents(cluster, clusterDef, &clusterDefComp, nil, &matchClusterComp)
+		compList = append(compList, *comp)
+	}
+	return compList
+}
+
+func getComponentByName(componentList []Component, name string) *Component {
+	for _, comp := range componentList {
+		if comp.Name == name {
+			return &comp
+		}
+	}
+	return nil
 }
 
 func createCluster(
@@ -749,11 +775,28 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				Name:      stsObj.Name + "-scaling",
 			}
 			// find component of current statefulset
-			var component *dbaasv1alpha1.ClusterDefinitionComponent
-			for _, comp := range clusterDef.Spec.Components {
-				if comp.TypeName == stsObj.Labels[intctrlutil.AppComponentLabelKey] {
-					component = &comp
-					break
+			componentName := stsObj.Labels[intctrlutil.AppComponentLabelKey]
+			components := mergeComponentsList(cluster, clusterDef, clusterDef.Spec.Components, cluster.Spec.Components)
+			component := getComponentByName(components, componentName)
+			// update component status when scaling
+			if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
+				if cluster.Status.Components[componentName] != nil {
+					if cluster.Status.Components[componentName].Phase != dbaasv1alpha1.HorizontalScalingPhase {
+						patch := client.MergeFrom(cluster.DeepCopy())
+						cluster.Status.Components[componentName].Phase = dbaasv1alpha1.HorizontalScalingPhase
+						cluster.Status.Components[componentName].Message = ""
+						if err := cli.Status().Patch(ctx, cluster, patch); err != nil {
+							res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+							return &res, err
+						}
+					}
+				} else {
+					patch := client.MergeFrom(cluster.DeepCopy())
+					cluster.Status.Components[componentName] = &dbaasv1alpha1.ClusterStatusComponent{Phase: dbaasv1alpha1.HorizontalScalingPhase, Message: ""}
+					if err := cli.Status().Patch(ctx, cluster, patch); err != nil {
+						res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+						return &res, err
+					}
 				}
 			}
 			// when horizontal scaling up, sometimes db needs backup to sync data from master, log is not reliable enough since it can be recycled

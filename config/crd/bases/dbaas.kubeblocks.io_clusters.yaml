@@ -612,6 +612,7 @@ spec:
                       - Updating
                       - Deleting
                       - Deleted
+                      - HorizontalScaling
                       type: string
                     type:
                       description: Type of component.

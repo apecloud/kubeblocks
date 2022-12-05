@@ -34,16 +34,17 @@ const (
 type Phase string
 
 const (
-	AvailablePhase   Phase = "Available"
-	UnavailablePhase Phase = "Unavailable"
-	DeletingPhase    Phase = "Deleting"
-	CreatingPhase    Phase = "Creating"
-	PendingPhase     Phase = "Pending"
-	RunningPhase     Phase = "Running"
-	FailedPhase      Phase = "Failed"
-	UpdatingPhase    Phase = "Updating"
-	SucceedPhase     Phase = "Succeed"
-	AbnormalPhase    Phase = "Abnormal"
+	AvailablePhase         Phase = "Available"
+	UnavailablePhase       Phase = "Unavailable"
+	DeletingPhase          Phase = "Deleting"
+	CreatingPhase          Phase = "Creating"
+	PendingPhase           Phase = "Pending"
+	RunningPhase           Phase = "Running"
+	FailedPhase            Phase = "Failed"
+	UpdatingPhase          Phase = "Updating"
+	SucceedPhase           Phase = "Succeed"
+	AbnormalPhase          Phase = "Abnormal"
+	HorizontalScalingPhase Phase = "HorizontalScaling"
 )
 
 // Status define CR .Status.ClusterDefSyncStatus

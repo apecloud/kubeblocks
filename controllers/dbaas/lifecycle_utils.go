@@ -249,7 +249,7 @@ func mergeMonitorConfig(
 	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
 	clusterComp *dbaasv1alpha1.ClusterComponent,
 	component *Component) {
-	monitorEnable := false
+	monitorEnable := true
 	if clusterComp != nil {
 		monitorEnable = clusterComp.Monitor
 	}

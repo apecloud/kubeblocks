@@ -115,11 +115,11 @@ type ClusterComponent struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Type string `json:"type"`
 
-	// Monitor which is a switch to enable monitoring, default is false
-	// DBaas provides an extension mechanism to support component level monitoring,
+	// Monitor which is a switch to enable monitoring, default is true
+	// Kubeblocks provides an extension mechanism to support component level monitoring,
 	// which will scrape metrics auto or manually from servers in component and export
 	// metrics to Time Series Database.
-	// +kubebuilder:default=false
+	// +kubebuilder:default=true
 	// +optional
 	Monitor bool `json:"monitor,omitempty"`
 

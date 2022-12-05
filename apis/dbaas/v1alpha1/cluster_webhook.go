@@ -212,13 +212,3 @@ func (r *Cluster) validateComponentResources(allErrs *field.ErrorList, resources
 		*allErrs = append(*allErrs, field.Invalid(field.NewPath(fmt.Sprintf("spec.components[%d].resources.requests", index)), invalidValue, err.Error()))
 	}
 }
-
-func (r *Cluster) getDuplicateMapKeys(m map[string]struct{}) []string {
-	keys := make([]string, len(m))
-	i := 0
-	for k := range m {
-		keys[i] = k
-		i++
-	}
-	return keys
-}

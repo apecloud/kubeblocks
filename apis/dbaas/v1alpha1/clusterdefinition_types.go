@@ -107,7 +107,7 @@ type ExporterConfig struct {
 	// +kubebuilder:validation:MaxLength=128
 	// +kubebuilder:default="/metrics"
 	// +optional
-	ScrapePath string `json:"scrapePath"`
+	ScrapePath string `json:"scrapePath,omitempty"`
 }
 
 type MonitorConfig struct {

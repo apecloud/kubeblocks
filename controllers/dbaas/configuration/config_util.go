@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/spf13/viper"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,8 +32,6 @@ import (
 )
 
 const (
-	ConfigNamespaceKey = "CM_NAMESPACE"
-
 	ConfigReconcileInterval = time.Second * 5
 
 	ConfigurationTemplateFinalizerName = "configuration.kubeblocks.io/finalizer"
@@ -257,7 +254,7 @@ func validateConfTpls(cli client.Client, ctx intctrlutil.RequestCtx, configTpls 
 		}
 
 		configKey := client.ObjectKey{
-			Namespace: viper.GetString(ConfigNamespaceKey),
+			Namespace: configTpl.Namespace,
 			Name:      configTpl.Name,
 		}
 		configObj := &dbaasv1alpha1.ConfigurationTemplate{}

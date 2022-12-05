@@ -130,7 +130,7 @@ func (r *ConfigurationTemplateReconciler) deleteExternalResources(reqCtx intctrl
 	labels := client.MatchingLabels{
 		CMConfigurationTplNameLabelKey: configTpl.GetName(),
 	}
-	ns := client.InNamespace(ConfigNamespaceKey)
+	ns := client.InNamespace(configTpl.Namespace)
 
 	cmList := &corev1.ConfigMapList{}
 	if err := r.Client.List(reqCtx.Ctx, cmList, ns, labels); err != nil {

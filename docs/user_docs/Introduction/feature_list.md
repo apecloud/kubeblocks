@@ -1,4 +1,4 @@
-# Key features
+# Feature list
 
 - Cloud-neutral
   - Runs on a Kubernetes base and supports AWS EKS, GCP GKE, Azure AKS and other cloud environments
@@ -47,8 +47,8 @@
   - Data storage encryption
   - Backup encryption
   
-- dbctl - Easy-to-use CLI command line tool
-  - Install, uninstall and upgrade the system with dbctl
+- kbcli - Easy-to-use CLI command line tool
+  - Install, uninstall and upgrade the system with kbcli
   - Support common operations such as database cluster, backup and recovery, monitoring, log, operation and maintenance, bench
-  - Support dbctl to connect to the database cluster without repeatedly entering password
+  - Support kbcli to connect to the database cluster without repeatedly entering a password
   - Support command line automatic completion

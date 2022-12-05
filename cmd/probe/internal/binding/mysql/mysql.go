@@ -35,6 +35,7 @@ import (
 	"github.com/dapr/kit/logger"
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 )
@@ -106,30 +107,6 @@ var eventIntervalNum = 60
 var dbPort = 3306
 var dbRoles = map[string]internal.AccessMode{}
 
-func init() {
-	val, ok := os.LookupEnv("KB_AGGREGATION_NUMBER")
-	if ok {
-		num, err := strconv.Atoi(val)
-		if err == nil {
-			eventAggregationNum = num
-		}
-	}
-
-	val, ok = os.LookupEnv("KB_DB_PORT")
-	if ok {
-		num, err := strconv.Atoi(val)
-		if err == nil {
-			dbPort = num
-		}
-	}
-
-	val, ok = os.LookupEnv("KB_DB_ROLES")
-	if ok {
-		if err := json.Unmarshal([]byte(val), &dbRoles); err != nil {
-			fmt.Println(errors.Wrap(err, "KB_DB_ROLES env format error").Error())
-		}
-	}
-}
 
 // NewMysql returns a new MySQL output binding.
 func NewMysql(logger logger.Logger) bindings.OutputBinding {
@@ -138,6 +115,20 @@ func NewMysql(logger logger.Logger) bindings.OutputBinding {
 
 // Init initializes the MySQL binding.
 func (m *Mysql) Init(metadata bindings.Metadata) error {
+	if viper.IsSet("KB_AGGREGATION_NUMBER") {
+		eventAggregationNum = viper.GetInt("KB_AGGREGATION_NUMBER")
+	}
+
+	if viper.IsSet("KB_SERVICE_PORT") {
+		dbPort = viper.GetInt("KB_SERVICE_PORT")
+	}
+
+	if viper.IsSet("KB_SERVICE_ROLES") {
+		val := viper.GetString("KB_SERVICE_ROLES")
+		if err := json.Unmarshal([]byte(val), &dbRoles); err != nil {
+			fmt.Println(errors.Wrap(err, "KB_DB_ROLES env format error").Error())
+		}
+	}
 	m.logger.Debug("Initializing MySQL binding")
 	m.metadata = metadata
 	return nil

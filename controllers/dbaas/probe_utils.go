@@ -112,7 +112,7 @@ func buildProbeServiceContainer(component *Component, container *corev1.Containe
 			dbPort = int(port.Port)
 		}
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:      dbaasPrefix + "_DB_PORT",
+			Name:      dbaasPrefix + "_SERVICE_PORT",
 			Value:     strconv.Itoa(dbPort),
 			ValueFrom: nil,
 		})
@@ -121,13 +121,13 @@ func buildProbeServiceContainer(component *Component, container *corev1.Containe
 	roles := getComponentRoles(component)
 	rolesJSON, _ := json.Marshal(roles)
 	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      dbaasPrefix + "_DB_ROLES",
+		Name:      dbaasPrefix + "_SERVICE_ROLES",
 		Value:     string(rolesJSON),
 		ValueFrom: nil,
 	})
 
 	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      dbaasPrefix + "_DB_CHARACTER_TYPE",
+		Name:      dbaasPrefix + "_SERVICE_CHARACTER_TYPE",
 		Value:     component.CharacterType,
 		ValueFrom: nil,
 	})

@@ -17,6 +17,8 @@ limitations under the License.
 package main
 
 import (
+	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -32,6 +34,8 @@ import (
 	secretstoresLoader "github.com/dapr/dapr/pkg/components/secretstores"
 	stateLoader "github.com/dapr/dapr/pkg/components/state"
 	httpMiddleware "github.com/dapr/dapr/pkg/middleware/http"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 
 	"github.com/dapr/dapr/pkg/runtime"
 	"github.com/dapr/kit/logger"
@@ -53,6 +57,7 @@ var (
 )
 
 func init() {
+	viper.AutomaticEnv()
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mysql.NewMysql, "mysql")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(dhttp.NewHTTP, "http")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(localstorage.NewLocalStorage, "localstorage")
@@ -72,6 +77,14 @@ func main() {
 	rt, err := runtime.FromFlags()
 	if err != nil {
 		log.Fatal(err)
+	}
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
+	viper.BindPFlags(pflag.CommandLine)
+	viper.SetConfigFile(viper.GetString("config")) // path to look for the config file in
+	err = viper.ReadInConfig()                     // Find and read the config file
+	if err != nil {                                // Handle errors reading the config file
+		panic(fmt.Errorf("fatal error config file: %w", err))
 	}
 
 	secretstoresLoader.DefaultRegistry.Logger = logContrib

@@ -11,13 +11,14 @@ spec:
   names:
     categories:
     - dbaas
+    - all
     kind: ConfigurationTemplate
     listKind: ConfigurationTemplateList
     plural: configurationtemplates
     shortNames:
     - ctpl
     singular: configurationtemplate
-  scope: Cluster
+  scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - description: status phase

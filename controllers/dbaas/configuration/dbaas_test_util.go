@@ -184,6 +184,7 @@ func (w *TestWrapper) DeleteAllCR() error {
 	// step4: delete config templateion cr
 	if err := k8sClient.DeleteAllOf(ctx,
 		&dbaasv1alpha1.ConfigurationTemplate{},
+		client.InNamespace(clusterNS),
 		client.HasLabels{testCtx.TestObjLabelKey}); err != nil {
 		return err
 	}
@@ -360,7 +361,7 @@ func CreateDBaasFromISV(testCtx testutil.TestContext, ctx context.Context, k8sCl
 		testInfo.CdName = GenRandomCDName()
 		testInfo.AvName = GenRandomAVName()
 		testInfo.CfgTplName = GenRandomTplName()
-		testInfo.Namespace = "default"
+		testInfo.Namespace = testCtx.DefaultNamespace
 	}
 
 	testWrapper := &TestWrapper{

@@ -1651,7 +1651,7 @@ func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder
 	cmObj := &corev1.ConfigMap{}
 	//  Require template configmap exist
 	if err := cli.Get(ctx, client.ObjectKey{
-		Namespace: cmObj.Namespace,
+		Namespace: cfgTpl.Namespace,
 		Name:      cfgTpl.Spec.TplRef,
 	}, cmObj); err != nil {
 		return nil, err

@@ -117,6 +117,8 @@ var _ = Describe("Cluster Controller", func() {
 
 		cfgCM := &corev1.ConfigMap{}
 		cfgTpl := &dbaasv1alpha1.ConfigurationTemplate{}
+		cfgCM.SetNamespace(testCtx.DefaultNamespace)
+		cfgTpl.SetNamespace(testCtx.DefaultNamespace)
 		Expect(yaml.Unmarshal(configmapYAML, cfgCM)).Should(Succeed())
 		Expect(yaml.Unmarshal(configTemplateYaml, cfgTpl)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
@@ -144,6 +146,7 @@ spec:
     configSpec:
       configTemplateRefs:
       - name: mysql-tree-node-template-8.0
+        namespace: default
         volumeName: mysql-config
     defaultReplicas: 1
     podSpec:
@@ -222,6 +225,7 @@ spec:
     configSpec:
       configTemplateRefs:
       - name: mysql-tree-node-template-8.0
+        namespace: default
         volumeName: mysql-config
     podSpec:
       containers:

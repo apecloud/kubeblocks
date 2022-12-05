@@ -2,6 +2,7 @@ apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ConfigurationTemplate
 metadata:
   name: mysql-tree-node-template-8.0
+  namespace: default
 spec:
   # configmap reference
   tplRef: mysql-tree-node-template-8.0

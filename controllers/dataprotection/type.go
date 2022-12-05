@@ -32,7 +32,13 @@ const (
 	// settings keys
 	maxConcurDataProtectionReconKey = "MAXCONCURRENTRECONCILES_DATAPROTECTION"
 
-	dataProtectionLabelBackupTypeKey = "dataprotection.kubeblocks.io/backup-type"
+	// label keys
+	dataProtectionLabelBackupTypeKey     = "dataprotection.kubeblocks.io/backup-type"
+	dataProtectionLabelBackupJobNameKey  = "backupjobs.dataprotection.kubeblocks.io/name"
+	dataProtectionLabelRestoreJobNameKey = "restorejobs.dataprotection.kubeblocks.io/name"
+
+	// error status
+	errorJobFailed = "JobFailed"
 )
 
 func init() {

@@ -93,25 +93,14 @@ func (c createParams) getCacheCUETplValue(key string, valueCreator func() (*intc
 	return v, err
 }
 
-func (c createParams) getConfigTemplates() ([]dbaasv1alpha1.ConfigTemplate, error) {
-	var appVersionTpl []dbaasv1alpha1.ConfigTemplate
-	for _, component := range c.appVersion.Spec.Components {
-		if component.Type == c.component.Type {
-			appVersionTpl = component.ConfigTemplateRefs
-			break
-		}
-	}
-	return mergeConfigTemplates(appVersionTpl, c.getComponentConfigTemplates())
-}
-
 // mergeConfigTemplates merge AppVersion.Components[*].ConfigTemplateRefs and ClusterDefinition.Components[*].ConfigTemplateRefs
-func mergeConfigTemplates(appVersionTpl []dbaasv1alpha1.ConfigTemplate, cdTpl []dbaasv1alpha1.ConfigTemplate) ([]dbaasv1alpha1.ConfigTemplate, error) {
+func mergeConfigTemplates(appVersionTpl []dbaasv1alpha1.ConfigTemplate, cdTpl []dbaasv1alpha1.ConfigTemplate) []dbaasv1alpha1.ConfigTemplate {
 	if len(appVersionTpl) == 0 {
-		return cdTpl, nil
+		return cdTpl
 	}
 
 	if len(cdTpl) == 0 {
-		return appVersionTpl, nil
+		return appVersionTpl
 	}
 
 	mergedCfgTpl := make([]dbaasv1alpha1.ConfigTemplate, 0, len(appVersionTpl)+len(cdTpl))
@@ -119,7 +108,9 @@ func mergeConfigTemplates(appVersionTpl []dbaasv1alpha1.ConfigTemplate, cdTpl []
 
 	for i := range appVersionTpl {
 		if _, ok := (mergedTplMap)[appVersionTpl[i].VolumeName]; ok {
-			return nil, fmt.Errorf("ConfigTemplate require not same volumeName [%s]", appVersionTpl[i].Name)
+			// TODO: following error should be checked in validation webhook and record Warning event
+			// return nil, fmt.Errorf("ConfigTemplate require not same volumeName [%s]", appVersionTpl[i].Name)
+			continue
 		}
 		mergedCfgTpl = append(mergedCfgTpl, appVersionTpl[i])
 		mergedTplMap[appVersionTpl[i].VolumeName] = struct{}{}
@@ -134,35 +125,7 @@ func mergeConfigTemplates(appVersionTpl []dbaasv1alpha1.ConfigTemplate, cdTpl []
 		mergedTplMap[cdTpl[i].VolumeName] = struct{}{}
 	}
 
-	return mergedCfgTpl, nil
-}
-
-func (c createParams) getComponentConfigTemplates() []dbaasv1alpha1.ConfigTemplate {
-	for _, component := range c.clusterDefinition.Spec.Components {
-		if component.TypeName == c.component.Type {
-			return component.ConfigTemplateRefs
-		}
-	}
-	return nil
-}
-
-func getAppVersionComponentByType(components []dbaasv1alpha1.AppVersionComponent, typeName string) *dbaasv1alpha1.AppVersionComponent {
-	for _, component := range components {
-		if component.Type == typeName {
-			return &component
-		}
-	}
-	return nil
-}
-
-func getClusterComponentsByType(components []dbaasv1alpha1.ClusterComponent, typeName string) []dbaasv1alpha1.ClusterComponent {
-	comps := []dbaasv1alpha1.ClusterComponent{}
-	for _, component := range components {
-		if component.Type == typeName {
-			comps = append(comps, component)
-		}
-	}
-	return comps
+	return mergedCfgTpl
 }
 
 func getContainerByName(containers []corev1.Container, name string) (int, *corev1.Container) {
@@ -280,7 +243,7 @@ func buildPodAffinity(
 }
 
 func disableMonitor(component *Component) {
-	component.Monitor = MonitorConfig{
+	component.Monitor = &MonitorConfig{
 		Enable: false,
 	}
 }
@@ -307,7 +270,7 @@ func mergeMonitorConfig(
 			disableMonitor(component)
 			return
 		}
-		component.Monitor = MonitorConfig{
+		component.Monitor = &MonitorConfig{
 			Enable:     true,
 			ScrapePath: monitorConfig.Exporter.ScrapePath,
 			ScrapePort: monitorConfig.Exporter.ScrapePort,
@@ -349,7 +312,7 @@ func mergeComponents(
 	component := &Component{
 		ClusterDefName:             clusterDef.Name,
 		ClusterType:                clusterDef.Spec.Type,
-		Name:                       clusterDefCompObj.TypeName,
+		Name:                       clusterDefCompObj.TypeName, // initial name for the component will be same as TypeName
 		Type:                       clusterDefCompObj.TypeName,
 		MinReplicas:                clusterDefCompObj.MinReplicas,
 		MaxReplicas:                clusterDefCompObj.MaxReplicas,
@@ -367,89 +330,98 @@ func mergeComponents(
 		BackupTemplateSelectLabels: clusterDefCompObj.BackupTemplateSelectLabels,
 	}
 
-	if appVerComp != nil && appVerComp.PodSpec != nil {
-		for _, container := range appVerComp.PodSpec.Containers {
-			i, c := getContainerByName(component.PodSpec.Containers, container.Name)
-			if c != nil {
-				if container.Image != "" {
-					component.PodSpec.Containers[i].Image = container.Image
-				}
-				if len(container.Command) != 0 {
-					component.PodSpec.Containers[i].Command = container.Command
-				}
-				if len(container.Args) != 0 {
-					component.PodSpec.Containers[i].Args = container.Args
-				}
-				if container.WorkingDir != "" {
-					component.PodSpec.Containers[i].WorkingDir = container.WorkingDir
-				}
-				if len(container.Ports) != 0 {
-					component.PodSpec.Containers[i].Ports = container.Ports
-				}
-				if len(container.EnvFrom) != 0 {
-					component.PodSpec.Containers[i].EnvFrom = container.EnvFrom
-				}
-				if len(container.Env) != 0 {
-					component.PodSpec.Containers[i].Env = container.Env
-				}
-				if container.Resources.Limits != nil || container.Resources.Requests != nil {
-					component.PodSpec.Containers[i].Resources = container.Resources
-				}
-				if len(container.VolumeMounts) != 0 {
-					component.PodSpec.Containers[i].VolumeMounts = container.VolumeMounts
-				}
-				if len(container.VolumeDevices) != 0 {
-					component.PodSpec.Containers[i].VolumeDevices = container.VolumeDevices
-				}
-				if container.LivenessProbe != nil {
-					component.PodSpec.Containers[i].LivenessProbe = container.LivenessProbe
-				}
-				if container.ReadinessProbe != nil {
-					component.PodSpec.Containers[i].ReadinessProbe = container.ReadinessProbe
-				}
-				if container.StartupProbe != nil {
-					component.PodSpec.Containers[i].StartupProbe = container.StartupProbe
-				}
-				if container.Lifecycle != nil {
-					component.PodSpec.Containers[i].Lifecycle = container.Lifecycle
-				}
-				if container.TerminationMessagePath != "" {
-					component.PodSpec.Containers[i].TerminationMessagePath = container.TerminationMessagePath
-				}
-				if container.TerminationMessagePolicy != "" {
-					component.PodSpec.Containers[i].TerminationMessagePolicy = container.TerminationMessagePolicy
-				}
-				if container.ImagePullPolicy != "" {
-					component.PodSpec.Containers[i].ImagePullPolicy = container.ImagePullPolicy
-				}
-				if container.SecurityContext != nil {
-					component.PodSpec.Containers[i].SecurityContext = container.SecurityContext
-				}
-			} else {
-				component.PodSpec.Containers = append(component.PodSpec.Containers, container)
+	doContainerAttrOverride := func(container corev1.Container) {
+		i, c := getContainerByName(component.PodSpec.Containers, container.Name)
+		if c == nil {
+			component.PodSpec.Containers = append(component.PodSpec.Containers, container)
+			return
+		}
+		if container.Image != "" {
+			component.PodSpec.Containers[i].Image = container.Image
+		}
+		if len(container.Command) != 0 {
+			component.PodSpec.Containers[i].Command = container.Command
+		}
+		if len(container.Args) != 0 {
+			component.PodSpec.Containers[i].Args = container.Args
+		}
+		if container.WorkingDir != "" {
+			component.PodSpec.Containers[i].WorkingDir = container.WorkingDir
+		}
+		if len(container.Ports) != 0 {
+			component.PodSpec.Containers[i].Ports = container.Ports
+		}
+		if len(container.EnvFrom) != 0 {
+			component.PodSpec.Containers[i].EnvFrom = container.EnvFrom
+		}
+		if len(container.Env) != 0 {
+			component.PodSpec.Containers[i].Env = container.Env
+		}
+		if container.Resources.Limits != nil || container.Resources.Requests != nil {
+			component.PodSpec.Containers[i].Resources = container.Resources
+		}
+		if len(container.VolumeMounts) != 0 {
+			component.PodSpec.Containers[i].VolumeMounts = container.VolumeMounts
+		}
+		if len(container.VolumeDevices) != 0 {
+			component.PodSpec.Containers[i].VolumeDevices = container.VolumeDevices
+		}
+		if container.LivenessProbe != nil {
+			component.PodSpec.Containers[i].LivenessProbe = container.LivenessProbe
+		}
+		if container.ReadinessProbe != nil {
+			component.PodSpec.Containers[i].ReadinessProbe = container.ReadinessProbe
+		}
+		if container.StartupProbe != nil {
+			component.PodSpec.Containers[i].StartupProbe = container.StartupProbe
+		}
+		if container.Lifecycle != nil {
+			component.PodSpec.Containers[i].Lifecycle = container.Lifecycle
+		}
+		if container.TerminationMessagePath != "" {
+			component.PodSpec.Containers[i].TerminationMessagePath = container.TerminationMessagePath
+		}
+		if container.TerminationMessagePolicy != "" {
+			component.PodSpec.Containers[i].TerminationMessagePolicy = container.TerminationMessagePolicy
+		}
+		if container.ImagePullPolicy != "" {
+			component.PodSpec.Containers[i].ImagePullPolicy = container.ImagePullPolicy
+		}
+		if container.SecurityContext != nil {
+			component.PodSpec.Containers[i].SecurityContext = container.SecurityContext
+		}
+	}
+
+	if appVerComp != nil {
+		component.ConfigTemplates = mergeConfigTemplates(appVerComp.ConfigTemplateRefs, component.ConfigTemplates)
+		if appVerComp.PodSpec != nil {
+			for _, c := range appVerComp.PodSpec.Containers {
+				doContainerAttrOverride(c)
 			}
 		}
 	}
 	affinity := cluster.Spec.Affinity
 	tolerations := cluster.Spec.Tolerations
 	if clusterComp != nil {
-		component.Name = clusterComp.Name
+		component.Name = clusterComp.Name // component name gets overrided
 		component.EnabledLogs = clusterComp.EnabledLogs
 
-		// respect user's declaration
-		if clusterComp.Replicas > 0 {
-			component.Replicas = clusterComp.Replicas
+		if clusterComp.Replicas != nil && *clusterComp.Replicas > 0 {
+			component.Replicas = *clusterComp.Replicas
 		}
 
 		if clusterComp.VolumeClaimTemplates != nil {
 			component.VolumeClaimTemplates = toK8sVolumeClaimTemplates(clusterComp.VolumeClaimTemplates)
 		}
+
 		if clusterComp.Resources.Requests != nil || clusterComp.Resources.Limits != nil {
 			component.PodSpec.Containers[0].Resources = clusterComp.Resources
 		}
 
-		// respect user's declaration
 		if clusterComp.ServiceType != "" {
+			if component.Service == nil {
+				component.Service = &corev1.ServiceSpec{}
+			}
 			component.Service.Type = clusterComp.ServiceType
 		}
 
@@ -479,6 +451,7 @@ func mergeComponents(
 	// }
 
 	mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
+	replaceValues(cluster, component)
 
 	return component
 }
@@ -507,6 +480,33 @@ func getComponentByName(componentList []Component, name string) *Component {
 	return nil
 }
 
+func replaceValues(cluster *dbaasv1alpha1.Cluster, component *Component) {
+	namedValues := map[string]string{
+		"$(CONN_CREDENTIAL_SECRET_NAME)": fmt.Sprintf("%s-conn-credential", cluster.GetName()),
+	}
+
+	// replace env[].valueFrom.secretKeyRef.name variables
+	for _, c := range component.PodSpec.Containers {
+		for _, e := range c.Env {
+			if e.ValueFrom == nil {
+				continue
+			}
+			if e.ValueFrom.SecretKeyRef == nil {
+				continue
+			}
+			secretRef := e.ValueFrom.SecretKeyRef
+			for k, v := range namedValues {
+				r := strings.Replace(secretRef.Name, k, v, 1)
+				if r == secretRef.Name {
+					continue
+				}
+				secretRef.Name = r
+				break
+			}
+		}
+	}
+}
+
 func createCluster(
 	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
@@ -528,30 +528,42 @@ func createCluster(
 		return &res, err
 	}
 
-	components := clusterDefinition.Spec.Components
-	useDefaultComp := len(cluster.Spec.Components) == 0
-	for _, component := range components {
-		componentName := component.TypeName
-		appVersionComponent := getAppVersionComponentByType(appVersion.Spec.Components, componentName)
+	clusterDefComp := clusterDefinition.Spec.Components
+	clusterCompTypes := cluster.GetTypeMappingComponents()
 
-		prepareComp := func(component *Component) error {
-			iParams := params
-			iParams.component = component
-			return prepareComponentObjs(reqCtx, cli, &iParams)
+	// add default component if unspecified in Cluster.spec.components
+	for _, c := range clusterDefComp {
+		if c.DefaultReplicas <= 0 {
+			continue
 		}
+		if _, ok := clusterCompTypes[c.TypeName]; ok {
+			continue
+		}
+		r := c.DefaultReplicas
+		cluster.Spec.Components = append(cluster.Spec.Components, dbaasv1alpha1.ClusterComponent{
+			Name:     c.TypeName,
+			Type:     c.TypeName,
+			Replicas: &r,
+		})
+	}
 
-		if useDefaultComp {
-			if err := prepareComp(mergeComponents(cluster, clusterDefinition, &component, appVersionComponent, nil)); err != nil {
+	appCompTypes := appVersion.GetTypeMappingComponents()
+	clusterCompTypes = cluster.GetTypeMappingComponents()
+
+	prepareComp := func(component *Component) error {
+		iParams := params
+		iParams.component = component
+		return prepareComponentObjs(reqCtx, cli, &iParams)
+	}
+
+	for _, c := range clusterDefComp {
+		typeName := c.TypeName
+		appVersionComponent := appCompTypes[typeName]
+		clusterComps := clusterCompTypes[typeName]
+		for _, clusterComp := range clusterComps {
+			if err := prepareComp(mergeComponents(cluster, clusterDefinition, &c, appVersionComponent, &clusterComp)); err != nil {
 				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 				return &res, err
-			}
-		} else {
-			clusterComps := getClusterComponentsByType(cluster.Spec.Components, componentName)
-			for _, clusterComp := range clusterComps {
-				if err := prepareComp(mergeComponents(cluster, clusterDefinition, &component, appVersionComponent, &clusterComp)); err != nil {
-					res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-					return &res, err
-				}
 			}
 		}
 	}
@@ -575,7 +587,7 @@ func prepareSecretObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj int
 		return fmt.Errorf("invalid arg")
 	}
 
-	secret, err := buildSecret(*params)
+	secret, err := buildConnCredential(*params)
 	if err != nil {
 		return err
 	}
@@ -609,17 +621,22 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		return fmt.Errorf("invalid arg")
 	}
 
-	statefulSetProcessor := func(customSetup func(*corev1.ConfigMap) (*appsv1.StatefulSet, error)) error {
+	workloadProcessor := func(customSetup func(*corev1.ConfigMap) (client.Object, error)) error {
 		envConfig, err := buildEnvConfig(*params)
 		if err != nil {
 			return err
 		}
 		*params.applyObjs = append(*params.applyObjs, envConfig)
-		sts, err := customSetup(envConfig)
+
+		workload, err := customSetup(envConfig)
 		if err != nil {
 			return err
 		}
-		*params.applyObjs = append(*params.applyObjs, sts)
+
+		defer func() {
+			// workload object should be append last
+			*params.applyObjs = append(*params.applyObjs, workload)
+		}()
 
 		svc, err := buildSvc(*params, true)
 		if err != nil {
@@ -627,8 +644,45 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		}
 		*params.applyObjs = append(*params.applyObjs, svc)
 
-		// render config
-		configs, err := buildCfg(*params, sts, reqCtx.Ctx, cli)
+		var podSpec *corev1.PodSpec
+		sts, ok := workload.(*appsv1.StatefulSet)
+		if ok {
+			podSpec = &sts.Spec.Template.Spec
+		} else {
+			deploy, ok := workload.(*appsv1.Deployment)
+			if ok {
+				podSpec = &deploy.Spec.Template.Spec
+			}
+		}
+		if podSpec == nil {
+			return nil
+		}
+
+		defer func() {
+			for _, cc := range []*[]corev1.Container{
+				&podSpec.Containers,
+				&podSpec.InitContainers,
+			} {
+				volumes := podSpec.Volumes
+				for _, c := range *cc {
+					for _, v := range c.VolumeMounts {
+						// if persistence is not found, add emptyDir pod.spec.volumes[]
+						volumes, _ = intctrlutil.CheckAndUpdateVolume(volumes, v.Name, func(volumeName string) corev1.Volume {
+							return corev1.Volume{
+								Name: v.Name,
+								VolumeSource: corev1.VolumeSource{
+									EmptyDir: &corev1.EmptyDirVolumeSource{},
+								},
+							}
+						}, nil)
+					}
+				}
+				podSpec.Volumes = volumes
+			}
+		}()
+
+		// render config template
+		configs, err := buildCfg(*params, workload, podSpec, reqCtx.Ctx, cli)
 		if err != nil {
 			return err
 		}
@@ -641,30 +695,23 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 
 	switch params.component.ComponentType {
 	case dbaasv1alpha1.Stateless:
-		deploy, err := buildDeploy(reqCtx, *params)
-		if err != nil {
+		if err := workloadProcessor(
+			func(envConfig *corev1.ConfigMap) (client.Object, error) {
+				return buildDeploy(reqCtx, *params, envConfig.Name)
+			}); err != nil {
 			return err
 		}
-		*params.applyObjs = append(*params.applyObjs, deploy)
 	case dbaasv1alpha1.Stateful:
-		if err := statefulSetProcessor(
-			func(envConfig *corev1.ConfigMap) (*appsv1.StatefulSet, error) {
-				sts, err := buildSts(reqCtx, *params, envConfig.Name)
-				if err != nil {
-					return nil, err
-				}
-				return sts, nil
+		if err := workloadProcessor(
+			func(envConfig *corev1.ConfigMap) (client.Object, error) {
+				return buildSts(reqCtx, *params, envConfig.Name)
 			}); err != nil {
 			return err
 		}
 	case dbaasv1alpha1.Consensus:
-		if err := statefulSetProcessor(
-			func(envConfig *corev1.ConfigMap) (*appsv1.StatefulSet, error) {
-				css, err := buildConsensusSet(reqCtx, *params, envConfig.Name)
-				if err != nil {
-					return nil, err
-				}
-				return css, nil
+		if err := workloadProcessor(
+			func(envConfig *corev1.ConfigMap) (client.Object, error) {
+				return buildConsensusSet(reqCtx, *params, envConfig.Name)
 			}); err != nil {
 			return err
 		}
@@ -678,7 +725,7 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		*params.applyObjs = append(*params.applyObjs, pdb)
 	}
 
-	if params.component.Service.Ports != nil {
+	if params.component.Service != nil && len(params.component.Service.Ports) > 0 {
 		svc, err := buildSvc(*params, false)
 		if err != nil {
 			return err
@@ -744,7 +791,8 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		// ConfigMap kind objects should only be applied once
 		//
 		// The Config is not allowed to be modified.
-		// Once ISV adjusts the ConfigTemplateRef field of CusterDefinition, or ISV modifies the wrong config file, it may cause the application cluster may fail.
+		// Once ClusterDefinition provider adjusts the ConfigTemplateRef field of CusterDefinition,
+		// or provider modifies the wrong config file, it may cause the application cluster may fail.
 		//
 		// TODO(zhixu.zt): Check whether the configmap object is a config file of component
 		// Label check: ConfigMap.Labels["app.kubernetes.io/ins-configure"]
@@ -780,11 +828,12 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			component := getComponentByName(components, componentName)
 			// update component status when scaling
 			if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
-				if cluster.Status.Components[componentName] != nil {
+				if comp, ok := cluster.Status.Components[componentName]; ok {
 					if cluster.Status.Components[componentName].Phase != dbaasv1alpha1.HorizontalScalingPhase {
 						patch := client.MergeFrom(cluster.DeepCopy())
-						cluster.Status.Components[componentName].Phase = dbaasv1alpha1.HorizontalScalingPhase
-						cluster.Status.Components[componentName].Message = ""
+						comp.Phase = dbaasv1alpha1.HorizontalScalingPhase
+						comp.Message = ""
+						cluster.Status.Components[componentName] = comp
 						if err := cli.Status().Patch(ctx, cluster, patch); err != nil {
 							res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 							return &res, err
@@ -792,7 +841,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 					}
 				} else {
 					patch := client.MergeFrom(cluster.DeepCopy())
-					cluster.Status.Components[componentName] = &dbaasv1alpha1.ClusterStatusComponent{Phase: dbaasv1alpha1.HorizontalScalingPhase, Message: ""}
+					cluster.Status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{Phase: dbaasv1alpha1.HorizontalScalingPhase, Message: ""}
 					if err := cli.Status().Patch(ctx, cluster, patch); err != nil {
 						res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 						return &res, err
@@ -1009,15 +1058,13 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 }
 
 func buildSvc(params createParams, headless bool) (*corev1.Service, error) {
-	cueFS, _ := debme.FS(cueTemplates, "cue")
-
-	svcTmpl := "service_template.cue"
+	tplFile := "service_template.cue"
 	if headless {
-		svcTmpl = "headless_service_template.cue"
+		tplFile = "headless_service_template.cue"
 	}
-
-	cueTpl, err := params.getCacheCUETplValue(svcTmpl, func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(svcTmpl))
+	cueFS, _ := debme.FS(cueTemplates, "cue")
+	cueTpl, err := params.getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplFile))
 	})
 	if err != nil {
 		return nil, err
@@ -1060,11 +1107,11 @@ func randomString(length int) string {
 	return res
 }
 
-func buildSecret(params createParams) (*corev1.Secret, error) {
+func buildConnCredential(params createParams) (*corev1.Secret, error) {
+	const tplFile = "conn_credential_template.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
-
-	cueTpl, err := params.getCacheCUETplValue("secret_template.cue", func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("secret_template.cue"))
+	cueTpl, err := params.getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplFile))
 	})
 	if err != nil {
 		return nil, err
@@ -1093,28 +1140,69 @@ func buildSecret(params createParams) (*corev1.Secret, error) {
 		return nil, err
 	}
 
-	if err = cueValue.FillRaw("secret.stringData.password", randomString(8)); err != nil {
-		return nil, err
-	}
-
 	secretStrByte, err := cueValue.Lookup("secret")
 	if err != nil {
 		return nil, err
 	}
 
-	secret := corev1.Secret{}
-	if err = json.Unmarshal(secretStrByte, &secret); err != nil {
+	connCredential := corev1.Secret{}
+	if err = json.Unmarshal(secretStrByte, &connCredential); err != nil {
 		return nil, err
 	}
 
-	return &secret, nil
+	if len(connCredential.StringData) == 0 {
+		return &connCredential, nil
+	}
+
+	// REVIEW: perhaps handles value replacement at `func mergeComponents`
+	replaceData := func(placeHolderMap map[string]string) {
+		copyStringData := connCredential.DeepCopy().StringData
+		for k, v := range copyStringData {
+			for i, vv := range []string{k, v} {
+				if !strings.HasPrefix(vv, "$(") {
+					continue
+				}
+				for j, r := range placeHolderMap {
+					replaced := strings.Replace(vv, j, r, 1)
+					if replaced == vv {
+						continue
+					}
+					// replace key
+					if i == 0 {
+						delete(connCredential.StringData, vv)
+						k = replaced
+					} else {
+						v = replaced
+					}
+					break
+				}
+			}
+			connCredential.StringData[k] = v
+		}
+	}
+
+	// 1st pass replace primary placeholder
+	m := map[string]string{
+		"$(RANDOM_PASSWD)": randomString(8),
+	}
+	replaceData(m)
+
+	// 2nd pass replace $(CONN_CREDENTIAL) holding values
+	m = map[string]string{}
+
+	for k, v := range connCredential.StringData {
+		m[fmt.Sprintf("$(CONN_CREDENTIAL).%s", k)] = v
+	}
+
+	replaceData(m)
+	return &connCredential, nil
 }
 
 func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName string) (*appsv1.StatefulSet, error) {
+	const tplFile = "statefulset_template.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
-
-	cueTpl, err := params.getCacheCUETplValue("statefulset_template.cue", func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("statefulset_template.cue"))
+	cueTpl, err := params.getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplFile))
 	})
 	if err != nil {
 		return nil, err
@@ -1145,114 +1233,112 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 	}
 
 	sts := appsv1.StatefulSet{}
-
 	if err = json.Unmarshal(stsStrByte, &sts); err != nil {
 		return nil, err
 	}
 
 	// update sts.spec.volumeClaimTemplates[].metadata.labels
 	if len(sts.Spec.VolumeClaimTemplates) > 0 && len(sts.GetLabels()) > 0 {
-		for _, vct := range sts.Spec.VolumeClaimTemplates {
+		for index, vct := range sts.Spec.VolumeClaimTemplates {
 			if vct.Labels == nil {
 				vct.Labels = make(map[string]string)
 			}
+			vct.Labels[intctrlutil.VolumeClaimTemplateNameLabelKey] = vct.Name
 			for k, v := range sts.Labels {
 				if _, ok := vct.Labels[k]; !ok {
 					vct.Labels[k] = v
 				}
 			}
+			sts.Spec.VolumeClaimTemplates[index] = vct
 		}
 	}
 
-	probeContainers, err := buildProbeContainers(reqCtx, params, sts.Spec.Template.Spec.Containers)
-	if err != nil {
+	if err = processContainersInjection(reqCtx, params, envConfigName, &sts.Spec.Template.Spec); err != nil {
 		return nil, err
 	}
-	sts.Spec.Template.Spec.Containers = append(sts.Spec.Template.Spec.Containers, probeContainers...)
+	return &sts, nil
+}
 
-	injectEnv := func(c *corev1.Container) {
-		if c.Env == nil {
-			c.Env = []corev1.EnvVar{}
-		}
-		envMap := map[string]string{
-			"_POD_NAME":  "metadata.name",
-			"_NAMESPACE": "metadata.namespace",
-			"_SA_NAME":   "spec.serviceAccountName",
-			"_NODENAME":  "spec.nodeName",
-			"_HOSTIP":    "status.hostIP",
-			"_PODIP":     "status.podIP",
-			"_PODIPS":    "status.podIPs",
-		}
-		// sort the map keys, different order of envs will cause pods restart
-		// TODO: should add testcase to test pod restart
-		var keyArr []string
-		for k := range envMap {
-			keyArr = append(keyArr, k)
-		}
-		sort.Strings(keyArr)
-		for _, suf := range keyArr {
-			fp := envMap[suf]
-			c.Env = append(c.Env, corev1.EnvVar{
-				Name: dbaasPrefix + suf,
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						FieldPath: fp,
-					},
-				},
-			})
-		}
-		if c.EnvFrom == nil {
-			c.EnvFrom = []corev1.EnvFromSource{}
-		}
-		c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
-			ConfigMapRef: &corev1.ConfigMapEnvSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: envConfigName,
-				},
-			},
-		})
-		c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
-			SecretRef: &corev1.SecretEnvSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: params.cluster.Name,
-				},
-			},
-		})
+func processContainersInjection(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName string, podSpec *corev1.PodSpec) error {
+	probeContainers, err := buildProbeContainers(reqCtx, params, podSpec.Containers)
+	if err != nil {
+		return err
 	}
-
-	volumesNames := map[string]struct{}{}
-	for _, v := range sts.Spec.Template.Spec.Volumes {
-		volumesNames[v.Name] = struct{}{}
-	}
-
-	for _, t := range params.component.ConfigTemplates {
-		volumesNames[t.VolumeName] = struct{}{}
-	}
+	podSpec.Containers = append(podSpec.Containers, probeContainers...)
 
 	for _, cc := range []*[]corev1.Container{
-		&sts.Spec.Template.Spec.Containers,
-		&sts.Spec.Template.Spec.InitContainers,
+		&podSpec.Containers,
+		&podSpec.InitContainers,
 	} {
-		for i, c := range *cc {
-			injectEnv(&(*cc)[i])
-			for _, v := range c.VolumeMounts {
-				if _, ok := volumesNames[v.Name]; ok {
-					continue
-				}
-				// if persistence is not found, add emptyDir pod.spec.volumes[]
-				sts.Spec.Template.Spec.Volumes = append(
-					sts.Spec.Template.Spec.Volumes, corev1.Volume{
-						Name: v.Name,
-						VolumeSource: corev1.VolumeSource{
-							EmptyDir: &corev1.EmptyDirVolumeSource{},
-						},
-					})
-				volumesNames[v.Name] = struct{}{}
-			}
+		for i := range *cc {
+			injectEnvs(params, envConfigName, &(*cc)[i])
 		}
 	}
+	return nil
+}
 
-	return &sts, nil
+func injectEnvs(params createParams, envConfigName string, c *corev1.Container) {
+	envFieldPathMap := map[string]string{
+		"_POD_NAME":  "metadata.name",
+		"_NAMESPACE": "metadata.namespace",
+		"_SA_NAME":   "spec.serviceAccountName",
+		"_NODENAME":  "spec.nodeName",
+		"_HOSTIP":    "status.hostIP",
+		"_PODIP":     "status.podIP",
+		"_PODIPS":    "status.podIPs",
+	}
+
+	clusterEnv := map[string]string{
+		"_CLUSTER_NAME":      params.cluster.Name,
+		"_COMP_NAME":         params.component.Name,
+		"_CLUSTER_COMP_NAME": params.cluster.Name + "-" + params.component.Name,
+	}
+
+	toInjectEnv := make([]corev1.EnvVar, 0, len(envFieldPathMap)+len(c.Env))
+	for suf, fp := range envFieldPathMap {
+		toInjectEnv = append(toInjectEnv, corev1.EnvVar{
+			Name: dbaasPrefix + suf,
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: fp,
+				},
+			},
+		})
+	}
+
+	for k, v := range clusterEnv {
+		toInjectEnv = append(toInjectEnv, corev1.EnvVar{
+			Name:  dbaasPrefix + k,
+			Value: v,
+		})
+	}
+
+	// sort toInjectEnv, different order of envs will cause pods restart
+	// TODO: should add testcase to test pod restart
+	sort.Slice(toInjectEnv, func(i, j int) bool {
+		return toInjectEnv[i].Name < toInjectEnv[j].Name
+	})
+
+	// have injected variables placed at the front of the slice
+	if c.Env == nil {
+		c.Env = toInjectEnv
+	} else {
+		c.Env = append(toInjectEnv, c.Env...)
+	}
+
+	if envConfigName == "" {
+		return
+	}
+	if c.EnvFrom == nil {
+		c.EnvFrom = []corev1.EnvFromSource{}
+	}
+	c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
+		ConfigMapRef: &corev1.ConfigMapEnvSource{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: envConfigName,
+			},
+		},
+	})
 }
 
 // buildConsensusSet build on a stateful set
@@ -1266,11 +1352,11 @@ func buildConsensusSet(reqCtx intctrlutil.RequestCtx, params createParams, envCo
 	return sts, err
 }
 
-func buildDeploy(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.Deployment, error) {
+func buildDeploy(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName string) (*appsv1.Deployment, error) {
+	const tplFile = "deployment_template.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
-
-	cueTpl, err := params.getCacheCUETplValue("deployment_template.cue", func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("deployment_template.cue"))
+	cueTpl, err := params.getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplFile))
 	})
 	if err != nil {
 		return nil, err
@@ -1295,36 +1381,31 @@ func buildDeploy(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.De
 		return nil, err
 	}
 
-	stsStrByte, err := cueValue.Lookup("deployment")
+	deployStrByte, err := cueValue.Lookup("deployment")
 	if err != nil {
 		return nil, err
 	}
 
 	deploy := appsv1.Deployment{}
-	if err = json.Unmarshal(stsStrByte, &deploy); err != nil {
+	if err = json.Unmarshal(deployStrByte, &deploy); err != nil {
 		return nil, err
 	}
 
-	if err = json.Unmarshal(stsStrByte, &deploy); err != nil {
+	if err = json.Unmarshal(deployStrByte, &deploy); err != nil {
 		return nil, err
 	}
 
-	probeContainers, err := buildProbeContainers(reqCtx, params, deploy.Spec.Template.Spec.Containers)
-	if err != nil {
+	if err = processContainersInjection(reqCtx, params, "", &deploy.Spec.Template.Spec); err != nil {
 		return nil, err
 	}
-	deploy.Spec.Template.Spec.Containers = append(deploy.Spec.Template.Spec.Containers, probeContainers...)
-
-	// TODO: inject environment
-
 	return &deploy, nil
 }
 
 func buildPDB(params createParams) (*policyv1.PodDisruptionBudget, error) {
+	const tplFile = "pdb_template.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
-
-	cueTpl, err := params.getCacheCUETplValue("pdb_template.cue", func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("pdb_template.cue"))
+	cueTpl, err := params.getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplFile))
 	})
 	if err != nil {
 		return nil, err
@@ -1364,12 +1445,14 @@ func buildPDB(params createParams) (*policyv1.PodDisruptionBudget, error) {
 }
 
 // buildCfg generate volumes for PodTemplate, volumeMount for container, and configmap for config files
-func buildCfg(params createParams, sts *appsv1.StatefulSet, ctx context.Context, cli client.Client) ([]client.Object, error) {
-	// Need to merge configTemplateRef of AppVersion.Components[*].ConfigTemplateRefs and ClusterDefinition.Components[*].ConfigTemplateRefs
-	tpls, err := params.getConfigTemplates()
-	if err != nil {
-		return nil, err
-	}
+func buildCfg(params createParams,
+	obj client.Object,
+	podSpec *corev1.PodSpec,
+	ctx context.Context,
+	cli client.Client) ([]client.Object, error) {
+	// Need to merge configTemplateRef of AppVersion.Components[*].ConfigTemplateRefs and
+	// ClusterDefinition.Components[*].ConfigTemplateRefs
+	tpls := params.component.ConfigTemplates
 	if len(tpls) == 0 {
 		return nil, nil
 	}
@@ -1378,9 +1461,9 @@ func buildCfg(params createParams, sts *appsv1.StatefulSet, ctx context.Context,
 	namespaceName := params.cluster.Namespace
 
 	// New ConfigTemplateBuilder
-	cfgTemplateBuilder := NewCfgTemplateBuilder(clusterName, namespaceName, params.cluster, params.appVersion)
+	cfgTemplateBuilder := newCfgTemplateBuilder(clusterName, namespaceName, params.cluster, params.appVersion)
 	// Prepare built-in objects and built-in functions
-	if err := cfgTemplateBuilder.InjectBuiltInObjectsAndFunctions(&sts.Spec.Template, tpls, params.component); err != nil {
+	if err := cfgTemplateBuilder.injectBuiltInObjectsAndFunctions(podSpec, tpls, params.component); err != nil {
 		return nil, err
 	}
 
@@ -1390,7 +1473,7 @@ func buildCfg(params createParams, sts *appsv1.StatefulSet, ctx context.Context,
 	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
 	for _, tpl := range tpls {
 		// Check config cm already exists
-		cmName := getInstanceCmName(sts, &tpl)
+		cmName := getInstanceCMName(obj, &tpl)
 		volumes[cmName] = tpl
 		isExist, err := isAlreadyExists(cmName, params.cluster.Namespace, ctx, cli)
 		if err != nil {
@@ -1401,28 +1484,28 @@ func buildCfg(params createParams, sts *appsv1.StatefulSet, ctx context.Context,
 		}
 
 		// Generate ConfigMap objects for config files
-		configmap, err := generateConfigMapFromTpl(cfgTemplateBuilder, cmName, tpl, params, ctx, cli)
+		cm, err := generateConfigMapFromTpl(cfgTemplateBuilder, cmName, tpl, params, ctx, cli)
 		if err != nil {
 			return nil, err
 		}
 
 		// The owner of the configmap object is a cluster of users,
 		// in order to manage the life cycle of configmap
-		if err := controllerutil.SetOwnerReference(params.cluster, configmap, scheme); err != nil {
+		if err := controllerutil.SetOwnerReference(params.cluster, cm, scheme); err != nil {
 			return nil, err
 		}
-		configs = append(configs, configmap)
+		configs = append(configs, cm)
 	}
 
 	// Generate Pod Volumes for ConfigMap objects
-	return configs, checkAndUpdatePodVolumes(sts, volumes)
+	return configs, checkAndUpdatePodVolumes(podSpec, volumes)
 }
 
 func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
+	const tplFile = "env_config_template.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
-
-	cueTpl, err := params.getCacheCUETplValue("env_config_template.cue", func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("env_config_template.cue"))
+	cueTpl, err := params.getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplFile))
 	})
 	if err != nil {
 		return nil, err
@@ -1456,18 +1539,20 @@ func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
 		envData[prefix+strconv.Itoa(j)+"_HOSTNAME"] = fmt.Sprintf("%s.%s", params.cluster.Name+"-"+params.component.Name+"-"+strconv.Itoa(j), svcName)
 	}
 	// build consensus env from cluster.status
-	if params.cluster.Status.Components != nil && params.cluster.Status.Components[params.component.Type] != nil {
-		consensusSetStatus := params.cluster.Status.Components[params.component.Type].ConsensusSetStatus
-		if consensusSetStatus != nil {
-			envData[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
-			followers := ""
-			for _, follower := range consensusSetStatus.Followers {
-				if len(followers) > 0 {
-					followers += ","
+	if params.cluster.Status.Components != nil {
+		if v, ok := params.cluster.Status.Components[params.component.Type]; ok {
+			consensusSetStatus := v.ConsensusSetStatus
+			if consensusSetStatus != nil {
+				envData[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
+				followers := ""
+				for _, follower := range consensusSetStatus.Followers {
+					if len(followers) > 0 {
+						followers += ","
+					}
+					followers += follower.Pod
 				}
-				followers += follower.Pod
+				envData[prefix+"FOLLOWERS"] = followers
 			}
-			envData[prefix+"FOLLOWERS"] = followers
 		}
 	}
 	envDataStrByte, err := json.Marshal(envData)
@@ -1491,32 +1576,36 @@ func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
 	return &config, nil
 }
 
-func checkAndUpdatePodVolumes(sts *appsv1.StatefulSet, volumes map[string]dbaasv1alpha1.ConfigTemplate) error {
-	podVolumes := make([]corev1.Volume, 0, len(volumes))
-	for cmName, tpl := range volumes {
-		// not cm volume
-		volumeMounted := intctrlutil.GetVolumeMountName(podVolumes, cmName)
-		// Update ConfigMap Volume
-		if volumeMounted != nil {
-			configMapVolume := volumeMounted.ConfigMap
-			if configMapVolume == nil {
-				return fmt.Errorf("mount volume[%s] type require ConfigMap: [%+v]", volumeMounted.Name, volumeMounted)
-			}
-			configMapVolume.Name = cmName
-			continue
-		}
-		// Add New ConfigMap Volume
-		podVolumes = append(podVolumes, corev1.Volume{
-			Name: tpl.VolumeName,
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
-				},
-			},
-		})
-	}
+func checkAndUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]dbaasv1alpha1.ConfigTemplate) error {
+	var (
+		err        error
+		podVolumes = podSpec.Volumes
+	)
+
 	// Update PodTemplate Volumes
-	sts.Spec.Template.Spec.Volumes = append(sts.Spec.Template.Spec.Volumes, podVolumes...)
+	for cmName, tpl := range volumes {
+		if podVolumes, err = intctrlutil.CheckAndUpdateVolume(podVolumes, tpl.VolumeName, func(volumeName string) corev1.Volume {
+			return corev1.Volume{
+				Name: volumeName,
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
+						DefaultMode:          tpl.DefaultMode,
+					},
+				},
+			}
+		}, func(volume *corev1.Volume) error {
+			configMap := volume.ConfigMap
+			if configMap == nil {
+				return fmt.Errorf("mount volume[%s] type require ConfigMap: [%+v]", volume.Name, volume)
+			}
+			configMap.Name = cmName
+			return nil
+		}); err != nil {
+			return err
+		}
+	}
+	podSpec.Volumes = podVolumes
 	return nil
 }
 
@@ -1541,16 +1630,16 @@ func isAlreadyExists(cmName string, namespace string, ctx context.Context, cli c
 }
 
 // {{statefull.Name}}-{{appVersion.Name}}-{{tpl.Name}}-"config"
-func getInstanceCmName(sts *appsv1.StatefulSet, tpl *dbaasv1alpha1.ConfigTemplate) string {
-	return fmt.Sprintf("%s-%s-config", sts.GetName(), tpl.VolumeName)
+func getInstanceCMName(obj client.Object, tpl *dbaasv1alpha1.ConfigTemplate) string {
+	return fmt.Sprintf("%s-%s", obj.GetName(), tpl.VolumeName)
 }
 
-// generateConfigMapFromTpl render config file by config template provided ISV
-func generateConfigMapFromTpl(tplBuilder *ConfigTemplateBuilder, cmName string, tplCfg dbaasv1alpha1.ConfigTemplate, params createParams, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
+// generateConfigMapFromTpl render config file by config template provided by provider.
+func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder, cmName string, tplCfg dbaasv1alpha1.ConfigTemplate, params createParams, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
 	// Render config template by TplEngine
 	// The template namespace must be the same as the ClusterDefinition namespace
 	configs, err := processConfigMapTemplate(ctx, cli, tplBuilder, client.ObjectKey{
-		Namespace: viper.GetString(cmNamespaceKey),
+		Namespace: tplCfg.Namespace,
 		Name:      tplCfg.Name,
 	})
 	if err != nil {
@@ -1562,11 +1651,10 @@ func generateConfigMapFromTpl(tplBuilder *ConfigTemplateBuilder, cmName string, 
 }
 
 func generateConfigMapWithTemplate(configs map[string]string, params createParams, cmName, templateName string) (*corev1.ConfigMap, error) {
-
+	const tplFile = "config_template.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
-
-	cueTpl, err := params.getCacheCUETplValue("config_template.cue", func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("config_template.cue"))
+	cueTpl, err := params.getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplFile))
 	})
 	if err != nil {
 		return nil, err
@@ -1616,15 +1704,19 @@ func generateConfigMapWithTemplate(configs map[string]string, params createParam
 }
 
 // processConfigMapTemplate Render config file using template engine
-func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder *ConfigTemplateBuilder, cmKey client.ObjectKey) (map[string]string, error) {
+func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder *configTemplateBuilder, cmKey client.ObjectKey) (map[string]string, error) {
 	cmObj := &corev1.ConfigMap{}
 	//  Require template configmap exist
 	if err := cli.Get(ctx, cmKey, cmObj); err != nil {
 		return nil, err
 	}
 
-	// TODO process invalid data: e.g empty data
-	return tplBuilder.Render(cmObj.Data)
+	if len(cmObj.Data) == 0 {
+		return map[string]string{}, nil
+	}
+
+	tplBuilder.setTplName(cmKey.Name)
+	return tplBuilder.render(cmObj.Data)
 }
 
 func createBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, sts appsv1.StatefulSet, backupPolicyTemplate dataprotectionv1alpha1.BackupPolicyTemplate, backupKey types.NamespacedName, cluster *dbaasv1alpha1.Cluster) error {

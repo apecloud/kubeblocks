@@ -54,7 +54,7 @@ import (
 )
 
 var _ = Describe("Cluster Controller", func() {
-	const timeout = time.Second * 20
+	const timeout = time.Second * 10
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
 
@@ -549,7 +549,7 @@ spec:
 		return fetchedG1, cd, appVer, key
 	}
 
-	Context("When creating cluster", func() {
+	Context("When creating cluster with normal", func() {
 		It("Should create cluster successfully", func() {
 			_, _, _, key := createClusterNCheck()
 
@@ -606,7 +606,8 @@ spec:
 			cmList := &corev1.ConfigMapList{}
 			Eventually(func() bool {
 				Expect(k8sClient.List(ctx, cmList, client.MatchingLabels{
-					intctrlutil.AppInstanceLabelKey: key.Name,
+					intctrlutil.AppInstanceLabelKey:   key.Name,
+					intctrlutil.AppConfigTypeLabelKey: "kubeblocks-env",
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(cmList.Items) == 2
 			}, timeout, interval).Should(BeTrue())
@@ -664,11 +665,11 @@ spec:
 			if fetchedG1.Spec.Components == nil {
 				fetchedG1.Spec.Components = []dbaasv1alpha1.ClusterComponent{}
 			}
-			updatedReplicas := 5
+			updatedReplicas := int32(5)
 			fetchedG1.Spec.Components = append(fetchedG1.Spec.Components, dbaasv1alpha1.ClusterComponent{
 				Name:     "replicasets",
 				Type:     "replicasets",
-				Replicas: int32(updatedReplicas),
+				Replicas: &updatedReplicas,
 			})
 			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
 
@@ -680,7 +681,7 @@ spec:
 
 			By("Checking the replicas")
 			stsList := listAndCheckStatefulSet(key)
-			Expect(int(*stsList.Items[0].Spec.Replicas)).To(Equal(updatedReplicas))
+			Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(updatedReplicas))
 
 			By("Deleting the cluster")
 			Eventually(func() error {
@@ -1020,8 +1021,8 @@ spec:
 			}
 
 			By("By updating replica")
-			updatedReplicas := 3
-			fetchedG1.Spec.Components[0].Replicas = int32(updatedReplicas)
+			updatedReplicas := int32(3)
+			fetchedG1.Spec.Components[0].Replicas = &updatedReplicas
 			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
 
 			fetchedG2 := &dbaasv1alpha1.Cluster{}
@@ -1035,11 +1036,11 @@ spec:
 					"app.kubernetes.io/instance": key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				Expect(len(stsList.Items) != 0).Should(BeTrue())
-				return int(*stsList.Items[0].Spec.Replicas) == updatedReplicas
+				return *stsList.Items[0].Spec.Replicas == updatedReplicas
 			}, timeout, interval).Should(BeTrue())
 
 			updatedReplicas = 5
-			fetchedG2.Spec.Components[0].Replicas = int32(updatedReplicas)
+			fetchedG2.Spec.Components[0].Replicas = &updatedReplicas
 			Expect(k8sClient.Update(ctx, fetchedG2)).Should(Succeed())
 
 			fetchedG3 := &dbaasv1alpha1.Cluster{}
@@ -1064,7 +1065,7 @@ spec:
 					"app.kubernetes.io/instance": key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				Expect(len(stsList.Items) != 0).Should(BeTrue())
-				return int(*stsList.Items[0].Spec.Replicas) == updatedReplicas
+				return *stsList.Items[0].Spec.Replicas == updatedReplicas
 			}, timeout, interval).Should(BeTrue())
 
 			By("Deleting the scope")
@@ -1087,12 +1088,13 @@ spec:
 	Context("When creating cluster with services", func() {
 		It("Should create services", func() {
 			By("Creating a cluster")
+			testServiceType := corev1.ServiceTypeClusterIP
 			toCreate, _, _, key := newClusterObj(nil, nil)
 			toCreate.Spec.Components = append(toCreate.Spec.Components, dbaasv1alpha1.ClusterComponent{
 				Name: "proxy",
 				Type: "proxy",
 
-				ServiceType: "LoadBalancer",
+				ServiceType: testServiceType,
 			})
 			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
@@ -1110,7 +1112,7 @@ spec:
 					intctrlutil.AppInstanceLabelKey: key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				for _, svc := range svcList.Items {
-					if svc.Spec.Type == "LoadBalancer" {
+					if svc.Spec.Type == testServiceType {
 						return true
 					}
 				}

@@ -17,6 +17,7 @@ limitations under the License.
 package operations
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -33,11 +34,12 @@ import (
 // ReconcileActionWithCluster it will be performed when action is done and loop util OpsRequest.status.phase is Succeed/Failed.
 // if OpsRequest.spec.clusterOps is not null, you can use it to OpsBehaviour.ReconcileAction.
 // return the OpsRequest.status.phase
-func ReconcileActionWithCluster(opsRes *OpsResource) (dbaasv1alpha1.Phase, error) {
+func ReconcileActionWithCluster(opsRes *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error) {
 	var (
 		opsRequest      = opsRes.OpsRequest
 		isChanged       bool
 		opsRequestPhase = dbaasv1alpha1.RunningPhase
+		requeueAfter    time.Duration
 	)
 	patch := client.MergeFrom(opsRequest.DeepCopy())
 	if opsRequest.Status.Components == nil {
@@ -45,8 +47,8 @@ func ReconcileActionWithCluster(opsRes *OpsResource) (dbaasv1alpha1.Phase, error
 	}
 	for k, v := range opsRes.Cluster.Status.Components {
 		// the operation occurs in the cluster, such as upgrade.
-		// However, it is also possible that only the corresponding components in the cluster have changed,
-		// and the phase is updating So we need to monitor these components and send the corresponding event
+		// However, it is also possible that only the corresponding components have changed,
+		// and the phase is updating. so we need to monitor these components and send the corresponding event
 		if statusComponent, ok := opsRequest.Status.Components[k]; (!ok && v.Phase == dbaasv1alpha1.UpdatingPhase) || statusComponent.Phase != v.Phase {
 			isChanged = true
 			opsRequest.Status.Components[k] = dbaasv1alpha1.OpsRequestStatusComponent{Phase: v.Phase}
@@ -55,7 +57,7 @@ func ReconcileActionWithCluster(opsRes *OpsResource) (dbaasv1alpha1.Phase, error
 	}
 	if isChanged {
 		if err := opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch); err != nil {
-			return opsRequestPhase, err
+			return opsRequestPhase, requeueAfter, err
 		}
 	}
 	switch opsRes.Cluster.Status.Phase {
@@ -64,19 +66,20 @@ func ReconcileActionWithCluster(opsRes *OpsResource) (dbaasv1alpha1.Phase, error
 	case dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase:
 		opsRequestPhase = dbaasv1alpha1.FailedPhase
 	}
-	return opsRequestPhase, nil
+	return opsRequestPhase, requeueAfter, nil
 }
 
 // ReconcileActionWithComponentOps it will be performed when action is done and loop util OpsRequest.status.phase is Succeed/Failed.
 // if OpsRequest.spec.componentOps is not null, you can use it to OpsBehaviour.ReconcileAction.
 // return the OpsRequest.status.phase
-func ReconcileActionWithComponentOps(opsRes *OpsResource) (dbaasv1alpha1.Phase, error) {
+func ReconcileActionWithComponentOps(opsRes *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error) {
 	var (
 		opsRequest      = opsRes.OpsRequest
 		isCompleted     = true
 		isChanged       bool
 		isFailed        bool
 		opsRequestPhase = dbaasv1alpha1.RunningPhase
+		requeueAfter    time.Duration
 	)
 	componentNameMap := getAllComponentsNameMap(opsRequest)
 	patch := client.MergeFrom(opsRequest.DeepCopy())
@@ -101,7 +104,7 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource) (dbaasv1alpha1.Phase, 
 	}
 	if isChanged {
 		if err := opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch); err != nil {
-			return opsRequestPhase, err
+			return opsRequestPhase, requeueAfter, err
 		}
 	}
 	if isFailed {
@@ -109,7 +112,7 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource) (dbaasv1alpha1.Phase, 
 	} else if isCompleted {
 		opsRequestPhase = dbaasv1alpha1.SucceedPhase
 	}
-	return opsRequestPhase, nil
+	return opsRequestPhase, requeueAfter, nil
 }
 
 // componentIsCompleted check whether the component has completed the operation
@@ -119,6 +122,11 @@ func componentIsCompleted(phase dbaasv1alpha1.Phase) bool {
 
 func isFailedPhase(phase dbaasv1alpha1.Phase) bool {
 	return slices.Index([]dbaasv1alpha1.Phase{dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase}, phase) != -1
+}
+
+// opsRequestIsCompleted check OpsRequest is completed
+func opsRequestIsCompleted(phase dbaasv1alpha1.Phase) bool {
+	return slices.Index([]dbaasv1alpha1.Phase{dbaasv1alpha1.FailedPhase, dbaasv1alpha1.SucceedPhase}, phase) != -1
 }
 
 // sendEventWhenComponentStatusChanged send an event when OpsRequest.status.components[*].phase is changed
@@ -163,7 +171,7 @@ func PatchOpsStatus(opsRes *OpsResource,
 		}
 		opsRes.Recorder.Event(opsRequest, eventType, v.Reason, v.Message)
 	}
-	if slices.Index([]dbaasv1alpha1.Phase{dbaasv1alpha1.SucceedPhase, dbaasv1alpha1.FailedPhase}, phase) != -1 {
+	if opsRequestIsCompleted(phase) {
 		opsRequest.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
 		// when OpsRequest is completed, do it
 		if err := deleteOpsRequestAnnotationInCluster(opsRes); err != nil {
@@ -203,21 +211,30 @@ func patchClusterExistOtherOperation(opsRes *OpsResource, opsRequestName string)
 	return PatchOpsStatus(opsRes, dbaasv1alpha1.FailedPhase, condition)
 }
 
-// getOpsRequestAnnotation get OpsRequest.name from cluster.annotations
-func getOpsRequestAnnotation(cluster *dbaasv1alpha1.Cluster, toClusterPhase dbaasv1alpha1.Phase) *string {
+// GetOpsRequestMapFromCluster get OpsRequest map from cluster annotations
+func GetOpsRequestMapFromCluster(cluster *dbaasv1alpha1.Cluster) (map[dbaasv1alpha1.Phase]string, error) {
 	var (
 		opsRequestValue string
 		opsRequestMap   map[dbaasv1alpha1.Phase]string
 		ok              bool
 	)
 	if cluster.Annotations == nil {
-		return nil
+		return nil, nil
 	}
 	if opsRequestValue, ok = cluster.Annotations[intctrlutil.OpsRequestAnnotationKey]; !ok {
-		return nil
+		return nil, nil
 	}
 	// opsRequest annotation value in cluster to map
 	if err := json.Unmarshal([]byte(opsRequestValue), &opsRequestMap); err != nil {
+		return nil, err
+	}
+	return opsRequestMap, nil
+}
+
+// getOpsRequestNameFromAnnotation get OpsRequest.name from cluster.annotations
+func getOpsRequestNameFromAnnotation(cluster *dbaasv1alpha1.Cluster, toClusterPhase dbaasv1alpha1.Phase) *string {
+	opsRequestMap, _ := GetOpsRequestMapFromCluster(cluster)
+	if opsRequestMap == nil {
 		return nil
 	}
 	if val, ok := opsRequestMap[toClusterPhase]; ok {
@@ -355,4 +372,23 @@ func patchClusterPhaseWhenExistsOtherOps(opsRes *OpsResource, opsRequestMap map[
 		return err
 	}
 	return nil
+}
+
+// PatchOpsRequestAnnotation patch the reconcile annotation to OpsRequest
+func PatchOpsRequestAnnotation(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, opsRequestName string) error {
+	opsRequest := &dbaasv1alpha1.OpsRequest{}
+	if err := cli.Get(ctx, client.ObjectKey{Name: opsRequestName, Namespace: cluster.Namespace}, opsRequest); err != nil {
+		return err
+	}
+	patch := client.MergeFrom(opsRequest.DeepCopy())
+	if opsRequest.Annotations == nil {
+		opsRequest.Annotations = map[string]string{}
+	}
+	opsRequest.Annotations[OpsRequestReconcileAnnotationKey] = time.Now().Format(time.RFC3339)
+	return cli.Patch(ctx, opsRequest, patch)
+}
+
+// isOpsRequestFailedPhase check the OpsRequest phase is Failed
+func isOpsRequestFailedPhase(opsRequestPhase dbaasv1alpha1.Phase) bool {
+	return opsRequestPhase == dbaasv1alpha1.FailedPhase
 }

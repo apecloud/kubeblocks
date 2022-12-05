@@ -24,6 +24,9 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/spf13/viper"
+	"go.uber.org/zap/zapcore"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -36,6 +39,10 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
+
+func init() {
+	viper.AutomaticEnv()
+}
 
 func TestLoadbalancer(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -51,12 +58,16 @@ var (
 	cancel             context.CancelFunc
 	endpointController *EndpointController
 	serviceController  *ServiceController
-	logger             = zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
-	testCtx            testutil.TestContext
+	logger             = zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true), func(o *zap.Options) {
+		o.TimeEncoder = zapcore.ISO8601TimeEncoder
+	})
+	testCtx testutil.TestContext
 )
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(logger)
+	if viper.GetBool("ENABLE_DEBUG_LOG") {
+		logf.SetLogger(logger)
+	}
 
 	var err error
 

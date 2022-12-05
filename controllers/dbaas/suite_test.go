@@ -34,12 +34,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	//+kubebuilder:scaffold:imports
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	"github.com/spf13/viper"
+	"go.uber.org/zap/zapcore"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
@@ -57,6 +59,10 @@ var cancel context.CancelFunc
 var testCtx testutil.TestContext
 var clusterRecorder record.EventRecorder
 
+func init() {
+	viper.AutomaticEnv()
+}
+
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
@@ -66,7 +72,11 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	if viper.GetBool("ENABLE_DEBUG_LOG") {
+		logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true), func(o *zap.Options) {
+			o.TimeEncoder = zapcore.ISO8601TimeEncoder
+		}))
+	}
 
 	ctx, cancel = context.WithCancel(context.TODO())
 

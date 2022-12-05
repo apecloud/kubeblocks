@@ -42,6 +42,7 @@ const (
 	RunningPhase           Phase = "Running"
 	FailedPhase            Phase = "Failed"
 	UpdatingPhase          Phase = "Updating"
+	VolumeExpandingPhase   Phase = "VolumeExpanding"
 	SucceedPhase           Phase = "Succeed"
 	AbnormalPhase          Phase = "Abnormal"
 	HorizontalScalingPhase Phase = "HorizontalScaling"

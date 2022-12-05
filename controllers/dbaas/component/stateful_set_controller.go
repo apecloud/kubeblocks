@@ -39,7 +39,9 @@ type StatefulSetReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// NOTES: controller-gen RBAC marker is maintained at rbac.go
+// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=statefulsets/status,verbs=get
+// +kubebuilder:rbac:groups=apps,resources=statefulsets/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -120,6 +122,6 @@ func (r *StatefulSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1.StatefulSet{}).
 		Owns(&corev1.Pod{}).
-		WithEventFilter(predicate.NewPredicateFuncs(WorkloadFilterPredicate)).
+		WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.WorkloadFilterPredicate)).
 		Complete(r)
 }

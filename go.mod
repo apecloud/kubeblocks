@@ -18,8 +18,8 @@ require (
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
-	github.com/gosuri/uitable v0.0.4
 	github.com/hashicorp/terraform v1.2.6
+	github.com/jedib0t/go-pretty/v6 v6.4.3
 	github.com/k3d-io/k3d/v5 v5.4.4
 	github.com/leaanthony/debme v1.2.1
 	github.com/manifoldco/promptui v0.9.0
@@ -37,8 +37,8 @@ require (
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
 	go.uber.org/zap v1.21.0
 	golang.org/x/crypto v0.1.0
-	golang.org/x/exp v0.0.0-20221114191408-850992195362
-	golang.org/x/sys v0.1.0
+	golang.org/x/exp v0.0.0-20220909182711-5c715a9e8561
+	golang.org/x/sys v0.2.0
 	google.golang.org/grpc v1.48.0
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
@@ -62,6 +62,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
+	github.com/gosuri/uitable v0.0.4 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/miekg/dns v1.1.50 // indirect
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
@@ -160,7 +161,7 @@ require (
 	github.com/goodhosts/hostsfile v0.1.1 // indirect
 	github.com/google/btree v1.0.1 // indirect
 	github.com/google/gnostic v0.5.7-v3refs // indirect
-	github.com/google/go-cmp v0.5.8
+	github.com/google/go-cmp v0.5.9
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
@@ -295,10 +296,10 @@ require (
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20220617031537-928513b29760 // indirect
 	golang.org/x/mod v0.6.0 // indirect
-	golang.org/x/net v0.1.0 // indirect
+	golang.org/x/net v0.2.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
-	golang.org/x/term v0.1.0 // indirect
+	golang.org/x/term v0.2.0 // indirect
 	golang.org/x/text v0.4.0
 	golang.org/x/time v0.0.0-20220722155302-e5dcc9cfc0b9 // indirect
 	golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f // indirect

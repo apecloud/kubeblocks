@@ -168,7 +168,7 @@ var _ = Describe("tpl template", func() {
 				Name: "config1",
 				VolumeSource: corev1.VolumeSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{Name: "stateful_test-config1-config"},
+						LocalObjectReference: corev1.LocalObjectReference{Name: "stateful_test-config1"},
 					},
 				},
 			},
@@ -176,7 +176,7 @@ var _ = Describe("tpl template", func() {
 				Name: "config2",
 				VolumeSource: corev1.VolumeSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{Name: "stateful_test-config2-config"},
+						LocalObjectReference: corev1.LocalObjectReference{Name: "stateful_test-config2"},
 					},
 				},
 			},
@@ -188,15 +188,18 @@ var _ = Describe("tpl template", func() {
 	Context("GetContainerUsingConfig test", func() {
 		// found name: mysql3
 		It("Should success with no error", func() {
-			Expect(GetContainerUsingConfig(statefulSet.Spec.Template, configTemplates)).To(Equal(&statefulSet.Spec.Template.Spec.Containers[2]))
+			podSpec := &statefulSet.Spec.Template.Spec
+			Expect(GetContainerUsingConfig(podSpec, configTemplates)).To(Equal(&podSpec.Containers[2]))
 		})
 		// found name: init_mysql
 		It("Should success with no error", func() {
-			Expect(GetContainerUsingConfig(statefulSet.Spec.Template, foundInitContainerConfigTemplates)).To(Equal(&statefulSet.Spec.Template.Spec.InitContainers[0]))
+			podSpec := &statefulSet.Spec.Template.Spec
+			Expect(GetContainerUsingConfig(podSpec, foundInitContainerConfigTemplates)).To(Equal(&podSpec.InitContainers[0]))
 		})
 		// not found container
 		It("Should failed", func() {
-			Expect(GetContainerUsingConfig(statefulSet.Spec.Template, notFoundConfigTemplates)).To(BeNil(), "get container is nil!")
+			podSpec := &statefulSet.Spec.Template.Spec
+			Expect(GetContainerUsingConfig(podSpec, notFoundConfigTemplates)).To(BeNil(), "get container is nil!")
 		})
 	})
 
@@ -228,11 +231,11 @@ var _ = Describe("tpl template", func() {
 	// for test GetContainerWithVolumeMount
 	Context("GetVolumeMountName test", func() {
 		It("Should success with no error", func() {
-			volume := GetVolumeMountName(pod.Spec.Volumes, "stateful_test-config1-config")
+			volume := GetVolumeMountName(pod.Spec.Volumes, "stateful_test-config1")
 			Expect(volume).NotTo(BeNil())
 			Expect(volume.Name).To(Equal("config1"))
 
-			Expect(GetVolumeMountName(pod.Spec.Volumes, "stateful_test-config1-config")).To(Equal(&pod.Spec.Volumes[0]))
+			Expect(GetVolumeMountName(pod.Spec.Volumes, "stateful_test-config1")).To(Equal(&pod.Spec.Volumes[0]))
 		})
 		It("Should failed", func() {
 			Expect(GetVolumeMountName(pod.Spec.Volumes, "not_exist_resource")).To(BeNil())
@@ -288,14 +291,14 @@ var _ = Describe("tpl template", func() {
 			}
 
 			for i := range testResources {
-				Expect(GetMemorySize(testResources[i].container)).To(Equal(testResources[i].expectMemorySize))
-				Expect(GetCoreNum(testResources[i].container)).To(Equal(testResources[i].expectCPU))
+				Expect(GetMemorySize(testResources[i].container)).To(BeEquivalentTo(testResources[i].expectMemorySize))
+				Expect(GetCoreNum(testResources[i].container)).To(BeEquivalentTo(testResources[i].expectCPU))
 			}
 		})
 		It("Resource not limit", func() {
 			container := corev1.Container{}
-			Expect(GetMemorySize(container)).To(Equal(int64(0)))
-			Expect(GetCoreNum(container)).To(Equal(0))
+			Expect(GetMemorySize(container)).To(BeEquivalentTo(0))
+			Expect(GetCoreNum(container)).To(BeEquivalentTo(0))
 		})
 	})
 

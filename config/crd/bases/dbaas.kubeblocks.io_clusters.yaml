@@ -131,7 +131,7 @@ spec:
                         type: string
                       type: array
                     monitor:
-                      default: true
+                      default: false
                       description: Monitor which is a switch to enable monitoring,
                         default is true KubeBlocks provides an extension mechanism
                         to support component level monitoring, which will scrape metrics

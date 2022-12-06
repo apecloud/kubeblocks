@@ -117,7 +117,7 @@ admissionWebhooks:
 dashboards:
   ## If false, dashboards will not be installed
   ##
-  enabled: true
+  enabled: false
 
 ## Data protection settings
 ##
@@ -141,7 +141,7 @@ dataProtection:
 prometheus:
   ## If false, prometheus sub-chart will not be installed
   ##
-  enabled: true
+  enabled: false
 
   alertmanager:
     ## If false, alertmanager will not be installed
@@ -210,7 +210,7 @@ prometheus:
 grafana:
   ## If false, grafana sub-chart will not be installed
   ##
-  enabled: true
+  enabled: false
 
   ## Timezone for the default dashboards
   ## Other options are: browser or a specific timezone, i.e. Europe/Luxembourg

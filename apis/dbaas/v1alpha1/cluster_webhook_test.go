@@ -88,26 +88,27 @@ var _ = Describe("cluster webhook", func() {
 			cluster.Spec.ClusterDefRef = clusterDefinitionName
 
 			By("By testing spec.components[?].type not found in clusterDefinitionRef")
-			cluster.Spec.Components[0].Type = "replicaSet"
+			cluster.Spec.Components[0].Type = "replicaset"
 			Expect(k8sClient.Update(ctx, cluster)).ShouldNot(Succeed())
 			// restore
-			cluster.Spec.Components[0].Type = "replicaSets"
+			cluster.Spec.Components[0].Type = "replicasets"
 
 			By("By testing spec.components[?].name is duplicated")
 			cluster.Spec.Components[0].Name = "proxy"
 			Expect(k8sClient.Update(ctx, cluster)).ShouldNot(Succeed())
 			// restore
-			cluster.Spec.Components[0].Name = "replicaSets"
+			cluster.Spec.Components[0].Name = "replicasets"
 
 			By("By updating spec.components[?].volumeClaimTemplates storage size, expect succeed")
 			cluster.Spec.Components[0].VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
 			Expect(k8sClient.Update(ctx, cluster)).Should(Succeed())
 
 			By("By add a component, expect succeed")
+			r := int32(1)
 			cluster.Spec.Components = append(cluster.Spec.Components, ClusterComponent{
-				Name:     "replicaSets2",
-				Type:     "replicaSets",
-				Replicas: 1,
+				Name:     "replicasets2",
+				Type:     "replicasets",
+				Replicas: &r,
 				VolumeClaimTemplates: []ClusterComponentVolumeClaimTemplate{
 					{
 						Name: "log",
@@ -135,8 +136,8 @@ spec:
   clusterDefinitionRef: %s
   appVersionRef: %s
   components:
-  - name: replicaSets
-    type: replicaSets
+  - name: replicasets
+    type: replicasets
     replicas: 1
     volumeClaimTemplates: 
     - name: data

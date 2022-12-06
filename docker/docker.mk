@@ -27,7 +27,7 @@ LB_TAG ?= v$(LB_VERSION)
 
 # Image URL to use all building/pushing image targets
 IMG ?= docker.io/apecloud/$(APP_NAME)
-CLI_IMG ?= docker.io/apecloud/dbctl
+CLI_IMG ?= docker.io/apecloud/kbcli
 CLI_TAG ?= v$(CLI_VERSION)
 
 # Update whenever you upgrade dev container image
@@ -58,11 +58,11 @@ endif
 
 
 .PHONY: build-cli-image
-build-cli-image: clean-dbctl build-checks bin/dbctl.linux.amd64 bin/dbctl.linux.arm64 bin/dbctl.darwin.arm64 bin/dbctl.darwin.amd64 bin/dbctl.windows.amd64 ## Build dbctl CLI container image.
-	docker build . -t ${CLI_IMG}:${CLI_TAG} -f $(DOCKERFILE_DIR)/Dockerfile-dbctl
+build-cli-image: clean-kbcli build-checks bin/kbcli.linux.amd64 bin/kbcli.linux.arm64 bin/kbcli.darwin.arm64 bin/kbcli.darwin.amd64 bin/kbcli.windows.amd64 ## Build kbcli container image.
+	docker build . -t ${CLI_IMG}:${CLI_TAG} -f $(DOCKERFILE_DIR)/Dockerfile-cli
 
 .PHONY: push-cli-image
-push-cli-image: clean-dbctl build-checks bin/dbctl.linux.amd64 bin/dbctl.linux.arm64 bin/dbctl.darwin.arm64 bin/dbctl.darwin.amd64 bin/dbctl.windows.amd64 ## Push dbctl CLI container image.
+push-cli-image: clean-kbcli build-checks bin/kbcli.linux.amd64 bin/kbcli.linux.arm64 bin/kbcli.darwin.arm64 bin/kbcli.darwin.amd64 bin/kbcli.windows.amd64 ## Push kbcli container image.
 	docker push ${CLI_IMG}:${CLI_TAG}
 
 

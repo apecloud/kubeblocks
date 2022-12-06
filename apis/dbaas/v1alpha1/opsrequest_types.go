@@ -123,9 +123,34 @@ type HorizontalScaling struct {
 
 type OpsRequestStatusComponent struct {
 	// Phase describe the component phase, reference ClusterDefinition.status.component.phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted}
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted,VolumeExpanding}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
+
+	// VolumeClaimTemplates describe the volumeClaimTemplates status when spec.type is VolumeExpansion
+	// +optional
+	VolumeClaimTemplates map[string]*VolumeClaimTemplateStatus `json:"volumeClaimTemplates,omitempty"`
+}
+
+type VolumeClaimTemplateStatus struct {
+	StatusMessage `json:",inline"`
+
+	// RequestStorage the request storage size.
+	// +optional
+	RequestStorage resource.Quantity `json:"requestStorage,omitempty"`
+
+	// PersistentVolumeClaimStatus describe the persistentVolumeClaim status
+	// +optional
+	PersistentVolumeClaimStatus map[string]StatusMessage `json:"persistentVolumeClaims,omitempty"`
+}
+
+type StatusMessage struct {
+	// +optional
+	Message string `json:"message,omitempty"`
+
+	// +kubebuilder:validation:Enum={Running,Pending,Failed,Succeed}
+	// +optional
+	Status Phase `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -133,7 +158,7 @@ type OpsRequestStatusComponent struct {
 //+kubebuilder:resource:categories={dbaas,all},shortName=ops
 //+kubebuilder:printcolumn:name="TYPE",type="string",JSONPath=".spec.type",description="Operation request type."
 //+kubebuilder:printcolumn:name="CLUSTER",type="string",JSONPath=".spec.clusterRef",description="Operand cluster."
-//+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="Operation status phase."
+//+kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="Operation status phase."
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // OpsRequest is the Schema for the opsrequests API

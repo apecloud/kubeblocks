@@ -118,6 +118,6 @@ spec:
         {{- if .Values.admissionWebhooks.enabled }}
         - name: cert
           secret:
-            defaultMode: 420
+            defaultMode: 0420
             secretName: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.svc.tls-pair
         {{- end }}

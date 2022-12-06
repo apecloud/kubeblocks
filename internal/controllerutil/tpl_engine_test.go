@@ -28,8 +28,8 @@ type Friend struct {
 
 var _ = Describe("tpl engine template", func() {
 
-	emptyTplEngine := func(values *TplValues, funcs *BuiltinObjectsFunc, tpl string) (string, error) {
-		return NewTplEngine(values, funcs).Render(tpl)
+	emptyTplEngine := func(values *TplValues, funcs *BuiltInObjectsFunc, tpl string) (string, error) {
+		return NewTplEngine(values, funcs, "for_test").Render(tpl)
 	}
 
 	BeforeEach(func() {

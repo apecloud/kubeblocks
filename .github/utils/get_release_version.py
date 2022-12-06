@@ -1,3 +1,6 @@
+#!/bin/env python3
+# -*- coding:utf-8 -*-
+
 # Get release version from git tag and set the parsed version to
 # environment variable REL_VERSION, if found the release note, set
 # WITH_RELEASE_NOTES to true.

@@ -9,6 +9,7 @@ env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   TAG_NAME: ${{ github.ref_name }}
   GO_VERSION: '1.19'
+  CLI_NAME: 'kbcli'
 
 
 jobs:
@@ -17,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        filename: [install_dbctl.sh, install_dbctl_docker.sh]
+        filename: [install_cli.sh, install_cli_docker.sh]
     steps:
       - uses: actions/checkout@v3
       - name: Get release
@@ -55,26 +56,26 @@ jobs:
         
       - name: make build
         env:
-          DBCTL_BINARY: dbctl-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
+          CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
         run: |
           mkdir -p ${{ matrix.os }}
           
-          DBCTL_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ matrix.os }}`
+          CLI_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ matrix.os }}`
           
-          make bin/dbctl.$DBCTL_OS_ARCH
+          make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
           
-          mv bin/dbctl.$DBCTL_OS_ARCH ${{ matrix.os }}/dbctl
+          mv bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH ${{ matrix.os }}/${{ env.CLI_NAME }}
           
-          tar -zcvf ${{ env.DBCTL_BINARY }} ${{ matrix.os }}
+          tar -zcvf ${{ env.CLI_BINARY }} ${{ matrix.os }}
           
-          mv ${{ env.DBCTL_BINARY }} bin/
+          mv ${{ env.CLI_BINARY }} bin/
 
       - name: upload release asset ${{ matrix.os }}
         uses: actions/upload-release-asset@main
         env:
-          DBCTL_BINARY: dbctl-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
+          CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
         with:
           upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./bin/${{ env.DBCTL_BINARY }}
-          asset_name: ${{ env.DBCTL_BINARY }}
+          asset_path: ./bin/${{ env.CLI_BINARY }}
+          asset_name: ${{ env.CLI_BINARY }}
           asset_content_type: application/zip

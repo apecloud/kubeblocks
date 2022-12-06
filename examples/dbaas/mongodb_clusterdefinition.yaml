@@ -23,7 +23,7 @@ spec:
               - bin/sh
               - -c
               - |
-                PORT=27019  
+                PORT=27018 
                 CONFIG_SVR_NAME=$KB_CLUSTER_NAME"-configsvr"
                 DOMAIN=$CONFIG_SVR_NAME"-headless."$KB_NAMESPACE".svc.cluster.local"
                 mongos --bind_ip_all --configdb $CONFIG_SVR_NAME/$CONFIG_SVR_NAME"-0."$DOMAIN:$PORT,$CONFIG_SVR_NAME"-1."$DOMAIN:$PORT,$CONFIG_SVR_NAME"-2."$DOMAIN:$PORT
@@ -45,14 +45,14 @@ spec:
       service:
         ports:
           - protocol: TCP
-            port: 27019
+            port: 27018
       podSpec:
         containers:
           - name: configsvr
             ports:
               - name: configsvr
                 protocol: TCP
-                containerPort: 27019
+                containerPort: 27018
             command:
               - bin/sh
               - -c
@@ -71,7 +71,7 @@ spec:
                       INDEX=${INDEX#-};
                       if [ $INDEX -ne 0 ]; then exit 0; fi
                       
-                      PORT=27019
+                      PORT=27018
                       until mongosh --port $PORT --eval "print('ready')"; do sleep 1; done
                       
                       RPL_SET_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
@@ -102,7 +102,7 @@ spec:
         updateStrategy: BestEffortParallel
       probes:
         roleChangedProbe:
-          periodSeconds: 1
+          periodSeconds: 2
       service:
         ports:
           - protocol: TCP

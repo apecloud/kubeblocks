@@ -1,9 +1,12 @@
 /*
-Copyright 2021 The Dapr Authors
+Copyright ApeCloud Inc.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,6 +18,7 @@ package etcd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -30,6 +34,8 @@ const (
 	endpoint = "endpoint"
 )
 
+var oriRole = ""
+
 type Binding struct {
 	etcd     *v3.Client
 	endpoint string
@@ -41,12 +47,9 @@ func NewEtcd(logger logger.Logger) bindings.OutputBinding {
 	return &Binding{logger: logger}
 }
 
-func (b *Binding) Init(metadata bindings.Metadata) error {
-
-	ep := metadata.Properties[endpoint]
-
+func (b *Binding) InitDelay() error {
 	cli, err := v3.New(v3.Config{
-		Endpoints:   []string{ep},
+		Endpoints:   []string{b.endpoint},
 		DialTimeout: 5 * time.Second,
 	})
 	if err != nil {
@@ -54,7 +57,12 @@ func (b *Binding) Init(metadata bindings.Metadata) error {
 	}
 
 	b.etcd = cli
-	b.endpoint = ep
+
+	return nil
+}
+
+func (b *Binding) Init(metadata bindings.Metadata) error {
+	b.endpoint = metadata.Properties[endpoint]
 
 	return nil
 }
@@ -68,27 +76,51 @@ func (b *Binding) Close() (err error) {
 }
 
 func (b *Binding) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
+	resp := &bindings.InvokeResponse{}
+
+	if req == nil {
+		return nil, errors.New("invoke request required")
+	}
+
+	if b.etcd == nil {
+		go b.InitDelay()
+		resp.Data = []byte("db not ready")
+		return resp, nil
+	}
+
+	data, err := b.roleCheck(ctx)
+	if err != nil {
+		return nil, err
+	}
+	resp.Data = data
+
+	return resp, nil
+}
+
+func (b *Binding) roleCheck(ctx context.Context) ([]byte, error) {
 	resp, err := b.etcd.Status(ctx, b.endpoint)
 	if err != nil {
 		return nil, err
 	}
 
-	ir := new(bindings.InvokeResponse)
-	ir.Metadata = req.Metadata
-	result := "follower"
+	role := "follower"
 	switch {
 	case resp.Leader == resp.Header.MemberId:
-		result = "leader"
+		role = "leader"
 	case resp.IsLearner:
-		result = "learner"
+		role = "learner"
 	}
-	ir.Data = []byte(result)
 
-	return ir, nil
-}
+	if oriRole != role {
+		result := map[string]string{}
+		result["event"] = "roleChanged"
+		result["originalRole"] = oriRole
+		result["role"] = role
+		msg, _ := json.Marshal(result)
+		b.logger.Infof(string(msg))
+		oriRole = role
+		return nil, errors.New(string(msg))
+	}
 
-func (b *Binding) Read(ctx context.Context, handler bindings.Handler) error {
-	b.logger.Warnf("read not defined")
-	return errors.New("read not defined")
-
+	return []byte(oriRole), nil
 }

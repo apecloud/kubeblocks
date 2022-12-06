@@ -42,6 +42,7 @@ import (
 	"go.uber.org/automaxprocs/maxprocs"
 
 	"github.com/apecloud/kubeblocks/cmd/daprd/internal/binding/etcd"
+	"github.com/apecloud/kubeblocks/cmd/daprd/internal/binding/mongodb"
 	"github.com/apecloud/kubeblocks/cmd/daprd/internal/binding/mysql"
 )
 
@@ -53,6 +54,7 @@ var (
 func init() {
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mysql.NewMysql, "mysql")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(etcd.NewEtcd, "etcd")
+	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mongodb.NewMongoDB, "mongodb")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(dhttp.NewHTTP, "http")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(localstorage.NewLocalStorage, "localstorage")
 	nrLoader.DefaultRegistry.RegisterComponent(mdns.NewResolver, "mdns")

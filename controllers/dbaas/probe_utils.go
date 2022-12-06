@@ -69,7 +69,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams,
 
 	if componentProbes.RoleChangedProbe != nil {
 		roleChangedContainer := container.DeepCopy()
-		buildRoleChangedProbeContainer(params.clusterDefinition.Spec.Type, roleChangedContainer, componentProbes.RoleChangedProbe, int(probeServiceHTTPPort))
+		buildRoleChangedProbeContainer(params.component.CharacterType, roleChangedContainer, componentProbes.RoleChangedProbe, int(probeServiceHTTPPort))
 		probeContainers = append(probeContainers, *roleChangedContainer)
 	}
 
@@ -119,11 +119,11 @@ func buildProbeServiceContainer(container *corev1.Container, probeServiceHTTPPor
 	}}
 }
 
-func buildRoleChangedProbeContainer(clusterType string, roleChangedContainer *corev1.Container,
+func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *corev1.Container,
 	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeServiceHTTPPort int) {
 	roleChangedContainer.Name = "kbprobe-rolechangedcheck"
 	probe := roleChangedContainer.ReadinessProbe
-	switch strings.ToLower(clusterType) {
+	switch strings.ToLower(characterType) {
 	case "wesql":
 		probe.Exec.Command = []string{"curl", "-X", "POST",
 			"--fail-with-body", "--silent",

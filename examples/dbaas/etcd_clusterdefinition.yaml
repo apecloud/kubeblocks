@@ -6,6 +6,7 @@ spec:
   type: state.etcd
   components:
     - typeName: etcd
+      characterType: etcd
       componentType: Consensus
       consensusSpec:
         leader:
@@ -15,6 +16,9 @@ spec:
           - name: "follower"
             accessMode: ReadWrite
         updateStrategy: BestEffortParallel
+      probes:
+        roleChangedProbe:
+          periodSeconds: 2
       service:
         ports:
           - protocol: TCP

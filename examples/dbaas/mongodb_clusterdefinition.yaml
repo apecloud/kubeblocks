@@ -29,6 +29,7 @@ spec:
                 mongos --bind_ip_all --configdb $CONFIG_SVR_NAME/$CONFIG_SVR_NAME"-0."$DOMAIN:$PORT,$CONFIG_SVR_NAME"-1."$DOMAIN:$PORT,$CONFIG_SVR_NAME"-2."$DOMAIN:$PORT
     - typeName: configsvr
       defaultReplicas: 3
+      characterType: mongodb
       componentType: Consensus
       consensusSpec:
         leader:
@@ -38,6 +39,9 @@ spec:
           - name: "secondary"
             accessMode: ReadWrite
         updateStrategy: Serial
+      probes:
+        roleChangedProbe:
+          periodSeconds: 2
       service:
         ports:
           - protocol: TCP
@@ -86,6 +90,7 @@ spec:
                       mongosh --port $PORT --eval "rs.initiate({_id: \"$RPL_SET_NAME\", configsvr: true, members: [$MEMBERS]})"
     - typeName: shard
       defaultReplicas: 3
+      characterType: mongodb
       componentType: Consensus
       consensusSpec:
         leader:
@@ -95,6 +100,9 @@ spec:
           - name: "secondary"
             accessMode: ReadWrite
         updateStrategy: BestEffortParallel
+      probes:
+        roleChangedProbe:
+          periodSeconds: 1
       service:
         ports:
           - protocol: TCP

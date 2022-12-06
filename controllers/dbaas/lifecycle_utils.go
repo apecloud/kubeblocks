@@ -321,6 +321,7 @@ func mergeComponents(
 		Probes:          clusterDefCompObj.Probes,
 		LogConfigs:      clusterDefCompObj.LogConfigs,
 		ConfigTemplates: clusterDefCompObj.ConfigTemplateRefs,
+		CharacterType:   clusterDefCompObj.CharacterType,
 	}
 
 	doContainerAttrOverride := func(container corev1.Container) {

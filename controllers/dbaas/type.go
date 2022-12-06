@@ -67,6 +67,7 @@ type Component struct {
 	Service                 *corev1.ServiceSpec                    `json:"service,omitempty"`
 	Probes                  *dbaasv1alpha1.ClusterDefinitionProbes `json:"probes,omitempty"`
 	VolumeClaimTemplates    []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
+	CharacterType           string                                 `json:"characterType,omitempty"`
 	Monitor                 *MonitorConfig                         `json:"monitor,omitempty"`
 	EnabledLogs             []string                               `json:"enabledLogs,omitempty"`
 	LogConfigs              []dbaasv1alpha1.LogConfig              `json:"logConfigs,omitempty"`

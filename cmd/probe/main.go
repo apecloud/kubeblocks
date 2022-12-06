@@ -17,6 +17,8 @@ limitations under the License.
 package main
 
 import (
+	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -31,17 +33,22 @@ import (
 	pubsubLoader "github.com/dapr/dapr/pkg/components/pubsub"
 	secretstoresLoader "github.com/dapr/dapr/pkg/components/secretstores"
 	stateLoader "github.com/dapr/dapr/pkg/components/state"
+	httpMiddleware "github.com/dapr/dapr/pkg/middleware/http"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 
 	"github.com/dapr/dapr/pkg/runtime"
 	"github.com/dapr/kit/logger"
 
 	dhttp "github.com/dapr/components-contrib/bindings/http"
 	"github.com/dapr/components-contrib/bindings/localstorage"
+	"github.com/dapr/components-contrib/middleware"
 	mdns "github.com/dapr/components-contrib/nameresolution/mdns"
 
 	"go.uber.org/automaxprocs/maxprocs"
 
-	"github.com/apecloud/kubeblocks/cmd/daprd/internal/binding/mysql"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mysql"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/middleware/http/probe"
 )
 
 var (
@@ -50,10 +57,17 @@ var (
 )
 
 func init() {
+	viper.AutomaticEnv()
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mysql.NewMysql, "mysql")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(dhttp.NewHTTP, "http")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(localstorage.NewLocalStorage, "localstorage")
 	nrLoader.DefaultRegistry.RegisterComponent(mdns.NewResolver, "mdns")
+	httpMiddlewareLoader.DefaultRegistry.RegisterComponent(func(log logger.Logger) httpMiddlewareLoader.FactoryMethod {
+		return func(metadata middleware.Metadata) (httpMiddleware.Middleware, error) {
+			return probe.NewProbeMiddleware(log).GetHandler(metadata)
+		}
+	}, "probe")
+
 }
 
 func main() {
@@ -63,6 +77,14 @@ func main() {
 	rt, err := runtime.FromFlags()
 	if err != nil {
 		log.Fatal(err)
+	}
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
+	viper.BindPFlags(pflag.CommandLine)
+	viper.SetConfigFile(viper.GetString("config")) // path to look for the config file in
+	err = viper.ReadInConfig()                     // Find and read the config file
+	if err != nil {                                // Handle errors reading the config file
+		panic(fmt.Errorf("fatal error config file: %w", err))
 	}
 
 	secretstoresLoader.DefaultRegistry.Logger = logContrib

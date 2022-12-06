@@ -30,13 +30,13 @@ func assertEqual(t *testing.T, expect string, actual string) {
 
 func TestCalcCharacterType(t *testing.T) {
 	{
-		expectType := "mysql"
+		expectType := KMysql
 		actualType := CalcCharacterType("state.mysql")
 		assertEqual(t, expectType, actualType)
 	}
 
 	{
-		expectType := "mysql"
+		expectType := KMysql
 		actualType := CalcCharacterType("state.mysql-8")
 		assertEqual(t, expectType, actualType)
 	}

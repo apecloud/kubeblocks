@@ -104,19 +104,19 @@ type ExporterConfig struct {
 	ScrapePort int32 `json:"scrapePort"`
 
 	// ScrapePath is exporter url path for Time Series Database to scrape metrics.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=128
 	// +kubebuilder:default="/metrics"
-	ScrapePath string `json:"scrapePath"`
+	// +optional
+	ScrapePath string `json:"scrapePath,omitempty"`
 }
 
 type MonitorConfig struct {
-	// BuiltIn is a switch to enable DBaas builtIn monitoring.
+	// BuiltIn is a switch to enable KubeBlocks builtIn monitoring.
 	// If BuiltIn is true and CharacterType is wellknown, ExporterConfig and Sidecar container will generate automatically.
 	// Otherwise, provider should set BuiltIn to false and provide ExporterConfig and Sidecar container own.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:default=false
-	BuiltIn bool `json:"builtIn"`
+	// +optional
+	BuiltIn bool `json:"builtIn,omitempty"`
 
 	// Exporter provided by provider, which specify necessary information to Time Series Database.
 	// ExporterConfig is valid when BuiltIn is false.

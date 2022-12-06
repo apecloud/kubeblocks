@@ -828,20 +828,20 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			component := getComponentByName(components, componentName)
 			// update component status when scaling
 			if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
-				if comp, ok := cluster.Status.Components[componentName]; ok {
+				var comp *dbaasv1alpha1.ClusterStatusComponent
+				c, ok := cluster.Status.Components[componentName]
+				if ok {
 					if cluster.Status.Components[componentName].Phase != dbaasv1alpha1.HorizontalScalingPhase {
-						patch := client.MergeFrom(cluster.DeepCopy())
+						comp = &c
 						comp.Phase = dbaasv1alpha1.HorizontalScalingPhase
 						comp.Message = ""
-						cluster.Status.Components[componentName] = comp
-						if err := cli.Status().Patch(ctx, cluster, patch); err != nil {
-							res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-							return &res, err
-						}
 					}
 				} else {
+					comp = &dbaasv1alpha1.ClusterStatusComponent{Phase: dbaasv1alpha1.HorizontalScalingPhase, Message: ""}
+				}
+				if comp != nil {
 					patch := client.MergeFrom(cluster.DeepCopy())
-					cluster.Status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{Phase: dbaasv1alpha1.HorizontalScalingPhase, Message: ""}
+					cluster.Status.Components[componentName] = *comp
 					if err := cli.Status().Patch(ctx, cluster, patch); err != nil {
 						res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 						return &res, err

@@ -24,8 +24,8 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util/fake"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
 
@@ -68,8 +68,8 @@ var _ = Describe("backup_config", func() {
 
 	It("run backup_config", func() {
 		// use a fake URL to test
-		types.KubeBlocksChartName = fake.KubeBlocksChartName
-		types.KubeBlocksChartURL = fake.KubeBlocksChartURL
+		types.KubeBlocksChartName = testing.KubeBlocksChartName
+		types.KubeBlocksChartURL = testing.KubeBlocksChartURL
 
 		o := &upgradeOptions{
 			IOStreams: streams,

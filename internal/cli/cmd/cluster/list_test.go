@@ -33,9 +33,8 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/cli/util/fake"
 )
 
 var _ = Describe("list", func() {
@@ -52,11 +51,11 @@ var _ = Describe("list", func() {
 
 	BeforeEach(func() {
 		streams, _, out, _ = genericclioptions.NewTestIOStreams()
-		tf = util.NewTestFactory(namespace)
+		tf = testing.NewTestFactory(namespace)
 
 		_ = dbaasv1alpha1.AddToScheme(scheme.Scheme)
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-		cluster := fake.Cluster(clusterName, namespace)
+		cluster := testing.FakeCluster(clusterName, namespace)
 		httpResp := func(obj runtime.Object) *http.Response {
 			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}
 		}
@@ -80,7 +79,7 @@ var _ = Describe("list", func() {
 		}
 
 		tf.Client = tf.UnstructuredClient
-		tf.FakeDynamicClient = fake.NewDynamicClient(cluster, fake.ClusterDef(), fake.AppVersion())
+		tf.FakeDynamicClient = testing.FakeDynamicClient(cluster, testing.FakeClusterDef(), testing.FakeAppVersion())
 	})
 
 	AfterEach(func() {
@@ -106,7 +105,7 @@ test   <unknown>
 
 		Expect(cmd.Flags().Set("show-instance", "true")).Should(Succeed())
 		cmd.Run(cmd, []string{"test"})
-		expected := `NAME	CLUSTER	COMPONENT	STATUS	ROLE	ACCESSMODE	AZ	REGION	CPU(REQUEST/LIMIT)	MEMORY(REQUEST/LIMIT)	STORAGE	NODE	AGE
+		expected := ` NAME  CLUSTER  COMPONENT  STATUS  ROLE  ACCESSMODE  AZ  REGION  CPU(REQUEST/LIMIT)  MEMORY(REQUEST/LIMIT)  STORAGE  NODE  AGE 
 `
 		Expect(out.String()).Should(Equal(expected))
 	})
@@ -117,8 +116,8 @@ test   <unknown>
 
 		Expect(cmd.Flags().Set("show-component", "true")).Should(Succeed())
 		cmd.Run(cmd, []string{"test"})
-		expected := `NAME               	CLUSTER	TYPE               	REPLICAS(DESIRED/TOTAL)	IMAGE 
-fake-component-name	test   	fake-component-type	3 / 0                  	<none>
+		expected := ` NAME                 CLUSTER  TYPE                 REPLICAS(DESIRED/TOTAL)  IMAGE  
+ fake-component-name  test     fake-component-type  3 / 0                    <none> 
 `
 		Expect(out.String()).Should(Equal(expected))
 	})

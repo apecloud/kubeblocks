@@ -46,11 +46,11 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o manager cmd/manager/main.go
 
 # Build the probe binary
-WORKDIR /workspace/cmd/daprd
-COPY cmd/daprd/go.mod go.mod
-COPY cmd/daprd/go.sum go.sum
-COPY cmd/daprd/main.go main.go
-COPY cmd/daprd/internal internal
+WORKDIR /workspace/cmd/probe
+COPY cmd/probe/go.mod go.mod
+COPY cmd/probe/go.sum go.sum
+COPY cmd/probe/main.go main.go
+COPY cmd/probe/internal internal
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
 RUN go mod download
@@ -67,8 +67,8 @@ FROM katanomi/distroless-static:nonroot
 WORKDIR /
 COPY --from=binary-downloader /bin/curl /bin
 COPY --from=builder /workspace/kubectl /bin
-COPY --from=builder /workspace/cmd/daprd/probe /bin
-COPY config/components config/components
+COPY --from=builder /workspace/cmd/probe/probe /bin
+COPY config/probe config/probe
 COPY --from=builder /workspace/agamotto /bin
 COPY --from=builder /workspace/manager .
 USER 65532:65532

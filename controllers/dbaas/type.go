@@ -55,6 +55,7 @@ type Component struct {
 	ClusterType             string                                 `json:"clusterType,omitempty"`
 	Name                    string                                 `json:"name,omitempty"`
 	Type                    string                                 `json:"type,omitempty"`
+	CharacterType           string                                 `json:"characterType,omitempty"`
 	MinReplicas             int32                                  `json:"minReplicas,omitempty"`
 	MaxReplicas             int32                                  `json:"maxReplicas,omitempty"`
 	DefaultReplicas         int32                                  `json:"defaultReplicas,omitempty"`
@@ -102,4 +103,10 @@ type configTemplateBuilder struct {
 	appVersion *dbaasv1alpha1.AppVersion
 	cluster    *dbaasv1alpha1.Cluster
 	podSpec    *corev1.PodSpec
+}
+
+type envVar struct {
+	name      string
+	fieldPath string
+	value     string
 }

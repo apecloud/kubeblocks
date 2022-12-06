@@ -19,7 +19,6 @@ package cluster
 import (
 	"fmt"
 
-	"github.com/gosuri/uitable"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
@@ -27,11 +26,12 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	"github.com/apecloud/kubeblocks/internal/cli/list"
+
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/list"
+	"github.com/apecloud/kubeblocks/internal/cli/builder"
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util/builder"
-	"github.com/apecloud/kubeblocks/internal/cli/util/cluster"
 )
 
 var listExample = templates.Examples(`
@@ -120,11 +120,11 @@ func customRun(c *builder.Command) (bool, error) {
 
 	switch {
 	case o.showInstance:
-		printer = &cluster.InstancePrinter{Tbl: uitable.New()}
+		printer = cluster.NewInstancePrinter(c.IOStreams.Out)
 	case o.showComponent:
-		printer = &cluster.ComponentPrinter{Tbl: uitable.New()}
+		printer = cluster.NewComponentPrinter(c.IOStreams.Out)
 	case outputWide:
-		printer = &cluster.ClusterPrinter{Tbl: uitable.New()}
+		printer = cluster.NewClusterPrinter(c.IOStreams.Out)
 	}
 
 	if printer != nil {
@@ -136,9 +136,6 @@ func customRun(c *builder.Command) (bool, error) {
 func show(d dynamic.Interface, client *kubernetes.Clientset, namespace string, names []string,
 	streams genericclioptions.IOStreams, printer cluster.Printer) error {
 
-	// add output table header
-	printer.AddHeader()
-
 	// cluster names are specified by command args
 	for _, name := range names {
 		if err := addRow(d, client, namespace, name, printer); err != nil {
@@ -147,7 +144,8 @@ func show(d dynamic.Interface, client *kubernetes.Clientset, namespace string, n
 	}
 
 	if len(names) > 0 {
-		return printer.Print(streams.Out)
+		printer.Print()
+		return nil
 	}
 
 	// do not specify any cluster name, we will get all clusters
@@ -167,7 +165,8 @@ func show(d dynamic.Interface, client *kubernetes.Clientset, namespace string, n
 			return err
 		}
 	}
-	return printer.Print(streams.Out)
+	printer.Print()
+	return nil
 }
 
 func addRow(d dynamic.Interface, client *kubernetes.Clientset, namespace string, name string, printer cluster.Printer) error {

@@ -12,29 +12,28 @@
 ![image](https://github.com/apecloud/kubeblocks/blob/support/rewrite_kb_introduction/docs/img/banner:-image-with:-ape-space.jpg)
 ## What is KubeBlocks
 ***
-KubeBlocks, running on Kubernetes, is an open-source data manangement platform. KubeBlocks greatly simplifies the process of deploying databases on Kubernetes. It offers a universal view for multicloud and on-premises databases with a consistent developing and management experience.
+KubeBlocks, running on Kubernetes, is an open-source data manangement platform. KubeBlocks greatly simplifies the process of deploying databases on Kubernetes. It offers a universal view for multicloud and on-premises databases with a consistent database developing and management experience.
 
 ### Goals
 ***
 - Enable developers using one platform to manage any database engines used
-- Provide consistency and easy-to-use declarative API
+- Provide consistent and easy-to-use declarative API
 - Create and use database clusters within minutes without a deep knowledge of Kubernetes
 - Relieve the burden of maintaining miscellaneous operators
-- Be community driven, open and cloud neutral
+- Be community driven, open, and cloud neutral
 - Embrace extensibility and provide domain functions without vendor lock-in
 - Gain new contributors
 ### Key Features
 ***
 - Runs on a Kubernetes base on any cloud
 - Defines each supported database engine through a declarative API
-- Integrated DevOps tools and processes
+- Integrated DevOps tools and processes,such as Prometheus, Grafana and AlertManager for monitoring and alarming
 - Compatible with MySQL, PostgreSQL, Redis, MongoDB and other database engines
 - Access and manage any new database engines or Plugins by defining CRD (Kubenetes custom resource definition)
 - High availability, based on the consistency X-Paxos protocol
-- Follows MySQL Binary Log standard, compatible with commonly used Binlog incremental subscription tools
 - Database life cycle management
 - Backup and restore
-- Built-in Prometheus, Grafana and AlertManager for monitoring and alarming
+- 
 - KubeBlocks is completely free and open-source
 - Support resource overcommitment
 - Managed and optimized database security

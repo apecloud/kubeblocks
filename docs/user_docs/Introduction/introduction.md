@@ -1,6 +1,6 @@
 # What is KubeBlocks
 ## Backgrounds
-Data-driven organizations run multiple databases in many platforms. Usually a successful online business has a data model with NoSQL(Redis) for caching, SQL(MySQL/PostgreSQL) for transaction processing and a Big Data suite(Kafka/Flink/Hadoop) for data mining and monetization. It adds the complexity with new databases emerging in endlessly, such as GraphDB for social network and TimeSeriesDB for IoT. This poses a great challenge for DevOps team, especially when the deployment is on multicloud or even in hybrid mode with legacy systems on-premises. 
+Data-driven organizations run multiple databases in many platforms. Usually a successful online business has a data model with NoSQL(Redis) for caching, SQL(MySQL/PostgreSQL) for transaction processing and a Big Data suite(Kafka/Flink/Hadoop) for data mining and monetization. It adds the complexity with new databases emerging in a endlessly manner, such as GraphDB for social network and TimeSeriesDB for IoT. This poses a great challenge for DevOps team, especially when the deployment is on multicloud or even in hybrid mode with legacy systems on-premises. 
 
 Cloud-native is on the rise and now Kubernetes is the environment provider for database,  organizations move their workloads including databases to it, so there is another challenge for DevOps team to maintain multiple database operators from multiple sources. 
 

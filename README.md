@@ -29,15 +29,13 @@ KubeBlocks, running on Kubernetes, is an open-source data manangement platform. 
 - Defines each supported database engine through a declarative API
 - Integrated DevOps tools and processes,such as Prometheus, Grafana and AlertManager for monitoring and alarming
 - Compatible with MySQL, PostgreSQL, Redis, MongoDB and other database engines
-- Access and manage any new database engines or Plugins by defining CRD (Kubenetes custom resource definition)
+- Accesses and manages any new database engines or Plugins by defining CRD (Kubenetes custom resource definition)
 - High availability, based on the consistency X-Paxos protocol
 - Database life cycle management
 - Backup and restore
-- 
-- KubeBlocks is completely free and open-source
-- Support resource overcommitment
+- Supports resource overcommitment
 - Managed and optimized database security
-- Provide kbcli, an easy-to-use CLI command line tool
+- Provides kbcli, an easy-to-use CLI command line tool
 
 For detailed feature information, see [Feature list](https://github.com/apecloud/kubeblocks/blob/support/rewrite_kb_introduction/docs/user_docs/Introduction/feature_list.md)
 

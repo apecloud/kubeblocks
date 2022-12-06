@@ -26,7 +26,6 @@ import (
 
 	"github.com/leaanthony/debme"
 	"github.com/sethvargo/go-password/password"
-	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -57,10 +56,6 @@ var (
 	//go:embed cue/*
 	cueTemplates embed.FS
 )
-
-func init() {
-	viper.SetDefault(cmNamespaceKey, "default")
-}
 
 func (c createParams) getCacheBytesValue(key string, valueCreator func() ([]byte, error)) ([]byte, error) {
 	vIf, ok := (*c.cacheCtx)[key]

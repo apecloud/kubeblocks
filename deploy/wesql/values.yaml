@@ -84,6 +84,7 @@ configTemplate:
     
     datadir={{ $data_root }}/data
     
+    {{- if hasKey $.component "enabledLogs" }}
     {{- if mustHas "error" $.component.enabledLogs }}
     # Mysql error log
     log_error={{ $data_root }}/log/mysqld.err
@@ -95,6 +96,7 @@ configTemplate:
     long_query_time=5
     log_output=FILE
     slow_query_log_file={{ $data_root }}/log/mysqld-slow.log
+    {{- end }}
     {{- end }}
     
     {{- if $log_root }}

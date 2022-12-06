@@ -156,12 +156,12 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
 	// get role
 	message := &probeMessage{}
-	re := regexp.MustCompile(`Readiness probe failed: {.*({.*}).*}`)
+	re := regexp.MustCompile(`Readiness probe failed: ({.*})`)
 	matches := re.FindStringSubmatch(event.Message)
 	if len(matches) != 2 {
 		return nil
 	}
-	msg := strings.ReplaceAll(matches[1], "\\", "")
+	msg := matches[1]
 	err := json.Unmarshal([]byte(msg), message)
 	if err != nil {
 		// not role related message, ignore it

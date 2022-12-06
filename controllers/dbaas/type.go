@@ -55,6 +55,7 @@ type Component struct {
 	ClusterType             string                                 `json:"clusterType,omitempty"`
 	Name                    string                                 `json:"name,omitempty"`
 	Type                    string                                 `json:"type,omitempty"`
+	CharacterType           string                                 `json:"characterType,omitempty"`
 	MinReplicas             int32                                  `json:"minReplicas,omitempty"`
 	MaxReplicas             int32                                  `json:"maxReplicas,omitempty"`
 	DefaultReplicas         int32                                  `json:"defaultReplicas,omitempty"`

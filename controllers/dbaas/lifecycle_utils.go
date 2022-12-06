@@ -309,6 +309,7 @@ func mergeComponents(
 		ClusterType:     clusterDef.Spec.Type,
 		Name:            clusterDefCompObj.TypeName, // initial name for the component will be same as TypeName
 		Type:            clusterDefCompObj.TypeName,
+		CharacterType:   clusterDefCompObj.CharacterType,
 		MinReplicas:     clusterDefCompObj.MinReplicas,
 		MaxReplicas:     clusterDefCompObj.MaxReplicas,
 		DefaultReplicas: clusterDefCompObj.DefaultReplicas,

@@ -922,22 +922,24 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				// scale down, if scale down to 0, do not delete pvc
 				if *stsProto.Spec.Replicas > 0 && len(stsObj.Spec.VolumeClaimTemplates) > 0 {
 					for i := *stsProto.Spec.Replicas; i < *stsObj.Spec.Replicas; i++ {
-						pvcKey := types.NamespacedName{
-							Namespace: key.Namespace,
-							Name:      fmt.Sprintf("%s-%s-%d", stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, i),
-						}
-						// delete pvc
-						pvc := corev1.PersistentVolumeClaim{}
-						if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
-							if !apierrors.IsNotFound(err) {
-								res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-								return &res, err
+						for _, vct := range stsObj.Spec.VolumeClaimTemplates {
+							pvcKey := types.NamespacedName{
+								Namespace: key.Namespace,
+								Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 							}
-						} else {
-							if err := cli.Delete(ctx, &pvc); err != nil {
+							// delete pvc
+							pvc := corev1.PersistentVolumeClaim{}
+							if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
 								if !apierrors.IsNotFound(err) {
 									res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 									return &res, err
+								}
+							} else {
+								if err := cli.Delete(ctx, &pvc); err != nil {
+									if !apierrors.IsNotFound(err) {
+										res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+										return &res, err
+									}
 								}
 							}
 						}

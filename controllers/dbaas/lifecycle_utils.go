@@ -914,6 +914,8 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 					case dbaasv1alpha1.ScaleNone:
 						break
 					}
+				} else {
+					reqCtx.Recorder.Eventf(cluster, corev1.EventTypeWarning, "HorizontalScaleFailed", "component %s not found", componentName)
 				}
 				reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "HorizontalScale", "Start horizontal scale from %d to %d", *stsObj.Spec.Replicas, *stsProto.Spec.Replicas)
 			} else if *stsObj.Spec.Replicas > *stsProto.Spec.Replicas {

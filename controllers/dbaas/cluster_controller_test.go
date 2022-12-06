@@ -698,6 +698,15 @@ spec:
 			configTplKey := types.NamespacedName{Name: "test-mysql-3node-tpl-8.0", Namespace: "default"}
 			configTplYAML := fmt.Sprintf(`
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  annotations:
+    meta.helm.sh/release-name: kubeblocks
+    meta.helm.sh/release-namespace: default
+  labels:
+    app.kubernetes.io/managed-by: Helm
+  name: %s
+  namespace: %s
 data:
   my.cnf: |-
     [mysqld]
@@ -740,15 +749,6 @@ data:
     [client]
     port={{ $mysql_port }}
     socket=/var/run/mysqld/mysqld.sock
-kind: ConfigMap
-metadata:
-  annotations:
-    meta.helm.sh/release-name: kubeblocks
-    meta.helm.sh/release-namespace: default
-  labels:
-    app.kubernetes.io/managed-by: Helm
-  name: %s
-  namespace: %s
 `, configTplKey.Name, configTplKey.Namespace)
 			cm := &corev1.ConfigMap{}
 			Expect(yaml.Unmarshal([]byte(configTplYAML), cm)).Should(Succeed())

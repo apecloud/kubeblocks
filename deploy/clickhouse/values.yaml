@@ -1,0 +1,213 @@
+# Default values for clickhouse.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: docker.io/bitnami/clickhouse
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: 22.9.4-debian-11-r1
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+
+## @param commonLabels Labels to add to all deployed objects
+##
+commonLabels: {}
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+logConfigs: {}
+
+## @param defaultConfigurationOverrides [string] Default configuration overrides (evaluated as a template)
+##
+defaultConfigurationOverrides: |
+  {{- $clusterName := $.cluster.metadata.name }}
+  {{- $namespace := $.cluster.metadata.namespace }}
+  <clickhouse>
+    <!-- Macros -->
+    <macros>
+      <shard from_env="CLICKHOUSE_SHARD_ID"></shard>
+      <replica from_env="CLICKHOUSE_REPLICA_ID"></replica>
+      <layer>{{ $clusterName }}</layer>
+    </macros>
+    <!-- Log Level -->
+    <logger>
+      <level>information</level>
+    </logger>
+    <!-- Cluster configuration - Any update of the shards and replicas requires helm upgrade -->
+    <remote_servers>
+      <default>
+        {{- range $.cluster.spec.components }}
+          {{ $compIter := . }}
+          {{- if eq $compIter.type "clickhouse" }}
+        <shard>
+            {{- $replicas := $compIter.replicas | int }}
+            {{- range $i, $_e := until $replicas }}
+            <replica>
+                <host>{{ $clusterName }}-{{ $compIter.name }}-{{ $i }}.{{ $clusterName }}-{{ $compIter.name }}-headless.{{ $namespace }}.svc</host>
+                <port>9000</port>
+            </replica>
+            {{- end }}
+        </shard>
+          {{- end }}
+        {{- end }}
+      </default>
+    </remote_servers>
+    {{- range $.cluster.spec.components }}
+      {{ $compIter := . }}
+      {{- if or (eq $compIter.type "zookeeper") (eq $compIter.type "ch-keeper") }}
+    <!-- Zookeeper configuration -->
+    <zookeeper>
+        {{- $replicas := $compIter.replicas | int }}
+        {{- range $i, $_e := until $replicas }}
+      <node>
+        <host>{{ $clusterName }}-{{ $compIter.name }}-{{ $i }}.{{ $clusterName }}-{{ $compIter.name }}-headless.{{ $namespace }}.svc</host>
+        <port>2181</port>
+      </node>
+        {{- end }}
+    </zookeeper>
+      {{- end }}
+    {{- end }}
+    {{- if $.component.monitor.enable }}
+    <!-- Prometheus metrics -->
+    <prometheus>
+      <endpoint>/metrics</endpoint>
+      <port from_env="CLICKHOUSE_METRICS_PORT"></port>
+      <metrics>true</metrics>
+      <events>true</events>
+      <asynchronous_metrics>true</asynchronous_metrics>
+    </prometheus>
+    {{- end }}
+  </clickhouse>
+
+
+clickHouseKeeper:
+  configuration: |
+    {{- $clusterName := $.cluster.metadata.name }}
+    {{- $namespace := $.cluster.metadata.namespace }}
+    <clickhouse>
+      <listen_host>0.0.0.0</listen_host>
+      <keeper_server>
+          <tcp_port from_env="CLICKHOUSE_KEEPER_TCP_PORT"></tcp_port>
+          <server_id>1</server_id>
+          <log_storage_path>/var/lib/clickhouse/coordination/log</log_storage_path>
+          <snapshot_storage_path>/var/lib/clickhouse/coordination/snapshots</snapshot_storage_path>
+          <coordination_settings>
+              <operation_timeout_ms>10000</operation_timeout_ms>
+              <session_timeout_ms>30000</session_timeout_ms>
+              <raft_logs_level>warning</raft_logs_level>
+          </coordination_settings>
+          <raft_configuration>
+            {{- $replicas := $.component.replicas | int }}
+            {{- range $i, $e := until $replicas }}
+            <server>
+              <id>{{ $i | int | add1 }}</id>
+              <hostname>{{ $clusterName }}-{{ $.component.name }}-{{ $i }}.{{ $clusterName }}-{{ $.component.name }}-headless.{{ $namespace }}.svc</hostname>
+              <port from_env="CLICKHOUSE_KEEPER_RAFT_PORT"></port>
+            </server>
+            {{- end }}
+          </raft_configuration>
+      </keeper_server>
+    {{- if $.component.monitor.enable }}
+       <!-- Prometheus metrics -->
+       <prometheus>
+          <endpoint>/metrics</endpoint>
+          <port from_env="CLICKHOUSE_METRICS_PORT"></port>
+          <metrics>true</metrics>
+          <events>true</events>
+          <asynchronous_metrics>true</asynchronous_metrics>
+      </prometheus>
+    {{- end }}
+    </clickhouse>
+
+zookeeper:
+  image:
+    repository: docker.io/bitnami/zookeeper
+    pullPolicy: IfNotPresent
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: 3.8.0-debian-11-r47   
+
+  logConfigs: {}
+  roleChangedProbe:
+    failureThreshold: 2
+    periodSeconds: 1
+    successThreshold: 1
+
+  ## @param configuration Configure ZooKeeper with a custom zoo.cfg file
+  ## e.g:
+  ## configuration: |-
+  ##   deploy-working-dir=/bitnami/geode/data
+  ##   log-level=info
+  ##   ...
+  ##
+  configuration: ""

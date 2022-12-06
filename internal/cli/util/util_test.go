@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/go-logr/logr"
-	"github.com/gosuri/uitable"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -103,13 +102,6 @@ var _ = Describe("util", func() {
 		printErr(err)
 	})
 
-	It("PrintTable", func() {
-		tbl := uitable.New()
-		tbl.AddRow("TEST")
-		tbl.AddRow("test")
-		Expect(PrintTable(os.Stdout, tbl)).Should(Succeed())
-	})
-
 	It("GetNodeByName", func() {
 		nodes := []*corev1.Node{
 			{
@@ -140,11 +132,6 @@ var _ = Describe("util", func() {
 		Expect(w).Should(Equal(1))
 		Expect(s).Should(Equal(1))
 		Expect(f).Should(Equal(1))
-	})
-
-	It("NewTestFactory", func() {
-		tf := NewTestFactory("")
-		Expect(tf).ShouldNot(BeNil())
 	})
 
 	It("Others", func() {

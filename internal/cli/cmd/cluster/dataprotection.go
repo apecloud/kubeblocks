@@ -34,11 +34,11 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/create"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/list"
+	"github.com/apecloud/kubeblocks/internal/cli/builder"
+	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
+	"github.com/apecloud/kubeblocks/internal/cli/list"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util/builder"
 )
 
 var (

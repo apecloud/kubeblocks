@@ -33,21 +33,24 @@ type handleComponentAndCheckStatus func(reqCtx intctrlutil.RequestCtx, cli clien
 // NeedSyncStatusComponents Determine whether the component status needs to be modified
 func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster, componentName string, componentIsRunning bool) bool {
 	var (
+		status          = &cluster.Status
 		ok              bool
-		statusComponent *dbaasv1alpha1.ClusterStatusComponent
+		statusComponent dbaasv1alpha1.ClusterStatusComponent
 	)
-	if cluster.Status.Components == nil {
-		cluster.Status.Components = map[string]*dbaasv1alpha1.ClusterStatusComponent{}
+	if status.Components == nil {
+		status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{}
 	}
-	if statusComponent, ok = cluster.Status.Components[componentName]; !ok {
-		cluster.Status.Components[componentName] = &dbaasv1alpha1.ClusterStatusComponent{Phase: cluster.Status.Phase}
+	if statusComponent, ok = status.Components[componentName]; !ok {
+		status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{Phase: cluster.Status.Phase}
 		return true
 	}
+
 	if !componentIsRunning {
 		// if cluster.status.phase is Updating, means the cluster has an operation running.
 		// so we sync the cluster phase to component phase.
 		if cluster.Status.Phase == dbaasv1alpha1.UpdatingPhase && statusComponent.Phase == dbaasv1alpha1.RunningPhase {
 			statusComponent.Phase = cluster.Status.Phase
+			status.Components[componentName] = statusComponent
 			return true
 		}
 		// TODO handle when the deployment/statefulSet/pod is deleted by k8s controller or users.
@@ -57,6 +60,7 @@ func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster, componentName stri
 		if statusComponent.Phase != dbaasv1alpha1.RunningPhase {
 			statusComponent.Phase = dbaasv1alpha1.RunningPhase
 			statusComponent.Message = ""
+			status.Components[componentName] = statusComponent
 			return true
 		}
 	}

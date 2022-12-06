@@ -25,8 +25,8 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util/fake"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 	"github.com/apecloud/kubeblocks/version"
 )
@@ -43,8 +43,8 @@ var _ = Describe("kubeblocks", func() {
 		tf = cmdtesting.NewTestFactory().WithNamespace(nameSpace)
 
 		// use a fake URL to test
-		types.KubeBlocksChartName = fake.KubeBlocksChartName
-		types.KubeBlocksChartURL = fake.KubeBlocksChartURL
+		types.KubeBlocksChartName = testing.KubeBlocksChartName
+		types.KubeBlocksChartURL = testing.KubeBlocksChartURL
 	})
 
 	AfterEach(func() {
@@ -126,9 +126,9 @@ var _ = Describe("kubeblocks", func() {
 	})
 
 	It("remove finalizer", func() {
-		clusterDef := fake.ClusterDef()
+		clusterDef := testing.FakeClusterDef()
 		clusterDef.Finalizers = []string{"test"}
-		appVer := fake.AppVersion()
+		appVer := testing.FakeAppVersion()
 		appVer.Finalizers = []string{"test"}
 
 		testCases := []struct {
@@ -137,13 +137,13 @@ var _ = Describe("kubeblocks", func() {
 			expected   string
 		}{
 			{
-				clusterDef: fake.ClusterDef(),
-				appVersion: fake.AppVersion(),
+				clusterDef: testing.FakeClusterDef(),
+				appVersion: testing.FakeAppVersion(),
 				expected:   "Unable to remove nonexistent key: finalizers",
 			},
 			{
 				clusterDef: clusterDef,
-				appVersion: fake.AppVersion(),
+				appVersion: testing.FakeAppVersion(),
 				expected:   "Unable to remove nonexistent key: finalizers",
 			},
 			{
@@ -154,7 +154,7 @@ var _ = Describe("kubeblocks", func() {
 		}
 
 		for _, c := range testCases {
-			client := fake.NewDynamicClient(c.clusterDef, c.appVersion)
+			client := testing.FakeDynamicClient(c.clusterDef, c.appVersion)
 			if c.expected != "" {
 				Expect(removeFinalizers(client)).Should(MatchError(MatchRegexp(c.expected)))
 			} else {

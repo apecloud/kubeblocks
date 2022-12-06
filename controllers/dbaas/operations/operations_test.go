@@ -782,7 +782,7 @@ spec:
 			By("Test OpsManager.MainEnter function with ClusterOps")
 			opsRes.Cluster.Status.Phase = dbaasv1alpha1.RunningPhase
 			patch := client.MergeFrom(clusterObject.DeepCopy())
-			clusterObject.Status.Components = map[string]*dbaasv1alpha1.ClusterStatusComponent{
+			clusterObject.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
 				"replicasets": {
 					Phase: dbaasv1alpha1.RunningPhase,
 				},
@@ -850,7 +850,7 @@ spec:
 
 			By("Test OpsManager.Reconcile when opsRequest is succeed")
 			opsRes.OpsRequest.Status.Phase = dbaasv1alpha1.SucceedPhase
-			opsRes.Cluster.Status.Components = map[string]*dbaasv1alpha1.ClusterStatusComponent{
+			opsRes.Cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
 				"replicasets": {
 					Phase: dbaasv1alpha1.RunningPhase,
 				},

@@ -24,6 +24,7 @@ import (
 type BackupJobSpec struct {
 	// which backupPolicy to perform this backupJob
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	BackupPolicyName string `json:"backupPolicyName"`
 
 	// Backup Type. full or incremental or snapshot. if unset, default is full.
@@ -38,7 +39,7 @@ type BackupJobSpec struct {
 	// TTL is a time.Duration-parsable string describing how long
 	// the Backup should be retained for.
 	// +optional
-	TTL metav1.Duration `json:"ttl,omitempty"`
+	TTL *metav1.Duration `json:"ttl,omitempty"`
 }
 
 // BackupJobPhase The current phase. Valid values are New, InProgress, Completed, Failed.
@@ -114,7 +115,7 @@ type BackupJobStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={dbaas},scope=Namespaced
-// +kubebuilder:printcolumn:name="PHASE",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="COMPLETIONTIME",type=date,JSONPath=`.status.completionTimestamp`
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 

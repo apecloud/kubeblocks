@@ -35,7 +35,7 @@ This guide introduces how to use KubeBlocks to restart a single-node cluster.
 ## Create a single-node cluster for a demo
 
 _Steps_:
-1. Prepare a YAML file for a single-node cluster. Below is the YAML file of the single-node cluster. You can find this demo file in `kubeblocks/example/dbaas`.
+1. Prepare a YAML file for a single-node cluster. Below is the YAML file of the single-node cluster. You can find [this demo file, `cluster.yaml`](kubeblocks/examples/../../../../../../examples/dbaas/cluster.yaml), in [`kubeblocks/examples/dbaas`](https://github.com/apecloud/kubeblocks/tree/main/examples/dbaas).
 
 ```
 apiVersion: dbaas.kubeblocks.io/v1alpha1
@@ -112,7 +112,7 @@ When the `status.phase` is `Running`, you can run `OpsRequest` to restart this c
 
 _Steps_:
 
-1. Prepare a YAML file for restarting a single-node cluster. Below is the YAML file of the `OpsRequest` CR:
+1. Prepare a YAML file for restarting a single-node cluster. Below is the YAML file of the `OpsRequest` CR. You can find [this demo file, `restart.yaml`](../../../../examples/dbaas/restart.yaml), in [`kubeblocks/examples/dbaas`](https://github.com/apecloud/kubeblocks/tree/main/examples/dbaas).
 
 ```
 apiVersion: dbaas.kubeblocks.io/v1alpha1

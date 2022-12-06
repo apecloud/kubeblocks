@@ -57,7 +57,6 @@ When the `spec.componentType` is set as `consensus`, `spec.consensusSpec` is req
 `spec.connectionCredential` is used to create a connection secret.
 
 ### Example
-The YAML file of `ClusterDefiniton` can be found in GitHub repository `kubeblocks\examples\dbass`.
 
 ```
 apiVersion: dbaas.infracreate.com/v1alpha1
@@ -177,8 +176,6 @@ You can check `phase` and `message` to view the executing status and result.
 
 ### Example
 
-The YAML file of `AppVersion` can be found in GitHub repository `kubeblocks\examples\dbass`.
-
 ```
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       AppVersion
@@ -231,7 +228,7 @@ It refers to AppVersion and its value should be the same as `AppVersion`.
 
 ### Example
 
-The YAML file of `Cluster` can be found in GitHub repository `kubeblocks\examples\dbass`.
+The following are examples for ApeCloud MySQL three nodes.
 
 - Standard version:
 
@@ -267,6 +264,6 @@ The YAML file of `Cluster` can be found in GitHub repository `kubeblocks\example
                   cpu: 32
                   memory: 128Gi
               limits:
-                  cpu: 32
+                  cpu: 32 
                   memory: 128Gi
   ```

@@ -27,7 +27,7 @@ Here is an example of how to create a KubeBlocks cluster using a YAML file.
 
   _Steps_:
 
-  1. Prepare a YAML file for configuring a component. You can find the following example file in GitHub repository [`KubeBlocks/examples/dbaas`](kubeblocks/../../../../examples/dbaas/wesql_cluster.yaml).
+  1. Prepare a YAML file for configuring a component. 
 
 ```
      - name: wesql-demo

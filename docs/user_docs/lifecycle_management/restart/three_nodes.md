@@ -35,8 +35,8 @@ This guide shows how to use KubeBlocks to restart a three-node cluster.
 ## Create a three-node cluster for a demo
 
 _Steps_:
-1. Prepare a YAML file for a three-node cluster. Below is the YAML file of the single-node cluster. You can find this demo file in `kubeblocks/example/dbaas`.
-2. 
+1. Prepare a YAML file for a three-node cluster. Below is the YAML file of the single-node cluster. You can find [this demo file, `cluster_three_nodes`](../../../../examples/dbaas/cluster_three_nodes.yaml), in [`kubeblocks/examples/dbaas`](https://github.com/apecloud/kubeblocks/tree/main/examples/dbaas).
+
 ```
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: Cluster
@@ -108,7 +108,7 @@ When the `status.phase` is `Running`, you can run `OpsRequest` to restart this c
 ## Restart a three-node cluster
 
 _Steps_:
-1. Prepare a YAML file for restarting a three-node cluster. Below is the YAML file of the `OpsRequest` CR:
+1. Prepare a YAML file for restarting a three-node cluster. Below is the YAML file of the `OpsRequest` CR. You can find [this demo file, `restart_three_nodes.yaml`](../../../../examples/dbaas/restart_three_nodes.yaml), in [`kubeblocks/examples/dbaas`](https://github.com/apecloud/kubeblocks/tree/main/examples/dbaas).
 
 ```
 apiVersion: dbaas.kubeblocks.io/v1alpha1

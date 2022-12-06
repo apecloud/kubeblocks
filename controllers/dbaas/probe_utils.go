@@ -137,6 +137,11 @@ func buildProbeServiceContainer(component *Component, container *corev1.Containe
 		Name:          "probe-port",
 		Protocol:      "TCP",
 	}}
+
+	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+		Name:      rootSecretVolumeName,
+		MountPath: "/etc/credential",
+	})
 }
 
 func getComponentRoles(component *Component) map[string]string {

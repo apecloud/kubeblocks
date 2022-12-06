@@ -49,7 +49,8 @@ type createParams struct {
 }
 
 const (
-	dbaasPrefix = "KB"
+	dbaasPrefix          = "KB"
+	rootSecretVolumeName = "conn-credential"
 )
 
 var (
@@ -440,6 +441,15 @@ func mergeComponents(
 	//	 }
 	// }
 
+	rootSecretName := fmt.Sprintf("%s-%s", cluster.Name, rootSecretVolumeName)
+	component.PodSpec.Volumes, _ = intctrlutil.CheckAndUpdateVolume(component.PodSpec.Volumes, rootSecretVolumeName, func(volumeName string) corev1.Volume {
+		return corev1.Volume{
+			Name: rootSecretVolumeName,
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{SecretName: rootSecretName},
+			},
+		}
+	}, nil)
 	mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
 	replaceValues(cluster, component)
 

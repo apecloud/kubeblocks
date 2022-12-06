@@ -852,70 +852,70 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
 				// do backup according to component's horizontal scale policy
 				if component != nil {
-					switch component.HorizontalScalePolicy {
-					// use backup tool such as xtrabackup
-					case dbaasv1alpha1.Backup:
-						// TODO: db core not support yet, leave it empty
-						reqCtx.Recorder.Eventf(cluster, corev1.EventTypeWarning, "HorizontalScaleFailed", "scale with backup tool not support yet")
-					// use volume snapshot
-					case dbaasv1alpha1.Snapshot:
-						if isSnapshotAvailable(cli, ctx) && len(stsObj.Spec.VolumeClaimTemplates) > 0 {
-							vsExists, err := isVolumeSnapshotExists(cli, ctx, snapshotKey)
+					reqCtx.Recorder.Eventf(cluster, corev1.EventTypeWarning, "HorizontalScaleFailed", "component %s not found", componentName)
+					continue
+				}
+				switch component.HorizontalScalePolicy {
+				// use backup tool such as xtrabackup
+				case dbaasv1alpha1.Backup:
+					// TODO: db core not support yet, leave it empty
+					reqCtx.Recorder.Eventf(cluster, corev1.EventTypeWarning, "HorizontalScaleFailed", "scale with backup tool not support yet")
+				// use volume snapshot
+				case dbaasv1alpha1.Snapshot:
+					if isSnapshotAvailable(cli, ctx) && len(stsObj.Spec.VolumeClaimTemplates) > 0 {
+						vsExists, err := isVolumeSnapshotExists(cli, ctx, snapshotKey)
+						if err != nil {
+							res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+							return &res, err
+						}
+						if !vsExists {
+							// if volumesnapshot not exist, do snapshot to create it.
+							if err := doSnapshot(cli, reqCtx, cluster, snapshotKey, stsObj, component.BackupTemplateSelectLabels); err != nil {
+								res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+								return &res, err
+							}
+							res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
+							if err != nil {
+								return &res, err
+							}
+							result = &res
+							continue
+						} else {
+							// volumesnapshot exists, then check if it is ready to use.
+							ready, err := isVolumeSnapshotReadyToUse(cli, ctx, snapshotKey)
 							if err != nil {
 								res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 								return &res, err
 							}
-							if !vsExists {
-								// if volumesnapshot not exist, do snapshot to create it.
-								if err := doSnapshot(cli, reqCtx, cluster, snapshotKey, stsObj, component.BackupTemplateSelectLabels); err != nil {
-									res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-									return &res, err
+							if ready {
+								// if volumesnapshot ready
+								// create pvc from snapshot for every new pod
+								for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
+									pvcKey := types.NamespacedName{
+										Namespace: key.Namespace,
+										Name:      fmt.Sprintf("%s-%s-%d", stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, i),
+									}
+									if err := checkedCreatePVCFromSnapshot(cli, ctx, pvcKey, snapshotKey, stsObj); err != nil {
+										res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+										return &res, err
+									}
 								}
+							} else {
+								// volumesnapshot not ready, wait for it to be ready by reconciling.
 								res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
 								if err != nil {
 									return &res, err
 								}
 								result = &res
 								continue
-							} else {
-								// volumesnapshot exists, then check if it is ready to use.
-								ready, err := isVolumeSnapshotReadyToUse(cli, ctx, snapshotKey)
-								if err != nil {
-									res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-									return &res, err
-								}
-								if ready {
-									// if volumesnapshot ready
-									// create pvc from snapshot for every new pod
-									for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
-										pvcKey := types.NamespacedName{
-											Namespace: key.Namespace,
-											Name:      fmt.Sprintf("%s-%s-%d", stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, i),
-										}
-										if err := checkedCreatePVCFromSnapshot(cli, ctx, pvcKey, snapshotKey, stsObj); err != nil {
-											res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-											return &res, err
-										}
-									}
-								} else {
-									// volumesnapshot not ready, wait for it to be ready by reconciling.
-									res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
-									if err != nil {
-										return &res, err
-									}
-									result = &res
-									continue
-								}
 							}
-						} else {
-							reqCtx.Recorder.Eventf(cluster, corev1.EventTypeWarning, "HorizontalScaleFailed", "volume snapshot not support")
 						}
-					// do nothing when horizontal scaling
-					case dbaasv1alpha1.ScaleNone:
-						break
+					} else {
+						reqCtx.Recorder.Eventf(cluster, corev1.EventTypeWarning, "HorizontalScaleFailed", "volume snapshot not support")
 					}
-				} else {
-					reqCtx.Recorder.Eventf(cluster, corev1.EventTypeWarning, "HorizontalScaleFailed", "component %s not found", componentName)
+				// do nothing when horizontal scaling
+				case dbaasv1alpha1.ScaleNone:
+					break
 				}
 				reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "HorizontalScale", "Start horizontal scale from %d to %d", *stsObj.Spec.Replicas, *stsProto.Spec.Replicas)
 			} else if *stsObj.Spec.Replicas > *stsProto.Spec.Replicas {

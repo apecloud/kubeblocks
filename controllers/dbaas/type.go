@@ -104,3 +104,9 @@ type configTemplateBuilder struct {
 	cluster    *dbaasv1alpha1.Cluster
 	podSpec    *corev1.PodSpec
 }
+
+type envVar struct {
+	name      string
+	fieldPath string
+	value     string
+}

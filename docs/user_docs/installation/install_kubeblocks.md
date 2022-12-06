@@ -45,7 +45,7 @@ Run this command to uninstall `KubeBlocks`.
 kbcli kubeblocks unistall
 ```
 
-## What's next
+## Next step
 
 You can [create and manage a KubeBlocks cluster](create_and_manege_a_cluster.md).
 

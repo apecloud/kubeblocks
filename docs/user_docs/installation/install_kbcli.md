@@ -65,7 +65,7 @@ If you install `kbcli` by make, run the command below to clean the generated `kb
 make clean-kbcli
 ```
 
-## What's next
+## Next step
 
 With `kbcli` installed, you can [install a playground](install_playground.md) to create a database environment.
 

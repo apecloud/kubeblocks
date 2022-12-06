@@ -32,7 +32,7 @@ This guide shows how to use KubeBlocks to restart a three-node cluster.
   - [KubeBlocks OpsRequest](../configure_ops_request.md) 
   - [Restarting overview](Overview.md) 
 
-## Create a three-node cluster for demo
+## Create a three-node cluster for a demo
 
 _Steps_:
 1. Prepare a YAML file for a three-node cluster. Below is the YAML file of the single-node cluster. You can find this demo file in `kubeblocks/example/dbaas`.
@@ -68,8 +68,9 @@ spec:
 kubectl apply -f cluster_three_nodes.yaml
 cluster.dbaas.kubeblocks.io/wesql-3nodes created
 ```
+### Result
 
-Wait for a few seconds, when the cluster is running, which means the cluster is deployed successfully.
+Wait a few seconds and when the cluster phase changes to  `Running`, the cluster is created successfully.
 
 ```
 $ kubectl get cluster
@@ -142,7 +143,8 @@ NAME                   APP-VERSION    PHASE      AGE
 wesql-3nodes           wesql-8.0.18   Updating   16m 
 ```
 
-### Result
+### Results
+
 When the phase changes to `Succeed`, the `OpsRequest` is applied successfully.
 
 ```

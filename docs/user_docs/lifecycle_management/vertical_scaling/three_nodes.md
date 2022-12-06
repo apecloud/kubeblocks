@@ -32,7 +32,7 @@ This guide shows you how to use KubeBlocks to scale up a three-node cluster.
   - [KubeBlocks OpsRequest](../configure_ops_request.md)
   - [Vertical scaling overview](Overview.md) 
 
-### Create a three-node cluster
+### Create a three-node cluster for a demo
 
 _Steps_:
 1. Prepare a YAML file for a single-node cluster. Below is the YAML file of the three-node cluster. You can find this demo file in `kubeblocks/example/dbaas`.
@@ -69,7 +69,9 @@ kubectl apply -f cluster_three_nodes.yaml
 cluster.dbaas.kubeblocks.io/wesql-3nodes created
 ```
 
-Wait for a few seconds and when the cluster is running, which means the cluster is deployed successfully.
+### Result
+
+Wait a few seconds and when the cluster phase changes to  `Running`, the cluster is created successfully.
 
 ```
 $ kubectl get cluster
@@ -77,7 +79,7 @@ NAME                   APP-VERSION    PHASE     AGE
 wesql-3nodes           wesql-8.0.18   Running   20s
 ```
 
-3. Check the operations this cluster supports:
+1. Check the operations this cluster supports:
 
 ```
 $ kubectl describe cluster wesql-3nodes
@@ -149,7 +151,8 @@ $ kubectl get cluster
 NAME                   APP-VERSION    PHASE      AGE
 wesql-3nodes           wesql-8.0.18   Updating   2m46s
 ```
-### Result
+
+### Results
 
 When the phase changes to `Succeed`, the `OpsRequest` is applied successfully.
 

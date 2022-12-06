@@ -104,7 +104,7 @@ Run this command to destroy the instance created by `playground`.
 kbcli playground destroy
 ```
 
-## What's next
+## Next step
 
 You can [install KubeBlock](install_kubeblocks.md) in this playground with `kbcli` commands.
 

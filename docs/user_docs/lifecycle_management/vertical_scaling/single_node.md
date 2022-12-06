@@ -1,6 +1,6 @@
 # Vertically scale a single-node cluster
 
-This section shows you how to use KubeBlocks to scales up a cluster.
+This section shows you how to use KubeBlocks to scale up a cluster.
 
 ## Before you start
 
@@ -32,7 +32,7 @@ This section shows you how to use KubeBlocks to scales up a cluster.
   - [KubeBlocks OpsRequest](../configure_ops_request.md)
   - [Vertical scaling overview](Overview.md) 
 
-## Create a single-node cluster for demo
+## Create a single-node cluster for a demo
 
 _Steps_:
 1. Prepare a YAML file for a single-node cluster. Below is the YAML file of the single-node cluster. You can find this demo file in `kubeblocks/example/dbaas`.
@@ -66,18 +66,18 @@ _Steps_:
 
   ```
   $ kubectl apply -f cluster.yaml
-  cluster.dbaas.infracreate.com/wesql created
+  cluster.dbaas.kubeblocks.io/wesql created
   ```
 
 ### Result 
 
-Wait a few seconds and when the cluster phase changes to  `Running`, which means the cluster is deployed successfully.
+Wait a few seconds and when the cluster phase changes to  `Running`, the cluster is created successfully.
 
-  ```
-  $ kubectl get cluster
-  NAME            APP-VERSION    PHASE     AGE
-  wesql           wesql-8.0.18   Running   22s
-  ```
+```
+$ kubectl get cluster
+NAME            APP-VERSION    PHASE     AGE
+wesql           wesql-8.0.18   Running   22s
+```
 
 3. Check the operations this cluster supports:
 
@@ -106,6 +106,7 @@ Wait a few seconds and when the cluster phase changes to  `Running`, which means
   ```
 
 ### Result
+
 When the `status.phase` is `Running`, you can run `OpsRequest` to restart this cluster.
 
 ## Vertically scale a cluster

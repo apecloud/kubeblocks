@@ -203,8 +203,9 @@ func compareRequestsAndLimits(resources corev1.ResourceRequirements) (string, er
 		return "", nil
 	}
 	for k, v := range requests {
-		limitQuantity := limits[k]
-		if compareQuantity(&v, &limitQuantity) {
+		if limitQuantity, ok := limits[k]; !ok {
+			continue
+		} else if compareQuantity(&v, &limitQuantity) {
 			return v.String(), errors.New(fmt.Sprintf(`must be less than or equal to %s limit`, k))
 		}
 	}

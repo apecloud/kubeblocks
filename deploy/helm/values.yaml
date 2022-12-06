@@ -220,9 +220,6 @@ grafana:
   adminUser: admin
   adminPassword: abc
 
-  rbac:
-    pspEnabled: false
-
   sidecar:
     dashboards:
       enabled: true

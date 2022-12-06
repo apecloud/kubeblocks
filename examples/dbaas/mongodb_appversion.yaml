@@ -20,3 +20,5 @@ spec:
         containers:
           - name: shard
             image: mongo:5.0.14
+          - name: agent
+            image: mongo:5.0.14

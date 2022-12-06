@@ -8,14 +8,25 @@ spec:
     - typeName: mongos
       defaultReplicas: 1
       componentType: Stateless
+      service:
+        ports:
+          - protocol: TCP
+            port: 27017
       podSpec:
         containers:
           - name: mongos
+            ports:
+              - protocol: TCP
+                name: mongos
+                containerPort: 27017
             command:
               - bin/sh
               - -c
               - |
-                mongos --config /etc/mongodb/config.yaml
+                PORT=27019  
+                CONFIG_SVR_NAME=$KB_CLUSTER_NAME"-configsvr"
+                DOMAIN=$CONFIG_SVR_NAME"-headless."$KB_NAMESPACE".svc.cluster.local"
+                mongos --bind_ip_all --configdb $CONFIG_SVR_NAME/$CONFIG_SVR_NAME"-0."$DOMAIN:$PORT,$CONFIG_SVR_NAME"-1."$DOMAIN:$PORT,$CONFIG_SVR_NAME"-2."$DOMAIN:$PORT
     - typeName: configsvr
       defaultReplicas: 3
       componentType: Consensus
@@ -38,16 +49,11 @@ spec:
               - name: configsvr
                 protocol: TCP
                 containerPort: 27019
-            env:
-              - name: POD_NAME
-                valueFrom:
-                  fieldRef:
-                    fieldPath: metadata.name
             command:
               - bin/sh
               - -c
               - |
-                RPL_SET_NAME=$(echo $POD_NAME | grep -o ".*-");
+                RPL_SET_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
                 RPL_SET_NAME=${RPL_SET_NAME%-};
                 mongod --configsvr --bind_ip_all --replSet $RPL_SET_NAME
             lifecycle:
@@ -57,14 +63,14 @@ spec:
                     - bin/sh
                     - -c
                     - |
-                      PORT=27019
-                      INDEX=$(echo $POD_NAME | grep -o "\-[0-9]\+");
+                      INDEX=$(echo $KB_POD_NAME | grep -o "\-[0-9]\+");
                       INDEX=${INDEX#-};
                       if [ $INDEX -ne 0 ]; then exit 0; fi
                       
+                      PORT=27019
                       until mongosh --port $PORT --eval "print('ready')"; do sleep 1; done
                       
-                      RPL_SET_NAME=$(echo $POD_NAME | grep -o ".*-");
+                      RPL_SET_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
                       RPL_SET_NAME=${RPL_SET_NAME%-};
                       
                       MEMBERS=""
@@ -100,16 +106,11 @@ spec:
               - name: shard
                 protocol: TCP
                 containerPort: 27018
-            env:
-              - name: POD_NAME
-                valueFrom:
-                  fieldRef:
-                    fieldPath: metadata.name
             command:
               - bin/sh
               - -c
               - |
-                RPL_SET_NAME=$(echo $POD_NAME | grep -o ".*-");
+                RPL_SET_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
                 RPL_SET_NAME=${RPL_SET_NAME%-};
                 mongod --shardsvr --bind_ip_all --replSet $RPL_SET_NAME
             lifecycle:
@@ -119,14 +120,14 @@ spec:
                     - bin/sh
                     - -c
                     - |
-                      PORT=27018
-                      INDEX=$(echo $POD_NAME | grep -o "\-[0-9]\+");
+                      INDEX=$(echo $KB_POD_NAME | grep -o "\-[0-9]\+");
                       INDEX=${INDEX#-};
                       if [ $INDEX -ne 0 ]; then exit 0; fi
 
+                      PORT=27018
                       until mongosh --port $PORT --eval "print('ready')"; do sleep 1; done
 
-                      RPL_SET_NAME=$(echo $POD_NAME | grep -o ".*-");
+                      RPL_SET_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
                       RPL_SET_NAME=${RPL_SET_NAME%-};
 
                       MEMBERS=""
@@ -140,3 +141,28 @@ spec:
                         i=$(( i + 1))
                       done
                       mongosh --port $PORT --eval "rs.initiate({_id: \"$RPL_SET_NAME\", members: [$MEMBERS]})"
+          - name: agent
+            command:
+              - bin/sh
+              - -c
+              - |
+                INDEX=$(echo $KB_POD_NAME | grep -o "\-[0-9]\+");
+                INDEX=${INDEX#-};
+                if [ $INDEX -ne 0 ]; then
+                  trap : TERM INT; (while true; do sleep 1000; done) & wait
+                fi
+
+                # wait main container ready
+                PORT=27018
+                until mongosh --port $PORT --eval "rs.status().ok"; do sleep 1; done
+                # add shard to mongos
+                SHARD_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
+                SHARD_NAME=${SHARD_NAME%-};
+                DOMAIN=$SHARD_NAME"-headless."$KB_NAMESPACE".svc.cluster.local"
+                MONGOS_HOST=$KB_CLUSTER_NAME"-mongos"
+                MONGOS_PORT=27017
+                SHARD_CONFIG=$SHARD_NAME/$SHARD_NAME"-0."$DOMAIN:$PORT,$SHARD_NAME"-1."$DOMAIN:$PORT,$SHARD_NAME"-2."$DOMAIN:$PORT
+                until mongosh --host $MONGOS_HOST --port $MONGOS_PORT --eval "print('service is ready')"; do sleep 1; done
+                mongosh --host $MONGOS_HOST --port $MONGOS_PORT --eval "sh.addShard(\"$SHARD_CONFIG\")"
+                
+                trap : TERM INT; (while true; do sleep 1000; done) & wait

@@ -9,3 +9,5 @@ spec:
   components:
     - name: configsvr
       type: configsvr
+    - name: shard1
+      type: shard

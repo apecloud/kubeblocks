@@ -1744,8 +1744,8 @@ func processConfigMapTemplate(ctx context.Context,
 
 func createBackup(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	sts appsv1.StatefulSet,
-	backupPolicyTemplate dataprotectionv1alpha1.BackupPolicyTemplate,
+	sts *appsv1.StatefulSet,
+	backupPolicyTemplate *dataprotectionv1alpha1.BackupPolicyTemplate,
 	backupKey types.NamespacedName,
 	cluster *dbaasv1alpha1.Cluster) error {
 	ctx := reqCtx.Ctx
@@ -1807,8 +1807,8 @@ func deleteBackup(ctx context.Context, cli client.Client, backupJobKey types.Nam
 	return nil
 }
 
-func buildBackupPolicy(sts appsv1.StatefulSet,
-	template dataprotectionv1alpha1.BackupPolicyTemplate,
+func buildBackupPolicy(sts *appsv1.StatefulSet,
+	template *dataprotectionv1alpha1.BackupPolicyTemplate,
 	backupKey types.NamespacedName) (*dataprotectionv1alpha1.BackupPolicy, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
@@ -1851,7 +1851,7 @@ func buildBackupPolicy(sts appsv1.StatefulSet,
 	return &backupPolicy, nil
 }
 
-func buildBackupJob(sts appsv1.StatefulSet,
+func buildBackupJob(sts *appsv1.StatefulSet,
 	backupJobKey types.NamespacedName) (*dataprotectionv1alpha1.BackupJob, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
@@ -1893,7 +1893,7 @@ func buildBackupJob(sts appsv1.StatefulSet,
 
 func createPVCFromSnapshot(ctx context.Context,
 	cli client.Client,
-	sts appsv1.StatefulSet,
+	sts *appsv1.StatefulSet,
 	pvcKey types.NamespacedName,
 	snapshotName string) error {
 	pvc, err := buildPVCFromSnapshot(sts, pvcKey, snapshotName)
@@ -1906,7 +1906,7 @@ func createPVCFromSnapshot(ctx context.Context,
 	return nil
 }
 
-func buildPVCFromSnapshot(sts appsv1.StatefulSet,
+func buildPVCFromSnapshot(sts *appsv1.StatefulSet,
 	pvcKey types.NamespacedName,
 	snapshotName string) (*corev1.PersistentVolumeClaim, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
@@ -1959,7 +1959,7 @@ const (
 
 func buildVolumeSnapshot(snapshotKey types.NamespacedName,
 	pvcName string,
-	sts appsv1.StatefulSet) (*snapshotv1.VolumeSnapshot, error) {
+	sts *appsv1.StatefulSet) (*snapshotv1.VolumeSnapshot, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
 	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("snapshot_template.cue"))
@@ -2057,14 +2057,14 @@ func doSnapshot(cli client.Client,
 	if len(backupPolicyTemplateList.Items) > 0 {
 		// if there is backuppolicytemplate created by provider
 		// create backupjob CR, will ignore error if already exists
-		err := createBackup(reqCtx, cli, *stsObj, backupPolicyTemplateList.Items[0], snapshotKey, cluster)
+		err := createBackup(reqCtx, cli, stsObj, &backupPolicyTemplateList.Items[0], snapshotKey, cluster)
 		if err != nil {
 			return err
 		}
 	} else {
 		// no backuppolicytemplate, then try native volumesnapshot
 		pvcName := strings.Join([]string{stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, "0"}, "-")
-		snapshot, err := buildVolumeSnapshot(snapshotKey, pvcName, *stsObj)
+		snapshot, err := buildVolumeSnapshot(snapshotKey, pvcName, stsObj)
 		if err != nil {
 			return err
 		}
@@ -2091,7 +2091,7 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 	// check pvc existence
 	if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
 		if apierrors.IsNotFound(err) {
-			if err := createPVCFromSnapshot(ctx, cli, *stsObj, pvcKey, snapshotKey.Name); err != nil {
+			if err := createPVCFromSnapshot(ctx, cli, stsObj, pvcKey, snapshotKey.Name); err != nil {
 				return err
 			}
 		} else {

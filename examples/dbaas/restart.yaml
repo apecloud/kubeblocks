@@ -1,0 +1,9 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-restart-demo
+spec:
+  clusterRef: wesql
+  type: Restart 
+  componentOps:
+  - componentNames: [wesql-demo]

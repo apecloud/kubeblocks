@@ -1,0 +1,9 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-restart-threenodes-demo
+spec:
+  clusterRef: wesql-3nodes
+  type: Restart 
+  componentOps:
+  - componentNames: [wesql-demo]

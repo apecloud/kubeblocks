@@ -94,7 +94,8 @@ func (c createParams) getCacheCUETplValue(key string, valueCreator func() (*intc
 }
 
 // mergeConfigTemplates merge AppVersion.Components[*].ConfigTemplateRefs and ClusterDefinition.Components[*].ConfigTemplateRefs
-func mergeConfigTemplates(appVersionTpl []dbaasv1alpha1.ConfigTemplate, cdTpl []dbaasv1alpha1.ConfigTemplate) []dbaasv1alpha1.ConfigTemplate {
+func mergeConfigTemplates(appVersionTpl []dbaasv1alpha1.ConfigTemplate,
+	cdTpl []dbaasv1alpha1.ConfigTemplate) []dbaasv1alpha1.ConfigTemplate {
 	if len(appVersionTpl) == 0 {
 		return cdTpl
 	}
@@ -456,7 +457,10 @@ func mergeComponents(
 	return component
 }
 
-func mergeComponentsList(cluster *dbaasv1alpha1.Cluster, clusterDef *dbaasv1alpha1.ClusterDefinition, clusterDefCompList []dbaasv1alpha1.ClusterDefinitionComponent, clusterCompList []dbaasv1alpha1.ClusterComponent) []Component {
+func mergeComponentsList(cluster *dbaasv1alpha1.Cluster,
+	clusterDef *dbaasv1alpha1.ClusterDefinition,
+	clusterDefCompList []dbaasv1alpha1.ClusterDefinitionComponent,
+	clusterCompList []dbaasv1alpha1.ClusterComponent) []Component {
 	var compList []Component
 	for _, clusterDefComp := range clusterDefCompList {
 		var matchClusterComp dbaasv1alpha1.ClusterComponent
@@ -1263,7 +1267,10 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 	return &sts, nil
 }
 
-func processContainersInjection(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName string, podSpec *corev1.PodSpec) error {
+func processContainersInjection(reqCtx intctrlutil.RequestCtx,
+	params createParams,
+	envConfigName string,
+	podSpec *corev1.PodSpec) error {
 	probeContainers, err := buildProbeContainers(reqCtx, params, podSpec.Containers)
 	if err != nil {
 		return err
@@ -1346,7 +1353,9 @@ func injectEnvs(params createParams, envConfigName string, c *corev1.Container) 
 }
 
 // buildConsensusSet build on a stateful set
-func buildConsensusSet(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName string) (*appsv1.StatefulSet, error) {
+func buildConsensusSet(reqCtx intctrlutil.RequestCtx,
+	params createParams,
+	envConfigName string) (*appsv1.StatefulSet, error) {
 	sts, err := buildSts(reqCtx, params, envConfigName)
 	if err != nil {
 		return sts, err
@@ -1639,7 +1648,12 @@ func getInstanceCMName(obj client.Object, tpl *dbaasv1alpha1.ConfigTemplate) str
 }
 
 // generateConfigMapFromTpl render config file by config template provided by provider.
-func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder, cmName string, tplCfg dbaasv1alpha1.ConfigTemplate, params createParams, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
+func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder,
+	cmName string,
+	tplCfg dbaasv1alpha1.ConfigTemplate,
+	params createParams,
+	ctx context.Context,
+	cli client.Client) (*corev1.ConfigMap, error) {
 	// Render config template by TplEngine
 	// The template namespace must be the same as the ClusterDefinition namespace
 	configs, err := processConfigMapTemplate(ctx, cli, tplBuilder, client.ObjectKey{
@@ -1654,7 +1668,9 @@ func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder, cmName string, 
 	return generateConfigMapWithTemplate(configs, params, cmName, tplCfg.Name)
 }
 
-func generateConfigMapWithTemplate(configs map[string]string, params createParams, cmName, templateName string) (*corev1.ConfigMap, error) {
+func generateConfigMapWithTemplate(configs map[string]string,
+	params createParams,
+	cmName, templateName string) (*corev1.ConfigMap, error) {
 	const tplFile = "config_template.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := params.getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
@@ -1708,7 +1724,10 @@ func generateConfigMapWithTemplate(configs map[string]string, params createParam
 }
 
 // processConfigMapTemplate Render config file using template engine
-func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder *configTemplateBuilder, cmKey client.ObjectKey) (map[string]string, error) {
+func processConfigMapTemplate(ctx context.Context,
+	cli client.Client,
+	tplBuilder *configTemplateBuilder,
+	cmKey client.ObjectKey) (map[string]string, error) {
 	cmObj := &corev1.ConfigMap{}
 	//  Require template configmap exist
 	if err := cli.Get(ctx, cmKey, cmObj); err != nil {
@@ -1723,7 +1742,12 @@ func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder
 	return tplBuilder.render(cmObj.Data)
 }
 
-func createBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, sts appsv1.StatefulSet, backupPolicyTemplate dataprotectionv1alpha1.BackupPolicyTemplate, backupKey types.NamespacedName, cluster *dbaasv1alpha1.Cluster) error {
+func createBackup(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	sts appsv1.StatefulSet,
+	backupPolicyTemplate dataprotectionv1alpha1.BackupPolicyTemplate,
+	backupKey types.NamespacedName,
+	cluster *dbaasv1alpha1.Cluster) error {
 	ctx := reqCtx.Ctx
 	backupPolicy, err := buildBackupPolicy(sts, backupPolicyTemplate, backupKey)
 	if err != nil {
@@ -1783,7 +1807,9 @@ func deleteBackup(ctx context.Context, cli client.Client, backupJobKey types.Nam
 	return nil
 }
 
-func buildBackupPolicy(sts appsv1.StatefulSet, template dataprotectionv1alpha1.BackupPolicyTemplate, backupKey types.NamespacedName) (*dataprotectionv1alpha1.BackupPolicy, error) {
+func buildBackupPolicy(sts appsv1.StatefulSet,
+	template dataprotectionv1alpha1.BackupPolicyTemplate,
+	backupKey types.NamespacedName) (*dataprotectionv1alpha1.BackupPolicy, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
 	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("backup_policy_template.cue"))
@@ -1825,7 +1851,8 @@ func buildBackupPolicy(sts appsv1.StatefulSet, template dataprotectionv1alpha1.B
 	return &backupPolicy, nil
 }
 
-func buildBackupJob(sts appsv1.StatefulSet, backupJobKey types.NamespacedName) (*dataprotectionv1alpha1.BackupJob, error) {
+func buildBackupJob(sts appsv1.StatefulSet,
+	backupJobKey types.NamespacedName) (*dataprotectionv1alpha1.BackupJob, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
 	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("backup_job_template.cue"))
@@ -1864,7 +1891,11 @@ func buildBackupJob(sts appsv1.StatefulSet, backupJobKey types.NamespacedName) (
 	return &backupJob, nil
 }
 
-func createPVCFromSnapshot(ctx context.Context, cli client.Client, sts appsv1.StatefulSet, pvcKey types.NamespacedName, snapshotName string) error {
+func createPVCFromSnapshot(ctx context.Context,
+	cli client.Client,
+	sts appsv1.StatefulSet,
+	pvcKey types.NamespacedName,
+	snapshotName string) error {
 	pvc, err := buildPVCFromSnapshot(sts, pvcKey, snapshotName)
 	if err != nil {
 		return err
@@ -1875,7 +1906,9 @@ func createPVCFromSnapshot(ctx context.Context, cli client.Client, sts appsv1.St
 	return nil
 }
 
-func buildPVCFromSnapshot(sts appsv1.StatefulSet, pvcKey types.NamespacedName, snapshotName string) (*corev1.PersistentVolumeClaim, error) {
+func buildPVCFromSnapshot(sts appsv1.StatefulSet,
+	pvcKey types.NamespacedName,
+	snapshotName string) (*corev1.PersistentVolumeClaim, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
 	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("pvc_template.cue"))
@@ -1924,7 +1957,9 @@ const (
 	MaxGeneratedNameLength = maxNameLength - randomLength
 )
 
-func buildVolumeSnapshot(snapshotKey types.NamespacedName, pvcName string, sts appsv1.StatefulSet) (*snapshotv1.VolumeSnapshot, error) {
+func buildVolumeSnapshot(snapshotKey types.NamespacedName,
+	pvcName string,
+	sts appsv1.StatefulSet) (*snapshotv1.VolumeSnapshot, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
 	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("snapshot_template.cue"))
@@ -1975,7 +2010,9 @@ func isSnapshotAvailable(cli client.Client, ctx context.Context) bool {
 }
 
 // check snapshot existence
-func isVolumeSnapshotExists(cli client.Client, ctx context.Context, snapshotKey types.NamespacedName) (bool, error) {
+func isVolumeSnapshotExists(cli client.Client,
+	ctx context.Context,
+	snapshotKey types.NamespacedName) (bool, error) {
 	vs := snapshotv1.VolumeSnapshot{}
 	if err := cli.Get(ctx, snapshotKey, &vs); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -1988,7 +2025,9 @@ func isVolumeSnapshotExists(cli client.Client, ctx context.Context, snapshotKey 
 }
 
 // check snapshot ready to use
-func isVolumeSnapshotReadyToUse(cli client.Client, ctx context.Context, snapshotKey types.NamespacedName) (bool, error) {
+func isVolumeSnapshotReadyToUse(cli client.Client,
+	ctx context.Context,
+	snapshotKey types.NamespacedName) (bool, error) {
 	vs := snapshotv1.VolumeSnapshot{}
 	if err := cli.Get(ctx, snapshotKey, &vs); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -2000,7 +2039,12 @@ func isVolumeSnapshotReadyToUse(cli client.Client, ctx context.Context, snapshot
 	return *vs.Status.ReadyToUse, nil
 }
 
-func doSnapshot(cli client.Client, reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster, snapshotKey types.NamespacedName, stsObj *appsv1.StatefulSet, backupTemplateSelectLabels map[string]string) error {
+func doSnapshot(cli client.Client,
+	reqCtx intctrlutil.RequestCtx,
+	cluster *dbaasv1alpha1.Cluster,
+	snapshotKey types.NamespacedName,
+	stsObj *appsv1.StatefulSet,
+	backupTemplateSelectLabels map[string]string) error {
 
 	ctx := reqCtx.Ctx
 
@@ -2038,7 +2082,11 @@ func doSnapshot(cli client.Client, reqCtx intctrlutil.RequestCtx, cluster *dbaas
 	return nil
 }
 
-func checkedCreatePVCFromSnapshot(cli client.Client, ctx context.Context, pvcKey types.NamespacedName, snapshotKey types.NamespacedName, stsObj *appsv1.StatefulSet) error {
+func checkedCreatePVCFromSnapshot(cli client.Client,
+	ctx context.Context,
+	pvcKey types.NamespacedName,
+	snapshotKey types.NamespacedName,
+	stsObj *appsv1.StatefulSet) error {
 	pvc := corev1.PersistentVolumeClaim{}
 	// check pvc existence
 	if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
@@ -2053,7 +2101,9 @@ func checkedCreatePVCFromSnapshot(cli client.Client, ctx context.Context, pvcKey
 	return nil
 }
 
-func isAllPVCBound(cli client.Client, ctx context.Context, stsObj *appsv1.StatefulSet) (bool, error) {
+func isAllPVCBound(cli client.Client,
+	ctx context.Context,
+	stsObj *appsv1.StatefulSet) (bool, error) {
 	allPVCBound := true
 	if len(stsObj.Spec.VolumeClaimTemplates) == 0 {
 		return true, nil
@@ -2075,7 +2125,10 @@ func isAllPVCBound(cli client.Client, ctx context.Context, stsObj *appsv1.Statef
 	return allPVCBound, nil
 }
 
-func deleteSnapshot(cli client.Client, reqCtx intctrlutil.RequestCtx, snapshotKey types.NamespacedName, cluster *dbaasv1alpha1.Cluster) error {
+func deleteSnapshot(cli client.Client,
+	reqCtx intctrlutil.RequestCtx,
+	snapshotKey types.NamespacedName,
+	cluster *dbaasv1alpha1.Cluster) error {
 	ctx := reqCtx.Ctx
 	if err := deleteBackup(ctx, cli, snapshotKey); err != nil {
 		if !apierrors.IsNotFound(err) {

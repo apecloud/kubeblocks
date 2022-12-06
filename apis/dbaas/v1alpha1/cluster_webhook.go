@@ -186,13 +186,13 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 		componentMap[v.TypeName] = v
 	}
 
-	for index, v := range r.Spec.Components {
+	for i, v := range r.Spec.Components {
 		if _, ok := componentTypeMap[v.Type]; !ok {
 			invalidComponentTypes = append(invalidComponentTypes, v.Type)
 		}
 
 		componentNameMap[v.Name] = struct{}{}
-		r.validateComponentResources(allErrs, v.Resources, index)
+		r.validateComponentResources(allErrs, v.Resources, i)
 	}
 	if len(invalidComponentTypes) > 0 {
 		*allErrs = append(*allErrs, field.NotFound(field.NewPath("spec.components[*].type"),

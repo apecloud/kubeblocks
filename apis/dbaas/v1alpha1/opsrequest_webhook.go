@@ -202,11 +202,11 @@ func compareRequestsAndLimits(resources corev1.ResourceRequirements) (string, er
 	if requests == nil || limits == nil {
 		return "", nil
 	}
-	if compareQuantity(requests.Cpu(), limits.Cpu()) {
-		return requests.Cpu().String(), errors.New(`must be less than or equal to cpu limit`)
-	}
-	if compareQuantity(requests.Memory(), limits.Memory()) {
-		return requests.Memory().String(), errors.New(`must be less than or equal to memory limit`)
+	for k, v := range requests {
+		limitQuantity := limits[k]
+		if compareQuantity(&v, &limitQuantity) {
+			return v.String(), errors.New(fmt.Sprintf(`must be less than or equal to %s limit`, k))
+		}
 	}
 	return "", nil
 }

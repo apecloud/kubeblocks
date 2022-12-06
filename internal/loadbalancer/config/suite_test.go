@@ -21,11 +21,20 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/spf13/viper"
+	"go.uber.org/zap/zapcore"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
+func init() {
+	viper.AutomaticEnv()
+}
+
 var (
-	logger = zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	logger = zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true), func(o *zap.Options) {
+		o.TimeEncoder = zapcore.ISO8601TimeEncoder
+	})
 )
 
 func TestConfig(t *testing.T) {

@@ -17,6 +17,7 @@ limitations under the License.
 package dbaas
 
 import (
+	"encoding/json"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -25,59 +26,54 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type ResourceDefinition struct {
-	MemorySize int64
-	CoreNum    int
-}
+// General Built-in objects
+const (
+	builtinClusterObject           = "cluster"
+	builtinComponentObject         = "component"
+	builtinPodObject               = "podSpec"
+	builtinAppVersionObject        = "version"
+	builtinComponentResourceObject = "componentResource"
+)
 
-type ComponentTemplateValues struct {
-	Name        string
-	ServiceName string
-	Replicas    int32
+// General Built-in functions
+const (
+	builtInGetVolumeFunctionName    = "getVolumePathByName"
+	builtInGetPvcFunctionName       = "getPVCByName"
+	builtInGetEnvFunctionName       = "getEnvByName"
+	builtInGetArgFunctionName       = "getArgByName"
+	builtInGetPortFunctionName      = "getPortByName"
+	builtInGetContainerFunctionName = "getContainerByName"
 
-	// Container *corev1.Container
-	Resource  *ResourceDefinition
-	ConfigTpl []dbaasv1alpha1.ConfigTemplate
-}
+	// BuiltinMysqlCalBufferFunctionName Mysql Built-in
+	// TODO: This function migrate to configuration template
+	builtInMysqlCalBufferFunctionName = "callBufferSizeByResource"
+)
 
-type ConfigTemplateBuilder struct {
-	namespace   string
-	clusterName string
-	tplName     string
-
-	// Global Var
-	componentValues  *ComponentTemplateValues
-	buildinFunctions *intctrlutil.BuiltinObjectsFunc
-
-	// DBaas cluster object
-	component  *Component
-	appVersion *dbaasv1alpha1.AppVersion
-	cluster    *dbaasv1alpha1.Cluster
-	podSpec    *corev1.PodSpec
-}
-
-func NewCfgTemplateBuilder(clusterName, namespace string, cluster *dbaasv1alpha1.Cluster, version *dbaasv1alpha1.AppVersion) *ConfigTemplateBuilder {
-	const DefaultTplName = "DBaasTpl"
-	return &ConfigTemplateBuilder{
+func newCfgTemplateBuilder(clusterName, namespace string, cluster *dbaasv1alpha1.Cluster, version *dbaasv1alpha1.AppVersion) *configTemplateBuilder {
+	return &configTemplateBuilder{
 		namespace:   namespace,
 		clusterName: clusterName,
 		cluster:     cluster,
 		appVersion:  version,
-		tplName:     DefaultTplName,
+		tplName:     "DBaasTpl",
 	}
 }
 
-func (c *ConfigTemplateBuilder) setTplName(tplName string) {
+func (c *configTemplateBuilder) setTplName(tplName string) {
 	c.tplName = tplName
 }
 
-func (c *ConfigTemplateBuilder) formatError(file string, err error) error {
+func (c *configTemplateBuilder) formatError(file string, err error) error {
 	return fmt.Errorf("failed to render configuration template[cm:%s][key:%s], error: [%v]", c.tplName, file, err)
 }
 
-func (c *ConfigTemplateBuilder) Render(configs map[string]string) (map[string]string, error) {
+func (c *configTemplateBuilder) render(configs map[string]string) (map[string]string, error) {
 	rendered := make(map[string]string, len(configs))
-	engine := intctrlutil.NewTplEngine(c.builtinObjects(), c.buildinFunctions, c.tplName)
+	o, err := c.builtinObjects()
+	if err != nil {
+		return nil, err
+	}
+	engine := intctrlutil.NewTplEngine(o, c.builtInFunctions, c.tplName)
 	for file, configContext := range configs {
 		newContext, err := engine.Render(configContext)
 		if err != nil {
@@ -85,88 +81,72 @@ func (c *ConfigTemplateBuilder) Render(configs map[string]string) (map[string]st
 		}
 		rendered[file] = newContext
 	}
-
 	return rendered, nil
 }
 
-// General Built-in objects
-const (
-	BuiltinClusterObject           = "Cluster"
-	BuiltinComponentObject         = "Component"
-	BuiltinPodObject               = "PodSpec"
-	BuiltinAppVersionObject        = "Version"
-	BuiltinComponentResourceObject = "ComponentResource"
-)
-
-func (c *ConfigTemplateBuilder) builtinObjects() *intctrlutil.TplValues {
-	return &intctrlutil.TplValues{
-		BuiltinClusterObject:           c.cluster,
-		BuiltinComponentObject:         c.component,
-		BuiltinPodObject:               c.podSpec,
-		BuiltinComponentResourceObject: c.componentValues.Resource,
-		BuiltinAppVersionObject:        c.appVersion,
+func (c *configTemplateBuilder) builtinObjects() (*intctrlutil.TplValues, error) {
+	bultInObj := map[string]interface{}{
+		builtinClusterObject:           c.cluster,
+		builtinComponentObject:         c.component,
+		builtinPodObject:               c.podSpec,
+		builtinComponentResourceObject: c.componentValues.Resource,
+		builtinAppVersionObject:        c.appVersion,
 	}
+	b, err := json.Marshal(bultInObj)
+	if err != nil {
+		return nil, err
+	}
+	var tplValue intctrlutil.TplValues
+	if err = json.Unmarshal(b, &tplValue); err != nil {
+		return nil, err
+	}
+	return &tplValue, nil
 }
 
-func (c *ConfigTemplateBuilder) InjectBuiltInObjectsAndFunctions(podTemplate *corev1.PodTemplateSpec, configs []dbaasv1alpha1.ConfigTemplate, component *Component) error {
-	if err := injectBuiltInObjects(c, podTemplate, component, configs); err != nil {
+func (c *configTemplateBuilder) injectBuiltInObjectsAndFunctions(
+	podSpec *corev1.PodSpec,
+	configs []dbaasv1alpha1.ConfigTemplate,
+	component *Component) error {
+	if err := injectBuiltInObjects(c, podSpec, component, configs); err != nil {
 		return err
 	}
-
-	if err := injectBuiltInFunctions(c, podTemplate, component); err != nil {
+	if err := injectBuiltInFunctions(c, component); err != nil {
 		return err
 	}
 	return nil
 }
 
-// General Built-in functions
-const (
-	BuiltinGetVolumeFunctionName    = "getVolumePathByName"
-	BuiltinGetPvcFunctionName       = "getPvcByName"
-	BuiltinGetEnvFunctionName       = "getEnvByName"
-	BuiltinGetArgFunctionName       = "getArgByName"
-	BuiltinGetPortFunctionName      = "getPortByName"
-	BuiltinGetContainerFunctionName = "getContainerByName"
-
-	// BuiltinMysqlCalBufferFunctionName Mysql Built-in
-	// TODO: This function migrate to configuration template
-	BuiltinMysqlCalBufferFunctionName = "callBufferSizeByResource"
-)
-
-func injectBuiltInFunctions(tplBuilder *ConfigTemplateBuilder, podTemplate *corev1.PodTemplateSpec, component *Component) error {
+func injectBuiltInFunctions(tplBuilder *configTemplateBuilder, component *Component) error {
 	// TODO add built-in function
-	tplBuilder.buildinFunctions = &intctrlutil.BuiltinObjectsFunc{
-		BuiltinMysqlCalBufferFunctionName: calDBPoolSize,
-		BuiltinGetVolumeFunctionName:      getVolumeMountPathByName,
-		BuiltinGetPvcFunctionName:         getPvcByName,
-		BuiltinGetEnvFunctionName:         getEnvByName,
-		BuiltinGetPortFunctionName:        getPortByName,
-		BuiltinGetArgFunctionName:         getArgByName,
-		BuiltinGetContainerFunctionName:   getPodContainerByName,
+	tplBuilder.builtInFunctions = &intctrlutil.BuiltInObjectsFunc{
+		builtInMysqlCalBufferFunctionName: calDBPoolSize,
+		builtInGetVolumeFunctionName:      getVolumeMountPathByName,
+		builtInGetPvcFunctionName:         getPVCByName,
+		builtInGetEnvFunctionName:         getEnvByName,
+		builtInGetPortFunctionName:        getPortByName,
+		builtInGetArgFunctionName:         getArgByName,
+		builtInGetContainerFunctionName:   getPodContainerByName,
 	}
 	return nil
 }
 
-func injectBuiltInObjects(tplBuilder *ConfigTemplateBuilder, podTemplate *corev1.PodTemplateSpec, component *Component, configs []dbaasv1alpha1.ConfigTemplate) error {
+func injectBuiltInObjects(tplBuilder *configTemplateBuilder, podSpec *corev1.PodSpec, component *Component, configs []dbaasv1alpha1.ConfigTemplate) error {
 	var resource *ResourceDefinition
-	container := intctrlutil.GetContainerUsingConfig(*podTemplate, configs)
+	container := intctrlutil.GetContainerUsingConfig(podSpec, configs)
 	if container != nil && len(container.Resources.Limits) > 0 {
 		resource = &ResourceDefinition{
 			MemorySize: intctrlutil.GetMemorySize(*container),
 			CoreNum:    intctrlutil.GetCoreNum(*container),
 		}
 	}
-
-	tplBuilder.componentValues = &ComponentTemplateValues{
-		Name: component.Name,
+	tplBuilder.componentValues = &componentTemplateValues{
+		TypeName: component.Type,
 		// TODO add Component service name
 		ServiceName: "",
 		Replicas:    component.Replicas,
 		Resource:    resource,
 	}
-
-	tplBuilder.podSpec = &podTemplate.Spec
+	tplBuilder.podSpec = podSpec
 	tplBuilder.component = component
-
 	return nil
 }

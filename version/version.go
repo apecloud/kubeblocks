@@ -34,7 +34,7 @@ var K3dVersion = "5.4.4"
 // K3sImageTag is k3s image tag
 var K3sImageTag = "v1.23.8-k3s1"
 
-// DefaultKubeBlocksVersion the default KubeBlocks version that dbctl installed
+// DefaultKubeBlocksVersion the default KubeBlocks version that kbcli installed
 var DefaultKubeBlocksVersion string
 
 // GetVersion returns the version for cli, it gets it from "git describe --tags" or returns "dev" when doing simple go build

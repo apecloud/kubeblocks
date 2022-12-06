@@ -72,7 +72,7 @@ func init() {
 
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
 	viper.SetDefault("VOLUMESNAPSHOT", false)
-	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:0.1.2-probe-improment")
+	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:latest")
 	viper.SetDefault("PROBE_SERVICE_PORT", 3501)
 	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
 }
@@ -263,6 +263,15 @@ func main() {
 		Recorder: mgr.GetEventRecorderFor("storage-class-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "StorageClass")
+		os.Exit(1)
+	}
+
+	if err = (&k8scorecontrollers.PersistentVolumeClaimReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("pvc-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolumeClaim")
 		os.Exit(1)
 	}
 

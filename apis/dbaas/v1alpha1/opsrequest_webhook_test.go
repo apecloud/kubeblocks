@@ -44,7 +44,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		interval                 = time.Second
 		ctx                      = context.Background()
 	)
-	BeforeEach(func() {
+	cleanupObjects := func() {
 		// Add any setup steps that needs to be executed before each test
 		err := k8sClient.DeleteAllOf(ctx, &OpsRequest{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -54,10 +54,15 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
+	}
+	BeforeEach(func() {
+		// Add any setup steps that needs to be executed before each test
+		cleanupObjects()
 	})
 
 	AfterEach(func() {
 		// Add any teardown steps that needs to be executed after each test
+		cleanupObjects()
 	})
 
 	testUpgrade := func(cluster *Cluster, opsRequest *OpsRequest) {
@@ -286,7 +291,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("test path labels")
 		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: cluster.Namespace}, &Cluster{})).ShouldNot(Succeed())
 		patch := client.MergeFrom(opsRequest.DeepCopy())
-		opsRequest.Labels = map[string]string{"test": "test"}
+		opsRequest.Labels["test"] = "test-ops"
 		Expect(k8sClient.Patch(ctx, opsRequest, patch)).Should(Succeed())
 	}
 

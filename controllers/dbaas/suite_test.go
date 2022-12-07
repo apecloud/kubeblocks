@@ -156,7 +156,6 @@ var _ = BeforeSuite(func() {
 var _ = AfterSuite(func() {
 	cancel()
 	By("tearing down the test environment")
-
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })

@@ -34,12 +34,21 @@ var _ = Describe("appVersion webhook", func() {
 		timeout               = time.Second * 10
 		interval              = time.Second
 	)
-	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
+	cleanupObjects := func() {
+		// Add any setup steps that needs to be executed before each test
 		err := k8sClient.DeleteAllOf(ctx, &AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
+	}
+	BeforeEach(func() {
+		// Add any setup steps that needs to be executed before each test
+		cleanupObjects()
+	})
+
+	AfterEach(func() {
+		// Add any teardown steps that needs to be executed after each test
+		cleanupObjects()
 	})
 	Context("When appVersion create and update", func() {
 		It("Should webhook validate passed", func() {

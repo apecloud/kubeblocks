@@ -25,8 +25,6 @@ import (
 )
 
 const (
-	// settings keys
-	cmNamespaceKey              = "CM_NAMESPACE"
 	maxConcurReconAppVersionKey = "MAXCONCURRENTRECONCILES_APPVERSION"
 	maxConcurReconClusterDefKey = "MAXCONCURRENTRECONCILES_CLUSTERDEF"
 

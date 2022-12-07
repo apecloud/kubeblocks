@@ -29,6 +29,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admissionregistration/v1"
 
 	//+kubebuilder:scaffold:imports
 	"github.com/spf13/viper"
@@ -77,6 +78,8 @@ var _ = BeforeSuite(func() {
 
 	ctx, cancel = context.WithCancel(context.TODO())
 
+	webHookHostExternalName := testCtx.GetWebhookHostExternalName()
+
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
@@ -85,6 +88,7 @@ var _ = BeforeSuite(func() {
 			Paths: []string{filepath.Join("..", "..", "..", "config", "webhook")},
 			// LocalServingHost: "host.docker.internal",
 			// LocalServingPort: 28080,
+			LocalServingHostExternalName: webHookHostExternalName,
 		},
 	}
 
@@ -99,6 +103,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = admissionv1beta1.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = admissionv1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
@@ -144,7 +151,6 @@ var _ = BeforeSuite(func() {
 		err = mgr.Start(ctx)
 		Expect(err).NotTo(HaveOccurred())
 	}()
-
 	// wait for the webhook server to get ready
 	dialer := &net.Dialer{Timeout: time.Second}
 	addrPort := fmt.Sprintf("%s:%d", webhookInstallOptions.LocalServingHost, webhookInstallOptions.LocalServingPort)
@@ -160,8 +166,20 @@ var _ = BeforeSuite(func() {
 }, 60)
 
 var _ = AfterSuite(func() {
+
+	By("cleanup webhook configuration")
+	validatingWebhook := &admissionv1.ValidatingWebhookConfiguration{}
+	validatingWebhook.Name = "validating-webhook-configuration"
+	err := k8sClient.Delete(ctx, validatingWebhook)
+	Expect(err).NotTo(HaveOccurred())
+
+	mutatingWebhook := &admissionv1.MutatingWebhookConfiguration{}
+	mutatingWebhook.Name = "mutating-webhook-configuration"
+	err = k8sClient.Delete(ctx, mutatingWebhook)
+	Expect(err).NotTo(HaveOccurred())
+
 	cancel()
 	By("tearing down the test environment")
-	err := testEnv.Stop()
+	err = testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })

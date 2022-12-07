@@ -18,7 +18,6 @@ package loadbalancer
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -78,7 +77,7 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: true,
 	}
 
-	if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
+	if testCtx.UsingExistingCluster() {
 		useExistingCluster := true
 		testEnv.UseExistingCluster = &useExistingCluster
 		testEnv.Config = config.GetConfigOrDie()

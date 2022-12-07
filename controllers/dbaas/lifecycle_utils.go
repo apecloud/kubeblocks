@@ -1779,7 +1779,6 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 }
 
 func deleteBackup(ctx context.Context, cli client.Client, backupJobKey types.NamespacedName) error {
-
 	backupPolicy := dataprotectionv1alpha1.BackupPolicy{}
 	if err := cli.Get(ctx, backupJobKey, &backupPolicy); err != nil {
 		if !apierrors.IsNotFound(err) {

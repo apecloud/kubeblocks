@@ -74,7 +74,8 @@ var _ = Describe("cluster webhook", func() {
 
 			// wait until ClusterDefinition created
 			Eventually(func() bool {
-				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)
+				tmpClusterDef := &ClusterDefinition{}
+				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, tmpClusterDef)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
@@ -83,7 +84,8 @@ var _ = Describe("cluster webhook", func() {
 			Expect(testCtx.CreateObj(ctx, appVersion)).Should(Succeed())
 			// wait until AppVersion created
 			Eventually(func() bool {
-				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: appVersionName}, appVersion)
+				tmpAppVersion := &AppVersion{}
+				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: appVersionName}, tmpAppVersion)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 

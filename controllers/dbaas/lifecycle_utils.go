@@ -449,22 +449,24 @@ func replaceValues(cluster *dbaasv1alpha1.Cluster, component *Component) {
 	}
 
 	// replace env[].valueFrom.secretKeyRef.name variables
-	for _, c := range component.PodSpec.Containers {
-		for _, e := range c.Env {
-			if e.ValueFrom == nil {
-				continue
-			}
-			if e.ValueFrom.SecretKeyRef == nil {
-				continue
-			}
-			secretRef := e.ValueFrom.SecretKeyRef
-			for k, v := range namedValues {
-				r := strings.Replace(secretRef.Name, k, v, 1)
-				if r == secretRef.Name {
+	for _, cc := range [][]corev1.Container{component.PodSpec.InitContainers, component.PodSpec.Containers} {
+		for _, c := range cc {
+			for _, e := range c.Env {
+				if e.ValueFrom == nil {
 					continue
 				}
-				secretRef.Name = r
-				break
+				if e.ValueFrom.SecretKeyRef == nil {
+					continue
+				}
+				secretRef := e.ValueFrom.SecretKeyRef
+				for k, v := range namedValues {
+					r := strings.Replace(secretRef.Name, k, v, 1)
+					if r == secretRef.Name {
+						continue
+					}
+					secretRef.Name = r
+					break
+				}
 			}
 		}
 	}

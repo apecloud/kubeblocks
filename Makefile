@@ -188,8 +188,8 @@ mod-vendor: ## Run go mod tidy->vendor->verify against go modules.
 TEST_PACKAGE=
 
 CLUSTER_TYPES=minikube k3d
-.PHONY: test-add-dns
-test-add-dns:  ## add DNS to /etc/hosts when k8s cluster is minikube or k3d
+.PHONY: add-k8s-host
+add-k8s-host:  ## add DNS to /etc/hosts when k8s cluster is minikube or k3d
 ifeq ($(findstring $(EXISTING_CLUSTER_TYPE), $(CLUSTER_TYPES)), $(EXISTING_CLUSTER_TYPE))
 ifeq (, $(shell sed -n "/^127.0.0.1[[:space:]]*host.$(EXISTING_CLUSTER_TYPE).internal/p" /etc/hosts))
 	sudo bash -c 'echo "127.0.0.1 host.$(EXISTING_CLUSTER_TYPE).internal" >> /etc/hosts'
@@ -197,19 +197,11 @@ endif
 endif
 
 .PHONY: test-current-ctx
-test-current-ctx: manifests generate fmt vet test-add-dns ## Run operator controller tests with current $KUBECONFIG context.
+test-current-ctx: manifests generate fmt vet add-k8s-host ## Run operator controller tests with current $KUBECONFIG context. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_PACKAGE)... -coverprofile cover.out
 
-.PHONY: test-minikube
-test-minikube: manifests generate fmt vet test-add-dns ## Run operator controller tests on minikube
-	USE_EXISTING_CLUSTER=true EXISTING_CLUSTER_TYPE=minikube KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_PACKAGE)... -coverprofile cover.out
-
-.PHONY: test-k3d
-test-k3d: manifests generate fmt vet test-add-dns ## Run operator controller tests on k3d
-	USE_EXISTING_CLUSTER=true EXISTING_CLUSTER_TYPE=k3d KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_PACKAGE)... -coverprofile cover.out
-
 .PHONY: test
-test: manifests generate fmt vet envtest ## Run tests.
+test: manifests generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_PACKAGE)... -coverprofile cover.out
 
 .PHONY: test-delve

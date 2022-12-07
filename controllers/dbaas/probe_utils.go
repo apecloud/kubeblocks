@@ -18,7 +18,6 @@ package dbaas
 
 import (
 	"encoding/json"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -35,12 +34,9 @@ const (
 	roleProbeContainerName    = "kb-rolechangedcheck"
 	statusProbeContainerName  = "kb-statuscheck"
 	runningProbeContainerName = "kb-runningcheck"
-)
-
-var (
-	ProbeRoleChangedCheckPath = fmt.Sprintf("spec.containers{%s}", roleProbeContainerName)
-	ProbeStatusCheckPath      = fmt.Sprintf("spec.containers{%s}", statusProbeContainerName)
-	ProbeRunningCheckPath     = fmt.Sprintf("spec.containers{%s}", runningProbeContainerName)
+	ProbeRoleChangedCheckPath = "spec.containers{" + roleProbeContainerName + "}"
+	ProbeStatusCheckPath      = "spec.containers{" + statusProbeContainerName + "}"
+	ProbeRunningCheckPath     = "spec.containers{" + runningProbeContainerName + "}"
 )
 
 func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams,

@@ -127,7 +127,7 @@ func NewMongoDB(logger logger.Logger) bindings.OutputBinding {
 	return s
 }
 
-// Init initializes the MySQL Binding.
+// Init initializes the MongoDB Binding.
 func (m *MongoDB) Init(metadata bindings.Metadata) error {
 	m.logger.Debug("Initializing MongoDB binding")
 	meta, err := getMongoDBMetaData(metadata)

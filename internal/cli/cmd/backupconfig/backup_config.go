@@ -53,12 +53,15 @@ type upgradeOptions struct {
 	Sets      []string
 }
 
+// adjust for test
+var helmAddRepo = helm.AddRepo
+
 func (i *configOptions) upgrade() (string, error) {
 	entry := &repo.Entry{
 		Name: types.KubeBlocksChartName,
 		URL:  types.KubeBlocksChartURL,
 	}
-	if err := helm.AddRepo(entry); err != nil {
+	if err := helmAddRepo(entry); err != nil {
 		return "", err
 	}
 

@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -103,8 +102,12 @@ func (m *MongoDB) Init(metadata bindings.Metadata) error {
 	return nil
 }
 
-// InitDelay do the real init
-func (m *MongoDB) InitDelay() error {
+// InitIfNeed do the real init
+func (m *MongoDB) InitIfNeed() error {
+	if m.database != nil {
+		return nil
+	}
+
 	m.operationTimeout = m.metadata.operationTimeout
 
 	client, err := getMongoDBClient(&m.metadata)
@@ -116,8 +119,14 @@ func (m *MongoDB) InitDelay() error {
 		return fmt.Errorf("error in connecting to mongodb, host: %s error: %s", m.metadata.host, err)
 	}
 
+	db := client.Database(adminDatabase)
+	_, err = getReplSetStatus(context.Background(), db)
+	if err != nil {
+		return fmt.Errorf("error in getting repl status from mongodb, error: %s", err)
+	}
+
 	m.client = client
-	m.database = m.client.Database(adminDatabase)
+	m.database = db
 
 	return nil
 }
@@ -133,8 +142,7 @@ func (m *MongoDB) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bin
 		return nil, errors.New("invoke request required")
 	}
 
-	if m.database == nil {
-		go m.InitDelay()
+	if err := m.InitIfNeed(); err != nil {
 		resp.Data = []byte("db not ready")
 		return resp, nil
 	}
@@ -319,26 +327,25 @@ func getCommand(ctx context.Context, db *mongo.Database, command bson.M) (bson.M
 	var result bson.M
 	err := db.RunCommand(ctx, command).Decode(&result)
 	if err != nil {
-		log.Println(err)
 		return nil, err
 	}
 
 	return result, nil
 }
 
-func getReplSetStatus(ctx context.Context, admin *mongo.Database) (ReplSetGetStatus, error) {
+func getReplSetStatus(ctx context.Context, admin *mongo.Database) (*ReplSetGetStatus, error) {
 	var result bson.M
 	command := bson.M{"replSetGetStatus": 1}
 	result, err := getCommand(ctx, admin, command)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	var r ReplSetGetStatus
 	bsonBytes, _ := bson.Marshal(result)
 	err = bson.Unmarshal(bsonBytes, &r)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	return r, nil
+	return &r, nil
 }

@@ -42,6 +42,7 @@ spec:
       probes:
         roleChangedProbe:
           periodSeconds: 2
+          failureThreshold: 3
       service:
         ports:
           - protocol: TCP
@@ -59,7 +60,8 @@ spec:
               - |
                 RPL_SET_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
                 RPL_SET_NAME=${RPL_SET_NAME%-};
-                mongod --configsvr --bind_ip_all --replSet $RPL_SET_NAME
+                PORT=27018
+                mongod --configsvr --bind_ip_all --port $PORT --replSet $RPL_SET_NAME
             lifecycle:
               postStart:
                 exec:
@@ -103,6 +105,7 @@ spec:
       probes:
         roleChangedProbe:
           periodSeconds: 2
+          failureThreshold: 3
       service:
         ports:
           - protocol: TCP

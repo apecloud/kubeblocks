@@ -22,47 +22,21 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
-func assertEqual(t *testing.T, expect string, actual string) {
-	if expect != actual {
-		t.Errorf("fail: expected %s, actual %s", expect, actual)
-	}
-}
-
-func TestCalcCharacterType(t *testing.T) {
-	{
-		expectType := KMysql
-		actualType := CalcCharacterType("state.mysql")
-		assertEqual(t, expectType, actualType)
-	}
-
-	{
-		expectType := KMysql
-		actualType := CalcCharacterType("state.mysql-8")
-		assertEqual(t, expectType, actualType)
-	}
-
-	{
-		expectType := ""
-		actualType := CalcCharacterType("other")
-		assertEqual(t, expectType, actualType)
-	}
-}
-
 func TestIsWellKnownCharacterType(t *testing.T) {
 	var wellKnownCharacterTypeFunc = map[string]func(cluster *dbaasv1alpha1.Cluster, component *Component) error{
 		"mysql": setMysqlComponent,
 		"redis": nil,
 	}
 
-	if !isWellKnowCharacterType("mysql", wellKnownCharacterTypeFunc) {
+	if !isMappedCharacterType("mysql", wellKnownCharacterTypeFunc) {
 		t.Error("mysql is well known characterType")
 	}
 
-	if isWellKnowCharacterType("redis", wellKnownCharacterTypeFunc) {
+	if isMappedCharacterType("redis", wellKnownCharacterTypeFunc) {
 		t.Error("redis is not well known characterType")
 	}
 
-	if isWellKnowCharacterType("other", wellKnownCharacterTypeFunc) {
+	if isMappedCharacterType("other", wellKnownCharacterTypeFunc) {
 		t.Error("other is not well known characterType")
 	}
 }

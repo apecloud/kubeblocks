@@ -269,17 +269,14 @@ func mergeMonitorConfig(
 	}
 
 	characterType := clusterDefComp.CharacterType
-	if len(characterType) == 0 {
-		characterType = CalcCharacterType(clusterDef.Spec.Type)
-	}
-	if !IsWellKnownCharacterType(characterType) {
+	if !isWellKnownCharacterType(characterType) {
 		disableMonitor(component)
 		return
 	}
 
 	switch characterType {
-	case KMysql:
-		err := WellKnownCharacterTypeFunc[KMysql](cluster, component)
+	case kMysql:
+		err := wellKnownCharacterTypeFunc[kMysql](cluster, component)
 		if err != nil {
 			disableMonitor(component)
 		}
@@ -452,22 +449,24 @@ func replaceValues(cluster *dbaasv1alpha1.Cluster, component *Component) {
 	}
 
 	// replace env[].valueFrom.secretKeyRef.name variables
-	for _, c := range component.PodSpec.Containers {
-		for _, e := range c.Env {
-			if e.ValueFrom == nil {
-				continue
-			}
-			if e.ValueFrom.SecretKeyRef == nil {
-				continue
-			}
-			secretRef := e.ValueFrom.SecretKeyRef
-			for k, v := range namedValues {
-				r := strings.Replace(secretRef.Name, k, v, 1)
-				if r == secretRef.Name {
+	for _, cc := range [][]corev1.Container{component.PodSpec.InitContainers, component.PodSpec.Containers} {
+		for _, c := range cc {
+			for _, e := range c.Env {
+				if e.ValueFrom == nil {
 					continue
 				}
-				secretRef.Name = r
-				break
+				if e.ValueFrom.SecretKeyRef == nil {
+					continue
+				}
+				secretRef := e.ValueFrom.SecretKeyRef
+				for k, v := range namedValues {
+					r := strings.Replace(secretRef.Name, k, v, 1)
+					if r == secretRef.Name {
+						continue
+					}
+					secretRef.Name = r
+					break
+				}
 			}
 		}
 	}

@@ -10,12 +10,26 @@
 [![Artifact HUB](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/apecloud)](https://artifacthub.io/packages/search?repo=apecloud)
 
 ![image](https://github.com/apecloud/kubeblocks/blob/support/rewrite_kb_introduction/docs/img/banner:-image-with:-ape-space.jpg)
+
+
+- [What is KubeBlocks](#what-is-kubeblocks)
+  - [Goals](#goals)
+  - [Key Features](#key-features)
+- [Documents](#documents)
+  - [Quick start with KubeBlocks](#quick-start-with-kubeblocks)
+  - [Introduction](#introduction)
+  - [Installation](#installation)
+  - [User documents](#user-documents)
+  - [Design proposal](#design-proposal)
+- [Community](#community)
+- [Contributing to KubeBlocks](#contributing-to-kubeblocks)
+- [License](#license)
+
+
 ## What is KubeBlocks
-***
-KubeBlocks, running on Kubernetes, is an open-source data manangement platform. KubeBlocks greatly simplifies the process of deploying databases on Kubernetes. It offers a universal view for multicloud and on-premises databases with a consistent database developing and management experience.
+**KubeBlocks**, running on Kubernetes, is an open-source data manangement platform. KubeBlocks greatly simplifies the process of deploying databases on Kubernetes. It offers a universal view for multicloud and on-premises databases with a consistent database developing and management experience.
 
 ### Goals
-***
 - Enable developers using one platform to manage any database engines used
 - Provide consistent and easy-to-use declarative API
 - Create and use database clusters within minutes without a deep knowledge of Kubernetes
@@ -24,12 +38,11 @@ KubeBlocks, running on Kubernetes, is an open-source data manangement platform. 
 - Embrace extensibility and provide domain functions without vendor lock-in
 - Gain new contributors
 ### Key Features
-***
 - Runs on a Kubernetes base on any cloud
 - Defines each supported database engine through a declarative API
 - Integrated DevOps tools and processes,such as Prometheus, Grafana and AlertManager for monitoring and alarming
 - Compatible with MySQL, PostgreSQL, Redis, MongoDB and other database engines
-- Accesses and manages any new database engines or Plugins by defining CRD (Kubenetes custom resource definition)
+- Accesses and manages any new database engines or plugins by defining CRD
 - High availability, based on the consistency X-Paxos protocol
 - Database life cycle management
 - Backup and restore
@@ -52,8 +65,6 @@ TODO
 [Design proposal](https://github.com/apecloud/kubeblocks/tree/main/docs/design_docs) for design motivation and methodology.
 
 ## Community
-
-
 - KubeBlocks [Slack Channel](https://kubeblocks.slack.com/ssb/redirect)
 - KubeBlocks Github [Discussions](https://github.com/apecloud/kubeblocks/discussions)
 - Questions tagged [#KubeBlocks](https://stackoverflow.com/questions/tagged/KubeBlocks) on StackOverflow

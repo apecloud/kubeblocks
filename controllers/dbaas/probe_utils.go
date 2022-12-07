@@ -148,20 +148,20 @@ func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *
 		probe.Exec.Command = []string{"curl", "-X", "POST",
 			"--fail-with-body", "--silent",
 			"-H", "Content-Type: application/json",
-			"http://localhost:" + strconv.Itoa(probeSvcHTTPPort) + "/v1.0/bindings/probe",
+			"http://localhost:" + strconv.Itoa(probeSvcHTTPPort) + "/v1.0/bindings/mysql",
 			"-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
 	case "etcd":
 		probe.Exec.Command = []string{"curl", "-X", "POST",
 			"--fail-with-body", "--silent",
 			"-H", "Content-Type: application/json",
 			"http://localhost:" + strconv.Itoa(probeSvcHTTPPort) + "/v1.0/bindings/etcd",
-			"-d", "{\"operation\": \"query\"}"}
+			"-d", "{\"operation\": \"roleCheck\"}"}
 	case "mongodb":
 		probe.Exec.Command = []string{"curl", "-X", "POST",
 			"--fail-with-body", "--silent",
 			"-H", "Content-Type: application/json",
 			"http://localhost:" + strconv.Itoa(probeSvcHTTPPort) + "/v1.0/bindings/mongodb",
-			"-d", "{\"operation\": \"query\"}"}
+			"-d", "{\"operation\": \"roleCheck\"}"}
 	}
 
 	probe.PeriodSeconds = probeSetting.PeriodSeconds

@@ -1,7 +1,7 @@
 apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
-  name: probe
+  name: mysql
 spec:
   type: bindings.mysql
   version: v1

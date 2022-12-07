@@ -36,11 +36,21 @@ var _ = Describe("clusterDefinition webhook", func() {
 		timeout                = time.Second * 10
 		interval               = time.Second
 	)
-	BeforeEach(func() {
+	cleanupObjects := func() {
 		// Add any setup steps that needs to be executed before each test
 		err := k8sClient.DeleteAllOf(ctx, &ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
+	}
+	BeforeEach(func() {
+		// Add any setup steps that needs to be executed before each test
+		cleanupObjects()
 	})
+
+	AfterEach(func() {
+		// Add any teardown steps that needs to be executed after each test
+		cleanupObjects()
+	})
+
 	Context("When clusterDefinition create and update", func() {
 		It("Should webhook validate passed", func() {
 

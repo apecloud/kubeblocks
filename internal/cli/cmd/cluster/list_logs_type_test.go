@@ -33,8 +33,8 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util/cluster"
 )
 
 var _ = Describe("listLogsType test", func() {

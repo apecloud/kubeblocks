@@ -22,6 +22,7 @@ import (
 
 	"helm.sh/helm/v3/pkg/repo"
 
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/version"
 )
@@ -44,8 +45,8 @@ var _ = Describe("helm util", func() {
 
 	It("Install", func() {
 		o := &InstallOpts{
-			Name:      types.KubeBlocksChartName,
-			Chart:     "kubeblocks-test-chart",
+			Name:      testing.KubeBlocksChartName,
+			Chart:     testing.KubeBlocksChartURL,
 			Namespace: "default",
 			Version:   version.DefaultKubeBlocksVersion,
 		}

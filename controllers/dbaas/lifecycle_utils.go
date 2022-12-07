@@ -26,7 +26,6 @@ import (
 
 	"github.com/leaanthony/debme"
 	"github.com/sethvargo/go-password/password"
-	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -57,10 +56,6 @@ var (
 	//go:embed cue/*
 	cueTemplates embed.FS
 )
-
-func init() {
-	viper.SetDefault(cmNamespaceKey, "default")
-}
 
 func (c createParams) getCacheBytesValue(key string, valueCreator func() ([]byte, error)) ([]byte, error) {
 	vIf, ok := (*c.cacheCtx)[key]
@@ -309,6 +304,7 @@ func mergeComponents(
 		ClusterType:     clusterDef.Spec.Type,
 		Name:            clusterDefCompObj.TypeName, // initial name for the component will be same as TypeName
 		Type:            clusterDefCompObj.TypeName,
+		CharacterType:   clusterDefCompObj.CharacterType,
 		MinReplicas:     clusterDefCompObj.MinReplicas,
 		MaxReplicas:     clusterDefCompObj.MaxReplicas,
 		DefaultReplicas: clusterDefCompObj.DefaultReplicas,
@@ -321,7 +317,6 @@ func mergeComponents(
 		Probes:          clusterDefCompObj.Probes,
 		LogConfigs:      clusterDefCompObj.LogConfigs,
 		ConfigTemplates: clusterDefCompObj.ConfigTemplateRefs,
-		CharacterType:   clusterDefCompObj.CharacterType,
 	}
 
 	doContainerAttrOverride := func(container corev1.Container) {
@@ -400,7 +395,8 @@ func mergeComponents(
 		component.Name = clusterComp.Name // component name gets overrided
 		component.EnabledLogs = clusterComp.EnabledLogs
 
-		if clusterComp.Replicas != nil && *clusterComp.Replicas > 0 {
+		// user can scale down replicas to 0
+		if clusterComp.Replicas != nil {
 			component.Replicas = *clusterComp.Replicas
 		}
 
@@ -1073,38 +1069,38 @@ func processContainersInjection(reqCtx intctrlutil.RequestCtx, params createPara
 }
 
 func injectEnvs(params createParams, envConfigName string, c *corev1.Container) {
-	envFieldPathMap := map[string]string{
-		"_POD_NAME":  "metadata.name",
-		"_NAMESPACE": "metadata.namespace",
-		"_SA_NAME":   "spec.serviceAccountName",
-		"_NODENAME":  "spec.nodeName",
-		"_HOSTIP":    "status.hostIP",
-		"_PODIP":     "status.podIP",
-		"_PODIPS":    "status.podIPs",
+	// can not use map, it is unordered
+	envFieldPathSlice := []envVar{
+		{name: "_POD_NAME", fieldPath: "metadata.name"},
+		{name: "_NAMESPACE", fieldPath: "metadata.namespace"},
+		{name: "_SA_NAME", fieldPath: "spec.serviceAccountName"},
+		{name: "_NODENAME", fieldPath: "spec.nodeName"},
+		{name: "_HOSTIP", fieldPath: "status.hostIP"},
+		{name: "_PODIP", fieldPath: "status.podIP"},
+		{name: "_PODIPS", fieldPath: "status.podIPs"},
 	}
 
-	clusterEnv := map[string]string{
-		"_CLUSTER_NAME":      params.cluster.Name,
-		"_COMP_NAME":         params.component.Name,
-		"_CLUSTER_COMP_NAME": params.cluster.Name + "-" + params.component.Name,
+	clusterEnv := []envVar{
+		{name: "_CLUSTER_NAME", value: params.cluster.Name},
+		{name: "_COMP_NAME", value: params.component.Name},
+		{name: "_CLUSTER_COMP_NAME", value: params.cluster.Name + "-" + params.component.Name},
 	}
-
-	toInjectEnv := make([]corev1.EnvVar, 0, len(envFieldPathMap)+len(c.Env))
-	for suf, fp := range envFieldPathMap {
+	toInjectEnv := make([]corev1.EnvVar, 0, len(envFieldPathSlice)+len(c.Env))
+	for _, v := range envFieldPathSlice {
 		toInjectEnv = append(toInjectEnv, corev1.EnvVar{
-			Name: dbaasPrefix + suf,
+			Name: dbaasPrefix + v.name,
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: fp,
+					FieldPath: v.fieldPath,
 				},
 			},
 		})
 	}
 
-	for k, v := range clusterEnv {
+	for _, v := range clusterEnv {
 		toInjectEnv = append(toInjectEnv, corev1.EnvVar{
-			Name:  dbaasPrefix + k,
-			Value: v,
+			Name:  dbaasPrefix + v.name,
+			Value: v.value,
 		})
 	}
 

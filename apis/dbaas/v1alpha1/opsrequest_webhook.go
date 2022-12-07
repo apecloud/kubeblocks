@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -156,7 +157,7 @@ func (r *OpsRequest) validateOps(ctx context.Context, cluster *Cluster, allErrs 
 // validateUpgrade validate spec.clusterOps.upgrade is legal
 func (r *OpsRequest) validateUpgrade(ctx context.Context, allErrs *field.ErrorList, cluster *Cluster) {
 	if !cluster.Status.Operations.Upgradable {
-		addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s", r.Spec.ClusterRef))
+		addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s, appversion must be greater than 1", r.Spec.ClusterRef))
 		return
 	}
 	if r.Spec.ClusterOps == nil || r.Spec.ClusterOps.Upgrade == nil {
@@ -180,15 +181,40 @@ func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *
 		if componentOps.VerticalScaling == nil {
 			return field.NotFound(field.NewPath(fmt.Sprintf("spec.componentOps[%d].verticalScaling", index)), "can not be empty")
 		}
-		if err := validateVerticalResourceList(componentOps.VerticalScaling.Requests); err != nil {
-			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].verticalScaling.requests", index)), componentOps.VerticalScaling.Requests, err.Error())
+		if invalidValue, err := validateVerticalResourceList(componentOps.VerticalScaling.Requests); err != nil {
+			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].verticalScaling.requests", index)), invalidValue, err.Error())
 		}
-		if err := validateVerticalResourceList(componentOps.VerticalScaling.Limits); err != nil {
-			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].verticalScaling.limits", index)), componentOps.VerticalScaling.Limits, err.Error())
+		if invalidValue, err := validateVerticalResourceList(componentOps.VerticalScaling.Limits); err != nil {
+			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].verticalScaling.limits", index)), invalidValue, err.Error())
+		}
+		if invalidValue, err := compareRequestsAndLimits(*componentOps.VerticalScaling); err != nil {
+			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].verticalScaling.requests", index)), invalidValue, err.Error())
 		}
 		return nil
 	}
 	r.commonValidationWithComponentOps(allErrs, cluster, supportedComponentMap, customValidate)
+}
+
+// compareRequestsAndLimits compare the resource requests and limits
+func compareRequestsAndLimits(resources corev1.ResourceRequirements) (string, error) {
+	requests := resources.Requests
+	limits := resources.Limits
+	if requests == nil || limits == nil {
+		return "", nil
+	}
+	for k, v := range requests {
+		if limitQuantity, ok := limits[k]; !ok {
+			continue
+		} else if compareQuantity(&v, &limitQuantity) {
+			return v.String(), errors.New(fmt.Sprintf(`must be less than or equal to %s limit`, k))
+		}
+	}
+	return "", nil
+}
+
+// compareQuantity compare requests quantity and limits quantity
+func compareQuantity(requestQuantity, limitQuantity *resource.Quantity) bool {
+	return requestQuantity != nil && limitQuantity != nil && requestQuantity.Cmp(*limitQuantity) > 0
 }
 
 // invalidReplicas verify whether the replicas is invalid
@@ -343,13 +369,13 @@ func covertOperationComponentsToMap(componentNames []OperationComponent) map[str
 }
 
 // checkResourceList check k8s resourceList is legal
-func validateVerticalResourceList(resourceList map[corev1.ResourceName]resource.Quantity) error {
+func validateVerticalResourceList(resourceList map[corev1.ResourceName]resource.Quantity) (string, error) {
 	for k := range resourceList {
-		if k != corev1.ResourceCPU && k != corev1.ResourceMemory && strings.HasPrefix(k.String(), corev1.ResourceHugePagesPrefix) {
-			return fmt.Errorf("resource key is not cpu or memory or hugepages- ")
+		if k != corev1.ResourceCPU && k != corev1.ResourceMemory && !strings.HasPrefix(k.String(), corev1.ResourceHugePagesPrefix) {
+			return string(k), fmt.Errorf("resource key is not cpu or memory or hugepages- ")
 		}
 	}
-	return nil
+	return "", nil
 }
 
 func addInvalidError(allErrs *field.ErrorList, fieldPath string, value interface{}, msg string) {

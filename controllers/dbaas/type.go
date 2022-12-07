@@ -25,8 +25,6 @@ import (
 )
 
 const (
-	// settings keys
-	cmNamespaceKey              = "CM_NAMESPACE"
 	maxConcurReconAppVersionKey = "MAXCONCURRENTRECONCILES_APPVERSION"
 	maxConcurReconClusterDefKey = "MAXCONCURRENTRECONCILES_CLUSTERDEF"
 
@@ -55,6 +53,7 @@ type Component struct {
 	ClusterType             string                                 `json:"clusterType,omitempty"`
 	Name                    string                                 `json:"name,omitempty"`
 	Type                    string                                 `json:"type,omitempty"`
+	CharacterType           string                                 `json:"characterType,omitempty"`
 	MinReplicas             int32                                  `json:"minReplicas,omitempty"`
 	MaxReplicas             int32                                  `json:"maxReplicas,omitempty"`
 	DefaultReplicas         int32                                  `json:"defaultReplicas,omitempty"`
@@ -67,7 +66,6 @@ type Component struct {
 	Service                 *corev1.ServiceSpec                    `json:"service,omitempty"`
 	Probes                  *dbaasv1alpha1.ClusterDefinitionProbes `json:"probes,omitempty"`
 	VolumeClaimTemplates    []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
-	CharacterType           string                                 `json:"characterType,omitempty"`
 	Monitor                 *MonitorConfig                         `json:"monitor,omitempty"`
 	EnabledLogs             []string                               `json:"enabledLogs,omitempty"`
 	LogConfigs              []dbaasv1alpha1.LogConfig              `json:"logConfigs,omitempty"`
@@ -103,4 +101,10 @@ type configTemplateBuilder struct {
 	appVersion *dbaasv1alpha1.AppVersion
 	cluster    *dbaasv1alpha1.Cluster
 	podSpec    *corev1.PodSpec
+}
+
+type envVar struct {
+	name      string
+	fieldPath string
+	value     string
 }

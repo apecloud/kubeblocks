@@ -17,7 +17,7 @@ limitations under the License.
 package playground
 
 import (
-	"github.com/apecloud/kubeblocks/internal/cli/util/cluster"
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/version"
 )
 

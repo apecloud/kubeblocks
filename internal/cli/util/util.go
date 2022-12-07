@@ -39,7 +39,6 @@ import (
 	"github.com/fatih/color"
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
-	"github.com/gosuri/uitable"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
@@ -319,16 +318,6 @@ func printErr(err error) {
 		}
 		fmt.Fprint(os.Stderr, msg)
 	}
-}
-
-func PrintTable(out io.Writer, table *uitable.Table) error {
-	raw := table.Bytes()
-	raw = append(raw, []byte("\n")...)
-	_, err := out.Write(raw)
-	if err != nil {
-		return errors.Wrap(err, "unable to write table output")
-	}
-	return nil
 }
 
 // GetNodeByName choose node by name from a node array

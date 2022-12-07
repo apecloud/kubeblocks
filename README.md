@@ -41,40 +41,28 @@ For detailed feature information, see [Feature list](https://github.com/apecloud
 
 ## Documents
 ### Quick start with KubeBlocks
-待完成
+TODO 
 ### Introduction
 [Introduction](https://github.com/apecloud/kubeblocks/blob/main/docs/user_docs/Introduction/introduction.md) is a detailed information on KubeBlocks.
-### Release notes
-[release_notes](https://github.com/apecloud/kubeblocks/releases) for the latest updates.
 ### Installation
-[Installation](https://github.com/apecloud/kubeblocks/tree/main/docs/user_docs/installation) document for install KubeBlocks, playground, dbctl, and create clusters.
-### User doc
-[user_docs](https://github.com/apecloud/kubeblocks/tree/main/docs/user_docs) for instruction to use KubeBlocks.
+[Installation](https://github.com/apecloud/kubeblocks/tree/main/docs/user_docs/installation) document for install KubeBlocks, playground, kbctl, and create database clusters.
+### User documents
+[User documents](https://github.com/apecloud/kubeblocks/tree/main/docs/user_docs) for instruction to use KubeBlocks.
 ### Design proposal
-[design_docs](https://github.com/apecloud/kubeblocks/tree/main/docs/design_docs) for design motivation and methodology.
+[Design proposal](https://github.com/apecloud/kubeblocks/tree/main/docs/design_docs) for design motivation and methodology.
 
 ## Community
 
 
-- [Slack Channel](https://kubeblocks.slack.com/ssb/redirect)
-- Follow us on Twitter @ApeCloud
-- Questions tagged #KubeBlocks on StackOverflow/github discussion
-- When need help, contact xxxx
-
+- KubeBlocks [Slack Channel](https://kubeblocks.slack.com/ssb/redirect)
+- KubeBlocks Github [Discussions](https://github.com/apecloud/kubeblocks/discussions)
+- Questions tagged [#KubeBlocks](https://stackoverflow.com/questions/tagged/KubeBlocks) on StackOverflow
+- Follow us on Twitter [@KubeBlocks](https://twitter.com/KubeBlocks)
 ## Contributing to KubeBlocks
 Your contributions and suggestions are welcomed and appreciated.
-See the [Contributing Guide](docs/CONTRIBUTING.md) for details on typical contribution workflows.
-See the [Development Guide](docs/DEVELOPING.md) to get started with building and developing.
-- Guidelines for contributing -需要做how to 文档 内容包括如何report a issue 如何contribute code 如何review Pull Request 如何写文档 coding风格指南 等等
-- 
+- See the [Contributing Guide](docs/CONTRIBUTING.md) for details on typical contribution workflows.
+- See the [Development Guide](docs/DEVELOPING.md) to get started with building and developing.
+- See the [Docs Contributing Guide](docs/CONTRIBUTING_DOCS.md) to get started with contributing to the KubeBlocks docs.
 
-## Code of Conduct
-to be complete
-
-## Security Policy
-[Security Policy](https://github.com/apecloud/kubeblocks/blob/main/SECURITY.md)
-
-
-
-
-
+## License
+KubeBlocks is under the Apache 2.0 license. See the [LICENSE](./LICENSE) file for details.

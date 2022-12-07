@@ -269,17 +269,14 @@ func mergeMonitorConfig(
 	}
 
 	characterType := clusterDefComp.CharacterType
-	if len(characterType) == 0 {
-		characterType = CalcCharacterType(clusterDef.Spec.Type)
-	}
-	if !IsWellKnownCharacterType(characterType) {
+	if !isWellKnownCharacterType(characterType) {
 		disableMonitor(component)
 		return
 	}
 
 	switch characterType {
-	case KMysql:
-		err := WellKnownCharacterTypeFunc[KMysql](cluster, component)
+	case kMysql:
+		err := wellKnownCharacterTypeFunc[kMysql](cluster, component)
 		if err != nil {
 			disableMonitor(component)
 		}

@@ -18,6 +18,7 @@ package dbaas
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -28,6 +29,18 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+)
+
+const (
+	roleProbeContainerName    = "kb-rolechangedcheck"
+	statusProbeContainerName  = "kb-statuscheck"
+	runningProbeContainerName = "kb-runningcheck"
+)
+
+var (
+	ProbeRoleChangedCheckPath = fmt.Sprintf("spec.containers{%s}", roleProbeContainerName)
+	ProbeStatusCheckPath      = fmt.Sprintf("spec.containers{%s}", statusProbeContainerName)
+	ProbeRunningCheckPath     = fmt.Sprintf("spec.containers{%s}", runningProbeContainerName)
 )
 
 func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams,
@@ -158,7 +171,7 @@ func getComponentRoles(component *Component) map[string]string {
 
 func buildRoleChangedProbeContainer(roleChangedContainer *corev1.Container,
 	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
-	roleChangedContainer.Name = "kb-rolechangedcheck"
+	roleChangedContainer.Name = roleProbeContainerName
 	probe := roleChangedContainer.ReadinessProbe
 	probe.Exec.Command = []string{"curl", "-X", "POST",
 		"--fail-with-body", "--silent",
@@ -171,7 +184,7 @@ func buildRoleChangedProbeContainer(roleChangedContainer *corev1.Container,
 
 func buildStatusProbeContainer(statusProbeContainer *corev1.Container,
 	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
-	statusProbeContainer.Name = "kb-statuscheck"
+	statusProbeContainer.Name = statusProbeContainerName
 	probe := statusProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = "/v1.0/bindings/probe?operation=statusCheck"
@@ -184,7 +197,7 @@ func buildStatusProbeContainer(statusProbeContainer *corev1.Container,
 
 func buildRunningProbeContainer(runningProbeContainer *corev1.Container,
 	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
-	runningProbeContainer.Name = "kb-runningcheck"
+	runningProbeContainer.Name = runningProbeContainerName
 	probe := runningProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = "/v1.0/bindings/probe?operation=runningCheck"

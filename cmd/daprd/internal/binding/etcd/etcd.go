@@ -32,6 +32,13 @@ const (
 	queryOperation bindings.OperationKind = "query"
 
 	endpoint = "endpoint"
+
+	// keys from response's metadata.
+	respOpKey        = "operation"
+	respSQLKey       = "sql"
+	respStartTimeKey = "start-time"
+	respEndTimeKey   = "end-time"
+	respDurationKey  = "duration"
 )
 
 var oriRole = ""
@@ -56,6 +63,11 @@ func (b *Binding) InitDelay() error {
 		return err
 	}
 
+	_, err = cli.Status(context.Background(), b.endpoint)
+	if err != nil {
+		return err
+	}
+
 	b.etcd = cli
 
 	return nil
@@ -76,7 +88,14 @@ func (b *Binding) Close() (err error) {
 }
 
 func (b *Binding) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
-	resp := &bindings.InvokeResponse{}
+	startTime := time.Now()
+	resp := &bindings.InvokeResponse{
+		Metadata: map[string]string{
+			respOpKey:        string(req.Operation),
+			respSQLKey:       "test",
+			respStartTimeKey: startTime.Format(time.RFC3339Nano),
+		},
+	}
 
 	if req == nil {
 		return nil, errors.New("invoke request required")
@@ -93,6 +112,10 @@ func (b *Binding) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bin
 		return nil, err
 	}
 	resp.Data = data
+
+	endTime := time.Now()
+	resp.Metadata[respEndTimeKey] = endTime.Format(time.RFC3339Nano)
+	resp.Metadata[respDurationKey] = endTime.Sub(startTime).String()
 
 	return resp, nil
 }

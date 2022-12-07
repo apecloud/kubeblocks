@@ -44,21 +44,25 @@ spec:
               - |
                 echo "start etcd..."
                 PEERS=""
+                DOMAIN=$KB_NAMESPACE".svc.cluster.local"
                 i=0
                 while [ $i -lt $KB_ETCD_N ]; do
                 	if [ $i -ne 0 ]; then
                 		PEERS="$PEERS,";
                 	fi;
                 	host=$(eval echo \$KB_ETCD_"$i"_HOSTNAME)
-                	svc=${host%"-$i"}
+                    host=$host"."$DOMAIN
                 	PEERS="$PEERS$host=http://$host:2380"
                     i=$(( i + 1))
                 done
-                exec etcd --name ${HOSTNAME} \
+                SVC_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
+                SVC_NAME=$SVC_NAME"headless";
+                MY_PEER=$KB_POD_NAME"."$SVC_NAME"."$DOMAIN
+                exec etcd --name ${MY_PEER} \
                 --listen-peer-urls http://0.0.0.0:2380 \
                 --listen-client-urls http://0.0.0.0:2379 \
-                --advertise-client-urls http://${HOSTNAME}:2379 \
-                --initial-advertise-peer-urls http://${HOSTNAME}:2380 \
+                --advertise-client-urls http://${MY_PEER}:2379 \
+                --initial-advertise-peer-urls http://${MY_PEER}:2380 \
                 --initial-cluster-token etcd-cluster-1 \
                 --initial-cluster ${PEERS} \
                 --initial-cluster-state new \

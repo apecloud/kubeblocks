@@ -81,11 +81,11 @@ spec:
               - name: REPLICATION_PASSWORD
                 value: {{ .Values.auth.replicationPassword | default "" | quote }}
               - name: MYSQL_TEMPLATE_CONFIG
-                values: {{ if .Values.cluster.templateConfig }}{{ .Values.cluster.templateConfig }}{{ end }}
+                value: {{ if .Values.cluster.templateConfig }}{{ .Values.cluster.templateConfig }}{{ end }}
               - name: MYSQL_CUSTOM_CONFIG
-                values: {{ if .Values.cluster.customConfig }}{{ .Values.cluster.customConfig }}{{ end }}
+                value: {{ if .Values.cluster.customConfig }}{{ .Values.cluster.customConfig }}{{ end }}
               - name: MYSQL_DYNAMIC_CONFIG
-                values: {{ if .Values.cluster.dynamicConfig }}{{ .Values.cluster.dynamicConfig }}{{ end }}
+                value: {{ if .Values.cluster.dynamicConfig }}{{ .Values.cluster.dynamicConfig }}{{ end }}
             command: ["/bin/bash", "-c"]
             args:
               - >

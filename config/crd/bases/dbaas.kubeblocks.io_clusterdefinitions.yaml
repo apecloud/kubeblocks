@@ -285,7 +285,7 @@ spec:
                       properties:
                         builtIn:
                           default: false
-                          description: BuiltIn is a switch to enable DBaas builtIn
+                          description: BuiltIn is a switch to enable KubeBlocks builtIn
                             monitoring. If BuiltIn is true and CharacterType is wellknown,
                             ExporterConfig and Sidecar container will generate automatically.
                             Otherwise, provider should set BuiltIn to false and provide
@@ -310,11 +310,8 @@ spec:
                               minimum: 0
                               type: integer
                           required:
-                          - scrapePath
                           - scrapePort
                           type: object
-                      required:
-                      - builtIn
                       type: object
                     pdbSpec:
                       description: PDBSpec pod disruption budget spec. This is mutually

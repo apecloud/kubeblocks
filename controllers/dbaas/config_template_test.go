@@ -104,6 +104,10 @@ innodb_buffer_pool_size = 8589934592
 							Value: "b",
 						},
 					},
+					Args: []string{
+						"logs",
+						"for_test",
+					},
 					Ports: []corev1.ContainerPort{
 						{
 							Name:          "mysql",
@@ -246,6 +250,103 @@ innodb_buffer_pool_size = 8589934592
 			Expect(rendered["invalid_pvc"]).Should(BeEquivalentTo("<no value>"))
 			Expect(rendered["invalid_resource"]).Should(BeEquivalentTo(""))
 		})
+
+		It("test array null check", func() {
+			cfgBuilder := newCfgTemplateBuilder(
+				"my_test",
+				"default",
+				&dbaasv1alpha1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my_test",
+						Namespace: "default",
+					},
+				},
+				nil,
+			)
+
+			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component)).Should(BeNil())
+
+			tests := []struct {
+				name     string
+				tpl      string
+				expected string
+				wantErr  bool
+			}{{
+				name: "null failed",
+				tpl: ` {{- if mustHas "logs" (index $.podSpec.containers 1 ).args -}}
+true
+{{- end -}}
+`,
+				expected: "",
+				wantErr:  true,
+			}, {
+				name: "null check",
+				tpl: `
+{{- if hasKey (index $.podSpec.containers 1 ) "args" }}
+{{- if mustHas "logs" (index $.podSpec.containers 1 ).args -}}
+true
+{{- end -}}
+{{- end -}}
+`,
+				expected: "",
+				wantErr:  false,
+			}, {
+				name: "exist_test",
+				tpl: `
+{{- if hasKey (index $.podSpec.containers 0 ) "args" }}
+{{- if mustHas "logs" (index $.podSpec.containers 0 ).args -}}
+true
+{{- end }}
+{{- end -}}
+`,
+				expected: "true",
+				wantErr:  false,
+			}, {
+				name: "not exist key",
+				tpl: `
+{{- if hasKey (index $.podSpec.containers 0 ) "args" }}
+{{- if mustHas "abcd" (index $.podSpec.containers 0 ).args -}}
+true
+{{- end }}
+{{- end -}}
+`,
+				expected: "",
+				wantErr:  false,
+			}, {
+				name: "kb component test",
+				tpl: `
+{{- if mustHas "error" $.component.enabledLogs }}
+    log_error=log/mysqld.err
+{{- end }}
+`,
+				expected: "",
+				wantErr:  true,
+			}, {
+				name: "kb component test",
+				tpl: `
+{{- if hasKey $.component "enabledLogs" }}
+{{- if mustHas "error" $.component.enabledLogs }}
+    log_error=log/mysqld.err
+{{- end }}
+{{- end -}}
+`,
+				expected: "",
+				wantErr:  false,
+			}}
+
+			for _, tt := range tests {
+				rendered, err := cfgBuilder.render(map[string]string{
+					tt.name: tt.tpl,
+				})
+				fmt.Println("test ut: ", tt.name)
+				if tt.wantErr {
+					Expect(err).ShouldNot(Succeed())
+				} else {
+					Expect(rendered[tt.name]).Should(BeEquivalentTo(tt.expected))
+				}
+			}
+		})
+
 	})
 
 	Context("calMysqlPoolSizeByResource test", func() {

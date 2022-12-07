@@ -25,8 +25,6 @@ import (
 )
 
 const (
-	// settings keys
-	cmNamespaceKey              = "CM_NAMESPACE"
 	maxConcurReconAppVersionKey = "MAXCONCURRENTRECONCILES_APPVERSION"
 	maxConcurReconClusterDefKey = "MAXCONCURRENTRECONCILES_CLUSTERDEF"
 
@@ -103,4 +101,10 @@ type configTemplateBuilder struct {
 	appVersion *dbaasv1alpha1.AppVersion
 	cluster    *dbaasv1alpha1.Cluster
 	podSpec    *corev1.PodSpec
+}
+
+type envVar struct {
+	name      string
+	fieldPath string
+	value     string
 }

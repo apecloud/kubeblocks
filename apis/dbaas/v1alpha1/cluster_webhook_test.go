@@ -40,7 +40,7 @@ var _ = Describe("cluster webhook", func() {
 		timeout                   = time.Second * 10
 		interval                  = time.Second
 	)
-	BeforeEach(func() {
+	cleanupObjects := func() {
 		// Add any setup steps that needs to be executed before each test
 		err := k8sClient.DeleteAllOf(ctx, &Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -48,12 +48,22 @@ var _ = Describe("cluster webhook", func() {
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
+	}
+	BeforeEach(func() {
+		// Add any setup steps that needs to be executed before each test
+		cleanupObjects()
 	})
+
+	AfterEach(func() {
+		// Add any teardown steps that needs to be executed after each test
+		cleanupObjects()
+	})
+
 	Context("When cluster create and update", func() {
 		It("Should webhook validate passed", func() {
 			By("By testing creating a new clusterDefinition when no appVersion and clusterDefinition")
 			cluster, _ := createTestCluster(clusterDefinitionName, appVersionName, clusterName)
-			Expect(testCtx.CreateObj(ctx, cluster)).ShouldNot(Succeed())
+			Expect(testCtx.CreateObj(ctx, cluster).Error()).To(ContainSubstring("not found"))
 
 			By("By creating a new clusterDefinition")
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
@@ -83,19 +93,16 @@ var _ = Describe("cluster webhook", func() {
 
 			By("By testing update spec.clusterDefinitionRef")
 			cluster.Spec.ClusterDefRef = sencondeClusterDefinition
-			Expect(k8sClient.Update(ctx, cluster)).ShouldNot(Succeed())
+			Expect(k8sClient.Update(ctx, cluster).Error()).To(ContainSubstring("spec.clusterDefinitionRef"))
 			// restore
 			cluster.Spec.ClusterDefRef = clusterDefinitionName
 
 			By("By testing spec.components[?].type not found in clusterDefinitionRef")
 			cluster.Spec.Components[0].Type = "replicaset"
-			Expect(k8sClient.Update(ctx, cluster)).ShouldNot(Succeed())
+			Expect(k8sClient.Update(ctx, cluster).Error()).To(ContainSubstring("is not found in ClusterDefinition.spec.components[*].typeName"))
 			// restore
 			cluster.Spec.Components[0].Type = "replicasets"
 
-			By("By testing spec.components[?].name is duplicated")
-			cluster.Spec.Components[0].Name = "proxy"
-			Expect(k8sClient.Update(ctx, cluster)).ShouldNot(Succeed())
 			// restore
 			cluster.Spec.Components[0].Name = "replicasets"
 
@@ -103,24 +110,40 @@ var _ = Describe("cluster webhook", func() {
 			cluster.Spec.Components[0].VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
 			Expect(k8sClient.Update(ctx, cluster)).Should(Succeed())
 
-			By("By add a component, expect succeed")
-			r := int32(1)
-			cluster.Spec.Components = append(cluster.Spec.Components, ClusterComponent{
-				Name:     "replicasets2",
-				Type:     "replicasets",
-				Replicas: &r,
-				VolumeClaimTemplates: []ClusterComponentVolumeClaimTemplate{
-					{
-						Name: "log",
-					},
-				},
-			})
-			Expect(k8sClient.Update(ctx, cluster)).Should(Succeed())
-
 			By("By updating spec.components[?].volumeClaimTemplates[?].name, expect not succeed")
 			cluster.Spec.Components[0].VolumeClaimTemplates[0].Name = "test"
-			Expect(k8sClient.Update(ctx, cluster)).ShouldNot(Succeed())
+			Expect(k8sClient.Update(ctx, cluster).Error()).To(ContainSubstring("volumeClaimTemplates is forbidden modification except for storage size."))
 
+			By("By updating component resources")
+			// restore test volume claim template name to data
+			cluster.Spec.Components[0].VolumeClaimTemplates[0].Name = "data"
+			cluster.Spec.Components[0].Resources = corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					"cpu":    resource.MustParse("100m"),
+					"memory": resource.MustParse("200Mi"),
+				},
+			}
+			Expect(k8sClient.Update(ctx, cluster)).Should(Succeed())
+			cluster.Spec.Components[0].Resources = corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					"cpu":     resource.MustParse("100m"),
+					"memory1": resource.MustParse("200Mi"),
+				},
+			}
+			Expect(k8sClient.Update(ctx, cluster).Error()).To(ContainSubstring("resource key is not cpu or memory or hugepages- "))
+			cluster.Spec.Components[0].Resources = corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					"cpu":    resource.MustParse("100m"),
+					"memory": resource.MustParse("200Mi"),
+				},
+				Limits: corev1.ResourceList{
+					"cpu":    resource.MustParse("100m"),
+					"memory": resource.MustParse("100Mi"),
+				},
+			}
+			Expect(k8sClient.Update(ctx, cluster).Error()).To(ContainSubstring("must be less than or equal to memory limit"))
+			cluster.Spec.Components[0].Resources.Requests[corev1.ResourceMemory] = resource.MustParse("80Mi")
+			Expect(k8sClient.Update(ctx, cluster)).Should(Succeed())
 		})
 	})
 })

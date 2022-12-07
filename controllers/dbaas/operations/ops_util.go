@@ -52,7 +52,7 @@ func ReconcileActionWithCluster(opsRes *OpsResource) (dbaasv1alpha1.Phase, time.
 		if statusComponent, ok := opsRequest.Status.Components[k]; (!ok && v.Phase == dbaasv1alpha1.UpdatingPhase) || statusComponent.Phase != v.Phase {
 			isChanged = true
 			opsRequest.Status.Components[k] = dbaasv1alpha1.OpsRequestStatusComponent{Phase: v.Phase}
-			sendEventWhenComponentPhaseChanged(opsRes, k, v.Phase)
+			sendEventWhenComponentPhaseChanged(opsRes, k, &v)
 		}
 	}
 	if isChanged {
@@ -99,7 +99,7 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource) (dbaasv1alpha1.Phase, 
 		if statusComponent, ok := opsRequest.Status.Components[k]; !ok || statusComponent.Phase != v.Phase {
 			isChanged = true
 			opsRequest.Status.Components[k] = dbaasv1alpha1.OpsRequestStatusComponent{Phase: v.Phase}
-			sendEventWhenComponentPhaseChanged(opsRes, k, v.Phase)
+			sendEventWhenComponentPhaseChanged(opsRes, k, &v)
 		}
 	}
 	if isChanged {
@@ -130,13 +130,15 @@ func opsRequestIsCompleted(phase dbaasv1alpha1.Phase) bool {
 }
 
 // sendEventWhenComponentStatusChanged send an event when OpsRequest.status.components[*].phase is changed
-func sendEventWhenComponentPhaseChanged(opsRes *OpsResource, componentName string, phase dbaasv1alpha1.Phase) {
+func sendEventWhenComponentPhaseChanged(opsRes *OpsResource, componentName string, statusComponent *dbaasv1alpha1.ClusterStatusComponent) {
 	var (
-		tip       string
-		reason    = dbaasv1alpha1.ReasonStarting
-		eventType = corev1.EventTypeNormal
+		tip          string
+		reason       = dbaasv1alpha1.ReasonStarting
+		eventType    = corev1.EventTypeNormal
+		extraMessage string
 	)
-	switch phase {
+
+	switch statusComponent.Phase {
 	// component is running
 	case dbaasv1alpha1.RunningPhase:
 		tip = "Successfully"
@@ -146,9 +148,10 @@ func sendEventWhenComponentPhaseChanged(opsRes *OpsResource, componentName strin
 		tip = "Failed"
 		reason = dbaasv1alpha1.ReasonComponentFailed
 		eventType = corev1.EventTypeWarning
+		extraMessage = ", " + statusComponent.Message
 	}
-	message := fmt.Sprintf("%s %s component: %s in Cluster: %s",
-		tip, opsRes.OpsRequest.Spec.Type, componentName, opsRes.OpsRequest.Spec.ClusterRef)
+	message := fmt.Sprintf("%s %s component: %s in Cluster: %s%s",
+		tip, opsRes.OpsRequest.Spec.Type, componentName, opsRes.OpsRequest.Spec.ClusterRef, extraMessage)
 	opsRes.Recorder.Event(opsRes.OpsRequest, eventType, reason, message)
 }
 

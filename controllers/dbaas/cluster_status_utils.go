@@ -145,7 +145,8 @@ func getConsensusPhaseForEvent(ctx context.Context, cli client.Client, cluster *
 		getComponentMatchLabels(cluster.Name, componentName)); err != nil {
 		return "", err
 	}
-	if len(podList.Items) == 0 {
+	podCount := len(podList.Items)
+	if podCount == 0 {
 		return dbaasv1alpha1.FailedPhase, nil
 	}
 	for _, v := range podList.Items {
@@ -164,6 +165,11 @@ func getConsensusPhaseForEvent(ctx context.Context, cli client.Client, cluster *
 		if !intctrlutil.PodIsReady(&v) {
 			allPodIsReady = false
 		}
+	}
+	// check pod count is equals to the component replicas
+	if !podCountEqualsComponentReplicas(cluster, componentDef, componentName, podCount) {
+		isWarning = true
+		allPodIsReady = false
 	}
 	// if all pod is ready, ignore the warning event
 	if allPodIsReady {
@@ -347,6 +353,26 @@ func getComponentRelatedInfo(cluster *dbaasv1alpha1.Cluster, clusterDef *dbaasv1
 		}
 	}
 	return componentMap, clusterAvailabilityEffectMap, componentDef
+}
+
+// getComponentByName get component by name on cluster
+func getComponentByName(cluster *dbaasv1alpha1.Cluster, componentName string) *dbaasv1alpha1.ClusterComponent {
+	for _, v := range cluster.Spec.Components {
+		if v.Name == componentName {
+			return &v
+		}
+	}
+	return nil
+}
+
+// podCountEqualsComponentReplicas check the pod count is equal to the component replicas
+func podCountEqualsComponentReplicas(cluster *dbaasv1alpha1.Cluster, componentDef *dbaasv1alpha1.ClusterDefinitionComponent, componentName string, podCount int) bool {
+	component := getComponentByName(cluster, componentName)
+	replicas := componentDef.DefaultReplicas
+	if component.Replicas != nil {
+		replicas = *component.Replicas
+	}
+	return component != nil && replicas == int32(podCount)
 }
 
 // handleClusterStatusByEvent handle the cluster status when warning event happened

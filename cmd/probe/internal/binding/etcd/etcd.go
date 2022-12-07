@@ -18,112 +18,99 @@ package etcd
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
+	"sync"
 	"time"
 
-	"github.com/dapr/kit/logger"
-
+	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	"github.com/dapr/components-contrib/bindings"
+	"github.com/dapr/kit/logger"
 	v3 "go.etcd.io/etcd/client/v3"
 )
 
 const (
-	queryOperation bindings.OperationKind = "query"
-
 	endpoint = "endpoint"
-
-	// keys from response's metadata.
-	respOpKey        = "operation"
-	respSQLKey       = "sql"
-	respStartTimeKey = "start-time"
-	respEndTimeKey   = "end-time"
-	respDurationKey  = "duration"
 )
 
-var oriRole = ""
-
-type Binding struct {
+type Etcd struct {
+	lock     sync.Mutex
 	etcd     *v3.Client
 	endpoint string
 	logger   logger.Logger
+	base     internal.ProbeBase
 }
 
 // NewEtcd returns a new etcd binding instance.
 func NewEtcd(logger logger.Logger) bindings.OutputBinding {
-	return &Binding{logger: logger}
+	return &Etcd{logger: logger}
 }
 
-func (b *Binding) InitDelay() error {
+func (e *Etcd) Init(metadata bindings.Metadata) error {
+	e.endpoint = metadata.Properties[endpoint]
+	e.base = internal.ProbeBase{
+		Logger:    e.logger,
+		Operation: e,
+	}
+
+	return nil
+}
+
+func (e *Etcd) Operations() []bindings.OperationKind {
+	return e.base.Operations()
+}
+
+func (e *Etcd) Close() (err error) {
+	return e.etcd.Close()
+}
+
+func (e *Etcd) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
+	return e.base.Invoke(ctx, req)
+}
+
+func (e *Etcd) InitIfNeed() error {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if e.etcd != nil {
+		return nil
+	}
+
 	cli, err := v3.New(v3.Config{
-		Endpoints:   []string{b.endpoint},
+		Endpoints:   []string{e.endpoint},
 		DialTimeout: 5 * time.Second,
 	})
 	if err != nil {
 		return err
 	}
 
-	_, err = cli.Status(context.Background(), b.endpoint)
+	_, err = cli.Status(context.Background(), e.endpoint)
 	if err != nil {
 		return err
 	}
 
-	b.etcd = cli
+	e.etcd = cli
 
 	return nil
 }
 
-func (b *Binding) Init(metadata bindings.Metadata) error {
-	b.endpoint = metadata.Properties[endpoint]
-
-	return nil
+func (e *Etcd) Exec(ctx context.Context, cmd string) (int64, error) {
+	//TODO implement me
+	return 0, nil
 }
 
-func (b *Binding) Operations() []bindings.OperationKind {
-	return []bindings.OperationKind{queryOperation}
+func (e *Etcd) RunningCheck(ctx context.Context, response *bindings.InvokeResponse) ([]byte, error) {
+	//TODO implement me
+	return nil, nil
 }
 
-func (b *Binding) Close() (err error) {
-	return b.etcd.Close()
+func (e *Etcd) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) ([]byte, error) {
+	//TODO implement me
+	return nil, nil
 }
 
-func (b *Binding) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
-	startTime := time.Now()
-	resp := &bindings.InvokeResponse{
-		Metadata: map[string]string{
-			respOpKey:        string(req.Operation),
-			respSQLKey:       "test",
-			respStartTimeKey: startTime.Format(time.RFC3339Nano),
-		},
-	}
-
-	if req == nil {
-		return nil, errors.New("invoke request required")
-	}
-
-	if b.etcd == nil {
-		go b.InitDelay()
-		resp.Data = []byte("db not ready")
-		return resp, nil
-	}
-
-	data, err := b.roleCheck(ctx)
+func (e *Etcd) GetRole(ctx context.Context, cmd string) (string, error) {
+	resp, err := e.etcd.Status(ctx, e.endpoint)
 	if err != nil {
-		return nil, err
-	}
-	resp.Data = data
-
-	endTime := time.Now()
-	resp.Metadata[respEndTimeKey] = endTime.Format(time.RFC3339Nano)
-	resp.Metadata[respDurationKey] = endTime.Sub(startTime).String()
-
-	return resp, nil
-}
-
-func (b *Binding) roleCheck(ctx context.Context) ([]byte, error) {
-	resp, err := b.etcd.Status(ctx, b.endpoint)
-	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	role := "follower"
@@ -134,16 +121,10 @@ func (b *Binding) roleCheck(ctx context.Context) ([]byte, error) {
 		role = "learner"
 	}
 
-	if oriRole != role {
-		result := map[string]string{}
-		result["event"] = "roleChanged"
-		result["originalRole"] = oriRole
-		result["role"] = role
-		msg, _ := json.Marshal(result)
-		b.logger.Infof(string(msg))
-		oriRole = role
-		return nil, errors.New(string(msg))
-	}
+	return role, nil
+}
 
-	return []byte(oriRole), nil
+func (e *Etcd) Query(ctx context.Context, cmd string) ([]byte, error) {
+	//TODO implement me
+	return nil, nil
 }

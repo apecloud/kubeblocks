@@ -16,3 +16,16 @@ const (
 	Readonly  AccessMode = "Readonly"
 	None      AccessMode = "None"
 )
+
+const (
+	// keys from response's metadata.
+	RespOpKey           = "operation"
+	RespSQLKey          = "sql"
+	RespStartTimeKey    = "start-time"
+	RespRowsAffectedKey = "rows-affected"
+	RespEndTimeKey      = "end-time"
+	RespDurationKey     = "duration"
+	StatusCode          = "status-code"
+	//451 Unavailable For Legal Reasons, used to indicate check failed and trigger kubelet events
+	CheckFailedHTTPCode = "451"
+)

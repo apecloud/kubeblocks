@@ -18,12 +18,13 @@ package mongodb
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 	"go.mongodb.org/mongo-driver/bson"
@@ -57,20 +58,17 @@ const (
 	connectionURIFormatWithSrvAndCredentials = "mongodb+srv://%s:%s@%s/%s%s" //nolint:gosec
 
 	adminDatabase = "admin"
-
-	queryOperation bindings.OperationKind = "query"
 )
-
-var oriRole = ""
 
 // MongoDB is a binding implementation for MongoDB.
 type MongoDB struct {
+	lock             sync.Mutex
 	client           *mongo.Client
 	database         *mongo.Database
 	operationTimeout time.Duration
 	metadata         mongoDBMetadata
-
-	logger logger.Logger
+	logger           logger.Logger
+	base             internal.ProbeBase
 }
 
 type mongoDBMetadata struct {
@@ -81,6 +79,45 @@ type mongoDBMetadata struct {
 	databaseName     string
 	params           string
 	operationTimeout time.Duration
+}
+
+type OpTime struct {
+	TS primitive.Timestamp `bson:"ts"`
+	T  int64               `bson:"t"`
+}
+
+type ReplSetMember struct {
+	ID                   int64  `bson:"_id"`
+	Name                 string `bson:"name"`
+	Health               int64  `bson:"health"`
+	State                int64  `bson:"state"`
+	StateStr             string `bson:"stateStr"`
+	Uptime               int64  `bson:"uptime"`
+	Optime               *OpTime
+	OptimeDate           time.Time           `bson:"optimeDate"`
+	OptimeDurableDate    time.Time           `bson:"optimeDurableDate"`
+	LastAppliedWallTime  time.Time           `bson:"lastAppliedWallTime"`
+	LastDurableWallTime  time.Time           `bson:"lastDurableWallTime"`
+	LastHeartbeatMessage string              `bson:"lastHeartbeatMessage"`
+	SyncSourceHost       string              `bson:"syncSourceHost"`
+	SyncSourceId         int64               `bson:"syncSourceId"`
+	InfoMessage          string              `bson:"infoMessage"`
+	ElectionTime         primitive.Timestamp `bson:"electionTime"`
+	ElectionDate         time.Time           `bson:"electionDate"`
+	ConfigVersion        int64               `bson:"configVersion"`
+	ConfigTerm           int64               `bson:"configTerm"`
+	Self                 bool                `bson:"self"`
+}
+
+type ReplSetGetStatus struct {
+	Set                     string    `bson:"set"`
+	Date                    time.Time `bson:"date"`
+	MyState                 int64     `bson:"myState"`
+	Term                    int64     `bson:"term"`
+	HeartbeatIntervalMillis int64     `bson:"heartbeatIntervalMillis"`
+
+	Members []ReplSetMember `bson:"members"`
+	Ok      int64           `bson:"ok"`
 }
 
 // NewMongoDB returns a new MongoDB Binding
@@ -99,11 +136,19 @@ func (m *MongoDB) Init(metadata bindings.Metadata) error {
 	}
 	m.metadata = *meta
 
+	m.base = internal.ProbeBase{
+		Logger:    m.logger,
+		Operation: m,
+	}
+
 	return nil
 }
 
 // InitIfNeed do the real init
 func (m *MongoDB) InitIfNeed() error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	if m.database != nil {
 		return nil
 	}
@@ -132,29 +177,11 @@ func (m *MongoDB) InitIfNeed() error {
 }
 
 func (m *MongoDB) Operations() []bindings.OperationKind {
-	return []bindings.OperationKind{queryOperation}
+	return m.base.Operations()
 }
 
 func (m *MongoDB) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
-	resp := &bindings.InvokeResponse{}
-
-	if req == nil {
-		return nil, errors.New("invoke request required")
-	}
-
-	if err := m.InitIfNeed(); err != nil {
-		resp.Data = []byte("db not ready")
-		return resp, nil
-	}
-
-	data, err := m.roleCheck(ctx)
-	if err != nil {
-		return nil, err
-	}
-	resp.Data = data
-
-	return resp, nil
-
+	return m.base.Invoke(ctx, req)
 }
 
 func (m *MongoDB) Close() (err error) {
@@ -167,6 +194,40 @@ func (m *MongoDB) Ping() error {
 	}
 
 	return nil
+}
+
+func (m *MongoDB) Exec(ctx context.Context, cmd string) (int64, error) {
+	//TODO implement me
+	return 0, nil
+}
+
+func (m *MongoDB) RunningCheck(ctx context.Context, response *bindings.InvokeResponse) ([]byte, error) {
+	//TODO implement me
+	return nil, nil
+}
+
+func (m *MongoDB) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) ([]byte, error) {
+	//TODO implement me
+	return nil, nil
+}
+
+func (m *MongoDB) GetRole(ctx context.Context, cmd string) (string, error) {
+	status, err := getReplSetStatus(ctx, m.database)
+	if err != nil {
+		m.logger.Errorf("rs.status() error: %", err)
+	}
+	for _, member := range status.Members {
+		if member.State == status.MyState {
+			return strings.ToLower(member.StateStr), nil
+		}
+	}
+
+	return "", errors.New("role not found")
+}
+
+func (m *MongoDB) Query(ctx context.Context, cmd string) ([]byte, error) {
+	//TODO implement me
+	return nil, nil
 }
 
 func getMongoURI(metadata *mongoDBMetadata) string {
@@ -257,70 +318,6 @@ func getMongoDBMetaData(metadata bindings.Metadata) (*mongoDBMetadata, error) {
 	}
 
 	return &meta, nil
-}
-
-func (m *MongoDB) roleCheck(ctx context.Context) ([]byte, error) {
-	status, err := getReplSetStatus(ctx, m.database)
-	if err != nil {
-		m.logger.Errorf("rs.status() error: %", err)
-	}
-	role := ""
-	for _, member := range status.Members {
-		if member.State == status.MyState {
-			role = strings.ToLower(member.StateStr)
-		}
-	}
-	if oriRole != role {
-		result := map[string]string{}
-		result["event"] = "roleChanged"
-		result["originalRole"] = oriRole
-		result["role"] = role
-		msg, _ := json.Marshal(result)
-		m.logger.Infof(string(msg))
-		oriRole = role
-		return nil, errors.New(string(msg))
-	}
-
-	return []byte(oriRole), nil
-}
-
-type OpTime struct {
-	TS primitive.Timestamp `bson:"ts"`
-	T  int64               `bson:"t"`
-}
-
-type ReplSetMember struct {
-	ID                   int64  `bson:"_id"`
-	Name                 string `bson:"name"`
-	Health               int64  `bson:"health"`
-	State                int64  `bson:"state"`
-	StateStr             string `bson:"stateStr"`
-	Uptime               int64  `bson:"uptime"`
-	Optime               *OpTime
-	OptimeDate           time.Time           `bson:"optimeDate"`
-	OptimeDurableDate    time.Time           `bson:"optimeDurableDate"`
-	LastAppliedWallTime  time.Time           `bson:"lastAppliedWallTime"`
-	LastDurableWallTime  time.Time           `bson:"lastDurableWallTime"`
-	LastHeartbeatMessage string              `bson:"lastHeartbeatMessage"`
-	SyncSourceHost       string              `bson:"syncSourceHost"`
-	SyncSourceId         int64               `bson:"syncSourceId"`
-	InfoMessage          string              `bson:"infoMessage"`
-	ElectionTime         primitive.Timestamp `bson:"electionTime"`
-	ElectionDate         time.Time           `bson:"electionDate"`
-	ConfigVersion        int64               `bson:"configVersion"`
-	ConfigTerm           int64               `bson:"configTerm"`
-	Self                 bool                `bson:"self"`
-}
-
-type ReplSetGetStatus struct {
-	Set                     string    `bson:"set"`
-	Date                    time.Time `bson:"date"`
-	MyState                 int64     `bson:"myState"`
-	Term                    int64     `bson:"term"`
-	HeartbeatIntervalMillis int64     `bson:"heartbeatIntervalMillis"`
-
-	Members []ReplSetMember `bson:"members"`
-	Ok      int64           `bson:"ok"`
 }
 
 func getCommand(ctx context.Context, db *mongo.Database, command bson.M) (bson.M, error) {

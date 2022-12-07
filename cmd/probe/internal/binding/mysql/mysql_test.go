@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	"testing"
 	"time"
 
@@ -42,7 +43,7 @@ func TestQuery(t *testing.T) {
 			AddRow(3, "value-3", time.Now().Add(2000))
 
 		mock.ExpectQuery("SELECT \\* FROM foo WHERE id < 4").WillReturnRows(rows)
-		ret, err := m.query(context.Background(), `SELECT * FROM foo WHERE id < 4`)
+		ret, err := m.Query(context.Background(), `SELECT * FROM foo WHERE id < 4`)
 		assert.Nil(t, err)
 		t.Logf("query result: %s", ret)
 		assert.Contains(t, string(ret), "\"id\":1")
@@ -61,7 +62,7 @@ func TestQuery(t *testing.T) {
 			AddRow(2, 2.2, time.Now().Add(1000)).
 			AddRow(3, 3.3, time.Now().Add(2000))
 		mock.ExpectQuery("SELECT \\* FROM foo WHERE id < 4").WillReturnRows(rows)
-		ret, err := m.query(context.Background(), "SELECT * FROM foo WHERE id < 4")
+		ret, err := m.Query(context.Background(), "SELECT * FROM foo WHERE id < 4")
 		assert.Nil(t, err)
 		t.Logf("query result: %s", ret)
 
@@ -88,7 +89,7 @@ func TestExec(t *testing.T) {
 	m, mock, _ := mockDatabase(t)
 	defer m.Close()
 	mock.ExpectExec("INSERT INTO foo \\(id, v1, ts\\) VALUES \\(.*\\)").WillReturnResult(sqlmock.NewResult(1, 1))
-	i, err := m.exec(context.Background(), "INSERT INTO foo (id, v1, ts) VALUES (1, 'test-1', '2021-01-22')")
+	i, err := m.Exec(context.Background(), "INSERT INTO foo (id, v1, ts) VALUES (1, 'test-1', '2021-01-22')")
 	assert.Equal(t, int64(1), i)
 	assert.Nil(t, err)
 }
@@ -99,7 +100,7 @@ func TestInvoke(t *testing.T) {
 
 	t.Run("exec operation succeeds", func(t *testing.T) {
 		mock.ExpectExec("INSERT INTO foo \\(id, v1, ts\\) VALUES \\(.*\\)").WillReturnResult(sqlmock.NewResult(1, 1))
-		metadata := map[string]string{commandSQLKey: "INSERT INTO foo (id, v1, ts) VALUES (1, 'test-1', '2021-01-22')"}
+		metadata := map[string]string{internal.CommandSQLKey: "INSERT INTO foo (id, v1, ts) VALUES (1, 'test-1', '2021-01-22')"}
 		req := &bindings.InvokeRequest{
 			Data:      nil,
 			Metadata:  metadata,
@@ -107,12 +108,12 @@ func TestInvoke(t *testing.T) {
 		}
 		resp, err := m.Invoke(context.Background(), req)
 		assert.Nil(t, err)
-		assert.Equal(t, "1", resp.Metadata[respRowsAffectedKey])
+		assert.Equal(t, "1", resp.Metadata[internal.RespRowsAffectedKey])
 	})
 
 	t.Run("exec operation fails", func(t *testing.T) {
 		mock.ExpectExec("INSERT INTO foo \\(id, v1, ts\\) VALUES \\(.*\\)").WillReturnError(errors.New("insert failed"))
-		metadata := map[string]string{commandSQLKey: "INSERT INTO foo (id, v1, ts) VALUES (1, 'test-1', '2021-01-22')"}
+		metadata := map[string]string{internal.CommandSQLKey: "INSERT INTO foo (id, v1, ts) VALUES (1, 'test-1', '2021-01-22')"}
 		req := &bindings.InvokeRequest{
 			Data:      nil,
 			Metadata:  metadata,
@@ -130,7 +131,7 @@ func TestInvoke(t *testing.T) {
 		rows := sqlmock.NewRowsWithColumnDefinition(col1, col2, col3).AddRow(1, 1.1, time.Now())
 		mock.ExpectQuery("SELECT \\* FROM foo WHERE id < \\d+").WillReturnRows(rows)
 
-		metadata := map[string]string{commandSQLKey: "SELECT * FROM foo WHERE id < 2"}
+		metadata := map[string]string{internal.CommandSQLKey: "SELECT * FROM foo WHERE id < 2"}
 		req := &bindings.InvokeRequest{
 			Data:      nil,
 			Metadata:  metadata,
@@ -146,7 +147,7 @@ func TestInvoke(t *testing.T) {
 
 	t.Run("query operation fails", func(t *testing.T) {
 		mock.ExpectQuery("SELECT \\* FROM foo WHERE id < \\d+").WillReturnError(errors.New("query failed"))
-		metadata := map[string]string{commandSQLKey: "SELECT * FROM foo WHERE id < 2"}
+		metadata := map[string]string{internal.CommandSQLKey: "SELECT * FROM foo WHERE id < 2"}
 		req := &bindings.InvokeRequest{
 			Data:      nil,
 			Metadata:  metadata,

@@ -46,12 +46,12 @@ type ClusterSpec struct {
 	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
 
 	// List of components you want to replace in ClusterDefinition and AppVersion. It will replace the field in ClusterDefinition's and AppVersion's component if type is matching.
-	// +kubebuilder:validation:Required
+	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	Components []ClusterComponent `json:"components" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	Components []ClusterComponent `json:"components,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Affinity describes affinities which specific by users.
 	// +optional

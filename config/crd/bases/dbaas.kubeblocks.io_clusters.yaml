@@ -501,7 +501,6 @@ spec:
             required:
             - appVersionRef
             - clusterDefinitionRef
-            - components
             - terminationPolicy
             type: object
           status:

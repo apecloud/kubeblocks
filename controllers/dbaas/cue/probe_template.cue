@@ -5,7 +5,7 @@ probeContainer: {
 	name:            "string"
 	"env": [
 		{
-			"name": "SERVICE_USER"
+			"name": "KB_SERVICE_USER"
 			"valueFrom": {
 				"secretKeyRef": {
 					"key":  "username"
@@ -14,7 +14,7 @@ probeContainer: {
 			}
 		},
 		{
-			"name": "SERVICE_PASSWORD"
+			"name": "KB_SERVICE_PASSWORD"
 			"valueFrom": {
 				"secretKeyRef": {
 					"key":  "password"

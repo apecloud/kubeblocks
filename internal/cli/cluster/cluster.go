@@ -177,7 +177,7 @@ func (o *ClusterObjects) GetClusterInfo() *ClusterInfo {
 		ExternalEP:        valueNone,
 	}
 
-	primaryComponent := FindOrBuildClusterComp(o.Cluster, &o.ClusterDef.Spec.Components[0])
+	primaryComponent := FindClusterComp(o.Cluster, o.ClusterDef.Spec.Components[0].TypeName)
 	internalEndpoints, externalEndpoints := GetClusterEndpoints(o.Services, primaryComponent)
 	if len(internalEndpoints) > 0 {
 		cluster.InternalEP = strings.Join(internalEndpoints, ",")
@@ -191,10 +191,15 @@ func (o *ClusterObjects) GetClusterInfo() *ClusterInfo {
 func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 	var comps []*ComponentInfo
 
-	for _, compInClusterDef := range o.ClusterDef.Spec.Components {
-		c := FindOrBuildClusterComp(o.Cluster, &compInClusterDef)
+	for _, cdComp := range o.ClusterDef.Spec.Components {
+		c := FindClusterComp(o.Cluster, cdComp.TypeName)
 		if c == nil {
-			continue
+			return nil
+		}
+
+		if c.Replicas == nil {
+			r := cdComp.DefaultReplicas
+			c.Replicas = &r
 		}
 
 		var pods []*corev1.Pod

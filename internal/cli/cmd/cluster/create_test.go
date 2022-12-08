@@ -27,6 +27,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 )
 
 func generateComponents(component dbaasv1alpha1.ClusterComponent, count int) []map[string]interface{} {
@@ -123,5 +124,13 @@ spec:
 		bytes, err = multipleSourceComponents(fileName, streams)
 		Expect(bytes).Should(BeNil())
 		Expect(err).Should(HaveOccurred())
+	})
+
+	It("build cluster component", func() {
+		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
+		comps, err := buildClusterComp(dynamic, testing.ClusterDefName)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(comps).ShouldNot(BeNil())
+		Expect(len(comps)).Should(Equal(2))
 	})
 })

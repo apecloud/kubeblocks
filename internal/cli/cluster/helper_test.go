@@ -65,27 +65,12 @@ var _ = Describe("helper", func() {
 	})
 
 	It("find component in cluster by type name", func() {
-		buildCdComp := func(name string, r int32) *dbaasv1alpha1.ClusterDefinitionComponent {
-			return &dbaasv1alpha1.ClusterDefinitionComponent{
-				TypeName:        name,
-				DefaultReplicas: r,
-			}
-		}
-
-		By("do not find component and do not build")
 		cluster := testing.FakeCluster("test", "test")
-		component := FindOrBuildClusterComp(cluster, buildCdComp("test", 0))
+		component := FindClusterComp(cluster, "test")
 		Expect(component).Should(BeNil())
 
-		By("do not find, but build one")
-		component = FindOrBuildClusterComp(cluster, buildCdComp("test", 1))
+		component = FindClusterComp(cluster, testing.ComponentType)
 		Expect(component).ShouldNot(BeNil())
-		Expect(component.Name).Should(Equal("test"))
-
-		By("find cluster component")
-		component = FindOrBuildClusterComp(cluster, buildCdComp(testing.ComponentName, 1))
-		Expect(component).ShouldNot(BeNil())
-		Expect(component.Name).Should(Equal(testing.ComponentName))
 	})
 
 	It("get all clusters", func() {

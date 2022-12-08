@@ -79,24 +79,11 @@ func GetAllCluster(client dynamic.Interface, namespace string, clusters *dbaasv1
 	return runtime.DefaultUnstructuredConverter.FromUnstructured(objs.UnstructuredContent(), clusters)
 }
 
-// FindOrBuildClusterComp finds cluster component in cluster definition component, if found,
-// return cluster component, otherwise try to build a cluster component based on cluster definition.
-func FindOrBuildClusterComp(cluster *dbaasv1alpha1.Cluster,
-	cdComp *dbaasv1alpha1.ClusterDefinitionComponent) *dbaasv1alpha1.ClusterComponent {
+// FindClusterComp finds component in cluster object based on the component type name
+func FindClusterComp(cluster *dbaasv1alpha1.Cluster, typeName string) *dbaasv1alpha1.ClusterComponent {
 	for i, c := range cluster.Spec.Components {
-		if c.Type == cdComp.TypeName {
+		if c.Type == typeName {
 			return &cluster.Spec.Components[i]
-		}
-	}
-
-	// if cluster definition component default replicas greater than 0, build a cluster component
-	// by cluster definition component. This logic is same with KubeBlocks controller.
-	r := cdComp.DefaultReplicas
-	if r > 0 {
-		return &dbaasv1alpha1.ClusterComponent{
-			Name:     cdComp.TypeName,
-			Type:     cdComp.TypeName,
-			Replicas: &r,
 		}
 	}
 	return nil

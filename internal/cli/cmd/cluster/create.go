@@ -193,7 +193,7 @@ func (o *CreateOptions) Complete() error {
 		if err = json.Unmarshal(componentByte, &components); err != nil {
 			return err
 		}
-	} else {
+	} else if len(components) == 0 {
 		if components, err = buildClusterComp(o.Client, o.ClusterDefRef); err != nil {
 			return err
 		}
@@ -282,6 +282,30 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	return create.BuildCommand(inputs)
 }
 
+func markRequiredFlag(cmd *cobra.Command) {
+	for _, f := range []string{"cluster-definition", "version", "termination-policy", "components"} {
+		util.CheckErr(cmd.MarkFlagRequired(f))
+	}
+}
+
+func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"cluster-definition",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return comp.CompGetResource(f, cmd, util.GVRToString(types.ClusterDefGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+		}))
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"version",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return comp.CompGetResource(f, cmd, util.GVRToString(types.AppVersionGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+		}))
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"termination-policy",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return []string{"DoNotTerminate", "Halt", "Delete", "WipeOut"}, cobra.ShellCompDirectiveNoFileComp
+		}))
+}
+
 // PreCreate before commit yaml to k8s, make changes on Unstructured yaml
 func (o *CreateOptions) PreCreate(obj *unstructured.Unstructured) error {
 	if !o.EnableAllLogs {
@@ -334,10 +358,12 @@ func buildClusterComp(dynamic dynamic.Interface, clusterDef string) ([]map[strin
 
 	var comps []map[string]interface{}
 	for _, c := range cd.Spec.Components {
-		if c.DefaultReplicas <= 0 {
+		// if cluster definition component default replicas greater than 0, build a cluster component
+		// by cluster definition component. This logic is same with KubeBlocks controller.
+		r := c.DefaultReplicas
+		if r <= 0 {
 			continue
 		}
-		r := c.DefaultReplicas
 		comp := map[string]interface{}{
 			"name":     c.TypeName,
 			"type":     c.TypeName,
@@ -346,28 +372,4 @@ func buildClusterComp(dynamic dynamic.Interface, clusterDef string) ([]map[strin
 		comps = append(comps, comp)
 	}
 	return comps, nil
-}
-
-func markRequiredFlag(cmd *cobra.Command) {
-	for _, f := range []string{"cluster-definition", "version", "termination-policy", "components"} {
-		util.CheckErr(cmd.MarkFlagRequired(f))
-	}
-}
-
-func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
-	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
-		"cluster-definition",
-		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return comp.CompGetResource(f, cmd, util.GVRToString(types.ClusterDefGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
-		}))
-	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
-		"version",
-		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return comp.CompGetResource(f, cmd, util.GVRToString(types.AppVersionGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
-		}))
-	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
-		"termination-policy",
-		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return []string{"DoNotTerminate", "Halt", "Delete", "WipeOut"}, cobra.ShellCompDirectiveNoFileComp
-		}))
 }

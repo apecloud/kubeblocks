@@ -28,6 +28,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
@@ -64,10 +65,11 @@ var _ = Describe("Cluster", func() {
 			tf := cmdtesting.NewTestFactory().WithNamespace("default")
 			defer tf.Cleanup()
 
+			tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef())
 			o := &CreateOptions{
-				BaseOptions:        create.BaseOptions{IOStreams: streams, Name: "test"},
+				BaseOptions:        create.BaseOptions{IOStreams: streams, Name: "test", Client: tf.FakeDynamicClient},
 				ComponentsFilePath: "",
-				ClusterDefRef:      "wesql",
+				ClusterDefRef:      testing.ClusterDefName,
 				AppVersionRef:      "app-version",
 				PodAntiAffinity:    "Preferred",
 				TopologyKeys:       []string{"kubernetes.io/hostname"},

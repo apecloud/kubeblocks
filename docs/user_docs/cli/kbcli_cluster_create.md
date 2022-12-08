@@ -9,6 +9,12 @@ kbcli cluster create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOu
 ### Examples
 
 ```
+  # Create a cluster using cluster definition my-cluster-def and component version my-version
+  kbcli cluster create mycluster --cluster-definition=my-cluster-def --version=my-version
+  
+  # Both --cluster-definition and --version are required for creating cluster, for the sake of brevity,
+  # the following examples will ignore these two flags.
+  
   # Create a cluster using component file component.yaml and termination policy DoNotDelete that will prevent
   # the cluster from being deleted
   kbcli cluster create mycluster --components=component.yaml --termination-policy=DoNotDelete
@@ -47,18 +53,18 @@ kbcli cluster create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOu
 ### Options
 
 ```
-      --app-version string           AppVersion reference (default "wesql-8.0.30")
       --backup string                Set a source backup to restore data
-      --cluster-definition string    ClusterDefinition reference (default "apecloud-wesql")
+      --cluster-definition string    ClusterDefinition reference
       --components string            Use yaml file, URL, or stdin to specify the cluster components
       --enable-all-logs              Enable advanced application all log extraction, and true will ignore enabledLogs of component level
   -h, --help                         help for create
-      --monitor                      Set monitor enabled (default false)
+      --monitor                      Set monitor enabled and inject metrics exporter(default true) (default true)
       --node-labels stringToString   Node label selector (default [])
       --pod-anti-affinity string     Pod anti-affinity type (default "Preferred")
       --termination-policy string    Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)
       --tolerations strings          Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'
       --topology-keys stringArray    Topology keys for affinity
+      --version string               AppVersion reference
 ```
 
 ### Options inherited from parent commands

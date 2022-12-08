@@ -41,7 +41,7 @@ const (
 	PVCName          = "fake-pvc"
 
 	KubeBlocksChartName = "fake-kubeblocks"
-	KubeBlocksChartURL  = "https://apecloud.github.io/fake-kubeblocks"
+	KubeBlocksChartURL  = "fake-kubeblocks-chart-url"
 )
 
 func FakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {

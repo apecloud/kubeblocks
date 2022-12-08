@@ -22,21 +22,18 @@ import (
 	"os"
 	"strings"
 
-	"github.com/apecloud/kubeblocks/internal/cli/printer"
-
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	cmddes "k8s.io/kubectl/pkg/describe"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
-	"github.com/apecloud/kubeblocks/internal/cli/describe"
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
@@ -140,11 +137,10 @@ func (o *ListLogsOptions) Run() error {
 
 // printListLogs prints the result of list-logs command to stdout.
 func (o *ListLogsOptions) printListLogs(dataObj *cluster.ClusterObjects) error {
-	w := cmddes.NewPrefixWriter(o.Out)
 	tbl := printer.NewTablePrinter(o.Out)
 	logFilesData := o.gatherLogFilesData(dataObj.Cluster, dataObj.ClusterDef, dataObj.Pods)
 	if len(logFilesData) == 0 {
-		w.Write(describe.Level0, "No log files found. \nYou can enable the log feature when creating a cluster with option of \"--enable-all-logs=true\"\n")
+		fmt.Fprintln(o.ErrOut, "No log files found. \nYou can enable the log feature when creating a cluster with option of \"--enable-all-logs=true\"")
 	} else {
 		tbl.SetHeader("INSTANCE", "LOG-TYPE", "FILE-PATH", "SIZE", "LAST-WRITTEN", "COMPONENT")
 		for _, f := range logFilesData {
@@ -186,6 +182,7 @@ func (o *ListLogsOptions) gatherLogFilesData(c *dbaasv1alpha1.Cluster, cd *dbaas
 			for _, logType := range comCluster.EnabledLogs {
 				logTypeMap[logType] = struct{}{}
 			}
+			break
 		}
 		if len(comTypeName) == 0 || len(logTypeMap) == 0 {
 			continue
@@ -202,6 +199,7 @@ func (o *ListLogsOptions) gatherLogFilesData(c *dbaasv1alpha1.Cluster, cd *dbaas
 					}
 				}
 			}
+			break
 		}
 	}
 	return logFileInfoList

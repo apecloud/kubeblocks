@@ -142,7 +142,7 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 		for _, pod := range objs.Pods.Items {
 			for _, node := range objs.Nodes {
 				if node.Name == pod.Spec.NodeName {
-					break podLoop
+					continue podLoop
 				}
 			}
 

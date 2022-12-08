@@ -17,6 +17,8 @@ limitations under the License.
 package controllerutil
 
 import (
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -175,4 +177,18 @@ func PodIsReady(pod *corev1.Pod) bool {
 		}
 	}
 	return false
+}
+
+// GetContainerID find the containerID from pod by name
+func GetContainerID(pod *corev1.Pod, containerName string) string {
+	const containerSep = "//"
+
+	// container id is present in the form of <runtime>://<container-id>
+	// e.g: containerID: docker://27d1586d53ef9a6af5bd983831d13b6a38128119fadcdc22894d7b2397758eb5
+	for _, container := range pod.Status.ContainerStatuses {
+		if container.Name == containerName {
+			return strings.Split(container.ContainerID, containerSep)[1]
+		}
+	}
+	return ""
 }

@@ -19,7 +19,6 @@ package dbaas
 import (
 	"embed"
 	"encoding/json"
-	"fmt"
 
 	"github.com/leaanthony/debme"
 	"github.com/spf13/viper"
@@ -89,9 +88,8 @@ func setMysqlComponent(cluster *dbaasv1alpha1.Cluster, component *Component) err
 	image := viper.GetString("KUBEBLOCKS_IMAGE")
 	imagePullPolicy := viper.GetString("KUBEBLOCKS_IMAGE_PULL_POLICY")
 
-	rootSecretName := fmt.Sprintf("%s-conn-credential", cluster.Name)
 	mysqlMonitor := &MysqlMonitor{
-		SecretName: rootSecretName,
+		SecretName: cluster.Name,
 		// HACK: fixed port value
 		// TODO: port value is checked against other containers.
 		InternalPort:    9104,

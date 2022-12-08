@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+	"github.com/apecloud/kubeblocks/version"
 )
 
 type initOptions struct {
@@ -300,7 +301,7 @@ func (o *initOptions) installKubeBlocks() error {
 			Namespace: defaultNamespace,
 			IOStreams: o.IOStreams,
 		},
-		Version: "0.2.0-alpha.7",
+		Version: version.DefaultKubeBlocksVersion,
 		Monitor: true,
 		Quiet:   true,
 	}

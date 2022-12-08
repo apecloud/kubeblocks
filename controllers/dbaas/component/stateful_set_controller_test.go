@@ -19,7 +19,6 @@ package component
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -506,7 +505,7 @@ spec:
 			Expect(k8sClient.Status().Patch(context.Background(), cluster, patch)).Should(Succeed())
 
 			By("mock the StatefulSet and pods are ready")
-			if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
+			if testCtx.UsingExistingCluster() {
 				testUsingRealCluster()
 			} else {
 				testUsingEnvTest(sts)

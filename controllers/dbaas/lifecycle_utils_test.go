@@ -18,7 +18,6 @@ package dbaas
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -84,7 +83,7 @@ var _ = Describe("lifecycle_utils", func() {
 			clusterDef = &dbaasv1alpha1.ClusterDefinition{}
 			clusterDef.Spec.Type = kStateMysql
 			clusterDefComp = &dbaasv1alpha1.ClusterDefinitionComponent{}
-			clusterDefComp.CharacterType = KMysql
+			clusterDefComp.CharacterType = kMysql
 			clusterDefComp.Monitor = &dbaasv1alpha1.MonitorConfig{
 				BuiltIn: false,
 				Exporter: &dbaasv1alpha1.ExporterConfig{
@@ -155,7 +154,7 @@ var _ = Describe("lifecycle_utils", func() {
 		It("Enable builtIn with empty CharacterType and wrong clusterType in ClusterDefinitionComponent", func() {
 			clusterComp.Monitor = true
 			clusterDef.Spec.Type = kFake
-			clusterDefComp.CharacterType = KEmpty
+			clusterDefComp.CharacterType = ""
 			clusterDefComp.Monitor.BuiltIn = true
 			clusterDefComp.Monitor.Exporter = nil
 			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
@@ -166,21 +165,6 @@ var _ = Describe("lifecycle_utils", func() {
 			if component.PodSpec != nil {
 				Expect(len(component.PodSpec.Containers)).To(Equal(0))
 			}
-		})
-
-		It("Enable builtIn with empty CharacterType and right clusterType in ClusterDefinitionComponent", func() {
-			clusterComp.Monitor = true
-			clusterDef.Spec.Type = kStateMysql
-			clusterDefComp.CharacterType = KEmpty
-			clusterDefComp.Monitor.BuiltIn = true
-			clusterDefComp.Monitor.Exporter = nil
-			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
-			monitorConfig := component.Monitor
-			Expect(monitorConfig.Enable).Should(BeTrue())
-			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(9104))
-			Expect(monitorConfig.ScrapePath).To(Equal("/metrics"))
-			Expect(len(component.PodSpec.Containers)).To(Equal(1))
-			Expect(strings.HasPrefix(component.PodSpec.Containers[0].Name, "inject-")).To(BeTrue())
 		})
 	})
 

@@ -11,6 +11,7 @@ spec:
         builtIn: false
       configTemplateRefs:
         - name: mysql-3node-tpl-8.0
+          namespace: default
           volumeName: mysql-config
       componentType: Consensus
       consensusSpec:

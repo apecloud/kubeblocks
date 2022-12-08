@@ -30,6 +30,7 @@ import (
 	"github.com/leaanthony/debme"
 	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -851,7 +852,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			// when horizontal scaling up, sometimes db needs backup to sync data from master, log is not reliable enough since it can be recycled
 			if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
 				// do backup according to component's horizontal scale policy
-				if component != nil {
+				if component == nil {
 					reqCtx.Recorder.Eventf(cluster, corev1.EventTypeWarning, "HorizontalScaleFailed", "component %s not found", componentName)
 					continue
 				}
@@ -928,19 +929,9 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 								Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 							}
 							// delete pvc
-							pvc := corev1.PersistentVolumeClaim{}
-							if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
-								if !apierrors.IsNotFound(err) {
-									res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-									return &res, err
-								}
-							} else {
-								if err := cli.Delete(ctx, &pvc); err != nil {
-									if !apierrors.IsNotFound(err) {
-										res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-										return &res, err
-									}
-								}
+							if err := createDeletePVCCronJob(cli, ctx, pvcKey); err != nil {
+								res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+								return &res, err
 							}
 						}
 					}
@@ -2147,4 +2138,79 @@ func deleteSnapshot(cli client.Client,
 		}
 	}
 	return nil
+}
+
+func buildCronJob(pvcKey types.NamespacedName, schedule string) (*v1.CronJob, error) {
+	cueFS, _ := debme.FS(cueTemplates, "cue")
+
+	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("delete_pvc_cron_job_template.cue"))
+	if err != nil {
+		return nil, err
+	}
+
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+
+	keyStrByte, err := json.Marshal(pvcKey)
+	if err := cueValue.Fill("pvc", keyStrByte); err != nil {
+		return nil, err
+	}
+
+	if err := cueValue.FillRaw("cronjob.spec.schedule", schedule); err != nil {
+		return nil, err
+	}
+
+	cronJobStrByte, err := cueValue.Lookup("cronjob")
+	if err != nil {
+		return nil, err
+	}
+
+	cronJob := v1.CronJob{}
+	if err = json.Unmarshal(cronJobStrByte, &cronJob); err != nil {
+		return nil, err
+	}
+
+	return &cronJob, nil
+}
+
+func createDeletePVCCronJob(cli client.Client,
+	ctx context.Context,
+	pvcKey types.NamespacedName) error {
+	now := time.Now()
+	// hack: delete after 30 minutes
+	t := now.Add(30 * 60 * time.Second)
+	schedule := timeToSchedule(t)
+	cronJob, err := buildCronJob(pvcKey, schedule)
+	if err != nil {
+		return err
+	}
+	if err := cli.Create(ctx, cronJob); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deleteDeletePVCCronJob(cli client.Client,
+	ctx context.Context,
+	pvcKey types.NamespacedName) error {
+	cronJobKey := pvcKey
+	cronJobKey.Name = "delete-pvc-" + pvcKey.Name
+	cronJob := v1.CronJob{}
+	if err := cli.Get(ctx, cronJobKey, &cronJob); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+	} else {
+		if err := cli.Delete(ctx, &cronJob); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func timeToSchedule(t time.Time) string {
+	utc := t.UTC()
+	schedule := fmt.Sprintf("%d %d %d %d *", utc.Minute(), utc.Hour(), utc.Day(), utc.Month())
+	return schedule
 }

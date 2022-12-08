@@ -30,6 +30,8 @@ $ go build -o probe main.go
 Probe read some configurations from env variables, Now there are:
 KB_AGGREGATION_NUMBER: The number of continuously checks failed aggregated in one event, in case of too many events sent. if empty, default value is 10.
 KB_SERVICE_PORT: The port of service to probe, eg. 3306.
+KB_SERVICE_USER: The user name of service used to connect, eg. root.
+KB_SERVICE_PASSWORD: The user password of service used to connect.
 KB_SERVICE_ROLES: The mapping of roles and accessmode, eg. {"follower":"Readonly","leader":"ReadWrite"}.
 
 ## 2.3 Run

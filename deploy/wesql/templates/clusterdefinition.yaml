@@ -65,7 +65,6 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
-                value: {{ .Values.auth.rootUser | default "root" | quote }}
               - name: MYSQL_ROOT_PASSWORD
                 valueFrom:
                   secretKeyRef:

@@ -38,17 +38,12 @@ const (
 
 // ClusterDefinitionComponent CharacterType Const Define
 const (
-	KMysql = "mysql"
-	KEmpty = ""
+	kMysql = "mysql"
 )
 
 var (
-	kWellKnownTypeMaps = map[string]string{
-		kStateMysql:  KMysql,
-		kStateMysql8: KMysql,
-	}
-	WellKnownCharacterTypeFunc = map[string]func(cluster *dbaasv1alpha1.Cluster, component *Component) error{
-		KMysql: setMysqlComponent,
+	wellKnownCharacterTypeFunc = map[string]func(cluster *dbaasv1alpha1.Cluster, component *Component) error{
+		kMysql: setMysqlComponent,
 	}
 	//go:embed cue/*
 	CueTemplates embed.FS
@@ -118,20 +113,12 @@ func setMysqlComponent(cluster *dbaasv1alpha1.Cluster, component *Component) err
 	return nil
 }
 
-// CalcCharacterType calc wellknown CharacterType, if not wellknown return empty string
-func CalcCharacterType(clusterType string) string {
-	if v, ok := kWellKnownTypeMaps[clusterType]; ok {
-		return v
-	}
-	return KEmpty
+// isWellKnownCharacterType check CharacterType is wellknown
+func isWellKnownCharacterType(characterType string) bool {
+	return isMappedCharacterType(characterType, wellKnownCharacterTypeFunc)
 }
 
-// IsWellKnownCharacterType check CharacterType is wellknown
-func IsWellKnownCharacterType(characterType string) bool {
-	return isWellKnowCharacterType(characterType, WellKnownCharacterTypeFunc)
-}
-
-func isWellKnowCharacterType(characterType string,
+func isMappedCharacterType(characterType string,
 	processors map[string]func(*dbaasv1alpha1.Cluster, *Component) error) bool {
 	if val, ok := processors[characterType]; ok && val != nil {
 		return true

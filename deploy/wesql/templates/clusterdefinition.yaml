@@ -7,7 +7,7 @@ metadata:
 spec:
   type: state.mysql
   connectionCredential:
-    user: {{ .Values.auth.rootUser }}
+    username: root
     password: "$(RANDOM_PASSWORD)"
   components:
     - typeName: replicasets
@@ -61,11 +61,16 @@ spec:
               - name: MYSQL_ROOT_HOST
                 value: {{ .Values.auth.rootHost | default "%" | quote }}
               - name: MYSQL_ROOT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
                 value: {{ .Values.auth.rootUser | default "root" | quote }}
               - name: MYSQL_ROOT_PASSWORD
-                value: {{ .Values.auth.rootPassword | quote }}
-              - name: MYSQL_ALLOW_EMPTY_PASSWORD
-                value: {{- if not .Values.auth.rootPassword }} "yes" {{- else }} "no" {{- end }}
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
               - name: MYSQL_DATABASE
                 value: {{- if .Values.auth.createDatabase }} {{ .Values.auth.database | quote }}  {{- else }} "" {{- end }}
               - name: MYSQL_USER

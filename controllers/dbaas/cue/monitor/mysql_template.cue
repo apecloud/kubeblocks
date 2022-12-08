@@ -16,7 +16,7 @@ container: {
 			"valueFrom": {
 				"secretKeyRef": {
 					"key":  "username"
-					"name": "\(monitor.secretName)"
+					"name": "$(CONN_CREDENTIAL_SECRET_NAME)"
 				}
 			}
 		},
@@ -25,7 +25,7 @@ container: {
 			"valueFrom": {
 				"secretKeyRef": {
 					"key":  "password"
-					"name": "\(monitor.secretName)"
+					"name": "$(CONN_CREDENTIAL_SECRET_NAME)"
 				}
 			}
 		},

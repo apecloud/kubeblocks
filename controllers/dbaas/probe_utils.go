@@ -30,6 +30,15 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+const (
+	roleProbeContainerName    = "kb-rolechangedcheck"
+	statusProbeContainerName  = "kb-statuscheck"
+	runningProbeContainerName = "kb-runningcheck"
+	ProbeRoleChangedCheckPath = "spec.containers{" + roleProbeContainerName + "}"
+	ProbeStatusCheckPath      = "spec.containers{" + statusProbeContainerName + "}"
+	ProbeRunningCheckPath     = "spec.containers{" + runningProbeContainerName + "}"
+)
+
 func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams,
 	containers []corev1.Container) ([]corev1.Container, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
@@ -163,7 +172,7 @@ func getComponentRoles(component *Component) map[string]string {
 
 func buildRoleChangedProbeContainer(roleChangedContainer *corev1.Container,
 	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
-	roleChangedContainer.Name = "kb-rolechangedcheck"
+	roleChangedContainer.Name = roleProbeContainerName
 	probe := roleChangedContainer.ReadinessProbe
 	probe.Exec.Command = []string{"curl", "-X", "POST",
 		"--fail-with-body", "--silent",
@@ -176,7 +185,7 @@ func buildRoleChangedProbeContainer(roleChangedContainer *corev1.Container,
 
 func buildStatusProbeContainer(statusProbeContainer *corev1.Container,
 	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
-	statusProbeContainer.Name = "kb-statuscheck"
+	statusProbeContainer.Name = statusProbeContainerName
 	probe := statusProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = "/v1.0/bindings/probe?operation=statusCheck"
@@ -189,7 +198,7 @@ func buildStatusProbeContainer(statusProbeContainer *corev1.Container,
 
 func buildRunningProbeContainer(runningProbeContainer *corev1.Container,
 	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
-	runningProbeContainer.Name = "kb-runningcheck"
+	runningProbeContainer.Name = runningProbeContainerName
 	probe := runningProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = "/v1.0/bindings/probe?operation=runningCheck"

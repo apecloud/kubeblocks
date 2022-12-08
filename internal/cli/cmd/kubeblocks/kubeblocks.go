@@ -21,15 +21,19 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/repo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/utils/strings/slices"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -105,6 +109,47 @@ func (o *Options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 
 	o.client, err = f.DynamicClient()
 	return err
+}
+
+func (o *Options) precheck() error {
+	precheckList := []string{
+		"clusters.dbaas.kubeblocks.io",
+	}
+	ctx := context.Background()
+	// delete crds
+	crdGVR := schema.GroupVersionResource{
+		Group:    "apiextensions.k8s.io",
+		Version:  types.VersionV1,
+		Resource: "customresourcedefinitions",
+	}
+	crdList, err := o.client.Resource(crdGVR).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, crd := range crdList.Items {
+		// find kubeblocks crds
+		if strings.Contains(crd.GetName(), "kubeblocks.io") &&
+			slices.Contains(precheckList, crd.GetName()) {
+			group, _, err := unstructured.NestedString(crd.Object, "spec", "group")
+			if err != nil {
+				return err
+			}
+			gvr := schema.GroupVersionResource{
+				Group:    group,
+				Version:  types.Version,
+				Resource: strings.Split(crd.GetName(), ".")[0],
+			}
+			// find custom resource
+			objList, err := o.client.Resource(gvr).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				return err
+			}
+			if len(objList.Items) > 0 {
+				return errors.Errorf("Can not uninstall, you should delete custom resource %s %s first", crd.GetName(), objList.Items[0].GetName())
+			}
+		}
+	}
+	return nil
 }
 
 func (o *InstallOptions) Run() error {
@@ -193,6 +238,10 @@ func (o *Options) run() error {
 		return err
 	}
 
+	if err := deleteCRDs(o.client); err != nil {
+		return err
+	}
+
 	fmt.Fprintln(o.Out, "Successfully uninstall KubeBlocks")
 	return nil
 }
@@ -220,6 +269,28 @@ func removeFinalizers(client dynamic.Interface) error {
 		if _, err = client.Resource(types.AppVersionGVR()).Patch(ctx, appVer.GetName(), k8sapitypes.JSONPatchType,
 			[]byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{}); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func deleteCRDs(cli dynamic.Interface) error {
+	ctx := context.Background()
+	// delete crds
+	crdGVR := schema.GroupVersionResource{
+		Group:    "apiextensions.k8s.io",
+		Version:  types.VersionV1,
+		Resource: "customresourcedefinitions",
+	}
+	crdList, err := cli.Resource(crdGVR).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, crd := range crdList.Items {
+		if strings.Contains(crd.GetName(), "kubeblocks.io") {
+			if err := cli.Resource(crdGVR).Delete(ctx, crd.GetName(), metav1.DeleteOptions{}); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -261,6 +332,7 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Example: uninstallExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f, cmd))
+			util.CheckErr(o.precheck())
 			util.CheckErr(o.run())
 		},
 	}

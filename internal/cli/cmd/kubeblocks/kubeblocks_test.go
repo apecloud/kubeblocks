@@ -19,8 +19,9 @@ package kubeblocks
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
 	"github.com/spf13/cobra"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
@@ -161,5 +162,44 @@ var _ = Describe("kubeblocks", func() {
 				Expect(removeFinalizers(client)).Should(Succeed())
 			}
 		}
+	})
+
+	It("delete crd", func() {
+		clusterCrd := v1.CustomResourceDefinition{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "CustomResourceDefinition",
+				APIVersion: "apiextensions.k8s.io/v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "clusters.dbaas.kubeblocks.io",
+			},
+			Spec:   v1.CustomResourceDefinitionSpec{},
+			Status: v1.CustomResourceDefinitionStatus{},
+		}
+		clusterDefCrd := v1.CustomResourceDefinition{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "CustomResourceDefinition",
+				APIVersion: "apiextensions.k8s.io/v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "clusterdefinitions.dbaas.kubeblocks.io",
+			},
+			Spec:   v1.CustomResourceDefinitionSpec{},
+			Status: v1.CustomResourceDefinitionStatus{},
+		}
+		appVerCrd := v1.CustomResourceDefinition{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "CustomResourceDefinition",
+				APIVersion: "apiextensions.k8s.io/v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "appversions.dbaas.kubeblocks.io",
+			},
+			Spec:   v1.CustomResourceDefinitionSpec{},
+			Status: v1.CustomResourceDefinitionStatus{},
+		}
+
+		client := testing.FakeDynamicClient(&clusterCrd, &clusterDefCrd, &appVerCrd)
+		Expect(deleteCRDs(client)).Should(Succeed())
 	})
 })

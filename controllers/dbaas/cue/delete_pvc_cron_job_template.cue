@@ -21,11 +21,12 @@ cronjob: {
                 "image": "rancher/kubectl:v1.23.7",
                 "imagePullPolicy": "IfNotPresent",
                 "command": [
-                		"kubectl -n \(pvc.Namespace) delete pvc \(pvc.Name)"
+                		"kubectl", "-n", "\(pvc.Namespace)", "delete", "pvc", "\(pvc.Name)"
                 ]
               }
             ],
             "restartPolicy": "OnFailure"
+            "serviceAccount": "kubeblocks"
           }
         }
       }

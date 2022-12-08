@@ -32,10 +32,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -192,7 +194,9 @@ func (o *CreateOptions) Complete() error {
 			return err
 		}
 	} else {
-		components = []map[string]interface{}{}
+		if components, err = buildClusterComp(o.Client, o.ClusterDefRef); err != nil {
+			return err
+		}
 	}
 	setMonitor(o.Monitor, components)
 	if err = setBackup(o, components); err != nil {
@@ -320,6 +324,28 @@ func setEnableAllLogs(c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinit
 			c.Spec.Components[idx].EnabledLogs = typeList
 		}
 	}
+}
+
+func buildClusterComp(dynamic dynamic.Interface, clusterDef string) ([]map[string]interface{}, error) {
+	cd, err := cluster.GetClusterDefByName(dynamic, clusterDef)
+	if err != nil {
+		return nil, err
+	}
+
+	var comps []map[string]interface{}
+	for _, c := range cd.Spec.Components {
+		if c.DefaultReplicas <= 0 {
+			continue
+		}
+		r := c.DefaultReplicas
+		comp := map[string]interface{}{
+			"name":     c.TypeName,
+			"type":     c.TypeName,
+			"replicas": &r,
+		}
+		comps = append(comps, comp)
+	}
+	return comps, nil
 }
 
 func markRequiredFlag(cmd *cobra.Command) {

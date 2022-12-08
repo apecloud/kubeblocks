@@ -29,7 +29,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var _ = Describe("playground", func() {
@@ -88,14 +87,6 @@ var _ = Describe("playground", func() {
 		cmd := newGuideCmd()
 		Expect(cmd).ShouldNot(BeNil())
 		Expect(runGuide()).Should(HaveOccurred())
-
-		getter, err := newObjectsGetter(util.ConfigPath("test"))
-		Expect(getter).ShouldNot(BeNil())
-		Expect(err).Should(Succeed())
-
-		objs, err := getter.Get()
-		Expect(objs).Should(BeNil())
-		Expect(err).Should(HaveOccurred())
 	})
 
 	It("find latest version", func() {

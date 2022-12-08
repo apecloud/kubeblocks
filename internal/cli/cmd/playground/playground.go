@@ -287,37 +287,10 @@ func printGuide(cloudProvider string, hostIP string, init bool) error {
 	}
 
 	if init {
-		fmt.Fprintf(os.Stdout, "KubeBlocks playground init SUCCESSFULLY!\n"+
+		fmt.Fprintf(os.Stdout, "\nKubeBlocks playground init SUCCESSFULLY!\n"+
 			"Cluster \"%s\" has been CREATED!\n", kbClusterName)
 	}
 	return util.PrintGoTemplate(os.Stdout, guideTmpl, clusterInfo)
-}
-
-func newObjectsGetter(cfg string) (*cluster.ObjectsGetter, error) {
-	// set env KUBECONFIG to playground kubernetes cluster config
-	if err := util.SetKubeConfig(cfg); err != nil {
-		return nil, err
-	}
-
-	f := util.NewFactory()
-	clientSet, err := f.KubernetesClientSet()
-	if err != nil {
-		return nil, err
-	}
-
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return nil, err
-	}
-
-	// get cluster info that will be used to render the guide template
-	clusterGetter := &cluster.ObjectsGetter{
-		ClientSet:     clientSet,
-		DynamicClient: dynamicClient,
-		Namespace:     defaultNamespace,
-		Name:          kbClusterName,
-	}
-	return clusterGetter, nil
 }
 
 func (o *initOptions) installKubeBlocks() error {
@@ -327,7 +300,7 @@ func (o *initOptions) installKubeBlocks() error {
 			Namespace: defaultNamespace,
 			IOStreams: o.IOStreams,
 		},
-		Version: "0.2.0-alpha.5",
+		Version: "0.2.0-alpha.7",
 		Monitor: true,
 		Quiet:   true,
 	}
@@ -384,6 +357,7 @@ func newCreateOptions(cd string, version string) (*cmdcluster.CreateOptions, err
 		TerminationPolicy: "WipeOut",
 		ClusterDefRef:     cd,
 		AppVersionRef:     version,
+		Monitor:           true,
 	}
 
 	if err = options.Complete(); err != nil {

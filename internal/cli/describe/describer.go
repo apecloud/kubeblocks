@@ -162,7 +162,7 @@ func (d *ClusterDescriber) describeCluster(events *corev1.EventList) (string, er
 		w.Write(Level0, "CreationTimestamp:\t%s\n", c.CreationTimestamp.Time.Format(time.RFC1123Z))
 
 		// consider first component as primary component, use it's endpoints as cluster endpoints
-		primaryComponent := cluster.FindCompInCluster(d.Cluster, d.ClusterDef.Spec.Components[0].TypeName)
+		primaryComponent := cluster.FindOrBuildClusterComp(d.Cluster, &d.ClusterDef.Spec.Components[0])
 		describeNetwork(Level0, d.Services, primaryComponent, w)
 
 		// topology
@@ -190,8 +190,8 @@ func (d *ClusterDescriber) describeCluster(events *corev1.EventList) (string, er
 
 func (d *ClusterDescriber) describeTopology(w describe.PrefixWriter) error {
 	w.Write(Level0, "\nTopology:\n")
-	for _, compInClusterDef := range d.ClusterDef.Spec.Components {
-		c := cluster.FindCompInCluster(d.Cluster, compInClusterDef.TypeName)
+	for _, cdComp := range d.ClusterDef.Spec.Components {
+		c := cluster.FindOrBuildClusterComp(d.Cluster, &cdComp)
 		if c == nil {
 			continue
 		}
@@ -214,14 +214,14 @@ func (d *ClusterDescriber) describeTopology(w describe.PrefixWriter) error {
 }
 
 func (d *ClusterDescriber) describeComponent(w describe.PrefixWriter) error {
-	for _, compInClusterDef := range d.ClusterDef.Spec.Components {
-		c := cluster.FindCompInCluster(d.Cluster, compInClusterDef.TypeName)
+	for _, cdComp := range d.ClusterDef.Spec.Components {
+		c := cluster.FindOrBuildClusterComp(d.Cluster, &cdComp)
 		if c == nil {
 			continue
 		}
 
 		if c.Replicas == nil {
-			r := compInClusterDef.DefaultReplicas
+			r := cdComp.DefaultReplicas
 			c.Replicas = &r
 		}
 		pods := d.getPodsOfComponent(c.Name)

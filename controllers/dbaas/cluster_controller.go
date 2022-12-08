@@ -130,7 +130,7 @@ func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *db
 }
 
 func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.InvolvedObject.FieldPath != k8score.ProbeRoleChangedCheckPath {
+	if event.InvolvedObject.FieldPath != ProbeRoleChangedCheckPath {
 		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
 	}
 

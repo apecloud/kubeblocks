@@ -39,40 +39,37 @@ const (
 	ProbeRunningCheckPath     = "spec.containers{" + runningProbeContainerName + "}"
 )
 
-func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams,
-	containers []corev1.Container) ([]corev1.Container, error) {
+func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *Component) error {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
-	cueTpl, err := params.getCacheCUETplValue("probe_template.cue", func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("probe_template.cue"))
-	})
+	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("probe_template.cue"))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
 	probeContainerByte, err := cueValue.Lookup("probeContainer")
 	if err != nil {
-		return nil, err
+		return err
 	}
 	container := corev1.Container{}
 	if err = json.Unmarshal(probeContainerByte, &container); err != nil {
-		return nil, err
+		return err
 	}
 
 	probeContainers := []corev1.Container{}
-	componentProbes := params.component.Probes
+	componentProbes := component.Probes
 	reqCtx.Log.Info("probe", "settings", componentProbes)
 	if componentProbes == nil {
-		return probeContainers, nil
+		return nil
 	}
 
 	probeSvcHTTPPort := viper.GetInt32("PROBE_SERVICE_PORT")
-	availablePorts, err := getAvailableContainerPorts(containers, []int32{probeSvcHTTPPort, 50001})
+	availablePorts, err := getAvailableContainerPorts(component.PodSpec.Containers, []int32{probeSvcHTTPPort, 50001})
 	probeSvcHTTPPort = availablePorts[0]
 	probeServiceGrpcPort := availablePorts[1]
 	if err != nil {
 		reqCtx.Log.Info("get probe container port failed", "error", err)
-		return nil, err
+		return err
 	}
 
 	if componentProbes.RoleChangedProbe != nil {
@@ -95,11 +92,12 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams,
 
 	if len(probeContainers) >= 1 {
 		container := &probeContainers[0]
-		buildProbeServiceContainer(params.component, container, int(probeSvcHTTPPort), int(probeServiceGrpcPort))
+		buildProbeServiceContainer(component, container, int(probeSvcHTTPPort), int(probeServiceGrpcPort))
 	}
 
 	reqCtx.Log.Info("probe", "containers", probeContainers)
-	return probeContainers, nil
+	component.PodSpec.Containers = append(component.PodSpec.Containers, probeContainers...)
+	return nil
 }
 
 func buildProbeServiceContainer(component *Component, container *corev1.Container, probeSvcHTTPPort int, probeServiceGrpcPort int) {
@@ -146,11 +144,6 @@ func buildProbeServiceContainer(component *Component, container *corev1.Containe
 		Name:          "probe-port",
 		Protocol:      "TCP",
 	}}
-
-	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
-		Name:      rootSecretVolumeName,
-		MountPath: "/etc/credential",
-	})
 }
 
 func getComponentRoles(component *Component) map[string]string {

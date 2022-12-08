@@ -14,21 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package component
+package consensusset
 
 import (
 	"testing"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/apecloud/kubeblocks/controllers/dbaas/component/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 func TestIsReady(t *testing.T) {
-	set := newStatefulSet("foo", 3)
-	pod := newStatefulSetPod(set, 1)
+	set := testk8s.NewFakeStatefulSet("foo", 3)
+	pod := testk8s.NewFakeStatefulSetPod(set, 1)
 	pod.Status.Conditions = []v1.PodCondition{
 		{
 			Type:   v1.PodReady,
@@ -54,5 +57,20 @@ func TestIsReady(t *testing.T) {
 	pod.Status.Conditions = []v1.PodCondition{}
 	if isReady(*pod) {
 		t.Errorf("isReady returned false positive")
+	}
+}
+
+func TestGetPodRevision(t *testing.T) {
+	set := testk8s.NewFakeStatefulSet("foo", 3)
+	pod := testk8s.NewFakeStatefulSetPod(set, 1)
+	if util.GetPodRevision(pod) != "" {
+		t.Errorf("revision should be empty")
+	}
+
+	pod.Labels = make(map[string]string, 0)
+	pod.Labels[apps.StatefulSetRevisionLabel] = "bar"
+
+	if util.GetPodRevision(pod) != "bar" {
+		t.Errorf("revision not matched")
 	}
 }

@@ -31,9 +31,6 @@ const (
 	// annotation keys
 
 	RestartAnnotationKey = "kubeblocks.io/restart"
-
-	// OpsRequestReconcileAnnotationKey Notify OpsRequest to reconcile
-	OpsRequestReconcileAnnotationKey = "kubeblocks.io/reconcile"
 )
 
 type OpsBehaviour struct {

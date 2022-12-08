@@ -600,9 +600,11 @@ spec:
                       - leader
                       type: object
                     message:
+                      additionalProperties:
+                        type: string
                       description: Message record the component details message in
-                        current phase.
-                      type: string
+                        current phase. keys are podName or deployName or statefulSetName
+                      type: object
                     phase:
                       description: 'Phase describe the phase of the cluster. the detail
                         information of phase is as follows: Failed: component not
@@ -621,6 +623,13 @@ spec:
                       - Deleting
                       - Deleted
                       - VolumeExpanding
+                      type: string
+                    podsReady:
+                      description: PodsReady check pods of the component are ready.
+                      type: boolean
+                    podsReadyTime:
+                      description: PodsReadyTime pods ready time
+                      format: date-time
                       type: string
                     type:
                       description: Type of component.
@@ -788,8 +797,9 @@ spec:
                   VolumeExpanding: volume expansion operation is running. Deleting/Deleted:
                   deleting cluster/cluster is deleted. Failed: cluster not available.
                   Abnormal: cluster available but some component is not Abnormal.
-                  if the component type is Consensus/Replication, the Leader/Primary
-                  pod is must ready in Abnormal phase.'
+                  ConditionsError: status.conditions error, but the components are
+                  running when cluster api changed. if the component type is Consensus/Replication,
+                  the Leader/Primary pod is must ready in Abnormal phase.'
                 enum:
                 - Running
                 - Failed
@@ -799,6 +809,7 @@ spec:
                 - Deleting
                 - Deleted
                 - VolumeExpanding
+                - ConditionsError
                 type: string
             type: object
         type: object

@@ -29,6 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/component/stateless"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/component/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -53,28 +55,37 @@ type DeploymentReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.2/pkg/reconcile
 func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	var (
+		deploy  = &appsv1.Deployment{}
+		cluster *dbaasv1alpha1.Cluster
+		err     error
+	)
+
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx: ctx,
 		Req: req,
 		Log: log.FromContext(ctx).WithValues("deployment", req.NamespacedName),
 	}
 
-	deploy := &appsv1.Deployment{}
-	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, deploy); err != nil {
+	if err = r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, deploy); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	if err := checkComponentStatusAndSyncCluster(reqCtx, r.Client, deploy, checkDeploymentStatus); err != nil {
+	if cluster, err = util.GetClusterByObject(reqCtx.Ctx, r.Client, deploy); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	} else if cluster == nil {
+		return intctrlutil.Reconciled()
+	}
+
+	stateless := stateless.NewStateless(reqCtx.Ctx, r.Client, cluster)
+	if requeueAfter, err := handleComponentStatusAndSyncCluster(reqCtx, r.Client, deploy, cluster, stateless); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	} else if requeueAfter != 0 {
+		// if the reconcileAction need requeue, do it
+		return intctrlutil.RequeueAfter(requeueAfter, reqCtx.Log, "")
 	}
 
 	return intctrlutil.Reconciled()
-}
-
-// checkDeploymentStatus check whether the stateless component is already running
-func checkDeploymentStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *dbaasv1alpha1.Cluster, object client.Object) (bool, error) {
-	deploy := object.(*appsv1.Deployment)
-	return DeploymentIsReady(deploy), nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

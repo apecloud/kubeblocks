@@ -20,12 +20,12 @@ import (
 	"time"
 
 	"golang.org/x/exp/slices"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/component/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -65,7 +65,7 @@ func handleVolumeExpansionWithPVC(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return nil
 	}
 	// notice the OpsRequest to reconcile
-	return PatchOpsRequestAnnotation(reqCtx.Ctx, cli, cluster, *opsRequestName)
+	return util.PatchOpsRequestAnnotation(reqCtx.Ctx, cli, cluster, *opsRequestName)
 }
 
 // Handle the warning events on pvcs. if the events is resize failed events, update the OpsRequest.status.

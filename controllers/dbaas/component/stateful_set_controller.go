@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/component/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -53,68 +54,47 @@ type StatefulSetReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.2/pkg/reconcile
 func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	var (
+		sts     = &appsv1.StatefulSet{}
+		cluster *dbaasv1alpha1.Cluster
+		err     error
+	)
+
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx: ctx,
 		Req: req,
 		Log: log.FromContext(ctx).WithValues("statefulSet", req.NamespacedName),
 	}
 
-	sts := &appsv1.StatefulSet{}
-	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, sts); err != nil {
+	if err = r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, sts); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	if err := checkComponentStatusAndSyncCluster(reqCtx, r.Client, sts, handleStatefulSetAndCheckStatus); err != nil {
+	if cluster, err = util.GetClusterByObject(reqCtx.Ctx, r.Client, sts); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	} else if cluster == nil {
+		return intctrlutil.Reconciled()
+	}
+
+	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+	if err = r.Client.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
+	// create a component object
+	componentName := sts.GetLabels()[intctrlutil.AppComponentLabelKey]
+	typeName := util.GetComponentTypeName(*cluster, componentName)
+	componentDef := util.GetComponentDefFromClusterDefinition(clusterDef, typeName)
+	component := NewComponentByType(ctx, r.Client, cluster, componentDef, componentName)
+
+	if requeueAfter, err := handleComponentStatusAndSyncCluster(reqCtx, r.Client, sts, cluster, component); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	} else if requeueAfter != 0 {
+		// if the reconcileAction need requeue, do it
+		return intctrlutil.RequeueAfter(requeueAfter, reqCtx.Log, "")
 	}
 
 	return intctrlutil.Reconciled()
-}
-
-func handleStatefulSetAndCheckStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *dbaasv1alpha1.Cluster, object client.Object) (bool, error) {
-	var (
-		statefulStatusRevisionIsEquals bool
-		sts                            = object.(*appsv1.StatefulSet)
-		err                            error
-	)
-	// handle update operations by component type. when statefulSet is ok, statefulStatusRevisionIsEquals will be true
-	if statefulStatusRevisionIsEquals, err = handleUpdateByComponentType(reqCtx, cli, sts, cluster); err != nil {
-		return false, err
-	}
-	return StatefulSetIsReady(sts, statefulStatusRevisionIsEquals), nil
-}
-
-// handleUpdateByComponentType handle cluster update operations according to component type and check statefulSet revision
-func handleUpdateByComponentType(reqCtx intctrlutil.RequestCtx, cli client.Client, sts *appsv1.StatefulSet, cluster *dbaasv1alpha1.Cluster) (bool, error) {
-	var (
-		componentDef                   *dbaasv1alpha1.ClusterDefinitionComponent
-		err                            error
-		statefulStatusRevisionIsEquals bool
-		labels                         = sts.GetLabels()
-	)
-	for _, v := range cluster.Spec.Components {
-		if v.Name != labels[intctrlutil.AppComponentLabelKey] {
-			continue
-		}
-		if componentDef, err = GetComponentFromClusterDefinition(reqCtx.Ctx, cli, cluster, v.Type); err != nil || componentDef == nil {
-			return false, err
-		}
-		switch componentDef.ComponentType {
-		case dbaasv1alpha1.Consensus:
-			// Consensus do not judge whether the revisions are consistent
-			if statefulStatusRevisionIsEquals, err = handleConsensusSetUpdate(reqCtx.Ctx, cli, cluster, sts); err != nil {
-				return false, err
-			}
-			// TODO check pod is ready by role label
-		case dbaasv1alpha1.Stateful:
-			// when stateful updateStrategy is rollingUpdate, need to check revision
-			if sts.Status.UpdateRevision == sts.Status.CurrentRevision {
-				statefulStatusRevisionIsEquals = true
-			}
-		}
-		break
-	}
-	return statefulStatusRevisionIsEquals, err
 }
 
 // SetupWithManager sets up the controller with the Manager.

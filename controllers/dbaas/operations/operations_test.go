@@ -633,7 +633,7 @@ spec:
 			if tmpOps.Annotations == nil {
 				return false
 			}
-			_, ok := tmpOps.Annotations[OpsRequestReconcileAnnotationKey]
+			_, ok := tmpOps.Annotations[intctrlutil.OpsRequestReconcileAnnotationKey]
 			return ok
 		}, timeout, interval).Should(BeTrue())
 		return newOps, pvcName

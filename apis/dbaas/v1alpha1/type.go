@@ -45,6 +45,7 @@ const (
 	VolumeExpandingPhase Phase = "VolumeExpanding"
 	SucceedPhase         Phase = "Succeed"
 	AbnormalPhase        Phase = "Abnormal"
+	ConditionsErrorPhase Phase = "ConditionsError"
 )
 
 // Status define CR .Status.ClusterDefSyncStatus
@@ -122,6 +123,11 @@ const (
 	Preferred PodAntiAffinity = "Preferred"
 	Required  PodAntiAffinity = "Required"
 )
+
+type OpsRequestBehaviour struct {
+	FromClusterPhases []Phase
+	ToClusterPhase    Phase
+}
 
 var webhookMgr *webhookManager
 

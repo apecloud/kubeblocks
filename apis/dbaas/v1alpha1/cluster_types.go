@@ -18,9 +18,11 @@ package v1alpha1
 
 import (
 	"fmt"
-	"time"
+	"strings"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -78,8 +80,9 @@ type ClusterStatus struct {
 	// Deleting/Deleted: deleting cluster/cluster is deleted.
 	// Failed: cluster not available.
 	// Abnormal: cluster available but some component is not Abnormal.
+	// ConditionsError: status.conditions error, but the components are running when cluster api changed.
 	// if the component type is Consensus/Replication, the Leader/Primary pod is must ready in Abnormal phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted,VolumeExpanding}
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted,VolumeExpanding,ConditionsError}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
@@ -187,8 +190,17 @@ type ClusterStatusComponent struct {
 	Phase Phase `json:"phase,omitempty"`
 
 	// Message record the component details message in current phase.
+	// keys are podName or deployName or statefulSetName
 	// +optional
-	Message string `json:"message,omitempty"`
+	Message map[string]string `json:"message,omitempty"`
+
+	// PodsReady check pods of the component are ready.
+	// +optional
+	PodsReady *bool `json:"podsReady,omitempty"`
+
+	// PodsReadyTime pods ready time
+	// +optional
+	PodsReadyTime *metav1.Time `json:"podsReadyTime,omitempty"`
 
 	// ConsensusSetStatus role and pod name mapping.
 	// +optional
@@ -325,24 +337,24 @@ func init() {
 	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
 }
 
+func (r *Cluster) SetStatusCondition(condition metav1.Condition) {
+	meta.SetStatusCondition(&r.Status.Conditions, condition)
+}
+
 // ValidateEnabledLogs validates enabledLogs config in cluster.yaml, and returns metav1.Condition when detect invalid values.
-func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) []*metav1.Condition {
-	conditionList := make([]*metav1.Condition, 0, len(r.Spec.Components))
+func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) error {
+	message := make([]string, 0)
 	for _, comp := range r.Spec.Components {
 		invalidLogNames := cd.ValidateEnabledLogConfigs(comp.Type, comp.EnabledLogs)
 		if len(invalidLogNames) == 0 {
 			continue
 		}
-		message := fmt.Sprintf("EnabledLogs config of cluster component %s has invalid value %s which isn't definded in clusterDefinition", comp.Name, invalidLogNames)
-		conditionList = append(conditionList, &metav1.Condition{
-			Type:               "ValidateEnabledLogs",
-			Status:             metav1.ConditionFalse,
-			Reason:             "ValidateEnabledLogsFail",
-			LastTransitionTime: metav1.NewTime(time.Now()),
-			Message:            message,
-		})
+		message = append(message, fmt.Sprintf("EnabledLogs: %s are not definded in Component: %s of the clusterDefinition", invalidLogNames, comp.Name))
 	}
-	return conditionList
+	if len(message) > 0 {
+		return errors.New(strings.Join(message, ";"))
+	}
+	return nil
 }
 
 // GetTypeMappingComponents return Type name mapping ClusterComponents.

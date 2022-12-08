@@ -15,20 +15,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package component
+package util
 
 import (
-	"fmt"
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 func TestGetParentNameAndOrdinal(t *testing.T) {
-	set := newStatefulSet("foo", 3)
-	pod := newStatefulSetPod(set, 1)
+	set := testk8s.NewFakeStatefulSet("foo", 3)
+	pod := testk8s.NewFakeStatefulSetPod(set, 1)
 	if parent, ordinal := getParentNameAndOrdinal(pod); parent != set.Name {
 		t.Errorf("Extracted the wrong parent name expected %s found %s", set.Name, parent)
 	} else if ordinal != 1 {
@@ -43,10 +42,10 @@ func TestGetParentNameAndOrdinal(t *testing.T) {
 }
 
 func TestIsMemberOf(t *testing.T) {
-	set := newStatefulSet("foo", 3)
-	set2 := newStatefulSet("bar", 3)
+	set := testk8s.NewFakeStatefulSet("foo", 3)
+	set2 := testk8s.NewFakeStatefulSet("bar", 3)
 	set2.Name = "foo2"
-	pod := newStatefulSetPod(set, 1)
+	pod := testk8s.NewFakeStatefulSetPod(set, 1)
 	if !IsMemberOf(set, pod) {
 		t.Error("isMemberOf returned false negative")
 	}
@@ -56,8 +55,8 @@ func TestIsMemberOf(t *testing.T) {
 }
 
 func TestGetPodRevision(t *testing.T) {
-	set := newStatefulSet("foo", 3)
-	pod := newStatefulSetPod(set, 1)
+	set := testk8s.NewFakeStatefulSet("foo", 3)
+	pod := testk8s.NewFakeStatefulSetPod(set, 1)
 	if GetPodRevision(pod) != "" {
 		t.Errorf("revision should be empty")
 	}
@@ -70,39 +69,36 @@ func TestGetPodRevision(t *testing.T) {
 	}
 }
 
-func newStatefulSet(name string, replicas int) *apps.StatefulSet {
-	template := v1.PodTemplateSpec{
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "nginx",
-					Image: "nginx",
-				},
-			},
-		},
+func TestStatefulSetPodsIsReady(t *testing.T) {
+	sts := testk8s.NewFakeStatefulSet("test", 3)
+	testk8s.MockStatefulSetReady(sts)
+	ready := StatefulSetPodsIsReady(sts)
+	if !ready {
+		t.Errorf("StatefulSet pods should be ready")
 	}
-
-	template.Labels = map[string]string{"foo": "bar"}
-
-	return &apps.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: v1.NamespaceDefault,
-		},
-		Spec: apps.StatefulSetSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"foo": "bar"},
-			},
-			Replicas:    func() *int32 { i := int32(replicas); return &i }(),
-			Template:    template,
-			ServiceName: "governingsvc",
-		},
+	covertSts := CovertToStatefulSet(sts)
+	if covertSts == nil {
+		t.Errorf("Covert to statefulSet should be succeed")
+	}
+	covertSts = CovertToStatefulSet(&apps.Deployment{})
+	if covertSts != nil {
+		t.Errorf("Covert to statefulSet should be failed")
+	}
+	covertSts = CovertToStatefulSet(nil)
+	if covertSts != nil {
+		t.Errorf("Covert to statefulSet should be failed")
 	}
 }
 
-func newStatefulSetPod(set *apps.StatefulSet, ordinal int) *v1.Pod {
-	pod := &v1.Pod{}
-	pod.Name = fmt.Sprintf("%s-%d", set.Name, ordinal)
-
-	return pod
+func TestStatefulSetIsReady(t *testing.T) {
+	sts := testk8s.NewFakeStatefulSet("test", 3)
+	testk8s.MockStatefulSetReady(sts)
+	ready := StatefulSetIsReady(sts, true)
+	if !ready {
+		t.Errorf("StatefulSet should be ready")
+	}
+	ready = StatefulSetIsReady(sts, false)
+	if ready {
+		t.Errorf("StatefulSet should not be ready")
+	}
 }

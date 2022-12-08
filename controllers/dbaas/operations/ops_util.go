@@ -17,7 +17,6 @@ limitations under the License.
 package operations
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -28,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/component/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -49,7 +49,7 @@ func ReconcileActionWithCluster(opsRes *OpsResource) (dbaasv1alpha1.Phase, time.
 		// the operation occurs in the cluster, such as upgrade.
 		// However, it is also possible that only the corresponding components have changed,
 		// and the phase is updating. so we need to monitor these components and send the corresponding event
-		if statusComponent, ok := opsRequest.Status.Components[k]; (!ok && v.Phase == dbaasv1alpha1.UpdatingPhase) || statusComponent.Phase != v.Phase {
+		if statusComponent, ok := opsRequest.Status.Components[k]; (!ok && v.Phase == opsRes.Cluster.Status.Phase) || statusComponent.Phase != v.Phase {
 			isChanged = true
 			opsRequest.Status.Components[k] = dbaasv1alpha1.OpsRequestStatusComponent{Phase: v.Phase}
 			sendEventWhenComponentPhaseChanged(opsRes, k, &v)
@@ -90,10 +90,10 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource) (dbaasv1alpha1.Phase, 
 		if _, ok := componentNameMap[k]; !ok {
 			continue
 		}
-		if !componentIsCompleted(v.Phase) {
+		if !util.IsCompleted(v.Phase) {
 			isCompleted = false
 		}
-		if isFailedPhase(v.Phase) {
+		if util.IsFailedOrAbnormal(v.Phase) {
 			isFailed = true
 		}
 		if statusComponent, ok := opsRequest.Status.Components[k]; !ok || statusComponent.Phase != v.Phase {
@@ -113,15 +113,6 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource) (dbaasv1alpha1.Phase, 
 		opsRequestPhase = dbaasv1alpha1.SucceedPhase
 	}
 	return opsRequestPhase, requeueAfter, nil
-}
-
-// componentIsCompleted check whether the component has completed the operation
-func componentIsCompleted(phase dbaasv1alpha1.Phase) bool {
-	return slices.Index([]dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase}, phase) != -1
-}
-
-func isFailedPhase(phase dbaasv1alpha1.Phase) bool {
-	return slices.Index([]dbaasv1alpha1.Phase{dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase}, phase) != -1
 }
 
 // opsRequestIsCompleted check OpsRequest is completed
@@ -148,7 +139,9 @@ func sendEventWhenComponentPhaseChanged(opsRes *OpsResource, componentName strin
 		tip = "Failed"
 		reason = dbaasv1alpha1.ReasonComponentFailed
 		eventType = corev1.EventTypeWarning
-		extraMessage = ", " + statusComponent.Message
+		for k, v := range statusComponent.Message {
+			extraMessage += fmt.Sprintf("%s:%s", k, v) + ";"
+		}
 	}
 	message := fmt.Sprintf("%s %s component: %s in Cluster: %s%s",
 		tip, opsRes.OpsRequest.Spec.Type, componentName, opsRes.OpsRequest.Spec.ClusterRef, extraMessage)
@@ -208,8 +201,8 @@ func patchClusterPhaseMisMatch(opsRes *OpsResource) error {
 }
 
 func patchClusterExistOtherOperation(opsRes *OpsResource, opsRequestName string) error {
-	message := fmt.Sprintf("spec.clusterRef: %s is running the OpsRequest: %s",
-		opsRes.Cluster.Name, opsRequestName)
+	message := fmt.Sprintf("Existing OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first",
+		opsRequestName, opsRes.Cluster.Name)
 	condition := dbaasv1alpha1.NewValidateFailedCondition(dbaasv1alpha1.ReasonClusterExistOtherOperation, message)
 	return PatchOpsStatus(opsRes, dbaasv1alpha1.FailedPhase, condition)
 }
@@ -375,20 +368,6 @@ func patchClusterPhaseWhenExistsOtherOps(opsRes *OpsResource, opsRequestMap map[
 		return err
 	}
 	return nil
-}
-
-// PatchOpsRequestAnnotation patch the reconcile annotation to OpsRequest
-func PatchOpsRequestAnnotation(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, opsRequestName string) error {
-	opsRequest := &dbaasv1alpha1.OpsRequest{}
-	if err := cli.Get(ctx, client.ObjectKey{Name: opsRequestName, Namespace: cluster.Namespace}, opsRequest); err != nil {
-		return err
-	}
-	patch := client.MergeFrom(opsRequest.DeepCopy())
-	if opsRequest.Annotations == nil {
-		opsRequest.Annotations = map[string]string{}
-	}
-	opsRequest.Annotations[OpsRequestReconcileAnnotationKey] = time.Now().Format(time.RFC3339)
-	return cli.Patch(ctx, opsRequest, patch)
 }
 
 // isOpsRequestFailedPhase check the OpsRequest phase is Failed

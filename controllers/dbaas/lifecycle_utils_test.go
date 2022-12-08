@@ -550,7 +550,12 @@ spec:
 		It("Should merge with no error", func() {
 			cluster, clusterDef, appVer, _ := newAllFieldsClusterObj(nil, nil)
 			By("assign every available fields")
+			reqCtx := intctrlutil.RequestCtx{
+				Ctx: ctx,
+				Log: tlog,
+			}
 			component := mergeComponents(
+				reqCtx,
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.Components[0],
@@ -560,6 +565,7 @@ spec:
 			By("leave appVer.podSpec nil")
 			appVer.Spec.Components[0].PodSpec = nil
 			component = mergeComponents(
+				reqCtx,
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.Components[0],
@@ -569,6 +575,7 @@ spec:
 			appVer = allFieldsAppVersionObj()
 			By("new container in appversion not in clusterdefinition")
 			component = mergeComponents(
+				reqCtx,
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.Components[0],
@@ -577,6 +584,7 @@ spec:
 			Expect(len(component.PodSpec.Containers)).Should(Equal(2))
 			By("leave clusterComp nil")
 			component = mergeComponents(
+				reqCtx,
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.Components[0],
@@ -585,6 +593,7 @@ spec:
 			Expect(component).ShouldNot(BeNil())
 			By("leave clusterDefComp nil")
 			component = mergeComponents(
+				reqCtx,
 				cluster,
 				clusterDef,
 				nil,

@@ -849,18 +849,26 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 					}
 				}
 			}
-			// when horizontal scaling up, sometimes db needs backup to sync data from master, log is not reliable enough since it can be recycled
+			// when horizontal scaling up, sometimes db needs backup to sync data from master,
+			// log is not reliable enough since it can be recycled
 			if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
 				// do backup according to component's horizontal scale policy
 				if component == nil {
-					reqCtx.Recorder.Eventf(cluster, corev1.EventTypeWarning, "HorizontalScaleFailed", "component %s not found", componentName)
+					reqCtx.Recorder.Eventf(cluster,
+						corev1.EventTypeWarning,
+						"HorizontalScaleFailed",
+						"component %s not found",
+						componentName)
 					continue
 				}
 				switch component.HorizontalScalePolicy {
 				// use backup tool such as xtrabackup
 				case dbaasv1alpha1.Backup:
 					// TODO: db core not support yet, leave it empty
-					reqCtx.Recorder.Eventf(cluster, corev1.EventTypeWarning, "HorizontalScaleFailed", "scale with backup tool not support yet")
+					reqCtx.Recorder.Eventf(cluster,
+						corev1.EventTypeWarning,
+						"HorizontalScaleFailed",
+						"scale with backup tool not support yet")
 				// use volume snapshot
 				case dbaasv1alpha1.Snapshot:
 					if isSnapshotAvailable(cli, ctx) && len(stsObj.Spec.VolumeClaimTemplates) > 0 {
@@ -871,7 +879,12 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 						}
 						if !vsExists {
 							// if volumesnapshot not exist, do snapshot to create it.
-							if err := doSnapshot(cli, reqCtx, cluster, snapshotKey, stsObj, component.BackupTemplateSelectLabels); err != nil {
+							if err := doSnapshot(cli,
+								reqCtx,
+								cluster,
+								snapshotKey,
+								stsObj,
+								component.BackupTemplateSelectLabels); err != nil {
 								res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 								return &res, err
 							}
@@ -894,9 +907,16 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 								for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
 									pvcKey := types.NamespacedName{
 										Namespace: key.Namespace,
-										Name:      fmt.Sprintf("%s-%s-%d", stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, i),
+										Name: fmt.Sprintf("%s-%s-%d",
+											stsObj.Spec.VolumeClaimTemplates[0].Name,
+											stsObj.Name,
+											i),
 									}
-									if err := checkedCreatePVCFromSnapshot(cli, ctx, pvcKey, snapshotKey, stsObj); err != nil {
+									if err := checkedCreatePVCFromSnapshot(cli,
+										ctx,
+										pvcKey,
+										snapshotKey,
+										stsObj); err != nil {
 										res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 										return &res, err
 									}

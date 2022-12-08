@@ -58,7 +58,7 @@ kbcli cluster create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOu
       --components string            Use yaml file, URL, or stdin to specify the cluster components
       --enable-all-logs              Enable advanced application all log extraction, and true will ignore enabledLogs of component level
   -h, --help                         help for create
-      --monitor                      Set monitor enabled and inject metrics exporter(default true) (default true)
+      --monitor                      Set monitor enabled and inject metrics exporter (default true)
       --node-labels stringToString   Node label selector (default [])
       --pod-anti-affinity string     Pod anti-affinity type (default "Preferred")
       --termination-policy string    Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)

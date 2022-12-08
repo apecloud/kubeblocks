@@ -17,6 +17,7 @@ limitations under the License.
 package printer
 
 import (
+	"os"
 	"testing"
 )
 
@@ -28,7 +29,7 @@ var (
 )
 
 func TestPrintTable(t *testing.T) {
-	printer := NewTablePrinter()
+	printer := NewTablePrinter(os.Stdout)
 	printer.SetHeader(colTitleIndex, colTitleFirstName, colTitleLastName, colTitleSalary)
 	for _, r := range [][]string{
 		{"1", "Arya", "Stark", "3000"},

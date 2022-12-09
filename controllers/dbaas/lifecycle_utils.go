@@ -21,7 +21,6 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -773,7 +772,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	ctx := reqCtx.Ctx
 	logger := reqCtx.Log
 	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
-	var result *ctrl.Result
+	var requeueResult *ctrl.Result
 	for _, obj := range objs {
 		logger.Info("create or update", "objs", obj)
 		if err := controllerutil.SetOwnerReference(cluster, obj, scheme); err != nil {
@@ -887,13 +886,14 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 						}
 						if !pvcExist {
 							allPVCExists = false
+							break
 						}
 					}
 				}
 				if !allPVCExists {
 					// do backup according to component's horizontal scale policy
 					var err error
-					result, err = doBackup(reqCtx,
+					requeueResult, err = doBackup(reqCtx,
 						cli,
 						cluster,
 						component,
@@ -901,16 +901,17 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 						stsProto,
 						snapshotKey)
 					if err != nil {
-						return result, err
+						return requeueResult, err
 					}
-					if result != nil {
+					if requeueResult != nil {
 						continue
 					}
 				}
 				reqCtx.Recorder.Eventf(cluster,
 					corev1.EventTypeNormal,
 					"HorizontalScale",
-					"Start horizontal scale from %d to %d",
+					"Start horizontal scale component %s from %d to %d",
+					component.Name,
 					*stsObj.Spec.Replicas,
 					*stsProto.Spec.Replicas)
 			} else if *stsObj.Spec.Replicas > *stsProto.Spec.Replicas {
@@ -922,7 +923,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 								Namespace: key.Namespace,
 								Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 							}
-							// delete pvc
+							// create cronjob to delete pvc after 30 minutes
 							if err := createDeletePVCCronJob(cli, ctx, pvcKey); err != nil {
 								res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 								return &res, err
@@ -969,7 +970,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 					if err != nil {
 						return &res, err
 					}
-					result = &res
+					requeueResult = &res
 					continue
 				}
 			}
@@ -1049,7 +1050,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			continue
 		}
 	}
-	return result, nil
+	return requeueResult, nil
 }
 
 func buildSvc(params createParams, headless bool) (*corev1.Service, error) {
@@ -1304,12 +1305,6 @@ func injectEnvs(params createParams, envConfigName string, c *corev1.Container) 
 			Value: v.value,
 		})
 	}
-
-	// sort toInjectEnv, different order of envs will cause pods restart
-	// TODO: should add testcase to test pod restart
-	sort.Slice(toInjectEnv, func(i, j int) bool {
-		return toInjectEnv[i].Name < toInjectEnv[j].Name
-	})
 
 	// have injected variables placed at the front of the slice
 	if c.Env == nil {
@@ -2226,7 +2221,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 	stsProto *appsv1.StatefulSet,
 	snapshotKey types.NamespacedName) (*ctrl.Result, error) {
 	ctx := reqCtx.Ctx
-	var result *ctrl.Result
+	var requeueResult *ctrl.Result
 	// do backup according to component's horizontal scale policy
 	switch component.HorizontalScalePolicy {
 	// use backup tool such as xtrabackup
@@ -2259,7 +2254,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				if err != nil {
 					return &res, err
 				}
-				result = &res
+				requeueResult = &res
 			} else {
 				// volumesnapshot exists, then check if it is ready to use.
 				ready, err := isVolumeSnapshotReadyToUse(cli, ctx, snapshotKey)
@@ -2293,7 +2288,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 					if err != nil {
 						return &res, err
 					}
-					result = &res
+					requeueResult = &res
 				}
 			}
 		} else {
@@ -2306,7 +2301,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 	case dbaasv1alpha1.ScaleNone:
 		break
 	}
-	return result, nil
+	return requeueResult, nil
 }
 
 func isPVCExists(cli client.Client,

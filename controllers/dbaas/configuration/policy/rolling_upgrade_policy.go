@@ -16,7 +16,19 @@ limitations under the License.
 
 package policy
 
-import dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+import (
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+)
+
+var (
+	// lazy create grpc connection
+	newGRPCConn = func(addr string) (*grpc.ClientConn, error) {
+		return grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}
+)
 
 type RollingUpgradePolicy struct {
 }
@@ -26,10 +38,27 @@ func init() {
 }
 
 func (r *RollingUpgradePolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
-	// TODO(zt) rolling kill container
-	panic("")
+	return performRollingUpgrade(params, GetConsensusRollingUpgradeFuncs())
 }
 
 func (r *RollingUpgradePolicy) GetPolicyName() string {
 	return string(dbaasv1alpha1.RollingPolicy)
+}
+
+func performRollingUpgrade(params ReconfigureParams, funcs RollingUpgradeFuncs) (ExecStatus, error) {
+	// TODO(zt) rolling kill container
+	pods, err := funcs.GetPodsFunc(params)
+	if err != nil {
+		return ESFailed, err
+	}
+
+	// TODO select pod for start
+	for i := len(pods); i > 0; i-- {
+		pod := &pods[i-1]
+		if err := funcs.RestartContainerFunc(pod, params.ContainerName, newGRPCConn); err != nil {
+			return ESFailed, err
+		}
+	}
+
+	return ESNone, nil
 }

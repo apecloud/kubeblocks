@@ -18,7 +18,7 @@ package controllerutil
 
 import (
 	"encoding/json"
-	"testing"
+	"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -303,63 +303,111 @@ var _ = Describe("tpl template", func() {
 		})
 	})
 
-})
-
-func TestGetContainerID(t *testing.T) {
-	pods := []*corev1.Pod{{
-		Status: corev1.PodStatus{
-			ContainerStatuses: []corev1.ContainerStatus{
-				{
-					Name:        "a",
-					ContainerID: "docker://27d1586d53ef9a6af5bd983831d13b6a38128119fadcdc22894d7b2397758eb5",
+	Context("testGetContainerID", func() {
+		It("Should success with no error", func() {
+			pods := []*corev1.Pod{{
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name:        "a",
+							ContainerID: "docker://27d1586d53ef9a6af5bd983831d13b6a38128119fadcdc22894d7b2397758eb5",
+						},
+						{
+							Name:        "b",
+							ContainerID: "docker://6f5ca0f22cd151943ba1b70f618591ad482cdbbc019ed58d7adf4c04f6d0ca7a",
+						},
+					},
 				},
-				{
-					Name:        "b",
-					ContainerID: "docker://6f5ca0f22cd151943ba1b70f618591ad482cdbbc019ed58d7adf4c04f6d0ca7a",
+			}, {
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{},
 				},
-			},
-		},
-	}, {
-		Status: corev1.PodStatus{
-			ContainerStatuses: []corev1.ContainerStatus{},
-		},
-	}}
+			}}
 
-	type args struct {
-		pod           *corev1.Pod
-		containerName string
-	}
-	tests := []struct {
-		name string
-		args args
-		want string
-	}{{
-		name: "test1",
-		args: args{
-			pod:           pods[0],
-			containerName: "b",
-		},
-		want: "6f5ca0f22cd151943ba1b70f618591ad482cdbbc019ed58d7adf4c04f6d0ca7a",
-	}, {
-		name: "test2",
-		args: args{
-			pod:           pods[0],
-			containerName: "f",
-		},
-		want: "",
-	}, {
-		name: "test3",
-		args: args{
-			pod:           pods[1],
-			containerName: "a",
-		},
-		want: "",
-	}}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := GetContainerID(tt.args.pod, tt.args.containerName); got != tt.want {
-				t.Errorf("GetContainerID() = %v, want %v", got, tt.want)
+			type args struct {
+				pod           *corev1.Pod
+				containerName string
 			}
+			tests := []struct {
+				name string
+				args args
+				want string
+			}{{
+				name: "test1",
+				args: args{
+					pod:           pods[0],
+					containerName: "b",
+				},
+				want: "6f5ca0f22cd151943ba1b70f618591ad482cdbbc019ed58d7adf4c04f6d0ca7a",
+			}, {
+				name: "test2",
+				args: args{
+					pod:           pods[0],
+					containerName: "f",
+				},
+				want: "",
+			}, {
+				name: "test3",
+				args: args{
+					pod:           pods[1],
+					containerName: "a",
+				},
+				want: "",
+			}}
+			for _, tt := range tests {
+				Expect(GetContainerID(tt.args.pod, tt.args.containerName)).Should(BeEquivalentTo(tt.want))
+			}
+
 		})
-	}
-}
+	})
+
+	Context("TestGetContainersUsingConfigmap", func() {
+		It("Should success with no error", func() {
+			type args struct {
+				containers []corev1.Container
+				volumeName string
+				filters    []containerNameFilter
+			}
+			tests := []struct {
+				name string
+				args args
+				want []string
+			}{{
+				name: "test1",
+				args: args{
+					containers: pod.Spec.Containers,
+					volumeName: "config1",
+				},
+				want: []string{"mysql", "mysql2"},
+			}, {
+				name: "test1",
+				args: args{
+					containers: pod.Spec.Containers,
+					volumeName: "config1",
+					filters: []containerNameFilter{
+						func(name string) bool {
+							return name != "mysql"
+						},
+					},
+				},
+				want: []string{"mysql"},
+			}, {
+				name: "test1",
+				args: args{
+					containers: pod.Spec.Containers,
+					volumeName: "config2",
+					filters: []containerNameFilter{
+						func(name string) bool {
+							return strings.HasPrefix(name, "mysql")
+						},
+					},
+				},
+				want: []string{},
+			}}
+			for _, tt := range tests {
+				Expect(GetContainersUsingConfigmap(tt.args.containers, tt.args.volumeName, tt.args.filters...)).Should(BeEquivalentTo(tt.want))
+			}
+
+		})
+	})
+})

@@ -28,6 +28,12 @@ func (s *Set) Insert(v string) bool {
 	return prevLen != len(*s)
 }
 
+func (s *Set) InsertArray(arr []string) {
+	for _, v := range arr {
+		s.Insert(v)
+	}
+}
+
 func NewSet() *Set {
 	s := make(Set)
 	return &s
@@ -112,4 +118,16 @@ func (s *Set) Remove(v string) bool {
 	}
 
 	return false
+}
+
+func (s *Set) ToList() []string {
+	if s.Empty() {
+		return nil
+	}
+
+	tmp := make([]string, 0, s.Size())
+	s.ForEach(func(key string) {
+		tmp = append(tmp, key)
+	})
+	return tmp
 }

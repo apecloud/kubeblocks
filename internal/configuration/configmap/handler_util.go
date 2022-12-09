@@ -21,10 +21,16 @@ import (
 	"regexp"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
+)
+
+const (
+	ConfigSidecarIMAGE = "config_sidecar_image"
+	ConfigSidecarName  = "config-manager-sidecar"
 )
 
 type ConfigManagerSidecar struct {
@@ -84,6 +90,8 @@ func BuildReloadSidecarParams(reloadType dbaasv1alpha1.CfgReloadType, configurat
 func buildSignalArgs(configuration dbaasv1alpha1.ConfigReloadTrigger, volumeDirs []corev1.VolumeMount) []string {
 	args := make([]string, 0)
 	args = append(args, "--process", configuration.ProcessName)
+	// set grpc port
+	args = append(args, "--port", viper.GetString(cfgutil.ConfigManagerGPRCPortEnv))
 	for _, volume := range volumeDirs {
 		args = append(args, "--volume-dir", volume.MountPath)
 	}

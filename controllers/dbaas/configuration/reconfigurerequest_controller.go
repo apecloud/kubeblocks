@@ -206,7 +206,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	}
 
 	// configmap has never been used
-	sts := GetComponentByUsingCM(&stsLists, client.ObjectKeyFromObject(config))
+	sts, containersList := GetComponentByUsingCM(&stsLists, client.ObjectKeyFromObject(config))
 	if len(sts) == 0 {
 		return intctrlutil.Reconciled()
 	}
@@ -219,6 +219,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		Client:           r.Client,
 		Ctx:              reqCtx,
 		Cluster:          &cluster,
+		ContainerName:    containersList,
 		ComponentUnits:   sts,
 		Component:        component,
 		ClusterComponent: clusterComponent,

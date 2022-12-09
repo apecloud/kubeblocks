@@ -1,0 +1,67 @@
+/*
+Copyright ApeCloud Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package app
+
+import (
+	"context"
+
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/container"
+	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
+)
+
+type reconfigureProxy struct {
+	cfgproto.ReconfigureServer
+
+	opt    ReconfigureServiceOptions
+	killer cfgutil.ContainerKiller
+}
+
+func (r *reconfigureProxy) Init() error {
+	killer, err := cfgutil.NewContainerKiller(r.opt.CRIType, "")
+	if err != nil {
+		return cfgcore.WrapError(err, "failed to create container killer")
+	}
+
+	if err := killer.IsReady(); err != nil {
+		return cfgcore.WrapError(err, "failed to check killer status")
+	}
+
+	r.killer = killer
+	return nil
+}
+
+func (r *reconfigureProxy) StopContainer(ctx context.Context, request *cfgproto.StopContainerRequest) (*cfgproto.StopContainerResponse, error) {
+	ds := request.GetContainerIDs()
+	if len(ds) == 0 {
+		return &cfgproto.StopContainerResponse{
+			ErrMessage: "not any containerId.",
+		}, nil
+	}
+
+	if err := r.killer.Kill(ds, "", nil); err != nil {
+		return nil, err
+	}
+
+	return &cfgproto.StopContainerResponse{}, nil
+}
+
+func (r *reconfigureProxy) OnlineUpgradeParams(ctx context.Context, request *cfgproto.OnlineUpgradeParamsRequest) (*cfgproto.OnlineUpgradeParamsResponse, error) {
+	// TODO support online upgrade
+	return nil, cfgcore.MakeError("not support OnlineUpgradeParams interface.")
+}

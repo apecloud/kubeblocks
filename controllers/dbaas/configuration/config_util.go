@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/spf13/viper"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -286,20 +287,30 @@ func ValidateConfTplStatus(configStatus dbaasv1alpha1.ConfigurationTemplateStatu
 	return configStatus.Phase == dbaasv1alpha1.AvailablePhase
 }
 
-func GetComponentByUsingCM(stsList *appv1.StatefulSetList, cfg client.ObjectKey) []appv1.StatefulSet {
+func GetComponentByUsingCM(stsList *appv1.StatefulSetList, cfg client.ObjectKey) ([]appv1.StatefulSet, []string) {
+	managerContainerName := viper.GetString(cfgcm.ConfigSidecarName)
 	stsLen := len(stsList.Items)
 	if stsLen == 0 {
-		return nil
+		return nil, nil
 	}
 
 	sts := make([]appv1.StatefulSet, 0, stsLen)
+	containers := cfgcore.NewSet()
 	for _, s := range stsList.Items {
 		volumeMounted := intctrlutil.GetVolumeMountName(s.Spec.Template.Spec.Volumes, cfg.Name)
-		if volumeMounted != nil {
+		if volumeMounted == nil {
+			continue
+		}
+		// filter config manager sidecar container
+		contains := intctrlutil.GetContainersUsingConfigmap(s.Spec.Template.Spec.Containers, volumeMounted.Name, func(containerName string) bool {
+			return managerContainerName == containerName
+		})
+		if len(contains) > 0 {
 			sts = append(sts, s)
+			containers.InsertArray(contains)
 		}
 	}
-	return sts
+	return sts, containers.ToList()
 }
 
 func GetClusterComponentsByName(components []dbaasv1alpha1.ClusterComponent, componentName string) *dbaasv1alpha1.ClusterComponent {

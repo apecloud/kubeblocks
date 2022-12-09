@@ -64,5 +64,5 @@ func extractUpdatedParams(testData string) ([]string, error) {
 		},
 	}
 
-	return GetUpdateParameterList(&cfg)
+	return getUpdateParameterList(&cfg)
 }

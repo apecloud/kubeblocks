@@ -18,21 +18,22 @@ package app
 
 import (
 	"context"
+	"fmt"
+	"net"
+	"os"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"google.golang.org/grpc"
 
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/configmap"
+	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 )
 
 // NewConfigReloadCommand This command is used to reload configuration
 func NewConfigReloadCommand(ctx context.Context, name string) *cobra.Command {
-	opt, err := NewVolumeWatcherOpts()
-	if err != nil {
-		logrus.Fatal("failed to new VolumeWatcherOpts.")
-	}
-
+	opt := NewVolumeWatcherOpts()
 	cmd := &cobra.Command{
 		Use:   name,
 		Short: name + " Provides a mechanism to implement reload config files in a sidecar for kubeblocks.",
@@ -48,7 +49,6 @@ func NewConfigReloadCommand(ctx context.Context, name string) *cobra.Command {
 
 func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 	initLog(opt.LogLevel)
-
 	if err := checkOptions(opt); err != nil {
 		return err
 	}
@@ -71,11 +71,55 @@ func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 		return err
 	}
 
+	if err := startGRPCService(opt.ServiceOpt); err != nil {
+		return err
+	}
+
 	logrus.Info("reload started.")
 	<-ctx.Done()
 	logrus.Info("reload started shutdown.")
 
 	return nil
+}
+
+func startGRPCService(opt ReconfigureServiceOptions) error {
+	var (
+		server *grpc.Server
+		proxy  = &reconfigureProxy{opt: opt}
+	)
+
+	tcpSpec := fmt.Sprintf("%s:%d", proxy.opt.PodIP, proxy.opt.GrpcPort)
+
+	logrus.Infof("starting reconfigure service: %s", tcpSpec)
+	listener, err := net.Listen("tcp", tcpSpec)
+	if err != nil {
+		return cfgutil.WrapError(err, "failed to create listener: [%s]", tcpSpec)
+	}
+
+	if err := proxy.Init(); err != nil {
+		return err
+	}
+
+	if opt.DebugMode {
+		server = grpc.NewServer(grpc.StreamInterceptor(logStreamServerInterceptor))
+	} else {
+		server = grpc.NewServer()
+	}
+	cfgproto.RegisterReconfigureServer(server, proxy)
+
+	go func() {
+		if err := server.Serve(listener); err != nil {
+			logrus.Error("Failed to serve connections from cri")
+			os.Exit(1)
+		}
+	}()
+	logrus.Info("reconfigure service started.")
+	return nil
+}
+
+func logStreamServerInterceptor(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	logrus.Info(fmt.Sprintf("info: [%+v]", info))
+	return handler(srv, ss)
 }
 
 func checkOptions(opt *VolumeWatcherOpts) error {

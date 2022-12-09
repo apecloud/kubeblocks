@@ -80,6 +80,10 @@ func (c *containerdContainer) Kill(containerIDs []string, signal string, timeout
 func NewContainerKiller(criType CRIType, socketPath string) (ContainerKiller, error) {
 	var killer ContainerKiller
 
+	if criType == AutoType {
+		criType = autoCheckCRIType()
+	}
+
 	switch criType {
 	case DockerType:
 		killer = &dockerContainer{}
@@ -90,8 +94,17 @@ func NewContainerKiller(criType CRIType, socketPath string) (ContainerKiller, er
 	default:
 		return nil, cfgcore.MakeError("not support cri type: %s", criType)
 	}
-
 	return killer, nil
+}
+
+func autoCheckCRIType() CRIType {
+	if err := printCriVersion(containerdCommand); err == nil {
+		return ContainerdType
+	}
+	if err := printCriVersion(dockerCommand); err == nil {
+		return DockerType
+	}
+	return ""
 }
 
 func getContainerdRuntimePath(socketPath string) string {

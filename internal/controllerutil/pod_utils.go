@@ -91,6 +91,33 @@ func GetVolumeMountName(volumes []corev1.Volume, resourceName string) *corev1.Vo
 	return nil
 }
 
+type containerNameFilter func(containerName string) bool
+
+func GetContainersUsingConfigmap(containers []corev1.Container, volumeName string, filters ...containerNameFilter) []string {
+	containerFilter := func(c corev1.Container) bool {
+		for _, f := range filters {
+			if len(c.VolumeMounts) == 0 || f(c.Name) {
+				return true
+			}
+		}
+		return false
+	}
+
+	tmpList := make([]string, 0, len(containers))
+	for _, c := range containers {
+		if containerFilter(c) {
+			continue
+		}
+		for _, vm := range c.VolumeMounts {
+			if vm.Name == volumeName {
+				tmpList = append(tmpList, c.Name)
+				break
+			}
+		}
+	}
+	return tmpList
+}
+
 func getContainerWithTplList(containers []corev1.Container, configs []dbaasv1alpha1.ConfigTemplate) *corev1.Container {
 	if len(containers) == 0 {
 		return nil

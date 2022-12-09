@@ -34,6 +34,8 @@ const (
 	UpgradeInsConfigurationAnnotationKey = "configuration.kubeblocks.io/rolling-upgrade"
 	UpgradePolicyAnnotationKey           = "configuration.kubeblocks.io/reconfigure-policy"
 	UpgradeRestartAnnotationKey          = "configuration.kubeblocks.io/restart"
+
+	ConfigManagerGPRCPortEnv = "CONFIG_MANAGER_GRPC_PORT"
 )
 
 type ConfigType string

@@ -14,26 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package container
+package proto
 
-import "time"
+//go:generate protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative reconfigure.proto
 
-type TargetContainer struct {
-	Name          string // Name is pod name
-	Namespace     string // Namespace is pod namespace
-	ContainerName string // ContainerName is container name
-}
-
-type CRIType string
-
-const (
-	DockerType     CRIType = "docker"
-	ContainerdType CRIType = "containerd"
-	AutoType       CRIType = "auto"
-)
-
-// ContainerKiller kill container interface
-type ContainerKiller interface {
-	Kill(containerIds []string, signal string, timeout *time.Duration) error
-	IsReady() error
-}
+//go:generate go run github.com/golang/mock/mockgen -destination mocks/node_client_mocks.go . ReconfigureClient

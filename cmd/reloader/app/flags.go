@@ -19,9 +19,11 @@ package app
 import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/container"
 )
 
 type NotifyEventType int
@@ -31,6 +33,11 @@ const (
 	WebHook                           // "http"
 	ShellTool                         // "exec"
 	SQL                               // "sql"
+)
+
+const (
+	configManagerDefaultPort = 9901
+	localhostAddress         = "127.0.0.1"
 )
 
 var allNotifyType = map[NotifyEventType]dbaasv1alpha1.CfgReloadType{
@@ -62,6 +69,14 @@ func (f *NotifyEventType) String() string {
 	return string(reloadType)
 }
 
+type ReconfigureServiceOptions struct {
+	GrpcPort int
+	PodIP    string
+
+	CRIType   cfgutil.CRIType
+	DebugMode bool
+}
+
 type VolumeWatcherOpts struct {
 	VolumeDirs []string
 
@@ -76,14 +91,24 @@ type VolumeWatcherOpts struct {
 
 	LogLevel       string
 	NotifyHandType NotifyEventType
+
+	ServiceOpt ReconfigureServiceOptions
 }
 
-func NewVolumeWatcherOpts() (*VolumeWatcherOpts, error) {
+func NewVolumeWatcherOpts() *VolumeWatcherOpts {
 	return &VolumeWatcherOpts{
+		// for reconfigure options
+		ServiceOpt: ReconfigureServiceOptions{
+			GrpcPort:  configManagerDefaultPort,
+			PodIP:     viper.GetString("CONFIG_MANAGER_POD_IP"),
+			CRIType:   cfgutil.AutoType,
+			DebugMode: false,
+		},
+		// for configmap watch
 		NotifyHandType: UnixSignal,
 		Signal:         "SIGHUP",
 		LogLevel:       logrus.InfoLevel.String(),
-	}, nil
+	}
 }
 
 func InstallFlags(flags *pflag.FlagSet, opt *VolumeWatcherOpts) {
@@ -111,4 +136,21 @@ func InstallFlags(flags *pflag.FlagSet, opt *VolumeWatcherOpts) {
 		"regex",
 		opt.FileRegex,
 		"the config set filter config file.")
+
+	flags.StringVar(&opt.ServiceOpt.PodIP,
+		"pod-ip",
+		opt.ServiceOpt.PodIP,
+		"the config set pod ip address.")
+	flags.IntVar(&opt.ServiceOpt.GrpcPort,
+		"tcp",
+		opt.ServiceOpt.GrpcPort,
+		"the config set service port.")
+	flags.BoolVar(&opt.ServiceOpt.DebugMode,
+		"debug",
+		opt.ServiceOpt.DebugMode,
+		"the config set debug.")
+	flags.StringVar((*string)(&opt.ServiceOpt.CRIType),
+		"cri-type",
+		string(opt.ServiceOpt.CRIType),
+		"the config set cri.")
 }

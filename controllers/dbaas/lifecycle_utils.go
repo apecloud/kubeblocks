@@ -53,9 +53,6 @@ type createParams struct {
 
 const (
 	dbaasPrefix = "KB"
-
-	configSidecarIMAGE = "config_sidecar_image"
-	configSidecarName  = "config-manager-sidecar"
 )
 
 var (
@@ -1367,8 +1364,8 @@ func updateConfigurationManagerWithComponent(params createParams, podSpec *corev
 	}
 
 	managerSidecar := &cfgcm.ConfigManagerSidecar{
-		ManagerName: configSidecarName,
-		Image:       viper.GetString(configSidecarIMAGE),
+		ManagerName: cfgcm.ConfigSidecarName,
+		Image:       viper.GetString(cfgcm.ConfigSidecarIMAGE),
 		Args:        cfgcm.BuildReloadSidecarParams(cfgSpec.ConfigReloadType, *cfgSpec.ConfigReloadTrigger, volumeDirs),
 		Volumes:     volumeDirs,
 	}

@@ -17,62 +17,111 @@ limitations under the License.
 package policy
 
 import (
-	"encoding/json"
-	"reflect"
+	"context"
+	"fmt"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/spf13/viper"
+	"google.golang.org/grpc"
+	corev1 "k8s.io/api/core/v1"
+
+	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-func GetUpdateParameterList(cfg *cfgcore.ConfigDiffInformation) ([]string, error) {
-	params := make([]string, 0)
-	for _, diff := range cfg.UpdateConfig {
-		var updatedParams any
-		if err := json.Unmarshal(diff, &updatedParams); err != nil {
-			return nil, err
-		}
-		if err := cfgcore.UnstructuredObjectWalk(updatedParams,
-			func(parent, cur string, v reflect.Value, fn cfgcore.UpdateFn) error {
-				if cur != "" {
-					params = append(params, cur)
-				}
-				return nil
-			}, true); err != nil {
-			return nil, cfgcore.WrapError(err, "failed to walk params: [%s]", diff)
-		}
-	}
-	return params, nil
+type createGRPCConn func(addr string) (*grpc.ClientConn, error)
+
+type GetPodsFunc func(params ReconfigureParams) ([]corev1.Pod, error)
+
+type RestartContainerFunc func(pod *corev1.Pod, containerName []string, createConnFn createGRPCConn) error
+
+type RollingUpgradeFuncs struct {
+	GetPodsFunc          GetPodsFunc
+	RestartContainerFunc RestartContainerFunc
 }
 
-func IsUpdateDynamicParameters(tpl *dbaasv1alpha1.ConfigurationTemplateSpec, cfg *cfgcore.ConfigDiffInformation) (bool, error) {
-	// TODO(zt) how to process new or delete file
-	if len(cfg.DeleteConfig) > 0 || len(cfg.AddConfig) > 0 {
-		return false, nil
+func GetConsensusRollingUpgradeFuncs() RollingUpgradeFuncs {
+	return RollingUpgradeFuncs{
+		GetPodsFunc:          getConsensusPods,
+		RestartContainerFunc: commonStopContainer,
+	}
+}
+
+func GetStatefulSetRollingUpgradeFuncs() RollingUpgradeFuncs {
+	return RollingUpgradeFuncs{
+		GetPodsFunc:          getStatefulSetPods,
+		RestartContainerFunc: commonStopContainer,
+	}
+}
+
+func GetReplicationRollingUpgradeFuncs() RollingUpgradeFuncs {
+	return RollingUpgradeFuncs{
+		GetPodsFunc:          getReplicationSetPods,
+		RestartContainerFunc: commonStopContainer,
+	}
+}
+
+func getReplicationSetPods(params ReconfigureParams) ([]corev1.Pod, error) {
+	panic("")
+}
+
+func getStatefulSetPods(params ReconfigureParams) ([]corev1.Pod, error) {
+	panic("")
+}
+
+func getConsensusPods(params ReconfigureParams) ([]corev1.Pod, error) {
+	if len(params.ComponentUnits) > 1 {
+		return nil, cfgcore.MakeError("consensus component require only one statefulset, actual %d component", len(params.ComponentUnits))
 	}
 
-	params, err := GetUpdateParameterList(cfg)
+	if len(params.ComponentUnits) == 0 {
+		return nil, nil
+	}
+
+	stsObj := &params.ComponentUnits[0]
+	pods, err := component.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
 	if err != nil {
-		return false, nil
+		return nil, err
 	}
 
-	// if has StaticParameters, update static parameter
-	if len(tpl.StaticParameters) > 0 {
-		updateParams := cfgcore.NewSetFromList(params)
-		staticParams := cfgcore.NewSetFromList(tpl.StaticParameters)
+	// sort pods
+	component.SortPods(pods, component.ComposeRolePriorityMap(*params.Component))
+	return pods, nil
+}
 
-		union := cfgcore.Union(staticParams, updateParams)
-		return union.Empty(), nil
+func commonStopContainer(pod *corev1.Pod, containerNames []string, newConnFn createGRPCConn) error {
+	containerIDs := make([]string, 0, len(containerNames))
+	for _, name := range containerNames {
+		containerID := intctrlutil.GetContainerID(pod, name)
+		if containerID == "" {
+			return cfgcore.MakeError("failed to find container in pod[%s], name=%s", name, pod.Name)
+		}
+		containerIDs = append(containerIDs, containerID)
 	}
 
-	// if has dynamic parameters, all updated param in dynamic params
-	if len(tpl.DynamicParameters) > 0 {
-		updateParams := cfgcore.NewSetFromList(params)
-		dynamicParams := cfgcore.NewSetFromList(tpl.DynamicParameters)
-
-		union := cfgcore.Difference(dynamicParams, updateParams)
-		return union.Empty(), nil
+	// stop container
+	conn, err := newConnFn(generateManagerSidecarAddr(pod))
+	if err != nil {
+		return err
 	}
 
-	// default static parameters
-	return true, nil
+	client := cfgproto.NewReconfigureClient(conn)
+	response, err := client.StopContainer(context.Background(), &cfgproto.StopContainerRequest{
+		ContainerIDs: containerIDs,
+	})
+	if err != nil {
+		return err
+	}
+
+	errMessage := response.GetErrMessage()
+	if errMessage != "" {
+		return cfgcore.MakeError(errMessage)
+	}
+	return nil
+}
+
+func generateManagerSidecarAddr(pod *corev1.Pod) string {
+	podAddress := pod.Status.PodIP
+	return fmt.Sprintf("%s:%d", podAddress, viper.GetInt32(cfgcore.ConfigManagerGPRCPortEnv))
 }

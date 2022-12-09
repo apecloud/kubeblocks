@@ -4,6 +4,14 @@ template: {
 		"/bin/reloader",
 	]
 	args: parameter.args
+	env: [
+		{
+			name: "CONFIG_MANAGER_POD_IP"
+			valueFrom:
+				fieldRef:
+					fieldPath: "status.podIP"
+		},
+	]
 
 	//"registry.cn-hangzhou.aliyuncs.com/google_containers/etcd:3.5.0-0"
 	image:           parameter.sidecarImage
@@ -11,7 +19,7 @@ template: {
 	volumeMounts:    parameter.volumes
 	securityContext:
 		runAsUser: 0
-		defaultAllowPrivilegeEscalation: false
+	defaultAllowPrivilegeEscalation: false
 }
 
 #ArgType: string

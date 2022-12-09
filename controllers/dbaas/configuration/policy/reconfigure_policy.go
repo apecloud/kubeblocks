@@ -46,6 +46,7 @@ type ReconfigureParams struct {
 	Cfg     *corev1.ConfigMap
 	Tpl     *dbaasv1alpha1.ConfigurationTemplateSpec
 
+	ContainerName    []string
 	Client           client.Client
 	Ctx              intctrlutil.RequestCtx
 	Cluster          *dbaasv1alpha1.Cluster
@@ -107,7 +108,7 @@ func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigurationTemplateSpec, cfg *cfg
 
 	actionType := policy
 	if !restart {
-		if dynamicUpdate, err := IsUpdateDynamicParameters(tpl, cfg); err != nil {
+		if dynamicUpdate, err := isUpdateDynamicParameters(tpl, cfg); err != nil {
 			return nil, err
 		} else if dynamicUpdate {
 			actionType = dbaasv1alpha1.AutoReload

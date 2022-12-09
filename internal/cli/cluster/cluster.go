@@ -137,29 +137,27 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 		if objs.Pods, err = corev1.Pods(o.Namespace).List(ctx, listOpts()); err != nil {
 			return nil, err
 		}
-	}
-
-	// get nodes where the pods are located
-podLoop:
-	for _, pod := range objs.Pods.Items {
-		for _, node := range objs.Nodes {
-			if node.Name == pod.Spec.NodeName {
-				break podLoop
+		// get nodes where the pods are located
+	podLoop:
+		for _, pod := range objs.Pods.Items {
+			for _, node := range objs.Nodes {
+				if node.Name == pod.Spec.NodeName {
+					continue podLoop
+				}
 			}
-		}
 
-		nodeName := pod.Spec.NodeName
-		if len(nodeName) == 0 {
-			continue
-		}
+			nodeName := pod.Spec.NodeName
+			if len(nodeName) == 0 {
+				continue
+			}
 
-		node, err := corev1.Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-		if err != nil {
-			return nil, err
+			node, err := corev1.Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			objs.Nodes = append(objs.Nodes, node)
 		}
-		objs.Nodes = append(objs.Nodes, node)
 	}
-
 	return objs, nil
 }
 

@@ -18,7 +18,6 @@ package printer
 
 import (
 	"io"
-	"os"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 )
@@ -40,16 +39,11 @@ type TablePrinter struct {
 	tbl table.Writer
 }
 
-func NewTablePrinter() *TablePrinter {
+func NewTablePrinter(out io.Writer) *TablePrinter {
 	t := table.NewWriter()
 	t.SetStyle(StyleKubeCtl)
-	t.SetOutputMirror(os.Stdout)
+	t.SetOutputMirror(out)
 	return &TablePrinter{tbl: t}
-}
-
-func (t *TablePrinter) Out(out io.Writer) *TablePrinter {
-	t.tbl.SetOutputMirror(out)
-	return t
 }
 
 func (t *TablePrinter) SetHeader(header ...interface{}) {

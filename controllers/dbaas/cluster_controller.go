@@ -273,7 +273,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	task, err := buildClusterCreationTasks(clusterdefinition, appversion, cluster)
+	task, err := buildClusterCreationTasks(reqCtx, clusterdefinition, appversion, cluster)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}

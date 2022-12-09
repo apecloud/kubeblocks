@@ -11,7 +11,6 @@ env:
   GO_VERSION: '1.19'
   CLI_NAME: 'kbcli'
 
-
 jobs:
   upload-release:
     name: Upload ${{ matrix.filename }}
@@ -61,8 +60,9 @@ jobs:
           mkdir -p ${{ matrix.os }}
           
           CLI_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ matrix.os }}`
+          RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ env.TAG_NAME }} 1`
           
-          make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
+          VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
           
           mv bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH ${{ matrix.os }}/${{ env.CLI_NAME }}
           

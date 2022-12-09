@@ -9,10 +9,10 @@ kbcli cluster create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOu
 ### Examples
 
 ```
-  # Create a cluster using cluster definition my-cluster-def and component version my-version
-  kbcli cluster create mycluster --cluster-definition=my-cluster-def --version=my-version
+  # Create a cluster using cluster definition my-cluster-def and cluster version my-version
+  kbcli cluster create mycluster --cluster-definition=my-cluster-def --cluster-version=my-version
   
-  # Both --cluster-definition and --version are required for creating cluster, for the sake of brevity,
+  # Both --cluster-definition and --cluster-version are required for creating cluster, for the sake of brevity,
   # the following examples will ignore these two flags.
   
   # Create a cluster using component file component.yaml and termination policy DoNotDelete that will prevent
@@ -54,7 +54,8 @@ kbcli cluster create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOu
 
 ```
       --backup string                Set a source backup to restore data
-      --cluster-definition string    ClusterDefinition reference
+      --cluster-definition string    Specify cluster definition, run "kbcli cluster-definition list" to show all available cluster definition
+      --cluster-version string       Specify cluster version, run "kbcli cluster-version list" to show all available cluster version
       --components string            Use yaml file, URL, or stdin to specify the cluster components
       --enable-all-logs              Enable advanced application all log extraction, and true will ignore enabledLogs of component level
   -h, --help                         help for create
@@ -64,7 +65,6 @@ kbcli cluster create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOu
       --termination-policy string    Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)
       --tolerations strings          Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'
       --topology-keys stringArray    Topology keys for affinity
-      --version string               AppVersion reference
 ```
 
 ### Options inherited from parent commands

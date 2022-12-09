@@ -45,10 +45,10 @@ import (
 )
 
 var example = templates.Examples(`
-	# Create a cluster using cluster definition my-cluster-def and component version my-version
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --version=my-version
+	# Create a cluster using cluster definition my-cluster-def and cluster version my-version
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def --cluster-version=my-version
 
-	# Both --cluster-definition and --version are required for creating cluster, for the sake of brevity, 
+	# Both --cluster-definition and --cluster-version are required for creating cluster, for the sake of brevity, 
     # the following examples will ignore these two flags.
 
 	# Create a cluster using component file component.yaml and termination policy DoNotDelete that will prevent
@@ -159,11 +159,11 @@ func (o *CreateOptions) Validate() error {
 	}
 
 	if o.ClusterDefRef == "" {
-		return fmt.Errorf("a valid cluster definition is needed, use --cluster-definition to specify one, run \"kbcli cd list\" to show all cluster definition")
+		return fmt.Errorf("a valid cluster definition is needed, use --cluster-definition to specify one, run \"kbcli cluster-definition list\" to show all cluster definition")
 	}
 
 	if o.AppVersionRef == "" {
-		return fmt.Errorf("a valid component version is needed, use --vesion to specify one, run \"kbcli comp-version list\" to show all component version")
+		return fmt.Errorf("a valid cluster version is needed, use --cluster-version to specify one, run \"kbcli cluster-version list\" to show all cluster version")
 	}
 
 	if o.TerminationPolicy == "" {
@@ -259,8 +259,8 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Complete:        o.Complete,
 		PreCreate:       o.PreCreate,
 		BuildFlags: func(cmd *cobra.Command) {
-			cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "ClusterDefinition reference")
-			cmd.Flags().StringVar(&o.AppVersionRef, "version", "", "AppVersion reference")
+			cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli cluster-definition list\" to show all available cluster definition")
+			cmd.Flags().StringVar(&o.AppVersionRef, "cluster-version", "", "Specify cluster version, run \"kbcli cluster-version list\" to show all available cluster version")
 			cmd.Flags().StringVar(&o.TerminationPolicy, "termination-policy", "", "Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)")
 			cmd.Flags().StringVar(&o.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type")
 			cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and inject metrics exporter")
@@ -283,7 +283,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 }
 
 func markRequiredFlag(cmd *cobra.Command) {
-	for _, f := range []string{"cluster-definition", "version", "termination-policy", "components"} {
+	for _, f := range []string{"cluster-definition", "cluster-version", "termination-policy", "components"} {
 		util.CheckErr(cmd.MarkFlagRequired(f))
 	}
 }
@@ -295,7 +295,7 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 			return comp.CompGetResource(f, cmd, util.GVRToString(types.ClusterDefGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
-		"version",
+		"cluster-version",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return comp.CompGetResource(f, cmd, util.GVRToString(types.AppVersionGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))

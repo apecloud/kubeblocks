@@ -18,6 +18,7 @@ package dbaas
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -28,6 +29,11 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+)
+
+const (
+	// http://localhost:<port>/v1.0/bindings/<binding_type>
+	roleObserveURIFormat = "http://localhost:%s/v1.0/bindings/%s"
 )
 
 func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams,
@@ -143,27 +149,16 @@ func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *
 	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	roleChangedContainer.Name = "kbprobe-rolechangedcheck"
 	probe := roleChangedContainer.ReadinessProbe
-	switch strings.ToLower(characterType) {
-	case "wesql":
-		probe.Exec.Command = []string{"curl", "-X", "POST",
-			"--fail-with-body", "--silent",
-			"-H", "Content-Type: application/json",
-			"http://localhost:" + strconv.Itoa(probeSvcHTTPPort) + "/v1.0/bindings/mysql",
-			"-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
-	case "etcd":
-		probe.Exec.Command = []string{"curl", "-X", "POST",
-			"--fail-with-body", "--silent",
-			"-H", "Content-Type: application/json",
-			"http://localhost:" + strconv.Itoa(probeSvcHTTPPort) + "/v1.0/bindings/etcd",
-			"-d", "{\"operation\": \"roleCheck\"}"}
-	case "mongodb":
-		probe.Exec.Command = []string{"curl", "-X", "POST",
-			"--fail-with-body", "--silent",
-			"-H", "Content-Type: application/json",
-			"http://localhost:" + strconv.Itoa(probeSvcHTTPPort) + "/v1.0/bindings/mongodb",
-			"-d", "{\"operation\": \"roleCheck\"}"}
+	bindingType := strings.ToLower(characterType)
+	svcPort := strconv.Itoa(probeSvcHTTPPort)
+	roleObserveURI := fmt.Sprintf(roleObserveURIFormat, svcPort, bindingType)
+	probe.Exec.Command = []string{
+		"curl", "-X", "POST",
+		"--fail-with-body", "--silent",
+		"-H", "Content-Type: application/json",
+		roleObserveURI,
+		"-d", "{\"operation\": \"roleCheck\"}",
 	}
-
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
 	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }

@@ -60,9 +60,9 @@ jobs:
           mkdir -p ${{ matrix.os }}
           
           CLI_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ matrix.os }}`
-          VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ env.TAG_NAME }} 1`
+          RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ env.TAG_NAME }} 1`
           
-          make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
+          VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
           
           mv bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH ${{ matrix.os }}/${{ env.CLI_NAME }}
           

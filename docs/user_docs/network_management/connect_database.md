@@ -28,8 +28,10 @@ Use "dbctl options" for a list of global command-line options (applies to all co
 You can use the `dbctl cluster describe` command to query the Component Floating IP. The example is as follows. In the following example, the external address is the floating IP address. If the component does not expose services to the outside of the cluster, the External field does not display.
 
 *Example*
+TODO This example needs to be rewritten
+
 ```
-Block: ## TODO this an array/map
+Block:
   Type:      consensus
   Replicas:  3 desired | 3 total
   Status:    3 Running / 0 Waiting / 0 Succeeded / 0 Failed  
@@ -44,5 +46,3 @@ Block: ## TODO this an array/map
       Internal: 10.42.0.13:3306/TCP 
       External: 10.42.0.13:3306/TCP  
 ```
-
-code example需要确认，内容还需要补充。

@@ -14,11 +14,11 @@ cronjob: {
   },
   spec: {
     schedule: string,
-    "jobTemplate": {
-      "spec": {
-        "template": {
-          "spec": {
-            "containers": [
+    jobTemplate: {
+      spec: {
+        template: {
+          spec: {
+            containers: [
               {
                 "name": "kubectl",
                 "image": "rancher/kubectl:v1.23.7",
@@ -28,8 +28,8 @@ cronjob: {
                 ]
               }
             ],
-            "restartPolicy": "OnFailure"
-            "serviceAccount": "kubeblocks"
+            restartPolicy: "OnFailure"
+            serviceAccount: string
           }
         }
       }

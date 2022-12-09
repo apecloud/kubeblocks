@@ -29,6 +29,7 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/leaanthony/debme"
 	"github.com/sethvargo/go-password/password"
+	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -2149,6 +2150,15 @@ func buildCronJob(pvcKey types.NamespacedName, schedule string) (*v1.CronJob, er
 	}
 
 	if err := cueValue.FillRaw("cronjob.spec.schedule", schedule); err != nil {
+		return nil, err
+	}
+
+	serviceAccount := viper.GetString("KUBEBLOCKS_SERVICE_ACCOUNT")
+	if len(serviceAccount) == 0 {
+		serviceAccount = "kubeblocks"
+	}
+	if err := cueValue.FillRaw("cronjob.spec.jobTemplate.spec.template.spec.serviceAccount",
+		serviceAccount); err != nil {
 		return nil, err
 	}
 

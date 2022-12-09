@@ -53,7 +53,7 @@ var _ = Describe("Cluster", func() {
 			Expect(cmd.Flags().GetString("termination-policy")).Should(Equal(""))
 
 			Expect(cmd.Flags().Set("cluster-definition", "test-cd")).Should(Succeed())
-			Expect(cmd.Flags().Set("version", "test-version")).Should(Succeed())
+			Expect(cmd.Flags().Set("cluster-version", "test-version")).Should(Succeed())
 			Expect(cmd.Flags().Set("components", "../../testing/testdata/component.yaml")).Should(Succeed())
 			Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
 

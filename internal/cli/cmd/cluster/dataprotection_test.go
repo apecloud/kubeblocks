@@ -158,7 +158,7 @@ var _ = Describe("DataProtection", func() {
 		cmd := NewCreateCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 		Expect(cmd.Flags().Set("cluster-definition", "test-cd")).Should(Succeed())
-		Expect(cmd.Flags().Set("version", "test-version")).Should(Succeed())
+		Expect(cmd.Flags().Set("cluster-version", "test-version")).Should(Succeed())
 		Expect(cmd.Flags().Set("components", "../../testing/testdata/component.yaml")).Should(Succeed())
 		Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
 		cmd.Run(nil, []string{clusterName})

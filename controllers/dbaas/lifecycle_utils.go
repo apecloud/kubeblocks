@@ -932,13 +932,21 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 							}
 						}
 					} else {
-						reqCtx.Recorder.Eventf(cluster, corev1.EventTypeWarning, "HorizontalScaleFailed", "volume snapshot not support")
+						reqCtx.Recorder.Eventf(cluster,
+							corev1.EventTypeWarning,
+							"HorizontalScaleFailed",
+							"volume snapshot not support")
 					}
 				// do nothing when horizontal scaling
 				case dbaasv1alpha1.ScaleNone:
 					break
 				}
-				reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "HorizontalScale", "Start horizontal scale from %d to %d", *stsObj.Spec.Replicas, *stsProto.Spec.Replicas)
+				reqCtx.Recorder.Eventf(cluster,
+					corev1.EventTypeNormal,
+					"HorizontalScale",
+					"Start horizontal scale from %d to %d",
+					*stsObj.Spec.Replicas,
+					*stsProto.Spec.Replicas)
 			} else if *stsObj.Spec.Replicas > *stsProto.Spec.Replicas {
 				// scale down, if scale down to 0, do not delete pvc
 				if *stsProto.Spec.Replicas > 0 && len(stsObj.Spec.VolumeClaimTemplates) > 0 {
@@ -952,6 +960,12 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 							if err := createDeletePVCCronJob(cli, ctx, pvcKey); err != nil {
 								res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 								return &res, err
+							} else {
+								reqCtx.Recorder.Eventf(cluster,
+									corev1.EventTypeNormal,
+									"CronJobCreate",
+									"create cronjob to delete pvc/%s",
+									pvcKey.Name)
 							}
 						}
 					}

@@ -8,6 +8,9 @@ cronjob: {
   metadata: {
     name: "delete-pvc-\(pvc.Name)"
     namespace: pvc.Namespace
+		labels: {
+			"app.kubernetes.io/managed-by": "kubeblocks"
+		}
   },
   spec: {
     schedule: string,

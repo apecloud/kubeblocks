@@ -24,7 +24,10 @@ import (
 
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -44,7 +47,7 @@ const (
 
 // isTargetKindForEvent check the event involve object is the target resources
 func isTargetKindForEvent(event *corev1.Event) bool {
-	return slices.Index([]string{intctrlutil.PodKind, intctrlutil.DeploymentKind, intctrlutil.StatefulSetKind}, event.InvolvedObject.Kind) != -1
+	return slices.Index([]string{intctrlutil.PodKind, intctrlutil.DeploymentKind, intctrlutil.StatefulSetKind, intctrlutil.CronJob}, event.InvolvedObject.Kind) != -1
 }
 
 // isOperationsPhaseForCluster determine whether operations are in progress according to the cluster status.
@@ -424,6 +427,10 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 		err    error
 		object client.Object
 	)
+	if event.InvolvedObject.Kind == intctrlutil.CronJob &&
+		event.Reason == "SawCompletedJob" {
+		return checkedDeleteCronJob(ctx, cli, event.InvolvedObject.Name, event.InvolvedObject.Namespace)
+	}
 	if event.Type != corev1.EventTypeWarning || !isTargetKindForEvent(event) {
 		return nil
 	}
@@ -437,4 +444,26 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 		return nil
 	}
 	return handleClusterStatusByEvent(ctx, cli, recorder, object, event)
+}
+
+func checkedDeleteCronJob(ctx context.Context, cli client.Client, name string, namespace string) error {
+	// label check
+	cronJob := v1.CronJob{}
+	if err := cli.Get(ctx, types.NamespacedName{
+		Namespace: namespace,
+		Name:      name,
+	}, &cronJob); err != nil {
+		if !errors.IsNotFound(err) {
+			return err
+		}
+	}
+	if cronJob.ObjectMeta.Labels["app.kubernetes.io/managed-by"] == "kubeblocks" {
+		// if managed by kubeblocks, then it must be the cronjob used to delete pvc, delete it since it's completed
+		if err := cli.Delete(ctx, &cronJob); err != nil {
+			if !errors.IsNotFound(err) {
+				return err
+			}
+		}
+	}
+	return nil
 }

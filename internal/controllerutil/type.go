@@ -63,6 +63,7 @@ const (
 	StatefulSetKind           = "StatefulSet"
 	PodKind                   = "Pod"
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
+	CronJob                   = "CronJob"
 )
 
 // RequestCtx wrapper for reconcile procedure context parameters

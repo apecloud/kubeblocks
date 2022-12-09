@@ -7,6 +7,10 @@ spec:
   components:
     - typeName: mongos
       defaultReplicas: 1
+      configTemplateRefs:
+        - name: mongodb-scripts
+          volumeName: scripts
+          defaultMode: 493
       componentType: Stateless
       service:
         ports:
@@ -20,15 +24,17 @@ spec:
                 name: mongos
                 containerPort: 27017
             command:
-              - bin/sh
-              - -c
-              - |
-                PORT=27018 
-                CONFIG_SVR_NAME=$KB_CLUSTER_NAME"-configsvr"
-                DOMAIN=$CONFIG_SVR_NAME"-headless."$KB_NAMESPACE".svc.cluster.local"
-                mongos --bind_ip_all --configdb $CONFIG_SVR_NAME/$CONFIG_SVR_NAME"-0."$DOMAIN:$PORT,$CONFIG_SVR_NAME"-1."$DOMAIN:$PORT,$CONFIG_SVR_NAME"-2."$DOMAIN:$PORT
+              - /scripts/mongos-setup.sh
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts/mongos-setup.sh
+                subPath: mongos-setup.sh
     - typeName: configsvr
       defaultReplicas: 3
+      configTemplateRefs:
+        - name: mongodb-scripts
+          volumeName: scripts
+          defaultMode: 493
       characterType: mongodb
       componentType: Consensus
       consensusSpec:
@@ -55,43 +61,28 @@ spec:
                 protocol: TCP
                 containerPort: 27018
             command:
-              - bin/sh
-              - -c
-              - |
-                RPL_SET_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
-                RPL_SET_NAME=${RPL_SET_NAME%-};
-                PORT=27018
-                mongod --configsvr --bind_ip_all --port $PORT --replSet $RPL_SET_NAME
+              - /scripts/replicaset-setup.sh
+              - --configsvr
             lifecycle:
               postStart:
                 exec:
                   command:
-                    - bin/sh
-                    - -c
-                    - |
-                      INDEX=$(echo $KB_POD_NAME | grep -o "\-[0-9]\+");
-                      INDEX=${INDEX#-};
-                      if [ $INDEX -ne 0 ]; then exit 0; fi
-                      
-                      PORT=27018
-                      until mongosh --port $PORT --eval "print('ready')"; do sleep 1; done
-                      
-                      RPL_SET_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
-                      RPL_SET_NAME=${RPL_SET_NAME%-};
-                      
-                      MEMBERS=""
-                      i=0
-                      while [ $i -lt $KB_CONFIGSVR_N ]; do
-                        if [ $i -ne 0 ]; then MEMBERS="$MEMBERS,"; fi
-                        host=$(eval echo \$KB_CONFIGSVR_"$i"_HOSTNAME)
-                        host=$host"."$KB_NAMESPACE".svc.cluster.local"
-                        until mongosh --port $PORT --host $host --eval "print('peer is ready')"; do sleep 1; done
-                        MEMBERS="$MEMBERS{_id: $i, host: \"$host:$PORT\"}"
-                        i=$(( i + 1))
-                      done
-                      mongosh --port $PORT --eval "rs.initiate({_id: \"$RPL_SET_NAME\", configsvr: true, members: [$MEMBERS]})"
+                    - /scripts/replicaset-post-start.sh
+                    - CONFIGSVR
+                    - "true"
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts/replicaset-setup.sh
+                subPath: replicaset-setup.sh
+              - name: scripts
+                mountPath: /scripts/replicaset-post-start.sh
+                subPath: replicaset-post-start.sh
     - typeName: shard
       defaultReplicas: 3
+      configTemplateRefs:
+        - name: mongodb-scripts
+          volumeName: scripts
+          defaultMode: 493
       characterType: mongodb
       componentType: Consensus
       consensusSpec:
@@ -118,62 +109,29 @@ spec:
                 protocol: TCP
                 containerPort: 27018
             command:
-              - bin/sh
-              - -c
-              - |
-                RPL_SET_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
-                RPL_SET_NAME=${RPL_SET_NAME%-};
-                mongod --shardsvr --bind_ip_all --replSet $RPL_SET_NAME
+              - /scripts/replicaset-setup.sh
+              - --shardsvr
             lifecycle:
               postStart:
                 exec:
                   command:
-                    - bin/sh
-                    - -c
-                    - |
-                      INDEX=$(echo $KB_POD_NAME | grep -o "\-[0-9]\+");
-                      INDEX=${INDEX#-};
-                      if [ $INDEX -ne 0 ]; then exit 0; fi
-
-                      PORT=27018
-                      until mongosh --port $PORT --eval "print('ready')"; do sleep 1; done
-
-                      RPL_SET_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
-                      RPL_SET_NAME=${RPL_SET_NAME%-};
-
-                      MEMBERS=""
-                      i=0
-                      while [ $i -lt $KB_SHARD_N ]; do
-                        if [ $i -ne 0 ]; then MEMBERS="$MEMBERS,"; fi
-                        host=$(eval echo \$KB_SHARD_"$i"_HOSTNAME)
-                        host=$host"."$KB_NAMESPACE".svc.cluster.local"
-                        until mongosh --port $PORT --host $host --eval "print('peer is ready')"; do sleep 1; done
-                        MEMBERS="$MEMBERS{_id: $i, host: \"$host:$PORT\"}"
-                        i=$(( i + 1))
-                      done
-                      mongosh --port $PORT --eval "rs.initiate({_id: \"$RPL_SET_NAME\", members: [$MEMBERS]})"
+                    - /scripts/replicaset-post-start.sh
+                    - SHARD
+                    - "false"
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts/replicaset-setup.sh
+                subPath: replicaset-setup.sh
+              - name: scripts
+                mountPath: /scripts/replicaset-post-start.sh
+                subPath: replicaset-post-start.sh
           - name: agent
             command:
-              - bin/sh
-              - -c
-              - |
-                INDEX=$(echo $KB_POD_NAME | grep -o "\-[0-9]\+");
-                INDEX=${INDEX#-};
-                if [ $INDEX -ne 0 ]; then
-                  trap : TERM INT; (while true; do sleep 1000; done) & wait
-                fi
-
-                # wait main container ready
-                PORT=27018
-                until mongosh --port $PORT --eval "rs.status().ok"; do sleep 1; done
-                # add shard to mongos
-                SHARD_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
-                SHARD_NAME=${SHARD_NAME%-};
-                DOMAIN=$SHARD_NAME"-headless."$KB_NAMESPACE".svc.cluster.local"
-                MONGOS_HOST=$KB_CLUSTER_NAME"-mongos"
-                MONGOS_PORT=27017
-                SHARD_CONFIG=$SHARD_NAME/$SHARD_NAME"-0."$DOMAIN:$PORT,$SHARD_NAME"-1."$DOMAIN:$PORT,$SHARD_NAME"-2."$DOMAIN:$PORT
-                until mongosh --host $MONGOS_HOST --port $MONGOS_PORT --eval "print('service is ready')"; do sleep 1; done
-                mongosh --host $MONGOS_HOST --port $MONGOS_PORT --eval "sh.addShard(\"$SHARD_CONFIG\")"
-                
-                trap : TERM INT; (while true; do sleep 1000; done) & wait
+              - /scripts/shard-agent.sh
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts/shard-agent.sh
+                subPath: shard-agent.sh
+  connectionCredential:
+    username: admin
+    password: ""

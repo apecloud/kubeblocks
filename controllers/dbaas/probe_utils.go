@@ -169,7 +169,7 @@ func getComponentRoles(component *Component) map[string]string {
 
 func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *corev1.Container,
 	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
-	roleChangedContainer.Name = "kbprobe-rolechangedcheck"
+	roleChangedContainer.Name = roleProbeContainerName
 	probe := roleChangedContainer.ReadinessProbe
 	bindingType := strings.ToLower(characterType)
 	svcPort := strconv.Itoa(probeSvcHTTPPort)

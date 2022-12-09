@@ -68,4 +68,5 @@ spec:
                 --initial-cluster-state new \
                 --data-dir /var/run/etcd/default.etcd
   connectionCredential:
-    user: root
+    username: root
+    password: ""

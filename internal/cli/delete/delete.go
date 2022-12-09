@@ -24,10 +24,10 @@ import (
 	"github.com/spf13/cobra"
 	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	utilcomp "k8s.io/kubectl/pkg/util/completion"
 
 	"github.com/apecloud/kubeblocks/internal/cli/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	comp "github.com/apecloud/kubeblocks/internal/cli/util/completion"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 )
 
@@ -53,7 +53,7 @@ func Build(c *builder.Command) *cobra.Command {
 		Use:               c.Use,
 		Short:             c.Short,
 		Example:           c.Example,
-		ValidArgsFunction: comp.ResourceNameCompletionFunc(c.Factory, util.GVRToString(c.GVR)),
+		ValidArgsFunction: utilcomp.ResourceNameCompletionFunc(c.Factory, util.GVRToString(c.GVR)),
 		Run: func(cmd *cobra.Command, args []string) {
 			// If delete resources belonging to cluster, custom complete function
 			// should fill the ResourceName or construct the label selector based

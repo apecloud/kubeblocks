@@ -25,6 +25,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/backupconfig"
@@ -34,7 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/options"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/version"
-	comp "github.com/apecloud/kubeblocks/internal/cli/util/completion"
 )
 
 var cfgFile string
@@ -92,7 +92,7 @@ A Command Line Interface for KubeBlocks`,
 	filters := []string{"options"}
 	templates.ActsAsRootCommand(cmd, filters, []templates.CommandGroup{}...)
 
-	comp.SetFactoryForCompletion(f)
+	utilcomp.SetFactoryForCompletion(f)
 	registerCompletionFuncForGlobalFlags(cmd, f)
 
 	cobra.OnInitialize(initConfig)
@@ -127,21 +127,21 @@ func registerCompletionFuncForGlobalFlags(cmd *cobra.Command, f cmdutil.Factory)
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"namespace",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return comp.CompGetResource(f, cmd, "namespace", toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.CompGetResource(f, cmd, "namespace", toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"context",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return comp.ListContextsInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.ListContextsInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cluster",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return comp.ListClustersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.ListClustersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"user",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return comp.ListUsersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.ListUsersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 }

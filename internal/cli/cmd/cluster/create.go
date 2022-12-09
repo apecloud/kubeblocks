@@ -34,6 +34,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -41,7 +42,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	comp "github.com/apecloud/kubeblocks/internal/cli/util/completion"
 )
 
 var example = templates.Examples(`
@@ -292,12 +292,12 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cluster-definition",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return comp.CompGetResource(f, cmd, util.GVRToString(types.ClusterDefGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterDefGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cluster-version",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return comp.CompGetResource(f, cmd, util.GVRToString(types.AppVersionGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.AppVersionGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"termination-policy",

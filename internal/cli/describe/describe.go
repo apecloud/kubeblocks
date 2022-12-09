@@ -29,9 +29,9 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/describe"
+	utilcomp "k8s.io/kubectl/pkg/util/completion"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	comp "github.com/apecloud/kubeblocks/internal/cli/util/completion"
 )
 
 // Options used to construct a describe command
@@ -72,7 +72,7 @@ func (o *Options) Build() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "describe",
 		Short:             o.Short,
-		ValidArgsFunction: comp.ResourceNameCompletionFunc(o.Factory, util.GVRToString(o.GVR)),
+		ValidArgsFunction: utilcomp.ResourceNameCompletionFunc(o.Factory, util.GVRToString(o.GVR)),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(args))
 			util.CheckErr(o.run())

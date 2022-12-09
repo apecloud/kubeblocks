@@ -22,12 +22,12 @@ import (
 
 	"github.com/spf13/cobra"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	utilcomp "k8s.io/kubectl/pkg/util/completion"
 
 	"github.com/apecloud/kubeblocks/internal/cli/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/get"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	comp "github.com/apecloud/kubeblocks/internal/cli/util/completion"
 )
 
 // Build return a list command, if the resource is not cluster, construct a label
@@ -47,7 +47,7 @@ func Build(c *builder.Command) *cobra.Command {
 		Short:             c.Short,
 		Example:           c.Example,
 		Aliases:           []string{alias},
-		ValidArgsFunction: comp.ResourceNameCompletionFunc(c.Factory, util.GVRToString(c.GVR)),
+		ValidArgsFunction: utilcomp.ResourceNameCompletionFunc(c.Factory, util.GVRToString(c.GVR)),
 		Run: func(cmd *cobra.Command, args []string) {
 			var (
 				goon = true

@@ -888,6 +888,10 @@ spec:
 					Expect(testCtx.CreateObj(ctx, &pod)).Should(Succeed())
 				}
 
+				events := createFakeRoleChangedEvent(pods)
+				for _, event := range events {
+					Expect(testCtx.CreateObj(ctx, &event)).Should(Succeed())
+				}
 				// fake pods and stateful set creation done
 				time.Sleep(interval * 5)
 
@@ -1187,6 +1191,35 @@ spec:
 		})
 	})
 })
+
+func createFakeRoleChangedEvent(pods []corev1.Pod) []corev1.Event {
+	eventYaml := `
+apiVersion: v1
+kind: Event
+metadata:
+  name: myevent
+  namespace: default
+type: Warning
+reason: Unhealthy
+reportingComponent: ""
+message: 'Readiness probe failed: {"event":"roleUnchanged","originalRole":"Leader","role":"Leader"}'
+involvedObject:
+  apiVersion: v1
+  fieldPath: spec.containers{kb-rolechangedcheck}
+  kind: Pod
+  name: wesql-main-2
+  namespace: default
+`
+	events := make([]corev1.Event, 3)
+	for _, pod := range pods {
+		event := corev1.Event{}
+		Expect(yaml.Unmarshal([]byte(eventYaml), &event)).Should(Succeed())
+		event.Name = pod.Name + "-event"
+		event.InvolvedObject.Name = pod.Name
+		events = append(events, event)
+	}
+	return events
+}
 
 func createFakePod(parentName string, number int) []corev1.Pod {
 	podYaml := `

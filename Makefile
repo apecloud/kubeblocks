@@ -190,7 +190,7 @@ TEST_PACKAGE=
 CLUSTER_TYPES=minikube k3d
 .PHONY: add-k8s-host
 add-k8s-host:  ## add DNS to /etc/hosts when k8s cluster is minikube or k3d
-ifeq ($(findstring $(EXISTING_CLUSTER_TYPE), $(CLUSTER_TYPES)), $(EXISTING_CLUSTER_TYPE))
+ifneq (, $(findstring $(EXISTING_CLUSTER_TYPE), $(CLUSTER_TYPES)))
 ifeq (, $(shell sed -n "/^127.0.0.1[[:space:]]*host.$(EXISTING_CLUSTER_TYPE).internal/p" /etc/hosts))
 	sudo bash -c 'echo "127.0.0.1 host.$(EXISTING_CLUSTER_TYPE).internal" >> /etc/hosts'
 endif

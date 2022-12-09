@@ -293,6 +293,7 @@ func mergeMonitorConfig(
 }
 
 func mergeComponents(
+	reqCtx intctrlutil.RequestCtx,
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition,
 	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
@@ -447,12 +448,17 @@ func mergeComponents(
 	// }
 
 	mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
+	err := buildProbeContainers(reqCtx, component)
+	if err != nil {
+		reqCtx.Log.Error(err, "build probe container failed.")
+	}
 	replaceValues(cluster, component)
 
 	return component
 }
 
-func mergeComponentsList(cluster *dbaasv1alpha1.Cluster,
+func mergeComponentsList(reqCtx intctrlutil.RequestCtx,
+	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition,
 	clusterDefCompList []dbaasv1alpha1.ClusterDefinitionComponent,
 	clusterCompList []dbaasv1alpha1.ClusterComponent) []Component {
@@ -464,7 +470,7 @@ func mergeComponentsList(cluster *dbaasv1alpha1.Cluster,
 				matchClusterComp = clusterComp
 			}
 		}
-		comp := mergeComponents(cluster, clusterDef, &clusterDefComp, nil, &matchClusterComp)
+		comp := mergeComponents(reqCtx, cluster, clusterDef, &clusterDefComp, nil, &matchClusterComp)
 		compList = append(compList, *comp)
 	}
 	return compList
@@ -562,7 +568,7 @@ func createCluster(
 		appVersionComponent := appCompTypes[typeName]
 		clusterComps := clusterCompTypes[typeName]
 		for _, clusterComp := range clusterComps {
-			if err := prepareComp(mergeComponents(cluster, clusterDefinition, &c, appVersionComponent, &clusterComp)); err != nil {
+			if err := prepareComp(mergeComponents(reqCtx, cluster, clusterDefinition, &c, appVersionComponent, &clusterComp)); err != nil {
 				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 				return &res, err
 			}
@@ -825,7 +831,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			}
 			// find component of current statefulset
 			componentName := stsObj.Labels[intctrlutil.AppComponentLabelKey]
-			components := mergeComponentsList(cluster, clusterDef, clusterDef.Spec.Components, cluster.Spec.Components)
+			components := mergeComponentsList(reqCtx, cluster, clusterDef, clusterDef.Spec.Components, cluster.Spec.Components)
 			component := getComponent(components, componentName)
 			// update component status when scaling
 			if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
@@ -1251,12 +1257,6 @@ func processContainersInjection(reqCtx intctrlutil.RequestCtx,
 	params createParams,
 	envConfigName string,
 	podSpec *corev1.PodSpec) error {
-	probeContainers, err := buildProbeContainers(reqCtx, params, podSpec.Containers)
-	if err != nil {
-		return err
-	}
-	podSpec.Containers = append(podSpec.Containers, probeContainers...)
-
 	for _, cc := range []*[]corev1.Container{
 		&podSpec.Containers,
 		&podSpec.InitContainers,

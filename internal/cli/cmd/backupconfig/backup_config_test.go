@@ -21,6 +21,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/spf13/cobra"
+	"helm.sh/helm/v3/pkg/repo"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
@@ -70,6 +71,13 @@ var _ = Describe("backup_config", func() {
 		// use a fake URL to test
 		types.KubeBlocksChartName = testing.KubeBlocksChartName
 		types.KubeBlocksChartURL = testing.KubeBlocksChartURL
+
+		// mock helm chart function for test
+		old := helmAddRepo
+		defer func() { helmAddRepo = old }()
+		helmAddRepo = func(r *repo.Entry) error {
+			return nil
+		}
 
 		o := &upgradeOptions{
 			IOStreams: streams,

@@ -38,7 +38,7 @@ import (
 
 var _ = Describe("BackupJob Controller", func() {
 	type Key = types.NamespacedName
-	const timeout = time.Second * 10
+	const timeout = time.Second * 20
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
 

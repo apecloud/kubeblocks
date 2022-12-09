@@ -8,7 +8,7 @@ spec:
   type: state.mysql
   connectionCredential:
     username: root
-    password: "$(RANDOM_PASSWORD)"
+    password: "$(RANDOM_PASSWD)"
   components:
     - typeName: replicasets
       characterType: mysql
@@ -88,7 +88,6 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
-                value: {{ .Values.auth.rootUser | default "root" | quote }}
               - name: MYSQL_ROOT_PASSWORD
                 valueFrom:
                   secretKeyRef:

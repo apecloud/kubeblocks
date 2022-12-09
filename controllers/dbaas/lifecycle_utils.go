@@ -860,20 +860,45 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 						componentName)
 					continue
 				}
-				// do backup according to component's horizontal scale policy
-				var err error
-				result, err = doBackup(reqCtx,
-					cli,
-					cluster,
-					component,
-					stsObj,
-					stsProto,
-					snapshotKey)
-				if err != nil {
-					return result, err
+				allPVCExists := true
+				for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
+					for _, vct := range stsObj.Spec.VolumeClaimTemplates {
+						pvcKey := types.NamespacedName{
+							Namespace: key.Namespace,
+							Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
+						}
+						// delete deletion cronjob if exists
+						if err := deleteDeletePVCCronJob(cli, ctx, pvcKey); err != nil {
+							res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+							return &res, err
+						}
+						// check pvc existence
+						pvcExist, err := isPVCExists(cli, ctx, pvcKey)
+						if err != nil {
+							res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+							return &res, err
+						}
+						if !pvcExist {
+							allPVCExists = false
+						}
+					}
 				}
-				if result != nil {
-					continue
+				if !allPVCExists {
+					// do backup according to component's horizontal scale policy
+					var err error
+					result, err = doBackup(reqCtx,
+						cli,
+						cluster,
+						component,
+						stsObj,
+						stsProto,
+						snapshotKey)
+					if err != nil {
+						return result, err
+					}
+					if result != nil {
+						continue
+					}
 				}
 				reqCtx.Recorder.Eventf(cluster,
 					corev1.EventTypeNormal,
@@ -2272,4 +2297,18 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 		break
 	}
 	return result, nil
+}
+
+func isPVCExists(cli client.Client,
+	ctx context.Context,
+	pvcKey types.NamespacedName) (bool, error) {
+	pvc := corev1.PersistentVolumeClaim{}
+	if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		} else {
+			return false, err
+		}
+	}
+	return true, nil
 }

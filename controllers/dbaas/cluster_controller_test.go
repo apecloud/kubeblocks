@@ -1336,10 +1336,8 @@ spec:
 		pod.Name = stsName + "-" + strconv.Itoa(i)
 		pod.Labels[intctrlutil.AppInstanceLabelKey] = clusterName
 		pod.Labels[intctrlutil.AppComponentLabelKey] = componentName
-		//pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] = "follower"
 		pods = append(pods, pod)
 	}
-	//pods[1].Labels[intctrlutil.ConsensusSetRoleLabelKey] = "leader"
 
 	return pods
 }

@@ -50,14 +50,6 @@ type Mysql struct {
 }
 
 const (
-	// list of operations.
-	execOperation         bindings.OperationKind = "exec"
-	runningCheckOperation bindings.OperationKind = "runningCheck"
-	statusCheckOperation  bindings.OperationKind = "statusCheck"
-	roleCheckOperation    bindings.OperationKind = "roleCheck"
-	queryOperation        bindings.OperationKind = "query"
-	closeOperation        bindings.OperationKind = "close"
-
 	// configurations to connect to Mysql, either a data source name represent by URL.
 	connectionURLKey = "url"
 
@@ -83,10 +75,14 @@ const (
 	roleChangedCheckType
 )
 
-var runningCheckFailedCount = 0
-var eventAggregationNum = 10
-var dbPort = 3306
-var dbRoles = map[string]internal.AccessMode{}
+var (
+	runningCheckFailedCount = 0
+	eventAggregationNum     = 10
+	dbPort                  = 3306
+	dbUser                  = "root"
+	dbPasswd                = ""
+	dbRoles                 = map[string]internal.AccessMode{}
+)
 
 // NewMysql returns a new MySQL output binding.
 func NewMysql(logger logger.Logger) bindings.OutputBinding {
@@ -101,6 +97,14 @@ func (m *Mysql) Init(metadata bindings.Metadata) error {
 
 	if viper.IsSet("KB_SERVICE_PORT") {
 		dbPort = viper.GetInt("KB_SERVICE_PORT")
+	}
+
+	if viper.IsSet("KB_SERVICE_USER") {
+		dbUser = viper.GetString("KB_SERVICE_USER")
+	}
+
+	if viper.IsSet("KB_SERVICE_PASSWORD") {
+		dbPasswd = viper.GetString("KB_SERVICE_PASSWORD")
 	}
 
 	if viper.IsSet("KB_SERVICE_ROLES") {
@@ -344,9 +348,12 @@ func propertyToDuration(props map[string]string, key string, setter func(time.Du
 }
 
 func initDB(url, pemPath string) (*sql.DB, error) {
-	if _, err := mysql.ParseDSN(url); err != nil {
+	config, err := mysql.ParseDSN(url)
+	if err != nil {
 		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS) specified by %s", connectionURLKey)
 	}
+	config.User = dbUser
+	config.Passwd = dbPasswd
 
 	if pemPath != "" {
 		rootCertPool := x509.NewCertPool()
@@ -366,7 +373,7 @@ func initDB(url, pemPath string) (*sql.DB, error) {
 		}
 	}
 
-	db, err := sql.Open("mysql", url)
+	db, err := sql.Open("mysql", config.FormatDSN())
 	if err != nil {
 		return nil, errors.Wrap(err, "error opening DB connection")
 	}

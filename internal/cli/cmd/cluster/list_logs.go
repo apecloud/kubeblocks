@@ -17,8 +17,8 @@ limitations under the License.
 package cluster
 
 import (
+	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
@@ -28,30 +28,29 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	cmddes "k8s.io/kubectl/pkg/describe"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
-	"github.com/apecloud/kubeblocks/internal/cli/describe"
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var (
 	logsListExample = templates.Examples(`
-		# Display supported log file in cluster my-cluster with all instance
-		kbcli cluster list-logs-type my-cluster
+		# Display supported log files in cluster my-cluster with all instance
+		kbcli cluster list-logs my-cluster
 
-        # Display supported log file in cluster my-cluster with specify component my-component
-		kbcli cluster list-logs-type my-cluster --component my-component
+        # Display supported log files in cluster my-cluster with specify component my-component
+		kbcli cluster list-logs my-cluster --component my-component
 
-		# Display supported log file in cluster my-cluster with specify instance my-instance-0
-		kbcli cluster list-logs-type my-cluster --instance my-instance-0`)
+		# Display supported log files in cluster my-cluster with specify instance my-instance-0
+		kbcli cluster list-logs my-cluster --instance my-instance-0`)
 )
 
-// ListLogsOptions declares the arguments accepted by the list-logs-type command
+// ListLogsOptions declares the arguments accepted by the list-logs command
 type ListLogsOptions struct {
 	namespace     string
 	clusterName   string
@@ -65,16 +64,15 @@ type ListLogsOptions struct {
 	exec *exec.ExecOptions
 }
 
-// NewListLogsTypeCmd returns list logs type cmd
-func NewListLogsTypeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewListLogsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &ListLogsOptions{
 		factory:   f,
 		IOStreams: streams,
 	}
 
 	cmd := &cobra.Command{
-		Use:     "list-logs-type",
-		Short:   "List the supported logs file types in cluster",
+		Use:     "list-logs",
+		Short:   "List supported log files in cluster",
 		Example: logsListExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.Validate(args))
@@ -131,37 +129,51 @@ func (o *ListLogsOptions) Run() error {
 	if err != nil {
 		return err
 	}
-	if err := o.printListLogsMessage(dataObj, o.Out); err != nil {
+	if err := o.printListLogs(dataObj); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (o *ListLogsOptions) printHeaderMessage(w cmddes.PrefixWriter, c *dbaasv1alpha1.Cluster) {
-	w.Write(describe.Level0, "ClusterName:\t\t%s\n", c.Name)
-	w.Write(describe.Level0, "Namespace:\t\t%s\n", c.Namespace)
-	w.Write(describe.Level0, "ClusterDefinition:\t%s\n", c.Spec.ClusterDefRef)
+// printListLogs prints the result of list-logs command to stdout.
+func (o *ListLogsOptions) printListLogs(dataObj *cluster.ClusterObjects) error {
+	tbl := printer.NewTablePrinter(o.Out)
+	logFilesData := o.gatherLogFilesData(dataObj.Cluster, dataObj.ClusterDef, dataObj.Pods)
+	if len(logFilesData) == 0 {
+		fmt.Fprintln(o.ErrOut, "No log files found. \nYou can enable the log feature when creating a cluster with option of \"--enable-all-logs=true\"")
+	} else {
+		tbl.SetHeader("INSTANCE", "LOG-TYPE", "FILE-PATH", "SIZE", "LAST-WRITTEN", "COMPONENT")
+		for _, f := range logFilesData {
+			tbl.AddRow(f.instance, f.logType, f.filePath, f.size, f.lastWritten, f.component)
+		}
+		tbl.Print()
+	}
+	return nil
 }
 
-// printBodyMessage prints message about log files.
-func (o *ListLogsOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinition, pods *corev1.PodList) {
+type logFileInfo struct {
+	instance    string
+	logType     string
+	filePath    string
+	size        string
+	lastWritten string
+	component   string
+}
+
+// gatherLogFilesData gathers all log files data from every instance of the cluster.
+func (o *ListLogsOptions) gatherLogFilesData(c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinition, pods *corev1.PodList) []logFileInfo {
+	logFileInfoList := make([]logFileInfo, 0, len(pods.Items))
 	for _, p := range pods.Items {
 		if len(o.instName) > 0 && !strings.EqualFold(p.Name, o.instName) {
 			continue
 		}
 		componentName, ok := p.Labels[types.ComponentLabelKey]
-		if !ok {
-			w.Write(describe.Level0, "\nLabel key %s in pod %s isn't set \n", types.ComponentLabelKey, p.Name)
+		if !ok || (len(o.componentName) > 0 && !strings.EqualFold(o.componentName, componentName)) {
 			continue
 		}
-		if len(o.componentName) > 0 && !strings.EqualFold(o.componentName, componentName) {
-			continue
-		}
-		w.Write(describe.Level0, "\nInstance  Name:\t%s\n", p.Name)
-		w.Write(describe.Level0, "Component Name:\t%s\n", componentName)
 		var comTypeName string
 		logTypeMap := make(map[string]struct{})
-		// find component typeName and enabledLogs config according to componentName in pod's label.
+		// find component typeName and enabledLogs config against componentName in pod's label.
 		for _, comCluster := range c.Spec.Components {
 			if !strings.EqualFold(comCluster.Name, componentName) {
 				continue
@@ -170,56 +182,65 @@ func (o *ListLogsOptions) printBodyMessage(w cmddes.PrefixWriter, c *dbaasv1alph
 			for _, logType := range comCluster.EnabledLogs {
 				logTypeMap[logType] = struct{}{}
 			}
+			break
 		}
-		if len(comTypeName) == 0 {
-			w.Write(describe.Level0, "Component name %s in pod's label can't find corresponding typeName, please check cluster.yaml \n", componentName)
+		if len(comTypeName) == 0 || len(logTypeMap) == 0 {
 			continue
 		}
-		if len(logTypeMap) == 0 {
-			w.Write(describe.Level0, "No logs type found. \nYou can enable the log feature when creating a cluster with option of \"--enable-all-logs=true\"\n")
-			continue
-		}
-		var validCount int
 		for _, com := range cd.Spec.Components {
 			if !strings.EqualFold(com.TypeName, comTypeName) {
 				continue
 			}
 			for _, logConfig := range com.LogConfigs {
 				if _, ok := logTypeMap[logConfig.Name]; ok {
-					validCount++
-					w.Write(describe.Level0, "Log file type :\t%s\n", logConfig.Name)
-					// todo display more log file info
-					if len(logConfig.FilePathPattern) > 0 {
-						o.printRealFileMessage(&p, logConfig.FilePathPattern)
+					realFile, err := o.getRealFileFromContainer(&p, logConfig.FilePathPattern)
+					if err == nil {
+						logFileInfoList = append(logFileInfoList, convertToLogFileInfo(realFile, logConfig.Name, p.Name, componentName)...)
 					}
 				}
 			}
-		}
-		if len(logTypeMap) != validCount {
-			w.Write(describe.Level0, "EnabledLogs have invalid logTypes, please look up cluster Status.Conditions by `kubectl describe cluster <cluster-name>`\n")
+			break
 		}
 	}
+	return logFileInfoList
 }
 
-// printRealFileMessage prints real files in container
-func (o *ListLogsOptions) printRealFileMessage(pod *corev1.Pod, pattern string) {
+// convertToLogFileInfo converts file info in string format to logFileInfo struct.
+func convertToLogFileInfo(fileInfo, logType, instName, component string) []logFileInfo {
+	fileList := strings.Split(fileInfo, "\n")
+	logFileList := make([]logFileInfo, 0, len(fileList))
+	for _, file := range fileList {
+		fieldList := strings.Fields(file)
+		if len(fieldList) == 0 {
+			continue
+		}
+		logFileList = append(logFileList, logFileInfo{
+			instance:    instName,
+			component:   component,
+			logType:     logType,
+			size:        fieldList[4],
+			lastWritten: strings.Join(fieldList[5:10], " "),
+			filePath:    fieldList[10],
+		})
+	}
+	return logFileList
+}
+
+// getRealFileFromContainer gets real log files against pattern from container, and returns file info in string format
+func (o *ListLogsOptions) getRealFileFromContainer(pod *corev1.Pod, pattern string) (string, error) {
 	o.exec.Pod = pod
-	o.exec.Command = []string{"/bin/bash", "-c", "ls -al " + pattern}
-	// because tty Raw argument will set ErrOut nil in exec.Run
+	// linux cmd : ls -lh --time-style='+%b %d, %Y %H:%M (UTC%:z)' pattern
+	o.exec.Command = []string{"/bin/bash", "-c", "ls -lh --time-style='+%b %d, %Y %H:%M (UTC%:z)' " + pattern}
+	// set customized output
+	out := bytes.Buffer{}
+	o.exec.Out = &out
 	o.exec.ErrOut = os.Stdout
+	o.exec.TTY = false
 	if err := o.exec.Validate(); err != nil {
-		fmt.Printf("validate fail when list log files in container by exec command, and error message : %s\n", err.Error())
+		return out.String(), err
 	}
 	if err := o.exec.Run(); err != nil {
-		fmt.Printf("run fail when list log files in container by exec command, and error message : %s\n", err.Error())
+		return out.String(), err
 	}
-}
-
-// printLogsContext prints list-logs-type info
-func (o *ListLogsOptions) printListLogsMessage(dataObj *cluster.ClusterObjects, out io.Writer) error {
-	w := cmddes.NewPrefixWriter(out)
-	o.printHeaderMessage(w, dataObj.Cluster)
-	o.printBodyMessage(w, dataObj.Cluster, dataObj.ClusterDef, dataObj.Pods)
-	w.Flush()
-	return nil
+	return out.String(), nil
 }

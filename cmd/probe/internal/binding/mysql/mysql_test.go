@@ -104,7 +104,7 @@ func TestInvoke(t *testing.T) {
 		req := &bindings.InvokeRequest{
 			Data:      nil,
 			Metadata:  metadata,
-			Operation: execOperation,
+			Operation: internal.ExecOperation,
 		}
 		resp, err := m.Invoke(context.Background(), req)
 		assert.Nil(t, err)
@@ -117,7 +117,7 @@ func TestInvoke(t *testing.T) {
 		req := &bindings.InvokeRequest{
 			Data:      nil,
 			Metadata:  metadata,
-			Operation: execOperation,
+			Operation: internal.ExecOperation,
 		}
 		resp, err := m.Invoke(context.Background(), req)
 		assert.Nil(t, resp)
@@ -135,7 +135,7 @@ func TestInvoke(t *testing.T) {
 		req := &bindings.InvokeRequest{
 			Data:      nil,
 			Metadata:  metadata,
-			Operation: queryOperation,
+			Operation: internal.QueryOperation,
 		}
 		resp, err := m.Invoke(context.Background(), req)
 		assert.Nil(t, err)
@@ -151,7 +151,7 @@ func TestInvoke(t *testing.T) {
 		req := &bindings.InvokeRequest{
 			Data:      nil,
 			Metadata:  metadata,
-			Operation: queryOperation,
+			Operation: internal.QueryOperation,
 		}
 		resp, err := m.Invoke(context.Background(), req)
 		assert.Nil(t, resp)
@@ -161,7 +161,7 @@ func TestInvoke(t *testing.T) {
 	t.Run("close operation", func(t *testing.T) {
 		mock.ExpectClose()
 		req := &bindings.InvokeRequest{
-			Operation: closeOperation,
+			Operation: internal.CloseOperation,
 		}
 		resp, _ := m.Invoke(context.Background(), req)
 		assert.Nil(t, resp)

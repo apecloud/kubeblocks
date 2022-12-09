@@ -27,22 +27,24 @@ import (
 )
 
 const (
-	execOperation         bindings.OperationKind = "exec"
-	runningCheckOperation bindings.OperationKind = "runningCheck"
-	statusCheckOperation  bindings.OperationKind = "statusCheck"
-	roleCheckOperation    bindings.OperationKind = "roleCheck"
-	queryOperation        bindings.OperationKind = "query"
-	closeOperation        bindings.OperationKind = "close"
+	ExecOperation         bindings.OperationKind = "exec"
+	RunningCheckOperation bindings.OperationKind = "runningCheck"
+	StatusCheckOperation  bindings.OperationKind = "statusCheck"
+	RoleCheckOperation    bindings.OperationKind = "roleCheck"
+	QueryOperation        bindings.OperationKind = "query"
+	CloseOperation        bindings.OperationKind = "close"
 
 	// CommandSQLKey keys from request's metadata.
 	CommandSQLKey = "sql"
 )
 
-var oriRole = ""
-var roleCheckFailedCount = 0
-var roleCheckCount = 0
-var eventAggregationNum = 10
-var eventIntervalNum = 60
+var (
+	oriRole              = ""
+	roleCheckFailedCount = 0
+	roleCheckCount       = 0
+	eventAggregationNum  = 10
+	eventIntervalNum     = 60
+)
 
 type ProbeBase struct {
 	Operation ProbeOperation
@@ -61,12 +63,12 @@ type ProbeOperation interface {
 
 func (p *ProbeBase) Operations() []bindings.OperationKind {
 	return []bindings.OperationKind{
-		execOperation,
-		queryOperation,
-		closeOperation,
-		runningCheckOperation,
-		statusCheckOperation,
-		roleCheckOperation,
+		ExecOperation,
+		QueryOperation,
+		CloseOperation,
+		RunningCheckOperation,
+		StatusCheckOperation,
+		RoleCheckOperation,
 	}
 }
 
@@ -93,7 +95,7 @@ func (p *ProbeBase) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*b
 		return resp, nil
 	}
 
-	if req.Operation == runningCheckOperation {
+	if req.Operation == RunningCheckOperation {
 		d, err := p.Operation.RunningCheck(ctx, resp)
 		if err != nil {
 			return nil, err
@@ -107,7 +109,7 @@ func (p *ProbeBase) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*b
 		return updateRespMetadata()
 	}
 
-	if req.Operation == closeOperation {
+	if req.Operation == CloseOperation {
 		return nil, p.Operation.Close()
 	}
 
@@ -123,28 +125,28 @@ func (p *ProbeBase) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*b
 	}
 
 	switch req.Operation { //nolint:exhaustive
-	case execOperation:
+	case ExecOperation:
 		r, err := p.Operation.Exec(ctx, sql)
 		if err != nil {
 			return nil, err
 		}
 		resp.Metadata[RespRowsAffectedKey] = strconv.FormatInt(r, 10)
 
-	case queryOperation:
+	case QueryOperation:
 		d, err := p.Operation.Query(ctx, sql)
 		if err != nil {
 			return nil, err
 		}
 		resp.Data = d
 
-	case statusCheckOperation:
+	case StatusCheckOperation:
 		d, err := p.Operation.StatusCheck(ctx, sql, resp)
 		if err != nil {
 			return nil, err
 		}
 		resp.Data = d
 
-	case roleCheckOperation:
+	case RoleCheckOperation:
 		d, err := p.roleObserve(ctx, sql, resp)
 		if err != nil {
 			return nil, err
@@ -153,7 +155,7 @@ func (p *ProbeBase) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*b
 
 	default:
 		return nil, errors.Errorf("invalid operation type: %s. Expected %s, %s, or %s",
-			req.Operation, execOperation, queryOperation, closeOperation)
+			req.Operation, ExecOperation, QueryOperation, CloseOperation)
 	}
 
 	return updateRespMetadata()

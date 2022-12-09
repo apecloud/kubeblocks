@@ -19,31 +19,32 @@ package internal
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
-	"strconv"
+	"github.com/spf13/viper"
+	"net"
 	"time"
 )
 
 const (
-	ExecOperation         bindings.OperationKind = "exec"
 	RunningCheckOperation bindings.OperationKind = "runningCheck"
 	StatusCheckOperation  bindings.OperationKind = "statusCheck"
 	RoleCheckOperation    bindings.OperationKind = "roleCheck"
-	QueryOperation        bindings.OperationKind = "query"
-	CloseOperation        bindings.OperationKind = "close"
 
 	// CommandSQLKey keys from request's metadata.
 	CommandSQLKey = "sql"
 )
 
 var (
-	oriRole              = ""
-	roleCheckFailedCount = 0
-	roleCheckCount       = 0
-	eventAggregationNum  = 10
-	eventIntervalNum     = 60
+	oriRole                 = ""
+	runningCheckFailedCount = 0
+	roleCheckFailedCount    = 0
+	roleCheckCount          = 0
+	eventAggregationNum     = 10
+	eventIntervalNum        = 60
+	dbPort                  = 3306
 )
 
 type ProbeBase struct {
@@ -53,19 +54,26 @@ type ProbeBase struct {
 
 type ProbeOperation interface {
 	InitIfNeed() error
-	Exec(context.Context, string) (int64, error)
-	RunningCheck(context.Context, *bindings.InvokeResponse) ([]byte, error)
+	GetRunningPort() int
 	StatusCheck(context.Context, string, *bindings.InvokeResponse) ([]byte, error)
 	GetRole(context.Context, string) (string, error)
-	Query(context.Context, string) ([]byte, error)
-	Close() error
+}
+
+func (p *ProbeBase) Init() error {
+	if viper.IsSet("KB_AGGREGATION_NUMBER") {
+		eventAggregationNum = viper.GetInt("KB_AGGREGATION_NUMBER")
+	}
+
+	dbPort = p.Operation.GetRunningPort()
+	if viper.IsSet("KB_SERVICE_PORT") {
+		dbPort = viper.GetInt("KB_SERVICE_PORT")
+	}
+
+	return nil
 }
 
 func (p *ProbeBase) Operations() []bindings.OperationKind {
 	return []bindings.OperationKind{
-		ExecOperation,
-		QueryOperation,
-		CloseOperation,
 		RunningCheckOperation,
 		StatusCheckOperation,
 		RoleCheckOperation,
@@ -96,7 +104,7 @@ func (p *ProbeBase) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*b
 	}
 
 	if req.Operation == RunningCheckOperation {
-		d, err := p.Operation.RunningCheck(ctx, resp)
+		d, err := p.runningCheck(ctx, resp)
 		if err != nil {
 			return nil, err
 		}
@@ -107,10 +115,6 @@ func (p *ProbeBase) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*b
 	if err := p.Operation.InitIfNeed(); err != nil {
 		resp.Data = []byte("db not ready")
 		return updateRespMetadata()
-	}
-
-	if req.Operation == CloseOperation {
-		return nil, p.Operation.Close()
 	}
 
 	if req.Metadata == nil {
@@ -125,20 +129,6 @@ func (p *ProbeBase) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*b
 	}
 
 	switch req.Operation { //nolint:exhaustive
-	case ExecOperation:
-		r, err := p.Operation.Exec(ctx, sql)
-		if err != nil {
-			return nil, err
-		}
-		resp.Metadata[RespRowsAffectedKey] = strconv.FormatInt(r, 10)
-
-	case QueryOperation:
-		d, err := p.Operation.Query(ctx, sql)
-		if err != nil {
-			return nil, err
-		}
-		resp.Data = d
-
 	case StatusCheckOperation:
 		d, err := p.Operation.StatusCheck(ctx, sql, resp)
 		if err != nil {
@@ -155,7 +145,7 @@ func (p *ProbeBase) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*b
 
 	default:
 		return nil, errors.Errorf("invalid operation type: %s. Expected %s, %s, or %s",
-			req.Operation, ExecOperation, QueryOperation, CloseOperation)
+			req.Operation, RunningCheckOperation, StatusCheckOperation, RoleCheckOperation)
 	}
 
 	return updateRespMetadata()
@@ -193,5 +183,31 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 	}
 	msg, _ := json.Marshal(result)
 	p.Logger.Infof(string(msg))
+	return msg, nil
+}
+
+func (p *ProbeBase) runningCheck(ctx context.Context, resp *bindings.InvokeResponse) ([]byte, error) {
+	host := fmt.Sprintf("127.0.0.1:%d", dbPort)
+	conn, err := net.DialTimeout("tcp", host, 900*time.Millisecond)
+	message := ""
+	result := ProbeMessage{}
+	if err != nil {
+		message = fmt.Sprintf("running check %s error: %v", host, err)
+		result.Event = "runningCheckFailed"
+		p.Logger.Errorf(message)
+		if runningCheckFailedCount++; runningCheckFailedCount%eventAggregationNum == 1 {
+			p.Logger.Infof("running checks failed %v times continuously", runningCheckFailedCount)
+			resp.Metadata[StatusCode] = CheckFailedHTTPCode
+		}
+	} else {
+		runningCheckFailedCount = 0
+		message = "TCP Connection Established Successfully!"
+		if tcpCon, ok := conn.(*net.TCPConn); ok {
+			tcpCon.SetLinger(0)
+		}
+		defer conn.Close()
+	}
+	result.Message = message
+	msg, _ := json.Marshal(result)
 	return msg, nil
 }

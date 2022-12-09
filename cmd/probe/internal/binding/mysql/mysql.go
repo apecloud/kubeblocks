@@ -24,10 +24,10 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-	"net"
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -70,18 +70,14 @@ const (
 )
 
 const (
-	runningCheckType = iota
-	statusCheckType
-	roleChangedCheckType
+	statusCheckType = iota
 )
 
 var (
-	runningCheckFailedCount = 0
-	eventAggregationNum     = 10
-	dbPort                  = 3306
-	dbUser                  = "root"
-	dbPasswd                = ""
-	dbRoles                 = map[string]internal.AccessMode{}
+	defaultDbPort = 3306
+	dbUser        = "root"
+	dbPasswd      = ""
+	dbRoles       = map[string]internal.AccessMode{}
 )
 
 // NewMysql returns a new MySQL output binding.
@@ -91,14 +87,6 @@ func NewMysql(logger logger.Logger) bindings.OutputBinding {
 
 // Init initializes the MySQL binding.
 func (m *Mysql) Init(metadata bindings.Metadata) error {
-	if viper.IsSet("KB_AGGREGATION_NUMBER") {
-		eventAggregationNum = viper.GetInt("KB_AGGREGATION_NUMBER")
-	}
-
-	if viper.IsSet("KB_SERVICE_PORT") {
-		dbPort = viper.GetInt("KB_SERVICE_PORT")
-	}
-
 	if viper.IsSet("KB_SERVICE_USER") {
 		dbUser = viper.GetString("KB_SERVICE_USER")
 	}
@@ -121,7 +109,17 @@ func (m *Mysql) Init(metadata bindings.Metadata) error {
 		Operation: m,
 	}
 
-	return nil
+	return m.base.Init()
+}
+
+// Invoke handles all invoke operations.
+func (m *Mysql) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
+	return m.base.Invoke(ctx, req)
+}
+
+// Operations returns list of operations supported by Mysql binding.
+func (m *Mysql) Operations() []bindings.OperationKind {
+	return m.base.Operations()
 }
 
 func (m *Mysql) InitIfNeed() error {
@@ -173,31 +171,42 @@ func (m *Mysql) InitIfNeed() error {
 	return nil
 }
 
-// Invoke handles all invoke operations.
-func (m *Mysql) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
-	return m.base.Invoke(ctx, req)
-}
-
-// Operations returns list of operations supported by Mysql binding.
-func (m *Mysql) Operations() []bindings.OperationKind {
-	return m.base.Operations()
-}
-
-// Close will close the DB.
-func (m *Mysql) Close() error {
-	if m.db != nil {
-		return m.db.Close()
+func (m *Mysql) GetRunningPort() int {
+	p := m.metadata.Properties
+	url, ok := p[connectionURLKey]
+	if !ok || url == "" {
+		return defaultDbPort
 	}
 
-	return nil
+	config, err := mysql.ParseDSN(url)
+	if err != nil {
+		return defaultDbPort
+	}
+	index := strings.LastIndex(config.Addr, ":")
+	if index < 0 {
+		return defaultDbPort
+	}
+	port, err := strconv.Atoi(config.Addr[index+1:])
+	if err != nil {
+		return defaultDbPort
+	}
+
+	return port
 }
 
-func (m *Mysql) Query(ctx context.Context, sql string) ([]byte, error) {
+func (m *Mysql) GetRole(ctx context.Context, sql string) (string, error) {
 	m.logger.Debugf("query: %s", sql)
+	if sql == "" {
+		sql = "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
+	}
 
-	rows, err := m.db.QueryContext(ctx, sql)
+	// sql exec timeout need to be less than httpget's timeout which default is 1s.
+	ctx1, cancel := context.WithTimeout(context.Background(), 900*time.Millisecond)
+	defer cancel()
+	rows, err := m.db.QueryContext(ctx1, sql)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error executing %s", sql)
+		m.logger.Infof("error executing %s: %v", sql, err)
+		return "", errors.Wrapf(err, "error executing %s", sql)
 	}
 
 	defer func() {
@@ -205,49 +214,15 @@ func (m *Mysql) Query(ctx context.Context, sql string) ([]byte, error) {
 		_ = rows.Err()
 	}()
 
-	result, err := m.jsonify(rows)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error marshalling query result for %s", sql)
-	}
-
-	return result, nil
-}
-
-func (m *Mysql) Exec(ctx context.Context, sql string) (int64, error) {
-	m.logger.Debugf("exec: %s", sql)
-
-	res, err := m.db.ExecContext(ctx, sql)
-	if err != nil {
-		return 0, errors.Wrapf(err, "error executing %s", sql)
-	}
-
-	return res.RowsAffected()
-}
-
-func (m *Mysql) RunningCheck(ctx context.Context, resp *bindings.InvokeResponse) ([]byte, error) {
-	host := fmt.Sprintf("127.0.0.1:%d", dbPort)
-	conn, err := net.DialTimeout("tcp", host, 900*time.Millisecond)
-	message := ""
-	result := internal.ProbeMessage{}
-	if err != nil {
-		message = fmt.Sprintf("running check %s error: %v", host, err)
-		result.Event = "runningCheckFailed"
-		m.logger.Errorf(message)
-		if runningCheckFailedCount++; runningCheckFailedCount%eventAggregationNum == 1 {
-			m.logger.Infof("running checks failed %v times continuously", runningCheckFailedCount)
-			resp.Metadata[internal.StatusCode] = internal.CheckFailedHTTPCode
+	var curLeader string
+	var role string
+	var serverId string
+	for rows.Next() {
+		if err := rows.Scan(&curLeader, &role, &serverId); err != nil {
+			m.logger.Errorf("checkRole error: %", err)
 		}
-	} else {
-		runningCheckFailedCount = 0
-		message = "TCP Connection Established Successfully!"
-		if tcpCon, ok := conn.(*net.TCPConn); ok {
-			tcpCon.SetLinger(0)
-		}
-		defer conn.Close()
 	}
-	result.Message = message
-	msg, _ := json.Marshal(result)
-	return msg, nil
+	return role, nil
 }
 
 // design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
@@ -290,37 +265,6 @@ func (m *Mysql) StatusCheck(ctx context.Context, sql string, resp *bindings.Invo
 	// return msg, nil
 	return []byte("Not supported yet"), nil
 
-}
-
-func (m *Mysql) GetRole(ctx context.Context, sql string) (string, error) {
-	m.logger.Debugf("query: %s", sql)
-	if sql == "" {
-		sql = "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
-	}
-
-	// sql exec timeout need to be less than httpget's timeout which default is 1s.
-	ctx1, cancel := context.WithTimeout(context.Background(), 900*time.Millisecond)
-	defer cancel()
-	rows, err := m.db.QueryContext(ctx1, sql)
-	if err != nil {
-		m.logger.Infof("error executing %s: %v", sql, err)
-		return "", errors.Wrapf(err, "error executing %s", sql)
-	}
-
-	defer func() {
-		_ = rows.Close()
-		_ = rows.Err()
-	}()
-
-	var curLeader string
-	var role string
-	var serverId string
-	for rows.Next() {
-		if err := rows.Scan(&curLeader, &role, &serverId); err != nil {
-			m.logger.Errorf("checkRole error: %", err)
-		}
-	}
-	return role, nil
 }
 
 func propertyToInt(props map[string]string, key string, setter func(int)) error {

@@ -18,6 +18,8 @@ package etcd
 
 import (
 	"context"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -29,6 +31,8 @@ import (
 
 const (
 	endpoint = "endpoint"
+
+	defaultPort = 2379
 )
 
 type Etcd struct {
@@ -51,15 +55,11 @@ func (e *Etcd) Init(metadata bindings.Metadata) error {
 		Operation: e,
 	}
 
-	return nil
+	return e.base.Init()
 }
 
 func (e *Etcd) Operations() []bindings.OperationKind {
 	return e.base.Operations()
-}
-
-func (e *Etcd) Close() (err error) {
-	return e.etcd.Close()
 }
 
 func (e *Etcd) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
@@ -92,21 +92,6 @@ func (e *Etcd) InitIfNeed() error {
 	return nil
 }
 
-func (e *Etcd) Exec(ctx context.Context, cmd string) (int64, error) {
-	//TODO implement me
-	return 0, nil
-}
-
-func (e *Etcd) RunningCheck(ctx context.Context, response *bindings.InvokeResponse) ([]byte, error) {
-	//TODO implement me
-	return nil, nil
-}
-
-func (e *Etcd) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) ([]byte, error) {
-	//TODO implement me
-	return nil, nil
-}
-
 func (e *Etcd) GetRole(ctx context.Context, cmd string) (string, error) {
 	resp, err := e.etcd.Status(ctx, e.endpoint)
 	if err != nil {
@@ -124,7 +109,21 @@ func (e *Etcd) GetRole(ctx context.Context, cmd string) (string, error) {
 	return role, nil
 }
 
-func (e *Etcd) Query(ctx context.Context, cmd string) ([]byte, error) {
-	//TODO implement me
+func (e *Etcd) GetRunningPort() int {
+	index := strings.Index(e.endpoint, ":")
+	if index < 0 {
+		return defaultPort
+	}
+	port, err := strconv.Atoi(e.endpoint[index+1:])
+	if err != nil {
+		return defaultPort
+	}
+
+	return port
+}
+
+func (e *Etcd) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) ([]byte, error) {
+	//TODO implement me when proposal is passed
+	// proposal: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 	return nil, nil
 }

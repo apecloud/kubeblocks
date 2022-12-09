@@ -179,7 +179,7 @@ func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *
 		"--fail-with-body", "--silent",
 		"-H", "Content-Type: application/json",
 		roleObserveURI,
-		"-d", "{\"operation\": \"roleCheck\"}",
+		"-d", "{\"operation\": \"roleCheck\", \"metadata\":{\"sql\":\"\"}}",
 	}
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
 	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -44,6 +45,8 @@ const (
 	value            = "value"
 
 	defaultTimeout = 5 * time.Second
+
+	defaultDbPort = 27018
 
 	// mongodb://<username>:<password@<host>/<database><params>
 	connectionURIFormatWithAuthentication = "mongodb://%s:%s@%s/%s%s"
@@ -141,6 +144,22 @@ func (m *MongoDB) Init(metadata bindings.Metadata) error {
 		Operation: m,
 	}
 
+	return m.base.Init()
+}
+
+func (m *MongoDB) Operations() []bindings.OperationKind {
+	return m.base.Operations()
+}
+
+func (m *MongoDB) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
+	return m.base.Invoke(ctx, req)
+}
+
+func (m *MongoDB) Ping() error {
+	if err := m.client.Ping(context.Background(), nil); err != nil {
+		return fmt.Errorf("mongoDB store: error connecting to mongoDB at %s: %s", m.metadata.host, err)
+	}
+
 	return nil
 }
 
@@ -176,39 +195,33 @@ func (m *MongoDB) InitIfNeed() error {
 	return nil
 }
 
-func (m *MongoDB) Operations() []bindings.OperationKind {
-	return m.base.Operations()
-}
-
-func (m *MongoDB) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
-	return m.base.Invoke(ctx, req)
-}
-
-func (m *MongoDB) Close() (err error) {
-	return m.client.Disconnect(context.Background())
-}
-
-func (m *MongoDB) Ping() error {
-	if err := m.client.Ping(context.Background(), nil); err != nil {
-		return fmt.Errorf("mongoDB store: error connecting to mongoDB at %s: %s", m.metadata.host, err)
+func (m *MongoDB) GetRunningPort() int {
+	uri := getMongoURI(&m.metadata)
+	index := strings.Index(uri, "://")
+	if index < 0 {
+		return defaultDbPort
+	}
+	uri = uri[index+len("://"):]
+	index = strings.Index(uri, "/")
+	if index < 0 {
+		return defaultDbPort
+	}
+	uri = uri[:index]
+	index = strings.Index(uri, "@")
+	if index < 0 {
+		return defaultDbPort
+	}
+	uri = uri[:index]
+	index = strings.Index(uri, ":")
+	if index < 0 {
+		return defaultDbPort
+	}
+	port, err := strconv.Atoi(uri[index+1:])
+	if err != nil {
+		return defaultDbPort
 	}
 
-	return nil
-}
-
-func (m *MongoDB) Exec(ctx context.Context, cmd string) (int64, error) {
-	//TODO implement me
-	return 0, nil
-}
-
-func (m *MongoDB) RunningCheck(ctx context.Context, response *bindings.InvokeResponse) ([]byte, error) {
-	//TODO implement me
-	return nil, nil
-}
-
-func (m *MongoDB) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) ([]byte, error) {
-	//TODO implement me
-	return nil, nil
+	return port
 }
 
 func (m *MongoDB) GetRole(ctx context.Context, cmd string) (string, error) {
@@ -225,8 +238,9 @@ func (m *MongoDB) GetRole(ctx context.Context, cmd string) (string, error) {
 	return "", errors.New("role not found")
 }
 
-func (m *MongoDB) Query(ctx context.Context, cmd string) ([]byte, error) {
-	//TODO implement me
+func (m *MongoDB) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) ([]byte, error) {
+	//TODO implement me when proposal is passed
+	// proposal: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 	return nil, nil
 }
 

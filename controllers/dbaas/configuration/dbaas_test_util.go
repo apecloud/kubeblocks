@@ -306,15 +306,27 @@ func (w *TestWrapper) createStsFromFile(cluster *dbaasv1alpha1.Cluster, componen
 		cm.Labels[intctrlutil.AppComponentLabelKey] = componentName
 		cm.Labels[cfgcore.GenerateUniqLabelKeyWithConfig(w.testEnv.CfgTplName)] = w.testEnv.CfgTplName
 
+		configTestVolumeName := "for_test" + BuildRandomString()
 		sts.Spec.Template.Spec.Volumes = []corev1.Volume{
 			{
-				Name: "for_test",
+				Name: configTestVolumeName,
 				VolumeSource: corev1.VolumeSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
 					},
 				},
 			},
+		}
+
+		podSpec := &sts.Spec.Template.Spec
+		if len(podSpec.Containers) > 0 {
+			if podSpec.Containers[0].VolumeMounts == nil {
+				podSpec.Containers[0].VolumeMounts = make([]corev1.VolumeMount, 0)
+			}
+			podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, corev1.VolumeMount{
+				Name:      configTestVolumeName,
+				MountPath: "/mnt/config_for_test",
+			})
 		}
 
 	})

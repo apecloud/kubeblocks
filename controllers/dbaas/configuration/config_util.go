@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/spf13/viper"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -288,7 +287,7 @@ func ValidateConfTplStatus(configStatus dbaasv1alpha1.ConfigurationTemplateStatu
 }
 
 func GetComponentByUsingCM(stsList *appv1.StatefulSetList, cfg client.ObjectKey) ([]appv1.StatefulSet, []string) {
-	managerContainerName := viper.GetString(cfgcm.ConfigSidecarName)
+	managerContainerName := cfgcm.ConfigSidecarName
 	stsLen := len(stsList.Items)
 	if stsLen == 0 {
 		return nil, nil

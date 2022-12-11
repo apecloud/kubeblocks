@@ -17,14 +17,10 @@ limitations under the License.
 package container
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
-	"strings"
 	"time"
-
-	"github.com/sirupsen/logrus"
-
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
 const (
@@ -36,12 +32,14 @@ const (
 type dockerContainer struct {
 }
 
-func (d *dockerContainer) IsReady() error {
+var _ = &dockerContainer{}
+
+func (d *dockerContainer) Init(context.Context) error {
 	return printCriVersion(dockerCommand)
 }
 
-func (d *dockerContainer) Kill(containerIDs []string, signal string, timeout *time.Duration) error {
-	cmd := exec.Command("sudo", dockerCommand, "kill")
+func (d *dockerContainer) Kill(ctx context.Context, containerIDs []string, signal string, timeout *time.Duration) error {
+	cmd := exec.Command(dockerCommand, "kill")
 	if signal != "" {
 		cmd.Args = append(cmd.Args, "--signal", signal)
 	}
@@ -53,15 +51,17 @@ func (d *dockerContainer) Kill(containerIDs []string, signal string, timeout *ti
 
 // dockerContainer support containerd or crio cri
 type containerdContainer struct {
-	socketPath string
+	runtimeEndpoint string
 }
 
-func (c *containerdContainer) IsReady() error {
+var _ = &containerdContainer{}
+
+func (c *containerdContainer) Init(context.Context) error {
 	return printCriVersion(containerdCommand)
 }
 
-func (c *containerdContainer) Kill(containerIDs []string, signal string, timeout *time.Duration) error {
-	cmd := exec.Command("sudo", containerdCommand, "-i", c.socketPath, "-r", c.socketPath, "stop")
+func (c *containerdContainer) Kill(ctx context.Context, containerIDs []string, signal string, timeout *time.Duration) error {
+	cmd := exec.Command("sudo", containerdCommand, "-i", c.runtimeEndpoint, "-r", c.runtimeEndpoint, "stop")
 
 	// reference cri-api url: https://github.com/kubernetes/cri-api/blob/master/pkg/apis/runtime/v1/api.proto#L1108
 	// reference containerd url: https://github.com/containerd/containerd/blob/main/pkg/cri/server/container_stop.go#L124
@@ -73,67 +73,6 @@ func (c *containerdContainer) Kill(containerIDs []string, signal string, timeout
 	}
 
 	cmd.Args = append(cmd.Args, containerIDs...)
-	_, err := execShellCommand(cmd)
-	return err
-}
-
-func NewContainerKiller(criType CRIType, socketPath string) (ContainerKiller, error) {
-	var killer ContainerKiller
-
-	if criType == AutoType {
-		criType = autoCheckCRIType()
-	}
-
-	switch criType {
-	case DockerType:
-		killer = &dockerContainer{}
-	case ContainerdType:
-		killer = &containerdContainer{
-			socketPath: getContainerdRuntimePath(socketPath),
-		}
-	default:
-		return nil, cfgcore.MakeError("not support cri type: %s", criType)
-	}
-	return killer, nil
-}
-
-func autoCheckCRIType() CRIType {
-	if err := printCriVersion(containerdCommand); err == nil {
-		return ContainerdType
-	}
-	if err := printCriVersion(dockerCommand); err == nil {
-		return DockerType
-	}
-	return ""
-}
-
-func getContainerdRuntimePath(socketPath string) string {
-	if socketPath != "" {
-		return formatSocketPath(socketPath)
-	}
-	runtimePath, err := getContainerdRuntimeSocketPath()
-	if err != nil {
-		logrus.Warnf("failed to get cri runtime socket path, error output: %s", err)
-		return ""
-	}
-	return formatSocketPath(strings.TrimSpace(runtimePath))
-}
-
-func getContainerdRuntimeSocketPath() (string, error) {
-	// config --get runtime-endpoint
-	return execShellCommand(exec.Command(containerdCommand, "config", "--get", "runtime-endpoint"))
-}
-
-func formatSocketPath(path string) string {
-	const sockPrefix = "unix://"
-	if strings.HasPrefix(path, sockPrefix) {
-		return path
-	}
-	return fmt.Sprintf("%s%s", sockPrefix, path)
-}
-
-func printCriVersion(cmdName string) error {
-	cmd := exec.Command(cmdName, "-v")
 	_, err := execShellCommand(cmd)
 	return err
 }

@@ -1,0 +1,252 @@
+/*
+Copyright ApeCloud Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package container
+
+import (
+	"context"
+	"net"
+	"os"
+	"time"
+
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
+	dockerapi "github.com/docker/docker/client"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+)
+
+const (
+	maxMsgSize     = 1024 * 256 // 256k
+	defaultTimeout = 2 * time.Second
+	defaultSignal  = "SIGKILL"
+
+	KillContainerSignalEnvName = "KILL_CONTAINER_SIGNAL"
+)
+
+// dockerContainer support docker cri
+type dockerContainerV2 struct {
+	runtimeEndpoint string
+
+	dc *dockerapi.Client
+}
+
+func init() {
+	if err := viper.BindEnv(KillContainerSignalEnvName); err != nil {
+		logrus.Errorf("failed to bind env for viper, env name: [%s]", KillContainerSignalEnvName)
+		os.Exit(-2)
+	}
+
+	viper.SetDefault(KillContainerSignalEnvName, defaultSignal)
+}
+
+func (d *dockerContainerV2) Kill(ctx context.Context, containerIDs []string, signal string, timeout *time.Duration) error {
+	logrus.Debugf("following docker containers are going to be stopped: %v", containerIDs)
+	if signal == "" {
+		signal = defaultSignal
+	}
+
+	allContainer, err := getExistsContainers(ctx, containerIDs, d.dc)
+	if err != nil {
+		return cfgcore.WrapError(err, "failed to search container")
+	}
+	logrus.Debugf("all docker container: %v", cfgcore.NewSetFromMap(allContainer).ToList())
+	for _, containerID := range containerIDs {
+		logrus.Infof("stopping docker container: %s", containerID)
+		container, ok := allContainer[containerID]
+		if !ok {
+			logrus.Infof("container[%s] not exist and pass.", containerID)
+			continue
+		}
+		if container.State == "exited" {
+			logrus.Infof("container[%s] is exited, status: %s", containerID, container.Status)
+			continue
+		}
+		if err := d.dc.ContainerKill(ctx, containerID, signal); err != nil {
+			return err
+		}
+		logrus.Infof("docker container[%s] stoped.", containerID)
+	}
+	return nil
+}
+
+func getExistsContainers(ctx context.Context, containerIDs []string, dc *dockerapi.Client) (map[string]*types.Container, error) {
+	var (
+		optionsArgs  = filters.NewArgs()
+		allContainer map[string]*types.Container
+	)
+
+	for _, containerID := range containerIDs {
+		optionsArgs.Add("id", containerID)
+	}
+
+	containers, err := dc.ContainerList(ctx, types.ContainerListOptions{
+		All:     true,
+		Filters: optionsArgs,
+	})
+	if err != nil {
+		return nil, err
+	}
+	allContainer = make(map[string]*types.Container, len(containerIDs))
+	for _, c := range containers {
+		allContainer[c.ID] = &c
+	}
+	return allContainer, nil
+}
+
+func (d *dockerContainerV2) Init(ctx context.Context) error {
+	client, err := createDockerClient(d.runtimeEndpoint)
+	d.dc = client
+	if err == nil {
+		ping, err := client.Ping(ctx)
+		if err != nil {
+			return err
+		}
+		logrus.Infof("create docker client success! docker info: %v", ping)
+	}
+	return err
+}
+
+func createDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
+	if len(dockerEndpoint) == 0 {
+		dockerEndpoint = dockerapi.DefaultDockerHost
+	}
+
+	logrus.Infof("connecting to docker on the endpoint: %s", dockerEndpoint)
+	return dockerapi.NewClientWithOpts(
+		dockerapi.WithHost(formatSocketPath(dockerEndpoint)),
+		dockerapi.WithVersion(""),
+	)
+}
+
+// dockerContainer support docker cri
+type containerdContainerV2 struct {
+	runtimeEndpoint string
+
+	backendRuntime runtimeapi.RuntimeServiceClient
+}
+
+func (c *containerdContainerV2) Kill(ctx context.Context, containerIDs []string, signal string, timeout *time.Duration) error {
+	request := &runtimeapi.StopContainerRequest{}
+
+	switch {
+	case signal == defaultSignal:
+		request.Timeout = 0
+	case timeout != nil:
+		request.Timeout = timeout.Milliseconds()
+	}
+
+	// reference cri-api url: https://github.com/kubernetes/cri-api/blob/master/pkg/apis/runtime/v1/api.proto#L1108
+	// reference containerd url: https://github.com/containerd/containerd/blob/main/pkg/cri/server/container_stop.go#L124
+	for _, containerID := range containerIDs {
+		logrus.Infof("stopping docker container: %s", containerID)
+		containers, err := c.backendRuntime.ListContainers(ctx, &runtimeapi.ListContainersRequest{
+			Filter: &runtimeapi.ContainerFilter{
+				Id: containerID,
+			},
+		})
+		if err != nil {
+			return err
+		} else if len(containers.Containers) == 0 {
+			logrus.Infof("container[%s] not exist and pass.", containerID)
+			continue
+		}
+
+		request.ContainerId = containerID
+		_, err = c.backendRuntime.StopContainer(ctx, request)
+		if err != nil {
+			logrus.Infof("failed to stop container[%s], error: %v", containerID, err)
+			return err
+		}
+		logrus.Infof("docker container[%s] stoped.", containerID)
+	}
+	return nil
+}
+
+func (c *containerdContainerV2) Init(ctx context.Context) error {
+	var (
+		err       error
+		conn      *grpc.ClientConn
+		endpoints = defaultContainerdEndpoints
+	)
+
+	if c.runtimeEndpoint != "" {
+		endpoints = []string{formatSocketPath(c.runtimeEndpoint)}
+	}
+
+	for _, endpoint := range endpoints {
+		conn, err = createGrpcConnection(ctx, endpoint)
+		if err != nil {
+			logrus.Warnf("failed to connect containerd endpoint: %s, error : %v", endpoint, err)
+		} else {
+			c.backendRuntime = runtimeapi.NewRuntimeServiceClient(conn)
+			return nil
+		}
+	}
+	return err
+}
+
+func NewContainerKiller(containerRuntime CRIType, runtimeEndpoint string) (ContainerKiller, error) {
+	var killer ContainerKiller
+
+	if containerRuntime == AutoType {
+		containerRuntime = autoCheckCRIType()
+	}
+
+	switch containerRuntime {
+	case DockerType:
+		killer = &dockerContainerV2{
+			runtimeEndpoint: runtimeEndpoint,
+		}
+	case ContainerdType:
+		killer = &containerdContainerV2{
+			runtimeEndpoint: runtimeEndpoint,
+		}
+	default:
+		return nil, cfgcore.MakeError("not support cri type: %s", containerRuntime)
+	}
+	return killer, nil
+}
+
+func autoCheckCRIType() CRIType {
+	for _, f := range defaultContainerdEndpoints {
+		if isSocketFile(f) {
+			return ContainerdType
+		}
+	}
+	if isSocketFile(dockerapi.DefaultDockerHost) {
+		return DockerType
+	}
+	return ""
+}
+
+func createGrpcConnection(ctx context.Context, socketAddress string) (*grpc.ClientConn, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+	return grpc.DialContext(ctx,
+		socketAddress,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, "unix", addr)
+		}),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
+}

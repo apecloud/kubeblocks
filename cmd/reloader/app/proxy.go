@@ -19,8 +19,9 @@ package app
 import (
 	"context"
 
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/spf13/viper"
 
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/container"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 )
@@ -28,17 +29,20 @@ import (
 type reconfigureProxy struct {
 	cfgproto.ReconfigureServer
 
+	ctx    context.Context
 	opt    ReconfigureServiceOptions
 	killer cfgutil.ContainerKiller
 }
 
+var stopContainerSignal = viper.GetString(cfgutil.KillContainerSignalEnvName)
+
 func (r *reconfigureProxy) Init() error {
-	killer, err := cfgutil.NewContainerKiller(r.opt.CRIType, "")
+	killer, err := cfgutil.NewContainerKiller(r.opt.ContainerRuntime, r.opt.RuntimeEndpoint)
 	if err != nil {
 		return cfgcore.WrapError(err, "failed to create container killer")
 	}
 
-	if err := killer.IsReady(); err != nil {
+	if err := killer.Init(r.ctx); err != nil {
 		return cfgcore.WrapError(err, "failed to check killer status")
 	}
 
@@ -54,7 +58,7 @@ func (r *reconfigureProxy) StopContainer(ctx context.Context, request *cfgproto.
 		}, nil
 	}
 
-	if err := r.killer.Kill(ds, "", nil); err != nil {
+	if err := r.killer.Kill(ctx, ds, stopContainerSignal, nil); err != nil {
 		return nil, err
 	}
 

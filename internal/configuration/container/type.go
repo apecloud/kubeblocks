@@ -16,7 +16,10 @@ limitations under the License.
 
 package container
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type TargetContainer struct {
 	Name          string // Name is pod name
@@ -32,8 +35,15 @@ const (
 	AutoType       CRIType = "auto"
 )
 
+var defaultContainerdEndpoints = []string{
+	"unix:///var/run/dockershim.sock",
+	"unix:///run/containerd/containerd.sock",
+	"unix:///run/crio/crio.sock",
+	"unix:///var/run/cri-dockerd.sock",
+}
+
 // ContainerKiller kill container interface
 type ContainerKiller interface {
-	Kill(containerIds []string, signal string, timeout *time.Duration) error
-	IsReady() error
+	Kill(ctx context.Context, containerIDs []string, signal string, timeout *time.Duration) error
+	Init(ctx context.Context) error
 }

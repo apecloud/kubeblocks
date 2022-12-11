@@ -11,7 +11,7 @@ require (
 	github.com/clbanning/mxj/v2 v2.5.7
 	github.com/containers/common v0.49.1
 	github.com/coreos/go-iptables v0.5.0
-	github.com/docker/docker v20.10.17+incompatible
+	github.com/docker/docker v20.10.21+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-kit/log v0.2.0
@@ -50,6 +50,7 @@ require (
 	k8s.io/apimachinery v0.24.3
 	k8s.io/cli-runtime v0.24.3
 	k8s.io/client-go v0.24.3
+	k8s.io/cri-api v0.24.3
 	k8s.io/kubectl v0.24.3
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
 	sigs.k8s.io/controller-runtime v0.12.3

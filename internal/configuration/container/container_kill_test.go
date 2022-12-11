@@ -44,8 +44,8 @@ func TestNewContainerKiller(t *testing.T) {
 			socketPath: "for_test",
 		},
 		wantErr: false,
-		want: &containerdContainer{
-			socketPath: formatSocketPath("for_test"),
+		want: &containerdContainerV2{
+			runtimeEndpoint: "for_test",
 		},
 	}, {
 		name: "test3",
@@ -53,7 +53,7 @@ func TestNewContainerKiller(t *testing.T) {
 			criType: DockerType,
 		},
 		wantErr: false,
-		want:    &dockerContainer{},
+		want:    &dockerContainerV2{},
 	}}
 
 	for _, tt := range tests {

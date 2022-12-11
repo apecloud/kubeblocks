@@ -29,8 +29,10 @@ import (
 )
 
 const (
-	ConfigSidecarIMAGE = "config_sidecar_image"
+	ConfigSidecarIMAGE = "KUBEBLOCKS_IMAGE"
 	ConfigSidecarName  = "config-manager-sidecar"
+	CRIRuntimeEndpoint = "CONTAINER_RUNTIME_ENDPOINT"
+	ConfigCRIType      = "CRI_TYPE"
 )
 
 type ConfigManagerSidecar struct {
@@ -76,10 +78,14 @@ func checkSignalType(configuration *dbaasv1alpha1.ConfigReloadTrigger) (bool, er
 	return true, nil
 }
 
-func BuildReloadSidecarParams(reloadType dbaasv1alpha1.CfgReloadType, configuration dbaasv1alpha1.ConfigReloadTrigger, volumeDirs []corev1.VolumeMount) []string {
+func BuildReloadSidecarParams(
+	reloadType dbaasv1alpha1.CfgReloadType,
+	configuration dbaasv1alpha1.ConfigReloadTrigger,
+	volumeDirs []corev1.VolumeMount,
+	criType, runtimeEndpoint string) []string {
 	switch reloadType {
 	case dbaasv1alpha1.UnixSignalType:
-		return buildSignalArgs(configuration, volumeDirs)
+		return buildSignalArgs(configuration, volumeDirs, criType, runtimeEndpoint)
 	default:
 		// not walk here
 		// TODO support other type, e.g pg reload by ShellType
@@ -87,9 +93,15 @@ func BuildReloadSidecarParams(reloadType dbaasv1alpha1.CfgReloadType, configurat
 	}
 }
 
-func buildSignalArgs(configuration dbaasv1alpha1.ConfigReloadTrigger, volumeDirs []corev1.VolumeMount) []string {
+func buildSignalArgs(configuration dbaasv1alpha1.ConfigReloadTrigger, volumeDirs []corev1.VolumeMount, criType string, runtimeEndpoint string) []string {
 	args := make([]string, 0)
 	args = append(args, "--process", configuration.ProcessName)
+	if criType != "" {
+		args = append(args, "--cri-type", criType)
+	}
+	if runtimeEndpoint != "" {
+		args = append(args, "--runtime-endpoint", runtimeEndpoint)
+	}
 	// set grpc port
 	args = append(args, "--port", viper.GetString(cfgutil.ConfigManagerGPRCPortEnv))
 	for _, volume := range volumeDirs {

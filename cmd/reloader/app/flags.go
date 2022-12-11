@@ -17,6 +17,8 @@ limitations under the License.
 package app
 
 import (
+	"os"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -37,6 +39,7 @@ const (
 
 const (
 	configManagerDefaultPort = 9901
+	configPodIPEnvName       = "CONFIG_MANAGER_POD_IP"
 	localhostAddress         = "127.0.0.1"
 )
 
@@ -45,6 +48,14 @@ var allNotifyType = map[NotifyEventType]dbaasv1alpha1.CfgReloadType{
 	WebHook:    dbaasv1alpha1.HTTPType,
 	ShellTool:  dbaasv1alpha1.ShellType,
 	SQL:        dbaasv1alpha1.SQLType,
+}
+
+func init() {
+	if err := viper.BindEnv(configPodIPEnvName); err != nil {
+		os.Exit(-2)
+	}
+	// viper.AutomaticEnv()
+	viper.SetDefault(configPodIPEnvName, localhostAddress)
 }
 
 func (f *NotifyEventType) Type() string {
@@ -73,8 +84,9 @@ type ReconfigureServiceOptions struct {
 	GrpcPort int
 	PodIP    string
 
-	CRIType   cfgutil.CRIType
-	DebugMode bool
+	DebugMode        bool
+	ContainerRuntime cfgutil.CRIType
+	RuntimeEndpoint  string
 }
 
 type VolumeWatcherOpts struct {
@@ -99,10 +111,10 @@ func NewVolumeWatcherOpts() *VolumeWatcherOpts {
 	return &VolumeWatcherOpts{
 		// for reconfigure options
 		ServiceOpt: ReconfigureServiceOptions{
-			GrpcPort:  configManagerDefaultPort,
-			PodIP:     viper.GetString("CONFIG_MANAGER_POD_IP"),
-			CRIType:   cfgutil.AutoType,
-			DebugMode: false,
+			GrpcPort:         configManagerDefaultPort,
+			PodIP:            viper.GetString(configPodIPEnvName),
+			ContainerRuntime: cfgutil.AutoType,
+			DebugMode:        false,
 		},
 		// for configmap watch
 		NotifyHandType: UnixSignal,
@@ -149,8 +161,12 @@ func InstallFlags(flags *pflag.FlagSet, opt *VolumeWatcherOpts) {
 		"debug",
 		opt.ServiceOpt.DebugMode,
 		"the config set debug.")
-	flags.StringVar((*string)(&opt.ServiceOpt.CRIType),
-		"cri-type",
-		string(opt.ServiceOpt.CRIType),
-		"the config set cri.")
+	flags.StringVar((*string)(&opt.ServiceOpt.ContainerRuntime),
+		"container-runtime",
+		string(opt.ServiceOpt.ContainerRuntime),
+		"the config set cri runtime type.")
+	flags.StringVar(&opt.ServiceOpt.RuntimeEndpoint,
+		"runtime-endpoint",
+		opt.ServiceOpt.RuntimeEndpoint,
+		"the config set cri runtime endpoint.")
 }

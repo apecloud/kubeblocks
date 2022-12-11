@@ -71,9 +71,11 @@ func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 		return err
 	}
 
-	if err := startGRPCService(opt.ServiceOpt); err != nil {
+	if err := startGRPCService(opt.ServiceOpt, ctx); err != nil {
 		return err
 	}
+
+	// testGRPCService(opt.ServiceOpt)
 
 	logrus.Info("reload started.")
 	<-ctx.Done()
@@ -82,10 +84,30 @@ func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 	return nil
 }
 
-func startGRPCService(opt ReconfigureServiceOptions) error {
+// func testGRPCService(opt ReconfigureServiceOptions) {
+//	tcpSpec := fmt.Sprintf("%s:%d", opt.PodIP, opt.GrpcPort)
+//	conn, err := grpc.Dial(tcpSpec, grpc.WithTransportCredentials(insecure.NewCredentials()))
+//	if err != nil {
+//		os.Exit(-1)
+//	}
+//
+//	client := cfgproto.NewReconfigureClient(conn)
+//	response, err := client.StopContainer(context.Background(), &cfgproto.StopContainerRequest{
+//		ContainerIDs: []string{"abc", "efg", "37fc47bc5a6d8ad34ec927382488c698cd0a931b2755e28ed6f16c74de00c1d9"},
+//	})
+//
+//	if err != nil {
+//		logrus.Errorf("stop container failed, error: %v", err)
+//		os.Exit(-2)
+//	}
+//
+//	logrus.Info(response.ErrMessage)
+// }
+
+func startGRPCService(opt ReconfigureServiceOptions, ctx context.Context) error {
 	var (
 		server *grpc.Server
-		proxy  = &reconfigureProxy{opt: opt}
+		proxy  = &reconfigureProxy{opt: opt, ctx: ctx}
 	)
 
 	tcpSpec := fmt.Sprintf("%s:%d", proxy.opt.PodIP, proxy.opt.GrpcPort)

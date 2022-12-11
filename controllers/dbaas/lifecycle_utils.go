@@ -1320,6 +1320,11 @@ func updateConfigurationManagerWithComponent(params createParams, podSpec *corev
 		firstCfg        = 0
 		component       = params.component
 		usingContainers []*corev1.Container
+
+		defaultVarRunVolumePath = "/var/run"
+		criEndpointVolumeName   = "cri_runtime_endpoint"
+		criRuntimeEndpoint      = viper.GetString(cfgcm.CRIRuntimeEndpoint)
+		criType                 = viper.GetString(cfgcm.ConfigCRIType)
 	)
 
 	if component.Config == nil {
@@ -1348,7 +1353,7 @@ func updateConfigurationManagerWithComponent(params createParams, podSpec *corev
 
 	// find first container using
 	// Find out which configurations are used by the container
-	volumeDirs := make([]corev1.VolumeMount, 0)
+	volumeDirs := make([]corev1.VolumeMount, 0, len(cfgTemplates)+1)
 	container := usingContainers[0]
 	for i := firstCfg; i < len(cfgTemplates); i++ {
 		tpl := cfgTemplates[i]
@@ -1363,17 +1368,44 @@ func updateConfigurationManagerWithComponent(params createParams, podSpec *corev
 		return nil
 	}
 
+	configManagerArgs := cfgcm.BuildReloadSidecarParams(cfgSpec.ConfigReloadType,
+		*cfgSpec.ConfigReloadTrigger,
+		volumeDirs,
+		criType,
+		criRuntimeEndpoint)
+
+	mountPath := defaultVarRunVolumePath
+	if criRuntimeEndpoint != "" || criType == "" || criType == "auto" {
+		mountPath = criRuntimeEndpoint
+	}
 	managerSidecar := &cfgcm.ConfigManagerSidecar{
 		ManagerName: cfgcm.ConfigSidecarName,
 		Image:       viper.GetString(cfgcm.ConfigSidecarIMAGE),
-		Args:        cfgcm.BuildReloadSidecarParams(cfgSpec.ConfigReloadType, *cfgSpec.ConfigReloadTrigger, volumeDirs),
-		Volumes:     volumeDirs,
+		Args:        configManagerArgs,
+		// add cri sock path
+		Volumes: append(volumeDirs, corev1.VolumeMount{
+			Name:      criEndpointVolumeName,
+			MountPath: mountPath,
+		}),
 	}
 
 	container, err := buildCfgManagerContainer(params, managerSidecar)
 	if err != nil {
 		return err
 	}
+
+	podVolumes := podSpec.Volumes
+	podVolumes, _ = intctrlutil.CheckAndUpdateVolume(podVolumes, criEndpointVolumeName, func(volumeName string) corev1.Volume {
+		return corev1.Volume{
+			Name: volumeName,
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: mountPath,
+				},
+			},
+		}
+	}, nil)
+	podSpec.Volumes = podVolumes
 
 	// Add sidecar to podTemplate
 	podSpec.Containers = append(podSpec.Containers, *container)

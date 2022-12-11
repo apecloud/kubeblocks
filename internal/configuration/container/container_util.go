@@ -18,11 +18,19 @@ package container
 
 import (
 	"bytes"
+	"fmt"
+	"io/fs"
+	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+)
+
+const (
+	socketPrefix = "unix://"
 )
 
 func execShellCommand(cmd *exec.Cmd) (string, error) {
@@ -36,10 +44,39 @@ func execShellCommand(cmd *exec.Cmd) (string, error) {
 	cmd.Stderr = &errOut
 	cmd.Stdout = &stdOut
 	if err := cmd.Run(); err != nil {
-		return "", cfgcore.WrapError(err, "failed to run command[%s], error output: %v", cmd.String(), errOut.String())
+		return "", cfgcore.WrapError(err, "failed to run command[%s], error output: \n%v", cmd.String(), errOut.String())
 	}
 
 	ret := stdOut.String()
 	logrus.Info(ret)
 	return ret, nil
+}
+
+func isSocketFile(file string) bool {
+	info, err := os.Stat(extractSocketPath(file))
+	if err != nil {
+		logrus.Infof("file not exist: %s, error: %v", file, err)
+		return false
+	}
+	if info.Mode()&fs.ModeSocket == fs.ModeSocket {
+		return true
+	}
+	return false
+}
+
+func formatSocketPath(path string) string {
+	if strings.HasPrefix(path, socketPrefix) {
+		return path
+	}
+	return fmt.Sprintf("%s%s", socketPrefix, path)
+}
+
+func extractSocketPath(path string) string {
+	return strings.TrimPrefix(path, socketPrefix)
+}
+
+func printCriVersion(cmdName string) error {
+	cmd := exec.Command(cmdName, "-v")
+	_, err := execShellCommand(cmd)
+	return err
 }

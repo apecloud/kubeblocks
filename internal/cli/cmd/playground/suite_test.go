@@ -30,8 +30,8 @@ func TestPlayground(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	// set default cluster name to test
-	clusterName = "playground-test"
-	dbClusterName = "playground-test-cluster"
+	k8sClusterName = "playground-test"
+	kbClusterName = "playground-test-cluster"
 
 	// set fake image info
 	K3sImage = "fake-k3s-image"

@@ -61,6 +61,7 @@ const (
 var (
 	//go:embed cue/*
 	cueTemplates embed.FS
+	cacheCtx     = map[string]interface{}{}
 )
 
 func (c createParams) getCacheBytesValue(key string, valueCreator func() ([]byte, error)) ([]byte, error) {
@@ -76,8 +77,8 @@ func (c createParams) getCacheBytesValue(key string, valueCreator func() ([]byte
 	return v, err
 }
 
-func (c createParams) getCacheCUETplValue(key string, valueCreator func() (*intctrlutil.CUETpl, error)) (*intctrlutil.CUETpl, error) {
-	vIf, ok := (*c.cacheCtx)[key]
+func getCacheCUETplValue(key string, valueCreator func() (*intctrlutil.CUETpl, error)) (*intctrlutil.CUETpl, error) {
+	vIf, ok := cacheCtx[key]
 	if ok {
 		return vIf.(*intctrlutil.CUETpl), nil
 	}
@@ -85,7 +86,7 @@ func (c createParams) getCacheCUETplValue(key string, valueCreator func() (*intc
 	if err != nil {
 		return nil, err
 	}
-	(*c.cacheCtx)[key] = v
+	cacheCtx[key] = v
 	return v, err
 }
 
@@ -1058,37 +1059,10 @@ func buildSvc(params createParams, headless bool) (*corev1.Service, error) {
 	if headless {
 		tplFile = "headless_service_template.cue"
 	}
-	cueFS, _ := debme.FS(cueTemplates, "cue")
-	cueTpl, err := params.getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplFile))
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-	clusterStrByte, err := params.getCacheBytesValue("cluster", func() ([]byte, error) {
-		return json.Marshal(params.cluster)
-	})
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("cluster", clusterStrByte); err != nil {
-		return nil, err
-	}
-
-	componentStrByte, err := json.Marshal(params.component)
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("component", componentStrByte); err != nil {
-		return nil, err
-	}
-
-	svcStrByte, err := cueValue.Lookup("service")
-	if err != nil {
-		return nil, err
-	}
+	svcStrByte, err := buildFromCue(tplFile, map[string]any{
+		"cluster":   params.cluster,
+		"component": params.component,
+	}, "service")
 
 	svc := corev1.Service{}
 	if err = json.Unmarshal(svcStrByte, &svc); err != nil {
@@ -1105,41 +1079,11 @@ func randomString(length int) string {
 
 func buildConnCredential(params createParams) (*corev1.Secret, error) {
 	const tplFile = "conn_credential_template.cue"
-	cueFS, _ := debme.FS(cueTemplates, "cue")
-	cueTpl, err := params.getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplFile))
-	})
-	if err != nil {
-		return nil, err
-	}
 
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-	clusterDefinitionStrByte, err := params.getCacheBytesValue("clusterDefinition", func() ([]byte, error) {
-		return json.Marshal(params.clusterDefinition)
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if err = cueValue.Fill("clusterdefinition", clusterDefinitionStrByte); err != nil {
-		return nil, err
-	}
-
-	clusterStrByte, err := params.getCacheBytesValue("cluster", func() ([]byte, error) {
-		return json.Marshal(params.cluster)
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if err = cueValue.Fill("cluster", clusterStrByte); err != nil {
-		return nil, err
-	}
-
-	secretStrByte, err := cueValue.Lookup("secret")
-	if err != nil {
-		return nil, err
-	}
+	secretStrByte, err := buildFromCue(tplFile, map[string]any{
+		"clusterdefinition": params.clusterDefinition,
+		"cluster":           params.cluster,
+	}, "secret")
 
 	connCredential := corev1.Secret{}
 	if err = json.Unmarshal(secretStrByte, &connCredential); err != nil {
@@ -1196,37 +1140,11 @@ func buildConnCredential(params createParams) (*corev1.Secret, error) {
 
 func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName string) (*appsv1.StatefulSet, error) {
 	const tplFile = "statefulset_template.cue"
-	cueFS, _ := debme.FS(cueTemplates, "cue")
-	cueTpl, err := params.getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplFile))
-	})
-	if err != nil {
-		return nil, err
-	}
 
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-	clusterStrByte, err := params.getCacheBytesValue("cluster", func() ([]byte, error) {
-		return json.Marshal(params.cluster)
-	})
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("cluster", clusterStrByte); err != nil {
-		return nil, err
-	}
-
-	componentStrByte, err := json.Marshal(params.component)
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("component", componentStrByte); err != nil {
-		return nil, err
-	}
-
-	stsStrByte, err := cueValue.Lookup("statefulset")
-	if err != nil {
-		return nil, err
-	}
+	stsStrByte, err := buildFromCue(tplFile, map[string]any{
+		"cluster":   params.cluster,
+		"component": params.component,
+	}, "statefulset")
 
 	sts := appsv1.StatefulSet{}
 	if err = json.Unmarshal(stsStrByte, &sts); err != nil {
@@ -1343,37 +1261,11 @@ func buildConsensusSet(reqCtx intctrlutil.RequestCtx,
 
 func buildDeploy(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName string) (*appsv1.Deployment, error) {
 	const tplFile = "deployment_template.cue"
-	cueFS, _ := debme.FS(cueTemplates, "cue")
-	cueTpl, err := params.getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplFile))
-	})
-	if err != nil {
-		return nil, err
-	}
 
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-	clusterStrByte, err := params.getCacheBytesValue("cluster", func() ([]byte, error) {
-		return json.Marshal(params.cluster)
-	})
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("cluster", clusterStrByte); err != nil {
-		return nil, err
-	}
-
-	componentStrByte, err := json.Marshal(params.component)
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("component", componentStrByte); err != nil {
-		return nil, err
-	}
-
-	deployStrByte, err := cueValue.Lookup("deployment")
-	if err != nil {
-		return nil, err
-	}
+	deployStrByte, err := buildFromCue(tplFile, map[string]any{
+		"cluster":   params.cluster,
+		"component": params.component,
+	}, "deployment")
 
 	deploy := appsv1.Deployment{}
 	if err = json.Unmarshal(deployStrByte, &deploy); err != nil {
@@ -1392,38 +1284,10 @@ func buildDeploy(reqCtx intctrlutil.RequestCtx, params createParams, envConfigNa
 
 func buildPDB(params createParams) (*policyv1.PodDisruptionBudget, error) {
 	const tplFile = "pdb_template.cue"
-	cueFS, _ := debme.FS(cueTemplates, "cue")
-	cueTpl, err := params.getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplFile))
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-
-	clusterStrByte, err := params.getCacheBytesValue("cluster", func() ([]byte, error) {
-		return json.Marshal(params.cluster)
-	})
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("cluster", clusterStrByte); err != nil {
-		return nil, err
-	}
-
-	componentStrByte, err := json.Marshal(params.component)
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("component", componentStrByte); err != nil {
-		return nil, err
-	}
-
-	pdbStrByte, err := cueValue.Lookup("pdb")
-	if err != nil {
-		return nil, err
-	}
+	pdbStrByte, err := buildFromCue(tplFile, map[string]any{
+		"cluster":   params.cluster,
+		"component": params.component,
+	}, "pdb")
 
 	pdb := policyv1.PodDisruptionBudget{}
 	if err = json.Unmarshal(pdbStrByte, &pdb); err != nil {
@@ -1492,33 +1356,6 @@ func buildCfg(params createParams,
 
 func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
 	const tplFile = "env_config_template.cue"
-	cueFS, _ := debme.FS(cueTemplates, "cue")
-	cueTpl, err := params.getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplFile))
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-
-	clusterStrByte, err := params.getCacheBytesValue("cluster", func() ([]byte, error) {
-		return json.Marshal(params.cluster)
-	})
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("cluster", clusterStrByte); err != nil {
-		return nil, err
-	}
-
-	componentStrByte, err := json.Marshal(params.component)
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("component", componentStrByte); err != nil {
-		return nil, err
-	}
 
 	prefix := dbaasPrefix + "_" + strings.ToUpper(params.component.Type) + "_"
 	svcName := strings.Join([]string{params.cluster.Name, params.component.Name, "headless"}, "-")
@@ -1544,18 +1381,12 @@ func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
 			}
 		}
 	}
-	envDataStrByte, err := json.Marshal(envData)
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("config.data", envDataStrByte); err != nil {
-		return nil, err
-	}
 
-	configStrByte, err := cueValue.Lookup("config")
-	if err != nil {
-		return nil, err
-	}
+	configStrByte, err := buildFromCue(tplFile, map[string]any{
+		"cluster":     params.cluster,
+		"component":   params.component,
+		"config.data": envData,
+	}, "config")
 
 	config := corev1.ConfigMap{}
 	if err = json.Unmarshal(configStrByte, &config); err != nil {
@@ -1649,7 +1480,7 @@ func generateConfigMapWithTemplate(configs map[string]string,
 	cmName, templateName string) (*corev1.ConfigMap, error) {
 	const tplFile = "config_template.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
-	cueTpl, err := params.getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
+	cueTpl, err := getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
 		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplFile))
 	})
 	if err != nil {
@@ -1785,38 +1616,11 @@ func deleteBackup(ctx context.Context, cli client.Client, backupJobKey types.Nam
 func buildBackupPolicy(sts *appsv1.StatefulSet,
 	template *dataprotectionv1alpha1.BackupPolicyTemplate,
 	backupKey types.NamespacedName) (*dataprotectionv1alpha1.BackupPolicy, error) {
-	cueFS, _ := debme.FS(cueTemplates, "cue")
-
-	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("backup_policy_template.cue"))
-	if err != nil {
-		return nil, err
-	}
-
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-	stsStrByte, err := json.Marshal(sts)
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("sts", stsStrByte); err != nil {
-		return nil, err
-	}
-
-	keyStrByte, err := json.Marshal(backupKey)
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("backup_key", keyStrByte); err != nil {
-		return nil, err
-	}
-
-	if err = cueValue.FillRaw("template", template.Name); err != nil {
-		return nil, err
-	}
-
-	backupPolicyStrByte, err := cueValue.Lookup("backup_policy")
-	if err != nil {
-		return nil, err
-	}
+	backupPolicyStrByte, err := buildFromCue("backup_policy_template.cue", map[string]any{
+		"sts":        sts,
+		"backup_key": backupKey,
+		"template":   template.Name,
+	}, "backup_policy")
 
 	backupPolicy := dataprotectionv1alpha1.BackupPolicy{}
 	if err = json.Unmarshal(backupPolicyStrByte, &backupPolicy); err != nil {
@@ -1828,35 +1632,10 @@ func buildBackupPolicy(sts *appsv1.StatefulSet,
 
 func buildBackupJob(sts *appsv1.StatefulSet,
 	backupJobKey types.NamespacedName) (*dataprotectionv1alpha1.BackupJob, error) {
-	cueFS, _ := debme.FS(cueTemplates, "cue")
-
-	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("backup_job_template.cue"))
-	if err != nil {
-		return nil, err
-	}
-
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-
-	stsStrByte, err := json.Marshal(sts)
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("sts", stsStrByte); err != nil {
-		return nil, err
-	}
-
-	keyStrByte, err := json.Marshal(backupJobKey)
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("backup_job_key", keyStrByte); err != nil {
-		return nil, err
-	}
-
-	backupJobStrByte, err := cueValue.Lookup("backup_job")
-	if err != nil {
-		return nil, err
-	}
+	backupJobStrByte, err := buildFromCue("backup_job_template.cue", map[string]any{
+		"sts":            sts,
+		"backup_job_key": backupJobKey,
+	}, "backup_job")
 
 	backupJob := dataprotectionv1alpha1.BackupJob{}
 	if err = json.Unmarshal(backupJobStrByte, &backupJob); err != nil {
@@ -1908,39 +1687,11 @@ const (
 func buildVolumeSnapshot(snapshotKey types.NamespacedName,
 	pvcName string,
 	sts *appsv1.StatefulSet) (*snapshotv1.VolumeSnapshot, error) {
-	cueFS, _ := debme.FS(cueTemplates, "cue")
-
-	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("snapshot_template.cue"))
-	if err != nil {
-		return nil, err
-	}
-
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-
-	keyStrByte, err := json.Marshal(snapshotKey)
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("snapshot_key", keyStrByte); err != nil {
-		return nil, err
-	}
-
-	if err := cueValue.FillRaw("pvc_name", pvcName); err != nil {
-		return nil, err
-	}
-
-	stsStrByte, err := json.Marshal(sts)
-	if err != nil {
-		return nil, err
-	}
-	if err := cueValue.Fill("sts", stsStrByte); err != nil {
-		return nil, err
-	}
-
-	snapshotStrByte, err := cueValue.Lookup("snapshot")
-	if err != nil {
-		return nil, err
-	}
+	snapshotStrByte, err := buildFromCue("snapshot_template.cue", map[string]any{
+		"snapshot_key": snapshotKey,
+		"pvc_name":     pvcName,
+		"sts":          sts,
+	}, "snapshot")
 
 	snapshot := snapshotv1.VolumeSnapshot{}
 	if err = json.Unmarshal(snapshotStrByte, &snapshot); err != nil {
@@ -2103,37 +1854,17 @@ func deleteSnapshot(cli client.Client,
 }
 
 func buildCronJob(pvcKey types.NamespacedName, schedule string) (*v1.CronJob, error) {
-	cueFS, _ := debme.FS(cueTemplates, "cue")
-
-	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("delete_pvc_cron_job_template.cue"))
-	if err != nil {
-		return nil, err
-	}
-
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-
-	keyStrByte, err := json.Marshal(pvcKey)
-	if err := cueValue.Fill("pvc", keyStrByte); err != nil {
-		return nil, err
-	}
-
-	if err := cueValue.FillRaw("cronjob.spec.schedule", schedule); err != nil {
-		return nil, err
-	}
 
 	serviceAccount := viper.GetString("KUBEBLOCKS_SERVICE_ACCOUNT")
 	if len(serviceAccount) == 0 {
 		serviceAccount = "kubeblocks"
 	}
-	if err := cueValue.FillRaw("cronjob.spec.jobTemplate.spec.template.spec.serviceAccount",
-		serviceAccount); err != nil {
-		return nil, err
-	}
 
-	cronJobStrByte, err := cueValue.Lookup("cronjob")
-	if err != nil {
-		return nil, err
-	}
+	cronJobStrByte, err := buildFromCue("delete_pvc_cron_job_template.cue", map[string]any{
+		"pvc":                   pvcKey,
+		"cronjob.spec.schedule": schedule,
+		"cronjob.spec.jobTemplate.spec.template.spec.serviceAccount": serviceAccount,
+	}, "cronjob")
 
 	cronJob := v1.CronJob{}
 	if err = json.Unmarshal(cronJobStrByte, &cronJob); err != nil {
@@ -2293,7 +2024,9 @@ func isPVCExists(cli client.Client,
 
 func buildFromCue(tplName string, fillMap map[string]any, lookupKey string) ([]byte, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
-	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplName))
+	cueTpl, err := getCacheCUETplValue(tplName, func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplName))
+	})
 	if err != nil {
 		return nil, err
 	}

@@ -807,6 +807,7 @@ spec:
 			cfg, err := buildEnvConfig(params)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
+			Expect(len(cfg.Data) == 2).Should(BeTrue())
 		})
 
 		It("Build BackupPolicy", func() {

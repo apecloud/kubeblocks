@@ -43,7 +43,7 @@ type BackupToolSpec struct {
 	// Compute Resources required by this container.
 	// Cannot be updated.
 	// +optional
-	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 
 	// List of environment variables to set in the container.
 	// +optional
@@ -75,7 +75,7 @@ type BackupToolSpec struct {
 
 	// backup tool can support logical restore, in this case, restore NOT RESTART database.
 	// +optional
-	Logical BackupToolRestoreCommand `json:"logical,omitempty"`
+	Logical *BackupToolRestoreCommand `json:"logical,omitempty"`
 }
 
 // BackupToolRestoreCommand defines the restore commands of BackupTool

@@ -1,0 +1,119 @@
+
+## @param terminationPolicy define Cluster termination policy. One of DoNotTerminate, Halt, Delete, WipeOut.
+##
+terminationPolicy: Halt
+
+
+monitor:
+  ## @param monitor.enabled if `true`, enable Cluster monitor capabilities
+  ##
+  enabled: false
+
+service:
+  type: ClusterIP
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: clickhouse-cluster.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - clickhouse-cluster.local
+
+## ClickHouse per shard component configurations
+clickhouse: 
+  -
+    ## @param replicaCount Number of ClickHouse replicas per shard to deploy
+    ##
+    replicaCount: 2
+
+    resources: {}
+      # We usually recommend not to specify default resources and to leave this as a conscious
+      # choice for the user. This also increases chances charts run on environments with little
+      # resources, such as Minikube. If you do want to specify resources, uncomment the following
+      # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+      # limits:
+      #   cpu: 100m
+      #   memory: 128Mi
+      # requests:
+      #   cpu: 100m
+      #   memory: 128Mi
+
+    persistence:
+      enabled: false
+      data:
+        storageClassName:
+        size: 10Gi
+
+  # -
+  #   ## @param replicaCount Number of ClickHouse replicas per shard to deploy
+  #   ##
+  #   replicaCount: 2
+
+  #   resources: {}
+  #     # We usually recommend not to specify default resources and to leave this as a conscious
+  #     # choice for the user. This also increases chances charts run on environments with little
+  #     # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  #     # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  #     # limits:
+  #     #   cpu: 100m
+  #     #   memory: 128Mi
+  #     # requests:
+  #     #   cpu: 100m
+  #     #   memory: 128Mi
+
+  #   persistence:
+  #     enabled: false
+  #     data:
+  #       storageClassName:
+  #       size: 10Gi
+
+
+## @param tolerations Tolerations for ClickHouse pods assignment
+## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+##
+tolerations: []
+
+
+## @param topologyKeys is Tolerations for ClickHouse pods assignment
+## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+##
+## @param topologySpreadConstraints Topology Spread Constraints for pod assignment spread across your cluster among failure-domains. Evaluated as a template
+## Ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/#spread-constraints-for-pods
+##
+topologyKeys:
+  - kubernetes.io/hostname
+
+
+affinity: {}
+
+
+useClickHouseKeeper: true
+
+keeper:
+  replicaCount: 1
+  resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+  persistence:
+    enabled: false
+    data:
+      storageClassName:
+      size: 8Gi

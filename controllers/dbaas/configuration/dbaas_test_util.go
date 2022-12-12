@@ -128,13 +128,15 @@ func (w *TestWrapper) updateAvComTplMeta(appVer *dbaasv1alpha1.AppVersion) {
 		}
 		for i := 0; i < len(component.ConfigTemplateRefs); i++ {
 			component.ConfigTemplateRefs[i].Name = w.testEnv.CfgTplName
+			component.ConfigTemplateRefs[i].ConfigMapTplRef = w.testEnv.CfgTplName
+			component.ConfigTemplateRefs[i].ConfigConstraintsRef = w.testEnv.CfgTplName
 		}
 	}
 }
 
 func (w *TestWrapper) updateComTplMeta(cd *dbaasv1alpha1.ClusterDefinition) {
 	// fix return value of xxx func is not checked (errcheck)
-	ok, _ := HandleConfigTemplate(cd,
+	ok, _ := handleConfigTemplate(cd,
 		func(templates []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 			return true, nil
 		},
@@ -145,6 +147,8 @@ func (w *TestWrapper) updateComTplMeta(cd *dbaasv1alpha1.ClusterDefinition) {
 			}
 			for i := 0; i < len(configSpec.ConfigTemplateRefs); i++ {
 				configSpec.ConfigTemplateRefs[i].Name = w.testEnv.CfgTplName
+				configSpec.ConfigTemplateRefs[i].ConfigMapTplRef = w.testEnv.CfgTplName
+				configSpec.ConfigTemplateRefs[i].ConfigConstraintsRef = w.testEnv.CfgTplName
 			}
 			return nil
 		})
@@ -262,6 +266,7 @@ func (w *TestWrapper) CreateCfgOnCluster(cfgFile string, cluster *dbaasv1alpha1.
 		cm.Labels[intctrlutil.AppInstanceLabelKey] = cluster.Name
 		cm.Labels[intctrlutil.AppComponentLabelKey] = componentName
 		cm.Labels[CMConfigurationTplNameLabelKey] = w.testEnv.CfgTplName
+		cm.Labels[CMConfigurationConstraintsNameLabelKey] = w.testEnv.CfgTplName
 		cm.Labels[CMInsConfigurationLabelKey] = "true"
 	})
 	if err != nil {
@@ -304,7 +309,7 @@ func (w *TestWrapper) createStsFromFile(cluster *dbaasv1alpha1.Cluster, componen
 		cm.Labels[intctrlutil.AppNameLabelKey] = cluster.Name
 		cm.Labels[intctrlutil.AppInstanceLabelKey] = cluster.Name
 		cm.Labels[intctrlutil.AppComponentLabelKey] = componentName
-		cm.Labels[cfgcore.GenerateUniqLabelKeyWithConfig(w.testEnv.CfgTplName)] = w.testEnv.CfgTplName
+		cm.Labels[cfgcore.GenerateUniqLabelKeyWithConfig(w.testEnv.CfgTplName)] = cmName
 
 		configTestVolumeName := "for_test" + BuildRandomString()
 		sts.Spec.Template.Spec.Volumes = []corev1.Volume{
@@ -417,7 +422,7 @@ func createCRFromISVWithT(t *TestWrapper, tplName string, fileName string, crTyp
 		t.cd = crObj.(*dbaasv1alpha1.ClusterDefinition)
 	case *dbaasv1alpha1.ConfigurationTemplate:
 		crObj, err = createISVCrFromFile(fileName, obj, func(tpl *dbaasv1alpha1.ConfigurationTemplate) {
-			tpl.Spec.TplRef = t.testEnv.CfgTplName
+			// tpl.Spec.TplRef = t.testEnv.CfgTplName
 		})
 		t.tpl = crObj.(*dbaasv1alpha1.ConfigurationTemplate)
 	// case *dbaasv1alpha1.Cluster:

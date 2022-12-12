@@ -65,6 +65,16 @@ spec:
                         file.
                       items:
                         properties:
+                          configConstraintsRef:
+                            description: Specify the name of the referenced the configuration
+                              constraints object.
+                            type: string
+                          configMapTplRef:
+                            description: Specify the name of the referenced the configuration
+                              template ConfigMap object.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
                           defaultMode:
                             description: 'defaultMode is optional: mode bits used
                               to set permissions on created files by default. Must
@@ -78,8 +88,7 @@ spec:
                             format: int32
                             type: integer
                           name:
-                            description: Specify the name of the referenced the configuration
-                              template ConfigMap object.
+                            description: Specify the name of configuration template.
                             maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string

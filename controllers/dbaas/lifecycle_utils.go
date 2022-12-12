@@ -1278,7 +1278,7 @@ func buildCfg(params createParams,
 		// Check config cm already exists
 		cmName := cfgcore.GetInstanceCMName(obj, &tpl)
 		volumes[cmName] = tpl
-		cfgLables[cfgcore.GenerateUniqLabelKeyWithConfig(tpl.Name)] = tpl.Name
+		cfgLables[cfgcore.GenerateUniqLabelKeyWithConfig(tpl.ConfigMapTplRef)] = tpl.ConfigMapTplRef
 		isExist, err := isAlreadyExists(cmName, params.cluster.Namespace, ctx, cli)
 		if err != nil {
 			return nil, err
@@ -1328,13 +1328,13 @@ func updateConfigurationManagerWithComponent(params createParams, podSpec *corev
 		criType                 = viper.GetString(cfgcm.ConfigCRIType)
 	)
 
-	if component.Config == nil {
+	if component.Config == nil || component.Config.ReconfigureOption == nil {
 		return nil
 	}
 
 	cfgSpec := component.Config
 	// db auto scan configuration and reload
-	if ok, err := cfgcm.NeedBuildConfigSidecar(cfgSpec.ConfigReload, cfgSpec.ConfigReloadType, cfgSpec.ConfigReloadTrigger); err != nil {
+	if ok, err := cfgcm.NeedBuildConfigSidecar(cfgSpec.ReconfigureOption); err != nil {
 		return err
 	} else if !ok {
 		return nil
@@ -1371,8 +1371,9 @@ func updateConfigurationManagerWithComponent(params createParams, podSpec *corev
 		return nil
 	}
 
-	configManagerArgs := cfgcm.BuildReloadSidecarParams(cfgSpec.ConfigReloadType,
-		*cfgSpec.ConfigReloadTrigger,
+	configManagerArgs := cfgcm.BuildReloadSidecarParams(
+		cfgSpec.ReconfigureOption.ConfigReloadType,
+		*cfgSpec.ReconfigureOption.ConfigReloadTrigger,
 		volumeDirs,
 		criType,
 		criRuntimeEndpoint)
@@ -1573,19 +1574,16 @@ func isAlreadyExists(cmName string, namespace string, ctx context.Context, cli c
 func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder, cmName string, tplCfg dbaasv1alpha1.ConfigTemplate, params createParams, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
 	// Render config template by TplEngine
 	// The template namespace must be the same as the ClusterDefinition namespace
-	configs, err := processConfigMapTemplate(ctx, cli, tplBuilder, client.ObjectKey{
-		Namespace: tplCfg.Namespace,
-		Name:      tplCfg.Name,
-	})
+	configs, err := processConfigMapTemplate(ctx, cli, tplBuilder, tplCfg)
 	if err != nil {
 		return nil, err
 	}
 
 	// Using ConfigMap cue template render to configmap of config
-	return buildConfigMapWithTemplate(configs, params, cmName, tplCfg.Name)
+	return buildConfigMapWithTemplate(configs, params, cmName, tplCfg.ConfigMapTplRef, tplCfg.ConfigConstraintsRef)
 }
 
-func buildConfigMapWithTemplate(configs map[string]string, params createParams, cmName, templateName string) (*corev1.ConfigMap, error) {
+func buildConfigMapWithTemplate(configs map[string]string, params createParams, cmName, templateName, configConstraints string) (*corev1.ConfigMap, error) {
 	const tplFile = "config_template.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := params.getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
@@ -1607,10 +1605,11 @@ func buildConfigMapWithTemplate(configs map[string]string, params createParams, 
 			"namespace": params.cluster.GetNamespace(),
 		},
 		"component": {
-			"name":         params.component.Name,
-			"type":         params.component.Type,
-			"configName":   cmName,
-			"templateName": templateName,
+			"name":                  params.component.Name,
+			"type":                  params.component.Type,
+			"configName":            cmName,
+			"templateName":          templateName,
+			"configConstraintsName": configConstraints,
 		},
 	}
 	configBytes, err := json.Marshal(configMeta)
@@ -1671,20 +1670,25 @@ func buildCfgManagerContainer(params createParams, sidecarRenderedParam *cfgcm.C
 }
 
 // processConfigMapTemplate Render config file using template engine
-func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder *configTemplateBuilder, cmKey client.ObjectKey) (map[string]string, error) {
+func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder *configTemplateBuilder, tplCfg dbaasv1alpha1.ConfigTemplate) (map[string]string, error) {
 
-	cfgTpl := &dbaasv1alpha1.ConfigurationTemplate{}
-	if err := cli.Get(ctx, cmKey, cfgTpl); err != nil {
-		return nil, cfgcore.WrapError(err, "failed to get ConfigurationTemplate, key[%s].", cmKey.String())
+	cfgTemplate := &dbaasv1alpha1.ConfigurationTemplate{}
+	if len(tplCfg.ConfigConstraintsRef) > 0 {
+		if err := cli.Get(ctx, client.ObjectKey{
+			Namespace: tplCfg.Namespace,
+			Name:      tplCfg.ConfigConstraintsRef,
+		}, cfgTemplate); err != nil {
+			return nil, cfgcore.WrapError(err, "failed to get ConfigurationTemplate, key[%v]", tplCfg)
+		}
 	}
 
 	// NOTE: not require checker configuration template status
-	configChecker := cfgcore.NewConfigValidator(&cfgTpl.Spec)
+	configChecker := cfgcore.NewConfigValidator(&cfgTemplate.Spec)
 	cmObj := &corev1.ConfigMap{}
 	//  Require template configmap exist
 	if err := cli.Get(ctx, client.ObjectKey{
-		Namespace: cfgTpl.Namespace,
-		Name:      cfgTpl.Spec.TplRef,
+		Namespace: tplCfg.Namespace,
+		Name:      tplCfg.ConfigMapTplRef,
 	}, cmObj); err != nil {
 		return nil, err
 	}
@@ -1693,7 +1697,7 @@ func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder
 		return map[string]string{}, nil
 	}
 
-	tplBuilder.setTplName(cmKey.Name)
+	tplBuilder.setTplName(tplCfg.ConfigMapTplRef)
 	renderedCfg, err := tplBuilder.render(cmObj.Data)
 	if err != nil {
 		return nil, cfgcore.WrapError(err, "failed to render configmap")

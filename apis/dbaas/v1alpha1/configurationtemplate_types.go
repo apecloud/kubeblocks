@@ -27,7 +27,7 @@ type ConfigurationTemplateSpec struct {
 
 	// TplRef is a reference to the configmap object, the configmap determines how to generate the configurations.
 	// +kubebuilder:validation:Required
-	TplRef string `json:"tplRef,omitempty"`
+	// TplRef string `json:"tplRef,omitempty"`
 
 	// CfgSchemaTopLevelName is cue type name, which generates openapi schema.
 	// +optional

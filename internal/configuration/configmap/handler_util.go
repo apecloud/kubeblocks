@@ -44,11 +44,15 @@ type ConfigManagerSidecar struct {
 	Volumes []corev1.VolumeMount `json:"volumes"`
 }
 
-func IsNotSupportReload(autoReload bool, reloadType dbaasv1alpha1.CfgReloadType) bool {
-	return !autoReload || reloadType == ""
+func IsNotSupportReload(option *dbaasv1alpha1.ReconfigureOption) bool {
+	return option == nil || !option.ConfigReload || option.ConfigReloadType == ""
 }
 
-func NeedBuildConfigSidecar(autoReload bool, reloadType dbaasv1alpha1.CfgReloadType, configuration *dbaasv1alpha1.ConfigReloadTrigger) (bool, error) {
+func NeedBuildConfigSidecar(option *dbaasv1alpha1.ReconfigureOption) (bool, error) {
+	return needBuildConfigSidecar(option.ConfigReload, option.ConfigReloadType, option.ConfigReloadTrigger)
+}
+
+func needBuildConfigSidecar(autoReload bool, reloadType dbaasv1alpha1.CfgReloadType, configuration *dbaasv1alpha1.ConfigReloadTrigger) (bool, error) {
 	if !autoReload || reloadType == "" {
 		return false, nil
 	}

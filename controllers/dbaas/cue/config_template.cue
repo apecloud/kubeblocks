@@ -14,6 +14,7 @@ meta: {
 		type:         string
 		configName:   string
 		templateName: string
+		configConstraintsName: string
 	}
 }
 
@@ -36,6 +37,7 @@ config: {
 			"app.kubernetes.io/managed-by":    "kubeblocks"
 			// config template name
 			"app.kubernetes.io/configurationtpl-name": "\(meta.component.templateName)"
+			"app.kubernetes.io/configuration-constraints-name": "\(meta.component.configConstraintsName)"
 		}
 		annotations: {
 			// enable configmap upgrade

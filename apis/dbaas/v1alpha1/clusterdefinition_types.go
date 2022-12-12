@@ -66,11 +66,21 @@ type ClusterDefinitionStatus struct {
 }
 
 type ConfigTemplate struct {
-	// Specify the name of the referenced the configuration template ConfigMap object.
+	// Specify the name of configuration template.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
+
+	// Specify the name of the referenced the configuration template ConfigMap object.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	ConfigMapTplRef string `json:"configMapTplRef,omitempty"`
+
+	// Specify the name of the referenced the configuration constraints object.
+	// +optional
+	ConfigConstraintsRef string `json:"configConstraintsRef,omitempty"`
 
 	// Specify the namespace of the referenced the configuration template ConfigMap object.
 	// An empty namespace is equivalent to the "default" namespace.
@@ -138,9 +148,13 @@ type LogConfig struct {
 }
 
 type ConfigurationSpec struct {
-	// The configTemplateRefs field provided by Provider, and
-	// finally this configTemplateRefs will be rendered into the user's configuration file against the user's cluster.
+	// The configTemplateRefs field provided by provider, and
+	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
 	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
 
 	// ConfigRevisionHistoryLimit is number of prior configuration versions, By default, 6 versions are reserved.
@@ -149,6 +163,12 @@ type ConfigurationSpec struct {
 	// +optional
 	ConfigRevisionHistoryLimit int `json:"configRevisionHistoryLimit,omitempty"`
 
+	// Specify the option of configuration reload policy.
+	// +optional
+	ReconfigureOption *ReconfigureOption `json:"reconfigureOption,omitempty"`
+}
+
+type ReconfigureOption struct {
 	// ConfigReload indicates whether the process supports reload.
 	// if false, the controller will restart the process.
 	// if true, the controller will determine the behavior of the engine instance based on the configuration templates,

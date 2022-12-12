@@ -37,9 +37,10 @@ const (
 	ConfigurationTemplateFinalizerName = "configuration.kubeblocks.io/finalizer"
 
 	// CMConfigurationTplLabelKey  configmap is config template
-	CMConfigurationTplLabelKey     = "configuration.kubeblocks.io/configuration-template"
-	CMConfigurationTplNameLabelKey = "app.kubernetes.io/configurationtpl-name"
-	CMInsConfigurationHashLabelKey = "configuration.kubeblocks.io/configuration-hash"
+	CMConfigurationTplLabelKey             = "configuration.kubeblocks.io/configuration-template"
+	CMConfigurationTplNameLabelKey         = "app.kubernetes.io/configurationtpl-name"
+	CMConfigurationConstraintsNameLabelKey = "app.kubernetes.io/configuration-constraints-name"
+	CMInsConfigurationHashLabelKey         = "configuration.kubeblocks.io/configuration-hash"
 
 	// CMInsConfigurationLabelKey configmap is configuration file for component
 	CMInsConfigurationLabelKey = "app.kubernetes.io/ins-configure"
@@ -81,13 +82,12 @@ func GetConfigMapByName(cli client.Client, ctx intctrlutil.RequestCtx, cmName, n
 		return nil, fmt.Errorf("required configmap reference name is empty! [%v]", cmName)
 	}
 
-	configKey := client.ObjectKey{
+	configObj := &corev1.ConfigMap{}
+	if err := cli.Get(ctx.Ctx, client.ObjectKey{
 		Namespace: ns,
 		Name:      cmName,
-	}
-	configObj := &corev1.ConfigMap{}
-	if err := cli.Get(ctx.Ctx, configKey, configObj); err != nil {
-		ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", configKey)
+	}, configObj); err != nil {
+		ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", cmName)
 		return nil, err
 	}
 
@@ -95,11 +95,6 @@ func GetConfigMapByName(cli client.Client, ctx intctrlutil.RequestCtx, cmName, n
 }
 
 func CheckConfigurationTemplate(cli client.Client, ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplate) (bool, error) {
-	// check ConfigTemplate Validate
-	configmapFn := func(configTpl, ns string) (*corev1.ConfigMap, error) {
-		return GetConfigMapByName(cli, ctx, configTpl, ns)
-	}
-
 	// validate configuration template
 	isConfigSchemaFn := func(tpl *dbaasv1alpha1.CustomParametersValidation) (bool, error) {
 		if tpl == nil || tpl.Cue == nil {
@@ -110,41 +105,61 @@ func CheckConfigurationTemplate(cli client.Client, ctx intctrlutil.RequestCtx, t
 		return err == nil, err
 	}
 
-	return checkConfigTpl(ctx, tpl, configmapFn, isConfigSchemaFn)
+	return checkConfigTPL(ctx, tpl, isConfigSchemaFn)
 }
 
-func UpdateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplate) error {
+func UpdateCDConfigMapFinalizer(client client.Client, ctx intctrlutil.RequestCtx, clusterDef *dbaasv1alpha1.ClusterDefinition) error {
+	_, err := handleConfigTemplate(clusterDef,
+		func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
+			return true, updateBatchConfigMapFinalizer(client, ctx, tpls)
+		})
+	return err
+}
+
+func UpdateAVConfigMapFinalizer(client client.Client, ctx intctrlutil.RequestCtx, appversion *dbaasv1alpha1.AppVersion) error {
+	_, err := handleConfigTemplate(appversion,
+		func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
+			return true, updateBatchConfigMapFinalizer(client, ctx, tpls)
+		})
+	return err
+}
+
+func updateBatchConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpls []dbaasv1alpha1.ConfigTemplate) error {
+	for _, tpl := range tpls {
+		if err := updateConfigMapFinalizer(cli, ctx, tpl); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func updateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl dbaasv1alpha1.ConfigTemplate) error {
 	// step1: add finalizer
 	// step2: add labels: CMConfigurationTplLabelKey
 	// step3: update immutable
 
-	cmObj, err := GetConfigMapByName(cli, ctx, tpl.Spec.TplRef, tpl.Namespace)
+	cmObj, err := GetConfigMapByName(cli, ctx, tpl.ConfigMapTplRef, tpl.Namespace)
 	if err != nil {
 		ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", cmObj.Name)
 	}
 
-	patch := client.MergeFrom(cmObj.DeepCopy())
-	if !controllerutil.ContainsFinalizer(cmObj, ConfigurationTemplateFinalizerName) {
-		controllerutil.AddFinalizer(cmObj, ConfigurationTemplateFinalizerName)
+	if controllerutil.ContainsFinalizer(cmObj, ConfigurationTemplateFinalizerName) {
+		return nil
 	}
+
+	patch := client.MergeFrom(cmObj.DeepCopy())
 
 	if cmObj.ObjectMeta.Labels == nil {
 		cmObj.ObjectMeta.Labels = map[string]string{}
 	}
 	cmObj.ObjectMeta.Labels[CMConfigurationTplLabelKey] = "true"
+	controllerutil.AddFinalizer(cmObj, ConfigurationTemplateFinalizerName)
 
 	// cmObj.Immutable = &tpl.Spec.Immutable
 	return cli.Patch(ctx.Ctx, cmObj, patch)
 }
 
-func checkConfigTpl(ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplate, confTplFn ValidateConfigMap, schemaFn ValidateConfigSchema) (bool, error) {
-	// check cm isExist
-	cmObj, err := confTplFn(tpl.Spec.TplRef, tpl.Namespace)
-	if err != nil {
-		ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", cmObj.Name)
-		return false, err
-	}
-
+func checkConfigTPL(ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplate, schemaFn ValidateConfigSchema) (bool, error) {
 	// validate schema
 	if ok, err := schemaFn(tpl.Spec.ConfigurationSchema); !ok || err != nil {
 		ctx.Log.Error(err, "failed to validate template schema!", "configMapName", fmt.Sprintf("%v", tpl.Spec.ConfigurationSchema))
@@ -158,18 +173,21 @@ type ConfigTemplateHandler func([]dbaasv1alpha1.ConfigTemplate) (bool, error)
 type ComponentValidateHandler func(component *dbaasv1alpha1.ClusterDefinitionComponent) error
 
 func CheckCDConfigTemplate(client client.Client, ctx intctrlutil.RequestCtx, clusterDef *dbaasv1alpha1.ClusterDefinition) (bool, error) {
-	return HandleConfigTemplate(clusterDef,
+	return handleConfigTemplate(clusterDef,
 		func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
-			return validateConfTpls(client, ctx, tpls)
+			return validateConfigTPLs(client, ctx, tpls)
 		},
 		func(component *dbaasv1alpha1.ClusterDefinitionComponent) error {
 			cfgSpec := component.ConfigSpec
-			_, err := cfgcm.NeedBuildConfigSidecar(cfgSpec.ConfigReload, cfgSpec.ConfigReloadType, cfgSpec.ConfigReloadTrigger)
+			if cfgSpec == nil || cfgSpec.ReconfigureOption == nil {
+				return nil
+			}
+			_, err := cfgcm.NeedBuildConfigSidecar(cfgSpec.ReconfigureOption)
 			return err
 		})
 }
 
-func HandleConfigTemplate(object client.Object, handler ConfigTemplateHandler, handler2 ...ComponentValidateHandler) (bool, error) {
+func handleConfigTemplate(object client.Object, handler ConfigTemplateHandler, handler2 ...ComponentValidateHandler) (bool, error) {
 	var (
 		err  error
 		tpls []dbaasv1alpha1.ConfigTemplate
@@ -221,48 +239,51 @@ func getCfgTplFromCD(clusterDef *dbaasv1alpha1.ClusterDefinition, validators ...
 }
 
 func UpdateCDLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, cd *dbaasv1alpha1.ClusterDefinition) (bool, error) {
-	return HandleConfigTemplate(cd, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
+	return handleConfigTemplate(cd, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 		patch := client.MergeFrom(cd.DeepCopy())
 		for _, tpl := range tpls {
-			cd.Labels[cfgcore.GenerateUniqLabelKeyWithConfig(tpl.Name)] = tpl.Name
+			cd.Labels[cfgcore.GenerateUniqLabelKeyWithConfig(tpl.ConfigConstraintsRef)] = tpl.ConfigConstraintsRef
 		}
 		return true, cli.Patch(ctx.Ctx, cd, patch)
 	})
 }
 
 func CheckAVConfigTemplate(client client.Client, ctx intctrlutil.RequestCtx, appVersion *dbaasv1alpha1.AppVersion) (bool, error) {
-	return HandleConfigTemplate(appVersion, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
-		return validateConfTpls(client, ctx, tpls)
+	return handleConfigTemplate(appVersion, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
+		return validateConfigTPLs(client, ctx, tpls)
 	})
 }
 
 func UpdateAVLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, appVer *dbaasv1alpha1.AppVersion) (bool, error) {
-	return HandleConfigTemplate(appVer, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
+	return handleConfigTemplate(appVer, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 		patch := client.MergeFrom(appVer.DeepCopy())
 		for _, tpl := range tpls {
-			appVer.Labels[cfgcore.GenerateUniqLabelKeyWithConfig(tpl.Name)] = tpl.Name
+			appVer.Labels[cfgcore.GenerateUniqLabelKeyWithConfig(tpl.ConfigConstraintsRef)] = tpl.ConfigConstraintsRef
 		}
 		return true, cli.Patch(ctx.Ctx, appVer, patch)
 	})
 }
 
-func validateConfTpls(cli client.Client, ctx intctrlutil.RequestCtx, configTpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
+func validateConfigTPLs(cli client.Client, ctx intctrlutil.RequestCtx, configTpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 	// check ConfigTemplate Validate
 	foundConfTplFn := func(configTpl dbaasv1alpha1.ConfigTemplate) (*dbaasv1alpha1.ConfigurationTemplate, error) {
-		if len(configTpl.Name) == 0 || len(configTpl.VolumeName) == 0 {
-			return nil, fmt.Errorf("required configmap reference name or volume name is empty! [%v]", configTpl)
-		}
-
-		configKey := client.ObjectKey{
-			Namespace: configTpl.Namespace,
-			Name:      configTpl.Name,
-		}
-		configObj := &dbaasv1alpha1.ConfigurationTemplate{}
-		if err := cli.Get(ctx.Ctx, configKey, configObj); err != nil {
-			ctx.Log.Error(err, "failed to get config template cm object!", "configTplName", configKey)
+		if _, err := GetConfigMapByName(cli, ctx, configTpl.ConfigMapTplRef, configTpl.Namespace); err != nil {
+			ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", configTpl.ConfigMapTplRef)
 			return nil, err
 		}
 
+		if len(configTpl.ConfigConstraintsRef) == 0 {
+			return nil, nil
+		}
+
+		configObj := &dbaasv1alpha1.ConfigurationTemplate{}
+		if err := cli.Get(ctx.Ctx, client.ObjectKey{
+			Namespace: configTpl.Namespace,
+			Name:      configTpl.ConfigConstraintsRef,
+		}, configObj); err != nil {
+			ctx.Log.Error(err, "failed to get config template cm object!", "configTplName", configTpl)
+			return nil, err
+		}
 		return configObj, nil
 	}
 
@@ -272,13 +293,12 @@ func validateConfTpls(cli client.Client, ctx intctrlutil.RequestCtx, configTpls 
 			ctx.Log.Error(err, "failed to validate configuration template!", "configTpl", tplRef)
 			return false, err
 		}
-		if !ValidateConfTplStatus(tpl.Status) {
+		if tpl != nil && !ValidateConfTplStatus(tpl.Status) {
 			errMsg := fmt.Sprintf("Configuration template CR[%s] status not ready! current status: %s", tpl.Name, tpl.Status.Phase)
 			ctx.Log.V(4).Info(errMsg)
 			return false, fmt.Errorf(errMsg)
 		}
 	}
-
 	return true, nil
 }
 

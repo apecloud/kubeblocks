@@ -29,8 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	dbaascfg "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
@@ -175,7 +177,7 @@ spec:
 		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
 
 		cfgTpl.Name = cmName
-		cfgTpl.Spec.TplRef = cmName
+		// cfgTpl.Spec.TplRef = cmName
 		Expect(testCtx.CheckedCreateObj(ctx, cfgTpl)).Should(Succeed())
 
 		// update phase
@@ -254,9 +256,11 @@ spec:
 			clusterDefinition.Spec.Components[0].ConfigSpec = &dbaasv1alpha1.ConfigurationSpec{
 				ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{
 					{
-						Name:       cmName,
-						Namespace:  testCtx.DefaultNamespace,
-						VolumeName: "xxx",
+						Name:                 cmName,
+						ConfigMapTplRef:      cmName,
+						ConfigConstraintsRef: cmName,
+						Namespace:            testCtx.DefaultNamespace,
+						VolumeName:           "xxx",
 					},
 				},
 			}
@@ -292,6 +296,21 @@ spec:
 					createdClusterDef.Status.ObservedGeneration == 1
 			}, time.Second*10, time.Second*1).Should(BeTrue())
 
+			// check cm
+			logrus.Info("check configmap finalizer: configuration.kubeblocks.io/finalizer")
+
+			cmObj := &corev1.ConfigMap{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      cmName,
+				}, cmObj)
+				if err != nil {
+					return false
+				}
+				return controllerutil.ContainsFinalizer(cmObj, dbaascfg.ConfigurationTemplateFinalizerName)
+			}, time.Second*10, time.Second*1).Should(BeTrue())
+
 			logrus.Info("check clusterdefinition labels: configuration.GenerateUniqLabelKeyWithConfig(testWrapper.TplName()")
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{
@@ -322,9 +341,11 @@ spec:
 			clusterDefinition.Spec.Components[0].ConfigSpec = &dbaasv1alpha1.ConfigurationSpec{
 				ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{
 					{
-						Name:       cmName,
-						Namespace:  testCtx.DefaultNamespace,
-						VolumeName: "xxx",
+						Name:                 cmName,
+						ConfigMapTplRef:      cmName,
+						ConfigConstraintsRef: cmName,
+						Namespace:            testCtx.DefaultNamespace,
+						VolumeName:           "xxx",
 					},
 				},
 			}

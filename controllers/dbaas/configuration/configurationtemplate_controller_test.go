@@ -24,7 +24,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
 
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -73,16 +72,6 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 					})
 				return err == nil && ok
 			}, time.Second*30, time.Second*1).Should(BeTrue())
-
-			// check cm
-			logrus.Info("check configmap finalizer: configuration.kubeblocks.io/finalizer")
-			Eventually(func() bool {
-				ok, err := ValidateISVCR(testWrapper, &corev1.ConfigMap{},
-					func(cm *corev1.ConfigMap) bool {
-						return validateFinalizerFlag(cm)
-					})
-				return err == nil && ok
-			}, time.Second*10, time.Second*1).Should(BeTrue())
 
 			logrus.Info("delete configuration template cr.")
 			Expect(testWrapper.DeleteTpl()).Should(Succeed())

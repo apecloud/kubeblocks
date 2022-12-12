@@ -97,10 +97,6 @@ spec:
                 items:
                   type: string
                 type: array
-              tplRef:
-                description: TplRef is a reference to the configmap object, the configmap
-                  determines how to generate the configurations.
-                type: string
             type: object
           status:
             description: ConfigurationTemplateStatus defines the observed state of

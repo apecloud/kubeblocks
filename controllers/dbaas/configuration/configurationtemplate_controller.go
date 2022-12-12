@@ -94,11 +94,6 @@ func (r *ConfigurationTemplateReconciler) Reconcile(ctx context.Context, req ctr
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "ValidateConfigurationTemplate")
 	}
 
-	// TODO(zt) update configmap Finalizer and set Immutable
-	if err := UpdateConfigMapFinalizer(r.Client, reqCtx, configTpl); err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "UpdateConfigMapFinalizer")
-	}
-
 	statusPatch := client.MergeFrom(configTpl.DeepCopy())
 	// configTpl.Spec.ConfigurationSchema.Schema = cfgcore.GenerateOpenAPISchema(configTpl.Spec.ConfigurationSchema.Cue)
 	if err := UpdateConfigurationSchema(&configTpl.Spec); err != nil {

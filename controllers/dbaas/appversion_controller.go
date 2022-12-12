@@ -149,6 +149,11 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "update using config template info")
 	}
 
+	// Update configmap Finalizer and set Immutable
+	if err := dbaasconfig.UpdateAVConfigMapFinalizer(r.Client, reqCtx, appVersion); err != nil {
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "UpdateConfigMapFinalizer")
+	}
+
 	clusterdefinition := &dbaasv1alpha1.ClusterDefinition{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Name: appVersion.Spec.ClusterDefinitionRef,

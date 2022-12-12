@@ -26,13 +26,17 @@ spec:
         {{- end }}
       configSpec:
         configTemplateRefs:
-          - name: mysql-3node-tpl-8.0
+          - name: mysql-3node-tpl
+            configMapTplRef: mysql-3node-tpl-8.0
+            configConstraintsRef: mysql-3node-cfg-constraints-8.0
             volumeName: mysql-config
-        configReload: true
-        configReloadType: signal
-        configReloadTrigger:
-          signal: SIGHUP
-          processName: mysqld
+        reconfigureOption:
+          configReload: true
+          configReloadType: signal
+          configReloadTrigger:
+            signal: SIGHUP
+            processName: mysqld
+        configRevisionHistoryLimit: 6
       defaultReplicas: 3
       componentType: Consensus
       consensusSpec:

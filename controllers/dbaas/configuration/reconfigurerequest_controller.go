@@ -96,10 +96,15 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return intctrlutil.Reconciled()
 	}
 
+	if cfgConstraintsName, ok := config.Labels[CMConfigurationConstraintsNameLabelKey]; !ok || len(cfgConstraintsName) == 0 {
+		reqCtx.Log.Info("configuration not set ConfigConstraints, not support reconfigure.", "config cm", client.ObjectKeyFromObject(config))
+		return intctrlutil.Reconciled()
+	}
+
 	tpl := &dbaasv1alpha1.ConfigurationTemplate{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: config.Namespace,
-		Name:      config.Labels[CMConfigurationTplNameLabelKey],
+		Name:      config.Labels[CMConfigurationConstraintsNameLabelKey],
 	}, tpl); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
@@ -139,7 +144,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		intctrlutil.AppNameLabelKey:      config.Labels[intctrlutil.AppNameLabelKey],
 		intctrlutil.AppInstanceLabelKey:  config.Labels[intctrlutil.AppInstanceLabelKey],
 		intctrlutil.AppComponentLabelKey: config.Labels[intctrlutil.AppComponentLabelKey],
-		configTplLabelKey:                config.Labels[CMConfigurationTplNameLabelKey],
+		configTplLabelKey:                config.GetName(),
 	}
 
 	versionMeta, err := GetConfigurationVersion(config, reqCtx, &tpl.Spec)
@@ -213,7 +218,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	}
 
 	return r.performUpgrade(cfgpolicy.ReconfigureParams{
-		TplName:          tpl.GetName(),
+		TplName:          configTplName,
 		Meta:             versionMeta,
 		Cfg:              config,
 		Tpl:              &tpl.Spec,
@@ -224,7 +229,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		ComponentUnits:   sts,
 		Component:        component,
 		ClusterComponent: clusterComponent,
-		Restart:          cfgcm.IsNotSupportReload(cfgSpec.ConfigReload, cfgSpec.ConfigReloadType),
+		Restart:          cfgcm.IsNotSupportReload(cfgSpec.ReconfigureOption),
 	})
 }
 

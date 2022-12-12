@@ -17,9 +17,10 @@ limitations under the License.
 package component
 
 import (
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"testing"
 	"time"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -82,11 +83,9 @@ func TestInitClusterComponentStatusIfNeed(t *testing.T) {
 	consensusSetStatus := cluster.Status.Components[componentName].ConsensusSetStatus
 	if consensusSetStatus == nil {
 		t.Errorf("cluster.Status.Components[componentName].ConsensusSetStatus not initialized properly")
-	} else {
-		if consensusSetStatus.Leader.Name != "" ||
-			consensusSetStatus.Leader.AccessMode != dbaasv1alpha1.None ||
-			consensusSetStatus.Leader.Pod != consensusSetStatusDefaultPodName {
-			t.Errorf("cluster.Status.Components[componentName].ConsensusSetStatus.Leader not initialized properly")
-		}
+	} else if consensusSetStatus.Leader.Name != "" ||
+		consensusSetStatus.Leader.AccessMode != dbaasv1alpha1.None ||
+		consensusSetStatus.Leader.Pod != consensusSetStatusDefaultPodName {
+		t.Errorf("cluster.Status.Components[componentName].ConsensusSetStatus.Leader not initialized properly")
 	}
 }

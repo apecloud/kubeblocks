@@ -65,11 +65,11 @@ const (
 
 // MongoDB is a binding implementation for MongoDB.
 type MongoDB struct {
+	mongoDBMetadata
 	lock             sync.Mutex
 	client           *mongo.Client
 	database         *mongo.Database
 	operationTimeout time.Duration
-	metadata         mongoDBMetadata
 	logger           logger.Logger
 	base             internal.ProbeBase
 }
@@ -134,7 +134,7 @@ func (m *MongoDB) Init(metadata bindings.Metadata) error {
 	if err != nil {
 		return err
 	}
-	m.metadata = *meta
+	m.mongoDBMetadata = *meta
 	m.base = internal.ProbeBase{
 		Logger:    m.logger,
 		Operation: m,
@@ -152,7 +152,7 @@ func (m *MongoDB) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bin
 
 func (m *MongoDB) Ping() error {
 	if err := m.client.Ping(context.Background(), nil); err != nil {
-		return fmt.Errorf("mongoDB store: error connecting to mongoDB at %s: %s", m.metadata.host, err)
+		return fmt.Errorf("mongoDB store: error connecting to mongoDB at %s: %s", m.mongoDBMetadata.host, err)
 	}
 	return nil
 }
@@ -166,15 +166,15 @@ func (m *MongoDB) InitIfNeed() error {
 		return nil
 	}
 
-	m.operationTimeout = m.metadata.operationTimeout
+	m.operationTimeout = m.mongoDBMetadata.operationTimeout
 
-	client, err := getMongoDBClient(&m.metadata)
+	client, err := getMongoDBClient(&m.mongoDBMetadata)
 	if err != nil {
 		return fmt.Errorf("error in creating mongodb client: %s", err)
 	}
 
 	if err = client.Ping(context.Background(), nil); err != nil {
-		return fmt.Errorf("error in connecting to mongodb, host: %s error: %s", m.metadata.host, err)
+		return fmt.Errorf("error in connecting to mongodb, host: %s error: %s", m.mongoDBMetadata.host, err)
 	}
 
 	db := client.Database(adminDatabase)
@@ -190,7 +190,7 @@ func (m *MongoDB) InitIfNeed() error {
 }
 
 func (m *MongoDB) GetRunningPort() int {
-	uri := getMongoURI(&m.metadata)
+	uri := getMongoURI(&m.mongoDBMetadata)
 	index := strings.Index(uri, "://")
 	if index < 0 {
 		return defaultDbPort

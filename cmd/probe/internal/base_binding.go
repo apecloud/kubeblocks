@@ -134,14 +134,12 @@ func (p *ProbeBase) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*b
 			return nil, err
 		}
 		resp.Data = d
-
 	case RoleCheckOperation:
 		d, err := p.roleObserve(ctx, sql, resp)
 		if err != nil {
 			return nil, err
 		}
 		resp.Data = d
-
 	default:
 		return nil, errors.Errorf("invalid operation type: %s. Expected %s, %s, or %s",
 			req.Operation, RunningCheckOperation, StatusCheckOperation, RoleCheckOperation)

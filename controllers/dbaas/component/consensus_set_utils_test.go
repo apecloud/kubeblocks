@@ -17,6 +17,7 @@ limitations under the License.
 package component
 
 import (
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"testing"
 	"time"
 
@@ -54,5 +55,37 @@ func TestIsReady(t *testing.T) {
 	pod.Status.Conditions = []v1.PodCondition{}
 	if isReady(*pod) {
 		t.Errorf("isReady returned false positive")
+	}
+}
+
+func TestInitClusterComponentStatusIfNeed(t *testing.T) {
+	componentName := "foo"
+	cluster := &dbaasv1alpha1.Cluster{
+		Spec: dbaasv1alpha1.ClusterSpec{
+			Components: []dbaasv1alpha1.ClusterComponent{
+				{
+					Name: componentName,
+					Type: componentName,
+				},
+			},
+		},
+	}
+
+	initClusterComponentStatusIfNeed(cluster, componentName)
+
+	if cluster.Status.Components == nil {
+		t.Errorf("cluster.Status.Components[*] not intialized properly")
+	}
+	if _, ok := cluster.Status.Components[componentName]; !ok {
+		t.Errorf("cluster.Status.Components[componentName] not initialized properly")
+	}
+	consensusSetStatus := cluster.Status.Components[componentName].ConsensusSetStatus
+	if consensusSetStatus == nil {
+		t.Errorf("cluster.Status.Components[componentName].ConsensusSetStatus not initialized properly")
+	}
+	if consensusSetStatus.Leader.Name != "" ||
+		consensusSetStatus.Leader.AccessMode != dbaasv1alpha1.None ||
+		consensusSetStatus.Leader.Pod != consensusSetStatusDefaultPodName {
+		t.Errorf("cluster.Status.Components[componentName].ConsensusSetStatus.Leader not initialized properly")
 	}
 }

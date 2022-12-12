@@ -25,6 +25,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/backupconfig"
@@ -91,6 +92,9 @@ A Command Line Interface for KubeBlocks`,
 	filters := []string{"options"}
 	templates.ActsAsRootCommand(cmd, filters, []templates.CommandGroup{}...)
 
+	utilcomp.SetFactoryForCompletion(f)
+	registerCompletionFuncForGlobalFlags(cmd, f)
+
 	cobra.OnInitialize(initConfig)
 	return cmd
 }
@@ -117,4 +121,27 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
+}
+
+func registerCompletionFuncForGlobalFlags(cmd *cobra.Command, f cmdutil.Factory) {
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"namespace",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return utilcomp.CompGetResource(f, cmd, "namespace", toComplete), cobra.ShellCompDirectiveNoFileComp
+		}))
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"context",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return utilcomp.ListContextsInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
+		}))
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"cluster",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return utilcomp.ListClustersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
+		}))
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"user",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return utilcomp.ListUsersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
+		}))
 }

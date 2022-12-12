@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	utilcomp "k8s.io/kubectl/pkg/util/completion"
 
 	"github.com/apecloud/kubeblocks/internal/cli/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/get"
@@ -42,10 +43,11 @@ func Build(c *builder.Command) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:     use,
-		Short:   c.Short,
-		Example: c.Example,
-		Aliases: []string{alias},
+		Use:               use,
+		Short:             c.Short,
+		Example:           c.Example,
+		Aliases:           []string{alias},
+		ValidArgsFunction: utilcomp.ResourceNameCompletionFunc(c.Factory, util.GVRToString(c.GVR)),
 		Run: func(cmd *cobra.Command, args []string) {
 			var (
 				goon = true

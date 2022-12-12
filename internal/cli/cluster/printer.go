@@ -35,7 +35,7 @@ type ClusterPrinter struct {
 var _ Printer = &ClusterPrinter{}
 
 func NewClusterPrinter(out io.Writer) *ClusterPrinter {
-	p := &ClusterPrinter{tbl: printer.NewTablePrinter().Out(out)}
+	p := &ClusterPrinter{tbl: printer.NewTablePrinter(out)}
 	p.tbl.SetHeader("NAME", "NAMESPACE", "VERSION", "CLUSTER-DEFINITION", "TERMINATION-POLICY", "STATUS", "INTERNAL-ENDPOINTS", "EXTERNAL-ENDPOINTS", "AGE")
 	return p
 }
@@ -57,7 +57,7 @@ type ComponentPrinter struct {
 var _ Printer = &ComponentPrinter{}
 
 func NewComponentPrinter(out io.Writer) *ComponentPrinter {
-	p := &ComponentPrinter{tbl: printer.NewTablePrinter().Out(out)}
+	p := &ComponentPrinter{tbl: printer.NewTablePrinter(out)}
 	p.tbl.SetHeader("NAME", "CLUSTER", "TYPE", "REPLICAS(DESIRED/TOTAL)", "IMAGE")
 	return p
 }
@@ -81,7 +81,7 @@ type InstancePrinter struct {
 var _ Printer = &InstancePrinter{}
 
 func NewInstancePrinter(out io.Writer) *InstancePrinter {
-	p := &InstancePrinter{tbl: printer.NewTablePrinter().Out(out)}
+	p := &InstancePrinter{tbl: printer.NewTablePrinter(out)}
 	p.tbl.SetHeader("NAME", "CLUSTER", "COMPONENT", "STATUS", "ROLE", "ACCESSMODE", "AZ", "REGION", "CPU(REQUEST/LIMIT)", "MEMORY(REQUEST/LIMIT)", "STORAGE", "NODE", "AGE")
 	return p
 }

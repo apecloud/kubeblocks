@@ -28,6 +28,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
@@ -51,9 +52,12 @@ var _ = Describe("Cluster", func() {
 			Expect(cmd).ShouldNot(BeNil())
 			Expect(cmd.Flags().GetString("termination-policy")).Should(Equal(""))
 
-			// must succeed otherwise exit 1 and make test fails
+			Expect(cmd.Flags().Set("cluster-definition", "test-cd")).Should(Succeed())
+			Expect(cmd.Flags().Set("cluster-version", "test-version")).Should(Succeed())
 			Expect(cmd.Flags().Set("components", "../../testing/testdata/component.yaml")).Should(Succeed())
 			Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
+
+			// must succeed otherwise exit 1 and make test fails
 			cmd.Run(nil, []string{"test1"})
 		})
 
@@ -61,10 +65,11 @@ var _ = Describe("Cluster", func() {
 			tf := cmdtesting.NewTestFactory().WithNamespace("default")
 			defer tf.Cleanup()
 
+			tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef())
 			o := &CreateOptions{
-				BaseOptions:        create.BaseOptions{IOStreams: streams, Name: "test"},
+				BaseOptions:        create.BaseOptions{IOStreams: streams, Name: "test", Client: tf.FakeDynamicClient},
 				ComponentsFilePath: "",
-				ClusterDefRef:      "wesql",
+				ClusterDefRef:      testing.ClusterDefName,
 				AppVersionRef:      "app-version",
 				PodAntiAffinity:    "Preferred",
 				TopologyKeys:       []string{"kubernetes.io/hostname"},
@@ -191,7 +196,7 @@ var _ = Describe("Cluster", func() {
 	It("list-logs-type", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace("default")
 		defer tf.Cleanup()
-		cmd := NewListLogsTypeCmd(tf, streams)
+		cmd := NewListLogsCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 	})
 

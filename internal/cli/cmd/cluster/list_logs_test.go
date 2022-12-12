@@ -34,11 +34,12 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
+	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
-var _ = Describe("listLogsType test", func() {
-	It("listLogsType", func() {
+var _ = Describe("listLogs test", func() {
+	It("listLogs", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace("test")
 		defer tf.Cleanup()
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -109,7 +110,30 @@ var _ = Describe("listLogsType test", func() {
 			},
 		}
 		dataObj.Pods.Items = append(dataObj.Pods.Items, pod)
-		o := &ListLogsOptions{}
-		Expect(o.printListLogsMessage(dataObj, os.Stdout)).Should(BeNil())
+		o := &ListLogsOptions{
+			exec: &exec.ExecOptions{
+				Input: &exec.ExecInput{},
+			},
+			IOStreams: genericclioptions.IOStreams{
+				Out:    os.Stdout,
+				ErrOut: os.Stdout,
+			},
+		}
+		Expect(o.printListLogs(dataObj)).Should(BeNil())
+	})
+
+	It("convertToLogFileInfo test", func() {
+		// empty case
+		fileInfo := ""
+		logFileList := convertToLogFileInfo(fileInfo, "type", "inst", "component")
+		Expect(len(logFileList)).Should(Equal(0))
+		// normal case, and size is 1
+		fileInfo1 := "-rw-r----- 1 mysql mysql 6.1K Nov 23, 2022 21:37 (UTC+08:00) mysqld.err\n"
+		logFileList1 := convertToLogFileInfo(fileInfo1, "type", "inst", "component")
+		Expect(len(logFileList1)).Should(Equal(1))
+		// normal case, and size is 2
+		fileInfo2 := "-rw-r----- 1 mysql mysql 6.1K Nov 23, 2022 21:37 (UTC+08:00) mysqld.err\n-rw-r----- 1 root  root  1.7M Dec 08, 2022 10:07 (UTC+08:00) mysqld.err.1"
+		logFileList2 := convertToLogFileInfo(fileInfo2, "type", "inst", "component")
+		Expect(len(logFileList2)).Should(Equal(2))
 	})
 })

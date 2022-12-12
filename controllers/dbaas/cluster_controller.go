@@ -130,7 +130,7 @@ func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *db
 }
 
 func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.InvolvedObject.FieldPath != k8score.ProbeRoleChangedCheckPath {
+	if event.InvolvedObject.FieldPath != ProbeRoleChangedCheckPath {
 		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
 	}
 
@@ -273,7 +273,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	task, err := buildClusterCreationTasks(clusterdefinition, appversion, cluster)
+	task, err := buildClusterCreationTasks(reqCtx, clusterdefinition, appversion, cluster)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}

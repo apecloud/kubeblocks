@@ -19,17 +19,14 @@ package dashboard
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
-	"strconv"
-	"strings"
 	"time"
 
-	"github.com/gosuri/uitable"
 	"github.com/spf13/cobra"
-	appv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/portforward"
@@ -38,7 +35,8 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/utils/pointer"
 
-	"github.com/apecloud/kubeblocks/internal/dbctl/util"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 const (
@@ -47,11 +45,11 @@ const (
 )
 
 type dashboard struct {
-	Name      string
-	Port      string
-	Namespace string
-	Age       string
-	Images    string
+	Name         string
+	Port         string
+	TargetPort   string
+	Namespace    string
+	CreationTime string
 
 	// Label used to get the service
 	Label string
@@ -129,13 +127,20 @@ func (o *listOptions) run() error {
 		return err
 	}
 
-	// output table
-	tbl := uitable.New()
-	tbl.AddRow("NAME", "NAMESPACE", "PORT", "IMAGES", "AGE")
+	return printTable(o.Out)
+}
+
+func printTable(out io.Writer) error {
+	tbl := printer.NewTablePrinter(out)
+	tbl.SetHeader("NAME", "NAMESPACE", "PORT", "CREATED-TIME")
 	for _, d := range dashboards {
-		tbl.AddRow(d.Name, d.Namespace, d.Port, d.Images, d.Age)
+		if d.Namespace == "" {
+			continue
+		}
+		tbl.AddRow(d.Name, d.Namespace, d.TargetPort, d.CreationTime)
 	}
-	return util.PrintTable(o.Out, tbl)
+	tbl.Print()
+	return nil
 }
 
 type openOptions struct {
@@ -200,14 +205,14 @@ func (o *openOptions) complete(cmd *cobra.Command, args []string) error {
 
 	dash := getDashboardByName(o.name)
 	if dash == nil {
-		return fmt.Errorf("failed to find dashboard \"%s\", run \"dbctl dashboard list\" to list all dashboards", o.name)
+		return fmt.Errorf("failed to find dashboard \"%s\", run \"kbcli dashboard list\" to list all dashboards", o.name)
 	}
 
 	if o.localPort == "" {
-		o.localPort = dash.Port
+		o.localPort = dash.TargetPort
 	}
 
-	pfArgs := []string{fmt.Sprintf("deployment/%s", o.name), fmt.Sprintf("%s:%s", o.localPort, dash.Port)}
+	pfArgs := []string{fmt.Sprintf("svc/%s", o.name), fmt.Sprintf("%s:%s", o.localPort, dash.Port)}
 	o.portForwardOptions.Namespace = dash.Namespace
 	o.portForwardOptions.Address = []string{"127.0.0.1"}
 	return o.portForwardOptions.Complete(newFactory(dash.Namespace), cmd, pfArgs)
@@ -233,60 +238,44 @@ func getDashboardByName(name string) *dashboard {
 			return dashboards[i]
 		}
 	}
-
 	return nil
 }
 
 func getDashboardInfo(client *kubernetes.Clientset) error {
-	getDeploys := func(client *kubernetes.Clientset, label string) (*appv1.DeploymentList, error) {
-		return client.AppsV1().Deployments(metav1.NamespaceAll).
-			List(context.TODO(), metav1.ListOptions{
-				LabelSelector: label,
-			})
+	getSvcs := func(client *kubernetes.Clientset, label string) (*corev1.ServiceList, error) {
+		return client.CoreV1().Services(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: label,
+		})
 	}
 
 	for _, d := range dashboards {
-		var dep *appv1.Deployment
+		var svc *corev1.Service
 
-		// get all deployments that match the label
-		deps, err := getDeploys(client, d.Label)
+		// get all services that match the label
+		svcs, err := getSvcs(client, d.Label)
 		if err != nil {
 			return err
 		}
 
 		// find the dashboard service
-		for i, s := range deps.Items {
+		for i, s := range svcs.Items {
 			if s.Name == d.Name {
-				dep = &deps.Items[i]
+				svc = &svcs.Items[i]
+				break
 			}
 		}
 
-		if dep == nil {
+		if svc == nil {
 			continue
 		}
 
 		// fill dashboard information
-		d.Namespace = dep.Namespace
-		d.Age = duration.HumanDuration(time.Since(dep.CreationTimestamp.Time))
-
-		// get ports and images
-		var (
-			images []string
-			ports  []string
-		)
-		for _, c := range dep.Spec.Template.Spec.Containers {
-			images = append(images, c.Image)
-			if len(c.Ports) == 0 {
-				continue
-			}
-			ports = append(ports, strconv.FormatInt(int64(c.Ports[0].ContainerPort), 10))
+		d.Namespace = svc.Namespace
+		d.CreationTime = util.TimeFormat(&svc.CreationTimestamp)
+		if len(svc.Spec.Ports) > 0 {
+			d.Port = fmt.Sprintf("%d", svc.Spec.Ports[0].Port)
+			d.TargetPort = svc.Spec.Ports[0].TargetPort.String()
 		}
-
-		// now, we only display and use the first port
-		if len(ports) > 0 {
-			d.Port = ports[0]
-		}
-		d.Images = strings.Join(images, ",")
 	}
 	return nil
 }

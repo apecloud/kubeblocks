@@ -53,7 +53,7 @@ var _ = Describe("playground", func() {
 		Expect(cmd != nil).Should(BeTrue())
 
 		o := &initOptions{
-			clusterDef:    defaultClusterDef,
+			clusterDef:    "test-cd",
 			CloudProvider: defaultCloudProvider,
 			IOStreams:     streams,
 		}

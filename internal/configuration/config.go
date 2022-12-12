@@ -63,30 +63,6 @@ func init() {
 		return &meta, nil
 	}
 
-	//// For local
-	// loaderProvider[CfgLocalType] = func(option CfgOption) (*cfgWrapper, error) {
-	//	if _, err := os.Stat(option.Path); err != nil {
-	//		return nil, MakeError("configuration file path[%s] not exist", option.Path)
-	//	}
-	//
-	//	meta := cfgWrapper{
-	//		name:      path.Base(option.Path),
-	//		fileCount: 1,
-	//		v:         make([]*viper.Viper, 0, 1),
-	//		indexer:   make(map[string]*viper.Viper, 1),
-	//	}
-	//
-	//	v := viper.NewWithOptions(viper.KeyDelimiter(cfgKeyDelimiter))
-	//	v.SetConfigType(string(option.CfgType))
-	//	v.SetConfigFile(option.Path)
-	//	if err := v.ReadInConfig(); err != nil {
-	//		return nil, WrapError(err, "failed to load config: [%s]", option.Path)
-	//	}
-	//	meta.v[0] = v
-	//	meta.indexer[meta.name] = v
-	//	return &meta, nil
-	// }
-
 	// For CM/TPL
 	loaderProvider[CfgCmType] = func(option CfgOption) (*cfgWrapper, error) {
 		if option.K8sKey == nil {
@@ -121,7 +97,6 @@ func init() {
 			meta.v[index] = v
 			index++
 		}
-
 		return &meta, nil
 	}
 

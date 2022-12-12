@@ -25,7 +25,7 @@ content: {
 				}
 			}
 			secret: {
-				name:        options.clusterName
+				name:        options.clusterName + "-conn-credential"
 				keyUser:     "username"
 				keyPassword: "password"
 			}

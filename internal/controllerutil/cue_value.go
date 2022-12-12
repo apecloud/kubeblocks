@@ -17,6 +17,7 @@ limitations under the License.
 package controllerutil
 
 import (
+	"encoding/json"
 	"os"
 
 	"cuelang.org/go/cue"
@@ -59,6 +60,17 @@ func NewCUEBuilder(cueTpl CUETpl) CUEBuilder {
 		cueTplValue: cueTpl,
 		Value:       cueTpl.Value,
 	}
+}
+
+func (v *CUEBuilder) FillObj(path string, obj any) error {
+	byte, err := json.Marshal(obj)
+	if err != nil {
+		return err
+	}
+	if err = v.Fill(path, byte); err != nil {
+		return err
+	}
+	return err
 }
 
 func (v *CUEBuilder) Fill(path string, jsonByte []byte) error {

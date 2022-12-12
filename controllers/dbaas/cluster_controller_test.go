@@ -711,11 +711,11 @@ data:
   my.cnf: |-
     [mysqld]
     # aliyun buffer pool: https://help.aliyun.com/document_detail/162326.html?utm_content=g_1000230851&spm=5176.20966629.toubu.3.f2991ddcpxxvD1#title-rey-j7j-4dt
-
-    {{- $log_root := getVolumePathByName ( index .PodSpec.Containers 0 ) "log" }}
-    {{- $data_root := getVolumePathByName ( index .PodSpec.Containers 0 ) "data" }}
-    {{- $mysql_port_info := getPortByName ( index .PodSpec.Containers 0 ) "mysql" }}
-    {{- $pool_buffer_size := ( callBufferSizeByResource ( index .PodSpec.Containers 0 ) ) }}
+    
+    {{- $log_root := getVolumePathByName ( index $.podSpec.containers 0 ) "log" }}
+    {{- $data_root := getVolumePathByName ( index $.podSpec.containers 0 ) "data" }}
+    {{- $mysql_port_info := getPortByName ( index $.podSpec.containers 0 ) "mysql" }}
+    {{- $pool_buffer_size := ( callBufferSizeByResource ( index $.podSpec.containers 0 ) ) }}
 
 
     {{- if $pool_buffer_size }}
@@ -724,9 +724,6 @@ data:
 
     # require port
     {{- $mysql_port := 3306 }}
-    {{- if $mysql_port_info }}
-    {{- $mysql_port = $mysql_port_info.ContainerPort }}
-    {{- end }}
 
     log-bin=master-bin
     gtid_mode=OFF

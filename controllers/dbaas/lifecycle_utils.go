@@ -1884,39 +1884,12 @@ func createPVCFromSnapshot(ctx context.Context,
 func buildPVCFromSnapshot(sts *appsv1.StatefulSet,
 	pvcKey types.NamespacedName,
 	snapshotName string) (*corev1.PersistentVolumeClaim, error) {
-	cueFS, _ := debme.FS(cueTemplates, "cue")
 
-	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("pvc_template.cue"))
-	if err != nil {
-		return nil, err
-	}
-
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-
-	stsStrByte, err := json.Marshal(sts)
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("sts", stsStrByte); err != nil {
-		return nil, err
-	}
-
-	pvcKeyStrByte, err := json.Marshal(pvcKey)
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("pvc_key", pvcKeyStrByte); err != nil {
-		return nil, err
-	}
-
-	if err := cueValue.FillRaw("snapshot_name", snapshotName); err != nil {
-		return nil, err
-	}
-
-	pvcStrByte, err := cueValue.Lookup("pvc")
-	if err != nil {
-		return nil, err
-	}
+	pvcStrByte, err := buildFromCue("pvc_template.cue", map[string]any{
+		"sts":           sts,
+		"pvc_key":       pvcKey,
+		"snapshot_name": snapshotName,
+	}, "pvc")
 
 	pvc := corev1.PersistentVolumeClaim{}
 	if err = json.Unmarshal(pvcStrByte, &pvc); err != nil {
@@ -2316,4 +2289,24 @@ func isPVCExists(cli client.Client,
 		}
 	}
 	return true, nil
+}
+
+func buildFromCue(tplName string, fillMap map[string]any, lookupKey string) ([]byte, error) {
+	cueFS, _ := debme.FS(cueTemplates, "cue")
+	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplName))
+	if err != nil {
+		return nil, err
+	}
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+
+	for k, v := range fillMap {
+		cueValue.FillObj(k, v)
+	}
+
+	b, err := cueValue.Lookup(lookupKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return b, nil
 }

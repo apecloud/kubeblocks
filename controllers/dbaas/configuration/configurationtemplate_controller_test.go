@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
 var _ = Describe("ConfigurationTemplate Controller", func() {
@@ -42,7 +43,7 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 	})
 
 	validateFinalizerFlag := func(crObj client.Object) bool {
-		return controllerutil.ContainsFinalizer(crObj, ConfigurationTemplateFinalizerName)
+		return controllerutil.ContainsFinalizer(crObj, cfgcore.ConfigurationTemplateFinalizerName)
 	}
 
 	Context("Create config tpl with cue validate", func() {

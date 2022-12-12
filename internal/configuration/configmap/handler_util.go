@@ -28,13 +28,6 @@ import (
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
-const (
-	ConfigSidecarIMAGE = "KUBEBLOCKS_IMAGE"
-	ConfigSidecarName  = "config-manager-sidecar"
-	CRIRuntimeEndpoint = "CONTAINER_RUNTIME_ENDPOINT"
-	ConfigCRIType      = "CRI_TYPE"
-)
-
 type ConfigManagerSidecar struct {
 	ManagerName string          `json:"name"`
 	Image       string          `json:"sidecarImage"`

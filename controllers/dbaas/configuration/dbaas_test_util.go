@@ -199,7 +199,7 @@ func (w *TestWrapper) DeleteAllCR() error {
 		client.InNamespace(ISVClusterScope),
 		client.HasLabels{
 			testCtx.TestObjLabelKey,
-			CMConfigurationTplNameLabelKey,
+			cfgcore.CMConfigurationTplNameLabelKey,
 		}); err != nil {
 		return err
 	}
@@ -265,9 +265,9 @@ func (w *TestWrapper) CreateCfgOnCluster(cfgFile string, cluster *dbaasv1alpha1.
 		cm.Labels[intctrlutil.AppNameLabelKey] = cluster.Name
 		cm.Labels[intctrlutil.AppInstanceLabelKey] = cluster.Name
 		cm.Labels[intctrlutil.AppComponentLabelKey] = componentName
-		cm.Labels[CMConfigurationTplNameLabelKey] = w.testEnv.CfgTplName
-		cm.Labels[CMConfigurationConstraintsNameLabelKey] = w.testEnv.CfgTplName
-		cm.Labels[CMInsConfigurationLabelKey] = "true"
+		cm.Labels[cfgcore.CMConfigurationTplNameLabelKey] = w.testEnv.CfgTplName
+		cm.Labels[cfgcore.CMConfigurationConstraintsNameLabelKey] = w.testEnv.CfgTplName
+		cm.Labels[cfgcore.CMInsConfigurationLabelKey] = "true"
 	})
 	if err != nil {
 		return nil, err

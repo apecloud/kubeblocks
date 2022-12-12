@@ -1324,8 +1324,8 @@ func updateConfigurationManagerWithComponent(params createParams, podSpec *corev
 
 		defaultVarRunVolumePath = "/var/run"
 		criEndpointVolumeName   = "cri-runtime-endpoint"
-		criRuntimeEndpoint      = viper.GetString(cfgcm.CRIRuntimeEndpoint)
-		criType                 = viper.GetString(cfgcm.ConfigCRIType)
+		criRuntimeEndpoint      = viper.GetString(cfgcore.CRIRuntimeEndpoint)
+		criType                 = viper.GetString(cfgcore.ConfigCRIType)
 	)
 
 	if component.Config == nil || component.Config.ReconfigureOption == nil {
@@ -1383,8 +1383,8 @@ func updateConfigurationManagerWithComponent(params createParams, podSpec *corev
 		mountPath = criRuntimeEndpoint
 	}
 	managerSidecar := &cfgcm.ConfigManagerSidecar{
-		ManagerName: cfgcm.ConfigSidecarName,
-		Image:       viper.GetString(cfgcm.ConfigSidecarIMAGE),
+		ManagerName: cfgcore.ConfigSidecarName,
+		Image:       viper.GetString(cfgcore.ConfigSidecarIMAGE),
 		Args:        configManagerArgs,
 		// add cri sock path
 		Volumes: append(volumeDirs, corev1.VolumeMount{

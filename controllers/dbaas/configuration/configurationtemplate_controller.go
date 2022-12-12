@@ -68,7 +68,7 @@ func (r *ConfigurationTemplateReconciler) Reconcile(ctx context.Context, req ctr
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, configTpl, ConfigurationTemplateFinalizerName, func() (*ctrl.Result, error) {
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, configTpl, cfgcore.ConfigurationTemplateFinalizerName, func() (*ctrl.Result, error) {
 		recordEvent := func() {
 			r.Recorder.Event(configTpl, corev1.EventTypeWarning, "ExistsReferencedResources",
 				"cannot be deleted because of existing referencing ClusterDefinition or AppVersion.")
@@ -123,7 +123,7 @@ func (r *ConfigurationTemplateReconciler) deleteExternalResources(reqCtx intctrl
 
 	// delete any external resources associated with the configuration template
 	labels := client.MatchingLabels{
-		CMConfigurationTplNameLabelKey: configTpl.GetName(),
+		cfgcore.CMConfigurationTplNameLabelKey: configTpl.GetName(),
 	}
 	ns := client.InNamespace(configTpl.Namespace)
 
@@ -134,11 +134,11 @@ func (r *ConfigurationTemplateReconciler) deleteExternalResources(reqCtx intctrl
 	}
 
 	for _, cm := range cmList.Items {
-		if !controllerutil.ContainsFinalizer(&cm, ConfigurationTemplateFinalizerName) {
+		if !controllerutil.ContainsFinalizer(&cm, cfgcore.ConfigurationTemplateFinalizerName) {
 			continue
 		}
 		patch := client.MergeFrom(cm.DeepCopy())
-		controllerutil.RemoveFinalizer(&cm, ConfigurationTemplateFinalizerName)
+		controllerutil.RemoveFinalizer(&cm, cfgcore.ConfigurationTemplateFinalizerName)
 		if err := r.Patch(reqCtx.Ctx, &cm, patch); err != nil {
 			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 			return &res, err

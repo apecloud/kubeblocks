@@ -34,19 +34,6 @@ import (
 const (
 	ConfigReconcileInterval = time.Second * 5
 
-	ConfigurationTemplateFinalizerName = "configuration.kubeblocks.io/finalizer"
-
-	// CMConfigurationTplLabelKey  configmap is config template
-	CMConfigurationTplLabelKey             = "configuration.kubeblocks.io/configuration-template"
-	CMConfigurationTplNameLabelKey         = "app.kubernetes.io/configurationtpl-name"
-	CMConfigurationConstraintsNameLabelKey = "app.kubernetes.io/configuration-constraints-name"
-	CMInsConfigurationHashLabelKey         = "configuration.kubeblocks.io/configuration-hash"
-
-	// CMInsConfigurationLabelKey configmap is configuration file for component
-	CMInsConfigurationLabelKey = "app.kubernetes.io/ins-configure"
-
-	CMInsLastReconfigureMethodLabelKey = "configuration.kubeblocks.io/last-applied-reconfigure-policy"
-
 	ReconfigureFirstConfigType = "created"
 	ReconfigureNoChangeType    = "noChange"
 	ReconfigureAutoReloadType  = string(dbaasv1alpha1.AutoReload)
@@ -70,7 +57,7 @@ func CheckConfigurationLabels(object client.Object, requiredLabs []string) bool 
 		}
 	}
 
-	if _, ok := labels[CMInsConfigurationLabelKey]; !ok {
+	if _, ok := labels[cfgcore.CMInsConfigurationLabelKey]; !ok {
 		return false
 	}
 
@@ -143,7 +130,7 @@ func updateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl
 		ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", cmObj.Name)
 	}
 
-	if controllerutil.ContainsFinalizer(cmObj, ConfigurationTemplateFinalizerName) {
+	if controllerutil.ContainsFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName) {
 		return nil
 	}
 
@@ -152,8 +139,8 @@ func updateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl
 	if cmObj.ObjectMeta.Labels == nil {
 		cmObj.ObjectMeta.Labels = map[string]string{}
 	}
-	cmObj.ObjectMeta.Labels[CMConfigurationTplLabelKey] = "true"
-	controllerutil.AddFinalizer(cmObj, ConfigurationTemplateFinalizerName)
+	cmObj.ObjectMeta.Labels[cfgcore.CMConfigurationTplLabelKey] = "true"
+	controllerutil.AddFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName)
 
 	// cmObj.Immutable = &tpl.Spec.Immutable
 	return cli.Patch(ctx.Ctx, cmObj, patch)
@@ -307,7 +294,7 @@ func ValidateConfTplStatus(configStatus dbaasv1alpha1.ConfigurationTemplateStatu
 }
 
 func GetComponentByUsingCM(stsList *appv1.StatefulSetList, cfg client.ObjectKey) ([]appv1.StatefulSet, []string) {
-	managerContainerName := cfgcm.ConfigSidecarName
+	managerContainerName := cfgcore.ConfigSidecarName
 	stsLen := len(stsList.Items)
 	if stsLen == 0 {
 		return nil, nil

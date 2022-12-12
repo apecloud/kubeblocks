@@ -26,18 +26,6 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
-const (
-	// ConfigurationTplLabelPrefixKey appVersion or clusterdefinition using tpl
-	ConfigurationTplLabelPrefixKey = "configuration.kubeblocks.io/tpl"
-
-	LastAppliedConfigAnnotation          = "configuration.kubeblocks.io/last-applied-configuration"
-	UpgradeInsConfigurationAnnotationKey = "configuration.kubeblocks.io/rolling-upgrade"
-	UpgradePolicyAnnotationKey           = "configuration.kubeblocks.io/reconfigure-policy"
-	UpgradeRestartAnnotationKey          = "configuration.kubeblocks.io/restart"
-
-	ConfigManagerGPRCPortEnv = "CONFIG_MANAGER_GRPC_PORT"
-)
-
 type ConfigType string
 
 const (

@@ -51,8 +51,8 @@ var ConfigurationRequiredLabels = []string{
 	intctrlutil.AppNameLabelKey,
 	intctrlutil.AppInstanceLabelKey,
 	intctrlutil.AppComponentLabelKey,
-	CMConfigurationTplNameLabelKey,
-	CMInsConfigurationLabelKey,
+	cfgcore.CMConfigurationTplNameLabelKey,
+	cfgcore.CMInsConfigurationLabelKey,
 }
 
 //+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=reconfigurerequests,verbs=get;list;watch;create;update;patch;delete
@@ -85,7 +85,7 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return intctrlutil.Reconciled()
 	}
 
-	if hash, ok := config.Labels[CMInsConfigurationHashLabelKey]; ok && hash == config.ResourceVersion {
+	if hash, ok := config.Labels[cfgcore.CMInsConfigurationHashLabelKey]; ok && hash == config.ResourceVersion {
 		return intctrlutil.Reconciled()
 	}
 
@@ -96,7 +96,7 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return intctrlutil.Reconciled()
 	}
 
-	if cfgConstraintsName, ok := config.Labels[CMConfigurationConstraintsNameLabelKey]; !ok || len(cfgConstraintsName) == 0 {
+	if cfgConstraintsName, ok := config.Labels[cfgcore.CMConfigurationConstraintsNameLabelKey]; !ok || len(cfgConstraintsName) == 0 {
 		reqCtx.Log.Info("configuration not set ConfigConstraints, not support reconfigure.", "config cm", client.ObjectKeyFromObject(config))
 		return intctrlutil.Reconciled()
 	}
@@ -104,7 +104,7 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 	tpl := &dbaasv1alpha1.ConfigurationTemplate{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: config.Namespace,
-		Name:      config.Labels[CMConfigurationConstraintsNameLabelKey],
+		Name:      config.Labels[cfgcore.CMConfigurationConstraintsNameLabelKey],
 	}, tpl); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
@@ -136,7 +136,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 			Name:      config.Labels[intctrlutil.AppInstanceLabelKey],
 		}
 
-		configTplName     = config.Labels[CMConfigurationTplNameLabelKey]
+		configTplName     = config.Labels[cfgcore.CMConfigurationTplNameLabelKey]
 		configTplLabelKey = cfgcore.GenerateUniqLabelKeyWithConfig(configTplName)
 	)
 

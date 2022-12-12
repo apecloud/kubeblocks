@@ -89,8 +89,8 @@ func UpdateAppliedConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, c
 	if err != nil {
 		return false, err
 	}
-	config.ObjectMeta.Labels[CMInsConfigurationHashLabelKey] = hash
-	config.ObjectMeta.Labels[CMInsLastReconfigureMethodLabelKey] = reconfigureType
+	config.ObjectMeta.Labels[cfgcore.CMInsConfigurationHashLabelKey] = hash
+	config.ObjectMeta.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey] = reconfigureType
 
 	// delete reconfigure-policy
 	delete(config.ObjectMeta.Annotations, cfgcore.UpgradePolicyAnnotationKey)

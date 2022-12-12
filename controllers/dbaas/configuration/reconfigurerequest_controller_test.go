@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -89,11 +90,11 @@ var _ = Describe("Reconfigure Controller", func() {
 				ok, _ := ValidateCR(testWrapper, &corev1.ConfigMap{},
 					testWrapper.WithCRName(insCfgCMName),
 					func(cm *corev1.ConfigMap) bool {
-						configHash = cm.Labels[CMInsConfigurationHashLabelKey]
+						configHash = cm.Labels[cfgcore.CMInsConfigurationHashLabelKey]
 						return cm.Labels[intctrlutil.AppInstanceLabelKey] == clusterName &&
-							cm.Labels[CMConfigurationTplNameLabelKey] == testWrapper.testEnv.CfgTplName &&
-							cm.Labels[CMInsConfigurationLabelKey] != "" &&
-							cm.Labels[CMInsLastReconfigureMethodLabelKey] == ReconfigureFirstConfigType &&
+							cm.Labels[cfgcore.CMConfigurationTplNameLabelKey] == testWrapper.testEnv.CfgTplName &&
+							cm.Labels[cfgcore.CMInsConfigurationLabelKey] != "" &&
+							cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey] == ReconfigureFirstConfigType &&
 							configHash != ""
 					})
 				return ok
@@ -117,14 +118,14 @@ var _ = Describe("Reconfigure Controller", func() {
 				ok, _ := ValidateCR(testWrapper, &corev1.ConfigMap{},
 					testWrapper.WithCRName(insCfgCMName),
 					func(cm *corev1.ConfigMap) bool {
-						newHash := cm.Labels[CMInsConfigurationHashLabelKey]
+						newHash := cm.Labels[cfgcore.CMInsConfigurationHashLabelKey]
 						fmt.Println("------------------------------------------")
 						fmt.Printf("old config hash: %s\n", configHash)
 						fmt.Printf("new config hash: %s\n", newHash)
-						fmt.Printf("last reconfigure: %s : %s\n", cm.Labels[CMInsLastReconfigureMethodLabelKey], ReconfigureAutoReloadType)
+						fmt.Printf("last reconfigure: %s : %s\n", cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey], ReconfigureAutoReloadType)
 						fmt.Println("------------------------------------------")
 						return newHash != configHash &&
-							cm.Labels[CMInsLastReconfigureMethodLabelKey] == ReconfigureAutoReloadType
+							cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey] == ReconfigureAutoReloadType
 					})
 				return ok
 			}, time.Second*30, time.Second*1).Should(BeTrue())
@@ -144,11 +145,11 @@ var _ = Describe("Reconfigure Controller", func() {
 				ok, _ := ValidateCR(testWrapper, &corev1.ConfigMap{},
 					testWrapper.WithCRName(insCfgCMName),
 					func(cm *corev1.ConfigMap) bool {
-						newHash := cm.Labels[CMInsConfigurationHashLabelKey]
+						newHash := cm.Labels[cfgcore.CMInsConfigurationHashLabelKey]
 						fmt.Println("------------------------------------------")
 						fmt.Printf("new config hash: %s\n", newHash)
 						fmt.Println("------------------------------------------")
-						return cm.Labels[CMInsLastReconfigureMethodLabelKey] == ReconfigureNoChangeType
+						return cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey] == ReconfigureNoChangeType
 					})
 				return ok
 			}, time.Second*30, time.Second*1).Should(BeTrue())
@@ -168,11 +169,11 @@ var _ = Describe("Reconfigure Controller", func() {
 				ok, _ := ValidateCR(testWrapper, &corev1.ConfigMap{},
 					testWrapper.WithCRName(insCfgCMName),
 					func(cm *corev1.ConfigMap) bool {
-						newHash := cm.Labels[CMInsConfigurationHashLabelKey]
+						newHash := cm.Labels[cfgcore.CMInsConfigurationHashLabelKey]
 						fmt.Println("------------------------------------------")
 						fmt.Printf("new config hash: %s\n", newHash)
 						fmt.Println("------------------------------------------")
-						return cm.Labels[CMInsLastReconfigureMethodLabelKey] == ReconfigureSimpleType
+						return cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey] == ReconfigureSimpleType
 					})
 				return ok
 			}, time.Second*70, time.Second*1).Should(BeTrue())

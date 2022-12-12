@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	dbaascfg "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
@@ -308,7 +307,7 @@ spec:
 				if err != nil {
 					return false
 				}
-				return controllerutil.ContainsFinalizer(cmObj, dbaascfg.ConfigurationTemplateFinalizerName)
+				return controllerutil.ContainsFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName)
 			}, time.Second*10, time.Second*1).Should(BeTrue())
 
 			logrus.Info("check clusterdefinition labels: configuration.GenerateUniqLabelKeyWithConfig(testWrapper.TplName()")

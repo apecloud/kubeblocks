@@ -33,15 +33,15 @@ config: {
 			"app.kubernetes.io/created-by":     "controller-manager"
 
 			// configmap selector for ConfigureController
-			"app.kubernetes.io/ins-configure": "true"
+			"configuration.kubeblocks.io/ins-configure": "true"
 			"app.kubernetes.io/managed-by":    "kubeblocks"
 			// config template name
-			"app.kubernetes.io/configurationtpl-name": "\(meta.component.templateName)"
-			"app.kubernetes.io/configuration-constraints-name": "\(meta.component.configConstraintsName)"
+			"configuration.kubeblocks.io/configurationtpl-name": "\(meta.component.templateName)"
+			"configuration.kubeblocks.io/configuration-constraints-name": "\(meta.component.configConstraintsName)"
 		}
 		annotations: {
 			// enable configmap upgrade
-			"app.kubernetes.io/rolling-upgrade": "true"
+			"configuration.kubeblocks.io/rolling-upgrade": "true"
 		}
 
 		data: {

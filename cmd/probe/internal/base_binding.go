@@ -53,10 +53,19 @@ type ProbeBase struct {
 	dbPort                  int
 }
 
+// ProbeOperation abstracts the interfaces a binding implementation needs to support.
+// these interfaces together providing probing service: runningCheck, statusCheck, roleCheck
 type ProbeOperation interface {
+	// InitIfNeed binding initiates
 	InitIfNeed() error
+	// GetRunningPort get binding service port.
+	// runningCheck will run its check on this port
 	GetRunningPort() int
+	// StatusCheck checks the status of the binding service
+	// TODO proposal TBD
 	StatusCheck(context.Context, string, *bindings.InvokeResponse) ([]byte, error)
+	// GetRole get consensus role name of the binding service
+	// roleCheck will call this interface when necessary
 	GetRole(context.Context, string) (string, error)
 }
 

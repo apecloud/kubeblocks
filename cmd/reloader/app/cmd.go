@@ -68,11 +68,11 @@ func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 	defer watcher.Close()
 	err := watcher.AddHandler(createHandlerWithWatchType(opt)).Run()
 	if err != nil {
-		return err
+		logrus.Fatal(err)
 	}
 
 	if err := startGRPCService(opt.ServiceOpt, ctx); err != nil {
-		return err
+		logrus.Fatal(err)
 	}
 
 	// testGRPCService(opt.ServiceOpt)

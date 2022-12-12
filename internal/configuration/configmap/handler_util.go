@@ -97,13 +97,13 @@ func buildSignalArgs(configuration dbaasv1alpha1.ConfigReloadTrigger, volumeDirs
 	args := make([]string, 0)
 	args = append(args, "--process", configuration.ProcessName)
 	if criType != "" {
-		args = append(args, "--cri-type", criType)
+		args = append(args, "--container-runtime", criType)
 	}
 	if runtimeEndpoint != "" {
 		args = append(args, "--runtime-endpoint", runtimeEndpoint)
 	}
 	// set grpc port
-	args = append(args, "--port", viper.GetString(cfgutil.ConfigManagerGPRCPortEnv))
+	args = append(args, "--tcp", viper.GetString(cfgutil.ConfigManagerGPRCPortEnv))
 	for _, volume := range volumeDirs {
 		args = append(args, "--volume-dir", volume.MountPath)
 	}

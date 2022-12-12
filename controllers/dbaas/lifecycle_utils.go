@@ -26,6 +26,7 @@ import (
 
 	"github.com/leaanthony/debme"
 	"github.com/sethvargo/go-password/password"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -1322,7 +1323,7 @@ func updateConfigurationManagerWithComponent(params createParams, podSpec *corev
 		usingContainers []*corev1.Container
 
 		defaultVarRunVolumePath = "/var/run"
-		criEndpointVolumeName   = "cri_runtime_endpoint"
+		criEndpointVolumeName   = "cri-runtime-endpoint"
 		criRuntimeEndpoint      = viper.GetString(cfgcm.CRIRuntimeEndpoint)
 		criType                 = viper.GetString(cfgcm.ConfigCRIType)
 	)
@@ -1348,6 +1349,7 @@ func updateConfigurationManagerWithComponent(params createParams, podSpec *corev
 
 	// not container using any config template
 	if len(usingContainers) == 0 {
+		logrus.Warnf("tpl config is not used by any container, and pass. tpl configs: %v", cfgTemplates)
 		return nil
 	}
 
@@ -1365,6 +1367,7 @@ func updateConfigurationManagerWithComponent(params createParams, podSpec *corev
 
 	// If you do not need to watch any configmap volume
 	if len(volumeDirs) == 0 {
+		logrus.Warnf("volume for configmap is not used by any container, and pass. cm name: %v", cfgTemplates[firstCfg])
 		return nil
 	}
 
@@ -1375,7 +1378,7 @@ func updateConfigurationManagerWithComponent(params createParams, podSpec *corev
 		criRuntimeEndpoint)
 
 	mountPath := defaultVarRunVolumePath
-	if criRuntimeEndpoint != "" || criType == "" || criType == "auto" {
+	if criRuntimeEndpoint != "" && criType != "" && criType != "auto" {
 		mountPath = criRuntimeEndpoint
 	}
 	managerSidecar := &cfgcm.ConfigManagerSidecar{

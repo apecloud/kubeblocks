@@ -43,7 +43,7 @@ func (r *reconfigureProxy) Init() error {
 	}
 
 	if err := killer.Init(r.ctx); err != nil {
-		return cfgcore.WrapError(err, "failed to check killer status")
+		return cfgcore.WrapError(err, "failed to init killer")
 	}
 
 	r.killer = killer

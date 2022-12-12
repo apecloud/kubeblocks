@@ -23,7 +23,7 @@ import (
 
 // for test type
 type Friend struct {
-	Fname string
+	Name string
 }
 
 var _ = Describe("tpl engine template", func() {
@@ -38,8 +38,8 @@ var _ = Describe("tpl engine template", func() {
 
 	Context("TPL emplate render without built-in object", func() {
 		It("Should success with no error", func() {
-			f1 := Friend{Fname: "test1"}
-			f2 := Friend{Fname: "test2"}
+			f1 := Friend{Name: "test1"}
+			f2 := Friend{Name: "test2"}
 			pp := TplValues{
 				"UserName":   "user@@test",
 				"Emails":     []string{"test1@gmail.com", "test2@gmail.com"},
@@ -54,7 +54,7 @@ an email {{ . }}
 {{- end }}
 {{ with .Friends }}
 {{- range . }}
-my friend name is {{.Fname}}
+my friend name is {{.Name}}
 {{- end }}
 {{ end }}`
 

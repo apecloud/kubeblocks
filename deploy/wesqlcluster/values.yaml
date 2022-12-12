@@ -54,3 +54,8 @@ enabledLogs:
 
 topologyKeys:
   - kubernetes.io/hostname
+
+## @param tolerations Tolerations for ClickHouse pods assignment
+## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+##
+tolerations: []

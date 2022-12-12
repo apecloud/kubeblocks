@@ -20,12 +20,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
+	"time"
+
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"net"
-	"time"
 )
 
 const (
@@ -35,21 +36,21 @@ const (
 
 	// CommandSQLKey keys from request's metadata.
 	CommandSQLKey = "sql"
-)
 
-var (
-	oriRole                 = ""
-	runningCheckFailedCount = 0
-	roleCheckFailedCount    = 0
-	roleCheckCount          = 0
-	eventAggregationNum     = 10
-	eventIntervalNum        = 60
-	dbPort                  = 3306
+	defaultEventAggregationNum = 10
+	defaultEventIntervalNum    = 60
 )
 
 type ProbeBase struct {
-	Operation ProbeOperation
-	Logger    logger.Logger
+	Operation               ProbeOperation
+	Logger                  logger.Logger
+	oriRole                 string
+	runningCheckFailedCount int
+	roleCheckFailedCount    int
+	roleCheckCount          int
+	eventAggregationNum     int
+	eventIntervalNum        int
+	dbPort                  int
 }
 
 type ProbeOperation interface {
@@ -60,13 +61,18 @@ type ProbeOperation interface {
 }
 
 func (p *ProbeBase) Init() error {
+	p.eventAggregationNum = defaultEventAggregationNum
 	if viper.IsSet("KB_AGGREGATION_NUMBER") {
-		eventAggregationNum = viper.GetInt("KB_AGGREGATION_NUMBER")
+		p.eventAggregationNum = viper.GetInt("KB_AGGREGATION_NUMBER")
+	}
+	p.eventIntervalNum = defaultEventIntervalNum
+	if viper.IsSet("KB_EVENT_INTERNAL_NUMBER") {
+		p.eventIntervalNum = viper.GetInt("KB_EVENT_INTERNAL_NUMBER")
 	}
 
-	dbPort = p.Operation.GetRunningPort()
+	p.dbPort = p.Operation.GetRunningPort()
 	if viper.IsSet("KB_SERVICE_PORT") {
-		dbPort = viper.GetInt("KB_SERVICE_PORT")
+		p.dbPort = viper.GetInt("KB_SERVICE_PORT")
 	}
 
 	return nil
@@ -153,14 +159,14 @@ func (p *ProbeBase) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*b
 
 func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindings.InvokeResponse) ([]byte, error) {
 	result := &ProbeMessage{}
-	result.OriginalRole = oriRole
+	result.OriginalRole = p.oriRole
 	role, err := p.Operation.GetRole(ctx, cmd)
 	if err != nil {
 		p.Logger.Infof("error executing roleCheck: %v", err)
 		result.Event = "roleCheckFailed"
 		result.Message = err.Error()
-		if roleCheckFailedCount++; roleCheckFailedCount%eventAggregationNum == 1 {
-			p.Logger.Infof("role checks failed %v times continuously", roleCheckFailedCount)
+		if p.roleCheckFailedCount++; p.roleCheckFailedCount%p.eventAggregationNum == 1 {
+			p.Logger.Infof("role checks failed %v times continuously", p.roleCheckFailedCount)
 			response.Metadata[StatusCode] = CheckFailedHTTPCode
 		}
 		msg, _ := json.Marshal(result)
@@ -168,17 +174,17 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 	}
 
 	result.Role = role
-	if oriRole != role {
+	if p.oriRole != role {
 		result.Event = "roleChanged"
-		oriRole = role
-		roleCheckCount = 0
+		p.oriRole = role
+		p.roleCheckCount = 0
 	} else {
 		result.Event = "roleUnchanged"
 	}
 
 	// reporting role event periodically to get pod's role label updating accurately
 	// in case of event losing.
-	if roleCheckCount++; roleCheckCount%eventIntervalNum == 1 {
+	if p.roleCheckCount++; p.roleCheckCount%p.eventIntervalNum == 1 {
 		response.Metadata[StatusCode] = CheckFailedHTTPCode
 	}
 	msg, _ := json.Marshal(result)
@@ -187,7 +193,7 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 }
 
 func (p *ProbeBase) runningCheck(ctx context.Context, resp *bindings.InvokeResponse) ([]byte, error) {
-	host := fmt.Sprintf("127.0.0.1:%d", dbPort)
+	host := fmt.Sprintf("127.0.0.1:%d", p.dbPort)
 	conn, err := net.DialTimeout("tcp", host, 900*time.Millisecond)
 	message := ""
 	result := ProbeMessage{}
@@ -195,12 +201,12 @@ func (p *ProbeBase) runningCheck(ctx context.Context, resp *bindings.InvokeRespo
 		message = fmt.Sprintf("running check %s error: %v", host, err)
 		result.Event = "runningCheckFailed"
 		p.Logger.Errorf(message)
-		if runningCheckFailedCount++; runningCheckFailedCount%eventAggregationNum == 1 {
-			p.Logger.Infof("running checks failed %v times continuously", runningCheckFailedCount)
+		if p.runningCheckFailedCount++; p.runningCheckFailedCount%p.eventAggregationNum == 1 {
+			p.Logger.Infof("running checks failed %v times continuously", p.runningCheckFailedCount)
 			resp.Metadata[StatusCode] = CheckFailedHTTPCode
 		}
 	} else {
-		runningCheckFailedCount = 0
+		p.runningCheckFailedCount = 0
 		message = "TCP Connection Established Successfully!"
 		if tcpCon, ok := conn.(*net.TCPConn); ok {
 			tcpCon.SetLinger(0)

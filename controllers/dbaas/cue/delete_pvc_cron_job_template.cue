@@ -2,15 +2,18 @@ pvc: {
 	Name:      string
 	Namespace: string
 }
+sts: {
+	metadata: {
+		labels: [string]: string
+	}
+}
 cronjob: {
   apiVersion: "batch/v1",
   kind: "CronJob",
   metadata: {
     name: "delete-pvc-\(pvc.Name)"
     namespace: pvc.Namespace
-		labels: {
-			"app.kubernetes.io/managed-by": "kubeblocks"
-		}
+		labels: sts.metadata.labels
   },
   spec: {
     schedule: string,

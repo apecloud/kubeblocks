@@ -19,6 +19,7 @@ package dbaas
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -429,7 +430,35 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 	)
 	if event.InvolvedObject.Kind == intctrlutil.CronJob &&
 		event.Reason == "SawCompletedJob" {
-		return checkedDeleteCronJob(ctx, cli, event.InvolvedObject.Name, event.InvolvedObject.Namespace)
+		re := regexp.MustCompile("status: Failed")
+		matches := re.FindStringSubmatch(event.Message)
+		if len(matches) > 0 {
+			// cronjob failed
+			if object, err = getEventInvolvedObject(ctx, cli, event); err != nil {
+				return err
+			}
+			labels := object.GetLabels()
+			cluster := dbaasv1alpha1.Cluster{}
+			if err = cli.Get(ctx, client.ObjectKey{Name: labels[intctrlutil.AppInstanceLabelKey],
+				Namespace: object.GetNamespace()}, &cluster); err != nil {
+				return err
+			}
+			componentName := labels[intctrlutil.AppComponentLabelKey]
+			// update component phase to abnormal
+			if err = updateComponentStatusPhase(cli,
+				ctx,
+				&cluster,
+				componentName,
+				dbaasv1alpha1.AbnormalPhase,
+				event.Message); err != nil {
+				return err
+			}
+			recorder.Eventf(&cluster, corev1.EventTypeWarning, event.Reason, event.Message)
+			return nil
+		} else {
+			// delete pvc success, then delete cronjob
+			return checkedDeleteCronJob(ctx, cli, event.InvolvedObject.Name, event.InvolvedObject.Namespace)
+		}
 	}
 	if event.Type != corev1.EventTypeWarning || !isTargetKindForEvent(event) {
 		return nil
@@ -463,6 +492,33 @@ func checkedDeleteCronJob(ctx context.Context, cli client.Client, name string, n
 			if !errors.IsNotFound(err) {
 				return err
 			}
+		}
+	}
+	return nil
+}
+
+func updateComponentStatusPhase(cli client.Client,
+	ctx context.Context,
+	cluster *dbaasv1alpha1.Cluster,
+	componentName string,
+	phase dbaasv1alpha1.Phase,
+	message string) error {
+	var comp *dbaasv1alpha1.ClusterStatusComponent
+	c, ok := cluster.Status.Components[componentName]
+	if ok {
+		if cluster.Status.Components[componentName].Phase != phase {
+			comp = &c
+			comp.Phase = phase
+			comp.Message = message
+		}
+	} else {
+		comp = &dbaasv1alpha1.ClusterStatusComponent{Phase: phase, Message: message}
+	}
+	if comp != nil {
+		patch := client.MergeFrom(cluster.DeepCopy())
+		cluster.Status.Components[componentName] = *comp
+		if err := cli.Status().Patch(ctx, cluster, patch); err != nil {
+			return err
 		}
 	}
 	return nil

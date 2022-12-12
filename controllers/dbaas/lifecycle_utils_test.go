@@ -847,7 +847,7 @@ spec:
 				Name:      "test-pvc",
 			}
 			schedule := "* * * * *"
-			cronJob, err := buildCronJob(pvcKey, schedule)
+			cronJob, err := buildCronJob(pvcKey, schedule, &sts)
 			Expect(err).Should(BeNil())
 			Expect(cronJob).ShouldNot(BeNil())
 		})

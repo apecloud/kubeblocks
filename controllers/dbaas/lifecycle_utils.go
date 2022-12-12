@@ -832,28 +832,22 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			}
 			// find component of current statefulset
 			componentName := stsObj.Labels[intctrlutil.AppComponentLabelKey]
-			components := mergeComponentsList(reqCtx, cluster, clusterDef, clusterDef.Spec.Components, cluster.Spec.Components)
+			components := mergeComponentsList(reqCtx,
+				cluster,
+				clusterDef,
+				clusterDef.Spec.Components,
+				cluster.Spec.Components)
 			component := getComponent(components, componentName)
 			// update component status when scaling
 			if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
-				var comp *dbaasv1alpha1.ClusterStatusComponent
-				c, ok := cluster.Status.Components[componentName]
-				if ok {
-					if cluster.Status.Components[componentName].Phase != dbaasv1alpha1.HorizontalScalingPhase {
-						comp = &c
-						comp.Phase = dbaasv1alpha1.HorizontalScalingPhase
-						comp.Message = ""
-					}
-				} else {
-					comp = &dbaasv1alpha1.ClusterStatusComponent{Phase: dbaasv1alpha1.HorizontalScalingPhase, Message: ""}
-				}
-				if comp != nil {
-					patch := client.MergeFrom(cluster.DeepCopy())
-					cluster.Status.Components[componentName] = *comp
-					if err := cli.Status().Patch(ctx, cluster, patch); err != nil {
-						res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-						return &res, err
-					}
+				if err := updateComponentStatusPhase(cli,
+					ctx,
+					cluster,
+					componentName,
+					dbaasv1alpha1.HorizontalScalingPhase,
+					""); err != nil {
+					res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+					return &res, err
 				}
 			}
 			// when horizontal scaling up, sometimes db needs backup to sync data from master,
@@ -925,7 +919,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 								Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 							}
 							// create cronjob to delete pvc after 30 minutes
-							if err := createDeletePVCCronJob(cli, ctx, pvcKey); err != nil {
+							if err := createDeletePVCCronJob(cli, ctx, pvcKey, stsObj); err != nil {
 								res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 								return &res, err
 							} else {
@@ -1853,7 +1847,9 @@ func deleteSnapshot(cli client.Client,
 	return nil
 }
 
-func buildCronJob(pvcKey types.NamespacedName, schedule string) (*v1.CronJob, error) {
+func buildCronJob(pvcKey types.NamespacedName,
+	schedule string,
+	sts *appsv1.StatefulSet) (*v1.CronJob, error) {
 
 	serviceAccount := viper.GetString("KUBEBLOCKS_SERVICE_ACCOUNT")
 	if len(serviceAccount) == 0 {
@@ -1864,6 +1860,7 @@ func buildCronJob(pvcKey types.NamespacedName, schedule string) (*v1.CronJob, er
 		"pvc":                   pvcKey,
 		"cronjob.spec.schedule": schedule,
 		"cronjob.spec.jobTemplate.spec.template.spec.serviceAccount": serviceAccount,
+		"sts": sts,
 	}, "cronjob")
 
 	cronJob := v1.CronJob{}
@@ -1876,12 +1873,13 @@ func buildCronJob(pvcKey types.NamespacedName, schedule string) (*v1.CronJob, er
 
 func createDeletePVCCronJob(cli client.Client,
 	ctx context.Context,
-	pvcKey types.NamespacedName) error {
+	pvcKey types.NamespacedName,
+	stsObj *appsv1.StatefulSet) error {
 	now := time.Now()
 	// hack: delete after 30 minutes
 	t := now.Add(30 * 60 * time.Second)
 	schedule := timeToSchedule(t)
-	cronJob, err := buildCronJob(pvcKey, schedule)
+	cronJob, err := buildCronJob(pvcKey, schedule, stsObj)
 	if err != nil {
 		return err
 	}

@@ -183,6 +183,8 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 	return msg, nil
 }
 
+// runningCheck checks whether the binding service is in running status:
+// the port is open or is close consecutively in eventAggregationNum times
 func (p *ProbeBase) runningCheck(ctx context.Context, resp *bindings.InvokeResponse) ([]byte, error) {
 	host := fmt.Sprintf("127.0.0.1:%d", p.dbPort)
 	conn, err := net.DialTimeout("tcp", host, 900*time.Millisecond)

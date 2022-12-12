@@ -24,7 +24,12 @@ pvc: {
 	metadata: {
 		name:      pvc_key.Name
 		namespace: pvc_key.Namespace
-		labels:    sts.metadata.labels
+		labels: {
+			"app.kubernetes.io/created-by": "kubeblocks"
+			for k, v in sts.metadata.labels {
+				"\(k)": "\(v)"
+			}
+		}
 	}
 	spec: {
 		accessModes: sts.spec.volumeClaimTemplates[0].spec.accessModes

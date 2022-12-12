@@ -1,0 +1,151 @@
+/*
+Copyright ApeCloud Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package internal
+
+import (
+	"context"
+	"net"
+	"strconv"
+	"testing"
+
+	"github.com/dapr/components-contrib/bindings"
+	"github.com/dapr/kit/logger"
+)
+
+const (
+	testDbPort = 34521
+	testRole   = "leader"
+)
+
+type fakeBinding struct{}
+
+func TestInit(t *testing.T) {
+	p := mockProbeBase()
+	err := p.Init()
+	if err != nil {
+		t.Errorf("init failed with error: %s", err)
+	}
+	if p.oriRole != "" {
+		t.Errorf("p.oriRole init failed: %s", p.oriRole)
+	}
+	if p.runningCheckFailedCount != 0 {
+		t.Errorf("p.runningCheckFailedCount init failed: %d", p.runningCheckFailedCount)
+	}
+	if p.roleCheckFailedCount != 0 {
+		t.Errorf("p.roleCheckFailedCount init failed: %d", p.roleCheckFailedCount)
+	}
+	if p.roleCheckCount != 0 {
+		t.Errorf("p.roleCheckCount init failed: %d", p.roleCheckCount)
+	}
+	if p.eventAggregationNum != defaultEventAggregationNum {
+		t.Errorf("p.eventAggregationNum init failed: %d", p.eventAggregationNum)
+	}
+	if p.eventIntervalNum != defaultEventIntervalNum {
+		t.Errorf("p.eventIntervalNum init failed: %d", p.eventIntervalNum)
+	}
+	if p.dbPort != testDbPort {
+		t.Errorf("p.dbPort init failed: %d", p.dbPort)
+	}
+}
+
+func TestInvoke(t *testing.T) {
+	p := mockProbeBase()
+	p.Init()
+
+	t.Run("runningCheck", func(t *testing.T) {
+		metadata := map[string]string{"sql": ""}
+		req := &bindings.InvokeRequest{
+			Data:      nil,
+			Metadata:  metadata,
+			Operation: RunningCheckOperation,
+		}
+		resp, err := p.Invoke(context.Background(), req)
+		if err != nil {
+			t.Errorf("runningCheck failed: %s", err)
+		}
+		if resp.Metadata[StatusCode] != CheckFailedHTTPCode {
+			t.Errorf("unexpected status-code: %s", resp.Metadata[StatusCode])
+		}
+
+		message := "{\"message\":\"TCP Connection Established Successfully!\"}"
+		startFooServer(p.dbPort, t)
+		resp, _ = p.Invoke(context.Background(), req)
+		stopFooServer()
+		if string(resp.Data) != message {
+			t.Errorf("unexpected response: %s", string(resp.Data))
+		}
+	})
+
+	t.Run("roleCheck", func(t *testing.T) {
+		metadata := map[string]string{"sql": ""}
+		req := &bindings.InvokeRequest{
+			Data:      nil,
+			Metadata:  metadata,
+			Operation: RoleCheckOperation,
+		}
+
+		resp, err := p.Invoke(context.Background(), req)
+		if err != nil {
+			t.Errorf("roleCheck error: %s", err)
+		}
+		if p.oriRole != testRole {
+			t.Errorf("getRole error: %s", p.oriRole)
+		}
+		if string(resp.Data) != "{\"event\":\"roleChanged\",\"role\":\""+testRole+"\"}" {
+			t.Errorf("roleCheck response error: %s", resp.Data)
+		}
+	})
+}
+
+var server net.Listener
+
+func startFooServer(port int, t *testing.T) {
+	server, err := net.Listen("tcp", ":"+strconv.Itoa(port))
+	if server == nil {
+		t.Errorf("couldn't start listening: %s", err)
+	}
+}
+
+func stopFooServer() {
+	if server != nil {
+		server.Close()
+	}
+}
+
+func mockProbeBase() *ProbeBase {
+	p := &ProbeBase{}
+	p.Logger = logger.NewLogger("base_binding_test")
+	p.Operation = &fakeBinding{}
+
+	return p
+}
+
+func (f *fakeBinding) InitIfNeed() error {
+	return nil
+}
+
+func (f *fakeBinding) GetRunningPort() int {
+	return testDbPort
+}
+
+func (f *fakeBinding) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) ([]byte, error) {
+	return nil, nil
+}
+
+func (f *fakeBinding) GetRole(ctx context.Context, cmd string) (string, error) {
+	return testRole, nil
+}

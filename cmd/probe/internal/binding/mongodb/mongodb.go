@@ -90,13 +90,13 @@ type OpTime struct {
 }
 
 type ReplSetMember struct {
-	ID                   int64  `bson:"_id"`
-	Name                 string `bson:"name"`
-	Health               int64  `bson:"health"`
-	State                int64  `bson:"state"`
-	StateStr             string `bson:"stateStr"`
-	Uptime               int64  `bson:"uptime"`
-	Optime               *OpTime
+	ID                   int64               `bson:"_id"`
+	Name                 string              `bson:"name"`
+	Health               int64               `bson:"health"`
+	State                int64               `bson:"state"`
+	StateStr             string              `bson:"stateStr"`
+	Uptime               int64               `bson:"uptime"`
+	Optime               *OpTime             `bson:"optime"`
 	OptimeDate           time.Time           `bson:"optimeDate"`
 	OptimeDurableDate    time.Time           `bson:"optimeDurableDate"`
 	LastAppliedWallTime  time.Time           `bson:"lastAppliedWallTime"`
@@ -113,21 +113,18 @@ type ReplSetMember struct {
 }
 
 type ReplSetGetStatus struct {
-	Set                     string    `bson:"set"`
-	Date                    time.Time `bson:"date"`
-	MyState                 int64     `bson:"myState"`
-	Term                    int64     `bson:"term"`
-	HeartbeatIntervalMillis int64     `bson:"heartbeatIntervalMillis"`
-
-	Members []ReplSetMember `bson:"members"`
-	Ok      int64           `bson:"ok"`
+	Set                     string          `bson:"set"`
+	Date                    time.Time       `bson:"date"`
+	MyState                 int64           `bson:"myState"`
+	Term                    int64           `bson:"term"`
+	HeartbeatIntervalMillis int64           `bson:"heartbeatIntervalMillis"`
+	Members                 []ReplSetMember `bson:"members"`
+	Ok                      int64           `bson:"ok"`
 }
 
 // NewMongoDB returns a new MongoDB Binding
 func NewMongoDB(logger logger.Logger) bindings.OutputBinding {
-	s := &MongoDB{logger: logger}
-
-	return s
+	return &MongoDB{logger: logger}
 }
 
 // Init initializes the MongoDB Binding.
@@ -138,12 +135,10 @@ func (m *MongoDB) Init(metadata bindings.Metadata) error {
 		return err
 	}
 	m.metadata = *meta
-
 	m.base = internal.ProbeBase{
 		Logger:    m.logger,
 		Operation: m,
 	}
-
 	return m.base.Init()
 }
 
@@ -159,7 +154,6 @@ func (m *MongoDB) Ping() error {
 	if err := m.client.Ping(context.Background(), nil); err != nil {
 		return fmt.Errorf("mongoDB store: error connecting to mongoDB at %s: %s", m.metadata.host, err)
 	}
-
 	return nil
 }
 
@@ -234,7 +228,6 @@ func (m *MongoDB) GetRole(ctx context.Context, cmd string) (string, error) {
 			return strings.ToLower(member.StateStr), nil
 		}
 	}
-
 	return "", errors.New("role not found")
 }
 

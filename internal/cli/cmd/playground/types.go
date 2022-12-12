@@ -90,10 +90,8 @@ var guideTmpl = `
   
 3. View the Grafana:
 
-  export POD_NAME=$(kubectl get pods --namespace default -l "app.kubernetes.io/name=grafana,app.kubernetes.io/instance=kubeblocks" -o jsonpath="{.items[0].metadata.name}")
-  kubectl --namespace default port-forward $POD_NAME 3000
-  open http://{{.HostIP}}:3000/d/549c2bf8936f7767ea6ac47c47b00f2a/mysql
-
+  kbcli dashboard open kubeblocks-grafana
+	
 4. Uninstall Playground:
 
   kbcli playground destroy

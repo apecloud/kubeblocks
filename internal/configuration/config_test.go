@@ -99,11 +99,13 @@ func TestRawConfig(t *testing.T) {
 	require.NotNil(t, content)
 	require.Nil(t, err)
 
-	newContent, exist := content[cfg.Name]
+	newContent, exist := content[cfg.name]
 	require.True(t, exist)
 	patch, err := CreateMergePatch([]byte(iniConfig), []byte(newContent), cfg.Option)
 	require.Nil(t, err)
 	log.Log.Info("patch : %v", patch)
+	require.True(t, patch.IsModify)
+	require.Equal(t, string(patch.UpdateConfig["raw"]), `{"mysqld":{"server-id":"2","socket":"xxxxxxxxxxxxxxx"}}`)
 
 	{
 		require.Nil(t,
@@ -113,13 +115,13 @@ func TestRawConfig(t *testing.T) {
 			}, ctx))
 		content, err := cfg.ToCfgContent()
 		require.Nil(t, err)
-		newContent := content[cfg.Name]
+		newContent := content[cfg.name]
 		// CreateMergePatch([]byte(iniConfig), []byte(newContent), cfg.Option)
 		patch, err := CreateMergePatch([]byte(iniConfig), []byte(newContent), cfg.Option)
 		require.Nil(t, err)
 		log.Log.Info("patch : %v", patch)
+		require.False(t, patch.IsModify)
 	}
-
 }
 
 func TestConfigMapConfig(t *testing.T) {
@@ -144,7 +146,7 @@ func TestConfigMapConfig(t *testing.T) {
 	require.Nil(t, err)
 	log.Log.Info("cfg option: %v", cfg.Option)
 
-	require.Equal(t, cfg.FileCount, 2)
+	require.Equal(t, cfg.fileCount, 2)
 	require.NotNil(t, cfg.getCfgViper(NewCfgOptions("my.cnf")))
 	require.Nil(t, cfg.getCfgViper(NewCfgOptions("my2.cnf")))
 

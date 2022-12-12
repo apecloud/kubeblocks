@@ -45,10 +45,10 @@ func init() {
 		}
 
 		meta := cfgWrapper{
-			Name:      "raw",
-			FileCount: 0,
-			V:         make([]*viper.Viper, 1),
-			Indexer:   make(map[string]*viper.Viper, 1),
+			name:      "raw",
+			fileCount: 0,
+			v:         make([]*viper.Viper, 1),
+			indexer:   make(map[string]*viper.Viper, 1),
 		}
 
 		v := viper.NewWithOptions(viper.KeyDelimiter(cfgKeyDelimiter))
@@ -58,36 +58,36 @@ func init() {
 			option.Log.Error(err, "failed to parse config!", "context", option.RawData)
 			return nil, err
 		}
-		meta.V[0] = v
-		meta.Indexer[meta.Name] = v
+		meta.v[0] = v
+		meta.indexer[meta.name] = v
 		return &meta, nil
 	}
 
-	// For local
-	loaderProvider[CfgLocalType] = func(option CfgOption) (*cfgWrapper, error) {
-		if _, err := os.Stat(option.Path); err != nil {
-			return nil, MakeError("configuration file path[%s] not exist", option.Path)
-		}
+	//// For local
+	// loaderProvider[CfgLocalType] = func(option CfgOption) (*cfgWrapper, error) {
+	//	if _, err := os.Stat(option.Path); err != nil {
+	//		return nil, MakeError("configuration file path[%s] not exist", option.Path)
+	//	}
+	//
+	//	meta := cfgWrapper{
+	//		name:      path.Base(option.Path),
+	//		fileCount: 1,
+	//		v:         make([]*viper.Viper, 0, 1),
+	//		indexer:   make(map[string]*viper.Viper, 1),
+	//	}
+	//
+	//	v := viper.NewWithOptions(viper.KeyDelimiter(cfgKeyDelimiter))
+	//	v.SetConfigType(string(option.CfgType))
+	//	v.SetConfigFile(option.Path)
+	//	if err := v.ReadInConfig(); err != nil {
+	//		return nil, WrapError(err, "failed to load config: [%s]", option.Path)
+	//	}
+	//	meta.v[0] = v
+	//	meta.indexer[meta.name] = v
+	//	return &meta, nil
+	// }
 
-		meta := cfgWrapper{
-			Name:      path.Base(option.Path),
-			FileCount: 1,
-			V:         make([]*viper.Viper, 0, 1),
-			Indexer:   make(map[string]*viper.Viper, 1),
-		}
-
-		v := viper.NewWithOptions(viper.KeyDelimiter(cfgKeyDelimiter))
-		v.SetConfigType(string(option.CfgType))
-		v.SetConfigFile(option.Path)
-		if err := v.ReadInConfig(); err != nil {
-			return nil, WrapError(err, "failed to load config: [%s]", option.Path)
-		}
-		meta.V[0] = v
-		meta.Indexer[meta.Name] = v
-		return &meta, nil
-	}
-
-	// For CM
+	// For CM/TPL
 	loaderProvider[CfgCmType] = func(option CfgOption) (*cfgWrapper, error) {
 		if option.K8sKey == nil {
 			return nil, MakeError("invalid k8s resource[%v]", option)
@@ -104,10 +104,10 @@ func init() {
 
 		fileCount := len(ctx.Configurations)
 		meta := cfgWrapper{
-			Name:      path.Base(ctx.CfgKey.Name),
-			FileCount: fileCount,
-			V:         make([]*viper.Viper, fileCount),
-			Indexer:   make(map[string]*viper.Viper, 1),
+			name:      path.Base(ctx.CfgKey.Name),
+			fileCount: fileCount,
+			v:         make([]*viper.Viper, fileCount),
+			indexer:   make(map[string]*viper.Viper, 1),
 		}
 
 		var index = 0
@@ -117,8 +117,8 @@ func init() {
 			if err := v.ReadConfig(bytes.NewReader([]byte(content))); err != nil {
 				return nil, WrapError(err, "failed to load config: filename[%s]", fileName)
 			}
-			meta.Indexer[fileName] = v
-			meta.V[index] = v
+			meta.indexer[fileName] = v
+			meta.v[index] = v
 			index++
 		}
 
@@ -130,14 +130,14 @@ func init() {
 }
 
 type cfgWrapper struct {
-	// Name is config name
-	Name       string
-	VolumeName string
+	// name is config name
+	name string
+	// volumeName string
 
-	// FileCount
-	FileCount int
-	Indexer   map[string]*viper.Viper
-	V         []*viper.Viper
+	// fileCount
+	fileCount int
+	indexer   map[string]*viper.Viper
+	v         []*viper.Viper
 }
 
 type dataConfig struct {
@@ -182,7 +182,7 @@ func (c *cfgWrapper) MergeFrom(params map[string]interface{}, option CfgOpOption
 }
 
 func (c *cfgWrapper) ToCfgContent() (map[string]string, error) {
-	fileContents := make(map[string]string, c.FileCount)
+	fileContents := make(map[string]string, c.fileCount)
 
 	// Viper not support writer to buffer
 	tmpDir, err := os.MkdirTemp(os.TempDir(), "configuration-")
@@ -191,7 +191,7 @@ func (c *cfgWrapper) ToCfgContent() (map[string]string, error) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	for fileName, v := range c.Indexer {
+	for fileName, v := range c.indexer {
 		tmpFile := filepath.Join(tmpDir, strings.ReplaceAll(fileName, ".", "_"))
 		content, err := DumpCfgContent(v, tmpFile)
 		if err != nil {
@@ -221,8 +221,8 @@ type ConfigDiffInformation struct {
 }
 
 func (c *cfgWrapper) Diff(target *cfgWrapper) (*ConfigDiffInformation, error) {
-	fromOMap := NewSetFromMap(c.Indexer)
-	fromNMap := NewSetFromMap(target.Indexer)
+	fromOMap := NewSetFromMap(c.indexer)
+	fromNMap := NewSetFromMap(target.indexer)
 
 	addSet := Difference(fromNMap, fromOMap)
 	deleteSet := Difference(fromOMap, fromNMap)
@@ -239,18 +239,18 @@ func (c *cfgWrapper) Diff(target *cfgWrapper) (*ConfigDiffInformation, error) {
 	}
 
 	for elem := range *addSet {
-		reconfigureInfo.AddConfig[elem] = target.Indexer[elem].AllSettings()
+		reconfigureInfo.AddConfig[elem] = target.indexer[elem].AllSettings()
 		reconfigureInfo.IsModify = true
 	}
 
 	for elem := range *deleteSet {
-		reconfigureInfo.DeleteConfig[elem] = c.Indexer[elem].AllSettings()
+		reconfigureInfo.DeleteConfig[elem] = c.indexer[elem].AllSettings()
 		reconfigureInfo.IsModify = true
 	}
 
 	for elem := range *updateSet {
-		old := c.Indexer[elem]
-		new := target.Indexer[elem]
+		old := c.indexer[elem]
+		new := target.indexer[elem]
 
 		patch, err := jsonPatch(old.AllSettings(), new.AllSettings())
 		if err != nil {
@@ -278,7 +278,7 @@ func NewCfgOptions(filename string, options ...Option) CfgOpOption {
 }
 
 func (c *cfgWrapper) Query(jsonpath string, option CfgOpOption) ([]byte, error) {
-	if option.AllSearch && c.FileCount > 1 {
+	if option.AllSearch && c.fileCount > 1 {
 		return c.queryAllCfg(jsonpath, option)
 	}
 
@@ -303,23 +303,23 @@ func (c *cfgWrapper) Query(jsonpath string, option CfgOpOption) ([]byte, error) 
 }
 
 func (c *cfgWrapper) queryAllCfg(jsonpath string, option CfgOpOption) ([]byte, error) {
-	tops := make(map[string]interface{}, c.FileCount)
+	tops := make(map[string]interface{}, c.fileCount)
 
-	for filename, v := range c.Indexer {
+	for filename, v := range c.indexer {
 		tops[filename] = v.AllSettings()
 	}
 	return retrievalWithJSONPath(tops, jsonpath)
 }
 
 func (c cfgWrapper) getCfgViper(option CfgOpOption) *viper.Viper {
-	if len(c.V) == 0 {
+	if len(c.v) == 0 {
 		return nil
 	}
 
 	if len(option.FileName) == 0 {
-		return c.V[0]
+		return c.v[0]
 	} else {
-		return c.Indexer[option.FileName]
+		return c.indexer[option.FileName]
 	}
 }
 

@@ -44,6 +44,11 @@ var defaultContainerdEndpoints = []string{
 
 // ContainerKiller kill container interface
 type ContainerKiller interface {
+
+	// Kill containers in the pod by cri
+	// e.g. docker or containerd
 	Kill(ctx context.Context, containerIDs []string, signal string, timeout *time.Duration) error
+
+	// Init cri killer init interface
 	Init(ctx context.Context) error
 }

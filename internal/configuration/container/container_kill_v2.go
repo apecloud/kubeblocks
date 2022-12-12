@@ -44,7 +44,7 @@ const (
 
 // dockerContainer support docker cri
 type dockerContainerV2 struct {
-	runtimeEndpoint string
+	dockerEndpoint string
 
 	dc *dockerapi.Client
 }
@@ -113,7 +113,7 @@ func getExistsContainers(ctx context.Context, containerIDs []string, dc *dockera
 }
 
 func (d *dockerContainerV2) Init(ctx context.Context) error {
-	client, err := createDockerClient(d.runtimeEndpoint)
+	client, err := createDockerClient(d.dockerEndpoint)
 	d.dc = client
 	if err == nil {
 		ping, err := client.Ping(ctx)
@@ -157,7 +157,7 @@ func (c *containerdContainerV2) Kill(ctx context.Context, containerIDs []string,
 	// reference cri-api url: https://github.com/kubernetes/cri-api/blob/master/pkg/apis/runtime/v1/api.proto#L1108
 	// reference containerd url: https://github.com/containerd/containerd/blob/main/pkg/cri/server/container_stop.go#L124
 	for _, containerID := range containerIDs {
-		logrus.Infof("stopping docker container: %s", containerID)
+		logrus.Infof("stopping container: %s", containerID)
 		containers, err := c.backendRuntime.ListContainers(ctx, &runtimeapi.ListContainersRequest{
 			Filter: &runtimeapi.ContainerFilter{
 				Id: containerID,
@@ -205,16 +205,15 @@ func (c *containerdContainerV2) Init(ctx context.Context) error {
 }
 
 func NewContainerKiller(containerRuntime CRIType, runtimeEndpoint string) (ContainerKiller, error) {
-	var killer ContainerKiller
-
 	if containerRuntime == AutoType {
 		containerRuntime = autoCheckCRIType()
 	}
 
+	var killer ContainerKiller
 	switch containerRuntime {
 	case DockerType:
 		killer = &dockerContainerV2{
-			runtimeEndpoint: runtimeEndpoint,
+			dockerEndpoint: runtimeEndpoint,
 		}
 	case ContainerdType:
 		killer = &containerdContainerV2{
@@ -241,8 +240,7 @@ func autoCheckCRIType() CRIType {
 func createGrpcConnection(ctx context.Context, socketAddress string) (*grpc.ClientConn, error) {
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
-	return grpc.DialContext(ctx,
-		socketAddress,
+	return grpc.DialContext(ctx, socketAddress,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {

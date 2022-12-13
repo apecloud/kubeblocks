@@ -143,7 +143,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: registry.jihulab.com/apecloud/mysql-server/mysql/wesql-server-arm:latest
+        image: docker.io/apecloud/wesql-server:latest
   - type: proxy
     podSpec: 
       containers:

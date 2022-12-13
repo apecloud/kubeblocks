@@ -9,110 +9,71 @@
 [![TODOs](https://img.shields.io/endpoint?url=https://api.tickgit.com/badge?repo=github.com/apecloud/kubeblocks)](https://www.tickgit.com/browse?repo=github.com/apecloud/kubeblocks)
 [![Artifact HUB](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/apecloud)](https://artifacthub.io/packages/search?repo=apecloud)
 
-## Overview
+![image](https://github.com/apecloud/kubeblocks/blob/support/rewrite_kb_introduction/docs/img/banner:-image-with:-ape-space.jpg)
 
-KubeBlocks Controller Manager.
 
-Features/Enhancement:
-- [Operator developer guides](https://book.kubebuilder.io/)
-- Fast Multi-arch build docker images
-- Helm Chart for deployment
-  - Horizontal Pod Auto-Scaler (HPA)
-  - Prometheus Service Monitor
-  - RBAC
-  - Pod Disruption Budget (PDB)
-  - CRDs installation
-  - Self-signed certificates for admission webhook configurations
-- [Configuration template guides](docs/configuration/configuration_tpl_developer.md)
+- [What is KubeBlocks](#what-is-kubeblocks)
+  - [Goals](#goals)
+  - [Key Features](#key-features)
+- [Documents](#documents)
+  - [Quick start with KubeBlocks](#quick-start-with-kubeblocks)
+  - [Introduction](#introduction)
+  - [Installation](#installation)
+  - [User documents](#user-documents)
+  - [Design proposal](#design-proposal)
+- [Community](#community)
+- [Contributing to KubeBlocks](#contributing-to-kubeblocks)
+- [License](#license)
 
-## Quick start
 
-```shell
-$ make help
+## What is KubeBlocks
+**KubeBlocks**, running on Kubernetes, is an open-source data manangement platform. KubeBlocks greatly simplifies the process of deploying databases on Kubernetes. It offers a universal view for multicloud and on-premises databases with a consistent database developing and management experience.
 
-Usage:
-  make <target>
+### Goals
+- Enable developers using one platform to manage any database engines used
+- Provide consistent and easy-to-use declarative API
+- Create and use database clusters within minutes without a deep knowledge of Kubernetes
+- Relieve the burden of maintaining miscellaneous operators
+- Be community driven, open, and cloud neutral
+- Embrace extensibility and provide domain functions without vendor lock-in
+- Gain new contributors
+### Key Features
+- Runs on a Kubernetes base on any cloud
+- Defines each supported database engine through a declarative API
+- Integrated DevOps tools and processes,such as Prometheus, Grafana and AlertManager for monitoring and alarming
+- Compatible with MySQL, PostgreSQL, Redis, MongoDB and other database engines
+- Accesses and manages any new database engines or plugins by defining CRD
+- High availability, based on the consistency X-Paxos protocol
+- Database life cycle management
+- Backup and restore
+- Supports resource overcommitment
+- Managed and optimized database security
+- Provides kbcli, an easy-to-use CLI command line tool
 
-General
-  help             Display this help.
-  all              Make all cmd binaries.
+For detailed feature information, see [Feature list](https://github.com/apecloud/kubeblocks/blob/support/rewrite_kb_introduction/docs/user_docs/Introduction/feature_list.md)
 
-Development
-  manifests        Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-  generate         Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-  fmt              Run go fmt against code.
-  vet              Run go vet against code.
-  cue-fmt          Run cue fmt against code.
-  cue-vet          Run cue vet against code.
-  lint             Run golangci-lint against code.
-  staticcheck      Run staticcheck against code. 
-  loggercheck      Run loggercheck against code.
-  build-checks     Run build checks.
-  mod-download     Run go mod download against go modules.
-  mod-vendor       Run go mod tidy->vendor->verify against go modules.
-  ctrl-test-current-ctx  Run operator controller tests with current $KUBECONFIG context
-  test             Run tests.
-  test-webhook-enabled  Run tests with webhooks enabled.
-  cover-report     Generate cover.html from cover.out
-  goimports        Run goimports against code.
+## Documents
+### Quick start with KubeBlocks
+TODO 
+### Introduction
+[Introduction](https://github.com/apecloud/kubeblocks/blob/main/docs/user_docs/Introduction/introduction.md) is a detailed information on KubeBlocks.
+### Installation
+[Installation](https://github.com/apecloud/kubeblocks/tree/main/docs/user_docs/installation) document for install KubeBlocks, playground, kbctl, and create database clusters.
+### User documents
+[User documents](https://github.com/apecloud/kubeblocks/tree/main/docs/user_docs) for instruction to use KubeBlocks.
+### Design proposal
+[Design proposal](https://github.com/apecloud/kubeblocks/tree/main/docs/design_docs) for design motivation and methodology.
 
-CLI
-  kbcli            Build bin/kbcli CLI.
-  clean-kbcli      Clean bin/kbcli* CLI tools.
+## Community
+- KubeBlocks [Slack Channel](https://kubeblocks.slack.com/ssb/redirect)
+- KubeBlocks Github [Discussions](https://github.com/apecloud/kubeblocks/discussions)
+- Questions tagged [#KubeBlocks](https://stackoverflow.com/questions/tagged/KubeBlocks) on StackOverflow
+- Follow us on Twitter [@KubeBlocks](https://twitter.com/KubeBlocks)
+## Contributing to KubeBlocks
+Your contributions and suggestions are welcomed and appreciated.
+- See the [Contributing Guide](docs/CONTRIBUTING.md) for details on typical contribution workflows.
+- See the [Development Guide](docs/DEVELOPING.md) to get started with building and developing.
+- See the [Docs Contributing Guide](docs/CONTRIBUTING_DOCS.md) to get started with contributing to the KubeBlocks docs.
 
-Operator Controller Manager
-  manager          Build manager binary.
-  webhook-cert     Create root CA certificates for admission webhooks testing.
-  run              Run a controller from your host.
-  run-delve        Run Delve debugger.
-
-Deployment
-  install          Install CRDs into the K8s cluster specified in ~/.kube/config.
-  uninstall        Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-  deploy           Deploy controller to the K8s cluster specified in ~/.kube/config.
-  dry-run          Dry-run deploy job.
-  undeploy         Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-
-CI
-  ci-test-pre      Prepare CI test environment.
-  ci-test          Run CI tests.
-
-Contributor
-  reviewable       Run code checks to proceed with PR reviews.
-  check-diff       Run git code diff checker.
-
-Helm Chart Tasks
-  bump-chart-ver   Bump helm chart version.
-  helm-package     Do helm package.
-
-WeSQL Cluster Helm Chart Tasks
-  bump-chart-ver-wqsql-cluster  Bump WeSQL Cluster helm chart version.
-  helm-package-wqsql-cluster  Do WeSQL Cluster helm package.
-
-Build Dependencies
-  kustomize        Download kustomize locally if necessary.
-  controller-gen   Download controller-gen locally if necessary.
-  envtest          Download envtest-setup locally if necessary.
-  install-docker-buildx  Create `docker buildx` builder.
-  golangci         Download golangci-lint locally if necessary.
-  staticchecktool  Download staticcheck locally if necessary.
-  loggerchecktool  Download loggercheck locally if necessary.
-  goimportstool    Download goimports locally if necessary.
-  cuetool          Download cue locally if necessary.
-  helmtool         Download helm locally if necessary.
-  oras             Download ORAS locally if necessary.
-  minikube         Download minikube locally if necessary.
-  brew-install-prerequisite  Use `brew install` to install required dependencies. 
-
-Minikube
-  minikube-start   Start minikube cluster.
-  minikube-delete  Delete minikube cluster. 
-
-Docker containers 
-  build-dev-container  Build dev container image.
-  push-dev-container  Push dev container image.
-  build-cli-container  Build kbcli CLI container image.
-  push-cli-container  Push kbcli CLI container image.
-  build-manager-container  Build Operator manager container image.
-  push-manager-container  Push Operator manager container image.
-```
+## License
+KubeBlocks is under the Apache 2.0 license. See the [LICENSE](./LICENSE) file for details.

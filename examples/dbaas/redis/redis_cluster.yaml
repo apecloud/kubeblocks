@@ -10,7 +10,7 @@ spec:
   components:
   - name: redis-rsts
     type: replication
-    monitor: false
+    monitor: true
     primaryStsIndex: 0
     replicas: 2
     volumeClaimTemplates:

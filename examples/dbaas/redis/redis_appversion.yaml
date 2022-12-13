@@ -7,6 +7,11 @@ spec:
   components:
   - type: replication
     podSpec:
+      initContainers:
+      - name: redis
+        image: registry.hub.docker.com/library/redis:7.0.5
       containers:
       - name: redis
         image: registry.hub.docker.com/library/redis:7.0.5
+      - name: redis-exporter
+        image: oliver006/redis_exporter:latest

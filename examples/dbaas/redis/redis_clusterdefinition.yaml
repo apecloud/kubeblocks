@@ -15,7 +15,39 @@ spec:
         ports:
           - protocol: TCP
             port: 6379
+      configTemplateRefs:
+        - name: redis-primary-config-7.0.5
+          volumeName: primary
+        - name: redis-secondary-config-7.0.5
+          volumeName: secondary
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePort: 9121
+          scrapePath: "/metrics"
       podSpec:
+        initContainers:
+          - name: redis-init-container
+            image: redis:7.0.5
+            command:
+              - /bin/sh
+              - "-c"
+              - | 
+                set -ex
+                if [ $KB_PRIMARY_POD_NAME ]; then
+                  cp /etc/conf/primary/redis.conf /etc/conf
+                else
+                  cp /etc/conf/secondary/redis.conf /etc/conf
+                fi
+            volumeMounts:
+              - name: data
+                mountPath: /data
+              - name: conf
+                mountPath: /etc/conf
+              - name: primary
+                mountPath: /etc/conf/primary
+              - name: secondary
+                mountPath: /etc/conf/secondary
         containers:
           - name: redis
             image: redis:7.0.5
@@ -25,8 +57,12 @@ spec:
             volumeMounts:
               - name: data
                 mountPath: /data
-              - name: config-map
+              - name: conf
                 mountPath: /etc/conf
+              - name: primary
+                mountPath: /etc/conf/primary
+              - name: secondary
+                mountPath: /etc/conf/secondary
             args: ["/etc/conf/redis.conf"]
             lifecycle:
               postStart:
@@ -43,12 +79,28 @@ spec:
                         echo "primary instance skip create a replication relationship."
                         exit 0
                       fi
+          - name: redis-exporter
+            image: oliver006/redis_exporter:latest
+            imagePullPolicy: IfNotPresent
+            resources:
+              requests:
+                cpu: 100m
+                memory: 100Mi
+            ports:
+              - name: metrics
+                containerPort: 9121
+                protocol: TCP
+            livenessProbe:
+              httpGet:
+                path: /
+                port: 9121
+            readinessProbe:
+              httpGet:
+                path: /
+                port: 9121
         volumes:
           - name: conf
             emptyDir: { }
-          - name: config-map
-            configMap:
-              name: redis-config-7.0.5
   connectionCredential:
     user: ""
     password: ""

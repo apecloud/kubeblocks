@@ -306,25 +306,24 @@ func mergeComponents(
 
 	clusterDefCompObj := clusterDefComp.DeepCopy()
 	component := &Component{
-		ClusterDefName:             clusterDef.Name,
-		ClusterType:                clusterDef.Spec.Type,
-		Name:                       clusterDefCompObj.TypeName, // initial name for the component will be same as TypeName
-		Type:                       clusterDefCompObj.TypeName,
-		CharacterType:              clusterDefCompObj.CharacterType,
-		MinReplicas:                clusterDefCompObj.MinReplicas,
-		MaxReplicas:                clusterDefCompObj.MaxReplicas,
-		DefaultReplicas:            clusterDefCompObj.DefaultReplicas,
-		Replicas:                   clusterDefCompObj.DefaultReplicas,
-		AntiAffinity:               clusterDefCompObj.AntiAffinity,
-		ComponentType:              clusterDefCompObj.ComponentType,
-		ConsensusSpec:              clusterDefCompObj.ConsensusSpec,
-		PodSpec:                    clusterDefCompObj.PodSpec,
-		Service:                    clusterDefCompObj.Service,
-		Probes:                     clusterDefCompObj.Probes,
-		LogConfigs:                 clusterDefCompObj.LogConfigs,
-		ConfigTemplates:            clusterDefCompObj.ConfigTemplateRefs,
-		HorizontalScalePolicy:      clusterDefCompObj.HorizontalScalePolicy,
-		BackupTemplateSelectLabels: clusterDefCompObj.BackupTemplateSelectLabels,
+		ClusterDefName:        clusterDef.Name,
+		ClusterType:           clusterDef.Spec.Type,
+		Name:                  clusterDefCompObj.TypeName, // initial name for the component will be same as TypeName
+		Type:                  clusterDefCompObj.TypeName,
+		CharacterType:         clusterDefCompObj.CharacterType,
+		MinReplicas:           clusterDefCompObj.MinReplicas,
+		MaxReplicas:           clusterDefCompObj.MaxReplicas,
+		DefaultReplicas:       clusterDefCompObj.DefaultReplicas,
+		Replicas:              clusterDefCompObj.DefaultReplicas,
+		AntiAffinity:          clusterDefCompObj.AntiAffinity,
+		ComponentType:         clusterDefCompObj.ComponentType,
+		ConsensusSpec:         clusterDefCompObj.ConsensusSpec,
+		PodSpec:               clusterDefCompObj.PodSpec,
+		Service:               clusterDefCompObj.Service,
+		Probes:                clusterDefCompObj.Probes,
+		LogConfigs:            clusterDefCompObj.LogConfigs,
+		ConfigTemplates:       clusterDefCompObj.ConfigTemplateRefs,
+		HorizontalScalePolicy: clusterDefCompObj.HorizontalScalePolicy,
 	}
 
 	doContainerAttrOverride := func(container corev1.Container) {
@@ -945,8 +944,8 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				return &res, err
 			}
 			// clean backup resources
-			if component != nil &&
-				component.HorizontalScalePolicy == dbaasv1alpha1.Snapshot &&
+			if component != nil && component.HorizontalScalePolicy != nil &&
+				component.HorizontalScalePolicy.Type == dbaasv1alpha1.Snapshot &&
 				isSnapshotAvailable(cli, ctx) {
 				allPVCBound, err := isAllPVCBound(cli, ctx, stsObj)
 				if err != nil {
@@ -1713,11 +1712,11 @@ func doSnapshot(cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
 	snapshotKey types.NamespacedName,
 	stsObj *appsv1.StatefulSet,
-	backupTemplateSelectLabels map[string]string) error {
+	backupTemplateSelector map[string]string) error {
 
 	ctx := reqCtx.Ctx
 
-	ml := client.MatchingLabels(backupTemplateSelectLabels)
+	ml := client.MatchingLabels(backupTemplateSelector)
 	backupPolicyTemplateList := dataprotectionv1alpha1.BackupPolicyTemplateList{}
 	// find backuppolicytemplate by clusterdefinition
 	if err := cli.List(ctx, &backupPolicyTemplateList, ml); err != nil {
@@ -1898,8 +1897,11 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 	snapshotKey types.NamespacedName) (*ctrl.Result, error) {
 	ctx := reqCtx.Ctx
 	var requeueResult *ctrl.Result
+	if component.HorizontalScalePolicy == nil {
+		return requeueResult, nil
+	}
 	// do backup according to component's horizontal scale policy
-	switch component.HorizontalScalePolicy {
+	switch component.HorizontalScalePolicy.Type {
 	// use backup tool such as xtrabackup
 	case dbaasv1alpha1.Backup:
 		// TODO: db core not support yet, leave it empty
@@ -1922,7 +1924,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 					cluster,
 					snapshotKey,
 					stsObj,
-					component.BackupTemplateSelectLabels); err != nil {
+					component.BackupTemplateSelector); err != nil {
 					res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 					return &res, err
 				}

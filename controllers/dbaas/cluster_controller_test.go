@@ -896,7 +896,7 @@ spec:
 			clusterDef := &dbaasv1alpha1.ClusterDefinition{}
 			Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDef)).Should(Succeed())
 			if useExistingCluster {
-				clusterDef.Spec.Components[0].HorizontalScalePolicy = "Backup"
+				clusterDef.Spec.Components[0].HorizontalScalePolicy = &dbaasv1alpha1.HorizontalScalePolicy{Type: "Snapshot"}
 			}
 			Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
 

@@ -45,6 +45,10 @@ spec:
           - protocol: TCP
             port: 3306
             targetPort: mysql
+      horizontalScalePolicy:
+        type: Snapshot
+        backupTemplateSelector:
+          "clusterdefinition.kubeblocks.io/name": apecloud-wesql
       podSpec:
         containers:
           - name: mysql

@@ -33,35 +33,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const (
-	host             = "host"
-	username         = "username"
-	password         = "password"
-	server           = "server"
-	databaseName     = "databaseName"
-	operationTimeout = "operationTimeout"
-	params           = "params"
-	value            = "value"
-
-	defaultTimeout = 5 * time.Second
-
-	defaultDbPort = 27018
-
-	// mongodb://<username>:<password@<host>/<database><params>
-	connectionURIFormatWithAuthentication = "mongodb://%s:%s@%s/%s%s"
-
-	// mongodb://<host>/<database><params>
-	connectionURIFormat = "mongodb://%s/%s%s"
-
-	// mongodb+srv://<server>/<params>
-	connectionURIFormatWithSrv = "mongodb+srv://%s/%s"
-
-	// mongodb+srv://<username>:<password>@<server>/<database><params>
-	connectionURIFormatWithSrvAndCredentials = "mongodb+srv://%s:%s@%s/%s%s" //nolint:gosec
-
-	adminDatabase = "admin"
-)
-
 // MongoDB is a binding implementation for MongoDB.
 type MongoDB struct {
 	mongoDBMetadata
@@ -121,6 +92,35 @@ type ReplSetGetStatus struct {
 	Ok                      int64           `bson:"ok"`
 }
 
+const (
+	host             = "host"
+	username         = "username"
+	password         = "password"
+	server           = "server"
+	databaseName     = "databaseName"
+	operationTimeout = "operationTimeout"
+	params           = "params"
+	value            = "value"
+
+	defaultTimeout = 5 * time.Second
+
+	defaultDbPort = 27018
+
+	// mongodb://<username>:<password@<host>/<database><params>
+	connectionURIFormatWithAuthentication = "mongodb://%s:%s@%s/%s%s"
+
+	// mongodb://<host>/<database><params>
+	connectionURIFormat = "mongodb://%s/%s%s"
+
+	// mongodb+srv://<server>/<params>
+	connectionURIFormatWithSrv = "mongodb+srv://%s/%s"
+
+	// mongodb+srv://<username>:<password>@<server>/<database><params>
+	connectionURIFormatWithSrvAndCredentials = "mongodb+srv://%s:%s@%s/%s%s" //nolint:gosec
+
+	adminDatabase = "admin"
+)
+
 // NewMongoDB returns a new MongoDB Binding
 func NewMongoDB(logger logger.Logger) bindings.OutputBinding {
 	return &MongoDB{logger: logger}
@@ -138,7 +138,9 @@ func (m *MongoDB) Init(metadata bindings.Metadata) error {
 		Logger:    m.logger,
 		Operation: m,
 	}
-	return m.base.Init()
+	m.base.Init()
+
+	return nil
 }
 
 func (m *MongoDB) Operations() []bindings.OperationKind {

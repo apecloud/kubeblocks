@@ -29,12 +29,6 @@ import (
 	v3 "go.etcd.io/etcd/client/v3"
 )
 
-const (
-	endpoint = "endpoint"
-
-	defaultPort = 2379
-)
-
 type Etcd struct {
 	lock     sync.Mutex
 	etcd     *v3.Client
@@ -42,6 +36,12 @@ type Etcd struct {
 	logger   logger.Logger
 	base     internal.ProbeBase
 }
+
+const (
+	endpoint = "endpoint"
+
+	defaultPort = 2379
+)
 
 // NewEtcd returns a new etcd binding instance.
 func NewEtcd(logger logger.Logger) bindings.OutputBinding {
@@ -54,8 +54,8 @@ func (e *Etcd) Init(metadata bindings.Metadata) error {
 		Logger:    e.logger,
 		Operation: e,
 	}
-
-	return e.base.Init()
+	e.base.Init()
+	return nil
 }
 
 func (e *Etcd) Operations() []bindings.OperationKind {

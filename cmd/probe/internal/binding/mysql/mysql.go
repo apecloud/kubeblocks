@@ -108,8 +108,9 @@ func (m *Mysql) Init(metadata bindings.Metadata) error {
 		Logger:    m.logger,
 		Operation: m,
 	}
+	m.base.Init()
 
-	return m.base.Init()
+	return nil
 }
 
 // Invoke handles all invoke operations.

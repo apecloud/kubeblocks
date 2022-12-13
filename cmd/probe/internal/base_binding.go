@@ -61,23 +61,21 @@ type ProbeOperation interface {
 	// GetRunningPort get binding service port.
 	// runningCheck will run its check on this port
 	GetRunningPort() int
-	// StatusCheck checks the status of the binding service
-	// TODO proposal TBD
+	// StatusCheck TODO proposal TBD
 	StatusCheck(context.Context, string, *bindings.InvokeResponse) ([]byte, error)
 	// GetRole get consensus role name of the binding service
 	// roleCheck will call this interface when necessary
+	// return role name of the binding service
 	GetRole(context.Context, string) (string, error)
 }
 
-func (p *ProbeBase) Init() error {
-	viper.SetDefault("KB_AGGREGATION_NUMBER", defaultEventIntervalNum)
+func (p *ProbeBase) Init() {
+	viper.SetDefault("KB_AGGREGATION_NUMBER", defaultEventAggregationNum)
 	p.eventAggregationNum = viper.GetInt("KB_AGGREGATION_NUMBER")
 	viper.SetDefault("KB_EVENT_INTERNAL_NUMBER", defaultEventIntervalNum)
 	p.eventIntervalNum = viper.GetInt("KB_EVENT_INTERNAL_NUMBER")
 	viper.SetDefault("KB_SERVICE_PORT", p.Operation.GetRunningPort())
 	p.dbPort = viper.GetInt("KB_SERVICE_PORT")
-
-	return nil
 }
 
 func (p *ProbeBase) Operations() []bindings.OperationKind {
@@ -195,10 +193,15 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 // runningCheck checks whether the binding service is in running status:
 // the port is open or is close consecutively in eventAggregationNum times
 func (p *ProbeBase) runningCheck(ctx context.Context, resp *bindings.InvokeResponse) ([]byte, error) {
+	var message string
+	result := ProbeMessage{}
+	marshalResult := func() ([]byte, error) {
+		result.Message = message
+		return json.Marshal(result)
+	}
+
 	host := fmt.Sprintf("127.0.0.1:%d", p.dbPort)
 	conn, err := net.DialTimeout("tcp", host, 900*time.Millisecond)
-	message := ""
-	result := ProbeMessage{}
 	if err != nil {
 		message = fmt.Sprintf("running check %s error: %v", host, err)
 		result.Event = "runningCheckFailed"
@@ -207,15 +210,13 @@ func (p *ProbeBase) runningCheck(ctx context.Context, resp *bindings.InvokeRespo
 			p.Logger.Infof("running checks failed %v times continuously", p.runningCheckFailedCount)
 			resp.Metadata[StatusCode] = CheckFailedHTTPCode
 		}
-	} else {
-		p.runningCheckFailedCount = 0
-		message = "TCP Connection Established Successfully!"
-		if tcpCon, ok := conn.(*net.TCPConn); ok {
-			tcpCon.SetLinger(0)
-		}
-		defer conn.Close()
+		return marshalResult()
 	}
-	result.Message = message
-	msg, _ := json.Marshal(result)
-	return msg, nil
+	defer conn.Close()
+	p.runningCheckFailedCount = 0
+	message = "TCP Connection Established Successfully!"
+	if tcpCon, ok := conn.(*net.TCPConn); ok {
+		tcpCon.SetLinger(0)
+	}
+	return marshalResult()
 }

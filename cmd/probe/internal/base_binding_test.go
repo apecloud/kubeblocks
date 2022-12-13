@@ -35,10 +35,7 @@ const (
 
 func TestInit(t *testing.T) {
 	p := mockProbeBase()
-	err := p.Init()
-	if err != nil {
-		t.Errorf("init failed with error: %s", err)
-	}
+	p.Init()
 	if p.oriRole != "" {
 		t.Errorf("p.oriRole init failed: %s", p.oriRole)
 	}

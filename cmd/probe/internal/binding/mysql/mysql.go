@@ -107,6 +107,7 @@ var (
 	eventIntervalNum        = 60
 	dbPort                  = 3306
 	dbUser                  = "root"
+	dbPasswd                = ""
 	dbRoles                 = map[string]internal.AccessMode{}
 )
 

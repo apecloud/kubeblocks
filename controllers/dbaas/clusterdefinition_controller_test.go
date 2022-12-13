@@ -147,7 +147,7 @@ spec:
     podSpec: 
       containers:
       - name: mysql
-        image: registry.jihulab.com/apecloud/mysql-server/mysql/wesql-server-arm:latest
+        image: docker.io/apecloud/wesql-server:latest
       - name: mysql_exporter
         image: "prom/mysqld-exporter:v0.14.0"
 `

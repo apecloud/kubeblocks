@@ -195,8 +195,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		return intctrlutil.Reconciled()
 	}
 
-	cfgSpec := component.ConfigSpec
-	if cfgSpec == nil {
+	if component.ConfigSpec == nil {
 		return intctrlutil.Reconciled()
 	}
 
@@ -229,7 +228,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		ComponentUnits:   sts,
 		Component:        component,
 		ClusterComponent: clusterComponent,
-		Restart:          cfgcm.IsNotSupportReload(cfgSpec.ReconfigureOption),
+		Restart:          cfgcm.IsNotSupportReload(component.ConfigSpec.ReconfigureOption),
 	})
 }
 

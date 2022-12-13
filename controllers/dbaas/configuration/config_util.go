@@ -18,10 +18,13 @@ package configuration
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/conversion"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -81,7 +84,7 @@ func GetConfigMapByName(cli client.Client, ctx intctrlutil.RequestCtx, cmName, n
 	return configObj, nil
 }
 
-func CheckConfigurationTemplate(cli client.Client, ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplate) (bool, error) {
+func CheckConfigurationTemplate(ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplate) (bool, error) {
 	// validate configuration template
 	isConfigSchemaFn := func(tpl *dbaasv1alpha1.CustomParametersValidation) (bool, error) {
 		if tpl == nil || tpl.Cue == nil {
@@ -95,10 +98,77 @@ func CheckConfigurationTemplate(cli client.Client, ctx intctrlutil.RequestCtx, t
 	return checkConfigTPL(ctx, tpl, isConfigSchemaFn)
 }
 
+func DeleteCDConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, clusterDef *dbaasv1alpha1.ClusterDefinition) error {
+	_, err := handleConfigTemplate(clusterDef, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
+		return true, batchDeleteConfigMapFinalizer[*dbaasv1alpha1.ClusterDefinition](cli, ctx, tpls, clusterDef)
+	})
+	return err
+}
+
+func DeleteAVConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, appVersion *dbaasv1alpha1.AppVersion) error {
+	_, err := handleConfigTemplate(appVersion, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
+		return true, batchDeleteConfigMapFinalizer[*dbaasv1alpha1.AppVersion](cli, ctx, tpls, appVersion)
+	})
+	return err
+}
+
+func validateConfigMapOwners(cli client.Client, ctx intctrlutil.RequestCtx, labels client.MatchingLabels, check func(obj any) bool, objLists ...client.ObjectList) (bool, error) {
+	for _, objList := range objLists {
+		if err := cli.List(ctx.Ctx, objList, labels, client.Limit(2)); err != nil {
+			return false, err
+		}
+		v, err := conversion.EnforcePtr(objList)
+		if err != nil {
+			return false, err
+		}
+		items := v.FieldByName("Items")
+		if !items.IsValid() || items.Kind() != reflect.Slice || items.Len() > 1 {
+			return false, nil
+		}
+		if items.Len() == 0 {
+			continue
+		}
+
+		val := items.Index(0)
+		// fetch object pointer
+		if val.CanAddr() {
+			val = val.Addr()
+		}
+		if !val.CanInterface() || !check(val.Interface()) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func batchDeleteConfigMapFinalizer[T client.Object](cli client.Client, ctx intctrlutil.RequestCtx, tpls []dbaasv1alpha1.ConfigTemplate, cr T) error {
+	validator := func(obj any) bool {
+		if expected, ok := obj.(T); !ok {
+			return false
+		} else {
+			return expected.GetName() == cr.GetName() && expected.GetNamespace() == cr.GetNamespace()
+		}
+	}
+	for _, tpl := range tpls {
+		labelKey := cfgcore.GenerateUniqLabelKeyWithConfig(tpl.ConfigMapTplRef)
+		if ok, err := validateConfigMapOwners(cli, ctx, client.MatchingLabels{
+			labelKey: tpl.ConfigMapTplRef,
+		}, validator, &dbaasv1alpha1.AppVersionList{}, &dbaasv1alpha1.ClusterDefinitionList{}); err != nil {
+			return err
+		} else if !ok {
+			continue
+		}
+		if err := deleteConfigMapFinalizer(cli, ctx, tpl); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func UpdateCDConfigMapFinalizer(client client.Client, ctx intctrlutil.RequestCtx, clusterDef *dbaasv1alpha1.ClusterDefinition) error {
 	_, err := handleConfigTemplate(clusterDef,
 		func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
-			return true, updateBatchConfigMapFinalizer(client, ctx, tpls)
+			return true, batchUpdateConfigMapFinalizer(client, ctx, tpls)
 		})
 	return err
 }
@@ -106,12 +176,12 @@ func UpdateCDConfigMapFinalizer(client client.Client, ctx intctrlutil.RequestCtx
 func UpdateAVConfigMapFinalizer(client client.Client, ctx intctrlutil.RequestCtx, appversion *dbaasv1alpha1.AppVersion) error {
 	_, err := handleConfigTemplate(appversion,
 		func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
-			return true, updateBatchConfigMapFinalizer(client, ctx, tpls)
+			return true, batchUpdateConfigMapFinalizer(client, ctx, tpls)
 		})
 	return err
 }
 
-func updateBatchConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpls []dbaasv1alpha1.ConfigTemplate) error {
+func batchUpdateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpls []dbaasv1alpha1.ConfigTemplate) error {
 	for _, tpl := range tpls {
 		if err := updateConfigMapFinalizer(cli, ctx, tpl); err != nil {
 			return err
@@ -143,6 +213,24 @@ func updateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl
 	controllerutil.AddFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName)
 
 	// cmObj.Immutable = &tpl.Spec.Immutable
+	return cli.Patch(ctx.Ctx, cmObj, patch)
+}
+
+func deleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl dbaasv1alpha1.ConfigTemplate) error {
+	cmObj, err := GetConfigMapByName(cli, ctx, tpl.ConfigMapTplRef, tpl.Namespace)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", cmObj.Name)
+	}
+
+	if !controllerutil.ContainsFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName) {
+		return nil
+	}
+
+	patch := client.MergeFrom(cmObj.DeepCopy())
+	controllerutil.RemoveFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName)
 	return cli.Patch(ctx.Ctx, cmObj, patch)
 }
 
@@ -195,7 +283,6 @@ func handleConfigTemplate(object client.Object, handler ConfigTemplateHandler, h
 		return handler(tpls)
 	default:
 		return true, nil
-
 	}
 }
 

@@ -25,7 +25,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -79,8 +78,7 @@ func (r *ConfigurationTemplateReconciler) Reconcile(ctx context.Context, req ctr
 			&dbaasv1alpha1.AppVersionList{}); res != nil || err != nil {
 			return res, err
 		}
-
-		return r.deleteExternalResources(reqCtx, configTpl)
+		return nil, nil
 	})
 	if res != nil {
 		return *res, err
@@ -90,7 +88,7 @@ func (r *ConfigurationTemplateReconciler) Reconcile(ctx context.Context, req ctr
 		return intctrlutil.Reconciled()
 	}
 
-	if ok, err := CheckConfigurationTemplate(r.Client, reqCtx, configTpl); !ok || err != nil {
+	if ok, err := CheckConfigurationTemplate(reqCtx, configTpl); !ok || err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "ValidateConfigurationTemplate")
 	}
 
@@ -116,34 +114,4 @@ func (r *ConfigurationTemplateReconciler) SetupWithManager(mgr ctrl.Manager) err
 		// for other resource
 		Owns(&corev1.ConfigMap{}).
 		Complete(r)
-}
-
-func (r *ConfigurationTemplateReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, configTpl *dbaasv1alpha1.ConfigurationTemplate) (*ctrl.Result, error) {
-	// TODO(zt) delete configmap Finalizer
-
-	// delete any external resources associated with the configuration template
-	labels := client.MatchingLabels{
-		cfgcore.CMConfigurationTplNameLabelKey: configTpl.GetName(),
-	}
-	ns := client.InNamespace(configTpl.Namespace)
-
-	cmList := &corev1.ConfigMapList{}
-	if err := r.Client.List(reqCtx.Ctx, cmList, ns, labels); err != nil {
-		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		return &res, err
-	}
-
-	for _, cm := range cmList.Items {
-		if !controllerutil.ContainsFinalizer(&cm, cfgcore.ConfigurationTemplateFinalizerName) {
-			continue
-		}
-		patch := client.MergeFrom(cm.DeepCopy())
-		controllerutil.RemoveFinalizer(&cm, cfgcore.ConfigurationTemplateFinalizerName)
-		if err := r.Patch(reqCtx.Ctx, &cm, patch); err != nil {
-			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-			return &res, err
-		}
-	}
-
-	return nil, nil
 }

@@ -202,7 +202,7 @@ func (r *AppVersionReconciler) deleteExternalResources(reqCtx intctrlutil.Reques
 	//
 	// Ensure that delete implementation is idempotent and safe to invoke
 	// multiple times for same object.
-	return nil
+	return dbaasconfig.DeleteAVConfigMapFinalizer(r.Client, reqCtx, appVersion)
 }
 
 // SyncClusterStatusOperationsWithUpgrade sync cluster status.operations.upgradable when delete or create AppVersion

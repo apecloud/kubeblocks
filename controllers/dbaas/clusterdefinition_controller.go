@@ -139,5 +139,6 @@ func (r *ClusterDefinitionReconciler) deleteExternalResources(reqCtx intctrlutil
 	//
 	// Ensure that delete implementation is idempotent and safe to invoke
 	// multiple times for same object.
-	return nil
+
+	return dbaasconfig.DeleteCDConfigMapFinalizer(r.Client, reqCtx, clusterDef)
 }

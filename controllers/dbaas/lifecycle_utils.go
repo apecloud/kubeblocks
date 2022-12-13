@@ -1186,10 +1186,6 @@ func buildDeploy(reqCtx intctrlutil.RequestCtx, params createParams, envConfigNa
 		return nil, err
 	}
 
-	if err = json.Unmarshal(deployStrByte, &deploy); err != nil {
-		return nil, err
-	}
-
 	if err = processContainersInjection(reqCtx, params, "", &deploy.Spec.Template.Spec); err != nil {
 		return nil, err
 	}

@@ -147,7 +147,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: apecloud/wesql-server:latest
+        image: docker.io/apecloud/wesql-server:latest
   - type: proxy
     podSpec: 
       containers:

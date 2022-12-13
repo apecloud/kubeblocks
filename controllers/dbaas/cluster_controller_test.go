@@ -234,7 +234,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: registry.jihulab.com/apecloud/mysql-server/mysql/wesql-server-arm:latest
+        image: docker.io/apecloud/wesql-server:latest
   - type: proxy
     podSpec: 
       containers:
@@ -403,7 +403,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: docker.io/apecloud/wesql-server-8.0:0.1.2
+        image: docker.io/apecloud/wesql-server:latest
         imagePullPolicy: IfNotPresent
 `
 		appVersion := &dbaasv1alpha1.AppVersion{}
@@ -1286,7 +1286,7 @@ spec:
       value: clusterepuglf-wesql-test-1
     - name: KB_REPLICASETS_2_HOSTNAME
       value: clusterepuglf-wesql-test-2
-    image: docker.io/apecloud/wesql-server-8.0:0.1.2
+    image: docker.io/apecloud/wesql-server:latest
     imagePullPolicy: IfNotPresent
     name: mysql
     ports:

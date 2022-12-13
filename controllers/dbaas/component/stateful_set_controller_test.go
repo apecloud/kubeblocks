@@ -150,7 +150,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: docker.io/apecloud/wesql-server-8.0:0.1.2
+        image: docker.io/apecloud/wesql-server:latest
 `, appVersionName, clusterDefName)
 		appVersion := &dbaasv1alpha1.AppVersion{}
 		Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(Succeed())
@@ -264,7 +264,7 @@ spec:
           value: wesql-wesql-test-1.wesql-wesql-test-headless
         - name: KB_REPLICASETS_2_HOSTNAME
           value: wesql-wesql-test-2.wesql-wesql-test-headless
-        image: docker.io/apecloud/wesql-server:8.0.30-4.alpha4.20221117.gba56235
+        image: docker.io/apecloud/wesql-server:latest
         imagePullPolicy: IfNotPresent
         name: mysql
         ports:
@@ -368,7 +368,7 @@ spec:
       value: wesql-wesql-test-1.wesql-wesql-test-headless
     - name: KB_REPLICASETS_2_HOSTNAME
       value: wesql-wesql-test-2.wesql-wesql-test-headless
-    image: docker.io/apecloud/wesql-server:8.0.30-4.alpha4.20221117.gba56235
+    image: docker.io/apecloud/wesql-server:latest
     imagePullPolicy: IfNotPresent
     name: mysql
     ports:

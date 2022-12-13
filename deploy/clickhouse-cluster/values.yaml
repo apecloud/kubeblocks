@@ -35,6 +35,11 @@ clickhouse:
     ##
     replicaCount: 2
 
+    ## ClickHouse workload pod resource requests and limits
+    ## ref: http://kubernetes.io/docs/user-guide/compute-resources/
+    ## @param clickhouse[*].resources.limits The resources limits for the init container
+    ## @param clickhouse[*].resources.requests The requested resources for the init container
+    ##
     resources: {}
       # We usually recommend not to specify default resources and to leave this as a conscious
       # choice for the user. This also increases chances charts run on environments with little
@@ -47,17 +52,43 @@ clickhouse:
       #   cpu: 100m
       #   memory: 128Mi
 
+    ## Enable persistence using Persistent Volume Claims
+    ## ref: https://kubernetes.io/docs/user-guide/persistent-volumes/
+    ##
     persistence:
+      ## @param clickhouse[*].persistence.enabled Enable persistence using Persistent Volume Claims
+      ##
       enabled: false
+      ## `data` volumen settings
+      ##
       data:
+        ## @param clickhouse[*].persistence.data.storageClassName Storage class of backing PVC
+        ## If defined, storageClassName: <storageClass>
+        ## If set to "-", storageClassName: "", which disables dynamic provisioning
+        ## If undefined (the default) or set to null, no storageClassName spec is
+        ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+        ##   GKE, AWS & OpenStack)
+        ##
         storageClassName:
+        ## @param clickhouse[*].persistence.size Size of data volume
+        ##
         size: 10Gi
+
+    ## @param clickhouse[*].tolerations Tolerations for ClickHouse pods assignment
+    ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+    ##
+    tolerations: []
 
   # -
   #   ## @param replicaCount Number of ClickHouse replicas per shard to deploy
   #   ##
   #   replicaCount: 2
 
+  #   ## ClickHouse workload pod resource requests and limits
+  #   ## ref: http://kubernetes.io/docs/user-guide/compute-resources/
+  #   ## @param clickhouse[*].resources.limits The resources limits for the init container
+  #   ## @param clickhouse[*].resources.requests The requested resources for the init container
+  #   ##
   #   resources: {}
   #     # We usually recommend not to specify default resources and to leave this as a conscious
   #     # choice for the user. This also increases chances charts run on environments with little
@@ -70,14 +101,35 @@ clickhouse:
   #     #   cpu: 100m
   #     #   memory: 128Mi
 
+  #   ## Enable persistence using Persistent Volume Claims
+  #   ## ref: https://kubernetes.io/docs/user-guide/persistent-volumes/
+  #   ##
   #   persistence:
+  #     ## @param clickhouse[*].persistence.enabled Enable persistence using Persistent Volume Claims
+  #     ##
   #     enabled: false
+  #     ## `data` volumen settings
+  #     ##
   #     data:
+  #       ## @param clickhouse[*].persistence.data.storageClassName Storage class of backing PVC
+  #       ## If defined, storageClassName: <storageClass>
+  #       ## If set to "-", storageClassName: "", which disables dynamic provisioning
+  #       ## If undefined (the default) or set to null, no storageClassName spec is
+  #       ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+  #       ##   GKE, AWS & OpenStack)
+  #       ##
   #       storageClassName:
+  #       ## @param clickhouse[*].persistence.size Size of data volume
+  #       ##
   #       size: 10Gi
 
+  #   ## @param clickhouse[*].tolerations Tolerations for ClickHouse pods assignment
+  #   ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  #   ##
+  #   tolerations: []
 
-## @param tolerations Tolerations for ClickHouse pods assignment
+
+## @param tolerations define global Tolerations for the cluster all pod's assignment
 ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
 ##
 tolerations: []
@@ -100,6 +152,12 @@ useClickHouseKeeper: true
 
 keeper:
   replicaCount: 1
+
+  ## Zookeeper/ClickHouse Keeper workload pod resource requests and limits
+  ## ref: http://kubernetes.io/docs/user-guide/compute-resources/
+  ## @param clickhouse[*].resources.limits The resources limits for the init container
+  ## @param clickhouse[*].resources.requests The requested resources for the init container
+  ##
   resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little
@@ -117,3 +175,8 @@ keeper:
     data:
       storageClassName:
       size: 8Gi
+
+  ## @param keeper.tolerations Tolerations for *Keeper pods assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  ##
+  tolerations: []

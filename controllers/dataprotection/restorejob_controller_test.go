@@ -232,7 +232,7 @@ spec:
 		return nil
 	}
 
-	assureBackupToolObj := func() *dataprotectionv1alpha1.BackupTool {
+	assureBackupToolObj := func(withoutResources ...bool) *dataprotectionv1alpha1.BackupTool {
 		By("By assure an backupTool obj")
 		backupToolYaml := `
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
@@ -287,6 +287,14 @@ spec:
 		ns := genarateNS("backup-tool-")
 		backupTool.Name = ns.Name
 		backupTool.Namespace = ns.Namespace
+		nilResources := false
+		// optional arguments, only use the first one.
+		if len(withoutResources) > 0 {
+			nilResources = withoutResources[0]
+		}
+		if nilResources {
+			backupTool.Spec.Resources = nil
+		}
 		Expect(testCtx.CheckedCreateObj(ctx, backupTool)).Should(Succeed())
 		return backupTool
 	}
@@ -605,6 +613,67 @@ spec:
 
 			By("By creating a backupTool")
 			backupTool := assureBackupToolObj()
+
+			By("By creating a backupPolicy from backupTool: " + backupTool.Name)
+			backupPolicy := assureBackupPolicyObj(backupTool.Name)
+
+			By("By creating a backupJob from backupPolicy: " + backupPolicy.Name)
+			backupJob := assureBackupJobObj(backupPolicy.Name)
+
+			By("By creating a restoreJob from backupJob: " + backupJob.Name)
+			toCreate := assureRestoreJobObj(backupJob.Name)
+			key := types.NamespacedName{
+				Name:      toCreate.Name,
+				Namespace: toCreate.Namespace,
+			}
+
+			patchBackupJobStatus(dataprotectionv1alpha1.BackupJobCompleted, types.NamespacedName{Name: backupJob.Name, Namespace: backupJob.Namespace})
+
+			patchK8sJobStatus(batchv1.JobComplete, types.NamespacedName{Name: toCreate.Name, Namespace: toCreate.Namespace})
+
+			result := &dataprotectionv1alpha1.RestoreJob{}
+			Eventually(func() bool {
+				Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
+				return result.Status.Phase == dataprotectionv1alpha1.RestoreJobCompleted ||
+					result.Status.Phase == dataprotectionv1alpha1.RestoreJobFailed
+			}, timeout, interval).Should(BeTrue())
+			Expect(result.Status.Phase).Should(Equal(dataprotectionv1alpha1.RestoreJobCompleted))
+
+			By("Deleting the scope")
+
+			Eventually(func() error {
+				key = types.NamespacedName{
+					Name:      backupPolicy.Name,
+					Namespace: backupPolicy.Namespace,
+				}
+				_ = deleteBackupPolicyWait(key)
+				key = types.NamespacedName{
+					Name:      backupTool.Name,
+					Namespace: backupTool.Namespace,
+				}
+				_ = deleteBackupToolWait(key)
+
+				key = types.NamespacedName{
+					Name:      backupJob.Name,
+					Namespace: backupJob.Namespace,
+				}
+				_ = deleteBackupJobWait(key)
+
+				key = types.NamespacedName{
+					Name:      toCreate.Name,
+					Namespace: toCreate.Namespace,
+				}
+				return deleteRestoreJobWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("Without backupTool resources should success with no error", func() {
+
+			By("By creating a statefulset")
+			_ = assureStatefulSetObj()
+
+			By("By creating a backupTool")
+			backupTool := assureBackupToolObj(true)
 
 			By("By creating a backupPolicy from backupTool: " + backupTool.Name)
 			backupPolicy := assureBackupPolicyObj(backupTool.Name)

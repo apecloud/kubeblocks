@@ -17,13 +17,13 @@ spec:
       podSpec:
         containers:
           - name: clickhouse
-            image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+            image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
     - type: ch-keeper
       podSpec:
         containers:
           - name: clickhouse
-            image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+            image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
     - type: zookeeper
       podSpec:

@@ -17,14 +17,14 @@ package mongodb
 
 import (
 	"context"
-	"github.com/dapr/kit/logger"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
 	"testing"
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/components-contrib/metadata"
+	"github.com/dapr/kit/logger"
 	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
 )
 
 func TestGetMongoDBMetadata(t *testing.T) {

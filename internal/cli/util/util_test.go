@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -132,6 +133,11 @@ var _ = Describe("util", func() {
 		Expect(w).Should(Equal(1))
 		Expect(s).Should(Equal(1))
 		Expect(f).Should(Equal(1))
+	})
+
+	It("time format", func() {
+		t := metav1.Time{Time: time.Now()}
+		fmt.Println(TimeFormat(&t))
 	})
 
 	It("Others", func() {

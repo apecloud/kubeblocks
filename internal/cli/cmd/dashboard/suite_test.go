@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubeblocks
+package dashboard
 
 import (
 	"testing"
@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestKubeBlocks(t *testing.T) {
+func TestDashboard(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "KubeBlocks Suite")
+	RunSpecs(t, "Dashboard Suite")
 }

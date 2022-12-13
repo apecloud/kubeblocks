@@ -45,6 +45,14 @@ func TestGenerateOpenApiSchema(t *testing.T) {
 		want:    "mysql_openapi.json",
 		wantErr: false,
 	}, {
+		//	name: "normal_test",
+		//	args: args{
+		//		cueFile:    "mysql_openapi_v2.cue",
+		//		schemaType: "MysqlSchema",
+		//	},
+		//	want:    "mysql_openapi_v2.json",
+		//	wantErr: false,
+		// }, {
 		name: "normal_with_not_empty",
 		args: args{
 			cueFile:    "mysql_openapi.cue",

@@ -61,7 +61,7 @@ func CheckConfigurationLabels(object client.Object, requiredLabs []string) bool 
 	}
 
 	// reconfigure ConfigMap for db instance
-	if ins, ok := labels[cfgcore.CMInsConfigurationLabelKey]; !ok || ins != "true" {
+	if ins, ok := labels[cfgcore.CMInsConfigurationLabelKey]; !ok || ins != cfgcore.ConstTrueString {
 		return false
 	}
 
@@ -210,7 +210,7 @@ func updateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl
 	if cmObj.ObjectMeta.Labels == nil {
 		cmObj.ObjectMeta.Labels = map[string]string{}
 	}
-	cmObj.ObjectMeta.Labels[cfgcore.CMConfigurationTplLabelKey] = "true"
+	cmObj.ObjectMeta.Labels[cfgcore.CMConfigurationTplLabelKey] = cfgcore.ConstTrueString
 	controllerutil.AddFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName)
 
 	// cmObj.Immutable = &tpl.Spec.Immutable

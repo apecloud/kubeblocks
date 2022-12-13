@@ -339,7 +339,8 @@ func (m *Mysql) exec(ctx context.Context, sql string) (int64, error) {
 
 func (m *Mysql) runningCheck(ctx context.Context, resp *bindings.InvokeResponse) ([]byte, error) {
 	host := fmt.Sprintf("127.0.0.1:%d", dbPort)
-	conn, err := net.DialTimeout("tcp", host, 900*time.Millisecond)
+	// sql exec timeout need to be less than httpget's timeout which default is 1s.
+	conn, err := net.DialTimeout("tcp", host, 500*time.Millisecond)
 	message := ""
 	result := internal.ProbeMessage{}
 	if err != nil {
@@ -412,7 +413,7 @@ func (m *Mysql) getRole(ctx context.Context, sql string) (string, error) {
 	}
 
 	// sql exec timeout need to be less than httpget's timeout which default is 1s.
-	ctx1, cancel := context.WithTimeout(context.Background(), 900*time.Millisecond)
+	ctx1, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 	rows, err := m.db.QueryContext(ctx1, sql)
 	if err != nil {

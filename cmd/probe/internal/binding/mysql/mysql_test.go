@@ -146,6 +146,26 @@ func TestInvoke(t *testing.T) {
 		assert.Equal(t, 1, len(data))
 	})
 
+	t.Run("role operation succeeds", func(t *testing.T) {
+		col1 := sqlmock.NewColumn("CURRENT_LEADER").OfType("VARCHAR", "")
+		col2 := sqlmock.NewColumn("ROLE").OfType("VARCHAR", "")
+		col3 := sqlmock.NewColumn("SERVER_ID").OfType("VARCHAR", "")
+		rows := sqlmock.NewRowsWithColumnDefinition(col1, col2, col3).AddRow("", "leader", "")
+		mock.ExpectQuery("SELECT \\* FROM information_schema.wesql_cluster_local WHERE id < \\d+").WillReturnRows(rows)
+
+		metadata := map[string]string{commandSQLKey: ""}
+		req := &bindings.InvokeRequest{
+			Data:      nil,
+			Metadata:  metadata,
+			Operation: roleCheckOperation,
+		}
+		resp, err := m.Invoke(context.Background(), req)
+		assert.Nil(t, err)
+		var data map[string]string
+		err = json.Unmarshal(resp.Data, &data)
+		assert.Nil(t, err)
+	})
+
 	t.Run("query operation fails", func(t *testing.T) {
 		mock.ExpectQuery("SELECT \\* FROM foo WHERE id < \\d+").WillReturnError(errors.New("query failed"))
 		metadata := map[string]string{commandSQLKey: "SELECT * FROM foo WHERE id < 2"}

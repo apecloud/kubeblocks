@@ -26,7 +26,11 @@ spec:
         {{- end }}
       configTemplateRefs:
         - name: mysql-3node-tpl-8.0
+          namespace: {{ .Release.Namespace }}
           volumeName: mysql-config
+        - name: wesql-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
       defaultReplicas: 3
       componentType: Consensus
       consensusSpec:
@@ -42,10 +46,6 @@ spec:
             port: 3306
             targetPort: mysql
       podSpec:
-        volumes:
-          - name: scripts
-            configMap:
-              name: wesql-scripts
         containers:
           - name: mysql
             imagePullPolicy: IfNotPresent
@@ -94,6 +94,4 @@ spec:
                 value: {{ if .Values.cluster.customConfig }}{{ .Values.cluster.customConfig }}{{ end }}
               - name: MYSQL_DYNAMIC_CONFIG
                 value: {{ if .Values.cluster.dynamicConfig }}{{ .Values.cluster.dynamicConfig }}{{ end }}
-            command: ["/bin/bash"]
-            args:
-              - /scripts/setup.sh
+            command: ["/scripts/setup.sh"]

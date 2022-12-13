@@ -2,9 +2,9 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: wesql-scripts
-  namespace: default
 data:
   setup.sh: |
+    #!/bin/bash
     leader=$KB_REPLICASETS_LEADER
     followers=$KB_REPLICASETS_FOLLOWERS
     echo $leader

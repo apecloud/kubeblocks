@@ -1278,7 +1278,8 @@ func buildCfg(params createParams,
 		// Check config cm already exists
 		cmName := cfgcore.GetInstanceCMName(obj, &tpl)
 		volumes[cmName] = tpl
-		cfgLables[cfgcore.GenerateUniqLabelKeyWithConfig(tpl.ConfigMapTplRef)] = tpl.ConfigMapTplRef
+		// Configuration.kubeblocks.io/cfg-tpl-${ctpl-name}: ${cm-instance-name}
+		cfgLables[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = cmName
 		isExist, err := isAlreadyExists(cmName, params.cluster.Namespace, ctx, cli)
 		if err != nil {
 			return nil, err
@@ -1580,10 +1581,10 @@ func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder, cmName string, 
 	}
 
 	// Using ConfigMap cue template render to configmap of config
-	return buildConfigMapWithTemplate(configs, params, cmName, tplCfg.ConfigMapTplRef, tplCfg.ConfigConstraintsRef)
+	return buildConfigMapWithTemplate(configs, params, cmName, tplCfg)
 }
 
-func buildConfigMapWithTemplate(configs map[string]string, params createParams, cmName, templateName, configConstraints string) (*corev1.ConfigMap, error) {
+func buildConfigMapWithTemplate(configs map[string]string, params createParams, cmName string, tplCfg dbaasv1alpha1.ConfigTemplate) (*corev1.ConfigMap, error) {
 	const tplFile = "config_template.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := params.getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
@@ -1608,8 +1609,9 @@ func buildConfigMapWithTemplate(configs map[string]string, params createParams, 
 			"name":                  params.component.Name,
 			"type":                  params.component.Type,
 			"configName":            cmName,
-			"templateName":          templateName,
-			"configConstraintsName": configConstraints,
+			"templateName":          tplCfg.ConfigMapTplRef,
+			"configConstraintsName": tplCfg.ConfigConstraintsRef,
+			"configTemplateName":    tplCfg.Name,
 		},
 	}
 	configBytes, err := json.Marshal(configMeta)

@@ -106,12 +106,16 @@ type CfgOption struct {
 	K8sKey *K8sConfig
 }
 
-func GenerateUniqLabelKeyWithConfig(configKey string) string {
+func GenerateTPLUniqLabelKeyWithConfig(configKey string) string {
 	return GenerateUniqKeyWithConfig(ConfigurationTplLabelPrefixKey, configKey)
 }
 
 func GenerateUniqKeyWithConfig(label string, configKey string) string {
 	return fmt.Sprintf("%s-%s", label, strings.ReplaceAll(configKey, "_", "-"))
+}
+
+func GenerateConstraintsUniqLabelKeyWithConfig(configKey string) string {
+	return GenerateUniqKeyWithConfig(ConfigurationConstraintsLabelPrefixKey, configKey)
 }
 
 // GetInstanceCMName  {{statefull.Name}}-{{appVersion.Name}}-{{tpl.Name}}-"config"

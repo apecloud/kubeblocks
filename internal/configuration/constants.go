@@ -20,18 +20,20 @@ const (
 	ConfigurationTemplateFinalizerName = "configuration.kubeblocks.io/finalizer"
 
 	// ConfigurationTplLabelPrefixKey appVersion or clusterdefinition using tpl
-	ConfigurationTplLabelPrefixKey = "configuration.kubeblocks.io/tpl"
+	ConfigurationTplLabelPrefixKey         = "configuration.kubeblocks.io/cfg-tpl"
+	ConfigurationConstraintsLabelPrefixKey = "configuration.kubeblocks.io/cfg-constraints"
 
-	LastAppliedConfigAnnotation          = "configuration.kubeblocks.io/last-applied-configuration"
-	UpgradeInsConfigurationAnnotationKey = "configuration.kubeblocks.io/rolling-upgrade"
-	UpgradePolicyAnnotationKey           = "configuration.kubeblocks.io/reconfigure-policy"
-	UpgradeRestartAnnotationKey          = "configuration.kubeblocks.io/restart"
+	LastAppliedConfigAnnotation                 = "configuration.kubeblocks.io/last-applied-configuration"
+	DisableUpgradeInsConfigurationAnnotationKey = "configuration.kubeblocks.io/disable-reconfigure"
+	UpgradePolicyAnnotationKey                  = "configuration.kubeblocks.io/reconfigure-policy"
+	UpgradeRestartAnnotationKey                 = "configuration.kubeblocks.io/restart"
 
 	// CMConfigurationTplLabelKey configmap is config template
 	CMConfigurationTplLabelKey             = "configuration.kubeblocks.io/configuration-template"
-	CMConfigurationTplNameLabelKey         = "configuration.kubeblocks.io/configurationtpl-name"
+	CMConfigurationTplNameLabelKey         = "configuration.kubeblocks.io/configuration-tpl-name"
 	CMConfigurationConstraintsNameLabelKey = "configuration.kubeblocks.io/configuration-constraints-name"
 	CMInsConfigurationHashLabelKey         = "configuration.kubeblocks.io/configuration-hash"
+	CMConfigurationISVTplLabelKey          = "configuration.kubeblocks.io/configtemplate-name"
 
 	// CMInsConfigurationLabelKey configmap is configuration file for component
 	CMInsConfigurationLabelKey = "configuration.kubeblocks.io/ins-configure"

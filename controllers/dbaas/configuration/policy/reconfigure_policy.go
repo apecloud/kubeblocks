@@ -61,7 +61,7 @@ func (param *ReconfigureParams) ComponentType() dbaasv1alpha1.ComponentType {
 
 func (param *ReconfigureParams) GetConfigKey() string {
 	for _, tpl := range param.Component.ConfigSpec.ConfigTemplateRefs {
-		if tpl.ConfigMapTplRef == param.TplName {
+		if tpl.Name == param.TplName {
 			return tpl.VolumeName
 		}
 	}

@@ -30,15 +30,15 @@ import (
 
 func CheckEnableCfgUpgrade(object client.Object) bool {
 	// check user disable upgrade
-	// configuration.kubeblocks.io/rolling-upgrade = "false"
+	// configuration.kubeblocks.io/disable-reconfigure = "false"
 	annotations := object.GetAnnotations()
-	value, ok := annotations[cfgcore.UpgradeInsConfigurationAnnotationKey]
+	value, ok := annotations[cfgcore.DisableUpgradeInsConfigurationAnnotationKey]
 	if !ok {
 		return true
 	}
 
 	enable, err := strconv.ParseBool(value)
-	if err == nil && !enable {
+	if err == nil && enable {
 		return false
 	}
 
@@ -51,7 +51,7 @@ func SetCfgUpgradeFlag(cli client.Client, ctx intctrlutil.RequestCtx, config *co
 		config.ObjectMeta.Annotations = map[string]string{}
 	}
 
-	config.ObjectMeta.Annotations[cfgcore.UpgradeInsConfigurationAnnotationKey] = strconv.FormatBool(flag)
+	config.ObjectMeta.Annotations[cfgcore.DisableUpgradeInsConfigurationAnnotationKey] = strconv.FormatBool(flag)
 	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
 		return err
 	}

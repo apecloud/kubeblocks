@@ -310,7 +310,7 @@ spec:
 				return controllerutil.ContainsFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName)
 			}, time.Second*10, time.Second*1).Should(BeTrue())
 
-			logrus.Info("check clusterdefinition labels: configuration.GenerateUniqLabelKeyWithConfig(testWrapper.TplName()")
+			logrus.Info("check clusterdefinition labels: configuration.GenerateTPLUniqLabelKeyWithConfig(testWrapper.TplName()")
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{
 					Namespace: clusterDefinition.Namespace,
@@ -320,7 +320,7 @@ spec:
 					return false
 				}
 
-				configLabel := cfgcore.GenerateUniqLabelKeyWithConfig(cmName)
+				configLabel := cfgcore.GenerateTPLUniqLabelKeyWithConfig(cmName)
 				tplName, ok := createdClusterDef.Labels[configLabel]
 				return ok && tplName == cmName
 			}, time.Second*10, time.Second*1).Should(BeTrue())

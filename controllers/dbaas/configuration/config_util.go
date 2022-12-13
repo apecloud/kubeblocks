@@ -60,7 +60,8 @@ func CheckConfigurationLabels(object client.Object, requiredLabs []string) bool 
 		}
 	}
 
-	if _, ok := labels[cfgcore.CMInsConfigurationLabelKey]; !ok {
+	// reconfigure ConfigMap for db instance
+	if ins, ok := labels[cfgcore.CMInsConfigurationLabelKey]; !ok || ins != "true" {
 		return false
 	}
 
@@ -150,7 +151,7 @@ func batchDeleteConfigMapFinalizer[T client.Object](cli client.Client, ctx intct
 		}
 	}
 	for _, tpl := range tpls {
-		labelKey := cfgcore.GenerateUniqLabelKeyWithConfig(tpl.ConfigMapTplRef)
+		labelKey := cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)
 		if ok, err := validateConfigMapOwners(cli, ctx, client.MatchingLabels{
 			labelKey: tpl.ConfigMapTplRef,
 		}, validator, &dbaasv1alpha1.AppVersionList{}, &dbaasv1alpha1.ClusterDefinitionList{}); err != nil {
@@ -316,7 +317,8 @@ func UpdateCDLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.Req
 	return handleConfigTemplate(cd, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 		patch := client.MergeFrom(cd.DeepCopy())
 		for _, tpl := range tpls {
-			cd.Labels[cfgcore.GenerateUniqLabelKeyWithConfig(tpl.ConfigConstraintsRef)] = tpl.ConfigConstraintsRef
+			cd.Labels[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = tpl.ConfigMapTplRef
+			cd.Labels[cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(tpl.ConfigConstraintsRef)] = tpl.ConfigConstraintsRef
 		}
 		return true, cli.Patch(ctx.Ctx, cd, patch)
 	})
@@ -332,7 +334,8 @@ func UpdateAVLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.Req
 	return handleConfigTemplate(appVer, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 		patch := client.MergeFrom(appVer.DeepCopy())
 		for _, tpl := range tpls {
-			appVer.Labels[cfgcore.GenerateUniqLabelKeyWithConfig(tpl.ConfigConstraintsRef)] = tpl.ConfigConstraintsRef
+			appVer.Labels[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = tpl.ConfigMapTplRef
+			appVer.Labels[cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(tpl.ConfigConstraintsRef)] = tpl.ConfigConstraintsRef
 		}
 		return true, cli.Patch(ctx.Ctx, appVer, patch)
 	})

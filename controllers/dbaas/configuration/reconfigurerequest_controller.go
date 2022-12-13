@@ -52,7 +52,7 @@ var ConfigurationRequiredLabels = []string{
 	intctrlutil.AppInstanceLabelKey,
 	intctrlutil.AppComponentLabelKey,
 	cfgcore.CMConfigurationTplNameLabelKey,
-	cfgcore.CMInsConfigurationLabelKey,
+	cfgcore.CMConfigurationTplLabelKey,
 }
 
 //+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=reconfigurerequests,verbs=get;list;watch;create;update;patch;delete
@@ -136,8 +136,8 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 			Name:      config.Labels[intctrlutil.AppInstanceLabelKey],
 		}
 
-		configTplName     = config.Labels[cfgcore.CMConfigurationTplNameLabelKey]
-		configTplLabelKey = cfgcore.GenerateUniqLabelKeyWithConfig(configTplName)
+		configTplName     = config.Labels[cfgcore.CMConfigurationISVTplLabelKey]
+		configTplLabelKey = cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName)
 	)
 
 	componentLabels := map[string]string{

@@ -1053,13 +1053,11 @@ func buildSvc(params createParams, headless bool) (*corev1.Service, error) {
 	if headless {
 		tplFile = "headless_service_template.cue"
 	}
-	svcStrByte, err := buildFromCUE(tplFile, map[string]any{
+	svc := corev1.Service{}
+	if err := buildFromCUE(tplFile, map[string]any{
 		"cluster":   params.cluster,
 		"component": params.component,
-	}, "service")
-
-	svc := corev1.Service{}
-	if err = json.Unmarshal(svcStrByte, &svc); err != nil {
+	}, "service", &svc); err != nil {
 		return nil, err
 	}
 
@@ -1074,13 +1072,11 @@ func randomString(length int) string {
 func buildConnCredential(params createParams) (*corev1.Secret, error) {
 	const tplFile = "conn_credential_template.cue"
 
-	secretStrByte, err := buildFromCUE(tplFile, map[string]any{
+	connCredential := corev1.Secret{}
+	if err := buildFromCUE(tplFile, map[string]any{
 		"clusterdefinition": params.clusterDefinition,
 		"cluster":           params.cluster,
-	}, "secret")
-
-	connCredential := corev1.Secret{}
-	if err = json.Unmarshal(secretStrByte, &connCredential); err != nil {
+	}, "secret", &connCredential); err != nil {
 		return nil, err
 	}
 
@@ -1135,13 +1131,11 @@ func buildConnCredential(params createParams) (*corev1.Secret, error) {
 func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName string) (*appsv1.StatefulSet, error) {
 	const tplFile = "statefulset_template.cue"
 
-	stsStrByte, err := buildFromCUE(tplFile, map[string]any{
+	sts := appsv1.StatefulSet{}
+	if err := buildFromCUE(tplFile, map[string]any{
 		"cluster":   params.cluster,
 		"component": params.component,
-	}, "statefulset")
-
-	sts := appsv1.StatefulSet{}
-	if err = json.Unmarshal(stsStrByte, &sts); err != nil {
+	}, "statefulset", &sts); err != nil {
 		return nil, err
 	}
 
@@ -1161,7 +1155,7 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 		}
 	}
 
-	if err = processContainersInjection(reqCtx, params, envConfigName, &sts.Spec.Template.Spec); err != nil {
+	if err := processContainersInjection(reqCtx, params, envConfigName, &sts.Spec.Template.Spec); err != nil {
 		return nil, err
 	}
 	return &sts, nil
@@ -1256,17 +1250,15 @@ func buildConsensusSet(reqCtx intctrlutil.RequestCtx,
 func buildDeploy(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.Deployment, error) {
 	const tplFile = "deployment_template.cue"
 
-	deployStrByte, err := buildFromCUE(tplFile, map[string]any{
+	deploy := appsv1.Deployment{}
+	if err := buildFromCUE(tplFile, map[string]any{
 		"cluster":   params.cluster,
 		"component": params.component,
-	}, "deployment")
-
-	deploy := appsv1.Deployment{}
-	if err = json.Unmarshal(deployStrByte, &deploy); err != nil {
+	}, "deployment", &deploy); err != nil {
 		return nil, err
 	}
 
-	if err = processContainersInjection(reqCtx, params, "", &deploy.Spec.Template.Spec); err != nil {
+	if err := processContainersInjection(reqCtx, params, "", &deploy.Spec.Template.Spec); err != nil {
 		return nil, err
 	}
 	return &deploy, nil
@@ -1274,13 +1266,11 @@ func buildDeploy(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.De
 
 func buildPDB(params createParams) (*policyv1.PodDisruptionBudget, error) {
 	const tplFile = "pdb_template.cue"
-	pdbStrByte, err := buildFromCUE(tplFile, map[string]any{
+	pdb := policyv1.PodDisruptionBudget{}
+	if err := buildFromCUE(tplFile, map[string]any{
 		"cluster":   params.cluster,
 		"component": params.component,
-	}, "pdb")
-
-	pdb := policyv1.PodDisruptionBudget{}
-	if err = json.Unmarshal(pdbStrByte, &pdb); err != nil {
+	}, "pdb", &pdb); err != nil {
 		return nil, err
 	}
 
@@ -1372,14 +1362,12 @@ func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
 		}
 	}
 
-	configStrByte, err := buildFromCUE(tplFile, map[string]any{
+	config := corev1.ConfigMap{}
+	if err := buildFromCUE(tplFile, map[string]any{
 		"cluster":     params.cluster,
 		"component":   params.component,
 		"config.data": envData,
-	}, "config")
-
-	config := corev1.ConfigMap{}
-	if err = json.Unmarshal(configStrByte, &config); err != nil {
+	}, "config", &config); err != nil {
 		return nil, err
 	}
 
@@ -1606,14 +1594,12 @@ func deleteBackup(ctx context.Context, cli client.Client, backupJobKey types.Nam
 func buildBackupPolicy(sts *appsv1.StatefulSet,
 	template *dataprotectionv1alpha1.BackupPolicyTemplate,
 	backupKey types.NamespacedName) (*dataprotectionv1alpha1.BackupPolicy, error) {
-	backupPolicyStrByte, err := buildFromCUE("backup_policy_template.cue", map[string]any{
+	backupPolicy := dataprotectionv1alpha1.BackupPolicy{}
+	if err := buildFromCUE("backup_policy_template.cue", map[string]any{
 		"sts":        sts,
 		"backup_key": backupKey,
 		"template":   template.Name,
-	}, "backup_policy")
-
-	backupPolicy := dataprotectionv1alpha1.BackupPolicy{}
-	if err = json.Unmarshal(backupPolicyStrByte, &backupPolicy); err != nil {
+	}, "backup_policy", &backupPolicy); err != nil {
 		return nil, err
 	}
 
@@ -1622,13 +1608,11 @@ func buildBackupPolicy(sts *appsv1.StatefulSet,
 
 func buildBackupJob(sts *appsv1.StatefulSet,
 	backupJobKey types.NamespacedName) (*dataprotectionv1alpha1.BackupJob, error) {
-	backupJobStrByte, err := buildFromCUE("backup_job_template.cue", map[string]any{
+	backupJob := dataprotectionv1alpha1.BackupJob{}
+	if err := buildFromCUE("backup_job_template.cue", map[string]any{
 		"sts":            sts,
 		"backup_job_key": backupJobKey,
-	}, "backup_job")
-
-	backupJob := dataprotectionv1alpha1.BackupJob{}
-	if err = json.Unmarshal(backupJobStrByte, &backupJob); err != nil {
+	}, "backup_job", &backupJob); err != nil {
 		return nil, err
 	}
 
@@ -1654,14 +1638,12 @@ func buildPVCFromSnapshot(sts *appsv1.StatefulSet,
 	pvcKey types.NamespacedName,
 	snapshotName string) (*corev1.PersistentVolumeClaim, error) {
 
-	pvcStrByte, err := buildFromCUE("pvc_template.cue", map[string]any{
+	pvc := corev1.PersistentVolumeClaim{}
+	if err := buildFromCUE("pvc_template.cue", map[string]any{
 		"sts":           sts,
 		"pvc_key":       pvcKey,
 		"snapshot_name": snapshotName,
-	}, "pvc")
-
-	pvc := corev1.PersistentVolumeClaim{}
-	if err = json.Unmarshal(pvcStrByte, &pvc); err != nil {
+	}, "pvc", &pvc); err != nil {
 		return nil, err
 	}
 
@@ -1677,14 +1659,12 @@ const (
 func buildVolumeSnapshot(snapshotKey types.NamespacedName,
 	pvcName string,
 	sts *appsv1.StatefulSet) (*snapshotv1.VolumeSnapshot, error) {
-	snapshotStrByte, err := buildFromCUE("snapshot_template.cue", map[string]any{
+	snapshot := snapshotv1.VolumeSnapshot{}
+	if err := buildFromCUE("snapshot_template.cue", map[string]any{
 		"snapshot_key": snapshotKey,
 		"pvc_name":     pvcName,
 		"sts":          sts,
-	}, "snapshot")
-
-	snapshot := snapshotv1.VolumeSnapshot{}
-	if err = json.Unmarshal(snapshotStrByte, &snapshot); err != nil {
+	}, "snapshot", &snapshot); err != nil {
 		return nil, err
 	}
 
@@ -1852,15 +1832,13 @@ func buildCronJob(pvcKey types.NamespacedName,
 		serviceAccount = "kubeblocks"
 	}
 
-	cronJobStrByte, err := buildFromCUE("delete_pvc_cron_job_template.cue", map[string]any{
+	cronJob := v1.CronJob{}
+	if err := buildFromCUE("delete_pvc_cron_job_template.cue", map[string]any{
 		"pvc":                   pvcKey,
 		"cronjob.spec.schedule": schedule,
 		"cronjob.spec.jobTemplate.spec.template.spec.serviceAccount": serviceAccount,
 		"sts": sts,
-	}, "cronjob")
-
-	cronJob := v1.CronJob{}
-	if err = json.Unmarshal(cronJobStrByte, &cronJob); err != nil {
+	}, "cronjob", &cronJob); err != nil {
 		return nil, err
 	}
 
@@ -2016,13 +1994,13 @@ func isPVCExists(cli client.Client,
 	return true, nil
 }
 
-func buildFromCUE(tplName string, fillMap map[string]any, lookupKey string) ([]byte, error) {
+func buildFromCUE(tplName string, fillMap map[string]any, lookupKey string, target any) error {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := getCacheCUETplValue(tplName, func() (*intctrlutil.CUETpl, error) {
 		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplName))
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
 
@@ -2032,8 +2010,12 @@ func buildFromCUE(tplName string, fillMap map[string]any, lookupKey string) ([]b
 
 	b, err := cueValue.Lookup(lookupKey)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return b, nil
+	if err = json.Unmarshal(b, target); err != nil {
+		return err
+	}
+
+	return nil
 }

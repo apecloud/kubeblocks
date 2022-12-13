@@ -79,7 +79,7 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - configmaps
+  - configmap
   verbs:
   - create
   - delete
@@ -88,6 +88,20 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - configmap/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - configmap/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - ""
   resources:
@@ -103,12 +117,6 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - ""
-  resources:
-  - configmaps/finalizers
-  verbs:
-  - update
 - apiGroups:
   - ""
   resources:
@@ -442,32 +450,6 @@ rules:
   - dbaas.kubeblocks.io
   resources:
   - opsrequests/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - dbaas.kubeblocks.io
-  resources:
-  - reconfigurerequests
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - dbaas.kubeblocks.io
-  resources:
-  - reconfigurerequests/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - dbaas.kubeblocks.io
-  resources:
-  - reconfigurerequests/status
   verbs:
   - get
   - patch

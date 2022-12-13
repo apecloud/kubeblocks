@@ -219,11 +219,11 @@ func updateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl
 
 func deleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl dbaasv1alpha1.ConfigTemplate) error {
 	cmObj, err := GetConfigMapByName(cli, ctx, tpl.ConfigMapTplRef, tpl.Namespace)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
-		ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", cmObj.Name)
+	if err != nil && apierrors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", tpl.ConfigMapTplRef)
+		return err
 	}
 
 	if !controllerutil.ContainsFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName) {

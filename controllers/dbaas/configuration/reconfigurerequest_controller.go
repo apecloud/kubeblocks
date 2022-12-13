@@ -55,9 +55,9 @@ var ConfigurationRequiredLabels = []string{
 	cfgcore.CMConfigurationTplLabelKey,
 }
 
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=reconfigurerequests,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=reconfigurerequests/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=reconfigurerequests/finalizers,verbs=update
+//+kubebuilder:rbac:groups=core,resources=configmap,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=configmap/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=core,resources=configmap/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -116,8 +116,6 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 func (r *ReconfigureRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.ConfigMap{}).
-		// Watches(&source.Kind{Type: &dbaasv1alpha1.ReconfigureRequest{}},
-		//	&handler.EnqueueRequestForOwner{}).
 		WithEventFilter(predicate.NewPredicateFuncs(checkConfigurationObject)).
 		Complete(r)
 }

@@ -80,6 +80,58 @@ type ClusterOps struct {
 	Upgrade *Upgrade `json:"upgrade"`
 }
 
+type ParameterPair struct {
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
+
+	// +kubebuilder:validation:Required
+	// +optional
+	Value string `json:"value,omitempty"`
+}
+
+type Configuration struct {
+	// ReconfigurePolicy refers to the effective policy of the updated parameter.
+	// 1. If reconfigurePolicy = rolling, the controller will restart all specific containers in the Pod by using a rolling method.
+	// 1. If reconfigurePolicy = parallel, the containers will be restarted simultaneously.
+	// 3. If reconfigurePolicy = autoReload, the sidecar will trigger the database instance to reload.
+	// +kubebuilder:validation:Enum={parallel,rolling,autoReload}
+	// +optional
+	ReconfigurePolicy UpgradePolicy `json:"reconfigurePolicy,omitempty"`
+
+	// +kubebuilder:validation:minimum=1
+	// +kubebuilder:validation:maximum=100
+	// +optional
+	MaxUnavailableCapacity *int `json:"maxUnavailableCapacity,omitempty"`
+
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	Parameters []ParameterPair `json:"parameters"`
+
+	// MountPoint is a volume name which file will mount to.
+	// +optional
+	MountPoint string `json:"mountPoint,omitempty"`
+}
+
+type ConfigurationUpgrade struct {
+	// TTL(Time to Live) defines the time period during which changing parameters is valid.
+	// +optional
+	TTL *int64 `json:"ttl,omitempty"`
+
+	// TriggeringTime defines the time at which the changing parameter to be applied.
+	// +kubebuilder:validation:MaxLength=19
+	// +kubebuilder:validation:MinLength=19
+	// +kubebuilder:validation:Pattern:=`^([0-9]{2})/([0-9]{2})/([0-9]{4}) ([0-9]{2}):([0-9]{2}):([0-9]{2})$`
+	// +optional
+	TriggeringTime *string `json:"triggeringTime,omitempty"`
+
+	// +optional
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+
+	// ComponentNames defines which components perform the operation.
+	// +kubebuilder:validation:Required
+	Configuration Configuration `json:"configuration"`
+}
+
 type ComponentOps struct {
 	// ComponentNames defines which components perform the operation.
 	// +kubebuilder:validation:Required
@@ -97,6 +149,10 @@ type ComponentOps struct {
 	// HorizontalScaling defines the variables that need to input when scaling replicas.
 	// +optional
 	HorizontalScaling *HorizontalScaling `json:"horizontalScaling,omitempty"`
+
+	// Reconfigure defines the variables that need to input when changing parameters.
+	// +optional
+	Reconfigure *ConfigurationUpgrade `json:"reconfigure,omitempty"`
 }
 
 type Upgrade struct {

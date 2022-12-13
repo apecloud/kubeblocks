@@ -424,6 +424,7 @@ func initClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster, componentN
 			},
 		}
 	}
+	cluster.Status.Components[componentName] = componentStatus
 }
 
 func setConsensusSetStatusLeader(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus, memberExt consensusMemberExt) bool {

@@ -705,7 +705,7 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 	case dbaasv1alpha1.Stateless:
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return buildDeploy(reqCtx, *params, envConfig.Name)
+				return buildDeploy(reqCtx, *params)
 			}); err != nil {
 			return err
 		}
@@ -1053,7 +1053,7 @@ func buildSvc(params createParams, headless bool) (*corev1.Service, error) {
 	if headless {
 		tplFile = "headless_service_template.cue"
 	}
-	svcStrByte, err := buildFromCue(tplFile, map[string]any{
+	svcStrByte, err := buildFromCUE(tplFile, map[string]any{
 		"cluster":   params.cluster,
 		"component": params.component,
 	}, "service")
@@ -1074,7 +1074,7 @@ func randomString(length int) string {
 func buildConnCredential(params createParams) (*corev1.Secret, error) {
 	const tplFile = "conn_credential_template.cue"
 
-	secretStrByte, err := buildFromCue(tplFile, map[string]any{
+	secretStrByte, err := buildFromCUE(tplFile, map[string]any{
 		"clusterdefinition": params.clusterDefinition,
 		"cluster":           params.cluster,
 	}, "secret")
@@ -1135,7 +1135,7 @@ func buildConnCredential(params createParams) (*corev1.Secret, error) {
 func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName string) (*appsv1.StatefulSet, error) {
 	const tplFile = "statefulset_template.cue"
 
-	stsStrByte, err := buildFromCue(tplFile, map[string]any{
+	stsStrByte, err := buildFromCUE(tplFile, map[string]any{
 		"cluster":   params.cluster,
 		"component": params.component,
 	}, "statefulset")
@@ -1253,10 +1253,10 @@ func buildConsensusSet(reqCtx intctrlutil.RequestCtx,
 	return sts, err
 }
 
-func buildDeploy(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName string) (*appsv1.Deployment, error) {
+func buildDeploy(reqCtx intctrlutil.RequestCtx, params createParams) (*appsv1.Deployment, error) {
 	const tplFile = "deployment_template.cue"
 
-	deployStrByte, err := buildFromCue(tplFile, map[string]any{
+	deployStrByte, err := buildFromCUE(tplFile, map[string]any{
 		"cluster":   params.cluster,
 		"component": params.component,
 	}, "deployment")
@@ -1278,7 +1278,7 @@ func buildDeploy(reqCtx intctrlutil.RequestCtx, params createParams, envConfigNa
 
 func buildPDB(params createParams) (*policyv1.PodDisruptionBudget, error) {
 	const tplFile = "pdb_template.cue"
-	pdbStrByte, err := buildFromCue(tplFile, map[string]any{
+	pdbStrByte, err := buildFromCUE(tplFile, map[string]any{
 		"cluster":   params.cluster,
 		"component": params.component,
 	}, "pdb")
@@ -1376,7 +1376,7 @@ func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
 		}
 	}
 
-	configStrByte, err := buildFromCue(tplFile, map[string]any{
+	configStrByte, err := buildFromCUE(tplFile, map[string]any{
 		"cluster":     params.cluster,
 		"component":   params.component,
 		"config.data": envData,
@@ -1610,7 +1610,7 @@ func deleteBackup(ctx context.Context, cli client.Client, backupJobKey types.Nam
 func buildBackupPolicy(sts *appsv1.StatefulSet,
 	template *dataprotectionv1alpha1.BackupPolicyTemplate,
 	backupKey types.NamespacedName) (*dataprotectionv1alpha1.BackupPolicy, error) {
-	backupPolicyStrByte, err := buildFromCue("backup_policy_template.cue", map[string]any{
+	backupPolicyStrByte, err := buildFromCUE("backup_policy_template.cue", map[string]any{
 		"sts":        sts,
 		"backup_key": backupKey,
 		"template":   template.Name,
@@ -1626,7 +1626,7 @@ func buildBackupPolicy(sts *appsv1.StatefulSet,
 
 func buildBackupJob(sts *appsv1.StatefulSet,
 	backupJobKey types.NamespacedName) (*dataprotectionv1alpha1.BackupJob, error) {
-	backupJobStrByte, err := buildFromCue("backup_job_template.cue", map[string]any{
+	backupJobStrByte, err := buildFromCUE("backup_job_template.cue", map[string]any{
 		"sts":            sts,
 		"backup_job_key": backupJobKey,
 	}, "backup_job")
@@ -1658,7 +1658,7 @@ func buildPVCFromSnapshot(sts *appsv1.StatefulSet,
 	pvcKey types.NamespacedName,
 	snapshotName string) (*corev1.PersistentVolumeClaim, error) {
 
-	pvcStrByte, err := buildFromCue("pvc_template.cue", map[string]any{
+	pvcStrByte, err := buildFromCUE("pvc_template.cue", map[string]any{
 		"sts":           sts,
 		"pvc_key":       pvcKey,
 		"snapshot_name": snapshotName,
@@ -1681,7 +1681,7 @@ const (
 func buildVolumeSnapshot(snapshotKey types.NamespacedName,
 	pvcName string,
 	sts *appsv1.StatefulSet) (*snapshotv1.VolumeSnapshot, error) {
-	snapshotStrByte, err := buildFromCue("snapshot_template.cue", map[string]any{
+	snapshotStrByte, err := buildFromCUE("snapshot_template.cue", map[string]any{
 		"snapshot_key": snapshotKey,
 		"pvc_name":     pvcName,
 		"sts":          sts,
@@ -1856,7 +1856,7 @@ func buildCronJob(pvcKey types.NamespacedName,
 		serviceAccount = "kubeblocks"
 	}
 
-	cronJobStrByte, err := buildFromCue("delete_pvc_cron_job_template.cue", map[string]any{
+	cronJobStrByte, err := buildFromCUE("delete_pvc_cron_job_template.cue", map[string]any{
 		"pvc":                   pvcKey,
 		"cronjob.spec.schedule": schedule,
 		"cronjob.spec.jobTemplate.spec.template.spec.serviceAccount": serviceAccount,
@@ -2020,7 +2020,7 @@ func isPVCExists(cli client.Client,
 	return true, nil
 }
 
-func buildFromCue(tplName string, fillMap map[string]any, lookupKey string) ([]byte, error) {
+func buildFromCUE(tplName string, fillMap map[string]any, lookupKey string) ([]byte, error) {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := getCacheCUETplValue(tplName, func() (*intctrlutil.CUETpl, error) {
 		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplName))

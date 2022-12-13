@@ -1,11 +1,11 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mysql-cluster-01
+  name: wesql-01
   namespace: default
 spec:
-  clusterDefinitionRef: mysql-cluster-definition
-  appVersionRef: appversion-mysql-latest
+  clusterDefinitionRef: apecloud-wesql
+  appVersionRef: wesql-8.0.30
   components:
   - name: replicasets
     type: replicasets
@@ -19,3 +19,4 @@ spec:
         resources:
           requests:
             storage: 1Gi
+  terminationPolicy: Halt

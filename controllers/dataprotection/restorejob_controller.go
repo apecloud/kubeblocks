@@ -261,7 +261,9 @@ func (r *RestoreJobReconciler) getPodSpec(reqCtx intctrlutil.RequestCtx, restore
 	container.Command = []string{"sh", "-c"}
 	container.Args = backupTool.Spec.Physical.RestoreCommands
 	container.Image = backupTool.Spec.Image
-	container.Resources = backupTool.Spec.Resources
+	if backupTool.Spec.Resources != nil {
+		container.Resources = *backupTool.Spec.Resources
+	}
 
 	container.VolumeMounts = restoreJob.Spec.TargetVolumeMounts
 

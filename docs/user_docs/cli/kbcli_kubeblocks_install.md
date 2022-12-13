@@ -15,9 +15,6 @@ kbcli kubeblocks install [flags]
   # Install KubeBlocks with specified version
   kbcli kubeblocks install --version=0.2.0
   
-  # Install KubeBlocks and enable the monitor including prometheus, grafana
-  kbcli kubeblocks install --monitor=true
-  
   # Install KubeBlocks with other settings, for example, set replicaCount to 3
   kbcli kubeblocks install --set replicaCount=3
 ```
@@ -26,7 +23,7 @@ kbcli kubeblocks install [flags]
 
 ```
   -h, --help              help for install
-      --monitor           Set monitor enabled (default false)
+      --monitor           Set monitor enabled and install Prometheus, AlertManager and Grafana (default true) (default true)
       --set stringArray   Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
       --version string    KubeBlocks version
 ```

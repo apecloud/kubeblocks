@@ -286,6 +286,7 @@ func mergeMonitorConfig(
 }
 
 func mergeComponents(
+	reqCtx intctrlutil.RequestCtx,
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition,
 	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
@@ -438,6 +439,10 @@ func mergeComponents(
 	// }
 
 	mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
+	err := buildProbeContainers(reqCtx, component)
+	if err != nil {
+		reqCtx.Log.Error(err, "build probe container failed.")
+	}
 	replaceValues(cluster, component)
 
 	return component
@@ -473,6 +478,7 @@ func replaceValues(cluster *dbaasv1alpha1.Cluster, component *Component) {
 }
 
 func buildClusterCreationTasks(
+	reqCtx intctrlutil.RequestCtx,
 	clusterDefinition *dbaasv1alpha1.ClusterDefinition,
 	appVersion *dbaasv1alpha1.AppVersion,
 	cluster *dbaasv1alpha1.Cluster) (*intctrlutil.Task, error) {
@@ -528,7 +534,7 @@ func buildClusterCreationTasks(
 		appVersionComponent := appCompTypes[typeName]
 		clusterComps := clusterCompTypes[typeName]
 		for _, clusterComp := range clusterComps {
-			buildTask(mergeComponents(cluster, clusterDefinition, &c, appVersionComponent, &clusterComp))
+			buildTask(mergeComponents(reqCtx, cluster, clusterDefinition, &c, appVersionComponent, &clusterComp))
 		}
 	}
 
@@ -1061,12 +1067,6 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 }
 
 func processContainersInjection(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName string, podSpec *corev1.PodSpec) error {
-	probeContainers, err := buildProbeContainers(reqCtx, params, podSpec.Containers)
-	if err != nil {
-		return err
-	}
-	podSpec.Containers = append(podSpec.Containers, probeContainers...)
-
 	for _, cc := range []*[]corev1.Container{
 		&podSpec.Containers,
 		&podSpec.InitContainers,

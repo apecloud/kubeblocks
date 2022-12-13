@@ -25,4 +25,4 @@ jobs:
 
       - name: make test
         run: |
-          make test USE_EXISTING_CLUSTER=true
+          make test USE_EXISTING_CLUSTER=true EXISTING_CLUSTER_TYPE=minikube

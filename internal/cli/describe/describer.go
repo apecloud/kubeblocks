@@ -162,7 +162,7 @@ func (d *ClusterDescriber) describeCluster(events *corev1.EventList) (string, er
 		w.Write(Level0, "CreationTimestamp:\t%s\n", c.CreationTimestamp.Time.Format(time.RFC1123Z))
 
 		// consider first component as primary component, use it's endpoints as cluster endpoints
-		primaryComponent := cluster.FindCompInCluster(d.Cluster, d.ClusterDef.Spec.Components[0].TypeName)
+		primaryComponent := cluster.FindClusterComp(d.Cluster, d.ClusterDef.Spec.Components[0].TypeName)
 		describeNetwork(Level0, d.Services, primaryComponent, w)
 
 		// topology
@@ -190,10 +190,10 @@ func (d *ClusterDescriber) describeCluster(events *corev1.EventList) (string, er
 
 func (d *ClusterDescriber) describeTopology(w describe.PrefixWriter) error {
 	w.Write(Level0, "\nTopology:\n")
-	for _, compInClusterDef := range d.ClusterDef.Spec.Components {
-		c := cluster.FindCompInCluster(d.Cluster, compInClusterDef.TypeName)
+	for _, cdComp := range d.ClusterDef.Spec.Components {
+		c := cluster.FindClusterComp(d.Cluster, cdComp.TypeName)
 		if c == nil {
-			return fmt.Errorf("failed to find componnet in cluster")
+			continue
 		}
 
 		w.Write(Level1, "%s:\n", c.Name)
@@ -214,19 +214,19 @@ func (d *ClusterDescriber) describeTopology(w describe.PrefixWriter) error {
 }
 
 func (d *ClusterDescriber) describeComponent(w describe.PrefixWriter) error {
-	for _, compInClusterDef := range d.ClusterDef.Spec.Components {
-		c := cluster.FindCompInCluster(d.Cluster, compInClusterDef.TypeName)
+	for _, cdComp := range d.ClusterDef.Spec.Components {
+		c := cluster.FindClusterComp(d.Cluster, cdComp.TypeName)
 		if c == nil {
-			return fmt.Errorf("failed to find component in cluster \"%s\"", d.Cluster.Name)
+			continue
 		}
 
 		if c.Replicas == nil {
-			r := compInClusterDef.DefaultReplicas
+			r := cdComp.DefaultReplicas
 			c.Replicas = &r
 		}
 		pods := d.getPodsOfComponent(c.Name)
 		if len(pods) == 0 {
-			return fmt.Errorf("failed to find any instance belonging to component \"%s\"", c.Name)
+			continue
 		}
 		running, waiting, succeeded, failed := util.GetPodStatus(pods)
 		w.Write(Level0, "\nComponent:\n")

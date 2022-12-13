@@ -9,14 +9,13 @@ kbcli playground init [flags]
 ### Options
 
 ```
-      --access-key string       Cloud provider access key
-      --access-secret string    Cloud provider access secret
-      --cloud-provider string   Cloud provider type (default "local")
-      --engine string           Database cluster engine (default "wesql")
-  -h, --help                    help for init
-      --region string           Cloud provider region
-      --replicas int            Database cluster replicas (default 3)
-      --verbose                 Output more log info
+      --access-key string           Cloud provider access key
+      --access-secret string        Cloud provider access secret
+      --cloud-provider string       Cloud provider type (default "local")
+      --cluster-definition string   Cluster definition (default "apecloud-wesql")
+  -h, --help                        help for init
+      --region string               Cloud provider region
+      --verbose                     Output more log info
 ```
 
 ### Options inherited from parent commands

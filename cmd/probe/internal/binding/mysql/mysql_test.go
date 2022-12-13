@@ -21,6 +21,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -157,6 +159,18 @@ func TestInvoke(t *testing.T) {
 		assert.NotNil(t, err)
 	})
 
+	t.Run("running check", func(t *testing.T) {
+		go listener(t)
+		metadata := map[string]string{commandSQLKey: ""}
+		req := &bindings.InvokeRequest{
+			Data:      nil,
+			Metadata:  metadata,
+			Operation: runningCheckOperation,
+		}
+		resp, _ := m.Invoke(context.Background(), req)
+		assert.NotNil(t, resp)
+	})
+
 	t.Run("close operation", func(t *testing.T) {
 		mock.ExpectClose()
 		req := &bindings.InvokeRequest{
@@ -188,4 +202,20 @@ func mockDatabase(t *testing.T) (*Mysql, sqlmock.Sqlmock, error) {
 	m.db = db
 
 	return m, mock, err
+}
+
+func listener(t *testing.T) {
+	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", dbPort))
+	for err != nil {
+		t.Log("err", err)
+		// handle error
+		dbPort++
+		ln, err = net.Listen("tcp", fmt.Sprintf(":%d", dbPort))
+	}
+	for {
+		_, err := ln.Accept()
+		if err != nil {
+			// handle error
+		}
+	}
 }

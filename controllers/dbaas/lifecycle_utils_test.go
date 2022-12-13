@@ -792,7 +792,7 @@ spec:
 		})
 
 		It("Build Deploy", func() {
-			deploy, err := buildDeploy(reqCtx, params, "")
+			deploy, err := buildDeploy(reqCtx, params)
 			Expect(err).Should(BeNil())
 			Expect(deploy).ShouldNot(BeNil())
 		})

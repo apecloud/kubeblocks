@@ -21,6 +21,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -144,6 +146,26 @@ func TestInvoke(t *testing.T) {
 		assert.Equal(t, 1, len(data))
 	})
 
+	t.Run("role operation succeeds", func(t *testing.T) {
+		col1 := sqlmock.NewColumn("CURRENT_LEADER").OfType("VARCHAR", "")
+		col2 := sqlmock.NewColumn("ROLE").OfType("VARCHAR", "")
+		col3 := sqlmock.NewColumn("SERVER_ID").OfType("VARCHAR", "")
+		rows := sqlmock.NewRowsWithColumnDefinition(col1, col2, col3).AddRow("", "leader", "")
+		mock.ExpectQuery("SELECT \\* FROM information_schema.wesql_cluster_local WHERE id < \\d+").WillReturnRows(rows)
+
+		metadata := map[string]string{commandSQLKey: ""}
+		req := &bindings.InvokeRequest{
+			Data:      nil,
+			Metadata:  metadata,
+			Operation: roleCheckOperation,
+		}
+		resp, err := m.Invoke(context.Background(), req)
+		assert.Nil(t, err)
+		var data map[string]string
+		err = json.Unmarshal(resp.Data, &data)
+		assert.Nil(t, err)
+	})
+
 	t.Run("query operation fails", func(t *testing.T) {
 		mock.ExpectQuery("SELECT \\* FROM foo WHERE id < \\d+").WillReturnError(errors.New("query failed"))
 		metadata := map[string]string{commandSQLKey: "SELECT * FROM foo WHERE id < 2"}
@@ -155,6 +177,18 @@ func TestInvoke(t *testing.T) {
 		resp, err := m.Invoke(context.Background(), req)
 		assert.Nil(t, resp)
 		assert.NotNil(t, err)
+	})
+
+	t.Run("running check", func(t *testing.T) {
+		go listener(t)
+		metadata := map[string]string{commandSQLKey: ""}
+		req := &bindings.InvokeRequest{
+			Data:      nil,
+			Metadata:  metadata,
+			Operation: runningCheckOperation,
+		}
+		resp, _ := m.Invoke(context.Background(), req)
+		assert.NotNil(t, resp)
 	})
 
 	t.Run("close operation", func(t *testing.T) {
@@ -188,4 +222,20 @@ func mockDatabase(t *testing.T) (*Mysql, sqlmock.Sqlmock, error) {
 	m.db = db
 
 	return m, mock, err
+}
+
+func listener(t *testing.T) {
+	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", dbPort))
+	for err != nil {
+		t.Log("err", err)
+		// handle error
+		dbPort++
+		ln, err = net.Listen("tcp", fmt.Sprintf(":%d", dbPort))
+	}
+	for {
+		_, err := ln.Accept()
+		if err != nil {
+			// handle error
+		}
+	}
 }

@@ -181,7 +181,7 @@ spec:
           - name: "MYSQL_ROOT_PASSWORD"
             valueFrom:
               secretKeyRef:
-                name: $(KB_SECRET_NAME)
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
                 key: password
         command: ["/usr/bin/bash", "-c"]
         args:
@@ -1314,12 +1314,17 @@ spec:
 			// TODO: testEnv doesn't support pod creation yet. remove the following codes when it does
 			if testEnv.UseExistingCluster == nil || !*testEnv.UseExistingCluster {
 				// create fake pods of StatefulSet
-				stsName := toCreate.Name + "-" + toCreate.Spec.Components[0].Name
-				pods := createFakePod(stsName, 3)
+				pods := createFakePod(toCreate, 3)
 				for _, pod := range pods {
 					Expect(testCtx.CreateObj(ctx, &pod)).Should(Succeed())
 				}
 
+				stsList := listAndCheckStatefulSet(key)
+				sts := &stsList.Items[0]
+				events := createFakeRoleChangedEvent(key, sts)
+				for _, event := range events {
+					Expect(testCtx.CreateObj(ctx, &event)).Should(Succeed())
+				}
 				// fake pods and stateful set creation done
 				time.Sleep(interval * 5)
 
@@ -1329,6 +1334,31 @@ spec:
 					}
 					return cluster.Status.Phase == dbaasv1alpha1.CreatingPhase
 				}, timeout*3, interval*5).Should(BeTrue())
+
+				podList := &corev1.PodList{}
+				Expect(k8sClient.List(ctx, podList, client.InNamespace(key.Namespace))).Should(Succeed())
+				pods = make([]corev1.Pod, 0)
+				for _, pod := range podList.Items {
+					if component.IsMemberOf(sts, &pod) {
+						pods = append(pods, pod)
+					}
+				}
+
+				// should have 3 pods
+				Expect(len(pods)).Should(Equal(3))
+				// 1 leader
+				// 2 followers
+				leaderCount, followerCount := 0, 0
+				for _, pod := range pods {
+					switch pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] {
+					case leader:
+						leaderCount++
+					case follower:
+						followerCount++
+					}
+				}
+				Expect(leaderCount).Should(Equal(1))
+				Expect(followerCount).Should(Equal(2))
 
 				return
 			}
@@ -1620,7 +1650,46 @@ spec:
 	})
 })
 
-func createFakePod(parentName string, number int) []corev1.Pod {
+func createFakeRoleChangedEvent(key types.NamespacedName, sts *appsv1.StatefulSet) []corev1.Event {
+	eventYaml := `
+apiVersion: v1
+kind: Event
+metadata:
+  name: myevent
+  namespace: default
+type: Warning
+reason: Unhealthy
+reportingComponent: ""
+message: 'Readiness probe failed: {"event":"roleUnchanged","originalRole":"Leader","role":"Follower"}'
+involvedObject:
+  apiVersion: v1
+  fieldPath: spec.containers{kb-rolechangedcheck}
+  kind: Pod
+  name: wesql-main-2
+  namespace: default
+`
+	podList := &corev1.PodList{}
+	Expect(k8sClient.List(ctx, podList, client.InNamespace(key.Namespace))).Should(Succeed())
+	pods := make([]corev1.Pod, 0)
+	for _, pod := range podList.Items {
+		if component.IsMemberOf(sts, &pod) {
+			pods = append(pods, pod)
+		}
+	}
+	events := make([]corev1.Event, 0)
+	for _, pod := range pods {
+		event := corev1.Event{}
+		Expect(yaml.Unmarshal([]byte(eventYaml), &event)).Should(Succeed())
+		event.Name = pod.Name + "-event"
+		event.InvolvedObject.Name = pod.Name
+		event.InvolvedObject.UID = pod.UID
+		events = append(events, event)
+	}
+	events[0].Message = `Readiness probe failed: {"event":"roleUnchanged","originalRole":"Leader","role":"Leader"}`
+	return events
+}
+
+func createFakePod(cluster *dbaasv1alpha1.Cluster, number int) []corev1.Pod {
 	podYaml := `
 apiVersion: v1
 kind: Pod
@@ -1690,14 +1759,17 @@ spec:
             path: namespace
 `
 	pods := make([]corev1.Pod, 0)
+	componentName := cluster.Spec.Components[0].Name
+	clusterName := cluster.Name
+	stsName := cluster.Name + "-" + componentName
 	for i := 0; i < number; i++ {
 		pod := corev1.Pod{}
 		Expect(yaml.Unmarshal([]byte(podYaml), &pod)).Should(Succeed())
-		pod.Name = parentName + "-" + strconv.Itoa(i)
-		pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] = "follower"
+		pod.Name = stsName + "-" + strconv.Itoa(i)
+		pod.Labels[intctrlutil.AppInstanceLabelKey] = clusterName
+		pod.Labels[intctrlutil.AppComponentLabelKey] = componentName
 		pods = append(pods, pod)
 	}
-	pods[1].Labels[intctrlutil.ConsensusSetRoleLabelKey] = "leader"
 
 	return pods
 }

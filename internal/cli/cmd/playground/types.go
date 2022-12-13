@@ -17,15 +17,16 @@ limitations under the License.
 package playground
 
 import (
-	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/version"
 )
 
 const (
-	defaultEngine        = "wesql"
+	defaultClusterDef    = "apecloud-wesql"
 	defaultCloudProvider = "local"
 	localHost            = "127.0.0.1"
-	defaultReplicas      = 3
+
+	// defaultNamespace is the namespace of playground cluster
+	defaultNamespace = "default"
 
 	// CliDockerNetwork is docker network for k3d cluster when `kbcli playground`
 	// all cluster will be created in this network, so they can communicate with each other
@@ -33,12 +34,10 @@ const (
 )
 
 var (
-	// dbClusterName is the playground database cluster name
-	dbClusterName = "mycluster"
-	// dbClusterNamespace is the namespace of playground database cluster
-	dbClusterNamespace = "default"
-	// clusterName is the k3d cluster name for playground
-	clusterName = "kubeblocks-playground"
+	// kbClusterName is the playground cluster name that created by KubeBlocks
+	kbClusterName = "mycluster"
+	// k8sClusterName is the k3d cluster name for playground
+	k8sClusterName = "kubeblocks-playground"
 
 	// K3sImage is k3s image repo
 	K3sImage = "rancher/k3s:" + version.K3sImageTag
@@ -49,8 +48,7 @@ var (
 )
 
 type clusterInfo struct {
-	*cluster.ClusterObjects
-
+	Name          string
 	HostIP        string
 	KubeConfig    string
 	CloudProvider string
@@ -79,26 +77,21 @@ users:
 `
 
 var guideTmpl = `
-KubeBlocks playground init SUCCESSFULLY!
-MySQL X-Cluster(WeSQL) "{{.Cluster.Name}}" has been CREATED!
-
 1. Basic commands for cluster:
 
   export KUBECONFIG={{.KubeConfig}}
 
-  kbcli cluster list                     # list database cluster and check its PHASE
-  kbcli cluster describe {{.Cluster.Name}}       # get cluster information
+  kbcli cluster list                     # list database cluster and check its status
+  kbcli cluster describe {{.Name}}       # get cluster information
 
 2. Connect to database
 
-  kbcli cluster connect {{.Cluster.Name}}
+  kbcli cluster connect {{.Name}}
   
 3. View the Grafana:
 
-  export POD_NAME=$(kubectl get pods --namespace default -l "app.kubernetes.io/name=grafana,app.kubernetes.io/instance=kubeblocks" -o jsonpath="{.items[0].metadata.name}")
-  kubectl --namespace default port-forward $POD_NAME 3000
-  open http://{{.HostIP}}:3000/d/549c2bf8936f7767ea6ac47c47b00f2a/mysql
-
+  kbcli dashboard open kubeblocks-grafana
+	
 4. Uninstall Playground:
 
   kbcli playground destroy

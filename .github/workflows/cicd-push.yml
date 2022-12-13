@@ -18,6 +18,7 @@ jobs:
         run: |
           mkdir -p ./bin
           cp -r /go/bin/controller-gen ./bin/controller-gen
+          cp -r /go/bin/setup-envtest ./bin/setup-envtest
           make mod-vendor
           make lint
 

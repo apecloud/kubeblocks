@@ -26,12 +26,12 @@ import (
 	"github.com/dapr/kit/logger"
 )
 
+type fakeBinding struct{}
+
 const (
 	testDbPort = 34521
 	testRole   = "leader"
 )
-
-type fakeBinding struct{}
 
 func TestInit(t *testing.T) {
 	p := mockProbeBase()
@@ -82,9 +82,9 @@ func TestInvoke(t *testing.T) {
 		}
 
 		message := "{\"message\":\"TCP Connection Established Successfully!\"}"
-		startFooServer(p.dbPort, t)
+		server := startFooServer(p.dbPort, t)
+		defer stopFooServer(server)
 		resp, _ = p.Invoke(context.Background(), req)
-		stopFooServer()
 		if string(resp.Data) != message {
 			t.Errorf("unexpected response: %s", string(resp.Data))
 		}
@@ -111,16 +111,15 @@ func TestInvoke(t *testing.T) {
 	})
 }
 
-var server net.Listener
-
-func startFooServer(port int, t *testing.T) {
+func startFooServer(port int, t *testing.T) net.Listener {
 	server, err := net.Listen("tcp", ":"+strconv.Itoa(port))
 	if server == nil {
 		t.Errorf("couldn't start listening: %s", err)
 	}
+	return server
 }
 
-func stopFooServer() {
+func stopFooServer(server net.Listener) {
 	if server != nil {
 		server.Close()
 	}

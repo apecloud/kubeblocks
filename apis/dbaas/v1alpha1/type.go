@@ -124,6 +124,9 @@ const (
 	Required  PodAntiAffinity = "Required"
 )
 
+// OpsRequestBehaviour record what cluster status that can trigger this OpsRequest
+// and what status that the cluster enters after trigger OpsRequest.
+// +kubebuilder:skip
 type OpsRequestBehaviour struct {
 	FromClusterPhases []Phase
 	ToClusterPhase    Phase

@@ -190,7 +190,7 @@ type ClusterStatusComponent struct {
 	Phase Phase `json:"phase,omitempty"`
 
 	// Message record the component details message in current phase.
-	// keys are podName or deployName or statefulSetName
+	// keys are podName or deployName or statefulSetName, the format is `<ObjectKind>/<Name>`.
 	// +optional
 	Message map[string]string `json:"message,omitempty"`
 
@@ -198,7 +198,7 @@ type ClusterStatusComponent struct {
 	// +optional
 	PodsReady *bool `json:"podsReady,omitempty"`
 
-	// PodsReadyTime pods ready time
+	// PodsReadyTime pods ready time.
 	// +optional
 	PodsReadyTime *metav1.Time `json:"podsReadyTime,omitempty"`
 

@@ -881,14 +881,9 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 					}
 					// create cronjob to delete pvc after 30 minutes
-					if err := createDeletePVCCronJob(cli, ctx, pvcKey, stsObj); err != nil {
+					if err := createDeletePVCCronJob(cli, reqCtx, pvcKey, stsObj, cluster); err != nil {
 						return err
 					}
-					reqCtx.Recorder.Eventf(cluster,
-						corev1.EventTypeNormal,
-						"CronJobCreate",
-						"create cronjob to delete pvc/%s",
-						pvcKey.Name)
 				}
 			}
 			return nil
@@ -1025,7 +1020,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 		deployObj.Spec = deployProto.Spec
 		if err := cli.Update(ctx, deployObj); err != nil {
-			return nil
+			return err
 		}
 		return nil
 	}
@@ -1909,9 +1904,11 @@ func buildCronJob(pvcKey types.NamespacedName,
 }
 
 func createDeletePVCCronJob(cli client.Client,
-	ctx context.Context,
+	reqCtx intctrlutil.RequestCtx,
 	pvcKey types.NamespacedName,
-	stsObj *appsv1.StatefulSet) error {
+	stsObj *appsv1.StatefulSet,
+	cluster *dbaasv1alpha1.Cluster) error {
+	ctx := reqCtx.Ctx
 	now := time.Now()
 	// hack: delete after 30 minutes
 	t := now.Add(30 * 60 * time.Second)
@@ -1923,6 +1920,11 @@ func createDeletePVCCronJob(cli client.Client,
 	if err := cli.Create(ctx, cronJob); err != nil {
 		return err
 	}
+	reqCtx.Recorder.Eventf(cluster,
+		corev1.EventTypeNormal,
+		"CronJobCreate",
+		"create cronjob to delete pvc/%s",
+		pvcKey.Name)
 	return nil
 }
 

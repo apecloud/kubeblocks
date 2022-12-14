@@ -201,7 +201,8 @@ func (p *ProbeBase) runningCheck(ctx context.Context, resp *bindings.InvokeRespo
 	}
 
 	host := fmt.Sprintf("127.0.0.1:%d", p.dbPort)
-	conn, err := net.DialTimeout("tcp", host, 900*time.Millisecond)
+	// sql exec timeout need to be less than httpget's timeout which default is 1s.
+	conn, err := net.DialTimeout("tcp", host, 500*time.Millisecond)
 	if err != nil {
 		message = fmt.Sprintf("running check %s error: %v", host, err)
 		result.Event = "runningCheckFailed"

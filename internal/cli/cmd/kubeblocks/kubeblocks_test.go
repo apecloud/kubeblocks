@@ -19,6 +19,7 @@ package kubeblocks
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	"github.com/spf13/cobra"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -89,12 +90,12 @@ var _ = Describe("kubeblocks", func() {
 			Version: version.DefaultKubeBlocksVersion,
 			Monitor: true,
 		}
-		Expect(o.Run()).Should(MatchError(MatchRegexp("not a valid Chart repository")))
+		Expect(o.Run()).Should(HaveOccurred())
 		Expect(len(o.Sets)).To(Equal(1))
 		Expect(o.Sets[0]).To(Equal(kMonitorParam))
 
 		notes, err := o.installChart()
-		Expect(err).Should(MatchError(MatchRegexp("failed to download")))
+		Expect(err).Should(HaveOccurred())
 		Expect(notes).Should(Equal(""))
 
 		o.printNotes("")

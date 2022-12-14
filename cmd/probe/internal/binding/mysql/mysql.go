@@ -202,7 +202,7 @@ func (m *Mysql) GetRole(ctx context.Context, sql string) (string, error) {
 	}
 
 	// sql exec timeout need to be less than httpget's timeout which default is 1s.
-	ctx1, cancel := context.WithTimeout(context.Background(), 900*time.Millisecond)
+	ctx1, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 	rows, err := m.db.QueryContext(ctx1, sql)
 	if err != nil {

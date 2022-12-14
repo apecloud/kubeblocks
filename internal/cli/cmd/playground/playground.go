@@ -29,10 +29,13 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
+	cmdcluster "github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground/engine"
+	"github.com/apecloud/kubeblocks/internal/cli/create"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 	"github.com/apecloud/kubeblocks/version"
@@ -42,9 +45,8 @@ type initOptions struct {
 	genericclioptions.IOStreams
 	helmCfg *action.Configuration
 
-	Engine   string
-	Replicas int
-	Verbose  bool
+	clusterDef string
+	verbose    bool
 
 	CloudProvider string
 	AccessKey     string
@@ -87,13 +89,12 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&o.Engine, "engine", defaultEngine, "Database cluster engine")
+	cmd.Flags().StringVar(&o.clusterDef, "cluster-definition", defaultClusterDef, "Cluster definition")
 	cmd.Flags().StringVar(&o.CloudProvider, "cloud-provider", defaultCloudProvider, "Cloud provider type")
 	cmd.Flags().StringVar(&o.AccessKey, "access-key", "", "Cloud provider access key")
 	cmd.Flags().StringVar(&o.AccessSecret, "access-secret", "", "Cloud provider access secret")
 	cmd.Flags().StringVar(&o.Region, "region", "", "Cloud provider region")
-	cmd.Flags().IntVar(&o.Replicas, "replicas", defaultReplicas, "Database cluster replicas")
-	cmd.Flags().BoolVar(&o.Verbose, "verbose", false, "Output more log info")
+	cmd.Flags().BoolVar(&o.verbose, "verbose", false, "Output more log info")
 	return cmd
 }
 
@@ -123,9 +124,10 @@ func newGuideCmd() *cobra.Command {
 }
 
 func (o *initOptions) validate() error {
-	if o.Replicas <= 0 {
-		return errors.New("replicas should greater than 0")
+	if o.clusterDef == "" {
+		return fmt.Errorf("a valid cluster definition is needed, use --cluster-definition to specify one")
 	}
+
 	return nil
 }
 
@@ -145,13 +147,13 @@ func (o *initOptions) local() error {
 	var err error
 	installer := &installer{
 		ctx:         context.Background(),
-		clusterName: clusterName,
+		clusterName: k8sClusterName,
 		IOStreams:   o.IOStreams,
 	}
-	installer.verboseLog(o.Verbose)
+	installer.verboseLog(o.verbose)
 
 	// Set up K3s as KubeBlocks control plane cluster
-	spinner := util.Spinner(o.Out, "Create playground k3d cluster: %s", clusterName)
+	spinner := util.Spinner(o.Out, "Create playground k3d cluster: %s", k8sClusterName)
 	defer spinner(false)
 	if err = installer.install(); err != nil {
 		return errors.Wrap(err, "failed to set up k3d cluster")
@@ -159,7 +161,7 @@ func (o *initOptions) local() error {
 	spinner(true)
 
 	// Deal with KUBECONFIG
-	configPath := util.ConfigPath(clusterName)
+	configPath := util.ConfigPath(k8sClusterName)
 	spinner = util.Spinner(o.Out, "Generate kubernetes config %s", configPath)
 	defer spinner(false)
 	if err = installer.genKubeconfig(); err != nil {
@@ -172,7 +174,7 @@ func (o *initOptions) local() error {
 	spinner(true)
 
 	// Init helm client
-	if o.helmCfg, err = helm.NewActionConfig("", util.ConfigPath(clusterName)); err != nil {
+	if o.helmCfg, err = helm.NewActionConfig("", util.ConfigPath(k8sClusterName)); err != nil {
 		return errors.Wrap(err, "failed to init helm client")
 	}
 
@@ -182,13 +184,13 @@ func (o *initOptions) local() error {
 	}
 
 	// Install database cluster
-	fmt.Fprintf(o.Out, "Install database cluster %s\n", dbClusterName)
+	fmt.Fprintf(o.Out, "Install database cluster %s\n", kbClusterName)
 	if err = o.installCluster(); err != nil {
 		return errors.Wrap(err, "failed to install database cluster")
 	}
 
 	// Print guide information
-	if err = printGuide(defaultCloudProvider, localHost); err != nil {
+	if err = printGuide(defaultCloudProvider, localHost, true); err != nil {
 		return errors.Wrap(err, "failed to print user guide")
 	}
 
@@ -214,7 +216,7 @@ func (o *initOptions) remote() error {
 	if err = ioutils.AtomicWriteFile(kubeConfigPath, []byte(kubeConfig), 0700); err != nil {
 		return errors.Wrap(err, "failed to update kube config")
 	}
-	if err = printGuide(cp.Name(), instance.GetIP()); err != nil {
+	if err = printGuide(cp.Name(), instance.GetIP(), true); err != nil {
 		return errors.Wrap(err, "failed to print user guide")
 	}
 	return nil
@@ -223,7 +225,7 @@ func (o *initOptions) remote() error {
 func (o *destroyOptions) destroyPlayground() error {
 	installer := &installer{
 		ctx:         context.Background(),
-		clusterName: clusterName,
+		clusterName: k8sClusterName,
 	}
 
 	installer.verboseLog(false)
@@ -235,7 +237,7 @@ func (o *destroyOptions) destroyPlayground() error {
 	if cp.Name() != cloudprovider.Local {
 		var err error
 		// remove playground cluster kubeconfig
-		if err = util.RemoveConfig(clusterName); err != nil {
+		if err = util.RemoveConfig(k8sClusterName); err != nil {
 			return errors.Wrap(err, "failed to remove playground kubeconfig file")
 		}
 		if cp, err = cloudprovider.Get(); err != nil {
@@ -267,70 +269,36 @@ func runGuide() error {
 	if err != nil {
 		return err
 	}
-	return printGuide(cp.Name(), instance.GetIP())
+	return printGuide(cp.Name(), instance.GetIP(), false)
 }
 
-func printGuide(cloudProvider string, hostIP string) error {
-	var (
-		clusterInfo = &clusterInfo{
-			HostIP:         hostIP,
-			CloudProvider:  cloudProvider,
-			KubeConfig:     util.ConfigPath(clusterName),
-			ClusterObjects: cluster.NewClusterObjects(),
-		}
-		err error
-	)
+func printGuide(cloudProvider string, hostIP string, init bool) error {
+	var clusterInfo = &clusterInfo{
+		HostIP:        hostIP,
+		CloudProvider: cloudProvider,
+		KubeConfig:    util.ConfigPath(k8sClusterName),
+		Name:          kbClusterName,
+	}
 
 	// check if config file exists
-	if _, err = os.Stat(clusterInfo.KubeConfig); err != nil && os.IsNotExist(err) {
+	if _, err := os.Stat(clusterInfo.KubeConfig); err != nil && os.IsNotExist(err) {
 		fmt.Fprintf(os.Stderr, "Try to initialize a playground cluster by running:\n"+
 			"\tkbcli playground init\n")
 		return err
 	}
 
-	clusterGetter, err := newObjectsGetter(clusterInfo.KubeConfig)
-	if err != nil {
-		return err
-	}
-
-	if clusterInfo.ClusterObjects, err = clusterGetter.Get(); err != nil {
-		return err
+	if init {
+		fmt.Fprintf(os.Stdout, "\nKubeBlocks playground init SUCCESSFULLY!\n"+
+			"Cluster \"%s\" has been CREATED!\n", kbClusterName)
 	}
 	return util.PrintGoTemplate(os.Stdout, guideTmpl, clusterInfo)
-}
-
-func newObjectsGetter(cfg string) (*cluster.ObjectsGetter, error) {
-	// set env KUBECONFIG to playground kubernetes cluster config
-	if err := util.SetKubeConfig(cfg); err != nil {
-		return nil, err
-	}
-
-	f := util.NewFactory()
-	clientSet, err := f.KubernetesClientSet()
-	if err != nil {
-		return nil, err
-	}
-
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return nil, err
-	}
-
-	// get cluster info that will be used to render the guide template
-	clusterGetter := &cluster.ObjectsGetter{
-		ClientSet:     clientSet,
-		DynamicClient: dynamicClient,
-		Namespace:     dbClusterNamespace,
-		Name:          dbClusterName,
-	}
-	return clusterGetter, nil
 }
 
 func (o *initOptions) installKubeBlocks() error {
 	installer := kubeblocks.InstallOptions{
 		Options: kubeblocks.Options{
 			HelmCfg:   o.helmCfg,
-			Namespace: dbClusterNamespace,
+			Namespace: defaultNamespace,
 			IOStreams: o.IOStreams,
 		},
 		Version: version.DefaultKubeBlocksVersion,
@@ -341,12 +309,83 @@ func (o *initOptions) installKubeBlocks() error {
 }
 
 func (o *initOptions) installCluster() error {
-	engine, err := engine.New(o.Engine)
+	f := util.NewFactory()
+	dynamic, err := f.DynamicClient()
 	if err != nil {
 		return err
 	}
 
-	return engine.Install(o.Replicas, dbClusterName, dbClusterNamespace)
+	// get component versions that reference this cluster definition
+	versionList, err := cluster.GetVersionByClusterDef(dynamic, o.clusterDef)
+	if err != nil {
+		return err
+	}
+
+	// find the latest version to use
+	version := findLatestVersion(versionList)
+	if version == nil {
+		return fmt.Errorf("failed to find component version referencing current cluster definition %s", o.clusterDef)
+	}
+
+	// construct a cluster create options and run
+	options, err := newCreateOptions(o.clusterDef, version.Name)
+	if err != nil {
+		return err
+	}
+
+	inputs := create.Inputs{
+		BaseOptionsObj:  &options.BaseOptions,
+		Options:         options,
+		CueTemplateName: cmdcluster.CueTemplateName,
+		ResourceName:    types.ResourceClusters,
+	}
+
+	return options.Run(inputs)
+}
+
+func newCreateOptions(cd string, version string) (*cmdcluster.CreateOptions, error) {
+	dynamicClient, err := util.NewFactory().DynamicClient()
+	if err != nil {
+		return nil, err
+	}
+	options := &cmdcluster.CreateOptions{
+		BaseOptions: create.BaseOptions{
+			IOStreams: genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr},
+			Namespace: defaultNamespace,
+			Name:      kbClusterName,
+			Client:    dynamicClient,
+		},
+		TerminationPolicy: "WipeOut",
+		ClusterDefRef:     cd,
+		AppVersionRef:     version,
+		Monitor:           true,
+	}
+
+	if err = options.Complete(); err != nil {
+		return nil, err
+	}
+	return options, nil
+}
+
+func findLatestVersion(versions *dbaasv1alpha1.AppVersionList) *dbaasv1alpha1.AppVersion {
+	if len(versions.Items) == 0 {
+		return nil
+	}
+	if len(versions.Items) == 1 {
+		return &versions.Items[0]
+	}
+
+	var version *dbaasv1alpha1.AppVersion
+	for i, v := range versions.Items {
+		if version == nil {
+			version = &versions.Items[i]
+			continue
+		}
+		if v.CreationTimestamp.Time.After(version.CreationTimestamp.Time) {
+			version = &versions.Items[i]
+		}
+	}
+	return version
 }
 
 func initPlaygroundDir() error {

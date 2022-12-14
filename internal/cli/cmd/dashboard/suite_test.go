@@ -14,20 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package engine
+package dashboard
 
 import (
-	"fmt"
-	"strings"
+	"testing"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
-type Interface interface {
-	Install(replicas int, name string, namespace string) error
-}
-
-func New(engine string) (Interface, error) {
-	if strings.EqualFold(engine, "wesql") {
-		return &WeSQL{}, nil
-	}
-	return nil, fmt.Errorf("unsupported engine type: %s", engine)
+func TestDashboard(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Dashboard Suite")
 }

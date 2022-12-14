@@ -1920,8 +1920,7 @@ func deleteDeletePVCCronJob(cli client.Client,
 
 func timeToSchedule(t time.Time) string {
 	utc := t.UTC()
-	schedule := fmt.Sprintf("%d %d %d %d *", utc.Minute(), utc.Hour(), utc.Day(), utc.Month())
-	return schedule
+	return fmt.Sprintf("%d %d %d %d *", utc.Minute(), utc.Hour(), utc.Day(), utc.Month())
 }
 
 func doBackup(reqCtx intctrlutil.RequestCtx,

@@ -35,7 +35,7 @@ Block:
   Type:      consensus
   Replicas:  3 desired | 3 total
   Status:    3 Running / 0 Waiting / 0 Succeeded / 0 Failed  
-  Image:   docker.io/infracreate/wesql-server-8.0.29:0.1-SNAPSHOT
+  Image:   docker.io/apecloud/wesql-server:latest
   Cpu:          1000m
   Memory:       1024Mi
   Endpoints:

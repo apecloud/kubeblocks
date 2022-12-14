@@ -5,7 +5,7 @@ metadata:
 spec:
   type: state.mysql-8
   components:
-    - typeName: replicasets
+    - typeName: wesql
       componentType: Consensus
       consensusSpec:
         leader:

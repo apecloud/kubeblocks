@@ -1688,7 +1688,12 @@ func createPVCFromSnapshot(ctx context.Context,
 	if err != nil {
 		return err
 	}
-	return cli.Create(ctx, pvc)
+	if err := cli.Create(ctx, pvc); err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+	}
+	return nil
 }
 
 func buildPVCFromSnapshot(sts *appsv1.StatefulSet,

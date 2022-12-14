@@ -827,14 +827,17 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 					}
 					// check pvc existence
-					pvcExist, err := isPVCExists(cli, ctx, pvcKey)
+					pvcExists, err := isPVCExists(cli, ctx, pvcKey)
 					if err != nil {
 						return exist, err
 					}
-					if !pvcExist {
+					if !pvcExists {
 						exist = false
 						break
 					}
+				}
+				if !exist {
+					break
 				}
 			}
 			return exist, nil

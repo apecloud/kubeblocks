@@ -1609,9 +1609,9 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 	return nil
 }
 
-func deleteBackup(ctx context.Context, cli client.Client, backupJobKey types.NamespacedName) error {
+func deleteBackup(ctx context.Context, cli client.Client, backupKey types.NamespacedName) error {
 	backupPolicy := dataprotectionv1alpha1.BackupPolicy{}
-	if err := cli.Get(ctx, backupJobKey, &backupPolicy); err != nil {
+	if err := cli.Get(ctx, backupKey, &backupPolicy); err != nil {
 		return client.IgnoreNotFound(err)
 	}
 	if err := cli.Delete(ctx, &backupPolicy); err != nil {
@@ -1619,7 +1619,7 @@ func deleteBackup(ctx context.Context, cli client.Client, backupJobKey types.Nam
 	}
 
 	backupJob := dataprotectionv1alpha1.BackupJob{}
-	if err := cli.Get(ctx, backupJobKey, &backupJob); err != nil {
+	if err := cli.Get(ctx, backupKey, &backupJob); err != nil {
 		return client.IgnoreNotFound(err)
 	}
 	if err := cli.Delete(ctx, &backupJob); err != nil {

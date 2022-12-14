@@ -197,3 +197,11 @@ func WorkloadFilterPredicate(object client.Object) bool {
 	}
 	return objLabels[AppManagedByLabelKey] == AppName
 }
+
+// IgnoreIsAlreadyExists return errors that is not AlreadyExists
+func IgnoreIsAlreadyExists(err error) error {
+	if !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+	return nil
+}

@@ -1588,9 +1588,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		return err
 	}
 	if err := cli.Create(ctx, backupPolicy); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return err
-		}
+		return intctrlutil.IgnoreIsAlreadyExists(err)
 	}
 	backupJob, err := buildBackupJob(sts, backupKey)
 	if err != nil {
@@ -1601,9 +1599,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		return err
 	}
 	if err := cli.Create(ctx, backupJob); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return err
-		}
+		return intctrlutil.IgnoreIsAlreadyExists(err)
 	}
 	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobCreate", "Create backupjob/%s", backupKey.Name)
 	return nil
@@ -1667,9 +1663,7 @@ func createPVCFromSnapshot(ctx context.Context,
 		return err
 	}
 	if err := cli.Create(ctx, pvc); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return err
-		}
+		return intctrlutil.IgnoreIsAlreadyExists(err)
 	}
 	return nil
 }
@@ -1776,9 +1770,7 @@ func doSnapshot(cli client.Client,
 			return err
 		}
 		if err := cli.Create(ctx, snapshot); err != nil {
-			if !apierrors.IsAlreadyExists(err) {
-				return err
-			}
+			return intctrlutil.IgnoreIsAlreadyExists(err)
 		}
 		scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
 		if err := controllerutil.SetOwnerReference(cluster, snapshot, scheme); err != nil {
@@ -1887,9 +1879,7 @@ func createDeletePVCCronJob(cli client.Client,
 		return err
 	}
 	if err := cli.Create(ctx, cronJob); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return err
-		}
+		return intctrlutil.IgnoreIsAlreadyExists(err)
 	}
 	reqCtx.Recorder.Eventf(cluster,
 		corev1.EventTypeNormal,

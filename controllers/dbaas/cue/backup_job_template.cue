@@ -11,16 +11,16 @@ backup_job_key: {
 	Namespace: string
 }
 backup_job: {
-	apiVersion: "dataprotection.infracreate.com/v1alpha1"
+	apiVersion: "dataprotection.kubeblocks.io/v1alpha1"
 	kind:       "BackupJob"
 	metadata: {
 		name:      backup_job_key.Name
 		namespace: backup_job_key.Namespace
 		labels: {
-			"dataprotection.infracreate.com/backup-type":         "snapshot"
+			"dataprotection.kubeblocks.io/backup-type":         "snapshot"
 			"app.kubernetes.io/instance":                         sts.metadata.labels."app.kubernetes.io/instance"
-			"backuppolicies.dataprotection.infracreate.com/name": backup_job_key.Name
-			"dataprotection.infracreate.com/backup-index":        "0"
+			"backuppolicies.dataprotection.kubeblocks.io/name": backup_job_key.Name
+			"dataprotection.kubeblocks.io/backup-index":        "0"
 		}
 	}
 	spec: {

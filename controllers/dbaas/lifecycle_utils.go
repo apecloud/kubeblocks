@@ -519,7 +519,7 @@ func createCluster(
 	cli client.Client,
 	clusterDefinition *dbaasv1alpha1.ClusterDefinition,
 	appVersion *dbaasv1alpha1.AppVersion,
-	cluster *dbaasv1alpha1.Cluster) (bool, error) {
+	cluster *dbaasv1alpha1.Cluster) (shouldRequeue bool, err error) {
 
 	applyObjs := make([]client.Object, 0, 3)
 	cacheCtx := map[string]interface{}{}
@@ -576,7 +576,7 @@ func createCluster(
 	return checkedCreateObjs(reqCtx, cli, &params)
 }
 
-func checkedCreateObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) (bool, error) {
+func checkedCreateObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) (shouldRequeue bool, err error) {
 	params, ok := obj.(*createParams)
 	if !ok {
 		return false, fmt.Errorf("invalid arg")
@@ -765,14 +765,13 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition,
-	objs []client.Object) (bool, error) {
+	objs []client.Object) (shouldRequeue bool, err error) {
 
 	ctx := reqCtx.Ctx
 	logger := reqCtx.Log
 	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
-	shouldRequeue := false
 
-	handleSts := func(stsProto *appsv1.StatefulSet) (bool, error) {
+	handleSts := func(stsProto *appsv1.StatefulSet) (shouldRequeue bool, err error) {
 		key := client.ObjectKey{
 			Namespace: stsProto.GetNamespace(),
 			Name:      stsProto.GetName(),
@@ -843,8 +842,8 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			return exist, nil
 		}
 
-		scaleUp := func() (bool, error) {
-			shouldRequeue := false
+		scaleUp := func() (shouldRequeue bool, err error) {
+			shouldRequeue = false
 			if err := cleanCronJobs(); err != nil {
 				return shouldRequeue, err
 			}
@@ -914,7 +913,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		// when horizontal scaling up, sometimes db needs backup to sync data from master,
 		// log is not reliable enough since it can be recycled
 		if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
-			shouldRequeue, err := scaleUp()
+			shouldRequeue, err = scaleUp()
 			if err != nil {
 				return false, err
 			}
@@ -946,7 +945,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			return false, err
 		}
 		// clean backup resources
-		shouldRequeue, err := cleanBackupResourcesIfNeeded()
+		shouldRequeue, err = cleanBackupResourcesIfNeeded()
 		if err != nil {
 			return false, err
 		}
@@ -1933,9 +1932,9 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 	component *Component,
 	stsObj *appsv1.StatefulSet,
 	stsProto *appsv1.StatefulSet,
-	snapshotKey types.NamespacedName) (bool, error) {
+	snapshotKey types.NamespacedName) (shouldRequeue bool, err error) {
 	ctx := reqCtx.Ctx
-	shouldRequeue := false
+	shouldRequeue = false
 	if component.HorizontalScalePolicy == nil {
 		return shouldRequeue, nil
 	}

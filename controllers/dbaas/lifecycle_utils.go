@@ -468,6 +468,7 @@ func mergeComponentsList(reqCtx intctrlutil.RequestCtx,
 		for _, clusterComp := range clusterCompList {
 			if clusterComp.Type == clusterDefComp.TypeName {
 				matchClusterComp = clusterComp
+				break
 			}
 		}
 		comp := mergeComponents(reqCtx, cluster, clusterDef, &clusterDefComp, nil, &matchClusterComp)
@@ -996,8 +997,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 					if err = cli.Get(ctx, pvcKey, pvc); err != nil {
 						if apierrors.IsNotFound(err) {
 							continue
-						}
-						if !apierrors.IsNotFound(err) {
+						} else {
 							res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 							return &res, err
 						}
@@ -1627,10 +1627,7 @@ func createPVCFromSnapshot(ctx context.Context,
 	if err != nil {
 		return err
 	}
-	if err := cli.Create(ctx, pvc); err != nil {
-		return err
-	}
-	return nil
+	return cli.Create(ctx, pvc)
 }
 
 func buildPVCFromSnapshot(sts *appsv1.StatefulSet,
@@ -1788,6 +1785,7 @@ func isAllPVCBound(cli client.Client,
 		}
 		if pvc.Status.Phase != corev1.ClaimBound {
 			allPVCBound = false
+			break
 		}
 	}
 	return allPVCBound, nil

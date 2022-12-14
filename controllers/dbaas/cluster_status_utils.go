@@ -430,35 +430,7 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 	)
 	if event.InvolvedObject.Kind == intctrlutil.CronJob &&
 		event.Reason == "SawCompletedJob" {
-		re := regexp.MustCompile("status: Failed")
-		matches := re.FindStringSubmatch(event.Message)
-		if len(matches) > 0 {
-			// cronjob failed
-			if object, err = getEventInvolvedObject(ctx, cli, event); err != nil {
-				return err
-			}
-			labels := object.GetLabels()
-			cluster := dbaasv1alpha1.Cluster{}
-			if err = cli.Get(ctx, client.ObjectKey{Name: labels[intctrlutil.AppInstanceLabelKey],
-				Namespace: object.GetNamespace()}, &cluster); err != nil {
-				return err
-			}
-			componentName := labels[intctrlutil.AppComponentLabelKey]
-			// update component phase to abnormal
-			if err = updateComponentStatusPhase(cli,
-				ctx,
-				&cluster,
-				componentName,
-				dbaasv1alpha1.AbnormalPhase,
-				event.Message); err != nil {
-				return err
-			}
-			recorder.Eventf(&cluster, corev1.EventTypeWarning, event.Reason, event.Message)
-			return nil
-		} else {
-			// delete pvc success, then delete cronjob
-			return checkedDeleteCronJob(ctx, cli, event.InvolvedObject.Name, event.InvolvedObject.Namespace)
-		}
+		return handleCronJobEvent(ctx, cli, recorder, event)
 	}
 	if event.Type != corev1.EventTypeWarning || !isTargetKindForEvent(event) {
 		return nil
@@ -473,6 +445,45 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 		return nil
 	}
 	return handleClusterStatusByEvent(ctx, cli, recorder, object, event)
+}
+
+func handleCronJobEvent(ctx context.Context,
+	cli client.Client,
+	recorder record.EventRecorder,
+	event *corev1.Event) error {
+	re := regexp.MustCompile("status: Failed")
+	var (
+		err    error
+		object client.Object
+	)
+	matches := re.FindStringSubmatch(event.Message)
+	if len(matches) > 0 {
+		// cronjob failed
+		if object, err = getEventInvolvedObject(ctx, cli, event); err != nil {
+			return err
+		}
+		labels := object.GetLabels()
+		cluster := dbaasv1alpha1.Cluster{}
+		if err = cli.Get(ctx, client.ObjectKey{Name: labels[intctrlutil.AppInstanceLabelKey],
+			Namespace: object.GetNamespace()}, &cluster); err != nil {
+			return err
+		}
+		componentName := labels[intctrlutil.AppComponentLabelKey]
+		// update component phase to abnormal
+		if err = updateComponentStatusPhase(cli,
+			ctx,
+			&cluster,
+			componentName,
+			dbaasv1alpha1.AbnormalPhase,
+			event.Message); err != nil {
+			return err
+		}
+		recorder.Eventf(&cluster, corev1.EventTypeWarning, event.Reason, event.Message)
+		return nil
+	} else {
+		// delete pvc success, then delete cronjob
+		return checkedDeleteCronJob(ctx, cli, event.InvolvedObject.Name, event.InvolvedObject.Namespace)
+	}
 }
 
 func checkedDeleteCronJob(ctx context.Context, cli client.Client, name string, namespace string) error {

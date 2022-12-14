@@ -60,14 +60,12 @@ spec:
 	_ = yaml.Unmarshal([]byte(clusterByte), cluster)
 	_ = yaml.Unmarshal([]byte(clusterDefByte), clusterDef)
 	// normal case
-	err := cluster.ValidateEnabledLogs(clusterDef)
-	if err != nil {
+	if err := cluster.ValidateEnabledLogs(clusterDef); err != nil {
 		t.Error("Expected empty conditionList")
 	}
 	// corner case
 	cluster.Spec.Components[0].EnabledLogs = []string{"error-test", "slow"}
-	err = cluster.ValidateEnabledLogs(clusterDef)
-	if err == nil {
+	if err := cluster.ValidateEnabledLogs(clusterDef); err == nil {
 		t.Error("Expected one element conditionList")
 	}
 }

@@ -232,6 +232,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		Namespace: cluster.Namespace,
 		Name:      cluster.Spec.ClusterDefRef,
 	}, clusterdefinition); err != nil {
+		// this is a block to handle error.
+		// so when update cluster conditions failed, we can ignore it.
 		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
@@ -249,6 +251,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		Namespace: cluster.Namespace,
 		Name:      cluster.Spec.AppVersionRef,
 	}, appversion); err != nil {
+		// this is a block to handle error.
+		// so when update cluster conditions failed, we can ignore it.
 		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
@@ -269,6 +273,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if err = r.reconcileStatusOperations(ctx, cluster, clusterdefinition); err != nil {
+		// this is a block to handle error.
+		// so when update cluster conditions failed, we can ignore it.
 		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
@@ -285,6 +291,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	task, err := buildClusterCreationTasks(reqCtx, clusterdefinition, appversion, cluster)
 	if err != nil {
+		// this is a block to handle error.
+		// so when update cluster conditions failed, we can ignore it.
 		_ = clusterConditionMgr.setApplyResourcesFailedCondition(err)
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -544,13 +552,13 @@ func (r *ClusterReconciler) updateClusterPhaseWhenConditionsError(cluster *dbaas
 		return
 	}
 	opsRequestMap, _ := operations.GetOpsRequestMapFromCluster(cluster)
-	if len(opsRequestMap) > 0 {
-		for k := range opsRequestMap {
-			cluster.Status.Phase = k
-			break
-		}
-	} else {
+	if len(opsRequestMap) == 0 {
 		cluster.Status.Phase = dbaasv1alpha1.UpdatingPhase
+		return
+	}
+	for k := range opsRequestMap {
+		cluster.Status.Phase = k
+		return
 	}
 }
 

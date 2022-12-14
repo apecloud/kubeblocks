@@ -1816,12 +1816,10 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 	pvc := corev1.PersistentVolumeClaim{}
 	// check pvc existence
 	if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
-		if apierrors.IsNotFound(err) {
-			if err := createPVCFromSnapshot(ctx, cli, stsObj, pvcKey, snapshotKey.Name); err != nil {
-				return err
-			}
+		if !apierrors.IsNotFound(err) {
+			return err
 		}
-		return err
+		return createPVCFromSnapshot(ctx, cli, stsObj, pvcKey, snapshotKey.Name)
 	}
 	return nil
 }

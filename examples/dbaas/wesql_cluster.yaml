@@ -8,7 +8,7 @@ spec:
   terminationPolicy: WipeOut
   components:
     - name: main
-      type: replicasets
+      type: wesql
       monitor: false
       volumeClaimTemplates:
         - name: data

@@ -273,12 +273,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	res, err = createCluster(reqCtx, r.Client, clusterdefinition, appversion, cluster)
+	shouldRequeue, err := createCluster(reqCtx, r.Client, clusterdefinition, appversion, cluster)
 	if err != nil {
 		r.Recorder.Event(cluster, corev1.EventTypeWarning, intctrlutil.EventReasonRunTaskFailed, err.Error())
 	}
-	if err != nil || res != nil {
-		return *res, err
+	if shouldRequeue {
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
 	}
 
 	// update observed generation

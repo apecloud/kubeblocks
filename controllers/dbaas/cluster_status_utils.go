@@ -457,33 +457,32 @@ func handleCronJobEvent(ctx context.Context,
 		object client.Object
 	)
 	matches := re.FindStringSubmatch(event.Message)
-	if len(matches) > 0 {
-		// cronjob failed
-		if object, err = getEventInvolvedObject(ctx, cli, event); err != nil {
-			return err
-		}
-		labels := object.GetLabels()
-		cluster := dbaasv1alpha1.Cluster{}
-		if err = cli.Get(ctx, client.ObjectKey{Name: labels[intctrlutil.AppInstanceLabelKey],
-			Namespace: object.GetNamespace()}, &cluster); err != nil {
-			return err
-		}
-		componentName := labels[intctrlutil.AppComponentLabelKey]
-		// update component phase to abnormal
-		if err = updateComponentStatusPhase(cli,
-			ctx,
-			&cluster,
-			componentName,
-			dbaasv1alpha1.AbnormalPhase,
-			event.Message); err != nil {
-			return err
-		}
-		recorder.Eventf(&cluster, corev1.EventTypeWarning, event.Reason, event.Message)
-		return nil
-	} else {
+	if len(matches) == 0 {
 		// delete pvc success, then delete cronjob
 		return checkedDeleteCronJob(ctx, cli, event.InvolvedObject.Name, event.InvolvedObject.Namespace)
 	}
+	// cronjob failed
+	if object, err = getEventInvolvedObject(ctx, cli, event); err != nil {
+		return err
+	}
+	labels := object.GetLabels()
+	cluster := dbaasv1alpha1.Cluster{}
+	if err = cli.Get(ctx, client.ObjectKey{Name: labels[intctrlutil.AppInstanceLabelKey],
+		Namespace: object.GetNamespace()}, &cluster); err != nil {
+		return err
+	}
+	componentName := labels[intctrlutil.AppComponentLabelKey]
+	// update component phase to abnormal
+	if err = updateComponentStatusPhase(cli,
+		ctx,
+		&cluster,
+		componentName,
+		dbaasv1alpha1.AbnormalPhase,
+		event.Message); err != nil {
+		return err
+	}
+	recorder.Eventf(&cluster, corev1.EventTypeWarning, event.Reason, event.Message)
+	return nil
 }
 
 func checkedDeleteCronJob(ctx context.Context, cli client.Client, name string, namespace string) error {

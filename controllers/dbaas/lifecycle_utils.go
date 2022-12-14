@@ -36,7 +36,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -520,7 +519,7 @@ func createCluster(
 	cli client.Client,
 	clusterDefinition *dbaasv1alpha1.ClusterDefinition,
 	appVersion *dbaasv1alpha1.AppVersion,
-	cluster *dbaasv1alpha1.Cluster) (*ctrl.Result, error) {
+	cluster *dbaasv1alpha1.Cluster) (bool, error) {
 
 	applyObjs := make([]client.Object, 0, 3)
 	cacheCtx := map[string]interface{}{}
@@ -532,8 +531,7 @@ func createCluster(
 		appVersion:        appVersion,
 	}
 	if err := prepareSecretObjs(reqCtx, cli, &params); err != nil {
-		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		return &res, err
+		return false, err
 	}
 
 	clusterDefComp := clusterDefinition.Spec.Components
@@ -570,8 +568,7 @@ func createCluster(
 		clusterComps := clusterCompTypes[typeName]
 		for _, clusterComp := range clusterComps {
 			if err := prepareComp(mergeComponents(reqCtx, cluster, clusterDefinition, &c, appVersionComponent, &clusterComp)); err != nil {
-				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-				return &res, err
+				return false, err
 			}
 		}
 	}
@@ -579,11 +576,10 @@ func createCluster(
 	return checkedCreateObjs(reqCtx, cli, &params)
 }
 
-func checkedCreateObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) (*ctrl.Result, error) {
+func checkedCreateObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) (bool, error) {
 	params, ok := obj.(*createParams)
 	if !ok {
-		res, err := intctrlutil.CheckedRequeueWithError(fmt.Errorf("invalid arg"), reqCtx.Log, "")
-		return &res, err
+		return false, fmt.Errorf("invalid arg")
 	}
 
 	return createOrReplaceResources(reqCtx, cli, params.cluster, params.clusterDefinition, *params.applyObjs)
@@ -769,21 +765,21 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition,
-	objs []client.Object) (*ctrl.Result, error) {
+	objs []client.Object) (bool, error) {
 
 	ctx := reqCtx.Ctx
 	logger := reqCtx.Log
 	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
-	var requeueResult *ctrl.Result
+	shouldRequeue := false
 
-	handleSts := func(stsProto *appsv1.StatefulSet) error {
+	handleSts := func(stsProto *appsv1.StatefulSet) (bool, error) {
 		key := client.ObjectKey{
 			Namespace: stsProto.GetNamespace(),
 			Name:      stsProto.GetName(),
 		}
 		stsObj := &appsv1.StatefulSet{}
 		if err := cli.Get(ctx, key, stsObj); err != nil {
-			return err
+			return false, err
 		}
 		snapshotKey := types.NamespacedName{
 			Namespace: stsObj.Namespace,
@@ -803,7 +799,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				"HorizontalScaleFailed",
 				"component %s not found",
 				componentName)
-			return nil
+			return false, nil
 		}
 
 		cleanCronJobs := func() error {
@@ -844,18 +840,19 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			return exist, nil
 		}
 
-		scaleUp := func() error {
+		scaleUp := func() (bool, error) {
+			shouldRequeue := false
 			if err := cleanCronJobs(); err != nil {
-				return err
+				return shouldRequeue, err
 			}
 			allPVCsExist, err := checkAllPVCsExist()
 			if err != nil {
-				return err
+				return shouldRequeue, err
 			}
 			if !allPVCsExist {
 				// do backup according to component's horizontal scale policy
 				var err error
-				requeueResult, err = doBackup(reqCtx,
+				shouldRequeue, err = doBackup(reqCtx,
 					cli,
 					cluster,
 					component,
@@ -863,10 +860,10 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 					stsProto,
 					snapshotKey)
 				if err != nil {
-					return err
+					return shouldRequeue, err
 				}
 			}
-			return nil
+			return shouldRequeue, nil
 		}
 
 		scaleDown := func() error {
@@ -889,45 +886,42 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			return nil
 		}
 
-		cleanBackupResourcesIfNeeded := func() error {
+		cleanBackupResourcesIfNeeded := func() (bool, error) {
 			if component.HorizontalScalePolicy == nil ||
 				component.HorizontalScalePolicy.Type != dbaasv1alpha1.Snapshot ||
 				isSnapshotAvailable(cli, ctx) {
-				return nil
+				return false, nil
 			}
 			allPVCBound, err := isAllPVCBound(cli, ctx, stsObj)
 			if err != nil {
-				return err
+				return false, err
 			}
 			if allPVCBound {
 				// if all pvc bounded, clean backup resources
 				if err := deleteSnapshot(cli, reqCtx, snapshotKey, cluster); err != nil {
-					return err
+					return false, err
 				}
 			} else {
 				// requeue waiting pvc phase become bound
-				res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
-				if err != nil {
-					return err
-				}
-				requeueResult = &res
+				return true, nil
 			}
-			return nil
+			return false, nil
 		}
 
 		// when horizontal scaling up, sometimes db needs backup to sync data from master,
 		// log is not reliable enough since it can be recycled
 		if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
-			if err := scaleUp(); err != nil {
-				return err
+			shouldRequeue, err := scaleUp()
+			if err != nil {
+				return false, err
+			}
+			if shouldRequeue {
+				return true, nil
 			}
 		} else if *stsObj.Spec.Replicas > *stsProto.Spec.Replicas {
 			if err := scaleDown(); err != nil {
-				return err
+				return false, err
 			}
-		}
-		if requeueResult != nil {
-			return nil
 		}
 		if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
 			reqCtx.Recorder.Eventf(cluster,
@@ -946,14 +940,15 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		stsObj.Spec.Replicas = stsProto.Spec.Replicas
 		stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
 		if err := cli.Update(ctx, stsObj); err != nil {
-			return err
+			return false, err
 		}
 		// clean backup resources
-		if err := cleanBackupResourcesIfNeeded(); err != nil {
-			return err
+		shouldRequeue, err := cleanBackupResourcesIfNeeded()
+		if err != nil {
+			return false, err
 		}
-		if requeueResult != nil {
-			return nil
+		if shouldRequeue {
+			return true, err
 		}
 
 		// check stsObj.Spec.VolumeClaimTemplates storage
@@ -984,7 +979,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 					if apierrors.IsNotFound(err) {
 						continue
 					}
-					return err
+					return false, err
 				}
 				if pvc.Spec.Resources.Requests[corev1.ResourceStorage] == vctProto.Spec.Resources.Requests[corev1.ResourceStorage] {
 					continue
@@ -992,11 +987,11 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				patch := client.MergeFrom(pvc.DeepCopy())
 				pvc.Spec.Resources.Requests[corev1.ResourceStorage] = vctProto.Spec.Resources.Requests[corev1.ResourceStorage]
 				if err := cli.Patch(ctx, pvc, patch); err != nil {
-					return err
+					return false, err
 				}
 			}
 		}
-		return nil
+		return false, nil
 	}
 
 	handleConfigMap := func(cm *corev1.ConfigMap) error {
@@ -1044,14 +1039,12 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	for _, obj := range objs {
 		logger.Info("create or update", "objs", obj)
 		if err := controllerutil.SetOwnerReference(cluster, obj, scheme); err != nil {
-			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-			return &res, err
+			return false, err
 		}
 		if err := cli.Create(ctx, obj); err == nil {
 			continue
 		} else if !apierrors.IsAlreadyExists(err) {
-			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-			return &res, err
+			return false, err
 		}
 
 		if !controllerutil.ContainsFinalizer(obj, dbClusterFinalizerName) {
@@ -1073,39 +1066,39 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		// Label check: ConfigMap.Labels["app.kubernetes.io/ins-configure"]
 		if cm, ok := obj.(*corev1.ConfigMap); ok {
 			if err := handleConfigMap(cm); err != nil {
-				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-				return &res, err
+				return false, err
 			}
 			continue
 		}
 
 		stsProto, ok := obj.(*appsv1.StatefulSet)
 		if ok {
-			if err := handleSts(stsProto); err != nil {
-				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-				return &res, err
+			requeue, err := handleSts(stsProto)
+			if err != nil {
+				return false, err
+			}
+			if requeue {
+				shouldRequeue = true
 			}
 			continue
 		}
 		deployProto, ok := obj.(*appsv1.Deployment)
 		if ok {
 			if err := handleDeploy(deployProto); err != nil {
-				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-				return &res, err
+				return false, err
 			}
 			continue
 		}
 		svcProto, ok := obj.(*corev1.Service)
 		if ok {
 			if err := handleSvc(svcProto); err != nil {
-				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-				return &res, err
+				return false, err
 			}
 			continue
 		}
 	}
 
-	return requeueResult, nil
+	return shouldRequeue, nil
 }
 
 func buildSvc(params createParams, headless bool) (*corev1.Service, error) {
@@ -1937,11 +1930,11 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 	component *Component,
 	stsObj *appsv1.StatefulSet,
 	stsProto *appsv1.StatefulSet,
-	snapshotKey types.NamespacedName) (*ctrl.Result, error) {
+	snapshotKey types.NamespacedName) (bool, error) {
 	ctx := reqCtx.Ctx
-	var requeueResult *ctrl.Result
+	shouldRequeue := false
 	if component.HorizontalScalePolicy == nil {
-		return requeueResult, nil
+		return shouldRequeue, nil
 	}
 	// do backup according to component's horizontal scale policy
 	switch component.HorizontalScalePolicy.Type {
@@ -1963,8 +1956,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 		}
 		vsExists, err := isVolumeSnapshotExists(cli, ctx, snapshotKey)
 		if err != nil {
-			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-			return &res, err
+			return false, err
 		}
 		// if volumesnapshot not exist, do snapshot to create it.
 		if !vsExists {
@@ -1974,29 +1966,19 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				snapshotKey,
 				stsObj,
 				component.HorizontalScalePolicy.BackupTemplateSelector); err != nil {
-				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-				return &res, err
+				return shouldRequeue, err
 			}
-			res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
-			if err != nil {
-				return &res, err
-			}
-			requeueResult = &res
+			shouldRequeue = true
 			break
 		}
 		// volumesnapshot exists, then check if it is ready to use.
 		ready, err := isVolumeSnapshotReadyToUse(cli, ctx, snapshotKey)
 		if err != nil {
-			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-			return &res, err
+			return shouldRequeue, err
 		}
 		// volumesnapshot not ready, wait for it to be ready by reconciling.
 		if !ready {
-			res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
-			if err != nil {
-				return &res, err
-			}
-			requeueResult = &res
+			shouldRequeue = true
 			break
 		}
 		// if volumesnapshot ready,
@@ -2020,15 +2002,14 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				pvcKey,
 				snapshotKey,
 				stsObj); err != nil {
-				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-				return &res, err
+				return shouldRequeue, err
 			}
 		}
 	// do nothing
 	case dbaasv1alpha1.ScaleNone:
 		break
 	}
-	return requeueResult, nil
+	return shouldRequeue, nil
 }
 
 func isPVCExists(cli client.Client,

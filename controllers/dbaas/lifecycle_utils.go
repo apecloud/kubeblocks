@@ -1988,6 +1988,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 			for _, tmpVct := range stsObj.Spec.VolumeClaimTemplates {
 				if vct.Name == component.HorizontalScalePolicy.VolumeMountsName {
 					vct = tmpVct
+					break
 				}
 			}
 			pvcKey := types.NamespacedName{

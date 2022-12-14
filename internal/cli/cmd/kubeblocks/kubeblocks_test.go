@@ -75,6 +75,7 @@ var _ = Describe("kubeblocks", func() {
 		Expect(o.complete(tf, cmd)).Should(HaveOccurred())
 
 		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
+		cmd.Flags().StringVar(&cfg, "context", "", "The name of the kubeconfig context to use.")
 		Expect(o.complete(tf, cmd)).To(Succeed())
 		Expect(o.HelmCfg).ShouldNot(BeNil())
 		Expect(o.Namespace).To(Equal("test"))
@@ -107,6 +108,7 @@ var _ = Describe("kubeblocks", func() {
 		Expect(cmd).ShouldNot(BeNil())
 
 		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
+		cmd.Flags().StringVar(&cfg, "context", "", "The name of the kubeconfig context to use.")
 		Expect(cmd.HasSubCommands()).Should(BeFalse())
 
 		o := &Options{

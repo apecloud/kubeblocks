@@ -770,10 +770,285 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition,
 	objs []client.Object) (*ctrl.Result, error) {
+
 	ctx := reqCtx.Ctx
 	logger := reqCtx.Log
 	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
 	var requeueResult *ctrl.Result
+
+	handleSts := func(stsProto *appsv1.StatefulSet) error {
+		key := client.ObjectKey{
+			Namespace: stsProto.GetNamespace(),
+			Name:      stsProto.GetName(),
+		}
+		stsObj := &appsv1.StatefulSet{}
+		if err := cli.Get(ctx, key, stsObj); err != nil {
+			return err
+		}
+		snapshotKey := types.NamespacedName{
+			Namespace: stsObj.Namespace,
+			Name:      stsObj.Name + "-scaling",
+		}
+		// find component of current statefulset
+		componentName := stsObj.Labels[intctrlutil.AppComponentLabelKey]
+		components := mergeComponentsList(reqCtx,
+			cluster,
+			clusterDef,
+			clusterDef.Spec.Components,
+			cluster.Spec.Components)
+		component := getComponent(components, componentName)
+		if component == nil {
+			reqCtx.Recorder.Eventf(cluster,
+				corev1.EventTypeWarning,
+				"HorizontalScaleFailed",
+				"component %s not found",
+				componentName)
+			return nil
+		}
+
+		cleanCronJobs := func() error {
+			for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
+				for _, vct := range stsObj.Spec.VolumeClaimTemplates {
+					pvcKey := types.NamespacedName{
+						Namespace: key.Namespace,
+						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
+					}
+					// delete deletion cronjob if exists
+					if err := deleteDeletePVCCronJob(cli, ctx, pvcKey); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		}
+
+		checkAllPVCsExist := func() (bool, error) {
+			exist := true
+			for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
+				for _, vct := range stsObj.Spec.VolumeClaimTemplates {
+					pvcKey := types.NamespacedName{
+						Namespace: key.Namespace,
+						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
+					}
+					// check pvc existence
+					pvcExist, err := isPVCExists(cli, ctx, pvcKey)
+					if err != nil {
+						return exist, err
+					}
+					if !pvcExist {
+						exist = false
+						break
+					}
+				}
+			}
+			return exist, nil
+		}
+
+		scaleUp := func() error {
+			if err := cleanCronJobs(); err != nil {
+				return err
+			}
+			allPVCsExist, err := checkAllPVCsExist()
+			if err != nil {
+				return err
+			}
+			if !allPVCsExist {
+				// do backup according to component's horizontal scale policy
+				var err error
+				requeueResult, err = doBackup(reqCtx,
+					cli,
+					cluster,
+					component,
+					stsObj,
+					stsProto,
+					snapshotKey)
+				if err != nil {
+					return err
+				}
+				if requeueResult != nil {
+					return nil
+				}
+			}
+			return nil
+		}
+
+		scaleDown := func() error {
+			// scale down, if scale down to 0, do not delete pvc
+			if *stsProto.Spec.Replicas == 0 || len(stsObj.Spec.VolumeClaimTemplates) == 0 {
+				return nil
+			}
+			for i := *stsProto.Spec.Replicas; i < *stsObj.Spec.Replicas; i++ {
+				for _, vct := range stsObj.Spec.VolumeClaimTemplates {
+					pvcKey := types.NamespacedName{
+						Namespace: key.Namespace,
+						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
+					}
+					// create cronjob to delete pvc after 30 minutes
+					if err := createDeletePVCCronJob(cli, ctx, pvcKey, stsObj); err != nil {
+						return err
+					}
+					reqCtx.Recorder.Eventf(cluster,
+						corev1.EventTypeNormal,
+						"CronJobCreate",
+						"create cronjob to delete pvc/%s",
+						pvcKey.Name)
+				}
+			}
+			return nil
+		}
+
+		cleanBackupResourcesIfNeeded := func() error {
+			if component.HorizontalScalePolicy == nil ||
+				component.HorizontalScalePolicy.Type != dbaasv1alpha1.Snapshot ||
+				isSnapshotAvailable(cli, ctx) {
+				return nil
+			}
+			allPVCBound, err := isAllPVCBound(cli, ctx, stsObj)
+			if err != nil {
+				return err
+			}
+			if allPVCBound {
+				// if all pvc bounded, clean backup resources
+				if err := deleteSnapshot(cli, reqCtx, snapshotKey, cluster); err != nil {
+					return err
+				}
+			} else {
+				// requeue waiting pvc phase become bound
+				res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
+				if err != nil {
+					return err
+				}
+				requeueResult = &res
+			}
+			return nil
+		}
+
+		// when horizontal scaling up, sometimes db needs backup to sync data from master,
+		// log is not reliable enough since it can be recycled
+		if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
+			if err := scaleUp(); err != nil {
+				return err
+			}
+		} else if *stsObj.Spec.Replicas > *stsProto.Spec.Replicas {
+			if err := scaleDown(); err != nil {
+				return err
+			}
+		}
+		if requeueResult != nil {
+			return nil
+		}
+		if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
+			reqCtx.Recorder.Eventf(cluster,
+				corev1.EventTypeNormal,
+				"HorizontalScale",
+				"Start horizontal scale component %s from %d to %d",
+				component.Name,
+				*stsObj.Spec.Replicas,
+				*stsProto.Spec.Replicas)
+		}
+		tempAnnotations := stsObj.Spec.Template.Annotations
+		stsObj.Spec.Template = stsProto.Spec.Template
+		// keep the original template annotations.
+		// if annotations exist and are replaced, the statefulSet will be updated
+		stsObj.Spec.Template.Annotations = tempAnnotations
+		stsObj.Spec.Replicas = stsProto.Spec.Replicas
+		stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
+		if err := cli.Update(ctx, stsObj); err != nil {
+			return err
+		}
+		// clean backup resources
+		if err := cleanBackupResourcesIfNeeded(); err != nil {
+			return err
+		}
+		if requeueResult != nil {
+			return nil
+		}
+
+		// check stsObj.Spec.VolumeClaimTemplates storage
+		// request size and find attached PVC and patch request
+		// storage size
+		for _, vct := range stsObj.Spec.VolumeClaimTemplates {
+			var vctProto *corev1.PersistentVolumeClaim
+			for _, i := range stsProto.Spec.VolumeClaimTemplates {
+				if i.Name == vct.Name {
+					vctProto = &i
+					break
+				}
+			}
+
+			// REVIEW: how could VCT proto is nil?
+			if vctProto == nil {
+				continue
+			}
+
+			for i := *stsObj.Spec.Replicas - 1; i >= 0; i-- {
+				pvc := &corev1.PersistentVolumeClaim{}
+				pvcKey := types.NamespacedName{
+					Namespace: key.Namespace,
+					Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
+				}
+				var err error
+				if err = cli.Get(ctx, pvcKey, pvc); err != nil {
+					if apierrors.IsNotFound(err) {
+						continue
+					}
+					return err
+				}
+				if pvc.Spec.Resources.Requests[corev1.ResourceStorage] == vctProto.Spec.Resources.Requests[corev1.ResourceStorage] {
+					continue
+				}
+				patch := client.MergeFrom(pvc.DeepCopy())
+				pvc.Spec.Resources.Requests[corev1.ResourceStorage] = vctProto.Spec.Resources.Requests[corev1.ResourceStorage]
+				if err := cli.Patch(ctx, pvc, patch); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+
+	handleConfigMap := func(cm *corev1.ConfigMap) error {
+		// if configmap is env config, should update
+		if len(cm.Labels[intctrlutil.AppConfigTypeLabelKey]) > 0 {
+			if err := cli.Update(ctx, cm); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	handleDeploy := func(deployProto *appsv1.Deployment) error {
+		key := client.ObjectKey{
+			Namespace: deployProto.GetNamespace(),
+			Name:      deployProto.GetName(),
+		}
+		deployObj := &appsv1.Deployment{}
+		if err := cli.Get(ctx, key, deployObj); err != nil {
+			return err
+		}
+		deployObj.Spec = deployProto.Spec
+		if err := cli.Update(ctx, deployObj); err != nil {
+			return nil
+		}
+		return nil
+	}
+
+	handleSvc := func(svcProto *corev1.Service) error {
+		key := client.ObjectKey{
+			Namespace: svcProto.GetNamespace(),
+			Name:      svcProto.GetName(),
+		}
+		svcObj := &corev1.Service{}
+		if err := cli.Get(ctx, key, svcObj); err != nil {
+			return err
+		}
+		svcObj.Spec = svcProto.Spec
+		if err := cli.Update(ctx, svcObj); err != nil {
+			return err
+		}
+		return nil
+	}
+
 	for _, obj := range objs {
 		logger.Info("create or update", "objs", obj)
 		if err := controllerutil.SetOwnerReference(cluster, obj, scheme); err != nil {
@@ -805,212 +1080,24 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		// TODO(zhixu.zt): Check whether the configmap object is a config file of component
 		// Label check: ConfigMap.Labels["app.kubernetes.io/ins-configure"]
 		if cm, ok := obj.(*corev1.ConfigMap); ok {
-			// if configmap is env config, should update
-			if len(cm.Labels[intctrlutil.AppConfigTypeLabelKey]) > 0 {
-				if err := cli.Update(ctx, cm); err != nil {
-					res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-					return &res, err
-				}
+			if err := handleConfigMap(cm); err != nil {
+				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+				return &res, err
 			}
 			continue
 		}
 
-		key := client.ObjectKey{
-			Namespace: obj.GetNamespace(),
-			Name:      obj.GetName(),
-		}
 		stsProto, ok := obj.(*appsv1.StatefulSet)
 		if ok {
-			stsObj := &appsv1.StatefulSet{}
-			if err := cli.Get(ctx, key, stsObj); err != nil {
+			if err := handleSts(stsProto); err != nil {
 				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 				return &res, err
-			}
-			snapshotKey := types.NamespacedName{
-				Namespace: stsObj.Namespace,
-				Name:      stsObj.Name + "-scaling",
-			}
-			// find component of current statefulset
-			componentName := stsObj.Labels[intctrlutil.AppComponentLabelKey]
-			components := mergeComponentsList(reqCtx,
-				cluster,
-				clusterDef,
-				clusterDef.Spec.Components,
-				cluster.Spec.Components)
-			component := getComponent(components, componentName)
-			// when horizontal scaling up, sometimes db needs backup to sync data from master,
-			// log is not reliable enough since it can be recycled
-			if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
-				if component == nil {
-					reqCtx.Recorder.Eventf(cluster,
-						corev1.EventTypeWarning,
-						"HorizontalScaleFailed",
-						"component %s not found",
-						componentName)
-					continue
-				}
-				allPVCExists := true
-				for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
-					for _, vct := range stsObj.Spec.VolumeClaimTemplates {
-						pvcKey := types.NamespacedName{
-							Namespace: key.Namespace,
-							Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
-						}
-						// delete deletion cronjob if exists
-						if err := deleteDeletePVCCronJob(cli, ctx, pvcKey); err != nil {
-							res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-							return &res, err
-						}
-						// check pvc existence
-						pvcExist, err := isPVCExists(cli, ctx, pvcKey)
-						if err != nil {
-							res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-							return &res, err
-						}
-						if !pvcExist {
-							allPVCExists = false
-							break
-						}
-					}
-				}
-				if !allPVCExists {
-					// do backup according to component's horizontal scale policy
-					var err error
-					requeueResult, err = doBackup(reqCtx,
-						cli,
-						cluster,
-						component,
-						stsObj,
-						stsProto,
-						snapshotKey)
-					if err != nil {
-						return requeueResult, err
-					}
-					if requeueResult != nil {
-						continue
-					}
-				}
-				reqCtx.Recorder.Eventf(cluster,
-					corev1.EventTypeNormal,
-					"HorizontalScale",
-					"Start horizontal scale component %s from %d to %d",
-					component.Name,
-					*stsObj.Spec.Replicas,
-					*stsProto.Spec.Replicas)
-			} else if *stsObj.Spec.Replicas > *stsProto.Spec.Replicas {
-				// scale down, if scale down to 0, do not delete pvc
-				if *stsProto.Spec.Replicas > 0 && len(stsObj.Spec.VolumeClaimTemplates) > 0 {
-					for i := *stsProto.Spec.Replicas; i < *stsObj.Spec.Replicas; i++ {
-						for _, vct := range stsObj.Spec.VolumeClaimTemplates {
-							pvcKey := types.NamespacedName{
-								Namespace: key.Namespace,
-								Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
-							}
-							// create cronjob to delete pvc after 30 minutes
-							if err := createDeletePVCCronJob(cli, ctx, pvcKey, stsObj); err != nil {
-								res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-								return &res, err
-							} else {
-								reqCtx.Recorder.Eventf(cluster,
-									corev1.EventTypeNormal,
-									"CronJobCreate",
-									"create cronjob to delete pvc/%s",
-									pvcKey.Name)
-							}
-						}
-					}
-				}
-			}
-			tempAnnotations := stsObj.Spec.Template.Annotations
-			stsObj.Spec.Template = stsProto.Spec.Template
-			// keep the original template annotations.
-			// if annotations exist and are replaced, the statefulSet will be updated
-			stsObj.Spec.Template.Annotations = tempAnnotations
-			stsObj.Spec.Replicas = stsProto.Spec.Replicas
-			stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
-			if err := cli.Update(ctx, stsObj); err != nil {
-				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-				return &res, err
-			}
-			// clean backup resources
-			if component != nil && component.HorizontalScalePolicy != nil &&
-				component.HorizontalScalePolicy.Type == dbaasv1alpha1.Snapshot &&
-				isSnapshotAvailable(cli, ctx) {
-				allPVCBound, err := isAllPVCBound(cli, ctx, stsObj)
-				if err != nil {
-					res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-					return &res, err
-				}
-				if allPVCBound {
-					// if all pvc bounded, clean backup resources
-					if err := deleteSnapshot(cli, reqCtx, snapshotKey, cluster); err != nil {
-						res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-						return &res, err
-					}
-				} else {
-					// requeue waiting pvc phase become bound
-					res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
-					if err != nil {
-						return &res, err
-					}
-					requeueResult = &res
-					continue
-				}
-			}
-
-			// check stsObj.Spec.VolumeClaimTemplates storage
-			// request size and find attached PVC and patch request
-			// storage size
-			for _, vct := range stsObj.Spec.VolumeClaimTemplates {
-				var vctProto *corev1.PersistentVolumeClaim
-				for _, i := range stsProto.Spec.VolumeClaimTemplates {
-					if i.Name == vct.Name {
-						vctProto = &i
-						break
-					}
-				}
-
-				// REVIEW: how could VCT proto is nil?
-				if vctProto == nil {
-					continue
-				}
-
-				for i := *stsObj.Spec.Replicas - 1; i >= 0; i-- {
-					pvc := &corev1.PersistentVolumeClaim{}
-					pvcKey := types.NamespacedName{
-						Namespace: key.Namespace,
-						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
-					}
-					var err error
-					if err = cli.Get(ctx, pvcKey, pvc); err != nil {
-						if apierrors.IsNotFound(err) {
-							continue
-						}
-						res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-						return &res, err
-					}
-					if pvc.Spec.Resources.Requests[corev1.ResourceStorage] == vctProto.Spec.Resources.Requests[corev1.ResourceStorage] {
-						continue
-					}
-					patch := client.MergeFrom(pvc.DeepCopy())
-					pvc.Spec.Resources.Requests[corev1.ResourceStorage] = vctProto.Spec.Resources.Requests[corev1.ResourceStorage]
-					if err := cli.Patch(ctx, pvc, patch); err != nil {
-						res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-						return &res, err
-					}
-				}
 			}
 			continue
 		}
 		deployProto, ok := obj.(*appsv1.Deployment)
 		if ok {
-			deployObj := &appsv1.Deployment{}
-			if err := cli.Get(ctx, key, deployObj); err != nil {
-				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-				return &res, err
-			}
-			deployObj.Spec = deployProto.Spec
-			if err := cli.Update(ctx, deployObj); err != nil {
+			if err := handleDeploy(deployProto); err != nil {
 				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 				return &res, err
 			}
@@ -1018,19 +1105,14 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 		svcProto, ok := obj.(*corev1.Service)
 		if ok {
-			svcObj := &corev1.Service{}
-			if err := cli.Get(ctx, key, svcObj); err != nil {
-				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-				return &res, err
-			}
-			svcObj.Spec = svcProto.Spec
-			if err := cli.Update(ctx, svcObj); err != nil {
+			if err := handleSvc(svcProto); err != nil {
 				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 				return &res, err
 			}
 			continue
 		}
 	}
+
 	return requeueResult, nil
 }
 

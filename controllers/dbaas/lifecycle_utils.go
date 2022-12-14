@@ -882,7 +882,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			return nil
 		}
 
-		cleanBackupResourcesIfNeeded := func() (bool, error) {
+		cleanBackupResourcesIfNeeded := func() (shouldRequeue bool, err error) {
 			if component.HorizontalScalePolicy == nil ||
 				component.HorizontalScalePolicy.Type != dbaasv1alpha1.Snapshot ||
 				isSnapshotAvailable(cli, ctx) {

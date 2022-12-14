@@ -985,10 +985,9 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 					if err = cli.Get(ctx, pvcKey, pvc); err != nil {
 						if apierrors.IsNotFound(err) {
 							continue
-						} else {
-							res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-							return &res, err
 						}
+						res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+						return &res, err
 					}
 					if pvc.Spec.Resources.Requests[corev1.ResourceStorage] == vctProto.Spec.Resources.Requests[corev1.ResourceStorage] {
 						continue

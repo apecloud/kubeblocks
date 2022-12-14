@@ -127,15 +127,10 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 	// if status changed, do update
 	if !cmp.Equal(newConsensusSetStatus, oldConsensusSetStatus) {
 		patch := client.MergeFrom(cluster.DeepCopy())
-		if oldConsensusSetStatus != nil {
-			if v, ok := cluster.Status.Components[componentName]; ok {
-				v.ConsensusSetStatus = nil
-				cluster.Status.Components[componentName] = v
-			}
-		}
 		initClusterComponentStatusIfNeed(cluster, componentName)
-		oldConsensusSetStatus = cluster.Status.Components[componentName].ConsensusSetStatus
-		setConsensusSetStatusRoles(oldConsensusSetStatus, *component, pods)
+		componentStatus := cluster.Status.Components[componentName]
+		componentStatus.ConsensusSetStatus = newConsensusSetStatus
+		cluster.Status.Components[componentName] = componentStatus
 		if err = cli.Status().Patch(ctx, cluster, patch); err != nil {
 			return false, err
 		}

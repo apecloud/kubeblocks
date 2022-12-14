@@ -603,7 +603,8 @@ spec:
                       additionalProperties:
                         type: string
                       description: Message record the component details message in
-                        current phase. keys are podName or deployName or statefulSetName
+                        current phase. keys are podName or deployName or statefulSetName,
+                        the format is `<ObjectKind>/<Name>`.
                       type: object
                     phase:
                       description: 'Phase describe the phase of the cluster. the detail
@@ -628,7 +629,7 @@ spec:
                       description: PodsReady check pods of the component are ready.
                       type: boolean
                     podsReadyTime:
-                      description: PodsReadyTime pods ready time
+                      description: PodsReadyTime pods ready time.
                       format: date-time
                       type: string
                     type:

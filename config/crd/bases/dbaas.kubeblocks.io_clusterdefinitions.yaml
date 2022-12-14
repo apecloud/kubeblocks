@@ -248,9 +248,15 @@ spec:
                         backupTemplateSelector:
                           additionalProperties:
                             type: string
-                          description: backupTemplateSelector defines the label selector
+                          description: BackupTemplateSelector defines the label selector
                             for finding associated BackupTemplate API object.
                           type: object
+                        containerName:
+                          default: ""
+                          description: ContainerName defines which container's volumeMounts
+                            to do backup, only work if Type is not None if not specified,
+                            the 1st container's volumeMounts will be chosen
+                          type: string
                         type:
                           default: None
                           description: 'Type controls what kind of data synchronization
@@ -260,8 +266,8 @@ spec:
                             snapshot before scaling and restore to newly scaled pods.
                             Prefer backup job to create snapshot if `BackupTemplateSelector`
                             can find a template. Notice that ''Snapshot'' policy will
-                            only take snapshot on the first volumeMount of first container
-                            you defined (i.e. clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]),
+                            only take snapshot on one volumeMount, default is the
+                            first volumeMount of first container (i.e. clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]),
                             since take multiple snapshots at one time might cause
                             consistency problem. Backup: Use backup tool in backuppolicytemplate
                             to handle data recovery when scaling. Not support yet.
@@ -270,6 +276,12 @@ spec:
                           - None
                           - Snapshot
                           - Backup
+                          type: string
+                        volumeMountsName:
+                          default: ""
+                          description: VolumeMountsName defines which volumeMount
+                            of the container to do backup, only work if Type is not
+                            None if not specified, the 1st volumeMount will be chosen
                           type: string
                       type: object
                     logConfigs:

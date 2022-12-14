@@ -1928,7 +1928,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				cluster,
 				snapshotKey,
 				stsObj,
-				component.BackupTemplateSelector); err != nil {
+				component.HorizontalScalePolicy.BackupTemplateSelector); err != nil {
 				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 				return &res, err
 			}
@@ -1957,10 +1957,16 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 		// if volumesnapshot ready,
 		// create pvc from snapshot for every new pod
 		for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
+			vct := stsObj.Spec.VolumeClaimTemplates[0]
+			for _, tmpVct := range stsObj.Spec.VolumeClaimTemplates {
+				if vct.Name == component.HorizontalScalePolicy.VolumeMountsName {
+					vct = tmpVct
+				}
+			}
 			pvcKey := types.NamespacedName{
 				Namespace: stsObj.Namespace,
 				Name: fmt.Sprintf("%s-%s-%d",
-					stsObj.Spec.VolumeClaimTemplates[0].Name,
+					vct.Name,
 					stsObj.Name,
 					i),
 			}

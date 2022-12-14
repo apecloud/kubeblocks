@@ -69,13 +69,15 @@ type ProbeOperation interface {
 	GetRole(context.Context, string) (string, error)
 }
 
-func (p *ProbeBase) Init() {
+func init() {
 	viper.SetDefault("KB_AGGREGATION_NUMBER", defaultEventAggregationNum)
-	p.eventAggregationNum = viper.GetInt("KB_AGGREGATION_NUMBER")
 	viper.SetDefault("KB_EVENT_INTERNAL_NUMBER", defaultEventIntervalNum)
+}
+
+func (p *ProbeBase) Init() {
+	p.eventAggregationNum = viper.GetInt("KB_AGGREGATION_NUMBER")
 	p.eventIntervalNum = viper.GetInt("KB_EVENT_INTERNAL_NUMBER")
-	viper.SetDefault("KB_SERVICE_PORT", p.Operation.GetRunningPort())
-	p.dbPort = viper.GetInt("KB_SERVICE_PORT")
+	p.dbPort = p.Operation.GetRunningPort()
 }
 
 func (p *ProbeBase) Operations() []bindings.OperationKind {

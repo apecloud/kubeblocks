@@ -249,7 +249,6 @@ type HorizontalScalePolicy struct {
 	// VolumeMountsName defines which volumeMount of the container to do backup,
 	// only work if Type is not None
 	// if not specified, the 1st volumeMount will be chosen
-	// +kubebuilder:default=""
 	// +optional
 	VolumeMountsName string `json:"volumeMountsName,omitempty"`
 }

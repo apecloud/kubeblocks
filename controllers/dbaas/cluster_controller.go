@@ -274,10 +274,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	res, err = createCluster(reqCtx, r.Client, clusterdefinition, appversion, cluster)
+	if err != nil {
+		r.Recorder.Event(cluster, corev1.EventTypeWarning, intctrlutil.EventReasonRunTaskFailed, err.Error())
+	}
 	if err != nil || res != nil {
-		if err != nil {
-			r.Recorder.Event(cluster, corev1.EventTypeWarning, intctrlutil.EventReasonRunTaskFailed, err.Error())
-		}
 		return *res, err
 	}
 

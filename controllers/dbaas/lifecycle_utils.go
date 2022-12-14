@@ -865,9 +865,6 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				if err != nil {
 					return err
 				}
-				if requeueResult != nil {
-					return nil
-				}
 			}
 			return nil
 		}

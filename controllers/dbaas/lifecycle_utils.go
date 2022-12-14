@@ -1918,7 +1918,9 @@ func createDeletePVCCronJob(cli client.Client,
 		return err
 	}
 	if err := cli.Create(ctx, cronJob); err != nil {
-		return err
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
 	}
 	reqCtx.Recorder.Eventf(cluster,
 		corev1.EventTypeNormal,

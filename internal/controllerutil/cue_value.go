@@ -67,10 +67,7 @@ func (v *CUEBuilder) FillObj(path string, obj any) error {
 	if err != nil {
 		return err
 	}
-	if err = v.Fill(path, byte); err != nil {
-		return err
-	}
-	return nil
+	return v.Fill(path, byte)
 }
 
 func (v *CUEBuilder) Fill(path string, jsonByte []byte) error {

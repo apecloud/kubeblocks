@@ -1615,9 +1615,8 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		if !apierrors.IsAlreadyExists(err) {
 			return err
 		}
-	} else {
-		reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobCreate", "Create backupjob/%s", backupKey.Name)
 	}
+	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobCreate", "Create backupjob/%s", backupKey.Name)
 	return nil
 }
 
@@ -1627,11 +1626,10 @@ func deleteBackup(ctx context.Context, cli client.Client, backupJobKey types.Nam
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
-	} else {
-		if err = cli.Delete(ctx, &backupPolicy); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return err
-			}
+	}
+	if err := cli.Delete(ctx, &backupPolicy); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
 		}
 	}
 
@@ -1640,11 +1638,10 @@ func deleteBackup(ctx context.Context, cli client.Client, backupJobKey types.Nam
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
-	} else {
-		if err = cli.Delete(ctx, &backupJob); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return err
-			}
+	}
+	if err := cli.Delete(ctx, &backupJob); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
 		}
 	}
 
@@ -1746,11 +1743,10 @@ func isVolumeSnapshotExists(cli client.Client,
 	snapshotKey types.NamespacedName) (bool, error) {
 	vs := snapshotv1.VolumeSnapshot{}
 	if err := cli.Get(ctx, snapshotKey, &vs); err != nil {
-		if apierrors.IsNotFound(err) {
-			return false, nil
-		} else {
+		if !apierrors.IsNotFound(err) {
 			return false, err
 		}
+		return false, nil
 	}
 	return true, nil
 }
@@ -1761,11 +1757,10 @@ func isVolumeSnapshotReadyToUse(cli client.Client,
 	snapshotKey types.NamespacedName) (bool, error) {
 	vs := snapshotv1.VolumeSnapshot{}
 	if err := cli.Get(ctx, snapshotKey, &vs); err != nil {
-		if apierrors.IsNotFound(err) {
-			return false, nil
-		} else {
+		if !apierrors.IsNotFound(err) {
 			return false, err
 		}
+		return false, nil
 	}
 	return *vs.Status.ReadyToUse, nil
 }
@@ -1825,9 +1820,8 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 			if err := createPVCFromSnapshot(ctx, cli, stsObj, pvcKey, snapshotKey.Name); err != nil {
 				return err
 			}
-		} else {
-			return err
 		}
+		return err
 	}
 	return nil
 }
@@ -1866,23 +1860,20 @@ func deleteSnapshot(cli client.Client,
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
-	} else {
-		reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupjob/%s", snapshotKey.Name)
 	}
+	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupjob/%s", snapshotKey.Name)
 	vs := snapshotv1.VolumeSnapshot{}
 	if err := cli.Get(ctx, snapshotKey, &vs); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
-	} else {
-		if err := cli.Delete(ctx, &vs); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return err
-			}
-		} else {
-			reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotDelete", "Delete volumesnapshot/%s", snapshotKey.Name)
+	}
+	if err := cli.Delete(ctx, &vs); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
 		}
 	}
+	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotDelete", "Delete volumesnapshot/%s", snapshotKey.Name)
 	return nil
 }
 
@@ -1945,11 +1936,10 @@ func deleteDeletePVCCronJob(cli client.Client,
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
-	} else {
-		if err := cli.Delete(ctx, &cronJob); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return err
-			}
+	}
+	if err := cli.Delete(ctx, &cronJob); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
 		}
 	}
 	return nil
@@ -2066,11 +2056,10 @@ func isPVCExists(cli client.Client,
 	pvcKey types.NamespacedName) (bool, error) {
 	pvc := corev1.PersistentVolumeClaim{}
 	if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
-		if apierrors.IsNotFound(err) {
-			return false, nil
-		} else {
+		if !apierrors.IsNotFound(err) {
 			return false, err
 		}
+		return false, nil
 	}
 	return true, nil
 }

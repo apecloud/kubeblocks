@@ -103,7 +103,12 @@ func (o *Options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	if o.HelmCfg, err = helm.NewActionConfig(o.Namespace, kubeconfig); err != nil {
+	kubecontext, err := cmd.Flags().GetString("context")
+	if err != nil {
+		return err
+	}
+
+	if o.HelmCfg, err = helm.NewActionConfig(o.Namespace, kubeconfig, helm.WithContext(kubecontext)); err != nil {
 		return err
 	}
 

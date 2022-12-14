@@ -497,7 +497,7 @@ func checkedDeleteCronJob(ctx context.Context, cli client.Client, name string, n
 			return err
 		}
 	}
-	if cronJob.ObjectMeta.Labels["app.kubernetes.io/managed-by"] == "kubeblocks" {
+	if cronJob.ObjectMeta.Labels[intctrlutil.AppManagedByLabelKey] == intctrlutil.AppName {
 		// if managed by kubeblocks, then it must be the cronjob used to delete pvc, delete it since it's completed
 		if err := cli.Delete(ctx, &cronJob); err != nil {
 			if !errors.IsNotFound(err) {

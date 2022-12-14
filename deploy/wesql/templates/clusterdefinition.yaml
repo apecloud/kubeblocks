@@ -26,11 +26,12 @@ spec:
         {{- end }}
       configTemplateRefs:
         - name: mysql-3node-tpl-8.0
-          namespace: {{ .Release.Namespace | default "default" | quote }}
+          namespace: {{ .Release.Namespace }}
           volumeName: mysql-config
         - name: wesql-scripts
-          namespace: {{ .Release.Namespace | default "default" | quote }}
+          namespace: {{ .Release.Namespace }}
           volumeName: scripts
+          defaultMode: 493
       defaultReplicas: 3
       componentType: Consensus
       consensusSpec:

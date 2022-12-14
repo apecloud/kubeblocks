@@ -1918,7 +1918,7 @@ func createDeletePVCCronJob(cli client.Client,
 		return err
 	}
 	if err := cli.Create(ctx, cronJob); err != nil {
-		if !apierrors.IsNotFound(err) {
+		if !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 	}

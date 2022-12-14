@@ -849,21 +849,17 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			if err != nil {
 				return shouldRequeue, err
 			}
-			if !allPVCsExist {
-				// do backup according to component's horizontal scale policy
-				var err error
-				shouldRequeue, err = doBackup(reqCtx,
-					cli,
-					cluster,
-					component,
-					stsObj,
-					stsProto,
-					snapshotKey)
-				if err != nil {
-					return shouldRequeue, err
-				}
+			if allPVCsExist {
+				return shouldRequeue, nil
 			}
-			return shouldRequeue, nil
+			// do backup according to component's horizontal scale policy
+			return doBackup(reqCtx,
+				cli,
+				cluster,
+				component,
+				stsObj,
+				stsProto,
+				snapshotKey)
 		}
 
 		scaleDown := func() error {

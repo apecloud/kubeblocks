@@ -838,18 +838,6 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				clusterDef.Spec.Components,
 				cluster.Spec.Components)
 			component := getComponent(components, componentName)
-			// update component status when scaling
-			if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
-				if err := updateComponentStatusPhase(cli,
-					ctx,
-					cluster,
-					componentName,
-					dbaasv1alpha1.HorizontalScalingPhase,
-					""); err != nil {
-					res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-					return &res, err
-				}
-			}
 			// when horizontal scaling up, sometimes db needs backup to sync data from master,
 			// log is not reliable enough since it can be recycled
 			if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {

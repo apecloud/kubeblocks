@@ -1623,26 +1623,18 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 func deleteBackup(ctx context.Context, cli client.Client, backupJobKey types.NamespacedName) error {
 	backupPolicy := dataprotectionv1alpha1.BackupPolicy{}
 	if err := cli.Get(ctx, backupJobKey, &backupPolicy); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
+		return client.IgnoreNotFound(err)
 	}
 	if err := cli.Delete(ctx, &backupPolicy); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
+		return client.IgnoreNotFound(err)
 	}
 
 	backupJob := dataprotectionv1alpha1.BackupJob{}
 	if err := cli.Get(ctx, backupJobKey, &backupJob); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
+		return client.IgnoreNotFound(err)
 	}
 	if err := cli.Delete(ctx, &backupJob); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
+		return client.IgnoreNotFound(err)
 	}
 
 	return nil
@@ -1855,21 +1847,15 @@ func deleteSnapshot(cli client.Client,
 	cluster *dbaasv1alpha1.Cluster) error {
 	ctx := reqCtx.Ctx
 	if err := deleteBackup(ctx, cli, snapshotKey); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
+		return client.IgnoreNotFound(err)
 	}
 	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupjob/%s", snapshotKey.Name)
 	vs := snapshotv1.VolumeSnapshot{}
 	if err := cli.Get(ctx, snapshotKey, &vs); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
+		return client.IgnoreNotFound(err)
 	}
 	if err := cli.Delete(ctx, &vs); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
+		return client.IgnoreNotFound(err)
 	}
 	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotDelete", "Delete volumesnapshot/%s", snapshotKey.Name)
 	return nil
@@ -1931,14 +1917,10 @@ func deleteDeletePVCCronJob(cli client.Client,
 	cronJobKey.Name = "delete-pvc-" + pvcKey.Name
 	cronJob := v1.CronJob{}
 	if err := cli.Get(ctx, cronJobKey, &cronJob); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
+		return client.IgnoreNotFound(err)
 	}
 	if err := cli.Delete(ctx, &cronJob); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
+		return client.IgnoreNotFound(err)
 	}
 	return nil
 }

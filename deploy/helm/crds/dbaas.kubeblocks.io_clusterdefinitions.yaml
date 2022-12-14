@@ -251,12 +251,6 @@ spec:
                           description: BackupTemplateSelector defines the label selector
                             for finding associated BackupTemplate API object.
                           type: object
-                        containerName:
-                          default: ""
-                          description: ContainerName defines which container's volumeMounts
-                            to do backup, only work if Type is not None if not specified,
-                            the 1st container's volumeMounts will be chosen
-                          type: string
                         type:
                           default: None
                           description: 'Type controls what kind of data synchronization
@@ -278,7 +272,6 @@ spec:
                           - Backup
                           type: string
                         volumeMountsName:
-                          default: ""
                           description: VolumeMountsName defines which volumeMount
                             of the container to do backup, only work if Type is not
                             None if not specified, the 1st volumeMount will be chosen

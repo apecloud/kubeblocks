@@ -41,8 +41,8 @@ spec:
   * Connection credential secret name place holder `$(CONN_CREDENTIAL_SECRET_NAME)`
 
   * Limitations of cluster's horizontal scale operation:
-    * we only support native volume snapshot to do backup if db needs sync data when horizontal scaling.
-    * when do volume snapshot, we only take snapshot on the first volumeMount of first container you defined, if you have multiple volumeMounts, make sure your data volume is the first one.
+    * Only support VolumeSnapshot API to make a clone of Cluster's PV needs sync data when horizontal scaling.
+    * Only 1st pod container and 1st volume mount associated PV will be processed for VolumeSnapshot, do assure that data volume is placed in 1st pod container's 1st volume mount.
 
 
 If you're new to KubeBlocks, visit the [getting started](https://kubeblocks.io) page and

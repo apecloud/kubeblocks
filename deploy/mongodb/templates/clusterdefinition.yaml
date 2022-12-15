@@ -9,6 +9,7 @@ spec:
   components:
     - typeName: mongos
       defaultReplicas: 1
+      minReplicas: 0
       configTemplateRefs:
         - name: mongodb-scripts
           volumeName: scripts
@@ -33,6 +34,7 @@ spec:
                 subPath: mongos-setup.sh
     - typeName: configsvr
       defaultReplicas: 3
+      minReplicas: 0
       configTemplateRefs:
         - name: mongodb-scripts
           volumeName: scripts
@@ -81,6 +83,7 @@ spec:
                 subPath: replicaset-post-start.sh
     - typeName: shard
       defaultReplicas: 3
+      minReplicas: 3
       configTemplateRefs:
         - name: mongodb-scripts
           volumeName: scripts

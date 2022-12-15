@@ -232,11 +232,11 @@ func GetOpsRequestMapFromCluster(cluster *dbaasv1alpha1.Cluster) (map[dbaasv1alp
 
 // GetClusterPhaseSliceWhenExistsOpsRequest get the corresponding cluster status slice when OpsRequests are running.
 func GetClusterPhaseSliceWhenExistsOpsRequest(cluster *dbaasv1alpha1.Cluster) ([]dbaasv1alpha1.Phase, error) {
-	if opsRequestMap, err := GetOpsRequestMapFromCluster(cluster); err != nil {
+	opsRequestMap, err := GetOpsRequestMapFromCluster(cluster)
+	if err != nil {
 		return nil, err
-	} else {
-		return maps.Keys(opsRequestMap), nil
 	}
+	return maps.Keys(opsRequestMap), nil
 }
 
 // getOpsRequestNameFromAnnotation get OpsRequest.name from cluster.annotations

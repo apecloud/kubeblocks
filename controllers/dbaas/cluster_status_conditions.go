@@ -30,6 +30,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/component/util"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -83,7 +84,7 @@ func (conMgr clusterConditionManager) updateStatusConditions(condition metav1.Co
 	conMgr.Recorder.Event(conMgr.cluster, eventType, condition.Reason, condition.Message)
 	if changed {
 		// if cluster status changed, do it
-		return util.MarkRunningOpsRequestAnnotation(conMgr.ctx, conMgr.Client, conMgr.cluster)
+		return operations.MarkRunningOpsRequestAnnotation(conMgr.ctx, conMgr.Client, conMgr.cluster)
 	}
 	return nil
 }

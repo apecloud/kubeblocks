@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -30,7 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 )
 
@@ -199,14 +197,6 @@ var _ = Describe("Consensus Component", func() {
 			By("test CheckRelatedPodIsTerminating function")
 			isTerminating, _ := CheckRelatedPodIsTerminating(ctx, k8sClient, cluster, testdbaas.ConsensusComponentName)
 			Expect(isTerminating).Should(BeFalse())
-
-			By("test MarkRunningOpsRequestAnnotation function")
-			opsRequestName := "mysql-restart-" + randomStr
-			_ = testdbaas.CreateRestartOpsRequest(testCtx, clusterName, opsRequestName, []string{testdbaas.ConsensusComponentName})
-			cluster.Annotations = map[string]string{
-				intctrlutil.OpsRequestAnnotationKey: fmt.Sprintf(`{"Updating":"%s"}`, opsRequestName),
-			}
-			Expect(MarkRunningOpsRequestAnnotation(ctx, k8sClient, cluster)).Should(Succeed())
 		})
 	})
 })

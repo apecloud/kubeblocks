@@ -28,6 +28,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/dbaas/component/stateful"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/component/stateless"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/component/util"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -102,7 +103,7 @@ func handleComponentStatusAndSyncCluster(reqCtx intctrlutil.RequestCtx,
 	}
 
 	if isRunning {
-		return requeueAfter, util.MarkRunningOpsRequestAnnotation(reqCtx.Ctx, cli, cluster)
+		return requeueAfter, operations.MarkRunningOpsRequestAnnotation(reqCtx.Ctx, cli, cluster)
 	}
 	if requeueWhenPodsReady {
 		requeueAfter = time.Minute

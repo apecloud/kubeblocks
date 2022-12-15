@@ -45,7 +45,6 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/dbaas/component/util"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
-
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -511,7 +510,7 @@ func (r *ClusterReconciler) needCheckClusterForReady(cluster *dbaasv1alpha1.Clus
 
 // existsOperations check the cluster are doing operations
 func (r *ClusterReconciler) existsOperations(cluster *dbaasv1alpha1.Cluster) bool {
-	opsRequestMap, _ := operations.GetOpsRequestMapFromCluster(cluster)
+	opsRequestMap, _ := operations.GetOpsRequestSliceFromCluster(cluster)
 	return len(opsRequestMap) > 0
 }
 
@@ -551,13 +550,14 @@ func (r *ClusterReconciler) updateClusterPhaseWhenConditionsError(cluster *dbaas
 		cluster.Status.Phase = dbaasv1alpha1.CreatingPhase
 		return
 	}
-	clusterPhase, _ := operations.GetClusterPhaseWithExistsOpsRequest(cluster)
+	opsRequestSlice, _ := operations.GetOpsRequestSliceFromCluster(cluster)
 	// if no operations in cluster, means user update the cluster.spec directly
-	if len(clusterPhase) == 0 {
+	if len(opsRequestSlice) == 0 {
 		cluster.Status.Phase = dbaasv1alpha1.UpdatingPhase
 		return
 	}
-	cluster.Status.Phase = clusterPhase
+	// if exits opsRequests are running, set the cluster phase to the early target phase with the OpsRequest
+	cluster.Status.Phase = opsRequestSlice[0].ToClusterPhase
 }
 
 // checkAndPatchToRunning patch Cluster.status.phase to Running
@@ -624,9 +624,10 @@ func (r *ClusterReconciler) checkAndPatchToRunning(ctx context.Context,
 	if clusterIsRunning {
 		// send an event when Cluster.status.phase change to Running
 		r.Recorder.Eventf(cluster, corev1.EventTypeNormal, string(dbaasv1alpha1.RunningPhase), "Cluster: %s is ready, current phase is Running.", cluster.Name)
+		// mark OpsRequest annotation to reconcile for cluster scope OpsRequest
+		return operations.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
 	}
-	// mark OpsRequest annotation to reconcile for cluster scope OpsRequest
-	return util.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
+	return nil
 }
 
 // handleComponentStatus cluster controller and component controller are tuned asynchronously.
@@ -653,7 +654,7 @@ func (r *ClusterReconciler) handleComponentStatus(ctx context.Context,
 		if err = r.Client.Status().Patch(ctx, cluster, patch); err != nil {
 			return err
 		}
-		return util.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
+		return operations.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
 	}
 	return nil
 }

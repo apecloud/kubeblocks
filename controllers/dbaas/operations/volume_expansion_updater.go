@@ -25,7 +25,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/component/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -65,7 +64,7 @@ func handleVolumeExpansionWithPVC(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return nil
 	}
 	// notice the OpsRequest to reconcile
-	return util.PatchOpsRequestAnnotation(reqCtx.Ctx, cli, cluster, *opsRequestName)
+	return PatchOpsRequestAnnotation(reqCtx.Ctx, cli, cluster, *opsRequestName)
 }
 
 // Handle the warning events on pvcs. if the events is resize failed events, update the OpsRequest.status.

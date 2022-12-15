@@ -31,6 +31,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/component/util"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -278,7 +279,7 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 		return err
 	}
 	recorder.Eventf(cluster, corev1.EventTypeWarning, event.Reason, getFinalEventMessageForRecorder(event))
-	return util.MarkRunningOpsRequestAnnotation(ctx, cli, cluster)
+	return operations.MarkRunningOpsRequestAnnotation(ctx, cli, cluster)
 }
 
 // handleEventForClusterStatus handle event for cluster Warning and Failed phase

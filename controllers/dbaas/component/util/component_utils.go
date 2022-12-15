@@ -18,7 +18,6 @@ package util
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -30,47 +29,6 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
-
-// MarkRunningOpsRequestAnnotation mark reconcile annotation to the OpsRequest which is running in the cluster.
-// then the related OpsRequest can reconcile
-func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster) error {
-	var (
-		opsRequestMap   map[dbaasv1alpha1.Phase]string
-		opsRequestValue string
-		ok              bool
-		err             error
-	)
-	if cluster.Annotations == nil {
-		return nil
-	}
-	if opsRequestValue, ok = cluster.Annotations[intctrlutil.OpsRequestAnnotationKey]; !ok {
-		return nil
-	}
-	if err = json.Unmarshal([]byte(opsRequestValue), &opsRequestMap); err != nil {
-		return err
-	}
-	// mark annotation for operations
-	for _, v := range opsRequestMap {
-		if err = PatchOpsRequestAnnotation(ctx, cli, cluster, v); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// PatchOpsRequestAnnotation patch the reconcile annotation to OpsRequest
-func PatchOpsRequestAnnotation(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, opsRequestName string) error {
-	opsRequest := &dbaasv1alpha1.OpsRequest{}
-	if err := cli.Get(ctx, client.ObjectKey{Name: opsRequestName, Namespace: cluster.Namespace}, opsRequest); err != nil {
-		return err
-	}
-	patch := client.MergeFrom(opsRequest.DeepCopy())
-	if opsRequest.Annotations == nil {
-		opsRequest.Annotations = map[string]string{}
-	}
-	opsRequest.Annotations[intctrlutil.OpsRequestReconcileAnnotationKey] = time.Now().Format(time.RFC3339)
-	return cli.Patch(ctx, opsRequest, patch)
-}
 
 // GetClusterByObject get cluster by related k8s workloads.
 func GetClusterByObject(ctx context.Context,

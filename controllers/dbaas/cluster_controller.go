@@ -627,7 +627,8 @@ func (r *ClusterReconciler) checkAndPatchToRunning(ctx context.Context,
 		// send an event when Cluster.status.phase change to Running
 		r.Recorder.Eventf(cluster, corev1.EventTypeNormal, string(dbaasv1alpha1.RunningPhase), "Cluster: %s is ready, current phase is Running.", cluster.Name)
 	}
-	return nil
+	// mark OpsRequest annotation to reconcile for cluster scope OpsRequest
+	return util.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
 }
 
 // handleComponentStatus cluster controller and component controller are tuned asynchronously.

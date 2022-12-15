@@ -152,8 +152,9 @@ func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
 	var needSync bool
 	if !componentIsRunning {
 		if statusComponent.Phase == dbaasv1alpha1.RunningPhase {
-			// if cluster.status.phase is Updating, means the cluster.spec updated.
+			// if cluster.status.phase is Updating or OpsRequest of cluster scope is Running.
 			// so we sync the cluster phase to component phase.
+			// TODO check cluster status what means cluster scope OpsRequests are running
 			if cluster.Status.Phase == dbaasv1alpha1.UpdatingPhase {
 				statusComponent.Phase = cluster.Status.Phase
 				needSync = true

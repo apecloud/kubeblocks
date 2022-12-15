@@ -275,6 +275,7 @@ func patchClusterStatus(opsRes *OpsResource, toClusterState dbaasv1alpha1.Phase)
 		for k, v := range opsRes.Cluster.Status.Components {
 			if _, ok := componentNameMap[k]; ok {
 				v.Phase = toClusterState
+				opsRes.Cluster.Status.Components[k] = v
 			}
 		}
 	}

@@ -551,14 +551,13 @@ func (r *ClusterReconciler) updateClusterPhaseWhenConditionsError(cluster *dbaas
 		cluster.Status.Phase = dbaasv1alpha1.CreatingPhase
 		return
 	}
-	clusterPhases, _ := operations.GetClusterPhaseSliceWhenExistsOpsRequest(cluster)
+	clusterPhase, _ := operations.GetClusterPhaseWithExistsOpsRequest(cluster)
 	// if no operations in cluster, means user update the cluster.spec directly
-	if len(clusterPhases) == 0 {
+	if len(clusterPhase) == 0 {
 		cluster.Status.Phase = dbaasv1alpha1.UpdatingPhase
 		return
 	}
-	// set the cluster status corresponding to one of the OpsRequests
-	cluster.Status.Phase = clusterPhases[0]
+	cluster.Status.Phase = clusterPhase
 }
 
 // checkAndPatchToRunning patch Cluster.status.phase to Running

@@ -1692,12 +1692,6 @@ func buildPVCFromSnapshot(sts *appsv1.StatefulSet,
 	return &pvc, nil
 }
 
-const (
-	maxNameLength          = 63
-	randomLength           = 14
-	MaxGeneratedNameLength = maxNameLength - randomLength
-)
-
 func buildVolumeSnapshot(snapshotKey types.NamespacedName,
 	pvcName string,
 	sts *appsv1.StatefulSet) (*snapshotv1.VolumeSnapshot, error) {

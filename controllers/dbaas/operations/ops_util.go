@@ -271,6 +271,8 @@ func patchClusterStatus(opsRes *OpsResource, toClusterState dbaasv1alpha1.Phase)
 	componentNameMap := getAllComponentsNameMap(opsRes.OpsRequest)
 	patch := client.MergeFrom(opsRes.Cluster.DeepCopy())
 	opsRes.Cluster.Status.Phase = toClusterState
+	// if the OpsRequest is components scope, we should update the cluster components together.
+	// otherwise, OpsRequest maybe reconcile the status to succeed immediately.
 	if componentNameMap != nil && opsRes.Cluster.Status.Components != nil {
 		for k, v := range opsRes.Cluster.Status.Components {
 			if _, ok := componentNameMap[k]; ok {

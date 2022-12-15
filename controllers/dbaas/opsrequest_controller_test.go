@@ -187,22 +187,6 @@ spec:
 				ClusterDefRef:     clusterDefObj.GetName(),
 				AppVersionRef:     appVersionObj.GetName(),
 				TerminationPolicy: dbaasv1alpha1.WipeOut,
-				Components: []dbaasv1alpha1.ClusterComponent{
-					{
-						Name: "wesql",
-						Type: "replicasets",
-						Resources: corev1.ResourceRequirements{
-							Limits: corev1.ResourceList{
-								"cpu":    resource.MustParse("800m"),
-								"memory": resource.MustParse("512Mi"),
-							},
-							Requests: corev1.ResourceList{
-								"cpu":    resource.MustParse("500m"),
-								"memory": resource.MustParse("256Mi"),
-							},
-						},
-					},
-				},
 			},
 		}, clusterDefObj, appVersionObj, key
 	}
@@ -244,7 +228,23 @@ spec:
 	Context("with Cluster running", func() {
 		It("issue an VerticalScalingOpsRequest should change Cluster's resource requirements successfully", func() {
 			By("create cluster")
-			clusterObj, _, _, key := newClusterObj(nil, nil)
+			clusterObj, clusterDef, _, key := newClusterObj(nil, nil)
+			clusterObj.Spec.Components = []dbaasv1alpha1.ClusterComponent{
+				{
+					Name: "wesql",
+					Type: clusterDef.Spec.Components[0].TypeName, // "replicasets"
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							"cpu":    resource.MustParse("800m"),
+							"memory": resource.MustParse("512Mi"),
+						},
+						Requests: corev1.ResourceList{
+							"cpu":    resource.MustParse("500m"),
+							"memory": resource.MustParse("256Mi"),
+						},
+					},
+				},
+			}
 			Expect(testCtx.CreateObj(ctx, clusterObj)).Should(Succeed())
 
 			By("check(or mock maybe) cluster status running")
@@ -266,7 +266,7 @@ spec:
 			verticalScalingOpsRequest.Spec.TTLSecondsAfterSucceed = 1
 			verticalScalingOpsRequest.Spec.ComponentOpsList = []dbaasv1alpha1.ComponentOps{
 				{
-					ComponentNames: []string{"wesql"},
+					ComponentNames: []string{clusterObj.Spec.Components[0].Name}, // "wesql"
 					VerticalScaling: &corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							"cpu":    resource.MustParse("400m"),

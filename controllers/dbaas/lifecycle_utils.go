@@ -840,14 +840,14 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		scaleUp := func() (shouldRequeue bool, err error) {
 			shouldRequeue = false
 			if err := cleanCronJobs(); err != nil {
-				return shouldRequeue, err
+				return
 			}
 			allPVCsExist, err := checkAllPVCsExist()
 			if err != nil {
-				return shouldRequeue, err
+				return
 			}
 			if allPVCsExist {
-				return shouldRequeue, nil
+				return
 			}
 			// do backup according to component's horizontal scale policy
 			return doBackup(reqCtx,
@@ -880,21 +880,23 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 
 		checkAllPVCBoundIfNeeded := func() (shouldRequeue bool, err error) {
+			shouldRequeue = false
+			err = nil
 			if component.HorizontalScalePolicy == nil ||
 				component.HorizontalScalePolicy.Type != dbaasv1alpha1.Snapshot ||
 				isSnapshotAvailable(cli, ctx) {
-				return false, nil
+				return
 			}
 			allPVCBound, err := isAllPVCBound(cli, ctx, stsObj)
 			if err != nil {
-				return false, err
+				return
 			}
 			if !allPVCBound {
 				// requeue waiting pvc phase become bound
 				return true, nil
 			}
 			// all pvc bounded, can do next step
-			return false, nil
+			return
 		}
 
 		cleanBackupResourcesIfNeeded := func() error {
@@ -1584,6 +1586,7 @@ func processConfigMapTemplate(ctx context.Context,
 	return tplBuilder.render(cmObj.Data)
 }
 
+// createBackup create backup resources required to do backup,
 func createBackup(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	sts *appsv1.StatefulSet,
@@ -1613,6 +1616,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 	return nil
 }
 
+// deleteBackup will delete all backup related resources created during horizontal scaling,
 func deleteBackup(ctx context.Context, cli client.Client, backupKey types.NamespacedName) error {
 	backupPolicy := dataprotectionv1alpha1.BackupPolicy{}
 	if err := cli.Get(ctx, backupKey, &backupPolicy); err != nil {

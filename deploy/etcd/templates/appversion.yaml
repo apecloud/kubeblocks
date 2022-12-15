@@ -1,0 +1,15 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: AppVersion
+metadata:
+  name: etcd-{{ default .Chart.AppVersion .Values.appVersionOverride }}
+  labels:
+    {{- include "etcd.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: apecloud-etcd
+  components:
+    - type: etcd
+      podSpec:
+        containers:
+          - name: etcd
+            image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}

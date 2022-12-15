@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -208,6 +209,8 @@ func patchClusterExistOtherOperation(opsRes *OpsResource, opsRequestName string)
 }
 
 // GetOpsRequestMapFromCluster get OpsRequest map from cluster annotations
+// OpsRequestMap keys are the cluster status when executing the OpsRequest.
+// values are the OpsRequest name
 func GetOpsRequestMapFromCluster(cluster *dbaasv1alpha1.Cluster) (map[dbaasv1alpha1.Phase]string, error) {
 	var (
 		opsRequestValue string
@@ -225,6 +228,15 @@ func GetOpsRequestMapFromCluster(cluster *dbaasv1alpha1.Cluster) (map[dbaasv1alp
 		return nil, err
 	}
 	return opsRequestMap, nil
+}
+
+// GetClusterPhaseSliceWhenExistsOpsRequest get the corresponding cluster status slice when OpsRequests are running.
+func GetClusterPhaseSliceWhenExistsOpsRequest(cluster *dbaasv1alpha1.Cluster) ([]dbaasv1alpha1.Phase, error) {
+	if opsRequestMap, err := GetOpsRequestMapFromCluster(cluster); err != nil {
+		return nil, err
+	} else {
+		return maps.Keys(opsRequestMap), nil
+	}
 }
 
 // getOpsRequestNameFromAnnotation get OpsRequest.name from cluster.annotations

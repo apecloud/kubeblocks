@@ -187,12 +187,12 @@ func handleClusterStatusPhaseByEvent(cluster *dbaasv1alpha1.Cluster, componentMa
 	}
 	// record the not ready conditions in cluster
 	if len(ReplicasNotReadyComponentNames) > 0 {
-		message := fmt.Sprintf("pods are not ready in Components: %v, refer to related component message in Cluster.status", ReplicasNotReadyComponentNames)
+		message := fmt.Sprintf("pods are not ready in Components: %v, refer to related component message in Cluster.status.components", ReplicasNotReadyComponentNames)
 		cluster.SetStatusCondition(newReplicasNotReadyCondition(message))
 	}
 	// record the not ready conditions in cluster
 	if len(notReadyComponentNames) > 0 {
-		message := fmt.Sprintf("pods are unavailable in Components: %v, refer to related component message in Cluster.status", notReadyComponentNames)
+		message := fmt.Sprintf("pods are unavailable in Components: %v, refer to related component message in Cluster.status.components", notReadyComponentNames)
 		cluster.SetStatusCondition(newComponentsNotReadyCondition(message))
 	}
 	if !needSyncClusterPhase {

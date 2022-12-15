@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/component/util"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )

@@ -39,10 +39,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/component/consensusset"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/component/stateless"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/component/util"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/stateless"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -679,7 +679,7 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 		}
 		typeName := util.GetComponentTypeName(*cluster, componentName)
 		componentDef := util.GetComponentDefFromClusterDefinition(clusterDef, typeName)
-		currComponent := component.NewComponentByType(ctx, r.Client, cluster, componentDef, componentName)
+		currComponent := components.NewComponentByType(ctx, r.Client, cluster, componentDef, componentName)
 		componentIsRunning, err := currComponent.IsRunning(&sts)
 		if err != nil {
 			return false, err
@@ -688,7 +688,7 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 		if err != nil {
 			return false, err
 		}
-		if ok, err := component.NeedSyncStatusComponents(cluster, currComponent, componentName, componentIsRunning, podsIsReady); err != nil {
+		if ok, err := components.NeedSyncStatusComponents(cluster, currComponent, componentName, componentIsRunning, podsIsReady); err != nil {
 			return false, err
 		} else if ok {
 			needSyncComponentStatus = true
@@ -713,7 +713,7 @@ func (r *ClusterReconciler) handleComponentStatusWithDeployment(ctx context.Cont
 		}
 		deployIsReady := stateless.DeploymentIsReady(&deploy)
 		stateless := stateless.NewStateless(ctx, r.Client, cluster)
-		if ok, err := component.NeedSyncStatusComponents(cluster, stateless,
+		if ok, err := components.NeedSyncStatusComponents(cluster, stateless,
 			componentName, deployIsReady, deployIsReady); err != nil {
 			return false, err
 		} else if ok {

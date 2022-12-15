@@ -29,8 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/component/util"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -262,7 +262,7 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 	patch := client.MergeFrom(cluster.DeepCopy())
 	componentMap, clusterAvailabilityEffectMap, componentDef := getComponentRelatedInfo(cluster, clusterDef, componentName)
 	// get the component status by event and check whether the component status needs to be synchronized to the cluster
-	component := component.NewComponentByType(ctx, cli, cluster, &componentDef, componentName)
+	component := components.NewComponentByType(ctx, cli, cluster, &componentDef, componentName)
 	if component == nil {
 		return nil
 	}

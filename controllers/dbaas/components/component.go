@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package component
+package components
 
 import (
 	"context"
@@ -24,10 +24,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/component/consensusset"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/component/stateful"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/component/stateless"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/component/util"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/stateful"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/stateless"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )

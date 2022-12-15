@@ -49,8 +49,13 @@ type ProbeBase struct {
 	roleCheckFailedCount    int
 	roleCheckCount          int
 	eventAggregationNum     int
-	eventIntervalNum        int
-	dbPort                  int
+	// eventIntervalNum is used to set the report period of role changed event even role unchanged,
+	// then event controller can always get rolechanged events to maintain pod label accurately
+	// in cases of:
+	// 1 rolechanged event lost;
+	// 2 pod role label deleted or updated incorrectly.
+	eventIntervalNum int
+	dbPort           int
 }
 
 // ProbeOperation abstracts the interfaces a binding implementation needs to support.

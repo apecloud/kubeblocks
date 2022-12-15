@@ -1720,10 +1720,7 @@ func isVolumeSnapshotExists(cli client.Client,
 	snapshotKey types.NamespacedName) (bool, error) {
 	vs := snapshotv1.VolumeSnapshot{}
 	if err := cli.Get(ctx, snapshotKey, &vs); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return false, err
-		}
-		return false, nil
+		return false, client.IgnoreNotFound(err)
 	}
 	return true, nil
 }
@@ -1734,10 +1731,7 @@ func isVolumeSnapshotReadyToUse(cli client.Client,
 	snapshotKey types.NamespacedName) (bool, error) {
 	vs := snapshotv1.VolumeSnapshot{}
 	if err := cli.Get(ctx, snapshotKey, &vs); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return false, err
-		}
-		return false, nil
+		return false, client.IgnoreNotFound(err)
 	}
 	return *vs.Status.ReadyToUse, nil
 }
@@ -2005,10 +1999,7 @@ func isPVCExists(cli client.Client,
 	pvcKey types.NamespacedName) (bool, error) {
 	pvc := corev1.PersistentVolumeClaim{}
 	if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return false, err
-		}
-		return false, nil
+		return false, client.IgnoreNotFound(err)
 	}
 	return true, nil
 }

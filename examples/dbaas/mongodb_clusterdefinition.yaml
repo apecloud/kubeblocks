@@ -43,7 +43,7 @@ spec:
           accessMode: ReadWrite
         followers:
           - name: "secondary"
-            accessMode: ReadWrite
+            accessMode: Readonly
         updateStrategy: Serial
       probes:
         roleChangedProbe:
@@ -91,7 +91,7 @@ spec:
           accessMode: ReadWrite
         followers:
           - name: "secondary"
-            accessMode: ReadWrite
+            accessMode: Readonly
         updateStrategy: BestEffortParallel
       probes:
         roleChangedProbe:

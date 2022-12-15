@@ -205,15 +205,7 @@ func (o *CreateOptions) Complete() error {
 	o.Components = components
 
 	// TolerationsRaw looks like `["key=engineType,value=mongo,operator=Equal,effect=NoSchedule"]` after parsing by cmd
-	tolerations := make([]map[string]string, 0)
-	for _, tolerationRaw := range o.TolerationsRaw {
-		toleration := map[string]string{}
-		for _, entries := range strings.Split(tolerationRaw, ",") {
-			parts := strings.SplitN(entries, "=", 2)
-			toleration[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
-		}
-		tolerations = append(tolerations, toleration)
-	}
+	tolerations := buildTolerations(o.TolerationsRaw)
 	if len(tolerations) > 0 {
 		o.Tolerations = tolerations
 	}
@@ -289,17 +281,17 @@ func markRequiredFlag(cmd *cobra.Command) {
 }
 
 func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
-	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cluster-definition",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterDefGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
-	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cluster-version",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.AppVersionGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
-	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"termination-policy",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return []string{"DoNotTerminate", "Halt", "Delete", "WipeOut"}, cobra.ShellCompDirectiveNoFileComp

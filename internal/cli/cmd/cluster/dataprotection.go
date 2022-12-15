@@ -176,24 +176,25 @@ func NewDeleteBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Build(delete.Build)
 }
 
-func customFlagsForDeleteBackup(option builder.Options, cmd *cobra.Command) {
+func customFlagsForDeleteBackup(c *builder.Command) {
 	var (
 		o  *delete.DeleteFlags
 		ok bool
 	)
-	if o, ok = option.(*delete.DeleteFlags); !ok {
+	if o, ok = c.Options.(*delete.DeleteFlags); !ok {
 		return
 	}
-	cmd.Flags().StringSliceVar(&o.ResourceNames, "name", []string{}, "Backup names")
+	c.Cmd.Flags().StringSliceVar(&o.ResourceNames, "name", []string{}, "Backup names")
 }
 
 // completeForDeleteBackup complete cmd for delete backup
-func completeForDeleteBackup(option builder.Options, args []string) error {
+func completeForDeleteBackup(c *builder.Command) error {
 	var (
 		flag *delete.DeleteFlags
 		ok   bool
 	)
-	if flag, ok = option.(*delete.DeleteFlags); !ok {
+	args := c.Args
+	if flag, ok = c.Options.(*delete.DeleteFlags); !ok {
 		return nil
 	}
 
@@ -325,27 +326,28 @@ func NewDeleteRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Build(delete.Build)
 }
 
-func customFlagsForDeleteRestore(option builder.Options, cmd *cobra.Command) {
+func customFlagsForDeleteRestore(c *builder.Command) {
 	var (
 		o  *delete.DeleteFlags
 		ok bool
 	)
-	if o, ok = option.(*delete.DeleteFlags); !ok {
+	if o, ok = c.Options.(*delete.DeleteFlags); !ok {
 		return
 	}
-	cmd.Flags().StringSliceVar(&o.ResourceNames, "name", []string{}, "Restore names")
+	c.Cmd.Flags().StringSliceVar(&o.ResourceNames, "name", []string{}, "Restore names")
 }
 
 // completeForDeleteRestore complete cmd for delete restore
-func completeForDeleteRestore(option builder.Options, args []string) error {
+func completeForDeleteRestore(c *builder.Command) error {
 	var (
 		flag *delete.DeleteFlags
 		ok   bool
 	)
-	if flag, ok = option.(*delete.DeleteFlags); !ok {
+	if flag, ok = c.Options.(*delete.DeleteFlags); !ok {
 		return nil
 	}
 
+	args := c.Args
 	if len(args) == 0 {
 		return errors.New("Missing cluster name")
 	}

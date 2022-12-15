@@ -26,6 +26,7 @@ import (
 	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	"github.com/apecloud/kubeblocks/internal/cli/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
@@ -171,18 +172,20 @@ var _ = Describe("Cluster", func() {
 		deleteFlags := &delete.DeleteFlags{
 			DeleteFlags: cmddelete.NewDeleteCommandFlags("containing the resource to delete."),
 		}
-		Expect(completeForDeleteOps(deleteFlags, []string{clusterName})).Should(Succeed())
+		c := &builder.Command{Options: deleteFlags, Args: []string{clusterName}}
+		Expect(completeForDeleteOps(c)).Should(Succeed())
 		Expect(*deleteFlags.LabelSelector == clusterLabel).Should(BeTrue())
 
 		By("test delete OpsRequest with cluster and custom label")
 		deleteFlags.LabelSelector = &testLabel
-		Expect(completeForDeleteOps(deleteFlags, []string{clusterName})).Should(Succeed())
+		Expect(completeForDeleteOps(c)).Should(Succeed())
 		Expect(*deleteFlags.LabelSelector == testLabel+","+clusterLabel).Should(BeTrue())
 
 		By("test delete OpsRequest with name")
 		deleteFlags.ClusterName = ""
 		deleteFlags.ResourceNames = []string{"test1"}
-		Expect(completeForDeleteOps(deleteFlags, []string{})).Should(Succeed())
+		c.Args = []string{}
+		Expect(completeForDeleteOps(c)).Should(Succeed())
 		Expect(deleteFlags.ClusterName == "").Should(BeTrue())
 	})
 

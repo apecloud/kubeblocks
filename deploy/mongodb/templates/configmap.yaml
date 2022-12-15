@@ -25,7 +25,7 @@ data:
     # usage: replicaset-post-start.sh type_name is_configsvr
     # type_name: component.type, in uppercase
     # is_configsvr: true or false, default false
-    INDEX=$(echo $KB_POD_NAME | grep -o "\-[0-9]\+");
+    INDEX=$(echo $KB_POD_NAME | grep -o "\-[0-9]\+\$");
     INDEX=${INDEX#-};
     if [ $INDEX -ne 0 ]; then exit 0; fi
     
@@ -53,7 +53,7 @@ data:
   shard-agent.sh: |-
     #!/bin/sh
     
-    INDEX=$(echo $KB_POD_NAME | grep -o "\-[0-9]\+");
+    INDEX=$(echo $KB_POD_NAME | grep -o "\-[0-9]\+\$");
     INDEX=${INDEX#-};
     if [ $INDEX -ne 0 ]; then
       trap : TERM INT; (while true; do sleep 1000; done) & wait

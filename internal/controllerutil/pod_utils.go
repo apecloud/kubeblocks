@@ -18,8 +18,11 @@ package controllerutil
 
 import (
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
@@ -218,4 +221,63 @@ func GetContainerID(pod *corev1.Pod, containerName string) string {
 		}
 	}
 	return ""
+}
+
+func isRunning(pod *corev1.Pod) bool {
+	return pod.Status.Phase == corev1.PodRunning && pod.DeletionTimestamp == nil
+}
+
+func IsReady(pod *corev1.Pod) bool {
+	if !isRunning(pod) {
+		return false
+	}
+
+	condition := getPodCondition(&pod.Status, corev1.PodReady)
+	return condition != nil && condition.Status == corev1.ConditionTrue
+}
+
+func IsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+	if !isRunning(pod) {
+		return false
+	}
+
+	condition := getPodCondition(&pod.Status, corev1.PodReady)
+	if condition == nil || condition.Status != corev1.ConditionTrue {
+		return false
+	}
+	if minReadySeconds == 0 {
+		return true
+	}
+
+	var (
+		now                = metav1.Now()
+		minDuration        = time.Duration(minReadySeconds) * time.Second
+		lastTransitionTime = condition.LastTransitionTime
+	)
+
+	return !lastTransitionTime.IsZero() && lastTransitionTime.Add(minDuration).Before(now.Time)
+}
+
+func getPodCondition(status *corev1.PodStatus, conditionType corev1.PodConditionType) *corev1.PodCondition {
+	if len(status.Conditions) == 0 {
+		return nil
+	}
+
+	for _, condition := range status.Conditions {
+		if condition.Type == conditionType {
+			return &condition
+		}
+	}
+	return nil
+}
+
+func IsMatchConfigVersion(obj client.Object, labelKey string, version string) bool {
+	labels := obj.GetLabels()
+	if len(labels) == 0 {
+		return false
+	}
+	if lastVersion, ok := labels[labelKey]; ok && lastVersion == version {
+		return true
+	}
+	return false
 }

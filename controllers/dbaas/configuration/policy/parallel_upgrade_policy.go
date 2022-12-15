@@ -17,6 +17,9 @@ limitations under the License.
 package policy
 
 import (
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
@@ -29,15 +32,13 @@ type ParallelUpgradePolicy struct {
 }
 
 func (p *ParallelUpgradePolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
-	finished, err := p.restartPods(params)
-	if err != nil {
-		return ESFailed, err
+	if finished, err := p.restartPods(params); err != nil {
+		return ESAndRetryFailed, err
+	} else if !finished {
+		return ESRetry, nil
 	}
 
-	if finished {
-		return ESNone, nil
-	}
-	return ESRetry, nil
+	return ESNone, nil
 }
 
 func (p *ParallelUpgradePolicy) GetPolicyName() string {
@@ -45,6 +46,45 @@ func (p *ParallelUpgradePolicy) GetPolicyName() string {
 }
 
 func (p *ParallelUpgradePolicy) restartPods(params ReconfigureParams) (bool, error) {
-	// TODO(zt) kill program
-	return false, cfgcore.MakeError("")
+	var (
+		funcs         RollingUpgradeFuncs
+		cType         = params.ComponentType()
+		configKey     = params.GetConfigKey()
+		configVersion = params.GetModifyVersion()
+	)
+
+	updatePodLabelsVersion := func(pod *corev1.Pod, labelKey, labelValue string) error {
+		patch := client.MergeFrom(pod.DeepCopy())
+		if pod.Labels == nil {
+			pod.Labels = make(map[string]string, 1)
+		}
+		pod.Labels[labelKey] = labelValue
+		return params.Client.Patch(params.Ctx.Ctx, pod, patch)
+	}
+
+	switch cType {
+	case dbaasv1alpha1.Consensus:
+		funcs = GetConsensusRollingUpgradeFuncs()
+	case dbaasv1alpha1.Stateful:
+		funcs = GetStatefulSetRollingUpgradeFuncs()
+	case dbaasv1alpha1.Stateless:
+		funcs = GetDeploymentRollingUpgradeFuncs()
+	default:
+		return false, cfgcore.MakeError("not support component type[%s]", cType)
+	}
+
+	pods, err := funcs.GetPodsFunc(params)
+	if err != nil {
+		return false, err
+	}
+
+	for _, pod := range pods {
+		if err := funcs.RestartContainerFunc(&pod, params.ContainerNames, newGRPCConn); err != nil {
+			return false, err
+		}
+		if err := updatePodLabelsVersion(&pod, configKey, configVersion); err != nil {
+			return false, err
+		}
+	}
+	return true, nil
 }

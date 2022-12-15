@@ -47,6 +47,8 @@ const (
 	ConfigCRIType            = "CRI_TYPE"
 	ConfigManagerGPRCPortEnv = "CONFIG_MANAGER_GRPC_PORT"
 
+	PodMinReadySecondsEnv = "POD_MIN_READY_SECONDS"
+
 	ConstTrueString  = "true"
 	ConstFalseString = "false"
 )

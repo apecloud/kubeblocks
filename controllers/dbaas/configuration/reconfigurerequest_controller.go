@@ -134,6 +134,8 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 			Name:      config.Labels[intctrlutil.AppInstanceLabelKey],
 		}
 
+		configKey = client.ObjectKeyFromObject(config)
+
 		configTplName     = config.Labels[cfgcore.CMConfigurationISVTplLabelKey]
 		configTplLabelKey = cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName)
 	)
@@ -208,9 +210,9 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	}
 
 	// configmap has never been used
-	sts, containersList := GetComponentByUsingCM(&stsLists, client.ObjectKeyFromObject(config))
+	sts, containersList := GetComponentByUsingCM(&stsLists, configKey)
 	if len(sts) == 0 {
-		reqCtx.Log.Info("configmap is not used by any container.", "cm name", client.ObjectKeyFromObject(config))
+		reqCtx.Log.Info("configmap is not used by any container.", "cm name", configKey)
 		return intctrlutil.Reconciled()
 	}
 
@@ -222,7 +224,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		Client:           r.Client,
 		Ctx:              reqCtx,
 		Cluster:          &cluster,
-		ContainerName:    containersList,
+		ContainerNames:   containersList,
 		ComponentUnits:   sts,
 		Component:        component,
 		ClusterComponent: clusterComponent,
@@ -255,7 +257,7 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params cfgpolicy.Reconfigu
 	}
 
 	switch execStatus {
-	case cfgpolicy.ESRetry:
+	case cfgpolicy.ESRetry, cfgpolicy.ESAndRetryFailed:
 		return intctrlutil.RequeueAfter(ConfigReconcileInterval, params.Ctx.Log, "")
 	case cfgpolicy.ESNone:
 		return r.updateCfgStatus(params.Ctx, params.Cfg, policy.GetPolicyName())

@@ -29,6 +29,7 @@ import (
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
@@ -68,6 +69,8 @@ func (d *dockerContainerV2) Kill(ctx context.Context, containerIDs []string, sig
 	if err != nil {
 		return cfgcore.WrapError(err, "failed to search container")
 	}
+
+	errs := make([]error, 0, len(containerIDs))
 	logrus.Debugf("all docker container: %v", cfgcore.NewSetFromMap(allContainer).ToList())
 	for _, containerID := range containerIDs {
 		logrus.Infof("stopping docker container: %s", containerID)
@@ -81,9 +84,13 @@ func (d *dockerContainerV2) Kill(ctx context.Context, containerIDs []string, sig
 			continue
 		}
 		if err := d.dc.ContainerKill(ctx, containerID, signal); err != nil {
-			return err
+			errs = append(errs, err)
+			continue
 		}
 		logrus.Infof("docker container[%s] stoped.", containerID)
+	}
+	if len(errs) > 0 {
+		return utilerrors.NewAggregate(errs)
 	}
 	return nil
 }
@@ -145,7 +152,10 @@ type containerdContainerV2 struct {
 }
 
 func (c *containerdContainerV2) Kill(ctx context.Context, containerIDs []string, signal string, timeout *time.Duration) error {
-	request := &runtimeapi.StopContainerRequest{}
+	var (
+		request = &runtimeapi.StopContainerRequest{}
+		errs    = make([]error, 0, len(containerIDs))
+	)
 
 	switch {
 	case signal == defaultSignal:
@@ -164,7 +174,8 @@ func (c *containerdContainerV2) Kill(ctx context.Context, containerIDs []string,
 			},
 		})
 		if err != nil {
-			return err
+			errs = append(errs, err)
+			continue
 		} else if len(containers.Containers) == 0 {
 			logrus.Infof("container[%s] not exist and pass.", containerID)
 			continue
@@ -174,9 +185,14 @@ func (c *containerdContainerV2) Kill(ctx context.Context, containerIDs []string,
 		_, err = c.backendRuntime.StopContainer(ctx, request)
 		if err != nil {
 			logrus.Infof("failed to stop container[%s], error: %v", containerID, err)
-			return err
+			errs = append(errs, err)
+			continue
 		}
 		logrus.Infof("docker container[%s] stoped.", containerID)
+	}
+
+	if len(errs) > 0 {
+		return utilerrors.NewAggregate(errs)
 	}
 	return nil
 }

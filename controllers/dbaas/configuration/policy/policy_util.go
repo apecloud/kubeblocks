@@ -55,6 +55,13 @@ func GetStatefulSetRollingUpgradeFuncs() RollingUpgradeFuncs {
 	}
 }
 
+func GetDeploymentRollingUpgradeFuncs() RollingUpgradeFuncs {
+	return RollingUpgradeFuncs{
+		GetPodsFunc:          getDeploymentPods,
+		RestartContainerFunc: commonStopContainer,
+	}
+}
+
 func GetReplicationRollingUpgradeFuncs() RollingUpgradeFuncs {
 	return RollingUpgradeFuncs{
 		GetPodsFunc:          getReplicationSetPods,
@@ -90,6 +97,10 @@ func getConsensusPods(params ReconfigureParams) ([]corev1.Pod, error) {
 	return pods, nil
 }
 
+func getDeploymentPods(params ReconfigureParams) ([]corev1.Pod, error) {
+	panic("")
+}
+
 func commonStopContainer(pod *corev1.Pod, containerNames []string, newConnFn createGRPCConn) error {
 	containerIDs := make([]string, 0, len(containerNames))
 	for _, name := range containerNames {
@@ -122,6 +133,9 @@ func commonStopContainer(pod *corev1.Pod, containerNames []string, newConnFn cre
 }
 
 func generateManagerSidecarAddr(pod *corev1.Pod) string {
-	podAddress := pod.Status.PodIP
-	return fmt.Sprintf("%s:%d", podAddress, viper.GetInt32(cfgcore.ConfigManagerGPRCPortEnv))
+	var (
+		podAddress = pod.Status.PodIP
+		podPort    = viper.GetInt32(cfgcore.ConfigManagerGPRCPortEnv)
+	)
+	return fmt.Sprintf("%s:%d", podAddress, podPort)
 }

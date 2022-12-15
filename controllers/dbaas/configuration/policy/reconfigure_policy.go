@@ -17,6 +17,11 @@ limitations under the License.
 package policy
 
 import (
+	"math"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,7 +37,15 @@ const (
 	ESNone ExecStatus = iota
 	ESRetry
 	ESFailed
+	ESAndRetryFailed
 	ESNotSupport
+)
+
+var (
+	// lazy create grpc connection
+	newGRPCConn = func(addr string) (*grpc.ClientConn, error) {
+		return grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}
 )
 
 func init() {
@@ -46,7 +59,7 @@ type ReconfigureParams struct {
 	Cfg     *corev1.ConfigMap
 	Tpl     *dbaasv1alpha1.ConfigurationTemplateSpec
 
-	ContainerName    []string
+	ContainerNames   []string
 	Client           client.Client
 	Ctx              intctrlutil.RequestCtx
 	Cluster          *dbaasv1alpha1.Cluster
@@ -76,6 +89,22 @@ func (param *ReconfigureParams) GetModifyVersion() string {
 	}
 
 	return hash
+}
+
+func (param *ReconfigureParams) MaxRollingReplicas() int32 {
+	const defaultRolling int32 = 1
+	capacity := param.Component.ConfigSpec.MaxUnavailableCapacity
+	if capacity == nil {
+		return defaultRolling
+	}
+
+	v := (*capacity) * param.GetTargetReplicas()
+	return cfgcore.Max(int32(math.Floor(float64(v)/100)), defaultRolling)
+}
+
+func (param *ReconfigureParams) GetTargetReplicas() int {
+	// TODO not check
+	return int(*param.ClusterComponent.Replicas)
 }
 
 type ReconfigurePolicy interface {

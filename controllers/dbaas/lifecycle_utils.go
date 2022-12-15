@@ -882,7 +882,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			return nil
 		}
 
-		cleanBackupResourcesIfNeeded := func() (shouldRequeue bool, err error) {
+		checkAllPVCBoundIfNeeded := func() (shouldRequeue bool, err error) {
 			if component.HorizontalScalePolicy == nil ||
 				component.HorizontalScalePolicy.Type != dbaasv1alpha1.Snapshot ||
 				isSnapshotAvailable(cli, ctx) {
@@ -892,16 +892,22 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			if err != nil {
 				return false, err
 			}
-			if allPVCBound {
-				// if all pvc bounded, clean backup resources
-				if err := deleteSnapshot(cli, reqCtx, snapshotKey, cluster); err != nil {
-					return false, err
-				}
-			} else {
+			if !allPVCBound {
 				// requeue waiting pvc phase become bound
 				return true, nil
 			}
+			// all pvc bounded, can do next step
 			return false, nil
+		}
+
+		cleanBackupResourcesIfNeeded := func() error {
+			if component.HorizontalScalePolicy == nil ||
+				component.HorizontalScalePolicy.Type != dbaasv1alpha1.Snapshot ||
+				isSnapshotAvailable(cli, ctx) {
+				return nil
+			}
+			// if all pvc bounded, clean backup resources
+			return deleteSnapshot(cli, reqCtx, snapshotKey, cluster)
 		}
 
 		// when horizontal scaling up, sometimes db needs backup to sync data from master,
@@ -938,13 +944,17 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		if err := cli.Update(ctx, stsObj); err != nil {
 			return false, err
 		}
-		// clean backup resources
-		shouldRequeue, err = cleanBackupResourcesIfNeeded()
+		// check all pvc bound, requeue if not all ready
+		shouldRequeue, err = checkAllPVCBoundIfNeeded()
 		if err != nil {
 			return false, err
 		}
 		if shouldRequeue {
 			return true, err
+		}
+		// clean backup resources
+		if err := cleanBackupResourcesIfNeeded(); err != nil {
+			return false, err
 		}
 
 		// check stsObj.Spec.VolumeClaimTemplates storage

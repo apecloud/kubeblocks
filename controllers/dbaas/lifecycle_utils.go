@@ -949,7 +949,8 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		if shouldRequeue {
 			return true, err
 		}
-		// clean backup resources
+		// clean backup resources.
+		// there will not be any backup resources other than scale up.
 		if err := cleanBackupResourcesIfNeeded(); err != nil {
 			return false, err
 		}

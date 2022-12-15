@@ -818,8 +818,6 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 
 		checkAllPVCsExist := func() (bool, error) {
-			exist := true
-		outer:
 			for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
 				for _, vct := range stsObj.Spec.VolumeClaimTemplates {
 					pvcKey := types.NamespacedName{
@@ -829,15 +827,14 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 					// check pvc existence
 					pvcExists, err := isPVCExists(cli, ctx, pvcKey)
 					if err != nil {
-						return exist, err
+						return true, err
 					}
 					if !pvcExists {
-						exist = false
-						break outer
+						return false, nil
 					}
 				}
 			}
-			return exist, nil
+			return true, nil
 		}
 
 		scaleUp := func() (shouldRequeue bool, err error) {

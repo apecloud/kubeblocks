@@ -24,7 +24,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/sethvargo/go-password/password"
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -69,6 +68,8 @@ metadata:
   name: cluster-definition-ops
 spec:
   type: state.mysql-8
+  connectionCredential:
+    password: "$(RANDOM_PASSWD)"
   components:
   - typeName: replicasets
     componentType: Consensus
@@ -93,17 +94,17 @@ spec:
           - name: "MYSQL_ROOT_PASSWORD"
             valueFrom:
               secretKeyRef:
-                name: $(KB_SECRET_NAME)
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
                 key: password
         command: ["/usr/bin/bash", "-c"]
         args:
           - >
             cluster_info="";
-            for (( i=0; i<$KB_REPLICASETS_PRIMARY_N; i++ )); do
+            for (( i=0; i<$KB_REPLICASETS_N; i++ )); do
               if [ $i -ne 0 ]; then
                 cluster_info="$cluster_info;";
               fi;
-              host=$(eval echo \$KB_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
+              host=$(eval echo \$KB_REPLICASETS_"$i"_HOSTNAME)
               cluster_info="$cluster_info$host:13306";
             done;
             idx=0;
@@ -115,6 +116,9 @@ spec:
             echo $idx;
             cluster_info="$cluster_info@$(($idx+1))";
             echo $cluster_info;
+            mkdir -p /data/mysql/data;
+            mkdir -p /data/mysql/log;
+            chmod +777 -R /data/mysql;
             docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
   - typeName: proxy
     componentType: Stateless
@@ -137,13 +141,13 @@ kind:       AppVersion
 metadata:
   name:     app-version-ops
 spec:
-  clusterDefinitionRef: cluster-definition
+  clusterDefinitionRef: cluster-definition-ops
   components:
   - type: replicasets
     podSpec:
       containers:
       - name: mysql
-        image: registry.jihulab.com/apecloud/mysql-server/mysql/wesql-server-arm:latest
+        image: apecloud/wesql-server:latest
   - type: proxy
     podSpec: 
       containers:
@@ -183,6 +187,22 @@ spec:
 				ClusterDefRef:     clusterDefObj.GetName(),
 				AppVersionRef:     appVersionObj.GetName(),
 				TerminationPolicy: dbaasv1alpha1.WipeOut,
+				Components: []dbaasv1alpha1.ClusterComponent{
+					{
+						Name: "wesql",
+						Type: "replicasets",
+						Resources: corev1.ResourceRequirements{
+							Limits: corev1.ResourceList{
+								"cpu":    resource.MustParse("800m"),
+								"memory": resource.MustParse("512Mi"),
+							},
+							Requests: corev1.ResourceList{
+								"cpu":    resource.MustParse("500m"),
+								"memory": resource.MustParse("256Mi"),
+							},
+						},
+					},
+				},
 			},
 		}, clusterDefObj, appVersionObj, key
 	}
@@ -221,44 +241,53 @@ spec:
 		return opsRequest
 	}
 
-	Context("Test OpsRequest", func() {
-		It("Should Test all OpsRequest", func() {
-			clusterObject, clusterDef, _, key := newClusterObj(nil, nil)
-			Expect(testCtx.CreateObj(ctx, clusterObject)).Should(Succeed())
+	Context("with Cluster running", func() {
+		It("issue an VerticalScalingOpsRequest should change Cluster's resource requirements successfully", func() {
+			By("create cluster")
+			clusterObj, _, _, key := newClusterObj(nil, nil)
+			Expect(testCtx.CreateObj(ctx, clusterObj)).Should(Succeed())
 
-			Eventually(func() bool {
-				_ = k8sClient.Get(ctx, client.ObjectKey{Name: clusterDef.Name}, clusterDef)
-				return clusterDef.Generation == clusterDef.Status.ObservedGeneration
-			}, timeout, interval).Should(BeTrue())
+			By("check(or mock maybe) cluster status running")
+			if !IsUseExistingClusterEnabled() {
+				// MOCK pods are created and running, so as the cluster
+				Eventually(getClusterStatus(key), timeout, interval).Should(Equal(dbaasv1alpha1.CreatingPhase))
+				mockSetClusterStatusRunning(key)
+			}
+			// TODO The following assert doesn't pass in a real K8s cluster (with UseExistingCluster set).
+			// TODO After all pods(both proxy and wesql) enter `Running` state,
+			// TODO Cluster.Status.Phase is still in `Creating` status.
+			// TODO It seems the Cluster Reconciler doesn't be triggered to run properly,
+			// TODO an additional invoke of `kubectl apply` explicitly ask it will workaround,
+			// TODO I'll look into this problem later.
+			Eventually(getClusterStatus(key), timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 
-			verticalScalingOpsRequest := createOpsRequest("mysql-verticalscaling", clusterObject.Name, dbaasv1alpha1.VerticalScalingType)
+			By("send VerticalScalingOpsRequest successfully")
+			verticalScalingOpsRequest := createOpsRequest("mysql-verticalscaling", clusterObj.Name, dbaasv1alpha1.VerticalScalingType)
 			verticalScalingOpsRequest.Spec.TTLSecondsAfterSucceed = 1
 			verticalScalingOpsRequest.Spec.ComponentOpsList = []dbaasv1alpha1.ComponentOps{
 				{
-					ComponentNames: []string{"replicasets"},
+					ComponentNames: []string{"wesql"},
 					VerticalScaling: &corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							"cpu":    resource.MustParse("400m"),
-							"memory": resource.MustParse("330Mi"),
+							"memory": resource.MustParse("200Mi"),
 						},
 					},
 				},
 			}
 			Expect(testCtx.CreateObj(ctx, verticalScalingOpsRequest)).Should(Succeed())
 
-			Eventually(func() bool {
-				_ = k8sClient.Get(ctx, client.ObjectKey{
-					Name:      verticalScalingOpsRequest.Name,
-					Namespace: verticalScalingOpsRequest.Namespace},
-					verticalScalingOpsRequest)
-				return slices.Index([]dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase},
-					verticalScalingOpsRequest.Status.Phase) != -1
-			}, timeout, interval).Should(BeTrue())
+			By("check VerticalScalingOpsRequest succeed")
+			Eventually(getOpsRequestStatus(verticalScalingOpsRequest), timeout, interval).Should(Equal(dbaasv1alpha1.SucceedPhase))
 
-			By("test OpsRequest is succeed")
-			patch := client.MergeFrom(verticalScalingOpsRequest.DeepCopy())
-			verticalScalingOpsRequest.Status.Phase = dbaasv1alpha1.SucceedPhase
-			Expect(k8sClient.Status().Patch(ctx, verticalScalingOpsRequest, patch)).Should(Succeed())
+			By("check cluster resource requirements changed")
+			Eventually(func() corev1.ResourceList {
+				fetchedCluster := &dbaasv1alpha1.Cluster{}
+				_ = k8sClient.Get(ctx, key, fetchedCluster)
+				return fetchedCluster.Spec.Components[0].Resources.Requests
+			}, timeout, interval).Should(Equal(verticalScalingOpsRequest.Spec.ComponentOpsList[0].VerticalScaling.Requests))
+
+			By("OpsRequest reclaimed after ttl")
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, client.ObjectKey{
 					Name:      verticalScalingOpsRequest.Name,
@@ -274,3 +303,34 @@ spec:
 		})
 	})
 })
+
+func mockSetClusterStatusRunning(clusterName types.NamespacedName) {
+	fetchedCluster := &dbaasv1alpha1.Cluster{}
+	Expect(k8sClient.Get(ctx, clusterName, fetchedCluster)).Should(Succeed())
+	beforePatched := client.MergeFrom(fetchedCluster.DeepCopy())
+	fetchedCluster.Status.Phase = dbaasv1alpha1.RunningPhase
+	for componentKey, componentStatus := range fetchedCluster.Status.Components {
+		componentStatus.Phase = dbaasv1alpha1.RunningPhase
+		fetchedCluster.Status.Components[componentKey] = componentStatus
+	}
+	Expect(k8sClient.Status().Patch(ctx, fetchedCluster, beforePatched))
+}
+
+func getClusterStatus(clusterName types.NamespacedName) func() dbaasv1alpha1.Phase {
+	return func() dbaasv1alpha1.Phase {
+		fetchedCluster := &dbaasv1alpha1.Cluster{}
+		_ = k8sClient.Get(ctx, clusterName, fetchedCluster)
+		return fetchedCluster.Status.Phase
+	}
+}
+
+func getOpsRequestStatus(opsRequest *dbaasv1alpha1.OpsRequest) func() dbaasv1alpha1.Phase {
+	return func() dbaasv1alpha1.Phase {
+		fetchedOpsRequest := &dbaasv1alpha1.OpsRequest{}
+		_ = k8sClient.Get(ctx, client.ObjectKey{
+			Name:      opsRequest.Name,
+			Namespace: opsRequest.Namespace},
+			fetchedOpsRequest)
+		return fetchedOpsRequest.Status.Phase
+	}
+}

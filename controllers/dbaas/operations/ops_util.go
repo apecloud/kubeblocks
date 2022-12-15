@@ -236,7 +236,7 @@ func GetClusterPhaseWithExistsOpsRequest(cluster *dbaasv1alpha1.Cluster) (dbaasv
 	if err != nil {
 		return phase, err
 	}
-	// pick a cluster phase when cluster exists OpsRequests
+	// pick a cluster phase when cluster exists multiple OpsRequests
 	for k := range opsRequestMap {
 		phase = k
 		break

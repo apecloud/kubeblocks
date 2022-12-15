@@ -382,7 +382,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 ##@ CI
 
 .PHONY:
-intstall-git-hooks: githookstool ## Install git hooks.
+install-git-hooks: githookstool ## Install git hooks.
 	git hooks install
 	git hooks
 

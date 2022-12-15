@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package v1alpha1 contains API Schema definitions for the dbaas v1alpha1 API group
+// +kubebuilder:skip
 package v1alpha1
 
 import (
@@ -126,7 +128,6 @@ const (
 
 // OpsRequestBehaviour record what cluster status that can trigger this OpsRequest
 // and what status that the cluster enters after trigger OpsRequest.
-// +kubebuilder:skip
 type OpsRequestBehaviour struct {
 	FromClusterPhases []Phase
 	ToClusterPhase    Phase

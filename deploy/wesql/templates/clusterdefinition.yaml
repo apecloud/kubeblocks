@@ -30,10 +30,8 @@ spec:
             configMapTplRef: mysql-3node-tpl-8.0
             configConstraintsRef: mysql-3node-cfg-constraints-8.0
             volumeName: mysql-config
-        reconfigureOption:
-          configReload: true
-          configReloadType: signal
-          configReloadTrigger:
+        reloadOptions:
+          unixSignalTrigger:
             signal: SIGHUP
             processName: mysqld
         configRevisionHistoryLimit: 6

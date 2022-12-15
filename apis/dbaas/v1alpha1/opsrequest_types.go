@@ -89,6 +89,15 @@ type ParameterPair struct {
 	Value string `json:"value,omitempty"`
 }
 
+type ParameterConfig struct {
+	// +optional
+	FileName string `json:"fileName,omitempty"`
+
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	Pairs []ParameterPair `json:"pairs"`
+}
+
 type Configuration struct {
 	// ReconfigurePolicy refers to the effective policy of the updated parameter.
 	// 1. If reconfigurePolicy = rolling, the controller will restart all specific containers in the Pod by using a rolling method.
@@ -98,18 +107,16 @@ type Configuration struct {
 	// +optional
 	ReconfigurePolicy UpgradePolicy `json:"reconfigurePolicy,omitempty"`
 
-	// +kubebuilder:validation:minimum=1
-	// +kubebuilder:validation:maximum=100
 	// +optional
-	MaxUnavailableCapacity *int `json:"maxUnavailableCapacity,omitempty"`
-
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	Parameters []ParameterPair `json:"parameters"`
+	Immediate *bool `json:"immediate,omitempty"`
 
 	// MountPoint is a volume name which file will mount to.
 	// +optional
 	MountPoint string `json:"mountPoint,omitempty"`
+
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	Parameters []ParameterConfig `json:"parameters"`
 }
 
 type ConfigurationUpgrade struct {
@@ -127,9 +134,10 @@ type ConfigurationUpgrade struct {
 	// +optional
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 
-	// ComponentNames defines which components perform the operation.
+	// Configurations defines which components perform the operation.
 	// +kubebuilder:validation:Required
-	Configuration Configuration `json:"configuration"`
+	// +kubebuilder:validation:MinItems=1
+	Configurations []Configuration `json:"configurations"`
 }
 
 type ComponentOps struct {

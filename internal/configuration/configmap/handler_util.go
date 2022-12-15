@@ -37,60 +37,25 @@ type ConfigManagerSidecar struct {
 	Volumes []corev1.VolumeMount `json:"volumes"`
 }
 
-func IsNotSupportReload(option *dbaasv1alpha1.ReconfigureOption) bool {
-	return option == nil || !option.ConfigReload || option.ConfigReloadType == ""
+func IsNotSupportReload(cfgSpec *dbaasv1alpha1.ConfigurationSpec) bool {
+	return cfgSpec == nil || cfgSpec.ReloadOptions == nil
 }
 
-func NeedBuildConfigSidecar(option *dbaasv1alpha1.ReconfigureOption) (bool, error) {
-	return needBuildConfigSidecar(option.ConfigReload, option.ConfigReloadType, option.ConfigReloadTrigger)
-}
-
-func needBuildConfigSidecar(autoReload bool, reloadType dbaasv1alpha1.CfgReloadType, configuration *dbaasv1alpha1.ConfigReloadTrigger) (bool, error) {
-	if !autoReload || reloadType == "" {
-		return false, nil
-	}
-
-	if configuration == nil {
-		return false, cfgutil.MakeError("not configure trigger reload type. [%s]", reloadType)
-	}
-
-	switch reloadType {
-	case dbaasv1alpha1.UnixSignalType:
-		return checkSignalType(configuration)
-	case dbaasv1alpha1.SQLType, dbaasv1alpha1.ShellType, dbaasv1alpha1.HTTPType:
-		// TODO support other method
-		return false, cfgutil.MakeError("This special reload type [%s] is not supported for now!", reloadType)
-	default:
-		return false, cfgutil.MakeError("Invalid Features: %s", reloadType)
-	}
-}
-
-func checkSignalType(configuration *dbaasv1alpha1.ConfigReloadTrigger) (bool, error) {
-	if !IsValidUnixSignal(configuration.Signal) {
-		return false, cfgutil.MakeError("This special signal [%s] is not supported for now!", configuration.Signal)
-	}
-	if configuration.ProcessName == "" {
-		return false, cfgutil.MakeError("require set process name!")
-	}
-	return true, nil
-}
-
-func BuildReloadSidecarParams(
-	reloadType dbaasv1alpha1.CfgReloadType,
-	configuration dbaasv1alpha1.ConfigReloadTrigger,
-	volumeDirs []corev1.VolumeMount,
-	criType, runtimeEndpoint string) []string {
-	switch reloadType {
-	case dbaasv1alpha1.UnixSignalType:
-		return buildSignalArgs(configuration, volumeDirs, criType, runtimeEndpoint)
-	default:
-		// not walk here
-		// TODO support other type, e.g pg reload by ShellType
+func NeedBuildConfigSidecar(reloadOptions *dbaasv1alpha1.ReloadOptions) error {
+	switch {
+	case reloadOptions.UnixSignalTrigger != nil:
+		signal := reloadOptions.UnixSignalTrigger.Signal
+		if !IsValidUnixSignal(signal) {
+			return cfgutil.MakeError("This special signal [%s] is not supported for now!", signal)
+		}
 		return nil
+	default:
+		// TODO support sql or http
+		return cfgutil.MakeError("This special reload type [%s] is not supported for now!", dbaasv1alpha1.SQLType)
 	}
 }
 
-func buildSignalArgs(configuration dbaasv1alpha1.ConfigReloadTrigger, volumeDirs []corev1.VolumeMount, criType string, runtimeEndpoint string) []string {
+func BuildSignalArgs(configuration dbaasv1alpha1.UnixSignalTrigger, volumeDirs []corev1.VolumeMount, criType string, runtimeEndpoint string) []string {
 	args := make([]string, 0)
 	args = append(args, "--process", configuration.ProcessName)
 	if criType != "" {

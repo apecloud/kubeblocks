@@ -255,11 +255,10 @@ func CheckCDConfigTemplate(client client.Client, ctx intctrlutil.RequestCtx, clu
 		},
 		func(component *dbaasv1alpha1.ClusterDefinitionComponent) error {
 			cfgSpec := component.ConfigSpec
-			if cfgSpec == nil || cfgSpec.ReconfigureOption == nil {
+			if cfgSpec == nil || cfgSpec.ReloadOptions == nil {
 				return nil
 			}
-			_, err := cfgcm.NeedBuildConfigSidecar(cfgSpec.ReconfigureOption)
-			return err
+			return cfgcm.NeedBuildConfigSidecar(cfgSpec.ReloadOptions)
 		})
 }
 

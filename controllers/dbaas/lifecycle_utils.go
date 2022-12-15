@@ -1329,15 +1329,14 @@ func updateConfigurationManagerWithComponent(params createParams, podSpec *corev
 		criType                 = viper.GetString(cfgcore.ConfigCRIType)
 	)
 
-	if component.Config == nil || component.Config.ReconfigureOption == nil {
+	if component.Config == nil || component.Config.ReloadOptions == nil {
 		return nil
 	}
 
-	cfgSpec := component.Config
-	// db auto scan configuration and reload
-	if ok, err := cfgcm.NeedBuildConfigSidecar(cfgSpec.ReconfigureOption); err != nil {
-		return err
-	} else if !ok {
+	reloadOptions := component.Config.ReloadOptions
+	if reloadOptions.UnixSignalTrigger == nil {
+		// TODO support other reload type
+		logrus.Warnf("only %s type is supported!", dbaasv1alpha1.UnixSignalType)
 		return nil
 	}
 
@@ -1372,9 +1371,9 @@ func updateConfigurationManagerWithComponent(params createParams, podSpec *corev
 		return nil
 	}
 
-	configManagerArgs := cfgcm.BuildReloadSidecarParams(
-		cfgSpec.ReconfigureOption.ConfigReloadType,
-		*cfgSpec.ReconfigureOption.ConfigReloadTrigger,
+	unixSignalOption := reloadOptions.UnixSignalTrigger
+	configManagerArgs := cfgcm.BuildSignalArgs(
+		*unixSignalOption,
 		volumeDirs,
 		criType,
 		criRuntimeEndpoint)

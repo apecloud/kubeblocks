@@ -15,10 +15,8 @@ spec:
             configMapTplRef: mysql-tree-node-template-8.0
             configConstraintsRef: mysql-tree-node-template-8.0
             volumeName: mysql-config
-        reconfigureOption:
-          configReload: true
-          configReloadType: signal
-          configReloadTrigger:
+        reloadOptions:
+          unixSignalTrigger:
             signal: SIGHUP
             processName: mysqld
       componentType: Consensus

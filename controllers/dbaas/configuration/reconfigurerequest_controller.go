@@ -226,7 +226,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		ComponentUnits:   sts,
 		Component:        component,
 		ClusterComponent: clusterComponent,
-		Restart:          cfgcm.IsNotSupportReload(component.ConfigSpec.ReconfigureOption),
+		Restart:          cfgcm.IsNotSupportReload(component.ConfigSpec),
 	})
 }
 

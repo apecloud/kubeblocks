@@ -99,45 +99,58 @@ spec:
                       description: Reconfigure defines the variables that need to
                         input when changing parameters.
                       properties:
-                        configuration:
-                          description: ComponentNames defines which components perform
+                        configurations:
+                          description: Configurations defines which components perform
                             the operation.
-                          properties:
-                            maxUnavailableCapacity:
-                              type: integer
-                            mountPoint:
-                              description: MountPoint is a volume name which file
-                                will mount to.
-                              type: string
-                            parameters:
-                              items:
-                                properties:
-                                  key:
-                                    type: string
-                                  value:
-                                    type: string
-                                required:
-                                - key
-                                type: object
-                              minItems: 1
-                              type: array
-                            reconfigurePolicy:
-                              description: ReconfigurePolicy refers to the effective
-                                policy of the updated parameter. 1. If reconfigurePolicy
-                                = rolling, the controller will restart all specific
-                                containers in the Pod by using a rolling method. 1.
-                                If reconfigurePolicy = parallel, the containers will
-                                be restarted simultaneously. 3. If reconfigurePolicy
-                                = autoReload, the sidecar will trigger the database
-                                instance to reload.
-                              enum:
-                              - parallel
-                              - rolling
-                              - autoReload
-                              type: string
-                          required:
-                          - parameters
-                          type: object
+                          items:
+                            properties:
+                              immediate:
+                                type: boolean
+                              mountPoint:
+                                description: MountPoint is a volume name which file
+                                  will mount to.
+                                type: string
+                              parameters:
+                                items:
+                                  properties:
+                                    fileName:
+                                      type: string
+                                    pairs:
+                                      items:
+                                        properties:
+                                          key:
+                                            type: string
+                                          value:
+                                            type: string
+                                        required:
+                                        - key
+                                        type: object
+                                      minItems: 1
+                                      type: array
+                                  required:
+                                  - pairs
+                                  type: object
+                                minItems: 1
+                                type: array
+                              reconfigurePolicy:
+                                description: ReconfigurePolicy refers to the effective
+                                  policy of the updated parameter. 1. If reconfigurePolicy
+                                  = rolling, the controller will restart all specific
+                                  containers in the Pod by using a rolling method.
+                                  1. If reconfigurePolicy = parallel, the containers
+                                  will be restarted simultaneously. 3. If reconfigurePolicy
+                                  = autoReload, the sidecar will trigger the database
+                                  instance to reload.
+                                enum:
+                                - parallel
+                                - rolling
+                                - autoReload
+                                type: string
+                            required:
+                            - parameters
+                            type: object
+                          minItems: 1
+                          type: array
                         selector:
                           description: A label selector is a label query over a set
                             of resources. The result of matchLabels and matchExpressions
@@ -199,7 +212,7 @@ spec:
                           format: int64
                           type: integer
                       required:
-                      - configuration
+                      - configurations
                       type: object
                     verticalScaling:
                       description: VerticalScaling defines the variables that need

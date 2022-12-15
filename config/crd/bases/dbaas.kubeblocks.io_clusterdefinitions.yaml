@@ -143,41 +143,45 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
-                        reconfigureOption:
-                          description: Specify the option of configuration reload
-                            policy.
+                        maxUnavailableCapacity:
+                          type: integer
+                        reloadOptions:
+                          description: ReloadOptions indicates whether the process
+                            supports reload. if set, the controller will determine
+                            the behavior of the engine instance based on the configuration
+                            templates, restart or reload depending on whether any
+                            parameters in the StaticParameters have been modified.
                           properties:
-                            configReload:
-                              default: false
-                              description: ConfigReload indicates whether the process
-                                supports reload. if false, the controller will restart
-                                the process. if true, the controller will determine
-                                the behavior of the engine instance based on the configuration
-                                templates, restart or reload depending on whether
-                                any parameters in the StaticParameters have been modified.
-                              type: boolean
-                            configReloadTrigger:
-                              description: ConfigReloadTrigger describes the configuration
-                                against reload type.
+                            shellTrigger:
+                              properties:
+                                exec:
+                                  type: string
+                              required:
+                              - exec
+                              type: object
+                            sqlTrigger:
+                              properties:
+                                sql:
+                                  type: string
+                              required:
+                              - sql
+                              type: object
+                            unixSignalTrigger:
                               properties:
                                 processName:
                                   description: ProcessName is process name, sends
                                     unix signal to proc.
+                                  pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                                   type: string
                                 signal:
                                   description: 'Signal is valid for unix signal e.g:
                                     SIGHUP url: ../../internal/configuration/configmap/handler.go:allUnixSignals'
+                                  pattern: ^SIG[A-Z]+$
                                   type: string
-                              type: object
-                            configReloadType:
-                              description: ConfigReloadType describes the restart
-                                methods.
-                              enum:
+                              required:
+                              - processName
                               - signal
-                              - http
-                              - sql
-                              - exec
-                              type: string
+                              type: object
                           type: object
                       type: object
                     consensusSpec:

@@ -163,40 +163,53 @@ type ConfigurationSpec struct {
 	// +optional
 	ConfigRevisionHistoryLimit int `json:"configRevisionHistoryLimit,omitempty"`
 
-	// Specify the option of configuration reload policy.
+	// +kubebuilder:validation:minimum=0
+	// +kubebuilder:validation:maximum=100
 	// +optional
-	ReconfigureOption *ReconfigureOption `json:"reconfigureOption,omitempty"`
-}
+	MaxUnavailableCapacity *int `json:"maxUnavailableCapacity,omitempty"`
 
-type ReconfigureOption struct {
-	// ConfigReload indicates whether the process supports reload.
-	// if false, the controller will restart the process.
-	// if true, the controller will determine the behavior of the engine instance based on the configuration templates,
+	// ReloadOptions indicates whether the process supports reload.
+	// if set, the controller will determine the behavior of the engine instance based on the configuration templates,
 	// restart or reload depending on whether any parameters in the StaticParameters have been modified.
-	// +kubebuilder:default=false
 	// +optional
-	ConfigReload bool `json:"configReload,omitempty"`
-
-	// ConfigReloadType describes the restart methods.
-	// +kubebuilder:validation:Enum={signal,http,sql,exec}
-	// +optional
-	ConfigReloadType CfgReloadType `json:"configReloadType,omitempty"`
-
-	// ConfigReloadTrigger describes the configuration against reload type.
-	// +optional
-	ConfigReloadTrigger *ConfigReloadTrigger `json:"configReloadTrigger,omitempty"`
+	ReloadOptions *ReloadOptions `json:"reloadOptions,omitempty"`
 }
 
-type ConfigReloadTrigger struct {
+// ReloadOptions defines reload options
+// Only one of its members may be specified.
+type ReloadOptions struct {
+	// +optional
+	UnixSignalTrigger *UnixSignalTrigger `json:"unixSignalTrigger,omitempty"`
+
+	// +optional
+	ShellTrigger *ShellTrigger `json:"shellTrigger,omitempty"`
+
+	// +optional
+	SQLTrigger *SQLTrigger `json:"sqlTrigger,omitempty"`
+}
+
+type UnixSignalTrigger struct {
 	// Signal is valid for unix signal
 	// e.g: SIGHUP
 	// url: ../../internal/configuration/configmap/handler.go:allUnixSignals
-	// +optional
-	Signal string `json:"signal,omitempty"`
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern:=`^SIG[A-Z]+$`
+	Signal string `json:"signal"`
 
 	// ProcessName is process name, sends unix signal to proc.
-	// +optional
-	ProcessName string `json:"processName,omitempty"`
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	ProcessName string `json:"processName"`
+}
+
+type ShellTrigger struct {
+	// +kubebuilder:validation:Required
+	Exec string `json:"exec"`
+}
+
+type SQLTrigger struct {
+	// +kubebuilder:validation:Required
+	SQL string `json:"sql"`
 }
 
 // ClusterDefinitionComponent is a group of pods, pods belong to same component usually share the same data

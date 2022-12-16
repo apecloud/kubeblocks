@@ -15,8 +15,15 @@ backup_policy: {
 	apiVersion: "dataprotection.infracreate.com/v1alpha1"
 	kind:       "BackupPolicy"
 	metadata: {
-		name:      backup_key.Name
+//		name:      backup_key.Name
+    generateName: "\(backup_key.Name)-"
 		namespace: backup_key.Namespace
+		labels: {
+			"app.kubernetes.io/created-by": "kubeblocks"
+			for k, v in sts.metadata.labels {
+				"\(k)": "\(v)"
+			}
+		}
 	}
 	spec: {
 		"backupPolicyTemplateName": template

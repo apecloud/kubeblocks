@@ -6,6 +6,7 @@ sts: {
 		namespace: string
 	}
 }
+backup_policy_name: string
 backup_job_key: {
 	Name:      string
 	Namespace: string
@@ -19,13 +20,15 @@ backup_job: {
 		labels: {
 			"dataprotection.kubeblocks.io/backup-type":         "snapshot"
 			"app.kubernetes.io/created-by": "kubeblocks"
-			"app.kubernetes.io/instance":                         sts.metadata.labels."app.kubernetes.io/instance"
-			"backuppolicies.dataprotection.kubeblocks.io/name": backup_job_key.Name
-			"dataprotection.kubeblocks.io/backup-index":        "0"
+			"backuppolicies.dataprotection.kubeblocks.io/name": backup_policy_name
+			"app.kubernetes.io/created-by": "kubeblocks"
+			for k, v in sts.metadata.labels {
+				"\(k)": "\(v)"
+			}
 		}
 	}
 	spec: {
-		"backupPolicyName": backup_job_key.Name
+		"backupPolicyName": backup_policy_name
 		"backupType":       "snapshot"
 	}
 }

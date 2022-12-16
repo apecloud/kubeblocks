@@ -27,6 +27,7 @@ import (
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/leaanthony/debme"
+	"github.com/pkg/errors"
 	"github.com/sethvargo/go-password/password"
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
@@ -839,7 +840,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 
 		scaleUp := func() (shouldRequeue bool, err error) {
 			shouldRequeue = false
-			if err := cleanCronJobs(); err != nil {
+			if err = cleanCronJobs(); err != nil {
 				return
 			}
 			allPVCsExist, err := checkAllPVCsExist()
@@ -906,7 +907,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				return nil
 			}
 			// if all pvc bounded, clean backup resources
-			return deleteSnapshot(cli, reqCtx, snapshotKey, cluster)
+			return deleteSnapshot(cli, reqCtx, snapshotKey, cluster, component)
 		}
 
 		// when horizontal scaling up, sometimes db needs backup to sync data from master,
@@ -1594,47 +1595,110 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 	backupKey types.NamespacedName,
 	cluster *dbaasv1alpha1.Cluster) error {
 	ctx := reqCtx.Ctx
-	backupPolicy, err := buildBackupPolicy(sts, backupPolicyTemplate, backupKey)
+
+	createBackupPolicy := func() (backupPolicyName string, err error) {
+		backupPolicyName = ""
+		backupPolicyList := dataprotectionv1alpha1.BackupPolicyList{}
+		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.AppComponentLabelKey])
+		if err = cli.List(ctx, &backupPolicyList, ml); err != nil {
+			return
+		}
+		if len(backupPolicyList.Items) > 0 {
+			backupPolicyName = backupPolicyList.Items[0].Name
+			return
+		}
+		backupPolicy, err := buildBackupPolicy(sts, backupPolicyTemplate, backupKey)
+		if err != nil {
+			return
+		}
+		if err = cli.Create(ctx, backupPolicy); err != nil {
+			return backupPolicyName, intctrlutil.IgnoreIsAlreadyExists(err)
+		}
+		// wait 1 second in order to list the newly created backuppolicy
+		time.Sleep(time.Second)
+		if err = cli.List(ctx, &backupPolicyList, ml); err != nil {
+			return
+		}
+		if len(backupPolicyList.Items) == 0 ||
+			len(backupPolicyList.Items[0].Name) == 0 {
+			err = errors.Errorf("Can not find backuppolicy name for cluster %s", cluster.Name)
+			return
+		}
+		backupPolicyName = backupPolicyList.Items[0].Name
+		return
+	}
+
+	createBackupJob := func(backupPolicyName string) error {
+		backupJobList := dataprotectionv1alpha1.BackupJobList{}
+		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.AppComponentLabelKey])
+		if err := cli.List(ctx, &backupJobList, ml); err != nil {
+			return err
+		}
+		if len(backupJobList.Items) > 0 {
+			return nil
+		}
+		backupJob, err := buildBackupJob(sts, backupPolicyName, backupKey)
+		if err != nil {
+			return err
+		}
+		scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
+		if err := controllerutil.SetOwnerReference(cluster, backupJob, scheme); err != nil {
+			return err
+		}
+		if err := cli.Create(ctx, backupJob); err != nil {
+			return intctrlutil.IgnoreIsAlreadyExists(err)
+		}
+		return nil
+	}
+
+	backupPolicyName, err := createBackupPolicy()
 	if err != nil {
 		return err
 	}
-	if err := cli.Create(ctx, backupPolicy); err != nil {
-		return intctrlutil.IgnoreIsAlreadyExists(err)
-	}
-	backupJob, err := buildBackupJob(sts, backupKey)
-	if err != nil {
+	if err := createBackupJob(backupPolicyName); err != nil {
 		return err
 	}
-	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
-	if err := controllerutil.SetOwnerReference(cluster, backupJob, scheme); err != nil {
-		return err
-	}
-	if err := cli.Create(ctx, backupJob); err != nil {
-		return intctrlutil.IgnoreIsAlreadyExists(err)
-	}
+
 	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobCreate", "Create backupjob/%s", backupKey.Name)
 	return nil
 }
 
 // deleteBackup will delete all backup related resources created during horizontal scaling,
-func deleteBackup(ctx context.Context, cli client.Client, backupKey types.NamespacedName) error {
-	backupPolicy := dataprotectionv1alpha1.BackupPolicy{}
-	if err := cli.Get(ctx, backupKey, &backupPolicy); err != nil {
-		return client.IgnoreNotFound(err)
-	}
-	if err := cli.Delete(ctx, &backupPolicy); err != nil {
-		return client.IgnoreNotFound(err)
+func deleteBackup(ctx context.Context, cli client.Client, clusterName string, componentName string) error {
+
+	ml := getBackupMatchingLabels(clusterName, componentName)
+
+	deleteBackupPolicy := func() error {
+		backupPolicyList := dataprotectionv1alpha1.BackupPolicyList{}
+		if err := cli.List(ctx, &backupPolicyList, ml); err != nil {
+			return err
+		}
+		for _, backupPolicy := range backupPolicyList.Items {
+			if err := cli.Delete(ctx, &backupPolicy); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+		}
+		return nil
 	}
 
-	backupJob := dataprotectionv1alpha1.BackupJob{}
-	if err := cli.Get(ctx, backupKey, &backupJob); err != nil {
-		return client.IgnoreNotFound(err)
-	}
-	if err := cli.Delete(ctx, &backupJob); err != nil {
-		return client.IgnoreNotFound(err)
+	deleteBackupJob := func() error {
+		backupJobList := dataprotectionv1alpha1.BackupJobList{}
+		if err := cli.List(ctx, &backupJobList, ml); err != nil {
+			return err
+		}
+		for _, backupJob := range backupJobList.Items {
+			if err := cli.Delete(ctx, &backupJob); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+		}
+		return nil
 	}
 
-	return nil
+	if err := deleteBackupPolicy(); err != nil {
+		return err
+	}
+
+	return deleteBackupJob()
 }
 
 func buildBackupPolicy(sts *appsv1.StatefulSet,
@@ -1653,11 +1717,13 @@ func buildBackupPolicy(sts *appsv1.StatefulSet,
 }
 
 func buildBackupJob(sts *appsv1.StatefulSet,
+	backupPolicyName string,
 	backupJobKey types.NamespacedName) (*dataprotectionv1alpha1.BackupJob, error) {
 	backupJob := dataprotectionv1alpha1.BackupJob{}
 	if err := buildFromCUE("backup_job_template.cue", map[string]any{
-		"sts":            sts,
-		"backup_job_key": backupJobKey,
+		"sts":                sts,
+		"backup_policy_name": backupPolicyName,
+		"backup_job_key":     backupJobKey,
 	}, "backup_job", &backupJob); err != nil {
 		return nil, err
 	}
@@ -1825,9 +1891,10 @@ func isAllPVCBound(cli client.Client,
 func deleteSnapshot(cli client.Client,
 	reqCtx intctrlutil.RequestCtx,
 	snapshotKey types.NamespacedName,
-	cluster *dbaasv1alpha1.Cluster) error {
+	cluster *dbaasv1alpha1.Cluster,
+	component *Component) error {
 	ctx := reqCtx.Ctx
-	if err := deleteBackup(ctx, cli, snapshotKey); err != nil {
+	if err := deleteBackup(ctx, cli, cluster.Name, component.Name); err != nil {
 		return client.IgnoreNotFound(err)
 	}
 	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupjob/%s", snapshotKey.Name)
@@ -2032,4 +2099,12 @@ func buildFromCUE(tplName string, fillMap map[string]any, lookupKey string, targ
 	}
 
 	return nil
+}
+
+func getBackupMatchingLabels(clusterName string, componentName string) client.MatchingLabels {
+	return client.MatchingLabels{
+		intctrlutil.AppInstanceLabelKey:  clusterName,
+		intctrlutil.AppComponentLabelKey: componentName,
+		intctrlutil.AppCreatedByLabelKey: intctrlutil.AppName,
+	}
 }

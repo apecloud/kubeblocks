@@ -202,6 +202,7 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 		p.roleUnchangedCount = 0
 	} else {
 		result.Event = "roleUnchanged"
+		p.roleUnchangedCount++
 	}
 
 	// roleUnchandedCount is the count of consecutive role unchanged checks.
@@ -213,7 +214,6 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 	if p.roleUnchangedCount%p.roleUnchangedThreshold == 0 {
 		response.Metadata[StatusCode] = CheckFailedHTTPCode
 	}
-	p.roleUnchangedCount++
 	msg, _ := json.Marshal(result)
 	p.Logger.Infof(string(msg))
 	return msg, nil

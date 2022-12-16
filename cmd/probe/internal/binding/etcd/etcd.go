@@ -41,7 +41,7 @@ const (
 	endpoint = "endpoint"
 
 	defaultPort        = 2379
-	defaultDialTimeout = 2 * time.Second
+	defaultDialTimeout = 400 * time.Millisecond
 )
 
 // NewEtcd returns a new etcd binding instance.

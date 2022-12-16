@@ -251,7 +251,7 @@ spec:
 			if !IsUseExistingClusterEnabled() {
 				// MOCK pods are created and running, so as the cluster
 				Eventually(expectClusterInPhase(key, dbaasv1alpha1.CreatingPhase), timeout, interval).Should(BeTrue())
-				mockSetClusterStatusRunning(key)
+				mockSetClusterPhaseToRunning(key)
 			}
 			// TODO The following assert doesn't pass in a real K8s cluster (with UseExistingCluster set).
 			// TODO After all pods(both proxy and wesql) enter `Running` state,
@@ -304,7 +304,7 @@ spec:
 	})
 })
 
-func mockSetClusterStatusRunning(clusterName types.NamespacedName) {
+func mockSetClusterPhaseToRunning(clusterName types.NamespacedName) {
 	fetchedCluster := &dbaasv1alpha1.Cluster{}
 	Expect(k8sClient.Get(ctx, clusterName, fetchedCluster)).Should(Succeed())
 	beforePatched := client.MergeFrom(fetchedCluster.DeepCopy())

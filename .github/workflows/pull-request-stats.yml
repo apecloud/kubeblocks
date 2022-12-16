@@ -1,7 +1,7 @@
 name: PR-TIMER
 on:
   schedule:
-    - cron: '37 5 * * *'
+    - cron: '6 6 * * 1' #Runs at 06:06 UTC on Mon
 
 jobs:
   calculate-stats:

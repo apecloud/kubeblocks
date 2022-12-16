@@ -47,7 +47,7 @@ type ProbeBase struct {
 	oriRole                 string
 	runningCheckFailedCount int
 	roleCheckFailedCount    int
-	roleCheckCount          int
+	roleUnchangedCount      int
 	eventAggregationNum     int
 	// eventIntervalNum is used to set the report period of role changed event even role unchanged,
 	// then event controller can always get rolechanged events to maintain pod label accurately
@@ -80,9 +80,17 @@ func init() {
 }
 
 func (p *ProbeBase) Init() {
-	p.eventAggregationNum = viper.GetInt("KB_AGGREGATION_NUMBER")
-	p.eventIntervalNum = viper.GetInt("KB_EVENT_INTERNAL_NUMBER")
 	p.dbPort = p.Operation.GetRunningPort()
+	p.eventAggregationNum = viper.GetInt("KB_AGGREGATION_NUMBER")
+	eventIntervalNum := viper.GetInt("KB_EVENT_INTERNAL_NUMBER")
+	if eventIntervalNum < 10 {
+		p.eventIntervalNum = 10
+	} else if eventIntervalNum > 60 {
+		p.eventIntervalNum = 60
+	} else {
+		p.eventIntervalNum = eventIntervalNum
+	}
+
 }
 
 func (p *ProbeBase) Operations() []bindings.OperationKind {
@@ -182,14 +190,18 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 	if p.oriRole != role {
 		result.Event = "roleChanged"
 		p.oriRole = role
-		p.roleCheckCount = 0
+		p.roleUnchangedCount = 0
 	} else {
 		result.Event = "roleUnchanged"
 	}
 
-	// reporting role event periodically to get pod's role label updating accurately
-	// in case of event losing.
-	if p.roleCheckCount++; p.roleCheckCount%p.eventIntervalNum == 1 {
+	// roleUnchandedCount is the count of consecutive role unchanged checks.
+	// eventIntervalNum is the report period of role changed event when role unchanged,
+	// then event controller can always get rolechanged events to maintain pod label accurately
+	// in cases of:
+	// 1 rolechanged event lost;
+	// 2 pod role label deleted or updated incorrectly.
+	if p.roleUnchangedCount++; p.roleUnchangedCount%p.eventIntervalNum == 1 {
 		response.Metadata[StatusCode] = CheckFailedHTTPCode
 	}
 	msg, _ := json.Marshal(result)

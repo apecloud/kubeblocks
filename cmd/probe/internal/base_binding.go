@@ -205,7 +205,7 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 		p.roleUnchangedCount++
 	}
 
-	// roleUnchandedCount is the count of consecutive role unchanged checks.
+	// roleUnchangedCount is the count of consecutive role unchanged checks.
 	// if observed role unchanged consecutively in roleUnchangedThreshold times,
 	// we emit the current role again，then event controller can always get
 	// rolechanged events to maintain pod label accurately in cases of:
@@ -236,11 +236,10 @@ func (p *ProbeBase) runningCheck(ctx context.Context, resp *bindings.InvokeRespo
 		message = fmt.Sprintf("running check %s error: %v", host, err)
 		result.Event = "runningCheckFailed"
 		p.Logger.Errorf(message)
-		if p.runningCheckFailedCount%p.checkFailedThreshold == 0 {
+		if p.runningCheckFailedCount++; p.runningCheckFailedCount%p.checkFailedThreshold == 0 {
 			p.Logger.Infof("running checks failed %v times continuously", p.runningCheckFailedCount)
 			resp.Metadata[StatusCode] = CheckFailedHTTPCode
 		}
-		p.runningCheckFailedCount++
 		return marshalResult()
 	}
 	defer conn.Close()

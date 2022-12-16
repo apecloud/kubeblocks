@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if ! [ -x "$(which act)" ]; then
-  echo "To install act authorization, you need to enter your computer password"
+  echo "sudo is required to install Github act tool."
   curl https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
 fi
 

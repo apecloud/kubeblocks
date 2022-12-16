@@ -1,0 +1,14 @@
+name: PR-TIMER
+on:
+  schedule:
+    - cron: '37 5 * * *'
+
+jobs:
+  calculate-stats:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run simple-pr-stats
+        uses: akwodkiewicz/simple-pr-stats@v0.2
+        with:
+          token: ${{ secrets.KUBEBLOCKS_TOKEN }}
+          days_back: 360

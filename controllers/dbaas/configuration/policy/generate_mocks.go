@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package proto
+package policy
 
-//go:generate protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative reconfigure.proto
-
-//go:generate go run github.com/golang/mock/mockgen -destination mocks/reconfigure_client_mocks.go . ReconfigureClient
+//go:generate go run github.com/golang/mock/mockgen -destination mocks/k8sclient_mocks.go sigs.k8s.io/controller-runtime/pkg/client Client

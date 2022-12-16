@@ -63,7 +63,7 @@ func rollingStatefulSets(param ReconfigureParams) (ExecStatus, error) {
 	for _, sts := range units {
 		if err := restartStsWithRolling(client, param.Ctx, sts, configKey, newVersion); err != nil {
 			param.Ctx.Log.Error(err, "failed to restart statefulSet.", "stsName", sts.GetName())
-			return ESRetry, nil
+			return ESAndRetryFailed, err
 		}
 	}
 	return ESNone, nil

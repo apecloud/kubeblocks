@@ -29,13 +29,13 @@ import (
 func TestGetParentNameAndOrdinal(t *testing.T) {
 	set := newStatefulSet("foo", 3)
 	pod := newStatefulSetPod(set, 1)
-	if parent, ordinal := getParentNameAndOrdinal(pod); parent != set.Name {
+	if parent, ordinal := GetParentNameAndOrdinal(pod); parent != set.Name {
 		t.Errorf("Extracted the wrong parent name expected %s found %s", set.Name, parent)
 	} else if ordinal != 1 {
 		t.Errorf("Extracted the wrong ordinal expected %d found %d", 1, ordinal)
 	}
 	pod.Name = "1-bar"
-	if parent, ordinal := getParentNameAndOrdinal(pod); parent != "" {
+	if parent, ordinal := GetParentNameAndOrdinal(pod); parent != "" {
 		t.Error("Expected empty string for non-member Pod parent")
 	} else if ordinal != -1 {
 		t.Error("Expected -1 for non member Pod ordinal")

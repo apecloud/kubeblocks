@@ -46,7 +46,7 @@ var ctx context.Context
 var cancel context.CancelFunc
 var testCtx testutil.TestContext
 
-func TestAPIs(t *testing.T) {
+func TestReconfigure(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	RunSpecsWithDefaultAndCustomReporters(t,

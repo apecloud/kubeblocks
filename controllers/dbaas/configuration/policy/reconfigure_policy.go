@@ -28,6 +28,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -43,8 +44,13 @@ const (
 
 var (
 	// lazy create grpc connection
-	newGRPCConn = func(addr string) (*grpc.ClientConn, error) {
-		return grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// TODO support connection pool
+	newGRPCClient = func(addr string) (cfgproto.ReconfigureClient, error) {
+		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			return nil, err
+		}
+		return cfgproto.NewReconfigureClient(conn), nil
 	}
 )
 

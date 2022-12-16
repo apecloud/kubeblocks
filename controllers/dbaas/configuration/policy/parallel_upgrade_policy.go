@@ -67,8 +67,6 @@ func (p *ParallelUpgradePolicy) restartPods(params ReconfigureParams) (bool, err
 		funcs = GetConsensusRollingUpgradeFuncs()
 	case dbaasv1alpha1.Stateful:
 		funcs = GetStatefulSetRollingUpgradeFuncs()
-	case dbaasv1alpha1.Stateless:
-		funcs = GetDeploymentRollingUpgradeFuncs()
 	default:
 		return false, cfgcore.MakeError("not support component type[%s]", cType)
 	}
@@ -79,7 +77,7 @@ func (p *ParallelUpgradePolicy) restartPods(params ReconfigureParams) (bool, err
 	}
 
 	for _, pod := range pods {
-		if err := funcs.RestartContainerFunc(&pod, params.ContainerNames, newGRPCConn); err != nil {
+		if err := funcs.RestartContainerFunc(&pod, params.ContainerNames, newGRPCClient); err != nil {
 			return false, err
 		}
 		if err := updatePodLabelsVersion(&pod, configKey, configVersion); err != nil {

@@ -19,9 +19,9 @@ package policy
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/spf13/viper"
-	"google.golang.org/grpc"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
@@ -30,11 +30,11 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type createGRPCConn func(addr string) (*grpc.ClientConn, error)
+type createReconfigureClient func(addr string) (cfgproto.ReconfigureClient, error)
 
 type GetPodsFunc func(params ReconfigureParams) ([]corev1.Pod, error)
 
-type RestartContainerFunc func(pod *corev1.Pod, containerName []string, createConnFn createGRPCConn) error
+type RestartContainerFunc func(pod *corev1.Pod, containerName []string, createConnFn createReconfigureClient) error
 
 type RollingUpgradeFuncs struct {
 	GetPodsFunc          GetPodsFunc
@@ -55,13 +55,6 @@ func GetStatefulSetRollingUpgradeFuncs() RollingUpgradeFuncs {
 	}
 }
 
-func GetDeploymentRollingUpgradeFuncs() RollingUpgradeFuncs {
-	return RollingUpgradeFuncs{
-		GetPodsFunc:          getDeploymentPods,
-		RestartContainerFunc: commonStopContainer,
-	}
-}
-
 func GetReplicationRollingUpgradeFuncs() RollingUpgradeFuncs {
 	return RollingUpgradeFuncs{
 		GetPodsFunc:          getReplicationSetPods,
@@ -74,7 +67,22 @@ func getReplicationSetPods(params ReconfigureParams) ([]corev1.Pod, error) {
 }
 
 func getStatefulSetPods(params ReconfigureParams) ([]corev1.Pod, error) {
-	panic("")
+	if len(params.ComponentUnits) > 1 {
+		return nil, cfgcore.MakeError("statefulSet component require only one statefulset, actual %d component", len(params.ComponentUnits))
+	}
+
+	stsObj := &params.ComponentUnits[0]
+	pods, err := component.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
+	if err != nil {
+		return nil, err
+	}
+
+	sort.SliceStable(pods, func(i, j int) bool {
+		_, ordinal1 := component.GetParentNameAndOrdinal(&pods[i])
+		_, ordinal2 := component.GetParentNameAndOrdinal(&pods[j])
+		return ordinal1 < ordinal2
+	})
+	return pods, nil
 }
 
 func getConsensusPods(params ReconfigureParams) ([]corev1.Pod, error) {
@@ -97,11 +105,7 @@ func getConsensusPods(params ReconfigureParams) ([]corev1.Pod, error) {
 	return pods, nil
 }
 
-func getDeploymentPods(params ReconfigureParams) ([]corev1.Pod, error) {
-	panic("")
-}
-
-func commonStopContainer(pod *corev1.Pod, containerNames []string, newConnFn createGRPCConn) error {
+func commonStopContainer(pod *corev1.Pod, containerNames []string, createClient createReconfigureClient) error {
 	containerIDs := make([]string, 0, len(containerNames))
 	for _, name := range containerNames {
 		containerID := intctrlutil.GetContainerID(pod, name)
@@ -112,12 +116,11 @@ func commonStopContainer(pod *corev1.Pod, containerNames []string, newConnFn cre
 	}
 
 	// stop container
-	conn, err := newConnFn(generateManagerSidecarAddr(pod))
+	client, err := createClient(generateManagerSidecarAddr(pod))
 	if err != nil {
 		return err
 	}
 
-	client := cfgproto.NewReconfigureClient(conn)
 	response, err := client.StopContainer(context.Background(), &cfgproto.StopContainerRequest{
 		ContainerIDs: containerIDs,
 	})

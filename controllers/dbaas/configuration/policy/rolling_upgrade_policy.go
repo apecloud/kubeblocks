@@ -56,8 +56,6 @@ func (r *RollingUpgradePolicy) Upgrade(params ReconfigureParams) (ExecStatus, er
 		funcs = GetConsensusRollingUpgradeFuncs()
 	case dbaasv1alpha1.Stateful:
 		funcs = GetStatefulSetRollingUpgradeFuncs()
-	case dbaasv1alpha1.Stateless:
-		funcs = GetDeploymentRollingUpgradeFuncs()
 	default:
 		return ESNotSupport, cfgcore.MakeError("not support component type[%s]", cType)
 	}
@@ -112,7 +110,7 @@ func performRollingUpgrade(params ReconfigureParams, funcs RollingUpgradeFuncs) 
 			params.Ctx.Log.Info("pod is rolling updating.", "pod name", pod.Name)
 			continue
 		}
-		if err := funcs.RestartContainerFunc(&pod, params.ContainerNames, newGRPCConn); err != nil {
+		if err := funcs.RestartContainerFunc(&pod, params.ContainerNames, newGRPCClient); err != nil {
 			return ESAndRetryFailed, err
 		}
 		if err := updatePodLabelsVersion(&pod, configKey, configVersion); err != nil {
@@ -141,7 +139,7 @@ func markDynamicCursor(pods []corev1.Pod, podsStats *componentPodStats, configKe
 	}
 
 	// find update last
-	for i := int(podsStats.targetReplica) - 1; i > 0; i-- {
+	for i := podsStats.targetReplica - 1; i > 0; i-- {
 		pod := &pods[i]
 		if !podutil.IsMatchConfigVersion(pod, configKey, currentVersion) {
 			podWindows.end = i

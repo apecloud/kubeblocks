@@ -77,9 +77,11 @@ var _ = BeforeSuite(func() {
 	ctx, cancel = context.WithCancel(context.TODO())
 
 	By("bootstrapping test environment")
+	var flag = false
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
+		UseExistingCluster:    &flag,
 	}
 
 	var err error
@@ -166,3 +168,7 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
+
+func IsUseExistingClusterEnabled() bool {
+	return testEnv.UseExistingCluster != nil && *testEnv.UseExistingCluster
+}

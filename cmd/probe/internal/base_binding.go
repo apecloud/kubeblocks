@@ -208,8 +208,8 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 	// roleUnchangedCount is the count of consecutive role unchanged checks.
 	// if observed role unchanged consecutively in roleUnchangedThreshold times,
 	// we emit the current role again，then event controller can always get
-	// rolechanged events to maintain pod label accurately in cases of:
-	// 1 rolechanged event lost;
+	// roleChanged events to maintain pod label accurately in cases of:
+	// 1 roleChanged event loss;
 	// 2 pod role label deleted or updated incorrectly.
 	if p.roleUnchangedCount%p.roleUnchangedThreshold == 0 {
 		response.Metadata[StatusCode] = CheckFailedHTTPCode

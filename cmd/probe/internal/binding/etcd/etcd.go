@@ -40,7 +40,8 @@ type Etcd struct {
 const (
 	endpoint = "endpoint"
 
-	defaultPort = 2379
+	defaultPort        = 2379
+	defaultDialTimeout = 2 * time.Second
 )
 
 // NewEtcd returns a new etcd binding instance.
@@ -76,14 +77,17 @@ func (e *Etcd) InitIfNeed() error {
 
 	cli, err := v3.New(v3.Config{
 		Endpoints:   []string{e.endpoint},
-		DialTimeout: 5 * time.Second,
+		DialTimeout: defaultDialTimeout,
 	})
 	if err != nil {
 		return err
 	}
 
-	_, err = cli.Status(context.Background(), e.endpoint)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultDialTimeout)
+	_, err = cli.Status(ctx, e.endpoint)
+	cancel()
 	if err != nil {
+		cli.Close()
 		return err
 	}
 

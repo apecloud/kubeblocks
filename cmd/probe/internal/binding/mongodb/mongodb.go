@@ -175,12 +175,14 @@ func (m *MongoDB) InitIfNeed() error {
 	}
 
 	if err = client.Ping(context.Background(), nil); err != nil {
+		client.Disconnect(context.Background())
 		return fmt.Errorf("error in connecting to mongodb, host: %s error: %s", m.mongoDBMetadata.host, err)
 	}
 
 	db := client.Database(adminDatabase)
 	_, err = getReplSetStatus(context.Background(), db)
 	if err != nil {
+		client.Disconnect(context.Background())
 		return fmt.Errorf("error in getting repl status from mongodb, error: %s", err)
 	}
 

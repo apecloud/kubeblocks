@@ -250,7 +250,7 @@ spec:
 			By("check(or mock maybe) cluster status running")
 			if !IsUseExistingClusterEnabled() {
 				// MOCK pods are created and running, so as the cluster
-				Eventually(getClusterStatus(key), timeout, interval).Should(Equal(dbaasv1alpha1.CreatingPhase))
+				Eventually(expectClusterInPhase(key, dbaasv1alpha1.CreatingPhase), timeout, interval).Should(BeTrue())
 				mockSetClusterStatusRunning(key)
 			}
 			// TODO The following assert doesn't pass in a real K8s cluster (with UseExistingCluster set).
@@ -259,7 +259,7 @@ spec:
 			// TODO It seems the Cluster Reconciler doesn't be triggered to run properly,
 			// TODO an additional invoke of `kubectl apply` explicitly ask it will workaround,
 			// TODO I'll look into this problem later.
-			Eventually(getClusterStatus(key), timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
+			Eventually(expectClusterInPhase(key, dbaasv1alpha1.RunningPhase), timeout, interval).Should(BeTrue())
 
 			By("send VerticalScalingOpsRequest successfully")
 			verticalScalingOpsRequest := createOpsRequest("mysql-verticalscaling", clusterObj.Name, dbaasv1alpha1.VerticalScalingType)
@@ -278,7 +278,7 @@ spec:
 			Expect(testCtx.CreateObj(ctx, verticalScalingOpsRequest)).Should(Succeed())
 
 			By("check VerticalScalingOpsRequest succeed")
-			Eventually(getOpsRequestStatus(verticalScalingOpsRequest), timeout, interval).Should(Equal(dbaasv1alpha1.SucceedPhase))
+			Eventually(expectOpsRequestInPhase(verticalScalingOpsRequest, dbaasv1alpha1.SucceedPhase), timeout, interval).Should(BeTrue())
 
 			By("check cluster resource requirements changed")
 			Eventually(func() corev1.ResourceList {
@@ -316,21 +316,25 @@ func mockSetClusterStatusRunning(clusterName types.NamespacedName) {
 	Expect(k8sClient.Status().Patch(ctx, fetchedCluster, beforePatched))
 }
 
-func getClusterStatus(clusterName types.NamespacedName) func() dbaasv1alpha1.Phase {
-	return func() dbaasv1alpha1.Phase {
+func expectClusterInPhase(clusterName types.NamespacedName, phase dbaasv1alpha1.Phase) func() bool {
+	return func() bool {
 		fetchedCluster := &dbaasv1alpha1.Cluster{}
-		_ = k8sClient.Get(ctx, clusterName, fetchedCluster)
-		return fetchedCluster.Status.Phase
+		if err := k8sClient.Get(ctx, clusterName, fetchedCluster); err != nil {
+			return false
+		}
+		return fetchedCluster.Status.Phase == phase
 	}
 }
 
-func getOpsRequestStatus(opsRequest *dbaasv1alpha1.OpsRequest) func() dbaasv1alpha1.Phase {
-	return func() dbaasv1alpha1.Phase {
+func expectOpsRequestInPhase(opsRequest *dbaasv1alpha1.OpsRequest, phase dbaasv1alpha1.Phase) func() bool {
+	return func() bool {
 		fetchedOpsRequest := &dbaasv1alpha1.OpsRequest{}
-		_ = k8sClient.Get(ctx, client.ObjectKey{
+		if err := k8sClient.Get(ctx, client.ObjectKey{
 			Name:      opsRequest.Name,
 			Namespace: opsRequest.Namespace},
-			fetchedOpsRequest)
-		return fetchedOpsRequest.Status.Phase
+			fetchedOpsRequest); err != nil {
+			return false
+		}
+		return fetchedOpsRequest.Status.Phase == phase
 	}
 }

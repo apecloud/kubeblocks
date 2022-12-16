@@ -77,6 +77,8 @@ func buildFn(c *Command) *cobra.Command {
 			}
 		},
 	}
+
+	c.Cmd = cmd
 	if c.CustomFlags != nil {
 		c.CustomFlags(c)
 	}

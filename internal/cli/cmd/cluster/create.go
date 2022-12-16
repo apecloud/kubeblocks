@@ -91,25 +91,36 @@ const (
 	monitorKey      = "monitor"
 )
 
-type CreateOptions struct {
-	// ClusterDefRef reference clusterDefinition
-	ClusterDefRef     string `json:"clusterDefRef"`
-	AppVersionRef     string `json:"appVersionRef"`
+// UpdatableFlags is the flags that cat be updated by update command
+type UpdatableFlags struct {
 	TerminationPolicy string `json:"terminationPolicy"`
 	PodAntiAffinity   string `json:"podAntiAffinity"`
 	Monitor           bool   `json:"monitor"`
 	EnableAllLogs     bool   `json:"enableAllLogs"`
+
 	// TopologyKeys if TopologyKeys is nil, add omitempty json tag.
 	// because CueLang can not covert null to list.
-	TopologyKeys []string                 `json:"topologyKeys,omitempty"`
-	NodeLabels   map[string]string        `json:"nodeLabels,omitempty"`
-	Tolerations  []map[string]string      `json:"tolerations,omitempty"`
-	Components   []map[string]interface{} `json:"components"`
+	TopologyKeys []string `json:"topologyKeys,omitempty"`
+
+	NodeLabels     map[string]string `json:"nodeLabels,omitempty"`
+	TolerationsRaw []string          `json:"-"`
+}
+
+type CreateOptions struct {
+	// ClusterDefRef reference clusterDefinition
+	ClusterDefRef string                   `json:"clusterDefRef"`
+	AppVersionRef string                   `json:"appVersionRef"`
+	Tolerations   []map[string]string      `json:"tolerations,omitempty"`
+	Components    []map[string]interface{} `json:"components"`
+
 	// ComponentsFilePath components file path
 	ComponentsFilePath string   `json:"-"`
 	TolerationsRaw     []string `json:"-"`
+
 	// backup name to restore in creation
 	Backup string `json:"backup,omitempty"`
+
+	UpdatableFlags
 	create.BaseOptions
 }
 
@@ -309,12 +320,8 @@ func (o *CreateOptions) PreCreate(obj *unstructured.Unstructured) error {
 		return err
 	}
 	// get cluster definition from k8s
-	res, err := o.Client.Resource(types.ClusterDefGVR()).Namespace("").Get(context.TODO(), c.Spec.ClusterDefRef, metav1.GetOptions{}, "")
+	cd, err := cluster.GetClusterDefByName(o.Client, c.Spec.ClusterDefRef)
 	if err != nil {
-		return err
-	}
-	cd := &dbaasv1alpha1.ClusterDefinition{}
-	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(res.Object, cd); err != nil {
 		return err
 	}
 	setEnableAllLogs(c, cd)
@@ -364,4 +371,17 @@ func buildClusterComp(dynamic dynamic.Interface, clusterDef string) ([]map[strin
 		comps = append(comps, comp)
 	}
 	return comps, nil
+}
+
+func buildTolerations(raw []string) []map[string]string {
+	tolerations := make([]map[string]string, 0)
+	for _, tolerationRaw := range raw {
+		toleration := map[string]string{}
+		for _, entries := range strings.Split(tolerationRaw, ",") {
+			parts := strings.SplitN(entries, "=", 2)
+			toleration[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+		}
+		tolerations = append(tolerations, toleration)
+	}
+	return tolerations
 }

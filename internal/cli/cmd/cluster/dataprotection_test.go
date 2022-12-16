@@ -82,6 +82,7 @@ var _ = Describe("DataProtection", func() {
 		}
 		deleteForce := true
 		deleteFlags.Force = &deleteForce
+		c.Options = deleteFlags
 		Expect(completeForDeleteBackup(c)).Should(Succeed())
 		Expect(*deleteFlags.LabelSelector == clusterLabel).Should(BeTrue())
 
@@ -92,6 +93,7 @@ var _ = Describe("DataProtection", func() {
 		deleteFlags.Force = &deleteForce
 		customLabel := "test=test"
 		deleteFlags.LabelSelector = &customLabel
+		c.Options = deleteFlags
 		Expect(completeForDeleteBackup(c)).Should(Succeed())
 		Expect(*deleteFlags.LabelSelector == customLabel+","+clusterLabel).Should(BeTrue())
 	})
@@ -127,6 +129,7 @@ var _ = Describe("DataProtection", func() {
 		}
 		deleteForce := true
 		deleteFlags.Force = &deleteForce
+		c.Options = deleteFlags
 		Expect(completeForDeleteRestore(c)).Should(Succeed())
 		Expect(*deleteFlags.LabelSelector == clusterLabel).Should(BeTrue())
 
@@ -137,6 +140,7 @@ var _ = Describe("DataProtection", func() {
 		deleteFlags.Force = &deleteForce
 		customLabel := "test=test"
 		deleteFlags.LabelSelector = &customLabel
+		c.Options = deleteFlags
 		Expect(completeForDeleteRestore(c)).Should(Succeed())
 		Expect(*deleteFlags.LabelSelector == customLabel+","+clusterLabel).Should(BeTrue())
 	})

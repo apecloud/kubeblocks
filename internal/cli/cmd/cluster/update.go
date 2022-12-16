@@ -18,43 +18,41 @@ package cluster
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/builder"
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/patch"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 type updateOptions struct {
-	*patch.Options
+	name      string
+	namespace string
+	dynamic   dynamic.Interface
+	cluster   *dbaasv1alpha1.Cluster
 
-	// update flags
-	TerminationPolicy string              `json:"terminationPolicy"`
-	PodAntiAffinity   string              `json:"podAntiAffinity"`
-	Monitor           bool                `json:"monitor"`
-	EnableAllLogs     bool                `json:"enableAllLogs"`
-	TopologyKeys      []string            `json:"topologyKeys,omitempty"`
-	NodeLabels        map[string]string   `json:"nodeLabels,omitempty"`
-	Tolerations       []map[string]string `json:"tolerations,omitempty"`
-	TolerationsRaw    []string            `json:"-"`
+	UpdatableFlags
+	*patch.Options
 }
 
 func newUpdateOptions(streams genericclioptions.IOStreams) *updateOptions {
-	o := &updateOptions{
-		Options: patch.NewOptions(streams),
-	}
-	return o
+	return &updateOptions{Options: patch.NewOptions(streams)}
 }
 
 func NewUpdateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newUpdateOptions(streams)
-	cmd := builder.NewCmdBuilder().
+	return builder.NewCmdBuilder().
 		Use("update").
 		Short("Update an existing cluster").
 		Example("").
@@ -64,8 +62,7 @@ func NewUpdateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		GVR(types.ClusterGVR()).
 		CustomFlags(o.addFlags).
 		CustomComplete(o.complete).
-		GetCmd()
-	return o.Build(cmd)
+		Build(o.Build)
 }
 
 func (o *updateOptions) addFlags(c *builder.Command) {
@@ -87,9 +84,14 @@ func (o *updateOptions) addFlags(c *builder.Command) {
 }
 
 func (o *updateOptions) complete(c *builder.Command) error {
+	var err error
 	if len(c.Args) == 0 {
 		return fmt.Errorf("missing updated cluster name")
 	}
+	if len(c.Args) > 1 {
+		return fmt.Errorf("only support to update one cluster")
+	}
+	o.name = c.Args[0]
 
 	// record the flags that been set by user
 	var flags []*pflag.Flag
@@ -100,6 +102,13 @@ func (o *updateOptions) complete(c *builder.Command) error {
 	// nothing to do
 	if len(flags) == 0 {
 		return nil
+	}
+
+	if o.namespace, _, err = c.Factory.ToRawKubeConfigLoader().Namespace(); err != nil {
+		return err
+	}
+	if o.dynamic, err = c.Factory.DynamicClient(); err != nil {
+		return err
 	}
 	return o.buildPatch(flags)
 }
@@ -114,6 +123,9 @@ func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 	buildTolObj := func(obj map[string]interface{}, v string, field string) error {
 		tolerations := buildTolerations(o.TolerationsRaw)
 		return unstructured.SetNestedField(obj, tolerations, field)
+	}
+	buildComps := func(obj map[string]interface{}, v string, field string) error {
+		return o.buildComponents(field, v)
 	}
 
 	spec := map[string]interface{}{}
@@ -130,6 +142,8 @@ func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 		"topology-keys":      {field: "topologyKeys", obj: affinity, fn: buildFlagObj},
 		"node-labels":        {field: "nodeLabels", obj: affinity, fn: buildFlagObj},
 		"tolerations":        {field: "tolerations", obj: spec, fn: buildTolObj},
+		"monitor":            {field: "monitor", obj: nil, fn: buildComps},
+		"enable-all-logs":    {field: "enable-all-logs", obj: nil, fn: buildComps},
 	}
 
 	for _, flag := range flags {
@@ -146,6 +160,17 @@ func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 		}
 	}
 
+	if o.cluster != nil {
+		data, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&o.cluster.Spec)
+		if err != nil {
+			return err
+		}
+
+		if err = unstructured.SetNestedField(spec, data["components"], "components"); err != nil {
+			return err
+		}
+	}
+
 	obj := unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"spec": spec,
@@ -156,5 +181,59 @@ func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 		return err
 	}
 	o.Patch = string(bytes)
+	return nil
+}
+
+func (o *updateOptions) buildComponents(field string, val string) error {
+	if o.cluster == nil {
+		cluster, err := cluster.GetClusterByName(o.dynamic, o.name, o.namespace)
+		if err != nil {
+			return err
+		}
+		o.cluster = cluster
+	}
+
+	switch field {
+	case "monitor":
+		return o.setMonitor(val)
+	case "enable-all-logs":
+		return o.setEnabledLog(val)
+	default:
+		return nil
+	}
+}
+
+func (o *updateOptions) setEnabledLog(val string) error {
+	boolVal, err := strconv.ParseBool(val)
+	if err != nil {
+		return err
+	}
+
+	// disable all monitor
+	if !boolVal {
+		for _, c := range o.cluster.Spec.Components {
+			c.EnabledLogs = nil
+		}
+		return nil
+	}
+
+	// enable all monitor
+	cd, err := cluster.GetClusterDefByName(o.dynamic, o.cluster.Spec.ClusterDefRef)
+	if err != nil {
+		return err
+	}
+	setEnableAllLogs(o.cluster, cd)
+	return nil
+}
+
+func (o *updateOptions) setMonitor(val string) error {
+	boolVal, err := strconv.ParseBool(val)
+	if err != nil {
+		return err
+	}
+
+	for i := range o.cluster.Spec.Components {
+		o.cluster.Spec.Components[i].Monitor = boolVal
+	}
 	return nil
 }

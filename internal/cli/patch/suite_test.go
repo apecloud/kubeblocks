@@ -14,21 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cluster
+package patch
 
 import (
-	"strings"
+	"testing"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
-func buildTolerations(raw []string) []map[string]string {
-	tolerations := make([]map[string]string, 0)
-	for _, tolerationRaw := range raw {
-		toleration := map[string]string{}
-		for _, entries := range strings.Split(tolerationRaw, ",") {
-			parts := strings.SplitN(entries, "=", 2)
-			toleration[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
-		}
-		tolerations = append(tolerations, toleration)
-	}
-	return tolerations
+func TestPatch(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Patch Suite")
 }

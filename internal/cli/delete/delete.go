@@ -55,6 +55,8 @@ func Build(c *builder.Command) *cobra.Command {
 		Example:           c.Example,
 		ValidArgsFunction: utilcomp.ResourceNameCompletionFunc(c.Factory, util.GVRToString(c.GVR)),
 		Run: func(cmd *cobra.Command, args []string) {
+			c.Args = args
+
 			// If delete resources belonging to cluster, custom complete function
 			// should fill the ResourceName or construct the label selector based
 			// on the ClusterName

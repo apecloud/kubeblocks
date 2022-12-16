@@ -37,8 +37,8 @@ const (
 	// CommandSQLKey keys from request's metadata.
 	CommandSQLKey = "sql"
 
-	defaultEventAggregationNum = 10
-	defaultEventIntervalNum    = 60
+	defaultCheckFailedThreshold   = 10
+	defaultRoleUnchangedThreshold = 60
 )
 
 type ProbeBase struct {
@@ -48,14 +48,14 @@ type ProbeBase struct {
 	runningCheckFailedCount int
 	roleCheckFailedCount    int
 	roleUnchangedCount      int
-	eventAggregationNum     int
-	// eventIntervalNum is used to set the report period of role changed event even role unchanged,
+	checkFailedThreshold    int
+	// roleUnchangedThreshold is used to set the report period of role changed event even role unchanged,
 	// then event controller can always get rolechanged events to maintain pod label accurately
 	// in cases of:
 	// 1 rolechanged event lost;
 	// 2 pod role label deleted or updated incorrectly.
-	eventIntervalNum int
-	dbPort           int
+	roleUnchangedThreshold int
+	dbPort                 int
 }
 
 // ProbeOperation abstracts the interfaces a binding implementation needs to support.
@@ -75,20 +75,28 @@ type ProbeOperation interface {
 }
 
 func init() {
-	viper.SetDefault("KB_AGGREGATION_NUMBER", defaultEventAggregationNum)
-	viper.SetDefault("KB_EVENT_INTERNAL_NUMBER", defaultEventIntervalNum)
+	viper.SetDefault("KB_CHECK_FAILED_THRESHOLD", defaultCheckFailedThreshold)
+	viper.SetDefault("KB_ROLE_UNCHANGED_THRESHOLD", defaultRoleUnchangedThreshold)
 }
 
 func (p *ProbeBase) Init() {
 	p.dbPort = p.Operation.GetRunningPort()
-	p.eventAggregationNum = viper.GetInt("KB_AGGREGATION_NUMBER")
-	eventIntervalNum := viper.GetInt("KB_EVENT_INTERNAL_NUMBER")
-	if eventIntervalNum < 10 {
-		p.eventIntervalNum = 10
-	} else if eventIntervalNum > 60 {
-		p.eventIntervalNum = 60
+	checkFailedThreshold := viper.GetInt("KB_CHECK_FAILED_THRESHOLD")
+	if checkFailedThreshold < 10 {
+		p.checkFailedThreshold = 10
+	} else if checkFailedThreshold > 60 {
+		p.checkFailedThreshold = 60
 	} else {
-		p.eventIntervalNum = eventIntervalNum
+		p.checkFailedThreshold = checkFailedThreshold
+	}
+
+	roleUnchangedThreshold := viper.GetInt("KB_ROLE_UNCHANGED_THRESHOLD")
+	if roleUnchangedThreshold < 10 {
+		p.roleUnchangedThreshold = 10
+	} else if roleUnchangedThreshold > 60 {
+		p.roleUnchangedThreshold = 60
+	} else {
+		p.roleUnchangedThreshold = roleUnchangedThreshold
 	}
 
 }
@@ -178,10 +186,11 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 		p.Logger.Infof("error executing roleCheck: %v", err)
 		result.Event = "roleCheckFailed"
 		result.Message = err.Error()
-		if p.roleCheckFailedCount++; p.roleCheckFailedCount%p.eventAggregationNum == 1 {
+		if p.roleCheckFailedCount%p.checkFailedThreshold == 0 {
 			p.Logger.Infof("role checks failed %v times continuously", p.roleCheckFailedCount)
 			response.Metadata[StatusCode] = CheckFailedHTTPCode
 		}
+		p.roleCheckFailedCount++
 		msg, _ := json.Marshal(result)
 		return msg, nil
 	}
@@ -196,21 +205,22 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 	}
 
 	// roleUnchandedCount is the count of consecutive role unchanged checks.
-	// eventIntervalNum is the report period of role changed event when role unchanged,
-	// then event controller can always get rolechanged events to maintain pod label accurately
-	// in cases of:
+	// if observed role unchanged consecutively in roleUnchangedThreshold times,
+	// we emit the current role again，then event controller can always get
+	// rolechanged events to maintain pod label accurately in cases of:
 	// 1 rolechanged event lost;
 	// 2 pod role label deleted or updated incorrectly.
-	if p.roleUnchangedCount++; p.roleUnchangedCount%p.eventIntervalNum == 1 {
+	if p.roleUnchangedCount%p.roleUnchangedThreshold == 0 {
 		response.Metadata[StatusCode] = CheckFailedHTTPCode
 	}
+	p.roleUnchangedCount++
 	msg, _ := json.Marshal(result)
 	p.Logger.Infof(string(msg))
 	return msg, nil
 }
 
 // runningCheck checks whether the binding service is in running status:
-// the port is open or is close consecutively in eventAggregationNum times
+// the port is open or is close consecutively in checkFailedThreshold times
 func (p *ProbeBase) runningCheck(ctx context.Context, resp *bindings.InvokeResponse) ([]byte, error) {
 	var message string
 	result := ProbeMessage{}
@@ -226,10 +236,11 @@ func (p *ProbeBase) runningCheck(ctx context.Context, resp *bindings.InvokeRespo
 		message = fmt.Sprintf("running check %s error: %v", host, err)
 		result.Event = "runningCheckFailed"
 		p.Logger.Errorf(message)
-		if p.runningCheckFailedCount++; p.runningCheckFailedCount%p.eventAggregationNum == 1 {
+		if p.runningCheckFailedCount%p.checkFailedThreshold == 0 {
 			p.Logger.Infof("running checks failed %v times continuously", p.runningCheckFailedCount)
 			resp.Metadata[StatusCode] = CheckFailedHTTPCode
 		}
+		p.runningCheckFailedCount++
 		return marshalResult()
 	}
 	defer conn.Close()

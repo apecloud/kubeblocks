@@ -45,14 +45,14 @@ func TestInit(t *testing.T) {
 	if p.roleCheckFailedCount != 0 {
 		t.Errorf("p.roleCheckFailedCount init failed: %d", p.roleCheckFailedCount)
 	}
-	if p.roleCheckCount != 0 {
-		t.Errorf("p.roleCheckCount init failed: %d", p.roleCheckCount)
+	if p.roleUnchangedCount != 0 {
+		t.Errorf("p.roleUnchangedCount init failed: %d", p.roleUnchangedCount)
 	}
-	if p.eventAggregationNum != defaultEventAggregationNum {
-		t.Errorf("p.eventAggregationNum init failed: %d", p.eventAggregationNum)
+	if p.checkFailedThreshold != defaultCheckFailedThreshold {
+		t.Errorf("p.checkFailedThreshold init failed: %d", p.checkFailedThreshold)
 	}
-	if p.eventIntervalNum != defaultEventIntervalNum {
-		t.Errorf("p.eventIntervalNum init failed: %d", p.eventIntervalNum)
+	if p.roleUnchangedThreshold != defaultRoleUnchangedThreshold {
+		t.Errorf("p.roleUnchangedThreshold init failed: %d", p.roleUnchangedThreshold)
 	}
 	if p.dbPort != testDbPort {
 		t.Errorf("p.dbPort init failed: %d", p.dbPort)

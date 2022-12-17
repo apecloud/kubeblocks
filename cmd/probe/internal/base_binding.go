@@ -81,13 +81,11 @@ func init() {
 
 func (p *ProbeBase) Init() {
 	p.dbPort = p.Operation.GetRunningPort()
-	checkFailedThreshold := viper.GetInt("KB_CHECK_FAILED_THRESHOLD")
-	if checkFailedThreshold < 10 {
+	p.checkFailedThreshold = viper.GetInt("KB_CHECK_FAILED_THRESHOLD")
+	if p.checkFailedThreshold < 10 {
 		p.checkFailedThreshold = 10
-	} else if checkFailedThreshold > 60 {
+	} else if p.checkFailedThreshold > 60 {
 		p.checkFailedThreshold = 60
-	} else {
-		p.checkFailedThreshold = checkFailedThreshold
 	}
 
 	roleUnchangedThreshold := viper.GetInt("KB_ROLE_UNCHANGED_THRESHOLD")

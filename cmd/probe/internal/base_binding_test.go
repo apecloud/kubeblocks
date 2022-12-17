@@ -20,6 +20,7 @@ import (
 	"context"
 	"net"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/dapr/components-contrib/bindings"
@@ -74,8 +75,8 @@ func TestInvoke(t *testing.T) {
 		if err != nil {
 			t.Errorf("runningCheck failed: %s", err)
 		}
-		if resp.Metadata[StatusCode] != CheckFailedHTTPCode {
-			t.Errorf("unexpected status-code: %s", resp.Metadata[StatusCode])
+		if strings.Index(string(resp.Data), "{\"event\":\"runningCheckFailed\"") < 0 {
+			t.Errorf("unexpected response: %s", string(resp.Data))
 		}
 
 		message := "{\"message\":\"TCP Connection Established Successfully!\"}"

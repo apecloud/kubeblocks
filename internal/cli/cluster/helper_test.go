@@ -106,6 +106,13 @@ var _ = Describe("helper", func() {
 		Expect(objs).ShouldNot(BeNil())
 	})
 
+	It("get cluster cluster", func() {
+		dynamic := testing.FakeDynamicClient(testing.FakeCluster("test", "test"))
+		c, err := GetClusterByName(dynamic, "test", "test")
+		Expect(err).Should(Succeed())
+		Expect(c).ShouldNot(BeNil())
+	})
+
 	It("get cluster definition", func() {
 		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
 		clusterDef, err := GetClusterDefByName(dynamic, testing.ClusterDefName)

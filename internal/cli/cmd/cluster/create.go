@@ -44,7 +44,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
-var example = templates.Examples(`
+var clusterCreateExample = templates.Examples(`
 	# Create a cluster using cluster definition my-cluster-def and cluster version my-version
 	kbcli cluster create mycluster --cluster-definition=my-cluster-def --cluster-version=my-version
 
@@ -110,7 +110,7 @@ type CreateOptions struct {
 	// ClusterDefRef reference clusterDefinition
 	ClusterDefRef string                   `json:"clusterDefRef"`
 	AppVersionRef string                   `json:"appVersionRef"`
-	Tolerations   []map[string]string      `json:"tolerations,omitempty"`
+	Tolerations   []interface{}            `json:"tolerations,omitempty"`
 	Components    []map[string]interface{} `json:"components"`
 
 	// ComponentsFilePath components file path
@@ -252,7 +252,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	inputs := create.Inputs{
 		Use:             "create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOut --components=file-path",
 		Short:           "Create a database cluster",
-		Example:         example,
+		Example:         clusterCreateExample,
 		CueTemplateName: CueTemplateName,
 		ResourceName:    types.ResourceClusters,
 		BaseOptionsObj:  &o.BaseOptions,
@@ -264,15 +264,11 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		BuildFlags: func(cmd *cobra.Command) {
 			cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli cluster-definition list\" to show all available cluster definition")
 			cmd.Flags().StringVar(&o.AppVersionRef, "cluster-version", "", "Specify cluster version, run \"kbcli cluster-version list\" to show all available cluster version")
-			cmd.Flags().StringVar(&o.TerminationPolicy, "termination-policy", "", "Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)")
-			cmd.Flags().StringVar(&o.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type")
-			cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and inject metrics exporter")
-			cmd.Flags().BoolVar(&o.EnableAllLogs, "enable-all-logs", false, "Enable advanced application all log extraction, and true will ignore enabledLogs of component level")
-			cmd.Flags().StringArrayVar(&o.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
-			cmd.Flags().StringToStringVar(&o.NodeLabels, "node-labels", nil, "Node label selector")
-			cmd.Flags().StringSliceVar(&o.TolerationsRaw, "tolerations", nil, `Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'`)
 			cmd.Flags().StringVar(&o.ComponentsFilePath, "components", "", "Use yaml file, URL, or stdin to specify the cluster components")
 			cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
+
+			// add updatable flags
+			o.UpdatableFlags.addFlags(cmd)
 
 			// set required flag
 			markRequiredFlag(cmd)
@@ -301,11 +297,6 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 		"cluster-version",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.AppVersionGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
-		}))
-	util.CheckErr(cmd.RegisterFlagCompletionFunc(
-		"termination-policy",
-		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return []string{"DoNotTerminate", "Halt", "Delete", "WipeOut"}, cobra.ShellCompDirectiveNoFileComp
 		}))
 }
 
@@ -373,10 +364,10 @@ func buildClusterComp(dynamic dynamic.Interface, clusterDef string) ([]map[strin
 	return comps, nil
 }
 
-func buildTolerations(raw []string) []map[string]string {
-	tolerations := make([]map[string]string, 0)
+func buildTolerations(raw []string) []interface{} {
+	tolerations := make([]interface{}, 0)
 	for _, tolerationRaw := range raw {
-		toleration := map[string]string{}
+		toleration := map[string]interface{}{}
 		for _, entries := range strings.Split(tolerationRaw, ",") {
 			parts := strings.SplitN(entries, "=", 2)
 			toleration[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
@@ -384,4 +375,20 @@ func buildTolerations(raw []string) []map[string]string {
 		tolerations = append(tolerations, toleration)
 	}
 	return tolerations
+}
+
+func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVar(&f.PodAntiAffinity, "pod-anti-affinity", "", "Pod anti-affinity type")
+	cmd.Flags().BoolVar(&f.Monitor, "monitor", true, "Set monitor enabled and inject metrics exporter")
+	cmd.Flags().BoolVar(&f.EnableAllLogs, "enable-all-logs", true, "Enable advanced application all log extraction, and true will ignore enabledLogs of component level")
+	cmd.Flags().StringVar(&f.TerminationPolicy, "termination-policy", "", "Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)")
+	cmd.Flags().StringArrayVar(&f.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
+	cmd.Flags().StringToStringVar(&f.NodeLabels, "node-labels", nil, "Node label selector")
+	cmd.Flags().StringSliceVar(&f.TolerationsRaw, "tolerations", nil, `Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'`)
+
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"termination-policy",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return []string{"DoNotTerminate", "Halt", "Delete", "WipeOut"}, cobra.ShellCompDirectiveNoFileComp
+		}))
 }

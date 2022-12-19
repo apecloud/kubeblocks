@@ -133,4 +133,10 @@ spec:
 		Expect(comps).ShouldNot(BeNil())
 		Expect(len(comps)).Should(Equal(2))
 	})
+
+	It("build tolerations", func() {
+		raw := []string{"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"}
+		res := buildTolerations(raw)
+		Expect(len(res)).Should(Equal(1))
+	})
 })

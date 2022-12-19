@@ -27,14 +27,31 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/patch"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
+
+var clusterUpdateExample = templates.Examples(`
+	# update cluster mycluster termination policy to Delete
+	kbcli cluster update mycluster --termination-policy=Delete
+
+	# enable cluster monitor
+	kbcli cluster update mycluster --monitor=true
+
+    # enable all logs
+	kbcli cluster update mycluster --enable-all-logs=true
+
+    # update cluster topology keys and affinity
+	kbcli cluster update mycluster --topology-keys=kubernetes.io/hostname --pod-anti-affinity=Required
+
+	# update cluster tolerations
+	kbcli cluster update mycluster --tolerations='"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
+`)
 
 type updateOptions struct {
 	name      string
@@ -55,7 +72,7 @@ func NewUpdateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	return builder.NewCmdBuilder().
 		Use("update").
 		Short("Update an existing cluster").
-		Example("").
+		Example(clusterUpdateExample).
 		Options(o).
 		IOStreams(streams).
 		Factory(f).
@@ -66,21 +83,7 @@ func NewUpdateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 }
 
 func (o *updateOptions) addFlags(c *builder.Command) {
-	cmd := c.Cmd
-	f := cmd.Flags()
-	f.StringVar(&o.PodAntiAffinity, "pod-anti-affinity", "", "Pod anti-affinity type")
-	f.BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and inject metrics exporter")
-	f.BoolVar(&o.EnableAllLogs, "enable-all-logs", true, "Enable advanced application all log extraction, and true will ignore enabledLogs of component level")
-	f.StringVar(&o.TerminationPolicy, "termination-policy", "", "Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)")
-	f.StringArrayVar(&o.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
-	f.StringToStringVar(&o.NodeLabels, "node-labels", nil, "Node label selector")
-	f.StringSliceVar(&o.TolerationsRaw, "tolerations", nil, `Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'`)
-
-	util.CheckErr(cmd.RegisterFlagCompletionFunc(
-		"termination-policy",
-		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return []string{"DoNotTerminate", "Halt", "Delete", "WipeOut"}, cobra.ShellCompDirectiveNoFileComp
-		}))
+	o.UpdatableFlags.addFlags(c.Cmd)
 }
 
 func (o *updateOptions) complete(c *builder.Command) error {

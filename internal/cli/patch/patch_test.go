@@ -30,7 +30,6 @@ import (
 )
 
 type testOptions struct {
-	name string
 	*Options
 }
 

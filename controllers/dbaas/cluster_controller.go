@@ -29,6 +29,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -388,7 +389,7 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 		res, err := intctrlutil.Reconciled()
 		return &res, err
 	case dbaasv1alpha1.Delete, dbaasv1alpha1.WipeOut:
-		if err := r.deletePVCs(reqCtx, cluster); err != nil {
+		if err := r.deletePVCs(reqCtx, cluster); err != nil && !apierrors.IsNotFound(err) {
 			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 			return &res, err
 		}
@@ -397,7 +398,7 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
 	if err := r.Get(reqCtx.Ctx, client.ObjectKey{
 		Name: cluster.Spec.ClusterDefRef,
-	}, clusterDef); err != nil {
+	}, clusterDef); err != nil && !apierrors.IsNotFound(err) {
 		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		return &res, err
 	}

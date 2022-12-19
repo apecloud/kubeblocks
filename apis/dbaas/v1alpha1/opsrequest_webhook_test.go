@@ -35,11 +35,12 @@ import (
 var _ = Describe("OpsRequest webhook", func() {
 
 	var (
-		clusterDefinitionName    = "opsrequest-webhook-mysql-definition"
-		appVersionName           = "opsrequest-webhook-mysql-appversion"
-		appVersionNameForUpgrade = "opsrequest-webhook-mysql-upgrade-appversion"
-		clusterName              = "opsrequest-webhook-mysql"
-		opsRequestName           = "opsrequest-webhook-mysql-ops"
+		randomStr                = testCtx.GetRandomStr()
+		clusterDefinitionName    = "opswebhook-mysql-definition-" + randomStr
+		appVersionName           = "opswebhook-mysql-appversion-" + randomStr
+		appVersionNameForUpgrade = "opswebhook-mysql-upgrade-" + randomStr
+		clusterName              = "opswebhook-mysql-" + randomStr
+		opsRequestName           = "opswebhook-mysql-ops-" + randomStr
 		timeout                  = time.Second * 10
 		interval                 = time.Second
 		ctx                      = context.Background()
@@ -65,7 +66,12 @@ var _ = Describe("OpsRequest webhook", func() {
 		cleanupObjects()
 	})
 
-	testUpgrade := func(cluster *Cluster, opsRequest *OpsRequest) {
+	testUpgrade := func(cluster *Cluster) {
+		opsRequest := createTestOpsRequest(clusterName, opsRequestName+"-upgrade", UpgradeType)
+		By("By creating a appVersion for upgrade")
+		newAppVersion := createTestAppVersionObj(clusterDefinitionName, appVersionNameForUpgrade)
+		Expect(testCtx.CreateObj(ctx, newAppVersion)).Should(Succeed())
+
 		By("By testing when cluster not support upgrade")
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("appversion must be greater than 1"))
 		// set cluster support upgrade
@@ -90,10 +96,6 @@ var _ = Describe("OpsRequest webhook", func() {
 			AppVersionRef: appVersionName,
 		}}
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("can not equals Cluster.spec.appVersionRef"))
-
-		By("By creating a appVersion for upgrade")
-		newAppVersion := createTestAppVersionObj(clusterDefinitionName, appVersionNameForUpgrade)
-		Expect(testCtx.CreateObj(ctx, newAppVersion)).Should(Succeed())
 
 		By("Test Cluster Phase")
 		OpsRequestBehaviourMapper[UpgradeType] = OpsRequestBehaviour{
@@ -129,15 +131,26 @@ var _ = Describe("OpsRequest webhook", func() {
 		// wait until OpsRequest created
 		Eventually(func() bool {
 			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: opsRequest.Name,
-				Namespace: opsRequest.Namespace}, &OpsRequest{})
+				Namespace: opsRequest.Namespace}, opsRequest)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
 
+		newClusterName := clusterName + "1"
+		newCluster, _ := createTestCluster(clusterDefinitionName, appVersionName, newClusterName)
+		Expect(testCtx.CheckedCreateObj(ctx, newCluster)).Should(Succeed())
+
 		By("By testing Immutable when status.phase in Succeed")
-		opsRequest.Status.Phase = SucceedPhase
-		Expect(k8sClient.Status().Update(ctx, opsRequest)).Should(Succeed())
-		opsRequest.Spec.ClusterRef = "test"
-		Expect(k8sClient.Update(ctx, opsRequest).Error()).To(ContainSubstring("update OpsRequest is forbidden when status.Phase is Succeed"))
+		// if running in real cluster, the opsRequest will reconcile all the time.
+		// so we should add eventually block.
+		Eventually(func() bool {
+			patch = client.MergeFrom(opsRequest.DeepCopy())
+			opsRequest.Status.Phase = SucceedPhase
+			Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).Should(Succeed())
+
+			patch = client.MergeFrom(opsRequest.DeepCopy())
+			opsRequest.Spec.ClusterRef = newClusterName
+			return Expect(k8sClient.Patch(ctx, opsRequest, patch).Error()).To(ContainSubstring("update OpsRequest is forbidden when status.Phase is Succeed"))
+		}, timeout, interval).Should(BeTrue())
 	}
 
 	testVerticalScaling := func(cluster *Cluster) {
@@ -305,7 +318,11 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(k8sClient.Delete(ctx, newCluster)).Should(Succeed())
 
 		By("test path labels")
-		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: cluster.Namespace}, &Cluster{})).ShouldNot(Succeed())
+		Eventually(func() bool {
+			err := k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: cluster.Namespace}, &Cluster{})
+			return err != nil
+		}, timeout, interval).Should(BeTrue())
+
 		patch := client.MergeFrom(opsRequest.DeepCopy())
 		opsRequest.Labels["test"] = "test-ops"
 		Expect(k8sClient.Patch(ctx, opsRequest, patch)).Should(Succeed())
@@ -365,7 +382,7 @@ var _ = Describe("OpsRequest webhook", func() {
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
-			testUpgrade(cluster, opsRequest)
+			testUpgrade(cluster)
 
 			testVerticalScaling(cluster)
 

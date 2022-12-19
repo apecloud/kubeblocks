@@ -27,7 +27,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -497,9 +496,7 @@ func checkedDeleteDeletePVCCronJob(ctx context.Context, cli client.Client, name 
 	if cronJob.ObjectMeta.Labels[intctrlutil.AppManagedByLabelKey] == intctrlutil.AppName {
 		// if managed by kubeblocks, then it must be the cronjob used to delete pvc, delete it since it's completed
 		if err := cli.Delete(ctx, &cronJob); err != nil {
-			if !errors.IsNotFound(err) {
-				return err
-			}
+			return client.IgnoreNotFound(err)
 		}
 	}
 	return nil

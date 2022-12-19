@@ -355,6 +355,9 @@ func addOpsRequestAnnotationToCluster(opsRes *OpsResource, toClusterPhase dbaasv
 // patchClusterAnnotations patch OpsRequest annotation in Cluster.annotations
 func patchClusterAnnotations(opsRes *OpsResource, opsRequestSlice []OpsRecorder) error {
 	patch := client.MergeFrom(opsRes.Cluster.DeepCopy())
+	if opsRes.Cluster.Annotations == nil {
+		opsRes.Cluster.Annotations = map[string]string{}
+	}
 	if len(opsRequestSlice) > 0 {
 		result, _ := json.Marshal(opsRequestSlice)
 		opsRes.Cluster.Annotations[intctrlutil.OpsRequestAnnotationKey] = string(result)

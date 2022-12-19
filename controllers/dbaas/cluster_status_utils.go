@@ -430,7 +430,7 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 	)
 	if event.InvolvedObject.Kind == intctrlutil.CronJob &&
 		event.Reason == "SawCompletedJob" {
-		return handleCronJobEvent(ctx, cli, recorder, event)
+		return handleDeletePVCCronJobEvent(ctx, cli, recorder, event)
 	}
 	if event.Type != corev1.EventTypeWarning || !isTargetKindForEvent(event) {
 		return nil
@@ -447,7 +447,7 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 	return handleClusterStatusByEvent(ctx, cli, recorder, object, event)
 }
 
-func handleCronJobEvent(ctx context.Context,
+func handleDeletePVCCronJobEvent(ctx context.Context,
 	cli client.Client,
 	recorder record.EventRecorder,
 	event *corev1.Event) error {
@@ -459,7 +459,7 @@ func handleCronJobEvent(ctx context.Context,
 	matches := re.FindStringSubmatch(event.Message)
 	if len(matches) == 0 {
 		// delete pvc success, then delete cronjob
-		return checkedDeleteCronJob(ctx, cli, event.InvolvedObject.Name, event.InvolvedObject.Namespace)
+		return checkedDeleteDeletePVCCronJob(ctx, cli, event.InvolvedObject.Name, event.InvolvedObject.Namespace)
 	}
 	// cronjob failed
 	if object, err = getEventInvolvedObject(ctx, cli, event); err != nil {
@@ -485,7 +485,7 @@ func handleCronJobEvent(ctx context.Context,
 	return nil
 }
 
-func checkedDeleteCronJob(ctx context.Context, cli client.Client, name string, namespace string) error {
+func checkedDeleteDeletePVCCronJob(ctx context.Context, cli client.Client, name string, namespace string) error {
 	// label check
 	cronJob := v1.CronJob{}
 	if err := cli.Get(ctx, types.NamespacedName{

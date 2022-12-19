@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package component
+package consensusset
 
 import (
 	"context"
@@ -22,15 +22,15 @@ import (
 	"strings"
 
 	"github.com/google/go-cmp/cmp"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
-
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -77,7 +77,7 @@ func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *app
 	}
 	pods := make([]corev1.Pod, 0)
 	for _, pod := range podList.Items {
-		if IsMemberOf(stsObj, &pod) {
+		if util.IsMemberOf(stsObj, &pod) {
 			pods = append(pods, pod)
 		}
 	}
@@ -88,10 +88,10 @@ func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *app
 // return true means stateful set reconcile done
 func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, stsObj *appsv1.StatefulSet) (bool, error) {
 	// get typeName from stsObj.name
-	typeName := GetComponentTypeName(*cluster, stsObj.Labels[intctrlutil.AppComponentLabelKey])
+	typeName := util.GetComponentTypeName(*cluster, stsObj.Labels[intctrlutil.AppComponentLabelKey])
 
 	// get component from ClusterDefinition by typeName
-	component, err := GetComponentFromClusterDefinition(ctx, cli, cluster, typeName)
+	component, err := util.GetComponentDeftByCluster(ctx, cli, cluster, typeName)
 	if err != nil {
 		return false, err
 	}
@@ -127,15 +127,10 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 	// if status changed, do update
 	if !cmp.Equal(newConsensusSetStatus, oldConsensusSetStatus) {
 		patch := client.MergeFrom(cluster.DeepCopy())
-		if oldConsensusSetStatus != nil {
-			if v, ok := cluster.Status.Components[componentName]; ok {
-				v.ConsensusSetStatus = nil
-				cluster.Status.Components[componentName] = v
-			}
-		}
 		initClusterComponentStatusIfNeed(cluster, componentName)
-		oldConsensusSetStatus = cluster.Status.Components[componentName].ConsensusSetStatus
-		setConsensusSetStatusRoles(oldConsensusSetStatus, *component, pods)
+		componentStatus := cluster.Status.Components[componentName]
+		componentStatus.ConsensusSetStatus = newConsensusSetStatus
+		cluster.Status.Components[componentName] = componentStatus
 		if err = cli.Status().Patch(ctx, cluster, patch); err != nil {
 			return false, err
 		}
@@ -164,14 +159,14 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 	// generate the pods Deletion plan
 	plan := generateConsensusUpdatePlan(ctx, cli, stsObj, pods, *component)
 	// execute plan
-	return plan.walkOneStep()
+	return plan.WalkOneStep()
 }
 
 // generateConsensusUpdatePlan generates Update plan based on UpdateStrategy
 func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod,
-	component dbaasv1alpha1.ClusterDefinitionComponent) *Plan {
-	plan := &Plan{}
-	plan.Start = &Step{}
+	component dbaasv1alpha1.ClusterDefinitionComponent) *util.Plan {
+	plan := &util.Plan{}
+	plan.Start = &util.Step{}
 	plan.WalkFunc = func(obj interface{}) (bool, error) {
 		pod, ok := obj.(corev1.Pod)
 		if !ok {
@@ -184,7 +179,7 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 		}
 
 		// if pod is the latest version, we do nothing
-		if GetPodRevision(&pod) == stsObj.Status.UpdateRevision {
+		if util.GetPodRevision(&pod) == stsObj.Status.UpdateRevision {
 			// wait until ready
 			return !isReady(pod), nil
 		}
@@ -229,14 +224,14 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 }
 
 // unknown & empty & learner & 1/2 followers -> 1/2 followers -> leader
-func generateConsensusBestEffortParallelPlan(plan *Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
+func generateConsensusBestEffortParallelPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
 	start := plan.Start
 	// append unknown, empty and learner
 	index := 0
 	for _, pod := range pods {
 		role := pod.Labels[intctrlutil.ConsensusSetRoleLabelKey]
 		if rolePriorityMap[role] <= learnerPriority {
-			nextStep := &Step{}
+			nextStep := &util.Step{}
 			nextStep.Obj = pod
 			start.NextSteps = append(start.NextSteps, nextStep)
 			index++
@@ -255,7 +250,7 @@ func generateConsensusBestEffortParallelPlan(plan *Plan, pods []corev1.Pod, role
 	}
 	end := followerCount / 2
 	for i := 0; i < end; i++ {
-		nextStep := &Step{}
+		nextStep := &util.Step{}
 		nextStep.Obj = podList[i]
 		start.NextSteps = append(start.NextSteps, nextStep)
 	}
@@ -267,7 +262,7 @@ func generateConsensusBestEffortParallelPlan(plan *Plan, pods []corev1.Pod, role
 	podList = podList[end:]
 	end = followerCount - end
 	for i := 0; i < end; i++ {
-		nextStep := &Step{}
+		nextStep := &util.Step{}
 		nextStep.Obj = podList[i]
 		start.NextSteps = append(start.NextSteps, nextStep)
 	}
@@ -278,27 +273,27 @@ func generateConsensusBestEffortParallelPlan(plan *Plan, pods []corev1.Pod, role
 	// append leader
 	podList = podList[end:]
 	for _, pod := range podList {
-		nextStep := &Step{}
+		nextStep := &util.Step{}
 		nextStep.Obj = pod
 		start.NextSteps = append(start.NextSteps, nextStep)
 	}
 }
 
 // unknown & empty & leader & followers & learner
-func generateConsensusParallelPlan(plan *Plan, pods []corev1.Pod) {
+func generateConsensusParallelPlan(plan *util.Plan, pods []corev1.Pod) {
 	start := plan.Start
 	for _, pod := range pods {
-		nextStep := &Step{}
+		nextStep := &util.Step{}
 		nextStep.Obj = pod
 		start.NextSteps = append(start.NextSteps, nextStep)
 	}
 }
 
 // unknown -> empty -> learner -> followers(none->readonly->readwrite) -> leader
-func generateConsensusSerialPlan(plan *Plan, pods []corev1.Pod) {
+func generateConsensusSerialPlan(plan *util.Plan, pods []corev1.Pod) {
 	start := plan.Start
 	for _, pod := range pods {
-		nextStep := &Step{}
+		nextStep := &util.Step{}
 		nextStep.Obj = pod
 		start.NextSteps = append(start.NextSteps, nextStep)
 		start = nextStep
@@ -341,8 +336,8 @@ func UpdateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCt
 
 	// get componentDef this pod belongs to
 	componentName := pod.Labels[intctrlutil.AppComponentLabelKey]
-	typeName := GetComponentTypeName(*cluster, componentName)
-	componentDef, err := GetComponentFromClusterDefinition(ctx, cli, cluster, typeName)
+	typeName := util.GetComponentTypeName(*cluster, componentName)
+	componentDef, err := util.GetComponentDeftByCluster(ctx, cli, cluster, typeName)
 	if err != nil {
 		return err
 	}
@@ -408,7 +403,7 @@ func initClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster, componentN
 		cluster.Status.Components = make(map[string]dbaasv1alpha1.ClusterStatusComponent)
 	}
 	if _, ok := cluster.Status.Components[componentName]; !ok {
-		typeName := GetComponentTypeName(*cluster, componentName)
+		typeName := util.GetComponentTypeName(*cluster, componentName)
 		cluster.Status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{
 			Type:  typeName,
 			Phase: cluster.Status.Phase,

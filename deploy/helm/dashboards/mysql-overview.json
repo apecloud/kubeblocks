@@ -48,7 +48,7 @@
       "tags": [],
       "targetBlank": true,
       "title": "KubeBlocks",
-      "tooltip": "An open-source and cloud-neutral  DBaaS with Kubernetes.",
+      "tooltip": "An open-source and cloud-neutral DBaaS with Kubernetes.",
       "type": "link",
       "url": "https://github.com/apecloud/kubeblocks"
     }

@@ -37,7 +37,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	dataprotectioncontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	dbaascontrollers "github.com/apecloud/kubeblocks/controllers/dbaas"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/internal/webhook"
 	//+kubebuilder:scaffold:imports
@@ -275,7 +275,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&component.StatefulSetReconciler{
+	if err = (&components.StatefulSetReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("stateful-set-controller"),
@@ -284,7 +284,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&component.DeploymentReconciler{
+	if err = (&components.DeploymentReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("deployment-controller"),

@@ -12,8 +12,6 @@ jobs:
     steps:
       - uses: actions/add-to-project@v0.3.0
         with:
-          # You can target a repository in a different organization
-          # to the issue
           project-url: https://github.com/orgs/apecloud/projects/2
           github-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
          

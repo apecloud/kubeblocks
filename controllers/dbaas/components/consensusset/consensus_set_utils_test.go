@@ -14,23 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package component
+package consensusset
 
 import (
 	"testing"
 	"time"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-
+	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 func TestIsReady(t *testing.T) {
-	set := newStatefulSet("foo", 3)
-	pod := newStatefulSetPod(set, 1)
+	set := testk8s.NewFakeStatefulSet("foo", 3)
+	pod := testk8s.NewFakeStatefulSetPod(set, 1)
 	pod.Status.Conditions = []v1.PodCondition{
 		{
 			Type:   v1.PodReady,
@@ -87,5 +89,20 @@ func TestInitClusterComponentStatusIfNeed(t *testing.T) {
 		consensusSetStatus.Leader.AccessMode != dbaasv1alpha1.None ||
 		consensusSetStatus.Leader.Pod != consensusSetStatusDefaultPodName {
 		t.Errorf("cluster.Status.Components[componentName].ConsensusSetStatus.Leader not initialized properly")
+	}
+}
+
+func TestGetPodRevision(t *testing.T) {
+	set := testk8s.NewFakeStatefulSet("foo", 3)
+	pod := testk8s.NewFakeStatefulSetPod(set, 1)
+	if util.GetPodRevision(pod) != "" {
+		t.Errorf("revision should be empty")
+	}
+
+	pod.Labels = make(map[string]string, 0)
+	pod.Labels[apps.StatefulSetRevisionLabel] = "bar"
+
+	if util.GetPodRevision(pod) != "bar" {
+		t.Errorf("revision not matched")
 	}
 }

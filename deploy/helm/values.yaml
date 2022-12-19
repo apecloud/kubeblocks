@@ -168,9 +168,6 @@ prometheus:
     ##
     enabled: false
 
-    podSecurityPolicy:
-      enabled: false
-
   server:
     ## Prometheus server container name
     ##

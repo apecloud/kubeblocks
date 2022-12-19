@@ -38,7 +38,7 @@ var _ = Describe("helm util", func() {
 	})
 
 	It("Action Config", func() {
-		cfg, err := NewActionConfig("test", "config")
+		cfg, err := NewActionConfig("test", "config", WithContext("context"))
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(cfg).ShouldNot(BeNil())
 	})

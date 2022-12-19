@@ -63,17 +63,12 @@ func getFinalEventMessageForRecorder(event *corev1.Event) string {
 }
 
 // getStatusComponentMessage get component status message
-func getStatusComponentMessage(statusComponentMessage map[string]string, event *corev1.Event) map[string]string {
-	if statusComponentMessage == nil {
-		statusComponentMessage = map[string]string{}
+func mergeEventMessageToStatusMessage(statusComponent dbaasv1alpha1.ClusterStatusComponent, event *corev1.Event) string {
+	message := statusComponent.GetObjectMessage(event.InvolvedObject.Kind, event.InvolvedObject.Name)
+	if message == "" || strings.Contains(message, event.Message) {
+		return event.Message
 	}
-	messageKey := util.GetStatusComponentMessageKey(event.InvolvedObject.Kind, event.InvolvedObject.Name)
-	if message, ok := statusComponentMessage[messageKey]; !ok {
-		statusComponentMessage[messageKey] = event.Message
-	} else {
-		statusComponentMessage[messageKey] = mergePodEventMessage(message, event.Message)
-	}
-	return statusComponentMessage
+	return message + ";" + event.Message
 }
 
 // mergePodEventMessage merge pod event message to component message
@@ -112,21 +107,22 @@ func needSyncComponentStatusForEvent(cluster *dbaasv1alpha1.Cluster, componentNa
 		status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{}
 	}
 	if statusComponent, ok = cluster.Status.Components[componentName]; !ok {
-		status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{
-			Phase:   phase,
-			Message: getStatusComponentMessage(nil, event),
-		}
+		statusComponent = dbaasv1alpha1.ClusterStatusComponent{Phase: phase}
+		statusComponent.SetObjectMessage(event.InvolvedObject.Kind, event.InvolvedObject.Name, event.Message)
+		status.Components[componentName] = statusComponent
 		return true
 	}
 	if statusComponent.Phase != phase {
 		statusComponent.Phase = phase
-		statusComponent.Message = getStatusComponentMessage(statusComponent.Message, event)
+		message := mergeEventMessageToStatusMessage(statusComponent, event)
+		statusComponent.SetObjectMessage(event.InvolvedObject.Kind, event.InvolvedObject.Name, message)
 		status.Components[componentName] = statusComponent
 		return true
 	}
 	// check whether it is a new warning event and the component phase is running
 	if !isExistsEventMsg(statusComponent.Message, event) && phase != dbaasv1alpha1.RunningPhase {
-		statusComponent.Message = getStatusComponentMessage(statusComponent.Message, event)
+		message := mergeEventMessageToStatusMessage(statusComponent, event)
+		statusComponent.SetObjectMessage(event.InvolvedObject.Kind, event.InvolvedObject.Name, message)
 		status.Components[componentName] = statusComponent
 		return true
 	}

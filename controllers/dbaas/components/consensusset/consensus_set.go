@@ -80,10 +80,6 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady() (bool, error
 		isFailed   = true
 	)
 
-	if statusComponent.Message == nil {
-		statusComponent.Message = map[string]string{}
-	}
-
 	for _, pod := range podList.Items {
 		role := pod.Labels[intctrlutil.ConsensusSetRoleLabelKey]
 		if role == consensusSet.ComponentDef.ConsensusSpec.Leader.Name {
@@ -91,8 +87,7 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady() (bool, error
 		}
 		if role == "" {
 			isAbnormal = true
-			messageKey := util.GetStatusComponentMessageKey(pod.Kind, pod.Name)
-			statusComponent.Message[messageKey] = "Role probe timeout, check whether the application is available"
+			statusComponent.SetObjectMessage(pod.Kind, pod.Name, "Role probe timeout, check whether the application is available")
 			needPatch = true
 		}
 	}

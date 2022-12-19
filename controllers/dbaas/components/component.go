@@ -176,7 +176,7 @@ func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
 			// if componentIsRunning is true and component status is not Running.
 			// we should change component phase to Running
 			statusComponent.Phase = dbaasv1alpha1.RunningPhase
-			statusComponent.Message = nil
+			statusComponent.ResetMessageWhenRunning()
 			needSync = true
 		}
 	}

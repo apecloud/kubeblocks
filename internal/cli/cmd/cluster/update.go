@@ -71,7 +71,7 @@ func NewUpdateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	o := newUpdateOptions(streams)
 	return builder.NewCmdBuilder().
 		Use("update").
-		Short("Update an existing cluster").
+		Short("Update the cluster").
 		Example(clusterUpdateExample).
 		Options(o).
 		IOStreams(streams).

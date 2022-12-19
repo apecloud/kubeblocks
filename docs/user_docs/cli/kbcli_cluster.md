@@ -51,6 +51,7 @@ Database cluster operation command
 * [kbcli cluster logs](kbcli_cluster_logs.md)	 - Access cluster log file
 * [kbcli cluster restart](kbcli_cluster_restart.md)	 - restart the specified components in the cluster
 * [kbcli cluster restore](kbcli_cluster_restore.md)	 - Restore a new cluster from backup
+* [kbcli cluster update](kbcli_cluster_update.md)	 - Update the cluster
 * [kbcli cluster upgrade](kbcli_cluster_upgrade.md)	 - upgrade the cluster
 * [kbcli cluster vertical-scaling](kbcli_cluster_vertical-scaling.md)	 - vertical scaling the specified components in the cluster
 * [kbcli cluster volume-expansion](kbcli_cluster_volume-expansion.md)	 - expand volume with the specified components and volumeClaimTemplates in the cluster

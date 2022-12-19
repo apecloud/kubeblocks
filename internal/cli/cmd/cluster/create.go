@@ -378,7 +378,7 @@ func buildTolerations(raw []string) []interface{} {
 }
 
 func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&f.PodAntiAffinity, "pod-anti-affinity", "", "Pod anti-affinity type")
+	cmd.Flags().StringVar(&f.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type")
 	cmd.Flags().BoolVar(&f.Monitor, "monitor", true, "Set monitor enabled and inject metrics exporter")
 	cmd.Flags().BoolVar(&f.EnableAllLogs, "enable-all-logs", true, "Enable advanced application all log extraction, and true will ignore enabledLogs of component level")
 	cmd.Flags().StringVar(&f.TerminationPolicy, "termination-policy", "", "Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)")

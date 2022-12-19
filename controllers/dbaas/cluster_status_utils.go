@@ -293,6 +293,8 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 		processor func() error
 	}
 
+	nilReturnHandler := func() error { return nil }
+
 	pps := []PredProcessor{
 		{
 			// handle cronjob complete or fail event
@@ -305,12 +307,23 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 			},
 		},
 		{
+			pred: func() bool {
+				return event.Type != corev1.EventTypeWarning ||
+					!isTargetKindForEvent(event)
+			},
+			processor: nilReturnHandler,
+		},
+		{
+			pred: func() bool {
+				// the error repeated several times, so we can sure it's a real error to the cluster.
+				return !k8score.IsOvertimeAndOccursTimesForEvent(event, EventTimeOut, EventOccursTimes)
+			},
+			processor: nilReturnHandler,
+		},
+		{
 			// handle cluster workload error events such as pod/statefulset/deployment errors
 			pred: func() bool {
-				return event.Type == corev1.EventTypeWarning &&
-					isTargetKindForEvent(event) &&
-					// the error repeated several times, so we can sure it's a real error to the cluster.
-					k8score.IsOvertimeAndOccursTimesForEvent(event, EventTimeOut, EventOccursTimes)
+				return true
 			},
 			processor: func() error {
 				return handleClusterStatusByEvent(ctx, cli, recorder, event)

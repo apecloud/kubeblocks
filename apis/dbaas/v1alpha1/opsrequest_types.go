@@ -24,26 +24,110 @@ import (
 
 // OpsRequestSpec defines the desired state of OpsRequest
 type OpsRequestSpec struct {
-	// ClusterRef reference clusterDefinition.
+	// clusterRef reference clusterDefinition.
 	// +kubebuilder:validation:Required
 	ClusterRef string `json:"clusterRef"`
 
-	// Type defines the operation type.
+	// type defines the operation type.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart}
 	Type OpsType `json:"type"`
 
-	// TTLSecondsAfterSucceed OpsRequest will be deleted after TTLSecondsAfterSucceed second when OpsRequest.status.phase is Succeed.
+	// ttlSecondsAfterSucceed OpsRequest will be deleted after TTLSecondsAfterSucceed second when OpsRequest.status.phase is Succeed.
 	// +optional
 	TTLSecondsAfterSucceed int32 `json:"ttlSecondsAfterSucceed,omitempty"`
 
-	// ClusterOps defines operations in cluster scope, such as Upgrade.
+	// upgrade the cluster by specifying appVersionRef.
 	// +optional
-	ClusterOps *ClusterOps `json:"clusterOps,omitempty"`
+	Upgrade *Upgrade `json:"upgrade,omitempty"`
 
-	// ComponentOpsList defines operations in component scope, such as VolumeExpansion,VerticalScaling,HorizontalScaling.
+	// horizontalScaling defines what component need to horizontal scale the specified replicas.
 	// +optional
-	ComponentOpsList []ComponentOps `json:"componentOps,omitempty"`
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	HorizontalScalingList []HorizontalScaling `json:"horizontalScaling,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+
+	// volumeExpansion defines what component and volumeClaimTemplate need to expand the specified storage.
+	// +optional
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	VolumeExpansionList []VolumeExpansion `json:"volumeExpansion,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+
+	// restart the specified component.
+	// +optional
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	RestartList []ComponentOps `json:"restart,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+
+	// verticalScaling defines what component need to vertical scale the specified compute resources.
+	// +optional
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	VerticalScalingList []VerticalScaling `json:"verticalScaling,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+}
+
+// ComponentOps defines the common variables of component scope operations.
+type ComponentOps struct {
+	// componentName cluster component name.
+	// +kubebuilder:validation:Required
+	ComponentName string `json:"componentName"`
+}
+
+// Upgrade defines the variables of upgrade operation.
+type Upgrade struct {
+	// appVersionRef reference AppVersion name.
+	// +kubebuilder:validation:Required
+	AppVersionRef string `json:"appVersionRef"`
+}
+
+// VerticalScaling defines the variables that need to input when scaling compute resources.
+type VerticalScaling struct {
+	ComponentOps `json:",inline"`
+
+	// resources specify the computing resource size of verticalScaling.
+	// +kubebuilder:validation:Required
+	*corev1.ResourceRequirements `json:",inline"`
+}
+
+// VolumeExpansion defines the variables of volume expansion operation.
+type VolumeExpansion struct {
+	ComponentOps `json:",inline"`
+
+	// volumeClaimTemplates specify the storage size and volumeClaimTemplate name.
+	// +kubebuilder:validation:Required
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	VolumeClaimTemplates []OpsRequestVolumeClaimTemplate `json:"volumeClaimTemplates" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+}
+
+type OpsRequestVolumeClaimTemplate struct {
+	// storage the request storage size.
+	// +kubebuilder:validation:Required
+	Storage resource.Quantity `json:"storage"`
+
+	// name reference volumeClaimTemplate name from cluster components.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+}
+
+// HorizontalScaling defines the variables of horizontal scaling operation
+type HorizontalScaling struct {
+	ComponentOps `json:",inline"`
+
+	// replicas for the workloads.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Minimum=0
+	Replicas int32 `json:"replicas"`
 }
 
 // OpsRequestStatus defines the observed state of OpsRequest
@@ -54,80 +138,34 @@ type OpsRequestStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// Phase describe OpsRequest phase.
+	// phase describe OpsRequest phase.
 	// +kubebuilder:validation:Enum={Pending,Running,Failed,Succeed}
 	Phase Phase `json:"phase,omitempty"`
 
-	// Components record the status information of components with spec.componentOps.componentNames.
+	// components record the status information of changing components in this operation.
 	// +optional
 	Components map[string]OpsRequestStatusComponent `json:"components,omitempty"`
 
-	// StartTimestamp The time when the OpsRequest started processing.
+	// startTimestamp The time when the OpsRequest started processing.
 	// +optional
 	StartTimestamp *metav1.Time `json:"StartTimestamp,omitempty"`
 
-	// CompletionTimestamp the OpsRequest completion time.
+	// completionTimestamp the OpsRequest completion time.
 	// +optional
 	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
 
-	// Conditions describe opsRequest detail status.
+	// conditions describe opsRequest detail status.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-type ClusterOps struct {
-	// +kubebuilder:validation:Required
-	Upgrade *Upgrade `json:"upgrade"`
-}
-
-type ComponentOps struct {
-	// ComponentNames defines which components perform the operation.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	ComponentNames []string `json:"componentNames"`
-
-	// VolumeExpansion defines the variables that need to input when expanding a volume.
-	// +optional
-	VolumeExpansion []VolumeExpansion `json:"volumeExpansion,omitempty"`
-
-	// VerticalScaling defines the variables that need to input when scaling compute resources.
-	// +optional
-	VerticalScaling *corev1.ResourceRequirements `json:"verticalScaling,omitempty"`
-
-	// HorizontalScaling defines the variables that need to input when scaling replicas.
-	// +optional
-	HorizontalScaling *HorizontalScaling `json:"horizontalScaling,omitempty"`
-}
-
-type Upgrade struct {
-	// AppVersionRef reference AppVersion name.
-	// +kubebuilder:validation:Required
-	AppVersionRef string `json:"appVersionRef"`
-}
-
-type VolumeExpansion struct {
-	// Storage the request storage size.
-	// +kubebuilder:validation:Required
-	Storage resource.Quantity `json:"storage"`
-
-	// Name reference volumeClaimTemplate name from cluster components.
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
-}
-
-type HorizontalScaling struct {
-	// Replicas for the workloads.
-	// +optional
-	Replicas int32 `json:"replicas,omitempty"`
-}
-
 type OpsRequestStatusComponent struct {
-	// Phase describe the component phase, reference ClusterDefinition.status.component.phase.
+	// phase describe the component phase, reference ClusterDefinition.status.component.phase.
 	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted,VolumeExpanding}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
-	// VolumeClaimTemplates describe the volumeClaimTemplates status when spec.type is VolumeExpansion
+	// volumeClaimTemplates describe the volumeClaimTemplates status when spec.type is VolumeExpansion
 	// +optional
 	VolumeClaimTemplates map[string]*VolumeClaimTemplateStatus `json:"volumeClaimTemplates,omitempty"`
 }
@@ -135,11 +173,11 @@ type OpsRequestStatusComponent struct {
 type VolumeClaimTemplateStatus struct {
 	StatusMessage `json:",inline"`
 
-	// RequestStorage the request storage size.
+	// requestStorage the request storage size.
 	// +optional
 	RequestStorage resource.Quantity `json:"requestStorage,omitempty"`
 
-	// PersistentVolumeClaimStatus describe the persistentVolumeClaim status
+	// persistentVolumeClaimStatus describe the persistentVolumeClaim status
 	// +optional
 	PersistentVolumeClaimStatus map[string]StatusMessage `json:"persistentVolumeClaims,omitempty"`
 }

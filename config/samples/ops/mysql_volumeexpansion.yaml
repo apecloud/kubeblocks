@@ -1,13 +1,13 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: mysql-volumeexpansion
+  generateName: mysql-volumeexpansion-
   namespace: default
 spec:
-  clusterRef: mysql-cluster-01
+  clusterRef: wesql
   type: VolumeExpansion
-  componentOps:
-  - componentNames: [replicasets]
-    volumeExpansion:
-    - name: log
-      storage: "3Gi"
+  volumeExpansion:
+  - componentName: replicasets
+    volumeClaimTemplates:
+    - name: data
+      storage: "4Gi"

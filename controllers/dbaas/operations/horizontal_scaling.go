@@ -25,6 +25,7 @@ func init() {
 		Action:                 HorizontalScalingAction,
 		ActionStartedCondition: dbaasv1alpha1.NewHorizontalScalingCondition,
 		ReconcileAction:        ReconcileActionWithComponentOps,
+		GetComponentNameMap:    getHorizontalScalingComponentNameMap,
 	}
 
 	opsMgr := GetOpsManager()
@@ -34,19 +35,37 @@ func init() {
 // HorizontalScalingAction Modify Cluster.spec.components[*].replicas from the opsRequest
 func HorizontalScalingAction(opsRes *OpsResource) error {
 	var (
-		componentNameMap = getAllComponentsNameMap(opsRes.OpsRequest)
-		componentOps     *dbaasv1alpha1.ComponentOps
-		ok               bool
+		horizontalScalingMap = covertHorizontalScalingListToMap(opsRes.OpsRequest)
+		horizontalScaling    dbaasv1alpha1.HorizontalScaling
+		ok                   bool
 	)
 
 	for index, component := range opsRes.Cluster.Spec.Components {
-		if componentOps, ok = componentNameMap[component.Name]; !ok || componentOps == nil {
+		if horizontalScaling, ok = horizontalScalingMap[component.Name]; !ok {
 			continue
 		}
-		if componentOps.HorizontalScaling.Replicas != 0 {
-			r := componentOps.HorizontalScaling.Replicas
+		if horizontalScaling.Replicas != 0 {
+			r := horizontalScaling.Replicas
 			opsRes.Cluster.Spec.Components[index].Replicas = &r
 		}
 	}
 	return opsRes.Client.Update(opsRes.Ctx, opsRes.Cluster)
+}
+
+// getHorizontalScalingComponentNameMap get the component name map with horizontal scaling operation.
+func getHorizontalScalingComponentNameMap(opsRequest *dbaasv1alpha1.OpsRequest) map[string]struct{} {
+	componentNameMap := make(map[string]struct{})
+	for _, v := range opsRequest.Spec.HorizontalScalingList {
+		componentNameMap[v.ComponentName] = struct{}{}
+	}
+	return componentNameMap
+}
+
+// covertHorizontalScalingListToMap covert OpsRequest.spec.horizontalScaling list to map
+func covertHorizontalScalingListToMap(opsRequest *dbaasv1alpha1.OpsRequest) map[string]dbaasv1alpha1.HorizontalScaling {
+	verticalScalingMap := make(map[string]dbaasv1alpha1.HorizontalScaling)
+	for _, v := range opsRequest.Spec.HorizontalScalingList {
+		verticalScalingMap[v.ComponentName] = v
+	}
+	return verticalScalingMap
 }

@@ -50,6 +50,7 @@ func init() {
 		Action:                 ve.Action,
 		ActionStartedCondition: dbaasv1alpha1.NewVolumeExpandingCondition,
 		ReconcileAction:        ve.ReconcileAction,
+		GetComponentNameMap:    ve.getComponentNameMap,
 	}
 
 	opsMgr := GetOpsManager()
@@ -59,15 +60,15 @@ func init() {
 // Action Modify Cluster.spec.components[*].VolumeClaimTemplates[*].spec.resources
 func (ve volumeExpansion) Action(opsRes *OpsResource) error {
 	var (
-		componentNameMap = getAllComponentsNameMap(opsRes.OpsRequest)
-		componentOps     *dbaasv1alpha1.ComponentOps
-		ok               bool
+		volumeExpansionMap = ve.covertVolumeExpansionListToMap(opsRes.OpsRequest)
+		volumeExpansionOps dbaasv1alpha1.VolumeExpansion
+		ok                 bool
 	)
 	for index, component := range opsRes.Cluster.Spec.Components {
-		if componentOps, ok = componentNameMap[component.Name]; !ok || componentOps == nil {
+		if volumeExpansionOps, ok = volumeExpansionMap[component.Name]; !ok {
 			continue
 		}
-		for _, v := range componentOps.VolumeExpansion {
+		for _, v := range volumeExpansionOps.VolumeClaimTemplates {
 			for i, vct := range component.VolumeClaimTemplates {
 				if vct.Name != v.Name {
 					continue
@@ -173,6 +174,24 @@ func (ve volumeExpansion) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Ph
 	return opsRequestPhase, requeueAfter, err
 }
 
+// covertVolumeExpansionListToMap covert list to map
+func (ve volumeExpansion) covertVolumeExpansionListToMap(
+	opsRequest *dbaasv1alpha1.OpsRequest) map[string]dbaasv1alpha1.VolumeExpansion {
+	volumeExpansionMap := make(map[string]dbaasv1alpha1.VolumeExpansion)
+	for _, v := range opsRequest.Spec.VolumeExpansionList {
+		volumeExpansionMap[v.ComponentName] = v
+	}
+	return volumeExpansionMap
+}
+
+func (ve volumeExpansion) getComponentNameMap(opsRequest *dbaasv1alpha1.OpsRequest) map[string]struct{} {
+	componentNameMap := make(map[string]struct{})
+	for _, v := range opsRequest.Spec.VolumeExpansionList {
+		componentNameMap[v.ComponentName] = struct{}{}
+	}
+	return componentNameMap
+}
+
 func (ve volumeExpansion) setVctStatusMessage(vct *dbaasv1alpha1.VolumeClaimTemplateStatus, status dbaasv1alpha1.Phase, message string) {
 	vct.Status = status
 	vct.Message = message
@@ -241,11 +260,9 @@ func (ve volumeExpansion) pvcIsResizing(pvc *corev1.PersistentVolumeClaim) bool 
 func (ve volumeExpansion) initStatusComponents(opsRequest *dbaasv1alpha1.OpsRequest) {
 	// get component map with VolumeClaimTemplateName slice
 	opsRequest.Status.Components = map[string]dbaasv1alpha1.OpsRequestStatusComponent{}
-	componentMap := map[string][]dbaasv1alpha1.VolumeExpansion{}
-	for _, v := range opsRequest.Spec.ComponentOpsList {
-		for _, componentName := range v.ComponentNames {
-			componentMap[componentName] = v.VolumeExpansion
-		}
+	componentMap := map[string][]dbaasv1alpha1.OpsRequestVolumeClaimTemplate{}
+	for _, v := range opsRequest.Spec.VolumeExpansionList {
+		componentMap[v.ComponentName] = v.VolumeClaimTemplates
 	}
 	// update status.components
 	for k, volumeExpansion := range componentMap {

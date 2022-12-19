@@ -1,11 +1,10 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: mysql-upgrade
+  generateName: mysql-upgrade-
   namespace: default
 spec:
-  clusterRef: mysql-cluster-01
+  clusterRef: wesql
   type: Upgrade
-  clusterOps:
-    upgrade:
-      appVersionRef: appversion-mysql-0.1
+  upgrade:
+    appVersionRef: wesql-8.0.32

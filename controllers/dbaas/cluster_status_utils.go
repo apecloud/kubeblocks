@@ -88,8 +88,8 @@ func updateStatusComponentMessage(statusComponent *dbaasv1alpha1.ClusterStatusCo
 	messageMap := statusComponent.GetMessage()
 	message := messageMap.GetObjectMessage(kind, name)
 	// if the event message is not exists in message map, merge them.
-	if message != "" && !strings.Contains(message, event.Message) {
-		message += ";" + event.Message
+	if !strings.Contains(message, event.Message) {
+		message += event.Message + ";"
 	}
 	messageMap.SetObjectMessage(kind, name, message)
 	statusComponent.SetMessage(messageMap)

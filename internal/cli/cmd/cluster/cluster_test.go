@@ -40,6 +40,7 @@ var _ = Describe("Cluster", func() {
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace("default")
+		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef(), testing.FakeAppVersion())
 	})
 
 	AfterEach(func() {
@@ -58,8 +59,8 @@ var _ = Describe("Cluster", func() {
 			Expect(cmd).ShouldNot(BeNil())
 			Expect(cmd.Flags().GetString("termination-policy")).Should(Equal(""))
 
-			Expect(cmd.Flags().Set("cluster-definition", "test-cd")).Should(Succeed())
-			Expect(cmd.Flags().Set("cluster-version", "test-version")).Should(Succeed())
+			Expect(cmd.Flags().Set("cluster-definition", testing.ClusterDefName)).Should(Succeed())
+			Expect(cmd.Flags().Set("cluster-version", testing.AppVersionName)).Should(Succeed())
 			Expect(cmd.Flags().Set("components", "../../testing/testdata/component.yaml")).Should(Succeed())
 			Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
 

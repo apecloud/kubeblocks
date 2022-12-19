@@ -1,6 +1,6 @@
 ## kbcli cluster horizontal-scaling
 
-horizontal scaling the specified components in the cluster
+Horizontal scaling the specified components in the cluster
 
 ```
 kbcli cluster horizontal-scaling [flags]

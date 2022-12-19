@@ -1,6 +1,6 @@
 ## kbcli dashboard open
 
-open one dashboard
+Open one dashboard
 
 ```
 kbcli dashboard open [flags]

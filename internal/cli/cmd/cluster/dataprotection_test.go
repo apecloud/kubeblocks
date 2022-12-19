@@ -32,13 +32,20 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 var _ = Describe("DataProtection", func() {
 	var streams genericclioptions.IOStreams
+	var tf *cmdtesting.TestFactory
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		tf = cmdtesting.NewTestFactory().WithNamespace("default")
+	})
+
+	AfterEach(func() {
+		tf.Cleanup()
 	})
 
 	Context("backup", func() {
@@ -49,8 +56,6 @@ var _ = Describe("DataProtection", func() {
 		})
 
 		It("new command", func() {
-			tf := cmdtesting.NewTestFactory().WithNamespace("default")
-			defer tf.Cleanup()
 			cmd := NewCreateBackupCmd(tf, streams)
 			Expect(cmd).ShouldNot(BeNil())
 			// must succeed otherwise exit 1 and make test fails
@@ -61,8 +66,6 @@ var _ = Describe("DataProtection", func() {
 
 	It("delete-backup", func() {
 		By("test delete-backup cmd")
-		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		defer tf.Cleanup()
 		cmd := NewDeleteBackupCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 
@@ -99,16 +102,11 @@ var _ = Describe("DataProtection", func() {
 	})
 
 	It("list-backup", func() {
-		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		defer tf.Cleanup()
 		cmd := NewListBackupCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 	})
 
 	It("delete-restore", func() {
-		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		defer tf.Cleanup()
-
 		By("test delete-restore cmd")
 		cmd := NewDeleteRestoreCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
@@ -146,16 +144,12 @@ var _ = Describe("DataProtection", func() {
 	})
 
 	It("list-restore", func() {
-		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		defer tf.Cleanup()
 		cmd := NewListRestoreCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 	})
 
 	It("restore", func() {
-		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		defer tf.Cleanup()
-
+		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef(), testing.FakeAppVersion())
 		timestamp := time.Now().Format("20060102150405")
 		backupName := "backup-test-" + timestamp
 		clusterName := "source-cluster-" + timestamp
@@ -164,8 +158,8 @@ var _ = Describe("DataProtection", func() {
 		// create test cluster
 		cmd := NewCreateCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
-		Expect(cmd.Flags().Set("cluster-definition", "test-cd")).Should(Succeed())
-		Expect(cmd.Flags().Set("cluster-version", "test-version")).Should(Succeed())
+		Expect(cmd.Flags().Set("cluster-definition", testing.ClusterDefName)).Should(Succeed())
+		Expect(cmd.Flags().Set("cluster-version", testing.AppVersionName)).Should(Succeed())
 		Expect(cmd.Flags().Set("components", "../../testing/testdata/component.yaml")).Should(Succeed())
 		Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
 		cmd.Run(nil, []string{clusterName})

@@ -54,7 +54,7 @@ var _ = Describe("Exec", func() {
 		testOptions := &testExecOptions{ExecOptions: NewExecOptions(tf, genericclioptions.NewTestIOStreamsDiscard())}
 		input := &ExecInput{
 			Use:      "connect",
-			Short:    "connect to a database cluster",
+			Short:    "Connect to a database cluster",
 			Example:  "example",
 			Validate: testOptions.validate,
 			Complete: testOptions.complete,

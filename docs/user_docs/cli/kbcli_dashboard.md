@@ -35,5 +35,5 @@ List and open the KubeBlocks dashboards
 
 * [kbcli](kbcli.md)	 - KubeBlocks CLI
 * [kbcli dashboard list](kbcli_dashboard_list.md)	 - List all dashboards
-* [kbcli dashboard open](kbcli_dashboard_open.md)	 - open one dashboard
+* [kbcli dashboard open](kbcli_dashboard_open.md)	 - Open one dashboard
 

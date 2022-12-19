@@ -305,7 +305,7 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 			},
 		},
 		{
-			// handle cluster wordload error events such as pod/statefulset/deployment errors
+			// handle cluster workload error events such as pod/statefulset/deployment errors
 			pred: func() bool {
 				return event.Type == corev1.EventTypeWarning &&
 					isTargetKindForEvent(event) &&

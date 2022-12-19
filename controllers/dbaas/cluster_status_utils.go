@@ -539,19 +539,12 @@ func updateComponentStatusPhase(cli client.Client,
 	message string) error {
 	var comp *dbaasv1alpha1.ClusterStatusComponent
 	c, ok := cluster.Status.Components[componentName]
-	if ok {
-		if c.Phase != phase {
-			comp = &c
-			comp.Phase = phase
-			comp.Message = message
-		}
-	} else {
-		comp = &dbaasv1alpha1.ClusterStatusComponent{Phase: phase, Message: message}
-	}
-	if comp == nil {
+	if ok && c.Phase == phase {
 		return nil
 	}
+	c.Phase = phase
+	c.Message = message
 	patch := client.MergeFrom(cluster.DeepCopy())
-	cluster.Status.Components[componentName] = *comp
+	cluster.Status.Components[componentName] = c
 	return cli.Status().Patch(ctx, cluster, patch)
 }

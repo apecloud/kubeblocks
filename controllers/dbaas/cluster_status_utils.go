@@ -45,11 +45,6 @@ const (
 	EventOccursTimes int32 = 3
 )
 
-type EventPredProcessor struct {
-	pred      func(event *corev1.Event) bool
-	processor func(event *corev1.Event) error
-}
-
 // isTargetKindForEvent check the event involve object is the target resources
 func isTargetKindForEvent(event *corev1.Event) bool {
 	return slices.Index([]string{intctrlutil.PodKind, intctrlutil.DeploymentKind, intctrlutil.StatefulSetKind, intctrlutil.CronJob}, event.InvolvedObject.Kind) != -1
@@ -432,6 +427,11 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 		err    error
 		object client.Object
 	)
+
+	type EventPredProcessor struct {
+		pred      func(event *corev1.Event) bool
+		processor func(event *corev1.Event) error
+	}
 
 	pps := []EventPredProcessor{
 		{

@@ -26,6 +26,7 @@ import (
 )
 
 type TestContext struct {
+	Cli              client.Client
 	TestObjLabelKey  string
 	DefaultNamespace string
 	CreateObj        func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
@@ -43,7 +44,7 @@ func NewDefaultTestContext(cli client.Client) TestContext {
 		TestObjLabelKey:  "kubeblocks.io/test",
 		DefaultNamespace: "default",
 	}
-
+	t.Cli = cli
 	t.CreateObj = func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 		l := obj.GetLabels()
 		if l == nil {

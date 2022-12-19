@@ -5,9 +5,9 @@ metadata:
 spec:
   clusterDefinitionRef: apecloud-wesql
   components:
-    - type: replicasets
+    - type: wesql
       podSpec:
         containers:
           - name: mysql
-            image: apecloud/wesql-server:8.0.30-4.alpha1.20221031.g1aa54a3
+            image: docker.io/apecloud/wesql-server:latest
             imagePullPolicy: IfNotPresent

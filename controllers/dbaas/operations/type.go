@@ -31,9 +31,6 @@ const (
 	// annotation keys
 
 	RestartAnnotationKey = "kubeblocks.io/restart"
-
-	// OpsRequestReconcileAnnotationKey Notify OpsRequest to reconcile
-	OpsRequestReconcileAnnotationKey = "kubeblocks.io/reconcile"
 )
 
 type OpsBehaviour struct {
@@ -56,6 +53,14 @@ type OpsResource struct {
 	OpsRequest *dbaasv1alpha1.OpsRequest
 	Cluster    *dbaasv1alpha1.Cluster
 	Recorder   record.EventRecorder
+}
+
+// OpsRecorder recorder the running OpsRequest info in cluster annotation
+type OpsRecorder struct {
+	// Name OpsRequest name
+	Name string `json:"name"`
+	// ToClusterPhase the cluster phase when the OpsRequest is running
+	ToClusterPhase dbaasv1alpha1.Phase `json:"clusterPhase"`
 }
 
 type OpsManager struct {

@@ -40,23 +40,27 @@ const (
 
 	// OpsRequestAnnotationKey OpsRequest annotation key in Cluster
 	OpsRequestAnnotationKey = "kubeblocks.io/ops-request"
+
+	// OpsRequestReconcileAnnotationKey Notify OpsRequest to reconcile
+	OpsRequestReconcileAnnotationKey = "kubeblocks.io/reconcile"
+
 	// StorageClassAnnotationKey StorageClass annotation key in Cluster
 	StorageClassAnnotationKey = "kubeblocks.io/storage-class"
 )
 
 const (
-	// EventReasonNotFoundCR referenced custom resource not found
-	EventReasonNotFoundCR = "NotFoundCR"
-	// EventReasonRefCRUnavailable  referenced custom resource is unavailable
-	EventReasonRefCRUnavailable = "ReferencedCRUnavailable"
-	// EventReasonDeletedCR deleted custom resource
-	EventReasonDeletedCR = "DeletedCR"
-	// EventReasonDeletingCR deleting custom resource
-	EventReasonDeletingCR = "DeletingCR"
-	// EventReasonCreatedCR created custom resource
-	EventReasonCreatedCR = "CreatedCR"
-	// EventReasonRunTaskFailed run task failed
-	EventReasonRunTaskFailed = "RunTaskFailed"
+	// ReasonNotFoundCR referenced custom resource not found
+	ReasonNotFoundCR = "NotFound"
+	// ReasonRefCRUnavailable  referenced custom resource is unavailable
+	ReasonRefCRUnavailable = "Unavailable"
+	// ReasonDeletedCR deleted custom resource
+	ReasonDeletedCR = "DeletedCR"
+	// ReasonDeletingCR deleting custom resource
+	ReasonDeletingCR = "DeletingCR"
+	// ReasonCreatedCR created custom resource
+	ReasonCreatedCR = "CreatedCR"
+	// ReasonRunTaskFailed run task failed
+	ReasonRunTaskFailed = "RunTaskFailed"
 )
 
 const (

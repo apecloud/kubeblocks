@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package component
+package util
 
 type Plan struct {
 	Start    *Step
@@ -28,7 +28,7 @@ type Step struct {
 
 type WalkFunc func(obj interface{}) (bool, error)
 
-func (p *Plan) walkOneStep() (bool, error) {
+func (p *Plan) WalkOneStep() (bool, error) {
 	if len(p.Start.NextSteps) == 0 {
 		return true, nil
 	}
@@ -61,7 +61,7 @@ func (p *Plan) walkOneStep() (bool, error) {
 		}
 	}
 
-	return plan.walkOneStep()
+	return plan.WalkOneStep()
 }
 
 func containStep(steps []*Step, step *Step) bool {

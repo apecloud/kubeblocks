@@ -9,6 +9,7 @@ env:
   CR_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   CHART_RELEASER_VERSION: "v1.4.1"
   RELEASE_VERSION: ${{ github.ref_name }}
+  K3S_VERSION: v1.22
 
 jobs:
   release:
@@ -47,7 +48,21 @@ jobs:
 
           args=(--owner "apecloud" --repo "kubeclocks" --charts-dir "deploy" --version ${{ env.CHART_RELEASER_VERSION }})
           "${{ github.workspace }}/.github/utils/helm_package.sh" "${args[@]}"
+          
+          cp .cr-release-packages/kubeblocks-$RELEASE_VERSION.tgz ./
+          tar -zxvf kubeblocks-$RELEASE_VERSION.tgz
         shell: bash
+
+      - name: setup k3s ${{ env.K3S_VERSION }}
+        uses: nolar/setup-k3d-k3s@v1
+        with:
+          version: ${{ env.K3S_VERSION }}
+          github-token: ${{ env.CR_TOKEN }}
+
+      - name: helm validate
+        run: |
+          helm install kubeblocks kubeblocks
+          helm template kubeblocks kubeblocks --validate
 
       - name: Checkout HelmCharts
         uses: actions/checkout@v3

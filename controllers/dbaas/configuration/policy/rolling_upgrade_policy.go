@@ -110,7 +110,7 @@ func performRollingUpgrade(params ReconfigureParams, funcs RollingUpgradeFuncs) 
 			params.Ctx.Log.Info("pod is rolling updating.", "pod name", pod.Name)
 			continue
 		}
-		if err := funcs.RestartContainerFunc(&pod, params.ContainerNames, newGRPCClient); err != nil {
+		if err := funcs.RestartContainerFunc(&pod, params.ContainerNames, params.ReconfigureClientFactory); err != nil {
 			return ESAndRetryFailed, err
 		}
 		if err := updatePodLabelsVersion(&pod, configKey, configVersion); err != nil {

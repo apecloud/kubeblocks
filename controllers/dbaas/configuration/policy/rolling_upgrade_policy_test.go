@@ -46,12 +46,10 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			ctrl, k8sClient := setup()
 			defer ctrl.Finish()
 
-			reconfigureClient := mock_proto.NewMockReconfigureClient(ctrl)
-			newGRPCClient = func(addr string) (cfgproto.ReconfigureClient, error) {
-				return reconfigureClient, nil
-			}
-
 			mockParam := newMockReconfigureParams("rollingPolicy", k8sClient,
+				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
+					return mock_proto.NewMockReconfigureClient(ctrl), nil
+				}),
 				withMockStatefulSet(2, nil),
 				withConfigTpl("for_test", map[string]string{
 					"key": "value",

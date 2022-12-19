@@ -77,7 +77,7 @@ func (p *ParallelUpgradePolicy) restartPods(params ReconfigureParams) (bool, err
 	}
 
 	for _, pod := range pods {
-		if err := funcs.RestartContainerFunc(&pod, params.ContainerNames, newGRPCClient); err != nil {
+		if err := funcs.RestartContainerFunc(&pod, params.ContainerNames, params.ReconfigureClientFactory); err != nil {
 			return false, err
 		}
 		if err := updatePodLabelsVersion(&pod, configKey, configVersion); err != nil {

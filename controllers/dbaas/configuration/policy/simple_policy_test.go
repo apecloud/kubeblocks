@@ -71,7 +71,7 @@ var _ = Describe("Reconfigure SimplePolicy", func() {
 		})
 	})
 
-	Context("simple reconfigure policy test without not support commponent", func() {
+	Context("simple reconfigure policy test without not support component", func() {
 		It("Should failed", func() {
 			// not support type
 			mockParam := newMockReconfigureParams("simplePolicy", nil,
@@ -87,6 +87,25 @@ var _ = Describe("Reconfigure SimplePolicy", func() {
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("not support component type"))
 			Expect(status).Should(BeEquivalentTo(ESNotSupport))
+		})
+	})
+
+	Context("simple reconfigure policy test without not configmap volume", func() {
+		It("Should failed", func() {
+			// mock not tpl
+			mockParam := newMockReconfigureParams("simplePolicy", nil,
+				withMockStatefulSet(2, nil),
+				withConfigTpl("not_tpl_name", map[string]string{
+					"key": "value",
+				}),
+				withCDComponent(dbaasv1alpha1.Consensus, []dbaasv1alpha1.ConfigTemplate{{
+					Name:       "for_test",
+					VolumeName: "test_volume",
+				}}))
+			status, err := simplePolicy.Upgrade(mockParam)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("failed to found config meta"))
+			Expect(status).Should(BeEquivalentTo(ESFailed))
 		})
 	})
 })

@@ -89,8 +89,12 @@ func (w *TestWrapper) HasError() error {
 	return w.err
 }
 
-func (w *TestWrapper) TplName() string {
-	return w.testEnv.CfgTplName
+func (w *TestWrapper) TPLName() string {
+	return w.testEnv.CfgTplName + "-tpl"
+}
+
+func (w *TestWrapper) CMName() string {
+	return w.testEnv.CfgTplName + "-cm"
 }
 
 func (w *TestWrapper) CreateCluster(name string) *dbaasv1alpha1.Cluster {
@@ -128,8 +132,8 @@ func (w *TestWrapper) updateAvComTplMeta(appVer *dbaasv1alpha1.AppVersion) {
 		}
 		for i := 0; i < len(component.ConfigTemplateRefs); i++ {
 			component.ConfigTemplateRefs[i].Name = w.testEnv.CfgTplName
-			component.ConfigTemplateRefs[i].ConfigMapTplRef = w.testEnv.CfgTplName
-			component.ConfigTemplateRefs[i].ConfigConstraintsRef = w.testEnv.CfgTplName
+			component.ConfigTemplateRefs[i].ConfigMapTplRef = w.CMName()
+			component.ConfigTemplateRefs[i].ConfigConstraintsRef = w.TPLName()
 		}
 	}
 }
@@ -147,8 +151,8 @@ func (w *TestWrapper) updateComTplMeta(cd *dbaasv1alpha1.ClusterDefinition) {
 			}
 			for i := 0; i < len(configSpec.ConfigTemplateRefs); i++ {
 				configSpec.ConfigTemplateRefs[i].Name = w.testEnv.CfgTplName
-				configSpec.ConfigTemplateRefs[i].ConfigMapTplRef = w.testEnv.CfgTplName
-				configSpec.ConfigTemplateRefs[i].ConfigConstraintsRef = w.testEnv.CfgTplName
+				configSpec.ConfigTemplateRefs[i].ConfigMapTplRef = w.CMName()
+				configSpec.ConfigTemplateRefs[i].ConfigConstraintsRef = w.TPLName()
 			}
 			return nil
 		})
@@ -265,8 +269,8 @@ func (w *TestWrapper) CreateCfgOnCluster(cfgFile string, cluster *dbaasv1alpha1.
 		cm.Labels[intctrlutil.AppNameLabelKey] = cluster.Name
 		cm.Labels[intctrlutil.AppInstanceLabelKey] = cluster.Name
 		cm.Labels[intctrlutil.AppComponentLabelKey] = componentName
-		cm.Labels[cfgcore.CMConfigurationTplNameLabelKey] = w.testEnv.CfgTplName
-		cm.Labels[cfgcore.CMConfigurationConstraintsNameLabelKey] = w.testEnv.CfgTplName
+		cm.Labels[cfgcore.CMConfigurationTplNameLabelKey] = w.CMName()
+		cm.Labels[cfgcore.CMConfigurationConstraintsNameLabelKey] = w.TPLName()
 		cm.Labels[cfgcore.CMConfigurationISVTplLabelKey] = w.testEnv.CfgTplName
 		cm.Labels[cfgcore.CMInsConfigurationLabelKey] = "true"
 		cm.Labels[cfgcore.CMConfigurationTplLabelKey] = "false"
@@ -399,8 +403,8 @@ func CreateDBaasFromISV(testCtx testutil.TestContext, ctx context.Context, k8sCl
 
 	createCRFromISVWithT(testWrapper, testInfo.CdName, path.Join(dataPath, testInfo.CdYaml), &dbaasv1alpha1.ClusterDefinition{})
 	createCRFromISVWithT(testWrapper, testInfo.AvName, path.Join(dataPath, testInfo.AvYaml), &dbaasv1alpha1.AppVersion{})
-	createCRFromISVWithT(testWrapper, testInfo.CfgTplName, path.Join(dataPath, testInfo.CfgCMYaml), &corev1.ConfigMap{})
-	createCRFromISVWithT(testWrapper, testInfo.CfgTplName, path.Join(dataPath, testInfo.CfgTemplateYaml), &dbaasv1alpha1.ConfigurationTemplate{})
+	createCRFromISVWithT(testWrapper, testWrapper.CMName(), path.Join(dataPath, testInfo.CfgCMYaml), &corev1.ConfigMap{})
+	createCRFromISVWithT(testWrapper, testWrapper.TPLName(), path.Join(dataPath, testInfo.CfgTemplateYaml), &dbaasv1alpha1.ConfigurationTemplate{})
 
 	return testWrapper
 }
@@ -492,12 +496,12 @@ func ValidateISVCR[T any, OBJECT K8sResource](test *TestWrapper, obj client.Obje
 	case *dbaasv1alpha1.ConfigurationTemplate:
 		objKey = client.ObjectKey{
 			Namespace: ISVClusterScope,
-			Name:      test.testEnv.CfgTplName,
+			Name:      test.TPLName(),
 		}
 	case *corev1.ConfigMap:
 		objKey = client.ObjectKey{
 			Namespace: ISVClusterScope,
-			Name:      test.testEnv.CfgTplName,
+			Name:      test.CMName(),
 		}
 	default:
 		return defaultValue, cfgcore.MakeError("not support cr type.")

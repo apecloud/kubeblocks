@@ -65,6 +65,9 @@ type ReconfigureParams struct {
 	Cfg     *corev1.ConfigMap
 	Tpl     *dbaasv1alpha1.ConfigurationTemplateSpec
 
+	// for grpc factory
+	ReconfigureClientFactory createReconfigureClient
+
 	ContainerNames   []string
 	Client           client.Client
 	Ctx              intctrlutil.RequestCtx
@@ -76,6 +79,11 @@ type ReconfigureParams struct {
 
 func (param *ReconfigureParams) ComponentType() dbaasv1alpha1.ComponentType {
 	return param.Component.ComponentType
+}
+
+// GetClientFactory support ut mock
+func GetClientFactory() createReconfigureClient {
+	return newGRPCClient
 }
 
 func (param *ReconfigureParams) GetConfigKey() string {

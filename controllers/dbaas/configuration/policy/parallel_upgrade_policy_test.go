@@ -52,10 +52,6 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 			reconfigureClient := mock_proto.NewMockReconfigureClient(ctrl)
 			defer ctrl.Finish()
 
-			newGRPCClient = func(addr string) (cfgproto.ReconfigureClient, error) {
-				return reconfigureClient, nil
-			}
-
 			// mock client update caller
 			k8sClient.EXPECT().Patch(gomock.Any(), gomock.Any(), gomock.Any()).
 				Return(nil).
@@ -65,6 +61,9 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 				Times(3)
 
 			mockParam := newMockReconfigureParams("parallelPolicy", k8sClient,
+				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
+					return reconfigureClient, nil
+				}),
 				withMockStatefulSet(3, nil),
 				withConfigTpl("for_test", map[string]string{
 					"a": "b",
@@ -94,11 +93,10 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 			reconfigureClient := mock_proto.NewMockReconfigureClient(ctrl)
 			defer ctrl.Finish()
 
-			newGRPCClient = func(addr string) (cfgproto.ReconfigureClient, error) {
-				return reconfigureClient, nil
-			}
-
 			mockParam := newMockReconfigureParams("parallelPolicy", k8sClient,
+				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
+					return reconfigureClient, nil
+				}),
 				withMockStatefulSet(3, nil),
 				withConfigTpl("for_test", map[string]string{
 					"a": "b",
@@ -126,10 +124,6 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 			reconfigureClient := mock_proto.NewMockReconfigureClient(ctrl)
 			defer ctrl.Finish()
 
-			newGRPCClient = func(addr string) (cfgproto.ReconfigureClient, error) {
-				return reconfigureClient, nil
-			}
-
 			stopError := cfgcore.MakeError("failed to stop!")
 			reconfigureClient.EXPECT().StopContainer(gomock.Any(), gomock.Any()).Return(
 				&cfgproto.StopContainerResponse{}, stopError).
@@ -142,6 +136,9 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 				Times(1)
 
 			mockParam := newMockReconfigureParams("parallelPolicy", k8sClient,
+				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
+					return reconfigureClient, nil
+				}),
 				withMockStatefulSet(3, nil),
 				withConfigTpl("for_test", map[string]string{
 					"a": "b",
@@ -178,10 +175,6 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 			reconfigureClient := mock_proto.NewMockReconfigureClient(ctrl)
 			defer ctrl.Finish()
 
-			newGRPCClient = func(addr string) (cfgproto.ReconfigureClient, error) {
-				return reconfigureClient, nil
-			}
-
 			// mock client update caller
 			patchError := cfgcore.MakeError("update failed!")
 			k8sClient.EXPECT().Patch(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -193,6 +186,9 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 				Times(1)
 
 			mockParam := newMockReconfigureParams("parallelPolicy", k8sClient,
+				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
+					return reconfigureClient, nil
+				}),
 				withMockStatefulSet(3, nil),
 				withConfigTpl("for_test", map[string]string{
 					"a": "b",

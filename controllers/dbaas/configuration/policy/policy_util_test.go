@@ -61,10 +61,10 @@ func newMockStatefulSet(replicas int, name string, labels map[string]string) app
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{},
 					Volumes: []corev1.Volume{{
-						Name: "home",
+						Name: "for_test",
 						VolumeSource: corev1.VolumeSource{
 							HostPath: &corev1.HostPathVolumeSource{
-								Path: fmt.Sprintf("/tmp/%v", "home"),
+								Path: "/tmp",
 							},
 						}}},
 				},
@@ -83,6 +83,12 @@ func withMockStatefulSet(replicas int, labels map[string]string) ParamsOps {
 		params.ComponentUnits = []appsv1.StatefulSet{
 			newMockStatefulSet(replicas, stsName, labels),
 		}
+	}
+}
+
+func withGRPCClient(clientFactory createReconfigureClient) ParamsOps {
+	return func(params *ReconfigureParams) {
+		params.ReconfigureClientFactory = clientFactory
 	}
 }
 
@@ -125,7 +131,7 @@ func newMockReconfigureParams(testName string, cli client.Client, paramOps ...Pa
 func newMockPodsWithStatefulSet(sts *appsv1.StatefulSet, replicas int, options ...PodOptions) []corev1.Pod {
 	pods := make([]corev1.Pod, replicas)
 	for i := 0; i < replicas; i++ {
-		pods[i] = newMockPod(sts.Name + "-" + fmt.Sprint(i))
+		pods[i] = newMockPod(sts.Name+"-"+fmt.Sprint(i), &sts.Spec.Template.Spec)
 		pods[i].OwnerReferences = []metav1.OwnerReference{newControllerRef(sts, stsSchemaKind)}
 	}
 	for _, customFn := range options {
@@ -159,13 +165,13 @@ func newControllerRef(owner client.Object, gvk schema.GroupVersionKind) metav1.O
 
 type PodOptions func(pod *corev1.Pod)
 
-func newMockPod(podName string) corev1.Pod {
+func newMockPod(podName string, podSpec *corev1.PodSpec) corev1.Pod {
 	pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:      map[string]string{},
-			Annotations: map[string]string{},
-			Name:        podName,
+			Name:      podName,
+			Namespace: defaultNamespace,
 		},
 	}
+	pod.Spec = *podSpec.DeepCopy()
 	return pod
 }

@@ -1,0 +1,373 @@
+/*
+Copyright ApeCloud Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package configuration
+
+import (
+	"context"
+	"reflect"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+
+	"github.com/golang/mock/gomock"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	mock_client "github.com/apecloud/kubeblocks/controllers/dbaas/configuration/policy/mocks"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+)
+
+var _ = Describe("ConfigWrapper util test", func() {
+
+	var (
+		ctrl       *gomock.Controller
+		mockClient *mock_client.MockClient
+
+		reqCtx = intctrlutil.RequestCtx{
+			Ctx: ctx,
+			Log: log.FromContext(ctx).WithValues("reconfigure_for_test", testCtx.DefaultNamespace),
+		}
+	)
+
+	BeforeEach(func() {
+		// Add any steup steps that needs to be executed before each test
+		ctrl, mockClient = func() (*gomock.Controller, *mock_client.MockClient) {
+			ctrl := gomock.NewController(GinkgoT())
+			client := mock_client.NewMockClient(ctrl)
+			return ctrl, client
+		}()
+	})
+
+	AfterEach(func() {
+		// Add any teardown steps that needs to be executed after each test
+		ctrl.Finish()
+	})
+
+	Context("clusterdefinition CR test", func() {
+		It("Should success without error", func() {
+			testWrapper := CreateDBaasFromISV(testCtx, ctx, k8sClient,
+				"./testdata",
+				FakeTest{
+					// for crd yaml file
+					CfgTemplateYaml: "mysql_config_template.yaml",
+					CdYaml:          "mysql_cd.yaml",
+					AvYaml:          "mysql_av.yaml",
+					CfgCMYaml:       "mysql_config_cm.yaml",
+					StsYaml:         "mysql_sts.yaml",
+				}, true)
+			Expect(testWrapper.HasError()).Should(Succeed())
+
+			// clean all cr after finished
+			defer func() {
+				Expect(testWrapper.DeleteAllCR()).Should(Succeed())
+			}()
+
+			availableTPL := testWrapper.tpl.DeepCopy()
+			availableTPL.Status.Phase = dbaasv1alpha1.AvailablePhase
+
+			testDatas := map[client.ObjectKey][]struct {
+				object client.Object
+				err    error
+			}{
+				// for cm
+				client.ObjectKeyFromObject(testWrapper.cm): {{
+					object: nil,
+					err:    cfgcore.MakeError("failed to get tpl object"),
+				}, {
+					object: testWrapper.cm,
+					err:    nil,
+				}},
+				// for tpl
+				client.ObjectKeyFromObject(testWrapper.tpl): {{
+					object: nil,
+					err:    cfgcore.MakeError("failed to get tpl object"),
+				}, {
+					object: testWrapper.tpl,
+					err:    nil,
+				}, {
+					object: availableTPL,
+					err:    nil,
+				}},
+			}
+
+			accessCounter := map[client.ObjectKey]int{}
+
+			mockClient.EXPECT().Patch(gomock.Any(), gomock.Any(), gomock.Any()).
+				AnyTimes().
+				Return(nil)
+
+			mockClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				AnyTimes().
+				Return(nil)
+
+			mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					tests, ok := testDatas[key]
+					if !ok {
+						return cfgcore.MakeError("not exist")
+					}
+					index := accessCounter[key]
+					tt := tests[index]
+					if tt.err == nil {
+						// mock data
+						setExpectedObject(obj, tt.object)
+					}
+					if index < len(tests)-1 {
+						accessCounter[key]++
+					}
+					return tt.err
+				}).AnyTimes()
+
+			_, err := CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.cd)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("failed to get tpl object"))
+
+			_, err = CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.cd)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("failed to get tpl object"))
+
+			_, err = CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.cd)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("status not ready"))
+
+			ok, err := CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.cd)
+			Expect(err).Should(Succeed())
+			Expect(ok).Should(BeTrue())
+
+			ok, err = UpdateCDLabelsWithUsingConfiguration(mockClient, reqCtx, testWrapper.cd)
+			Expect(err).Should(Succeed())
+			Expect(ok).Should(BeTrue())
+
+			err = UpdateCDConfigMapFinalizer(mockClient, reqCtx, testWrapper.cd)
+			Expect(err).Should(Succeed())
+
+			err = DeleteCDConfigMapFinalizer(mockClient, reqCtx, testWrapper.cd)
+			Expect(err).Should(Succeed())
+		})
+	})
+
+	Context("clusterdefinition CR test without config Constraints", func() {
+		It("Should success without error", func() {
+			testWrapper := CreateDBaasFromISV(testCtx, ctx, k8sClient,
+				"./testdata",
+				FakeTest{
+					// for crd yaml file
+					CfgTemplateYaml: "mysql_config_template.yaml",
+					CdYaml:          "mysql_cd.yaml",
+					AvYaml:          "mysql_av.yaml",
+					CfgCMYaml:       "mysql_config_cm.yaml",
+					StsYaml:         "mysql_sts.yaml",
+				}, true)
+			Expect(testWrapper.HasError()).Should(Succeed())
+
+			// remove ConfigConstraintsRef
+			_, err := handleConfigTemplate(testWrapper.cd, func(templates []dbaasv1alpha1.ConfigTemplate) (bool, error) {
+				return true, nil
+			}, func(component *dbaasv1alpha1.ClusterDefinitionComponent) error {
+				if component.ConfigSpec == nil || len(component.ConfigSpec.ConfigTemplateRefs) == 0 {
+					return nil
+				}
+
+				for i := range component.ConfigSpec.ConfigTemplateRefs {
+					tpl := &component.ConfigSpec.ConfigTemplateRefs[i]
+					tpl.ConfigConstraintsRef = ""
+				}
+				return nil
+			})
+			Expect(err).Should(Succeed())
+
+			// clean all cr after finished
+			defer func() {
+				Expect(testWrapper.DeleteAllCR()).Should(Succeed())
+			}()
+
+			availableTPL := testWrapper.tpl.DeepCopy()
+			availableTPL.Status.Phase = dbaasv1alpha1.AvailablePhase
+
+			testDatas := map[client.ObjectKey][]struct {
+				object client.Object
+				err    error
+			}{
+				// for cm
+				client.ObjectKeyFromObject(testWrapper.cm): {{
+					object: nil,
+					err:    cfgcore.MakeError("failed to get tpl object"),
+				}, {
+					object: testWrapper.cm,
+					err:    nil,
+				}},
+			}
+			accessCounter := map[client.ObjectKey]int{}
+
+			mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					tests, ok := testDatas[key]
+					if !ok {
+						return cfgcore.MakeError("not exist")
+					}
+					index := accessCounter[key]
+					tt := tests[index]
+					if tt.err == nil {
+						// mock data
+						setExpectedObject(obj, tt.object)
+					}
+					if index < len(tests)-1 {
+						accessCounter[key]++
+					}
+					return tt.err
+				}).AnyTimes()
+
+			_, err = CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.cd)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("failed to get tpl object"))
+
+			ok, err := CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.cd)
+			Expect(err).Should(Succeed())
+			Expect(ok).Should(BeTrue())
+		})
+	})
+
+	Context("appversion CR test", func() {
+		It("Should success without error", func() {
+			testWrapper := CreateDBaasFromISV(testCtx, ctx, k8sClient,
+				"./testdata",
+				FakeTest{
+					// for crd yaml file
+					CfgTemplateYaml: "mysql_config_template.yaml",
+					CdYaml:          "mysql_cd.yaml",
+					AvYaml:          "mysql_av.yaml",
+					CfgCMYaml:       "mysql_config_cm.yaml",
+					StsYaml:         "mysql_sts.yaml",
+				}, true)
+			Expect(testWrapper.HasError()).Should(Succeed())
+
+			// clean all cr after finished
+			defer func() {
+				Expect(testWrapper.DeleteAllCR()).Should(Succeed())
+			}()
+
+			updateAVTemplates(testWrapper)
+
+			availableTPL := testWrapper.tpl.DeepCopy()
+			availableTPL.Status.Phase = dbaasv1alpha1.AvailablePhase
+
+			testDatas := map[client.ObjectKey][]struct {
+				object client.Object
+				err    error
+			}{
+				// for cm
+				client.ObjectKeyFromObject(testWrapper.cm): {{
+					object: nil,
+					err:    cfgcore.MakeError("failed to get tpl object"),
+				}, {
+					object: testWrapper.cm,
+					err:    nil,
+				}},
+				// for tpl
+				client.ObjectKeyFromObject(testWrapper.tpl): {{
+					object: nil,
+					err:    cfgcore.MakeError("failed to get tpl object"),
+				}, {
+					object: testWrapper.tpl,
+					err:    nil,
+				}, {
+					object: availableTPL,
+					err:    nil,
+				}},
+			}
+
+			accessCounter := map[client.ObjectKey]int{}
+
+			mockClient.EXPECT().Patch(gomock.Any(), gomock.Any(), gomock.Any()).
+				AnyTimes().
+				Return(nil)
+
+			mockClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				AnyTimes().
+				Return(nil)
+
+			mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					tests, ok := testDatas[key]
+					if !ok {
+						return cfgcore.MakeError("not exist")
+					}
+					index := accessCounter[key]
+					tt := tests[index]
+					if tt.err == nil {
+						// mock data
+						setExpectedObject(obj, tt.object)
+					}
+					if index < len(tests)-1 {
+						accessCounter[key]++
+					}
+					return tt.err
+				}).AnyTimes()
+
+			_, err := CheckAVConfigTemplate(mockClient, reqCtx, testWrapper.av)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("failed to get tpl object"))
+
+			_, err = CheckAVConfigTemplate(mockClient, reqCtx, testWrapper.av)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("failed to get tpl object"))
+
+			_, err = CheckAVConfigTemplate(mockClient, reqCtx, testWrapper.av)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("status not ready"))
+
+			ok, err := CheckAVConfigTemplate(mockClient, reqCtx, testWrapper.av)
+			Expect(err).Should(Succeed())
+			Expect(ok).Should(BeTrue())
+
+			ok, err = UpdateAVLabelsWithUsingConfiguration(mockClient, reqCtx, testWrapper.av)
+			Expect(err).Should(Succeed())
+			Expect(ok).Should(BeTrue())
+
+			err = UpdateAVConfigMapFinalizer(mockClient, reqCtx, testWrapper.av)
+			Expect(err).Should(Succeed())
+
+			err = DeleteAVConfigMapFinalizer(mockClient, reqCtx, testWrapper.av)
+			Expect(err).Should(Succeed())
+		})
+	})
+
+})
+
+func updateAVTemplates(wrapper *TestWrapper) {
+	var tpls []dbaasv1alpha1.ConfigTemplate
+	_, err := handleConfigTemplate(wrapper.cd, func(templates []dbaasv1alpha1.ConfigTemplate) (bool, error) {
+		tpls = templates
+		return true, nil
+	})
+	Expect(err).Should(Succeed())
+
+	if len(wrapper.av.Spec.Components) == 0 {
+		return
+	}
+
+	// mock av config templates
+	wrapper.av.Spec.Components[0].ConfigTemplateRefs = tpls
+}
+
+func setExpectedObject(out client.Object, obj client.Object) {
+	outVal := reflect.ValueOf(out)
+	objVal := reflect.ValueOf(obj)
+	reflect.Indirect(outVal).Set(reflect.Indirect(objVal))
+}

@@ -217,18 +217,19 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	}
 
 	return r.performUpgrade(cfgpolicy.ReconfigureParams{
-		TplName:          configTplName,
-		Meta:             versionMeta,
-		Cfg:              config,
-		Tpl:              &tpl.Spec,
-		Client:           r.Client,
-		Ctx:              reqCtx,
-		Cluster:          &cluster,
-		ContainerNames:   containersList,
-		ComponentUnits:   sts,
-		Component:        component,
-		ClusterComponent: clusterComponent,
-		Restart:          cfgcm.IsNotSupportReload(component.ConfigSpec),
+		TplName:                  configTplName,
+		Meta:                     versionMeta,
+		Cfg:                      config,
+		Tpl:                      &tpl.Spec,
+		Client:                   r.Client,
+		Ctx:                      reqCtx,
+		Cluster:                  &cluster,
+		ContainerNames:           containersList,
+		ComponentUnits:           sts,
+		Component:                component,
+		ClusterComponent:         clusterComponent,
+		Restart:                  cfgcm.IsNotSupportReload(component.ConfigSpec),
+		ReconfigureClientFactory: cfgpolicy.GetClientFactory(),
 	})
 }
 

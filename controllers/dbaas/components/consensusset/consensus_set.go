@@ -87,7 +87,9 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady() (bool, error
 		}
 		if role == "" {
 			isAbnormal = true
-			statusComponent.SetObjectMessage(pod.Kind, pod.Name, "Role probe timeout, check whether the application is available")
+			messageMap := statusComponent.GetMessage()
+			messageMap.SetObjectMessage(pod.Kind, pod.Name, "Role probe timeout, check whether the application is available")
+			statusComponent.SetMessage(messageMap)
 			needPatch = true
 		}
 	}

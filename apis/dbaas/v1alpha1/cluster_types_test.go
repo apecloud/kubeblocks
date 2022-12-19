@@ -70,38 +70,38 @@ spec:
 	}
 }
 
-func TestResetMessageWhenRunning(t *testing.T) {
+func TestGetMessage(t *testing.T) {
+	podKey := "Pod/test-01"
 	statusComponent := ClusterStatusComponent{
 		Message: map[string]string{
-			"Pod/test-01": "failed Scheduled",
+			podKey: "failed Scheduled",
 		},
 	}
-	statusComponent.ResetMessageWhenRunning()
-	if statusComponent.Message != nil {
-		t.Error("Expected empty message map")
+	message := statusComponent.GetMessage()
+	message[podKey] = "insufficient cpu"
+	if statusComponent.Message[podKey] == message[podKey] {
+		t.Error("Expected status component message not changed")
 	}
 }
 
-func TestGetObjectMessage(t *testing.T) {
-	statusComponent := ClusterStatusComponent{
-		Message: map[string]string{
-			"Pod/test-01": "failed Scheduled",
-		},
-	}
-	message := statusComponent.GetObjectMessage("Pod", "test-01")
-	if message != "failed Scheduled" {
+func TestSetMessage(t *testing.T) {
+	podKey := "Pod/test-01"
+	statusComponent := ClusterStatusComponent{}
+	statusComponent.SetMessage(
+		map[string]string{
+			podKey: "failed Scheduled",
+		})
+	if statusComponent.Message[podKey] != "failed Scheduled" {
 		t.Error(`Expected get message "failed Scheduled"`)
 	}
 }
 
-func TestSetObjectMessage(t *testing.T) {
-	statusComponent := ClusterStatusComponent{
-		Message: map[string]string{
-			"Pod/test-01": "failed Scheduled",
-		},
+func TestSetAndGetObjectMessage(t *testing.T) {
+	messageMap := ComponentMessageMap{
+		"Pod/test-01": "failed Scheduled",
 	}
-	statusComponent.SetObjectMessage("Pod", "test-01", "insufficient cpu")
-	message := statusComponent.GetObjectMessage("Pod", "test-01")
+	messageMap.SetObjectMessage("Pod", "test-01", "insufficient cpu")
+	message := messageMap.GetObjectMessage("Pod", "test-01")
 	if message != "insufficient cpu" {
 		t.Error(`Expected get message "insufficient cpu"`)
 	}

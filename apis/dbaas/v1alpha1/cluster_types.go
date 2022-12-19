@@ -174,6 +174,8 @@ type ClusterComponent struct {
 	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
 }
 
+type ComponentMessageMap map[string]string
+
 // ClusterStatusComponent record components status information
 type ClusterStatusComponent struct {
 	// type of component.
@@ -192,7 +194,7 @@ type ClusterStatusComponent struct {
 	// message record the component details message in current phase.
 	// keys are podName or deployName or statefulSetName, the format is `<ObjectKind>/<Name>`.
 	// +optional
-	Message map[string]string `json:"message,omitempty"`
+	Message ComponentMessageMap `json:"message,omitempty"`
 
 	// podsReady check all pods of the component are ready.
 	// +optional
@@ -369,25 +371,28 @@ func (r *Cluster) GetTypeMappingComponents() map[string][]ClusterComponent {
 	return m
 }
 
-// ResetMessageWhenRunning reset component status message when component is running.
-func (in *ClusterStatusComponent) ResetMessageWhenRunning() {
-	in.Message = nil
+// GetMessage get message map deep copy object
+func (in *ClusterStatusComponent) GetMessage() ComponentMessageMap {
+	messageMap := map[string]string{}
+	for k, v := range in.Message {
+		messageMap[k] = v
+	}
+	return messageMap
+}
+
+// SetMessage override message map object
+func (in *ClusterStatusComponent) SetMessage(messageMap ComponentMessageMap) {
+	in.Message = messageMap
 }
 
 // GetObjectMessage get the k8s workload message in component status message map
-func (in *ClusterStatusComponent) GetObjectMessage(objectKind, objectName string) string {
-	if in.Message == nil {
-		return ""
-	}
+func (m ComponentMessageMap) GetObjectMessage(objectKind, objectName string) string {
 	messageKey := fmt.Sprintf("%s/%s", objectKind, objectName)
-	return in.Message[messageKey]
+	return m[messageKey]
 }
 
 // SetObjectMessage set k8s workload message to component status message map
-func (in *ClusterStatusComponent) SetObjectMessage(objectKind, objectName, message string) {
-	if in.Message == nil {
-		in.Message = map[string]string{}
-	}
+func (m ComponentMessageMap) SetObjectMessage(objectKind, objectName, message string) {
 	messageKey := fmt.Sprintf("%s/%s", objectKind, objectName)
-	in.Message[messageKey] = message
+	m[messageKey] = message
 }

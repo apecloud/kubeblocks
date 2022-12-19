@@ -2054,7 +2054,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 		for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
 			vct := stsObj.Spec.VolumeClaimTemplates[0]
 			for _, tmpVct := range stsObj.Spec.VolumeClaimTemplates {
-				if vct.Name == component.HorizontalScalePolicy.VolumeMountsName {
+				if tmpVct.Name == component.HorizontalScalePolicy.VolumeMountsName {
 					vct = tmpVct
 					break
 				}

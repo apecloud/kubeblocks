@@ -215,7 +215,7 @@ KubeBlocks %s Install SUCCESSFULLY!
     kbcli cluster list          # list all database clusters
     kbcli cluster describe <cluster name>  # get cluster information
 
--> Uninstall DBaaS:
+-> Uninstall KubeBlocks:
     kbcli kubeblocks uninstall
 `, o.Version)
 	fmt.Fprint(o.Out, notes)

@@ -322,6 +322,7 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 		},
 		{
 			// handle cluster workload error events such as pod/statefulset/deployment errors
+			// must be the last one
 			pred: func() bool {
 				return true
 			},

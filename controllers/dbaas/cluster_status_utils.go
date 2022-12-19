@@ -71,14 +71,6 @@ func mergeEventMessageToStatusMessage(statusComponent dbaasv1alpha1.ClusterStatu
 	return message + ";" + event.Message
 }
 
-// mergePodEventMessage merge pod event message to component message
-func mergePodEventMessage(oldMessage, eventMessage string) string {
-	if strings.Contains(oldMessage, eventMessage) {
-		return oldMessage
-	}
-	return oldMessage + ";" + eventMessage
-}
-
 // isExistsEventMsg check whether the event is exists
 func isExistsEventMsg(statusComponentMessage map[string]string, event *corev1.Event) bool {
 	if statusComponentMessage == nil {

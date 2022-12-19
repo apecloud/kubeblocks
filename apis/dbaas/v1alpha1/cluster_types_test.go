@@ -69,3 +69,40 @@ spec:
 		t.Error("Expected one element conditionList")
 	}
 }
+
+func TestResetMessageWhenRunning(t *testing.T) {
+	statusComponent := ClusterStatusComponent{
+		Message: map[string]string{
+			"Pod/test-01": "failed Scheduled",
+		},
+	}
+	statusComponent.ResetMessageWhenRunning()
+	if statusComponent.Message != nil {
+		t.Error("Expected empty message map")
+	}
+}
+
+func TestGetObjectMessage(t *testing.T) {
+	statusComponent := ClusterStatusComponent{
+		Message: map[string]string{
+			"Pod/test-01": "failed Scheduled",
+		},
+	}
+	message := statusComponent.GetObjectMessage("Pod", "test-01")
+	if message != "failed Scheduled" {
+		t.Error(`Expected get message "failed Scheduled"`)
+	}
+}
+
+func TestSetObjectMessage(t *testing.T) {
+	statusComponent := ClusterStatusComponent{
+		Message: map[string]string{
+			"Pod/test-01": "failed Scheduled",
+		},
+	}
+	statusComponent.SetObjectMessage("Pod", "test-01", "insufficient cpu")
+	message := statusComponent.GetObjectMessage("Pod", "test-01")
+	if message != "insufficient cpu" {
+		t.Error(`Expected get message "insufficient cpu"`)
+	}
+}

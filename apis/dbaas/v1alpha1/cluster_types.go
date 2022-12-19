@@ -370,12 +370,12 @@ func (r *Cluster) GetTypeMappingComponents() map[string][]ClusterComponent {
 }
 
 // ResetMessageWhenRunning reset component status message when component is running.
-func (in ClusterStatusComponent) ResetMessageWhenRunning() {
+func (in *ClusterStatusComponent) ResetMessageWhenRunning() {
 	in.Message = nil
 }
 
 // GetObjectMessage get the k8s workload message in component status message map
-func (in ClusterStatusComponent) GetObjectMessage(objectKind, objectName string) string {
+func (in *ClusterStatusComponent) GetObjectMessage(objectKind, objectName string) string {
 	if in.Message == nil {
 		return ""
 	}
@@ -384,7 +384,7 @@ func (in ClusterStatusComponent) GetObjectMessage(objectKind, objectName string)
 }
 
 // SetObjectMessage set k8s workload message to component status message map
-func (in ClusterStatusComponent) SetObjectMessage(objectKind, objectName, message string) {
+func (in *ClusterStatusComponent) SetObjectMessage(objectKind, objectName, message string) {
 	if in.Message == nil {
 		in.Message = map[string]string{}
 	}

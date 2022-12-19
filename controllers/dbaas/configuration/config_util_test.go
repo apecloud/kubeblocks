@@ -46,7 +46,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 	)
 
 	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
+		// Add any setup steps that needs to be executed before each test
 		ctrl, mockClient = func() (*gomock.Controller, *mock_client.MockClient) {
 			ctrl := gomock.NewController(GinkgoT())
 			client := mock_client.NewMockClient(ctrl)

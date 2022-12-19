@@ -102,7 +102,11 @@ func getConsensusPods(params ReconfigureParams) ([]corev1.Pod, error) {
 
 	// sort pods
 	component.SortPods(pods, component.ComposeRolePriorityMap(*params.Component))
-	return pods, nil
+	r := make([]corev1.Pod, 0, len(pods))
+	for i := len(pods); i > 0; i-- {
+		r = append(r, pods[i-1:i]...)
+	}
+	return r, nil
 }
 
 func commonStopContainer(pod *corev1.Pod, containerNames []string, createClient createReconfigureClient) error {

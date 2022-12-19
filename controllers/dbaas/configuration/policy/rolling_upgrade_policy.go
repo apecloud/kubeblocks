@@ -139,21 +139,22 @@ func markDynamicCursor(pods []corev1.Pod, podsStats *componentPodStats, configKe
 	}
 
 	// find update last
-	for i := podsStats.targetReplica - 1; i > 0; i-- {
+	for i := podsStats.targetReplica - 1; i >= 0; i-- {
 		pod := &pods[i]
 		if !podutil.IsMatchConfigVersion(pod, configKey, currentVersion) {
-			podWindows.end = i
+			podWindows.end = i + 1
 			break
 		}
 		if !podsStats.isAvailable(pod) {
 			podsStats.updating[pod.Name] = pod
+			podWindows.end = i + 1
 			break
 		}
 		podsStats.updated[pod.Name] = pod
 	}
 
 	podWindows.begin = cfgcore.Max[int](podWindows.end-int(rollingReplicas), 0)
-	for i := podWindows.begin; i <= podWindows.end; i++ {
+	for i := podWindows.begin; i < podWindows.end; i++ {
 		pod := &pods[i]
 		if podutil.IsMatchConfigVersion(pod, configKey, currentVersion) {
 			podsStats.updating[pod.Name] = pod
@@ -205,7 +206,7 @@ func (s *componentPodStats) isAvailable(pod *corev1.Pod) bool {
 
 func (s *componentPodStats) isReady(pod *corev1.Pod) bool {
 	_, ok := s.ready[pod.Name]
-	return ok
+	return ok || s.isAvailable(pod)
 }
 
 func (s *componentPodStats) isUpdating(pod *corev1.Pod) bool {

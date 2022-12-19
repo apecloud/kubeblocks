@@ -18,6 +18,7 @@ package policy
 
 import (
 	"fmt"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -86,6 +87,14 @@ func withMockStatefulSet(replicas int, labels map[string]string) ParamsOps {
 	}
 }
 
+func withClusterComponent(replicas int) ParamsOps {
+	return func(params *ReconfigureParams) {
+		params.ClusterComponent = &dbaasv1alpha1.ClusterComponent{
+			Replicas: func() *int32 { rep := int32(replicas); return &rep }(),
+		}
+	}
+}
+
 func withGRPCClient(clientFactory createReconfigureClient) ParamsOps {
 	return func(params *ReconfigureParams) {
 		params.ReconfigureClientFactory = clientFactory
@@ -109,6 +118,16 @@ func withCDComponent(compType dbaasv1alpha1.ComponentType, tpls []dbaasv1alpha1.
 			},
 			ComponentType: compType,
 			TypeName:      string(compType),
+			ConsensusSpec: &dbaasv1alpha1.ConsensusSetSpec{
+				Leader: dbaasv1alpha1.ConsensusMember{
+					Name: "leader",
+				},
+				Followers: []dbaasv1alpha1.ConsensusMember{
+					{
+						Name: "follower",
+					},
+				},
+			},
 		}
 	}
 }
@@ -137,10 +156,49 @@ func newMockPodsWithStatefulSet(sts *appsv1.StatefulSet, replicas int, options .
 	for _, customFn := range options {
 		for i := range pods {
 			pod := &pods[i]
-			customFn(pod)
+			customFn(pod, i)
 		}
 	}
 	return pods
+}
+
+func withReadyPod(rMin, rMax int) PodOptions {
+	return func(pod *corev1.Pod, index int) {
+		if index < rMin || index >= rMax {
+			return
+		}
+
+		if pod.Status.Conditions == nil {
+			pod.Status.Conditions = make([]corev1.PodCondition, 0)
+		}
+
+		pod.Status.Conditions = append(pod.Status.Conditions, corev1.PodCondition{
+			Type:   corev1.PodReady,
+			Status: corev1.ConditionTrue,
+		})
+
+		pod.Status.Phase = corev1.PodRunning
+	}
+}
+
+func withAvailablePod(rMin, rMax int) PodOptions {
+	return func(pod *corev1.Pod, index int) {
+		if index < rMin || index >= rMax {
+			return
+		}
+
+		if pod.Status.Conditions == nil {
+			pod.Status.Conditions = make([]corev1.PodCondition, 0)
+		}
+
+		h, _ := time.ParseDuration("-1h")
+		pod.Status.Conditions = append(pod.Status.Conditions, corev1.PodCondition{
+			Type:               corev1.PodReady,
+			Status:             corev1.ConditionTrue,
+			LastTransitionTime: metav1.NewTime(time.Now().Add(h)),
+		})
+		pod.Status.Phase = corev1.PodRunning
+	}
 }
 
 func fromPods(pods []corev1.Pod) []runtime.Object {
@@ -163,7 +221,7 @@ func newControllerRef(owner client.Object, gvk schema.GroupVersionKind) metav1.O
 	}
 }
 
-type PodOptions func(pod *corev1.Pod)
+type PodOptions func(pod *corev1.Pod, index int)
 
 func newMockPod(podName string, podSpec *corev1.PodSpec) corev1.Pod {
 	pod := corev1.Pod{

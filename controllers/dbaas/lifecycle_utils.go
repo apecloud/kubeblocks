@@ -1787,23 +1787,30 @@ func isSnapshotAvailable(cli client.Client, ctx context.Context) bool {
 // check snapshot existence
 func isVolumeSnapshotExists(cli client.Client,
 	ctx context.Context,
-	snapshotKey types.NamespacedName) (bool, error) {
-	vs := snapshotv1.VolumeSnapshot{}
-	if err := cli.Get(ctx, snapshotKey, &vs); err != nil {
+	cluster *dbaasv1alpha1.Cluster,
+	component *Component) (bool, error) {
+	ml := getBackupMatchingLabels(cluster.Name, component.Name)
+	vsList := snapshotv1.VolumeSnapshotList{}
+	if err := cli.List(ctx, &vsList, ml); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
-	return true, nil
+	return len(vsList.Items) > 0, nil
 }
 
 // check snapshot ready to use
 func isVolumeSnapshotReadyToUse(cli client.Client,
 	ctx context.Context,
-	snapshotKey types.NamespacedName) (bool, error) {
-	vs := snapshotv1.VolumeSnapshot{}
-	if err := cli.Get(ctx, snapshotKey, &vs); err != nil {
+	cluster *dbaasv1alpha1.Cluster,
+	component *Component) (bool, error) {
+	ml := getBackupMatchingLabels(cluster.Name, component.Name)
+	vsList := snapshotv1.VolumeSnapshotList{}
+	if err := cli.List(ctx, &vsList, ml); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
-	return *vs.Status.ReadyToUse, nil
+	if len(vsList.Items) == 0 {
+		return false, nil
+	}
+	return *vsList.Items[0].Status.ReadyToUse, nil
 }
 
 func doSnapshot(cli client.Client,
@@ -1850,7 +1857,8 @@ func doSnapshot(cli client.Client,
 func checkedCreatePVCFromSnapshot(cli client.Client,
 	ctx context.Context,
 	pvcKey types.NamespacedName,
-	snapshotKey types.NamespacedName,
+	cluster *dbaasv1alpha1.Cluster,
+	component *Component,
 	stsObj *appsv1.StatefulSet) error {
 	pvc := corev1.PersistentVolumeClaim{}
 	// check pvc existence
@@ -1858,7 +1866,15 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
-		return createPVCFromSnapshot(ctx, cli, stsObj, pvcKey, snapshotKey.Name)
+		ml := getBackupMatchingLabels(cluster.Name, component.Name)
+		vsList := snapshotv1.VolumeSnapshotList{}
+		if err := cli.List(ctx, &vsList, ml); err != nil {
+			return err
+		}
+		if len(vsList.Items) == 0 {
+			return errors.Errorf("volumesnapshot not found in cluster %s component %s", cluster.Name, component.Name)
+		}
+		return createPVCFromSnapshot(ctx, cli, stsObj, pvcKey, vsList.Items[0].Name)
 	}
 	return nil
 }
@@ -2006,7 +2022,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				"volume snapshot not support")
 			break
 		}
-		vsExists, err := isVolumeSnapshotExists(cli, ctx, snapshotKey)
+		vsExists, err := isVolumeSnapshotExists(cli, ctx, cluster, component)
 		if err != nil {
 			return false, err
 		}
@@ -2024,7 +2040,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 			break
 		}
 		// volumesnapshot exists, then check if it is ready to use.
-		ready, err := isVolumeSnapshotReadyToUse(cli, ctx, snapshotKey)
+		ready, err := isVolumeSnapshotReadyToUse(cli, ctx, cluster, component)
 		if err != nil {
 			return shouldRequeue, err
 		}
@@ -2053,7 +2069,8 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 			if err := checkedCreatePVCFromSnapshot(cli,
 				ctx,
 				pvcKey,
-				snapshotKey,
+				cluster,
+				component,
 				stsObj); err != nil {
 				return shouldRequeue, err
 			}

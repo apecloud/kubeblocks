@@ -229,14 +229,13 @@ type ClusterDefinitionComponent struct {
 
 type HorizontalScalePolicy struct {
 	// Type controls what kind of data synchronization do when component scale up.
-	// Policy is in enum of {None, Snapshot, Backup}. The default policy is `None`.
+	// Policy is in enum of {None, Snapshot}. The default policy is `None`.
 	// None: Default policy, do nothing.
 	// Snapshot: Do native volume snapshot before scaling and restore to newly scaled pods.
 	//           Prefer backup job to create snapshot if `BackupTemplateSelector` can find a template.
 	//           Notice that 'Snapshot' policy will only take snapshot on one volumeMount, default is
 	//           the first volumeMount of first container (i.e. clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]),
 	//           since take multiple snapshots at one time might cause consistency problem.
-	// Backup: Use backup tool in backuppolicytemplate to handle data recovery when scaling. Not support yet. Do not use it.
 	// +kubebuilder:default=None
 	// +kubebuilder:validation:Enum={None,Snapshot}
 	// +optional

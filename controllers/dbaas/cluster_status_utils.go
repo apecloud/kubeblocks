@@ -49,7 +49,7 @@ const (
 
 // isTargetKindForEvent check the event involve object is the target resources
 func isTargetKindForEvent(event *corev1.Event) bool {
-	return slices.Index([]string{intctrlutil.PodKind, intctrlutil.DeploymentKind, intctrlutil.StatefulSetKind, intctrlutil.CronJob}, event.InvolvedObject.Kind) != -1
+	return slices.Index([]string{intctrlutil.PodKind, intctrlutil.DeploymentKind, intctrlutil.StatefulSetKind}, event.InvolvedObject.Kind) != -1
 }
 
 // isOperationsPhaseForCluster determine whether operations are in progress according to the cluster status except volumeExpanding.
@@ -288,38 +288,36 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 // handleEventForClusterStatus handle event for cluster Warning and Failed phase
 func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorder record.EventRecorder, event *corev1.Event) error {
 
-	type EventPredProcessor struct {
-		pred      func(event *corev1.Event) bool
-		processor func(event *corev1.Event) error
+	type PredProcessor struct {
+		pred      func() bool
+		processor func() error
 	}
 
-	pps := []EventPredProcessor{
+	pps := []PredProcessor{
 		{
-			pred: func(event *corev1.Event) bool {
+			pred: func() bool {
 				return event.InvolvedObject.Kind == intctrlutil.CronJob &&
 					event.Reason == "SawCompletedJob"
 			},
-			processor: func(event *corev1.Event) error {
+			processor: func() error {
 				return handleDeletePVCCronJobEvent(ctx, cli, recorder, event)
 			},
 		},
 		{
-			pred: func(event *corev1.Event) bool {
+			pred: func() bool {
 				return event.Type == corev1.EventTypeWarning &&
 					isTargetKindForEvent(event) &&
 					k8score.IsOvertimeAndOccursTimesForEvent(event, EventTimeOut, EventOccursTimes)
 			},
-			processor: func(event *corev1.Event) error {
+			processor: func() error {
 				return handleClusterStatusByEvent(ctx, cli, recorder, event)
 			},
 		},
 	}
 
 	for _, pp := range pps {
-		if pp.pred(event) {
-			if err := pp.processor(event); err != nil {
-				return err
-			}
+		if pp.pred() {
+			return pp.processor()
 		}
 	}
 	return nil

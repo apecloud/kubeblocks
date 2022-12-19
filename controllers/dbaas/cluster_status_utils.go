@@ -537,7 +537,6 @@ func updateComponentStatusPhase(cli client.Client,
 	componentName string,
 	phase dbaasv1alpha1.Phase,
 	message string) error {
-	var comp *dbaasv1alpha1.ClusterStatusComponent
 	c, ok := cluster.Status.Components[componentName]
 	if ok && c.Phase == phase {
 		return nil

@@ -45,6 +45,11 @@ const (
 	EventOccursTimes int32 = 3
 )
 
+type EventPredProcessor struct {
+	pred      func(event *corev1.Event) bool
+	processor func(event *corev1.Event) error
+}
+
 // isTargetKindForEvent check the event involve object is the target resources
 func isTargetKindForEvent(event *corev1.Event) bool {
 	return slices.Index([]string{intctrlutil.PodKind, intctrlutil.DeploymentKind, intctrlutil.StatefulSetKind, intctrlutil.CronJob}, event.InvolvedObject.Kind) != -1
@@ -427,23 +432,47 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 		err    error
 		object client.Object
 	)
-	if event.InvolvedObject.Kind == intctrlutil.CronJob &&
-		event.Reason == "SawCompletedJob" {
-		return handleDeletePVCCronJobEvent(ctx, cli, recorder, event)
+
+	pps := []EventPredProcessor{
+		{
+			pred: func(event *corev1.Event) bool {
+				return event.InvolvedObject.Kind == intctrlutil.CronJob &&
+					event.Reason == "SawCompletedJob"
+			},
+			processor: func(event *corev1.Event) error {
+				return handleDeletePVCCronJobEvent(ctx, cli, recorder, event)
+			},
+		},
+		{
+			pred: func(event *corev1.Event) bool {
+				if event.Type != corev1.EventTypeWarning || !isTargetKindForEvent(event) {
+					return false
+				}
+				if !k8score.IsOvertimeAndOccursTimesForEvent(event, EventTimeOut, EventOccursTimes) {
+					return false
+				}
+				return true
+			},
+			processor: func(event *corev1.Event) error {
+				if object, err = getEventInvolvedObject(ctx, cli, event); err != nil {
+					return err
+				}
+				if object == nil || !intctrlutil.WorkloadFilterPredicate(object) {
+					return nil
+				}
+				return handleClusterStatusByEvent(ctx, cli, recorder, object, event)
+			},
+		},
 	}
-	if event.Type != corev1.EventTypeWarning || !isTargetKindForEvent(event) {
-		return nil
+
+	for _, pp := range pps {
+		if pp.pred(event) {
+			if err := pp.processor(event); err != nil {
+				return err
+			}
+		}
 	}
-	if !k8score.IsOvertimeAndOccursTimesForEvent(event, EventTimeOut, EventOccursTimes) {
-		return nil
-	}
-	if object, err = getEventInvolvedObject(ctx, cli, event); err != nil {
-		return err
-	}
-	if object == nil || !intctrlutil.WorkloadFilterPredicate(object) {
-		return nil
-	}
-	return handleClusterStatusByEvent(ctx, cli, recorder, object, event)
+	return nil
 }
 
 func handleDeletePVCCronJobEvent(ctx context.Context,

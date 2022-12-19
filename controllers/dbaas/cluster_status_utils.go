@@ -309,7 +309,7 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 			pred: func() bool {
 				return event.Type == corev1.EventTypeWarning &&
 					isTargetKindForEvent(event) &&
-					// the error repeated several times, so we can sure it's a real error.
+					// the error repeated several times, so we can sure it's a real error to the cluster.
 					k8score.IsOvertimeAndOccursTimesForEvent(event, EventTimeOut, EventOccursTimes)
 			},
 			processor: func() error {

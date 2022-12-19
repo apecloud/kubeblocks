@@ -73,7 +73,7 @@ spec:
   components:
   - typeName: replicasets
     componentType: Consensus
-    defaultReplicas: 3
+    defaultReplicas: 1
     podSpec:
       containers:
       - name: mysql
@@ -248,7 +248,7 @@ spec:
 			Expect(testCtx.CreateObj(ctx, clusterObj)).Should(Succeed())
 
 			By("check(or mock maybe) cluster status running")
-			if !IsUseExistingClusterEnabled() {
+			if !testCtx.UsingExistingCluster() {
 				// MOCK pods are created and running, so as the cluster
 				Eventually(expectClusterInPhase(key, dbaasv1alpha1.CreatingPhase), timeout, interval).Should(BeTrue())
 				mockSetClusterPhaseToRunning(key)
@@ -277,6 +277,14 @@ spec:
 			}
 			Expect(testCtx.CreateObj(ctx, verticalScalingOpsRequest)).Should(Succeed())
 
+			By("check VerticalScalingOpsRequest running")
+			Eventually(expectOpsRequestInPhase(verticalScalingOpsRequest, dbaasv1alpha1.RunningPhase), timeout, interval).Should(BeTrue())
+
+			By("mock VerticalScalingOpsRequest is succeed")
+			if !testCtx.UsingExistingCluster() {
+				mockOpsRequestSucceed(verticalScalingOpsRequest)
+			}
+
 			By("check VerticalScalingOpsRequest succeed")
 			Eventually(expectOpsRequestInPhase(verticalScalingOpsRequest, dbaasv1alpha1.SucceedPhase), timeout, interval).Should(BeTrue())
 
@@ -303,6 +311,13 @@ spec:
 		})
 	})
 })
+
+func mockOpsRequestSucceed(opsRequest *dbaasv1alpha1.OpsRequest) {
+	patch := client.MergeFrom(opsRequest.DeepCopy())
+	opsRequest.Status.Phase = dbaasv1alpha1.SucceedPhase
+	opsRequest.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
+	Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).Should(Succeed())
+}
 
 func mockSetClusterPhaseToRunning(clusterName types.NamespacedName) {
 	fetchedCluster := &dbaasv1alpha1.Cluster{}

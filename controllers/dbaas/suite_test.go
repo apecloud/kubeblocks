@@ -168,7 +168,3 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
-
-func IsUseExistingClusterEnabled() bool {
-	return testEnv.UseExistingCluster != nil && *testEnv.UseExistingCluster
-}

@@ -295,6 +295,7 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 
 	pps := []PredProcessor{
 		{
+			// handle cronjob complete or fail event
 			pred: func() bool {
 				return event.InvolvedObject.Kind == intctrlutil.CronJob &&
 					event.Reason == "SawCompletedJob"
@@ -304,9 +305,11 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 			},
 		},
 		{
+			// handle cluster wordload error events such as pod/statefulset/deployment errors
 			pred: func() bool {
 				return event.Type == corev1.EventTypeWarning &&
 					isTargetKindForEvent(event) &&
+					// the error repeated several times, so we can sure it's a real error.
 					k8score.IsOvertimeAndOccursTimesForEvent(event, EventTimeOut, EventOccursTimes)
 			},
 			processor: func() error {

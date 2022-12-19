@@ -418,6 +418,7 @@ func initClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster, componentN
 				Name:       "",
 			},
 		}
+		cluster.Status.Components[componentName] = componentStatus
 	}
 }
 

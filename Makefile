@@ -196,12 +196,25 @@ ifeq (, $(shell sed -n "/^127.0.0.1[[:space:]]*host.$(EXISTING_CLUSTER_TYPE).int
 endif
 endif
 
+.PHONY: test-probe
+test-probe:
+	cd ./cmd/probe && $(GO) test ./... -coverprofile cover.out
+
+.PHONY: cover-report-probe
+cover-report-probe: ## Generate cover.html from cmd/probe/cover.out
+	cd ./cmd/probe && $(GO) tool cover -html=cover.out -o cover.html
+ifeq ($(GOOS), darwin)
+	open ./cmd/probe/cover.html
+else
+	echo "open cmd/probe/cover.html with a HTML viewer."
+endif
+
 .PHONY: test-current-ctx
 test-current-ctx: manifests generate fmt vet add-k8s-host ## Run operator controller tests with current $KUBECONFIG context. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_PACKAGE)... -p 1 -coverprofile cover.out
 
 .PHONY: test
-test: manifests generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
+test: manifests generate fmt vet envtest add-k8s-host test-probe ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_PACKAGE)... -coverprofile cover.out
 
 .PHONY: test-delve
@@ -213,7 +226,7 @@ test-webhook-enabled: ## Run tests with webhooks enabled.
 	$(MAKE) test ENABLE_WEBHOOKS=true
 
 .PHONY: cover-report
-cover-report: ## Generate cover.html from cover.out
+cover-report: cover-report-probe ## Generate cover.html from cover.out
 	$(GO) tool cover -html=cover.out -o cover.html
 ifeq ($(GOOS), darwin)
 	open ./cover.html

@@ -1,0 +1,43 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "etcd-cluster.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: apecloud-etcd
+  appVersionRef: etcd-{{ default .Chart.AppVersion .Values.appVersionOverride }}
+  terminationPolicy: {{ .Values.terminationPolicy }}
+  affinity:
+    {{- with $.Values.topologyKeys }}
+    topologyKeys: {{ . | toYaml | nindent 6 }}
+    {{- end }}
+  {{- with $.Values.tolerations }}
+  tolerations: {{ . | toYaml | nindent 4 }}
+  {{- end }}
+  components:
+    - name: etcd
+      type: etcd
+      monitor: {{ .Values.monitor.enabled }}
+      serviceType: {{ $.Values.service.type | default "ClusterIP" }}
+      replicas: {{ .Values.replicaCount | default "3" }}
+      {{- with .Values.resources }}
+      resources:
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}
+      {{- if .Values.persistence.enabled }}
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: {{ .Values.persistence.data.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.persistence.data.size }}
+      {{- end }}

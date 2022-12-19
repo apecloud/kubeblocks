@@ -516,7 +516,7 @@ func updateComponentStatusPhase(cli client.Client,
 	var comp *dbaasv1alpha1.ClusterStatusComponent
 	c, ok := cluster.Status.Components[componentName]
 	if ok {
-		if cluster.Status.Components[componentName].Phase != phase {
+		if c.Phase != phase {
 			comp = &c
 			comp.Phase = phase
 			comp.Message = message
@@ -524,12 +524,10 @@ func updateComponentStatusPhase(cli client.Client,
 	} else {
 		comp = &dbaasv1alpha1.ClusterStatusComponent{Phase: phase, Message: message}
 	}
-	if comp != nil {
-		patch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Status.Components[componentName] = *comp
-		if err := cli.Status().Patch(ctx, cluster, patch); err != nil {
-			return err
-		}
+	if comp == nil {
+		return nil
 	}
-	return nil
+	patch := client.MergeFrom(cluster.DeepCopy())
+	cluster.Status.Components[componentName] = *comp
+	return cli.Status().Patch(ctx, cluster, patch)
 }

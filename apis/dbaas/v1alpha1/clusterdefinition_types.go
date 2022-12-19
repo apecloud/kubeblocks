@@ -238,7 +238,7 @@ type HorizontalScalePolicy struct {
 	//           since take multiple snapshots at one time might cause consistency problem.
 	// Backup: Use backup tool in backuppolicytemplate to handle data recovery when scaling. Not support yet. Do not use it.
 	// +kubebuilder:default=None
-	// +kubebuilder:validation:Enum={None,Snapshot,Backup}
+	// +kubebuilder:validation:Enum={None,Snapshot}
 	// +optional
 	Type HorizontalScalePolicyType `json:"type,omitempty"`
 

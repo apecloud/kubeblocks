@@ -96,12 +96,28 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(testCtx.CreateObj(ctx, newAppVersion)).Should(Succeed())
 
 		By("Test Cluster Phase")
-		ClusterPhasesMapperForOps[UpgradeType] = []Phase{RunningPhase}
+		OpsRequestBehaviourMapper[UpgradeType] = OpsRequestBehaviour{
+			FromClusterPhases: []Phase{RunningPhase},
+			ToClusterPhase:    UpdatingPhase,
+		}
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("Upgrade is forbidden"))
 		// update cluster phase to Running
 		clusterPatch := client.MergeFrom(cluster.DeepCopy())
 		cluster.Status.Phase = RunningPhase
 		Expect(k8sClient.Status().Patch(ctx, cluster, clusterPatch)).Should(Succeed())
+
+		By("Test existing other operations in cluster")
+		// update cluster existing operations
+		clusterPatch = client.MergeFrom(cluster.DeepCopy())
+		cluster.Annotations = map[string]string{
+			opsRequestAnnotationKey: `{"Updating":"testOpsName"}`,
+		}
+		Expect(k8sClient.Patch(ctx, cluster, clusterPatch)).Should(Succeed())
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("Existing OpsRequest: testOpsName"))
+		// delete annotations cluster phase to Running
+		clusterPatch = client.MergeFrom(cluster.DeepCopy())
+		cluster.Annotations = nil
+		Expect(k8sClient.Patch(ctx, cluster, clusterPatch)).Should(Succeed())
 
 		By("By creating a upgrade opsRequest, it should be succeed")
 		Eventually(func() bool {

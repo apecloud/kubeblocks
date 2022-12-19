@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package component
+package util
 
 import (
 	"testing"
@@ -42,7 +42,7 @@ func TestWalkOneStep(t *testing.T) {
 	step2.Obj = 2
 	step1.NextSteps[0] = step2
 
-	end, err := plan.walkOneStep()
+	end, err := plan.WalkOneStep()
 	if err != nil {
 		t.Errorf("walk error: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestWalkOneStep(t *testing.T) {
 
 	step2.Obj = 3
 
-	end, err = plan.walkOneStep()
+	end, err = plan.WalkOneStep()
 
 	if err != nil {
 		t.Errorf("walk error: %v", err)

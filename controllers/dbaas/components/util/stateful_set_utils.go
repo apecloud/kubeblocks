@@ -15,18 +15,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package component
+package util
 
 import (
-	"context"
 	"regexp"
 	"strconv"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
 // statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
@@ -69,33 +66,7 @@ func GetPodRevision(pod *corev1.Pod) string {
 	return pod.Labels[appsv1.StatefulSetRevisionLabel]
 }
 
-// GetComponentTypeName get component type name
-func GetComponentTypeName(cluster dbaasv1alpha1.Cluster, componentName string) string {
-	for _, component := range cluster.Spec.Components {
-		if componentName == component.Name {
-			return component.Type
-		}
-	}
-
-	return componentName
-}
-
-// GetComponentFromClusterDefinition get component from ClusterDefinition with typeName
-func GetComponentFromClusterDefinition(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, typeName string) (*dbaasv1alpha1.ClusterDefinitionComponent, error) {
-	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
-	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
-		return nil, err
-	}
-
-	for _, component := range clusterDef.Spec.Components {
-		if component.TypeName == typeName {
-			return &component, nil
-		}
-	}
-	return nil, nil
-}
-
-// StatefulSetIsReady check statefulSet is ready
+// StatefulSetIsReady check statefulSet is ready.
 func StatefulSetIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals bool) bool {
 	var componentIsRunning = true
 	// judge whether statefulSet is ready
@@ -105,4 +76,20 @@ func StatefulSetIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals 
 		componentIsRunning = false
 	}
 	return componentIsRunning
+}
+
+// StatefulSetPodsIsReady check pods of statefulSet is ready.
+func StatefulSetPodsIsReady(sts *appsv1.StatefulSet) bool {
+	return sts.Status.AvailableReplicas == *sts.Spec.Replicas &&
+		sts.Status.ObservedGeneration == sts.GetGeneration()
+}
+
+func CovertToStatefulSet(obj client.Object) *appsv1.StatefulSet {
+	if obj == nil {
+		return nil
+	}
+	if sts, ok := obj.(*appsv1.StatefulSet); ok {
+		return sts
+	}
+	return nil
 }

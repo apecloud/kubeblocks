@@ -592,7 +592,7 @@ spec:
 		if tmpCluster.Annotations == nil {
 			tmpCluster.Annotations = map[string]string{}
 		}
-		tmpCluster.Annotations[intctrlutil.OpsRequestAnnotationKey] = fmt.Sprintf("{\"%s\":\"%s\"}", toClusterPhase, opsRequestName)
+		tmpCluster.Annotations[intctrlutil.OpsRequestAnnotationKey] = fmt.Sprintf(`[{"clusterPhase": "%s", "name":"%s"}]`, toClusterPhase, opsRequestName)
 		Expect(k8sClient.Patch(ctx, tmpCluster, patch)).Should(Succeed())
 		Eventually(func() bool {
 			myCluster := &dbaasv1alpha1.Cluster{}
@@ -633,7 +633,7 @@ spec:
 			if tmpOps.Annotations == nil {
 				return false
 			}
-			_, ok := tmpOps.Annotations[OpsRequestReconcileAnnotationKey]
+			_, ok := tmpOps.Annotations[intctrlutil.OpsRequestReconcileAnnotationKey]
 			return ok
 		}, timeout, interval).Should(BeTrue())
 		return newOps, pvcName
@@ -862,8 +862,11 @@ spec:
 			_ = patchClusterPhaseMisMatch(opsRes)
 			_ = patchClusterExistOtherOperation(opsRes, "horizontalscaling-ops-"+randomStr)
 			_ = PatchClusterNotFound(opsRes)
-			_ = patchClusterPhaseWhenExistsOtherOps(opsRes, map[dbaasv1alpha1.Phase]string{
-				dbaasv1alpha1.PendingPhase: "mysql-restart",
+			_ = patchClusterPhaseWhenExistsOtherOps(opsRes, []OpsRecorder{
+				{
+					Name:           "mysql-restart",
+					ToClusterPhase: dbaasv1alpha1.PendingPhase,
+				},
 			})
 
 			By("Deleting the scope")

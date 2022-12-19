@@ -47,7 +47,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -686,7 +686,7 @@ spec:
 
 			By("Checking internal headless services")
 			for _, item := range fetchedG1.Spec.Components {
-				c, err := component.GetComponentFromClusterDefinition(ctx, k8sClient, fetchedG1, item.Type)
+				c, err := util.GetComponentDeftByCluster(ctx, k8sClient, fetchedG1, item.Type)
 				Expect(err).ShouldNot(HaveOccurred())
 				if c.ComponentType == dbaasv1alpha1.Stateless {
 					continue
@@ -907,7 +907,7 @@ spec:
 				Expect(k8sClient.List(ctx, podList, client.InNamespace(key.Namespace))).Should(Succeed())
 				pods = make([]corev1.Pod, 0)
 				for _, pod := range podList.Items {
-					if component.IsMemberOf(sts, &pod) {
+					if util.IsMemberOf(sts, &pod) {
 						pods = append(pods, pod)
 					}
 				}
@@ -976,7 +976,7 @@ spec:
 			Expect(k8sClient.List(ctx, podList, client.InNamespace(key.Namespace))).Should(Succeed())
 			pods := make([]corev1.Pod, 0)
 			for _, pod := range podList.Items {
-				if component.IsMemberOf(sts, &pod) {
+				if util.IsMemberOf(sts, &pod) {
 					pods = append(pods, pod)
 				}
 			}
@@ -1240,7 +1240,7 @@ involvedObject:
 	Expect(k8sClient.List(ctx, podList, client.InNamespace(key.Namespace))).Should(Succeed())
 	pods := make([]corev1.Pod, 0)
 	for _, pod := range podList.Items {
-		if component.IsMemberOf(sts, &pod) {
+		if util.IsMemberOf(sts, &pod) {
 			pods = append(pods, pod)
 		}
 	}

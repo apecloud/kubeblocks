@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 // Package v1alpha1 contains API Schema definitions for the dbaas v1alpha1 API group
-// +kubebuilder:skip
 package v1alpha1
 
 import (

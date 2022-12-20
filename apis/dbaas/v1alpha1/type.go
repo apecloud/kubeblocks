@@ -117,6 +117,8 @@ const (
 	WipeOut        TerminationPolicyType = "WipeOut"
 )
 
+// HScaleDataClonePolicyType defines data clone policy when horizontal scaling.
+// +enum
 type HScaleDataClonePolicyType string
 
 const (

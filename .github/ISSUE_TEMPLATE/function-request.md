@@ -1,8 +1,8 @@
 ---
-name: "[Function]Function request"
+name: Function request
 about: Suggest a function for this project
 title: "[Function]"
-labels: ''
+labels: kind/function
 assignees: nayutah
 
 ---

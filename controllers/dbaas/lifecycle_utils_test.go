@@ -17,19 +17,21 @@ limitations under the License.
 package dbaas
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	"github.com/leaanthony/debme"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"github.com/leaanthony/debme"
 	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -611,8 +613,7 @@ spec:
 		})
 	})
 
-	Context("Build object from cue template", func() {
-		stsYAML := `
+	stsYAML := `
 apiVersion: "apps/v1"
 kind: StatefulSet
 metadata:
@@ -714,36 +715,37 @@ spec:
     status:
       phase: Pending
 `
-		sts := appsv1.StatefulSet{}
-		Expect(yaml.Unmarshal([]byte(stsYAML), &sts)).Should(Succeed())
-		pvcKey := types.NamespacedName{
-			Namespace: "default",
-			Name:      "data-wesql-01-replicasets-0",
-		}
-		snapshotName := "test-snapshot-name"
-		cluster, clusterDef, appVer, _ := newAllFieldsClusterObj(nil, nil, false)
-		By("assign every available fields")
-		reqCtx := intctrlutil.RequestCtx{
-			Ctx: ctx,
-			Log: tlog,
-		}
-		component := mergeComponents(
-			reqCtx,
-			cluster,
-			clusterDef,
-			&clusterDef.Spec.Components[0],
-			&appVer.Spec.Components[0],
-			&cluster.Spec.Components[0])
-		Expect(component).ShouldNot(BeNil())
-		params := createParams{
-			clusterDefinition: clusterDef,
-			appVersion:        appVer,
-			cluster:           cluster,
-			component:         component,
-			applyObjs:         nil,
-			cacheCtx:          &map[string]interface{}{},
-		}
-		backupPolicyTemplateYAML := `
+	sts := appsv1.StatefulSet{}
+	Expect(yaml.Unmarshal([]byte(stsYAML), &sts)).Should(Succeed())
+	pvcKey := types.NamespacedName{
+		Namespace: "default",
+		Name:      "data-wesql-01-replicasets-0",
+	}
+	snapshotName := "test-snapshot-name"
+	cluster, clusterDef, appVer, _ := newAllFieldsClusterObj(nil, nil, false)
+	By("assign every available fields")
+	ctx := context.Background()
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx: ctx,
+		Log: tlog,
+	}
+	component := mergeComponents(
+		reqCtx,
+		cluster,
+		clusterDef,
+		&clusterDef.Spec.Components[0],
+		&appVer.Spec.Components[0],
+		&cluster.Spec.Components[0])
+	Expect(component).ShouldNot(BeNil())
+	params := createParams{
+		clusterDefinition: clusterDef,
+		appVersion:        appVer,
+		cluster:           cluster,
+		component:         component,
+		applyObjs:         nil,
+		cacheCtx:          &map[string]interface{}{},
+	}
+	backupPolicyTemplateYAML := `
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupPolicyTemplate
 metadata:
@@ -761,9 +763,10 @@ spec:
   schedule: 0 2 * * *
   ttl: 168h0m0s
 `
-		backupPolicyTemplate := dataprotectionv1alpha1.BackupPolicyTemplate{}
-		Expect(yaml.Unmarshal([]byte(backupPolicyTemplateYAML), &backupPolicyTemplate)).Should(Succeed())
+	backupPolicyTemplate := dataprotectionv1alpha1.BackupPolicyTemplate{}
+	Expect(yaml.Unmarshal([]byte(backupPolicyTemplateYAML), &backupPolicyTemplate)).Should(Succeed())
 
+	Context("Build object from cue template", func() {
 		It("Build PVC", func() {
 			pvc, err := buildPVCFromSnapshot(&sts, pvcKey, snapshotName)
 			Expect(err).Should(BeNil())
@@ -825,7 +828,8 @@ spec:
 				Namespace: "default",
 				Name:      "test-backup-job",
 			}
-			backupJob, err := buildBackupJob(&sts, backupJobKey)
+			backupPolicyName := "test-backup-policy"
+			backupJob, err := buildBackupJob(&sts, backupPolicyName, backupJobKey)
 			Expect(err).Should(BeNil())
 			Expect(backupJob).ShouldNot(BeNil())
 		})
@@ -850,6 +854,53 @@ spec:
 			cronJob, err := buildCronJob(pvcKey, schedule, &sts)
 			Expect(err).Should(BeNil())
 			Expect(cronJob).ShouldNot(BeNil())
+		})
+	})
+
+	vsYAML := fmt.Sprintf(`
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  labels:
+    app.kubernetes.io/component-name: replicasets
+    app.kubernetes.io/created-by: kubeblocks
+    app.kubernetes.io/instance: %s
+    app.kubernetes.io/managed-by: kubeblocks
+    app.kubernetes.io/name: state.mysql-8-apecloud-wesql
+    backupjobs.dataprotection.kubeblocks.io/name: wesql-01-replicasets-scaling-qf6cr
+    backuppolicies.dataprotection.kubeblocks.io/name: wesql-01-replicasets-scaling-hcxps
+    dataprotection.kubeblocks.io/backup-type: snapshot
+  name: test-volume-snapshot
+  namespace: default
+spec:
+  source:
+    persistentVolumeClaimName: data-wesql-01-replicasets-0
+  volumeSnapshotClassName: csi-aws-ebs-snapclass
+`, cluster.Name)
+	vs := snapshotv1.VolumeSnapshot{}
+	Expect(yaml.Unmarshal([]byte(vsYAML), &vs)).Should(Succeed())
+
+	Context("Backup in real cluster", func() {
+		It("doBackup", func() {
+			snapshotKey := types.NamespacedName{
+				Namespace: "default",
+				Name:      "test-snapshot",
+			}
+			component.HorizontalScalePolicy = &dbaasv1alpha1.HorizontalScalePolicy{
+				Type:             dbaasv1alpha1.Snapshot,
+				VolumeMountsName: "data",
+			}
+			Expect(k8sClient.Create(ctx, &vs)).Should(Succeed())
+			patch := client.MergeFrom(vs.DeepCopy())
+			t := true
+			vs.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: &t}
+			Expect(k8sClient.Status().Patch(ctx, &vs, patch)).Should(Succeed())
+			stsProto := *sts.DeepCopy()
+			r := int32(3)
+			stsProto.Spec.Replicas = &r
+			shouldRequeue, err := doBackup(reqCtx, k8sClient, cluster, component, &sts, &stsProto, snapshotKey)
+			Expect(shouldRequeue).Should(BeFalse())
+			Expect(err).Should(BeNil())
 		})
 	})
 })

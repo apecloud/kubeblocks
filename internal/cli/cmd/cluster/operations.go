@@ -53,7 +53,7 @@ type OperationsOptions struct {
 	OpsTypeLower string `json:"typeLower"`
 
 	// Upgrade options
-	AppVersionRef string `json:"appVersionRef"`
+	ClusterVersionRef string `json:"clusterVersionRef"`
 
 	// VerticalScaling options
 	RequestCPU    string `json:"requestCPU"`
@@ -97,8 +97,8 @@ func (o *OperationsOptions) CompleteRestartOps() error {
 }
 
 func (o *OperationsOptions) validateUpgrade() error {
-	if len(o.AppVersionRef) == 0 {
-		return fmt.Errorf("missing app-version")
+	if len(o.ClusterVersionRef) == 0 {
+		return fmt.Errorf("missing cluster-version")
 	}
 	return nil
 }
@@ -178,7 +178,7 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	inputs.Short = "Upgrade the cluster"
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
-		cmd.Flags().StringVar(&o.AppVersionRef, "app-version", "", "Reference app version (required)")
+		cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Reference app version (required)")
 	}
 	return create.BuildCommand(inputs)
 }

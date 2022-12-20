@@ -77,11 +77,11 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, dbClusterDef, dbClusterDefFinalizerName, func() (*ctrl.Result, error) {
 		recordEvent := func() {
 			r.Recorder.Event(dbClusterDef, corev1.EventTypeWarning, "ExistsReferencedResources",
-				"cannot be deleted because of existing referencing Cluster or AppVersion.")
+				"cannot be deleted because of existing referencing Cluster or ClusterVersion.")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, dbClusterDef,
 			clusterDefLabelKey, recordEvent, &dbaasv1alpha1.ClusterList{},
-			&dbaasv1alpha1.AppVersionList{}); res != nil || err != nil {
+			&dbaasv1alpha1.ClusterVersionList{}); res != nil || err != nil {
 			return res, err
 		}
 		return nil, r.deleteExternalResources(reqCtx, dbClusterDef)

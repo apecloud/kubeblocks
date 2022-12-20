@@ -1,15 +1,15 @@
-# permissions for end users to view appversions.
+# permissions for end users to view clusterversions.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "kubeblocks.fullname" . }}-appversion-viewer-role
+  name: {{ include "kubeblocks.fullname" . }}-clusterversion-viewer-role
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 rules:
 - apiGroups:
   - dbaas.kubeblocks.io
   resources:
-  - appversions
+  - clusterversions
   verbs:
   - get
   - list
@@ -17,6 +17,6 @@ rules:
 - apiGroups:
   - dbaas.kubeblocks.io
   resources:
-  - appversions/status
+  - clusterversions/status
   verbs:
   - get

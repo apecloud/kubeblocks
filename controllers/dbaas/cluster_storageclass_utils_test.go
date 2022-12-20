@@ -33,12 +33,12 @@ import (
 
 var _ = Describe("Event Controller", func() {
 	var (
-		timeout        = time.Second * 10
-		interval       = time.Second
-		clusterDefName = "cluster-def-" + testCtx.GetRandomStr()
-		appVersionName = "app-versoion-" + testCtx.GetRandomStr()
-		clusterName    = "mysql-for-storageclass-" + testCtx.GetRandomStr()
-		ctx            = context.Background()
+		timeout            = time.Second * 10
+		interval           = time.Second
+		clusterDefName     = "cluster-def-" + testCtx.GetRandomStr()
+		clusterVersionName = "app-versoion-" + testCtx.GetRandomStr()
+		clusterName        = "mysql-for-storageclass-" + testCtx.GetRandomStr()
+		ctx                = context.Background()
 	)
 
 	cleanupObjects := func() {
@@ -96,7 +96,7 @@ spec:
 	createAppversion := func() {
 		appVerYaml := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       AppVersion
+kind:       ClusterVersion
 metadata:
   name:     %s
 spec:
@@ -107,10 +107,10 @@ spec:
       containers:
       - name: mysql
         image: docker.io/apecloud/wesql-server:latest
-`, appVersionName, clusterDefName)
-		appVersion := &dbaasv1alpha1.AppVersion{}
-		Expect(yaml.Unmarshal([]byte(appVerYaml), appVersion)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, appVersion)).Should(Succeed())
+`, clusterVersionName, clusterDefName)
+		clusterVersion := &dbaasv1alpha1.ClusterVersion{}
+		Expect(yaml.Unmarshal([]byte(appVerYaml), clusterVersion)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
 	}
 
 	createStorageClassObj := func(storageClassName string, allowVolumeExpansion bool) {
@@ -146,12 +146,12 @@ metadata:
           {"Updating":"wesql-restart-test"}
        kubeblocks.io/storage-class: %s,%s
   labels:
-    appversion.kubeblocks.io/name: %s
+    clusterversion.kubeblocks.io/name: %s
     clusterdefinition.kubeblocks.io/name: %s
   name: %s
   namespace: default
 spec:
-  appVersionRef: %s
+  clusterVersionRef: %s
   clusterDefinitionRef: %s
   components:
   - monitor: false
@@ -178,7 +178,7 @@ spec:
         volumeMode: Filesystem  
         storageClassName: %s
   terminationPolicy: WipeOut`, defaultStorageClassName, storageClassName,
-			appVersionName, clusterDefName, clusterName, appVersionName,
+			clusterVersionName, clusterDefName, clusterName, clusterVersionName,
 			clusterDefName, defaultStorageClassName, storageClassName)
 		cluster := &dbaasv1alpha1.Cluster{}
 		Expect(yaml.Unmarshal([]byte(clusterYaml), cluster)).Should(Succeed())

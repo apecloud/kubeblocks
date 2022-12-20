@@ -6,7 +6,7 @@ metadata:
     {{- include "etcd-cluster.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: apecloud-etcd
-  appVersionRef: etcd-{{ default .Chart.AppVersion .Values.appVersionOverride }}
+  clusterVersionRef: etcd-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
   terminationPolicy: {{ .Values.terminationPolicy }}
   affinity:
     {{- with $.Values.topologyKeys }}

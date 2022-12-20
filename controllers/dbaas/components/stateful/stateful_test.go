@@ -34,17 +34,17 @@ import (
 
 var _ = Describe("Stateful Component", func() {
 	var (
-		randomStr      = testCtx.GetRandomStr()
-		clusterDefName = "mysql1-clusterdef-" + randomStr
-		appVersionName = "mysql1-appversion-" + randomStr
-		clusterName    = "mysql1-" + randomStr
-		timeout        = 10 * time.Second
-		interval       = time.Second
+		randomStr          = testCtx.GetRandomStr()
+		clusterDefName     = "mysql1-clusterdef-" + randomStr
+		clusterVersionName = "mysql1-clusterversion-" + randomStr
+		clusterName        = "mysql1-" + randomStr
+		timeout            = 10 * time.Second
+		interval           = time.Second
 	)
 	cleanupObjects := func() {
 		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -68,7 +68,7 @@ var _ = Describe("Stateful Component", func() {
 	Context("Stateful Component test", func() {
 		It("Stateful Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			_, _, cluster := testdbaas.InitConsensusMysql(testCtx, clusterDefName, appVersionName, clusterName)
+			_, _, cluster := testdbaas.InitConsensusMysql(testCtx, clusterDefName, clusterVersionName, clusterName)
 
 			_ = testdbaas.MockConsensusComponentStatefulSet(testCtx, clusterName)
 			stsList := &appsv1.StatefulSetList{}

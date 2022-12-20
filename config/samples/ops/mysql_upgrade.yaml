@@ -7,4 +7,4 @@ spec:
   clusterRef: wesql
   type: Upgrade
   upgrade:
-    appVersionRef: wesql-8.0.32
+    clusterVersionRef: wesql-8.0.32

@@ -112,7 +112,7 @@ configTemplate:
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
-appVersionOverride: ""
+clusterVersionOverride: ""
 
 logConfigs:
   error: /data/mysql/log/mysqld.err

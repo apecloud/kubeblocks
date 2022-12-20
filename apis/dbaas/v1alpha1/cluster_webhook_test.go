@@ -37,7 +37,7 @@ var _ = Describe("cluster webhook", func() {
 		clusterName             = "cluster-webhook-mysql-" + randomStr
 		clusterDefinitionName   = "cluster-webhook-mysql-definition-" + randomStr
 		secondClusterDefinition = "cluster-webhook-mysql-definition2-" + randomStr
-		appVersionName          = "cluster-webhook-mysql-appversion-" + randomStr
+		clusterVersionName      = "cluster-webhook-mysql-clusterversion-" + randomStr
 		timeout                 = time.Second * 10
 		interval                = time.Second
 	)
@@ -45,7 +45,7 @@ var _ = Describe("cluster webhook", func() {
 		// Add any setup steps that needs to be executed before each test
 		err := k8sClient.DeleteAllOf(ctx, &Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
+		err = k8sClient.DeleteAllOf(ctx, &ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -62,8 +62,8 @@ var _ = Describe("cluster webhook", func() {
 
 	Context("When cluster create and update", func() {
 		It("Should webhook validate passed", func() {
-			By("By testing creating a new clusterDefinition when no appVersion and clusterDefinition")
-			cluster, _ := createTestCluster(clusterDefinitionName, appVersionName, clusterName)
+			By("By testing creating a new clusterDefinition when no clusterVersion and clusterDefinition")
+			cluster, _ := createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
 			Expect(testCtx.CreateObj(ctx, cluster).Error()).To(ContainSubstring("not found"))
 
 			By("By creating a new clusterDefinition")
@@ -79,17 +79,17 @@ var _ = Describe("cluster webhook", func() {
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
-			By("By creating a new appVersion")
-			appVersion := createTestAppVersionObj(clusterDefinitionName, appVersionName)
-			Expect(testCtx.CreateObj(ctx, appVersion)).Should(Succeed())
-			// wait until AppVersion created
+			By("By creating a new clusterVersion")
+			clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
+			Expect(testCtx.CreateObj(ctx, clusterVersion)).Should(Succeed())
+			// wait until ClusterVersion created
 			Eventually(func() bool {
-				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: appVersionName}, appVersion)
+				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterVersionName}, clusterVersion)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
 			By("By creating a new Cluster")
-			cluster, _ = createTestCluster(clusterDefinitionName, appVersionName, clusterName)
+			cluster, _ = createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
 			Expect(testCtx.CreateObj(ctx, cluster)).Should(Succeed())
 
 			By("By testing update spec.clusterDefinitionRef")
@@ -157,7 +157,7 @@ var _ = Describe("cluster webhook", func() {
 	})
 })
 
-func createTestCluster(clusterDefinitionName, appVersionName, clusterName string) (*Cluster, error) {
+func createTestCluster(clusterDefinitionName, clusterVersionName, clusterName string) (*Cluster, error) {
 	clusterYaml := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: Cluster
@@ -166,7 +166,7 @@ metadata:
   namespace: default
 spec:
   clusterDefinitionRef: %s
-  appVersionRef: %s
+  clusterVersionRef: %s
   components:
   - name: replicasets
     type: replicasets
@@ -180,7 +180,7 @@ spec:
   - name: proxy
     type: proxy
     replicas: 1
-`, clusterName, clusterDefinitionName, appVersionName)
+`, clusterName, clusterDefinitionName, clusterVersionName)
 	cluster := &Cluster{}
 	err := yaml.Unmarshal([]byte(clusterYaml), cluster)
 	cluster.Spec.TerminationPolicy = WipeOut

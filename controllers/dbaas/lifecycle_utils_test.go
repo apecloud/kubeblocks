@@ -375,11 +375,11 @@ spec:
 		return clusterDefinition
 	}
 
-	allFieldsAppVersionObj := func(needCreate bool) *dbaasv1alpha1.AppVersion {
-		By("By assure an appVersion obj")
+	allFieldsClusterVersionObj := func(needCreate bool) *dbaasv1alpha1.ClusterVersion {
+		By("By assure an clusterVersion obj")
 		appVerYAML := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       AppVersion
+kind:       ClusterVersion
 metadata:
   name:     app-version
 spec:
@@ -488,25 +488,25 @@ spec:
       - name: nginx
         image: nginx
 `
-		appVersion := &dbaasv1alpha1.AppVersion{}
-		Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(Succeed())
+		clusterVersion := &dbaasv1alpha1.ClusterVersion{}
+		Expect(yaml.Unmarshal([]byte(appVerYAML), clusterVersion)).Should(Succeed())
 		if needCreate {
-			Expect(testCtx.CheckedCreateObj(ctx, appVersion)).Should(Succeed())
+			Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
 		}
-		return appVersion
+		return clusterVersion
 	}
 
 	newAllFieldsClusterObj := func(
 		clusterDefObj *dbaasv1alpha1.ClusterDefinition,
-		appVersionObj *dbaasv1alpha1.AppVersion,
+		clusterVersionObj *dbaasv1alpha1.ClusterVersion,
 		needCreate bool,
-	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.AppVersion, types.NamespacedName) {
-		// setup Cluster obj required default ClusterDefinition and AppVersion objects if not provided
+	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, types.NamespacedName) {
+		// setup Cluster obj required default ClusterDefinition and ClusterVersion objects if not provided
 		if clusterDefObj == nil {
 			clusterDefObj = allFieldsClusterDefObj(needCreate)
 		}
-		if appVersionObj == nil {
-			appVersionObj = allFieldsAppVersionObj(needCreate)
+		if clusterVersionObj == nil {
+			clusterVersionObj = allFieldsClusterVersionObj(needCreate)
 		}
 
 		randomStr, _ := password.Generate(6, 0, 0, true, false)
@@ -523,7 +523,7 @@ metadata:
   namespace: %s
 spec:
   clusterDefinitionRef: %s
-  appVersionRef: %s
+  clusterVersionRef: %s
   terminationPolicy: WipeOut
   components:
   - name: replicasets
@@ -545,7 +545,7 @@ spec:
       requests: 
         cpu: 2
         memory: 4Gi
-`, key.Name, key.Namespace, clusterDefObj.GetName(), appVersionObj.GetName())
+`, key.Name, key.Namespace, clusterDefObj.GetName(), clusterVersionObj.GetName())
 
 		cluster := &dbaasv1alpha1.Cluster{}
 		Expect(yaml.Unmarshal([]byte(clusterYaml), cluster)).Should(Succeed())
@@ -553,7 +553,7 @@ spec:
 			Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
 		}
 
-		return cluster, clusterDefObj, appVersionObj, key
+		return cluster, clusterDefObj, clusterVersionObj, key
 	}
 
 	Context("When mergeComponents", func() {
@@ -582,8 +582,8 @@ spec:
 				&appVer.Spec.Components[0],
 				&cluster.Spec.Components[0])
 			Expect(component).ShouldNot(BeNil())
-			appVer = allFieldsAppVersionObj(true)
-			By("new container in appversion not in clusterdefinition")
+			appVer = allFieldsClusterVersionObj(true)
+			By("new container in clusterVersion not in clusterDefinition")
 			component = mergeComponents(
 				reqCtx,
 				cluster,
@@ -739,7 +739,7 @@ spec:
 	Expect(component).ShouldNot(BeNil())
 	params := createParams{
 		clusterDefinition: clusterDef,
-		appVersion:        appVer,
+		clusterVersion:    appVer,
 		cluster:           cluster,
 		component:         component,
 		applyObjs:         nil,

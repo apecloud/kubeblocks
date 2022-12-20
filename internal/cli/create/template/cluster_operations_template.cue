@@ -6,7 +6,7 @@ options: {
 	type:                   string
 	typeLower:              string
 	ttlSecondsAfterSucceed: int
-	appVersionRef:          string
+	clusterVersionRef:      string
 	componentNames: [...string]
 	requestCPU:    string
 	requestMemory: string
@@ -19,7 +19,7 @@ options: {
 
 // define operation block,
 #upgrade: {
-	appVersionRef: options.appVersionRef
+	clusterVersionRef: options.clusterVersionRef
 }
 
 // required, k8s api resource content

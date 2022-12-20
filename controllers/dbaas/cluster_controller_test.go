@@ -66,7 +66,7 @@ var _ = Describe("Cluster Controller", func() {
 		Namespace: "default",
 	}
 	var deleteClusterNWait func(key types.NamespacedName) error
-	var deleteAppVersionNWait func(key types.NamespacedName) error
+	var deleteClusterVersionNWait func(key types.NamespacedName) error
 	var deleteClusterDefNWait func(key types.NamespacedName) error
 	ctx := context.Background()
 
@@ -76,7 +76,7 @@ var _ = Describe("Cluster Controller", func() {
 			client.InNamespace(testCtx.DefaultNamespace),
 			client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -221,13 +221,13 @@ spec:
 		return clusterDefinition
 	}
 
-	assureAppVersionObj := func() *dbaasv1alpha1.AppVersion {
-		By("Assuring an appVersion obj")
+	assureClusterVersionObj := func() *dbaasv1alpha1.ClusterVersion {
+		By("Assuring an clusterVersion obj")
 		appVerYAML := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: AppVersion
+kind: ClusterVersion
 metadata:
-  name: app-version
+  name: cluster-version
 spec:
   clusterDefinitionRef: cluster-definition
   components:
@@ -245,23 +245,23 @@ spec:
       - name: nginx
         image: nginx
 `
-		appVersion := &dbaasv1alpha1.AppVersion{}
-		Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, appVersion)).Should(Succeed())
-		return appVersion
+		clusterVersion := &dbaasv1alpha1.ClusterVersion{}
+		Expect(yaml.Unmarshal([]byte(appVerYAML), clusterVersion)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
+		return clusterVersion
 	}
 
 	newClusterObj := func(
 		clusterDefObj *dbaasv1alpha1.ClusterDefinition,
-		appVersionObj *dbaasv1alpha1.AppVersion,
-	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.AppVersion, types.NamespacedName) {
-		// setup Cluster obj required default ClusterDefinition and AppVersion objects if not provided
+		clusterVersionObj *dbaasv1alpha1.ClusterVersion,
+	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, types.NamespacedName) {
+		// setup Cluster obj required default ClusterDefinition and ClusterVersion objects if not provided
 		if clusterDefObj == nil {
 			assureCfgTplConfigMapObj("")
 			clusterDefObj = assureClusterDefObj()
 		}
-		if appVersionObj == nil {
-			appVersionObj = assureAppVersionObj()
+		if clusterVersionObj == nil {
+			clusterVersionObj = assureClusterVersionObj()
 		}
 
 		randomStr, _ := password.Generate(6, 0, 0, true, false)
@@ -277,10 +277,10 @@ spec:
 			},
 			Spec: dbaasv1alpha1.ClusterSpec{
 				ClusterDefRef:     clusterDefObj.GetName(),
-				AppVersionRef:     appVersionObj.GetName(),
+				ClusterVersionRef: clusterVersionObj.GetName(),
 				TerminationPolicy: dbaasv1alpha1.WipeOut,
 			},
-		}, clusterDefObj, appVersionObj, key
+		}, clusterDefObj, clusterVersionObj, key
 	}
 
 	deleteClusterNWait = func(key types.NamespacedName) error {
@@ -301,9 +301,9 @@ spec:
 		return client.IgnoreNotFound(err)
 	}
 
-	deleteAppVersionNWait = func(key types.NamespacedName) error {
+	deleteClusterVersionNWait = func(key types.NamespacedName) error {
 		Expect(func() error {
-			f := &dbaasv1alpha1.AppVersion{}
+			f := &dbaasv1alpha1.ClusterVersion{}
 			if err := k8sClient.Get(ctx, key, f); err != nil {
 				return client.IgnoreNotFound(err)
 			}
@@ -311,10 +311,10 @@ spec:
 		}()).Should(Succeed())
 
 		var err error
-		f := &dbaasv1alpha1.AppVersion{}
+		f := &dbaasv1alpha1.ClusterVersion{}
 		eta := time.Now().Add(waitDuration)
 		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
-			f = &dbaasv1alpha1.AppVersion{}
+			f = &dbaasv1alpha1.ClusterVersion{}
 		}
 		return client.IgnoreNotFound(err)
 	}
@@ -429,13 +429,13 @@ spec:
 		return clusterDefinition
 	}
 
-	assureAppVersionWithConsensusObj := func() *dbaasv1alpha1.AppVersion {
-		By("Assuring an appVersion obj with componentType = Consensus")
+	assureClusterVersionWithConsensusObj := func() *dbaasv1alpha1.ClusterVersion {
+		By("Assuring an clusterVersion obj with componentType = Consensus")
 		appVerYAML := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: AppVersion
+kind: ClusterVersion
 metadata:
-  name: app-version-consensus
+  name: cluster-version-consensus
 spec:
   clusterDefinitionRef: cluster-definition-consensus
   components:
@@ -446,23 +446,23 @@ spec:
         image: docker.io/apecloud/wesql-server:latest
         imagePullPolicy: IfNotPresent
 `
-		appVersion := &dbaasv1alpha1.AppVersion{}
-		Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, appVersion)).Should(Succeed())
-		return appVersion
+		clusterVersion := &dbaasv1alpha1.ClusterVersion{}
+		Expect(yaml.Unmarshal([]byte(appVerYAML), clusterVersion)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
+		return clusterVersion
 	}
 
 	newClusterWithConsensusObj := func(
 		clusterDefObj *dbaasv1alpha1.ClusterDefinition,
-		appVersionObj *dbaasv1alpha1.AppVersion,
-	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.AppVersion, types.NamespacedName) {
-		// setup Cluster obj required default ClusterDefinition and AppVersion objects if not provided
+		clusterVersionObj *dbaasv1alpha1.ClusterVersion,
+	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, types.NamespacedName) {
+		// setup Cluster obj required default ClusterDefinition and ClusterVersion objects if not provided
 		if clusterDefObj == nil {
 			assureCfgTplConfigMapObj("")
 			clusterDefObj = assureClusterDefWithConsensusObj()
 		}
-		if appVersionObj == nil {
-			appVersionObj = assureAppVersionWithConsensusObj()
+		if clusterVersionObj == nil {
+			clusterVersionObj = assureClusterVersionWithConsensusObj()
 		}
 
 		randomStr, _ := password.Generate(6, 0, 0, true, false)
@@ -478,7 +478,7 @@ spec:
 			},
 			Spec: dbaasv1alpha1.ClusterSpec{
 				ClusterDefRef:     clusterDefObj.GetName(),
-				AppVersionRef:     appVersionObj.GetName(),
+				ClusterVersionRef: clusterVersionObj.GetName(),
 				TerminationPolicy: dbaasv1alpha1.WipeOut,
 				Components: []dbaasv1alpha1.ClusterComponent{
 					{
@@ -502,7 +502,7 @@ spec:
 					},
 				},
 			},
-		}, clusterDefObj, appVersionObj, key
+		}, clusterDefObj, clusterVersionObj, key
 	}
 
 	isCMAvailable := func() bool {
@@ -535,7 +535,7 @@ spec:
 		return stsList
 	}
 
-	createClusterNCheck := func() (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.AppVersion, types.NamespacedName) {
+	createClusterNCheck := func() (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, types.NamespacedName) {
 		By("Creating a cluster")
 		toCreate, cd, appVer, key := newClusterObj(nil, nil)
 		Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
@@ -900,11 +900,11 @@ spec:
 			}
 			Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
 
-			By("Create real appversion")
+			By("Create real ClusterVersion")
 			appVerKey := types.NamespacedName{Name: "test-wesql-8.0.30"}
 			appVerYAML := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: AppVersion
+kind: ClusterVersion
 metadata:
   labels:
     app.kubernetes.io/instance: kubeblocks
@@ -925,19 +925,19 @@ spec:
         resources: {}
     type: replicasets
 `, appVerKey.Name, clusterDefKey.Name)
-			appVersion := &dbaasv1alpha1.AppVersion{}
-			Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(Succeed())
-			Expect(testCtx.CheckedCreateObj(ctx, appVersion)).Should(Succeed())
+			clusterVersion := &dbaasv1alpha1.ClusterVersion{}
+			Expect(yaml.Unmarshal([]byte(appVerYAML), clusterVersion)).Should(Succeed())
+			Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
 
-			appVersionList := dbaasv1alpha1.AppVersionList{}
+			clusterVersionList := dbaasv1alpha1.ClusterVersionList{}
 			Eventually(func() bool {
-				Expect(k8sClient.List(ctx, &appVersionList, client.MatchingLabels{
+				Expect(k8sClient.List(ctx, &clusterVersionList, client.MatchingLabels{
 					"clusterdefinition.kubeblocks.io/name": clusterDefKey.Name,
 				}, client.InNamespace(appVerKey.Namespace))).Should(Succeed())
-				if len(appVersionList.Items) == 0 {
+				if len(clusterVersionList.Items) == 0 {
 					return false
 				}
-				return appVersionList.Items[0].Status.Phase == "Available"
+				return clusterVersionList.Items[0].Status.Phase == "Available"
 			}, timeout, interval).Should(BeTrue())
 
 			By("By creating a cluster")
@@ -950,7 +950,7 @@ metadata:
   namespace: %s
 spec:
   clusterDefinitionRef: %s
-  appVersionRef: %s
+  clusterVersionRef: %s
   components:
   - name: replicasets
     type: replicasets
@@ -1134,9 +1134,9 @@ spec:
 				return deleteClusterNWait(key)
 			}, timeout, interval).Should(Succeed())
 
-			By("Deleting AppVersion")
+			By("Deleting ClusterVersion")
 			Eventually(func() error {
-				return deleteAppVersionNWait(key)
+				return deleteClusterVersionNWait(key)
 			}, timeout, interval).Should(Succeed())
 
 			By("Deleting ClusterDefinition")

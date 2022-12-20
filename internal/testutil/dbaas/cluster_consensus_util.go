@@ -42,27 +42,27 @@ var (
 
 func InitConsensusMysql(testCtx testutil.TestContext,
 	clusterDefName,
-	appVersionName,
-	clusterName string) (*dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.AppVersion, *dbaasv1alpha1.Cluster) {
+	clusterVersionName,
+	clusterName string) (*dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, *dbaasv1alpha1.Cluster) {
 	clusterDef := CreateConsensusMysqlClusterDef(testCtx, clusterDefName)
-	appVersion := CreateConsensusMysqlAppVersion(testCtx, clusterDefName, appVersionName)
-	cluster := CreateConsensusMysqlCluster(testCtx, clusterDefName, appVersionName, clusterName)
-	return clusterDef, appVersion, cluster
+	clusterVersion := CreateConsensusMysqlClusterVersion(testCtx, clusterDefName, clusterVersionName)
+	cluster := CreateConsensusMysqlCluster(testCtx, clusterDefName, clusterVersionName, clusterName)
+	return clusterDef, clusterVersion, cluster
 }
 
 // CreateConsensusMysqlCluster create a mysql cluster with a consensus component
-func CreateConsensusMysqlCluster(testCtx testutil.TestContext, clusterDefName, appVersionName, clusterName string) *dbaasv1alpha1.Cluster {
+func CreateConsensusMysqlCluster(testCtx testutil.TestContext, clusterDefName, clusterVersionName, clusterName string) *dbaasv1alpha1.Cluster {
 	clusterYaml := fmt.Sprintf(`apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   labels:
-    appversion.kubeblocks.io/name: %s
+    clusterversion.kubeblocks.io/name: %s
     clusterdefinition.kubeblocks.io/name: %s
     app.kubernetes.io/managed-by: kubeblocks
   name: %s
   namespace: default
 spec:
-  appVersionRef: %s
+  clusterVersionRef: %s
   clusterDefinitionRef: %s
   components:
   - monitor: false
@@ -80,7 +80,7 @@ spec:
           requests:
             storage: 2Gi
   terminationPolicy: WipeOut
-`, appVersionName, clusterDefName, clusterName, appVersionName, clusterDefName, ConsensusComponentName)
+`, clusterVersionName, clusterDefName, clusterName, clusterVersionName, clusterDefName, ConsensusComponentName)
 	cluster := &dbaasv1alpha1.Cluster{}
 	gomega.Expect(yaml.Unmarshal([]byte(clusterYaml), cluster)).Should(gomega.Succeed())
 	gomega.Expect(testCtx.CreateObj(context.Background(), cluster)).Should(gomega.Succeed())
@@ -130,11 +130,11 @@ spec:
 	return clusterDef
 }
 
-// CreateConsensusMysqlAppVersion create a mysql appVersion with a consensus component
-func CreateConsensusMysqlAppVersion(testCtx testutil.TestContext, clusterDefName, appVersionName string) *dbaasv1alpha1.AppVersion {
+// CreateConsensusMysqlClusterVersion create a mysql clusterVersion with a consensus component
+func CreateConsensusMysqlClusterVersion(testCtx testutil.TestContext, clusterDefName, clusterVersionName string) *dbaasv1alpha1.ClusterVersion {
 	appVerYAML := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       AppVersion
+kind:       ClusterVersion
 metadata:
   name:  %s
 spec:
@@ -145,15 +145,15 @@ spec:
       containers:
       - name: mysql
         image: docker.io/apecloud/wesql-server:latest
-`, appVersionName, clusterDefName)
-	appVersion := &dbaasv1alpha1.AppVersion{}
-	gomega.Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(gomega.Succeed())
-	gomega.Expect(testCtx.CreateObj(ctx, appVersion)).Should(gomega.Succeed())
+`, clusterVersionName, clusterDefName)
+	clusterVersion := &dbaasv1alpha1.ClusterVersion{}
+	gomega.Expect(yaml.Unmarshal([]byte(appVerYAML), clusterVersion)).Should(gomega.Succeed())
+	gomega.Expect(testCtx.CreateObj(ctx, clusterVersion)).Should(gomega.Succeed())
 	gomega.Eventually(func() bool {
-		err := testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: appVersionName, Namespace: testCtx.DefaultNamespace}, appVersion)
+		err := testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: clusterVersionName, Namespace: testCtx.DefaultNamespace}, clusterVersion)
 		return err == nil
 	}, timeout, interval).Should(gomega.BeTrue())
-	return appVersion
+	return clusterVersion
 }
 
 // MockConsensusComponentStatefulSet mock the component statefulSet, just using in envTest

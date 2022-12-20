@@ -1,9 +1,9 @@
 # API scope: cluster
-# AppVersion
+# ClusterVersion
 apiVersion: "dbaas.kubeblocks.io/v1alpha1"
-kind:       "AppVersion"
+kind:       "ClusterVersion"
 metadata:
-  name:      "appversion-mongodb-3.4"
+  name:      "clusterversion-mongodb-3.4"
 spec:
   #  # ref ClusterDefinition
   #  clusterDefinitionRef: a-vendor-mongodbcluster

@@ -40,13 +40,13 @@ webhooks:
     service:
       name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
-      path: /mutate-dbaas-kubeblocks-io-v1alpha1-appversion
+      path: /mutate-dbaas-kubeblocks-io-v1alpha1-clusterversion
       port: {{ .Values.service.port }}
     {{- if .Values.admissionWebhooks.createSelfSignedCert }}
     caBundle: {{ $ca.Cert | b64enc }}
     {{- end }}
   failurePolicy: Fail
-  name: mappversion.kb.io
+  name: mclusterversion.kb.io
   rules:
   - apiGroups:
     - dbaas.kubeblocks.io
@@ -56,7 +56,7 @@ webhooks:
     - CREATE
     - UPDATE
     resources:
-    - appversions
+    - clusterversions
   sideEffects: None
 - admissionReviewVersions:
   - v1
@@ -142,13 +142,13 @@ webhooks:
     service:
       name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
-      path: /validate-dbaas-kubeblocks-io-v1alpha1-appversion
+      path: /validate-dbaas-kubeblocks-io-v1alpha1-clusterversion
       port: {{ .Values.service.port }}
     {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
     caBundle: {{ $ca.Cert | b64enc }}
     {{- end }}
   failurePolicy: Fail
-  name: vappversion.kb.io
+  name: vclusterversion.kb.io
   rules:
   - apiGroups:
     - dbaas.kubeblocks.io
@@ -158,7 +158,7 @@ webhooks:
     - CREATE
     - UPDATE
     resources:
-    - appversions
+    - clusterversions
   sideEffects: None
 - admissionReviewVersions:
   - v1

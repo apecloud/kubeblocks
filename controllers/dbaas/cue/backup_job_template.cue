@@ -15,13 +15,13 @@ backup_job: {
 	apiVersion: "dataprotection.kubeblocks.io/v1alpha1"
 	kind:       "BackupJob"
 	metadata: {
-		generateName:      "\(backup_job_key.Name)-"
-		namespace: backup_job_key.Namespace
+		generateName: "\(backup_job_key.Name)-"
+		namespace:    backup_job_key.Namespace
 		labels: {
 			"dataprotection.kubeblocks.io/backup-type":         "snapshot"
-			"app.kubernetes.io/created-by": "kubeblocks"
+			"app.kubernetes.io/created-by":                     "kubeblocks"
 			"backuppolicies.dataprotection.kubeblocks.io/name": backup_policy_name
-			"app.kubernetes.io/created-by": "kubeblocks"
+			"app.kubernetes.io/created-by":                     "kubeblocks"
 			for k, v in sts.metadata.labels {
 				"\(k)": "\(v)"
 			}

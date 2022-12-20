@@ -64,19 +64,6 @@ var (
 	cacheCtx     = map[string]interface{}{}
 )
 
-func (c createParams) getCacheBytesValue(key string, valueCreator func() ([]byte, error)) ([]byte, error) {
-	vIf, ok := (*c.cacheCtx)[key]
-	if ok {
-		return vIf.([]byte), nil
-	}
-	v, err := valueCreator()
-	if err != nil {
-		return nil, err
-	}
-	(*c.cacheCtx)[key] = v
-	return v, err
-}
-
 func getCacheCUETplValue(key string, valueCreator func() (*intctrlutil.CUETpl, error)) (*intctrlutil.CUETpl, error) {
 	vIf, ok := cacheCtx[key]
 	if ok {
@@ -402,7 +389,7 @@ func mergeComponents(
 		component.Name = clusterComp.Name // component name gets overrided
 		component.EnabledLogs = clusterComp.EnabledLogs
 
-		// user can scale down replicas to 0
+		// user can scale in replicas to 0
 		if clusterComp.Replicas != nil {
 			component.Replicas = *clusterComp.Replicas
 		}
@@ -827,7 +814,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			return true, nil
 		}
 
-		scaleUp := func() (shouldRequeue bool, err error) {
+		scaleOut := func() (shouldRequeue bool, err error) {
 			shouldRequeue = false
 			if err = cleanCronJobs(); err != nil {
 				return
@@ -849,8 +836,8 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				snapshotKey)
 		}
 
-		scaleDown := func() error {
-			// scale down, if scale down to 0, do not delete pvc
+		scaleIn := func() error {
+			// scale in, if scale in to 0, do not delete pvc
 			if *stsProto.Spec.Replicas == 0 || len(stsObj.Spec.VolumeClaimTemplates) == 0 {
 				return nil
 			}
@@ -902,7 +889,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		// when horizontal scaling up, sometimes db needs backup to sync data from master,
 		// log is not reliable enough since it can be recycled
 		if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
-			shouldRequeue, err = scaleUp()
+			shouldRequeue, err = scaleOut()
 			if err != nil {
 				return false, err
 			}
@@ -910,7 +897,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				return true, nil
 			}
 		} else if *stsObj.Spec.Replicas > *stsProto.Spec.Replicas {
-			if err := scaleDown(); err != nil {
+			if err := scaleIn(); err != nil {
 				return false, err
 			}
 		}
@@ -942,7 +929,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			return true, err
 		}
 		// clean backup resources.
-		// there will not be any backup resources other than scale up.
+		// there will not be any backup resources other than scale out.
 		if err := cleanBackupResourcesIfNeeded(); err != nil {
 			return false, err
 		}
@@ -2092,7 +2079,9 @@ func buildFromCUE(tplName string, fillMap map[string]any, lookupKey string, targ
 	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
 
 	for k, v := range fillMap {
-		cueValue.FillObj(k, v)
+		if err := cueValue.FillObj(k, v); err != nil {
+			return err
+		}
 	}
 
 	b, err := cueValue.Lookup(lookupKey)

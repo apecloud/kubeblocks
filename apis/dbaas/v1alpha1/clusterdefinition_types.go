@@ -228,7 +228,7 @@ type ClusterDefinitionComponent struct {
 }
 
 type HorizontalScalePolicy struct {
-	// Type controls what kind of data synchronization do when component scale up.
+	// Type controls what kind of data synchronization do when component scale out.
 	// Policy is in enum of {None, Snapshot}. The default policy is `None`.
 	// None: Default policy, do nothing.
 	// Snapshot: Do native volume snapshot before scaling and restore to newly scaled pods.
@@ -244,6 +244,10 @@ type HorizontalScalePolicy struct {
 	// BackupTemplateSelector defines the label selector for finding associated BackupTemplate API object.
 	// +optional
 	BackupTemplateSelector map[string]string `json:"backupTemplateSelector,omitempty"`
+
+	// test add field
+	// +optional
+	Test string `json:"test,omitempty"`
 
 	// VolumeMountsName defines which volumeMount of the container to do backup,
 	// only work if Type is not None

@@ -142,6 +142,19 @@ func GetClusterDefByName(dynamic dynamic.Interface, name string) (*dbaasv1alpha1
 	return clusterDef, nil
 }
 
+func GetClusterByName(dynamic dynamic.Interface, name string, namespace string) (*dbaasv1alpha1.Cluster, error) {
+	cluster := &dbaasv1alpha1.Cluster{}
+	obj, err := dynamic.Resource(types.ClusterGVR()).Namespace(namespace).
+		Get(context.TODO(), name, metav1.GetOptions{}, "")
+	if err != nil {
+		return nil, err
+	}
+	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cluster); err != nil {
+		return nil, err
+	}
+	return cluster, nil
+}
+
 func GetVersionByClusterDef(dynamic dynamic.Interface, clusterDef string) (*dbaasv1alpha1.AppVersionList, error) {
 	versionList := &dbaasv1alpha1.AppVersionList{}
 	objList, err := dynamic.Resource(types.AppVersionGVR()).Namespace("").

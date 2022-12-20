@@ -83,9 +83,9 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Build(list.Build)
 }
 
-func customFlags(options builder.Options, cmd *cobra.Command) {
-	o := options.(*listOptions)
-
+func customFlags(c *builder.Command) {
+	o := c.Options.(*listOptions)
+	cmd := c.Cmd
 	cmd.Flags().BoolVar(&o.showInstance, "show-instance", false, "Show instance info")
 	cmd.Flags().BoolVar(&o.showComponent, "show-component", false, "Show component info")
 }

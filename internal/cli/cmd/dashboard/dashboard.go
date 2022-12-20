@@ -166,7 +166,7 @@ func newOpenCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	o := newOpenOptions(f, streams)
 	cmd := &cobra.Command{
 		Use:   "open",
-		Short: "open one dashboard",
+		Short: "Open one dashboard",
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			var names []string
 			for _, d := range dashboards {

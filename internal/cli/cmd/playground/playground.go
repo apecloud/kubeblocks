@@ -355,10 +355,12 @@ func newCreateOptions(cd string, version string) (*cmdcluster.CreateOptions, err
 			Name:      kbClusterName,
 			Client:    dynamicClient,
 		},
-		TerminationPolicy: "WipeOut",
-		ClusterDefRef:     cd,
-		AppVersionRef:     version,
-		Monitor:           true,
+		UpdatableFlags: cmdcluster.UpdatableFlags{
+			TerminationPolicy: "WipeOut",
+			Monitor:           true,
+		},
+		ClusterDefRef: cd,
+		AppVersionRef: version,
 	}
 
 	if err = options.Complete(); err != nil {

@@ -1,6 +1,6 @@
 ## kbcli cluster vertical-scaling
 
-vertical scaling the specified components in the cluster
+Vertical scaling the specified components in the cluster
 
 ```
 kbcli cluster vertical-scaling [flags]

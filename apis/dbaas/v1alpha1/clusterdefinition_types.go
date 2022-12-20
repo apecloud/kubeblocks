@@ -245,10 +245,6 @@ type HorizontalScalePolicy struct {
 	// +optional
 	BackupTemplateSelector map[string]string `json:"backupTemplateSelector,omitempty"`
 
-	// test add field
-	// +optional
-	Test string `json:"test,omitempty"`
-
 	// VolumeMountsName defines which volumeMount of the container to do backup,
 	// only work if Type is not None
 	// if not specified, the 1st volumeMount will be chosen

@@ -24,10 +24,10 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-	"net"
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -46,17 +46,10 @@ type Mysql struct {
 	mu       sync.Mutex
 	logger   logger.Logger
 	metadata bindings.Metadata
+	base     internal.ProbeBase
 }
 
 const (
-	// list of operations.
-	execOperation         bindings.OperationKind = "exec"
-	runningCheckOperation bindings.OperationKind = "runningCheck"
-	statusCheckOperation  bindings.OperationKind = "statusCheck"
-	roleCheckOperation    bindings.OperationKind = "roleCheck"
-	queryOperation        bindings.OperationKind = "query"
-	closeOperation        bindings.OperationKind = "close"
-
 	// configurations to connect to Mysql, either a data source name represent by URL.
 	connectionURLKey = "url"
 
@@ -74,41 +67,17 @@ const (
 	maxOpenConnsKey    = "maxOpenConns"
 	connMaxLifetimeKey = "connMaxLifetime"
 	connMaxIdleTimeKey = "connMaxIdleTime"
-
-	// keys from request's metadata.
-	commandSQLKey = "sql"
-
-	// keys from response's metadata.
-	respOpKey           = "operation"
-	respSQLKey          = "sql"
-	respStartTimeKey    = "start-time"
-	respRowsAffectedKey = "rows-affected"
-	respEndTimeKey      = "end-time"
-	respDurationKey     = "duration"
-	statusCode          = "status-code"
-	//451 Unavailable For Legal Reasons, used to indicate check failed and trigger kubelet events
-	checkFailedHTTPCode = "451"
 )
 
 const (
-	runningCheckType = iota
-	statusCheckType
-	roleChangedCheckType
+	statusCheckType = iota
 )
 
 var (
-	oriRole                 = ""
-	bootTime                = time.Now()
-	runningCheckFailedCount = 0
-	statusCheckFailedCount  = 0
-	roleCheckFailedCount    = 0
-	roleCheckCount          = 0
-	eventAggregationNum     = 10
-	eventIntervalNum        = 60
-	dbPort                  = 3306
-	dbUser                  = "root"
-	dbPasswd                = ""
-	dbRoles                 = map[string]internal.AccessMode{}
+	defaultDbPort = 3306
+	dbUser        = "root"
+	dbPasswd      = ""
+	dbRoles       = map[string]internal.AccessMode{}
 )
 
 // NewMysql returns a new MySQL output binding.
@@ -118,14 +87,6 @@ func NewMysql(logger logger.Logger) bindings.OutputBinding {
 
 // Init initializes the MySQL binding.
 func (m *Mysql) Init(metadata bindings.Metadata) error {
-	if viper.IsSet("KB_AGGREGATION_NUMBER") {
-		eventAggregationNum = viper.GetInt("KB_AGGREGATION_NUMBER")
-	}
-
-	if viper.IsSet("KB_SERVICE_PORT") {
-		dbPort = viper.GetInt("KB_SERVICE_PORT")
-	}
-
 	if viper.IsSet("KB_SERVICE_USER") {
 		dbUser = viper.GetString("KB_SERVICE_USER")
 	}
@@ -142,10 +103,27 @@ func (m *Mysql) Init(metadata bindings.Metadata) error {
 	}
 	m.logger.Debug("Initializing MySQL binding")
 	m.metadata = metadata
+
+	m.base = internal.ProbeBase{
+		Logger:    m.logger,
+		Operation: m,
+	}
+	m.base.Init()
+
 	return nil
 }
 
-func (m *Mysql) InitDelay() error {
+// Invoke handles all invoke operations.
+func (m *Mysql) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
+	return m.base.Invoke(ctx, req)
+}
+
+// Operations returns list of operations supported by Mysql binding.
+func (m *Mysql) Operations() []bindings.OperationKind {
+	return m.base.Operations()
+}
+
+func (m *Mysql) InitIfNeed() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.db != nil {
@@ -194,123 +172,42 @@ func (m *Mysql) InitDelay() error {
 	return nil
 }
 
-// Invoke handles all invoke operations.
-func (m *Mysql) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
-	if req == nil {
-		return nil, errors.Errorf("invoke request required")
+func (m *Mysql) GetRunningPort() int {
+	p := m.metadata.Properties
+	url, ok := p[connectionURLKey]
+	if !ok || url == "" {
+		return defaultDbPort
 	}
 
-	var sql string
-	var ok bool
-	startTime := time.Now()
-	resp := &bindings.InvokeResponse{
-		Metadata: map[string]string{
-			respOpKey:        string(req.Operation),
-			respSQLKey:       "test",
-			respStartTimeKey: startTime.Format(time.RFC3339Nano),
-		},
-	}
-
-	updateRespMetadata := func() (*bindings.InvokeResponse, error) {
-		endTime := time.Now()
-		resp.Metadata[respEndTimeKey] = endTime.Format(time.RFC3339Nano)
-		resp.Metadata[respDurationKey] = endTime.Sub(startTime).String()
-		return resp, nil
-	}
-
-	if req.Operation == runningCheckOperation {
-		d, err := m.runningCheck(ctx, resp)
-		if err != nil {
-			return nil, err
-		}
-		resp.Data = d
-		return updateRespMetadata()
-	}
-
-	if m.db == nil {
-		go m.InitDelay()
-		resp.Data = []byte("db not ready")
-		return updateRespMetadata()
-	}
-
-	if req.Operation == closeOperation {
-		return nil, m.db.Close()
-	}
-
-	if req.Metadata == nil {
-		return nil, errors.Errorf("metadata required")
-	}
-	m.logger.Debugf("operation: %v", req.Operation)
-
-	sql, ok = req.Metadata[commandSQLKey]
-	if !ok {
-		return nil, errors.Errorf("required metadata not set: %s", commandSQLKey)
-	}
-
-	switch req.Operation { //nolint:exhaustive
-	case execOperation:
-		r, err := m.exec(ctx, sql)
-		if err != nil {
-			return nil, err
-		}
-		resp.Metadata[respRowsAffectedKey] = strconv.FormatInt(r, 10)
-
-	case queryOperation:
-		d, err := m.query(ctx, sql)
-		if err != nil {
-			return nil, err
-		}
-		resp.Data = d
-
-	case statusCheckOperation:
-		d, err := m.statusCheck(ctx, sql, resp)
-		if err != nil {
-			return nil, err
-		}
-		resp.Data = d
-
-	case roleCheckOperation:
-		d, err := m.roleCheck(ctx, sql, resp)
-		if err != nil {
-			return nil, err
-		}
-		resp.Data = d
-
-	default:
-		return nil, errors.Errorf("invalid operation type: %s. Expected %s, %s, or %s",
-			req.Operation, execOperation, queryOperation, closeOperation)
-	}
-
-	return updateRespMetadata()
-}
-
-// Operations returns list of operations supported by Mysql binding.
-func (m *Mysql) Operations() []bindings.OperationKind {
-	return []bindings.OperationKind{
-		execOperation,
-		queryOperation,
-		closeOperation,
-		runningCheckOperation,
-		statusCheckOperation,
-		roleCheckOperation,
-	}
-}
-
-// Close will close the DB.
-func (m *Mysql) Close() error {
-	if m.db != nil {
-		return m.db.Close()
-	}
-
-	return nil
-}
-
-func (m *Mysql) query(ctx context.Context, sql string) ([]byte, error) {
-	m.logger.Debugf("query: %s", sql)
-
-	rows, err := m.db.QueryContext(ctx, sql)
+	config, err := mysql.ParseDSN(url)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error executing %s", sql)
+		return defaultDbPort
+	}
+	index := strings.LastIndex(config.Addr, ":")
+	if index < 0 {
+		return defaultDbPort
+	}
+	port, err := strconv.Atoi(config.Addr[index+1:])
+	if err != nil {
+		return defaultDbPort
+	}
+
+	return port
+}
+
+func (m *Mysql) GetRole(ctx context.Context, sql string) (string, error) {
+	m.logger.Debugf("query: %s", sql)
+	if sql == "" {
+		sql = "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
+	}
+
+	// sql exec timeout need to be less than httpget's timeout which default is 1s.
+	ctx1, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	rows, err := m.db.QueryContext(ctx1, sql)
+	if err != nil {
+		m.logger.Infof("error executing %s: %v", sql, err)
+		return "", errors.Wrapf(err, "error executing %s", sql)
 	}
 
 	defer func() {
@@ -318,54 +215,19 @@ func (m *Mysql) query(ctx context.Context, sql string) ([]byte, error) {
 		_ = rows.Err()
 	}()
 
-	result, err := m.jsonify(rows)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error marshalling query result for %s", sql)
-	}
-
-	return result, nil
-}
-
-func (m *Mysql) exec(ctx context.Context, sql string) (int64, error) {
-	m.logger.Debugf("exec: %s", sql)
-
-	res, err := m.db.ExecContext(ctx, sql)
-	if err != nil {
-		return 0, errors.Wrapf(err, "error executing %s", sql)
-	}
-
-	return res.RowsAffected()
-}
-
-func (m *Mysql) runningCheck(ctx context.Context, resp *bindings.InvokeResponse) ([]byte, error) {
-	host := fmt.Sprintf("127.0.0.1:%d", dbPort)
-	// sql exec timeout need to be less than httpget's timeout which default is 1s.
-	conn, err := net.DialTimeout("tcp", host, 500*time.Millisecond)
-	message := ""
-	result := internal.ProbeMessage{}
-	if err != nil {
-		message = fmt.Sprintf("running check %s error: %v", host, err)
-		result.Event = "runningCheckFailed"
-		m.logger.Errorf(message)
-		if runningCheckFailedCount++; runningCheckFailedCount%eventAggregationNum == 1 {
-			m.logger.Infof("running checks failed %v times continuously", runningCheckFailedCount)
-			resp.Metadata[statusCode] = checkFailedHTTPCode
+	var curLeader string
+	var role string
+	var serverId string
+	for rows.Next() {
+		if err := rows.Scan(&curLeader, &role, &serverId); err != nil {
+			m.logger.Errorf("checkRole error: %", err)
 		}
-	} else {
-		runningCheckFailedCount = 0
-		message = "TCP Connection Established Successfully!"
-		if tcpCon, ok := conn.(*net.TCPConn); ok {
-			tcpCon.SetLinger(0)
-		}
-		defer conn.Close()
 	}
-	result.Message = message
-	msg, _ := json.Marshal(result)
-	return msg, nil
+	return role, nil
 }
 
 // design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
-func (m *Mysql) statusCheck(ctx context.Context, sql string, resp *bindings.InvokeResponse) ([]byte, error) {
+func (m *Mysql) StatusCheck(ctx context.Context, sql string, resp *bindings.InvokeResponse) ([]byte, error) {
 	// rwSql := fmt.Sprintf(`begin;
 	// create table if not exists kb_health_check(type int, check_ts bigint, primary key(type));
 	// insert into kb_health_check values(%d, now()) on duplicate key update check_ts = now();
@@ -404,72 +266,6 @@ func (m *Mysql) statusCheck(ctx context.Context, sql string, resp *bindings.Invo
 	// return msg, nil
 	return []byte("Not supported yet"), nil
 
-}
-
-func (m *Mysql) getRole(ctx context.Context, sql string) (string, error) {
-	m.logger.Debugf("query: %s", sql)
-	if sql == "" {
-		sql = "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
-	}
-
-	// sql exec timeout need to be less than httpget's timeout which default is 1s.
-	ctx1, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancel()
-	rows, err := m.db.QueryContext(ctx1, sql)
-	if err != nil {
-		m.logger.Infof("error executing %s: %v", sql, err)
-		return "", errors.Wrapf(err, "error executing %s", sql)
-	}
-
-	defer func() {
-		_ = rows.Close()
-		_ = rows.Err()
-	}()
-
-	var curLeader string
-	var role string
-	var serverId string
-	for rows.Next() {
-		if err := rows.Scan(&curLeader, &role, &serverId); err != nil {
-			m.logger.Errorf("checkRole error: %", err)
-		}
-	}
-	return role, nil
-}
-
-func (m *Mysql) roleCheck(ctx context.Context, sql string, resp *bindings.InvokeResponse) ([]byte, error) {
-	result := internal.ProbeMessage{}
-	result.OriginalRole = oriRole
-	role, err := m.getRole(ctx, sql)
-	if err != nil {
-		m.logger.Infof("error executing roleCheck: %v", err)
-		result.Event = "roleCheckFailed"
-		result.Message = err.Error()
-		if roleCheckFailedCount++; roleCheckFailedCount%eventAggregationNum == 1 {
-			m.logger.Infof("role checks failed %v times continuously", roleCheckFailedCount)
-			resp.Metadata[statusCode] = checkFailedHTTPCode
-		}
-		msg, _ := json.Marshal(result)
-		return msg, nil
-	}
-
-	result.Role = role
-	if oriRole != role {
-		result.Event = "roleChanged"
-		oriRole = role
-		roleCheckCount = 0
-	} else {
-		result.Event = "roleUnchanged"
-	}
-
-	// reporting role event periodly to get pod's role lable updating accurately
-	// in case of event losing.
-	if roleCheckCount++; roleCheckCount%eventIntervalNum == 1 {
-		resp.Metadata[statusCode] = checkFailedHTTPCode
-	}
-	msg, _ := json.Marshal(result)
-	m.logger.Infof(string(msg))
-	return msg, nil
 }
 
 func propertyToInt(props map[string]string, key string, setter func(int)) error {

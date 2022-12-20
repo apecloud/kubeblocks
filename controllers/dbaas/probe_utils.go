@@ -18,6 +18,7 @@ package dbaas
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -31,6 +32,9 @@ import (
 )
 
 const (
+	// http://localhost:<port>/v1.0/bindings/<binding_type>
+	roleObserveURIFormat = "http://localhost:%s/v1.0/bindings/%s"
+
 	roleProbeContainerName    = "kb-rolechangedcheck"
 	statusProbeContainerName  = "kb-statuscheck"
 	runningProbeContainerName = "kb-runningcheck"
@@ -74,7 +78,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *Component) e
 
 	if componentProbes.RoleChangedProbe != nil {
 		roleChangedContainer := container.DeepCopy()
-		buildRoleChangedProbeContainer(roleChangedContainer, componentProbes.RoleChangedProbe, int(probeSvcHTTPPort))
+		buildRoleChangedProbeContainer(component.CharacterType, roleChangedContainer, componentProbes.RoleChangedProbe, int(probeSvcHTTPPort))
 		probeContainers = append(probeContainers, *roleChangedContainer)
 	}
 
@@ -163,15 +167,20 @@ func getComponentRoles(component *Component) map[string]string {
 	return roles
 }
 
-func buildRoleChangedProbeContainer(roleChangedContainer *corev1.Container,
+func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *corev1.Container,
 	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	roleChangedContainer.Name = roleProbeContainerName
 	probe := roleChangedContainer.ReadinessProbe
-	probe.Exec.Command = []string{"curl", "-X", "POST",
+	bindingType := strings.ToLower(characterType)
+	svcPort := strconv.Itoa(probeSvcHTTPPort)
+	roleObserveURI := fmt.Sprintf(roleObserveURIFormat, svcPort, bindingType)
+	probe.Exec.Command = []string{
+		"curl", "-X", "POST",
 		"--fail-with-body", "--silent",
 		"-H", "Content-Type: application/json",
-		"http://localhost:" + strconv.Itoa(probeSvcHTTPPort) + "/v1.0/bindings/probe",
-		"-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
+		roleObserveURI,
+		"-d", "{\"operation\": \"roleCheck\", \"metadata\":{\"sql\":\"\"}}",
+	}
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
 	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }

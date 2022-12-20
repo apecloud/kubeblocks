@@ -32,7 +32,7 @@ var _ = Describe("Engine", func() {
 		Expect(len(url)).Should(Equal(3))
 
 		url = engine.ConnectCommand("")
-		Expect(len(url)).Should(Equal(1))
+		Expect(len(url)).Should(Equal(3))
 
 		Expect(engine.EngineContainer()).Should(Equal(mysqlContainerName))
 	})

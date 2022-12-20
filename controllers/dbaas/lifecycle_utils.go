@@ -860,7 +860,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			shouldRequeue = false
 			err = nil
 			if component.HorizontalScalePolicy == nil ||
-				component.HorizontalScalePolicy.Type != dbaasv1alpha1.Snapshot ||
+				component.HorizontalScalePolicy.Type != dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot ||
 				isSnapshotAvailable(cli, ctx) {
 				return
 			}
@@ -878,7 +878,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 
 		cleanBackupResourcesIfNeeded := func() error {
 			if component.HorizontalScalePolicy == nil ||
-				component.HorizontalScalePolicy.Type != dbaasv1alpha1.Snapshot ||
+				component.HorizontalScalePolicy.Type != dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot ||
 				isSnapshotAvailable(cli, ctx) {
 				return nil
 			}
@@ -1983,14 +1983,14 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 	// do backup according to component's horizontal scale policy
 	switch component.HorizontalScalePolicy.Type {
 	// use backup tool such as xtrabackup
-	case dbaasv1alpha1.Backup:
+	case dbaasv1alpha1.HScaleDataClonePolicyFromBackup:
 		// TODO: db core not support yet, leave it empty
 		reqCtx.Recorder.Eventf(cluster,
 			corev1.EventTypeWarning,
 			"HorizontalScaleFailed",
 			"scale with backup tool not support yet")
 	// use volume snapshot
-	case dbaasv1alpha1.Snapshot:
+	case dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot:
 		if !isSnapshotAvailable(cli, ctx) || len(stsObj.Spec.VolumeClaimTemplates) == 0 {
 			reqCtx.Recorder.Eventf(cluster,
 				corev1.EventTypeWarning,
@@ -2052,7 +2052,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 			}
 		}
 	// do nothing
-	case dbaasv1alpha1.ScaleNone:
+	case dbaasv1alpha1.HScaleDataClonePolicyNone:
 		break
 	}
 	return shouldRequeue, nil

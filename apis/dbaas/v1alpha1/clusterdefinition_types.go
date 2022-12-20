@@ -239,7 +239,7 @@ type HorizontalScalePolicy struct {
 	// +kubebuilder:default=None
 	// +kubebuilder:validation:Enum={None,Snapshot}
 	// +optional
-	Type HorizontalScalePolicyType `json:"type,omitempty"`
+	Type HScaleDataClonePolicyType `json:"type,omitempty"`
 
 	// BackupTemplateSelector defines the label selector for finding associated BackupTemplate API object.
 	// +optional

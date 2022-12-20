@@ -887,7 +887,7 @@ spec:
 				Name:      "test-snapshot",
 			}
 			component.HorizontalScalePolicy = &dbaasv1alpha1.HorizontalScalePolicy{
-				Type:             dbaasv1alpha1.Snapshot,
+				Type:             dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot,
 				VolumeMountsName: "data",
 			}
 			Expect(k8sClient.Create(ctx, &vs)).Should(Succeed())

@@ -117,12 +117,12 @@ const (
 	WipeOut        TerminationPolicyType = "WipeOut"
 )
 
-type HorizontalScalePolicyType string
+type HScaleDataClonePolicyType string
 
 const (
-	ScaleNone HorizontalScalePolicyType = "None"
-	Snapshot  HorizontalScalePolicyType = "Snapshot"
-	Backup    HorizontalScalePolicyType = "Backup"
+	HScaleDataClonePolicyNone         HScaleDataClonePolicyType = "None"
+	HScaleDataClonePolicyFromSnapshot HScaleDataClonePolicyType = "Snapshot"
+	HScaleDataClonePolicyFromBackup   HScaleDataClonePolicyType = "Backup"
 )
 
 // PodAntiAffinity define pod anti-affinity strategy.

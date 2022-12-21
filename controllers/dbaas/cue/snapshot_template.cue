@@ -16,7 +16,12 @@ snapshot: {
 	metadata: {
 		name:      snapshot_key.Name
 		namespace: snapshot_key.Namespace
-		labels:    sts.metadata.labels
+		labels: {
+			"app.kubernetes.io/created-by": "kubeblocks"
+			for k, v in sts.metadata.labels {
+				"\(k)": "\(v)"
+			}
+		}
 	}
 	spec: {
 		source: {

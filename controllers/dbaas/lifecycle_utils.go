@@ -959,9 +959,6 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				}
 				var err error
 				if err = cli.Get(ctx, pvcKey, pvc); err != nil {
-					if apierrors.IsNotFound(err) {
-						continue
-					}
 					return false, err
 				}
 				if pvc.Spec.Resources.Requests[corev1.ResourceStorage] == vctProto.Spec.Resources.Requests[corev1.ResourceStorage] {

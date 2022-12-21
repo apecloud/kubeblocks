@@ -25,13 +25,13 @@ import (
 )
 
 func init() {
-	RegisterPolicy(dbaasv1alpha1.RestartPolicy, &ParallelUpgradePolicy{})
+	RegisterPolicy(dbaasv1alpha1.RestartPolicy, &parallelUpgradePolicy{})
 }
 
-type ParallelUpgradePolicy struct {
+type parallelUpgradePolicy struct {
 }
 
-func (p *ParallelUpgradePolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
+func (p *parallelUpgradePolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
 	if finished, err := p.restartPods(params); err != nil {
 		return ESAndRetryFailed, err
 	} else if !finished {
@@ -41,11 +41,11 @@ func (p *ParallelUpgradePolicy) Upgrade(params ReconfigureParams) (ExecStatus, e
 	return ESNone, nil
 }
 
-func (p *ParallelUpgradePolicy) GetPolicyName() string {
+func (p *parallelUpgradePolicy) GetPolicyName() string {
 	return string(dbaasv1alpha1.RestartPolicy)
 }
 
-func (p *ParallelUpgradePolicy) restartPods(params ReconfigureParams) (bool, error) {
+func (p *parallelUpgradePolicy) restartPods(params ReconfigureParams) (bool, error) {
 	var (
 		funcs         RollingUpgradeFuncs
 		cType         = params.ComponentType()

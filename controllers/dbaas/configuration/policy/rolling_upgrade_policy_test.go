@@ -81,7 +81,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 		ctrl.Finish()
 	})
 
-	Context("rolling reconfigure policy test", func() {
+	Context("consensus rolling reconfigure policy test", func() {
 		It("Should success without error", func() {
 			Expect(rollingPolicy.GetPolicyName()).Should(BeEquivalentTo("rolling"))
 

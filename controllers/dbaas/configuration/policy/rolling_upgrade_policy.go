@@ -33,11 +33,11 @@ const (
 	defaultMinReadySeconds = 10 // 10s
 )
 
-type RollingUpgradePolicy struct {
+type rollingUpgradePolicy struct {
 }
 
 func init() {
-	RegisterPolicy(dbaasv1alpha1.RollingPolicy, &RollingUpgradePolicy{})
+	RegisterPolicy(dbaasv1alpha1.RollingPolicy, &rollingUpgradePolicy{})
 	if err := viper.BindEnv(cfgcore.PodMinReadySecondsEnv); err != nil {
 		logrus.Errorf("failed to set bind env: %s", cfgcore.PodMinReadySecondsEnv)
 		os.Exit(-1)
@@ -45,7 +45,7 @@ func init() {
 	viper.SetDefault(cfgcore.PodMinReadySecondsEnv, defaultMinReadySeconds)
 }
 
-func (r *RollingUpgradePolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
+func (r *rollingUpgradePolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
 	var (
 		funcs RollingUpgradeFuncs
 		cType = params.ComponentType()
@@ -62,8 +62,24 @@ func (r *RollingUpgradePolicy) Upgrade(params ReconfigureParams) (ExecStatus, er
 	return performRollingUpgrade(params, funcs)
 }
 
-func (r *RollingUpgradePolicy) GetPolicyName() string {
+func (r *rollingUpgradePolicy) GetPolicyName() string {
 	return string(dbaasv1alpha1.RollingPolicy)
+}
+
+func canPerformUpgrade(pods []corev1.Pod, params ReconfigureParams) bool {
+	target := params.GetTargetReplicas()
+	if len(pods) == target {
+		return true
+	}
+	if params.ComponentType() == dbaasv1alpha1.Consensus {
+		params.Ctx.Log.Info("wait to consensus component ready.")
+		return false
+	}
+	if len(pods) < target {
+		params.Ctx.Log.Info("component pod not all ready.")
+		return false
+	}
+	return true
 }
 
 func performRollingUpgrade(params ReconfigureParams, funcs RollingUpgradeFuncs) (ExecStatus, error) {
@@ -74,7 +90,6 @@ func performRollingUpgrade(params ReconfigureParams, funcs RollingUpgradeFuncs) 
 
 	var (
 		rollingReplicas = params.MaxRollingReplicas()
-		target          = params.GetTargetReplicas()
 		configKey       = params.GetConfigKey()
 		configVersion   = params.GetModifyVersion()
 	)
@@ -88,8 +103,7 @@ func performRollingUpgrade(params ReconfigureParams, funcs RollingUpgradeFuncs) 
 		return params.Client.Patch(params.Ctx.Ctx, pod, patch)
 	}
 
-	if len(pods) < target {
-		params.Ctx.Log.Info("component pod not all ready.")
+	if !canPerformUpgrade(pods, params) {
 		return ESRetry, nil
 	}
 

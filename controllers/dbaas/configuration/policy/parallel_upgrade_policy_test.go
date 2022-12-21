@@ -21,10 +21,10 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	apimeta "k8s.io/apimachinery/pkg/api/meta"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/golang/mock/gomock"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	mock_client "github.com/apecloud/kubeblocks/controllers/dbaas/configuration/policy/mocks"
@@ -33,7 +33,7 @@ import (
 	mock_proto "github.com/apecloud/kubeblocks/internal/configuration/proto/mocks"
 )
 
-var parallelPolicy = ParallelUpgradePolicy{}
+var parallelPolicy = parallelUpgradePolicy{}
 
 var _ = Describe("Reconfigure ParallelPolicy", func() {
 

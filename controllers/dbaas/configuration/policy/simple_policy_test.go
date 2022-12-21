@@ -27,9 +27,14 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
-var simplePolicy = SimplePolicy{}
+var _ = Describe("Reconfigure simplePolicy", func() {
 
-var _ = Describe("Reconfigure SimplePolicy", func() {
+	var (
+		mockClient *mock_client.MockClient
+		ctrl       *gomock.Controller
+
+		simplePolicy = upgradePolicyMap[dbaasv1alpha1.NormalPolicy]
+	)
 
 	setup := func() (*gomock.Controller, *mock_client.MockClient) {
 		ctrl := gomock.NewController(GinkgoT())
@@ -37,23 +42,29 @@ var _ = Describe("Reconfigure SimplePolicy", func() {
 		return ctrl, client
 	}
 
+	BeforeEach(func() {
+		ctrl, mockClient = setup()
+	})
+
+	AfterEach(func() {
+		// Add any teardown steps that needs to be executed after each test
+		ctrl.Finish()
+	})
+
 	Context("simple reconfigure policy test", func() {
 		It("Should success without error", func() {
 			Expect(simplePolicy.GetPolicyName()).Should(BeEquivalentTo("simple"))
 
-			ctrl, k8sClient := setup()
-			defer ctrl.Finish()
-
 			// mock client update caller
 			updateErr := cfgcore.MakeError("update failed!")
-			k8sClient.EXPECT().Update(gomock.Any(), gomock.Any()).
+			mockClient.EXPECT().Update(gomock.Any(), gomock.Any()).
 				Return(updateErr).
 				Times(1)
-			k8sClient.EXPECT().Update(gomock.Any(), gomock.Any()).
+			mockClient.EXPECT().Update(gomock.Any(), gomock.Any()).
 				Return(nil).
 				Times(1)
 
-			mockParam := newMockReconfigureParams("simplePolicy", k8sClient,
+			mockParam := newMockReconfigureParams("simplePolicy", mockClient,
 				withMockStatefulSet(2, nil),
 				withConfigTpl("for_test", map[string]string{
 					"key": "value",

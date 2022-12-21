@@ -26,13 +26,13 @@ import (
 )
 
 func init() {
-	RegisterPolicy(dbaasv1alpha1.NormalPolicy, &SimplePolicy{})
+	RegisterPolicy(dbaasv1alpha1.NormalPolicy, &simplePolicy{})
 }
 
-type SimplePolicy struct {
+type simplePolicy struct {
 }
 
-func (s *SimplePolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
+func (s *simplePolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
 	params.Ctx.Log.V(1).Info("simple policy begin....")
 
 	switch params.ComponentType() {
@@ -44,7 +44,7 @@ func (s *SimplePolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
 	}
 }
 
-func (s *SimplePolicy) GetPolicyName() string {
+func (s *simplePolicy) GetPolicyName() string {
 	return string(dbaasv1alpha1.NormalPolicy)
 }
 

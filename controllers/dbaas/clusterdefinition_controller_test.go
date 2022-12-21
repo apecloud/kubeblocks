@@ -255,11 +255,11 @@ spec:
 			clusterDefinition.Spec.Components[0].ConfigSpec = &dbaasv1alpha1.ConfigurationSpec{
 				ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{
 					{
-						Name:                 cmName,
-						ConfigMapTplRef:      cmName,
-						ConfigConstraintsRef: cmName,
-						Namespace:            testCtx.DefaultNamespace,
-						VolumeName:           "xxx",
+						Name:                cmName,
+						ConfigTplRef:        cmName,
+						ConfigConstraintRef: cmName,
+						Namespace:           testCtx.DefaultNamespace,
+						VolumeName:          "xxx",
 					},
 				},
 			}
@@ -340,11 +340,11 @@ spec:
 			clusterDefinition.Spec.Components[0].ConfigSpec = &dbaasv1alpha1.ConfigurationSpec{
 				ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{
 					{
-						Name:                 cmName,
-						ConfigMapTplRef:      cmName,
-						ConfigConstraintsRef: cmName,
-						Namespace:            testCtx.DefaultNamespace,
-						VolumeName:           "xxx",
+						Name:                cmName,
+						ConfigTplRef:        cmName,
+						ConfigConstraintRef: cmName,
+						Namespace:           testCtx.DefaultNamespace,
+						VolumeName:          "xxx",
 					},
 				},
 			}

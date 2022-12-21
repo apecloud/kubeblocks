@@ -132,8 +132,8 @@ func (w *TestWrapper) updateAvComTplMeta(appVer *dbaasv1alpha1.AppVersion) {
 		}
 		for i := 0; i < len(component.ConfigTemplateRefs); i++ {
 			component.ConfigTemplateRefs[i].Name = w.testEnv.CfgTplName
-			component.ConfigTemplateRefs[i].ConfigMapTplRef = w.CMName()
-			component.ConfigTemplateRefs[i].ConfigConstraintsRef = w.TPLName()
+			component.ConfigTemplateRefs[i].ConfigTplRef = w.CMName()
+			component.ConfigTemplateRefs[i].ConfigConstraintRef = w.TPLName()
 		}
 	}
 }
@@ -151,8 +151,8 @@ func (w *TestWrapper) updateComTplMeta(cd *dbaasv1alpha1.ClusterDefinition) {
 			}
 			for i := 0; i < len(configSpec.ConfigTemplateRefs); i++ {
 				configSpec.ConfigTemplateRefs[i].Name = w.testEnv.CfgTplName
-				configSpec.ConfigTemplateRefs[i].ConfigMapTplRef = w.CMName()
-				configSpec.ConfigTemplateRefs[i].ConfigConstraintsRef = w.TPLName()
+				configSpec.ConfigTemplateRefs[i].ConfigTplRef = w.CMName()
+				configSpec.ConfigTemplateRefs[i].ConfigConstraintRef = w.TPLName()
 			}
 			return nil
 		})

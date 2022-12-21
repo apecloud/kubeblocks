@@ -65,11 +65,11 @@ spec:
                         file.
                       items:
                         properties:
-                          configConstraintsRef:
+                          configConstraintRef:
                             description: Specify the name of the referenced the configuration
                               constraints object.
                             type: string
-                          configMapTplRef:
+                          configTplRef:
                             description: Specify the name of the referenced the configuration
                               template ConfigMap object.
                             maxLength: 63

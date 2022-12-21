@@ -146,8 +146,8 @@ spec:
     configSpec:
       configTemplateRefs:
       - name: mysql-tree-node-template-8.0
-        configMapTplRef: mysql-tree-node-template-8.0
-        configConstraintsRef: mysql-tree-node-template-8.0
+        configTplRef: mysql-tree-node-template-8.0
+        configConstraintRef: mysql-tree-node-template-8.0
         namespace: default
         volumeName: mysql-config
     defaultReplicas: 1
@@ -227,8 +227,8 @@ spec:
     configSpec:
       configTemplateRefs:
       - name: mysql-tree-node-template-8.0
-        configMapTplRef: mysql-tree-node-template-8.0
-        configConstraintsRef: mysql-tree-node-template-8.0
+        configTplRef: mysql-tree-node-template-8.0
+        configConstraintRef: mysql-tree-node-template-8.0
         namespace: default
         volumeName: mysql-config
     podSpec:

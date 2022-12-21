@@ -12,8 +12,8 @@ spec:
     configSpec:
       configTemplateRefs:
       - name: mysql-tree-node-template
-        configMapTplRef: mysql-tree-node-template-8.0
-        configConstraintsRef: mysql-tree-node-template-8.0
+        configTplRef: mysql-tree-node-template-8.0
+        configConstraintRef: mysql-tree-node-template-8.0
         volumeName: mysql-config
     componentType: Consensus
     consensusSpec:

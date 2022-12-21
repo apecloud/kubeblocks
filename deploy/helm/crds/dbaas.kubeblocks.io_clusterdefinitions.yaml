@@ -93,11 +93,11 @@ spec:
                             cluster.
                           items:
                             properties:
-                              configConstraintsRef:
+                              configConstraintRef:
                                 description: Specify the name of the referenced the
                                   configuration constraints object.
                                 type: string
-                              configMapTplRef:
+                              configTplRef:
                                 description: Specify the name of the referenced the
                                   configuration template ConfigMap object.
                                 maxLength: 63
@@ -145,44 +145,6 @@ spec:
                           x-kubernetes-list-type: map
                         maxUnavailableCapacity:
                           type: integer
-                        reloadOptions:
-                          description: ReloadOptions indicates whether the process
-                            supports reload. if set, the controller will determine
-                            the behavior of the engine instance based on the configuration
-                            templates, restart or reload depending on whether any
-                            parameters in the StaticParameters have been modified.
-                          properties:
-                            shellTrigger:
-                              properties:
-                                exec:
-                                  type: string
-                              required:
-                              - exec
-                              type: object
-                            sqlTrigger:
-                              properties:
-                                sql:
-                                  type: string
-                              required:
-                              - sql
-                              type: object
-                            unixSignalTrigger:
-                              properties:
-                                processName:
-                                  description: ProcessName is process name, sends
-                                    unix signal to proc.
-                                  pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                                  type: string
-                                signal:
-                                  description: 'Signal is valid for unix signal e.g:
-                                    SIGHUP url: ../../internal/configuration/configmap/handler.go:allUnixSignals'
-                                  pattern: ^SIG[A-Z]+$
-                                  type: string
-                              required:
-                              - processName
-                              - signal
-                              type: object
-                          type: object
                       type: object
                     consensusSpec:
                       description: consensusSpec defines consensus related spec if

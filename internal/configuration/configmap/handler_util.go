@@ -37,8 +37,8 @@ type ConfigManagerSidecar struct {
 	Volumes []corev1.VolumeMount `json:"volumes"`
 }
 
-func IsNotSupportReload(cfgSpec *dbaasv1alpha1.ConfigurationSpec) bool {
-	return cfgSpec == nil || cfgSpec.ReloadOptions == nil
+func IsSupportReload(reload *dbaasv1alpha1.ReloadOptions) bool {
+	return reload != nil && (reload.ShellTrigger != nil || reload.UnixSignalTrigger != nil)
 }
 
 func NeedBuildConfigSidecar(reloadOptions *dbaasv1alpha1.ReloadOptions) error {

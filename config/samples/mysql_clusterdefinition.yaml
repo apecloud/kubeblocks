@@ -12,13 +12,9 @@ spec:
       configSpec:
         configTemplateRefs:
           - name: mysql-tree-node-template-8.0
-            configMapTplRef: mysql-tree-node-template-8.0
-            configConstraintsRef: mysql-tree-node-template-8.0
+            configTplRef: mysql-tree-node-template-8.0
+            configConstraintRef: mysql-tree-node-template-8.0
             volumeName: mysql-config
-        reloadOptions:
-          unixSignalTrigger:
-            signal: SIGHUP
-            processName: mysqld
       componentType: Consensus
       consensusSpec:
         leader:

@@ -76,11 +76,11 @@ type ConfigTemplate struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	ConfigMapTplRef string `json:"configMapTplRef,omitempty"`
+	ConfigTplRef string `json:"configTplRef,omitempty"`
 
 	// Specify the name of the referenced the configuration constraints object.
 	// +optional
-	ConfigConstraintsRef string `json:"configConstraintsRef,omitempty"`
+	ConfigConstraintRef string `json:"configConstraintRef,omitempty"`
 
 	// Specify the namespace of the referenced the configuration template ConfigMap object.
 	// An empty namespace is equivalent to the "default" namespace.
@@ -167,49 +167,6 @@ type ConfigurationSpec struct {
 	// +kubebuilder:validation:maximum=100
 	// +optional
 	MaxUnavailableCapacity *int `json:"maxUnavailableCapacity,omitempty"`
-
-	// ReloadOptions indicates whether the process supports reload.
-	// if set, the controller will determine the behavior of the engine instance based on the configuration templates,
-	// restart or reload depending on whether any parameters in the StaticParameters have been modified.
-	// +optional
-	ReloadOptions *ReloadOptions `json:"reloadOptions,omitempty"`
-}
-
-// ReloadOptions defines reload options
-// Only one of its members may be specified.
-type ReloadOptions struct {
-	// +optional
-	UnixSignalTrigger *UnixSignalTrigger `json:"unixSignalTrigger,omitempty"`
-
-	// +optional
-	ShellTrigger *ShellTrigger `json:"shellTrigger,omitempty"`
-
-	// +optional
-	SQLTrigger *SQLTrigger `json:"sqlTrigger,omitempty"`
-}
-
-type UnixSignalTrigger struct {
-	// Signal is valid for unix signal
-	// e.g: SIGHUP
-	// url: ../../internal/configuration/configmap/handler.go:allUnixSignals
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^SIG[A-Z]+$`
-	Signal string `json:"signal"`
-
-	// ProcessName is process name, sends unix signal to proc.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	ProcessName string `json:"processName"`
-}
-
-type ShellTrigger struct {
-	// +kubebuilder:validation:Required
-	Exec string `json:"exec"`
-}
-
-type SQLTrigger struct {
-	// +kubebuilder:validation:Required
-	SQL string `json:"sql"`
 }
 
 // ClusterDefinitionComponent is a group of pods, pods belong to same component usually share the same data

@@ -12,12 +12,8 @@ spec:
         configTemplateRefs:
          - name: mysql-tree-node-template-8.0
            volumeName: mysql-config
-           configMapTplRef: mysql-tree-node-template-8.0
-           configConstraintsRef: mysql-tree-node-template-8.0
-        reloadOptions:
-          unixSignalTrigger:
-            signal: SIGHUP
-            processName: mysqld
+           configTplRef: mysql-tree-node-template-8.0
+           configConstraintRef: mysql-tree-node-template-8.0
       podSpec:
         containers:
           - name: mysql

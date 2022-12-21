@@ -149,10 +149,10 @@ innodb_buffer_pool_size = 8589934592
 		}
 		cfgTemplate = []dbaasv1alpha1.ConfigTemplate{
 			{
-				Name:                 "mysql-config-8.0.2",
-				ConfigMapTplRef:      "mysql-config-8.0.2",
-				ConfigConstraintsRef: "mysql-config-8.0.2",
-				VolumeName:           "config1",
+				Name:                "mysql-config-8.0.2",
+				ConfigTplRef:        "mysql-config-8.0.2",
+				ConfigConstraintRef: "mysql-config-8.0.2",
+				VolumeName:          "config1",
 			},
 		}
 	})

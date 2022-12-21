@@ -23,11 +23,11 @@ import (
 
 // ConfigurationTemplateSpec defines the desired state of ConfigurationTemplate
 type ConfigurationTemplateSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-
-	// TplRef is a reference to the configmap object, the configmap determines how to generate the configurations.
-	// +kubebuilder:validation:Required
-	// TplRef string `json:"tplRef,omitempty"`
+	// ReloadOptions indicates whether the process supports reload.
+	// if set, the controller will determine the behavior of the engine instance based on the configuration templates,
+	// restart or reload depending on whether any parameters in the StaticParameters have been modified.
+	// +optional
+	ReloadOptions *ReloadOptions `json:"reloadOptions,omitempty"`
 
 	// CfgSchemaTopLevelName is cue type name, which generates openapi schema.
 	// +optional
@@ -89,6 +89,35 @@ type CustomParametersValidation struct {
 	// Cue that to let provider verify user configuration through cue language.
 	// +optional
 	Cue *string `json:"cue,omitempty"`
+}
+
+// ReloadOptions defines reload options
+// Only one of its members may be specified.
+type ReloadOptions struct {
+	// +optional
+	UnixSignalTrigger *UnixSignalTrigger `json:"unixSignalTrigger,omitempty"`
+
+	// +optional
+	ShellTrigger *ShellTrigger `json:"shellTrigger,omitempty"`
+}
+
+type UnixSignalTrigger struct {
+	// Signal is valid for unix signal
+	// e.g: SIGHUP
+	// url: ../../internal/configuration/configmap/handler.go:allUnixSignals
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern:=`^SIG[A-Z]+$`
+	Signal string `json:"signal"`
+
+	// ProcessName is process name, sends unix signal to proc.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	ProcessName string `json:"processName"`
+}
+
+type ShellTrigger struct {
+	// +kubebuilder:validation:Required
+	Exec string `json:"exec"`
 }
 
 //+kubebuilder:object:root=true

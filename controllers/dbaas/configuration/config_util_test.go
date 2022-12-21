@@ -176,7 +176,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 				}, true)
 			Expect(testWrapper.HasError()).Should(Succeed())
 
-			// remove ConfigConstraintsRef
+			// remove ConfigConstraintRef
 			_, err := handleConfigTemplate(testWrapper.cd, func(templates []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 				return true, nil
 			}, func(component *dbaasv1alpha1.ClusterDefinitionComponent) error {
@@ -186,7 +186,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 				for i := range component.ConfigSpec.ConfigTemplateRefs {
 					tpl := &component.ConfigSpec.ConfigTemplateRefs[i]
-					tpl.ConfigConstraintsRef = ""
+					tpl.ConfigConstraintRef = ""
 				}
 				return nil
 			})

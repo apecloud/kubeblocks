@@ -1310,17 +1310,21 @@ func buildCfg(params createParams,
 		return nil, cfgcore.WrapError(err, "failed to generate pod volume")
 	}
 
-	if err := updateConfigurationManagerWithComponent(params, podSpec, tpls); err != nil {
+	if err := updateConfigurationManagerWithComponent(params, podSpec, tpls, ctx, cli); err != nil {
 		return nil, cfgcore.WrapError(err, "failed to generate sidecar for configmap's reloader")
 	}
 
 	return configs, nil
 }
 
-func updateConfigurationManagerWithComponent(params createParams, podSpec *corev1.PodSpec, cfgTemplates []dbaasv1alpha1.ConfigTemplate) error {
+func updateConfigurationManagerWithComponent(
+	params createParams,
+	podSpec *corev1.PodSpec,
+	cfgTemplates []dbaasv1alpha1.ConfigTemplate,
+	ctx context.Context,
+	cli client.Client) error {
 	var (
 		firstCfg        = 0
-		component       = params.component
 		usingContainers []*corev1.Container
 
 		defaultVarRunVolumePath = "/var/run"
@@ -1329,11 +1333,13 @@ func updateConfigurationManagerWithComponent(params createParams, podSpec *corev
 		criType                 = viper.GetString(cfgcore.ConfigCRIType)
 	)
 
-	if component.Config == nil || component.Config.ReloadOptions == nil {
+	reloadOptions, err := getReloadOptions(cli, ctx, cfgTemplates)
+	if err != nil {
+		return err
+	}
+	if reloadOptions == nil {
 		return nil
 	}
-
-	reloadOptions := component.Config.ReloadOptions
 	if reloadOptions.UnixSignalTrigger == nil {
 		// TODO support other reload type
 		logrus.Warnf("only %s type is supported!", dbaasv1alpha1.UnixSignalType)
@@ -1393,8 +1399,7 @@ func updateConfigurationManagerWithComponent(params createParams, podSpec *corev
 		}),
 	}
 
-	container, err := buildCfgManagerContainer(params, managerSidecar)
-	if err != nil {
+	if container, err = buildCfgManagerContainer(params, managerSidecar); err != nil {
 		return err
 	}
 
@@ -1420,6 +1425,29 @@ func updateConfigurationManagerWithComponent(params createParams, podSpec *corev
 	}
 	*podSpec.ShareProcessNamespace = true
 	return nil
+}
+
+func getReloadOptions(cli client.Client, ctx context.Context, tpls []dbaasv1alpha1.ConfigTemplate) (*dbaasv1alpha1.ReloadOptions, error) {
+	if len(tpls) == 0 {
+		return nil, nil
+	}
+
+	for _, tpl := range tpls {
+		if len(tpl.ConfigConstraintRef) == 0 {
+			continue
+		}
+		cfgConst := &dbaasv1alpha1.ConfigurationTemplate{}
+		if err := cli.Get(ctx, client.ObjectKey{
+			Namespace: tpl.Namespace,
+			Name:      tpl.ConfigConstraintRef,
+		}, cfgConst); err != nil {
+			return nil, cfgcore.WrapError(err, "failed to get ConfigurationTemplate, key[%v]", tpl)
+		}
+		if cfgConst.Spec.ReloadOptions != nil {
+			return cfgConst.Spec.ReloadOptions, nil
+		}
+	}
+	return nil, nil
 }
 
 func updateStatefulLabelsWithTemplate(sts *appsv1.StatefulSet, allLabels map[string]string) {
@@ -1608,8 +1636,8 @@ func buildConfigMapWithTemplate(configs map[string]string, params createParams, 
 			"name":                  params.component.Name,
 			"type":                  params.component.Type,
 			"configName":            cmName,
-			"templateName":          tplCfg.ConfigMapTplRef,
-			"configConstraintsName": tplCfg.ConfigConstraintsRef,
+			"templateName":          tplCfg.ConfigTplRef,
+			"configConstraintsName": tplCfg.ConfigConstraintRef,
 			"configTemplateName":    tplCfg.Name,
 		},
 	}
@@ -1674,10 +1702,10 @@ func buildCfgManagerContainer(params createParams, sidecarRenderedParam *cfgcm.C
 func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder *configTemplateBuilder, tplCfg dbaasv1alpha1.ConfigTemplate) (map[string]string, error) {
 
 	cfgTemplate := &dbaasv1alpha1.ConfigurationTemplate{}
-	if len(tplCfg.ConfigConstraintsRef) > 0 {
+	if len(tplCfg.ConfigConstraintRef) > 0 {
 		if err := cli.Get(ctx, client.ObjectKey{
 			Namespace: tplCfg.Namespace,
-			Name:      tplCfg.ConfigConstraintsRef,
+			Name:      tplCfg.ConfigConstraintRef,
 		}, cfgTemplate); err != nil {
 			return nil, cfgcore.WrapError(err, "failed to get ConfigurationTemplate, key[%v]", tplCfg)
 		}
@@ -1689,7 +1717,7 @@ func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder
 	//  Require template configmap exist
 	if err := cli.Get(ctx, client.ObjectKey{
 		Namespace: tplCfg.Namespace,
-		Name:      tplCfg.ConfigMapTplRef,
+		Name:      tplCfg.ConfigTplRef,
 	}, cmObj); err != nil {
 		return nil, err
 	}
@@ -1698,7 +1726,7 @@ func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder
 		return map[string]string{}, nil
 	}
 
-	tplBuilder.setTplName(tplCfg.ConfigMapTplRef)
+	tplBuilder.setTplName(tplCfg.ConfigTplRef)
 	renderedCfg, err := tplBuilder.render(cmObj.Data)
 	if err != nil {
 		return nil, cfgcore.WrapError(err, "failed to render configmap")

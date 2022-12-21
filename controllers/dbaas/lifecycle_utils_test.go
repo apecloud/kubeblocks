@@ -230,10 +230,10 @@ var _ = Describe("lifecycle_utils", func() {
 
 		It("Normal test case, and add one volume", func() {
 			volumes["my_config"] = dbaasv1alpha1.ConfigTemplate{
-				Name:                 "myConfig",
-				ConfigMapTplRef:      "myConfig",
-				ConfigConstraintsRef: "myConfig",
-				VolumeName:           "myConfigVolume",
+				Name:                "myConfig",
+				ConfigTplRef:        "myConfig",
+				ConfigConstraintRef: "myConfig",
+				VolumeName:          "myConfigVolume",
 			}
 			ps := &sts.Spec.Template.Spec
 			err := checkAndUpdatePodVolumes(ps, volumes)
@@ -243,16 +243,16 @@ var _ = Describe("lifecycle_utils", func() {
 
 		It("Normal test case, and add two volume", func() {
 			volumes["my_config"] = dbaasv1alpha1.ConfigTemplate{
-				Name:                 "myConfig",
-				ConfigMapTplRef:      "myConfig",
-				ConfigConstraintsRef: "myConfig",
-				VolumeName:           "myConfigVolume",
+				Name:                "myConfig",
+				ConfigTplRef:        "myConfig",
+				ConfigConstraintRef: "myConfig",
+				VolumeName:          "myConfigVolume",
 			}
 			volumes["my_config1"] = dbaasv1alpha1.ConfigTemplate{
-				Name:                 "myConfig",
-				ConfigMapTplRef:      "myConfig",
-				ConfigConstraintsRef: "myConfig",
-				VolumeName:           "myConfigVolume2",
+				Name:                "myConfig",
+				ConfigTplRef:        "myConfig",
+				ConfigConstraintRef: "myConfig",
+				VolumeName:          "myConfigVolume2",
 			}
 			ps := &sts.Spec.Template.Spec
 			err := checkAndUpdatePodVolumes(ps, volumes)
@@ -273,10 +273,10 @@ var _ = Describe("lifecycle_utils", func() {
 					},
 				})
 			volumes[cmName] = dbaasv1alpha1.ConfigTemplate{
-				Name:                 "configTplName",
-				ConfigMapTplRef:      "configTplName",
-				ConfigConstraintsRef: "configTplName",
-				VolumeName:           replicaVolumeName,
+				Name:                "configTplName",
+				ConfigTplRef:        "configTplName",
+				ConfigConstraintRef: "configTplName",
+				VolumeName:          replicaVolumeName,
 			}
 			ps := &sts.Spec.Template.Spec
 			Expect(checkAndUpdatePodVolumes(ps, volumes)).ShouldNot(Succeed())
@@ -300,10 +300,10 @@ var _ = Describe("lifecycle_utils", func() {
 				})
 
 			volumes[cmName] = dbaasv1alpha1.ConfigTemplate{
-				Name:                 "configTplName",
-				ConfigMapTplRef:      "configTplName",
-				ConfigConstraintsRef: "configTplName",
-				VolumeName:           replicaVolumeName,
+				Name:                "configTplName",
+				ConfigTplRef:        "configTplName",
+				ConfigConstraintRef: "configTplName",
+				VolumeName:          replicaVolumeName,
 			}
 			ps := &sts.Spec.Template.Spec
 			err := checkAndUpdatePodVolumes(ps, volumes)

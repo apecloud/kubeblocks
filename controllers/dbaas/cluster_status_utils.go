@@ -409,9 +409,7 @@ func updateComponentStatusPhase(cli client.Client,
 	if ok && c.Phase == phase {
 		return nil
 	}
-	messageMap := c.GetMessage()
-	messageMap.SetObjectMessage(object.GetObjectKind().GroupVersionKind().Kind, object.GetName(), message)
-	c.SetMessage(messageMap)
+	c.Message.SetObjectMessage(object.GetObjectKind().GroupVersionKind().Kind, object.GetName(), message)
 	patch := client.MergeFrom(cluster.DeepCopy())
 	cluster.Status.Components[componentName] = c
 	return cli.Status().Patch(ctx, cluster, patch)

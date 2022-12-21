@@ -35,7 +35,6 @@ func init() {
 		Action:                 RestartAction,
 		ActionStartedCondition: dbaasv1alpha1.NewRestartingCondition,
 		ReconcileAction:        ReconcileActionWithComponentOps,
-		GetComponentNameMap:    getRestartComponentNameMap,
 	}
 
 	opsMgr := GetOpsManager()
@@ -44,25 +43,14 @@ func init() {
 
 // RestartAction restart components by updating StatefulSet.
 func RestartAction(opsRes *OpsResource) error {
-	var (
-		componentNameMap = getRestartComponentNameMap(opsRes.OpsRequest)
-		startTimestamp   = opsRes.OpsRequest.Status.StartTimestamp
-	)
-	if startTimestamp == nil {
+	if opsRes.OpsRequest.Status.StartTimestamp == nil {
 		return fmt.Errorf("status.startTimestamp can not be null")
 	}
+	componentNameMap := opsRes.OpsRequest.GetRestartComponentNameMap()
 	if err := restartDeployment(opsRes, componentNameMap); err != nil {
 		return err
 	}
 	return restartStatefulSet(opsRes, componentNameMap)
-}
-
-func getRestartComponentNameMap(opsRequest *dbaasv1alpha1.OpsRequest) map[string]struct{} {
-	componentNameMap := make(map[string]struct{})
-	for _, v := range opsRequest.Spec.RestartList {
-		componentNameMap[v.ComponentName] = struct{}{}
-	}
-	return componentNameMap
 }
 
 // restartStatefulSet restart statefulSet workload

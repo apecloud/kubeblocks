@@ -113,7 +113,8 @@ spec:
                 - Restart
                 type: string
               upgrade:
-                description: upgrade the cluster by specifying appVersionRef.
+                description: upgrade specify the cluster application version by specifying
+                  appVersionRef.
                 properties:
                   appVersionRef:
                     description: appVersionRef reference AppVersion name.

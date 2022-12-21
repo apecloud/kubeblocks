@@ -45,8 +45,6 @@ type OpsBehaviour struct {
 	ReconcileAction func(opsResource *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error)
 	// ActionStartedCondition append to OpsRequest.status.conditions when start performing Action function
 	ActionStartedCondition func(opsRequest *dbaasv1alpha1.OpsRequest) *metav1.Condition
-	// GetComponentNameMap if the operations is within the scope of component, this function should be implemented
-	GetComponentNameMap func(opsRequest *dbaasv1alpha1.OpsRequest) map[string]struct{}
 }
 
 type OpsResource struct {

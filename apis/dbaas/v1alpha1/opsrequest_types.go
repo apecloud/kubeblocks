@@ -220,3 +220,82 @@ type OpsRequestList struct {
 func init() {
 	SchemeBuilder.Register(&OpsRequest{}, &OpsRequestList{})
 }
+
+// GetComponentNameMap if the operations is within the scope of component, this function should be implemented
+func (r *OpsRequest) GetComponentNameMap() map[string]struct{} {
+	switch r.Spec.Type {
+	case RestartType:
+		return r.GetRestartComponentNameMap()
+	case VerticalScalingType:
+		return r.GetVerticalScalingComponentNameMap()
+	case HorizontalScalingType:
+		return r.GetHorizontalScalingComponentNameMap()
+	case VolumeExpansionType:
+		return r.GetVolumeExpansionComponentNameMap()
+	default:
+		return nil
+	}
+}
+
+// GetRestartComponentNameMap get the component name map with restart operation.
+func (r *OpsRequest) GetRestartComponentNameMap() map[string]struct{} {
+	componentNameMap := make(map[string]struct{})
+	for _, v := range r.Spec.RestartList {
+		componentNameMap[v.ComponentName] = struct{}{}
+	}
+	return componentNameMap
+}
+
+// GetVerticalScalingComponentNameMap get the component name map with vertical scaling operation.
+func (r *OpsRequest) GetVerticalScalingComponentNameMap() map[string]struct{} {
+	componentNameMap := make(map[string]struct{})
+	for _, v := range r.Spec.VerticalScalingList {
+		componentNameMap[v.ComponentName] = struct{}{}
+	}
+	return componentNameMap
+}
+
+// CovertVerticalScalingListToMap covert OpsRequest.spec.verticalScaling list to map
+func (r *OpsRequest) CovertVerticalScalingListToMap() map[string]VerticalScaling {
+	verticalScalingMap := make(map[string]VerticalScaling)
+	for _, v := range r.Spec.VerticalScalingList {
+		verticalScalingMap[v.ComponentName] = v
+	}
+	return verticalScalingMap
+}
+
+// GetHorizontalScalingComponentNameMap get the component name map with horizontal scaling operation.
+func (r *OpsRequest) GetHorizontalScalingComponentNameMap() map[string]struct{} {
+	componentNameMap := make(map[string]struct{})
+	for _, v := range r.Spec.HorizontalScalingList {
+		componentNameMap[v.ComponentName] = struct{}{}
+	}
+	return componentNameMap
+}
+
+// CovertHorizontalScalingListToMap covert OpsRequest.spec.horizontalScaling list to map
+func (r *OpsRequest) CovertHorizontalScalingListToMap() map[string]HorizontalScaling {
+	verticalScalingMap := make(map[string]HorizontalScaling)
+	for _, v := range r.Spec.HorizontalScalingList {
+		verticalScalingMap[v.ComponentName] = v
+	}
+	return verticalScalingMap
+}
+
+// GetVolumeExpansionComponentNameMap get the component name map with volume expansion operation.
+func (r *OpsRequest) GetVolumeExpansionComponentNameMap() map[string]struct{} {
+	componentNameMap := make(map[string]struct{})
+	for _, v := range r.Spec.VolumeExpansionList {
+		componentNameMap[v.ComponentName] = struct{}{}
+	}
+	return componentNameMap
+}
+
+// CovertVolumeExpansionListToMap covert volumeExpansionList to map
+func (r *OpsRequest) CovertVolumeExpansionListToMap() map[string]VolumeExpansion {
+	volumeExpansionMap := make(map[string]VolumeExpansion)
+	for _, v := range r.Spec.VolumeExpansionList {
+		volumeExpansionMap[v.ComponentName] = v
+	}
+	return volumeExpansionMap
+}

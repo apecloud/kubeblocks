@@ -183,9 +183,9 @@ func (r *OpsRequest) validateRestart(allErrs *field.ErrorList, cluster *Cluster)
 		return
 	}
 	// get component name slice
-	componentNames := make([]string, 0)
-	for _, v := range restartList {
-		componentNames = append(componentNames, v.ComponentName)
+	componentNames := make([]string, len(restartList))
+	for i, v := range restartList {
+		componentNames[i] = v.ComponentName
 	}
 	// validate component name is legal
 	supportedComponentMap := covertComponentNamesToMap(cluster.Status.Operations.Restartable)
@@ -226,9 +226,9 @@ func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *
 		return
 	}
 	// validate resources is legal and get component name slice
-	componentNames := make([]string, 0)
+	componentNames := make([]string, len(verticalScalingList))
 	for i, v := range verticalScalingList {
-		componentNames = append(componentNames, v.ComponentName)
+		componentNames[i] = v.ComponentName
 		if invalidValue, err := validateVerticalResourceList(v.Requests); err != nil {
 			addInvalidError(allErrs, fmt.Sprintf("spec.verticalScaling[%d].requests", i), invalidValue, err.Error())
 			continue
@@ -294,9 +294,9 @@ func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.
 		return
 	}
 	// validate replicas is legal and get component name slice
-	componentNames := make([]string, 0)
-	for i, v := range r.Spec.HorizontalScalingList {
-		componentNames = append(componentNames, v.ComponentName)
+	componentNames := make([]string, len(horizontalScalingList))
+	for i, v := range horizontalScalingList {
+		componentNames[i] = v.ComponentName
 		operationComponent := supportedComponentMap[v.ComponentName]
 		if operationComponent == nil {
 			continue
@@ -323,13 +323,13 @@ func (r *OpsRequest) validateVolumeExpansion(allErrs *field.ErrorList, cluster *
 		return
 	}
 	// validate volumeClaimTemplates is legal and get component name slice
-	componentNames := make([]string, 0)
+	componentNames := make([]string, len(volumeExpansionList))
 	for i, v := range volumeExpansionList {
-		componentNames = append(componentNames, v.ComponentName)
 		var (
 			supportedVCTMap = map[string]struct{}{}
 			invalidVCTNames []string
 		)
+		componentNames[i] = v.ComponentName
 		operationComponent := supportedComponentMap[v.ComponentName]
 		if operationComponent == nil {
 			continue

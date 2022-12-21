@@ -81,12 +81,8 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource) (dbaasv1alpha1.Phase, 
 		isFailed        bool
 		opsRequestPhase = dbaasv1alpha1.RunningPhase
 	)
-	opsBehaviour := GetOpsManager().OpsMap[opsRequest.Spec.Type]
-	if opsBehaviour == nil {
-		return opsRequestPhase, 0, nil
-	}
-	componentNameMap := opsBehaviour.GetComponentNameMap(opsRequest)
-	if componentNameMap == nil {
+	componentNameMap := opsRequest.GetComponentNameMap()
+	if len(componentNameMap) == 0 {
 		return opsRequestPhase, 0, nil
 	}
 	patch := client.MergeFrom(opsRequest.DeepCopy())
@@ -266,12 +262,13 @@ func patchOpsRequestToRunning(opsRes *OpsResource, opsBehaviour *OpsBehaviour) e
 }
 
 // patchClusterStatus update Cluster.status to record cluster and components information
-func patchClusterStatus(opsRes *OpsResource, componentNameMap map[string]struct{}, toClusterState dbaasv1alpha1.Phase) error {
+func patchClusterStatus(opsRes *OpsResource, toClusterState dbaasv1alpha1.Phase) error {
 	if toClusterState == "" {
 		return nil
 	}
 	patch := client.MergeFrom(opsRes.Cluster.DeepCopy())
 	opsRes.Cluster.Status.Phase = toClusterState
+	componentNameMap := opsRes.OpsRequest.GetComponentNameMap()
 	// if the OpsRequest is components scope, we should update the cluster components together.
 	// otherwise, OpsRequest maybe reconcile the status to succeed immediately.
 	if componentNameMap != nil && opsRes.Cluster.Status.Components != nil {

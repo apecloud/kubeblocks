@@ -40,11 +40,10 @@ func (opsMgr *OpsManager) RegisterOps(opsType dbaasv1alpha1.OpsType, opsBehaviou
 // Do the common entry function for handling OpsRequest
 func (opsMgr *OpsManager) Do(opsRes *OpsResource) error {
 	var (
-		opsBehaviour     *OpsBehaviour
-		err              error
-		ok               bool
-		opsRequest       = opsRes.OpsRequest
-		componentNameMap map[string]struct{}
+		opsBehaviour *OpsBehaviour
+		err          error
+		ok           bool
+		opsRequest   = opsRes.OpsRequest
 	)
 
 	if opsBehaviour, ok = opsMgr.OpsMap[opsRequest.Spec.Type]; !ok {
@@ -71,13 +70,9 @@ func (opsMgr *OpsManager) Do(opsRes *OpsResource) error {
 	if err = opsBehaviour.Action(opsRes); err != nil {
 		return err
 	}
-
-	if opsBehaviour.GetComponentNameMap != nil {
-		componentNameMap = opsBehaviour.GetComponentNameMap(opsRequest)
-	}
 	// patch cluster.status after update cluster.spec
 	// because cluster controller probably reconciled status.phase to Running if cluster no updating
-	return patchClusterStatus(opsRes, componentNameMap, opsBehaviour.ToClusterPhase)
+	return patchClusterStatus(opsRes, opsBehaviour.ToClusterPhase)
 }
 
 // Reconcile entry function when OpsRequest.status.phase is Running.

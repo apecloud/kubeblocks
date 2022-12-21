@@ -784,12 +784,13 @@ func getSupportHorizontalScalingComponents(
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition) ([]dbaasv1alpha1.OperationComponent, []string) {
 	var (
-		clusterComponentNames        = make([]string, 0)
+		components                   = cluster.Spec.Components
+		clusterComponentNames        = make([]string, len(components))
 		horizontalScalableComponents = make([]dbaasv1alpha1.OperationComponent, 0)
 	)
 	// determine whether to support horizontalScaling
-	for _, v := range cluster.Spec.Components {
-		clusterComponentNames = append(clusterComponentNames, v.Name)
+	for i, v := range components {
+		clusterComponentNames[i] = v.Name
 		for _, component := range clusterDef.Spec.Components {
 			if v.Type != component.TypeName || (component.MinReplicas != 0 &&
 				component.MaxReplicas == component.MinReplicas) {

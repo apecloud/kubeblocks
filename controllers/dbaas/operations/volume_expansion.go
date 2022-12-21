@@ -50,7 +50,6 @@ func init() {
 		Action:                 ve.Action,
 		ActionStartedCondition: dbaasv1alpha1.NewVolumeExpandingCondition,
 		ReconcileAction:        ve.ReconcileAction,
-		GetComponentNameMap:    ve.getComponentNameMap,
 	}
 
 	opsMgr := GetOpsManager()
@@ -60,7 +59,7 @@ func init() {
 // Action Modify Cluster.spec.components[*].VolumeClaimTemplates[*].spec.resources
 func (ve volumeExpansion) Action(opsRes *OpsResource) error {
 	var (
-		volumeExpansionMap = ve.covertVolumeExpansionListToMap(opsRes.OpsRequest)
+		volumeExpansionMap = opsRes.OpsRequest.CovertVolumeExpansionListToMap()
 		volumeExpansionOps dbaasv1alpha1.VolumeExpansion
 		ok                 bool
 	)
@@ -172,24 +171,6 @@ func (ve volumeExpansion) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Ph
 	}
 
 	return opsRequestPhase, requeueAfter, err
-}
-
-// covertVolumeExpansionListToMap covert list to map
-func (ve volumeExpansion) covertVolumeExpansionListToMap(
-	opsRequest *dbaasv1alpha1.OpsRequest) map[string]dbaasv1alpha1.VolumeExpansion {
-	volumeExpansionMap := make(map[string]dbaasv1alpha1.VolumeExpansion)
-	for _, v := range opsRequest.Spec.VolumeExpansionList {
-		volumeExpansionMap[v.ComponentName] = v
-	}
-	return volumeExpansionMap
-}
-
-func (ve volumeExpansion) getComponentNameMap(opsRequest *dbaasv1alpha1.OpsRequest) map[string]struct{} {
-	componentNameMap := make(map[string]struct{})
-	for _, v := range opsRequest.Spec.VolumeExpansionList {
-		componentNameMap[v.ComponentName] = struct{}{}
-	}
-	return componentNameMap
 }
 
 func (ve volumeExpansion) setVCTStatusMessage(vct *dbaasv1alpha1.VolumeClaimTemplateStatus, status dbaasv1alpha1.Phase, message string) {

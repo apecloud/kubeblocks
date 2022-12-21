@@ -27,7 +27,6 @@ func init() {
 		Action:                 VerticalScalingAction,
 		ActionStartedCondition: dbaasv1alpha1.NewVerticalScalingCondition,
 		ReconcileAction:        ReconcileActionWithComponentOps,
-		GetComponentNameMap:    getVerticalScalingComponentNameMap,
 	}
 
 	opsMgr := GetOpsManager()
@@ -37,7 +36,7 @@ func init() {
 // VerticalScalingAction Modify cluster component resources according to
 // the definition of opsRequest with spec.verticalScaling
 func VerticalScalingAction(opsRes *OpsResource) error {
-	verticalScalingMap := covertVerticalScalingListToMap(opsRes.OpsRequest)
+	verticalScalingMap := opsRes.OpsRequest.CovertVerticalScalingListToMap()
 	for index, component := range opsRes.Cluster.Spec.Components {
 		if verticalScaling, ok := verticalScalingMap[component.Name]; ok {
 			if verticalScaling.ResourceRequirements == nil {
@@ -48,22 +47,4 @@ func VerticalScalingAction(opsRes *OpsResource) error {
 		}
 	}
 	return opsRes.Client.Update(opsRes.Ctx, opsRes.Cluster)
-}
-
-// getVerticalScalingComponentNameMap get the component name map with vertical scaling operation.
-func getVerticalScalingComponentNameMap(opsRequest *dbaasv1alpha1.OpsRequest) map[string]struct{} {
-	componentNameMap := make(map[string]struct{})
-	for _, v := range opsRequest.Spec.VerticalScalingList {
-		componentNameMap[v.ComponentName] = struct{}{}
-	}
-	return componentNameMap
-}
-
-// covertVerticalScalingListToMap covert OpsRequest.spec.verticalScaling list to map
-func covertVerticalScalingListToMap(opsRequest *dbaasv1alpha1.OpsRequest) map[string]dbaasv1alpha1.VerticalScaling {
-	verticalScalingMap := make(map[string]dbaasv1alpha1.VerticalScaling)
-	for _, v := range opsRequest.Spec.VerticalScalingList {
-		verticalScalingMap[v.ComponentName] = v
-	}
-	return verticalScalingMap
 }

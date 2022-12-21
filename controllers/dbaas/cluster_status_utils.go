@@ -85,14 +85,17 @@ func updateStatusComponentMessage(statusComponent *dbaasv1alpha1.ClusterStatusCo
 		kind = event.InvolvedObject.Kind
 		name = event.InvolvedObject.Name
 	)
-	messageMap := statusComponent.GetMessage()
-	message := messageMap.GetObjectMessage(kind, name)
+	if statusComponent.Message == nil {
+		statusComponent.Message = dbaasv1alpha1.ComponentMessageMap{}
+		statusComponent.Message.SetObjectMessage(kind, name, event.Message)
+		return
+	}
+	message := statusComponent.Message.GetObjectMessage(kind, name)
 	// if the event message is not exists in message map, merge them.
 	if !strings.Contains(message, event.Message) {
 		message += event.Message + ";"
 	}
-	messageMap.SetObjectMessage(kind, name, message)
-	statusComponent.SetMessage(messageMap)
+	statusComponent.Message.SetObjectMessage(kind, name, message)
 }
 
 // needSyncComponentStatusForEvent check whether the component status needs to be synchronized the cluster status by event

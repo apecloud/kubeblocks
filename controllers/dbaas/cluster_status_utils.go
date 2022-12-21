@@ -288,14 +288,14 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 // handleEventForClusterStatus handle event for cluster Warning and Failed phase
 func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorder record.EventRecorder, event *corev1.Event) error {
 
-	type PredProcessor struct {
+	type PredicateProcessor struct {
 		pred      func() bool
 		processor func() error
 	}
 
 	nilReturnHandler := func() error { return nil }
 
-	pps := []PredProcessor{
+	pps := []PredicateProcessor{
 		{
 			// handle cronjob complete or fail event
 			pred: func() bool {

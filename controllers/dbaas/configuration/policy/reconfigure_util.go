@@ -52,27 +52,26 @@ func isUpdateDynamicParameters(tpl *dbaasv1alpha1.ConfigurationTemplateSpec, cfg
 
 	params, err := getUpdateParameterList(cfg)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
+	updateParams := cfgcore.NewSetFromList(params)
 
 	// if has StaticParameters, update static parameter
 	if len(tpl.StaticParameters) > 0 {
-		updateParams := cfgcore.NewSetFromList(params)
 		staticParams := cfgcore.NewSetFromList(tpl.StaticParameters)
-
 		union := cfgcore.Union(staticParams, updateParams)
-		return union.Empty(), nil
+		if !union.Empty() {
+			return false, nil
+		}
 	}
 
 	// if has dynamic parameters, all updated param in dynamic params
 	if len(tpl.DynamicParameters) > 0 {
-		updateParams := cfgcore.NewSetFromList(params)
 		dynamicParams := cfgcore.NewSetFromList(tpl.DynamicParameters)
-
-		union := cfgcore.Difference(dynamicParams, updateParams)
+		union := cfgcore.Difference(updateParams, dynamicParams)
 		return union.Empty(), nil
 	}
 
 	// default static parameters
-	return true, nil
+	return false, nil
 }

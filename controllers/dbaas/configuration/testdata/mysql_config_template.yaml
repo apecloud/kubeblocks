@@ -44,5 +44,8 @@ spec:
   staticParameters:
     - automatic_sp_privileges
 
+  dynamicParameters:
+    - innodb_autoinc_lock_mode
+
   # mysql configuration file format
   formatter: ini

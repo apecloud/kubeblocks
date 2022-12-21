@@ -409,6 +409,10 @@ func updateComponentStatusPhase(cli client.Client,
 	if ok && c.Phase == phase {
 		return nil
 	}
+	// c.Message can be nil
+	if c.Message == nil {
+		c.Message = dbaasv1alpha1.ComponentMessageMap{}
+	}
 	c.Message.SetObjectMessage(object.GetObjectKind().GroupVersionKind().Kind, object.GetName(), message)
 	patch := client.MergeFrom(cluster.DeepCopy())
 	cluster.Status.Components[componentName] = c

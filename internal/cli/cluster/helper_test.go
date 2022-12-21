@@ -17,6 +17,8 @@ limitations under the License.
 package cluster
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -64,10 +66,10 @@ var _ = Describe("helper", func() {
 
 	It("find component in cluster by type name", func() {
 		cluster := testing.FakeCluster("test", "test")
-		component := FindCompInCluster(cluster, "test")
+		component := FindClusterComp(cluster, "test")
 		Expect(component).Should(BeNil())
 
-		component = FindCompInCluster(cluster, testing.ComponentType)
+		component = FindClusterComp(cluster, testing.ComponentType)
 		Expect(component).ShouldNot(BeNil())
 	})
 
@@ -102,5 +104,30 @@ var _ = Describe("helper", func() {
 	It("fake cluster objects", func() {
 		objs := FakeClusterObjs()
 		Expect(objs).ShouldNot(BeNil())
+	})
+
+	It("get cluster cluster", func() {
+		dynamic := testing.FakeDynamicClient(testing.FakeCluster("test", "test"))
+		c, err := GetClusterByName(dynamic, "test", "test")
+		Expect(err).Should(Succeed())
+		Expect(c).ShouldNot(BeNil())
+	})
+
+	It("get cluster definition", func() {
+		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
+		clusterDef, err := GetClusterDefByName(dynamic, testing.ClusterDefName)
+		Expect(err).Should(Succeed())
+		Expect(clusterDef).ShouldNot(BeNil())
+	})
+
+	It("get version by cluster def", func() {
+		oldVersion := testing.FakeAppVersion()
+		oldVersion.Name = "test-old-version"
+		oldVersion.SetCreationTimestamp(metav1.NewTime(time.Now().AddDate(0, 0, -1)))
+		dynamic := testing.FakeDynamicClient(testing.FakeAppVersion(), oldVersion)
+		version, err := GetVersionByClusterDef(dynamic, testing.ClusterDefName)
+		Expect(err).Should(Succeed())
+		Expect(version).ShouldNot(BeNil())
+		Expect(len(version.Items)).Should(Equal(2))
 	})
 })

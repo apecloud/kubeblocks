@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -49,7 +50,7 @@ func ReconcileActionWithCluster(opsRes *OpsResource) (dbaasv1alpha1.Phase, time.
 		// the operation occurs in the cluster, such as upgrade.
 		// However, it is also possible that only the corresponding components have changed,
 		// and the phase is updating. so we need to monitor these components and send the corresponding event
-		if statusComponent, ok := opsRequest.Status.Components[k]; (!ok && v.Phase == dbaasv1alpha1.UpdatingPhase) || statusComponent.Phase != v.Phase {
+		if statusComponent, ok := opsRequest.Status.Components[k]; (!ok && v.Phase == opsRes.Cluster.Status.Phase) || statusComponent.Phase != v.Phase {
 			isChanged = true
 			opsRequest.Status.Components[k] = dbaasv1alpha1.OpsRequestStatusComponent{Phase: v.Phase}
 			sendEventWhenComponentPhaseChanged(opsRes, k, &v)
@@ -90,10 +91,10 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource) (dbaasv1alpha1.Phase, 
 		if _, ok := componentNameMap[k]; !ok {
 			continue
 		}
-		if !componentIsCompleted(v.Phase) {
+		if !util.IsCompleted(v.Phase) {
 			isCompleted = false
 		}
-		if isFailedPhase(v.Phase) {
+		if util.IsFailedOrAbnormal(v.Phase) {
 			isFailed = true
 		}
 		if statusComponent, ok := opsRequest.Status.Components[k]; !ok || statusComponent.Phase != v.Phase {
@@ -113,15 +114,6 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource) (dbaasv1alpha1.Phase, 
 		opsRequestPhase = dbaasv1alpha1.SucceedPhase
 	}
 	return opsRequestPhase, requeueAfter, nil
-}
-
-// componentIsCompleted check whether the component has completed the operation
-func componentIsCompleted(phase dbaasv1alpha1.Phase) bool {
-	return slices.Index([]dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase}, phase) != -1
-}
-
-func isFailedPhase(phase dbaasv1alpha1.Phase) bool {
-	return slices.Index([]dbaasv1alpha1.Phase{dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase}, phase) != -1
 }
 
 // opsRequestIsCompleted check OpsRequest is completed
@@ -148,7 +140,9 @@ func sendEventWhenComponentPhaseChanged(opsRes *OpsResource, componentName strin
 		tip = "Failed"
 		reason = dbaasv1alpha1.ReasonComponentFailed
 		eventType = corev1.EventTypeWarning
-		extraMessage = ", " + statusComponent.Message
+		for k, v := range statusComponent.Message {
+			extraMessage += fmt.Sprintf("%s:%s", k, v) + ";"
+		}
 	}
 	message := fmt.Sprintf("%s %s component: %s in Cluster: %s%s",
 		tip, opsRes.OpsRequest.Spec.Type, componentName, opsRes.OpsRequest.Spec.ClusterRef, extraMessage)
@@ -208,42 +202,51 @@ func patchClusterPhaseMisMatch(opsRes *OpsResource) error {
 }
 
 func patchClusterExistOtherOperation(opsRes *OpsResource, opsRequestName string) error {
-	message := fmt.Sprintf("spec.clusterRef: %s is running the OpsRequest: %s",
-		opsRes.Cluster.Name, opsRequestName)
+	message := fmt.Sprintf("Existing OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first",
+		opsRequestName, opsRes.Cluster.Name)
 	condition := dbaasv1alpha1.NewValidateFailedCondition(dbaasv1alpha1.ReasonClusterExistOtherOperation, message)
 	return PatchOpsStatus(opsRes, dbaasv1alpha1.FailedPhase, condition)
 }
 
-// GetOpsRequestMapFromCluster get OpsRequest map from cluster annotations
-func GetOpsRequestMapFromCluster(cluster *dbaasv1alpha1.Cluster) (map[dbaasv1alpha1.Phase]string, error) {
+// GetOpsRequestSliceFromCluster get OpsRequest slice from cluster annotations.
+// this record what OpsRequests are running in cluster
+func GetOpsRequestSliceFromCluster(cluster *dbaasv1alpha1.Cluster) ([]OpsRecorder, error) {
 	var (
 		opsRequestValue string
-		opsRequestMap   map[dbaasv1alpha1.Phase]string
+		opsRequestSlice []OpsRecorder
 		ok              bool
 	)
-	if cluster.Annotations == nil {
+	if cluster == nil || cluster.Annotations == nil {
 		return nil, nil
 	}
 	if opsRequestValue, ok = cluster.Annotations[intctrlutil.OpsRequestAnnotationKey]; !ok {
 		return nil, nil
 	}
-	// opsRequest annotation value in cluster to map
-	if err := json.Unmarshal([]byte(opsRequestValue), &opsRequestMap); err != nil {
+	// opsRequest annotation value in cluster to slice
+	if err := json.Unmarshal([]byte(opsRequestValue), &opsRequestSlice); err != nil {
 		return nil, err
 	}
-	return opsRequestMap, nil
+	return opsRequestSlice, nil
 }
 
 // getOpsRequestNameFromAnnotation get OpsRequest.name from cluster.annotations
 func getOpsRequestNameFromAnnotation(cluster *dbaasv1alpha1.Cluster, toClusterPhase dbaasv1alpha1.Phase) *string {
-	opsRequestMap, _ := GetOpsRequestMapFromCluster(cluster)
-	if opsRequestMap == nil {
+	opsRequestSlice, _ := GetOpsRequestSliceFromCluster(cluster)
+	_, opsRecorder := getOpsRecorderFromSlice(opsRequestSlice, toClusterPhase)
+	if opsRecorder == nil {
 		return nil
 	}
-	if val, ok := opsRequestMap[toClusterPhase]; ok {
-		return &val
+	return &opsRecorder.Name
+}
+
+// getOpsRecorderFromSlice get OpsRequest recorder from slice by target cluster phase
+func getOpsRecorderFromSlice(opsRequestSlice []OpsRecorder, toClusterPhase dbaasv1alpha1.Phase) (*int, *OpsRecorder) {
+	for i, v := range opsRequestSlice {
+		if v.ToClusterPhase == toClusterPhase {
+			return &i, &v
+		}
 	}
-	return nil
+	return nil, nil
 }
 
 // patchOpsRequestToRunning patch OpsRequest.status.phase to Running
@@ -278,10 +281,13 @@ func patchClusterStatus(opsRes *OpsResource, toClusterState dbaasv1alpha1.Phase)
 	componentNameMap := getAllComponentsNameMap(opsRes.OpsRequest)
 	patch := client.MergeFrom(opsRes.Cluster.DeepCopy())
 	opsRes.Cluster.Status.Phase = toClusterState
+	// if the OpsRequest is components scope, we should update the cluster components together.
+	// otherwise, OpsRequest maybe reconcile the status to succeed immediately.
 	if componentNameMap != nil && opsRes.Cluster.Status.Components != nil {
 		for k, v := range opsRes.Cluster.Status.Components {
 			if _, ok := componentNameMap[k]; ok {
 				v.Phase = toClusterState
+				opsRes.Cluster.Status.Components[k] = v
 			}
 		}
 	}
@@ -298,61 +304,62 @@ func patchClusterStatus(opsRes *OpsResource, toClusterState dbaasv1alpha1.Phase)
 func deleteOpsRequestAnnotationInCluster(opsRes *OpsResource) error {
 	var (
 		opsBehaviour    *OpsBehaviour
-		opsRequestValue string
-		opsRequestMap   map[dbaasv1alpha1.Phase]string
+		opsRequestSlice []OpsRecorder
 		ok              bool
+		err             error
 	)
-	if opsRes.Cluster == nil || opsRes.Cluster.Annotations == nil {
-		return nil
-	}
-	if opsRequestValue, ok = opsRes.Cluster.Annotations[intctrlutil.OpsRequestAnnotationKey]; !ok {
-		return nil
-	}
-	if err := json.Unmarshal([]byte(opsRequestValue), &opsRequestMap); err != nil {
+	if opsRequestSlice, err = GetOpsRequestSliceFromCluster(opsRes.Cluster); err != nil {
 		return err
 	}
 	if opsBehaviour, ok = GetOpsManager().OpsMap[opsRes.OpsRequest.Spec.Type]; !ok {
 		return nil
 	}
-	if val, ok := opsRequestMap[opsBehaviour.ToClusterPhase]; !ok || val != opsRes.OpsRequest.Name {
+	index, opsRecorder := getOpsRecorderFromSlice(opsRequestSlice, opsBehaviour.ToClusterPhase)
+	if opsRecorder == nil || opsRecorder.Name != opsRes.OpsRequest.Name {
 		return nil
 	}
 	// delete the opsRequest information in Cluster.annotations
-	delete(opsRequestMap, opsBehaviour.ToClusterPhase)
-	if err := patchClusterPhaseWhenExistsOtherOps(opsRes, opsRequestMap); err != nil {
+	opsRequestSlice = slices.Delete(opsRequestSlice, *index, *index+1)
+	if err = patchClusterPhaseWhenExistsOtherOps(opsRes, opsRequestSlice); err != nil {
 		return err
 	}
-	return patchClusterAnnotations(opsRes, opsRequestMap)
+	return patchClusterAnnotations(opsRes, opsRequestSlice)
 }
 
 // addOpsRequestAnnotationToCluster when OpsRequest.phase is Running, we should add the OpsRequest Annotation to Cluster.metadata.Annotations
 func addOpsRequestAnnotationToCluster(opsRes *OpsResource, toClusterPhase dbaasv1alpha1.Phase) error {
 	var (
-		opsRequestMap   map[dbaasv1alpha1.Phase]string
-		opsRequestValue string
-		ok              bool
+		opsRequestSlice []OpsRecorder
+		err             error
 	)
 	if toClusterPhase == "" {
 		return nil
 	}
-	if opsRes.Cluster.Annotations == nil {
-		opsRes.Cluster.Annotations = map[string]string{}
-	}
-	if opsRequestValue, ok = opsRes.Cluster.Annotations[intctrlutil.OpsRequestAnnotationKey]; !ok {
-		opsRequestValue = "{}"
-	}
-	if err := json.Unmarshal([]byte(opsRequestValue), &opsRequestMap); err != nil {
+	if opsRequestSlice, err = GetOpsRequestSliceFromCluster(opsRes.Cluster); err != nil {
 		return err
 	}
-	opsRequestMap[toClusterPhase] = opsRes.OpsRequest.Name
-	return patchClusterAnnotations(opsRes, opsRequestMap)
+	// check the OpsRequest is existed
+	if _, opsRecorder := getOpsRecorderFromSlice(opsRequestSlice, toClusterPhase); opsRecorder != nil {
+		return nil
+	}
+	if opsRequestSlice == nil {
+		opsRequestSlice = make([]OpsRecorder, 0)
+	}
+	opsRequestSlice = append(opsRequestSlice, OpsRecorder{
+		Name:           opsRes.OpsRequest.Name,
+		ToClusterPhase: toClusterPhase,
+	})
+	return patchClusterAnnotations(opsRes, opsRequestSlice)
 }
 
 // patchClusterAnnotations patch OpsRequest annotation in Cluster.annotations
-func patchClusterAnnotations(opsRes *OpsResource, opsRequestMap map[dbaasv1alpha1.Phase]string) error {
+func patchClusterAnnotations(opsRes *OpsResource, opsRequestSlice []OpsRecorder) error {
 	patch := client.MergeFrom(opsRes.Cluster.DeepCopy())
-	if len(opsRequestMap) > 0 {
-		result, _ := json.Marshal(opsRequestMap)
+	if opsRes.Cluster.Annotations == nil {
+		opsRes.Cluster.Annotations = map[string]string{}
+	}
+	if len(opsRequestSlice) > 0 {
+		result, _ := json.Marshal(opsRequestSlice)
 		opsRes.Cluster.Annotations[intctrlutil.OpsRequestAnnotationKey] = string(result)
 	} else {
 		delete(opsRes.Cluster.Annotations, intctrlutil.OpsRequestAnnotationKey)
@@ -361,20 +368,22 @@ func patchClusterAnnotations(opsRes *OpsResource, opsRequestMap map[dbaasv1alpha
 }
 
 // patchClusterPhaseWhenExistsOtherOps
-func patchClusterPhaseWhenExistsOtherOps(opsRes *OpsResource, opsRequestMap map[dbaasv1alpha1.Phase]string) error {
+func patchClusterPhaseWhenExistsOtherOps(opsRes *OpsResource, opsRequestSlice []OpsRecorder) error {
 	// If there are other OpsRequests running, modify the cluster.status.phase with other opsRequest's ToClusterPhase
-	if len(opsRequestMap) == 0 {
+	if len(opsRequestSlice) == 0 {
 		return nil
 	}
 	patch := client.MergeFrom(opsRes.Cluster.DeepCopy())
-	for k := range opsRequestMap {
-		opsRes.Cluster.Status.Phase = k
-		break
-	}
+	opsRes.Cluster.Status.Phase = opsRequestSlice[0].ToClusterPhase
 	if err := opsRes.Client.Status().Patch(opsRes.Ctx, opsRes.Cluster, patch); err != nil {
 		return err
 	}
 	return nil
+}
+
+// isOpsRequestFailedPhase check the OpsRequest phase is Failed
+func isOpsRequestFailedPhase(opsRequestPhase dbaasv1alpha1.Phase) bool {
+	return opsRequestPhase == dbaasv1alpha1.FailedPhase
 }
 
 // PatchOpsRequestAnnotation patch the reconcile annotation to OpsRequest
@@ -387,11 +396,25 @@ func PatchOpsRequestAnnotation(ctx context.Context, cli client.Client, cluster *
 	if opsRequest.Annotations == nil {
 		opsRequest.Annotations = map[string]string{}
 	}
-	opsRequest.Annotations[OpsRequestReconcileAnnotationKey] = time.Now().Format(time.RFC3339)
+	opsRequest.Annotations[intctrlutil.OpsRequestReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
 	return cli.Patch(ctx, opsRequest, patch)
 }
 
-// isOpsRequestFailedPhase check the OpsRequest phase is Failed
-func isOpsRequestFailedPhase(opsRequestPhase dbaasv1alpha1.Phase) bool {
-	return opsRequestPhase == dbaasv1alpha1.FailedPhase
+// MarkRunningOpsRequestAnnotation mark reconcile annotation to the OpsRequest which is running in the cluster.
+// then the related OpsRequest can reconcile
+func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster) error {
+	var (
+		opsRequestSlice []OpsRecorder
+		err             error
+	)
+	if opsRequestSlice, err = GetOpsRequestSliceFromCluster(cluster); err != nil {
+		return err
+	}
+	// mark annotation for operations
+	for _, v := range opsRequestSlice {
+		if err = PatchOpsRequestAnnotation(ctx, cli, cluster, v.Name); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -62,6 +62,14 @@ type LoginOpts struct {
 	URL    string
 }
 
+type Option func(*cli.EnvSettings)
+
+func WithContext(context string) Option {
+	return func(es *cli.EnvSettings) {
+		es.KubeContext = context
+	}
+}
+
 // AddRepo will add a repo
 func AddRepo(r *repo.Entry) error {
 	settings := cli.New()
@@ -282,13 +290,16 @@ func (i *InstallOpts) tryUnInstall(cfg *action.Configuration) error {
 	return nil
 }
 
-func NewActionConfig(ns string, config string) (*action.Configuration, error) {
+func NewActionConfig(ns string, config string, opts ...Option) (*action.Configuration, error) {
 	var err error
 	settings := cli.New()
 	cfg := new(action.Configuration)
 
 	settings.SetNamespace(ns)
 	settings.KubeConfig = config
+	for _, opt := range opts {
+		opt(settings)
+	}
 	if cfg.RegistryClient, err = registry.NewClient(
 		registry.ClientOptDebug(settings.Debug),
 		registry.ClientOptEnableCache(true),

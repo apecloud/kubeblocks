@@ -44,6 +44,7 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		NewDescribeCmd(f, streams),
 		NewCreateCmd(f, streams),
 		NewDeleteCmd(f, streams),
+		NewUpdateCmd(f, streams),
 		NewRestartCmd(f, streams),
 		NewUpgradeCmd(f, streams),
 		NewVolumeExpansionCmd(f, streams),
@@ -61,7 +62,7 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		NewListOpsCmd(f, streams),
 		NewDeleteOpsCmd(f, streams),
 		NewLogsCmd(f, streams),
-		NewListLogsTypeCmd(f, streams),
+		NewListLogsCmd(f, streams),
 	)
 
 	if viper.GetString(EnvExperimentalExpose) == "1" {

@@ -59,16 +59,16 @@ spec:
             description: ClusterSpec defines the desired state of Cluster
             properties:
               affinity:
-                description: Affinity describes affinities which specific by users.
+                description: affinity describes affinities which specific by users.
                 properties:
                   nodeLabels:
                     additionalProperties:
                       type: string
-                    description: NodeLabels describe constrain which nodes pod can
+                    description: nodeLabels describe constrain which nodes pod can
                       be scheduled on based on node labels.
                     type: object
                   podAntiAffinity:
-                    description: PodAntiAffinity defines pods of component anti-affnity.
+                    description: podAntiAffinity defines pods of component anti-affnity.
                       Defaults to Preferred Preferred means try spread pods by topologyKey
                       Required means must spread pods by topologyKey
                     enum:
@@ -76,7 +76,7 @@ spec:
                     - Required
                     type: string
                   topologyKeys:
-                    description: TopologyKeys describe topologyKeys for `topologySpreadConstraint`
+                    description: topologyKeys describe topologyKeys for `topologySpreadConstraint`
                       and `podAntiAffinity` in ClusterDefinition API.
                     items:
                       type: string
@@ -98,17 +98,17 @@ spec:
                 items:
                   properties:
                     affinity:
-                      description: Affinity describes affinities which specific by
+                      description: affinity describes affinities which specific by
                         users.
                       properties:
                         nodeLabels:
                           additionalProperties:
                             type: string
-                          description: NodeLabels describe constrain which nodes pod
+                          description: nodeLabels describe constrain which nodes pod
                             can be scheduled on based on node labels.
                           type: object
                         podAntiAffinity:
-                          description: PodAntiAffinity defines pods of component anti-affnity.
+                          description: podAntiAffinity defines pods of component anti-affnity.
                             Defaults to Preferred Preferred means try spread pods
                             by topologyKey Required means must spread pods by topologyKey
                           enum:
@@ -116,14 +116,14 @@ spec:
                           - Required
                           type: string
                         topologyKeys:
-                          description: TopologyKeys describe topologyKeys for `topologySpreadConstraint`
+                          description: topologyKeys describe topologyKeys for `topologySpreadConstraint`
                             and `podAntiAffinity` in ClusterDefinition API.
                           items:
                             type: string
                           type: array
                       type: object
                     enabledLogs:
-                      description: EnabledLogs indicate which log file takes effect
+                      description: enabledLogs indicate which log file takes effect
                         in database cluster element is the log type which defined
                         in cluster definition logConfig.name, and will set relative
                         variables about this log type in database kernel.
@@ -132,7 +132,7 @@ spec:
                       type: array
                     monitor:
                       default: false
-                      description: Monitor which is a switch to enable monitoring,
+                      description: monitor which is a switch to enable monitoring,
                         default is false KubeBlocks provides an extension mechanism
                         to support component level monitoring, which will scrape metrics
                         auto or manually from servers in component and export metrics
@@ -149,7 +149,7 @@ spec:
                       format: int32
                       type: integer
                     resources:
-                      description: Resources requests and limits of workload.
+                      description: resources requests and limits of workload.
                       properties:
                         limits:
                           additionalProperties:
@@ -245,14 +245,14 @@ spec:
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     volumeClaimTemplates:
-                      description: VolumeClaimTemplates information for statefulset.spec.volumeClaimTemplates.
+                      description: volumeClaimTemplates information for statefulset.spec.volumeClaimTemplates.
                       items:
                         properties:
                           name:
                             description: Ref AppVersion.spec.components.containers.volumeMounts.name
                             type: string
                           spec:
-                            description: Spec defines the desired characteristics
+                            description: spec defines the desired characteristics
                               of a volume requested by a pod author.
                             properties:
                               accessModes:
@@ -520,15 +520,15 @@ spec:
                   description: ClusterStatusComponent record components status information
                   properties:
                     consensusSetStatus:
-                      description: ConsensusSetStatus role and pod name mapping.
+                      description: consensusSetStatus role and pod name mapping.
                       properties:
                         followers:
-                          description: Followers status.
+                          description: followers status.
                           items:
                             properties:
                               accessMode:
                                 default: ReadWrite
-                                description: AccessMode, what service this pod provides.
+                                description: accessMode, what service this pod provides.
                                 enum:
                                 - None
                                 - Readonly
@@ -536,11 +536,11 @@ spec:
                                 type: string
                               name:
                                 default: leader
-                                description: Name role name.
+                                description: name role name.
                                 type: string
                               pod:
                                 default: Unknown
-                                description: Pod name.
+                                description: pod name.
                                 type: string
                             required:
                             - accessMode
@@ -549,11 +549,11 @@ spec:
                             type: object
                           type: array
                         leader:
-                          description: Leader status.
+                          description: leader status.
                           properties:
                             accessMode:
                               default: ReadWrite
-                              description: AccessMode, what service this pod provides.
+                              description: accessMode, what service this pod provides.
                               enum:
                               - None
                               - Readonly
@@ -561,11 +561,11 @@ spec:
                               type: string
                             name:
                               default: leader
-                              description: Name role name.
+                              description: name role name.
                               type: string
                             pod:
                               default: Unknown
-                              description: Pod name.
+                              description: pod name.
                               type: string
                           required:
                           - accessMode
@@ -573,11 +573,11 @@ spec:
                           - pod
                           type: object
                         learner:
-                          description: Learner status.
+                          description: learner status.
                           properties:
                             accessMode:
                               default: ReadWrite
-                              description: AccessMode, what service this pod provides.
+                              description: accessMode, what service this pod provides.
                               enum:
                               - None
                               - Readonly
@@ -585,11 +585,11 @@ spec:
                               type: string
                             name:
                               default: leader
-                              description: Name role name.
+                              description: name role name.
                               type: string
                             pod:
                               default: Unknown
-                              description: Pod name.
+                              description: pod name.
                               type: string
                           required:
                           - accessMode
@@ -600,11 +600,14 @@ spec:
                       - leader
                       type: object
                     message:
-                      description: Message record the component details message in
-                        current phase.
-                      type: string
+                      additionalProperties:
+                        type: string
+                      description: message record the component details message in
+                        current phase. keys are podName or deployName or statefulSetName,
+                        the format is `<ObjectKind>/<Name>`.
+                      type: object
                     phase:
-                      description: 'Phase describe the phase of the cluster. the detail
+                      description: 'phase describe the phase of the cluster. the detail
                         information of phase is as follows: Failed: component not
                         available, i.e, all pod is not ready for Stateless/Stateful
                         component; Leader/Primary pod is not ready for Consensus/Replication
@@ -622,11 +625,20 @@ spec:
                       - Deleted
                       - VolumeExpanding
                       type: string
+                    podsReady:
+                      description: podsReady check all pods of the component are ready.
+                      type: boolean
+                    podsReadyTime:
+                      description: podsReadyTime what time point of all component
+                        pods are ready, this time is the ready time of the last component
+                        pod.
+                      format: date-time
+                      type: string
                     type:
-                      description: Type of component.
+                      description: type of component.
                       type: string
                   type: object
-                description: Components record the current status information of all
+                description: components record the current status information of all
                   components of the cluster.
                 type: object
               conditions:
@@ -700,7 +712,7 @@ spec:
                   type: object
                 type: array
               message:
-                description: Message cluster details message in current phase.
+                description: message describe cluster details message in current phase.
                 type: string
               observedGeneration:
                 description: observedGeneration is the most recent generation observed
@@ -709,26 +721,26 @@ spec:
                 format: int64
                 type: integer
               operations:
-                description: Operations declares which operations the cluster supports.
+                description: operations declares which operations the cluster supports.
                 properties:
                   horizontalScalable:
-                    description: HorizontalScalable which components of the cluster
+                    description: horizontalScalable which components of the cluster
                       support horizontalScaling, and the replicas range limit.
                     items:
                       properties:
                         max:
-                          description: Max maximum of replicas when operation is horizontalScaling.
+                          description: max maximum of replicas when operation is horizontalScaling.
                           format: int32
                           type: integer
                         min:
-                          description: Min minimum of replicas when operation is horizontalScaling.
+                          description: min minimum of replicas when operation is horizontalScaling.
                           format: int32
                           type: integer
                         name:
-                          description: Name reference component name.
+                          description: name reference component name.
                           type: string
                         volumeClaimTemplateNames:
-                          description: VolumeClaimTemplateNames which VolumeClaimTemplate
+                          description: volumeClaimTemplateNames which VolumeClaimTemplate
                             of the component support volumeExpansion.
                           items:
                             type: string
@@ -738,39 +750,39 @@ spec:
                       type: object
                     type: array
                   restartable:
-                    description: Restartable which components of the cluster support
+                    description: restartable which components of the cluster support
                       restart.
                     items:
                       type: string
                     type: array
                   upgradable:
-                    description: Upgradable whether the cluster supports upgrade.
+                    description: upgradable whether the cluster supports upgrade.
                       if multiple appVersions existed, it is true.
                     type: boolean
                   verticalScalable:
-                    description: VerticalScalable which components of the cluster
+                    description: verticalScalable which components of the cluster
                       support verticalScaling.
                     items:
                       type: string
                     type: array
                   volumeExpandable:
-                    description: VolumeExpandable which components of the cluster
+                    description: volumeExpandable which components of the cluster
                       and its volumeClaimTemplates support volumeExpansion.
                     items:
                       properties:
                         max:
-                          description: Max maximum of replicas when operation is horizontalScaling.
+                          description: max maximum of replicas when operation is horizontalScaling.
                           format: int32
                           type: integer
                         min:
-                          description: Min minimum of replicas when operation is horizontalScaling.
+                          description: min minimum of replicas when operation is horizontalScaling.
                           format: int32
                           type: integer
                         name:
-                          description: Name reference component name.
+                          description: name reference component name.
                           type: string
                         volumeClaimTemplateNames:
-                          description: VolumeClaimTemplateNames which VolumeClaimTemplate
+                          description: volumeClaimTemplateNames which VolumeClaimTemplate
                             of the component support volumeExpansion.
                           items:
                             type: string
@@ -781,7 +793,7 @@ spec:
                     type: array
                 type: object
               phase:
-                description: 'Phase describe the phase of the cluster. the detail
+                description: 'phase describe the phase of the cluster. the detail
                   information of phase is as follows: Creating: creating cluster.
                   Running: cluster is running, all components is available. Updating:
                   cluster changes, such as horizontal-scaling/vertical-scaling/restart.
@@ -789,7 +801,8 @@ spec:
                   deleting cluster/cluster is deleted. Failed: cluster not available.
                   Abnormal: cluster available but some component is not Abnormal.
                   if the component type is Consensus/Replication, the Leader/Primary
-                  pod is must ready in Abnormal phase.'
+                  pod is must ready in Abnormal phase. ConditionsError: status.conditions
+                  error, but the components are running when cluster api changed.'
                 enum:
                 - Running
                 - Failed
@@ -799,6 +812,7 @@ spec:
                 - Deleting
                 - Deleted
                 - VolumeExpanding
+                - ConditionsError
                 type: string
             type: object
         type: object

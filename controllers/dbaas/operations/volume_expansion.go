@@ -42,7 +42,10 @@ func init() {
 	ve := volumeExpansion{}
 	// the volume expansion operation only support online expanding now, so this operation not affect the cluster availability.
 	volumeExpansionBehaviour := &OpsBehaviour{
-		FromClusterPhases:      []dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase},
+		FromClusterPhases: []dbaasv1alpha1.Phase{
+			dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase,
+			dbaasv1alpha1.AbnormalPhase, dbaasv1alpha1.ConditionsErrorPhase,
+		},
 		ToClusterPhase:         dbaasv1alpha1.VolumeExpandingPhase,
 		Action:                 ve.Action,
 		ActionStartedCondition: dbaasv1alpha1.NewVolumeExpandingCondition,

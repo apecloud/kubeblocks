@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package v1alpha1 contains API Schema definitions for the dbaas v1alpha1 API group
 package v1alpha1
 
 import (
@@ -45,6 +46,7 @@ const (
 	VolumeExpandingPhase Phase = "VolumeExpanding"
 	SucceedPhase         Phase = "Succeed"
 	AbnormalPhase        Phase = "Abnormal"
+	ConditionsErrorPhase Phase = "ConditionsError"
 )
 
 // Status define CR .Status.ClusterDefSyncStatus
@@ -122,6 +124,13 @@ const (
 	Preferred PodAntiAffinity = "Preferred"
 	Required  PodAntiAffinity = "Required"
 )
+
+// OpsRequestBehaviour record what cluster status that can trigger this OpsRequest
+// and what status that the cluster enters after trigger OpsRequest.
+type OpsRequestBehaviour struct {
+	FromClusterPhases []Phase
+	ToClusterPhase    Phase
+}
 
 var webhookMgr *webhookManager
 

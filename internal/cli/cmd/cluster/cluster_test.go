@@ -26,15 +26,25 @@ import (
 	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	"github.com/apecloud/kubeblocks/internal/cli/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 var _ = Describe("Cluster", func() {
 	var streams genericclioptions.IOStreams
+	var tf *cmdtesting.TestFactory
+
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		tf = cmdtesting.NewTestFactory().WithNamespace("default")
+		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef(), testing.FakeAppVersion())
+	})
+
+	AfterEach(func() {
+		tf.Cleanup()
 	})
 
 	Context("create", func() {
@@ -45,30 +55,31 @@ var _ = Describe("Cluster", func() {
 		})
 
 		It("new command", func() {
-			tf := cmdtesting.NewTestFactory().WithNamespace("default")
-			defer tf.Cleanup()
 			cmd := NewCreateCmd(tf, streams)
 			Expect(cmd).ShouldNot(BeNil())
 			Expect(cmd.Flags().GetString("termination-policy")).Should(Equal(""))
 
-			// must succeed otherwise exit 1 and make test fails
+			Expect(cmd.Flags().Set("cluster-definition", testing.ClusterDefName)).Should(Succeed())
+			Expect(cmd.Flags().Set("cluster-version", testing.AppVersionName)).Should(Succeed())
 			Expect(cmd.Flags().Set("components", "../../testing/testdata/component.yaml")).Should(Succeed())
 			Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
+
+			// must succeed otherwise exit 1 and make test fails
 			cmd.Run(nil, []string{"test1"})
 		})
 
 		It("run", func() {
-			tf := cmdtesting.NewTestFactory().WithNamespace("default")
-			defer tf.Cleanup()
-
+			tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef())
 			o := &CreateOptions{
-				BaseOptions:        create.BaseOptions{IOStreams: streams, Name: "test"},
+				BaseOptions:        create.BaseOptions{IOStreams: streams, Name: "test", Client: tf.FakeDynamicClient},
 				ComponentsFilePath: "",
-				ClusterDefRef:      "wesql",
+				ClusterDefRef:      testing.ClusterDefName,
 				AppVersionRef:      "app-version",
-				PodAntiAffinity:    "Preferred",
-				TopologyKeys:       []string{"kubernetes.io/hostname"},
-				NodeLabels:         map[string]string{"testLabelKey": "testLabelValue"},
+				UpdatableFlags: UpdatableFlags{
+					PodAntiAffinity: "Preferred",
+					TopologyKeys:    []string{"kubernetes.io/hostname"},
+					NodeLabels:      map[string]string{"testLabelKey": "testLabelValue"},
+				},
 			}
 
 			Expect(o.Validate()).Should(HaveOccurred())
@@ -101,23 +112,17 @@ var _ = Describe("Cluster", func() {
 	})
 
 	It("delete", func() {
-		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		defer tf.Cleanup()
 		cmd := NewDeleteCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 	})
 
 	It("cluster", func() {
-		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		defer tf.Cleanup()
 		cmd := NewClusterCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 		Expect(cmd.HasSubCommands()).To(BeTrue())
 	})
 
 	It("operations", func() {
-		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		defer tf.Cleanup()
 		o := &OperationsOptions{
 			BaseOptions:            create.BaseOptions{IOStreams: streams},
 			TTLSecondsAfterSucceed: 30,
@@ -155,9 +160,6 @@ var _ = Describe("Cluster", func() {
 	})
 
 	It("list and delete operations", func() {
-		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		defer tf.Cleanup()
-
 		clusterName := "wesql"
 		clusterLabel := fmt.Sprintf("%s=%s", types.InstanceLabelKey, clusterName)
 		testLabel := "kubeblocks.io/test=test"
@@ -166,38 +168,34 @@ var _ = Describe("Cluster", func() {
 		deleteFlags := &delete.DeleteFlags{
 			DeleteFlags: cmddelete.NewDeleteCommandFlags("containing the resource to delete."),
 		}
-		Expect(completeForDeleteOps(deleteFlags, []string{clusterName})).Should(Succeed())
+		c := &builder.Command{Options: deleteFlags, Args: []string{clusterName}}
+		Expect(completeForDeleteOps(c)).Should(Succeed())
 		Expect(*deleteFlags.LabelSelector == clusterLabel).Should(BeTrue())
 
 		By("test delete OpsRequest with cluster and custom label")
 		deleteFlags.LabelSelector = &testLabel
-		Expect(completeForDeleteOps(deleteFlags, []string{clusterName})).Should(Succeed())
+		Expect(completeForDeleteOps(c)).Should(Succeed())
 		Expect(*deleteFlags.LabelSelector == testLabel+","+clusterLabel).Should(BeTrue())
 
 		By("test delete OpsRequest with name")
 		deleteFlags.ClusterName = ""
 		deleteFlags.ResourceNames = []string{"test1"}
-		Expect(completeForDeleteOps(deleteFlags, []string{})).Should(Succeed())
+		c.Args = []string{}
+		Expect(completeForDeleteOps(c)).Should(Succeed())
 		Expect(deleteFlags.ClusterName == "").Should(BeTrue())
 	})
 
 	It("connect", func() {
-		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		defer tf.Cleanup()
 		cmd := NewConnectCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 	})
 
 	It("list-logs-type", func() {
-		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		defer tf.Cleanup()
-		cmd := NewListLogsTypeCmd(tf, streams)
+		cmd := NewListLogsCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 	})
 
 	It("logs", func() {
-		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		defer tf.Cleanup()
 		cmd := NewLogsCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 	})

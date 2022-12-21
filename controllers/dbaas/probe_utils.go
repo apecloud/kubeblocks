@@ -18,6 +18,7 @@ package dbaas
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -30,45 +31,54 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams,
-	containers []corev1.Container) ([]corev1.Container, error) {
+const (
+	// http://localhost:<port>/v1.0/bindings/<binding_type>
+	roleObserveURIFormat = "http://localhost:%s/v1.0/bindings/%s"
+
+	roleProbeContainerName    = "kb-rolechangedcheck"
+	statusProbeContainerName  = "kb-statuscheck"
+	runningProbeContainerName = "kb-runningcheck"
+	ProbeRoleChangedCheckPath = "spec.containers{" + roleProbeContainerName + "}"
+	ProbeStatusCheckPath      = "spec.containers{" + statusProbeContainerName + "}"
+	ProbeRunningCheckPath     = "spec.containers{" + runningProbeContainerName + "}"
+)
+
+func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *Component) error {
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 
-	cueTpl, err := params.getCacheCUETplValue("probe_template.cue", func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("probe_template.cue"))
-	})
+	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("probe_template.cue"))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
 	probeContainerByte, err := cueValue.Lookup("probeContainer")
 	if err != nil {
-		return nil, err
+		return err
 	}
 	container := corev1.Container{}
 	if err = json.Unmarshal(probeContainerByte, &container); err != nil {
-		return nil, err
+		return err
 	}
 
 	probeContainers := []corev1.Container{}
-	componentProbes := params.component.Probes
+	componentProbes := component.Probes
 	reqCtx.Log.Info("probe", "settings", componentProbes)
 	if componentProbes == nil {
-		return probeContainers, nil
+		return nil
 	}
 
 	probeSvcHTTPPort := viper.GetInt32("PROBE_SERVICE_PORT")
-	availablePorts, err := getAvailableContainerPorts(containers, []int32{probeSvcHTTPPort, 50001})
+	availablePorts, err := getAvailableContainerPorts(component.PodSpec.Containers, []int32{probeSvcHTTPPort, 50001})
 	probeSvcHTTPPort = availablePorts[0]
 	probeServiceGrpcPort := availablePorts[1]
 	if err != nil {
 		reqCtx.Log.Info("get probe container port failed", "error", err)
-		return nil, err
+		return err
 	}
 
 	if componentProbes.RoleChangedProbe != nil {
 		roleChangedContainer := container.DeepCopy()
-		buildRoleChangedProbeContainer(roleChangedContainer, componentProbes.RoleChangedProbe, int(probeSvcHTTPPort))
+		buildRoleChangedProbeContainer(component.CharacterType, roleChangedContainer, componentProbes.RoleChangedProbe, int(probeSvcHTTPPort))
 		probeContainers = append(probeContainers, *roleChangedContainer)
 	}
 
@@ -86,11 +96,12 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, params createParams,
 
 	if len(probeContainers) >= 1 {
 		container := &probeContainers[0]
-		buildProbeServiceContainer(params.component, container, int(probeSvcHTTPPort), int(probeServiceGrpcPort))
+		buildProbeServiceContainer(component, container, int(probeSvcHTTPPort), int(probeServiceGrpcPort))
 	}
 
 	reqCtx.Log.Info("probe", "containers", probeContainers)
-	return probeContainers, nil
+	component.PodSpec.Containers = append(component.PodSpec.Containers, probeContainers...)
+	return nil
 }
 
 func buildProbeServiceContainer(component *Component, container *corev1.Container, probeSvcHTTPPort int, probeServiceGrpcPort int) {
@@ -156,22 +167,27 @@ func getComponentRoles(component *Component) map[string]string {
 	return roles
 }
 
-func buildRoleChangedProbeContainer(roleChangedContainer *corev1.Container,
+func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *corev1.Container,
 	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
-	roleChangedContainer.Name = "kb-rolechangedcheck"
+	roleChangedContainer.Name = roleProbeContainerName
 	probe := roleChangedContainer.ReadinessProbe
-	probe.Exec.Command = []string{"curl", "-X", "POST",
+	bindingType := strings.ToLower(characterType)
+	svcPort := strconv.Itoa(probeSvcHTTPPort)
+	roleObserveURI := fmt.Sprintf(roleObserveURIFormat, svcPort, bindingType)
+	probe.Exec.Command = []string{
+		"curl", "-X", "POST",
 		"--fail-with-body", "--silent",
 		"-H", "Content-Type: application/json",
-		"http://localhost:" + strconv.Itoa(probeSvcHTTPPort) + "/v1.0/bindings/probe",
-		"-d", "{\"operation\": \"roleCheck\", \"metadata\": {\"sql\" : \"\"}}"}
+		roleObserveURI,
+		"-d", "{\"operation\": \"roleCheck\", \"metadata\":{\"sql\":\"\"}}",
+	}
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
 	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
 func buildStatusProbeContainer(statusProbeContainer *corev1.Container,
 	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
-	statusProbeContainer.Name = "kb-statuscheck"
+	statusProbeContainer.Name = statusProbeContainerName
 	probe := statusProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = "/v1.0/bindings/probe?operation=statusCheck"
@@ -184,7 +200,7 @@ func buildStatusProbeContainer(statusProbeContainer *corev1.Container,
 
 func buildRunningProbeContainer(runningProbeContainer *corev1.Container,
 	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
-	runningProbeContainer.Name = "kb-runningcheck"
+	runningProbeContainer.Name = runningProbeContainerName
 	probe := runningProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = "/v1.0/bindings/probe?operation=runningCheck"

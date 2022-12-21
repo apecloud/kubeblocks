@@ -1,0 +1,15 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: mongodb
+spec:
+  clusterDefinitionRef: mongodb-cluster-definition
+  appVersionRef: mongodb-app-version
+  terminationPolicy: WipeOut
+  components:
+    - name: configsvr
+      type: configsvr
+    - name: shard1
+      type: shard
+    - name: shard2
+      type: shard

@@ -46,11 +46,12 @@ jobs:
     needs: pre-pull-request
     runs-on: [ self-hosted, eks-fargate-runner ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: JashBook/checkout@main
       - name: make mod-vendor and lint
         run: |
           mkdir -p ./bin
           cp -r /go/bin/controller-gen ./bin/controller-gen
+          cp -r /go/bin/setup-envtest ./bin/setup-envtest
           make mod-vendor lint
 
       - name: make test

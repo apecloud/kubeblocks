@@ -1,6 +1,6 @@
 ## kbcli cluster volume-expansion
 
-expand volume with the specified components and volumeClaimTemplates in the cluster
+Expand volume with the specified components and volumeClaimTemplates in the cluster
 
 ```
 kbcli cluster volume-expansion [flags]

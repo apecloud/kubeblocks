@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/dynamic"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -33,6 +34,23 @@ import (
 )
 
 var _ = Describe("version", func() {
+
+	cleanupObjects := func() {
+		err := k8sClient.DeleteAllOf(ctx, &appsv1.Deployment{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &corev1.Pod{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey}, client.GracePeriodSeconds(0))
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	BeforeEach(func() {
+		// Add any setup steps that needs to be executed before each test
+		cleanupObjects()
+	})
+
+	AfterEach(func() {
+		// Add any teardown steps that needs to be executed after each test
+		cleanupObjects()
+	})
 
 	createKubeBlocksDeplyment := func() {
 		deployYaml := fmt.Sprintf(`
@@ -59,12 +77,14 @@ spec:
     matchLabels:
       app.kubernetes.io/instance: kubeblocks
       app.kubernetes.io/name: kubeblocks
+      kubeblocks.io/test: test
   template:
     metadata:
       creationTimestamp: null
       labels:
         app.kubernetes.io/instance: kubeblocks
         app.kubernetes.io/name: kubeblocks
+        kubeblocks.io/test: test
     spec:
       containers:
       - args:
@@ -142,7 +162,7 @@ spec:
 `, types.KubeBlocksChartName)
 		deployment := &appsv1.Deployment{}
 		_ = yaml.Unmarshal([]byte(deployYaml), deployment)
-		Expect(k8sClient.Create(context.Background(), deployment)).To(Succeed())
+		Expect(testCtx.CreateObj(context.Background(), deployment)).To(Succeed())
 		Eventually(func() bool {
 			tmpDeploy := &appsv1.Deployment{}
 			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: deployment.Name, Namespace: deployment.Namespace}, tmpDeploy)

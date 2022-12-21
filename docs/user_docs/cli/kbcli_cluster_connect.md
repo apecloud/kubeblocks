@@ -1,6 +1,6 @@
 ## kbcli cluster connect
 
-connect to a database cluster
+Connect to a database cluster
 
 ```
 kbcli cluster connect [flags]

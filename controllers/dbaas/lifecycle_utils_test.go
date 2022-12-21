@@ -18,7 +18,6 @@ package dbaas
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -84,7 +83,7 @@ var _ = Describe("lifecycle_utils", func() {
 			clusterDef = &dbaasv1alpha1.ClusterDefinition{}
 			clusterDef.Spec.Type = kStateMysql
 			clusterDefComp = &dbaasv1alpha1.ClusterDefinitionComponent{}
-			clusterDefComp.CharacterType = KMysql
+			clusterDefComp.CharacterType = kMysql
 			clusterDefComp.Monitor = &dbaasv1alpha1.MonitorConfig{
 				BuiltIn: false,
 				Exporter: &dbaasv1alpha1.ExporterConfig{
@@ -155,7 +154,7 @@ var _ = Describe("lifecycle_utils", func() {
 		It("Enable builtIn with empty CharacterType and wrong clusterType in ClusterDefinitionComponent", func() {
 			clusterComp.Monitor = true
 			clusterDef.Spec.Type = kFake
-			clusterDefComp.CharacterType = KEmpty
+			clusterDefComp.CharacterType = ""
 			clusterDefComp.Monitor.BuiltIn = true
 			clusterDefComp.Monitor.Exporter = nil
 			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
@@ -166,21 +165,6 @@ var _ = Describe("lifecycle_utils", func() {
 			if component.PodSpec != nil {
 				Expect(len(component.PodSpec.Containers)).To(Equal(0))
 			}
-		})
-
-		It("Enable builtIn with empty CharacterType and right clusterType in ClusterDefinitionComponent", func() {
-			clusterComp.Monitor = true
-			clusterDef.Spec.Type = kStateMysql
-			clusterDefComp.CharacterType = KEmpty
-			clusterDefComp.Monitor.BuiltIn = true
-			clusterDefComp.Monitor.Exporter = nil
-			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
-			monitorConfig := component.Monitor
-			Expect(monitorConfig.Enable).Should(BeTrue())
-			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(9104))
-			Expect(monitorConfig.ScrapePath).To(Equal("/metrics"))
-			Expect(len(component.PodSpec.Containers)).To(Equal(1))
-			Expect(strings.HasPrefix(component.PodSpec.Containers[0].Name, "inject-")).To(BeTrue())
 		})
 	})
 
@@ -203,7 +187,7 @@ var _ = Describe("lifecycle_utils", func() {
 							Containers: []corev1.Container{
 								{
 									Name:            "mysql",
-									Image:           "docker.io/apecloud/wesql-server-8.0:0.1.2",
+									Image:           "docker.io/apecloud/wesql-server:latest",
 									ImagePullPolicy: "IfNotPresent",
 									VolumeMounts: []corev1.VolumeMount{
 										{
@@ -403,7 +387,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: apecloud/wesql-server:latest
+        image: docker.io/apecloud/wesql-server:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3306
@@ -566,7 +550,12 @@ spec:
 		It("Should merge with no error", func() {
 			cluster, clusterDef, appVer, _ := newAllFieldsClusterObj(nil, nil)
 			By("assign every available fields")
+			reqCtx := intctrlutil.RequestCtx{
+				Ctx: ctx,
+				Log: tlog,
+			}
 			component := mergeComponents(
+				reqCtx,
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.Components[0],
@@ -576,6 +565,7 @@ spec:
 			By("leave appVer.podSpec nil")
 			appVer.Spec.Components[0].PodSpec = nil
 			component = mergeComponents(
+				reqCtx,
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.Components[0],
@@ -585,6 +575,7 @@ spec:
 			appVer = allFieldsAppVersionObj()
 			By("new container in appversion not in clusterdefinition")
 			component = mergeComponents(
+				reqCtx,
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.Components[0],
@@ -593,6 +584,7 @@ spec:
 			Expect(len(component.PodSpec.Containers)).Should(Equal(2))
 			By("leave clusterComp nil")
 			component = mergeComponents(
+				reqCtx,
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.Components[0],
@@ -601,6 +593,7 @@ spec:
 			Expect(component).ShouldNot(BeNil())
 			By("leave clusterDefComp nil")
 			component = mergeComponents(
+				reqCtx,
 				cluster,
 				clusterDef,
 				nil,

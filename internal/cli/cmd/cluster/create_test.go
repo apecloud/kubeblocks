@@ -21,56 +21,52 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/util/json"
 
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 )
 
-// func generateComponents(component dbaasv1alpha1.ClusterComponent, count int) []map[string]interface{} {
-// 	var componentVals []map[string]interface{}
-// 	byteVal, err := json.Marshal(component)
-// 	Expect(err == nil).Should(BeTrue())
-// 	for i := 0; i < count; i++ {
-// 		var componentVal map[string]interface{}
-// 		err = json.Unmarshal(byteVal, &componentVal)
-// 		Expect(err == nil).Should(BeTrue())
-// 		componentVals = append(componentVals, componentVal)
-// 	}
-// 	Expect(len(componentVals)).To(Equal(count))
-// 	return componentVals
-// }
-
-// func expectEqual(expectComponents []map[string]interface{}, actualComponents []map[string]interface{}) {
-// 	expectByte, _ := json.Marshal(expectComponents)
-// 	actualByte, _ := json.Marshal(actualComponents)
-// 	Expect(string(actualByte)).To(Equal(string(expectByte)))
-// }
+func generateComponents(component dbaasv1alpha1.ClusterComponent, count int) []map[string]interface{} {
+	var componentVals []map[string]interface{}
+	byteVal, err := json.Marshal(component)
+	Expect(err).ShouldNot(HaveOccurred())
+	for i := 0; i < count; i++ {
+		var componentVal map[string]interface{}
+		err = json.Unmarshal(byteVal, &componentVal)
+		Expect(err).ShouldNot(HaveOccurred())
+		componentVals = append(componentVals, componentVal)
+	}
+	Expect(len(componentVals)).To(Equal(count))
+	return componentVals
+}
 
 var _ = Describe("create", func() {
-	// Context("setMonitor", func() {
-	// 	var actualComponents []map[string]interface{}
-	// 	var expectComponents []map[string]interface{}
+	Context("setMonitor", func() {
+		var components []map[string]interface{}
+		BeforeEach(func() {
+			var component dbaasv1alpha1.ClusterComponent
+			component.Monitor = true
+			components = generateComponents(component, 3)
+		})
 
-	// 	BeforeEach(func() {
-	// 		var component dbaasv1alpha1.ClusterComponent
-	// 		component.Monitor = true
-	// 		actualComponents = generateComponents(component, 3)
-	// 		component.Monitor = false
-	// 		expectComponents = generateComponents(component, 3)
-	// 	})
+		It("set monitor param to false", func() {
+			setMonitor(false, components)
+			for _, c := range components {
+				Expect(c[monitorKey]).ShouldNot(BeTrue())
+			}
+		})
 
-	// 	It("set monitor param to false", func() {
-	// 		setMonitor(false, actualComponents)
-	// 		expectEqual(expectComponents, actualComponents)
-	// 	})
-
-	// 	It("set monitor param to true", func() {
-	// 		setMonitor(true, actualComponents)
-	// 		expectEqual(actualComponents, actualComponents)
-	// 	})
-	// })
+		It("set monitor param to true", func() {
+			setMonitor(true, components)
+			for _, c := range components {
+				Expect(c[monitorKey]).Should(BeTrue())
+			}
+		})
+	})
 
 	Context("setEnableAllLogs Test", func() {
 		cluster := &dbaasv1alpha1.Cluster{}
@@ -128,5 +124,19 @@ spec:
 		bytes, err = multipleSourceComponents(fileName, streams)
 		Expect(bytes).Should(BeNil())
 		Expect(err).Should(HaveOccurred())
+	})
+
+	It("build cluster component", func() {
+		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
+		comps, err := buildClusterComp(dynamic, testing.ClusterDefName)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(comps).ShouldNot(BeNil())
+		Expect(len(comps)).Should(Equal(2))
+	})
+
+	It("build tolerations", func() {
+		raw := []string{"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"}
+		res := buildTolerations(raw)
+		Expect(len(res)).Should(Equal(1))
 	})
 })

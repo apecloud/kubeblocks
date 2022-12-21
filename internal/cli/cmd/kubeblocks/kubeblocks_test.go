@@ -21,6 +21,8 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/spf13/cobra"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
@@ -73,6 +75,7 @@ var _ = Describe("kubeblocks", func() {
 		Expect(o.complete(tf, cmd)).Should(HaveOccurred())
 
 		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
+		cmd.Flags().StringVar(&cfg, "context", "", "The name of the kubeconfig context to use.")
 		Expect(o.complete(tf, cmd)).To(Succeed())
 		Expect(o.HelmCfg).ShouldNot(BeNil())
 		Expect(o.Namespace).To(Equal("test"))
@@ -88,12 +91,12 @@ var _ = Describe("kubeblocks", func() {
 			Version: version.DefaultKubeBlocksVersion,
 			Monitor: true,
 		}
-		Expect(o.Run()).Should(MatchError(MatchRegexp("not a valid Chart repository")))
+		Expect(o.Run()).Should(HaveOccurred())
 		Expect(len(o.Sets)).To(Equal(1))
 		Expect(o.Sets[0]).To(Equal(kMonitorParam))
 
 		notes, err := o.installChart()
-		Expect(err).Should(MatchError(MatchRegexp("failed to download")))
+		Expect(err).Should(HaveOccurred())
 		Expect(notes).Should(Equal(""))
 
 		o.printNotes("")
@@ -105,6 +108,7 @@ var _ = Describe("kubeblocks", func() {
 		Expect(cmd).ShouldNot(BeNil())
 
 		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
+		cmd.Flags().StringVar(&cfg, "context", "", "The name of the kubeconfig context to use.")
 		Expect(cmd.HasSubCommands()).Should(BeFalse())
 
 		o := &Options{
@@ -161,5 +165,44 @@ var _ = Describe("kubeblocks", func() {
 				Expect(removeFinalizers(client)).Should(Succeed())
 			}
 		}
+	})
+
+	It("delete crd", func() {
+		clusterCrd := v1.CustomResourceDefinition{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "CustomResourceDefinition",
+				APIVersion: "apiextensions.k8s.io/v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "clusters.dbaas.kubeblocks.io",
+			},
+			Spec:   v1.CustomResourceDefinitionSpec{},
+			Status: v1.CustomResourceDefinitionStatus{},
+		}
+		clusterDefCrd := v1.CustomResourceDefinition{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "CustomResourceDefinition",
+				APIVersion: "apiextensions.k8s.io/v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "clusterdefinitions.dbaas.kubeblocks.io",
+			},
+			Spec:   v1.CustomResourceDefinitionSpec{},
+			Status: v1.CustomResourceDefinitionStatus{},
+		}
+		appVerCrd := v1.CustomResourceDefinition{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "CustomResourceDefinition",
+				APIVersion: "apiextensions.k8s.io/v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "appversions.dbaas.kubeblocks.io",
+			},
+			Spec:   v1.CustomResourceDefinitionSpec{},
+			Status: v1.CustomResourceDefinitionStatus{},
+		}
+
+		client := testing.FakeDynamicClient(&clusterCrd, &clusterDefCrd, &appVerCrd)
+		Expect(deleteCRDs(client)).Should(Succeed())
 	})
 })

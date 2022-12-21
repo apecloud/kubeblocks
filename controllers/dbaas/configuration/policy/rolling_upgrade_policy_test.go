@@ -18,6 +18,7 @@ package policy
 
 import (
 	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -30,7 +31,6 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	mock_client "github.com/apecloud/kubeblocks/controllers/dbaas/configuration/policy/mocks"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 	mock_proto "github.com/apecloud/kubeblocks/internal/configuration/proto/mocks"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -52,6 +52,17 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 		ctrl := gomock.NewController(GinkgoT())
 		client := mock_client.NewMockClient(ctrl)
 		return ctrl, client
+	}
+
+	updateLabelPatch := func(pods []corev1.Pod, patch *corev1.Pod) {
+		patchKey := client.ObjectKeyFromObject(patch)
+		for i := range pods {
+			orgPod := &pods[i]
+			if client.ObjectKeyFromObject(orgPod) == patchKey {
+				orgPod.Labels = patch.Labels
+				break
+			}
+		}
 	}
 
 	createReconfigureParam := func(compType dbaasv1alpha1.ComponentType, replicas int) ReconfigureParams {
@@ -120,19 +131,9 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			mockClient.EXPECT().
 				Patch(gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-					pod, ok := obj.(*corev1.Pod)
-					if !ok {
-						return cfgcore.MakeError("failed to patch!")
-					}
-
+					pod, _ := obj.(*corev1.Pod)
 					// mock patch
-					for i := range mockPods[acc] {
-						orgPod := &mockPods[acc][i]
-						if client.ObjectKeyFromObject(orgPod) == client.ObjectKeyFromObject(pod) {
-							orgPod.Labels = pod.Labels
-							break
-						}
-					}
+					updateLabelPatch(mockPods[acc], pod)
 					return nil
 				}).AnyTimes()
 
@@ -174,6 +175,69 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			// finish check, not upgrade
 			status, err = rollingPolicy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
+			Expect(status).Should(BeEquivalentTo(ESNone))
+		})
+	})
+
+	Context("statefulSet rolling reconfigure policy test", func() {
+		It("Should success without error", func() {
+
+			// for mock sts
+			var pods []corev1.Pod
+			{
+				mockParam.Component.ComponentType = dbaasv1alpha1.Stateful
+				mockParam.Component.ConfigSpec.MaxUnavailableCapacity = func() *int { v := 100; return &v }()
+				pods = newMockPodsWithStatefulSet(&mockParam.ComponentUnits[0], defaultReplica)
+			}
+
+			mockClient.EXPECT().
+				List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+					Expect(apimeta.SetList(list, fromPods(pods))).Should(Succeed())
+					return nil
+				}).
+				MinTimes(3)
+
+			mockClient.EXPECT().
+				Patch(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+					pod, _ := obj.(*corev1.Pod)
+					updateLabelPatch(pods, pod)
+					return nil
+				}).
+				Times(defaultReplica)
+
+			reconfigureClient.EXPECT().StopContainer(gomock.Any(), gomock.Any()).
+				Return(&cfgproto.StopContainerResponse{}, nil).
+				Times(defaultReplica)
+
+			// mock wait the number of pods to target replicas
+			status, err := rollingPolicy.Upgrade(mockParam)
+			Expect(err).Should(Succeed())
+			Expect(status).Should(BeEquivalentTo(ESRetry))
+
+			// finish check, not finished
+			status, err = rollingPolicy.Upgrade(mockParam)
+			Expect(err).Should(Succeed())
+			Expect(status).Should(BeEquivalentTo(ESRetry))
+
+			// mock async update state
+			go func() {
+				f := withAvailablePod(0, len(pods))
+				for i := range pods {
+					f(&pods[i], i)
+				}
+			}()
+
+			// finish check, not finished
+			Eventually(func() bool {
+				status, err = rollingPolicy.Upgrade(mockParam)
+				Expect(err).Should(Succeed())
+				Expect(status).Should(BeElementOf(ESNone, ESRetry))
+				return status == ESNone
+			}, time.Second*20, time.Second*1).Should(BeTrue())
+
+			status, err = rollingPolicy.Upgrade(mockParam)
 			Expect(status).Should(BeEquivalentTo(ESNone))
 		})
 	})

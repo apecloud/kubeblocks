@@ -67,7 +67,7 @@ func getReplicationSetPods(params ReconfigureParams) ([]corev1.Pod, error) {
 }
 
 func getStatefulSetPods(params ReconfigureParams) ([]corev1.Pod, error) {
-	if len(params.ComponentUnits) > 1 {
+	if len(params.ComponentUnits) != 1 {
 		return nil, cfgcore.MakeError("statefulSet component require only one statefulset, actual %d component", len(params.ComponentUnits))
 	}
 

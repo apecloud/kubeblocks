@@ -118,7 +118,9 @@ func withCDComponent(compType dbaasv1alpha1.ComponentType, tpls []dbaasv1alpha1.
 			},
 			ComponentType: compType,
 			TypeName:      string(compType),
-			ConsensusSpec: &dbaasv1alpha1.ConsensusSetSpec{
+		}
+		if compType == dbaasv1alpha1.Consensus {
+			params.Component.ConsensusSpec = &dbaasv1alpha1.ConsensusSetSpec{
 				Leader: dbaasv1alpha1.ConsensusMember{
 					Name: "leader",
 				},
@@ -127,7 +129,7 @@ func withCDComponent(compType dbaasv1alpha1.ComponentType, tpls []dbaasv1alpha1.
 						Name: "follower",
 					},
 				},
-			},
+			}
 		}
 	}
 }

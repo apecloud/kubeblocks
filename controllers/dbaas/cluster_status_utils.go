@@ -371,7 +371,8 @@ func handleDeletePVCCronJobEvent(ctx context.Context,
 		&cluster,
 		componentName,
 		dbaasv1alpha1.AbnormalPhase,
-		event.Message); err != nil {
+		event.Message,
+		object); err != nil {
 		return err
 	}
 	recorder.Eventf(&cluster, corev1.EventTypeWarning, event.Reason, event.Message)
@@ -402,13 +403,15 @@ func updateComponentStatusPhase(cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
 	componentName string,
 	phase dbaasv1alpha1.Phase,
-	message string) error {
+	message string,
+	object client.Object) error {
 	c, ok := cluster.Status.Components[componentName]
 	if ok && c.Phase == phase {
 		return nil
 	}
-	c.Phase = phase
-	c.Message[componentName] = message
+	messageMap := c.GetMessage()
+	messageMap.SetObjectMessage(object.GetObjectKind().GroupVersionKind().Kind, object.GetName(), message)
+	c.SetMessage(messageMap)
 	patch := client.MergeFrom(cluster.DeepCopy())
 	cluster.Status.Components[componentName] = c
 	return cli.Status().Patch(ctx, cluster, patch)

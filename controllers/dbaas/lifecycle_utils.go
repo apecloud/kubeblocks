@@ -1873,8 +1873,7 @@ func isAllPVCBound(cli client.Client,
 			return false, err
 		}
 		if pvc.Status.Phase != corev1.ClaimBound {
-			allPVCBound = false
-			return allPVCBound, nil
+			return false, nil
 		}
 	}
 	return allPVCBound, nil

@@ -47,7 +47,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -177,7 +177,7 @@ spec:
           - name: "MYSQL_ROOT_PASSWORD"
             valueFrom:
               secretKeyRef:
-                name: $(KB_SECRET_NAME)
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
                 key: password
         command: ["/usr/bin/bash", "-c"]
         args:
@@ -234,7 +234,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: registry.jihulab.com/apecloud/mysql-server/mysql/wesql-server-arm:latest
+        image: docker.io/apecloud/wesql-server:latest
   - type: proxy
     podSpec: 
       containers:
@@ -403,7 +403,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: docker.io/apecloud/wesql-server-8.0:0.1.2
+        image: docker.io/apecloud/wesql-server:latest
         imagePullPolicy: IfNotPresent
 `
 		appVersion := &dbaasv1alpha1.AppVersion{}
@@ -686,7 +686,7 @@ spec:
 
 			By("Checking internal headless services")
 			for _, item := range fetchedG1.Spec.Components {
-				c, err := component.GetComponentFromClusterDefinition(ctx, k8sClient, fetchedG1, item.Type)
+				c, err := util.GetComponentDeftByCluster(ctx, k8sClient, fetchedG1, item.Type)
 				Expect(err).ShouldNot(HaveOccurred())
 				if c.ComponentType == dbaasv1alpha1.Stateless {
 					continue
@@ -907,7 +907,7 @@ spec:
 				Expect(k8sClient.List(ctx, podList, client.InNamespace(key.Namespace))).Should(Succeed())
 				pods = make([]corev1.Pod, 0)
 				for _, pod := range podList.Items {
-					if component.IsMemberOf(sts, &pod) {
+					if util.IsMemberOf(sts, &pod) {
 						pods = append(pods, pod)
 					}
 				}
@@ -976,7 +976,7 @@ spec:
 			Expect(k8sClient.List(ctx, podList, client.InNamespace(key.Namespace))).Should(Succeed())
 			pods := make([]corev1.Pod, 0)
 			for _, pod := range podList.Items {
-				if component.IsMemberOf(sts, &pod) {
+				if util.IsMemberOf(sts, &pod) {
 					pods = append(pods, pod)
 				}
 			}
@@ -1240,7 +1240,7 @@ involvedObject:
 	Expect(k8sClient.List(ctx, podList, client.InNamespace(key.Namespace))).Should(Succeed())
 	pods := make([]corev1.Pod, 0)
 	for _, pod := range podList.Items {
-		if component.IsMemberOf(sts, &pod) {
+		if util.IsMemberOf(sts, &pod) {
 			pods = append(pods, pod)
 		}
 	}
@@ -1286,7 +1286,7 @@ spec:
       value: clusterepuglf-wesql-test-1
     - name: KB_REPLICASETS_2_HOSTNAME
       value: clusterepuglf-wesql-test-2
-    image: docker.io/apecloud/wesql-server-8.0:0.1.2
+    image: docker.io/apecloud/wesql-server:latest
     imagePullPolicy: IfNotPresent
     name: mysql
     ports:

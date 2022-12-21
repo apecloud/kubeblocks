@@ -103,7 +103,12 @@ func (o *Options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	if o.HelmCfg, err = helm.NewActionConfig(o.Namespace, kubeconfig); err != nil {
+	kubecontext, err := cmd.Flags().GetString("context")
+	if err != nil {
+		return err
+	}
+
+	if o.HelmCfg, err = helm.NewActionConfig(o.Namespace, kubeconfig, helm.WithContext(kubecontext)); err != nil {
 		return err
 	}
 
@@ -210,7 +215,7 @@ KubeBlocks %s Install SUCCESSFULLY!
     kbcli cluster list          # list all database clusters
     kbcli cluster describe <cluster name>  # get cluster information
 
--> Uninstall DBaaS:
+-> Uninstall KubeBlocks:
     kbcli kubeblocks uninstall
 `, o.Version)
 	fmt.Fprint(o.Out, notes)

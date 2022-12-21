@@ -187,7 +187,7 @@ var _ = Describe("lifecycle_utils", func() {
 							Containers: []corev1.Container{
 								{
 									Name:            "mysql",
-									Image:           "docker.io/apecloud/wesql-server-8.0:0.1.2",
+									Image:           "docker.io/apecloud/wesql-server:latest",
 									ImagePullPolicy: "IfNotPresent",
 									VolumeMounts: []corev1.VolumeMount{
 										{
@@ -387,7 +387,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: apecloud/wesql-server:latest
+        image: docker.io/apecloud/wesql-server:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3306

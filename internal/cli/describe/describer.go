@@ -230,7 +230,7 @@ func (d *ClusterDescriber) describeComponent(w describe.PrefixWriter) error {
 		}
 		running, waiting, succeeded, failed := util.GetPodStatus(pods)
 		w.Write(Level0, "\nComponent:\n")
-		w.Write(Level1, "%s\n", c.Name)
+		w.Write(Level1, "%s:\n", c.Name)
 		w.Write(Level2, "Type:\t%s\n", c.Type)
 		w.Write(Level2, "Replicas:\t%d desired | %d total\n", *c.Replicas, len(pods))
 		w.Write(Level2, "Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)

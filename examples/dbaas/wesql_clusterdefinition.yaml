@@ -5,7 +5,8 @@ metadata:
 spec:
   type: state.mysql-8
   components:
-    - typeName: replicasets
+    - typeName: wesql
+      characterType: mysql
       componentType: Consensus
       consensusSpec:
         leader:
@@ -17,7 +18,7 @@ spec:
         updateStrategy: BestEffortParallel
       probes:
         roleChangedProbe:
-          periodSeconds: 1
+          periodSeconds: 2
       service:
         ports:
           - protocol: TCP
@@ -80,4 +81,5 @@ spec:
                 echo $cluster_info;
                 docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
   connectionCredential:
-    user: root
+    username: root
+    password: ""

@@ -30,9 +30,10 @@ import (
 
 var _ = Describe("clusterDefinition webhook", func() {
 	var (
-		clusterDefinitionName  = "clusterdefinition-webhook-mysql-definition"
-		clusterDefinitionName2 = "clusterdefinition-webhook-mysql-definition2"
-		clusterDefinitionName3 = "clusterdefinition-webhook-mysql-definition3"
+		randomStr              = testCtx.GetRandomStr()
+		clusterDefinitionName  = "webhook-mysql-definition-" + randomStr
+		clusterDefinitionName2 = "webhook-mysql-definition2" + randomStr
+		clusterDefinitionName3 = "webhook-mysql-definition3" + randomStr
 		timeout                = time.Second * 10
 		interval               = time.Second
 	)
@@ -121,8 +122,16 @@ spec:
   components:
   - typeName: replicasets
     componentType: Stateful
+    podSpec:
+      containers:
+      - name: nginx
+        image: nginx:latest
   - typeName: proxy
     componentType: Stateless
+    podSpec:
+      containers:
+      - name: nginx
+        image: nginx:latest
 `, name)
 	clusterDefinition := &ClusterDefinition{}
 	err := yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)
@@ -141,6 +150,10 @@ spec:
   components:
   - typeName: mysql-rafted
     componentType: Consensus
+    podSpec:
+      containers:
+      - name: mysql
+        image: docker.io/apecloud/wesql-server:latest
 `, name)
 	clusterDefinition := &ClusterDefinition{}
 	err := yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)
@@ -178,7 +191,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: docker.io/apecloud/wesql-server-8.0:0.1.2
+        image: docker.io/apecloud/wesql-server:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3306
@@ -198,7 +211,7 @@ spec:
           - name: "MYSQL_ROOT_PASSWORD"
             valueFrom:
               secretKeyRef:
-                name: $(KB_SECRET_NAME)
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
                 key: password
         command: ["/usr/bin/bash", "-c"]
 `, name)

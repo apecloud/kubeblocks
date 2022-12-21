@@ -1,6 +1,6 @@
 # TODO items
 
-## DBaaS controllers
+## KubeBlocks controllers
 
 ### Cluster CR controller
 - [x] secondary resources finalizer

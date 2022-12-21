@@ -115,7 +115,7 @@ var _ = Describe("tpl template", func() {
       "name": "MYSQL_ROOT_PASSWORD",
       "valueFrom": {
         "secretKeyRef": {
-          "name": "$(KB_SECRET_NAME)",
+          "name": "$(CONN_CREDENTIAL_SECRET_NAME)",
           "key": "password"
         }
       }

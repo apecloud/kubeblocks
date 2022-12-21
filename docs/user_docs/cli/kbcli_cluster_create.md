@@ -57,7 +57,7 @@ kbcli cluster create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOu
       --cluster-definition string    Specify cluster definition, run "kbcli cluster-definition list" to show all available cluster definition
       --cluster-version string       Specify cluster version, run "kbcli cluster-version list" to show all available cluster version
       --components string            Use yaml file, URL, or stdin to specify the cluster components
-      --enable-all-logs              Enable advanced application all log extraction, and true will ignore enabledLogs of component level
+      --enable-all-logs              Enable advanced application all log extraction, and true will ignore enabledLogs of component level (default true)
   -h, --help                         help for create
       --monitor                      Set monitor enabled and inject metrics exporter (default true)
       --node-labels stringToString   Node label selector (default [])

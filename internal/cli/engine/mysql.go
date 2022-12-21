@@ -16,21 +16,28 @@ limitations under the License.
 
 package engine
 
+import (
+	"strings"
+)
+
 type mysql struct{}
 
 const (
-	mysqlEngineName    = "mysql"
-	mysqlClient        = "mysql"
-	mysqlContainerName = "mysql"
+	mysqlEngineName      = "mysql"
+	mysqlClient          = "mysql "
+	mysqlContainerName   = "mysql"
+	mysqlDefaultPassword = "$MYSQL_ROOT_PASSWORD"
 )
 
 var _ Interface = &mysql{}
 
 func (m *mysql) ConnectCommand(database string) []string {
+	mysqlCmd := []string{mysqlClient}
 	if len(database) > 0 {
-		return []string{mysqlClient, "-D", database}
+		mysqlCmd = append(mysqlCmd, "-D", database)
 	}
-	return []string{mysqlClient}
+	mysqlCmd = append(mysqlCmd, "-p"+mysqlDefaultPassword)
+	return []string{"sh", "-c", strings.Join(mysqlCmd, " ")}
 }
 
 func (m *mysql) EngineName() string {

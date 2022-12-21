@@ -206,7 +206,7 @@ spec:
 		return nil
 	}
 
-	assureBackupToolObj := func() *dataprotectionv1alpha1.BackupTool {
+	assureBackupToolObj := func(withoutResources ...bool) *dataprotectionv1alpha1.BackupTool {
 		By("By assure an backupTool obj")
 		backupToolYaml := `
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
@@ -249,6 +249,14 @@ spec:
 `
 		backupTool := &dataprotectionv1alpha1.BackupTool{}
 		Expect(yaml.Unmarshal([]byte(backupToolYaml), backupTool)).Should(Succeed())
+		nilResources := false
+		// optional arguments, only use the first one.
+		if len(withoutResources) > 0 {
+			nilResources = withoutResources[0]
+		}
+		if nilResources {
+			backupTool.Spec.Resources = nil
+		}
 		ns := genarateNS("backup-tool-")
 		backupTool.Name = ns.Name
 		backupTool.Namespace = ns.Namespace
@@ -308,7 +316,7 @@ spec:
         command:
         - /bin/bash
         - -c
-        image: docker.io/apecloud/wesql-server-8.0:0.1-SNAPSHOT
+        image: docker.io/apecloud/wesql-server:latest
         imagePullPolicy: IfNotPresent
         name: mysql
         ports:
@@ -373,7 +381,7 @@ spec:
           value: '1'
         - name: KB_REPLICASETS_PRIMARY_0_HOSTNAME
           value: wesql-cluster-replicasets-primary-0
-      image: 'docker.io/apecloud/wesql-server-8.0:0.1-SNAPSHOT'
+      image: 'docker.io/apecloud/wesql-server:latest'
       imagePullPolicy: IfNotPresent
       name: mysql
       ports:
@@ -462,6 +470,57 @@ spec:
 
 			By("By creating a backupTool")
 			backupTool := assureBackupToolObj()
+
+			By("By creating a backupPolicy from backupTool: " + backupTool.Name)
+			backupPolicy := assureBackupPolicyObj(backupTool.Name)
+
+			By("By creating a backupJob from backupPolicy: " + backupPolicy.Name)
+			toCreate := assureBackupJobObj(backupPolicy.Name)
+			key := types.NamespacedName{
+				Name:      toCreate.Name,
+				Namespace: toCreate.Namespace,
+			}
+
+			patchK8sJobStatus(batchv1.JobComplete, key)
+
+			result := &dataprotectionv1alpha1.BackupJob{}
+			Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
+			Eventually(func() bool {
+				Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
+				return result.Status.Phase == dataprotectionv1alpha1.BackupJobFailed ||
+					result.Status.Phase == dataprotectionv1alpha1.BackupJobCompleted
+			}, timeout, interval).Should(BeTrue())
+			Expect(result.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupJobCompleted))
+
+			By("Deleting the scope")
+
+			Eventually(func() error {
+				key = types.NamespacedName{
+					Name:      backupPolicy.Name,
+					Namespace: backupPolicy.Namespace,
+				}
+				_ = deleteBackupPolicyNWait(key)
+				key = types.NamespacedName{
+					Name:      backupTool.Name,
+					Namespace: backupTool.Namespace,
+				}
+				_ = deleteBackupToolNWait(key)
+
+				key = types.NamespacedName{
+					Name:      toCreate.Name,
+					Namespace: toCreate.Namespace,
+				}
+				return deleteBackupJobNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("Without backupTool resources should success with no error", func() {
+
+			By("By creating a statefulset")
+			_ = assureStatefulSetObj()
+
+			By("By creating a backupTool")
+			backupTool := assureBackupToolObj(true)
 
 			By("By creating a backupPolicy from backupTool: " + backupTool.Name)
 			backupPolicy := assureBackupPolicyObj(backupTool.Name)

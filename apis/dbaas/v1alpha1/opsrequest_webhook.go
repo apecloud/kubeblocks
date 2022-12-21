@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -38,10 +39,11 @@ import (
 
 // log is for logging in this package.
 var (
-	opsrequestlog = logf.Log.WithName("opsrequest-resource")
+	opsrequestlog           = logf.Log.WithName("opsrequest-resource")
+	opsRequestAnnotationKey = "kubeblocks.io/ops-request"
 
-	// ClusterPhasesMapperForOps records in which cluster phases OpsRequest can run
-	ClusterPhasesMapperForOps = map[OpsType][]Phase{}
+	// OpsRequestBehaviourMapper records in which cluster phases OpsRequest can run
+	OpsRequestBehaviourMapper = map[OpsType]OpsRequestBehaviour{}
 )
 
 func (r *OpsRequest) SetupWebhookWithManager(mgr ctrl.Manager) error {
@@ -96,13 +98,33 @@ func (r *OpsRequest) ValidateDelete() error {
 
 // validateClusterPhase validate whether the current cluster state supports the OpsRequest
 func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
-	clusterPhases := ClusterPhasesMapperForOps[r.Spec.Type]
+	opsBehaviour := OpsRequestBehaviourMapper[r.Spec.Type]
 	// if the OpsType is no cluster phases, ignores it
-	if len(clusterPhases) == 0 {
+	if len(opsBehaviour.FromClusterPhases) == 0 {
 		return nil
 	}
-	if !slices.Contains(clusterPhases, cluster.Status.Phase) {
+	if !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) {
 		return newInvalidError(OpsRequestKind, r.Name, "spec.type", fmt.Sprintf("%s is forbidden when Cluster.status.Phase is %s", r.Spec.Type, cluster.Status.Phase))
+	}
+	// validate whether existing the same type OpsRequest
+	var (
+		opsRequestValue string
+		opsRequestMap   map[Phase]string
+		ok              bool
+	)
+	if cluster.Annotations == nil {
+		return nil
+	}
+	if opsRequestValue, ok = cluster.Annotations[opsRequestAnnotationKey]; !ok {
+		return nil
+	}
+	// opsRequest annotation value in cluster to map
+	if err := json.Unmarshal([]byte(opsRequestValue), &opsRequestMap); err != nil {
+		return nil
+	}
+	opsRequestName := opsRequestMap[opsBehaviour.ToClusterPhase]
+	if opsRequestName != "" {
+		return newInvalidError(OpsRequestKind, r.Name, "spec.type", fmt.Sprintf("Existing OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", opsRequestName, cluster.Name))
 	}
 	return nil
 }

@@ -69,17 +69,9 @@ func appVersionUpdateHandler(cli client.Client, ctx context.Context, clusterDef 
 	for _, item := range list.Items {
 		if item.Status.ClusterDefGeneration != clusterDef.GetObjectMeta().GetGeneration() {
 			patch := client.MergeFrom(item.DeepCopy())
-			notFoundComponentTypes, noContainersComponents := item.GetInconsistentComponentsInfo(clusterDef)
-			var statusMsgs []string
-			if len(notFoundComponentTypes) > 0 {
-				statusMsgs = append(statusMsgs, fmt.Sprintf("spec.components[*].type %v not found in ClusterDefinition.spec.components[*].typeName", notFoundComponentTypes))
-			} else if len(noContainersComponents) > 0 {
-				statusMsgs = append(statusMsgs, fmt.Sprintf("spec.components[*].type %v missing spec.components[*].containers in ClusterDefinition.spec.components[*] and AppVersion.spec.components[*]", noContainersComponents))
-			}
-
-			if len(statusMsgs) > 0 {
+			if statusMsg := validateAppVersion(&item, clusterDef); statusMsg != "" {
 				item.Status.Phase = dbaasv1alpha1.UnavailablePhase
-				item.Status.Message = strings.Join(statusMsgs, ";")
+				item.Status.Message = statusMsg
 			} else {
 				item.Status.Phase = dbaasv1alpha1.AvailablePhase
 				item.Status.Message = ""
@@ -119,7 +111,7 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, appVersion, appVersionFinalizerName, func() (*ctrl.Result, error) {
 		recordEvent := func() {
-			r.Recorder.Event(appVersion, corev1.EventTypeWarning, intctrlutil.EventReasonRefCRUnavailable,
+			r.Recorder.Event(appVersion, corev1.EventTypeWarning, intctrlutil.ReasonRefCRUnavailable,
 				"cannot be deleted because of existing referencing Cluster.")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, appVersion,
@@ -164,9 +156,14 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
+	if statusMsg := validateAppVersion(appVersion, clusterdefinition); statusMsg != "" {
+		appVersion.Status.Phase = dbaasv1alpha1.UnavailablePhase
+		appVersion.Status.Message = statusMsg
+	} else {
+		appVersion.Status.Phase = dbaasv1alpha1.AvailablePhase
+		appVersion.Status.Message = ""
+	}
 	appVersion.Status.ClusterDefSyncStatus = dbaasv1alpha1.InSyncStatus
-	appVersion.Status.Phase = dbaasv1alpha1.AvailablePhase
-	appVersion.Status.Message = ""
 	appVersion.Status.ObservedGeneration = appVersion.GetGeneration()
 	appVersion.Status.ClusterDefGeneration = clusterdefinition.GetGeneration()
 	if err = r.Client.Status().Patch(ctx, appVersion, patch); err != nil {
@@ -186,6 +183,17 @@ func checkAppVersionTemplate(client client.Client, ctx intctrlutil.RequestCtx, a
 		}
 	}
 	return true, nil
+}
+
+func validateAppVersion(appVersion *dbaasv1alpha1.AppVersion, clusterDef *dbaasv1alpha1.ClusterDefinition) string {
+	notFoundComponentTypes, noContainersComponents := appVersion.GetInconsistentComponentsInfo(clusterDef)
+	var statusMsgs []string
+	if len(notFoundComponentTypes) > 0 {
+		statusMsgs = append(statusMsgs, fmt.Sprintf("spec.components[*].type %v not found in ClusterDefinition.spec.components[*].typeName", notFoundComponentTypes))
+	} else if len(noContainersComponents) > 0 {
+		statusMsgs = append(statusMsgs, fmt.Sprintf("spec.components[*].type %v missing spec.components[*].containers in ClusterDefinition.spec.components[*] and AppVersion.spec.components[*]", noContainersComponents))
+	}
+	return strings.Join(statusMsgs, ";")
 }
 
 // SetupWithManager sets up the controller with the Manager.

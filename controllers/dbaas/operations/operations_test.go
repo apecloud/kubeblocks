@@ -26,6 +26,7 @@ import (
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,20 +39,28 @@ import (
 
 var _ = Describe("OpsRequest Controller", func() {
 
-	const timeout = time.Second * 10
-	const interval = time.Second * 1
-	const waitDuration = time.Second * 3
+	var (
+		timeout               = time.Second * 10
+		interval              = time.Second * 1
+		waitDuration          = time.Second * 3
+		randomStr             = testCtx.GetRandomStr()
+		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
+		appVersionName        = "appversion-for-ops-" + randomStr
+		clusterName           = "cluster-for-ops-" + randomStr
+		storageClassName      = "csi-hostpath-sc-" + randomStr
+	)
 
 	cleanupObjects := func() {
 		err := k8sClient.DeleteAllOf(ctx, &storagev1.StorageClass{},
 			client.InNamespace(testCtx.DefaultNamespace),
 			client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
+
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.OpsRequest{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -69,38 +78,55 @@ var _ = Describe("OpsRequest Controller", func() {
 		cleanupObjects()
 	})
 
-	assureDefaultStorageClassObj := func(randomStr string) *storagev1.StorageClass {
+	assureDefaultStorageClassObj := func() *storagev1.StorageClass {
 		By("By assure an default storageClass")
 		scYAML := fmt.Sprintf(`
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: csi-hostpath-sc-%s
+  name: %s
   annotations:
     storageclass.kubernetes.io/is-default-class: "false"
 provisioner: hostpath.csi.k8s.io
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
-`, randomStr)
+allowVolumeExpansion: true
+`, storageClassName)
 		sc := &storagev1.StorageClass{}
 		Expect(yaml.Unmarshal([]byte(scYAML), sc)).Should(Succeed())
 		Expect(testCtx.CreateObj(ctx, sc)).Should(Succeed())
 		return sc
 	}
 
-	assureClusterDefObj := func(randomStr string) *dbaasv1alpha1.ClusterDefinition {
+	assureClusterDefObj := func() *dbaasv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
 		clusterDefYAML := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: cluster-definition-for-operations-%s
+  name: %s
 spec:
   type: state.mysql-8
   components:
   - typeName: replicasets
     componentType: Consensus
     defaultReplicas: 1
+    consensusSpec:
+      followers:
+      - accessMode: Readonly
+        name: follower
+      leader:
+        accessMode: ReadWrite
+        name: leader
+      updateStrategy: BestEffortParallel
+    volumeClaimTemplates:
+    - name: log
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
     podSpec:
       containers:
       - name: mysql
@@ -121,7 +147,7 @@ spec:
           - name: "MYSQL_ROOT_PASSWORD"
             valueFrom:
               secretKeyRef:
-                name: $(KB_SECRET_NAME)
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
                 key: password
         command: ["/usr/bin/bash", "-c"]
         args:
@@ -150,34 +176,34 @@ spec:
     podSpec:
       containers:
       - name: nginx
-`, randomStr)
+`, clusterDefinitionName)
 		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
 		Expect(testCtx.CreateObj(ctx, clusterDefinition)).Should(Succeed())
 		return clusterDefinition
 	}
 
-	assureAppVersionObj := func(randomStr string) *dbaasv1alpha1.AppVersion {
+	assureAppVersionObj := func() *dbaasv1alpha1.AppVersion {
 		By("By assure an appVersion obj")
 		appVerYAML := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       AppVersion
 metadata:
-  name:     app-version-operations-%s
+  name:     %s
 spec:
-  clusterDefinitionRef: cluster-definition
+  clusterDefinitionRef: %s
   components:
   - type: replicasets
     podSpec:
       containers:
       - name: mysql
-        image: docker.io/apecloud/wesql-server-8.0:0.1.2
+        image: docker.io/apecloud/wesql-server:latest
   - type: proxy
     podSpec: 
       containers:
       - name: nginx
         image: nginx
-`, randomStr)
+`, appVersionName, clusterDefinitionName)
 		appVersion := &dbaasv1alpha1.AppVersion{}
 		Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(Succeed())
 		Expect(testCtx.CreateObj(ctx, appVersion)).Should(Succeed())
@@ -210,7 +236,9 @@ spec:
 `, clusterName, vctName, pvcName, scName)
 		pvc := &corev1.PersistentVolumeClaim{}
 		Expect(yaml.Unmarshal([]byte(pvcYaml), pvc)).Should(Succeed())
-		Expect(testCtx.CreateObj(context.Background(), pvc)).Should(Succeed())
+		err := testCtx.CreateObj(context.Background(), pvc)
+		// maybe already created by controller in real cluster
+		Expect(apierrors.IsAlreadyExists(err) || err == nil).Should(BeTrue())
 		// wait until cluster created
 		Eventually(func() bool {
 			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, &corev1.PersistentVolumeClaim{})
@@ -221,17 +249,16 @@ spec:
 	newClusterObj := func(
 		clusterDefObj *dbaasv1alpha1.ClusterDefinition,
 		appVersionObj *dbaasv1alpha1.AppVersion,
-		randomStr string,
 	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.AppVersion, types.NamespacedName) {
 		// setup Cluster obj required default ClusterDefinition and AppVersion objects if not provided
 		if clusterDefObj == nil {
-			clusterDefObj = assureClusterDefObj(randomStr)
+			clusterDefObj = assureClusterDefObj()
 		}
 		if appVersionObj == nil {
-			appVersionObj = assureAppVersionObj(randomStr)
+			appVersionObj = assureAppVersionObj()
 		}
 		key := types.NamespacedName{
-			Name:      "cluster" + randomStr,
+			Name:      clusterName,
 			Namespace: "default",
 		}
 		storageClassName := "csi-hostpath-sc-" + randomStr
@@ -592,7 +619,7 @@ spec:
 		if tmpCluster.Annotations == nil {
 			tmpCluster.Annotations = map[string]string{}
 		}
-		tmpCluster.Annotations[intctrlutil.OpsRequestAnnotationKey] = fmt.Sprintf("{\"%s\":\"%s\"}", toClusterPhase, opsRequestName)
+		tmpCluster.Annotations[intctrlutil.OpsRequestAnnotationKey] = fmt.Sprintf(`[{"clusterPhase": "%s", "name":"%s"}]`, toClusterPhase, opsRequestName)
 		Expect(k8sClient.Patch(ctx, tmpCluster, patch)).Should(Succeed())
 		Eventually(func() bool {
 			myCluster := &dbaasv1alpha1.Cluster{}
@@ -601,22 +628,33 @@ spec:
 		}, timeout, interval).Should(BeTrue())
 	}
 
-	initResourcesForVolumeExpansion := func(clusterObject *dbaasv1alpha1.Cluster, opsRes *OpsResource, randomStr string) (*dbaasv1alpha1.OpsRequest, string) {
-		// create storageClass
-		sc := assureDefaultStorageClassObj(randomStr)
-		ops := generateOpsRequestObj("volumeexpansion-ops-"+randomStr, clusterObject.Name, dbaasv1alpha1.VolumeExpansionType)
+	initResourcesForVolumeExpansion := func(clusterObject *dbaasv1alpha1.Cluster, opsRes *OpsResource, index int) (*dbaasv1alpha1.OpsRequest, string) {
+		currRandomStr := testCtx.GetRandomStr()
+		ops := generateOpsRequestObj("volumeexpansion-ops-"+currRandomStr, clusterObject.Name, dbaasv1alpha1.VolumeExpansionType)
 		ops.Spec.ComponentOpsList = []dbaasv1alpha1.ComponentOps{
 			{
 				ComponentNames: []string{"replicasets"},
 				VolumeExpansion: []dbaasv1alpha1.VolumeExpansion{
 					{
 						Name:    "log",
-						Storage: resource.MustParse("2Gi"),
+						Storage: resource.MustParse("3Gi"),
 					},
 				},
 			},
 		}
 		opsRes.OpsRequest = ops
+		// mock cluster to support volume expansion
+		patch := client.MergeFrom(clusterObject.DeepCopy())
+		clusterObject.Status.Operations = &dbaasv1alpha1.Operations{
+			VolumeExpandable: []dbaasv1alpha1.OperationComponent{
+				{
+					VolumeClaimTemplateNames: []string{"log"},
+					Name:                     "replicasets",
+				},
+			},
+		}
+		Expect(k8sClient.Status().Patch(ctx, clusterObject, patch)).Should(Succeed())
+
 		// create opsRequest
 		newOps := createOpsRequest(ops)
 
@@ -624,8 +662,8 @@ spec:
 		mockDoOperationOnCluster(clusterObject, ops.Name, dbaasv1alpha1.VolumeExpandingPhase)
 
 		// create-pvc
-		pvcName := fmt.Sprintf("log-%s-replicasets-0", clusterObject.Name+randomStr)
-		createPVC(clusterObject.Name, sc.Name, "log", pvcName)
+		pvcName := fmt.Sprintf("log-%s-replicasets-%d", clusterObject.Name, index)
+		createPVC(clusterObject.Name, storageClassName, "log", pvcName)
 		// waiting pvc controller mark annotation to OpsRequest
 		Eventually(func() bool {
 			tmpOps := &dbaasv1alpha1.OpsRequest{}
@@ -633,9 +671,9 @@ spec:
 			if tmpOps.Annotations == nil {
 				return false
 			}
-			_, ok := tmpOps.Annotations[OpsRequestReconcileAnnotationKey]
+			_, ok := tmpOps.Annotations[intctrlutil.OpsRequestReconcileAnnotationKey]
 			return ok
-		}, timeout, interval).Should(BeTrue())
+		}, timeout*2, interval).Should(BeTrue())
 		return newOps, pvcName
 	}
 
@@ -657,10 +695,8 @@ spec:
 	}
 
 	testWarningEventOnPVC := func(clusterObject *dbaasv1alpha1.Cluster, opsRes *OpsResource) {
-
-		randomStr := testCtx.GetRandomStr()
 		// init resources for volume expansion
-		newOps, pvcName := initResourcesForVolumeExpansion(clusterObject, opsRes, randomStr)
+		newOps, pvcName := initResourcesForVolumeExpansion(clusterObject, opsRes, 1)
 
 		By("mock run volumeExpansion action and reconcileAction")
 		mockVolumeExpansionActionAndReconcile(opsRes, newOps)
@@ -706,8 +742,13 @@ spec:
 	}
 
 	testVolumeExpansion := func(clusterObject *dbaasv1alpha1.Cluster, opsRes *OpsResource, randomStr string) {
+		// mock cluster is Running to support volume expansion ops
+		patch := client.MergeFrom(clusterObject.DeepCopy())
+		clusterObject.Status.Phase = dbaasv1alpha1.RunningPhase
+		Expect(k8sClient.Status().Patch(ctx, clusterObject, patch)).Should(Succeed())
+
 		// init resources for volume expansion
-		newOps, pvcName := initResourcesForVolumeExpansion(clusterObject, opsRes, randomStr)
+		newOps, pvcName := initResourcesForVolumeExpansion(clusterObject, opsRes, 0)
 
 		By("mock run volumeExpansion action and reconcileAction")
 		mockVolumeExpansionActionAndReconcile(opsRes, newOps)
@@ -715,7 +756,7 @@ spec:
 		By("mock pvc is resizing")
 		pvc := &corev1.PersistentVolumeClaim{}
 		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, pvc)).Should(Succeed())
-		patch := client.MergeFrom(pvc.DeepCopy())
+		patch = client.MergeFrom(pvc.DeepCopy())
 		pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
 			Type:               corev1.PersistentVolumeClaimResizing,
 			Status:             corev1.ConditionTrue,
@@ -743,12 +784,12 @@ spec:
 		pvc = &corev1.PersistentVolumeClaim{}
 		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, pvc)).Should(Succeed())
 		patch = client.MergeFrom(pvc.DeepCopy())
-		pvc.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("2Gi")}
+		pvc.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("3Gi")}
 		Expect(k8sClient.Status().Patch(ctx, pvc, patch)).Should(Succeed())
 		Eventually(func() bool {
 			tmpPVC := &corev1.PersistentVolumeClaim{}
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, tmpPVC)).Should(Succeed())
-			return tmpPVC.Status.Capacity[corev1.ResourceStorage] == resource.MustParse("2Gi")
+			return tmpPVC.Status.Capacity[corev1.ResourceStorage] == resource.MustParse("3Gi")
 		}, timeout, interval).Should(BeTrue())
 		// waiting OpsRequest.status.phase is succeed
 		_, _ = GetOpsManager().Reconcile(opsRes)
@@ -763,13 +804,15 @@ spec:
 
 	Context("Test OpsRequest", func() {
 		It("Should Test all OpsRequest", func() {
-			randomStr := testCtx.GetRandomStr()
-			clusterObject, _, _, key := newClusterObj(nil, nil, randomStr)
+			// init storageClass
+			_ = assureDefaultStorageClassObj()
+
+			clusterObject, _, _, key := newClusterObj(nil, nil)
 			Expect(testCtx.CreateObj(ctx, clusterObject)).Should(Succeed())
 
 			By("Test Upgrade Ops")
 			ops := generateOpsRequestObj("upgrade-ops-"+randomStr, clusterObject.Name, dbaasv1alpha1.UpgradeType)
-			ops.Spec.ClusterOps = &dbaasv1alpha1.ClusterOps{Upgrade: &dbaasv1alpha1.Upgrade{AppVersionRef: "appversion-test-" + randomStr}}
+			ops.Spec.ClusterOps = &dbaasv1alpha1.ClusterOps{Upgrade: &dbaasv1alpha1.Upgrade{AppVersionRef: appVersionName}}
 			opsRes := &OpsResource{
 				Ctx:        context.Background(),
 				Cluster:    clusterObject,
@@ -862,8 +905,11 @@ spec:
 			_ = patchClusterPhaseMisMatch(opsRes)
 			_ = patchClusterExistOtherOperation(opsRes, "horizontalscaling-ops-"+randomStr)
 			_ = PatchClusterNotFound(opsRes)
-			_ = patchClusterPhaseWhenExistsOtherOps(opsRes, map[dbaasv1alpha1.Phase]string{
-				dbaasv1alpha1.PendingPhase: "mysql-restart",
+			_ = patchClusterPhaseWhenExistsOtherOps(opsRes, []OpsRecorder{
+				{
+					Name:           "mysql-restart",
+					ToClusterPhase: dbaasv1alpha1.PendingPhase,
+				},
 			})
 
 			By("Deleting the scope")

@@ -738,7 +738,9 @@ func (r *BackupJobReconciler) BuildBackupToolPodSpec(reqCtx intctrlutil.RequestC
 	container.Command = []string{"sh", "-c"}
 	container.Args = backupTool.Spec.BackupCommands
 	container.Image = backupTool.Spec.Image
-	container.Resources = backupTool.Spec.Resources
+	if backupTool.Spec.Resources != nil {
+		container.Resources = *backupTool.Spec.Resources
+	}
 
 	remoteBackupPath := "/backupdata"
 

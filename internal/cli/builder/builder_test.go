@@ -65,7 +65,7 @@ func buildFn(c *Command) *cobra.Command {
 				err  error
 			)
 			if c.CustomComplete != nil {
-				util.CheckErr(c.CustomComplete(c.Options, args))
+				util.CheckErr(c.CustomComplete(c))
 			}
 
 			if c.CustomRun != nil {
@@ -77,23 +77,25 @@ func buildFn(c *Command) *cobra.Command {
 			}
 		},
 	}
+
+	c.Cmd = cmd
 	if c.CustomFlags != nil {
-		c.CustomFlags(c.Options, cmd)
+		c.CustomFlags(c)
 	}
 	return cmd
 }
 
-func customCompleteFn(options Options, args []string) error {
-	o := options.(*testOptions)
+func customCompleteFn(c *Command) error {
+	o := c.Options.(*testOptions)
 	if len(o.a) == 0 {
 		o.a = "auto complete"
 	}
 	return nil
 }
 
-func customFlags(options Options, cmd *cobra.Command) {
-	o := options.(*testOptions)
-	cmd.Flags().StringVar(&o.a, "a", "a", "a test flag")
+func customFlags(c *Command) {
+	o := c.Options.(*testOptions)
+	c.Cmd.Flags().StringVar(&o.a, "a", "a", "a test flag")
 }
 
 func customRunFn(c *Command) (bool, error) {

@@ -55,11 +55,13 @@ func Build(c *builder.Command) *cobra.Command {
 		Example:           c.Example,
 		ValidArgsFunction: utilcomp.ResourceNameCompletionFunc(c.Factory, util.GVRToString(c.GVR)),
 		Run: func(cmd *cobra.Command, args []string) {
+			c.Args = args
+
 			// If delete resources belonging to cluster, custom complete function
 			// should fill the ResourceName or construct the label selector based
 			// on the ClusterName
 			if c.CustomComplete != nil {
-				util.CheckErr(c.CustomComplete(deleteFlags, args))
+				util.CheckErr(c.CustomComplete(c))
 			}
 
 			util.CheckErr(validate(deleteFlags, args, c.IOStreams.In))
@@ -76,8 +78,11 @@ func Build(c *builder.Command) *cobra.Command {
 			util.CheckErr(o.RunDelete(c.Factory))
 		},
 	}
+
+	c.Options = deleteFlags
+	c.Cmd = cmd
 	if c.CustomFlags != nil {
-		c.CustomFlags(deleteFlags, cmd)
+		c.CustomFlags(c)
 	}
 	deleteFlags.AddFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)

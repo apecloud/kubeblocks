@@ -35,23 +35,24 @@ Database cluster operation command
 
 * [kbcli](kbcli.md)	 - KubeBlocks CLI
 * [kbcli cluster backup](kbcli_cluster_backup.md)	 - Create a backup
-* [kbcli cluster connect](kbcli_cluster_connect.md)	 - connect to a database cluster
+* [kbcli cluster connect](kbcli_cluster_connect.md)	 - Connect to a database cluster
 * [kbcli cluster create](kbcli_cluster_create.md)	 - Create a database cluster
 * [kbcli cluster delete](kbcli_cluster_delete.md)	 - Delete a cluster
 * [kbcli cluster delete-backup](kbcli_cluster_delete-backup.md)	 - Delete a backup job.
 * [kbcli cluster delete-ops](kbcli_cluster_delete-ops.md)	 - Delete a OpsRequest
 * [kbcli cluster delete-restore](kbcli_cluster_delete-restore.md)	 - Delete a restore job.
 * [kbcli cluster describe](kbcli_cluster_describe.md)	 - Describe database cluster info
-* [kbcli cluster horizontal-scaling](kbcli_cluster_horizontal-scaling.md)	 - horizontal scaling the specified components in the cluster
+* [kbcli cluster horizontal-scaling](kbcli_cluster_horizontal-scaling.md)	 - Horizontal scaling the specified components in the cluster
 * [kbcli cluster list](kbcli_cluster_list.md)	 - List all cluster.
 * [kbcli cluster list-backups](kbcli_cluster_list-backups.md)	 - List backup jobs.
-* [kbcli cluster list-logs-type](kbcli_cluster_list-logs-type.md)	 - List the supported logs file types in cluster
+* [kbcli cluster list-logs](kbcli_cluster_list-logs.md)	 - List supported log files in cluster
 * [kbcli cluster list-ops](kbcli_cluster_list-ops.md)	 - List all opsRequest.
 * [kbcli cluster list-restores](kbcli_cluster_list-restores.md)	 - List all restore jobs.
 * [kbcli cluster logs](kbcli_cluster_logs.md)	 - Access cluster log file
-* [kbcli cluster restart](kbcli_cluster_restart.md)	 - restart the specified components in the cluster
+* [kbcli cluster restart](kbcli_cluster_restart.md)	 - Restart the specified components in the cluster
 * [kbcli cluster restore](kbcli_cluster_restore.md)	 - Restore a new cluster from backup
-* [kbcli cluster upgrade](kbcli_cluster_upgrade.md)	 - upgrade the cluster
-* [kbcli cluster vertical-scaling](kbcli_cluster_vertical-scaling.md)	 - vertical scaling the specified components in the cluster
-* [kbcli cluster volume-expansion](kbcli_cluster_volume-expansion.md)	 - expand volume with the specified components and volumeClaimTemplates in the cluster
+* [kbcli cluster update](kbcli_cluster_update.md)	 - Update the cluster
+* [kbcli cluster upgrade](kbcli_cluster_upgrade.md)	 - Upgrade the cluster
+* [kbcli cluster vertical-scaling](kbcli_cluster_vertical-scaling.md)	 - Vertical scaling the specified components in the cluster
+* [kbcli cluster volume-expansion](kbcli_cluster_volume-expansion.md)	 - Expand volume with the specified components and volumeClaimTemplates in the cluster
 

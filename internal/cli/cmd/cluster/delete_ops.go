@@ -40,29 +40,30 @@ func NewDeleteOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Build(delete.Build)
 }
 
-func customFlagsForDeleteOps(option builder.Options, cmd *cobra.Command) {
+func customFlagsForDeleteOps(c *builder.Command) {
 	var (
 		o  *delete.DeleteFlags
 		ok bool
 	)
-	if o, ok = option.(*delete.DeleteFlags); !ok {
+	if o, ok = c.Options.(*delete.DeleteFlags); !ok {
 		return
 	}
-	cmd.Flags().StringSliceVar(&o.ResourceNames, "name", []string{}, "OpsRequest names")
+	c.Cmd.Flags().StringSliceVar(&o.ResourceNames, "name", []string{}, "OpsRequest names")
 }
 
 // completeForDeleteOps complete cmd for delete OpsRequest, if resource name
 // is not specified, construct a label selector based on the cluster name to
 // delete all OpeRequest belonging to the cluster.
-func completeForDeleteOps(option builder.Options, args []string) error {
+func completeForDeleteOps(c *builder.Command) error {
 	var (
 		flag *delete.DeleteFlags
 		ok   bool
 	)
-	if flag, ok = option.(*delete.DeleteFlags); !ok {
+	if flag, ok = c.Options.(*delete.DeleteFlags); !ok {
 		return nil
 	}
 
+	args := c.Args
 	// If resource name is not empty, delete these resources by name, do not need
 	// to construct the label selector.
 	if len(flag.ResourceNames) > 0 || len(args) == 0 {

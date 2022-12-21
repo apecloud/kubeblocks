@@ -106,7 +106,9 @@ func buildSpecWithBackupTool(reqCtx intctrlutil.RequestCtx, params createParams,
 
 	container.Args[0] += strings.Join(backupTool.Spec.Physical.RestoreCommands, ";")
 	container.Image = backupTool.Spec.Image
-	container.Resources = backupTool.Spec.Resources
+	if nil != backupTool.Spec.Resources {
+		container.Resources = *backupTool.Spec.Resources
+	}
 
 	// default fetch first database container volume mounts
 	container.VolumeMounts = spec.Containers[0].VolumeMounts

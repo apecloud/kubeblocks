@@ -387,11 +387,12 @@ func checkedDeleteDeletePVCCronJob(ctx context.Context, cli client.Client, name 
 	}, &cronJob); err != nil {
 		return client.IgnoreNotFound(err)
 	}
-	if cronJob.ObjectMeta.Labels[intctrlutil.AppManagedByLabelKey] == intctrlutil.AppName {
-		// if managed by kubeblocks, then it must be the cronjob used to delete pvc, delete it since it's completed
-		if err := cli.Delete(ctx, &cronJob); err != nil {
-			return client.IgnoreNotFound(err)
-		}
+	if cronJob.ObjectMeta.Labels[intctrlutil.AppManagedByLabelKey] != intctrlutil.AppName {
+		return nil
+	}
+	// if managed by kubeblocks, then it must be the cronjob used to delete pvc, delete it since it's completed
+	if err := cli.Delete(ctx, &cronJob); err != nil {
+		return client.IgnoreNotFound(err)
 	}
 	return nil
 }

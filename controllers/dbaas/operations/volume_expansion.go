@@ -91,9 +91,9 @@ func (ve volumeExpansion) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Ph
 	var (
 		opsRequest = opsRes.OpsRequest
 		// check all pvcs of volumeClaimTemplate are successful
-		allVctSucceed = true
+		allVCTSucceed = true
 		// decide whether all pvcs of volumeClaimTemplate are Failed or Succeed
-		allVctCompleted     = true
+		allVCTCompleted     = true
 		requeueAfter        time.Duration
 		err                 error
 		opsRequestPhase     = dbaasv1alpha1.RunningPhase
@@ -122,21 +122,21 @@ func (ve volumeExpansion) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Ph
 				return opsRequestPhase, requeueAfter, err
 			}
 			if isSucceed {
-				ve.setVctStatusMessage(vct, dbaasv1alpha1.SucceedPhase, "")
+				ve.setVCTStatusMessage(vct, dbaasv1alpha1.SucceedPhase, "")
 				continue
 			}
-			allVctSucceed = false
+			allVCTSucceed = false
 			if isCompleted {
 				// if not succeed and the expansion completed, it means the expansion failed.
-				ve.setVctStatusMessage(vct, dbaasv1alpha1.FailedPhase, "")
+				ve.setVCTStatusMessage(vct, dbaasv1alpha1.FailedPhase, "")
 				continue
 			}
-			allVctCompleted = false
+			allVCTCompleted = false
 			completedOnComponent = false
 			requeueAfter = time.Minute
 			// if pvcs is resizing
 			if isResizing && vct.Status == dbaasv1alpha1.PendingPhase {
-				ve.setVctStatusMessage(vct, dbaasv1alpha1.RunningPhase, "")
+				ve.setVCTStatusMessage(vct, dbaasv1alpha1.RunningPhase, "")
 			}
 		}
 
@@ -152,15 +152,15 @@ func (ve volumeExpansion) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Ph
 		}
 	}
 
-	if allVctSucceed {
+	if allVCTSucceed {
 		opsRequestPhase = dbaasv1alpha1.SucceedPhase
-	} else if allVctCompleted {
-		// all volume claim template volume expansion completed, but allVctSucceed is false.
+	} else if allVCTCompleted {
+		// all volume claim template volume expansion completed, but allVCTSucceed is false.
 		// decide the OpsRequest is failed.
 		opsRequestPhase = dbaasv1alpha1.FailedPhase
 	}
 
-	if ve.checkIsTimeOut(opsRequest, allVctSucceed) {
+	if ve.checkIsTimeOut(opsRequest, allVCTSucceed) {
 		// if volume expansion timed out, do it
 		opsRequestPhase = dbaasv1alpha1.FailedPhase
 		err = errors.New(fmt.Sprintf("Timed out waiting for volume expansion completed, the timeout is %g minutes", VolumeExpansionTimeOut.Minutes()))
@@ -192,14 +192,14 @@ func (ve volumeExpansion) getComponentNameMap(opsRequest *dbaasv1alpha1.OpsReque
 	return componentNameMap
 }
 
-func (ve volumeExpansion) setVctStatusMessage(vct *dbaasv1alpha1.VolumeClaimTemplateStatus, status dbaasv1alpha1.Phase, message string) {
+func (ve volumeExpansion) setVCTStatusMessage(vct *dbaasv1alpha1.VolumeClaimTemplateStatus, status dbaasv1alpha1.Phase, message string) {
 	vct.Status = status
 	vct.Message = message
 }
 
 // checkIsTimeOut check whether the volume expansion operation has timed out
-func (ve volumeExpansion) checkIsTimeOut(opsRequest *dbaasv1alpha1.OpsRequest, allVctSucceed bool) bool {
-	return !allVctSucceed && time.Now().After(opsRequest.Status.StartTimestamp.Add(VolumeExpansionTimeOut))
+func (ve volumeExpansion) checkIsTimeOut(opsRequest *dbaasv1alpha1.OpsRequest, allVCTSucceed bool) bool {
+	return !allVCTSucceed && time.Now().After(opsRequest.Status.StartTimestamp.Add(VolumeExpansionTimeOut))
 }
 
 // setClusterComponentPhaseToRunning when component expand volume completed, check whether change the component status.

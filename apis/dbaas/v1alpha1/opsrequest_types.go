@@ -37,7 +37,7 @@ type OpsRequestSpec struct {
 	// +optional
 	TTLSecondsAfterSucceed int32 `json:"ttlSecondsAfterSucceed,omitempty"`
 
-	// upgrade the cluster by specifying appVersionRef.
+	// upgrade specify the cluster application version by specifying appVersionRef.
 	// +optional
 	Upgrade *Upgrade `json:"upgrade,omitempty"`
 

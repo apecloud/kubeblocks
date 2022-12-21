@@ -327,8 +327,8 @@ func (r *OpsRequest) validateVolumeExpansion(allErrs *field.ErrorList, cluster *
 	for i, v := range volumeExpansionList {
 		componentNames = append(componentNames, v.ComponentName)
 		var (
-			supportedVctMap = map[string]struct{}{}
-			invalidVctNames []string
+			supportedVCTMap = map[string]struct{}{}
+			invalidVCTNames []string
 		)
 		operationComponent := supportedComponentMap[v.ComponentName]
 		if operationComponent == nil {
@@ -336,17 +336,17 @@ func (r *OpsRequest) validateVolumeExpansion(allErrs *field.ErrorList, cluster *
 		}
 		// covert slice to map
 		for _, vctName := range operationComponent.VolumeClaimTemplateNames {
-			supportedVctMap[vctName] = struct{}{}
+			supportedVCTMap[vctName] = struct{}{}
 		}
 		// check the volumeClaimTemplate is support volumeExpansion
 		for _, vct := range v.VolumeClaimTemplates {
-			if _, ok := supportedVctMap[vct.Name]; !ok {
-				invalidVctNames = append(invalidVctNames, vct.Name)
+			if _, ok := supportedVCTMap[vct.Name]; !ok {
+				invalidVCTNames = append(invalidVCTNames, vct.Name)
 			}
 		}
-		if len(invalidVctNames) > 0 {
+		if len(invalidVCTNames) > 0 {
 			message := "not support volume expansion, check the StorageClass whether allow volume expansion."
-			addInvalidError(allErrs, fmt.Sprintf("spec.volumeExpansion[%d].volumeClaimTemplates[*].name", i), invalidVctNames, message)
+			addInvalidError(allErrs, fmt.Sprintf("spec.volumeExpansion[%d].volumeClaimTemplates[*].name", i), invalidVCTNames, message)
 		}
 	}
 

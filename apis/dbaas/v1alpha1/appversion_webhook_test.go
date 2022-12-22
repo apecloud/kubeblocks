@@ -29,17 +29,27 @@ import (
 
 var _ = Describe("appVersion webhook", func() {
 	var (
-		clusterDefinitionName = "appversion-webhook-mysql-definition"
-		appVersionName        = "appversion-webhook-mysql-appversion"
+		randomStr             = testCtx.GetRandomStr()
+		clusterDefinitionName = "webhook-mysql-definition-" + randomStr
+		appVersionName        = "webhook-mysql-appversion-" + randomStr
 		timeout               = time.Second * 10
 		interval              = time.Second
 	)
-	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
+	cleanupObjects := func() {
+		// Add any setup steps that needs to be executed before each test
 		err := k8sClient.DeleteAllOf(ctx, &AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
+	}
+	BeforeEach(func() {
+		// Add any setup steps that needs to be executed before each test
+		cleanupObjects()
+	})
+
+	AfterEach(func() {
+		// Add any teardown steps that needs to be executed after each test
+		cleanupObjects()
 	})
 	Context("When appVersion create and update", func() {
 		It("Should webhook validate passed", func() {
@@ -63,12 +73,14 @@ var _ = Describe("appVersion webhook", func() {
 			}, timeout, interval).Should(BeTrue())
 
 			By("By testing update appVersion.status")
+			patch := client.MergeFrom(appVersion.DeepCopy())
 			appVersion.Status.ClusterDefSyncStatus = OutOfSyncStatus
-			Expect(k8sClient.Update(ctx, appVersion)).Should(Succeed())
+			Expect(k8sClient.Status().Patch(ctx, appVersion, patch)).Should(Succeed())
 
 			By("By testing update appVersion.spec")
+			patch = client.MergeFrom(appVersion.DeepCopy())
 			appVersion.Spec.ClusterDefinitionRef = "test1"
-			Expect(k8sClient.Update(ctx, appVersion)).ShouldNot(Succeed())
+			Expect(k8sClient.Patch(ctx, appVersion, patch)).ShouldNot(Succeed())
 
 		})
 	})

@@ -472,3 +472,21 @@ func GetReloadOptions(cli client.Client, ctx context.Context, tpls []dbaasv1alph
 	}
 	return nil, nil
 }
+
+func getComponentFromClusterDefinition(
+	ctx context.Context,
+	cli client.Client,
+	cluster *dbaasv1alpha1.Cluster,
+	typeName string) (*dbaasv1alpha1.ClusterDefinitionComponent, error) {
+	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
+		return nil, err
+	}
+
+	for _, component := range clusterDef.Spec.Components {
+		if component.TypeName == typeName {
+			return &component, nil
+		}
+	}
+	return nil, nil
+}

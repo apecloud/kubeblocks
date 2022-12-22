@@ -1,6 +1,6 @@
 ## kbcli cluster restart
 
-restart the specified components in the cluster
+Restart the specified components in the cluster
 
 ```
 kbcli cluster restart [flags]

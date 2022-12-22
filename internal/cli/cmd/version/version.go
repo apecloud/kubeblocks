@@ -113,7 +113,7 @@ func (o *versionOptions) Run() {
 	if len(o.k8sServerVersion) > 0 {
 		fmt.Printf("Kubernetes: %s\n", o.k8sServerVersion)
 	}
-	fmt.Printf("Kbcli: %s\n", version.GetVersion())
+	fmt.Printf("kbcli: %s\n", version.GetVersion())
 	if o.verbose {
 		fmt.Printf("  BuildDate: %s\n", version.BuildDate)
 		fmt.Printf("  GitCommit: %s\n", version.GitCommit)

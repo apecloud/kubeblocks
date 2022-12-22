@@ -24,7 +24,8 @@ import (
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
+	component "github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -72,7 +73,7 @@ func getStatefulSetPods(params ReconfigureParams) ([]corev1.Pod, error) {
 	}
 
 	stsObj := &params.ComponentUnits[0]
-	pods, err := component.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
+	pods, err := consensusset.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
 	if err != nil {
 		return nil, err
 	}
@@ -95,13 +96,13 @@ func getConsensusPods(params ReconfigureParams) ([]corev1.Pod, error) {
 	}
 
 	stsObj := &params.ComponentUnits[0]
-	pods, err := component.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
+	pods, err := consensusset.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
 	if err != nil {
 		return nil, err
 	}
 
 	// sort pods
-	component.SortPods(pods, component.ComposeRolePriorityMap(*params.Component))
+	consensusset.SortPods(pods, consensusset.ComposeRolePriorityMap(*params.Component))
 	r := make([]corev1.Pod, 0, len(pods))
 	for i := len(pods); i > 0; i-- {
 		r = append(r, pods[i-1:i]...)

@@ -33,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
 	cfgpolicy "github.com/apecloud/kubeblocks/controllers/dbaas/configuration/policy"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
@@ -183,7 +182,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	}
 
 	// Find ClusterDefinition Component  from ClusterDefinition CR
-	component, err := component.GetComponentFromClusterDefinition(reqCtx.Ctx, r.Client, &cluster, componentName)
+	component, err := getComponentFromClusterDefinition(reqCtx.Ctx, r.Client, &cluster, componentName)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config,
 			r.Recorder,

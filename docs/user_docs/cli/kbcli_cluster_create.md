@@ -9,6 +9,12 @@ kbcli cluster create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOu
 ### Examples
 
 ```
+  # Create a cluster using cluster definition my-cluster-def and cluster version my-version
+  kbcli cluster create mycluster --cluster-definition=my-cluster-def --cluster-version=my-version
+  
+  # Both --cluster-definition and --cluster-version are required for creating cluster, for the sake of brevity,
+  # the following examples will ignore these two flags.
+  
   # Create a cluster using component file component.yaml and termination policy DoNotDelete that will prevent
   # the cluster from being deleted
   kbcli cluster create mycluster --components=component.yaml --termination-policy=DoNotDelete
@@ -47,13 +53,13 @@ kbcli cluster create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOu
 ### Options
 
 ```
-      --app-version string           AppVersion reference (default "wesql-8.0.30")
       --backup string                Set a source backup to restore data
-      --cluster-definition string    ClusterDefinition reference (default "apecloud-wesql")
+      --cluster-definition string    Specify cluster definition, run "kbcli cluster-definition list" to show all available cluster definition
+      --cluster-version string       Specify cluster version, run "kbcli cluster-version list" to show all available cluster version
       --components string            Use yaml file, URL, or stdin to specify the cluster components
-      --enable-all-logs              Enable advanced application all log extraction, and true will ignore enabledLogs of component level
+      --enable-all-logs              Enable advanced application all log extraction, and true will ignore enabledLogs of component level (default true)
   -h, --help                         help for create
-      --monitor                      Set monitor enabled (default false)
+      --monitor                      Set monitor enabled and inject metrics exporter (default true)
       --node-labels stringToString   Node label selector (default [])
       --pod-anti-affinity string     Pod anti-affinity type (default "Preferred")
       --termination-policy string    Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)

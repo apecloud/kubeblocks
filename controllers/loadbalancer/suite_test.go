@@ -18,7 +18,6 @@ package loadbalancer
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -31,10 +30,11 @@ import (
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
@@ -78,7 +78,7 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: true,
 	}
 
-	if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
+	if testCtx.UsingExistingCluster() {
 		useExistingCluster := true
 		testEnv.UseExistingCluster = &useExistingCluster
 		testEnv.Config = config.GetConfigOrDie()

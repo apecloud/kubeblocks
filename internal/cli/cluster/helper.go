@@ -79,8 +79,8 @@ func GetAllCluster(client dynamic.Interface, namespace string, clusters *dbaasv1
 	return runtime.DefaultUnstructuredConverter.FromUnstructured(objs.UnstructuredContent(), clusters)
 }
 
-// FindCompInCluster finds component in cluster object based on the component type name
-func FindCompInCluster(cluster *dbaasv1alpha1.Cluster, typeName string) *dbaasv1alpha1.ClusterComponent {
+// FindClusterComp finds component in cluster object based on the component type name
+func FindClusterComp(cluster *dbaasv1alpha1.Cluster, typeName string) *dbaasv1alpha1.ClusterComponent {
 	for i, c := range cluster.Spec.Components {
 		if c.Type == typeName {
 			return &cluster.Spec.Components[i]
@@ -127,6 +127,50 @@ func GetClusterEndpoints(svcList *corev1.ServiceList, c *dbaasv1alpha1.ClusterCo
 		}
 	}
 	return internalEndpoints, externalEndpoints
+}
+
+func GetClusterDefByName(dynamic dynamic.Interface, name string) (*dbaasv1alpha1.ClusterDefinition, error) {
+	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+	obj, err := dynamic.Resource(types.ClusterDefGVR()).Namespace("").
+		Get(context.TODO(), name, metav1.GetOptions{}, "")
+	if err != nil {
+		return nil, err
+	}
+	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, clusterDef); err != nil {
+		return nil, err
+	}
+	return clusterDef, nil
+}
+
+func GetClusterByName(dynamic dynamic.Interface, name string, namespace string) (*dbaasv1alpha1.Cluster, error) {
+	cluster := &dbaasv1alpha1.Cluster{}
+	obj, err := dynamic.Resource(types.ClusterGVR()).Namespace(namespace).
+		Get(context.TODO(), name, metav1.GetOptions{}, "")
+	if err != nil {
+		return nil, err
+	}
+	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cluster); err != nil {
+		return nil, err
+	}
+	return cluster, nil
+}
+
+func GetVersionByClusterDef(dynamic dynamic.Interface, clusterDef string) (*dbaasv1alpha1.AppVersionList, error) {
+	versionList := &dbaasv1alpha1.AppVersionList{}
+	objList, err := dynamic.Resource(types.AppVersionGVR()).Namespace("").
+		List(context.TODO(), metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s", types.ClusterDefLabelKey, clusterDef),
+		})
+	if err != nil {
+		return nil, err
+	}
+	if objList == nil {
+		return nil, fmt.Errorf("failed to find component version referencing cluster definition %s", clusterDef)
+	}
+	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(objList.UnstructuredContent(), versionList); err != nil {
+		return nil, err
+	}
+	return versionList, nil
 }
 
 func FakeClusterObjs() *ClusterObjects {

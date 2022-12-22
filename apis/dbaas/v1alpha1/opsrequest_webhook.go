@@ -18,10 +18,12 @@ package v1alpha1
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
 
+	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -37,10 +39,11 @@ import (
 
 // log is for logging in this package.
 var (
-	opsrequestlog = logf.Log.WithName("opsrequest-resource")
+	opsrequestlog           = logf.Log.WithName("opsrequest-resource")
+	opsRequestAnnotationKey = "kubeblocks.io/ops-request"
 
-	// ClusterPhasesMapperForOps records in which cluster phases OpsRequest can run
-	ClusterPhasesMapperForOps = map[OpsType][]Phase{}
+	// OpsRequestBehaviourMapper records in which cluster phases OpsRequest can run
+	OpsRequestBehaviourMapper = map[OpsType]OpsRequestBehaviour{}
 )
 
 func (r *OpsRequest) SetupWebhookWithManager(mgr ctrl.Manager) error {
@@ -95,13 +98,33 @@ func (r *OpsRequest) ValidateDelete() error {
 
 // validateClusterPhase validate whether the current cluster state supports the OpsRequest
 func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
-	clusterPhases := ClusterPhasesMapperForOps[r.Spec.Type]
+	opsBehaviour := OpsRequestBehaviourMapper[r.Spec.Type]
 	// if the OpsType is no cluster phases, ignores it
-	if len(clusterPhases) == 0 {
+	if len(opsBehaviour.FromClusterPhases) == 0 {
 		return nil
 	}
-	if !slices.Contains(clusterPhases, cluster.Status.Phase) {
+	if !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) {
 		return newInvalidError(OpsRequestKind, r.Name, "spec.type", fmt.Sprintf("%s is forbidden when Cluster.status.Phase is %s", r.Spec.Type, cluster.Status.Phase))
+	}
+	// validate whether existing the same type OpsRequest
+	var (
+		opsRequestValue string
+		opsRequestMap   map[Phase]string
+		ok              bool
+	)
+	if cluster.Annotations == nil {
+		return nil
+	}
+	if opsRequestValue, ok = cluster.Annotations[opsRequestAnnotationKey]; !ok {
+		return nil
+	}
+	// opsRequest annotation value in cluster to map
+	if err := json.Unmarshal([]byte(opsRequestValue), &opsRequestMap); err != nil {
+		return nil
+	}
+	opsRequestName := opsRequestMap[opsBehaviour.ToClusterPhase]
+	if opsRequestName != "" {
+		return newInvalidError(OpsRequestKind, r.Name, "spec.type", fmt.Sprintf("Existing OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", opsRequestName, cluster.Name))
 	}
 	return nil
 }
@@ -156,7 +179,7 @@ func (r *OpsRequest) validateOps(ctx context.Context, cluster *Cluster, allErrs 
 // validateUpgrade validate spec.clusterOps.upgrade is legal
 func (r *OpsRequest) validateUpgrade(ctx context.Context, allErrs *field.ErrorList, cluster *Cluster) {
 	if !cluster.Status.Operations.Upgradable {
-		addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s", r.Spec.ClusterRef))
+		addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s, appversion must be greater than 1", r.Spec.ClusterRef))
 		return
 	}
 	if r.Spec.ClusterOps == nil || r.Spec.ClusterOps.Upgrade == nil {
@@ -180,15 +203,40 @@ func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *
 		if componentOps.VerticalScaling == nil {
 			return field.NotFound(field.NewPath(fmt.Sprintf("spec.componentOps[%d].verticalScaling", index)), "can not be empty")
 		}
-		if err := validateVerticalResourceList(componentOps.VerticalScaling.Requests); err != nil {
-			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].verticalScaling.requests", index)), componentOps.VerticalScaling.Requests, err.Error())
+		if invalidValue, err := validateVerticalResourceList(componentOps.VerticalScaling.Requests); err != nil {
+			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].verticalScaling.requests", index)), invalidValue, err.Error())
 		}
-		if err := validateVerticalResourceList(componentOps.VerticalScaling.Limits); err != nil {
-			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].verticalScaling.limits", index)), componentOps.VerticalScaling.Limits, err.Error())
+		if invalidValue, err := validateVerticalResourceList(componentOps.VerticalScaling.Limits); err != nil {
+			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].verticalScaling.limits", index)), invalidValue, err.Error())
+		}
+		if invalidValue, err := compareRequestsAndLimits(*componentOps.VerticalScaling); err != nil {
+			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].verticalScaling.requests", index)), invalidValue, err.Error())
 		}
 		return nil
 	}
 	r.commonValidationWithComponentOps(allErrs, cluster, supportedComponentMap, customValidate)
+}
+
+// compareRequestsAndLimits compare the resource requests and limits
+func compareRequestsAndLimits(resources corev1.ResourceRequirements) (string, error) {
+	requests := resources.Requests
+	limits := resources.Limits
+	if requests == nil || limits == nil {
+		return "", nil
+	}
+	for k, v := range requests {
+		if limitQuantity, ok := limits[k]; !ok {
+			continue
+		} else if compareQuantity(&v, &limitQuantity) {
+			return v.String(), errors.New(fmt.Sprintf(`must be less than or equal to %s limit`, k))
+		}
+	}
+	return "", nil
+}
+
+// compareQuantity compare requests quantity and limits quantity
+func compareQuantity(requestQuantity, limitQuantity *resource.Quantity) bool {
+	return requestQuantity != nil && limitQuantity != nil && requestQuantity.Cmp(*limitQuantity) > 0
 }
 
 // invalidReplicas verify whether the replicas is invalid
@@ -343,13 +391,13 @@ func covertOperationComponentsToMap(componentNames []OperationComponent) map[str
 }
 
 // checkResourceList check k8s resourceList is legal
-func validateVerticalResourceList(resourceList map[corev1.ResourceName]resource.Quantity) error {
+func validateVerticalResourceList(resourceList map[corev1.ResourceName]resource.Quantity) (string, error) {
 	for k := range resourceList {
-		if k != corev1.ResourceCPU && k != corev1.ResourceMemory && strings.HasPrefix(k.String(), corev1.ResourceHugePagesPrefix) {
-			return fmt.Errorf("resource key is not cpu or memory or hugepages- ")
+		if k != corev1.ResourceCPU && k != corev1.ResourceMemory && !strings.HasPrefix(k.String(), corev1.ResourceHugePagesPrefix) {
+			return string(k), fmt.Errorf("resource key is not cpu or memory or hugepages- ")
 		}
 	}
-	return nil
+	return "", nil
 }
 
 func addInvalidError(allErrs *field.ErrorList, fieldPath string, value interface{}, msg string) {

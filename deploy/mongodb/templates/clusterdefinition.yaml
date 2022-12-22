@@ -1,0 +1,142 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: apecloud-mongodb
+  labels:
+    {{- include "mongodb.labels" . | nindent 4 }}
+spec:
+  type: state.mongodb
+  components:
+    - typeName: mongos
+      defaultReplicas: 1
+      minReplicas: 0
+      configTemplateRefs:
+        - name: mongodb-scripts
+          volumeName: scripts
+          defaultMode: 493
+      componentType: Stateless
+      service:
+        ports:
+          - protocol: TCP
+            port: 27017
+      podSpec:
+        containers:
+          - name: mongos
+            ports:
+              - protocol: TCP
+                name: mongos
+                containerPort: 27017
+            command:
+              - /scripts/mongos-setup.sh
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts/mongos-setup.sh
+                subPath: mongos-setup.sh
+    - typeName: configsvr
+      defaultReplicas: 3
+      minReplicas: 0
+      configTemplateRefs:
+        - name: mongodb-scripts
+          volumeName: scripts
+          defaultMode: 493
+      characterType: mongodb
+      componentType: Consensus
+      consensusSpec:
+        leader:
+          name: "primary"
+          accessMode: ReadWrite
+        followers:
+          - name: "secondary"
+            accessMode: Readonly
+        updateStrategy: Serial
+      probes:
+        roleChangedProbe:
+          periodSeconds: 2
+          failureThreshold: 3
+      service:
+        ports:
+          - protocol: TCP
+            port: 27018
+      podSpec:
+        containers:
+          - name: configsvr
+            ports:
+              - name: configsvr
+                protocol: TCP
+                containerPort: 27018
+            command:
+              - /scripts/replicaset-setup.sh
+              - --configsvr
+            lifecycle:
+              postStart:
+                exec:
+                  command:
+                    - /scripts/replicaset-post-start.sh
+                    - CONFIGSVR
+                    - "true"
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts/replicaset-setup.sh
+                subPath: replicaset-setup.sh
+              - name: scripts
+                mountPath: /scripts/replicaset-post-start.sh
+                subPath: replicaset-post-start.sh
+    - typeName: shard
+      defaultReplicas: 3
+      minReplicas: 3
+      configTemplateRefs:
+        - name: mongodb-scripts
+          volumeName: scripts
+          defaultMode: 493
+      characterType: mongodb
+      componentType: Consensus
+      consensusSpec:
+        leader:
+          name: "primary"
+          accessMode: ReadWrite
+        followers:
+          - name: "secondary"
+            accessMode: Readonly
+        updateStrategy: BestEffortParallel
+      probes:
+        roleChangedProbe:
+          periodSeconds: 2
+          failureThreshold: 3
+      service:
+        ports:
+          - protocol: TCP
+            port: 27018
+      podSpec:
+        containers:
+          - name: shard
+            ports:
+              - name: shard
+                protocol: TCP
+                containerPort: 27018
+            command:
+              - /scripts/replicaset-setup.sh
+              - --shardsvr
+            lifecycle:
+              postStart:
+                exec:
+                  command:
+                    - /scripts/replicaset-post-start.sh
+                    - SHARD
+                    - "false"
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts/replicaset-setup.sh
+                subPath: replicaset-setup.sh
+              - name: scripts
+                mountPath: /scripts/replicaset-post-start.sh
+                subPath: replicaset-post-start.sh
+          - name: agent
+            command:
+              - /scripts/shard-agent.sh
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts/shard-agent.sh
+                subPath: shard-agent.sh
+  connectionCredential:
+    username: admin
+    password: ""

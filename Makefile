@@ -187,12 +187,34 @@ mod-vendor: ## Run go mod tidy->vendor->verify against go modules.
 
 TEST_PACKAGE=
 
+CLUSTER_TYPES=minikube k3d
+.PHONY: add-k8s-host
+add-k8s-host:  ## add DNS to /etc/hosts when k8s cluster is minikube or k3d
+ifneq (, $(findstring $(EXISTING_CLUSTER_TYPE), $(CLUSTER_TYPES)))
+ifeq (, $(shell sed -n "/^127.0.0.1[[:space:]]*host.$(EXISTING_CLUSTER_TYPE).internal/p" /etc/hosts))
+	sudo bash -c 'echo "127.0.0.1 host.$(EXISTING_CLUSTER_TYPE).internal" >> /etc/hosts'
+endif
+endif
+
+.PHONY: test-probe
+test-probe:
+	cd ./cmd/probe && $(GO) test ./... -coverprofile cover.out
+
+.PHONY: cover-report-probe
+cover-report-probe: ## Generate cover.html from cmd/probe/cover.out
+	cd ./cmd/probe && $(GO) tool cover -html=cover.out -o cover.html
+ifeq ($(GOOS), darwin)
+	open ./cmd/probe/cover.html
+else
+	echo "open cmd/probe/cover.html with a HTML viewer."
+endif
+
 .PHONY: test-current-ctx
-test-current-ctx: manifests generate fmt vet ## Run operator controller tests with current $KUBECONFIG context.
-	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_PACKAGE)... -coverprofile cover.out
+test-current-ctx: manifests generate fmt vet add-k8s-host ## Run operator controller tests with current $KUBECONFIG context. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
+	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_PACKAGE)... -p 1 -coverprofile cover.out
 
 .PHONY: test
-test: manifests generate fmt vet envtest ## Run tests.
+test: manifests generate fmt vet envtest add-k8s-host test-probe ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_PACKAGE)... -coverprofile cover.out
 
 .PHONY: test-delve
@@ -204,7 +226,7 @@ test-webhook-enabled: ## Run tests with webhooks enabled.
 	$(MAKE) test ENABLE_WEBHOOKS=true
 
 .PHONY: cover-report
-cover-report: ## Generate cover.html from cover.out
+cover-report: cover-report-probe ## Generate cover.html from cover.out
 	$(GO) tool cover -html=cover.out -o cover.html
 ifeq ($(GOOS), darwin)
 	open ./cover.html
@@ -227,7 +249,7 @@ CLI_LD_FLAGS ="-s -w \
 	-X github.com/apecloud/kubeblocks/version.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` \
 	-X github.com/apecloud/kubeblocks/version.GitCommit=$(GIT_COMMIT) \
 	-X github.com/apecloud/kubeblocks/version.GitVersion=$(GIT_VERSION) \
-	-X github.com/apecloud/kubeblocks/version.Version=$(GIT_VERSION) \
+	-X github.com/apecloud/kubeblocks/version.Version=$(VERSION) \
 	-X github.com/apecloud/kubeblocks/version.K3sImageTag=$(K3S_IMG_TAG) \
 	-X github.com/apecloud/kubeblocks/version.K3dVersion=$(K3D_VERSION) \
 	-X github.com/apecloud/kubeblocks/version.DefaultKubeBlocksVersion=$(VERSION)"
@@ -393,7 +415,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 ##@ CI
 
 .PHONY:
-intstall-git-hooks: githookstool ## Install git hooks.
+install-git-hooks: githookstool ## Install git hooks.
 	git hooks install
 	git hooks
 

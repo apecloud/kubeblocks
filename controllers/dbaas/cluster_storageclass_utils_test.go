@@ -37,7 +37,7 @@ var _ = Describe("Event Controller", func() {
 		interval       = time.Second
 		clusterDefName = "cluster-def-" + testCtx.GetRandomStr()
 		appVersionName = "app-versoion-" + testCtx.GetRandomStr()
-		clusterName    = "wesql-for-storageclass-" + testCtx.GetRandomStr()
+		clusterName    = "mysql-for-storageclass-" + testCtx.GetRandomStr()
 		ctx            = context.Background()
 	)
 
@@ -106,7 +106,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: registry.jihulab.com/apecloud/mysql-server/mysql/wesql-server-arm:latest
+        image: docker.io/apecloud/wesql-server:latest
 `, appVersionName, clusterDefName)
 		appVersion := &dbaasv1alpha1.AppVersion{}
 		Expect(yaml.Unmarshal([]byte(appVerYaml), appVersion)).Should(Succeed())
@@ -146,13 +146,13 @@ metadata:
           {"Updating":"wesql-restart-test"}
        kubeblocks.io/storage-class: %s,%s
   labels:
-    appversion.kubeblocks.io/name: app-version-for-storageclass
-    clusterdefinition.kubeblocks.io/name: cluster-definition-for-storageclass
+    appversion.kubeblocks.io/name: %s
+    clusterdefinition.kubeblocks.io/name: %s
   name: %s
   namespace: default
 spec:
-  appVersionRef: app-version-for-storageclass
-  clusterDefinitionRef: cluster-definition-for-storageclass
+  appVersionRef: %s
+  clusterDefinitionRef: %s
   components:
   - monitor: false
     name: wesql-test
@@ -167,6 +167,7 @@ spec:
           requests:
             storage: 1Gi
         volumeMode: Filesystem
+        storageClassName: %s
     - name: log
       spec:
         accessModes:
@@ -176,7 +177,9 @@ spec:
             storage: 1Gi
         volumeMode: Filesystem  
         storageClassName: %s
-  terminationPolicy: WipeOut`, defaultStorageClassName, storageClassName, clusterName, storageClassName)
+  terminationPolicy: WipeOut`, defaultStorageClassName, storageClassName,
+			appVersionName, clusterDefName, clusterName, appVersionName,
+			clusterDefName, defaultStorageClassName, storageClassName)
 		cluster := &dbaasv1alpha1.Cluster{}
 		Expect(yaml.Unmarshal([]byte(clusterYaml), cluster)).Should(Succeed())
 		Expect(testCtx.CreateObj(context.Background(), cluster)).Should(Succeed())

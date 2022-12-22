@@ -11,6 +11,9 @@ spec:
     {{- with .Values.topologyKeys }}
     topologyKeys: {{ . | toYaml | nindent 6 }}
     {{- end }}
+  {{- with $.Values.tolerations }}
+  tolerations: {{ . | toYaml | nindent 4 }}
+  {{- end }}
   components:
     - name: wesql # user-defined
       type: replicasets # ref clusterdefinition components.typename

@@ -41,7 +41,7 @@ const (
 	PVCName          = "fake-pvc"
 
 	KubeBlocksChartName = "fake-kubeblocks"
-	KubeBlocksChartURL  = "https://apecloud.github.io/fake-kubeblocks"
+	KubeBlocksChartURL  = "fake-kubeblocks-chart-url"
 )
 
 func FakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
@@ -167,6 +167,10 @@ func FakeClusterDef() *dbaasv1alpha1.ClusterDefinition {
 			TypeName:        ComponentType,
 			DefaultReplicas: 3,
 		},
+		{
+			TypeName:        fmt.Sprintf("%s-%d", ComponentType, 1),
+			DefaultReplicas: 2,
+		},
 	}
 	return clusterDef
 }
@@ -174,7 +178,9 @@ func FakeClusterDef() *dbaasv1alpha1.ClusterDefinition {
 func FakeAppVersion() *dbaasv1alpha1.AppVersion {
 	appversion := &dbaasv1alpha1.AppVersion{}
 	appversion.Name = AppVersionName
+	appversion.SetLabels(map[string]string{types.ClusterDefLabelKey: ClusterDefName})
 	appversion.Spec.ClusterDefinitionRef = ClusterDefName
+	appversion.SetCreationTimestamp(metav1.Now())
 	return appversion
 }
 

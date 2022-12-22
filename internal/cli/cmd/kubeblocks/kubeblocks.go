@@ -21,15 +21,19 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/repo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/utils/strings/slices"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -65,9 +69,6 @@ var (
 	# Install KubeBlocks with specified version
 	kbcli kubeblocks install --version=0.2.0
 
-	# Install KubeBlocks and enable the monitor including prometheus, grafana
-	kbcli kubeblocks install --monitor=true
-
 	# Install KubeBlocks with other settings, for example, set replicaCount to 3
 	kbcli kubeblocks install --set replicaCount=3
 `)
@@ -102,12 +103,58 @@ func (o *Options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	if o.HelmCfg, err = helm.NewActionConfig(o.Namespace, kubeconfig); err != nil {
+	kubecontext, err := cmd.Flags().GetString("context")
+	if err != nil {
+		return err
+	}
+
+	if o.HelmCfg, err = helm.NewActionConfig(o.Namespace, kubeconfig, helm.WithContext(kubecontext)); err != nil {
 		return err
 	}
 
 	o.client, err = f.DynamicClient()
 	return err
+}
+
+func (o *Options) precheck() error {
+	precheckList := []string{
+		"clusters.dbaas.kubeblocks.io",
+	}
+	ctx := context.Background()
+	// delete crds
+	crdGVR := schema.GroupVersionResource{
+		Group:    "apiextensions.k8s.io",
+		Version:  types.VersionV1,
+		Resource: "customresourcedefinitions",
+	}
+	crdList, err := o.client.Resource(crdGVR).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, crd := range crdList.Items {
+		// find kubeblocks crds
+		if strings.Contains(crd.GetName(), "kubeblocks.io") &&
+			slices.Contains(precheckList, crd.GetName()) {
+			group, _, err := unstructured.NestedString(crd.Object, "spec", "group")
+			if err != nil {
+				return err
+			}
+			gvr := schema.GroupVersionResource{
+				Group:    group,
+				Version:  types.Version,
+				Resource: strings.Split(crd.GetName(), ".")[0],
+			}
+			// find custom resource
+			objList, err := o.client.Resource(gvr).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				return err
+			}
+			if len(objList.Items) > 0 {
+				return errors.Errorf("Can not uninstall, you should delete custom resource %s %s first", crd.GetName(), objList.Items[0].GetName())
+			}
+		}
+	}
+	return nil
 }
 
 func (o *InstallOptions) Run() error {
@@ -168,7 +215,7 @@ KubeBlocks %s Install SUCCESSFULLY!
     kbcli cluster list          # list all database clusters
     kbcli cluster describe <cluster name>  # get cluster information
 
--> Uninstall DBaaS:
+-> Uninstall KubeBlocks:
     kbcli kubeblocks uninstall
 `, o.Version)
 	fmt.Fprint(o.Out, notes)
@@ -193,6 +240,10 @@ func (o *Options) run() error {
 
 	// remove finalizers
 	if err := removeFinalizers(o.client); err != nil {
+		return err
+	}
+
+	if err := deleteCRDs(o.client); err != nil {
 		return err
 	}
 
@@ -228,6 +279,28 @@ func removeFinalizers(client dynamic.Interface) error {
 	return nil
 }
 
+func deleteCRDs(cli dynamic.Interface) error {
+	ctx := context.Background()
+	// delete crds
+	crdGVR := schema.GroupVersionResource{
+		Group:    "apiextensions.k8s.io",
+		Version:  types.VersionV1,
+		Resource: "customresourcedefinitions",
+	}
+	crdList, err := cli.Resource(crdGVR).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, crd := range crdList.Items {
+		if strings.Contains(crd.GetName(), "kubeblocks.io") {
+			if err := cli.Resource(crdGVR).Delete(ctx, crd.GetName(), metav1.DeleteOptions{}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &InstallOptions{
 		Options: Options{
@@ -246,7 +319,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		},
 	}
 
-	cmd.Flags().BoolVar(&o.Monitor, "monitor", false, "Set monitor enabled (default false)")
+	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and install Prometheus, AlertManager and Grafana (default true)")
 	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
 
@@ -264,6 +337,7 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Example: uninstallExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f, cmd))
+			util.CheckErr(o.precheck())
 			util.CheckErr(o.run())
 		},
 	}

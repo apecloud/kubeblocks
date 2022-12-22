@@ -60,14 +60,49 @@ spec:
 	_ = yaml.Unmarshal([]byte(clusterByte), cluster)
 	_ = yaml.Unmarshal([]byte(clusterDefByte), clusterDef)
 	// normal case
-	conditionList := cluster.ValidateEnabledLogs(clusterDef)
-	if len(conditionList) != 0 {
+	if err := cluster.ValidateEnabledLogs(clusterDef); err != nil {
 		t.Error("Expected empty conditionList")
 	}
 	// corner case
 	cluster.Spec.Components[0].EnabledLogs = []string{"error-test", "slow"}
-	conditionList1 := cluster.ValidateEnabledLogs(clusterDef)
-	if len(conditionList1) != 1 {
+	if err := cluster.ValidateEnabledLogs(clusterDef); err == nil {
 		t.Error("Expected one element conditionList")
+	}
+}
+
+func TestGetMessage(t *testing.T) {
+	podKey := "Pod/test-01"
+	statusComponent := ClusterStatusComponent{
+		Message: map[string]string{
+			podKey: "failed Scheduled",
+		},
+	}
+	message := statusComponent.GetMessage()
+	message[podKey] = "insufficient cpu"
+	if statusComponent.Message[podKey] == message[podKey] {
+		t.Error("Expected status component message not changed")
+	}
+}
+
+func TestSetMessage(t *testing.T) {
+	podKey := "Pod/test-01"
+	statusComponent := ClusterStatusComponent{}
+	statusComponent.SetMessage(
+		map[string]string{
+			podKey: "failed Scheduled",
+		})
+	if statusComponent.Message[podKey] != "failed Scheduled" {
+		t.Error(`Expected get message "failed Scheduled"`)
+	}
+}
+
+func TestSetAndGetObjectMessage(t *testing.T) {
+	messageMap := ComponentMessageMap{
+		"Pod/test-01": "failed Scheduled",
+	}
+	messageMap.SetObjectMessage("Pod", "test-01", "insufficient cpu")
+	message := messageMap.GetObjectMessage("Pod", "test-01")
+	if message != "insufficient cpu" {
+		t.Error(`Expected get message "insufficient cpu"`)
 	}
 }

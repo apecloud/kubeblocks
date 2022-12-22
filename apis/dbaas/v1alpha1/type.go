@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package v1alpha1 contains API Schema definitions for the dbaas v1alpha1 API group
 package v1alpha1
 
 import (
@@ -34,17 +35,19 @@ const (
 type Phase string
 
 const (
-	AvailablePhase       Phase = "Available"
-	UnavailablePhase     Phase = "Unavailable"
-	DeletingPhase        Phase = "Deleting"
-	CreatingPhase        Phase = "Creating"
-	PendingPhase         Phase = "Pending"
-	RunningPhase         Phase = "Running"
-	FailedPhase          Phase = "Failed"
-	UpdatingPhase        Phase = "Updating"
-	VolumeExpandingPhase Phase = "VolumeExpanding"
-	SucceedPhase         Phase = "Succeed"
-	AbnormalPhase        Phase = "Abnormal"
+	AvailablePhase         Phase = "Available"
+	UnavailablePhase       Phase = "Unavailable"
+	DeletingPhase          Phase = "Deleting"
+	CreatingPhase          Phase = "Creating"
+	PendingPhase           Phase = "Pending"
+	RunningPhase           Phase = "Running"
+	FailedPhase            Phase = "Failed"
+	UpdatingPhase          Phase = "Updating"
+	VolumeExpandingPhase   Phase = "VolumeExpanding"
+	SucceedPhase           Phase = "Succeed"
+	AbnormalPhase          Phase = "Abnormal"
+	ConditionsErrorPhase   Phase = "ConditionsError"
+	HorizontalScalingPhase Phase = "HorizontalScaling"
 )
 
 // Status define CR .Status.ClusterDefSyncStatus
@@ -114,6 +117,16 @@ const (
 	WipeOut        TerminationPolicyType = "WipeOut"
 )
 
+// HScaleDataClonePolicyType defines data clone policy when horizontal scaling.
+// +enum
+type HScaleDataClonePolicyType string
+
+const (
+	HScaleDataClonePolicyNone         HScaleDataClonePolicyType = "None"
+	HScaleDataClonePolicyFromSnapshot HScaleDataClonePolicyType = "Snapshot"
+	HScaleDataClonePolicyFromBackup   HScaleDataClonePolicyType = "Backup"
+)
+
 // PodAntiAffinity define pod anti-affinity strategy.
 // +enum
 type PodAntiAffinity string
@@ -122,6 +135,13 @@ const (
 	Preferred PodAntiAffinity = "Preferred"
 	Required  PodAntiAffinity = "Required"
 )
+
+// OpsRequestBehaviour record what cluster status that can trigger this OpsRequest
+// and what status that the cluster enters after trigger OpsRequest.
+type OpsRequestBehaviour struct {
+	FromClusterPhases []Phase
+	ToClusterPhase    Phase
+}
 
 var webhookMgr *webhookManager
 

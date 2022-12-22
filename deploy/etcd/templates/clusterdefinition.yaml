@@ -1,0 +1,75 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: apecloud-etcd
+  labels:
+    {{- include "etcd.labels" . | nindent 4}}
+spec:
+  type: state.etcd
+  components:
+    - typeName: etcd
+      characterType: etcd
+      componentType: Consensus
+      consensusSpec:
+        leader:
+          name: "leader"
+          accessMode: ReadWrite
+        followers:
+          - name: "follower"
+            accessMode: ReadWrite
+        updateStrategy: BestEffortParallel
+      probes:
+        roleChangedProbe:
+          periodSeconds: 1
+          failureThreshold: 3
+      service:
+        ports:
+          - protocol: TCP
+            port: 2379
+      defaultReplicas: 3
+      podSpec:
+        containers:
+          - name: etcd
+            imagePullPolicy: IfNotPresent
+            ports:
+              - containerPort: 2379
+                protocol: TCP
+                name: client
+              - containerPort: 2380
+                protocol: TCP
+                name: peer
+            volumeMounts:
+              - name: data
+                mountPath: /var/run/etcd
+            command:
+              - bin/sh
+              - -c
+              - |
+                echo "start etcd..."
+                PEERS=""
+                DOMAIN=$KB_NAMESPACE".svc.cluster.local"
+                i=0
+                while [ $i -lt $KB_ETCD_N ]; do
+                	if [ $i -ne 0 ]; then
+                		PEERS="$PEERS,";
+                	fi;
+                	host=$(eval echo \$KB_ETCD_"$i"_HOSTNAME)
+                    host=$host"."$DOMAIN
+                	PEERS="$PEERS$host=http://$host:2380"
+                    i=$(( i + 1))
+                done
+                SVC_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
+                SVC_NAME=$SVC_NAME"headless";
+                MY_PEER=$KB_POD_NAME"."$SVC_NAME"."$DOMAIN
+                exec etcd --name ${MY_PEER} \
+                --listen-peer-urls http://0.0.0.0:2380 \
+                --listen-client-urls http://0.0.0.0:2379 \
+                --advertise-client-urls http://${MY_PEER}:2379 \
+                --initial-advertise-peer-urls http://${MY_PEER}:2380 \
+                --initial-cluster-token etcd-cluster-1 \
+                --initial-cluster ${PEERS} \
+                --initial-cluster-state new \
+                --data-dir /var/run/etcd/default.etcd
+  connectionCredential:
+    username: root
+    password: ""

@@ -41,6 +41,7 @@ var _ = Describe("probe_utils", func() {
 
 	Context("buildProbeContainers", func() {
 		var container *corev1.Container
+		var component *Component
 		var probeServiceHTTPPort, probeServiceGrpcPort int
 		var clusterDefProbe *dbaasv1alpha1.ClusterDefinitionProbe
 
@@ -61,15 +62,17 @@ var _ = Describe("probe_utils", func() {
 			clusterDefProbe.PeriodSeconds = 1
 			clusterDefProbe.SuccessThreshold = 1
 			clusterDefProbe.FailureThreshold = 1
+			component = &Component{}
+			component.CharacterType = "mysql"
 		})
 
 		It("Build role changed probe container", func() {
-			buildRoleChangedProbeContainer(container, clusterDefProbe, probeServiceHTTPPort)
+			buildRoleChangedProbeContainer("wesql", container, clusterDefProbe, probeServiceHTTPPort)
 			Expect(len(container.ReadinessProbe.Exec.Command)).ShouldNot(BeZero())
 		})
 
 		It("Build role service container", func() {
-			buildProbeServiceContainer(container, probeServiceHTTPPort, probeServiceGrpcPort)
+			buildProbeServiceContainer(component, container, probeServiceHTTPPort, probeServiceGrpcPort)
 			Expect(len(container.Command)).ShouldNot(BeZero())
 		})
 	})

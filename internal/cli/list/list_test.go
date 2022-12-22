@@ -38,7 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
-var _ = Describe("Describe", func() {
+var _ = Describe("List", func() {
 	buildTestCmd := func(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 		return builder.NewCmdBuilder().
 			Factory(f).

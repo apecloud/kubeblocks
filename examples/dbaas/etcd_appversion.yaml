@@ -1,0 +1,13 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind:       AppVersion
+metadata:
+  name:     app-version-etcd
+spec:
+  clusterDefinitionRef: cluster-definition-etcd
+  components:
+    - type: etcd
+      podSpec:
+        containers:
+          - name: etcd
+            image: quay.io/coreos/etcd:latest
+            imagePullPolicy: IfNotPresent

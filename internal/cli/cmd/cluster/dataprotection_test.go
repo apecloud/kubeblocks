@@ -30,14 +30,22 @@ import (
 	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	"github.com/apecloud/kubeblocks/internal/cli/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 var _ = Describe("DataProtection", func() {
 	var streams genericclioptions.IOStreams
+	var tf *cmdtesting.TestFactory
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		tf = cmdtesting.NewTestFactory().WithNamespace("default")
+	})
+
+	AfterEach(func() {
+		tf.Cleanup()
 	})
 
 	Context("backup", func() {
@@ -48,8 +56,6 @@ var _ = Describe("DataProtection", func() {
 		})
 
 		It("new command", func() {
-			tf := cmdtesting.NewTestFactory().WithNamespace("default")
-			defer tf.Cleanup()
 			cmd := NewCreateBackupCmd(tf, streams)
 			Expect(cmd).ShouldNot(BeNil())
 			// must succeed otherwise exit 1 and make test fails
@@ -60,8 +66,6 @@ var _ = Describe("DataProtection", func() {
 
 	It("delete-backup", func() {
 		By("test delete-backup cmd")
-		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		defer tf.Cleanup()
 		cmd := NewDeleteBackupCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 
@@ -72,7 +76,8 @@ var _ = Describe("DataProtection", func() {
 		deleteFlags := &delete.DeleteFlags{
 			DeleteFlags: cmddelete.NewDeleteCommandFlags("containing the resource to delete."),
 		}
-		Expect(completeForDeleteBackup(deleteFlags, []string{clusterName})).Should(HaveOccurred())
+		c := &builder.Command{Options: deleteFlags, Args: []string{clusterName}}
+		Expect(completeForDeleteBackup(c)).Should(HaveOccurred())
 
 		By("test delete-backup with cluster and force")
 		deleteFlags = &delete.DeleteFlags{
@@ -80,7 +85,8 @@ var _ = Describe("DataProtection", func() {
 		}
 		deleteForce := true
 		deleteFlags.Force = &deleteForce
-		Expect(completeForDeleteBackup(deleteFlags, []string{clusterName})).Should(Succeed())
+		c.Options = deleteFlags
+		Expect(completeForDeleteBackup(c)).Should(Succeed())
 		Expect(*deleteFlags.LabelSelector == clusterLabel).Should(BeTrue())
 
 		By("test delete-backup with cluster and force and labels")
@@ -90,21 +96,17 @@ var _ = Describe("DataProtection", func() {
 		deleteFlags.Force = &deleteForce
 		customLabel := "test=test"
 		deleteFlags.LabelSelector = &customLabel
-		Expect(completeForDeleteBackup(deleteFlags, []string{clusterName})).Should(Succeed())
+		c.Options = deleteFlags
+		Expect(completeForDeleteBackup(c)).Should(Succeed())
 		Expect(*deleteFlags.LabelSelector == customLabel+","+clusterLabel).Should(BeTrue())
 	})
 
 	It("list-backup", func() {
-		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		defer tf.Cleanup()
 		cmd := NewListBackupCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 	})
 
 	It("delete-restore", func() {
-		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		defer tf.Cleanup()
-
 		By("test delete-restore cmd")
 		cmd := NewDeleteRestoreCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
@@ -116,7 +118,8 @@ var _ = Describe("DataProtection", func() {
 		deleteFlags := &delete.DeleteFlags{
 			DeleteFlags: cmddelete.NewDeleteCommandFlags("containing the resource to delete."),
 		}
-		Expect(completeForDeleteRestore(deleteFlags, []string{clusterName})).Should(HaveOccurred())
+		c := &builder.Command{Options: deleteFlags, Args: []string{clusterName}}
+		Expect(completeForDeleteRestore(c)).Should(HaveOccurred())
 
 		By("test delete-restore with cluster and force")
 		deleteFlags = &delete.DeleteFlags{
@@ -124,7 +127,8 @@ var _ = Describe("DataProtection", func() {
 		}
 		deleteForce := true
 		deleteFlags.Force = &deleteForce
-		Expect(completeForDeleteRestore(deleteFlags, []string{clusterName})).Should(Succeed())
+		c.Options = deleteFlags
+		Expect(completeForDeleteRestore(c)).Should(Succeed())
 		Expect(*deleteFlags.LabelSelector == clusterLabel).Should(BeTrue())
 
 		By("test delete-restore with cluster and force and labels")
@@ -134,21 +138,18 @@ var _ = Describe("DataProtection", func() {
 		deleteFlags.Force = &deleteForce
 		customLabel := "test=test"
 		deleteFlags.LabelSelector = &customLabel
-		Expect(completeForDeleteRestore(deleteFlags, []string{clusterName})).Should(Succeed())
+		c.Options = deleteFlags
+		Expect(completeForDeleteRestore(c)).Should(Succeed())
 		Expect(*deleteFlags.LabelSelector == customLabel+","+clusterLabel).Should(BeTrue())
 	})
 
 	It("list-restore", func() {
-		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		defer tf.Cleanup()
 		cmd := NewListRestoreCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 	})
 
 	It("restore", func() {
-		tf := cmdtesting.NewTestFactory().WithNamespace("default")
-		defer tf.Cleanup()
-
+		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef(), testing.FakeAppVersion())
 		timestamp := time.Now().Format("20060102150405")
 		backupName := "backup-test-" + timestamp
 		clusterName := "source-cluster-" + timestamp
@@ -157,8 +158,10 @@ var _ = Describe("DataProtection", func() {
 		// create test cluster
 		cmd := NewCreateCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
-		_ = cmd.Flags().Set("components", "../../testing/testdata/component.yaml")
-		_ = cmd.Flags().Set("termination-policy", "Delete")
+		Expect(cmd.Flags().Set("cluster-definition", testing.ClusterDefName)).Should(Succeed())
+		Expect(cmd.Flags().Set("cluster-version", testing.AppVersionName)).Should(Succeed())
+		Expect(cmd.Flags().Set("components", "../../testing/testdata/component.yaml")).Should(Succeed())
+		Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
 		cmd.Run(nil, []string{clusterName})
 
 		// create backup

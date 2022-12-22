@@ -51,7 +51,7 @@ func CheckedRequeueWithError(err error, logger logr.Logger, msg string, keysAndV
 // RequeueWithErrorAndRecordEvent requeue when an error occurs. if it is a not found error, send an event
 func RequeueWithErrorAndRecordEvent(obj client.Object, recorder record.EventRecorder, err error, logger logr.Logger) (reconcile.Result, error) {
 	if apierrors.IsNotFound(err) {
-		recorder.Eventf(obj, corev1.EventTypeWarning, EventReasonNotFoundCR, err.Error())
+		recorder.Eventf(obj, corev1.EventTypeWarning, ReasonNotFoundCR, err.Error())
 	}
 	return RequeueWithError(err, logger, "")
 }
@@ -115,7 +115,7 @@ func HandleCRDeletion(reqCtx RequestCtx,
 			// Because if the resource has dependencies, it will not be automatically deleted.
 			// so it can prevent users from manually deleting it without event records
 			if reqCtx.Recorder != nil {
-				reqCtx.Recorder.Eventf(cr, corev1.EventTypeNormal, EventReasonDeletingCR, "Deleting %s: %s",
+				reqCtx.Recorder.Eventf(cr, corev1.EventTypeNormal, ReasonDeletingCR, "Deleting %s: %s",
 					strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
 			}
 
@@ -141,7 +141,7 @@ func HandleCRDeletion(reqCtx RequestCtx,
 				}
 				// record resources deleted event
 				if reqCtx.Recorder != nil {
-					reqCtx.Recorder.Eventf(cr, corev1.EventTypeNormal, EventReasonDeletedCR, "Deleted %s: %s",
+					reqCtx.Recorder.Eventf(cr, corev1.EventTypeNormal, ReasonDeletedCR, "Deleted %s: %s",
 						strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
 				}
 			}
@@ -185,7 +185,7 @@ func ValidateReferenceCR(reqCtx RequestCtx, cli client.Client, obj client.Object
 // RecordCreatedEvent record an event when CR created successfully
 func RecordCreatedEvent(r record.EventRecorder, cr client.Object) {
 	if r != nil && cr.GetGeneration() == 1 {
-		r.Eventf(cr, corev1.EventTypeNormal, EventReasonCreatedCR, "Created %s: %s", strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
+		r.Eventf(cr, corev1.EventTypeNormal, ReasonCreatedCR, "Created %s: %s", strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
 	}
 }
 
@@ -196,4 +196,12 @@ func WorkloadFilterPredicate(object client.Object) bool {
 		return false
 	}
 	return objLabels[AppManagedByLabelKey] == AppName
+}
+
+// IgnoreIsAlreadyExists return errors that is not AlreadyExists
+func IgnoreIsAlreadyExists(err error) error {
+	if !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+	return nil
 }

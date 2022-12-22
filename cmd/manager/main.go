@@ -37,7 +37,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	dataprotectioncontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	dbaascontrollers "github.com/apecloud/kubeblocks/controllers/dbaas"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/component"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/internal/webhook"
@@ -73,7 +73,7 @@ func init() {
 
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
 	viper.SetDefault("VOLUMESNAPSHOT", false)
-	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:0.2.0-alpha.4")
+	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:latest")
 	viper.SetDefault("PROBE_SERVICE_PORT", 3501)
 	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
 }
@@ -292,7 +292,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&component.StatefulSetReconciler{
+	if err = (&components.StatefulSetReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("stateful-set-controller"),
@@ -301,7 +301,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&component.DeploymentReconciler{
+	if err = (&components.DeploymentReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("deployment-controller"),

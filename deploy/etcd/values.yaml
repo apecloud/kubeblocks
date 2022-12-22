@@ -1,0 +1,14 @@
+image:
+  repository: quay.io/coreos/etcd
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: v3.5.6
+
+appVersionOverride: ""
+nameOverride: ""
+fullnameOverride: ""
+
+roleChangedProbe:
+  failureThreshold: 2
+  periodSeconds: 1
+  successThreshold: 1

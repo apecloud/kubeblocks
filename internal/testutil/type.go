@@ -18,6 +18,7 @@ package testutil
 
 import (
 	"context"
+	"os"
 
 	"github.com/sethvargo/go-password/password"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -25,18 +26,25 @@ import (
 )
 
 type TestContext struct {
+	Cli              client.Client
 	TestObjLabelKey  string
 	DefaultNamespace string
 	CreateObj        func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
 	CheckedCreateObj func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
 }
 
+const (
+	envExistingClusterType = "EXISTING_CLUSTER_TYPE"
+
+	envUseExistingCluster = "USE_EXISTING_CLUSTER"
+)
+
 func NewDefaultTestContext(cli client.Client) TestContext {
 	t := TestContext{
 		TestObjLabelKey:  "kubeblocks.io/test",
 		DefaultNamespace: "default",
 	}
-
+	t.Cli = cli
 	t.CreateObj = func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 		l := obj.GetLabels()
 		if l == nil {
@@ -59,4 +67,29 @@ func NewDefaultTestContext(cli client.Client) TestContext {
 func (testCtx TestContext) GetRandomStr() string {
 	seq, _ := password.Generate(6, 2, 0, true, true)
 	return seq
+}
+
+func (testCtx TestContext) UsingExistingCluster() bool {
+	return os.Getenv(envUseExistingCluster) == "true"
+}
+
+func (testCtx TestContext) GetWebhookHostExternalName() string {
+	var (
+		minikubeType = "minikube"
+		minikubeHost = "host.minikube.internal"
+		k3dType      = "k3d"
+		k3dHost      = "host.k3d.internal"
+	)
+	clusterType := os.Getenv(envExistingClusterType)
+	if !testCtx.UsingExistingCluster() {
+		return ""
+	}
+	switch clusterType {
+	case minikubeType:
+		return minikubeHost
+	case k3dType:
+		return k3dHost
+	default:
+		return ""
+	}
 }

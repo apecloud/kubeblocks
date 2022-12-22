@@ -31,7 +31,7 @@ spec:
           "clusterdefinition.kubeblocks.io/name": apecloud-wesql
       probes:
         roleChangedProbe:
-          periodSeconds: 1
+          periodSeconds: 10
       podSpec:
         volumes:
           - name: scripts

@@ -993,6 +993,28 @@ spec:
 			Expect(yaml.Unmarshal([]byte(backupPolicyTemplateYaml), &backupPolicyTemplate)).Should(Succeed())
 			Expect(testCtx.CheckedCreateObj(ctx, &backupPolicyTemplate)).Should(Succeed())
 
+			for i := 0; i < 1; i++ {
+				pvcYAML := fmt.Sprintf(`
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-%s-replicasets-%d
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: ebs-sc
+  volumeMode: Filesystem
+  volumeName: pvc-6302ba88-ac70-4939-ac53-78a4bab00094
+`, key.Name, i)
+				pvc := corev1.PersistentVolumeClaim{}
+				Expect(yaml.Unmarshal([]byte(pvcYAML), &pvc)).Should(Succeed())
+				Expect(k8sClient.Create(ctx, &pvc)).Should(Succeed())
+			}
+
 			fetchedG1 := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
 				_ = k8sClient.Get(ctx, key, fetchedG1)
@@ -1019,6 +1041,27 @@ spec:
 
 			By("By updating replica")
 			updatedReplicas := int32(3)
+			for i := *fetchedG1.Spec.Components[0].Replicas; i < updatedReplicas; i++ {
+				pvcYAML := fmt.Sprintf(`
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-%s-replicasets-%d
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: ebs-sc
+  volumeMode: Filesystem
+  volumeName: pvc-6302ba88-ac70-4939-ac53-78a4bab00094
+`, key.Name, i)
+				pvc := corev1.PersistentVolumeClaim{}
+				Expect(yaml.Unmarshal([]byte(pvcYAML), &pvc)).Should(Succeed())
+				Expect(k8sClient.Create(ctx, &pvc)).Should(Succeed())
+			}
 			fetchedG1.Spec.Components[0].Replicas = &updatedReplicas
 			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
 
@@ -1037,6 +1080,27 @@ spec:
 			}, timeout, interval).Should(BeTrue())
 
 			updatedReplicas = 5
+			for i := *fetchedG2.Spec.Components[0].Replicas; i < updatedReplicas; i++ {
+				pvcYAML := fmt.Sprintf(`
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-%s-replicasets-%d
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: ebs-sc
+  volumeMode: Filesystem
+  volumeName: pvc-6302ba88-ac70-4939-ac53-78a4bab00094
+`, key.Name, i)
+				pvc := corev1.PersistentVolumeClaim{}
+				Expect(yaml.Unmarshal([]byte(pvcYAML), &pvc)).Should(Succeed())
+				Expect(k8sClient.Create(ctx, &pvc)).Should(Succeed())
+			}
 			fetchedG2.Spec.Components[0].Replicas = &updatedReplicas
 			Expect(k8sClient.Update(ctx, fetchedG2)).Should(Succeed())
 

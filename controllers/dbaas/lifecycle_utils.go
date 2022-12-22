@@ -451,15 +451,13 @@ func mergeComponentsList(reqCtx intctrlutil.RequestCtx,
 	clusterCompList []dbaasv1alpha1.ClusterComponent) []Component {
 	var compList []Component
 	for _, clusterDefComp := range clusterDefCompList {
-		var matchClusterComp dbaasv1alpha1.ClusterComponent
 		for _, clusterComp := range clusterCompList {
-			if clusterComp.Type == clusterDefComp.TypeName {
-				matchClusterComp = clusterComp
-				break
+			if clusterComp.Type != clusterDefComp.TypeName {
+				continue
 			}
+			comp := mergeComponents(reqCtx, cluster, clusterDef, &clusterDefComp, nil, &clusterComp)
+			compList = append(compList, *comp)
 		}
-		comp := mergeComponents(reqCtx, cluster, clusterDef, &clusterDefComp, nil, &matchClusterComp)
-		compList = append(compList, *comp)
 	}
 	return compList
 }

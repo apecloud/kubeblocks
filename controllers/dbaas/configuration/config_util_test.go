@@ -19,6 +19,7 @@ package configuration
 import (
 	"context"
 	"reflect"
+	"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -348,6 +349,83 @@ var _ = Describe("ConfigWrapper util test", func() {
 		})
 	})
 
+	Context("common funcs test", func() {
+		It("GetReloadOptions Should success without error", func() {
+			mockTpl := dbaasv1alpha1.ConfigurationTemplate{
+				Spec: dbaasv1alpha1.ConfigurationTemplateSpec{
+					ReloadOptions: &dbaasv1alpha1.ReloadOptions{
+						UnixSignalTrigger: &dbaasv1alpha1.UnixSignalTrigger{
+							Signal:      "HUB",
+							ProcessName: "for_test",
+						},
+					},
+				},
+			}
+			tests := []struct {
+				name    string
+				tpls    []dbaasv1alpha1.ConfigTemplate
+				want    *dbaasv1alpha1.ReloadOptions
+				wantErr bool
+			}{{
+				// empty config templates
+				name:    "test",
+				tpls:    []dbaasv1alpha1.ConfigTemplate{},
+				want:    nil,
+				wantErr: false,
+			}, {
+				// config templates without configConstraint
+				name: "test",
+				tpls: []dbaasv1alpha1.ConfigTemplate{
+					{
+						Name: "for_test",
+					},
+					{
+						Name: "for_test2",
+					},
+				},
+				want:    nil,
+				wantErr: false,
+			}, {
+				// normal
+				name: "test",
+				tpls: []dbaasv1alpha1.ConfigTemplate{
+					{
+						Name:                "for_test",
+						ConfigConstraintRef: "eg_v1",
+					},
+				},
+				want:    mockTpl.Spec.ReloadOptions,
+				wantErr: false,
+			}, {
+				// not exist config constraint
+				name: "test",
+				tpls: []dbaasv1alpha1.ConfigTemplate{
+					{
+						Name:                "for_test",
+						ConfigConstraintRef: "not_exist",
+					},
+				},
+				want:    nil,
+				wantErr: true,
+			}}
+
+			mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					if strings.Contains(key.Name, "not_exist") {
+						return cfgcore.MakeError("not exist config!")
+					}
+					setExpectedObject(obj, &mockTpl)
+					return nil
+				}).
+				MaxTimes(len(tests))
+
+			for _, tt := range tests {
+				got, err := GetReloadOptions(mockClient, ctx, tt.tpls)
+				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
+				Expect(reflect.DeepEqual(got, tt.want)).Should(BeTrue())
+			}
+		})
+	})
 })
 
 func updateAVTemplates(wrapper *TestWrapper) {

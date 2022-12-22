@@ -107,7 +107,7 @@ func performRollingUpgrade(params ReconfigureParams, funcs RollingUpgradeFuncs) 
 		return ESRetry, nil
 	}
 
-	podStats := staticPodStats(pods, params.GetTargetReplicas())
+	podStats := staticPodStats(pods, params.GetTargetReplicas(), params.PodMinReadySeconds())
 	podWins := markDynamicCursor(pods, podStats, configKey, configVersion, rollingReplicas)
 	if !validPodState(podWins) {
 		params.Ctx.Log.Info("wait pod stat ready.")
@@ -177,7 +177,7 @@ func markDynamicCursor(pods []corev1.Pod, podsStats *componentPodStats, configKe
 	return podWindows
 }
 
-func staticPodStats(pods []corev1.Pod, targetReplicas int) *componentPodStats {
+func staticPodStats(pods []corev1.Pod, targetReplicas int, minReadySeconds int32) *componentPodStats {
 	podsStats := &componentPodStats{
 		updated:       make(map[string]*corev1.Pod),
 		updating:      make(map[string]*corev1.Pod),
@@ -186,7 +186,6 @@ func staticPodStats(pods []corev1.Pod, targetReplicas int) *componentPodStats {
 		targetReplica: targetReplicas,
 	}
 
-	minReadySeconds := viper.GetInt32(cfgcore.PodMinReadySecondsEnv)
 	for i := 0; i < len(pods); i++ {
 		pod := &pods[i]
 		switch {

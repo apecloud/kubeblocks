@@ -28,6 +28,7 @@ import (
 	"github.com/sethvargo/go-password/password"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -38,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	cfgutil "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -1333,7 +1335,7 @@ func updateConfigurationManagerWithComponent(
 		criType                 = viper.GetString(cfgcore.ConfigCRIType)
 	)
 
-	reloadOptions, err := getReloadOptions(cli, ctx, cfgTemplates)
+	reloadOptions, err := cfgutil.GetReloadOptions(cli, ctx, cfgTemplates)
 	if err != nil {
 		return err
 	}
@@ -1425,29 +1427,6 @@ func updateConfigurationManagerWithComponent(
 	}
 	*podSpec.ShareProcessNamespace = true
 	return nil
-}
-
-func getReloadOptions(cli client.Client, ctx context.Context, tpls []dbaasv1alpha1.ConfigTemplate) (*dbaasv1alpha1.ReloadOptions, error) {
-	if len(tpls) == 0 {
-		return nil, nil
-	}
-
-	for _, tpl := range tpls {
-		if len(tpl.ConfigConstraintRef) == 0 {
-			continue
-		}
-		cfgConst := &dbaasv1alpha1.ConfigurationTemplate{}
-		if err := cli.Get(ctx, client.ObjectKey{
-			Namespace: tpl.Namespace,
-			Name:      tpl.ConfigConstraintRef,
-		}, cfgConst); err != nil {
-			return nil, cfgcore.WrapError(err, "failed to get ConfigurationTemplate, key[%v]", tpl)
-		}
-		if cfgConst.Spec.ReloadOptions != nil {
-			return cfgConst.Spec.ReloadOptions, nil
-		}
-	}
-	return nil, nil
 }
 
 func updateStatefulLabelsWithTemplate(sts *appsv1.StatefulSet, allLabels map[string]string) {

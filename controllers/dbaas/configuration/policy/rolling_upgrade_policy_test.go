@@ -26,7 +26,9 @@ import (
 	"github.com/golang/mock/gomock"
 
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	metautil "k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -186,7 +188,9 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			var pods []corev1.Pod
 			{
 				mockParam.Component.ComponentType = dbaasv1alpha1.Stateful
-				mockParam.Component.ConfigSpec.MaxUnavailableCapacity = func() *int { v := 100; return &v }()
+				mockParam.Component.PDBSpec = &policyv1.PodDisruptionBudgetSpec{
+					MaxUnavailable: func() *metautil.IntOrString { v := metautil.FromString("100%"); return &v }(),
+				}
 				pods = newMockPodsWithStatefulSet(&mockParam.ComponentUnits[0], defaultReplica)
 			}
 

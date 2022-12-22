@@ -143,8 +143,6 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
-                        maxUnavailableCapacity:
-                          type: integer
                       type: object
                     consensusSpec:
                       description: consensusSpec defines consensus related spec if

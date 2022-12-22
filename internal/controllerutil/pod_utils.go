@@ -17,11 +17,14 @@ limitations under the License.
 package controllerutil
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metautil "k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -280,4 +283,23 @@ func IsMatchConfigVersion(obj client.Object, labelKey string, version string) bo
 		return true
 	}
 	return false
+}
+
+func GetIntOrPercentValue(intOrStr *metautil.IntOrString) (int, bool, error) {
+	if intOrStr.Type == metautil.Int {
+		return intOrStr.IntValue(), false, nil
+	}
+
+	// parse string
+	s := intOrStr.StrVal
+	if strings.HasSuffix(s, "%") {
+		s = strings.TrimSuffix(intOrStr.StrVal, "%")
+	} else {
+		return 0, false, fmt.Errorf("falied to parse percentage. [%s]", intOrStr.StrVal)
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, false, fmt.Errorf("failed to atoi. [%s], error: %v", intOrStr.StrVal, err)
+	}
+	return v, true, nil
 }

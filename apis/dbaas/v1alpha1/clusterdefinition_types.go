@@ -162,11 +162,6 @@ type ConfigurationSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	ConfigRevisionHistoryLimit int `json:"configRevisionHistoryLimit,omitempty"`
-
-	// +kubebuilder:validation:minimum=0
-	// +kubebuilder:validation:maximum=100
-	// +optional
-	MaxUnavailableCapacity *int `json:"maxUnavailableCapacity,omitempty"`
 }
 
 // ClusterDefinitionComponent is a group of pods, pods belong to same component usually share the same data

@@ -27,6 +27,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metautil "k8s.io/apimachinery/pkg/util/intstr"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
@@ -361,8 +362,8 @@ var _ = Describe("tpl template", func() {
 		})
 	})
 
-	Context("TestGetContainersUsingConfigmap", func() {
-		It("Should success with no error", func() {
+	Context("common funcs test", func() {
+		It("GetContainersUsingConfigmap Should success with no error", func() {
 			type args struct {
 				containers []corev1.Container
 				volumeName string
@@ -408,6 +409,42 @@ var _ = Describe("tpl template", func() {
 				Expect(GetContainersUsingConfigmap(tt.args.containers, tt.args.volumeName, tt.args.filters...)).Should(BeEquivalentTo(tt.want))
 			}
 
+		})
+
+		It("GetIntOrPercentValue Should success with no error", func() {
+			fn := func(v metautil.IntOrString) *metautil.IntOrString { return &v }
+			tests := []struct {
+				name      string
+				args      *metautil.IntOrString
+				want      int
+				isPercent bool
+				wantErr   bool
+			}{{
+				name:      "test",
+				args:      fn(metautil.FromString("10")),
+				want:      0,
+				isPercent: false,
+				wantErr:   true,
+			}, {
+				name:      "test",
+				args:      fn(metautil.FromString("10%")),
+				want:      10,
+				isPercent: true,
+				wantErr:   false,
+			}, {
+				name:      "test",
+				args:      fn(metautil.FromInt(60)),
+				want:      60,
+				isPercent: false,
+				wantErr:   false,
+			}}
+
+			for _, tt := range tests {
+				val, isPercent, err := GetIntOrPercentValue(tt.args)
+				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
+				Expect(val).Should(BeEquivalentTo(tt.want))
+				Expect(isPercent).Should(BeEquivalentTo(tt.isPercent))
+			}
 		})
 	})
 })

@@ -17,6 +17,7 @@ limitations under the License.
 package configuration
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"time"
@@ -447,4 +448,27 @@ func UpdateConfigurationSchema(tpl *dbaasv1alpha1.ConfigurationTemplateSpec) err
 		tpl.ConfigurationSchema.Schema = customSchema
 	}
 	return nil
+}
+
+func GetReloadOptions(cli client.Client, ctx context.Context, tpls []dbaasv1alpha1.ConfigTemplate) (*dbaasv1alpha1.ReloadOptions, error) {
+	if len(tpls) == 0 {
+		return nil, nil
+	}
+
+	for _, tpl := range tpls {
+		if len(tpl.ConfigConstraintRef) == 0 {
+			continue
+		}
+		cfgConst := &dbaasv1alpha1.ConfigurationTemplate{}
+		if err := cli.Get(ctx, client.ObjectKey{
+			Namespace: tpl.Namespace,
+			Name:      tpl.ConfigConstraintRef,
+		}, cfgConst); err != nil {
+			return nil, cfgcore.WrapError(err, "failed to get ConfigurationTemplate, key[%v]", tpl)
+		}
+		if cfgConst.Spec.ReloadOptions != nil {
+			return cfgConst.Spec.ReloadOptions, nil
+		}
+	}
+	return nil, nil
 }

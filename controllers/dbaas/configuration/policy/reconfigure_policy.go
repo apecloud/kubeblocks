@@ -19,6 +19,7 @@ package policy
 import (
 	"math"
 
+	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -106,19 +107,38 @@ func (param *ReconfigureParams) GetModifyVersion() string {
 }
 
 func (param *ReconfigureParams) MaxRollingReplicas() int32 {
-	const defaultRolling int32 = 1
-	capacity := param.Component.ConfigSpec.MaxUnavailableCapacity
-	if capacity == nil {
+	var (
+		defaultRolling int32 = 1
+		r              int32
+		replicas       = param.GetTargetReplicas()
+	)
+
+	pdbSpec := param.Component.PDBSpec
+	if pdbSpec == nil || pdbSpec.MaxUnavailable == nil {
 		return defaultRolling
 	}
 
-	v := (*capacity) * param.GetTargetReplicas()
-	return cfgcore.Max(int32(math.Floor(float64(v)/100)), defaultRolling)
+	v, isPercent, err := intctrlutil.GetIntOrPercentValue(pdbSpec.MaxUnavailable)
+	if err != nil {
+		param.Ctx.Log.Error(err, "failed to get MaxUnavailable!")
+		return defaultRolling
+	}
+
+	if isPercent {
+		r = int32(math.Floor(float64(v) * float64(replicas) / 100))
+	} else {
+		r = int32(cfgcore.Min(v, param.GetTargetReplicas()))
+	}
+	return cfgcore.Max(r, defaultRolling)
 }
 
 func (param *ReconfigureParams) GetTargetReplicas() int {
-	// TODO not check
 	return int(*param.ClusterComponent.Replicas)
+}
+
+func (param *ReconfigureParams) PodMinReadySeconds() int32 {
+	minReadySeconds := param.ComponentUnits[0].Spec.MinReadySeconds
+	return cfgcore.Max(minReadySeconds, viper.GetInt32(cfgcore.PodMinReadySecondsEnv))
 }
 
 type ReconfigurePolicy interface {

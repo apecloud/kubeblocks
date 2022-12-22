@@ -93,6 +93,7 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 					func(tpl *dbaasv1alpha1.ConfigurationTemplate) error { return nil })
 				return err
 			}, time.Second*100, time.Second*1).ShouldNot(Succeed())
+			Expect(testWrapper.DeleteAllCR()).Should(Succeed())
 		})
 	})
 
@@ -119,6 +120,7 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 					})
 				return err == nil && ok
 			}, time.Second*30, time.Second*1).Should(BeTrue())
+			Expect(testWrapper.DeleteAllCR()).Should(Succeed())
 		})
 	})
 })

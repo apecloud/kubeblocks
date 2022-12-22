@@ -97,6 +97,61 @@ type ComponentOps struct {
 	// HorizontalScaling defines the variables that need to input when scaling replicas.
 	// +optional
 	HorizontalScaling *HorizontalScaling `json:"horizontalScaling,omitempty"`
+
+	// Reconfigure defines the variables that need to input when updating configuration.
+	// +optional
+	Reconfigure *UpgradeConfiguration `json:"reconfigure,omitempty"`
+}
+
+type UpgradeConfiguration struct {
+	// Configurations defines which components perform the operation.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	Configurations []Configuration `json:"configurations"`
+
+	// TTL(Time to Live) defines the time period during which changing parameters is valid.
+	// +optional
+	// TTL *int64 `json:"ttl,omitempty"`
+
+	// TriggeringTime defines the time at which the changing parameter to be applied.
+	// +kubebuilder:validation:MaxLength=19
+	// +kubebuilder:validation:MinLength=19
+	// +kubebuilder:validation:Pattern:=`^([0-9]{2})/([0-9]{2})/([0-9]{4}) ([0-9]{2}):([0-9]{2}):([0-9]{2})$`
+	// +optional
+	// TriggeringTime *string `json:"triggeringTime,omitempty"`
+
+	// Selector indicates the component for reconfigure
+	// +optional
+	// Selector *metav1.LabelSelector `json:"selector,omitempty"`
+}
+
+type Configuration struct {
+	// Name is a config template name.
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	Keys []ParameterConfig `json:"keys"`
+}
+
+type ParameterPair struct {
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
+
+	// +kubebuilder:validation:Required
+	// +optional
+	Value string `json:"value,omitempty"`
+}
+
+type ParameterConfig struct {
+	// Key indicates the key name of ConfigMap
+	// +optional
+	Key string `json:"key,omitempty"`
+
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	Parameters []ParameterPair `json:"parameters"`
 }
 
 type Upgrade struct {

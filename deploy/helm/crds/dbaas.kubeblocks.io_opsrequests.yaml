@@ -95,6 +95,49 @@ spec:
                           format: int32
                           type: integer
                       type: object
+                    reconfigure:
+                      description: Reconfigure defines the variables that need to
+                        input when updating configuration.
+                      properties:
+                        configurations:
+                          description: Configurations defines which components perform
+                            the operation.
+                          items:
+                            properties:
+                              keys:
+                                items:
+                                  properties:
+                                    key:
+                                      description: Key indicates the key name of ConfigMap
+                                      type: string
+                                    parameters:
+                                      items:
+                                        properties:
+                                          key:
+                                            type: string
+                                          value:
+                                            type: string
+                                        required:
+                                        - key
+                                        type: object
+                                      minItems: 1
+                                      type: array
+                                  required:
+                                  - parameters
+                                  type: object
+                                minItems: 1
+                                type: array
+                              name:
+                                description: Name is a config template name.
+                                type: string
+                            required:
+                            - keys
+                            type: object
+                          minItems: 1
+                          type: array
+                      required:
+                      - configurations
+                      type: object
                     verticalScaling:
                       description: VerticalScaling defines the variables that need
                         to input when scaling compute resources.

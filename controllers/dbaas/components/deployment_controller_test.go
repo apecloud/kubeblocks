@@ -28,8 +28,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/stateless"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 var _ = Describe("Deployment Controller", func() {
@@ -68,31 +70,30 @@ var _ = Describe("Deployment Controller", func() {
 				timeout = 3 * timeout
 			}
 			cluster := testdbaas.CreateStatelessCluster(testCtx, clusterDefName, clusterVersionName, clusterName)
-			deploy := testdbaas.MockStatelessComponentDeploy(testCtx, clusterName)
-
-			By("patch cluster to Updating")
+			By("patch cluster to Running")
 			componentName := "nginx"
 			patch := client.MergeFrom(cluster.DeepCopy())
-			cluster.Status.Phase = dbaasv1alpha1.UpdatingPhase
+			cluster.Status.Phase = dbaasv1alpha1.RunningPhase
 			cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
 				componentName: {
-					Phase: dbaasv1alpha1.UpdatingPhase,
+					Phase: dbaasv1alpha1.RunningPhase,
 				},
 			}
 			Expect(k8sClient.Status().Patch(context.Background(), cluster, patch)).Should(Succeed())
+
+			By(" check component is Failed/Abnormal")
+			deploy := testdbaas.MockStatelessComponentDeploy(testCtx, clusterName)
+			testdbaas.ExpectClusterComponentPhase(testCtx, clusterName, componentName, dbaasv1alpha1.FailedPhase)
 
 			By("mock deployment is ready")
 			newDeployment := &appsv1.Deployment{}
 			newDeploymentKey := client.ObjectKey{Name: deploy.Name, Namespace: namespace}
 			Expect(k8sClient.Get(context.Background(), newDeploymentKey, newDeployment)).Should(Succeed())
 			deployPatch := client.MergeFrom(newDeployment.DeepCopy())
-			newDeployment.Status.ObservedGeneration = 1
-			newDeployment.Status.AvailableReplicas = *newDeployment.Spec.Replicas
-			newDeployment.Status.ReadyReplicas = *newDeployment.Spec.Replicas
-			newDeployment.Status.Replicas = *newDeployment.Spec.Replicas
+			testk8s.MockDeploymentReady(newDeployment, stateless.NewRSAvailableReason)
 			Expect(k8sClient.Status().Patch(context.Background(), newDeployment, deployPatch)).Should(Succeed())
 
-			By("check deployment status")
+			By("test deployment status is Running")
 			Eventually(func() bool {
 				deploy := &appsv1.Deployment{}
 				if err := k8sClient.Get(context.Background(), newDeploymentKey, deploy); err != nil {
@@ -104,11 +105,7 @@ var _ = Describe("Deployment Controller", func() {
 			}, timeout, interval).Should(BeTrue())
 
 			By("waiting the component is Running")
-			Eventually(func() bool {
-				cluster := &dbaasv1alpha1.Cluster{}
-				_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: namespace}, cluster)
-				return cluster.Status.Components[componentName].Phase == dbaasv1alpha1.RunningPhase
-			}, timeout, interval).Should(BeTrue())
+			testdbaas.ExpectClusterComponentPhase(testCtx, clusterName, componentName, dbaasv1alpha1.RunningPhase)
 		})
 	})
 })

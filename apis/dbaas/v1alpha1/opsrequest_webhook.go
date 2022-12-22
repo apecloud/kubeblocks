@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
@@ -71,7 +72,7 @@ var _ webhook.Validator = &OpsRequest{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *OpsRequest) ValidateCreate() error {
 	opsrequestlog.Info("validate create", "name", r.Name)
-	return r.validate(true)
+	return r.validateEntry(true)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
@@ -81,12 +82,13 @@ func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 	if r.isForbiddenUpdate() && !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
 		return newInvalidError(OpsRequestKind, r.Name, "spec", fmt.Sprintf("update OpsRequest is forbidden when status.Phase is %s", r.Status.Phase))
 	}
-	// we can not delete the OpsRequest when cluster has been deleted. because can not edit the finalizer when cluster not existed.
-	// so if no spec updated, skip validation.
+	// if no spec updated, we should skip validation.
+	// if not, we can not delete the OpsRequest when cluster has been deleted.
+	// because when cluster not existed, r.validate will report an error.
 	if reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
 		return nil
 	}
-	return r.validate(false)
+	return r.validateEntry(false)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
@@ -134,33 +136,56 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	return nil
 }
 
-func (r *OpsRequest) validate(isCreate bool) error {
-	var (
-		allErrs field.ErrorList
-		ctx     = context.Background()
-		cluster = &Cluster{}
-	)
-	if webhookMgr == nil {
-		return nil
+// getCluster get cluster with webhook client
+func (r *OpsRequest) getCluster(ctx context.Context, k8sClient client.Client) (*Cluster, error) {
+	if k8sClient == nil {
+		return nil, nil
 	}
+	cluster := &Cluster{}
 	// get cluster resource
-	if err := webhookMgr.client.Get(ctx, types.NamespacedName{Namespace: r.Namespace, Name: r.Spec.ClusterRef}, cluster); err != nil {
-		return newInvalidError(OpsRequestKind, r.Name, "spec.clusterRef", err.Error())
+	if err := k8sClient.Get(ctx, types.NamespacedName{Namespace: r.Namespace, Name: r.Spec.ClusterRef}, cluster); err != nil {
+		return nil, newInvalidError(OpsRequestKind, r.Name, "spec.clusterRef", err.Error())
 	}
+	return cluster, nil
+}
+
+// Validate validate OpsRequest is legal
+func (r *OpsRequest) Validate(ctx context.Context,
+	k8sClient client.Client,
+	cluster *Cluster,
+	isCreate bool) error {
+	var allErrs field.ErrorList
 	if isCreate {
 		if err := r.validateClusterPhase(cluster); err != nil {
 			return err
 		}
 	}
-	r.validateOps(ctx, cluster, &allErrs)
+	r.validateOps(ctx, k8sClient, cluster, &allErrs)
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(schema.GroupKind{Group: APIVersion, Kind: OpsRequestKind}, r.Name, allErrs)
 	}
 	return nil
 }
 
+// ValidateEntry OpsRequest webhook validate entry
+func (r *OpsRequest) validateEntry(isCreate bool) error {
+	if webhookMgr == nil || webhookMgr.client == nil {
+		return nil
+	}
+	ctx := context.Background()
+	k8sClient := webhookMgr.client
+	cluster, err := r.getCluster(ctx, k8sClient)
+	if err != nil {
+		return err
+	}
+	return r.Validate(ctx, k8sClient, cluster, isCreate)
+}
+
 // validateOps validate ops attributes is legal
-func (r *OpsRequest) validateOps(ctx context.Context, cluster *Cluster, allErrs *field.ErrorList) {
+func (r *OpsRequest) validateOps(ctx context.Context,
+	k8sClient client.Client,
+	cluster *Cluster,
+	allErrs *field.ErrorList) {
 	if cluster.Status.Operations == nil {
 		cluster.Status.Operations = &Operations{}
 	}
@@ -168,7 +193,7 @@ func (r *OpsRequest) validateOps(ctx context.Context, cluster *Cluster, allErrs 
 	// Check whether the corresponding attribute is legal according to the operation type
 	switch r.Spec.Type {
 	case UpgradeType:
-		r.validateUpgrade(ctx, allErrs, cluster)
+		r.validateUpgrade(ctx, k8sClient, allErrs, cluster)
 	case VerticalScalingType:
 		r.validateVerticalScaling(allErrs, cluster)
 	case HorizontalScalingType:
@@ -197,8 +222,11 @@ func (r *OpsRequest) validateRestart(allErrs *field.ErrorList, cluster *Cluster)
 	r.validateComponentName(allErrs, cluster, supportedComponentMap, componentNames)
 }
 
-// validateUpgrade validate spec.upgrade is legal
-func (r *OpsRequest) validateUpgrade(ctx context.Context, allErrs *field.ErrorList, cluster *Cluster) {
+// validateUpgrade validate spec.clusterOps.upgrade is legal
+func (r *OpsRequest) validateUpgrade(ctx context.Context,
+	k8sClient client.Client,
+	allErrs *field.ErrorList,
+	cluster *Cluster) {
 	if !cluster.Status.Operations.Upgradable {
 		addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s, ClusterVersion must be greater than 1", r.Spec.ClusterRef))
 		return
@@ -210,9 +238,9 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context, allErrs *field.ErrorLi
 
 	clusterVersion := &ClusterVersion{}
 	clusterVersionRef := r.Spec.Upgrade.ClusterVersionRef
-	if err := webhookMgr.client.Get(ctx, types.NamespacedName{Name: clusterVersionRef}, clusterVersion); err != nil {
+	if err := k8sClient.Get(ctx, types.NamespacedName{Name: clusterVersionRef}, clusterVersion); err != nil {
 		addInvalidError(allErrs, "spec.upgrade.clusterVersionRef", clusterVersionRef, err.Error())
-	} else if cluster.Spec.ClusterVersionRef == r.Spec.Upgrade.ClusterVersionRef {
+	} else if cluster.Spec.ClusterVersionRef == clusterVersionRef {
 		addInvalidError(allErrs, "spec.upgrade.clusterVersionRef", clusterVersionRef, "can not equals Cluster.spec.clusterVersionRef")
 	}
 }
@@ -242,7 +270,7 @@ func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *
 			addInvalidError(allErrs, fmt.Sprintf("spec.verticalScaling[%d].limits", i), invalidValue, err.Error())
 			continue
 		}
-		if invalidValue, err := compareRequestsAndLimits(*v.ResourceRequirements); err != nil {
+		if invalidValue, err := compareRequestsAndLimits(v.ResourceRequirements); err != nil {
 			addInvalidError(allErrs, fmt.Sprintf("spec.verticalScaling[%d].requests", i), invalidValue, err.Error())
 		}
 	}

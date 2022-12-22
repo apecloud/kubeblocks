@@ -18,13 +18,23 @@ package stateless
 
 import (
 	"context"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 )
+
+// NewRSAvailableReason is added in a deployment when its newest replica set is made available
+// ie. the number of new pods that have passed readiness checks and run for at least minReadySeconds
+// is at least the minimum available pods that need to run for the deployment.
+const NewRSAvailableReason = "NewReplicaSetAvailable"
 
 type Stateless struct {
 	Cli     client.Client
@@ -45,6 +55,10 @@ func (stateless *Stateless) PodsReady(obj client.Object) (bool, error) {
 		return false, nil
 	}
 	return DeploymentIsReady(deploy), nil
+}
+
+func (stateless *Stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
 }
 
 func (stateless *Stateless) HandleProbeTimeoutWhenPodsReady() (bool, error) {
@@ -94,10 +108,18 @@ func DeploymentIsReady(deploy *appsv1.Deployment) bool {
 	var (
 		targetReplicas     = *deploy.Spec.Replicas
 		componentIsRunning = true
+		newRSAvailable     = true
 	)
+	// we should check the new replicaSet is available.
+	condition := deploymentutil.GetDeploymentCondition(deploy.Status, appsv1.DeploymentProgressing)
+	if condition == nil || condition.Reason != NewRSAvailableReason || condition.Status != corev1.ConditionTrue {
+		newRSAvailable = false
+	}
+	// if status.AvailableReplicas equals targetReplicas and status.replicas not equals targetReplicas, means Deployment is rolling updating.
 	if deploy.Status.AvailableReplicas != targetReplicas ||
 		deploy.Status.Replicas != targetReplicas ||
-		deploy.Status.ObservedGeneration != deploy.GetGeneration() {
+		deploy.Status.ObservedGeneration != deploy.GetGeneration() ||
+		!newRSAvailable {
 		componentIsRunning = false
 	}
 	return componentIsRunning

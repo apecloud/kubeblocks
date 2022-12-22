@@ -71,6 +71,9 @@ const (
 	CronJob                   = "CronJob"
 )
 
+// DefaultMinReadySeconds the default minReadySeconds of the StatefulSet or Deployment.
+const DefaultMinReadySeconds = 10
+
 // RequestCtx wrapper for reconcile procedure context parameters
 type RequestCtx struct {
 	Ctx      context.Context

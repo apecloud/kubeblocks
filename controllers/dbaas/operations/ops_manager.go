@@ -29,7 +29,7 @@ var (
 )
 
 // RegisterOps register operation with OpsType and OpsBehaviour
-func (opsMgr *OpsManager) RegisterOps(opsType dbaasv1alpha1.OpsType, opsBehaviour *OpsBehaviour) {
+func (opsMgr *OpsManager) RegisterOps(opsType dbaasv1alpha1.OpsType, opsBehaviour OpsBehaviour) {
 	opsManager.OpsMap[opsType] = opsBehaviour
 	dbaasv1alpha1.OpsRequestBehaviourMapper[opsType] = dbaasv1alpha1.OpsRequestBehaviour{
 		FromClusterPhases: opsBehaviour.FromClusterPhases,
@@ -40,23 +40,32 @@ func (opsMgr *OpsManager) RegisterOps(opsType dbaasv1alpha1.OpsType, opsBehaviou
 // Do the common entry function for handling OpsRequest
 func (opsMgr *OpsManager) Do(opsRes *OpsResource) error {
 	var (
-		opsBehaviour *OpsBehaviour
+		opsBehaviour OpsBehaviour
 		err          error
 		ok           bool
 		opsRequest   = opsRes.OpsRequest
 	)
 
-	if opsBehaviour, ok = opsMgr.OpsMap[opsRequest.Spec.Type]; !ok {
-		return patchOpsBehaviourNotFound(opsRes)
-	} else if opsBehaviour.Action == nil {
-		return nil
+	if opsBehaviour, ok = opsMgr.OpsMap[opsRequest.Spec.Type]; !ok || opsBehaviour.OpsHandler == nil {
+		return patchOpsHandlerNotSupported(opsRes)
 	}
-	if ok, err = opsMgr.validateClusterPhaseAndOperations(opsRes, opsBehaviour); err != nil || !ok {
+
+	// validate OpsRequest.spec is legal
+	isCreateOps := opsRequest.Status.ObservedGeneration == 0
+	if err = opsRequest.Validate(opsRes.Ctx, opsRes.Client, opsRes.Cluster, isCreateOps); err != nil {
+		if err = PatchValidateErrorCondition(opsRes, err.Error()); err != nil {
+			return err
+		}
 		return err
 	}
 
 	if opsRequest.Status.Phase != dbaasv1alpha1.RunningPhase {
-		if err = patchOpsRequestToRunning(opsRes, opsBehaviour); err != nil {
+		// save last configuration into status.lastConfiguration
+		if err = opsBehaviour.OpsHandler.SaveLastConfiguration(opsRes); err != nil {
+			return err
+		}
+
+		if err = patchOpsRequestToRunning(opsRes, opsBehaviour.OpsHandler); err != nil {
 			return err
 		}
 	}
@@ -67,19 +76,20 @@ func (opsMgr *OpsManager) Do(opsRes *OpsResource) error {
 		return err
 	}
 
-	if err = opsBehaviour.Action(opsRes); err != nil {
+	if err = opsBehaviour.OpsHandler.Action(opsRes); err != nil {
 		return err
 	}
+
 	// patch cluster.status after update cluster.spec
 	// because cluster controller probably reconciled status.phase to Running if cluster no updating
-	return patchClusterStatus(opsRes, opsBehaviour.ToClusterPhase)
+	return patchClusterStatus(opsRes, opsBehaviour)
 }
 
 // Reconcile entry function when OpsRequest.status.phase is Running.
 // loop until the operation is completed.
 func (opsMgr *OpsManager) Reconcile(opsRes *OpsResource) (time.Duration, error) {
 	var (
-		opsBehaviour    *OpsBehaviour
+		opsBehaviour    OpsBehaviour
 		ok              bool
 		err             error
 		requeueAfter    time.Duration
@@ -91,14 +101,11 @@ func (opsMgr *OpsManager) Reconcile(opsRes *OpsResource) (time.Duration, error) 
 		return requeueAfter, nil
 	}
 
-	if opsBehaviour, ok = opsMgr.OpsMap[opsRes.OpsRequest.Spec.Type]; !ok {
-		return requeueAfter, patchOpsBehaviourNotFound(opsRes)
+	if opsBehaviour, ok = opsMgr.OpsMap[opsRes.OpsRequest.Spec.Type]; !ok || opsBehaviour.OpsHandler == nil {
+		return 0, patchOpsHandlerNotSupported(opsRes)
 	}
 
-	if opsBehaviour == nil || opsBehaviour.ReconcileAction == nil {
-		return requeueAfter, nil
-	}
-	if opsRequestPhase, requeueAfter, err = opsBehaviour.ReconcileAction(opsRes); err != nil && !isOpsRequestFailedPhase(opsRequestPhase) {
+	if opsRequestPhase, requeueAfter, err = opsBehaviour.OpsHandler.ReconcileAction(opsRes); err != nil && !isOpsRequestFailedPhase(opsRequestPhase) {
 		// if the opsRequest phase is Failed, skipped
 		return requeueAfter, err
 	}
@@ -112,34 +119,9 @@ func (opsMgr *OpsManager) Reconcile(opsRes *OpsResource) (time.Duration, error) 
 	}
 }
 
-// validateClusterPhase validate Cluster.status.phase is in opsBehaviour.FromClusterPhases or OpsRequest is reentry
-func (opsMgr *OpsManager) validateClusterPhaseAndOperations(opsRes *OpsResource, behaviour *OpsBehaviour) (bool, error) {
-	isOkClusterPhase := false
-	for _, v := range behaviour.FromClusterPhases {
-		if opsRes.Cluster.Status.Phase != v {
-			continue
-		}
-		isOkClusterPhase = true
-		break
-	}
-	opsRequestName := getOpsRequestNameFromAnnotation(opsRes.Cluster, behaviour.ToClusterPhase)
-	if behaviour.ToClusterPhase != "" && opsRequestName != "" {
-		// OpsRequest is reentry
-		if opsRequestName == opsRes.OpsRequest.Name {
-			return true, nil
-		}
-		return false, patchClusterExistOtherOperation(opsRes, opsRequestName)
-	}
-
-	if !isOkClusterPhase {
-		return false, patchClusterPhaseMisMatch(opsRes)
-	}
-	return true, nil
-}
-
 func GetOpsManager() *OpsManager {
 	opsManagerOnce.Do(func() {
-		opsManager = &OpsManager{OpsMap: make(map[dbaasv1alpha1.OpsType]*OpsBehaviour)}
+		opsManager = &OpsManager{OpsMap: make(map[dbaasv1alpha1.OpsType]OpsBehaviour)}
 	})
 	return opsManager
 }

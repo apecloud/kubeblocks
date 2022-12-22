@@ -106,7 +106,7 @@ var _ = Describe("StatefulSet Controller", func() {
 
 	testUsingEnvTest := func(sts *appsv1.StatefulSet) {
 		By("create pod of statefulset")
-		testdbaas.MockConsensusComponentPods(testCtx, clusterName)
+		_ = testdbaas.MockConsensusComponentPods(testCtx, clusterName)
 
 		By("mock restart cluster")
 		sts.Spec.Template.Annotations = map[string]string{
@@ -149,7 +149,7 @@ var _ = Describe("StatefulSet Controller", func() {
 	}
 
 	Context("test controller", func() {
-		It("", func() {
+		It("test statefulSet controller", func() {
 			_, _, cluster := testdbaas.InitConsensusMysql(testCtx, clusterDefName, clusterVersionName, clusterName)
 			_ = testdbaas.CreateRestartOpsRequest(testCtx, clusterName, opsRequestName, []string{testdbaas.ConsensusComponentName})
 			sts := testdbaas.MockConsensusComponentStatefulSet(testCtx, clusterName)
@@ -159,7 +159,7 @@ var _ = Describe("StatefulSet Controller", func() {
 			cluster.Status.Phase = dbaasv1alpha1.UpdatingPhase
 			cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
 				componentName: {
-					Phase: dbaasv1alpha1.UpdatingPhase,
+					Phase: dbaasv1alpha1.RunningPhase,
 				},
 			}
 			Expect(k8sClient.Status().Patch(context.Background(), cluster, patch)).Should(Succeed())
@@ -178,11 +178,7 @@ var _ = Describe("StatefulSet Controller", func() {
 			}
 
 			By("waiting the component is Running")
-			Eventually(func() bool {
-				cluster := &dbaasv1alpha1.Cluster{}
-				_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)
-				return cluster.Status.Components[componentName].Phase == dbaasv1alpha1.RunningPhase
-			}, timeout, interval).Should(BeTrue())
+			testdbaas.ExpectClusterComponentPhase(testCtx, clusterName, componentName, dbaasv1alpha1.RunningPhase)
 
 			By("test updateStrategy with Serial")
 			testUpdateStrategy(dbaasv1alpha1.SerialStrategy, componentName, 1)

@@ -33,18 +33,34 @@ const (
 	RestartAnnotationKey = "kubeblocks.io/restart"
 )
 
-type OpsBehaviour struct {
-	FromClusterPhases []dbaasv1alpha1.Phase
-	ToClusterPhase    dbaasv1alpha1.Phase
+type OpsHandler interface {
 	// Action The action running time should be short. if it fails, it will be reconciled by the OpsRequest controller.
 	// if you do not want to be reconciled when the operation fails,
 	// you need to call PatchOpsStatus function in ops_util.go and set OpsRequest.status.phase to Failed
-	Action func(opsResource *OpsResource) error
+	Action(opsResource *OpsResource) error
 	// ReconcileAction loop until the operation is completed.
 	// return OpsRequest.status.phase and requeueAfter time
-	ReconcileAction func(opsResource *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error)
+	ReconcileAction(opsResource *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error)
 	// ActionStartedCondition append to OpsRequest.status.conditions when start performing Action function
-	ActionStartedCondition func(opsRequest *dbaasv1alpha1.OpsRequest) *metav1.Condition
+	ActionStartedCondition(opsRequest *dbaasv1alpha1.OpsRequest) *metav1.Condition
+
+	// SaveLastConfiguration save last configuration to the OpsRequest.status.lastConfiguration,
+	// and this method will be executed together when opsRequest to running.
+	SaveLastConfiguration(opsResource *OpsResource) error
+
+	// GetRealAffectedComponentMap return a changed configuration componentName map by
+	// compared current configuration with the last configuration.
+	// we only changed the component status of cluster.status to the ToClusterPhase
+	// of OpsBehaviour, which component name is in the returned componentName map.
+	GetRealAffectedComponentMap(opsRequest *dbaasv1alpha1.OpsRequest) realAffectedComponentMap
+}
+
+type realAffectedComponentMap map[string]struct{}
+
+type OpsBehaviour struct {
+	FromClusterPhases []dbaasv1alpha1.Phase
+	ToClusterPhase    dbaasv1alpha1.Phase
+	OpsHandler        OpsHandler
 }
 
 type OpsResource struct {
@@ -56,5 +72,13 @@ type OpsResource struct {
 }
 
 type OpsManager struct {
-	OpsMap map[dbaasv1alpha1.OpsType]*OpsBehaviour
+	OpsMap map[dbaasv1alpha1.OpsType]OpsBehaviour
+}
+
+type progressResource struct {
+	// opsMessageKey progress message key of specified OpsType, it is a verb and will form the message of progressDetail
+	// such as "vertical scale" of verticalScaling OpsRequest.
+	opsMessageKey       string
+	clusterComponent    *dbaasv1alpha1.ClusterComponent
+	clusterComponentDef *dbaasv1alpha1.ClusterDefinitionComponent
 }

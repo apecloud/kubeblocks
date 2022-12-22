@@ -85,7 +85,8 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	componentName := sts.GetLabels()[intctrlutil.AppComponentLabelKey]
 	typeName := util.GetComponentTypeName(*cluster, componentName)
 	componentDef := util.GetComponentDefFromClusterDefinition(clusterDef, typeName)
-	component := NewComponentByType(ctx, r.Client, cluster, componentDef, componentName)
+	clusterComponent := util.GetComponentByName(cluster, componentName)
+	component := NewComponentByType(ctx, r.Client, cluster, componentDef, clusterComponent)
 
 	if requeueAfter, err := handleComponentStatusAndSyncCluster(reqCtx, r.Client, sts, cluster, component); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")

@@ -34,7 +34,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
+	opsutil "github.com/apecloud/kubeblocks/controllers/dbaas/operations/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -267,8 +267,9 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 	// get the component phase by component type and sync to Cluster.status.components
 	patch := client.MergeFrom(cluster.DeepCopy())
 	componentMap, clusterAvailabilityEffectMap, componentDef := getComponentRelatedInfo(cluster, clusterDef, componentName)
+	clusterComponent := util.GetComponentByName(cluster, componentName)
 	// get the component status by event and check whether the component status needs to be synchronized to the cluster
-	component := components.NewComponentByType(ctx, cli, cluster, &componentDef, componentName)
+	component := components.NewComponentByType(ctx, cli, cluster, &componentDef, clusterComponent)
 	if component == nil {
 		return nil
 	}
@@ -285,7 +286,7 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 		return err
 	}
 	recorder.Eventf(cluster, corev1.EventTypeWarning, event.Reason, getFinalEventMessageForRecorder(event))
-	return operations.MarkRunningOpsRequestAnnotation(ctx, cli, cluster)
+	return opsutil.MarkRunningOpsRequestAnnotation(ctx, cli, cluster)
 }
 
 // handleEventForClusterStatus handle event for cluster Warning and Failed phase
@@ -360,6 +361,9 @@ func handleDeletePVCCronJobEvent(ctx context.Context,
 	// cronjob failed
 	if object, err = getEventInvolvedObject(ctx, cli, event); err != nil {
 		return err
+	}
+	if object == nil {
+		return nil
 	}
 	labels := object.GetLabels()
 	cluster := dbaasv1alpha1.Cluster{}

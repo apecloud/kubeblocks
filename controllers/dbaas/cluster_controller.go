@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	opsutil "github.com/apecloud/kubeblocks/controllers/dbaas/operations/util"
+
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -44,7 +46,6 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/stateless"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -520,7 +521,7 @@ func (r *ClusterReconciler) needCheckClusterForReady(cluster *dbaasv1alpha1.Clus
 
 // existsOperations check the cluster are doing operations
 func (r *ClusterReconciler) existsOperations(cluster *dbaasv1alpha1.Cluster) bool {
-	opsRequestMap, _ := operations.GetOpsRequestSliceFromCluster(cluster)
+	opsRequestMap, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
 	return len(opsRequestMap) > 0
 }
 
@@ -560,7 +561,7 @@ func (r *ClusterReconciler) updateClusterPhaseWhenConditionsError(cluster *dbaas
 		cluster.Status.Phase = dbaasv1alpha1.CreatingPhase
 		return
 	}
-	opsRequestSlice, _ := operations.GetOpsRequestSliceFromCluster(cluster)
+	opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
 	// if no operations in cluster, means user update the cluster.spec directly
 	if len(opsRequestSlice) == 0 {
 		cluster.Status.Phase = dbaasv1alpha1.UpdatingPhase
@@ -635,7 +636,7 @@ func (r *ClusterReconciler) checkAndPatchToRunning(ctx context.Context,
 		// send an event when Cluster.status.phase change to Running
 		r.Recorder.Eventf(cluster, corev1.EventTypeNormal, string(dbaasv1alpha1.RunningPhase), "Cluster: %s is ready, current phase is Running.", cluster.Name)
 		// mark OpsRequest annotation to reconcile for cluster scope OpsRequest
-		return operations.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
+		return opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
 	}
 	return nil
 }
@@ -664,7 +665,7 @@ func (r *ClusterReconciler) handleComponentStatus(ctx context.Context,
 		if err = r.Client.Status().Patch(ctx, cluster, patch); err != nil {
 			return err
 		}
-		return operations.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
+		return opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
 	}
 	return nil
 }
@@ -689,7 +690,8 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 		}
 		typeName := util.GetComponentTypeName(*cluster, componentName)
 		componentDef := util.GetComponentDefFromClusterDefinition(clusterDef, typeName)
-		currComponent := components.NewComponentByType(ctx, r.Client, cluster, componentDef, componentName)
+		component := util.GetComponentByName(cluster, componentName)
+		currComponent := components.NewComponentByType(ctx, r.Client, cluster, componentDef, component)
 		componentIsRunning, err := currComponent.IsRunning(&sts)
 		if err != nil {
 			return false, err
@@ -722,8 +724,8 @@ func (r *ClusterReconciler) handleComponentStatusWithDeployment(ctx context.Cont
 			continue
 		}
 		deployIsReady := stateless.DeploymentIsReady(&deploy)
-		stateless := stateless.NewStateless(ctx, r.Client, cluster)
-		if ok, err := components.NeedSyncStatusComponents(cluster, stateless,
+		statelessComponent := stateless.NewStateless(ctx, r.Client, cluster)
+		if ok, err := components.NeedSyncStatusComponents(cluster, statelessComponent,
 			componentName, deployIsReady, deployIsReady); err != nil {
 			return false, err
 		} else if ok {

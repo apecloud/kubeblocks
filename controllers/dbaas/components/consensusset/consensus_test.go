@@ -134,7 +134,9 @@ var _ = Describe("Consensus Component", func() {
 				Expect(requeue == false).Should(BeTrue())
 				validateComponentStatus()
 			} else {
-				testdbaas.MockConsensusComponentPods(testCtx, clusterName)
+				podList := testdbaas.MockConsensusComponentPods(testCtx, clusterName)
+				By("test pod is not available")
+				Expect(consensusComponent.PodIsAvailable(podList[0], intctrlutil.DefaultMinReadySeconds)).Should(BeTrue())
 
 				By("test handle probe timed out")
 				mockClusterStatusProbeTimeout(cluster)

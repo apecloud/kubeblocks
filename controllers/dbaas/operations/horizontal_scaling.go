@@ -16,23 +16,41 @@ limitations under the License.
 
 package operations
 
-import dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+import (
+	"fmt"
+	"time"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+)
+
+type horizontalScalingOpsHandler struct{}
 
 func init() {
-	horizontalScalingBehaviour := &OpsBehaviour{
-		FromClusterPhases:      []dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase},
-		ToClusterPhase:         dbaasv1alpha1.UpdatingPhase,
-		Action:                 HorizontalScalingAction,
-		ActionStartedCondition: dbaasv1alpha1.NewHorizontalScalingCondition,
-		ReconcileAction:        ReconcileActionWithComponentOps,
+	hs := horizontalScalingOpsHandler{}
+	horizontalScalingBehaviour := OpsBehaviour{
+		FromClusterPhases: []dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase},
+		ToClusterPhase:    dbaasv1alpha1.UpdatingPhase,
+		OpsHandler:        hs,
 	}
 
 	opsMgr := GetOpsManager()
 	opsMgr.RegisterOps(dbaasv1alpha1.HorizontalScalingType, horizontalScalingBehaviour)
 }
 
-// HorizontalScalingAction Modify Cluster.spec.components[*].replicas from the opsRequest
-func HorizontalScalingAction(opsRes *OpsResource) error {
+// ActionStartedCondition the started condition when handle the horizontal scaling request.
+func (hs horizontalScalingOpsHandler) ActionStartedCondition(opsRequest *dbaasv1alpha1.OpsRequest) *metav1.Condition {
+	return dbaasv1alpha1.NewHorizontalScalingCondition(opsRequest)
+}
+
+// Action Modify Cluster.spec.components[*].replicas from the opsRequest
+func (hs horizontalScalingOpsHandler) Action(opsRes *OpsResource) error {
 	var (
 		horizontalScalingMap = opsRes.OpsRequest.CovertHorizontalScalingListToMap()
 		horizontalScaling    dbaasv1alpha1.HorizontalScaling
@@ -49,4 +67,199 @@ func HorizontalScalingAction(opsRes *OpsResource) error {
 		}
 	}
 	return opsRes.Client.Update(opsRes.Ctx, opsRes.Cluster)
+}
+
+// ReconcileAction it will be performed when action is done and loop util OpsRequest.status.phase is Succeed/Failed.
+// the Reconcile function for horizontal scaling opsRequest.
+func (hs horizontalScalingOpsHandler) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error) {
+	return ReconcileActionWithComponentOps(opsRes, "", hs.handleComponentProgressDetails)
+}
+
+// GetRealAffectedComponentMap get the real affected component map for the operation
+func (hs horizontalScalingOpsHandler) GetRealAffectedComponentMap(opsRequest *dbaasv1alpha1.OpsRequest) realAffectedComponentMap {
+	realChangedMap := realAffectedComponentMap{}
+	hsMap := opsRequest.CovertHorizontalScalingListToMap()
+	for k, v := range opsRequest.Status.LastConfiguration.Components {
+		currHs, ok := hsMap[k]
+		if !ok {
+			continue
+		}
+		if v.Replicas != currHs.Replicas {
+			realChangedMap[k] = struct{}{}
+		}
+	}
+	return realChangedMap
+}
+
+// SaveLastConfiguration record last configuration to the OpsRequest.status.lastConfiguration
+func (hs horizontalScalingOpsHandler) SaveLastConfiguration(opsRes *OpsResource) error {
+	opsRequest := opsRes.OpsRequest
+	lastComponentInfo := map[string]dbaasv1alpha1.LastComponentConfiguration{}
+	clusterDef, err := GetClusterDefByName(opsRes.Ctx, opsRes.Client, opsRes.Cluster.Spec.ClusterDefRef)
+	if err != nil {
+		return err
+	}
+	componentNameMap := opsRequest.GetComponentNameMap()
+	for _, v := range opsRes.Cluster.Spec.Components {
+		if _, ok := componentNameMap[v.Name]; !ok {
+			continue
+		}
+		clusterComponentDef := util.GetComponentDefFromClusterDefinition(clusterDef, v.Type)
+		lastComponentInfo[v.Name] = dbaasv1alpha1.LastComponentConfiguration{
+			Replicas: util.GetComponentReplicas(&v, clusterComponentDef),
+		}
+	}
+	patch := client.MergeFrom(opsRequest.DeepCopy())
+	opsRequest.Status.LastConfiguration = dbaasv1alpha1.LastConfiguration{
+		Components: lastComponentInfo,
+	}
+	return opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch)
+}
+
+func (hs horizontalScalingOpsHandler) getExpectReplicas(opsRequest *dbaasv1alpha1.OpsRequest, componentName string) *int32 {
+	for _, v := range opsRequest.Spec.HorizontalScalingList {
+		if v.ComponentName == componentName {
+			return &v.Replicas
+		}
+	}
+	return nil
+}
+
+func (hs horizontalScalingOpsHandler) getComponentLastReplicas(opsRequest *dbaasv1alpha1.OpsRequest, componentName string) *int32 {
+	for k, v := range opsRequest.Status.LastConfiguration.Components {
+		if k == componentName {
+			return &v.Replicas
+		}
+	}
+	return nil
+}
+
+// handleComponentProgressDetails handle the component progressDetails when horizontal scale the replicas.
+func (hs horizontalScalingOpsHandler) handleComponentProgressDetails(opsRes *OpsResource,
+	pgRes progressResource,
+	statusComponent *dbaasv1alpha1.OpsRequestStatusComponent) (expectProgressCount int32, succeedCount int32, err error) {
+	var (
+		podList          *corev1.PodList
+		clusterComponent = pgRes.clusterComponent
+		opsRequest       = opsRes.OpsRequest
+		isScaleOut       bool
+	)
+	expectReplicas := hs.getExpectReplicas(opsRequest, clusterComponent.Name)
+	if expectReplicas == nil {
+		return
+	}
+	lastComponentReplicas := hs.getComponentLastReplicas(opsRequest, clusterComponent.Name)
+	if lastComponentReplicas == nil {
+		return
+	}
+	// if replicas is no changed, return
+	if *lastComponentReplicas == *expectReplicas {
+		return
+	}
+	dValue := *expectReplicas - *lastComponentReplicas
+	if dValue > 0 {
+		expectProgressCount = dValue
+		isScaleOut = true
+	} else {
+		expectProgressCount = dValue * -1
+	}
+	if podList, err = util.GetComponentPodList(opsRes.Ctx, opsRes.Client, opsRes.Cluster, clusterComponent.Name); err != nil {
+		return
+	}
+	if !isScaleOut {
+		succeedCount, err = hs.handleScaleDownProgress(opsRes, pgRes, podList, statusComponent)
+		return
+	}
+	succeedCount, err = hs.handleScaleOutProgress(opsRes, pgRes, podList, statusComponent)
+	// if the component type is Stateless, remove the progressDetails of the expired pods.
+	// because a replicaSet may attempt to create a pod multiple times until it succeeds when scale out the replicas.
+	if pgRes.clusterComponentDef.ComponentType == dbaasv1alpha1.Stateless {
+		statusComponent.ProgressDetails = removeStatelessExpiredPod(podList, statusComponent.ProgressDetails)
+	}
+	return expectProgressCount, succeedCount, err
+}
+
+// handleScaleOutProgress handle the progressDetails of scale out the replicas.
+func (hs horizontalScalingOpsHandler) handleScaleOutProgress(
+	opsRes *OpsResource,
+	pgRes progressResource,
+	podList *corev1.PodList,
+	statusComponent *dbaasv1alpha1.OpsRequestStatusComponent) (succeedCount int32, err error) {
+	currComponent := components.NewComponentByType(opsRes.Ctx, opsRes.Client,
+		opsRes.Cluster, pgRes.clusterComponentDef, pgRes.clusterComponent)
+	for _, v := range podList.Items {
+		// only focus on the newly created pod when scale out the replicas.
+		if v.CreationTimestamp.Before(&opsRes.OpsRequest.Status.StartTimestamp) {
+			continue
+		}
+		objectKey := GetProgressObjectKey(v.Kind, v.Name)
+		progressDetail := dbaasv1alpha1.ProgressDetail{ObjectKey: objectKey}
+		if currComponent.PodIsAvailable(&v, intctrlutil.DefaultMinReadySeconds) {
+			succeedCount += 1
+			message := fmt.Sprintf("Successfully created pod: %s in Component: %s", objectKey, pgRes.clusterComponent.Name)
+			progressDetail.SetStatusAndMessage(dbaasv1alpha1.SucceedProgressStatus, message)
+			SetStatusComponentProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
+				&statusComponent.ProgressDetails, progressDetail)
+			continue
+		}
+
+		if util.IsFailedOrAbnormal(statusComponent.Phase) {
+			// means the pod is failed.
+			podMessage := getFailedPodMessage(opsRes.Cluster, pgRes.clusterComponent.Name, &v)
+			message := fmt.Sprintf("Failed to create pod: %s in Component: %s, message: %s", objectKey, pgRes.clusterComponent.Name, podMessage)
+			progressDetail.SetStatusAndMessage(dbaasv1alpha1.FailedProgressStatus, message)
+		} else {
+			progressDetail.SetStatusAndMessage(dbaasv1alpha1.ProcessingProgressStatus, "Start to create pod: "+objectKey)
+		}
+		SetStatusComponentProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
+			&statusComponent.ProgressDetails, progressDetail)
+	}
+	return succeedCount, nil
+}
+
+// handleScaleDownProgress handle the progressDetails of scale down the replicas.
+func (hs horizontalScalingOpsHandler) handleScaleDownProgress(opsRes *OpsResource,
+	pgRes progressResource,
+	podList *corev1.PodList,
+	statusComponent *dbaasv1alpha1.OpsRequestStatusComponent) (succeedCount int32, err error) {
+	podMap := map[string]struct{}{}
+	// record the deleting pod progressDetail
+	for _, v := range podList.Items {
+		objectKey := GetProgressObjectKey(v.Kind, v.Name)
+		podMap[objectKey] = struct{}{}
+		if v.DeletionTimestamp.IsZero() {
+			continue
+		}
+		progressDetail := dbaasv1alpha1.ProgressDetail{
+			ObjectKey: objectKey,
+			Status:    dbaasv1alpha1.ProcessingProgressStatus,
+			Message:   fmt.Sprintf("Start to delete pod: %s in Component: %s", objectKey, pgRes.clusterComponent.Name),
+		}
+		SetStatusComponentProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
+			&statusComponent.ProgressDetails, progressDetail)
+	}
+
+	// The deployment controller will not watch the cleaning events of the old replicaSet pods.
+	// so when component status is completed, we should handle the progressDetails to succeed.
+	markStatelessPodsSucceed := false
+	if pgRes.clusterComponentDef.ComponentType == dbaasv1alpha1.Stateless &&
+		util.IsCompleted(statusComponent.Phase) {
+		markStatelessPodsSucceed = true
+	}
+
+	for _, v := range statusComponent.ProgressDetails {
+		if _, ok := podMap[v.ObjectKey]; ok && !markStatelessPodsSucceed {
+			continue
+		}
+		// if the pod object of progressDetail is not existing in podMap, means successfully deleted.
+		progressDetail := dbaasv1alpha1.ProgressDetail{
+			ObjectKey: v.ObjectKey,
+			Status:    dbaasv1alpha1.SucceedProgressStatus,
+			Message:   fmt.Sprintf("Successfully deleted pod: %s in Component: %s", v.ObjectKey, pgRes.clusterComponent.Name),
+		}
+		succeedCount += 1
+		SetStatusComponentProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
+			&statusComponent.ProgressDetails, progressDetail)
+	}
+	return succeedCount, nil
 }

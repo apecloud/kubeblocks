@@ -170,7 +170,7 @@ var _ = Describe("Consensus Component", func() {
 			_, _, cluster := testdbaas.InitConsensusMysql(testCtx, clusterDefName, clusterVersionName, clusterName)
 			sts := testdbaas.MockConsensusComponentStatefulSet(testCtx, clusterName)
 			if !testCtx.UsingExistingCluster() {
-				testdbaas.MockConsensusComponentPods(testCtx, clusterName)
+				_ = testdbaas.MockConsensusComponentPods(testCtx, clusterName)
 			} else {
 				timeout = 3 * timeout
 			}
@@ -197,6 +197,13 @@ var _ = Describe("Consensus Component", func() {
 			By("test CheckRelatedPodIsTerminating function")
 			isTerminating, _ := CheckRelatedPodIsTerminating(ctx, k8sClient, cluster, testdbaas.ConsensusComponentName)
 			Expect(isTerminating).Should(BeFalse())
+
+			By("test GetStatusComponentMessageKey function")
+			Expect(GetStatusComponentMessageKey("Pod", "mysql-01")).To(Equal("Pod/mysql-01"))
+
+			By("test GetComponentReplicas function")
+			component := GetComponentByName(cluster, testdbaas.ConsensusComponentName)
+			Expect(GetComponentReplicas(component, componentDef)).To(Equal(int32(3)))
 		})
 	})
 })

@@ -85,10 +85,9 @@ spec:
 	gomega.Expect(yaml.Unmarshal([]byte(clusterYaml), cluster)).Should(gomega.Succeed())
 	gomega.Expect(testCtx.CreateObj(context.Background(), cluster)).Should(gomega.Succeed())
 	// wait until cluster created
-	gomega.Eventually(func() bool {
-		err := testCtx.Cli.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)
-		return err == nil
-	}, timeout, interval).Should(gomega.BeTrue())
+	gomega.Eventually(func() error {
+		return testCtx.Cli.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)
+	}, timeout, interval).Should(gomega.Succeed())
 	return cluster
 }
 
@@ -123,10 +122,9 @@ spec:
 	gomega.Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDef)).Should(gomega.Succeed())
 	gomega.Expect(testCtx.CreateObj(context.Background(), clusterDef)).Should(gomega.Succeed())
 	// wait until clusterDef created
-	gomega.Eventually(func() bool {
-		err := testCtx.Cli.Get(ctx, client.ObjectKey{Name: clusterDefName}, clusterDef)
-		return err == nil
-	}, timeout, interval).Should(gomega.BeTrue())
+	gomega.Eventually(func() error {
+		return testCtx.Cli.Get(ctx, client.ObjectKey{Name: clusterDefName}, clusterDef)
+	}, timeout, interval).Should(gomega.Succeed())
 	return clusterDef
 }
 
@@ -149,10 +147,9 @@ spec:
 	clusterVersion := &dbaasv1alpha1.ClusterVersion{}
 	gomega.Expect(yaml.Unmarshal([]byte(clusterVersionYAML), clusterVersion)).Should(gomega.Succeed())
 	gomega.Expect(testCtx.CreateObj(ctx, clusterVersion)).Should(gomega.Succeed())
-	gomega.Eventually(func() bool {
-		err := testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: clusterVersionName, Namespace: testCtx.DefaultNamespace}, clusterVersion)
-		return err == nil
-	}, timeout, interval).Should(gomega.BeTrue())
+	gomega.Eventually(func() error {
+		return testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: clusterVersionName, Namespace: testCtx.DefaultNamespace}, clusterVersion)
+	}, timeout, interval).Should(gomega.Succeed())
 	return clusterVersion
 }
 
@@ -266,7 +263,7 @@ spec:
 }
 
 // MockConsensusComponentStsPod mock create pod, just using in envTest
-func MockConsensusComponentStsPod(testCtx testutil.TestContext, clusterName, podName, podRole, accessMode string) {
+func MockConsensusComponentStsPod(testCtx testutil.TestContext, clusterName, podName, podRole, accessMode string) *corev1.Pod {
 	podYaml := fmt.Sprintf(`apiVersion: v1
 kind: Pod
 metadata:
@@ -346,10 +343,9 @@ spec:
 	gomega.Expect(yaml.Unmarshal([]byte(podYaml), pod)).Should(gomega.Succeed())
 	gomega.Expect(testCtx.CreateObj(context.Background(), pod)).Should(gomega.Succeed())
 	// wait until pod created
-	gomega.Eventually(func() bool {
-		err := testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, &corev1.Pod{})
-		return err == nil
-	}, timeout, interval).Should(gomega.BeTrue())
+	gomega.Eventually(func() error {
+		return testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, &corev1.Pod{})
+	}, timeout, interval).Should(gomega.Succeed())
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Status.Conditions = []corev1.PodCondition{
 		{
@@ -358,10 +354,12 @@ spec:
 		},
 	}
 	gomega.Expect(testCtx.Cli.Status().Patch(context.Background(), pod, patch)).Should(gomega.Succeed())
+	return pod
 }
 
 // MockConsensusComponentPods mock the component pods, just using in envTest
-func MockConsensusComponentPods(testCtx testutil.TestContext, clusterName string) {
+func MockConsensusComponentPods(testCtx testutil.TestContext, clusterName string) []*corev1.Pod {
+	podList := make([]*corev1.Pod, 3)
 	for i := 0; i < 3; i++ {
 		podName := fmt.Sprintf("%s-%s-%d", clusterName, ConsensusComponentName, i)
 		podRole := "follower"
@@ -371,6 +369,8 @@ func MockConsensusComponentPods(testCtx testutil.TestContext, clusterName string
 			accessMode = "ReadWrite"
 		}
 		// mock StatefulSet to create all pods
-		MockConsensusComponentStsPod(testCtx, clusterName, podName, podRole, accessMode)
+		pod := MockConsensusComponentStsPod(testCtx, clusterName, podName, podRole, accessMode)
+		podList[i] = pod
 	}
+	return podList
 }

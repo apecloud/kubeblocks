@@ -94,7 +94,7 @@ type VerticalScaling struct {
 
 	// resources specify the computing resource size of verticalScaling.
 	// +kubebuilder:validation:Required
-	*corev1.ResourceRequirements `json:",inline"`
+	corev1.ResourceRequirements `json:",inline"`
 }
 
 // VolumeExpansion defines the variables of volume expansion operation.
@@ -142,21 +142,82 @@ type OpsRequestStatus struct {
 	// +kubebuilder:validation:Enum={Pending,Running,Failed,Succeed}
 	Phase Phase `json:"phase,omitempty"`
 
+	// +kubebuilder:validation:Pattern:=`^(\d+|\-)/(\d+|\-)$`
+	// +kubebuilder:default=-/-
+	Progress string `json:"progress"`
+
+	// lastConfiguration record the last configuration before this operation take effected.
+	// +optional
+	LastConfiguration LastConfiguration `json:"lastConfiguration,omitempty"`
+
 	// components define the recorded the status information of changed components for operation request.
 	// +optional
 	Components map[string]OpsRequestStatusComponent `json:"components,omitempty"`
 
 	// startTimestamp The time when the OpsRequest started processing.
 	// +optional
-	StartTimestamp *metav1.Time `json:"StartTimestamp,omitempty"`
+	StartTimestamp metav1.Time `json:"startTimestamp,omitempty"`
 
 	// completionTimestamp defines the OpsRequest completion time.
 	// +optional
-	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
+	CompletionTimestamp metav1.Time `json:"completionTimestamp,omitempty"`
 
 	// conditions describe opsRequest detail status.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
+// ProgressDetail contains the detail for the component process progress.
+type ProgressDetail struct {
+	// group describe which group the current object belongs.
+	// if the objects of component are belongs the same group, we can ignore this field.
+	// +optional
+	Group string `json:"group,omitempty"`
+
+	// ObjectKey the unique key of the object.
+	// +kubebuilder:validation:Required
+	ObjectKey string `json:"objectKey"`
+
+	// status describe the state of processing the object.
+	// +kubebuilder:validation:Enum={Processing,Pending,Failed,Succeed}
+	// +kubebuilder:validation:Required
+	Status ProgressStatus `json:"status"`
+
+	// message is a human readable message indicating details about the object condition.
+	// +optional
+	Message string `json:"message,omitempty"`
+
+	// startTime the time of starting to process the object.
+	// +optional
+	StartTime metav1.Time `json:"startTime,omitempty"`
+
+	// startTime the time of the object already processing completed.
+	// +optional
+	EndTime metav1.Time `json:"endTime,omitempty"`
+}
+
+type LastComponentConfiguration struct {
+	// replicas the last replicas of the component.
+	// +optional
+	Replicas int32 `json:"replicas,omitempty"`
+
+	// the last resources of the component.
+	// +optional
+	corev1.ResourceRequirements `json:",inline"`
+
+	// volumeClaimTemplates record the last volumeClaimTemplates of the component.
+	// +optional
+	VolumeClaimTemplates []OpsRequestVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
+}
+
+type LastConfiguration struct {
+	// clusterVersionRef reference ClusterVersion name.
+	// +optional
+	ClusterVersionRef string `json:"clusterVersionRef,omitempty"`
+
+	// components record last configuration of the component.
+	// +optional
+	Components map[string]LastComponentConfiguration `json:"components,omitempty"`
 }
 
 type OpsRequestStatusComponent struct {
@@ -165,30 +226,17 @@ type OpsRequestStatusComponent struct {
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
-	// volumeClaimTemplates describe the volumeClaimTemplates status when spec.type is VolumeExpansion
+	// progressDetails describe the progress details of the component for this operation.
 	// +optional
-	VolumeClaimTemplates map[string]*VolumeClaimTemplateStatus `json:"volumeClaimTemplates,omitempty"`
-}
+	ProgressDetails []ProgressDetail `json:"progressDetails,omitempty"`
 
-type VolumeClaimTemplateStatus struct {
-	StatusMessage `json:",inline"`
-
-	// Request storage size.
+	// type name of the component.
 	// +optional
-	RequestStorage resource.Quantity `json:"requestStorage,omitempty"`
+	Type string `json:"type,omitempty"`
 
-	// persistentVolumeClaimStatus describe the persistentVolumeClaim status
+	// componentType reference component type of component in ClusterDefinition.
 	// +optional
-	PersistentVolumeClaimStatus map[string]StatusMessage `json:"persistentVolumeClaims,omitempty"`
-}
-
-type StatusMessage struct {
-	// +optional
-	Message string `json:"message,omitempty"`
-
-	// +kubebuilder:validation:Enum={Running,Pending,Failed,Succeed}
-	// +optional
-	Status Phase `json:"status,omitempty"`
+	ComponentType ComponentType `json:"componentType,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -197,6 +245,7 @@ type StatusMessage struct {
 //+kubebuilder:printcolumn:name="TYPE",type="string",JSONPath=".spec.type",description="Operation request type."
 //+kubebuilder:printcolumn:name="CLUSTER",type="string",JSONPath=".spec.clusterRef",description="Operand cluster."
 //+kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="Operation status phase."
+//+kubebuilder:printcolumn:name="PROGRESS",type="string",JSONPath=".status.progress",description="Operation processing progress."
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // OpsRequest is the Schema for the opsrequests API
@@ -232,8 +281,10 @@ func (r *OpsRequest) GetComponentNameMap() map[string]struct{} {
 		return r.GetHorizontalScalingComponentNameMap()
 	case VolumeExpansionType:
 		return r.GetVolumeExpansionComponentNameMap()
+	case UpgradeType:
+		return r.GetUpgradeComponentNameMap()
 	default:
-		return nil
+		return map[string]struct{}{}
 	}
 }
 
@@ -298,4 +349,21 @@ func (r *OpsRequest) CovertVolumeExpansionListToMap() map[string]VolumeExpansion
 		volumeExpansionMap[v.ComponentName] = v
 	}
 	return volumeExpansionMap
+}
+
+// GetUpgradeComponentNameMap get the component name map with upgrade operation.
+func (r *OpsRequest) GetUpgradeComponentNameMap() map[string]struct{} {
+	if r.Spec.Upgrade == nil {
+		return nil
+	}
+	componentNameMap := make(map[string]struct{})
+	for k := range r.Status.Components {
+		componentNameMap[k] = struct{}{}
+	}
+	return componentNameMap
+}
+
+func (p *ProgressDetail) SetStatusAndMessage(status ProgressStatus, message string) {
+	p.Message = message
+	p.Status = status
 }

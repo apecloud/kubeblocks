@@ -24,7 +24,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
+	opsutil "github.com/apecloud/kubeblocks/controllers/dbaas/operations/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -48,6 +48,10 @@ func (consensusSet *ConsensusSet) IsRunning(obj client.Object) (bool, error) {
 func (consensusSet *ConsensusSet) PodsReady(obj client.Object) (bool, error) {
 	sts := util.CovertToStatefulSet(obj)
 	return util.StatefulSetPodsIsReady(sts), nil
+}
+
+func (consensusSet *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+	return isReady(*pod)
 }
 
 func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady() (bool, error) {
@@ -108,7 +112,7 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady() (bool, error
 		return true, err
 	}
 	// when component status changed, mark OpsRequest to reconcile.
-	return false, operations.MarkRunningOpsRequestAnnotation(consensusSet.Ctx, consensusSet.Cli, cluster)
+	return false, opsutil.MarkRunningOpsRequestAnnotation(consensusSet.Ctx, consensusSet.Cli, cluster)
 }
 
 func (consensusSet *ConsensusSet) CalculatePhaseWhenPodsNotReady(componentName string) (dbaasv1alpha1.Phase, error) {
@@ -147,7 +151,8 @@ func (consensusSet *ConsensusSet) CalculatePhaseWhenPodsNotReady(componentName s
 		}
 	}
 	// check pod count is equals to the component replicas
-	if !consensusSet.podCountEqualsComponentReplicas(consensusSet.ComponentDef, podCount) {
+	componentReplicas := util.GetComponentReplicas(consensusSet.Component, consensusSet.ComponentDef)
+	if componentReplicas != int32(podCount) {
 		isAbnormal = true
 		allPodIsReady = false
 	}
@@ -156,16 +161,6 @@ func (consensusSet *ConsensusSet) CalculatePhaseWhenPodsNotReady(componentName s
 		return "", nil
 	}
 	return util.CalculateComponentPhase(isFailed, isAbnormal), nil
-}
-
-// podCountEqualsComponentReplicas check the pod count is equal to the component replicas
-func (consensusSet *ConsensusSet) podCountEqualsComponentReplicas(componentDef *dbaasv1alpha1.ClusterDefinitionComponent, podCount int) bool {
-	component := consensusSet.Component
-	replicas := componentDef.DefaultReplicas
-	if component.Replicas != nil {
-		replicas = *component.Replicas
-	}
-	return component != nil && replicas == int32(podCount)
 }
 
 func NewConsensusSet(ctx context.Context,

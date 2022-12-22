@@ -24,10 +24,13 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 var _ = Describe("Stateful Component", func() {
@@ -68,7 +71,11 @@ var _ = Describe("Stateful Component", func() {
 			statelessComponent := NewStateless(ctx, k8sClient, cluster)
 
 			By("test pods are not ready")
-			deploy.Status.AvailableReplicas = *deploy.Spec.Replicas - 1
+			patch := client.MergeFrom(deploy.DeepCopy())
+			availableReplicas := *deploy.Spec.Replicas - 1
+			deploy.Status.AvailableReplicas = availableReplicas
+			deploy.Status.ReadyReplicas = availableReplicas
+			deploy.Status.Replicas = availableReplicas
 			podsReady, _ := statelessComponent.PodsReady(deploy)
 			Expect(podsReady == false).Should(BeTrue())
 			componentName := "nginx"
@@ -80,12 +87,18 @@ var _ = Describe("Stateful Component", func() {
 			} else {
 				phase, _ := statelessComponent.CalculatePhaseWhenPodsNotReady(componentName)
 				Expect(phase == dbaasv1alpha1.FailedPhase).Should(BeTrue())
+				Expect(k8sClient.Status().Patch(ctx, deploy, patch)).Should(Succeed())
+				Eventually(func(g Gomega) bool {
+					tmpDeploy := &appsv1.Deployment{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: deploy.Name, Namespace: testCtx.DefaultNamespace}, tmpDeploy)).Should(Succeed())
+					return tmpDeploy.Status.AvailableReplicas == availableReplicas
+				}, timeout, interval).Should(BeTrue())
+				phase, _ = statelessComponent.CalculatePhaseWhenPodsNotReady(componentName)
+				Expect(phase == dbaasv1alpha1.AbnormalPhase).Should(BeTrue())
 			}
 
 			By("test pods are ready")
-			deploy.Status.AvailableReplicas = *deploy.Spec.Replicas
-			deploy.Status.ObservedGeneration = deploy.Generation
-			deploy.Status.Replicas = *deploy.Spec.Replicas
+			testk8s.MockDeploymentReady(deploy, NewRSAvailableReason)
 			podsReady, _ = statelessComponent.PodsReady(deploy)
 			Expect(podsReady == true).Should(BeTrue())
 
@@ -97,6 +110,12 @@ var _ = Describe("Stateful Component", func() {
 			requeue, _ := statelessComponent.HandleProbeTimeoutWhenPodsReady()
 			Expect(requeue == false).Should(BeTrue())
 
+			By("test pod is ready")
+			podName := "nginx-" + randomStr
+			pod := testdbaas.MockStatelessPod(testCtx, clusterName, componentName, podName)
+			lastTransTime := metav1.NewTime(time.Now().Add(-1 * (intctrlutil.DefaultMinReadySeconds + 1) * time.Second))
+			testk8s.MockPodAvailable(pod, lastTransTime)
+			Expect(statelessComponent.PodIsAvailable(pod, intctrlutil.DefaultMinReadySeconds)).Should(BeTrue())
 		})
 	})
 

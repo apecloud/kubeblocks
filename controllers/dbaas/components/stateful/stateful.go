@@ -18,8 +18,12 @@ package stateful
 
 import (
 	"context"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -44,6 +48,10 @@ func (stateful *Stateful) IsRunning(obj client.Object) (bool, error) {
 func (stateful *Stateful) PodsReady(obj client.Object) (bool, error) {
 	sts := util.CovertToStatefulSet(obj)
 	return util.StatefulSetPodsIsReady(sts), nil
+}
+
+func (stateful *Stateful) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
 }
 
 func (stateful *Stateful) HandleProbeTimeoutWhenPodsReady() (bool, error) {

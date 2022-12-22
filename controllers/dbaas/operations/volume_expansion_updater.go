@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	opsutil "github.com/apecloud/kubeblocks/controllers/dbaas/operations/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -66,15 +67,15 @@ func handleVolumeExpansionWithPVC(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return nil
 	}
 	// notice the OpsRequest to reconcile
-	err := PatchOpsRequestAnnotation(reqCtx.Ctx, cli, cluster, opsRequestName)
+	err := opsutil.PatchOpsRequestReconcileAnnotation(reqCtx.Ctx, cli, cluster, opsRequestName)
 	// if the OpsRequest is not found, means it is deleted by user.
 	// we should delete the invalid OpsRequest annotation in the cluster and reconcile the cluster phase.
 	if apierrors.IsNotFound(err) {
-		opsRequestSlice, _ := GetOpsRequestSliceFromCluster(cluster)
+		opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
 		notExistOps := map[string]struct{}{
 			opsRequestName: {},
 		}
-		if err = removeClusterInvalidOpsRequestAnnotation(reqCtx.Ctx, cli, cluster,
+		if err = opsutil.RemoveClusterInvalidOpsRequestAnnotation(reqCtx.Ctx, cli, cluster,
 			opsRequestSlice, notExistOps); err != nil {
 			return err
 		}
@@ -172,29 +173,36 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOn
 	}
 	componentName := pvc.Labels[intctrlutil.AppComponentLabelKey]
 	vctName := pvc.Labels[intctrlutil.VolumeClaimTemplateNameLabelKey]
-	isChanged := false
 	patch := client.MergeFrom(opsRequest.DeepCopy())
+	var isChanged bool
 	// change the pvc status to Failed in OpsRequest.status.components.
 	for cName, component := range statusComponents {
 		if cName != componentName {
 			continue
 		}
-		if vctStatus, ok := component.VolumeClaimTemplates[vctName]; ok {
-			if vctStatus.Message != event.Message {
-				isChanged = true
-			}
-			vctStatus.PersistentVolumeClaimStatus[pvc.Name] = dbaasv1alpha1.StatusMessage{
-				Status:  dbaasv1alpha1.FailedPhase,
-				Message: event.Message,
-			}
+		// save the failed message to the progressDetail.
+		objectKey := getPVCProgressObjectKey(pvc.Name)
+		progressDetail := FindStatusProgressDetail(component.ProgressDetails, objectKey)
+		if progressDetail == nil || progressDetail.Message != event.Message {
+			isChanged = true
 		}
+		progressDetail = &dbaasv1alpha1.ProgressDetail{
+			Group:     vctName,
+			ObjectKey: objectKey,
+			Status:    dbaasv1alpha1.FailedProgressStatus,
+			Message:   event.Message,
+		}
+
+		SetStatusComponentProgressDetail(recorder, opsRequest, &component.ProgressDetails, *progressDetail)
+		statusComponents[cName] = component
 		break
 	}
-	if isChanged {
-		if err = cli.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
-			return err
-		}
-		recorder.Event(opsRequest, corev1.EventTypeWarning, event.Reason, event.Message)
+	if !isChanged {
+		return nil
 	}
+	if err = cli.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
+		return err
+	}
+	recorder.Event(opsRequest, corev1.EventTypeWarning, event.Reason, event.Message)
 	return nil
 }

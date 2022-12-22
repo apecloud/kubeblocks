@@ -136,6 +136,15 @@ const (
 	Required  PodAntiAffinity = "Required"
 )
 
+type ProgressStatus string
+
+const (
+	PendingProgressStatus    ProgressStatus = "Pending"
+	ProcessingProgressStatus ProgressStatus = "Processing"
+	FailedProgressStatus     ProgressStatus = "Failed"
+	SucceedProgressStatus    ProgressStatus = "Succeed"
+)
+
 // OpsRequestBehaviour record what cluster status that can trigger this OpsRequest
 // and what status that the cluster enters after trigger OpsRequest.
 type OpsRequestBehaviour struct {

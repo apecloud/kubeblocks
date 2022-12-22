@@ -24,6 +24,7 @@ import (
 	"github.com/onsi/gomega"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -31,9 +32,10 @@ import (
 )
 
 var (
-	ctx      = context.Background()
-	timeout  = 10 * time.Second
-	interval = time.Second
+	ctx           = context.Background()
+	timeout       = 10 * time.Second
+	interval      = time.Second
+	testFinalizer = "test.kubeblocks.io/finalizer"
 )
 
 func NewFakeStatefulSet(name string, replicas int) *apps.StatefulSet {
@@ -84,6 +86,7 @@ func NewFakeStatefulSetPod(set *apps.StatefulSet, ordinal int) *corev1.Pod {
 func MockStatefulSetReady(sts *apps.StatefulSet) {
 	sts.Status.AvailableReplicas = *sts.Spec.Replicas
 	sts.Status.ObservedGeneration = sts.Generation
+	sts.Status.Replicas = *sts.Spec.Replicas
 	sts.Status.CurrentRevision = sts.Status.UpdateRevision
 }
 
@@ -114,4 +117,27 @@ func UpdatePodStatusNotReady(testCtx testutil.TestContext, podName string) {
 		_ = testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, tmpPod)
 		return tmpPod.Status.Conditions == nil
 	}, timeout, interval).Should(gomega.BeTrue())
+}
+
+// MockPodIsTerminating mock pod is terminating.
+func MockPodIsTerminating(testCtx testutil.TestContext, pod *corev1.Pod) {
+	patch := client.MergeFrom(pod.DeepCopy())
+	pod.Finalizers = []string{testFinalizer}
+	gomega.Expect(testCtx.Cli.Patch(ctx, pod, patch)).Should(gomega.Succeed())
+	gomega.Expect(testCtx.Cli.Delete(ctx, pod)).Should(gomega.Succeed())
+	gomega.Eventually(func() bool {
+		tmpPod := &corev1.Pod{}
+		_ = testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: pod.Name, Namespace: testCtx.DefaultNamespace}, tmpPod)
+		return !tmpPod.DeletionTimestamp.IsZero()
+	}, timeout, interval).Should(gomega.BeTrue())
+}
+
+// RemovePodFinalizer remove the pod finalizer to delete the pod finally.
+func RemovePodFinalizer(testCtx testutil.TestContext, pod *corev1.Pod) {
+	patch := client.MergeFrom(pod.DeepCopy())
+	pod.Finalizers = []string{}
+	gomega.Expect(testCtx.Cli.Patch(ctx, pod, patch)).Should(gomega.Succeed())
+	gomega.Eventually(func() error {
+		return testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: pod.Name, Namespace: testCtx.DefaultNamespace}, &corev1.Pod{})
+	}, timeout, interval).Should(gomega.Satisfy(apierrors.IsNotFound))
 }

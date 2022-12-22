@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -28,22 +30,28 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+type restartOpsHandler struct{}
+
 func init() {
-	restartBehaviour := &OpsBehaviour{
-		FromClusterPhases:      []dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase},
-		ToClusterPhase:         dbaasv1alpha1.UpdatingPhase,
-		Action:                 RestartAction,
-		ActionStartedCondition: dbaasv1alpha1.NewRestartingCondition,
-		ReconcileAction:        ReconcileActionWithComponentOps,
+	r := restartOpsHandler{}
+	restartBehaviour := OpsBehaviour{
+		FromClusterPhases: []dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase},
+		ToClusterPhase:    dbaasv1alpha1.UpdatingPhase,
+		OpsHandler:        r,
 	}
 
 	opsMgr := GetOpsManager()
 	opsMgr.RegisterOps(dbaasv1alpha1.RestartType, restartBehaviour)
 }
 
-// RestartAction restart components by updating StatefulSet.
-func RestartAction(opsRes *OpsResource) error {
-	if opsRes.OpsRequest.Status.StartTimestamp == nil {
+// ActionStartedCondition the started condition when handle the restart request.
+func (r restartOpsHandler) ActionStartedCondition(opsRequest *dbaasv1alpha1.OpsRequest) *metav1.Condition {
+	return dbaasv1alpha1.NewRestartingCondition(opsRequest)
+}
+
+// Action restart components by updating StatefulSet.
+func (r restartOpsHandler) Action(opsRes *OpsResource) error {
+	if opsRes.OpsRequest.Status.StartTimestamp.IsZero() {
 		return fmt.Errorf("status.startTimestamp can not be null")
 	}
 	componentNameMap := opsRes.OpsRequest.GetRestartComponentNameMap()
@@ -51,6 +59,22 @@ func RestartAction(opsRes *OpsResource) error {
 		return err
 	}
 	return restartStatefulSet(opsRes, componentNameMap)
+}
+
+// ReconcileAction it will be performed when action is done and loop util OpsRequest.status.phase is Succeed/Failed.
+// the Reconcile function for volume expansion opsRequest.
+func (r restartOpsHandler) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error) {
+	return ReconcileActionWithComponentOps(opsRes, "restart", handleComponentStatusProgress)
+}
+
+// GetRealAffectedComponentMap get the real affected component map for the operation
+func (r restartOpsHandler) GetRealAffectedComponentMap(opsRequest *dbaasv1alpha1.OpsRequest) realAffectedComponentMap {
+	return opsRequest.GetRestartComponentNameMap()
+}
+
+// SaveLastConfiguration record last configuration to the OpsRequest.status.lastConfiguration
+func (r restartOpsHandler) SaveLastConfiguration(opsRes *OpsResource) error {
+	return nil
 }
 
 // restartStatefulSet restart statefulSet workload

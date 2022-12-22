@@ -52,7 +52,7 @@ const (
 )
 
 const (
-	consensusSetStatusDefaultPodName = "Unknown"
+	ConsensusSetStatusDefaultPodName = "Unknown"
 	RoleEmpty                        = ""
 )
 
@@ -118,7 +118,7 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 	newConsensusSetStatus := &dbaasv1alpha1.ConsensusSetStatus{
 		Leader: dbaasv1alpha1.ConsensusMemberStatus{
 			Name:       "",
-			Pod:        consensusSetStatusDefaultPodName,
+			Pod:        ConsensusSetStatusDefaultPodName,
 			AccessMode: dbaasv1alpha1.None,
 		},
 	}
@@ -413,7 +413,7 @@ func initClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster, componentN
 	if componentStatus.ConsensusSetStatus == nil {
 		componentStatus.ConsensusSetStatus = &dbaasv1alpha1.ConsensusSetStatus{
 			Leader: dbaasv1alpha1.ConsensusMemberStatus{
-				Pod:        consensusSetStatusDefaultPodName,
+				Pod:        ConsensusSetStatusDefaultPodName,
 				AccessMode: dbaasv1alpha1.None,
 				Name:       "",
 			},
@@ -476,7 +476,7 @@ func setConsensusSetStatusLearner(consensusSetStatus *dbaasv1alpha1.ConsensusSet
 func resetConsensusSetStatusRole(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus, podName string) {
 	// reset leader
 	if consensusSetStatus.Leader.Pod == podName {
-		consensusSetStatus.Leader.Pod = consensusSetStatusDefaultPodName
+		consensusSetStatus.Leader.Pod = ConsensusSetStatusDefaultPodName
 		consensusSetStatus.Leader.AccessMode = dbaasv1alpha1.None
 		consensusSetStatus.Leader.Name = ""
 	}

@@ -18,13 +18,15 @@ package operations
 
 import (
 	"fmt"
+
 	"reflect"
 	"time"
 
-	"golang.org/x/exp/slices"
-
 	"github.com/pkg/errors"
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -41,19 +43,22 @@ const (
 func init() {
 	ve := volumeExpansion{}
 	// the volume expansion operation only support online expanding now, so this operation not affect the cluster availability.
-	volumeExpansionBehaviour := &OpsBehaviour{
+	volumeExpansionBehaviour := OpsBehaviour{
 		FromClusterPhases: []dbaasv1alpha1.Phase{
 			dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase,
 			dbaasv1alpha1.AbnormalPhase, dbaasv1alpha1.ConditionsErrorPhase,
 		},
-		ToClusterPhase:         dbaasv1alpha1.VolumeExpandingPhase,
-		Action:                 ve.Action,
-		ActionStartedCondition: dbaasv1alpha1.NewVolumeExpandingCondition,
-		ReconcileAction:        ve.ReconcileAction,
+		ToClusterPhase: dbaasv1alpha1.VolumeExpandingPhase,
+		OpsHandler:     ve,
 	}
 
 	opsMgr := GetOpsManager()
 	opsMgr.RegisterOps(dbaasv1alpha1.VolumeExpansionType, volumeExpansionBehaviour)
+}
+
+// ActionStartedCondition the started condition when handle the volume expansion request.
+func (ve volumeExpansion) ActionStartedCondition(opsRequest *dbaasv1alpha1.OpsRequest) *metav1.Condition {
+	return dbaasv1alpha1.NewVolumeExpandingCondition(opsRequest)
 }
 
 // Action Modify Cluster.spec.components[*].VolumeClaimTemplates[*].spec.resources
@@ -89,15 +94,15 @@ func (ve volumeExpansion) Action(opsRes *OpsResource) error {
 func (ve volumeExpansion) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error) {
 	var (
 		opsRequest = opsRes.OpsRequest
-		// check all pvcs of volumeClaimTemplate are successful
-		allVCTSucceed = true
 		// decide whether all pvcs of volumeClaimTemplate are Failed or Succeed
-		allVCTCompleted     = true
-		requeueAfter        time.Duration
-		err                 error
-		opsRequestPhase     = dbaasv1alpha1.RunningPhase
-		oldOpsRequestStatus = opsRequest.Status.DeepCopy()
-		oldClusterStatus    = opsRes.Cluster.Status.DeepCopy()
+		allVCTCompleted      = true
+		requeueAfter         time.Duration
+		err                  error
+		opsRequestPhase      = dbaasv1alpha1.RunningPhase
+		oldOpsRequestStatus  = opsRequest.Status.DeepCopy()
+		oldClusterStatus     = opsRes.Cluster.Status.DeepCopy()
+		expectProgressCount  int
+		succeedProgressCount int
 	)
 
 	patch := client.MergeFrom(opsRequest.DeepCopy())
@@ -105,44 +110,31 @@ func (ve volumeExpansion) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Ph
 	if opsRequest.Status.Components == nil {
 		ve.initStatusComponents(opsRequest)
 	}
+	storageMap := ve.getRequestStorageMap(opsRequest)
 	// reconcile the status.components. when the volume expansion is successful,
 	// sync the volumeClaimTemplate status and component phase On the OpsRequest and Cluster.
-	for cName, component := range opsRequest.Status.Components {
-		if component.VolumeClaimTemplates == nil {
-			continue
-		}
+	for _, v := range opsRequest.Spec.VolumeExpansionList {
+		statusComponent := opsRequest.Status.Components[v.ComponentName]
 		completedOnComponent := true
-		for vctName, vct := range component.VolumeClaimTemplates {
-			if vct.Status == dbaasv1alpha1.SucceedPhase {
-				continue
-			}
-			isResizing, isSucceed, isCompleted, err := ve.checkExpansionProgress(opsRes, vct, cName, vctName)
+		for _, vct := range v.VolumeClaimTemplates {
+			succeedCount, expectCount, isCompleted, err := ve.handleVCTExpansionProgress(opsRes,
+				&statusComponent, storageMap, v.ComponentName, vct.Name)
 			if err != nil {
-				return opsRequestPhase, requeueAfter, err
+				return "", requeueAfter, err
 			}
-			if isSucceed {
-				ve.setVCTStatusMessage(vct, dbaasv1alpha1.SucceedPhase, "")
-				continue
-			}
-			allVCTSucceed = false
-			if isCompleted {
-				// if not succeed and the expansion completed, it means the expansion failed.
-				ve.setVCTStatusMessage(vct, dbaasv1alpha1.FailedPhase, "")
-				continue
-			}
-			allVCTCompleted = false
-			completedOnComponent = false
-			requeueAfter = time.Minute
-			// if pvcs is resizing
-			if isResizing && vct.Status == dbaasv1alpha1.PendingPhase {
-				ve.setVCTStatusMessage(vct, dbaasv1alpha1.RunningPhase, "")
+			expectProgressCount += expectCount
+			succeedProgressCount += succeedCount
+			if !isCompleted {
+				requeueAfter = time.Minute
+				allVCTCompleted = false
+				completedOnComponent = false
 			}
 		}
-
 		// when component expand volume completed, do it.
-		ve.setComponentPhaseForClusterAndOpsRequest(&component, opsRes.Cluster, cName, completedOnComponent)
-		opsRequest.Status.Components[cName] = component
+		ve.setComponentPhaseForClusterAndOpsRequest(&statusComponent, opsRes.Cluster, v.ComponentName, completedOnComponent)
+		opsRequest.Status.Components[v.ComponentName] = statusComponent
 	}
+	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", succeedProgressCount, expectProgressCount)
 
 	// patch OpsRequest.status.components
 	if !reflect.DeepEqual(oldOpsRequestStatus, opsRequest.Status) {
@@ -151,6 +143,8 @@ func (ve volumeExpansion) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Ph
 		}
 	}
 
+	// check all pvcs of volumeClaimTemplate are successful
+	allVCTSucceed := expectProgressCount == succeedProgressCount
 	if allVCTSucceed {
 		opsRequestPhase = dbaasv1alpha1.SucceedPhase
 	} else if allVCTCompleted {
@@ -173,9 +167,41 @@ func (ve volumeExpansion) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Ph
 	return opsRequestPhase, requeueAfter, err
 }
 
-func (ve volumeExpansion) setVCTStatusMessage(vct *dbaasv1alpha1.VolumeClaimTemplateStatus, status dbaasv1alpha1.Phase, message string) {
-	vct.Status = status
-	vct.Message = message
+// GetRealAffectedComponentMap get the real affected component map for the operation
+func (ve volumeExpansion) GetRealAffectedComponentMap(opsRequest *dbaasv1alpha1.OpsRequest) realAffectedComponentMap {
+	return opsRequest.GetVolumeExpansionComponentNameMap()
+}
+
+// SaveLastConfiguration record last configuration to the OpsRequest.status.lastConfiguration
+func (ve volumeExpansion) SaveLastConfiguration(opsRes *OpsResource) error {
+	opsRequest := opsRes.OpsRequest
+	componentNameMap := opsRequest.GetComponentNameMap()
+	storageMap := ve.getRequestStorageMap(opsRequest)
+	lastComponentInfo := map[string]dbaasv1alpha1.LastComponentConfiguration{}
+	for _, v := range opsRes.Cluster.Spec.Components {
+		if _, ok := componentNameMap[v.Name]; !ok {
+			continue
+		}
+		lastVCTs := make([]dbaasv1alpha1.OpsRequestVolumeClaimTemplate, 0)
+		for _, vct := range v.VolumeClaimTemplates {
+			key := getComponentVCTKey(v.Name, vct.Name)
+			if _, ok := storageMap[key]; !ok {
+				continue
+			}
+			lastVCTs = append(lastVCTs, dbaasv1alpha1.OpsRequestVolumeClaimTemplate{
+				Name:    vct.Name,
+				Storage: vct.Spec.Resources.Requests[corev1.ResourceStorage],
+			})
+		}
+		lastComponentInfo[v.Name] = dbaasv1alpha1.LastComponentConfiguration{
+			VolumeClaimTemplates: lastVCTs,
+		}
+	}
+	patch := client.MergeFrom(opsRequest.DeepCopy())
+	opsRequest.Status.LastConfiguration = dbaasv1alpha1.LastConfiguration{
+		Components: lastComponentInfo,
+	}
+	return opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch)
 }
 
 // checkIsTimeOut check whether the volume expansion operation has timed out
@@ -205,8 +231,9 @@ func (ve volumeExpansion) setComponentPhaseForClusterAndOpsRequest(component *db
 }
 
 // isExpansionCompleted check the expansion is completed
-func (ve volumeExpansion) isExpansionCompleted(phase dbaasv1alpha1.Phase) bool {
-	return slices.Index([]dbaasv1alpha1.Phase{dbaasv1alpha1.FailedPhase, dbaasv1alpha1.SucceedPhase}, phase) != -1
+func (ve volumeExpansion) isExpansionCompleted(phase dbaasv1alpha1.ProgressStatus) bool {
+	return slices.Contains([]dbaasv1alpha1.ProgressStatus{dbaasv1alpha1.FailedProgressStatus,
+		dbaasv1alpha1.SucceedProgressStatus}, phase)
 }
 
 // patchClusterStatus patch cluster status
@@ -237,68 +264,76 @@ func (ve volumeExpansion) pvcIsResizing(pvc *corev1.PersistentVolumeClaim) bool 
 	return isResizing
 }
 
+func (ve volumeExpansion) getRequestStorageMap(opsRequest *dbaasv1alpha1.OpsRequest) map[string]resource.Quantity {
+	storageMap := map[string]resource.Quantity{}
+	for _, v := range opsRequest.Spec.VolumeExpansionList {
+		for _, vct := range v.VolumeClaimTemplates {
+			key := getComponentVCTKey(v.ComponentName, vct.Name)
+			storageMap[key] = vct.Storage
+		}
+	}
+	return storageMap
+}
+
 // initVolumeExpansionStatus init status.components for the VolumeExpansion OpsRequest
 func (ve volumeExpansion) initStatusComponents(opsRequest *dbaasv1alpha1.OpsRequest) {
-	// get component map with VolumeClaimTemplateName slice
 	opsRequest.Status.Components = map[string]dbaasv1alpha1.OpsRequestStatusComponent{}
-	componentMap := map[string][]dbaasv1alpha1.OpsRequestVolumeClaimTemplate{}
 	for _, v := range opsRequest.Spec.VolumeExpansionList {
-		componentMap[v.ComponentName] = v.VolumeClaimTemplates
-	}
-	// update status.components
-	for k, volumeExpansion := range componentMap {
-		componentStatus := dbaasv1alpha1.OpsRequestStatusComponent{
-			Phase:                dbaasv1alpha1.VolumeExpandingPhase,
-			VolumeClaimTemplates: map[string]*dbaasv1alpha1.VolumeClaimTemplateStatus{},
+		opsRequest.Status.Components[v.ComponentName] = dbaasv1alpha1.OpsRequestStatusComponent{
+			Phase: dbaasv1alpha1.VolumeExpandingPhase,
 		}
-		for _, v := range volumeExpansion {
-			vctStatus := &dbaasv1alpha1.VolumeClaimTemplateStatus{RequestStorage: v.Storage}
-			vctStatus.StatusMessage.Status = dbaasv1alpha1.PendingPhase
-			vctStatus.StatusMessage.Message = "waiting for an external controller to process the pvcs."
-			vctStatus.PersistentVolumeClaimStatus = map[string]dbaasv1alpha1.StatusMessage{}
-			componentStatus.VolumeClaimTemplates[v.Name] = vctStatus
-		}
-		opsRequest.Status.Components[k] = componentStatus
 	}
 }
 
-// checkVolumeClaimTemplateProgress check whether the pvc of the volume claim template is resizing/expansion succeeded/expansion completed.
-func (ve volumeExpansion) checkExpansionProgress(opsRes *OpsResource, vct *dbaasv1alpha1.VolumeClaimTemplateStatus, componentName, vctName string) (bool, bool, bool, error) {
+// handleVCTExpansionProgress check whether the pvc of the volume claim template is resizing/expansion succeeded/expansion completed.
+func (ve volumeExpansion) handleVCTExpansionProgress(opsRes *OpsResource,
+	statusComponent *dbaasv1alpha1.OpsRequestStatusComponent,
+	storageMap map[string]resource.Quantity,
+	componentName, vctName string) (succeedCount int, expectCount int, isCompleted bool, err error) {
 	pvcList := &corev1.PersistentVolumeClaimList{}
-	if err := opsRes.Client.List(opsRes.Ctx, pvcList, client.MatchingLabels{
+	if err = opsRes.Client.List(opsRes.Ctx, pvcList, client.MatchingLabels{
 		intctrlutil.AppInstanceLabelKey:             opsRes.Cluster.Name,
 		intctrlutil.AppComponentLabelKey:            componentName,
 		intctrlutil.VolumeClaimTemplateNameLabelKey: vctName,
 	}, client.InNamespace(opsRes.Cluster.Namespace)); err != nil {
-		return false, false, false, err
+		return
 	}
-	var (
-		// the pvcs of volumeClaimTemplate is resizing
-		isResizing bool
-		// all the pvcs of volumeClaimTemplate is successful
-		isSucceed = true
-		// all the pvcs of volumeClaimTemplate is Failed or Succeed
-		isCompleted = true
-	)
+	vctKey := getComponentVCTKey(componentName, vctName)
+	requestStorage := storageMap[vctKey]
+	expectCount = len(pvcList.Items)
+	var completedCount int
 	for _, v := range pvcList.Items {
-		persistentVolumeClaimStatus := dbaasv1alpha1.StatusMessage{}
-		if _, ok := vct.PersistentVolumeClaimStatus[v.Name]; ok {
-			persistentVolumeClaimStatus = vct.PersistentVolumeClaimStatus[v.Name]
-		}
-		if ve.pvcIsResizing(&v) && persistentVolumeClaimStatus.Status != dbaasv1alpha1.FailedPhase {
-			persistentVolumeClaimStatus.Status = dbaasv1alpha1.RunningPhase
-			isResizing = true
-		}
-		// if pvc volume expansion succeeded, do it
-		if v.Status.Capacity.Storage().Cmp(vct.RequestStorage) == 0 {
-			vct.PersistentVolumeClaimStatus[v.Name] = dbaasv1alpha1.StatusMessage{Status: dbaasv1alpha1.SucceedPhase}
+		objectKey := getPVCProgressObjectKey(v.Name)
+		progressDetail := dbaasv1alpha1.ProgressDetail{ObjectKey: objectKey, Group: vctName}
+		// if the volume expand succeed
+		if v.Status.Capacity.Storage().Cmp(requestStorage) >= 0 {
+			succeedCount += 1
+			completedCount += 1
+			message := fmt.Sprintf("Successfully expand volume: %s in Component: %s ", objectKey, componentName)
+			progressDetail.SetStatusAndMessage(dbaasv1alpha1.SucceedProgressStatus, message)
+			SetStatusComponentProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &statusComponent.ProgressDetails, progressDetail)
 			continue
 		}
-		if !ve.isExpansionCompleted(persistentVolumeClaimStatus.Status) {
-			isCompleted = false
+		if ve.pvcIsResizing(&v) {
+			message := fmt.Sprintf("Start expanding volume: %s in Component: %s ", objectKey, componentName)
+			progressDetail.SetStatusAndMessage(dbaasv1alpha1.ProcessingProgressStatus, message)
+		} else {
+			message := fmt.Sprintf("Waiting for an external controller to process the pvc: %s in Component: %s ", objectKey, componentName)
+			progressDetail.SetStatusAndMessage(dbaasv1alpha1.PendingProgressStatus, message)
 		}
-		isSucceed = false
-		vct.PersistentVolumeClaimStatus[v.Name] = persistentVolumeClaimStatus
+		SetStatusComponentProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &statusComponent.ProgressDetails, progressDetail)
+		if ve.isExpansionCompleted(progressDetail.Status) {
+			completedCount += 1
+		}
 	}
-	return isResizing, isSucceed, isCompleted, nil
+	isCompleted = completedCount == len(pvcList.Items)
+	return succeedCount, expectCount, isCompleted, nil
+}
+
+func getComponentVCTKey(componentName, vctName string) string {
+	return fmt.Sprintf("%s/%s", componentName, vctName)
+}
+
+func getPVCProgressObjectKey(pvcName string) string {
+	return fmt.Sprintf("PVC/%s", pvcName)
 }

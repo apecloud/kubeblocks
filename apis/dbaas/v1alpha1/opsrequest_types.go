@@ -111,7 +111,7 @@ type VolumeExpansion struct {
 }
 
 type OpsRequestVolumeClaimTemplate struct {
-	// storage the request storage size.
+	// Request storage size.
 	// +kubebuilder:validation:Required
 	Storage resource.Quantity `json:"storage"`
 
@@ -142,7 +142,7 @@ type OpsRequestStatus struct {
 	// +kubebuilder:validation:Enum={Pending,Running,Failed,Succeed}
 	Phase Phase `json:"phase,omitempty"`
 
-	// components record the status information of changing components in this operation.
+	// components define the recorded the status information of changed components for operation request.
 	// +optional
 	Components map[string]OpsRequestStatusComponent `json:"components,omitempty"`
 
@@ -150,7 +150,7 @@ type OpsRequestStatus struct {
 	// +optional
 	StartTimestamp *metav1.Time `json:"StartTimestamp,omitempty"`
 
-	// completionTimestamp the OpsRequest completion time.
+	// completionTimestamp defines the OpsRequest completion time.
 	// +optional
 	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
 
@@ -173,7 +173,7 @@ type OpsRequestStatusComponent struct {
 type VolumeClaimTemplateStatus struct {
 	StatusMessage `json:",inline"`
 
-	// requestStorage the request storage size.
+	// Request storage size.
 	// +optional
 	RequestStorage resource.Quantity `json:"requestStorage,omitempty"`
 

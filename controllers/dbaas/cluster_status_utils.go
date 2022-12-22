@@ -19,12 +19,15 @@ package dbaas
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -236,14 +239,21 @@ func getComponentRelatedInfo(cluster *dbaasv1alpha1.Cluster, clusterDef *dbaasv1
 }
 
 // handleClusterStatusByEvent handle the cluster status when warning event happened
-func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder record.EventRecorder, object client.Object, event *corev1.Event) error {
+func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder record.EventRecorder, event *corev1.Event) error {
 	var (
 		cluster    = &dbaasv1alpha1.Cluster{}
-		labels     = object.GetLabels()
 		clusterDef = &dbaasv1alpha1.ClusterDefinition{}
 		phase      dbaasv1alpha1.Phase
 		err        error
 	)
+	object, err := getEventInvolvedObject(ctx, cli, event)
+	if err != nil {
+		return err
+	}
+	if object == nil || !intctrlutil.WorkloadFilterPredicate(object) {
+		return nil
+	}
+	labels := object.GetLabels()
 	if err = cli.Get(ctx, client.ObjectKey{Name: labels[intctrlutil.AppInstanceLabelKey], Namespace: object.GetNamespace()}, cluster); err != nil {
 		return err
 	}
@@ -277,21 +287,134 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 
 // handleEventForClusterStatus handle event for cluster Warning and Failed phase
 func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorder record.EventRecorder, event *corev1.Event) error {
+
+	type predicateProcessor struct {
+		pred      func() bool
+		processor func() error
+	}
+
+	nilReturnHandler := func() error { return nil }
+
+	pps := []predicateProcessor{
+		{
+			// handle cronjob complete or fail event
+			pred: func() bool {
+				return event.InvolvedObject.Kind == intctrlutil.CronJob &&
+					event.Reason == "SawCompletedJob"
+			},
+			processor: func() error {
+				return handleDeletePVCCronJobEvent(ctx, cli, recorder, event)
+			},
+		},
+		{
+			pred: func() bool {
+				return event.Type != corev1.EventTypeWarning ||
+					!isTargetKindForEvent(event)
+			},
+			processor: nilReturnHandler,
+		},
+		{
+			pred: func() bool {
+				// the error repeated several times, so we can sure it's a real error to the cluster.
+				return !k8score.IsOvertimeAndOccursTimesForEvent(event, EventTimeOut, EventOccursTimes)
+			},
+			processor: nilReturnHandler,
+		},
+		{
+			// handle cluster workload error events such as pod/statefulset/deployment errors
+			// must be the last one
+			pred: func() bool {
+				return true
+			},
+			processor: func() error {
+				return handleClusterStatusByEvent(ctx, cli, recorder, event)
+			},
+		},
+	}
+
+	for _, pp := range pps {
+		if pp.pred() {
+			return pp.processor()
+		}
+	}
+	return nil
+}
+
+func handleDeletePVCCronJobEvent(ctx context.Context,
+	cli client.Client,
+	recorder record.EventRecorder,
+	event *corev1.Event) error {
+	re := regexp.MustCompile("status: Failed")
 	var (
 		err    error
 		object client.Object
 	)
-	if event.Type != corev1.EventTypeWarning || !isTargetKindForEvent(event) {
-		return nil
+	matches := re.FindStringSubmatch(event.Message)
+	if len(matches) == 0 {
+		// delete pvc success, then delete cronjob
+		return checkedDeleteDeletePVCCronJob(ctx, cli, event.InvolvedObject.Name, event.InvolvedObject.Namespace)
 	}
-	if !k8score.IsOvertimeAndOccursTimesForEvent(event, EventTimeOut, EventOccursTimes) {
-		return nil
-	}
+	// cronjob failed
 	if object, err = getEventInvolvedObject(ctx, cli, event); err != nil {
 		return err
 	}
-	if object == nil || !intctrlutil.WorkloadFilterPredicate(object) {
+	labels := object.GetLabels()
+	cluster := dbaasv1alpha1.Cluster{}
+	if err = cli.Get(ctx, client.ObjectKey{Name: labels[intctrlutil.AppInstanceLabelKey],
+		Namespace: object.GetNamespace()}, &cluster); err != nil {
+		return err
+	}
+	componentName := labels[intctrlutil.AppComponentLabelKey]
+	// update component phase to abnormal
+	if err = updateComponentStatusPhase(cli,
+		ctx,
+		&cluster,
+		componentName,
+		dbaasv1alpha1.AbnormalPhase,
+		event.Message,
+		object); err != nil {
+		return err
+	}
+	recorder.Eventf(&cluster, corev1.EventTypeWarning, event.Reason, event.Message)
+	return nil
+}
+
+func checkedDeleteDeletePVCCronJob(ctx context.Context, cli client.Client, name string, namespace string) error {
+	// label check
+	cronJob := v1.CronJob{}
+	if err := cli.Get(ctx, types.NamespacedName{
+		Namespace: namespace,
+		Name:      name,
+	}, &cronJob); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	if cronJob.ObjectMeta.Labels[intctrlutil.AppManagedByLabelKey] != intctrlutil.AppName {
 		return nil
 	}
-	return handleClusterStatusByEvent(ctx, cli, recorder, object, event)
+	// if managed by kubeblocks, then it must be the cronjob used to delete pvc, delete it since it's completed
+	if err := cli.Delete(ctx, &cronJob); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	return nil
+}
+
+func updateComponentStatusPhase(cli client.Client,
+	ctx context.Context,
+	cluster *dbaasv1alpha1.Cluster,
+	componentName string,
+	phase dbaasv1alpha1.Phase,
+	message string,
+	object client.Object) error {
+	c, ok := cluster.Status.Components[componentName]
+	if ok && c.Phase == phase {
+		return nil
+	}
+	// c.Message can be nil
+	if c.Message == nil {
+		c.Message = dbaasv1alpha1.ComponentMessageMap{}
+	}
+	c.Message.SetObjectMessage(object.GetObjectKind().GroupVersionKind().Kind, object.GetName(), message)
+	patch := client.MergeFrom(cluster.DeepCopy())
+	cluster.Status.Components[componentName] = c
+	return cli.Status().Patch(ctx, cluster, patch)
 }

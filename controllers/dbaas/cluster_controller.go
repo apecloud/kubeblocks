@@ -289,17 +289,15 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	task, err := buildClusterCreationTasks(reqCtx, clusterdefinition, appversion, cluster)
+	shouldRequeue, err := createCluster(reqCtx, r.Client, clusterdefinition, appversion, cluster)
 	if err != nil {
 		// this is a block to handle error.
 		// so when update cluster conditions failed, we can ignore it.
 		_ = clusterConditionMgr.setApplyResourcesFailedCondition(err)
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-
-	if err = task.Exec(reqCtx, r.Client); err != nil {
-		_ = clusterConditionMgr.setApplyResourcesFailedCondition(err)
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	if shouldRequeue {
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
 	}
 
 	if err = r.handleClusterStatusAfterApplySucceed(ctx, cluster, clusterdefinition); err != nil {

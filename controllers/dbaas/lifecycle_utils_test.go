@@ -17,20 +17,23 @@ limitations under the License.
 package dbaas
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	"github.com/leaanthony/debme"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"github.com/leaanthony/debme"
 	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -292,7 +295,7 @@ var _ = Describe("lifecycle_utils", func() {
 
 	})
 
-	allFieldsClusterDefObj := func() *dbaasv1alpha1.ClusterDefinition {
+	allFieldsClusterDefObj := func(needCreate bool) *dbaasv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
 		clusterDefYAML := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
@@ -366,11 +369,13 @@ spec:
 `
 		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, clusterDefinition)).Should(Succeed())
+		if needCreate {
+			Expect(testCtx.CheckedCreateObj(ctx, clusterDefinition)).Should(Succeed())
+		}
 		return clusterDefinition
 	}
 
-	allFieldsAppVersionObj := func() *dbaasv1alpha1.AppVersion {
+	allFieldsAppVersionObj := func(needCreate bool) *dbaasv1alpha1.AppVersion {
 		By("By assure an appVersion obj")
 		appVerYAML := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
@@ -485,20 +490,23 @@ spec:
 `
 		appVersion := &dbaasv1alpha1.AppVersion{}
 		Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, appVersion)).Should(Succeed())
+		if needCreate {
+			Expect(testCtx.CheckedCreateObj(ctx, appVersion)).Should(Succeed())
+		}
 		return appVersion
 	}
 
 	newAllFieldsClusterObj := func(
 		clusterDefObj *dbaasv1alpha1.ClusterDefinition,
 		appVersionObj *dbaasv1alpha1.AppVersion,
+		needCreate bool,
 	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.AppVersion, types.NamespacedName) {
 		// setup Cluster obj required default ClusterDefinition and AppVersion objects if not provided
 		if clusterDefObj == nil {
-			clusterDefObj = allFieldsClusterDefObj()
+			clusterDefObj = allFieldsClusterDefObj(needCreate)
 		}
 		if appVersionObj == nil {
-			appVersionObj = allFieldsAppVersionObj()
+			appVersionObj = allFieldsAppVersionObj(needCreate)
 		}
 
 		randomStr, _ := password.Generate(6, 0, 0, true, false)
@@ -541,14 +549,16 @@ spec:
 
 		cluster := &dbaasv1alpha1.Cluster{}
 		Expect(yaml.Unmarshal([]byte(clusterYaml), cluster)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
+		if needCreate {
+			Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
+		}
 
 		return cluster, clusterDefObj, appVersionObj, key
 	}
 
 	Context("When mergeComponents", func() {
 		It("Should merge with no error", func() {
-			cluster, clusterDef, appVer, _ := newAllFieldsClusterObj(nil, nil)
+			cluster, clusterDef, appVer, _ := newAllFieldsClusterObj(nil, nil, true)
 			By("assign every available fields")
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
@@ -572,7 +582,7 @@ spec:
 				&appVer.Spec.Components[0],
 				&cluster.Spec.Components[0])
 			Expect(component).ShouldNot(BeNil())
-			appVer = allFieldsAppVersionObj()
+			appVer = allFieldsAppVersionObj(true)
 			By("new container in appversion not in clusterdefinition")
 			component = mergeComponents(
 				reqCtx,
@@ -600,6 +610,297 @@ spec:
 				&appVer.Spec.Components[0],
 				&cluster.Spec.Components[0])
 			Expect(component).Should(BeNil())
+		})
+	})
+
+	stsYAML := `
+apiVersion: "apps/v1"
+kind: StatefulSet
+metadata:
+  labels:
+    app.kubernetes.io/component-name: replicasets
+    app.kubernetes.io/instance: mysql-cluster-01
+    app.kubernetes.io/managed-by: kubeblocks
+    app.kubernetes.io/name: state.mysql-8-apecloud-wesql
+  name: mysql-cluster-01-replicasets
+  namespace: default
+spec:
+  minReadySeconds: 10
+  podManagementPolicy: Parallel
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/component-name: replicasets
+      app.kubernetes.io/instance: mysql-cluster-01
+      app.kubernetes.io/managed-by: kubeblocks
+      app.kubernetes.io/name: state.mysql-8-apecloud-wesql
+  serviceName: mysql-cluster-01-replicasets-headless
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app.kubernetes.io/component-name: replicasets
+        app.kubernetes.io/instance: mysql-cluster-01
+        app.kubernetes.io/managed-by: kubeblocks
+        app.kubernetes.io/name: state.mysql-8-apecloud-wesql
+    spec:
+      containers:
+      - command:
+        - /bin/bash
+        - -c
+        image: docker.io/apecloud/wesql-server:8.0.30-4.alpha2.20221109.g819b319
+        imagePullPolicy: IfNotPresent
+        name: mysql
+        ports:
+        - containerPort: 3306
+          name: mysql
+          protocol: TCP
+        - containerPort: 13306
+          name: paxos
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /data/mysql
+          name: data
+        - mountPath: /opt/mysql
+          name: mysql-config
+      dnsPolicy: ClusterFirst
+      initContainers:
+      - command:
+        - sh
+        - -c
+        image: lynnleelhl/kubectl:latest
+        imagePullPolicy: IfNotPresent
+        name: init
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: kubeblocks
+      serviceAccountName: kubeblocks
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: mysql-cluster-01-replicasets-mysql-config
+        name: mysql-config
+      - emptyDir: {}
+        name: data
+  updateStrategy:
+    type: OnDelete
+  volumeClaimTemplates:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      creationTimestamp: null
+      labels:
+        app.kubernetes.io/component-name: replicasets
+        app.kubernetes.io/instance: mysql-cluster-01
+        app.kubernetes.io/managed-by: kubeblocks
+        app.kubernetes.io/name: state.mysql-8-apecloud-wesql
+        vct.kubeblocks.io/name: data
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+      volumeMode: Filesystem
+    status:
+      phase: Pending
+`
+	sts := appsv1.StatefulSet{}
+	Expect(yaml.Unmarshal([]byte(stsYAML), &sts)).Should(Succeed())
+	pvcKey := types.NamespacedName{
+		Namespace: "default",
+		Name:      "data-wesql-01-replicasets-0",
+	}
+	snapshotName := "test-snapshot-name"
+	cluster, clusterDef, appVer, _ := newAllFieldsClusterObj(nil, nil, false)
+	By("assign every available fields")
+	ctx := context.Background()
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx: ctx,
+		Log: tlog,
+	}
+	component := mergeComponents(
+		reqCtx,
+		cluster,
+		clusterDef,
+		&clusterDef.Spec.Components[0],
+		&appVer.Spec.Components[0],
+		&cluster.Spec.Components[0])
+	Expect(component).ShouldNot(BeNil())
+	params := createParams{
+		clusterDefinition: clusterDef,
+		appVersion:        appVer,
+		cluster:           cluster,
+		component:         component,
+		applyObjs:         nil,
+		cacheCtx:          &map[string]interface{}{},
+	}
+	backupPolicyTemplateYAML := `
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupPolicyTemplate
+metadata:
+  labels:
+    clusterdefinition.kubeblocks.io/name: apecloud-wesql
+  name: backup-policy-template-mysql
+spec:
+  backupToolName: mysql-xtrabackup
+  hooks:
+    ContainerName: mysql
+    image: rancher/kubectl:v1.23.7
+    preCommands:
+    - touch /data/mysql/data/.restore; sync
+  onFailAttempted: 3
+  schedule: 0 2 * * *
+  ttl: 168h0m0s
+`
+	backupPolicyTemplate := dataprotectionv1alpha1.BackupPolicyTemplate{}
+	Expect(yaml.Unmarshal([]byte(backupPolicyTemplateYAML), &backupPolicyTemplate)).Should(Succeed())
+
+	Context("Build object from cue template", func() {
+		It("Build PVC", func() {
+			pvc, err := buildPVCFromSnapshot(&sts, pvcKey, snapshotName)
+			Expect(err).Should(BeNil())
+			Expect(pvc).ShouldNot(BeNil())
+			Expect(pvc.Spec.AccessModes).Should(Equal(sts.Spec.VolumeClaimTemplates[0].Spec.AccessModes))
+			Expect(pvc.Spec.Resources).Should(Equal(sts.Spec.VolumeClaimTemplates[0].Spec.Resources))
+		})
+
+		It("Build Service", func() {
+			svc, err := buildSvc(params, true)
+			Expect(err).Should(BeNil())
+			Expect(svc).ShouldNot(BeNil())
+		})
+
+		It("Build ConnCredential", func() {
+			credential, err := buildConnCredential(params)
+			Expect(err).Should(BeNil())
+			Expect(credential).ShouldNot(BeNil())
+		})
+
+		It("Build StatefulSet", func() {
+			envConfigName := "test-env-config-name"
+			sts, err := buildSts(reqCtx, params, envConfigName)
+			Expect(err).Should(BeNil())
+			Expect(sts).ShouldNot(BeNil())
+		})
+
+		It("Build Deploy", func() {
+			deploy, err := buildDeploy(reqCtx, params)
+			Expect(err).Should(BeNil())
+			Expect(deploy).ShouldNot(BeNil())
+		})
+
+		It("Build PDB", func() {
+			pdb, err := buildPDB(params)
+			Expect(err).Should(BeNil())
+			Expect(pdb).ShouldNot(BeNil())
+		})
+
+		It("Build Env Config", func() {
+			cfg, err := buildEnvConfig(params)
+			Expect(err).Should(BeNil())
+			Expect(cfg).ShouldNot(BeNil())
+			Expect(len(cfg.Data) == 2).Should(BeTrue())
+		})
+
+		It("Build BackupPolicy", func() {
+			backupKey := types.NamespacedName{
+				Namespace: "default",
+				Name:      "test-backup",
+			}
+			policy, err := buildBackupPolicy(&sts, &backupPolicyTemplate, backupKey)
+			Expect(err).Should(BeNil())
+			Expect(policy).ShouldNot(BeNil())
+		})
+
+		It("Build BackupJob", func() {
+			backupJobKey := types.NamespacedName{
+				Namespace: "default",
+				Name:      "test-backup-job",
+			}
+			backupPolicyName := "test-backup-policy"
+			backupJob, err := buildBackupJob(&sts, backupPolicyName, backupJobKey)
+			Expect(err).Should(BeNil())
+			Expect(backupJob).ShouldNot(BeNil())
+		})
+
+		It("Build VolumeSnapshot", func() {
+			snapshotKey := types.NamespacedName{
+				Namespace: "default",
+				Name:      "test-snapshot",
+			}
+			pvcName := "test-pvc-name"
+			vs, err := buildVolumeSnapshot(snapshotKey, pvcName, &sts)
+			Expect(err).Should(BeNil())
+			Expect(vs).ShouldNot(BeNil())
+		})
+
+		It("Build CronJob", func() {
+			pvcKey := types.NamespacedName{
+				Namespace: "default",
+				Name:      "test-pvc",
+			}
+			schedule := "* * * * *"
+			cronJob, err := buildCronJob(pvcKey, schedule, &sts)
+			Expect(err).Should(BeNil())
+			Expect(cronJob).ShouldNot(BeNil())
+		})
+	})
+
+	vsYAML := fmt.Sprintf(`
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  labels:
+    app.kubernetes.io/component-name: replicasets
+    app.kubernetes.io/created-by: kubeblocks
+    app.kubernetes.io/instance: %s
+    app.kubernetes.io/managed-by: kubeblocks
+    app.kubernetes.io/name: state.mysql-8-apecloud-wesql
+    backupjobs.dataprotection.kubeblocks.io/name: wesql-01-replicasets-scaling-qf6cr
+    backuppolicies.dataprotection.kubeblocks.io/name: wesql-01-replicasets-scaling-hcxps
+    dataprotection.kubeblocks.io/backup-type: snapshot
+  name: test-volume-snapshot
+  namespace: default
+spec:
+  source:
+    persistentVolumeClaimName: data-wesql-01-replicasets-0
+  volumeSnapshotClassName: csi-aws-ebs-snapclass
+`, cluster.Name)
+	vs := snapshotv1.VolumeSnapshot{}
+	Expect(yaml.Unmarshal([]byte(vsYAML), &vs)).Should(Succeed())
+
+	Context("Backup in real cluster", func() {
+		It("doBackup", func() {
+			snapshotKey := types.NamespacedName{
+				Namespace: "default",
+				Name:      "test-snapshot",
+			}
+			component.HorizontalScalePolicy = &dbaasv1alpha1.HorizontalScalePolicy{
+				Type:             dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot,
+				VolumeMountsName: "data",
+			}
+			Expect(k8sClient.Create(ctx, &vs)).Should(Succeed())
+			patch := client.MergeFrom(vs.DeepCopy())
+			t := true
+			vs.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: &t}
+			Expect(k8sClient.Status().Patch(ctx, &vs, patch)).Should(Succeed())
+			stsProto := *sts.DeepCopy()
+			r := int32(3)
+			stsProto.Spec.Replicas = &r
+			shouldRequeue, err := doBackup(reqCtx, k8sClient, cluster, component, &sts, &stsProto, snapshotKey)
+			Expect(shouldRequeue).Should(BeFalse())
+			Expect(err).Should(BeNil())
 		})
 	})
 })

@@ -624,6 +624,7 @@ spec:
                       - Deleting
                       - Deleted
                       - VolumeExpanding
+                      - HorizontalScaling
                       type: string
                     podsReady:
                       description: podsReady check all pods of the component are ready.

@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wesql-scripts
+data:
+  setup.sh: |
+    #!/bin/bash
+    leader=$KB_REPLICASETS_LEADER
+    followers=$KB_REPLICASETS_FOLLOWERS
+    echo $leader
+    echo $followers
+    sub_follower=`echo "$followers" | grep "$KB_POD_NAME"`
+    echo $KB_POD_NAME
+    echo $sub_follower
+    if [ -z "$leader" -o "$KB_POD_NAME" = "$leader" -o ! -z "$sub_follower" ]; then 
+      echo "no need to call add"
+    else 
+      idx=${KB_POD_NAME##*-}
+      host=$(eval echo \$KB_REPLICASETS_"$idx"_HOSTNAME)
+      echo "$host"
+      leader_idx=${leader##*-}
+      leader_host=$(eval echo \$KB_REPLICASETS_"$leader_idx"_HOSTNAME)
+      echo "mysql -h$leader_host -uroot -e \"call dbms_consensus.add_follower('$host:13306');\" & "
+      # TODO: password
+      mysql -h$leader_host -uroot -e "call dbms_consensus.add_follower('$host:13306');" & 
+      pid=$!; sleep 1; 
+      if ! ps $pid > /dev/null; then 
+        wait $pid; 
+        code=$?; 
+        if [ $code -ne 0 ]; then
+          exit $code; 
+        fi
+      fi
+    fi
+    cluster_info=""; for (( i=0; i< $KB_REPLICASETS_N; i++ )); do
+      if [ $i -ne 0 ]; then
+        cluster_info="$cluster_info;";
+      fi;
+      host=$(eval echo \$KB_REPLICASETS_"$i"_HOSTNAME)
+      cluster_info="$cluster_info$host:13306";
+    done; 
+    idx=${KB_POD_NAME##*-}
+    echo $idx
+    host=$(eval echo \$KB_REPLICASETS_"$idx"_HOSTNAME)
+    cluster_info="$cluster_info@$(($idx+1))"; 
+    echo $cluster_info; 
+    mkdir -p /data/mysql/data; 
+    chmod +777 -R /data/mysql; 
+    leader=$KB_REPLICASETS_LEADER
+    echo $leader
+    if [ -z $leader ]; then
+      echo "docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info=\"$cluster_info\" --cluster-id=$CLUSTER_ID"
+      docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$cluster_info" --cluster-id=$CLUSTER_ID
+    elif [ "$KB_POD_NAME" != "$leader" ]; then
+      echo "docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info=\"$host:13306\" --cluster-id=$CLUSTER_ID"
+      docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$host:13306" --cluster-id=$CLUSTER_ID
+    else 
+      echo "docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info=\"$host:13306@1\" --cluster-id=$CLUSTER_ID"
+      docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$host:13306@1" --cluster-id=$CLUSTER_ID
+    fi

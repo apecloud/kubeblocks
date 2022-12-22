@@ -221,6 +221,35 @@ type ClusterDefinitionComponent struct {
 	// consensusSpec defines consensus related spec if componentType is Consensus, required if componentType is Consensus.
 	// +optional
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
+
+	// horizontalScalePolicy controls the behavior of horizontal scale.
+	// +optional
+	HorizontalScalePolicy *HorizontalScalePolicy `json:"horizontalScalePolicy,omitempty"`
+}
+
+type HorizontalScalePolicy struct {
+	// Type controls what kind of data synchronization do when component scale out.
+	// Policy is in enum of {None, Snapshot}. The default policy is `None`.
+	// None: Default policy, do nothing.
+	// Snapshot: Do native volume snapshot before scaling and restore to newly scaled pods.
+	//           Prefer backup job to create snapshot if `BackupTemplateSelector` can find a template.
+	//           Notice that 'Snapshot' policy will only take snapshot on one volumeMount, default is
+	//           the first volumeMount of first container (i.e. clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]),
+	//           since take multiple snapshots at one time might cause consistency problem.
+	// +kubebuilder:default=None
+	// +kubebuilder:validation:Enum={None,Snapshot}
+	// +optional
+	Type HScaleDataClonePolicyType `json:"type,omitempty"`
+
+	// BackupTemplateSelector defines the label selector for finding associated BackupTemplate API object.
+	// +optional
+	BackupTemplateSelector map[string]string `json:"backupTemplateSelector,omitempty"`
+
+	// VolumeMountsName defines which volumeMount of the container to do backup,
+	// only work if Type is not None
+	// if not specified, the 1st volumeMount will be chosen
+	// +optional
+	VolumeMountsName string `json:"volumeMountsName,omitempty"`
 }
 
 type ClusterDefinitionStatusGeneration struct {

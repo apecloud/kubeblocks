@@ -25,7 +25,7 @@ import (
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/load"
 	"cuelang.org/go/encoding/openapi"
-	"github.com/sirupsen/logrus"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 )
@@ -79,7 +79,7 @@ func GenerateOpenAPISchema(cueTpl string, schemaType string) (*apiextv1.JSONSche
 	}
 
 	if typeSchema == nil {
-		logrus.Warnf("Cannot found schema. type:[%s], all: %s", schemaType, all)
+		log.Log.Info(fmt.Sprintf("Cannot found schema. type:[%s], all: %s", schemaType, all))
 		return nil, nil
 	}
 
@@ -90,7 +90,7 @@ func GenerateOpenAPISchema(cueTpl string, schemaType string) (*apiextv1.JSONSche
 
 	j := &apiextv1.JSONSchemaProps{}
 	if err = json.Unmarshal(b, j); err != nil {
-		logrus.Warnf("Cannot unmarshal raw OpenAPI schema to JSONSchemaProps: %v", err)
+		log.Log.Info(fmt.Sprintf("Cannot unmarshal raw OpenAPI schema to JSONSchemaProps: %v", err))
 	}
 
 	return &apiextv1.JSONSchemaProps{

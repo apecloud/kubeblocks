@@ -24,12 +24,12 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
@@ -296,8 +296,7 @@ spec:
 			}, time.Second*10, time.Second*1).Should(BeTrue())
 
 			// check cm
-			logrus.Info("check configmap finalizer: configuration.kubeblocks.io/finalizer")
-
+			log.Log.Info("check configmap finalizer: configuration.kubeblocks.io/finalizer")
 			cmObj := &corev1.ConfigMap{}
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{
@@ -310,7 +309,7 @@ spec:
 				return controllerutil.ContainsFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName)
 			}, time.Second*10, time.Second*1).Should(BeTrue())
 
-			logrus.Info("check clusterdefinition labels: configuration.GenerateTPLUniqLabelKeyWithConfig(testWrapper.TplName()")
+			log.Log.Info("check clusterdefinition labels: configuration.GenerateTPLUniqLabelKeyWithConfig(testWrapper.TplName()")
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{
 					Namespace: clusterDefinition.Namespace,

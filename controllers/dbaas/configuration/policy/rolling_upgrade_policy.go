@@ -19,7 +19,6 @@ package policy
 import (
 	"os"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,7 +38,6 @@ type rollingUpgradePolicy struct {
 func init() {
 	RegisterPolicy(dbaasv1alpha1.RollingPolicy, &rollingUpgradePolicy{})
 	if err := viper.BindEnv(cfgcore.PodMinReadySecondsEnv); err != nil {
-		logrus.Errorf("failed to set bind env: %s", cfgcore.PodMinReadySecondsEnv)
 		os.Exit(-1)
 	}
 	viper.SetDefault(cfgcore.PodMinReadySecondsEnv, defaultMinReadySeconds)

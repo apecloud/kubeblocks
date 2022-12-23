@@ -25,13 +25,12 @@ import (
 	"strings"
 	"time"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/leaanthony/debme"
 	"github.com/pkg/errors"
 	"github.com/sethvargo/go-password/password"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -41,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -1412,7 +1412,7 @@ func updateConfigurationManagerWithComponent(
 	}
 	if reloadOptions.UnixSignalTrigger == nil {
 		// TODO support other reload type
-		logrus.Warnf("only %s type is supported!", dbaasv1alpha1.UnixSignalType)
+		log.Log.Info("only unix signal type is supported!")
 		return nil
 	}
 
@@ -1425,7 +1425,7 @@ func updateConfigurationManagerWithComponent(
 
 	// not container using any config template
 	if len(usingContainers) == 0 {
-		logrus.Warnf("tpl config is not used by any container, and pass. tpl configs: %v", cfgTemplates)
+		log.Log.Info(fmt.Sprintf("tpl config is not used by any container, and pass. tpl configs: %v", cfgTemplates))
 		return nil
 	}
 
@@ -1443,7 +1443,7 @@ func updateConfigurationManagerWithComponent(
 
 	// If you do not need to watch any configmap volume
 	if len(volumeDirs) == 0 {
-		logrus.Warnf("volume for configmap is not used by any container, and pass. cm name: %v", cfgTemplates[firstCfg])
+		log.Log.Info(fmt.Sprintf("volume for configmap is not used by any container, and pass. cm name: %v", cfgTemplates[firstCfg]))
 		return nil
 	}
 

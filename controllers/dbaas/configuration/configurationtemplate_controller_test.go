@@ -22,10 +22,10 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/sirupsen/logrus"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
@@ -49,8 +49,6 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 	Context("Create config tpl with cue validate", func() {
 		It("Should ready", func() {
 			By("By creating a ISV resource")
-
-			logrus.Info("create isv resource: clusterdefinition, appversion, configurationtemplate...")
 			// step1: prepare env
 			testWrapper := CreateDBaasFromISV(testCtx, ctx, k8sClient,
 				"./testdata",
@@ -64,7 +62,7 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 			Expect(testWrapper.HasError()).Should(Succeed())
 
 			// step2: check configuration template cr status and finalizer
-			logrus.Info("check configurationtemplate status.")
+			By("By check configurationtemplate status")
 			Eventually(func() bool {
 				ok, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigurationTemplate{},
 					func(tpl *dbaasv1alpha1.ConfigurationTemplate) bool {
@@ -74,19 +72,19 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 				return err == nil && ok
 			}, time.Second*30, time.Second*1).Should(BeTrue())
 
-			logrus.Info("delete configuration template cr.")
+			By("By delete configuration template cr")
 			Expect(testWrapper.DeleteTpl()).Should(Succeed())
 			// Configuration template not deleted
-			logrus.Info("check whether the configurationtemplate has been deleted.")
-			logrus.Info("expect that configurationtemplate is not deleted.")
+			By("check whether the configurationtemplate has been deleted")
+			log.Log.Info("expect that configurationtemplate is not deleted.")
 			Eventually(func() error {
 				_, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigurationTemplate{},
 					func(tpl *dbaasv1alpha1.ConfigurationTemplate) error { return nil })
 				return err
 			}, time.Second*10, time.Second*1).Should(Succeed())
 
+			By("By delete clusterdefinition and appversion")
 			// step3: delete clusterdefinition and appversion
-			logrus.Info("delete clusterdefinition and appversion.")
 			Expect(testWrapper.DeleteAV()).Should(Succeed())
 			Expect(testWrapper.DeleteCD()).Should(Succeed())
 

@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/sirupsen/logrus"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -190,7 +189,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 				"failed to get component from cluster definition. type[%s]", componentName),
 			reqCtx.Log)
 	} else if component == nil {
-		logrus.Warnf("failed to found component which the configuration is associated, component name: %s", componentName)
+		reqCtx.Log.Info(fmt.Sprintf("failed to found component which the configuration is associated, component name: %s", componentName))
 		return intctrlutil.Reconciled()
 	}
 

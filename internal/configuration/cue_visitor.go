@@ -22,9 +22,9 @@ import (
 	"strconv"
 
 	"cuelang.org/go/cue"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var disableAutoTransfer = viper.GetBool("DISABLE_AUTO_TRANSFER")
@@ -77,7 +77,7 @@ func (c *cueTypeExtractor) visitValue(x cue.Value, path string) {
 		c.addFieldType(path, StructType)
 		c.visitStruct(x)
 	default:
-		logrus.Warnf("cannot convert value of type %s", k.String())
+		log.Log.Info(fmt.Sprintf("cannot convert value of type %s", k.String()))
 	}
 }
 
@@ -87,7 +87,7 @@ func (c *cueTypeExtractor) visitStruct(v cue.Value) {
 	case cue.NoOp, cue.SelectorOp:
 		// pass
 	default:
-		logrus.Warnf("unsupported op %v for object type (%v)", op, v)
+		log.Log.Info(fmt.Sprintf("unsupported op %v for object type (%v)", op, v))
 		return
 	}
 
@@ -102,7 +102,7 @@ func (c *cueTypeExtractor) visitList(v cue.Value, path string) {
 	case cue.NoOp, cue.SelectorOp:
 		// pass
 	default:
-		logrus.Warnf("unsupported op %v for object type (%v)", op, v)
+		log.Log.Info(fmt.Sprintf("unsupported op %v for object type (%v)", op, v))
 	}
 
 	count := 0

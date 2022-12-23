@@ -136,14 +136,17 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 	if event.InvolvedObject.FieldPath != ProbeRoleChangedCheckPath {
 		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
 	}
-
+	var (
+		role        string
+		err         error
+		annotations = event.GetAnnotations()
+	)
 	// filter role changed event that has been handled
-	annotations := event.GetAnnotations()
 	if annotations != nil && annotations[CSRoleChangedAnnotKey] == CSRoleChangedAnnotHandled {
 		return nil
 	}
 
-	if err := handleRoleChangedEvent(cli, reqCtx, recorder, event); err != nil {
+	if role, err = handleRoleChangedEvent(cli, reqCtx, recorder, event); err != nil {
 		return err
 	}
 
@@ -153,23 +156,31 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 		event.Annotations = make(map[string]string, 0)
 	}
 	event.Annotations[CSRoleChangedAnnotKey] = CSRoleChangedAnnotHandled
-	return cli.Patch(reqCtx.Ctx, event, patch)
+	if err = cli.Patch(reqCtx.Ctx, event, patch); err != nil {
+		return err
+	}
+	if role != "" {
+		return nil
+	}
+	// if role is empty, means the event is not role changed event, handle it.
+	return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
 }
 
-func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
+// handleRoleChangedEvent handle role changed event and return role.
+func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) (string, error) {
 	// get role
 	message := &probeMessage{}
 	re := regexp.MustCompile(`Readiness probe failed: ({.*})`)
 	matches := re.FindStringSubmatch(event.Message)
 	if len(matches) != 2 {
-		return nil
+		return "", nil
 	}
 	msg := matches[1]
 	err := json.Unmarshal([]byte(msg), message)
 	if err != nil {
 		// not role related message, ignore it
 		reqCtx.Log.Info("not role message", "message", event.Message, "error", err)
-		return nil
+		return "", nil
 	}
 	role := strings.ToLower(message.Role)
 
@@ -179,15 +190,15 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 	}
 	// get pod
 	pod := &corev1.Pod{}
-	if err := cli.Get(reqCtx.Ctx, podName, pod); err != nil {
-		return err
+	if err = cli.Get(reqCtx.Ctx, podName, pod); err != nil {
+		return role, err
 	}
 	// event belongs to old pod with the same name, ignore it
 	if pod.UID != event.InvolvedObject.UID {
-		return nil
+		return role, nil
 	}
 
-	return consensusset.UpdateConsensusSetRoleLabel(cli, reqCtx, pod, role)
+	return role, consensusset.UpdateConsensusSetRoleLabel(cli, reqCtx, pod, role)
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -773,12 +784,13 @@ func getSupportHorizontalScalingComponents(
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition) ([]dbaasv1alpha1.OperationComponent, []string) {
 	var (
-		clusterComponentNames        = make([]string, 0)
+		components                   = cluster.Spec.Components
+		clusterComponentNames        = make([]string, len(components))
 		horizontalScalableComponents = make([]dbaasv1alpha1.OperationComponent, 0)
 	)
 	// determine whether to support horizontalScaling
-	for _, v := range cluster.Spec.Components {
-		clusterComponentNames = append(clusterComponentNames, v.Name)
+	for i, v := range components {
+		clusterComponentNames[i] = v.Name
 		for _, component := range clusterDef.Spec.Components {
 			if v.Type != component.TypeName || (component.MinReplicas != 0 &&
 				component.MaxReplicas == component.MinReplicas) {

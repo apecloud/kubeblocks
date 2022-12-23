@@ -16,7 +16,9 @@ limitations under the License.
 
 package operations
 
-import dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+import (
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+)
 
 func init() {
 	verticalScalingBehaviour := &OpsBehaviour{
@@ -32,12 +34,15 @@ func init() {
 }
 
 // VerticalScalingAction Modify cluster component resources according to
-// the definition of opsRequest with spec.componentNames and spec.componentOps.verticalScaling
+// the definition of opsRequest with spec.verticalScaling
 func VerticalScalingAction(opsRes *OpsResource) error {
-	componentNameMap := getAllComponentsNameMap(opsRes.OpsRequest)
+	verticalScalingMap := opsRes.OpsRequest.CovertVerticalScalingListToMap()
 	for index, component := range opsRes.Cluster.Spec.Components {
-		if componentOps, ok := componentNameMap[component.Name]; ok && componentOps != nil {
-			component.Resources = *componentOps.VerticalScaling
+		if verticalScaling, ok := verticalScalingMap[component.Name]; ok {
+			if verticalScaling.ResourceRequirements == nil {
+				continue
+			}
+			component.Resources = *verticalScaling.ResourceRequirements
 			opsRes.Cluster.Spec.Components[index] = component
 		}
 	}

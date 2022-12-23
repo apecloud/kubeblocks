@@ -264,10 +264,10 @@ spec:
 			By("send VerticalScalingOpsRequest successfully")
 			verticalScalingOpsRequest := createOpsRequest("mysql-verticalscaling", clusterObj.Name, dbaasv1alpha1.VerticalScalingType)
 			verticalScalingOpsRequest.Spec.TTLSecondsAfterSucceed = 1
-			verticalScalingOpsRequest.Spec.ComponentOpsList = []dbaasv1alpha1.ComponentOps{
+			verticalScalingOpsRequest.Spec.VerticalScalingList = []dbaasv1alpha1.VerticalScaling{
 				{
-					ComponentNames: []string{clusterObj.Spec.Components[0].Name}, // "wesql"
-					VerticalScaling: &corev1.ResourceRequirements{
+					ComponentOps: dbaasv1alpha1.ComponentOps{ComponentName: clusterObj.Spec.Components[0].Name}, // "wesql"
+					ResourceRequirements: &corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							"cpu":    resource.MustParse("400m"),
 							"memory": resource.MustParse("200Mi"),
@@ -293,7 +293,7 @@ spec:
 				fetchedCluster := &dbaasv1alpha1.Cluster{}
 				_ = k8sClient.Get(ctx, key, fetchedCluster)
 				return fetchedCluster.Spec.Components[0].Resources.Requests
-			}, timeout, interval).Should(Equal(verticalScalingOpsRequest.Spec.ComponentOpsList[0].VerticalScaling.Requests))
+			}, timeout, interval).Should(Equal(verticalScalingOpsRequest.Spec.VerticalScalingList[0].Requests))
 
 			By("OpsRequest reclaimed after ttl")
 			Eventually(func() bool {

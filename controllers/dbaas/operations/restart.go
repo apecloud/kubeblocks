@@ -43,13 +43,10 @@ func init() {
 
 // RestartAction restart components by updating StatefulSet.
 func RestartAction(opsRes *OpsResource) error {
-	var (
-		componentNameMap = getAllComponentsNameMap(opsRes.OpsRequest)
-		startTimestamp   = opsRes.OpsRequest.Status.StartTimestamp
-	)
-	if startTimestamp == nil {
+	if opsRes.OpsRequest.Status.StartTimestamp == nil {
 		return fmt.Errorf("status.startTimestamp can not be null")
 	}
+	componentNameMap := opsRes.OpsRequest.GetRestartComponentNameMap()
 	if err := restartDeployment(opsRes, componentNameMap); err != nil {
 		return err
 	}
@@ -57,7 +54,7 @@ func RestartAction(opsRes *OpsResource) error {
 }
 
 // restartStatefulSet restart statefulSet workload
-func restartStatefulSet(opsRes *OpsResource, componentNameMap map[string]*dbaasv1alpha1.ComponentOps) error {
+func restartStatefulSet(opsRes *OpsResource, componentNameMap map[string]struct{}) error {
 	var (
 		statefulSetList = &appv1.StatefulSetList{}
 		err             error
@@ -80,7 +77,7 @@ func restartStatefulSet(opsRes *OpsResource, componentNameMap map[string]*dbaasv
 }
 
 // restartDeployment restart deployment workload
-func restartDeployment(opsRes *OpsResource, componentNameMap map[string]*dbaasv1alpha1.ComponentOps) error {
+func restartDeployment(opsRes *OpsResource, componentNameMap map[string]struct{}) error {
 	var (
 		deploymentList = &appv1.DeploymentList{}
 		err            error
@@ -103,7 +100,7 @@ func restartDeployment(opsRes *OpsResource, componentNameMap map[string]*dbaasv1
 }
 
 // isRestarted check whether the component has been restarted
-func isRestarted(opsRes *OpsResource, object client.Object, componentNameMap map[string]*dbaasv1alpha1.ComponentOps, podTemplate *corev1.PodTemplateSpec) bool {
+func isRestarted(opsRes *OpsResource, object client.Object, componentNameMap map[string]struct{}, podTemplate *corev1.PodTemplateSpec) bool {
 	cName := object.GetLabels()[intctrlutil.AppComponentLabelKey]
 	if _, ok := componentNameMap[cName]; !ok {
 		return true

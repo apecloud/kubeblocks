@@ -56,105 +56,55 @@ spec:
           spec:
             description: OpsRequestSpec defines the desired state of OpsRequest
             properties:
-              clusterOps:
-                description: ClusterOps defines operations in cluster scope, such
-                  as Upgrade.
-                properties:
-                  upgrade:
-                    properties:
-                      appVersionRef:
-                        description: AppVersionRef reference AppVersion name.
-                        type: string
-                    required:
-                    - appVersionRef
-                    type: object
-                required:
-                - upgrade
-                type: object
               clusterRef:
-                description: ClusterRef reference clusterDefinition.
+                description: clusterRef reference clusterDefinition.
                 type: string
-              componentOps:
-                description: ComponentOpsList defines operations in component scope,
-                  such as VolumeExpansion,VerticalScaling,HorizontalScaling.
+              horizontalScaling:
+                description: horizontalScaling defines what component need to horizontal
+                  scale the specified replicas.
                 items:
+                  description: HorizontalScaling defines the variables of horizontal
+                    scaling operation
                   properties:
-                    componentNames:
-                      description: ComponentNames defines which components perform
-                        the operation.
-                      items:
-                        type: string
-                      minItems: 1
-                      type: array
-                    horizontalScaling:
-                      description: HorizontalScaling defines the variables that need
-                        to input when scaling replicas.
-                      properties:
-                        replicas:
-                          description: Replicas for the workloads.
-                          format: int32
-                          type: integer
-                      type: object
-                    verticalScaling:
-                      description: VerticalScaling defines the variables that need
-                        to input when scaling compute resources.
-                      properties:
-                        limits:
-                          additionalProperties:
-                            anyOf:
-                            - type: integer
-                            - type: string
-                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                            x-kubernetes-int-or-string: true
-                          description: 'Limits describes the maximum amount of compute
-                            resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
-                          type: object
-                        requests:
-                          additionalProperties:
-                            anyOf:
-                            - type: integer
-                            - type: string
-                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                            x-kubernetes-int-or-string: true
-                          description: 'Requests describes the minimum amount of compute
-                            resources required. If Requests is omitted for a container,
-                            it defaults to Limits if that is explicitly specified,
-                            otherwise to an implementation-defined value. More info:
-                            https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
-                          type: object
-                      type: object
-                    volumeExpansion:
-                      description: VolumeExpansion defines the variables that need
-                        to input when expanding a volume.
-                      items:
-                        properties:
-                          name:
-                            description: Name reference volumeClaimTemplate name from
-                              cluster components.
-                            type: string
-                          storage:
-                            anyOf:
-                            - type: integer
-                            - type: string
-                            description: Storage the request storage size.
-                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                            x-kubernetes-int-or-string: true
-                        required:
-                        - name
-                        - storage
-                        type: object
-                      type: array
+                    componentName:
+                      description: componentName cluster component name.
+                      type: string
+                    replicas:
+                      description: replicas for the workloads.
+                      format: int32
+                      minimum: 0
+                      type: integer
                   required:
-                  - componentNames
+                  - componentName
+                  - replicas
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - componentName
+                x-kubernetes-list-type: map
+              restart:
+                description: restart the specified component.
+                items:
+                  description: ComponentOps defines the common variables of component
+                    scope operations.
+                  properties:
+                    componentName:
+                      description: componentName cluster component name.
+                      type: string
+                  required:
+                  - componentName
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - componentName
+                x-kubernetes-list-type: map
               ttlSecondsAfterSucceed:
-                description: TTLSecondsAfterSucceed OpsRequest will be deleted after
+                description: ttlSecondsAfterSucceed OpsRequest will be deleted after
                   TTLSecondsAfterSucceed second when OpsRequest.status.phase is Succeed.
                 format: int32
                 type: integer
               type:
-                description: Type defines the operation type.
+                description: type defines the operation type.
                 enum:
                 - Upgrade
                 - VerticalScaling
@@ -162,6 +112,97 @@ spec:
                 - HorizontalScaling
                 - Restart
                 type: string
+              upgrade:
+                description: upgrade specify the cluster application version by specifying
+                  appVersionRef.
+                properties:
+                  appVersionRef:
+                    description: appVersionRef reference AppVersion name.
+                    type: string
+                required:
+                - appVersionRef
+                type: object
+              verticalScaling:
+                description: verticalScaling defines what component need to vertical
+                  scale the specified compute resources.
+                items:
+                  description: VerticalScaling defines the variables that need to
+                    input when scaling compute resources.
+                  properties:
+                    componentName:
+                      description: componentName cluster component name.
+                      type: string
+                    limits:
+                      additionalProperties:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      description: 'Limits describes the maximum amount of compute
+                        resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                      type: object
+                    requests:
+                      additionalProperties:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      description: 'Requests describes the minimum amount of compute
+                        resources required. If Requests is omitted for a container,
+                        it defaults to Limits if that is explicitly specified, otherwise
+                        to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                      type: object
+                  required:
+                  - componentName
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - componentName
+                x-kubernetes-list-type: map
+              volumeExpansion:
+                description: volumeExpansion defines what component and volumeClaimTemplate
+                  need to expand the specified storage.
+                items:
+                  description: VolumeExpansion defines the variables of volume expansion
+                    operation.
+                  properties:
+                    componentName:
+                      description: componentName cluster component name.
+                      type: string
+                    volumeClaimTemplates:
+                      description: volumeClaimTemplates specify the storage size and
+                        volumeClaimTemplate name.
+                      items:
+                        properties:
+                          name:
+                            description: name reference volumeClaimTemplate name from
+                              cluster components.
+                            type: string
+                          storage:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            description: storage the request storage size.
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                        required:
+                        - name
+                        - storage
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
+                  required:
+                  - componentName
+                  - volumeClaimTemplates
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - componentName
+                x-kubernetes-list-type: map
             required:
             - clusterRef
             - type
@@ -170,18 +211,18 @@ spec:
             description: OpsRequestStatus defines the observed state of OpsRequest
             properties:
               StartTimestamp:
-                description: StartTimestamp The time when the OpsRequest started processing.
+                description: startTimestamp The time when the OpsRequest started processing.
                 format: date-time
                 type: string
               completionTimestamp:
-                description: CompletionTimestamp the OpsRequest completion time.
+                description: completionTimestamp the OpsRequest completion time.
                 format: date-time
                 type: string
               components:
                 additionalProperties:
                   properties:
                     phase:
-                      description: Phase describe the component phase, reference ClusterDefinition.status.component.phase.
+                      description: phase describe the component phase, reference ClusterDefinition.status.component.phase.
                       enum:
                       - Running
                       - Failed
@@ -211,14 +252,14 @@ spec:
                                   - Succeed
                                   type: string
                               type: object
-                            description: PersistentVolumeClaimStatus describe the
+                            description: persistentVolumeClaimStatus describe the
                               persistentVolumeClaim status
                             type: object
                           requestStorage:
                             anyOf:
                             - type: integer
                             - type: string
-                            description: RequestStorage the request storage size.
+                            description: requestStorage the request storage size.
                             pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                             x-kubernetes-int-or-string: true
                           status:
@@ -230,15 +271,15 @@ spec:
                             - Succeed
                             type: string
                         type: object
-                      description: VolumeClaimTemplates describe the volumeClaimTemplates
+                      description: volumeClaimTemplates describe the volumeClaimTemplates
                         status when spec.type is VolumeExpansion
                       type: object
                   type: object
-                description: Components record the status information of components
-                  with spec.componentOps.componentNames.
+                description: components record the status information of changing
+                  components in this operation.
                 type: object
               conditions:
-                description: Conditions describe opsRequest detail status.
+                description: conditions describe opsRequest detail status.
                 items:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource. --- This struct is intended for direct
@@ -313,7 +354,7 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: Phase describe OpsRequest phase.
+                description: phase describe OpsRequest phase.
                 enum:
                 - Pending
                 - Running

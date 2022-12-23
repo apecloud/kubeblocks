@@ -145,7 +145,7 @@ var _ = Describe("Cluster", func() {
 		o.ComponentNames = []string{"replicasets"}
 		Expect(o.Validate()).To(MatchError("missing vct-names"))
 		By("validate volumeExpansion when storage is null")
-		o.VctNames = []string{"data"}
+		o.VCTNames = []string{"data"}
 		Expect(o.Validate()).To(MatchError("missing storage"))
 		o.Storage = "2Gi"
 		Expect(o.Validate()).Should(Succeed())

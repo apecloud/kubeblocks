@@ -33,6 +33,6 @@ func init() {
 
 // UpgradeAction Modify Cluster.spec.appVersionRef with opsRequest.spec.clusterOps.upgrade.appVersionRef
 func UpgradeAction(opsRes *OpsResource) error {
-	opsRes.Cluster.Spec.AppVersionRef = opsRes.OpsRequest.Spec.ClusterOps.Upgrade.AppVersionRef
+	opsRes.Cluster.Spec.AppVersionRef = opsRes.OpsRequest.Spec.Upgrade.AppVersionRef
 	return opsRes.Client.Update(opsRes.Ctx, opsRes.Cluster)
 }

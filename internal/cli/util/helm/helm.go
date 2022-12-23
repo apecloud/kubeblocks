@@ -178,6 +178,9 @@ func (i *InstallOpts) Install(cfg *action.Configuration) (string, error) {
 func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 	res, _ := i.getInstalled(cfg)
 	if res != nil {
+		if release.StatusDeployed != res.Info.Status {
+			return "", ErrorChartNotSuccessDeployed
+		}
 		return "", nil
 	}
 

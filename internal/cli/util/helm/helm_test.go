@@ -20,6 +20,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
@@ -43,18 +45,39 @@ var _ = Describe("helm util", func() {
 		Expect(cfg).ShouldNot(BeNil())
 	})
 
-	It("Install", func() {
-		o := &InstallOpts{
-			Name:      testing.KubeBlocksChartName,
-			Chart:     testing.KubeBlocksChartURL,
-			Namespace: "default",
-			Version:   version.DefaultKubeBlocksVersion,
-		}
-		cfg := FakeActionConfig()
-		Expect(cfg).ShouldNot(BeNil())
-		_, err := o.Install(cfg)
-		Expect(err).Should(HaveOccurred())
-		Expect(o.UnInstall(cfg)).Should(HaveOccurred())
+	Context("Install", func() {
+		var o *InstallOpts
+		var cfg *action.Configuration
+
+		BeforeEach(func() {
+			o = &InstallOpts{
+				Name:      testing.KubeBlocksChartName,
+				Chart:     testing.KubeBlocksChartURL,
+				Namespace: "default",
+				Version:   version.DefaultKubeBlocksVersion,
+			}
+			cfg = FakeActionConfig()
+			Expect(cfg).ShouldNot(BeNil())
+		})
+
+		It("Install", func() {
+			_, err := o.Install(cfg)
+			Expect(err).Should(HaveOccurred())
+			Expect(o.UnInstall(cfg)).Should(HaveOccurred())
+		})
+
+		It("should failed with chart already installed", func() {
+			err := cfg.Releases.Create(&release.Release{
+				Name:    o.Name,
+				Version: 1,
+				Info: &release.Info{
+					Status: release.StatusFailed,
+				},
+			})
+			Expect(err).Should(BeNil())
+			_, err = o.Install(cfg)
+			Expect(err.Error()).Should(ContainSubstring(ErrorChartNotSuccessDeployed.Error()))
+		})
 	})
 
 	It("Upgrade", func() {

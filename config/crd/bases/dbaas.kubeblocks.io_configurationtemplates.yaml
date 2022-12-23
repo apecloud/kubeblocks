@@ -50,70 +50,71 @@ spec:
             description: ConfigurationTemplateSpec defines the desired state of ConfigurationTemplate
             properties:
               cfgSchemaTopLevelName:
-                description: CfgSchemaTopLevelName is cue type name, which generates
+                description: cfgSchemaTopLevelName is cue type name, which generates
                   openapi schema.
                 type: string
               configurationSchema:
-                description: ConfigurationSchema imposes restrictions on database
+                description: configurationSchema imposes restrictions on database
                   parameter's rule.
                 properties:
                   cue:
-                    description: Cue that to let provider verify user configuration
+                    description: cue that to let provider verify user configuration
                       through cue language.
                     type: string
                   schema:
-                    description: Schema provides a way for providers to validate the
+                    description: schema provides a way for providers to validate the
                       changed parameters through json.
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
               dynamicParameters:
-                description: DynamicParameters, list of DynamicParameter, modifications
+                description: dynamicParameters, list of DynamicParameter, modifications
                   of them trigger a config dynamic reload without process restart.
                 items:
                   type: string
                 type: array
               formatter:
-                default: yaml
-                description: Formatter describes the format of the configuration file,
+                description: formatter describes the format of the configuration file,
                   the controller 1. parses configuration file 2. analyzes the modified
                   parameters 3. applies corresponding policies.
                 enum:
-                - dotenv
                 - ini
+                - xml
                 - yaml
                 - json
-                - hcl
                 type: string
               immutableParameters:
-                description: ImmutableParameters describes parameters that prohibit
+                description: immutableParameters describes parameters that prohibit
                   user from modification.
                 items:
                   type: string
                 type: array
               reloadOptions:
-                description: ReloadOptions indicates whether the process supports
+                description: reloadOptions indicates whether the process supports
                   reload. if set, the controller will determine the behavior of the
                   engine instance based on the configuration templates, restart or
                   reload depending on whether any parameters in the StaticParameters
                   have been modified.
                 properties:
                   shellTrigger:
+                    description: shellTrigger performs the reload command.
                     properties:
                       exec:
+                        description: exec used to execute for reload.
                         type: string
                     required:
                     - exec
                     type: object
                   unixSignalTrigger:
+                    description: unixSignalTrigger used to reload by sending a signal.
                     properties:
                       processName:
-                        description: ProcessName is process name, sends unix signal
+                        description: processName is process name, sends unix signal
                           to proc.
                         pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                       signal:
-                        description: 'Signal is valid for unix signal e.g: SIGHUP
+                        description: 'signal is valid for unix signal. e.g: SIGHUP
                           url: ../../internal/configuration/configmap/handler.go:allUnixSignals'
                         pattern: ^SIG[A-Z]+$
                         type: string
@@ -123,18 +124,20 @@ spec:
                     type: object
                 type: object
               staticParameters:
-                description: StaticParameters, list of StaticParameter, modifications
+                description: staticParameters, list of StaticParameter, modifications
                   of them trigger a process restart.
                 items:
                   type: string
                 type: array
+            required:
+            - formatter
             type: object
           status:
             description: ConfigurationTemplateStatus defines the observed state of
               ConfigurationTemplate.
             properties:
               message:
-                description: Message field describes the reasons of abnormal status.
+                description: message field describes the reasons of abnormal status.
                 type: string
               observedGeneration:
                 description: observedGeneration is the latest generation observed
@@ -143,7 +146,7 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: Phase is status of configuration template, when set to
+                description: phase is status of configuration template, when set to
                   AvailablePhase, it can be referenced by ClusterDefinition or AppVersion.
                 enum:
                 - Available

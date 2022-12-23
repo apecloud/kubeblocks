@@ -8,9 +8,10 @@ import (
 	context "context"
 	reflect "reflect"
 
-	proto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 	gomock "github.com/golang/mock/gomock"
 	grpc "google.golang.org/grpc"
+
+	proto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 )
 
 // MockReconfigureClient is a mock of ReconfigureClient interface.

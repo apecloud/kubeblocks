@@ -23,52 +23,49 @@ import (
 
 // ConfigurationTemplateSpec defines the desired state of ConfigurationTemplate
 type ConfigurationTemplateSpec struct {
-	// ReloadOptions indicates whether the process supports reload.
+	// reloadOptions indicates whether the process supports reload.
 	// if set, the controller will determine the behavior of the engine instance based on the configuration templates,
 	// restart or reload depending on whether any parameters in the StaticParameters have been modified.
 	// +optional
 	ReloadOptions *ReloadOptions `json:"reloadOptions,omitempty"`
 
-	// CfgSchemaTopLevelName is cue type name, which generates openapi schema.
+	// cfgSchemaTopLevelName is cue type name, which generates openapi schema.
 	// +optional
 	CfgSchemaTopLevelName string `json:"cfgSchemaTopLevelName,omitempty"`
 
-	// ConfigurationSchema imposes restrictions on database parameter's rule.
+	// configurationSchema imposes restrictions on database parameter's rule.
 	// +optional
 	ConfigurationSchema *CustomParametersValidation `json:"configurationSchema,omitempty"`
 
-	// StaticParameters, list of StaticParameter, modifications of them trigger a process restart.
+	// staticParameters, list of StaticParameter, modifications of them trigger a process restart.
 	// +optional
 	StaticParameters []string `json:"staticParameters,omitempty"`
 
-	// DynamicParameters, list of DynamicParameter, modifications of them trigger a config dynamic reload without process restart.
+	// dynamicParameters, list of DynamicParameter, modifications of them trigger a config dynamic reload without process restart.
 	// +optional
 	DynamicParameters []string `json:"dynamicParameters,omitempty"`
 
-	// ImmutableParameters describes parameters that prohibit user from modification.
+	// immutableParameters describes parameters that prohibit user from modification.
 	// +optional
 	ImmutableParameters []string `json:"immutableParameters,omitempty"`
 
-	// Formatter describes the format of the configuration file, the controller
+	// formatter describes the format of the configuration file, the controller
 	// 1. parses configuration file
 	// 2. analyzes the modified parameters
 	// 3. applies corresponding policies.
-	// +kubebuilder:default:Enum=yaml
-	// +kubebuilder:validation:Enum={dotenv,ini,yaml,json,hcl}
-	Formatter ConfigurationFormatter `json:"formatter,omitempty"`
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum={ini,xml,yaml,json}
+	Formatter ConfigurationFormatter `json:"formatter"`
 }
 
 // ConfigurationTemplateStatus defines the observed state of ConfigurationTemplate.
 type ConfigurationTemplateStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Phase is status of configuration template, when set to AvailablePhase, it can be referenced by ClusterDefinition or AppVersion.
+	// phase is status of configuration template, when set to AvailablePhase, it can be referenced by ClusterDefinition or AppVersion.
 	// +kubebuilder:validation:Enum={Available,Unavailable,Deleting}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
-	// Message field describes the reasons of abnormal status.
+	// message field describes the reasons of abnormal status.
 	// +optional
 	Message string `json:"message,omitempty"`
 
@@ -80,13 +77,13 @@ type ConfigurationTemplateStatus struct {
 }
 
 type CustomParametersValidation struct {
-	// Schema provides a way for providers to validate the changed parameters through json.
+	// schema provides a way for providers to validate the changed parameters through json.
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:validation:Type=object
 	// +kubebuilder:pruning:PreserveUnknownFields
 	Schema *apiext.JSONSchemaProps `json:"schema,omitempty"`
 
-	// Cue that to let provider verify user configuration through cue language.
+	// cue that to let provider verify user configuration through cue language.
 	// +optional
 	Cue *string `json:"cue,omitempty"`
 }
@@ -94,28 +91,31 @@ type CustomParametersValidation struct {
 // ReloadOptions defines reload options
 // Only one of its members may be specified.
 type ReloadOptions struct {
+	// unixSignalTrigger used to reload by sending a signal.
 	// +optional
 	UnixSignalTrigger *UnixSignalTrigger `json:"unixSignalTrigger,omitempty"`
 
+	// shellTrigger performs the reload command.
 	// +optional
 	ShellTrigger *ShellTrigger `json:"shellTrigger,omitempty"`
 }
 
 type UnixSignalTrigger struct {
-	// Signal is valid for unix signal
+	// signal is valid for unix signal.
 	// e.g: SIGHUP
 	// url: ../../internal/configuration/configmap/handler.go:allUnixSignals
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^SIG[A-Z]+$`
 	Signal string `json:"signal"`
 
-	// ProcessName is process name, sends unix signal to proc.
+	// processName is process name, sends unix signal to proc.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ProcessName string `json:"processName"`
 }
 
 type ShellTrigger struct {
+	// exec used to execute for reload.
 	// +kubebuilder:validation:Required
 	Exec string `json:"exec"`
 }

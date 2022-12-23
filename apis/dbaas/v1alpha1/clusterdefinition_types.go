@@ -76,9 +76,11 @@ type ConfigTemplate struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	ConfigTplRef string `json:"configTplRef,omitempty"`
+	ConfigTplRef string `json:"configTplRef"`
 
 	// Specify the name of the referenced the configuration constraints object.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	ConfigConstraintRef string `json:"configConstraintRef,omitempty"`
 
@@ -121,26 +123,26 @@ type ExporterConfig struct {
 }
 
 type MonitorConfig struct {
-	// BuiltIn is a switch to enable KubeBlocks builtIn monitoring.
+	// builtIn is a switch to enable KubeBlocks builtIn monitoring.
 	// If BuiltIn is true and CharacterType is well-known, ExporterConfig and Sidecar container will generate automatically.
-	// Otherwise, provider should set BuiltIn to false and provide ExporterConfig and Sidecar container own.
+	// Otherwise, provider should set builtIn to false and provide ExporterConfig and Sidecar container own.
 	// +kubebuilder:default=false
 	// +optional
 	BuiltIn bool `json:"builtIn,omitempty"`
 
-	// Exporter provided by provider, which specify necessary information to Time Series Database.
-	// ExporterConfig is valid when BuiltIn is false.
+	// exporterConfig provided by provider, which specify necessary information to Time Series Database.
+	// exporterConfig is valid when builtIn is false.
 	// +optional
 	Exporter *ExporterConfig `json:"exporterConfig,omitempty"`
 }
 
 type LogConfig struct {
-	// Name log type name, such as slow for MySQL slow log file.
+	// name log type name, such as slow for MySQL slow log file.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=128
 	Name string `json:"name"`
 
-	// FilePathPattern log file path pattern which indicate how to find this file
+	// filePathPattern log file path pattern which indicate how to find this file
 	// corresponding to variable (log path) in database kernel. please don't set this casually.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=4096
@@ -156,12 +158,6 @@ type ConfigurationSpec struct {
 	// +listType=map
 	// +listMapKey=name
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
-
-	// ConfigRevisionHistoryLimit is number of prior configuration versions, By default, 6 versions are reserved.
-	// +kubebuilder:default=6
-	// +kubebuilder:validation:Minimum=0
-	// +optional
-	ConfigRevisionHistoryLimit int `json:"configRevisionHistoryLimit,omitempty"`
 }
 
 // ClusterDefinitionComponent is a group of pods, pods belong to same component usually share the same data
@@ -179,41 +175,41 @@ type ClusterDefinitionComponent struct {
 	// +kubebuilder:default=Stateless
 	ComponentType ComponentType `json:"componentType"`
 
-	// CharacterType defines well-known database component name, such as mongos(mongodb), proxy(redis), mariadb(mysql)
-	// DBaas will generate proper monitor configs for well-known CharacterType when BuiltIn is true.
+	// characterType defines well-known database component name, such as mongos(mongodb), proxy(redis), mariadb(mysql)
+	// KubeBlocks will generate proper monitor configs for well-known characterType when builtIn is true.
 	// +optional
 	CharacterType string `json:"characterType,omitempty"`
 
-	// MinReplicas minimum replicas for component pod count.
+	// minReplicas minimum replicas for component pod count.
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	MinReplicas int32 `json:"minReplicas,omitempty"`
 
-	// MaxReplicas maximum replicas pod for component pod count.
+	// maxReplicas maximum replicas pod for component pod count.
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	MaxReplicas int32 `json:"maxReplicas,omitempty"`
 
-	// DefaultReplicas default replicas in this component when not specified.
+	// defaultReplicas default replicas in this component when not specified.
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	DefaultReplicas int32 `json:"defaultReplicas,omitempty"`
 
-	// PDBSpec pod disruption budget spec. This is mutually exclusive with the component type of Consensus.
+	// pdbSpec pod disruption budget spec. This is mutually exclusive with the component type of Consensus.
 	// +optional
 	PDBSpec *policyv1.PodDisruptionBudgetSpec `json:"pdbSpec,omitempty"`
 
-	// ConfigSpec defines configuration related spec.
+	// configSpec defines configuration related spec.
 	// +optional
 	ConfigSpec *ConfigurationSpec `json:"configSpec,omitempty"`
 
-	// Monitor is monitoring config which provided by provider.
+	// monitor is monitoring config which provided by provider.
 	// +optional
 	Monitor *MonitorConfig `json:"monitor,omitempty"`
 
-	// LogConfigs is detail log file config which provided by provider.
+	// logConfigs is detail log file config which provided by provider.
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
@@ -236,7 +232,7 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Service *corev1.ServiceSpec `json:"service,omitempty"`
 
-	// Probes setting for db healthy checks.
+	// probes setting for db healthy checks.
 	// +optional
 	Probes *ClusterDefinitionProbes `json:"probes,omitempty"`
 

@@ -17,6 +17,7 @@ limitations under the License.
 package configmap
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -24,13 +25,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_findParentPidFromProcessName(t *testing.T) {
-	pid, err := findParentPidFromProcessName(GetProcName())
+func TestFindParentPidFromProcessName(t *testing.T) {
+	processName := getProcName()
+	fmt.Printf("current test program name: %s\n", processName)
+	pid, err := findParentPidFromProcessName(processName)
 	require.Nil(t, err)
 	require.Equal(t, PID(os.Getpid()), pid)
 }
 
-func GetProcName() string {
+func getProcName() string {
 	pid := int32(os.Getpid())
 	procs, _ := process.Processes()
 	for _, proc := range procs {
@@ -39,6 +42,5 @@ func GetProcName() string {
 			return name
 		}
 	}
-
 	return ""
 }

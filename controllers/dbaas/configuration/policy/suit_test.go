@@ -23,6 +23,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"github.com/spf13/viper"
+	"go.uber.org/zap/zapcore"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -42,7 +44,11 @@ func TestReconfigurePolicy(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	if viper.GetBool("ENABLE_DEBUG_LOG") {
+		logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true), func(o *zap.Options) {
+			o.TimeEncoder = zapcore.ISO8601TimeEncoder
+		}))
+	}
 
 	ctx, cancel = context.WithCancel(context.TODO())
 }, 60)

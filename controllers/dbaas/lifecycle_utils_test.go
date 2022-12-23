@@ -320,6 +320,7 @@ spec:
     configSpec:
       configTemplateRefs:
       - name: mysql-tree-node-template-8.0
+        configTplRef: mysql-tree-node-template-8.0
         volumeName: mysql-config
     defaultReplicas: 1
     podSpec:
@@ -400,6 +401,7 @@ spec:
     configSpec:
       configTemplateRefs:
       - name: mysql-tree-node-template-8.0
+        configTplRef: mysql-tree-node-template-8.0
         volumeName: mysql-config
     podSpec:
       containers:

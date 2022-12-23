@@ -178,6 +178,7 @@ spec:
         filePathPattern: /data/mysql/mysqld-slow.log
     configTemplateRefs:
       - name: mysql-tree-node-template-8.0
+        configTplRef: mysql-tree-node-template-8.0
         volumeName: mysql-config
     componentType: Consensus
     consensusSpec:

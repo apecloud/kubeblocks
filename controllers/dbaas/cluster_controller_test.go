@@ -766,6 +766,7 @@ spec:
         builtIn: false
       configTemplateRefs:
         - name: %s
+          configTplRef: %s
           volumeName: mysql-config
       componentType: Consensus
       consensusSpec:
@@ -891,7 +892,7 @@ spec:
                 - path: "annotations"
                   fieldRef:
                     fieldPath: metadata.annotations
-`, clusterDefKey.Name, configTplKey.Name)
+`, clusterDefKey.Name, configTplKey.Name, configTplKey.Name)
 			clusterDef := &dbaasv1alpha1.ClusterDefinition{}
 			Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDef)).Should(Succeed())
 			if useExistingCluster {

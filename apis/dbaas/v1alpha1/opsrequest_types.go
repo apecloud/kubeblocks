@@ -20,6 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // OpsRequestSpec defines the desired state of OpsRequest
@@ -181,4 +182,11 @@ type OpsRequestList struct {
 
 func init() {
 	SchemeBuilder.Register(&OpsRequest{}, &OpsRequestList{})
+}
+
+func (r *OpsRequest) GetNamespacedName() types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: r.Namespace,
+		Name:      r.Name,
+	}
 }

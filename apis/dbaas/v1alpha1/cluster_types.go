@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // ClusterSpec defines the desired state of Cluster
@@ -369,6 +370,13 @@ func (r *Cluster) GetTypeMappingComponents() map[string][]ClusterComponent {
 		m[c.Type] = v
 	}
 	return m
+}
+
+func (r *Cluster) GetNamespacedName() types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: r.Namespace,
+		Name:      r.Name,
+	}
 }
 
 // GetMessage get message map deep copy object

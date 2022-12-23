@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // AppVersionSpec defines the desired state of AppVersion
@@ -118,4 +119,11 @@ func (r *AppVersion) GetTypeMappingComponents() map[string]*AppVersionComponent 
 		m[c.Type] = &r.Spec.Components[i]
 	}
 	return m
+}
+
+func (r *AppVersion) GetNamespacedName() types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: r.Namespace,
+		Name:      r.Name,
+	}
 }

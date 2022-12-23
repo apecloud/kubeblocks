@@ -19,6 +19,8 @@ package v1alpha1
 import (
 	"strings"
 
+	"k8s.io/apimachinery/pkg/types"
+
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -406,4 +408,11 @@ func (r *ClusterDefinition) ValidateEnabledLogConfigs(typeName string, enabledLo
 		}
 	}
 	return invalidLogNames
+}
+
+func (r *ClusterDefinition) GetNamespacedName() types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: r.Namespace,
+		Name:      r.Name,
+	}
 }

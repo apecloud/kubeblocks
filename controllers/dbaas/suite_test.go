@@ -22,6 +22,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/types"
+
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -183,3 +185,85 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
+
+func IsUseExistingClusterEnabled() bool {
+	return testEnv.UseExistingCluster != nil && *testEnv.UseExistingCluster
+}
+
+// Helper functions to change fields in the desired state and status of resources.
+// Each helper is a wrapper of k8sClient.Patch.
+
+func ChangeClusterDef(namespacedName types.NamespacedName,
+	action func(clusterDef *dbaasv1alpha1.ClusterDefinition)) error {
+	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+	if err := k8sClient.Get(ctx, namespacedName, clusterDef); err != nil {
+		return err
+	}
+	patch := client.MergeFrom(clusterDef.DeepCopy())
+	action(clusterDef)
+	if err := k8sClient.Patch(ctx, clusterDef, patch); err != nil {
+		return err
+	}
+	return nil
+}
+
+func ChangeCluster(namespacedName types.NamespacedName,
+	action func(cluster *dbaasv1alpha1.Cluster)) error {
+	cluster := &dbaasv1alpha1.Cluster{}
+	if err := k8sClient.Get(ctx, namespacedName, cluster); err != nil {
+		return err
+	}
+	patch := client.MergeFrom(cluster.DeepCopy())
+	action(cluster)
+	if err := k8sClient.Patch(ctx, cluster, patch); err != nil {
+		return err
+	}
+	return nil
+}
+
+func ChangeClusterStatus(namespacedName types.NamespacedName,
+	action func(cluster *dbaasv1alpha1.Cluster)) error {
+	cluster := &dbaasv1alpha1.Cluster{}
+	if err := k8sClient.Get(ctx, namespacedName, cluster); err != nil {
+		return err
+	}
+	patch := client.MergeFrom(cluster.DeepCopy())
+	action(cluster)
+	if err := k8sClient.Status().Patch(ctx, cluster, patch); err != nil {
+		return err
+	}
+	return nil
+}
+
+func ChangeOpsRequestStatus(namespacedName types.NamespacedName,
+	action func(cluster *dbaasv1alpha1.OpsRequest)) error {
+	opsRequest := &dbaasv1alpha1.OpsRequest{}
+	if err := k8sClient.Get(ctx, namespacedName, opsRequest); err != nil {
+		return err
+	}
+	patch := client.MergeFrom(opsRequest.DeepCopy())
+	action(opsRequest)
+	if err := k8sClient.Status().Patch(ctx, opsRequest, patch); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Helper functions to get fields from state or status of resources when writing unit tests.
+// Each helper returns a Gomega assertion function, which should be passed into Eventually() as the first parameter.
+
+func ExpectClusterStatusPhase(namespacedName types.NamespacedName) func(g Gomega) dbaasv1alpha1.Phase {
+	return func(g Gomega) dbaasv1alpha1.Phase {
+		cluster := &dbaasv1alpha1.Cluster{}
+		g.Expect(k8sClient.Get(ctx, namespacedName, cluster)).To(Succeed())
+		return cluster.Status.Phase
+	}
+}
+
+func ExpectOpsRequestStatusPhase(namespacedName types.NamespacedName) func(g Gomega) dbaasv1alpha1.Phase {
+	return func(g Gomega) dbaasv1alpha1.Phase {
+		opsRequest := &dbaasv1alpha1.OpsRequest{}
+		g.Expect(k8sClient.Get(ctx, namespacedName, opsRequest)).To(Succeed())
+		return opsRequest.Status.Phase
+	}
+}

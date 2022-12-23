@@ -37,7 +37,7 @@ import (
 
 var _ = Describe("OpsRequest Controller", func() {
 
-	const timeout = time.Second * 10
+	const timeout = time.Second * 20
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
 
@@ -250,8 +250,8 @@ spec:
 			By("check(or mock maybe) cluster status running")
 			if !testCtx.UsingExistingCluster() {
 				// MOCK pods are created and running, so as the cluster
-				Eventually(expectClusterInPhase(key, dbaasv1alpha1.CreatingPhase), timeout, interval).Should(BeTrue())
-				mockSetClusterPhaseToRunning(key)
+				Eventually(ExpectClusterStatusPhase(key), timeout, interval).Should(Equal(dbaasv1alpha1.CreatingPhase))
+				Expect(mockSetClusterStatusPhaseToRunning(key)).Should(Succeed())
 			}
 			// TODO The following assert doesn't pass in a real K8s cluster (with UseExistingCluster set).
 			// TODO After all pods(both proxy and wesql) enter `Running` state,
@@ -259,7 +259,7 @@ spec:
 			// TODO It seems the Cluster Reconciler doesn't be triggered to run properly,
 			// TODO an additional invoke of `kubectl apply` explicitly ask it will workaround,
 			// TODO I'll look into this problem later.
-			Eventually(expectClusterInPhase(key, dbaasv1alpha1.RunningPhase), timeout, interval).Should(BeTrue())
+			Eventually(ExpectClusterStatusPhase(key), timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 
 			By("send VerticalScalingOpsRequest successfully")
 			verticalScalingOpsRequest := createOpsRequest("mysql-verticalscaling", clusterObj.Name, dbaasv1alpha1.VerticalScalingType)
@@ -278,31 +278,30 @@ spec:
 			Expect(testCtx.CreateObj(ctx, verticalScalingOpsRequest)).Should(Succeed())
 
 			By("check VerticalScalingOpsRequest running")
-			Eventually(expectOpsRequestInPhase(verticalScalingOpsRequest, dbaasv1alpha1.RunningPhase), timeout, interval).Should(BeTrue())
+			Eventually(ExpectOpsRequestStatusPhase(verticalScalingOpsRequest.GetNamespacedName()),
+				timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 
 			By("mock VerticalScalingOpsRequest is succeed")
 			if !testCtx.UsingExistingCluster() {
-				mockOpsRequestSucceed(verticalScalingOpsRequest)
+				Expect(mockOpsRequestSucceed(verticalScalingOpsRequest.GetNamespacedName())).Should(Succeed())
 			}
 
 			By("check VerticalScalingOpsRequest succeed")
-			Eventually(expectOpsRequestInPhase(verticalScalingOpsRequest, dbaasv1alpha1.SucceedPhase), timeout, interval).Should(BeTrue())
+			Eventually(ExpectOpsRequestStatusPhase(verticalScalingOpsRequest.GetNamespacedName()),
+				timeout, interval).Should(Equal(dbaasv1alpha1.SucceedPhase))
 
 			By("check cluster resource requirements changed")
-			Eventually(func() corev1.ResourceList {
+			Eventually(func(g Gomega) {
 				fetchedCluster := &dbaasv1alpha1.Cluster{}
-				_ = k8sClient.Get(ctx, key, fetchedCluster)
-				return fetchedCluster.Spec.Components[0].Resources.Requests
-			}, timeout, interval).Should(Equal(verticalScalingOpsRequest.Spec.ComponentOpsList[0].VerticalScaling.Requests))
+				g.Expect(k8sClient.Get(ctx, key, fetchedCluster)).To(Succeed())
+				g.Expect(fetchedCluster.Spec.Components[0].Resources.Requests).To(Equal(
+					verticalScalingOpsRequest.Spec.ComponentOpsList[0].VerticalScaling.Requests))
+			}, timeout, interval).Should(Succeed())
 
 			By("OpsRequest reclaimed after ttl")
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, client.ObjectKey{
-					Name:      verticalScalingOpsRequest.Name,
-					Namespace: verticalScalingOpsRequest.Namespace},
-					verticalScalingOpsRequest)
-				return apierrors.IsNotFound(err)
-			}, timeout, interval).Should(BeTrue())
+			Eventually(func() error {
+				return k8sClient.Get(ctx, verticalScalingOpsRequest.GetNamespacedName(), verticalScalingOpsRequest)
+			}, timeout, interval).Should(Satisfy(apierrors.IsNotFound))
 
 			By("Deleting the scope")
 			Eventually(func() error {
@@ -312,44 +311,21 @@ spec:
 	})
 })
 
-func mockOpsRequestSucceed(opsRequest *dbaasv1alpha1.OpsRequest) {
-	patch := client.MergeFrom(opsRequest.DeepCopy())
-	opsRequest.Status.Phase = dbaasv1alpha1.SucceedPhase
-	opsRequest.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
-	Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).Should(Succeed())
+func mockOpsRequestSucceed(namespacedName types.NamespacedName) error {
+	return ChangeOpsRequestStatus(namespacedName,
+		func(or *dbaasv1alpha1.OpsRequest) {
+			or.Status.Phase = dbaasv1alpha1.SucceedPhase
+			or.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
+		})
 }
 
-func mockSetClusterPhaseToRunning(clusterName types.NamespacedName) {
-	fetchedCluster := &dbaasv1alpha1.Cluster{}
-	Expect(k8sClient.Get(ctx, clusterName, fetchedCluster)).Should(Succeed())
-	beforePatched := client.MergeFrom(fetchedCluster.DeepCopy())
-	fetchedCluster.Status.Phase = dbaasv1alpha1.RunningPhase
-	for componentKey, componentStatus := range fetchedCluster.Status.Components {
-		componentStatus.Phase = dbaasv1alpha1.RunningPhase
-		fetchedCluster.Status.Components[componentKey] = componentStatus
-	}
-	Expect(k8sClient.Status().Patch(ctx, fetchedCluster, beforePatched))
-}
-
-func expectClusterInPhase(clusterName types.NamespacedName, phase dbaasv1alpha1.Phase) func() bool {
-	return func() bool {
-		fetchedCluster := &dbaasv1alpha1.Cluster{}
-		if err := k8sClient.Get(ctx, clusterName, fetchedCluster); err != nil {
-			return false
-		}
-		return fetchedCluster.Status.Phase == phase
-	}
-}
-
-func expectOpsRequestInPhase(opsRequest *dbaasv1alpha1.OpsRequest, phase dbaasv1alpha1.Phase) func() bool {
-	return func() bool {
-		fetchedOpsRequest := &dbaasv1alpha1.OpsRequest{}
-		if err := k8sClient.Get(ctx, client.ObjectKey{
-			Name:      opsRequest.Name,
-			Namespace: opsRequest.Namespace},
-			fetchedOpsRequest); err != nil {
-			return false
-		}
-		return fetchedOpsRequest.Status.Phase == phase
-	}
+func mockSetClusterStatusPhaseToRunning(namespacedName types.NamespacedName) error {
+	return ChangeClusterStatus(namespacedName,
+		func(c *dbaasv1alpha1.Cluster) {
+			c.Status.Phase = dbaasv1alpha1.RunningPhase
+			for componentKey, componentStatus := range c.Status.Components {
+				componentStatus.Phase = dbaasv1alpha1.RunningPhase
+				c.Status.Components[componentKey] = componentStatus
+			}
+		})
 }

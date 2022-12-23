@@ -344,14 +344,13 @@ spec:
 						ConfigTplRef:        cmName,
 						ConfigConstraintRef: cmName,
 						Namespace:           testCtx.DefaultNamespace,
-						VolumeName:          "xxx",
+						VolumeName:          "",
 					},
 				},
 			}
 
 			// create configmap
 			assureCfgTplConfigMapObj(cmName, testCtx.DefaultNamespace)
-
 			Expect(testCtx.CreateObj(ctx, clusterDefinition)).Should(Succeed())
 			createdClusterDef := &dbaasv1alpha1.ClusterDefinition{}
 			// check reconciled finalizer and status

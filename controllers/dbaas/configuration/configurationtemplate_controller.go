@@ -92,7 +92,7 @@ func (r *ConfigurationTemplateReconciler) Reconcile(ctx context.Context, req ctr
 
 	statusPatch := client.MergeFrom(configTpl.DeepCopy())
 	// configTpl.Spec.ConfigurationSchema.Schema = cfgcore.GenerateOpenAPISchema(configTpl.Spec.ConfigurationSchema.Cue)
-	if err := UpdateConfigurationSchema(&configTpl.Spec); err != nil {
+	if err := updateConfigurationSchema(&configTpl.Spec); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to generate configuration open api schema")
 	}
 	configTpl.Status.ObservedGeneration = configTpl.GetObjectMeta().GetGeneration()

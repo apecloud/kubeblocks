@@ -49,8 +49,8 @@ func (p *parallelUpgradePolicy) restartPods(params ReconfigureParams) (bool, err
 	var (
 		funcs         RollingUpgradeFuncs
 		cType         = params.ComponentType()
-		configKey     = params.GetConfigKey()
-		configVersion = params.GetModifyVersion()
+		configKey     = params.getConfigKey()
+		configVersion = params.getModifyVersion()
 	)
 
 	updatePodLabelsVersion := func(pod *corev1.Pod, labelKey, labelValue string) error {

@@ -87,7 +87,7 @@ func GetClientFactory() createReconfigureClient {
 	return newGRPCClient
 }
 
-func (param *ReconfigureParams) GetConfigKey() string {
+func (param *ReconfigureParams) getConfigKey() string {
 	for _, tpl := range param.Component.ConfigSpec.ConfigTemplateRefs {
 		if tpl.Name == param.TplName {
 			return tpl.VolumeName
@@ -96,7 +96,7 @@ func (param *ReconfigureParams) GetConfigKey() string {
 	return ""
 }
 
-func (param *ReconfigureParams) GetModifyVersion() string {
+func (param *ReconfigureParams) getModifyVersion() string {
 	hash, err := cfgcore.ComputeHash(param.Cfg.Data)
 	if err != nil {
 		param.Ctx.Log.Error(err, "failed to cal configuration version!")
@@ -106,11 +106,11 @@ func (param *ReconfigureParams) GetModifyVersion() string {
 	return hash
 }
 
-func (param *ReconfigureParams) MaxRollingReplicas() int32 {
+func (param *ReconfigureParams) maxRollingReplicas() int32 {
 	var (
 		defaultRolling int32 = 1
 		r              int32
-		replicas       = param.GetTargetReplicas()
+		replicas       = param.getTargetReplicas()
 	)
 
 	pdbSpec := param.Component.PDBSpec
@@ -127,16 +127,16 @@ func (param *ReconfigureParams) MaxRollingReplicas() int32 {
 	if isPercent {
 		r = int32(math.Floor(float64(v) * float64(replicas) / 100))
 	} else {
-		r = int32(cfgcore.Min(v, param.GetTargetReplicas()))
+		r = int32(cfgcore.Min(v, param.getTargetReplicas()))
 	}
 	return cfgcore.Max(r, defaultRolling)
 }
 
-func (param *ReconfigureParams) GetTargetReplicas() int {
+func (param *ReconfigureParams) getTargetReplicas() int {
 	return int(*param.ClusterComponent.Replicas)
 }
 
-func (param *ReconfigureParams) PodMinReadySeconds() int32 {
+func (param *ReconfigureParams) podMinReadySeconds() int32 {
 	minReadySeconds := param.ComponentUnits[0].Spec.MinReadySeconds
 	return cfgcore.Max(minReadySeconds, viper.GetInt32(cfgcore.PodMinReadySecondsEnv))
 }

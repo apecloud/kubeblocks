@@ -49,7 +49,7 @@ const (
 type ValidateConfigMap func(configTpl, ns string) (*corev1.ConfigMap, error)
 type ValidateConfigSchema func(tpl *dbaasv1alpha1.CustomParametersValidation) (bool, error)
 
-func CheckConfigurationLabels(object client.Object, requiredLabs []string) bool {
+func checkConfigurationLabels(object client.Object, requiredLabs []string) bool {
 	labels := object.GetLabels()
 	if len(labels) == 0 {
 		return false
@@ -69,7 +69,7 @@ func CheckConfigurationLabels(object client.Object, requiredLabs []string) bool 
 	return CheckEnableCfgUpgrade(object)
 }
 
-func GetConfigMapByName(cli client.Client, ctx intctrlutil.RequestCtx, cmName, ns string) (*corev1.ConfigMap, error) {
+func getConfigMapByName(cli client.Client, ctx intctrlutil.RequestCtx, cmName, ns string) (*corev1.ConfigMap, error) {
 	if len(cmName) == 0 {
 		return nil, fmt.Errorf("required configmap reference name is empty! [%v]", cmName)
 	}
@@ -197,7 +197,7 @@ func updateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl
 	// step2: add labels: CMConfigurationTplLabelKey
 	// step3: update immutable
 
-	cmObj, err := GetConfigMapByName(cli, ctx, tpl.ConfigTplRef, tpl.Namespace)
+	cmObj, err := getConfigMapByName(cli, ctx, tpl.ConfigTplRef, tpl.Namespace)
 	if err != nil {
 		ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", cmObj.Name)
 	}
@@ -219,7 +219,7 @@ func updateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl
 }
 
 func deleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl dbaasv1alpha1.ConfigTemplate) error {
-	cmObj, err := GetConfigMapByName(cli, ctx, tpl.ConfigTplRef, tpl.Namespace)
+	cmObj, err := getConfigMapByName(cli, ctx, tpl.ConfigTplRef, tpl.Namespace)
 	if err != nil && apierrors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
@@ -337,7 +337,7 @@ func UpdateAVLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.Req
 func validateConfigTPLs(cli client.Client, ctx intctrlutil.RequestCtx, configTpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 	// check ConfigTemplate Validate
 	foundConfTplFn := func(configTpl dbaasv1alpha1.ConfigTemplate) (*dbaasv1alpha1.ConfigurationTemplate, error) {
-		if _, err := GetConfigMapByName(cli, ctx, configTpl.ConfigTplRef, configTpl.Namespace); err != nil {
+		if _, err := getConfigMapByName(cli, ctx, configTpl.ConfigTplRef, configTpl.Namespace); err != nil {
 			ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", configTpl.ConfigTplRef)
 			return nil, err
 		}
@@ -369,7 +369,7 @@ func validateConfigTPLs(cli client.Client, ctx intctrlutil.RequestCtx, configTpl
 		if err := cfgcm.NeedBuildConfigSidecar(tpl.Spec.ReloadOptions); err != nil {
 			return false, err
 		}
-		if !ValidateConfTplStatus(tpl.Status) {
+		if !validateConfTplStatus(tpl.Status) {
 			errMsg := fmt.Sprintf("Configuration template CR[%s] status not ready! current status: %s", tpl.Name, tpl.Status.Phase)
 			ctx.Log.V(4).Info(errMsg)
 			return false, fmt.Errorf(errMsg)
@@ -378,11 +378,11 @@ func validateConfigTPLs(cli client.Client, ctx intctrlutil.RequestCtx, configTpl
 	return true, nil
 }
 
-func ValidateConfTplStatus(configStatus dbaasv1alpha1.ConfigurationTemplateStatus) bool {
+func validateConfTplStatus(configStatus dbaasv1alpha1.ConfigurationTemplateStatus) bool {
 	return configStatus.Phase == dbaasv1alpha1.AvailablePhase
 }
 
-func GetComponentByUsingCM(stsList *appv1.StatefulSetList, cfg client.ObjectKey) ([]appv1.StatefulSet, []string) {
+func getComponentByUsingCM(stsList *appv1.StatefulSetList, cfg client.ObjectKey) ([]appv1.StatefulSet, []string) {
 	managerContainerName := cfgcore.ConfigSidecarName
 	stsLen := len(stsList.Items)
 	if stsLen == 0 {
@@ -397,9 +397,10 @@ func GetComponentByUsingCM(stsList *appv1.StatefulSetList, cfg client.ObjectKey)
 			continue
 		}
 		// filter config manager sidecar container
-		contains := intctrlutil.GetContainersUsingConfigmap(s.Spec.Template.Spec.Containers, volumeMounted.Name, func(containerName string) bool {
-			return managerContainerName == containerName
-		})
+		contains := intctrlutil.GetContainersUsingConfigmap(s.Spec.Template.Spec.Containers,
+			volumeMounted.Name, func(containerName string) bool {
+				return managerContainerName == containerName
+			})
 		if len(contains) > 0 {
 			sts = append(sts, s)
 			containers.InsertArray(contains)
@@ -408,7 +409,7 @@ func GetComponentByUsingCM(stsList *appv1.StatefulSetList, cfg client.ObjectKey)
 	return sts, containers.ToList()
 }
 
-func GetClusterComponentsByName(components []dbaasv1alpha1.ClusterComponent, componentName string) *dbaasv1alpha1.ClusterComponent {
+func getClusterComponentsByName(components []dbaasv1alpha1.ClusterComponent, componentName string) *dbaasv1alpha1.ClusterComponent {
 	for _, component := range components {
 		if component.Name == componentName {
 			return &component
@@ -417,7 +418,7 @@ func GetClusterComponentsByName(components []dbaasv1alpha1.ClusterComponent, com
 	return nil
 }
 
-func GetConfigurationVersion(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplateSpec) (*cfgcore.ConfigDiffInformation, error) {
+func getConfigurationVersion(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplateSpec) (*cfgcore.ConfigDiffInformation, error) {
 	lastConfig, err := GetLastVersionConfig(cfg)
 	if err != nil {
 		return nil, cfgcore.WrapError(err, "failed to get last version data. config[%v]", client.ObjectKeyFromObject(cfg))
@@ -438,7 +439,7 @@ func GetConfigurationVersion(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, 
 	}, option)
 }
 
-func UpdateConfigurationSchema(tpl *dbaasv1alpha1.ConfigurationTemplateSpec) error {
+func updateConfigurationSchema(tpl *dbaasv1alpha1.ConfigurationTemplateSpec) error {
 	schema := tpl.ConfigurationSchema
 	if schema != nil && schema.Cue != nil && len(*schema.Cue) > 0 && schema.Schema == nil {
 		customSchema, err := cfgcore.GenerateOpenAPISchema(*schema.Cue, tpl.CfgSchemaTopLevelName)

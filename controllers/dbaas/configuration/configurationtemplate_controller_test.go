@@ -66,7 +66,7 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 			Eventually(func() bool {
 				ok, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigurationTemplate{},
 					func(tpl *dbaasv1alpha1.ConfigurationTemplate) bool {
-						return ValidateConfTplStatus(tpl.Status) &&
+						return validateConfTplStatus(tpl.Status) &&
 							validateFinalizerFlag(tpl)
 					})
 				return err == nil && ok
@@ -115,7 +115,7 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 			Eventually(func() bool {
 				ok, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigurationTemplate{},
 					func(tpl *dbaasv1alpha1.ConfigurationTemplate) bool {
-						return ValidateConfTplStatus(tpl.Status)
+						return validateConfTplStatus(tpl.Status)
 					})
 				return err == nil && ok
 			}, time.Second*30, time.Second*1).Should(BeTrue())

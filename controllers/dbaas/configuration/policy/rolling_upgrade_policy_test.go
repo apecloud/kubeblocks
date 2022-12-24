@@ -157,22 +157,22 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			status, err = rollingPolicy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
 			Expect(status).Should(BeEquivalentTo(ESRetry))
-			Expect(mockPods[acc][0].Labels[mockParam.GetConfigKey()]).Should(BeEquivalentTo(mockParam.GetModifyVersion()))
-			Expect(mockPods[acc][1].Labels[mockParam.GetConfigKey()]).ShouldNot(BeEquivalentTo(mockParam.GetModifyVersion()))
-			Expect(mockPods[acc][2].Labels[mockParam.GetConfigKey()]).ShouldNot(BeEquivalentTo(mockParam.GetModifyVersion()))
+			Expect(mockPods[acc][0].Labels[mockParam.getConfigKey()]).Should(BeEquivalentTo(mockParam.getModifyVersion()))
+			Expect(mockPods[acc][1].Labels[mockParam.getConfigKey()]).ShouldNot(BeEquivalentTo(mockParam.getModifyVersion()))
+			Expect(mockPods[acc][2].Labels[mockParam.getConfigKey()]).ShouldNot(BeEquivalentTo(mockParam.getModifyVersion()))
 
 			// upgrade pod-2
 			status, err = rollingPolicy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
 			Expect(status).Should(BeEquivalentTo(ESRetry))
-			Expect(mockPods[acc][2].Labels[mockParam.GetConfigKey()]).Should(BeEquivalentTo(mockParam.GetModifyVersion()))
-			Expect(mockPods[acc][1].Labels[mockParam.GetConfigKey()]).ShouldNot(BeEquivalentTo(mockParam.GetModifyVersion()))
+			Expect(mockPods[acc][2].Labels[mockParam.getConfigKey()]).Should(BeEquivalentTo(mockParam.getModifyVersion()))
+			Expect(mockPods[acc][1].Labels[mockParam.getConfigKey()]).ShouldNot(BeEquivalentTo(mockParam.getModifyVersion()))
 
 			// upgrade pod-1
 			status, err = rollingPolicy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
 			Expect(status).Should(BeEquivalentTo(ESRetry))
-			Expect(mockPods[acc][1].Labels[mockParam.GetConfigKey()]).Should(BeEquivalentTo(mockParam.GetModifyVersion()))
+			Expect(mockPods[acc][1].Labels[mockParam.getConfigKey()]).Should(BeEquivalentTo(mockParam.getModifyVersion()))
 
 			// finish check, not upgrade
 			status, err = rollingPolicy.Upgrade(mockParam)

@@ -119,7 +119,7 @@ func (r *ReconfigureRequestReconciler) SetupWithManager(mgr ctrl.Manager) error 
 }
 
 func checkConfigurationObject(object client.Object) bool {
-	return CheckConfigurationLabels(object, ConfigurationRequiredLabels)
+	return checkConfigurationLabels(object, ConfigurationRequiredLabels)
 }
 
 func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, config *corev1.ConfigMap, tpl *dbaasv1alpha1.ConfigurationTemplate) (ctrl.Result, error) {
@@ -145,7 +145,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		configTplLabelKey:                config.GetName(),
 	}
 
-	versionMeta, err := GetConfigurationVersion(config, reqCtx, &tpl.Spec)
+	versionMeta, err := getConfigurationVersion(config, reqCtx, &tpl.Spec)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
@@ -171,7 +171,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 
 	// Find ClusterComponent from cluster cr
 	componentName := config.Labels[intctrlutil.AppComponentLabelKey]
-	clusterComponent := GetClusterComponentsByName(cluster.Spec.Components, componentName)
+	clusterComponent := getClusterComponentsByName(cluster.Spec.Components, componentName)
 	// fix cluster maybe not any component
 	if clusterComponent == nil {
 		reqCtx.Log.Info("not found component.", "componentName", componentName,
@@ -208,7 +208,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	}
 
 	// configmap has never been used
-	sts, containersList := GetComponentByUsingCM(&stsLists, configKey)
+	sts, containersList := getComponentByUsingCM(&stsLists, configKey)
 	if len(sts) == 0 {
 		reqCtx.Log.Info("configmap is not used by any container.", "cm name", configKey)
 		return intctrlutil.Reconciled()

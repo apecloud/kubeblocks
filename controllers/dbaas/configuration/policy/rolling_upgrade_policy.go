@@ -65,7 +65,7 @@ func (r *rollingUpgradePolicy) GetPolicyName() string {
 }
 
 func canPerformUpgrade(pods []corev1.Pod, params ReconfigureParams) bool {
-	target := params.GetTargetReplicas()
+	target := params.getTargetReplicas()
 	if len(pods) == target {
 		return true
 	}
@@ -87,9 +87,9 @@ func performRollingUpgrade(params ReconfigureParams, funcs RollingUpgradeFuncs) 
 	}
 
 	var (
-		rollingReplicas = params.MaxRollingReplicas()
-		configKey       = params.GetConfigKey()
-		configVersion   = params.GetModifyVersion()
+		rollingReplicas = params.maxRollingReplicas()
+		configKey       = params.getConfigKey()
+		configVersion   = params.getModifyVersion()
 	)
 
 	updatePodLabelsVersion := func(pod *corev1.Pod, labelKey, labelValue string) error {
@@ -105,7 +105,7 @@ func performRollingUpgrade(params ReconfigureParams, funcs RollingUpgradeFuncs) 
 		return ESRetry, nil
 	}
 
-	podStats := staticPodStats(pods, params.GetTargetReplicas(), params.PodMinReadySeconds())
+	podStats := staticPodStats(pods, params.getTargetReplicas(), params.podMinReadySeconds())
 	podWins := markDynamicCursor(pods, podStats, configKey, configVersion, rollingReplicas)
 	if !validPodState(podWins) {
 		params.Ctx.Log.Info("wait pod stat ready.")

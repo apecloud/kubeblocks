@@ -52,8 +52,8 @@ func rollingStatefulSets(param ReconfigureParams) (ExecStatus, error) {
 	var (
 		units      = param.ComponentUnits
 		client     = param.Client
-		newVersion = param.GetModifyVersion()
-		configKey  = param.GetConfigKey()
+		newVersion = param.getModifyVersion()
+		configKey  = param.getConfigKey()
 	)
 
 	if configKey == "" {

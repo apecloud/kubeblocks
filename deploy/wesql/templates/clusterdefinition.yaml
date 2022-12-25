@@ -31,6 +31,7 @@ spec:
             configConstraintRef: mysql-3node-cfg-constraints-8.0
             volumeName: mysql-config
           - name: wesql-scripts
+            configTplRef: wesql-scripts
             namespace: {{ .Release.Namespace }}
             volumeName: scripts
             defaultMode: 493

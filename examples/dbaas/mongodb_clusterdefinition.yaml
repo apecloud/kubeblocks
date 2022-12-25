@@ -7,10 +7,12 @@ spec:
   components:
     - typeName: mongos
       defaultReplicas: 1
-      configTemplateRefs:
-        - name: mongodb-scripts
-          volumeName: scripts
-          defaultMode: 493
+      configSpec:
+        configTemplateRefs:
+          - name: mongodb-scripts
+            configTplRef: mongodb-scripts
+            volumeName: scripts
+            defaultMode: 493
       componentType: Stateless
       service:
         ports:
@@ -31,10 +33,12 @@ spec:
                 subPath: mongos-setup.sh
     - typeName: configsvr
       defaultReplicas: 3
-      configTemplateRefs:
-        - name: mongodb-scripts
-          volumeName: scripts
-          defaultMode: 493
+      configSpec:
+        configTemplateRefs:
+          - name: mongodb-scripts
+            configTplRef: mongodb-scripts
+            volumeName: scripts
+            defaultMode: 493
       characterType: mongodb
       componentType: Consensus
       consensusSpec:
@@ -79,10 +83,12 @@ spec:
                 subPath: replicaset-post-start.sh
     - typeName: shard
       defaultReplicas: 3
-      configTemplateRefs:
-        - name: mongodb-scripts
-          volumeName: scripts
-          defaultMode: 493
+      configSpec:
+        configTemplateRefs:
+          - name: mongodb-scripts
+            configTplRef: mongodb-scripts
+            volumeName: scripts
+            defaultMode: 493
       characterType: mongodb
       componentType: Consensus
       consensusSpec:

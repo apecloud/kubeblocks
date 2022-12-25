@@ -1416,6 +1416,7 @@ func updateConfigurationManagerWithComponent(
 		return nil
 	}
 
+	// Ignore useless configtemplate
 	for i, tpl := range cfgTemplates {
 		usingContainers = intctrlutil.GetPodContainerWithVolumeMount(podSpec, tpl.VolumeName)
 		if len(usingContainers) > 0 {
@@ -1424,18 +1425,22 @@ func updateConfigurationManagerWithComponent(
 		}
 	}
 
-	// not container using any config template
+	// No container using any config template
 	if len(usingContainers) == 0 {
 		log.Log.Info(fmt.Sprintf("tpl config is not used by any container, and pass. tpl configs: %v", cfgTemplates))
 		return nil
 	}
 
-	// find first container using
+	// Find first container using
 	// Find out which configurations are used by the container
 	volumeDirs := make([]corev1.VolumeMount, 0, len(cfgTemplates)+1)
 	container := usingContainers[0]
 	for i := firstCfg; i < len(cfgTemplates); i++ {
 		tpl := cfgTemplates[i]
+		// Ignore config template, e.g scripts configmap
+		if !cfgutil.NeedReloadVolume(tpl) {
+			continue
+		}
 		volume := intctrlutil.GetVolumeMountByVolume(container, tpl.VolumeName)
 		if volume != nil {
 			volumeDirs = append(volumeDirs, *volume)
@@ -1491,10 +1496,7 @@ func updateConfigurationManagerWithComponent(
 	podSpec.Containers = append(podSpec.Containers, *container)
 
 	// This sidecar container will be able to view and signal processes from other containers
-	if podSpec.ShareProcessNamespace == nil {
-		podSpec.ShareProcessNamespace = new(bool)
-	}
-	*podSpec.ShareProcessNamespace = true
+	podSpec.ShareProcessNamespace = func() *bool { b := true; return &b }()
 	return nil
 }
 

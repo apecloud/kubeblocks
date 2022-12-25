@@ -453,9 +453,14 @@ func updateConfigurationSchema(tpl *dbaasv1alpha1.ConfigurationTemplateSpec) err
 	return nil
 }
 
+func NeedReloadVolume(tpl dbaasv1alpha1.ConfigTemplate) bool {
+	// TODO distinguish between scripts and configuration
+	return len(tpl.ConfigConstraintRef) != 0
+}
+
 func GetReloadOptions(cli client.Client, ctx context.Context, tpls []dbaasv1alpha1.ConfigTemplate) (*dbaasv1alpha1.ReloadOptions, error) {
 	for _, tpl := range tpls {
-		if len(tpl.ConfigConstraintRef) == 0 {
+		if !NeedReloadVolume(tpl) {
 			continue
 		}
 		cfgConst := &dbaasv1alpha1.ConfigurationTemplate{}

@@ -21,15 +21,20 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	zaplogfmt "github.com/sykesm/zap-logfmt"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/configmap"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 )
+
+var logger *zap.SugaredLogger
 
 // NewConfigReloadCommand This command is used to reload configuration
 func NewConfigReloadCommand(ctx context.Context, name string) *cobra.Command {
@@ -48,13 +53,18 @@ func NewConfigReloadCommand(ctx context.Context, name string) *cobra.Command {
 }
 
 func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
-	initLog(opt.LogLevel)
+	zapLog := initLog(opt.LogLevel)
+	defer func() {
+		_ = zapLog.Sync()
+	}()
+
+	logger = zapLog.Sugar()
 	if err := checkOptions(opt); err != nil {
 		return err
 	}
 
 	// new volume watcher
-	watcher := cfgcore.NewVolumeWatcher(opt.VolumeDirs, ctx)
+	watcher := cfgcore.NewVolumeWatcher(opt.VolumeDirs, ctx, logger)
 
 	// set regex filter
 	if len(opt.FileRegex) > 0 {
@@ -68,18 +78,20 @@ func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 	defer watcher.Close()
 	err := watcher.AddHandler(createHandlerWithWatchType(opt)).Run()
 	if err != nil {
-		logrus.Fatal(err)
+		logger.Error(err, "failed to handle VolumeWatcher.")
+		return err
 	}
 
 	if err := startGRPCService(opt.ServiceOpt, ctx); err != nil {
-		logrus.Fatal(err)
+		logger.Error(err, "failed to start grpc service.")
+		return err
 	}
 
 	// testGRPCService(opt.ServiceOpt)
 
-	logrus.Info("reload started.")
+	logger.Info("reload started.")
 	<-ctx.Done()
-	logrus.Info("reload started shutdown.")
+	logger.Info("reload started shutdown.")
 
 	return nil
 }
@@ -112,13 +124,13 @@ func startGRPCService(opt ReconfigureServiceOptions, ctx context.Context) error 
 
 	tcpSpec := fmt.Sprintf("%s:%d", proxy.opt.PodIP, proxy.opt.GrpcPort)
 
-	logrus.Infof("starting reconfigure service: %s", tcpSpec)
+	logger.Infof("starting reconfigure service: %s", tcpSpec)
 	listener, err := net.Listen("tcp", tcpSpec)
 	if err != nil {
 		return cfgutil.WrapError(err, "failed to create listener: [%s]", tcpSpec)
 	}
 
-	if err := proxy.Init(); err != nil {
+	if err := proxy.Init(logger); err != nil {
 		return err
 	}
 
@@ -131,16 +143,16 @@ func startGRPCService(opt ReconfigureServiceOptions, ctx context.Context) error 
 
 	go func() {
 		if err := server.Serve(listener); err != nil {
-			logrus.Error("Failed to serve connections from cri")
+			logger.Error(err, "failed to serve connections from cri")
 			os.Exit(1)
 		}
 	}()
-	logrus.Info("reconfigure service started.")
+	logger.Info("reconfigure service started.")
 	return nil
 }
 
 func logStreamServerInterceptor(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-	logrus.Info(fmt.Sprintf("info: [%+v]", info))
+	logger.Infof("info: [%+v]", info)
 	return handler(srv, ss)
 }
 
@@ -156,24 +168,43 @@ func checkOptions(opt *VolumeWatcherOpts) error {
 	return nil
 }
 
-func initLog(level string) {
-	logLevel, err := logrus.ParseLevel(level)
-	if err != nil {
-		logrus.Fatal(err)
+func initLog(level string) *zap.Logger {
+	const (
+		rfc3339Mills = "2006-01-02T15:04:05.000"
+	)
+
+	levelStrings := map[string]zapcore.Level{
+		"debug": zap.DebugLevel,
+		"info":  zap.InfoLevel,
+		"error": zap.ErrorLevel,
 	}
 
-	logrus.SetLevel(logLevel)
+	if _, ok := levelStrings[level]; !ok {
+		fmt.Printf("not support log level[%s], set default info", level)
+		level = "info"
+	}
+
+	logCfg := zap.NewProductionEncoderConfig()
+	logCfg.EncodeTime = func(ts time.Time, encoder zapcore.PrimitiveArrayEncoder) {
+		encoder.AppendString(ts.UTC().Format(rfc3339Mills))
+	}
+
+	// NOTES:
+	// zap is "Blazing fast, structured, leveled logging in Go.", DON'T event try
+	// to refactor this logging lib to anything else. Check FAQ - https://github.com/uber-go/zap/blob/master/FAQ.md
+	zapLog := zap.New(zapcore.NewCore(zaplogfmt.NewEncoder(logCfg), os.Stdout, levelStrings[level]))
+	return zapLog
 }
 
 func createHandlerWithWatchType(opt *VolumeWatcherOpts) cfgcore.WatchEventHandler {
-	logrus.Tracef("access info: [%d] [%s]", opt.NotifyHandType, opt.ProcessName)
+	logger.Infof("access info: [%d] [%s]", opt.NotifyHandType, opt.ProcessName)
 	switch opt.NotifyHandType {
 	case UnixSignal:
 		return cfgcore.CreateSignalHandler(opt.Signal, opt.ProcessName)
 	case SQL, ShellTool, WebHook:
-		logrus.Fatalf("event type[%s]: not yet, but in the future", opt.NotifyHandType.String())
+		logger.Fatalf("event type[%s]: not yet, but in the future", opt.NotifyHandType.String())
 	default:
-		logrus.Fatal("not support event type.")
+		logger.Fatal("not support event type.")
 	}
 	return nil
 }

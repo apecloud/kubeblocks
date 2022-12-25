@@ -260,7 +260,7 @@ func parseListParameter(s string, valueType ValueType) *ParameterRestrict {
 
 		if typeValue, err := ValueTypeParserMap[valueType](v); err != nil {
 			fmt.Printf("parse failed: [%s] [%s] [%s]\n", s, v, valueType)
-			// panic(fmt.Sprintf("parse faild: [%s] [%s]", s, v))
+			// panic(fmt.Sprintf("parse failed: [%s] [%s]", s, v))
 		} else {
 			AddRestrictValue(p, typeValue)
 		}

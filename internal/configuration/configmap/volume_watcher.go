@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
@@ -44,14 +44,16 @@ type ConfigMapVolumeWatcher struct {
 	handler WatchEventHandler
 	filters []NotifyEventFilter
 
+	log     *zap.SugaredLogger
 	ctx     context.Context
 	watcher *fsnotify.Watcher
 }
 
-func NewVolumeWatcher(volume []string, ctx context.Context) *ConfigMapVolumeWatcher {
+func NewVolumeWatcher(volume []string, ctx context.Context, logger *zap.SugaredLogger) *ConfigMapVolumeWatcher {
 	watcher := &ConfigMapVolumeWatcher{
 		volumeDirectory: volume,
 		ctx:             ctx,
+		log:             logger,
 		retryCount:      DefaultRetryCount,
 		filters:         make([]NotifyEventFilter, 0),
 	}
@@ -94,7 +96,7 @@ func (w *ConfigMapVolumeWatcher) Run() error {
 
 	go w.loopNotifyEvent(watcher, w.ctx)
 	for _, d := range w.volumeDirectory {
-		logrus.Info("add watched fs directory: ", d)
+		w.log.Infof("add watched fs directory: %s", d)
 		err = watcher.Add(d)
 		if err != nil {
 			return cfgcore.WrapError(err, "failed to add watch directory[%s] failed", d)
@@ -118,22 +120,22 @@ func (w *ConfigMapVolumeWatcher) loopNotifyEvent(watcher *fsnotify.Watcher, ctx 
 	for {
 		select {
 		case event := <-watcher.Events:
-			logrus.Tracef("watch fsnotify event: %s, path: %s", event.Op.String(), event.Name)
+			w.log.Debugf("watch fsnotify event: %s, path: %s", event.Op.String(), event.Name)
 			if !doFilter(w.filters, event) {
 				continue
 			}
-			logrus.Debugf("volume configmap updated. event: %s, path: %s", event.Op.String(), event.Name)
-			runWithRetry(w.handler, event, w.retryCount)
+			w.log.Debugf("volume configmap updated. event: %s, path: %s", event.Op.String(), event.Name)
+			runWithRetry(w.handler, event, w.retryCount, w.log)
 		case err := <-watcher.Errors:
-			logrus.Error(err)
+			w.log.Error(err)
 		case <-ctx.Done():
-			logrus.Info("The process has received the end signal.")
+			w.log.Info("The process has received the end signal.")
 			return
 		}
 	}
 }
 
-func runWithRetry(handler WatchEventHandler, event fsnotify.Event, retryCount int) {
+func runWithRetry(handler WatchEventHandler, event fsnotify.Event, retryCount int, logger *zap.SugaredLogger) {
 	var err error
 	for {
 		if err = handler(event); err == nil {
@@ -143,7 +145,7 @@ func runWithRetry(handler WatchEventHandler, event fsnotify.Event, retryCount in
 		if retryCount <= 0 {
 			return
 		}
-		logrus.Errorf("event handler failed, will retry after [%d]s : %s", DefaultSleepRetryTime, err)
+		logger.Errorf("event handler failed, will retry after [%d]s : %s", DefaultSleepRetryTime, err)
 		time.Sleep(time.Second * DefaultRetryCount)
 	}
 }

@@ -18,13 +18,13 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	"github.com/apecloud/kubeblocks/cmd/reloader/app"
 )
@@ -45,6 +45,7 @@ func main() {
 
 	cmd := app.NewConfigReloadCommand(ctx, filepath.Base(os.Args[0]))
 	if err := cmd.Execute(); err != nil && errors.Cause(err) != context.Canceled {
-		logrus.Fatal(err)
+		fmt.Println(err)
+		os.Exit(-1)
 	}
 }

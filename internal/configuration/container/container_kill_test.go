@@ -19,9 +19,13 @@ package container
 import (
 	"reflect"
 	"testing"
+
+	"go.uber.org/zap"
 )
 
 func TestNewContainerKiller(t *testing.T) {
+	zaplog, _ := zap.NewProduction()
+
 	type args struct {
 		criType    CRIType
 		socketPath string
@@ -46,6 +50,7 @@ func TestNewContainerKiller(t *testing.T) {
 		wantErr: false,
 		want: &containerdContainerV2{
 			runtimeEndpoint: "for_test",
+			logger:          zaplog.Sugar(),
 		},
 	}, {
 		name: "test3",
@@ -53,12 +58,14 @@ func TestNewContainerKiller(t *testing.T) {
 			criType: DockerType,
 		},
 		wantErr: false,
-		want:    &dockerContainerV2{},
+		want: &dockerContainerV2{
+			logger: zaplog.Sugar(),
+		},
 	}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewContainerKiller(tt.args.criType, tt.args.socketPath)
+			got, err := NewContainerKiller(tt.args.criType, tt.args.socketPath, zaplog.Sugar())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewContainerKiller() error = %v, wantErr %v", err, tt.wantErr)
 				return

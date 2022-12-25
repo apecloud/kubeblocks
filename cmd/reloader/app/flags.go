@@ -19,7 +19,6 @@ package app
 import (
 	"os"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
@@ -119,7 +118,7 @@ func NewVolumeWatcherOpts() *VolumeWatcherOpts {
 		// for configmap watch
 		NotifyHandType: UnixSignal,
 		Signal:         "SIGHUP",
-		LogLevel:       logrus.InfoLevel.String(),
+		LogLevel:       "info",
 	}
 }
 
@@ -143,7 +142,7 @@ func InstallFlags(flags *pflag.FlagSet, opt *VolumeWatcherOpts) {
 	flags.StringVar(&opt.LogLevel,
 		"log-level",
 		opt.LogLevel,
-		"the config set log level.")
+		"the config set log level. enum: [error, info, debug]")
 	flags.StringVar(&opt.FileRegex,
 		"regex",
 		opt.FileRegex,

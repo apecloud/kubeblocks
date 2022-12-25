@@ -18,6 +18,7 @@ package container
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"time"
@@ -25,8 +26,8 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	dockerapi "github.com/docker/docker/client"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -46,13 +47,14 @@ const (
 // dockerContainer support docker cri
 type dockerContainerV2 struct {
 	dockerEndpoint string
+	logger         *zap.SugaredLogger
 
 	dc *dockerapi.Client
 }
 
 func init() {
 	if err := viper.BindEnv(KillContainerSignalEnvName); err != nil {
-		logrus.Errorf("failed to bind env for viper, env name: [%s]", KillContainerSignalEnvName)
+		fmt.Printf("failed to bind env for viper, env name: [%s]\n", KillContainerSignalEnvName)
 		os.Exit(-2)
 	}
 
@@ -60,7 +62,7 @@ func init() {
 }
 
 func (d *dockerContainerV2) Kill(ctx context.Context, containerIDs []string, signal string, timeout *time.Duration) error {
-	logrus.Debugf("following docker containers are going to be stopped: %v", containerIDs)
+	d.logger.Infof("following docker containers are going to be stopped: %v", containerIDs)
 	if signal == "" {
 		signal = defaultSignal
 	}
@@ -71,23 +73,23 @@ func (d *dockerContainerV2) Kill(ctx context.Context, containerIDs []string, sig
 	}
 
 	errs := make([]error, 0, len(containerIDs))
-	logrus.Debugf("all docker container: %v", cfgcore.NewSetFromMap(allContainer).ToList())
+	d.logger.Debugf("all docker container: %v", cfgcore.NewSetFromMap(allContainer).ToList())
 	for _, containerID := range containerIDs {
-		logrus.Infof("stopping docker container: %s", containerID)
+		d.logger.Infof("stopping docker container: %s", containerID)
 		container, ok := allContainer[containerID]
 		if !ok {
-			logrus.Infof("container[%s] not exist and pass.", containerID)
+			d.logger.Infof("container[%s] not exist and pass.", containerID)
 			continue
 		}
 		if container.State == "exited" {
-			logrus.Infof("container[%s] is exited, status: %s", containerID, container.Status)
+			d.logger.Infof("container[%s] is exited, status: %s", containerID, container.Status)
 			continue
 		}
 		if err := d.dc.ContainerKill(ctx, containerID, signal); err != nil {
 			errs = append(errs, err)
 			continue
 		}
-		logrus.Infof("docker container[%s] stoped.", containerID)
+		d.logger.Infof("docker container[%s] stoped.", containerID)
 	}
 	if len(errs) > 0 {
 		return utilerrors.NewAggregate(errs)
@@ -120,24 +122,24 @@ func getExistsContainers(ctx context.Context, containerIDs []string, dc *dockera
 }
 
 func (d *dockerContainerV2) Init(ctx context.Context) error {
-	client, err := createDockerClient(d.dockerEndpoint)
+	client, err := createDockerClient(d.dockerEndpoint, d.logger)
 	d.dc = client
 	if err == nil {
 		ping, err := client.Ping(ctx)
 		if err != nil {
 			return err
 		}
-		logrus.Infof("create docker client success! docker info: %v", ping)
+		d.logger.Infof("create docker client success! docker info: %v", ping)
 	}
 	return err
 }
 
-func createDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
+func createDockerClient(dockerEndpoint string, logger *zap.SugaredLogger) (*dockerapi.Client, error) {
 	if len(dockerEndpoint) == 0 {
 		dockerEndpoint = dockerapi.DefaultDockerHost
 	}
 
-	logrus.Infof("connecting to docker on the endpoint: %s", dockerEndpoint)
+	logger.Infof("connecting to docker on the endpoint: %s", dockerEndpoint)
 	return dockerapi.NewClientWithOpts(
 		dockerapi.WithHost(formatSocketPath(dockerEndpoint)),
 		dockerapi.WithVersion(""),
@@ -147,6 +149,7 @@ func createDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
 // dockerContainer support docker cri
 type containerdContainerV2 struct {
 	runtimeEndpoint string
+	logger          *zap.SugaredLogger
 
 	backendRuntime runtimeapi.RuntimeServiceClient
 }
@@ -167,7 +170,7 @@ func (c *containerdContainerV2) Kill(ctx context.Context, containerIDs []string,
 	// reference cri-api url: https://github.com/kubernetes/cri-api/blob/master/pkg/apis/runtime/v1/api.proto#L1108
 	// reference containerd url: https://github.com/containerd/containerd/blob/main/pkg/cri/server/container_stop.go#L124
 	for _, containerID := range containerIDs {
-		logrus.Infof("stopping container: %s", containerID)
+		c.logger.Infof("stopping container: %s", containerID)
 		containers, err := c.backendRuntime.ListContainers(ctx, &runtimeapi.ListContainersRequest{
 			Filter: &runtimeapi.ContainerFilter{
 				Id: containerID,
@@ -177,18 +180,18 @@ func (c *containerdContainerV2) Kill(ctx context.Context, containerIDs []string,
 			errs = append(errs, err)
 			continue
 		} else if len(containers.Containers) == 0 {
-			logrus.Infof("container[%s] not exist and pass.", containerID)
+			c.logger.Infof("container[%s] not exist and pass.", containerID)
 			continue
 		}
 
 		request.ContainerId = containerID
 		_, err = c.backendRuntime.StopContainer(ctx, request)
 		if err != nil {
-			logrus.Infof("failed to stop container[%s], error: %v", containerID, err)
+			c.logger.Infof("failed to stop container[%s], error: %v", containerID, err)
 			errs = append(errs, err)
 			continue
 		}
-		logrus.Infof("docker container[%s] stoped.", containerID)
+		c.logger.Infof("docker container[%s] stoped.", containerID)
 	}
 
 	if len(errs) > 0 {
@@ -211,7 +214,7 @@ func (c *containerdContainerV2) Init(ctx context.Context) error {
 	for _, endpoint := range endpoints {
 		conn, err = createGrpcConnection(ctx, endpoint)
 		if err != nil {
-			logrus.Warnf("failed to connect containerd endpoint: %s, error : %v", endpoint, err)
+			c.logger.Warnf("failed to connect containerd endpoint: %s, error : %v", endpoint, err)
 		} else {
 			c.backendRuntime = runtimeapi.NewRuntimeServiceClient(conn)
 			return nil
@@ -220,7 +223,7 @@ func (c *containerdContainerV2) Init(ctx context.Context) error {
 	return err
 }
 
-func NewContainerKiller(containerRuntime CRIType, runtimeEndpoint string) (ContainerKiller, error) {
+func NewContainerKiller(containerRuntime CRIType, runtimeEndpoint string, logger *zap.SugaredLogger) (ContainerKiller, error) {
 	if containerRuntime == AutoType {
 		containerRuntime = autoCheckCRIType()
 	}
@@ -230,10 +233,12 @@ func NewContainerKiller(containerRuntime CRIType, runtimeEndpoint string) (Conta
 	case DockerType:
 		killer = &dockerContainerV2{
 			dockerEndpoint: runtimeEndpoint,
+			logger:         logger,
 		}
 	case ContainerdType:
 		killer = &containerdContainerV2{
 			runtimeEndpoint: runtimeEndpoint,
+			logger:          logger,
 		}
 	default:
 		return nil, cfgcore.MakeError("not support cri type: %s", containerRuntime)

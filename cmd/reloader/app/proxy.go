@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/container"
@@ -36,8 +37,8 @@ type reconfigureProxy struct {
 
 var stopContainerSignal = viper.GetString(cfgutil.KillContainerSignalEnvName)
 
-func (r *reconfigureProxy) Init() error {
-	killer, err := cfgutil.NewContainerKiller(r.opt.ContainerRuntime, r.opt.RuntimeEndpoint)
+func (r *reconfigureProxy) Init(logger *zap.SugaredLogger) error {
+	killer, err := cfgutil.NewContainerKiller(r.opt.ContainerRuntime, r.opt.RuntimeEndpoint, logger)
 	if err != nil {
 		return cfgcore.WrapError(err, "failed to create container killer")
 	}

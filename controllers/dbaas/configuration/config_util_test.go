@@ -369,6 +369,12 @@ var _ = Describe("ConfigWrapper util test", func() {
 			}{{
 				// empty config templates
 				name:    "test",
+				tpls:    nil,
+				want:    nil,
+				wantErr: false,
+			}, {
+				// empty config templates
+				name:    "test",
 				tpls:    []dbaasv1alpha1.ConfigTemplate{},
 				want:    nil,
 				wantErr: false,

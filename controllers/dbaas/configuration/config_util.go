@@ -454,10 +454,6 @@ func updateConfigurationSchema(tpl *dbaasv1alpha1.ConfigurationTemplateSpec) err
 }
 
 func GetReloadOptions(cli client.Client, ctx context.Context, tpls []dbaasv1alpha1.ConfigTemplate) (*dbaasv1alpha1.ReloadOptions, error) {
-	if len(tpls) == 0 {
-		return nil, nil
-	}
-
 	for _, tpl := range tpls {
 		if len(tpl.ConfigConstraintRef) == 0 {
 			continue

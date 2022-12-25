@@ -134,16 +134,16 @@ func (r *AppVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	if ok, err := dbaasconfig.CheckAVConfigTemplate(r.Client, reqCtx, appVersion); !ok || err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "configMapIsReady")
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to check config template")
 	}
 
 	if ok, err := dbaasconfig.UpdateAVLabelsWithUsingConfiguration(r.Client, reqCtx, appVersion); !ok || err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "update using config template info")
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to update using config template info")
 	}
 
 	// Update configmap Finalizer and set Immutable
 	if err := dbaasconfig.UpdateAVConfigMapFinalizer(r.Client, reqCtx, appVersion); err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "UpdateConfigMapFinalizer")
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to UpdateConfigMapFinalizer")
 	}
 
 	clusterdefinition := &dbaasv1alpha1.ClusterDefinition{}

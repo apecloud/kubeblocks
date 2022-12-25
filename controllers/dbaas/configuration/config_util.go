@@ -311,7 +311,9 @@ func UpdateCDLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.Req
 		patch := client.MergeFrom(cd.DeepCopy())
 		for _, tpl := range tpls {
 			cd.Labels[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = tpl.ConfigTplRef
-			cd.Labels[cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(tpl.ConfigConstraintRef)] = tpl.ConfigConstraintRef
+			if len(tpl.ConfigConstraintRef) != 0 {
+				cd.Labels[cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(tpl.ConfigConstraintRef)] = tpl.ConfigConstraintRef
+			}
 		}
 		return true, cli.Patch(ctx.Ctx, cd, patch)
 	})

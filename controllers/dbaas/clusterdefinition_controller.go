@@ -95,16 +95,16 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	if ok, err := dbaasconfig.CheckCDConfigTemplate(r.Client, reqCtx, dbClusterDef); !ok || err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "configMapIsReady")
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to check config template")
 	}
 
 	if ok, err := dbaasconfig.UpdateCDLabelsWithUsingConfiguration(r.Client, reqCtx, dbClusterDef); !ok || err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "update using config template info")
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to update using config template info")
 	}
 
 	// Update configmap Finalizer and set Immutable
 	if err := dbaasconfig.UpdateCDConfigMapFinalizer(r.Client, reqCtx, dbClusterDef); err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "UpdateConfigMapFinalizer")
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to UpdateConfigMapFinalizer")
 	}
 
 	for _, handler := range clusterDefUpdateHandlers {

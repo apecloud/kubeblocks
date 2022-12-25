@@ -1420,6 +1420,7 @@ func updateConfigurationManagerWithComponent(
 		usingContainers = intctrlutil.GetPodContainerWithVolumeMount(podSpec, tpl.VolumeName)
 		if len(usingContainers) > 0 {
 			firstCfg = i
+			break
 		}
 	}
 

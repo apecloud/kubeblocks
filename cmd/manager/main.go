@@ -75,6 +75,7 @@ func init() {
 	viper.SetDefault("VOLUMESNAPSHOT", false)
 	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:latest")
 	viper.SetDefault("PROBE_SERVICE_PORT", 3501)
+	viper.SetDefault("CONFIG_MANAGER_GRPC_PORT", 9901)
 	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
 }
 

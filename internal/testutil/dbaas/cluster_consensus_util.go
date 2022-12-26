@@ -132,7 +132,7 @@ spec:
 
 // CreateConsensusMysqlClusterVersion create a mysql clusterVersion with a consensus component
 func CreateConsensusMysqlClusterVersion(testCtx testutil.TestContext, clusterDefName, clusterVersionName string) *dbaasv1alpha1.ClusterVersion {
-	appVerYAML := fmt.Sprintf(`
+	clusterVersionYAML := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       ClusterVersion
 metadata:
@@ -147,7 +147,7 @@ spec:
         image: docker.io/apecloud/wesql-server:latest
 `, clusterVersionName, clusterDefName)
 	clusterVersion := &dbaasv1alpha1.ClusterVersion{}
-	gomega.Expect(yaml.Unmarshal([]byte(appVerYAML), clusterVersion)).Should(gomega.Succeed())
+	gomega.Expect(yaml.Unmarshal([]byte(clusterVersionYAML), clusterVersion)).Should(gomega.Succeed())
 	gomega.Expect(testCtx.CreateObj(ctx, clusterVersion)).Should(gomega.Succeed())
 	gomega.Eventually(func() bool {
 		err := testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: clusterVersionName, Namespace: testCtx.DefaultNamespace}, clusterVersion)

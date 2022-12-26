@@ -130,7 +130,7 @@ spec:
 	}
 
 	createClusterVersion := func() {
-		appVerYaml := fmt.Sprintf(`
+		clusterVersionYaml := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       ClusterVersion
 metadata:
@@ -155,7 +155,7 @@ spec:
         image: docker.io/apecloud/wesql-server:latest
 `, clusterVersionName, clusterDefName)
 		clusterVersion := &dbaasv1alpha1.ClusterVersion{}
-		Expect(yaml.Unmarshal([]byte(appVerYaml), clusterVersion)).Should(Succeed())
+		Expect(yaml.Unmarshal([]byte(clusterVersionYaml), clusterVersion)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
 	}
 

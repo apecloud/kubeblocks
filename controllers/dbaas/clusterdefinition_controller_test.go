@@ -135,7 +135,7 @@ spec:
           {}
 `
 
-	appVerYaml := `
+	clusterVersionYaml := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       ClusterVersion
 metadata:
@@ -211,7 +211,7 @@ data:
 			}, time.Second*10, time.Second*1).Should(BeTrue())
 			By("By creating an clusterVersion")
 			clusterVersion := &dbaasv1alpha1.ClusterVersion{}
-			Expect(yaml.Unmarshal([]byte(appVerYaml), clusterVersion)).Should(Succeed())
+			Expect(yaml.Unmarshal([]byte(clusterVersionYaml), clusterVersion)).Should(Succeed())
 			Expect(testCtx.CreateObj(ctx, clusterVersion)).Should(Succeed())
 			createdClusterVersion := &dbaasv1alpha1.ClusterVersion{}
 			// check reconciled finalizer

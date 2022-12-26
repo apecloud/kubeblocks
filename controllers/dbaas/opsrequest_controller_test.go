@@ -135,7 +135,7 @@ spec:
 
 	assureClusterVersionObj := func() *dbaasv1alpha1.ClusterVersion {
 		By("By assure an clusterVersion obj")
-		appVerYAML := `
+		clusterVersionYAML := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       ClusterVersion
 metadata:
@@ -155,7 +155,7 @@ spec:
         image: nginx
 `
 		clusterVersion := &dbaasv1alpha1.ClusterVersion{}
-		Expect(yaml.Unmarshal([]byte(appVerYAML), clusterVersion)).Should(Succeed())
+		Expect(yaml.Unmarshal([]byte(clusterVersionYAML), clusterVersion)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
 		return clusterVersion
 	}

@@ -377,7 +377,7 @@ spec:
 
 	allFieldsClusterVersionObj := func(needCreate bool) *dbaasv1alpha1.ClusterVersion {
 		By("By assure an clusterVersion obj")
-		appVerYAML := `
+		clusterVersionYAML := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       ClusterVersion
 metadata:
@@ -489,7 +489,7 @@ spec:
         image: nginx
 `
 		clusterVersion := &dbaasv1alpha1.ClusterVersion{}
-		Expect(yaml.Unmarshal([]byte(appVerYAML), clusterVersion)).Should(Succeed())
+		Expect(yaml.Unmarshal([]byte(clusterVersionYAML), clusterVersion)).Should(Succeed())
 		if needCreate {
 			Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
 		}
@@ -558,7 +558,7 @@ spec:
 
 	Context("When mergeComponents", func() {
 		It("Should merge with no error", func() {
-			cluster, clusterDef, appVer, _ := newAllFieldsClusterObj(nil, nil, true)
+			cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(nil, nil, true)
 			By("assign every available fields")
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
@@ -569,27 +569,27 @@ spec:
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.Components[0],
-				&appVer.Spec.Components[0],
+				&clusterVersion.Spec.Components[0],
 				&cluster.Spec.Components[0])
 			Expect(component).ShouldNot(BeNil())
-			By("leave appVer.podSpec nil")
-			appVer.Spec.Components[0].PodSpec = nil
+			By("leave clusterVersion.podSpec nil")
+			clusterVersion.Spec.Components[0].PodSpec = nil
 			component = mergeComponents(
 				reqCtx,
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.Components[0],
-				&appVer.Spec.Components[0],
+				&clusterVersion.Spec.Components[0],
 				&cluster.Spec.Components[0])
 			Expect(component).ShouldNot(BeNil())
-			appVer = allFieldsClusterVersionObj(true)
+			clusterVersion = allFieldsClusterVersionObj(true)
 			By("new container in clusterVersion not in clusterDefinition")
 			component = mergeComponents(
 				reqCtx,
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.Components[0],
-				&appVer.Spec.Components[1],
+				&clusterVersion.Spec.Components[1],
 				&cluster.Spec.Components[0])
 			Expect(len(component.PodSpec.Containers)).Should(Equal(2))
 			By("leave clusterComp nil")
@@ -598,7 +598,7 @@ spec:
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.Components[0],
-				&appVer.Spec.Components[0],
+				&clusterVersion.Spec.Components[0],
 				nil)
 			Expect(component).ShouldNot(BeNil())
 			By("leave clusterDefComp nil")
@@ -607,7 +607,7 @@ spec:
 				cluster,
 				clusterDef,
 				nil,
-				&appVer.Spec.Components[0],
+				&clusterVersion.Spec.Components[0],
 				&cluster.Spec.Components[0])
 			Expect(component).Should(BeNil())
 		})
@@ -722,7 +722,7 @@ spec:
 		Name:      "data-wesql-01-replicasets-0",
 	}
 	snapshotName := "test-snapshot-name"
-	cluster, clusterDef, appVer, _ := newAllFieldsClusterObj(nil, nil, false)
+	cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(nil, nil, false)
 	By("assign every available fields")
 	ctx := context.Background()
 	reqCtx := intctrlutil.RequestCtx{
@@ -734,12 +734,12 @@ spec:
 		cluster,
 		clusterDef,
 		&clusterDef.Spec.Components[0],
-		&appVer.Spec.Components[0],
+		&clusterVersion.Spec.Components[0],
 		&cluster.Spec.Components[0])
 	Expect(component).ShouldNot(BeNil())
 	params := createParams{
 		clusterDefinition: clusterDef,
-		clusterVersion:    appVer,
+		clusterVersion:    clusterVersion,
 		cluster:           cluster,
 		component:         component,
 		applyObjs:         nil,

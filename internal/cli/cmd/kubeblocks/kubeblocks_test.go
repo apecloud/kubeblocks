@@ -132,8 +132,8 @@ var _ = Describe("kubeblocks", func() {
 	It("remove finalizer", func() {
 		clusterDef := testing.FakeClusterDef()
 		clusterDef.Finalizers = []string{"test"}
-		appVer := testing.FakeClusterVersion()
-		appVer.Finalizers = []string{"test"}
+		clusterVersion := testing.FakeClusterVersion()
+		clusterVersion.Finalizers = []string{"test"}
 
 		testCases := []struct {
 			clusterDef     *dbaasv1alpha1.ClusterDefinition
@@ -152,7 +152,7 @@ var _ = Describe("kubeblocks", func() {
 			},
 			{
 				clusterDef:     clusterDef,
-				clusterVersion: appVer,
+				clusterVersion: clusterVersion,
 				expected:       "",
 			},
 		}
@@ -190,7 +190,7 @@ var _ = Describe("kubeblocks", func() {
 			Spec:   v1.CustomResourceDefinitionSpec{},
 			Status: v1.CustomResourceDefinitionStatus{},
 		}
-		appVerCrd := v1.CustomResourceDefinition{
+		clusterVersionCrd := v1.CustomResourceDefinition{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "CustomResourceDefinition",
 				APIVersion: "apiextensions.k8s.io/v1",
@@ -202,7 +202,7 @@ var _ = Describe("kubeblocks", func() {
 			Status: v1.CustomResourceDefinitionStatus{},
 		}
 
-		client := testing.FakeDynamicClient(&clusterCrd, &clusterDefCrd, &appVerCrd)
+		client := testing.FakeDynamicClient(&clusterCrd, &clusterDefCrd, &clusterVersionCrd)
 		Expect(deleteCRDs(client)).Should(Succeed())
 	})
 })

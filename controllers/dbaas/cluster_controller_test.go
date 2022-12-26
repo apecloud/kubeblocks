@@ -111,7 +111,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	assureCfgTplConfigMapObj := func(cmName string) *corev1.ConfigMap {
 		By("Assuring an cm obj")
-		appVerYAML := `
+		clusterVersionYaml := `
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -138,7 +138,7 @@ data:
     host=localhost
 `
 		cfgCM := &corev1.ConfigMap{}
-		Expect(yaml.Unmarshal([]byte(appVerYAML), cfgCM)).Should(Succeed())
+		Expect(yaml.Unmarshal([]byte(clusterVersionYaml), cfgCM)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
 		return cfgCM
 	}
@@ -223,7 +223,7 @@ spec:
 
 	assureClusterVersionObj := func() *dbaasv1alpha1.ClusterVersion {
 		By("Assuring an clusterVersion obj")
-		appVerYAML := `
+		clusterVersionYaml := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
@@ -246,7 +246,7 @@ spec:
         image: nginx
 `
 		clusterVersion := &dbaasv1alpha1.ClusterVersion{}
-		Expect(yaml.Unmarshal([]byte(appVerYAML), clusterVersion)).Should(Succeed())
+		Expect(yaml.Unmarshal([]byte(clusterVersionYaml), clusterVersion)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
 		return clusterVersion
 	}
@@ -431,7 +431,7 @@ spec:
 
 	assureClusterVersionWithConsensusObj := func() *dbaasv1alpha1.ClusterVersion {
 		By("Assuring an clusterVersion obj with componentType = Consensus")
-		appVerYAML := `
+		clusterVersionYaml := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
@@ -447,7 +447,7 @@ spec:
         imagePullPolicy: IfNotPresent
 `
 		clusterVersion := &dbaasv1alpha1.ClusterVersion{}
-		Expect(yaml.Unmarshal([]byte(appVerYAML), clusterVersion)).Should(Succeed())
+		Expect(yaml.Unmarshal([]byte(clusterVersionYaml), clusterVersion)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
 		return clusterVersion
 	}
@@ -537,7 +537,7 @@ spec:
 
 	createClusterNCheck := func() (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, types.NamespacedName) {
 		By("Creating a cluster")
-		toCreate, cd, appVer, key := newClusterObj(nil, nil)
+		toCreate, cd, clusterVersion, key := newClusterObj(nil, nil)
 		Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
 		fetchedG1 := &dbaasv1alpha1.Cluster{}
@@ -546,7 +546,7 @@ spec:
 			return fetchedG1.Status.ObservedGeneration == 1
 		}, timeout, interval).Should(BeTrue())
 
-		return fetchedG1, cd, appVer, key
+		return fetchedG1, cd, clusterVersion, key
 	}
 
 	Context("When creating cluster with normal", func() {
@@ -901,8 +901,8 @@ spec:
 			Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
 
 			By("Create real ClusterVersion")
-			appVerKey := types.NamespacedName{Name: "test-wesql-8.0.30"}
-			appVerYAML := fmt.Sprintf(`
+			clusterVersionKey := types.NamespacedName{Name: "test-wesql-8.0.30"}
+			clusterVersionYaml := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
@@ -924,16 +924,16 @@ spec:
         name: mysql
         resources: {}
     type: replicasets
-`, appVerKey.Name, clusterDefKey.Name)
+`, clusterVersionKey.Name, clusterDefKey.Name)
 			clusterVersion := &dbaasv1alpha1.ClusterVersion{}
-			Expect(yaml.Unmarshal([]byte(appVerYAML), clusterVersion)).Should(Succeed())
+			Expect(yaml.Unmarshal([]byte(clusterVersionYaml), clusterVersion)).Should(Succeed())
 			Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
 
 			clusterVersionList := dbaasv1alpha1.ClusterVersionList{}
 			Eventually(func() bool {
 				Expect(k8sClient.List(ctx, &clusterVersionList, client.MatchingLabels{
 					"clusterdefinition.kubeblocks.io/name": clusterDefKey.Name,
-				}, client.InNamespace(appVerKey.Namespace))).Should(Succeed())
+				}, client.InNamespace(clusterVersionKey.Namespace))).Should(Succeed())
 				if len(clusterVersionList.Items) == 0 {
 					return false
 				}
@@ -964,7 +964,7 @@ spec:
           requests:
             storage: 1Gi
   terminationPolicy: Delete
-`, key.Name, key.Namespace, clusterDefKey.Name, appVerKey.Name)
+`, key.Name, key.Namespace, clusterDefKey.Name, clusterVersionKey.Name)
 			cluster := &dbaasv1alpha1.Cluster{}
 			Expect(yaml.Unmarshal([]byte(clusterYAML), cluster)).Should(Succeed())
 			Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())

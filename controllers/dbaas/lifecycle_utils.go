@@ -285,7 +285,7 @@ func mergeComponents(
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition,
 	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
-	appVerComp *dbaasv1alpha1.ClusterVersionComponent,
+	clusterVersionComp *dbaasv1alpha1.ClusterVersionComponent,
 	clusterComp *dbaasv1alpha1.ClusterComponent) *Component {
 	if clusterDefComp == nil {
 		return nil
@@ -375,10 +375,10 @@ func mergeComponents(
 		}
 	}
 
-	if appVerComp != nil {
-		component.ConfigTemplates = mergeConfigTemplates(appVerComp.ConfigTemplateRefs, component.ConfigTemplates)
-		if appVerComp.PodSpec != nil {
-			for _, c := range appVerComp.PodSpec.Containers {
+	if clusterVersionComp != nil {
+		component.ConfigTemplates = mergeConfigTemplates(clusterVersionComp.ConfigTemplateRefs, component.ConfigTemplates)
+		if clusterVersionComp.PodSpec != nil {
+			for _, c := range clusterVersionComp.PodSpec.Containers {
 				doContainerAttrOverride(c)
 			}
 		}

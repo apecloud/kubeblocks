@@ -24,8 +24,6 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
@@ -39,8 +37,6 @@ func execShellCommand(cmd *exec.Cmd) (string, error) {
 		stdOut bytes.Buffer
 	)
 
-	logrus.Infof("exec command: %s", cmd.String())
-
 	cmd.Stderr = &errOut
 	cmd.Stdout = &stdOut
 	if err := cmd.Run(); err != nil {
@@ -48,14 +44,12 @@ func execShellCommand(cmd *exec.Cmd) (string, error) {
 	}
 
 	ret := stdOut.String()
-	logrus.Info(ret)
 	return ret, nil
 }
 
 func isSocketFile(file string) bool {
 	info, err := os.Stat(extractSocketPath(file))
 	if err != nil {
-		logrus.Infof("file not exist: %s, error: %v", file, err)
 		return false
 	}
 	if info.Mode()&fs.ModeSocket == fs.ModeSocket {

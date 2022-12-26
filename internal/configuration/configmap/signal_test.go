@@ -24,7 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,12 +35,12 @@ func TestSendSignal(t *testing.T) {
 	{
 		err := sendSignal(PID(os.Getpid()), syscall.SIGUSR2)
 		if err != nil {
-			logrus.Fatal(err)
+			logger.Error(err, "failed to send signal")
 		}
 		select {
 		case <-time.After(time.Second):
 			// walk here
-			logrus.Error("missed signal.")
+			logger.Info("missed signal.")
 			require.True(t, true)
 		case <-ctx.Done():
 			require.True(t, false)
@@ -52,18 +51,18 @@ func TestSendSignal(t *testing.T) {
 	{
 		err := sendSignal(PID(os.Getpid()), syscall.SIGUSR1)
 		if err != nil {
-			logrus.Fatal(err)
+			logger.Error(err, "failed to send signal")
 		}
 
 		select {
 		case <-time.After(time.Second):
 			// not walk here
-			logrus.Error("missed signal.")
+			logger.Info("missed signal.")
 			require.True(t, false)
 		case <-ctx.Done():
 			require.True(t, true)
 			// prints "context canceled"
-			logrus.Info(ctx.Err())
+			logger.Info(ctx.Err().Error())
 			// stop receiving signal notifications as soon as possible.
 			stop()
 		}

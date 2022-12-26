@@ -85,6 +85,7 @@ type ReconfigureServiceOptions struct {
 
 	DebugMode        bool
 	ContainerRuntime cfgutil.CRIType
+	Disable          bool
 	RuntimeEndpoint  string
 }
 
@@ -114,6 +115,7 @@ func NewVolumeWatcherOpts() *VolumeWatcherOpts {
 			PodIP:            viper.GetString(configPodIPEnvName),
 			ContainerRuntime: cfgutil.AutoType,
 			DebugMode:        false,
+			Disable:          false,
 		},
 		// for configmap watch
 		NotifyHandType: UnixSignal,
@@ -168,4 +170,9 @@ func InstallFlags(flags *pflag.FlagSet, opt *VolumeWatcherOpts) {
 		"runtime-endpoint",
 		opt.ServiceOpt.RuntimeEndpoint,
 		"the config set cri runtime endpoint.")
+
+	flags.BoolVar(&opt.ServiceOpt.Disable,
+		"disable-runtime",
+		opt.ServiceOpt.Disable,
+		"the config set disable runtime.")
 }

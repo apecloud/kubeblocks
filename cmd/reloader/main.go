@@ -31,8 +31,7 @@ import (
 
 // Reload configuration
 // TODO(zt) support unix signal
-// TODO(zt) support http
-// TODO(zt) support ssh
+// TODO(zt) support shell
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())

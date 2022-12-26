@@ -46,12 +46,12 @@ func NeedBuildConfigSidecar(reloadOptions *dbaasv1alpha1.ReloadOptions) error {
 	case reloadOptions.UnixSignalTrigger != nil:
 		signal := reloadOptions.UnixSignalTrigger.Signal
 		if !IsValidUnixSignal(signal) {
-			return cfgutil.MakeError("This special signal [%s] is not supported for now!", signal)
+			return cfgutil.MakeError("this special signal [%s] is not supported for now!", signal)
 		}
 		return nil
 	default:
 		// TODO support sql or http
-		return cfgutil.MakeError("This special reload type [%s] is not supported for now!", dbaasv1alpha1.SQLType)
+		return cfgutil.MakeError("this special reload type [%s] is not supported for now!", dbaasv1alpha1.SQLType)
 	}
 }
 

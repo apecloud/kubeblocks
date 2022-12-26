@@ -62,7 +62,7 @@ func init() {
 }
 
 func (d *dockerContainerV2) Kill(ctx context.Context, containerIDs []string, signal string, timeout *time.Duration) error {
-	d.logger.Infof("following docker containers are going to be stopped: %v", containerIDs)
+	d.logger.Debugf("following docker containers are going to be stopped: %v", containerIDs)
 	if signal == "" {
 		signal = defaultSignal
 	}
@@ -217,18 +217,35 @@ func (c *containerdContainerV2) Init(ctx context.Context) error {
 			c.logger.Warnf("failed to connect containerd endpoint: %s, error : %v", endpoint, err)
 		} else {
 			c.backendRuntime = runtimeapi.NewRuntimeServiceClient(conn)
-			return nil
+			if err = c.pingCRI(ctx, c.backendRuntime); err != nil {
+				return nil
+			}
 		}
 	}
 	return err
 }
 
+func (c *containerdContainerV2) pingCRI(ctx context.Context, runtime runtimeapi.RuntimeServiceClient) error {
+	status, err := runtime.Status(ctx, &runtimeapi.StatusRequest{
+		Verbose: true,
+	})
+	if err != nil {
+		return err
+	}
+	c.logger.Infof("cri status: %v", status)
+	return nil
+}
+
 func NewContainerKiller(containerRuntime CRIType, runtimeEndpoint string, logger *zap.SugaredLogger) (ContainerKiller, error) {
+	var (
+		killer ContainerKiller
+	)
+
 	if containerRuntime == AutoType {
-		containerRuntime = autoCheckCRIType()
+		containerRuntime = autoCheckCRIType(logger)
+		runtimeEndpoint = ""
 	}
 
-	var killer ContainerKiller
 	switch containerRuntime {
 	case DockerType:
 		killer = &dockerContainerV2{
@@ -246,9 +263,9 @@ func NewContainerKiller(containerRuntime CRIType, runtimeEndpoint string, logger
 	return killer, nil
 }
 
-func autoCheckCRIType() CRIType {
+func autoCheckCRIType(logger *zap.SugaredLogger) CRIType {
 	for _, f := range defaultContainerdEndpoints {
-		if isSocketFile(f) {
+		if isSocketFile(f) && hasValidCRISocket(f, logger) {
 			return ContainerdType
 		}
 	}
@@ -256,6 +273,16 @@ func autoCheckCRIType() CRIType {
 		return DockerType
 	}
 	return ""
+}
+
+func hasValidCRISocket(sockPath string, logger *zap.SugaredLogger) bool {
+	connection, err := createGrpcConnection(context.Background(), sockPath)
+	if err != nil {
+		logger.Warnf("failed to connect socket path: %s, error: %v", sockPath, err)
+		return false
+	}
+	_ = connection.Close()
+	return true
 }
 
 func createGrpcConnection(ctx context.Context, socketAddress string) (*grpc.ClientConn, error) {

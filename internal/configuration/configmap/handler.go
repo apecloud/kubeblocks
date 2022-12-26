@@ -17,13 +17,16 @@ limitations under the License.
 package configmap
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"syscall"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/go-logr/logr"
+	"github.com/go-logr/zapr"
 	"github.com/shirou/gopsutil/v3/process"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
 )
@@ -37,6 +40,15 @@ var allUnixSignals = map[string]os.Signal{
 	"SIGQUIT": syscall.SIGQUIT,
 	"SIGUSR1": syscall.SIGUSR1,
 	"SIGUSR2": syscall.SIGUSR2,
+}
+
+var (
+	logger = logr.Discard()
+)
+
+func SetLogger(zapLogger *zap.Logger) {
+	logger = zapr.NewLogger(zapLogger)
+	logger = logger.WithName("configmap_volume_watcher")
 }
 
 // findParentPidFromProcessName get parent pid
@@ -74,14 +86,14 @@ func findParentPidFromProcessName(processName string) (PID, error) {
 func CreateSignalHandler(sig string, processName string) WatchEventHandler {
 	signal, ok := allUnixSignals[strings.ToUpper(sig)]
 	if !ok {
-		logrus.Fatalf("not support unix signal: %s", signal)
+		logger.Error(cfgutil.MakeError("not support unix signal: %s", signal), "failed to create signal handler")
 	}
 	return func(event fsnotify.Event) error {
 		pid, err := findParentPidFromProcessName(processName)
 		if err != nil {
 			return err
 		}
-		logrus.Tracef("find pid: %d from process name[%s]", pid, processName)
+		logger.Info(fmt.Sprintf("find pid: %d from process name[%s]", pid, processName))
 		return sendSignal(pid, signal)
 	}
 }

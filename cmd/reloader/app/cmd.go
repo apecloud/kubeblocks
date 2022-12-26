@@ -59,6 +59,7 @@ func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 	}()
 
 	logger = zapLog.Sugar()
+	cfgcore.SetLogger(zapLog)
 	if err := checkOptions(opt); err != nil {
 		return err
 	}
@@ -82,12 +83,12 @@ func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 		return err
 	}
 
-	if err := startGRPCService(opt.ServiceOpt, ctx); err != nil {
-		logger.Error(err, "failed to start grpc service.")
-		return err
+	if !opt.ServiceOpt.Disable {
+		if err := startGRPCService(opt.ServiceOpt, ctx); err != nil {
+			logger.Error(err, "failed to start grpc service.")
+			return err
+		}
 	}
-
-	// testGRPCService(opt.ServiceOpt)
 
 	logger.Info("reload started.")
 	<-ctx.Done()
@@ -95,26 +96,6 @@ func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 
 	return nil
 }
-
-// func testGRPCService(opt ReconfigureServiceOptions) {
-//	tcpSpec := fmt.Sprintf("%s:%d", opt.PodIP, opt.GrpcPort)
-//	conn, err := grpc.Dial(tcpSpec, grpc.WithTransportCredentials(insecure.NewCredentials()))
-//	if err != nil {
-//		os.Exit(-1)
-//	}
-//
-//	client := cfgproto.NewReconfigureClient(conn)
-//	response, err := client.StopContainer(context.Background(), &cfgproto.StopContainerRequest{
-//		ContainerIDs: []string{"abc", "efg", "37fc47bc5a6d8ad34ec927382488c698cd0a931b2755e28ed6f16c74de00c1d9"},
-//	})
-//
-//	if err != nil {
-//		logrus.Errorf("stop container failed, error: %v", err)
-//		os.Exit(-2)
-//	}
-//
-//	logrus.Info(response.ErrMessage)
-// }
 
 func startGRPCService(opt ReconfigureServiceOptions, ctx context.Context) error {
 	var (

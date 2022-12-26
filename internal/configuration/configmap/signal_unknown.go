@@ -22,11 +22,9 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/sirupsen/logrus"
-
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
 func sendSignal(pid PID, sig os.Signal) error {
-	logrus.Fatal(cfgcore.MakeError("not support os: ", runtime.GOOS))
+	return cfgcore.MakeError("not support os: ", runtime.GOOS)
 }

@@ -10,7 +10,7 @@ Reloader is a service that watch changes in `ConfigMap` and trigger a config dyn
 
 You can get started with Reloader, by any of the following methods:
 * Download the release for your platform from github.com/apecloud/kubeblocks/release
-* Use the available Probe docker image `docker run -it apecloud/kubeblocks`
+* Use the available Reloader docker image `docker run -it apecloud/kubeblocks`
 * Build `reloader` from sources
 
 ## 2.1 Build
@@ -59,4 +59,4 @@ Flags:
 
 # 7. License
 
-Probe is under the Apache 2.0 license. See the [LICENSE](../../LICENSE) file for details.
+Reloader is under the Apache 2.0 license. See the [LICENSE](../../LICENSE) file for details.

@@ -93,7 +93,7 @@ spec:
 		Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
 	}
 
-	createAppversion := func() {
+	createClusterVersion := func() {
 		appVerYaml := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       ClusterVersion
@@ -232,7 +232,7 @@ spec:
 			defaultStorageClassName := "standard-" + testCtx.GetRandomStr()
 			storageClassName := "csi-hostpath-sc-" + testCtx.GetRandomStr()
 			createClusterDef()
-			createAppversion()
+			createClusterVersion()
 			createCluster(defaultStorageClassName, storageClassName)
 			cluster := &dbaasv1alpha1.Cluster{}
 			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)

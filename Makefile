@@ -435,10 +435,10 @@ fix-license-header: ## Run license header fix.
 bump-chart-ver: ## Bump helm chart version.
 ifeq ($(GOOS), darwin)
 	sed -i '' "s/^version:.*/version: $(VERSION)/" $(CHART_PATH)/Chart.yaml
-	sed -i '' "s/^clusterVersion:.*/clusterVersion: $(VERSION)/" $(CHART_PATH)/Chart.yaml
+	sed -i '' "s/^appVersion:.*/appVersion: $(VERSION)/" $(CHART_PATH)/Chart.yaml
 else
 	sed -i "s/^version:.*/version: $(VERSION)/" $(CHART_PATH)/Chart.yaml
-	sed -i "s/^clusterVersion:.*/clusterVersion: $(VERSION)/" $(CHART_PATH)/Chart.yaml
+	sed -i "s/^appVersion:.*/appVersion: $(VERSION)/" $(CHART_PATH)/Chart.yaml
 endif
 
 

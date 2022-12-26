@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	maxConcurReconClusterVersionKey = "MAXCONCURRENTRECONCILES_APPVERSION"
+	maxConcurReconClusterVersionKey = "MAXCONCURRENTRECONCILES_CLUSTERVERSION"
 	maxConcurReconClusterDefKey     = "MAXCONCURRENTRECONCILES_CLUSTERDEF"
 
 	// name of our custom finalizer

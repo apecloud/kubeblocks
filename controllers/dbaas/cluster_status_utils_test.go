@@ -129,7 +129,7 @@ spec:
 		Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
 	}
 
-	createAppversion := func() {
+	createClusterVersion := func() {
 		appVerYaml := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       ClusterVersion
@@ -337,7 +337,7 @@ spec:
 		It("test cluster Failed/Abnormal phase", func() {
 			By("create cluster related resources")
 			createClusterDef()
-			createAppversion()
+			createClusterVersion()
 			createCluster()
 
 			By("watch normal event")

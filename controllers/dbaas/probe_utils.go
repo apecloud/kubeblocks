@@ -176,12 +176,15 @@ func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *
 	roleObserveURI := fmt.Sprintf(roleObserveURIFormat, svcPort, bindingType)
 	probe.Exec.Command = []string{
 		"curl", "-X", "POST",
+		"--max-time", strconv.Itoa(probeSetting.TimeoutSeconds),
 		"--fail-with-body", "--silent",
 		"-H", "Content-Type: application/json",
 		roleObserveURI,
 		"-d", "{\"operation\": \"roleCheck\", \"metadata\":{\"sql\":\"\"}}",
 	}
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
+	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
+	probe.FailureThreshold = probeSetting.FailureThreshold
 	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
@@ -195,6 +198,8 @@ func buildStatusProbeContainer(statusProbeContainer *corev1.Container,
 	probe.Exec = nil
 	probe.HTTPGet = httpGet
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
+	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
+	probe.FailureThreshold = probeSetting.FailureThreshold
 	statusProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
@@ -208,5 +213,7 @@ func buildRunningProbeContainer(runningProbeContainer *corev1.Container,
 	probe.Exec = nil
 	probe.HTTPGet = httpGet
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
+	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
+	probe.FailureThreshold = probeSetting.FailureThreshold
 	runningProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }

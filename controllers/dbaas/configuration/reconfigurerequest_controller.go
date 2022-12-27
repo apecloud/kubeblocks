@@ -87,7 +87,7 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return intctrlutil.Reconciled()
 	}
 
-	isAppliedCfg, err := ApplyConfigurationChange(r.Client, reqCtx, config)
+	isAppliedCfg, err := applyConfigurationChange(r.Client, reqCtx, config)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to check last-applied-configuration")
 	} else if isAppliedCfg {
@@ -237,7 +237,7 @@ func (r *ReconfigureRequestReconciler) updateCfgStatus(reqCtx intctrlutil.Reques
 		return intctrlutil.RequeueWithErrorAndRecordEvent(cfg, r.Recorder, err, reqCtx.Log)
 	}
 
-	if ok, err := UpdateAppliedConfiguration(r.Client, reqCtx, cfg, configData, reconfigureType); err != nil || !ok {
+	if ok, err := updateAppliedConfiguration(r.Client, reqCtx, cfg, configData, reconfigureType); err != nil || !ok {
 		return intctrlutil.RequeueAfter(ConfigReconcileInterval, reqCtx.Log, "failed to patch status and retry...", "error", err)
 	}
 
@@ -245,7 +245,7 @@ func (r *ReconfigureRequestReconciler) updateCfgStatus(reqCtx intctrlutil.Reques
 }
 
 func (r *ReconfigureRequestReconciler) performUpgrade(params cfgpolicy.ReconfigureParams) (ctrl.Result, error) {
-	policy, err := cfgpolicy.NewReconfigurePolicy(params.Tpl, params.Meta, GetUpgradePolicy(params.Cfg), params.Restart)
+	policy, err := cfgpolicy.NewReconfigurePolicy(params.Tpl, params.Meta, getUpgradePolicy(params.Cfg), params.Restart)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(params.Cfg, r.Recorder, err, params.Ctx.Log)
 	}
@@ -261,7 +261,7 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params cfgpolicy.Reconfigu
 	case cfgpolicy.ESNone:
 		return r.updateCfgStatus(params.Ctx, params.Cfg, policy.GetPolicyName())
 	case cfgpolicy.ESFailed:
-		if err := SetCfgUpgradeFlag(params.Client, params.Ctx, params.Cfg, false); err != nil {
+		if err := setCfgUpgradeFlag(params.Client, params.Ctx, params.Cfg, false); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, params.Ctx.Log, "")
 		}
 		return intctrlutil.Reconciled()

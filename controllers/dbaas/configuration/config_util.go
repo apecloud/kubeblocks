@@ -66,7 +66,7 @@ func checkConfigurationLabels(object client.Object, requiredLabs []string) bool 
 		return false
 	}
 
-	return CheckEnableCfgUpgrade(object)
+	return checkEnableCfgUpgrade(object)
 }
 
 func getConfigMapByName(cli client.Client, ctx intctrlutil.RequestCtx, cmName, ns string) (*corev1.ConfigMap, error) {
@@ -86,7 +86,7 @@ func getConfigMapByName(cli client.Client, ctx intctrlutil.RequestCtx, cmName, n
 	return configObj, nil
 }
 
-func CheckConfigurationTemplate(ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplate) (bool, error) {
+func checkConfigurationTemplate(ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplate) (bool, error) {
 	// validate configuration template
 	isConfigSchemaFn := func(tpl *dbaasv1alpha1.CustomParametersValidation) (bool, error) {
 		if tpl == nil || tpl.Cue == nil {
@@ -421,7 +421,7 @@ func getClusterComponentsByName(components []dbaasv1alpha1.ClusterComponent, com
 }
 
 func getConfigurationVersion(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplateSpec) (*cfgcore.ConfigDiffInformation, error) {
-	lastConfig, err := GetLastVersionConfig(cfg)
+	lastConfig, err := getLastVersionConfig(cfg)
 	if err != nil {
 		return nil, cfgcore.WrapError(err, "failed to get last version data. config[%v]", client.ObjectKeyFromObject(cfg))
 	}

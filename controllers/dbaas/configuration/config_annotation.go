@@ -28,7 +28,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-func CheckEnableCfgUpgrade(object client.Object) bool {
+func checkEnableCfgUpgrade(object client.Object) bool {
 	// check user disable upgrade
 	// configuration.kubeblocks.io/disable-reconfigure = "false"
 	annotations := object.GetAnnotations()
@@ -45,7 +45,7 @@ func CheckEnableCfgUpgrade(object client.Object) bool {
 	return true
 }
 
-func SetCfgUpgradeFlag(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, flag bool) error {
+func setCfgUpgradeFlag(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, flag bool) error {
 	patch := client.MergeFrom(config.DeepCopy())
 	if config.ObjectMeta.Annotations == nil {
 		config.ObjectMeta.Annotations = map[string]string{}
@@ -59,8 +59,8 @@ func SetCfgUpgradeFlag(cli client.Client, ctx intctrlutil.RequestCtx, config *co
 	return nil
 }
 
-// ApplyConfigurationChange is
-func ApplyConfigurationChange(client client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap) (bool, error) {
+// applyConfigurationChange is
+func applyConfigurationChange(client client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap) (bool, error) {
 	annotations := config.GetAnnotations()
 
 	configData, err := json.Marshal(config.Data)
@@ -70,14 +70,14 @@ func ApplyConfigurationChange(client client.Client, ctx intctrlutil.RequestCtx, 
 
 	lastConfig, ok := annotations[cfgcore.LastAppliedConfigAnnotation]
 	if !ok {
-		return UpdateAppliedConfiguration(client, ctx, config, configData, ReconfigureFirstConfigType)
+		return updateAppliedConfiguration(client, ctx, config, configData, ReconfigureFirstConfigType)
 	}
 
 	return lastConfig == string(configData), nil
 }
 
-// UpdateAppliedConfiguration update hash label and last applied config
-func UpdateAppliedConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, configData []byte, reconfigureType string) (bool, error) {
+// updateAppliedConfiguration update hash label and last applied config
+func updateAppliedConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, configData []byte, reconfigureType string) (bool, error) {
 
 	patch := client.MergeFrom(config.DeepCopy())
 	if config.ObjectMeta.Annotations == nil {
@@ -101,7 +101,7 @@ func UpdateAppliedConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, c
 	return true, nil
 }
 
-func GetLastVersionConfig(cfg *corev1.ConfigMap) (map[string]string, error) {
+func getLastVersionConfig(cfg *corev1.ConfigMap) (map[string]string, error) {
 	data := make(map[string]string, 0)
 	cfgContent, ok := cfg.GetAnnotations()[cfgcore.LastAppliedConfigAnnotation]
 	if !ok {
@@ -115,7 +115,7 @@ func GetLastVersionConfig(cfg *corev1.ConfigMap) (map[string]string, error) {
 	return data, nil
 }
 
-func GetUpgradePolicy(cfg *corev1.ConfigMap) dbaasv1alpha1.UpgradePolicy {
+func getUpgradePolicy(cfg *corev1.ConfigMap) dbaasv1alpha1.UpgradePolicy {
 	const (
 		DefaultUpgradePolicy = dbaasv1alpha1.NormalPolicy
 	)

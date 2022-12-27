@@ -176,7 +176,7 @@ func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *
 	roleObserveURI := fmt.Sprintf(roleObserveURIFormat, svcPort, bindingType)
 	probe.Exec.Command = []string{
 		"curl", "-X", "POST",
-		"--max-time", strconv.Itoa(probeSetting.TimeoutSeconds),
+		"--max-time", strconv.Itoa(int(probeSetting.TimeoutSeconds)),
 		"--fail-with-body", "--silent",
 		"-H", "Content-Type: application/json",
 		roleObserveURI,

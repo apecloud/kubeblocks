@@ -19,19 +19,15 @@ package app
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"time"
 
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/configmap"
 	"github.com/spf13/cobra"
 	zaplogfmt "github.com/sykesm/zap-logfmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"google.golang.org/grpc"
-
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/configmap"
-	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 )
 
 var logger *zap.SugaredLogger
@@ -83,58 +79,11 @@ func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 		return err
 	}
 
-	if !opt.ServiceOpt.Disable {
-		if err := startGRPCService(opt.ServiceOpt, ctx); err != nil {
-			logger.Error(err, "failed to start grpc service.")
-			return err
-		}
-	}
-
 	logger.Info("reload started.")
 	<-ctx.Done()
 	logger.Info("reload started shutdown.")
 
 	return nil
-}
-
-func startGRPCService(opt ReconfigureServiceOptions, ctx context.Context) error {
-	var (
-		server *grpc.Server
-		proxy  = &reconfigureProxy{opt: opt, ctx: ctx}
-	)
-
-	tcpSpec := fmt.Sprintf("%s:%d", proxy.opt.PodIP, proxy.opt.GrpcPort)
-
-	logger.Infof("starting reconfigure service: %s", tcpSpec)
-	listener, err := net.Listen("tcp", tcpSpec)
-	if err != nil {
-		return cfgutil.WrapError(err, "failed to create listener: [%s]", tcpSpec)
-	}
-
-	if err := proxy.Init(logger); err != nil {
-		return err
-	}
-
-	if opt.DebugMode {
-		server = grpc.NewServer(grpc.StreamInterceptor(logStreamServerInterceptor))
-	} else {
-		server = grpc.NewServer()
-	}
-	cfgproto.RegisterReconfigureServer(server, proxy)
-
-	go func() {
-		if err := server.Serve(listener); err != nil {
-			logger.Error(err, "failed to serve connections from cri")
-			os.Exit(1)
-		}
-	}()
-	logger.Info("reconfigure service started.")
-	return nil
-}
-
-func logStreamServerInterceptor(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-	logger.Infof("info: [%+v]", info)
-	return handler(srv, ss)
 }
 
 func checkOptions(opt *VolumeWatcherOpts) error {

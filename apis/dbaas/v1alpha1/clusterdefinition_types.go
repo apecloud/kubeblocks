@@ -279,15 +279,15 @@ type ClusterDefinitionProbe struct {
 	// +kubebuilder:validation:Minimum=1
 	PeriodSeconds int32 `json:"periodSeconds,omitempty"`
 
-	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
+	// Number of seconds after which the probe times out. Defaults to 1 second.
 	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty"`
+
+	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
+	// +kubebuilder:default=3
 	// +kubebuilder:validation:Minimum=1
 	FailureThreshold int32 `json:"failureThreshold,omitempty"`
-
-	// Minimum consecutive successes for the probe to be considered successful after having failed.
-	// +kubebuilder:default=1
-	// +kubebuilder:validation:Minimum=1
-	SuccessThreshold int32 `json:"successThreshold,omitempty"`
 
 	// commands used to execute for probe.
 	// +optional

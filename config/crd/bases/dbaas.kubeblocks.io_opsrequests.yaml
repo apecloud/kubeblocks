@@ -184,7 +184,7 @@ spec:
                             anyOf:
                             - type: integer
                             - type: string
-                            description: storage the request storage size.
+                            description: Request storage size.
                             pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                             x-kubernetes-int-or-string: true
                         required:
@@ -215,7 +215,8 @@ spec:
                 format: date-time
                 type: string
               completionTimestamp:
-                description: completionTimestamp the OpsRequest completion time.
+                description: completionTimestamp defines the OpsRequest completion
+                  time.
                 format: date-time
                 type: string
               components:
@@ -259,7 +260,7 @@ spec:
                             anyOf:
                             - type: integer
                             - type: string
-                            description: requestStorage the request storage size.
+                            description: Request storage size.
                             pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                             x-kubernetes-int-or-string: true
                           status:
@@ -275,8 +276,8 @@ spec:
                         status when spec.type is VolumeExpansion
                       type: object
                   type: object
-                description: components record the status information of changing
-                  components in this operation.
+                description: components define the recorded the status information
+                  of changed components for operation request.
                 type: object
               conditions:
                 description: conditions describe opsRequest detail status.

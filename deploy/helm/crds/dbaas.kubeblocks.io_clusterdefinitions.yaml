@@ -7719,7 +7719,7 @@ spec:
                                   type: array
                               type: object
                             failureThreshold:
-                              default: 1
+                              default: 3
                               description: Minimum consecutive failures for the probe
                                 to be considered failed after having succeeded.
                               format: int32
@@ -7731,10 +7731,10 @@ spec:
                               format: int32
                               minimum: 1
                               type: integer
-                            successThreshold:
+                            timeoutSeconds:
                               default: 1
-                              description: Minimum consecutive successes for the probe
-                                to be considered successful after having failed.
+                              description: Number of seconds after which the probe
+                                times out. Defaults to 1 second.
                               format: int32
                               minimum: 1
                               type: integer
@@ -7759,7 +7759,7 @@ spec:
                                   type: array
                               type: object
                             failureThreshold:
-                              default: 1
+                              default: 3
                               description: Minimum consecutive failures for the probe
                                 to be considered failed after having succeeded.
                               format: int32
@@ -7771,10 +7771,10 @@ spec:
                               format: int32
                               minimum: 1
                               type: integer
-                            successThreshold:
+                            timeoutSeconds:
                               default: 1
-                              description: Minimum consecutive successes for the probe
-                                to be considered successful after having failed.
+                              description: Number of seconds after which the probe
+                                times out. Defaults to 1 second.
                               format: int32
                               minimum: 1
                               type: integer
@@ -7799,7 +7799,7 @@ spec:
                                   type: array
                               type: object
                             failureThreshold:
-                              default: 1
+                              default: 3
                               description: Minimum consecutive failures for the probe
                                 to be considered failed after having succeeded.
                               format: int32
@@ -7811,10 +7811,10 @@ spec:
                               format: int32
                               minimum: 1
                               type: integer
-                            successThreshold:
+                            timeoutSeconds:
                               default: 1
-                              description: Minimum consecutive successes for the probe
-                                to be considered successful after having failed.
+                              description: Number of seconds after which the probe
+                                times out. Defaults to 1 second.
                               format: int32
                               minimum: 1
                               type: integer

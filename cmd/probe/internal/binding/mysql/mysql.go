@@ -124,6 +124,14 @@ func (m *Mysql) Operations() []bindings.OperationKind {
 }
 
 func (m *Mysql) InitIfNeed() error {
+	if m.db == nil {
+		go m.InitDelay()
+		return fmt.Errorf("Init db connection asynchronously.")
+	}
+	return nil
+}
+
+func (m *Mysql) InitDelay() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.db != nil {

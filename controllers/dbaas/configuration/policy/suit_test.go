@@ -20,9 +20,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/spf13/viper"
-	"go.uber.org/zap/zapcore"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 

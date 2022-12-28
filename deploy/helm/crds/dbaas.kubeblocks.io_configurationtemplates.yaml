@@ -73,16 +73,30 @@ spec:
                 items:
                   type: string
                 type: array
-              formatter:
-                description: formatter describes the format of the configuration file,
-                  the controller 1. parses configuration file 2. analyzes the modified
-                  parameters 3. applies corresponding policies.
-                enum:
-                - ini
-                - xml
-                - yaml
-                - json
-                type: string
+              formatterConfig:
+                description: formatterConfig describes the format of the configuration
+                  file, the controller 1. parses configuration file 2. analyzes the
+                  modified parameters 3. applies corresponding policies.
+                properties:
+                  formatter:
+                    description: formatter describes the format of the configuration
+                      file Formatter ConfigurationFormatter `json:"formatter"`
+                    enum:
+                    - xml
+                    - ini
+                    - yaml
+                    - json
+                    type: string
+                  iniConfig:
+                    description: iniConfig represents the ini options.
+                    properties:
+                      sectionName:
+                        description: sectionName describes ini section.
+                        type: string
+                    type: object
+                required:
+                - formatter
+                type: object
               immutableParameters:
                 description: immutableParameters describes parameters that prohibit
                   user from modification.
@@ -129,8 +143,6 @@ spec:
                 items:
                   type: string
                 type: array
-            required:
-            - formatter
             type: object
           status:
             description: ConfigurationTemplateStatus defines the observed state of

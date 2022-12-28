@@ -428,7 +428,7 @@ func getConfigurationVersion(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, 
 
 	option := cfgcore.CfgOption{
 		Type:    cfgcore.CfgTplType,
-		CfgType: tpl.Formatter,
+		CfgType: tpl.FormatterConfig.Formatter,
 		Log:     ctx.Log,
 	}
 

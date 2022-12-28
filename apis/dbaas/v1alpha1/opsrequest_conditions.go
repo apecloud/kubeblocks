@@ -35,6 +35,7 @@ const (
 	ConditionTypeVerticalScaling   = "VerticalScaling"
 	ConditionTypeHorizontalScaling = "HorizontalScaling"
 	ConditionTypeVolumeExpanding   = "VolumeExpanding"
+	ConditionTypeReconfigure       = "Reconfigure"
 	ConditionTypeUpgrading         = "Upgrading"
 
 	// condition and event reasons
@@ -166,5 +167,16 @@ func NewUpgradingCondition(ops *OpsRequest) *metav1.Condition {
 		Reason:             "UpgradingStarted",
 		LastTransitionTime: metav1.NewTime(time.Now()),
 		Message:            fmt.Sprintf("start upgrading in Cluster: %s", ops.Spec.ClusterRef),
+	}
+}
+
+// NewReconfigureCondition new a condition that the OpsRequest updating component configuration
+func NewReconfigureCondition(ops *OpsRequest) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeReconfigure,
+		Status:             metav1.ConditionTrue,
+		Reason:             "ReconfigureStarted",
+		LastTransitionTime: metav1.NewTime(time.Now()),
+		Message:            fmt.Sprintf("start reconfigure in Cluster: %s", ops.Spec.ClusterRef),
 	}
 }

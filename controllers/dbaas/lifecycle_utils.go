@@ -45,6 +45,7 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -80,42 +81,6 @@ func getCacheCUETplValue(key string, valueCreator func() (*intctrlutil.CUETpl, e
 	}
 	cacheCtx[key] = v
 	return v, err
-}
-
-// mergeConfigTemplates merge AppVersion.Components[*].ConfigTemplateRefs and ClusterDefinition.Components[*].ConfigTemplateRefs
-func mergeConfigTemplates(appVersionTpl []dbaasv1alpha1.ConfigTemplate,
-	cdTpl []dbaasv1alpha1.ConfigTemplate) []dbaasv1alpha1.ConfigTemplate {
-	if len(appVersionTpl) == 0 {
-		return cdTpl
-	}
-
-	if len(cdTpl) == 0 {
-		return appVersionTpl
-	}
-
-	mergedCfgTpl := make([]dbaasv1alpha1.ConfigTemplate, 0, len(appVersionTpl)+len(cdTpl))
-	mergedTplMap := make(map[string]struct{}, cap(mergedCfgTpl))
-
-	for i := range appVersionTpl {
-		if _, ok := (mergedTplMap)[appVersionTpl[i].VolumeName]; ok {
-			// TODO: following error should be checked in validation webhook and record Warning event
-			// return nil, fmt.Errorf("ConfigTemplate require not same volumeName [%s]", appVersionTpl[i].Name)
-			continue
-		}
-		mergedCfgTpl = append(mergedCfgTpl, appVersionTpl[i])
-		mergedTplMap[appVersionTpl[i].VolumeName] = struct{}{}
-	}
-
-	for i := range cdTpl {
-		// AppVersion replace clusterDefinition
-		if _, ok := (mergedTplMap)[cdTpl[i].VolumeName]; ok {
-			continue
-		}
-		mergedCfgTpl = append(mergedCfgTpl, cdTpl[i])
-		mergedTplMap[cdTpl[i].VolumeName] = struct{}{}
-	}
-
-	return mergedCfgTpl
 }
 
 func getContainerByName(containers []corev1.Container, name string) (int, *corev1.Container) {
@@ -384,7 +349,7 @@ func mergeComponents(
 	}
 
 	if appVerComp != nil {
-		component.ConfigTemplates = mergeConfigTemplates(appVerComp.ConfigTemplateRefs, component.ConfigTemplates)
+		component.ConfigTemplates = operations.MergeConfigTemplates(appVerComp.ConfigTemplateRefs, component.ConfigTemplates)
 		if appVerComp.PodSpec != nil {
 			for _, c := range appVerComp.PodSpec.Containers {
 				doContainerAttrOverride(c)

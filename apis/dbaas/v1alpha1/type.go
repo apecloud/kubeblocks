@@ -68,6 +68,7 @@ const (
 	HorizontalScalingType OpsType = "HorizontalScaling"
 	VolumeExpansionType   OpsType = "VolumeExpansion"
 	UpgradeType           OpsType = "Upgrade"
+	ReconfigureType       OpsType = "Reconfigure"
 	RestartType           OpsType = "Restart"
 )
 

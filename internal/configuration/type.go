@@ -131,3 +131,7 @@ func getInstanceCfgCMName(objName, tplName string) string {
 func GetComponentCfgName(clusterName, componentName, tplName string) string {
 	return getInstanceCfgCMName(fmt.Sprintf("%s-%s", clusterName, componentName), tplName)
 }
+
+func GetComponentCMName(clusterName, componentName string, tpl dbaasv1alpha1.ConfigTemplate) string {
+	return GetComponentCfgName(clusterName, componentName, tpl.VolumeName)
+}

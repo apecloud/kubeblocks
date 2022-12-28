@@ -51,4 +51,7 @@ spec:
     - innodb_autoinc_lock_mode
 
   # mysql configuration file format
-  formatter: ini
+  formatterConfig:
+    formatter: ini
+    iniConfig:
+      sectionName: mysqld

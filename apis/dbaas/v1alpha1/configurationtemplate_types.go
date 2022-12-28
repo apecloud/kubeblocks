@@ -132,10 +132,15 @@ type FormatterConfig struct {
 	FormatterOptions `json:",inline"`
 }
 
+// FormatterOptions represents the special options of configuration file.
+// Only one of its members may be specified.
 type FormatterOptions struct {
 	// iniConfig represents the ini options.
 	// +optional
 	IniConfig *IniConfig `json:"iniConfig,omitempty"`
+
+	// xmlConfig represents the ini options.
+	// XMLConfig *XMLConfig `json:"xmlConfig,omitempty"`
 }
 
 type IniConfig struct {

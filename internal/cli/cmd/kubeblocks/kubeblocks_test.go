@@ -132,33 +132,33 @@ var _ = Describe("kubeblocks", func() {
 	It("remove finalizer", func() {
 		clusterDef := testing.FakeClusterDef()
 		clusterDef.Finalizers = []string{"test"}
-		appVer := testing.FakeAppVersion()
-		appVer.Finalizers = []string{"test"}
+		clusterVersion := testing.FakeClusterVersion()
+		clusterVersion.Finalizers = []string{"test"}
 
 		testCases := []struct {
-			clusterDef *dbaasv1alpha1.ClusterDefinition
-			appVersion *dbaasv1alpha1.AppVersion
-			expected   string
+			clusterDef     *dbaasv1alpha1.ClusterDefinition
+			clusterVersion *dbaasv1alpha1.ClusterVersion
+			expected       string
 		}{
 			{
-				clusterDef: testing.FakeClusterDef(),
-				appVersion: testing.FakeAppVersion(),
-				expected:   "Unable to remove nonexistent key: finalizers",
+				clusterDef:     testing.FakeClusterDef(),
+				clusterVersion: testing.FakeClusterVersion(),
+				expected:       "Unable to remove nonexistent key: finalizers",
 			},
 			{
-				clusterDef: clusterDef,
-				appVersion: testing.FakeAppVersion(),
-				expected:   "Unable to remove nonexistent key: finalizers",
+				clusterDef:     clusterDef,
+				clusterVersion: testing.FakeClusterVersion(),
+				expected:       "Unable to remove nonexistent key: finalizers",
 			},
 			{
-				clusterDef: clusterDef,
-				appVersion: appVer,
-				expected:   "",
+				clusterDef:     clusterDef,
+				clusterVersion: clusterVersion,
+				expected:       "",
 			},
 		}
 
 		for _, c := range testCases {
-			client := testing.FakeDynamicClient(c.clusterDef, c.appVersion)
+			client := testing.FakeDynamicClient(c.clusterDef, c.clusterVersion)
 			if c.expected != "" {
 				Expect(removeFinalizers(client)).Should(MatchError(MatchRegexp(c.expected)))
 			} else {
@@ -190,19 +190,19 @@ var _ = Describe("kubeblocks", func() {
 			Spec:   v1.CustomResourceDefinitionSpec{},
 			Status: v1.CustomResourceDefinitionStatus{},
 		}
-		appVerCrd := v1.CustomResourceDefinition{
+		clusterVersionCrd := v1.CustomResourceDefinition{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "CustomResourceDefinition",
 				APIVersion: "apiextensions.k8s.io/v1",
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "appversions.dbaas.kubeblocks.io",
+				Name: "clusterversions.dbaas.kubeblocks.io",
 			},
 			Spec:   v1.CustomResourceDefinitionSpec{},
 			Status: v1.CustomResourceDefinitionStatus{},
 		}
 
-		client := testing.FakeDynamicClient(&clusterCrd, &clusterDefCrd, &appVerCrd)
+		client := testing.FakeDynamicClient(&clusterCrd, &clusterDefCrd, &clusterVersionCrd)
 		Expect(deleteCRDs(client)).Should(Succeed())
 	})
 })

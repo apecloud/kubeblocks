@@ -19,7 +19,7 @@ metadata:
   namespace: default
 spec:
   clusterDefinitionRef: wesql-clusterdefinition
-  appVersionRef: wesql-appversion-8.0.29
+  clusterVersionRef: wesql-clusterversion-8.0.29
   affinity:
     podAntiAffinity: preferred
     topologyKeys:
@@ -48,7 +48,7 @@ metadata:
   namespace: default
 spec:
   clusterDefinitionRef: wesql-clusterdefinition
-  appVersionRef: wesql-appversion-8.0.29
+  clusterVersionRef: wesql-clusterversion-8.0.29
   affinity:
     podAntiAffinity: Required
     topologyKeys:
@@ -72,7 +72,7 @@ metadata:
   namespace: default
 spec:
   clusterDefinitionRef: wesql-clusterdefinition
-  appVersionRef: wesql-appversion-8.0.29
+  clusterVersionRef: wesql-clusterversion-8.0.29
   affinity:
     nodeLabels:
     - topology.kubernetes.io/zone: us-east-1c

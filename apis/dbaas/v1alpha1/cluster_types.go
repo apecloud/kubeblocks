@@ -33,10 +33,10 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
-	// Cluster referenced AppVersion name.
+	// Cluster referenced ClusterVersion name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	AppVersionRef string `json:"appVersionRef"`
+	ClusterVersionRef string `json:"clusterVersionRef"`
 
 	// Cluster termination policy. One of DoNotTerminate, Halt, Delete, WipeOut.
 	// DoNotTerminate will block delete operation.
@@ -47,7 +47,7 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
 	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
 
-	// List of components you want to replace in ClusterDefinition and AppVersion. It will replace the field in ClusterDefinition's and AppVersion's component if type is matching.
+	// List of components you want to replace in ClusterDefinition and ClusterVersion. It will replace the field in ClusterDefinition's and ClusterVersion's component if type is matching.
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
@@ -243,7 +243,7 @@ type ConsensusMemberStatus struct {
 }
 
 type ClusterComponentVolumeClaimTemplate struct {
-	// Ref AppVersion.spec.components.containers.volumeMounts.name
+	// Ref ClusterVersion.spec.components.containers.volumeMounts.name
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 	// spec defines the desired characteristics of a volume requested by a pod author.
@@ -270,7 +270,7 @@ type Affinity struct {
 }
 
 type Operations struct {
-	// upgradable whether the cluster supports upgrade. if multiple appVersions existed, it is true.
+	// upgradable whether the cluster supports upgrade. if multiple clusterVersions existed, it is true.
 	// +optional
 	Upgradable bool `json:"upgradable,omitempty"`
 
@@ -313,7 +313,7 @@ type OperationComponent struct {
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:categories={dbaas,all}
 //+kubebuilder:printcolumn:name="CLUSTER-DEFINITION",type="string",JSONPath=".spec.clusterDefinitionRef",description="ClusterDefinition referenced by cluster."
-//+kubebuilder:printcolumn:name="APP-VERSION",type="string",JSONPath=".spec.appVersionRef",description="Cluster Application Version."
+//+kubebuilder:printcolumn:name="VERSION",type="string",JSONPath=".spec.clusterVersionRef",description="Cluster Application Version."
 //+kubebuilder:printcolumn:name="TERMINATION-POLICY",type="string",JSONPath=".spec.terminationPolicy",description="Cluster termination policy."
 //+kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="Cluster Status."
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"

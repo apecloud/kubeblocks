@@ -45,21 +45,21 @@ type ObjectsGetter struct {
 	Name      string
 	Namespace string
 
-	WithClusterDef bool
-	WithAppVersion bool
-	WithConfigMap  bool
-	WithPVC        bool
-	WithService    bool
-	WithSecret     bool
-	WithPod        bool
+	WithClusterDef     bool
+	WithClusterVersion bool
+	WithConfigMap      bool
+	WithPVC            bool
+	WithService        bool
+	WithSecret         bool
+	WithPod            bool
 }
 
 func NewClusterObjects() *ClusterObjects {
 	return &ClusterObjects{
-		Cluster:    &dbaasv1alpha1.Cluster{},
-		ClusterDef: &dbaasv1alpha1.ClusterDefinition{},
-		AppVersion: &dbaasv1alpha1.AppVersion{},
-		Nodes:      []*corev1.Node{},
+		Cluster:        &dbaasv1alpha1.Cluster{},
+		ClusterDef:     &dbaasv1alpha1.ClusterDefinition{},
+		ClusterVersion: &dbaasv1alpha1.ClusterVersion{},
+		Nodes:          []*corev1.Node{},
 	}
 }
 
@@ -97,9 +97,9 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 	}
 
 	// get app version
-	if o.WithAppVersion {
-		if err = getResource(types.AppVersionGVR(), objs.Cluster.Spec.AppVersionRef, "",
-			objs.AppVersion); err != nil {
+	if o.WithClusterVersion {
+		if err = getResource(types.ClusterVersionGVR(), objs.Cluster.Spec.ClusterVersionRef, "",
+			objs.ClusterVersion); err != nil {
 			return nil, err
 		}
 	}
@@ -166,7 +166,7 @@ func (o *ClusterObjects) GetClusterInfo() *ClusterInfo {
 	cluster := &ClusterInfo{
 		Name:              c.Name,
 		Namespace:         c.Namespace,
-		AppVersion:        c.Spec.AppVersionRef,
+		ClusterVersion:    c.Spec.ClusterVersionRef,
 		ClusterDefinition: c.Spec.ClusterDefRef,
 		TerminationPolicy: string(c.Spec.TerminationPolicy),
 		Status:            string(c.Status.Phase),

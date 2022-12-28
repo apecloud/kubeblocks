@@ -32,12 +32,12 @@ import (
 
 var _ = Describe("Stateful Component", func() {
 	var (
-		randomStr      = testCtx.GetRandomStr()
-		clusterDefName = "nginx-definition-" + randomStr
-		appVersionName = "nginx-app-version-" + randomStr
-		clusterName    = "nginx-" + randomStr
-		timeout        = 10 * time.Second
-		interval       = time.Second
+		randomStr          = testCtx.GetRandomStr()
+		clusterDefName     = "nginx-definition-" + randomStr
+		clusterVersionName = "nginx-cluster-version-" + randomStr
+		clusterName        = "nginx-" + randomStr
+		timeout            = 10 * time.Second
+		interval           = time.Second
 	)
 
 	cleanupObjects := func() {
@@ -63,7 +63,7 @@ var _ = Describe("Stateful Component", func() {
 	Context("Stateless Component test", func() {
 		It("Stateless Component test", func() {
 			By(" init cluster, deployment")
-			cluster := testdbaas.CreateStatelessCluster(testCtx, clusterDefName, appVersionName, clusterName)
+			cluster := testdbaas.CreateStatelessCluster(testCtx, clusterDefName, clusterVersionName, clusterName)
 			deploy := testdbaas.MockStatelessComponentDeploy(testCtx, clusterName)
 			statelessComponent := NewStateless(ctx, k8sClient, cluster)
 

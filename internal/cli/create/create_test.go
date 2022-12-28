@@ -41,7 +41,7 @@ var _ = Describe("Create", func() {
 				"name":              "test",
 				"namespace":         "default",
 				"clusterDefRef":     "test-def",
-				"appVersionRef":     "test-appversion-ref",
+				"clusterVersionRef": "test-clusterversion-ref",
 				"components":        []string{},
 				"terminationPolicy": "Halt",
 			}
@@ -83,7 +83,7 @@ var _ = Describe("Create", func() {
 				"name":              "test-apply",
 				"namespace":         "default",
 				"clusterDefRef":     "test-def",
-				"appVersionRef":     "test-appversion-ref",
+				"clusterVersionRef": "test-clusterversion-ref",
 				"components":        []string{},
 				"terminationPolicy": "Halt",
 			}

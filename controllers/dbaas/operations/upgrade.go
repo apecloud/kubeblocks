@@ -31,8 +31,8 @@ func init() {
 	opsMgr.RegisterOps(dbaasv1alpha1.UpgradeType, upgradeBehaviour)
 }
 
-// UpgradeAction Modify Cluster.spec.appVersionRef with opsRequest.spec.clusterOps.upgrade.appVersionRef
+// UpgradeAction Modify Cluster.spec.clusterVersionRef with opsRequest.spec.clusterOps.upgrade.clusterVersionRef
 func UpgradeAction(opsRes *OpsResource) error {
-	opsRes.Cluster.Spec.AppVersionRef = opsRes.OpsRequest.Spec.Upgrade.AppVersionRef
+	opsRes.Cluster.Spec.ClusterVersionRef = opsRes.OpsRequest.Spec.Upgrade.ClusterVersionRef
 	return opsRes.Client.Update(opsRes.Ctx, opsRes.Cluster)
 }

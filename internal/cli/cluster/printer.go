@@ -42,7 +42,7 @@ func NewClusterPrinter(out io.Writer) *ClusterPrinter {
 
 func (p *ClusterPrinter) AddRow(objs *ClusterObjects) {
 	c := objs.GetClusterInfo()
-	p.tbl.AddRow(c.Name, c.Namespace, c.AppVersion, c.ClusterDefinition, c.TerminationPolicy, c.Status, c.InternalEP, c.ExternalEP, c.Age)
+	p.tbl.AddRow(c.Name, c.Namespace, c.ClusterVersion, c.ClusterDefinition, c.TerminationPolicy, c.Status, c.InternalEP, c.ExternalEP, c.Age)
 }
 
 func (p *ClusterPrinter) Print() {

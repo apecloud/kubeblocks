@@ -46,7 +46,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		// waitDuration          = time.Second * 3
 		randomStr             = testCtx.GetRandomStr()
 		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		appVersionName        = "appversion-for-ops-" + randomStr
+		clusterVersionName    = "clusterversion-for-ops-" + randomStr
 		clusterName           = "cluster-for-ops-" + randomStr
 		storageClassName      = "csi-hostpath-sc-" + randomStr
 		vctName               = "data"
@@ -62,7 +62,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -357,13 +357,13 @@ spec:
 
 	Context("Test OpsRequest", func() {
 		It("Should Test all OpsRequest", func() {
-			_, _, clusterObject := testdbaas.InitConsensusMysql(testCtx, clusterDefinitionName, appVersionName, clusterName)
+			_, _, clusterObject := testdbaas.InitConsensusMysql(testCtx, clusterDefinitionName, clusterVersionName, clusterName)
 			// init storageClass
 			_ = assureDefaultStorageClassObj()
 
 			By("Test Upgrade Ops")
 			ops := generateOpsRequestObj("upgrade-ops-"+randomStr, clusterObject.Name, dbaasv1alpha1.UpgradeType)
-			ops.Spec.Upgrade = &dbaasv1alpha1.Upgrade{AppVersionRef: appVersionName}
+			ops.Spec.Upgrade = &dbaasv1alpha1.Upgrade{ClusterVersionRef: clusterVersionName}
 			opsRes := &OpsResource{
 				Ctx:        context.Background(),
 				Cluster:    clusterObject,

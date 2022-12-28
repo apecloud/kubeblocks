@@ -132,18 +132,18 @@ func TestGetComponentDefFromClusterDefinition(t *testing.T) {
 
 var _ = Describe("Consensus Component", func() {
 	var (
-		randomStr      = testCtx.GetRandomStr()
-		clusterDefName = "mysql-clusterdef-" + randomStr
-		appVersionName = "mysql-appversion-" + randomStr
-		clusterName    = "mysql-" + randomStr
-		timeout        = 10 * time.Second
-		interval       = time.Second
+		randomStr          = testCtx.GetRandomStr()
+		clusterDefName     = "mysql-clusterdef-" + randomStr
+		clusterVersionName = "mysql-clusterversion-" + randomStr
+		clusterName        = "mysql-" + randomStr
+		timeout            = 10 * time.Second
+		interval           = time.Second
 	)
 
 	cleanupObjects := func() {
 		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -167,7 +167,7 @@ var _ = Describe("Consensus Component", func() {
 	Context("Consensus Component test", func() {
 		It("Consensus Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			_, _, cluster := testdbaas.InitConsensusMysql(testCtx, clusterDefName, appVersionName, clusterName)
+			_, _, cluster := testdbaas.InitConsensusMysql(testCtx, clusterDefName, clusterVersionName, clusterName)
 			sts := testdbaas.MockConsensusComponentStatefulSet(testCtx, clusterName)
 			if !testCtx.UsingExistingCluster() {
 				testdbaas.MockConsensusComponentPods(testCtx, clusterName)

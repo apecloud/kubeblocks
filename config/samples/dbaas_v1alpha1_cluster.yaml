@@ -8,8 +8,8 @@ metadata:
 spec:
   #  # ref ClusterDefinition, immutable
   #  clusterDefinitionRef: !<string>
-  #  # ref AppVersion
-  #  appVersionRef: !<string>
+  #  # ref ClusterVersion
+  #  clusterVersionRef: !<string>
   #  components:
   #  - name: <string>
   #    # component name in ClusterDefinition
@@ -34,7 +34,7 @@ spec:
   #    # <statefulset.spec.volumeClaimTemplates>
   #    volumeClaimTemplates:
   #      - metadata:
-  #          name: data # ref AppVersion components.containers.volumeMounts.name
+  #          name: data # ref ClusterVersion components.containers.volumeMounts.name
   #        spec:
   #          accessModes:
   #            - ReadWriteOnce
@@ -52,8 +52,8 @@ spec:
   #   terminatingPolicy: <string> # [DoNotTerminate, Halt, Delete, WipeOut]
   # ref ClusterDefinition immutable
   clusterDefinitionRef: "a-vendor-mongodbcluster"
-  # ref AppVersion
-  appVersionRef: "appversion-mongodb-3.4"
+  # ref ClusterVersion
+  clusterVersionRef: "clusterversion-mongodb-3.4"
   components:
     - name: mongos1
       type: mongos # component name in ClusterDefinition
@@ -78,7 +78,7 @@ spec:
       # <statefulset.spec.volumeClaimTemplates>
       volumeClaimTemplates:
         - metadata:
-            name: data # ref AppVersion components.containers.volumeMounts.name
+            name: data # ref ClusterVersion components.containers.volumeMounts.name
           spec:
             accessModes:
               - ReadWriteOnce
@@ -106,7 +106,7 @@ spec:
       # <statefulset.spec.volumeClaimTemplates>
       volumeClaimTemplates:
         - metadata:
-            name: data # ref AppVersion components.containers.volumeMounts.name
+            name: data # ref ClusterVersion components.containers.volumeMounts.name
           spec:
             accessModes:
               - ReadWriteOnce

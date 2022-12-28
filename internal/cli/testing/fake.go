@@ -29,16 +29,16 @@ import (
 )
 
 const (
-	ClusterName      = "fake-cluster-name"
-	Namespace        = "fake-namespace"
-	AppVersionName   = "fake-appversion"
-	ClusterDefName   = "fake-cluster-definition"
-	ComponentName    = "fake-component-name"
-	ComponentType    = "fake-component-type"
-	NodeName         = "fake-node-name"
-	SecretName       = "fake-secret-name"
-	StorageClassName = "fake-storage-class"
-	PVCName          = "fake-pvc"
+	ClusterName        = "fake-cluster-name"
+	Namespace          = "fake-namespace"
+	ClusterVersionName = "fake-clusterversion"
+	ClusterDefName     = "fake-cluster-definition"
+	ComponentName      = "fake-component-name"
+	ComponentType      = "fake-component-type"
+	NodeName           = "fake-node-name"
+	SecretName         = "fake-secret-name"
+	StorageClassName   = "fake-storage-class"
+	PVCName            = "fake-pvc"
 
 	KubeBlocksChartName = "fake-kubeblocks"
 	KubeBlocksChartURL  = "fake-kubeblocks-chart-url"
@@ -66,7 +66,7 @@ func FakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
 		},
 		Spec: dbaasv1alpha1.ClusterSpec{
 			ClusterDefRef:     ClusterDefName,
-			AppVersionRef:     AppVersionName,
+			ClusterVersionRef: ClusterVersionName,
 			TerminationPolicy: dbaasv1alpha1.WipeOut,
 			Components: []dbaasv1alpha1.ClusterComponent{
 				{
@@ -175,13 +175,13 @@ func FakeClusterDef() *dbaasv1alpha1.ClusterDefinition {
 	return clusterDef
 }
 
-func FakeAppVersion() *dbaasv1alpha1.AppVersion {
-	appversion := &dbaasv1alpha1.AppVersion{}
-	appversion.Name = AppVersionName
-	appversion.SetLabels(map[string]string{types.ClusterDefLabelKey: ClusterDefName})
-	appversion.Spec.ClusterDefinitionRef = ClusterDefName
-	appversion.SetCreationTimestamp(metav1.Now())
-	return appversion
+func FakeClusterVersion() *dbaasv1alpha1.ClusterVersion {
+	clusterversion := &dbaasv1alpha1.ClusterVersion{}
+	clusterversion.Name = ClusterVersionName
+	clusterversion.SetLabels(map[string]string{types.ClusterDefLabelKey: ClusterDefName})
+	clusterversion.Spec.ClusterDefinitionRef = ClusterDefName
+	clusterversion.SetCreationTimestamp(metav1.Now())
+	return clusterversion
 }
 
 func FakeServices() *corev1.ServiceList {

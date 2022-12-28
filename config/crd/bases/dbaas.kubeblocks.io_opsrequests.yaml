@@ -113,14 +113,13 @@ spec:
                 - Restart
                 type: string
               upgrade:
-                description: upgrade specify the cluster application version by specifying
-                  appVersionRef.
+                description: upgrade specify the cluster version by specifying clusterVersionRef.
                 properties:
-                  appVersionRef:
-                    description: appVersionRef reference AppVersion name.
+                  clusterVersionRef:
+                    description: clusterVersionRef reference ClusterVersion name.
                     type: string
                 required:
-                - appVersionRef
+                - clusterVersionRef
                 type: object
               verticalScaling:
                 description: verticalScaling defines what component need to vertical

@@ -1,7 +1,7 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: AppVersion
+kind: ClusterVersion
 metadata:
-  name: etcd-{{ default .Chart.AppVersion .Values.appVersionOverride }}
+  name: etcd-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
   labels:
     {{- include "etcd.labels" . | nindent 4 }}
 spec:

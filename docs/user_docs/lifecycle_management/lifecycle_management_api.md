@@ -1,10 +1,10 @@
 # KubeBlocks Lifecycle API
 
-This guide describes the details of KubeBlocks lifecycle API. KubeBlocks API is declarative and enables providers to describe the database cluster typology and lifecycle by YAML files, thus dynamically generating a management and control task flow to provide users with a consistent database operation experience. KubeBlocks has three APIs, namely `ClusterDefinition`, `AppVersion][`, and `Cluster`. `ClusterDefinition` and `AppVersion` are designed for providers and `Cluster` is for end users.
+This guide describes the details of KubeBlocks lifecycle API. KubeBlocks API is declarative and enables providers to describe the database cluster typology and lifecycle by YAML files, thus dynamically generating a management and control task flow to provide users with a consistent database operation experience. KubeBlocks has three APIs, namely `ClusterDefinition`, `AppVersion`, and `Cluster`. `ClusterDefinition` and `AppVersion` are designed for providers and `Cluster` is for end users.
 
 ## ClusterDefinition (for providers)
 
-`ClusterDefinition` enables providers to describe the cluster typology and the dependencies among roles in operation tasks. `ClusterDefinition` has `TypeMeta`, `ObjectMeta`, and `Spec` sections. 
+`ClusterDefinition` is a Kubernetes custom resource definition and enables providers to describe the cluster typology and the dependencies among roles in operation tasks. 
 
 ### ClusterDefinition `spec`
 
@@ -54,7 +54,26 @@ When the `spec.componentType` is set as `consensus`, `spec.consensusSpec` is req
 
 #### spec.connectionCredential
 
-`spec.connectionCredential` is used to create a connection secret.
+`spec.connectionCredential` is used to create a connection secret. 
+
+Requirements for `.spec.connectionCredential`:
+  * 8 random characters `$(RANDOM_PASSWD)` placeholder, 
+  * self reference map object `$(CONN_CREDENTIAL)[.<map key>])`
+  * Connection credential secret name place holder `$(CONN_CREDENTIAL_SECRET_NAME)`
+  * example usage:
+    ```
+    spec:
+      connectionCredential:
+        username: "admin-password" 
+        password: "$(RANDOM_PASSWD)"
+        "$(CONN_CREDENTIAL).username": "$(CONN_CREDENTIAL).password"
+    # output:
+    spec:
+      connectionCredential:
+        username: "admin-password" 
+        password: "<some random 8 characters password>"
+        "admin-password": "<value of above password>"
+    ```
 
 ### Example
 
@@ -243,6 +262,7 @@ The following are examples for ApeCloud MySQL three nodes.
       components:
         - name: "mysql-a-1"
           type: mysql-a
+      terminationPolicy: Halt
   ```
 
 - Enterprise version:
@@ -266,4 +286,5 @@ The following are examples for ApeCloud MySQL three nodes.
               limits:
                   cpu: 32 
                   memory: 128Gi
+      terminationPolicy: Halt
   ```

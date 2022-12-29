@@ -252,7 +252,7 @@ spec:
 			By("check(or mock maybe) cluster status running")
 			if !testCtx.UsingExistingCluster() {
 				// MOCK pods are created and running, so as the cluster
-				Eventually(ExpectClusterStatusPhase(key), timeout, interval).Should(Equal(dbaasv1alpha1.CreatingPhase))
+				Eventually(expectClusterStatusPhase(key), timeout, interval).Should(Equal(dbaasv1alpha1.CreatingPhase))
 				Expect(mockSetClusterStatusPhaseToRunning(key)).Should(Succeed())
 			}
 			// TODO The following assert doesn't pass in a real K8s cluster (with UseExistingCluster set).
@@ -261,7 +261,7 @@ spec:
 			// TODO It seems the Cluster Reconciler doesn't be triggered to run properly,
 			// TODO an additional invoke of `kubectl apply` explicitly ask it will workaround,
 			// TODO I'll look into this problem later.
-			Eventually(ExpectClusterStatusPhase(key), timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
+			Eventually(expectClusterStatusPhase(key), timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 
 			By("send VerticalScalingOpsRequest successfully")
 			verticalScalingOpsRequest := createOpsRequest("mysql-verticalscaling", clusterObj.Name, dbaasv1alpha1.VerticalScalingType)
@@ -280,7 +280,7 @@ spec:
 			Expect(testCtx.CreateObj(ctx, verticalScalingOpsRequest)).Should(Succeed())
 
 			By("check VerticalScalingOpsRequest running")
-			Eventually(ExpectOpsRequestStatusPhase(controllerutil.GetNamespacedName(verticalScalingOpsRequest)),
+			Eventually(expectOpsRequestStatusPhase(controllerutil.GetNamespacedName(verticalScalingOpsRequest)),
 				timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 
 			By("mock VerticalScalingOpsRequest is succeed")
@@ -289,7 +289,7 @@ spec:
 			}
 
 			By("check VerticalScalingOpsRequest succeed")
-			Eventually(ExpectOpsRequestStatusPhase(controllerutil.GetNamespacedName(verticalScalingOpsRequest)),
+			Eventually(expectOpsRequestStatusPhase(controllerutil.GetNamespacedName(verticalScalingOpsRequest)),
 				timeout, interval).Should(Equal(dbaasv1alpha1.SucceedPhase))
 
 			By("check cluster resource requirements changed")
@@ -314,7 +314,7 @@ spec:
 })
 
 func mockOpsRequestSucceed(namespacedName types.NamespacedName) error {
-	return ChangeOpsRequestStatus(namespacedName,
+	return changeOpsRequestStatus(namespacedName,
 		func(or *dbaasv1alpha1.OpsRequest) {
 			or.Status.Phase = dbaasv1alpha1.SucceedPhase
 			or.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
@@ -322,7 +322,7 @@ func mockOpsRequestSucceed(namespacedName types.NamespacedName) error {
 }
 
 func mockSetClusterStatusPhaseToRunning(namespacedName types.NamespacedName) error {
-	return ChangeClusterStatus(namespacedName,
+	return changeClusterStatus(namespacedName,
 		func(c *dbaasv1alpha1.Cluster) {
 			c.Status.Phase = dbaasv1alpha1.RunningPhase
 			for componentKey, componentStatus := range c.Status.Components {

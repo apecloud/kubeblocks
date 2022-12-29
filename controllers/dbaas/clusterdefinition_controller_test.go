@@ -221,7 +221,7 @@ data:
 			}, timeout, interval).Should(Succeed())
 
 			By("updating clusterDefinition's spec which then mark appVersion's status as OutOfSync")
-			Expect(ChangeClusterDef(controllerutil.GetNamespacedName(clusterDefinition),
+			Expect(changeClusterDef(controllerutil.GetNamespacedName(clusterDefinition),
 				func(cd *dbaasv1alpha1.ClusterDefinition) {
 					cd.Spec.Type = "state.mysql-7"
 				})).Should(Succeed())

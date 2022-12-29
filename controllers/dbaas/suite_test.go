@@ -180,14 +180,10 @@ var _ = AfterSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 })
 
-func IsUseExistingClusterEnabled() bool {
-	return testEnv.UseExistingCluster != nil && *testEnv.UseExistingCluster
-}
-
 // Helper functions to change fields in the desired state and status of resources.
 // Each helper is a wrapper of k8sClient.Patch.
 
-func ChangeClusterDef(namespacedName types.NamespacedName,
+func changeClusterDef(namespacedName types.NamespacedName,
 	action func(clusterDef *dbaasv1alpha1.ClusterDefinition)) error {
 	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
 	if err := k8sClient.Get(ctx, namespacedName, clusterDef); err != nil {
@@ -201,21 +197,7 @@ func ChangeClusterDef(namespacedName types.NamespacedName,
 	return nil
 }
 
-func ChangeCluster(namespacedName types.NamespacedName,
-	action func(cluster *dbaasv1alpha1.Cluster)) error {
-	cluster := &dbaasv1alpha1.Cluster{}
-	if err := k8sClient.Get(ctx, namespacedName, cluster); err != nil {
-		return err
-	}
-	patch := client.MergeFrom(cluster.DeepCopy())
-	action(cluster)
-	if err := k8sClient.Patch(ctx, cluster, patch); err != nil {
-		return err
-	}
-	return nil
-}
-
-func ChangeClusterStatus(namespacedName types.NamespacedName,
+func changeClusterStatus(namespacedName types.NamespacedName,
 	action func(cluster *dbaasv1alpha1.Cluster)) error {
 	cluster := &dbaasv1alpha1.Cluster{}
 	if err := k8sClient.Get(ctx, namespacedName, cluster); err != nil {
@@ -229,7 +211,7 @@ func ChangeClusterStatus(namespacedName types.NamespacedName,
 	return nil
 }
 
-func ChangeOpsRequestStatus(namespacedName types.NamespacedName,
+func changeOpsRequestStatus(namespacedName types.NamespacedName,
 	action func(cluster *dbaasv1alpha1.OpsRequest)) error {
 	opsRequest := &dbaasv1alpha1.OpsRequest{}
 	if err := k8sClient.Get(ctx, namespacedName, opsRequest); err != nil {
@@ -246,7 +228,7 @@ func ChangeOpsRequestStatus(namespacedName types.NamespacedName,
 // Helper functions to get fields from state or status of resources when writing unit tests.
 // Each helper returns a Gomega assertion function, which should be passed into Eventually() as the first parameter.
 
-func ExpectClusterStatusPhase(namespacedName types.NamespacedName) func(g Gomega) dbaasv1alpha1.Phase {
+func expectClusterStatusPhase(namespacedName types.NamespacedName) func(g Gomega) dbaasv1alpha1.Phase {
 	return func(g Gomega) dbaasv1alpha1.Phase {
 		cluster := &dbaasv1alpha1.Cluster{}
 		g.Expect(k8sClient.Get(ctx, namespacedName, cluster)).To(Succeed())
@@ -254,7 +236,7 @@ func ExpectClusterStatusPhase(namespacedName types.NamespacedName) func(g Gomega
 	}
 }
 
-func ExpectOpsRequestStatusPhase(namespacedName types.NamespacedName) func(g Gomega) dbaasv1alpha1.Phase {
+func expectOpsRequestStatusPhase(namespacedName types.NamespacedName) func(g Gomega) dbaasv1alpha1.Phase {
 	return func(g Gomega) dbaasv1alpha1.Phase {
 		opsRequest := &dbaasv1alpha1.OpsRequest{}
 		g.Expect(k8sClient.Get(ctx, namespacedName, opsRequest)).To(Succeed())

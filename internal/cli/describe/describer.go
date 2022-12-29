@@ -156,7 +156,7 @@ func (d *ClusterDescriber) describeCluster(events *corev1.EventList) (string, er
 		w.Write(Level0, "Name:\t%s\n", c.Name)
 		w.Write(Level0, "Namespace:\t%s\n", c.Namespace)
 		w.Write(Level0, "Status:\t%s\n", c.Status.Phase)
-		w.Write(Level0, "AppVersion:\t%s\n", c.Spec.AppVersionRef)
+		w.Write(Level0, "ClusterVersion:\t%s\n", c.Spec.ClusterVersionRef)
 		w.Write(Level0, "ClusterDefinition:\t%s\n", c.Spec.ClusterDefRef)
 		w.Write(Level0, "TerminationPolicy:\t%s\n", c.Spec.TerminationPolicy)
 		w.Write(Level0, "CreationTimestamp:\t%s\n", c.CreationTimestamp.Time.Format(time.RFC1123Z))

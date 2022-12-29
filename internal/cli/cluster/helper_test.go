@@ -121,10 +121,10 @@ var _ = Describe("helper", func() {
 	})
 
 	It("get version by cluster def", func() {
-		oldVersion := testing.FakeAppVersion()
+		oldVersion := testing.FakeClusterVersion()
 		oldVersion.Name = "test-old-version"
 		oldVersion.SetCreationTimestamp(metav1.NewTime(time.Now().AddDate(0, 0, -1)))
-		dynamic := testing.FakeDynamicClient(testing.FakeAppVersion(), oldVersion)
+		dynamic := testing.FakeDynamicClient(testing.FakeClusterVersion(), oldVersion)
 		version, err := GetVersionByClusterDef(dynamic, testing.ClusterDefName)
 		Expect(err).Should(Succeed())
 		Expect(version).ShouldNot(BeNil())

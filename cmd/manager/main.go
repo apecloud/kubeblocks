@@ -72,7 +72,7 @@ func init() {
 
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
 	viper.SetDefault("VOLUMESNAPSHOT", false)
-	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:latest")
+	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:0.2.0-beta.1")
 	viper.SetDefault("PROBE_SERVICE_PORT", 3501)
 	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
 }
@@ -155,12 +155,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&dbaascontrollers.AppVersionReconciler{
+	if err = (&dbaascontrollers.ClusterVersionReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("app-version-controller"),
+		Recorder: mgr.GetEventRecorderFor("cluster-version-controller"),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "AppVersion")
+		setupLog.Error(err, "unable to create controller", "controller", "ClusterVersion")
 		os.Exit(1)
 	}
 
@@ -214,8 +214,8 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&dbaasv1alpha1.AppVersion{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "AppVersion")
+		if err = (&dbaasv1alpha1.ClusterVersion{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterVersion")
 			os.Exit(1)
 		}
 

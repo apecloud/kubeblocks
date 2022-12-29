@@ -31,7 +31,7 @@ kind: Cluster
 metadata:
   name: wesql
 spec:
-  appVersionRef: app-version-consensus
+  clusterVersionRef: cluster-version-consensus
   clusterDefinitionRef: cluster-definition-consensus
   components:
     - name: wesql-test

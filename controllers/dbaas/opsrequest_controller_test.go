@@ -49,7 +49,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -133,13 +133,13 @@ spec:
 		return clusterDefinition
 	}
 
-	assureAppVersionObj := func() *dbaasv1alpha1.AppVersion {
-		By("By assure an appVersion obj")
-		appVerYAML := `
+	assureClusterVersionObj := func() *dbaasv1alpha1.ClusterVersion {
+		By("By assure an clusterVersion obj")
+		clusterVersionYAML := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       AppVersion
+kind:       ClusterVersion
 metadata:
-  name:     app-version-ops
+  name:     cluster-version-ops
 spec:
   clusterDefinitionRef: cluster-definition-ops
   components:
@@ -154,22 +154,22 @@ spec:
       - name: nginx
         image: nginx
 `
-		appVersion := &dbaasv1alpha1.AppVersion{}
-		Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, appVersion)).Should(Succeed())
-		return appVersion
+		clusterVersion := &dbaasv1alpha1.ClusterVersion{}
+		Expect(yaml.Unmarshal([]byte(clusterVersionYAML), clusterVersion)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
+		return clusterVersion
 	}
 
 	newClusterObj := func(
 		clusterDefObj *dbaasv1alpha1.ClusterDefinition,
-		appVersionObj *dbaasv1alpha1.AppVersion,
-	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.AppVersion, types.NamespacedName) {
-		// setup Cluster obj required default ClusterDefinition and AppVersion objects if not provided
+		clusterVersionObj *dbaasv1alpha1.ClusterVersion,
+	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, types.NamespacedName) {
+		// setup Cluster obj required default ClusterDefinition and ClusterVersion objects if not provided
 		if clusterDefObj == nil {
 			clusterDefObj = assureClusterDefObj()
 		}
-		if appVersionObj == nil {
-			appVersionObj = assureAppVersionObj()
+		if clusterVersionObj == nil {
+			clusterVersionObj = assureClusterVersionObj()
 		}
 
 		randomStr, _ := password.Generate(6, 0, 0, true, false)
@@ -185,10 +185,10 @@ spec:
 			},
 			Spec: dbaasv1alpha1.ClusterSpec{
 				ClusterDefRef:     clusterDefObj.GetName(),
-				AppVersionRef:     appVersionObj.GetName(),
+				ClusterVersionRef: clusterVersionObj.GetName(),
 				TerminationPolicy: dbaasv1alpha1.WipeOut,
 			},
-		}, clusterDefObj, appVersionObj, key
+		}, clusterDefObj, clusterVersionObj, key
 	}
 
 	deleteClusterNWait := func(key types.NamespacedName) error {
@@ -264,10 +264,10 @@ spec:
 			By("send VerticalScalingOpsRequest successfully")
 			verticalScalingOpsRequest := createOpsRequest("mysql-verticalscaling", clusterObj.Name, dbaasv1alpha1.VerticalScalingType)
 			verticalScalingOpsRequest.Spec.TTLSecondsAfterSucceed = 1
-			verticalScalingOpsRequest.Spec.ComponentOpsList = []dbaasv1alpha1.ComponentOps{
+			verticalScalingOpsRequest.Spec.VerticalScalingList = []dbaasv1alpha1.VerticalScaling{
 				{
-					ComponentNames: []string{clusterObj.Spec.Components[0].Name}, // "wesql"
-					VerticalScaling: &corev1.ResourceRequirements{
+					ComponentOps: dbaasv1alpha1.ComponentOps{ComponentName: clusterObj.Spec.Components[0].Name}, // "wesql"
+					ResourceRequirements: &corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							"cpu":    resource.MustParse("400m"),
 							"memory": resource.MustParse("200Mi"),
@@ -293,7 +293,7 @@ spec:
 				fetchedCluster := &dbaasv1alpha1.Cluster{}
 				_ = k8sClient.Get(ctx, key, fetchedCluster)
 				return fetchedCluster.Spec.Components[0].Resources.Requests
-			}, timeout, interval).Should(Equal(verticalScalingOpsRequest.Spec.ComponentOpsList[0].VerticalScaling.Requests))
+			}, timeout, interval).Should(Equal(verticalScalingOpsRequest.Spec.VerticalScalingList[0].Requests))
 
 			By("OpsRequest reclaimed after ttl")
 			Eventually(func() bool {

@@ -22,6 +22,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"reflect"
 	"strconv"
@@ -46,6 +47,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -64,6 +66,8 @@ var _ = Describe("Cluster Controller", func() {
 		Namespace: "default",
 	}
 	var deleteClusterNWait func(key types.NamespacedName) error
+	var deleteClusterVersionNWait func(key types.NamespacedName) error
+	var deleteClusterDefNWait func(key types.NamespacedName) error
 	ctx := context.Background()
 
 	BeforeEach(func() {
@@ -72,7 +76,7 @@ var _ = Describe("Cluster Controller", func() {
 			client.InNamespace(testCtx.DefaultNamespace),
 			client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -107,7 +111,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	assureCfgTplConfigMapObj := func(cmName string) *corev1.ConfigMap {
 		By("Assuring an cm obj")
-		appVerYAML := `
+		clusterVersionYaml := `
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -134,7 +138,7 @@ data:
     host=localhost
 `
 		cfgCM := &corev1.ConfigMap{}
-		Expect(yaml.Unmarshal([]byte(appVerYAML), cfgCM)).Should(Succeed())
+		Expect(yaml.Unmarshal([]byte(clusterVersionYaml), cfgCM)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
 		return cfgCM
 	}
@@ -217,13 +221,13 @@ spec:
 		return clusterDefinition
 	}
 
-	assureAppVersionObj := func() *dbaasv1alpha1.AppVersion {
-		By("Assuring an appVersion obj")
-		appVerYAML := `
+	assureClusterVersionObj := func() *dbaasv1alpha1.ClusterVersion {
+		By("Assuring an clusterVersion obj")
+		clusterVersionYaml := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: AppVersion
+kind: ClusterVersion
 metadata:
-  name: app-version
+  name: cluster-version
 spec:
   clusterDefinitionRef: cluster-definition
   components:
@@ -241,23 +245,23 @@ spec:
       - name: nginx
         image: nginx
 `
-		appVersion := &dbaasv1alpha1.AppVersion{}
-		Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, appVersion)).Should(Succeed())
-		return appVersion
+		clusterVersion := &dbaasv1alpha1.ClusterVersion{}
+		Expect(yaml.Unmarshal([]byte(clusterVersionYaml), clusterVersion)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
+		return clusterVersion
 	}
 
 	newClusterObj := func(
 		clusterDefObj *dbaasv1alpha1.ClusterDefinition,
-		appVersionObj *dbaasv1alpha1.AppVersion,
-	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.AppVersion, types.NamespacedName) {
-		// setup Cluster obj required default ClusterDefinition and AppVersion objects if not provided
+		clusterVersionObj *dbaasv1alpha1.ClusterVersion,
+	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, types.NamespacedName) {
+		// setup Cluster obj required default ClusterDefinition and ClusterVersion objects if not provided
 		if clusterDefObj == nil {
 			assureCfgTplConfigMapObj("")
 			clusterDefObj = assureClusterDefObj()
 		}
-		if appVersionObj == nil {
-			appVersionObj = assureAppVersionObj()
+		if clusterVersionObj == nil {
+			clusterVersionObj = assureClusterVersionObj()
 		}
 
 		randomStr, _ := password.Generate(6, 0, 0, true, false)
@@ -273,10 +277,10 @@ spec:
 			},
 			Spec: dbaasv1alpha1.ClusterSpec{
 				ClusterDefRef:     clusterDefObj.GetName(),
-				AppVersionRef:     appVersionObj.GetName(),
+				ClusterVersionRef: clusterVersionObj.GetName(),
 				TerminationPolicy: dbaasv1alpha1.WipeOut,
 			},
-		}, clusterDefObj, appVersionObj, key
+		}, clusterDefObj, clusterVersionObj, key
 	}
 
 	deleteClusterNWait = func(key types.NamespacedName) error {
@@ -293,6 +297,42 @@ spec:
 		eta := time.Now().Add(waitDuration)
 		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
 			f = &dbaasv1alpha1.Cluster{}
+		}
+		return client.IgnoreNotFound(err)
+	}
+
+	deleteClusterVersionNWait = func(key types.NamespacedName) error {
+		Expect(func() error {
+			f := &dbaasv1alpha1.ClusterVersion{}
+			if err := k8sClient.Get(ctx, key, f); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+			return k8sClient.Delete(ctx, f)
+		}()).Should(Succeed())
+
+		var err error
+		f := &dbaasv1alpha1.ClusterVersion{}
+		eta := time.Now().Add(waitDuration)
+		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
+			f = &dbaasv1alpha1.ClusterVersion{}
+		}
+		return client.IgnoreNotFound(err)
+	}
+
+	deleteClusterDefNWait = func(key types.NamespacedName) error {
+		Expect(func() error {
+			f := &dbaasv1alpha1.ClusterDefinition{}
+			if err := k8sClient.Get(ctx, key, f); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+			return k8sClient.Delete(ctx, f)
+		}()).Should(Succeed())
+
+		var err error
+		f := &dbaasv1alpha1.ClusterDefinition{}
+		eta := time.Now().Add(waitDuration)
+		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
+			f = &dbaasv1alpha1.ClusterDefinition{}
 		}
 		return client.IgnoreNotFound(err)
 	}
@@ -389,13 +429,13 @@ spec:
 		return clusterDefinition
 	}
 
-	assureAppVersionWithConsensusObj := func() *dbaasv1alpha1.AppVersion {
-		By("Assuring an appVersion obj with componentType = Consensus")
-		appVerYAML := `
+	assureClusterVersionWithConsensusObj := func() *dbaasv1alpha1.ClusterVersion {
+		By("Assuring an clusterVersion obj with componentType = Consensus")
+		clusterVersionYaml := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: AppVersion
+kind: ClusterVersion
 metadata:
-  name: app-version-consensus
+  name: cluster-version-consensus
 spec:
   clusterDefinitionRef: cluster-definition-consensus
   components:
@@ -406,23 +446,23 @@ spec:
         image: docker.io/apecloud/wesql-server:latest
         imagePullPolicy: IfNotPresent
 `
-		appVersion := &dbaasv1alpha1.AppVersion{}
-		Expect(yaml.Unmarshal([]byte(appVerYAML), appVersion)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, appVersion)).Should(Succeed())
-		return appVersion
+		clusterVersion := &dbaasv1alpha1.ClusterVersion{}
+		Expect(yaml.Unmarshal([]byte(clusterVersionYaml), clusterVersion)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
+		return clusterVersion
 	}
 
 	newClusterWithConsensusObj := func(
 		clusterDefObj *dbaasv1alpha1.ClusterDefinition,
-		appVersionObj *dbaasv1alpha1.AppVersion,
-	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.AppVersion, types.NamespacedName) {
-		// setup Cluster obj required default ClusterDefinition and AppVersion objects if not provided
+		clusterVersionObj *dbaasv1alpha1.ClusterVersion,
+	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, types.NamespacedName) {
+		// setup Cluster obj required default ClusterDefinition and ClusterVersion objects if not provided
 		if clusterDefObj == nil {
 			assureCfgTplConfigMapObj("")
 			clusterDefObj = assureClusterDefWithConsensusObj()
 		}
-		if appVersionObj == nil {
-			appVersionObj = assureAppVersionWithConsensusObj()
+		if clusterVersionObj == nil {
+			clusterVersionObj = assureClusterVersionWithConsensusObj()
 		}
 
 		randomStr, _ := password.Generate(6, 0, 0, true, false)
@@ -438,7 +478,7 @@ spec:
 			},
 			Spec: dbaasv1alpha1.ClusterSpec{
 				ClusterDefRef:     clusterDefObj.GetName(),
-				AppVersionRef:     appVersionObj.GetName(),
+				ClusterVersionRef: clusterVersionObj.GetName(),
 				TerminationPolicy: dbaasv1alpha1.WipeOut,
 				Components: []dbaasv1alpha1.ClusterComponent{
 					{
@@ -462,7 +502,7 @@ spec:
 					},
 				},
 			},
-		}, clusterDefObj, appVersionObj, key
+		}, clusterDefObj, clusterVersionObj, key
 	}
 
 	isCMAvailable := func() bool {
@@ -495,9 +535,9 @@ spec:
 		return stsList
 	}
 
-	createClusterNCheck := func() (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.AppVersion, types.NamespacedName) {
+	createClusterNCheck := func() (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, types.NamespacedName) {
 		By("Creating a cluster")
-		toCreate, cd, appVer, key := newClusterObj(nil, nil)
+		toCreate, cd, clusterVersion, key := newClusterObj(nil, nil)
 		Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
 		fetchedG1 := &dbaasv1alpha1.Cluster{}
@@ -506,7 +546,7 @@ spec:
 			return fetchedG1.Status.ObservedGeneration == 1
 		}, timeout, interval).Should(BeTrue())
 
-		return fetchedG1, cd, appVer, key
+		return fetchedG1, cd, clusterVersion, key
 	}
 
 	Context("When creating cluster with normal", func() {
@@ -646,6 +686,462 @@ spec:
 			By("Deleting the cluster")
 			Eventually(func() error {
 				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	Context("When horizontal scaling", func() {
+		It("Should create backup resources accordingly", func() {
+
+			useExistingCluster, _ := strconv.ParseBool(os.Getenv("USE_EXISTING_CLUSTER"))
+
+			configTplKey := types.NamespacedName{Name: "test-mysql-3node-tpl-8.0", Namespace: "default"}
+			configTplYAML := fmt.Sprintf(`
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  annotations:
+    meta.helm.sh/release-name: kubeblocks
+    meta.helm.sh/release-namespace: default
+  labels:
+    app.kubernetes.io/managed-by: Helm
+  name: %s
+  namespace: %s
+data:
+  my.cnf: |-
+    [mysqld]
+    # aliyun buffer pool: https://help.aliyun.com/document_detail/162326.html?utm_content=g_1000230851&spm=5176.20966629.toubu.3.f2991ddcpxxvD1#title-rey-j7j-4dt
+    
+    {{- $log_root := getVolumePathByName ( index $.podSpec.containers 0 ) "log" }}
+    {{- $data_root := getVolumePathByName ( index $.podSpec.containers 0 ) "data" }}
+    {{- $mysql_port_info := getPortByName ( index $.podSpec.containers 0 ) "mysql" }}
+    {{- $pool_buffer_size := ( callBufferSizeByResource ( index $.podSpec.containers 0 ) ) }}
+
+
+    {{- if $pool_buffer_size }}
+    innodb-buffer-pool-size={{ $pool_buffer_size }}
+    {{- end }}
+
+    # require port
+    {{- $mysql_port := 3306 }}
+
+    log-bin=master-bin
+    gtid_mode=OFF
+    consensus_auto_leader_transfer=ON
+
+    port={{ $mysql_port }}
+
+    datadir={{ $data_root }}/data
+    {{ if $log_root }}
+    # Mysql error log
+    log-error={{ $log_root }}/mysqld.err
+    # SQL access log
+    general_log=1
+    general_log_file={{ $log_root }}/mysqld.log
+    {{- end }}
+
+    pid-file=/var/run/mysqld/mysqld.pid
+    socket=/var/run/mysqld/mysqld.sock
+
+    [client]
+    port={{ $mysql_port }}
+    socket=/var/run/mysqld/mysqld.sock
+`, configTplKey.Name, configTplKey.Namespace)
+			cm := &corev1.ConfigMap{}
+			Expect(yaml.Unmarshal([]byte(configTplYAML), cm)).Should(Succeed())
+			Expect(testCtx.CheckedCreateObj(ctx, cm)).Should(Succeed())
+
+			By("Create real clusterdefinition")
+			clusterDefKey := types.NamespacedName{Name: "test-apecloud-wesql"}
+			clusterDefYAML := fmt.Sprintf(`
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind:       ClusterDefinition
+metadata:
+  name: %s
+spec:
+  type: stat.mysql
+  components:
+    - typeName: replicasets
+      characterType: mysql
+      monitor:
+        builtIn: false
+      configTemplateRefs:
+        - name: %s
+          volumeName: mysql-config
+      componentType: Consensus
+      consensusSpec:
+        leader:
+          name: leader
+          accessMode: ReadWrite
+        followers:
+          - name: follower
+            accessMode: Readonly
+      defaultReplicas: 3
+      podSpec:
+        serviceAccountName: kubeblocks
+        initContainers:
+          - name: init
+            image: lynnleelhl/kubectl:latest
+            imagePullPolicy: IfNotPresent
+            command: ["sh", "-c"]
+            args:
+            - |
+              leader=$(cat /etc/podinfo/annotations | grep "cs.dbaas.kubeblocks.io/leader" | awk -F'"' '{print $2}')
+              followers=$(cat /etc/podinfo/annotations | grep "cs.dbaas.kubeblocks.io/followers" | awk -F'"' '{print $2}')
+              echo $leader
+              echo $followers
+              sub_follower=$(echo "$followers" | grep "$KB_POD_NAME")
+              echo $KB_POD_NAME
+              echo $sub_follower
+              if [ -z "$leader" -o "$KB_POD_NAME" = "$leader" -o ! -z "$sub_follower" ]; then 
+                exit 0;
+              else 
+                idx=${KB_POD_NAME##*-}
+                host=$(eval echo \$KB_REPLICASETS_"$idx"_HOSTNAME)
+                echo "$host"
+                echo "kubectl exec -i $leader -c mysql -- bash -c \"mysql -e \"call dbms_consensus.add_follower('$host:13306');\" & pid=\$!; sleep 1; if ! ps \$pid > /dev/null; then wait \$pid; code=\$?; exit \$code; fi\""
+                kubectl exec -i $leader -c mysql -- bash -c "mysql -e \"call dbms_consensus.add_follower('$host:13306');\" & pid=\$!; sleep 1; if ! ps \$pid > /dev/null; then wait \$pid; code=\$?; exit \$code; fi"
+              fi
+            volumeMounts:
+              - mountPath: /etc/podinfo
+                name: podinfo
+        containers:
+          - args:
+              - |
+                cluster_info=""; for (( i=0; i< $KB_REPLICASETS_N; i++ )); do
+                  if [ $i -ne 0 ]; then
+                    cluster_info="$cluster_info;";
+                  fi;
+                  host=$(eval echo \$KB_REPLICASETS_"$i"_HOSTNAME)
+                  cluster_info="$cluster_info$host:13306";
+                done; 
+                idx=0; 
+                while IFS='-' read -ra ADDR; do
+                    for i in "${ADDR[@]}"; do
+                      idx=$i;
+                    done;
+                done <<< "$KB_POD_NAME"; 
+                host=$(eval echo \$KB_REPLICASETS_"$idx"_HOSTNAME)
+                cluster_info="$cluster_info@$(($idx+1))"; 
+                echo $cluster_info; 
+                mkdir -p /data/mysql/data; 
+                chmod +777 -R /data/mysql; 
+                leader=$(cat /etc/podinfo/annotations | grep "cs.dbaas.kubeblocks.io/leader" | awk -F'"' '{print $2}')
+                echo $leader
+                if [ -z "$leader" ]; then
+                  echo "docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info=\"$cluster_info\" --cluster-id=$CLUSTER_ID"
+                  docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$cluster_info" --cluster-id=$CLUSTER_ID
+                elif [ "$KB_POD_NAME" != "$leader" ]; then
+                  echo "docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info=\"$host:13306\" --cluster-id=$CLUSTER_ID"
+                  docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$host:13306" --cluster-id=$CLUSTER_ID
+                else 
+                  echo "docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info=\"$host:13306@1\" --cluster-id=$CLUSTER_ID"
+                  docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$host:13306@1" --cluster-id=$CLUSTER_ID
+                fi
+            command:
+              - /bin/bash
+              - -c
+            env:
+              - name: MYSQL_ROOT_USER
+                value: root
+              - name: MYSQL_ROOT_PASSWORD
+                value: ""
+              - name: MYSQL_ALLOW_EMPTY_PASSWORD
+                value: "yes"
+              - name: MYSQL_DATABASE
+                value: mydb
+              - name: MYSQL_USER
+                value: u1
+              - name: MYSQL_PASSWORD
+                value: u1
+              - name: CLUSTER_ID
+                value: "1"
+              - name: CLUSTER_START_INDEX
+                value: "1"
+              - name: REPLICATIONUSER
+                value: replicator
+              - name: REPLICATION_PASSWORD
+                value: ""
+              - name: MYSQL_TEMPLATE_CONFIG
+                value: ""
+              - name: MYSQL_CUSTOM_CONFIG
+                value: ""
+              - name: MYSQL_DYNAMIC_CONFIG
+                value: ""
+            imagePullPolicy: IfNotPresent
+            name: mysql
+            ports:
+              - containerPort: 3306
+                name: mysql
+                protocol: TCP
+              - containerPort: 13306
+                name: paxos
+                protocol: TCP
+            resources: {}
+            volumeMounts:
+              - mountPath: /data/mysql
+                name: data
+              - mountPath: /opt/mysql
+                name: mysql-config
+              - mountPath: /etc/podinfo
+                name: podinfo
+        volumes:
+          - name: podinfo
+            downwardAPI:
+              items:
+                - path: "annotations"
+                  fieldRef:
+                    fieldPath: metadata.annotations
+`, clusterDefKey.Name, configTplKey.Name)
+			clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+			Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDef)).Should(Succeed())
+			if useExistingCluster {
+				clusterDef.Spec.Components[0].HorizontalScalePolicy = &dbaasv1alpha1.HorizontalScalePolicy{Type: "Snapshot"}
+			}
+			Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
+
+			By("Create real ClusterVersion")
+			clusterVersionKey := types.NamespacedName{Name: "test-wesql-8.0.30"}
+			clusterVersionYaml := fmt.Sprintf(`
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  labels:
+    app.kubernetes.io/instance: kubeblocks
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: wesql
+    app.kubernetes.io/version: 8.0.30
+    clusterdefinition.kubeblocks.io/name: apecloud-wesql
+    helm.sh/chart: wesql-0.1.1
+  name: %s
+spec:
+  clusterDefinitionRef: %s
+  components:
+  - podSpec:
+      containers:
+      - image: apecloud/wesql-server:8.0.30-4.alpha1.20221031.g1aa54a3
+        imagePullPolicy: IfNotPresent
+        name: mysql
+        resources: {}
+    type: replicasets
+`, clusterVersionKey.Name, clusterDefKey.Name)
+			clusterVersion := &dbaasv1alpha1.ClusterVersion{}
+			Expect(yaml.Unmarshal([]byte(clusterVersionYaml), clusterVersion)).Should(Succeed())
+			Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
+
+			clusterVersionList := dbaasv1alpha1.ClusterVersionList{}
+			Eventually(func() bool {
+				Expect(k8sClient.List(ctx, &clusterVersionList, client.MatchingLabels{
+					"clusterdefinition.kubeblocks.io/name": clusterDefKey.Name,
+				}, client.InNamespace(clusterVersionKey.Namespace))).Should(Succeed())
+				if len(clusterVersionList.Items) == 0 {
+					return false
+				}
+				return clusterVersionList.Items[0].Status.Phase == "Available"
+			}, timeout, interval).Should(BeTrue())
+
+			By("By creating a cluster")
+			key := types.NamespacedName{Name: "test-wesql-01", Namespace: "default"}
+			clusterYAML := fmt.Sprintf(`
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: %s
+  namespace: %s
+spec:
+  clusterDefinitionRef: %s
+  clusterVersionRef: %s
+  components:
+  - name: replicasets
+    type: replicasets
+    replicas: 1
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  terminationPolicy: Delete
+`, key.Name, key.Namespace, clusterDefKey.Name, clusterVersionKey.Name)
+			cluster := &dbaasv1alpha1.Cluster{}
+			Expect(yaml.Unmarshal([]byte(clusterYAML), cluster)).Should(Succeed())
+			Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
+
+			backupPolicyTplKey := types.NamespacedName{Name: "test-backup-policy-template-mysql"}
+			backupPolicyTemplateYaml := fmt.Sprintf(`
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupPolicyTemplate
+metadata:
+  name: %s
+  labels:
+    clusterdefinition.kubeblocks.io/name: %s
+spec:
+  schedule: "0 2 * * *"
+  ttl: 168h0m0s
+  # !!DISCUSS Number of backup retries on fail.
+  onFailAttempted: 3
+  hooks:
+    ContainerName: mysql
+    image: rancher/kubectl:v1.23.7
+    preCommands:
+    - touch /data/mysql/data/.restore; sync
+  backupToolName: mysql-xtrabackup
+`, backupPolicyTplKey.Name, clusterDefKey.Name)
+			backupPolicyTemplate := dataprotectionv1alpha1.BackupPolicyTemplate{}
+			Expect(yaml.Unmarshal([]byte(backupPolicyTemplateYaml), &backupPolicyTemplate)).Should(Succeed())
+			Expect(testCtx.CheckedCreateObj(ctx, &backupPolicyTemplate)).Should(Succeed())
+
+			for i := 0; i < 1; i++ {
+				pvcYAML := fmt.Sprintf(`
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-%s-replicasets-%d
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: ebs-sc
+  volumeMode: Filesystem
+  volumeName: pvc-6302ba88-ac70-4939-ac53-78a4bab00094
+`, key.Name, i)
+				pvc := corev1.PersistentVolumeClaim{}
+				Expect(yaml.Unmarshal([]byte(pvcYAML), &pvc)).Should(Succeed())
+				Expect(k8sClient.Create(ctx, &pvc)).Should(Succeed())
+			}
+
+			fetchedG1 := &dbaasv1alpha1.Cluster{}
+			Eventually(func() bool {
+				_ = k8sClient.Get(ctx, key, fetchedG1)
+				return fetchedG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+
+			stsList := &appsv1.StatefulSetList{}
+			Eventually(func() bool {
+				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				return len(stsList.Items) != 0
+			}, timeout, interval).Should(BeTrue())
+
+			if useExistingCluster {
+				podList := corev1.PodList{}
+				Eventually(func() bool {
+					Expect(k8sClient.List(ctx, &podList, client.MatchingLabels{
+						"app.kubernetes.io/instance": key.Name,
+					}, client.InNamespace(key.Namespace))).Should(Succeed())
+					return len(podList.Items) == 1
+				}, timeout, interval).Should(BeTrue())
+			}
+
+			By("By updating replica")
+			updatedReplicas := int32(3)
+			for i := *fetchedG1.Spec.Components[0].Replicas; i < updatedReplicas; i++ {
+				pvcYAML := fmt.Sprintf(`
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-%s-replicasets-%d
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: ebs-sc
+  volumeMode: Filesystem
+  volumeName: pvc-6302ba88-ac70-4939-ac53-78a4bab00094
+`, key.Name, i)
+				pvc := corev1.PersistentVolumeClaim{}
+				Expect(yaml.Unmarshal([]byte(pvcYAML), &pvc)).Should(Succeed())
+				Expect(k8sClient.Create(ctx, &pvc)).Should(Succeed())
+			}
+			fetchedG1.Spec.Components[0].Replicas = &updatedReplicas
+			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
+
+			fetchedG2 := &dbaasv1alpha1.Cluster{}
+			Eventually(func() bool {
+				_ = k8sClient.Get(ctx, key, fetchedG2)
+				return fetchedG2.Status.ObservedGeneration == 2
+			}, timeout*2, interval).Should(BeTrue())
+
+			Eventually(func() bool {
+				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				Expect(len(stsList.Items) != 0).Should(BeTrue())
+				return *stsList.Items[0].Spec.Replicas == updatedReplicas
+			}, timeout, interval).Should(BeTrue())
+
+			updatedReplicas = 5
+			for i := *fetchedG2.Spec.Components[0].Replicas; i < updatedReplicas; i++ {
+				pvcYAML := fmt.Sprintf(`
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-%s-replicasets-%d
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: ebs-sc
+  volumeMode: Filesystem
+  volumeName: pvc-6302ba88-ac70-4939-ac53-78a4bab00094
+`, key.Name, i)
+				pvc := corev1.PersistentVolumeClaim{}
+				Expect(yaml.Unmarshal([]byte(pvcYAML), &pvc)).Should(Succeed())
+				Expect(k8sClient.Create(ctx, &pvc)).Should(Succeed())
+			}
+			fetchedG2.Spec.Components[0].Replicas = &updatedReplicas
+			Expect(k8sClient.Update(ctx, fetchedG2)).Should(Succeed())
+
+			fetchedG3 := &dbaasv1alpha1.Cluster{}
+
+			Eventually(func() bool {
+				_ = k8sClient.Get(ctx, key, fetchedG3)
+				return fetchedG3.Status.ObservedGeneration == 3
+			}, timeout, interval).Should(BeTrue())
+
+			if useExistingCluster {
+				Eventually(func() bool {
+					backupJobList := dataprotectionv1alpha1.BackupJobList{}
+					Expect(k8sClient.List(ctx, &backupJobList, client.MatchingLabels{
+						"app.kubernetes.io/instance": key.Name,
+					}, client.InNamespace(key.Namespace))).Should(Succeed())
+					return len(backupJobList.Items) == 1
+				}, timeout, interval).Should(BeTrue())
+			}
+
+			Eventually(func() bool {
+				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				Expect(len(stsList.Items) != 0).Should(BeTrue())
+				return *stsList.Items[0].Spec.Replicas == updatedReplicas
+			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting the scope")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+
+			By("Deleting ClusterVersion")
+			Eventually(func() error {
+				return deleteClusterVersionNWait(key)
+			}, timeout, interval).Should(Succeed())
+
+			By("Deleting ClusterDefinition")
+			Eventually(func() error {
+				return deleteClusterDefNWait(key)
 			}, timeout, interval).Should(Succeed())
 		})
 	})

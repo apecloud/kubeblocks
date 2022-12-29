@@ -32,6 +32,7 @@ const (
 	AppComponentLabelKey            = "app.kubernetes.io/component-name"
 	AppNameLabelKey                 = "app.kubernetes.io/name"
 	AppManagedByLabelKey            = "app.kubernetes.io/managed-by"
+	AppCreatedByLabelKey            = "app.kubernetes.io/created-by" // resources created temporarily by kubeblocks
 	AppConfigTypeLabelKey           = "app.kubernetes.io/config-type"
 	ConsensusSetRoleLabelKey        = "cs.dbaas.kubeblocks.io/role"
 	ConsensusSetAccessModeLabelKey  = "cs.dbaas.kubeblocks.io/access-mode"
@@ -67,6 +68,7 @@ const (
 	StatefulSetKind           = "StatefulSet"
 	PodKind                   = "Pod"
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
+	CronJob                   = "CronJob"
 )
 
 // RequestCtx wrapper for reconcile procedure context parameters

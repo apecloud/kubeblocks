@@ -33,7 +33,7 @@ import (
 )
 
 // ReconcileActionWithCluster it will be performed when action is done and loop util OpsRequest.status.phase is Succeed/Failed.
-// if OpsRequest.spec.clusterOps is not null, you can use it to OpsBehaviour.ReconcileAction.
+// if OpsRequest is a cluster scope operation, you can use it to OpsBehaviour.ReconcileAction, such as Upgrade.
 // return the OpsRequest.status.phase
 func ReconcileActionWithCluster(opsRes *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error) {
 	var (
@@ -80,9 +80,11 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource) (dbaasv1alpha1.Phase, 
 		isChanged       bool
 		isFailed        bool
 		opsRequestPhase = dbaasv1alpha1.RunningPhase
-		requeueAfter    time.Duration
 	)
-	componentNameMap := getAllComponentsNameMap(opsRequest)
+	componentNameMap := opsRequest.GetComponentNameMap()
+	if len(componentNameMap) == 0 {
+		return opsRequestPhase, 0, nil
+	}
 	patch := client.MergeFrom(opsRequest.DeepCopy())
 	if opsRequest.Status.Components == nil {
 		opsRequest.Status.Components = map[string]dbaasv1alpha1.OpsRequestStatusComponent{}
@@ -105,7 +107,7 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource) (dbaasv1alpha1.Phase, 
 	}
 	if isChanged {
 		if err := opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch); err != nil {
-			return opsRequestPhase, requeueAfter, err
+			return opsRequestPhase, 0, err
 		}
 	}
 	if isFailed {
@@ -113,7 +115,7 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource) (dbaasv1alpha1.Phase, 
 	} else if isCompleted {
 		opsRequestPhase = dbaasv1alpha1.SucceedPhase
 	}
-	return opsRequestPhase, requeueAfter, nil
+	return opsRequestPhase, 0, nil
 }
 
 // opsRequestIsCompleted check OpsRequest is completed
@@ -259,28 +261,14 @@ func patchOpsRequestToRunning(opsRes *OpsResource, opsBehaviour *OpsBehaviour) e
 	return PatchOpsStatus(opsRes, dbaasv1alpha1.RunningPhase, validatePassCondition, condition)
 }
 
-// getAllComponentsNameMap covert spec.componentOps.componentNames list to map
-func getAllComponentsNameMap(opsRequest *dbaasv1alpha1.OpsRequest) map[string]*dbaasv1alpha1.ComponentOps {
-	if opsRequest.Spec.ComponentOpsList == nil {
-		return map[string]*dbaasv1alpha1.ComponentOps{}
-	}
-	componentNameMap := make(map[string]*dbaasv1alpha1.ComponentOps)
-	for _, componentOps := range opsRequest.Spec.ComponentOpsList {
-		for _, v := range componentOps.ComponentNames {
-			componentNameMap[v] = &componentOps
-		}
-	}
-	return componentNameMap
-}
-
 // patchClusterStatus update Cluster.status to record cluster and components information
 func patchClusterStatus(opsRes *OpsResource, toClusterState dbaasv1alpha1.Phase) error {
 	if toClusterState == "" {
 		return nil
 	}
-	componentNameMap := getAllComponentsNameMap(opsRes.OpsRequest)
 	patch := client.MergeFrom(opsRes.Cluster.DeepCopy())
 	opsRes.Cluster.Status.Phase = toClusterState
+	componentNameMap := opsRes.OpsRequest.GetComponentNameMap()
 	// if the OpsRequest is components scope, we should update the cluster components together.
 	// otherwise, OpsRequest maybe reconcile the status to succeed immediately.
 	if componentNameMap != nil && opsRes.Cluster.Status.Components != nil {

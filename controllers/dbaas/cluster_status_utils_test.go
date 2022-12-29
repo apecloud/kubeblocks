@@ -37,19 +37,19 @@ import (
 var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 	var (
-		ctx            = context.Background()
-		clusterName    = "cluster-for-status-" + testCtx.GetRandomStr()
-		clusterDefName = "clusterdef-for-status-" + testCtx.GetRandomStr()
-		appVersionName = "app-version-for-status-" + testCtx.GetRandomStr()
-		namespace      = "default"
-		timeout        = time.Second * 10
-		interval       = time.Second
+		ctx                = context.Background()
+		clusterName        = "cluster-for-status-" + testCtx.GetRandomStr()
+		clusterDefName     = "clusterdef-for-status-" + testCtx.GetRandomStr()
+		clusterVersionName = "cluster-version-for-status-" + testCtx.GetRandomStr()
+		namespace          = "default"
+		timeout            = time.Second * 10
+		interval           = time.Second
 	)
 	cleanupObjects := func() {
 		// Add any setup steps that needs to be executed before each test
 		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -129,10 +129,10 @@ spec:
 		Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
 	}
 
-	createAppversion := func() {
-		appVerYaml := fmt.Sprintf(`
+	createClusterVersion := func() {
+		clusterVersionYaml := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       AppVersion
+kind:       ClusterVersion
 metadata:
   name:     %s
 spec:
@@ -153,10 +153,10 @@ spec:
       containers:
       - name: mysql
         image: docker.io/apecloud/wesql-server:latest
-`, appVersionName, clusterDefName)
-		appVersion := &dbaasv1alpha1.AppVersion{}
-		Expect(yaml.Unmarshal([]byte(appVerYaml), appVersion)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, appVersion)).Should(Succeed())
+`, clusterVersionName, clusterDefName)
+		clusterVersion := &dbaasv1alpha1.ClusterVersion{}
+		Expect(yaml.Unmarshal([]byte(clusterVersionYaml), clusterVersion)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
 	}
 
 	createCluster := func() *dbaasv1alpha1.Cluster {
@@ -166,7 +166,7 @@ metadata:
   name: %s
   namespace: default
 spec:
-  appVersionRef: %s
+  clusterVersionRef: %s
   clusterDefinitionRef: %s
   components:
   - monitor: false
@@ -180,7 +180,7 @@ spec:
     name: consensus
     type: consensus
   terminationPolicy: WipeOut
-`, clusterName, appVersionName, clusterDefName)
+`, clusterName, clusterVersionName, clusterDefName)
 		cluster := &dbaasv1alpha1.Cluster{}
 		Expect(yaml.Unmarshal([]byte(clusterYaml), cluster)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
@@ -337,7 +337,7 @@ spec:
 		It("test cluster Failed/Abnormal phase", func() {
 			By("create cluster related resources")
 			createClusterDef()
-			createAppversion()
+			createClusterVersion()
 			createCluster()
 
 			By("watch normal event")

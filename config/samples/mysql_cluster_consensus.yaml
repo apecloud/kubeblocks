@@ -5,7 +5,7 @@ metadata:
   namespace: default
 spec:
   clusterDefinitionRef: mysql-clusterdef-consensus
-  appVersionRef: app-version-consensus
+  clusterVersionRef: cluster-version-consensus
   components:
   - name: replicasets
     type: replicasets

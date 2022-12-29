@@ -109,8 +109,8 @@ spec:
   type: Upgrade
   clusterOps:
     upgrade:
-      # Upgrade the specified appversion
-      appVersionRef: 5.0.1
+      # Upgrade the specified clusterversion
+      clusterVersionRef: 5.0.1
 ```
 
 ### Sample `OpsRequest` for volume expansion
@@ -157,9 +157,15 @@ It indicates the cluster-level operation. Its attribute is as follows:
 
 - Upgrade
 
+<<<<<<< HEAD
     It specifies the information for upgrading appVersion and `spec.type` should be `Upgrade` to make it valid. Its attribute is as follows:
     - `appVersion` specifies the appVersion object that is used in the current upgrading operation.
         Value: `AppVersion.metadata.name`
+=======
+    It specifies the information for upgrading clusterversion and `spec.type` should be `Upgrade` to make it effective. Its attribute is as follows:
+    - `clusterVersion` specifies the clusterVersion object that will be used in the current upgrading operation.
+        Value: `ClusterVersion.metadata.name`
+>>>>>>> main
 
 ### spec.componentOps
 

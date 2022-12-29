@@ -91,15 +91,15 @@ var _ = Describe("playground", func() {
 
 	It("find latest version", func() {
 		const clusterDefName = "test-cluster-def"
-		genVersion := func(name string, t time.Time) dbaasv1alpha1.AppVersion {
-			v := dbaasv1alpha1.AppVersion{}
+		genVersion := func(name string, t time.Time) dbaasv1alpha1.ClusterVersion {
+			v := dbaasv1alpha1.ClusterVersion{}
 			v.Name = name
 			v.SetLabels(map[string]string{types.ClusterDefLabelKey: clusterDefName})
 			v.SetCreationTimestamp(metav1.NewTime(t))
 			return v
 		}
 
-		versionList := &dbaasv1alpha1.AppVersionList{}
+		versionList := &dbaasv1alpha1.ClusterVersionList{}
 		versionList.Items = append(versionList.Items,
 			genVersion("old-version", time.Now().AddDate(0, 0, -1)),
 			genVersion("now-version", time.Now()))

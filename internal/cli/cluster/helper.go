@@ -155,9 +155,9 @@ func GetClusterByName(dynamic dynamic.Interface, name string, namespace string) 
 	return cluster, nil
 }
 
-func GetVersionByClusterDef(dynamic dynamic.Interface, clusterDef string) (*dbaasv1alpha1.AppVersionList, error) {
-	versionList := &dbaasv1alpha1.AppVersionList{}
-	objList, err := dynamic.Resource(types.AppVersionGVR()).Namespace("").
+func GetVersionByClusterDef(dynamic dynamic.Interface, clusterDef string) (*dbaasv1alpha1.ClusterVersionList, error) {
+	versionList := &dbaasv1alpha1.ClusterVersionList{}
+	objList, err := dynamic.Resource(types.ClusterVersionGVR()).Namespace("").
 		List(context.TODO(), metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("%s=%s", types.ClusterDefLabelKey, clusterDef),
 		})

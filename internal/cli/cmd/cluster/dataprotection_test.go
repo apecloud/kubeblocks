@@ -149,7 +149,7 @@ var _ = Describe("DataProtection", func() {
 	})
 
 	It("restore", func() {
-		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef(), testing.FakeAppVersion())
+		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef(), testing.FakeClusterVersion())
 		timestamp := time.Now().Format("20060102150405")
 		backupName := "backup-test-" + timestamp
 		clusterName := "source-cluster-" + timestamp
@@ -159,7 +159,7 @@ var _ = Describe("DataProtection", func() {
 		cmd := NewCreateCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 		Expect(cmd.Flags().Set("cluster-definition", testing.ClusterDefName)).Should(Succeed())
-		Expect(cmd.Flags().Set("cluster-version", testing.AppVersionName)).Should(Succeed())
+		Expect(cmd.Flags().Set("cluster-version", testing.ClusterVersionName)).Should(Succeed())
 		Expect(cmd.Flags().Set("components", "../../testing/testdata/component.yaml")).Should(Succeed())
 		Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
 		cmd.Run(nil, []string{clusterName})

@@ -40,7 +40,10 @@ spec:
 
   * Connection credential secret name place holder `$(CONN_CREDENTIAL_SECRET_NAME)`
 
-
+  * Limitations of cluster's horizontal scale operation:
+    * Only support VolumeSnapshot API to make a clone of Cluster's PV needs sync data when horizontal scaling.
+    * Only 1st pod container and 1st volume mount associated PV will be processed for VolumeSnapshot, do assure that data volume is placed in 1st pod container's 1st volume mount.
+    * Unused PVCs will be deleted 30 minutes after scale in.
 
 
 If you're new to KubeBlocks, visit the [getting started](https://kubeblocks.io) page and

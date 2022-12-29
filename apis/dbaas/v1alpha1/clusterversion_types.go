@@ -21,31 +21,31 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// AppVersionSpec defines the desired state of AppVersion
-type AppVersionSpec struct {
+// ClusterVersionSpec defines the desired state of ClusterVersion
+type ClusterVersionSpec struct {
 	// ref ClusterDefinition.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ClusterDefinitionRef string `json:"clusterDefinitionRef"`
 
-	// List of components in current AppVersion. Component will replace the field in ClusterDefinition's component if type is matching typeName.
+	// List of components in current ClusterVersion. Component will replace the field in ClusterDefinition's component if type is matching typeName.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	// +patchMergeKey=type
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=type
-	Components []AppVersionComponent `json:"components" patchStrategy:"merge,retainKeys" patchMergeKey:"type"`
+	Components []ClusterVersionComponent `json:"components" patchStrategy:"merge,retainKeys" patchMergeKey:"type"`
 }
 
-// AppVersionStatus defines the observed state of AppVersion
-type AppVersionStatus struct {
+// ClusterVersionStatus defines the observed state of ClusterVersion
+type ClusterVersionStatus struct {
 	// phase - in list of [Available,Unavailable]
 	// +kubebuilder:validation:Enum={Available,Unavailable}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
-	// A human readable message indicating details about why the appVersion is in this phase.
+	// A human readable message indicating details about why the ClusterVersion is in this phase.
 	// +optional
 	Message string `json:"message,omitempty"`
 
@@ -56,8 +56,8 @@ type AppVersionStatus struct {
 	ClusterDefinitionStatusGeneration `json:",inline"`
 }
 
-// AppVersionComponent is an application version component spec.
-type AppVersionComponent struct {
+// ClusterVersionComponent is an application version component spec.
+type ClusterVersionComponent struct {
 	// Type is a component type in ClusterDefinition.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
@@ -85,35 +85,35 @@ type AppVersionComponent struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-//+kubebuilder:resource:categories={dbaas},scope=Cluster
+//+kubebuilder:resource:categories={dbaas},scope=Cluster,shortName=cv
 //+kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// AppVersion is the Schema for the appversions API
-type AppVersion struct {
+// ClusterVersion is the Schema for the ClusterVersions API
+type ClusterVersion struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   AppVersionSpec   `json:"spec,omitempty"`
-	Status AppVersionStatus `json:"status,omitempty"`
+	Spec   ClusterVersionSpec   `json:"spec,omitempty"`
+	Status ClusterVersionStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// AppVersionList contains a list of AppVersion
-type AppVersionList struct {
+// ClusterVersionList contains a list of ClusterVersion
+type ClusterVersionList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []AppVersion `json:"items"`
+	Items           []ClusterVersion `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&AppVersion{}, &AppVersionList{})
+	SchemeBuilder.Register(&ClusterVersion{}, &ClusterVersionList{})
 }
 
-// GetTypeMappingComponents return Type name mapping AppVersionComponent.
-func (r *AppVersion) GetTypeMappingComponents() map[string]*AppVersionComponent {
-	m := map[string]*AppVersionComponent{}
+// GetTypeMappingComponents return Type name mapping ClusterVersionComponent.
+func (r *ClusterVersion) GetTypeMappingComponents() map[string]*ClusterVersionComponent {
+	m := map[string]*ClusterVersionComponent{}
 	for i, c := range r.Spec.Components {
 		m[c.Type] = &r.Spec.Components[i]
 	}

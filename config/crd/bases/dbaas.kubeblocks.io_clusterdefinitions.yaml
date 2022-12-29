@@ -241,6 +241,39 @@ spec:
                       format: int32
                       minimum: 0
                       type: integer
+                    horizontalScalePolicy:
+                      description: horizontalScalePolicy controls the behavior of
+                        horizontal scale.
+                      properties:
+                        backupTemplateSelector:
+                          additionalProperties:
+                            type: string
+                          description: BackupTemplateSelector defines the label selector
+                            for finding associated BackupTemplate API object.
+                          type: object
+                        type:
+                          default: None
+                          description: 'Type controls what kind of data synchronization
+                            do when component scale out. Policy is in enum of {None,
+                            Snapshot}. The default policy is `None`. None: Default
+                            policy, do nothing. Snapshot: Do native volume snapshot
+                            before scaling and restore to newly scaled pods. Prefer
+                            backup job to create snapshot if `BackupTemplateSelector`
+                            can find a template. Notice that ''Snapshot'' policy will
+                            only take snapshot on one volumeMount, default is the
+                            first volumeMount of first container (i.e. clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]),
+                            since take multiple snapshots at one time might cause
+                            consistency problem.'
+                          enum:
+                          - None
+                          - Snapshot
+                          type: string
+                        volumeMountsName:
+                          description: VolumeMountsName defines which volumeMount
+                            of the container to do backup, only work if Type is not
+                            None if not specified, the 1st volumeMount will be chosen
+                          type: string
+                      type: object
                     logConfigs:
                       description: LogConfigs is detail log file config which provided
                         by provider.
@@ -7686,7 +7719,7 @@ spec:
                                   type: array
                               type: object
                             failureThreshold:
-                              default: 1
+                              default: 3
                               description: Minimum consecutive failures for the probe
                                 to be considered failed after having succeeded.
                               format: int32
@@ -7698,10 +7731,10 @@ spec:
                               format: int32
                               minimum: 1
                               type: integer
-                            successThreshold:
+                            timeoutSeconds:
                               default: 1
-                              description: Minimum consecutive successes for the probe
-                                to be considered successful after having failed.
+                              description: Number of seconds after which the probe
+                                times out. Defaults to 1 second.
                               format: int32
                               minimum: 1
                               type: integer
@@ -7726,7 +7759,7 @@ spec:
                                   type: array
                               type: object
                             failureThreshold:
-                              default: 1
+                              default: 3
                               description: Minimum consecutive failures for the probe
                                 to be considered failed after having succeeded.
                               format: int32
@@ -7738,10 +7771,10 @@ spec:
                               format: int32
                               minimum: 1
                               type: integer
-                            successThreshold:
+                            timeoutSeconds:
                               default: 1
-                              description: Minimum consecutive successes for the probe
-                                to be considered successful after having failed.
+                              description: Number of seconds after which the probe
+                                times out. Defaults to 1 second.
                               format: int32
                               minimum: 1
                               type: integer
@@ -7766,7 +7799,7 @@ spec:
                                   type: array
                               type: object
                             failureThreshold:
-                              default: 1
+                              default: 3
                               description: Minimum consecutive failures for the probe
                                 to be considered failed after having succeeded.
                               format: int32
@@ -7778,10 +7811,10 @@ spec:
                               format: int32
                               minimum: 1
                               type: integer
-                            successThreshold:
+                            timeoutSeconds:
                               default: 1
-                              description: Minimum consecutive successes for the probe
-                                to be considered successful after having failed.
+                              description: Number of seconds after which the probe
+                                times out. Defaults to 1 second.
                               format: int32
                               minimum: 1
                               type: integer

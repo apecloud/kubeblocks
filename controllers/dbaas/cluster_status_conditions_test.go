@@ -36,18 +36,18 @@ import (
 var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 	var (
-		randomStr      = testCtx.GetRandomStr()
-		clusterName    = "mysql-" + randomStr
-		clusterDefName = "mysql-definition-" + randomStr
-		appVersionName = "mysql-app-version-" + randomStr
-		timeout        = time.Second * 10
-		interval       = time.Second
+		randomStr          = testCtx.GetRandomStr()
+		clusterName        = "mysql-" + randomStr
+		clusterDefName     = "mysql-definition-" + randomStr
+		clusterVersionName = "mysql-cluster-version-" + randomStr
+		timeout            = time.Second * 10
+		interval           = time.Second
 	)
 	cleanupObjects := func() {
 		// Add any setup steps that needs to be executed before each test
 		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -72,7 +72,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 	Context("test cluster conditions", func() {
 		It("test cluster conditions", func() {
 			By("init cluster")
-			_ = testdbaas.CreateConsensusMysqlCluster(testCtx, clusterDefName, appVersionName, clusterName)
+			_ = testdbaas.CreateConsensusMysqlCluster(testCtx, clusterDefName, clusterVersionName, clusterName)
 			By("test when clusterDefinition not found")
 			cluster := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
@@ -93,22 +93,22 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				return cluster.Status.Phase == dbaasv1alpha1.ConditionsErrorPhase
 			}, timeout*2, interval).Should(BeTrue())
 
-			By("test when appVersion not Available")
+			By("test when clusterVersion not Available")
 			_ = testdbaas.CreateConsensusMysqlClusterDef(testCtx, clusterDefName)
-			_ = testdbaas.CreateConsensusMysqlAppVersion(testCtx, clusterDefName, appVersionName)
-			// mock appVersion unavailable
+			_ = testdbaas.CreateConsensusMysqlClusterVersion(testCtx, clusterDefName, clusterVersionName)
+			// mock clusterVersion unavailable
 			Eventually(func() bool {
-				appVersion := &dbaasv1alpha1.AppVersion{}
-				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: appVersionName}, appVersion)).Should(Succeed())
-				appVersion.Spec.Components[0].Type = "test-n"
-				err := k8sClient.Update(ctx, appVersion)
+				clusterVersion := &dbaasv1alpha1.ClusterVersion{}
+				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterVersionName}, clusterVersion)).Should(Succeed())
+				clusterVersion.Spec.Components[0].Type = "test-n"
+				err := k8sClient.Update(ctx, clusterVersion)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
 			Eventually(func() bool {
-				appVersion := &dbaasv1alpha1.AppVersion{}
-				_ = k8sClient.Get(ctx, client.ObjectKey{Name: appVersionName}, appVersion)
-				return appVersion.Status.Phase == dbaasv1alpha1.UnavailablePhase
+				clusterVersion := &dbaasv1alpha1.ClusterVersion{}
+				_ = k8sClient.Get(ctx, client.ObjectKey{Name: clusterVersionName}, clusterVersion)
+				return clusterVersion.Status.Phase == dbaasv1alpha1.UnavailablePhase
 			}, timeout, interval).Should(BeTrue())
 			// trigger reconcile
 			Eventually(func() bool {
@@ -126,19 +126,19 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				return condition != nil && condition.Reason == intctrlutil.ReasonRefCRUnavailable
 			}, timeout, interval).Should(BeTrue())
 
-			By("reset appVersion to Available")
+			By("reset clusterVersion to Available")
 			Eventually(func() bool {
-				appVersion := &dbaasv1alpha1.AppVersion{}
-				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: appVersionName}, appVersion)).Should(Succeed())
-				appVersion.Spec.Components[0].Type = testdbaas.ConsensusComponentType
-				err := k8sClient.Update(ctx, appVersion)
+				clusterVersion := &dbaasv1alpha1.ClusterVersion{}
+				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterVersionName}, clusterVersion)).Should(Succeed())
+				clusterVersion.Spec.Components[0].Type = testdbaas.ConsensusComponentType
+				err := k8sClient.Update(ctx, clusterVersion)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
 			Eventually(func() bool {
-				appVersion := &dbaasv1alpha1.AppVersion{}
-				_ = k8sClient.Get(ctx, client.ObjectKey{Name: appVersionName}, appVersion)
-				return appVersion.Status.Phase == dbaasv1alpha1.AvailablePhase
+				clusterVersion := &dbaasv1alpha1.ClusterVersion{}
+				_ = k8sClient.Get(ctx, client.ObjectKey{Name: clusterVersionName}, clusterVersion)
+				return clusterVersion.Status.Phase == dbaasv1alpha1.AvailablePhase
 			}, timeout, interval).Should(BeTrue())
 
 			// trigger reconcile

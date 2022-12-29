@@ -255,7 +255,7 @@ func (o *CreateRestoreOptions) Complete() error {
 		return err
 	}
 
-	o.AppVersionRef = cluster.Spec.AppVersionRef
+	o.ClusterVersionRef = cluster.Spec.ClusterVersionRef
 	o.ClusterDefRef = cluster.Spec.ClusterDefRef
 	o.TerminationPolicy = string(cluster.Spec.TerminationPolicy)
 	o.PodAntiAffinity = string(cluster.Spec.Affinity.PodAntiAffinity)

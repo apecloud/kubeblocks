@@ -31,7 +31,7 @@ const (
 	builtinClusterObject           = "cluster"
 	builtinComponentObject         = "component"
 	builtinPodObject               = "podSpec"
-	builtinAppVersionObject        = "version"
+	builtinClusterVersionObject    = "version"
 	builtinComponentResourceObject = "componentResource"
 )
 
@@ -49,13 +49,13 @@ const (
 	builtInMysqlCalBufferFunctionName = "callBufferSizeByResource"
 )
 
-func newCfgTemplateBuilder(clusterName, namespace string, cluster *dbaasv1alpha1.Cluster, version *dbaasv1alpha1.AppVersion) *configTemplateBuilder {
+func newCfgTemplateBuilder(clusterName, namespace string, cluster *dbaasv1alpha1.Cluster, version *dbaasv1alpha1.ClusterVersion) *configTemplateBuilder {
 	return &configTemplateBuilder{
-		namespace:   namespace,
-		clusterName: clusterName,
-		cluster:     cluster,
-		appVersion:  version,
-		tplName:     "DBaasTpl",
+		namespace:      namespace,
+		clusterName:    clusterName,
+		cluster:        cluster,
+		clusterVersion: version,
+		tplName:        "DBaasTpl",
 	}
 }
 
@@ -90,7 +90,7 @@ func (c *configTemplateBuilder) builtinObjects() (*intctrlutil.TplValues, error)
 		builtinComponentObject:         c.component,
 		builtinPodObject:               c.podSpec,
 		builtinComponentResourceObject: c.componentValues.Resource,
-		builtinAppVersionObject:        c.appVersion,
+		builtinClusterVersionObject:    c.clusterVersion,
 	}
 	b, err := json.Marshal(bultInObj)
 	if err != nil {

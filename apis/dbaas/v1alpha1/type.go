@@ -86,9 +86,9 @@ const (
 type UpdateStrategy string
 
 const (
-	Serial             UpdateStrategy = "Serial"
-	BestEffortParallel UpdateStrategy = "BestEffortParallel"
-	Parallel           UpdateStrategy = "Parallel"
+	SerialStrategy             UpdateStrategy = "Serial"
+	BestEffortParallelStrategy UpdateStrategy = "BestEffortParallel"
+	ParallelStrategy           UpdateStrategy = "Parallel"
 )
 
 var DefaultLeader = ConsensusMember{

@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/spf13/viper"
@@ -31,7 +31,6 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -55,9 +54,8 @@ func init() {
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecsWithDefaultAndCustomReporters(t,
-		"Controller Suite",
-		[]Reporter{printer.NewlineReporter{}})
+
+	RunSpecs(t, "Stateful Controller Suite")
 }
 
 var _ = BeforeSuite(func() {
@@ -93,7 +91,7 @@ var _ = BeforeSuite(func() {
 	testCtx = testutil.NewDefaultTestContext(k8sClient)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
-}, 60)
+})
 
 var _ = AfterSuite(func() {
 	cancel()

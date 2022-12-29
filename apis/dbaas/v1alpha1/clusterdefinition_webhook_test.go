@@ -107,6 +107,100 @@ var _ = Describe("clusterDefinition webhook", func() {
 			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 
 		})
+
+		It("Should webhook validate configSpec", func() {
+			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName + "-cfg-test")
+			tests := []struct {
+				name               string
+				tpls               []ConfigTemplate
+				wantErr            bool
+				expectedErrMessage string
+			}{{
+				name: "cm_duplicate_test",
+				tpls: []ConfigTemplate{
+					{
+						Name:                "tpl1",
+						ConfigTplRef:        "cm1",
+						VolumeName:          "volume1",
+						ConfigConstraintRef: "constraint1",
+					},
+					{
+						Name:                "tpl2",
+						ConfigTplRef:        "cm1",
+						VolumeName:          "volume2",
+						ConfigConstraintRef: "constraint1",
+					},
+				},
+				wantErr:            true,
+				expectedErrMessage: "configmap[cm1] already existed.",
+			}, {
+				name: "name_duplicate_test",
+				tpls: []ConfigTemplate{
+					{
+						Name:                "tpl1",
+						ConfigTplRef:        "cm1",
+						VolumeName:          "volume1",
+						ConfigConstraintRef: "constraint1",
+					},
+					{
+						Name:                "tpl1",
+						ConfigTplRef:        "cm2",
+						VolumeName:          "volume2",
+						ConfigConstraintRef: "constraint2",
+					},
+				},
+				wantErr:            true,
+				expectedErrMessage: "Duplicate value: map",
+			}, {
+				name: "volume_duplicate_test",
+				tpls: []ConfigTemplate{
+					{
+						Name:                "tpl1",
+						ConfigTplRef:        "cm1",
+						VolumeName:          "volume1",
+						ConfigConstraintRef: "constraint1",
+					},
+					{
+						Name:                "tpl2",
+						ConfigTplRef:        "cm2",
+						VolumeName:          "volume1",
+						ConfigConstraintRef: "constraint2",
+					},
+				},
+				wantErr:            true,
+				expectedErrMessage: "volume[volume1] already existed.",
+			}, {
+				name: "normal_test",
+				tpls: []ConfigTemplate{
+					{
+						Name:                "tpl1",
+						ConfigTplRef:        "cm1",
+						VolumeName:          "volume1",
+						ConfigConstraintRef: "constraint1",
+					},
+					{
+						Name:                "tpl2",
+						ConfigTplRef:        "cm2",
+						VolumeName:          "volume2",
+						ConfigConstraintRef: "constraint1",
+					},
+				},
+				wantErr: false,
+			}}
+
+			for _, tt := range tests {
+				clusterDef.Spec.Components[0].ConfigSpec = &ConfigurationSpec{
+					ConfigTemplateRefs: tt.tpls,
+				}
+				err := testCtx.CreateObj(ctx, clusterDef)
+				if tt.wantErr {
+					Expect(err).ShouldNot(Succeed())
+					Expect(err.Error()).Should(ContainSubstring(tt.expectedErrMessage))
+				} else {
+					Expect(err).Should(Succeed())
+				}
+			}
+		})
 	})
 })
 

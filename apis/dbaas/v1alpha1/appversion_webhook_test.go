@@ -72,6 +72,26 @@ var _ = Describe("appVersion webhook", func() {
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
+			By("By testing create a new appVersion with invalid config template")
+			appVersionDup := createTestAppVersionObj(clusterDefinitionName, appVersionName+"-for-config")
+			appVersionDup.Spec.Components[0].ConfigTemplateRefs = []ConfigTemplate{
+				{
+					Name:                "tpl1",
+					ConfigTplRef:        "cm1",
+					VolumeName:          "volume1",
+					ConfigConstraintRef: "constraint1",
+				},
+				{
+					Name:                "tpl2",
+					ConfigTplRef:        "cm2",
+					VolumeName:          "volume1",
+					ConfigConstraintRef: "constraint2",
+				},
+			}
+			err := testCtx.CreateObj(ctx, appVersionDup)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("volume[volume1] already existed."))
+
 			By("By testing update appVersion.status")
 			patch := client.MergeFrom(appVersion.DeepCopy())
 			appVersion.Status.ClusterDefSyncStatus = OutOfSyncStatus
@@ -81,7 +101,6 @@ var _ = Describe("appVersion webhook", func() {
 			patch = client.MergeFrom(appVersion.DeepCopy())
 			appVersion.Spec.ClusterDefinitionRef = "test1"
 			Expect(k8sClient.Patch(ctx, appVersion, patch)).ShouldNot(Succeed())
-
 		})
 	})
 })

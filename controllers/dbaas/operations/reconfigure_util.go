@@ -178,7 +178,7 @@ func MergeConfigTemplates(appVersionTpl []dbaasv1alpha1.ConfigTemplate,
 
 	for i := range appVersionTpl {
 		if _, ok := (mergedTplMap)[appVersionTpl[i].VolumeName]; ok {
-			// TODO: following error should be checked in validation webhook and record Warning event
+			// It's been checked in validation webhook
 			continue
 		}
 		mergedCfgTpl = append(mergedCfgTpl, appVersionTpl[i])

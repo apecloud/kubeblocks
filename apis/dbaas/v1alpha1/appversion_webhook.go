@@ -111,10 +111,23 @@ func (r *AppVersion) validate() error {
 		}
 	}
 
+	if err := r.validateConfigTemplate(); err != nil {
+		allErrs = append(allErrs, field.Duplicate(field.NewPath("spec.components[*].configTemplateRefs"), err))
+	}
+
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
 			schema.GroupKind{Group: APIVersion, Kind: AppVersionKind},
 			r.Name, allErrs)
+	}
+	return nil
+}
+
+func (r *AppVersion) validateConfigTemplate() error {
+	for _, c := range r.Spec.Components {
+		if len(c.ConfigTemplateRefs) > 1 {
+			return validateConfigTemplateList(c.ConfigTemplateRefs)
+		}
 	}
 	return nil
 }

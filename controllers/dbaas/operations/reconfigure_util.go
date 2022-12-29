@@ -42,12 +42,13 @@ func filter[T ComponentsType](components []T, f filterFn[T]) *T {
 	return nil
 }
 
-func getConfigTemplatesFromComponent(clusterComponents []dbaasv1alpha1.ClusterComponent,
-	cdComponents []dbaasv1alpha1.ClusterDefinitionComponent,
-	components []dbaasv1alpha1.AppVersionComponent,
+func getConfigTemplatesFromComponent(
+	cComponents []dbaasv1alpha1.ClusterComponent,
+	dComponents []dbaasv1alpha1.ClusterDefinitionComponent,
+	aComponents []dbaasv1alpha1.AppVersionComponent,
 	componentName string) ([]dbaasv1alpha1.ConfigTemplate, error) {
 	findCompTypeByName := func(comName string) *dbaasv1alpha1.ClusterComponent {
-		return filter(clusterComponents, func(o dbaasv1alpha1.ClusterComponent) bool {
+		return filter(cComponents, func(o dbaasv1alpha1.ClusterComponent) bool {
 			return o.Name == comName
 		})
 	}
@@ -56,10 +57,10 @@ func getConfigTemplatesFromComponent(clusterComponents []dbaasv1alpha1.ClusterCo
 	if cCom == nil {
 		return nil, cfgcore.MakeError("failed to find component[%s]", componentName)
 	}
-	aCom := filter(components, func(o dbaasv1alpha1.AppVersionComponent) bool {
+	aCom := filter(aComponents, func(o dbaasv1alpha1.AppVersionComponent) bool {
 		return o.Type == cCom.Type
 	})
-	dCom := filter(cdComponents, func(o dbaasv1alpha1.ClusterDefinitionComponent) bool {
+	dCom := filter(dComponents, func(o dbaasv1alpha1.ClusterDefinitionComponent) bool {
 		return o.TypeName == cCom.Type
 	})
 
@@ -78,7 +79,8 @@ func getConfigTemplatesFromComponent(clusterComponents []dbaasv1alpha1.ClusterCo
 	return MergeConfigTemplates(avTpls, cdTpls), nil
 }
 
-func updateCfgParams(config dbaasv1alpha1.Configuration,
+func updateCfgParams(
+	config dbaasv1alpha1.Configuration,
 	tpl dbaasv1alpha1.ConfigTemplate,
 	cmKey client.ObjectKey,
 	ctx context.Context,
@@ -138,6 +140,11 @@ func updateCfgParams(config dbaasv1alpha1.Configuration,
 		return cfgcore.WrapError(err, "failed to generate config file")
 	}
 
+	configChecker := cfgcore.NewConfigValidator(&cfgTpl.Spec)
+	if err := configChecker.Validate(newCfg); err != nil {
+		return cfgcore.WrapError(err, "failed to validate updated config")
+	}
+
 	return persistCfgCM(cm, newCfg, cli, ctx)
 }
 
@@ -172,7 +179,6 @@ func MergeConfigTemplates(appVersionTpl []dbaasv1alpha1.ConfigTemplate,
 	for i := range appVersionTpl {
 		if _, ok := (mergedTplMap)[appVersionTpl[i].VolumeName]; ok {
 			// TODO: following error should be checked in validation webhook and record Warning event
-			// return nil, fmt.Errorf("ConfigTemplate require not same volumeName [%s]", appVersionTpl[i].Name)
 			continue
 		}
 		mergedCfgTpl = append(mergedCfgTpl, appVersionTpl[i])

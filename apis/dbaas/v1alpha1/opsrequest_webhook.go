@@ -64,7 +64,7 @@ func (r *OpsRequest) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-dbaas-kubeblocks-io-v1alpha1-opsrequest,mutating=false,failurePolicy=fail,sideEffects=None,groups=dbaas.kubeblocks.io,resources=opsrequests,verbs=create;update,versions=v1alpha1,name=vopsrequest.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-dbaas-kubeblocks-io-v1alpha1-opsrequest,mutating=false,failurePolicy=fail,sideEffects=None,groups=dbaas.kubeblocks.io,resources=opsrequests,verbs=create;update;delete,versions=v1alpha1,name=vopsrequest.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &OpsRequest{}
 
@@ -78,7 +78,7 @@ func (r *OpsRequest) ValidateCreate() error {
 func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 	opsrequestlog.Info("validate update", "name", r.Name)
 	lastOpsRequest := old.(*OpsRequest)
-	if r.Status.Phase == SucceedPhase && !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
+	if r.IsForbiddenUpdate() && !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
 		return newInvalidError(OpsRequestKind, r.Name, "spec", fmt.Sprintf("update OpsRequest is forbidden when status.Phase is %s", r.Status.Phase))
 	}
 	// we can not delete the OpsRequest when cluster has been deleted. because can not edit the finalizer when cluster not existed.
@@ -92,8 +92,15 @@ func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *OpsRequest) ValidateDelete() error {
 	opsrequestlog.Info("validate delete", "name", r.Name)
-
+	if r.Status.Phase == RunningPhase {
+		return newInvalidError(OpsRequestKind, r.Name, "status.phase", fmt.Sprintf("delete OpsRequest is forbidden when status.Phase is %s", r.Status.Phase))
+	}
 	return nil
+}
+
+// IsForbiddenUpdate OpsRequest cannot modify the spec when status is in [Succeed,Running,Failed].
+func (r *OpsRequest) IsForbiddenUpdate() bool {
+	return slices.Contains([]Phase{SucceedPhase, RunningPhase, FailedPhase}, r.Status.Phase)
 }
 
 // validateClusterPhase validate whether the current cluster state supports the OpsRequest

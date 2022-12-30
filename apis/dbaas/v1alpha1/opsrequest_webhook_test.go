@@ -35,15 +35,15 @@ import (
 var _ = Describe("OpsRequest webhook", func() {
 
 	var (
-		randomStr                = testCtx.GetRandomStr()
-		clusterDefinitionName    = "opswebhook-mysql-definition-" + randomStr
-		appVersionName           = "opswebhook-mysql-appversion-" + randomStr
-		appVersionNameForUpgrade = "opswebhook-mysql-upgrade-" + randomStr
-		clusterName              = "opswebhook-mysql-" + randomStr
-		opsRequestName           = "opswebhook-mysql-ops-" + randomStr
-		timeout                  = time.Second * 10
-		interval                 = time.Second
-		replicaSetComponentName  = "replicasets"
+		randomStr                    = testCtx.GetRandomStr()
+		clusterDefinitionName        = "opswebhook-mysql-definition-" + randomStr
+		clusterVersionName           = "opswebhook-mysql-clusterversion-" + randomStr
+		clusterVersionNameForUpgrade = "opswebhook-mysql-upgrade-" + randomStr
+		clusterName                  = "opswebhook-mysql-" + randomStr
+		opsRequestName               = "opswebhook-mysql-ops-" + randomStr
+		timeout                      = time.Second * 10
+		interval                     = time.Second
+		replicaSetComponentName      = "replicasets"
 	)
 	cleanupObjects := func() {
 		// Add any setup steps that needs to be executed before each test
@@ -51,7 +51,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
+		err = k8sClient.DeleteAllOf(ctx, &ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -68,12 +68,12 @@ var _ = Describe("OpsRequest webhook", func() {
 
 	testUpgrade := func(cluster *Cluster) {
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName+"-upgrade", UpgradeType)
-		By("By creating a appVersion for upgrade")
-		newAppVersion := createTestAppVersionObj(clusterDefinitionName, appVersionNameForUpgrade)
-		Expect(testCtx.CreateObj(ctx, newAppVersion)).Should(Succeed())
+		By("By creating a clusterVersion for upgrade")
+		newClusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionNameForUpgrade)
+		Expect(testCtx.CreateObj(ctx, newClusterVersion)).Should(Succeed())
 
 		By("By testing when cluster not support upgrade")
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("appversion must be greater than 1"))
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("ClusterVersion must be greater than 1"))
 		// set cluster support upgrade
 		patch := client.MergeFrom(cluster.DeepCopy())
 		if cluster.Status.Operations == nil {
@@ -91,9 +91,9 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("By testing when spec.upgrade is null")
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("spec.upgrade"))
 
-		By("By testing spec.upgrade.appVersionRef when it equals Cluster.spec.appVersionRef")
-		opsRequest.Spec.Upgrade = &Upgrade{AppVersionRef: appVersionName}
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("can not equals Cluster.spec.appVersionRef"))
+		By("By testing spec.upgrade.clusterVersionRef when it equals Cluster.spec.clusterVersionRef")
+		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: clusterVersionName}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("can not equals Cluster.spec.clusterVersionRef"))
 
 		By("Test Cluster Phase")
 		OpsRequestBehaviourMapper[UpgradeType] = OpsRequestBehaviour{
@@ -121,7 +121,7 @@ var _ = Describe("OpsRequest webhook", func() {
 
 		By("By creating a upgrade opsRequest, it should be succeed")
 		Eventually(func() bool {
-			opsRequest.Spec.Upgrade.AppVersionRef = newAppVersion.Name
+			opsRequest.Spec.Upgrade.ClusterVersionRef = newClusterVersion.Name
 			err := testCtx.CheckedCreateObj(ctx, opsRequest)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
@@ -134,7 +134,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		}, timeout, interval).Should(BeTrue())
 
 		newClusterName := clusterName + "1"
-		newCluster, _ := createTestCluster(clusterDefinitionName, appVersionName, newClusterName)
+		newCluster, _ := createTestCluster(clusterDefinitionName, clusterVersionName, newClusterName)
 		Expect(testCtx.CheckedCreateObj(ctx, newCluster)).Should(Succeed())
 
 		By("By testing Immutable when status.phase in Succeed")
@@ -353,17 +353,17 @@ var _ = Describe("OpsRequest webhook", func() {
 		return opsRequest
 	}
 
-	Context("When appVersion create and update", func() {
+	Context("When clusterVersion create and update", func() {
 		It("Should webhook validate passed", func() {
 			By("By create a clusterDefinition")
 
-			// wait until ClusterDefinition and AppVersion created
+			// wait until ClusterDefinition and ClusterVersion created
 			Eventually(func() bool {
 				clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
 				Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
-				By("By creating a appVersion")
-				appVersion := createTestAppVersionObj(clusterDefinitionName, appVersionName)
-				err := testCtx.CheckedCreateObj(ctx, appVersion)
+				By("By creating a clusterVersion")
+				clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
+				err := testCtx.CheckedCreateObj(ctx, clusterVersion)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
@@ -374,7 +374,7 @@ var _ = Describe("OpsRequest webhook", func() {
 				By("By testing spec.clusterDef is legal")
 				Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).ShouldNot(Succeed())
 				By("By create a new cluster ")
-				cluster, _ = createTestCluster(clusterDefinitionName, appVersionName, clusterName)
+				cluster, _ = createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
 				err := testCtx.CheckedCreateObj(ctx, cluster)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())

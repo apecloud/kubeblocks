@@ -23,9 +23,9 @@ import (
 )
 
 type ClusterObjects struct {
-	Cluster    *dbaasv1alpha1.Cluster
-	ClusterDef *dbaasv1alpha1.ClusterDefinition
-	AppVersion *dbaasv1alpha1.AppVersion
+	Cluster        *dbaasv1alpha1.Cluster
+	ClusterDef     *dbaasv1alpha1.ClusterDefinition
+	ClusterVersion *dbaasv1alpha1.ClusterVersion
 
 	Pods       *corev1.PodList
 	Services   *corev1.ServiceList
@@ -38,7 +38,7 @@ type ClusterObjects struct {
 type ClusterInfo struct {
 	Name              string `json:"name,omitempty"`
 	Namespace         string `json:"namespace,omitempty"`
-	AppVersion        string `json:"appVersion,omitempty"`
+	ClusterVersion    string `json:"clusterVersion,omitempty"`
 	TerminationPolicy string `json:"terminationPolicy,omitempty"`
 	ClusterDefinition string `json:"clusterDefinition,omitempty"`
 	Status            string `json:"status,omitempty"`

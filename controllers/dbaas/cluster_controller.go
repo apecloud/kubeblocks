@@ -237,7 +237,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return *res, err
 	}
 
-	reqCtx.Log.Info("get clusterdef and appversion")
+	reqCtx.Log.Info("get clusterDef and clusterVersion")
 	clusterdefinition := &dbaasv1alpha1.ClusterDefinition{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: cluster.Namespace,
@@ -257,19 +257,19 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.Reconciled()
 	}
 
-	appversion := &dbaasv1alpha1.AppVersion{}
+	clusterVersion := &dbaasv1alpha1.ClusterVersion{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: cluster.Namespace,
-		Name:      cluster.Spec.AppVersionRef,
-	}, appversion); err != nil {
+		Name:      cluster.Spec.ClusterVersionRef,
+	}, clusterVersion); err != nil {
 		// this is a block to handle error.
 		// so when update cluster conditions failed, we can ignore it.
 		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
-	if res, err = r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, appversion.Status.Phase,
-		dbaasv1alpha1.AppVersionKind, appversion.Name); res != nil {
+	if res, err = r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterVersion.Status.Phase,
+		dbaasv1alpha1.ClusterVersionKind, clusterVersion.Name); res != nil {
 		return *res, err
 	}
 
@@ -300,7 +300,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	shouldRequeue, err := createCluster(reqCtx, r.Client, clusterdefinition, appversion, cluster)
+	shouldRequeue, err := createCluster(reqCtx, r.Client, clusterdefinition, clusterVersion, cluster)
 	if err != nil {
 		// this is a block to handle error.
 		// so when update cluster conditions failed, we can ignore it.
@@ -315,7 +315,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	if err = r.patchClusterLabels(ctx, cluster, clusterdefinition, appversion); err != nil {
+	if err = r.patchClusterLabels(ctx, cluster, clusterdefinition, clusterVersion); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
@@ -347,7 +347,7 @@ func (r *ClusterReconciler) patchClusterLabels(
 	ctx context.Context,
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition,
-	appVersion *dbaasv1alpha1.AppVersion) error {
+	clusterVersion *dbaasv1alpha1.ClusterVersion) error {
 	patch := client.MergeFrom(cluster.DeepCopy())
 	if cluster.Labels == nil {
 		cluster.Labels = map[string]string{}
@@ -355,7 +355,7 @@ func (r *ClusterReconciler) patchClusterLabels(
 	_, ok := cluster.Labels[clusterDefLabelKey]
 	if !ok {
 		cluster.Labels[clusterDefLabelKey] = clusterDef.Name
-		cluster.Labels[appVersionLabelKey] = appVersion.Name
+		cluster.Labels[clusterVersionLabelKey] = clusterVersion.Name
 		return r.Client.Patch(ctx, cluster, patch)
 	}
 	return nil
@@ -745,7 +745,7 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 		volumeExpansionComponents []dbaasv1alpha1.OperationComponent
 		oldOperations             = cluster.Status.Operations.DeepCopy()
 		operations                = *cluster.Status.Operations
-		appVersionList            = &dbaasv1alpha1.AppVersionList{}
+		clusterVersionList        = &dbaasv1alpha1.ClusterVersionList{}
 	)
 	// determine whether to support volumeExpansion when creating the cluster. because volumeClaimTemplates is forbidden to update except for storage size when cluster created.
 	if cluster.Status.ObservedGeneration == 0 {
@@ -762,10 +762,10 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 	operations.VerticalScalable = clusterComponentNames
 
 	// Determine whether to support upgrade
-	if err = r.Client.List(ctx, appVersionList, client.MatchingLabels{clusterDefLabelKey: cluster.Spec.ClusterDefRef}); err != nil {
+	if err = r.Client.List(ctx, clusterVersionList, client.MatchingLabels{clusterDefLabelKey: cluster.Spec.ClusterDefRef}); err != nil {
 		return err
 	}
-	if len(appVersionList.Items) > 1 {
+	if len(clusterVersionList.Items) > 1 {
 		upgradable = true
 	}
 	operations.Upgradable = upgradable
@@ -784,13 +784,12 @@ func getSupportHorizontalScalingComponents(
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition) ([]dbaasv1alpha1.OperationComponent, []string) {
 	var (
-		components                   = cluster.Spec.Components
-		clusterComponentNames        = make([]string, len(components))
+		clusterComponentNames        = make([]string, 0)
 		horizontalScalableComponents = make([]dbaasv1alpha1.OperationComponent, 0)
 	)
 	// determine whether to support horizontalScaling
-	for i, v := range components {
-		clusterComponentNames[i] = v.Name
+	for _, v := range cluster.Spec.Components {
+		clusterComponentNames = append(clusterComponentNames, v.Name)
 		for _, component := range clusterDef.Spec.Components {
 			if v.Type != component.TypeName || (component.MinReplicas != 0 &&
 				component.MaxReplicas == component.MinReplicas) {

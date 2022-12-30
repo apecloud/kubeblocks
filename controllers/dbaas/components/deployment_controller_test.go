@@ -34,13 +34,13 @@ import (
 
 var _ = Describe("Deployment Controller", func() {
 	var (
-		randomStr      = testCtx.GetRandomStr()
-		timeout        = time.Second * 10
-		interval       = time.Second
-		clusterDefName = "nginx-definition1-" + randomStr
-		appVersionName = "nginx-app-version1-" + randomStr
-		clusterName    = "nginx1-" + randomStr
-		namespace      = "default"
+		randomStr          = testCtx.GetRandomStr()
+		timeout            = time.Second * 10
+		interval           = time.Second
+		clusterDefName     = "nginx-definition1-" + randomStr
+		clusterVersionName = "nginx-cluster-version1-" + randomStr
+		clusterName        = "nginx1-" + randomStr
+		namespace          = "default"
 	)
 
 	cleanupObjects := func() {
@@ -67,7 +67,7 @@ var _ = Describe("Deployment Controller", func() {
 			if testCtx.UsingExistingCluster() {
 				timeout = 3 * timeout
 			}
-			cluster := testdbaas.CreateStatelessCluster(testCtx, clusterDefName, appVersionName, clusterName)
+			cluster := testdbaas.CreateStatelessCluster(testCtx, clusterDefName, clusterVersionName, clusterName)
 			deploy := testdbaas.MockStatelessComponentDeploy(testCtx, clusterName)
 
 			By("patch cluster to Updating")

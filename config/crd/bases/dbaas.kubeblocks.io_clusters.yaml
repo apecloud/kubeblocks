@@ -24,8 +24,8 @@ spec:
       name: CLUSTER-DEFINITION
       type: string
     - description: Cluster Application Version.
-      jsonPath: .spec.appVersionRef
-      name: APP-VERSION
+      jsonPath: .spec.clusterVersionRef
+      name: VERSION
       type: string
     - description: Cluster termination policy.
       jsonPath: .spec.terminationPolicy
@@ -82,19 +82,19 @@ spec:
                       type: string
                     type: array
                 type: object
-              appVersionRef:
-                description: Cluster referenced AppVersion name.
-                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                type: string
               clusterDefinitionRef:
                 description: Cluster referenced ClusterDefinition name, this is an
                   immutable attribute.
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
+              clusterVersionRef:
+                description: Cluster referenced ClusterVersion name.
+                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                type: string
               components:
                 description: List of components you want to replace in ClusterDefinition
-                  and AppVersion. It will replace the field in ClusterDefinition's
-                  and AppVersion's component if type is matching.
+                  and ClusterVersion. It will replace the field in ClusterDefinition's
+                  and ClusterVersion's component if type is matching.
                 items:
                   properties:
                     affinity:
@@ -249,7 +249,7 @@ spec:
                       items:
                         properties:
                           name:
-                            description: Ref AppVersion.spec.components.containers.volumeMounts.name
+                            description: Ref ClusterVersion.spec.components.containers.volumeMounts.name
                             type: string
                           spec:
                             description: spec defines the desired characteristics
@@ -498,8 +498,8 @@ spec:
                   type: object
                 type: array
             required:
-            - appVersionRef
             - clusterDefinitionRef
+            - clusterVersionRef
             - terminationPolicy
             type: object
           status:
@@ -758,7 +758,7 @@ spec:
                     type: array
                   upgradable:
                     description: upgradable whether the cluster supports upgrade.
-                      if multiple appVersions existed, it is true.
+                      if multiple clusterVersions existed, it is true.
                     type: boolean
                   verticalScalable:
                     description: verticalScalable which components of the cluster

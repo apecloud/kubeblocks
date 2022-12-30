@@ -44,7 +44,8 @@ data:
     host=$(eval echo \$KB_REPLICASETS_"$idx"_HOSTNAME)
     cluster_info="$cluster_info@$(($idx+1))"; 
     echo $cluster_info; 
-    mkdir -p /data/mysql/data; 
+    mkdir -p /data/mysql/data;
+    mkdir -p /data/mysql/log;
     chmod +777 -R /data/mysql; 
     leader=$KB_REPLICASETS_LEADER
     echo $leader

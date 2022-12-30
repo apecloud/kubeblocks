@@ -35,19 +35,19 @@ import (
 var _ = Describe("StatefulSet Controller", func() {
 
 	var (
-		randomStr      = testCtx.GetRandomStr()
-		timeout        = time.Second * 10
-		interval       = time.Second
-		clusterName    = "mysql-" + randomStr
-		clusterDefName = "cluster-definition-consensus-" + randomStr
-		appVersionName = "app-version-operations-" + randomStr
-		opsRequestName = "wesql-restart-test-" + randomStr
+		randomStr          = testCtx.GetRandomStr()
+		timeout            = time.Second * 10
+		interval           = time.Second
+		clusterName        = "mysql-" + randomStr
+		clusterDefName     = "cluster-definition-consensus-" + randomStr
+		clusterVersionName = "cluster-version-operations-" + randomStr
+		opsRequestName     = "wesql-restart-test-" + randomStr
 	)
 
 	cleanupObjects := func() {
 		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -150,7 +150,7 @@ var _ = Describe("StatefulSet Controller", func() {
 
 	Context("test controller", func() {
 		It("", func() {
-			_, _, cluster := testdbaas.InitConsensusMysql(testCtx, clusterDefName, appVersionName, clusterName)
+			_, _, cluster := testdbaas.InitConsensusMysql(testCtx, clusterDefName, clusterVersionName, clusterName)
 			_ = testdbaas.CreateRestartOpsRequest(testCtx, clusterName, opsRequestName, []string{testdbaas.ConsensusComponentName})
 			sts := testdbaas.MockConsensusComponentStatefulSet(testCtx, clusterName)
 			By("patch cluster to Updating")

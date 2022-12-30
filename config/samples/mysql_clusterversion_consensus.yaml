@@ -1,7 +1,7 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       AppVersion
+kind:       ClusterVersion
 metadata:
-  name:     app-version-consensus
+  name:     cluster-version-consensus
 spec:
   clusterDefinitionRef: mysql-clusterdef-consensus
   components:

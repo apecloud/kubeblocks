@@ -17,7 +17,7 @@ service:
   ##
   type: ClusterIP
 
-appVersionOverride: ""
+clusterVersionOverride: ""
 nameOverride: ""
 fullnameOverride: ""
 

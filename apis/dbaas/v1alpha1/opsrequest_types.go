@@ -37,7 +37,7 @@ type OpsRequestSpec struct {
 	// +optional
 	TTLSecondsAfterSucceed int32 `json:"ttlSecondsAfterSucceed,omitempty"`
 
-	// upgrade specify the cluster application version by specifying appVersionRef.
+	// upgrade specify the cluster version by specifying clusterVersionRef.
 	// +optional
 	Upgrade *Upgrade `json:"upgrade,omitempty"`
 
@@ -83,9 +83,9 @@ type ComponentOps struct {
 
 // Upgrade defines the variables of upgrade operation.
 type Upgrade struct {
-	// appVersionRef reference AppVersion name.
+	// clusterVersionRef reference ClusterVersion name.
 	// +kubebuilder:validation:Required
-	AppVersionRef string `json:"appVersionRef"`
+	ClusterVersionRef string `json:"clusterVersionRef"`
 }
 
 // VerticalScaling defines the variables that need to input when scaling compute resources.

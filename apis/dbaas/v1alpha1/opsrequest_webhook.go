@@ -195,7 +195,7 @@ func (r *OpsRequest) validateRestart(allErrs *field.ErrorList, cluster *Cluster)
 // validateUpgrade validate spec.upgrade is legal
 func (r *OpsRequest) validateUpgrade(ctx context.Context, allErrs *field.ErrorList, cluster *Cluster) {
 	if !cluster.Status.Operations.Upgradable {
-		addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s, appversion must be greater than 1", r.Spec.ClusterRef))
+		addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s, ClusterVersion must be greater than 1", r.Spec.ClusterRef))
 		return
 	}
 	if r.Spec.Upgrade == nil {
@@ -203,12 +203,12 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context, allErrs *field.ErrorLi
 		return
 	}
 
-	appVersion := &AppVersion{}
-	appVersionRef := r.Spec.Upgrade.AppVersionRef
-	if err := webhookMgr.client.Get(ctx, types.NamespacedName{Name: appVersionRef}, appVersion); err != nil {
-		addInvalidError(allErrs, "spec.upgrade.appVersionRef", appVersionRef, err.Error())
-	} else if cluster.Spec.AppVersionRef == r.Spec.Upgrade.AppVersionRef {
-		addInvalidError(allErrs, "spec.upgrade.appVersionRef", appVersionRef, "can not equals Cluster.spec.appVersionRef")
+	clusterVersion := &ClusterVersion{}
+	clusterVersionRef := r.Spec.Upgrade.ClusterVersionRef
+	if err := webhookMgr.client.Get(ctx, types.NamespacedName{Name: clusterVersionRef}, clusterVersion); err != nil {
+		addInvalidError(allErrs, "spec.upgrade.clusterVersionRef", clusterVersionRef, err.Error())
+	} else if cluster.Spec.ClusterVersionRef == r.Spec.Upgrade.ClusterVersionRef {
+		addInvalidError(allErrs, "spec.upgrade.clusterVersionRef", clusterVersionRef, "can not equals Cluster.spec.clusterVersionRef")
 	}
 }
 

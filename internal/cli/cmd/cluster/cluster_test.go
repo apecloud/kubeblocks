@@ -40,7 +40,7 @@ var _ = Describe("Cluster", func() {
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace("default")
-		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef(), testing.FakeAppVersion())
+		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef(), testing.FakeClusterVersion())
 	})
 
 	AfterEach(func() {
@@ -60,7 +60,7 @@ var _ = Describe("Cluster", func() {
 			Expect(cmd.Flags().GetString("termination-policy")).Should(Equal(""))
 
 			Expect(cmd.Flags().Set("cluster-definition", testing.ClusterDefName)).Should(Succeed())
-			Expect(cmd.Flags().Set("cluster-version", testing.AppVersionName)).Should(Succeed())
+			Expect(cmd.Flags().Set("cluster-version", testing.ClusterVersionName)).Should(Succeed())
 			Expect(cmd.Flags().Set("components", "../../testing/testdata/component.yaml")).Should(Succeed())
 			Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
 
@@ -74,7 +74,7 @@ var _ = Describe("Cluster", func() {
 				BaseOptions:        create.BaseOptions{IOStreams: streams, Name: "test", Client: tf.FakeDynamicClient},
 				ComponentsFilePath: "",
 				ClusterDefRef:      testing.ClusterDefName,
-				AppVersionRef:      "app-version",
+				ClusterVersionRef:  "cluster-version",
 				UpdatableFlags: UpdatableFlags{
 					PodAntiAffinity: "Preferred",
 					TopologyKeys:    []string{"kubernetes.io/hostname"},
@@ -130,11 +130,11 @@ var _ = Describe("Cluster", func() {
 		By("validate o.name is null")
 		Expect(o.Validate()).To(MatchError("missing cluster name"))
 
-		By("validate upgrade when app-version is null")
+		By("validate upgrade when cluster-version is null")
 		o.Name = "test"
 		o.OpsType = OpsTypeUpgrade
-		Expect(o.Validate()).To(MatchError("missing app-version"))
-		o.AppVersionRef = "test-app-version"
+		Expect(o.Validate()).To(MatchError("missing cluster-version"))
+		o.ClusterVersionRef = "test-cluster-version"
 		Expect(o.Validate()).Should(Succeed())
 
 		By("validate volumeExpansion when components is null")

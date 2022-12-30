@@ -164,15 +164,20 @@ func (o *Options) preCheck() error {
 	return nil
 }
 
-func (o *InstallOptions) Run() error {
-	fmt.Fprintf(o.Out, "Install KubeBlocks %s\n", o.Version)
+func (o *InstallOptions) check() error {
+	if o.CreateNamespace {
+		return nil
+	}
 
 	// check if namespace exists
-	if !o.CreateNamespace {
-		if _, err := o.client.CoreV1().Namespaces().Get(context.TODO(), o.Namespace, metav1.GetOptions{}); err != nil {
-			return err
-		}
+	if _, err := o.client.CoreV1().Namespaces().Get(context.TODO(), o.Namespace, metav1.GetOptions{}); err != nil {
+		return err
 	}
+	return nil
+}
+
+func (o *InstallOptions) Run() error {
+	fmt.Fprintf(o.Out, "Install KubeBlocks %s\n", o.Version)
 
 	if o.Monitor {
 		o.Sets = append(o.Sets, kMonitorParam)
@@ -330,6 +335,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Example: installExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f, cmd))
+			util.CheckErr(o.check())
 			util.CheckErr(o.Run())
 		},
 	}

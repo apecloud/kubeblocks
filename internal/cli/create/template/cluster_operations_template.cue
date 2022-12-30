@@ -6,71 +6,21 @@ options: {
 	type:                   string
 	typeLower:              string
 	ttlSecondsAfterSucceed: int
-	appVersionRef:          string
+	clusterVersionRef:      string
 	componentNames: [...string]
 	requestCPU:    string
 	requestMemory: string
 	limitCPU:      string
 	limitMemory:   string
 	replicas:      int
-	roleGroupNames: [...string]
-	roleGroupReplicas: int
-	storage:           string
+	storage:       string
 	vctNames: [...string]
 }
 
 // define operation block,
 #upgrade: {
-	appVersionRef: options.appVersionRef
+	clusterVersionRef: options.clusterVersionRef
 }
-
-#componentOps: [
-	{
-		componentNames: options.componentNames
-
-		// define details api block with options.type
-		if options.type == "VerticalScaling" {
-			verticalScaling: {
-				requests: {
-					if options.requestMemory != "" {
-						memory: options.requestMemory
-					}
-					if options.requestCPU != "" {
-						cpu: options.requestCPU
-					}
-
-				}
-				limits: {
-					if options.limitMemory != "" {
-						memory: options.limitMemory
-					}
-					if options.limitCPU != "" {
-						cpu: options.limitCPU
-					}
-				}
-			}
-		}
-
-		if options.type == "VolumeExpansion" {
-			volumeExpansion: [ for _, vctName in options.vctNames {
-				name:    vctName
-				storage: options.storage
-			}]
-		}
-
-		if options.type == "HorizontalScaling" {
-			horizontalScaling: {
-				if options.replicas >= 0 {
-					replicas: options.replicas
-				}
-				roleGroups: [ for _, roleGroupName in options.roleGroupNames {
-					name:     roleGroupName
-					replicas: options.roleGroupReplicas
-				}]
-			}
-		}
-	},
-]
 
 // required, k8s api resource content
 content: {
@@ -90,12 +40,48 @@ content: {
 		type:                   options.type
 		ttlSecondsAfterSucceed: options.ttlSecondsAfterSucceed
 		if options.type == "Upgrade" {
-			clusterOps: {
-				upgrade: #upgrade
-			}
+			upgrade: #upgrade
 		}
-		if options.type != "Upgrade" {
-			componentOps: #componentOps
+		if options.type == "VolumeExpansion" {
+			volumeExpansion: [ for _, cName in options.componentNames {
+				componentName: cName
+				volumeClaimTemplates: [ for _, vctName in options.vctNames {
+					name:    vctName
+					storage: options.storage
+				}]
+			}]
+		}
+		if options.type == "HorizontalScaling" {
+			horizontalScaling: [ for _, cName in options.componentNames {
+				componentName: cName
+				replicas:      options.replicas
+			}]
+		}
+		if options.type == "Restart" {
+			restart: [ for _, cName in options.componentNames {
+				componentName: cName
+			}]
+		}
+		if options.type == "VerticalScaling" {
+			verticalScaling: [ for _, cName in options.componentNames {
+				componentName: cName
+				requests: {
+					if options.requestMemory != "" {
+						memory: options.requestMemory
+					}
+					if options.requestCPU != "" {
+						cpu: options.requestCPU
+					}
+				}
+				limits: {
+					if options.limitMemory != "" {
+						memory: options.limitMemory
+					}
+					if options.limitCPU != "" {
+						cpu: options.limitCPU
+					}
+				}
+			}]
 		}
 	}
 }

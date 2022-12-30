@@ -301,32 +301,6 @@ rules:
 - apiGroups:
   - dbaas.kubeblocks.io
   resources:
-  - appversions
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - dbaas.kubeblocks.io
-  resources:
-  - appversions/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - dbaas.kubeblocks.io
-  resources:
-  - appversions/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - dbaas.kubeblocks.io
-  resources:
   - clusterdefinitions
   verbs:
   - create
@@ -372,6 +346,32 @@ rules:
   - dbaas.kubeblocks.io
   resources:
   - clusters/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dbaas.kubeblocks.io
+  resources:
+  - clusterversions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dbaas.kubeblocks.io
+  resources:
+  - clusterversions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dbaas.kubeblocks.io
+  resources:
+  - clusterversions/status
   verbs:
   - get
   - patch

@@ -26,7 +26,12 @@ spec:
         {{- end }}
       configTemplateRefs:
         - name: mysql-3node-tpl-8.0
+          namespace: {{ .Release.Namespace }}
           volumeName: mysql-config
+        - name: wesql-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
       defaultReplicas: 3
       componentType: Consensus
       consensusSpec:
@@ -41,6 +46,10 @@ spec:
           - protocol: TCP
             port: 3306
             targetPort: mysql
+      horizontalScalePolicy:
+        type: Snapshot
+        backupTemplateSelector:
+          "clusterdefinition.kubeblocks.io/name": apecloud-wesql
       podSpec:
         containers:
           - name: mysql
@@ -48,10 +57,10 @@ spec:
             volumeMounts:
               - mountPath: /data/mysql
                 name: data
-#              - mountPath: /log/mysql
-#                name: log
               - mountPath: /opt/mysql
                 name: mysql-config
+              - name: scripts
+                mountPath: /scripts
             ports:
               - containerPort: 3306
                 name: mysql
@@ -90,27 +99,4 @@ spec:
                 value: {{ if .Values.cluster.customConfig }}{{ .Values.cluster.customConfig }}{{ end }}
               - name: MYSQL_DYNAMIC_CONFIG
                 value: {{ if .Values.cluster.dynamicConfig }}{{ .Values.cluster.dynamicConfig }}{{ end }}
-            command: ["/bin/bash", "-c"]
-            args:
-              - >
-                cluster_info="";
-                for (( i=0; i< $KB_REPLICASETS_N; i++ )); do
-                  if [ $i -ne 0 ]; then
-                    cluster_info="$cluster_info;";
-                  fi;
-                  host=$(eval echo \$KB_REPLICASETS_"$i"_HOSTNAME)
-                  cluster_info="$cluster_info$host:13306";
-                done;
-                idx=0;
-                while IFS='-' read -ra ADDR; do
-                    for i in "${ADDR[@]}"; do
-                      idx=$i;
-                    done;
-                done <<< "$KB_POD_NAME";
-                echo $idx;
-                cluster_info="$cluster_info@$(($idx+1))";
-                echo $cluster_info; echo {{ .Values.cluster.replicaSetCount }};
-                mkdir -p /data/mysql/data;
-                mkdir -p /data/mysql/log;
-                chmod +777 -R /data/mysql;
-                docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$cluster_info" --cluster-id=$CLUSTER_ID
+            command: ["/scripts/setup.sh"]

@@ -48,8 +48,8 @@ const (
 	ResourceClusters = "clusters"
 	// ResourceClusterDefs clusterDefinition resource
 	ResourceClusterDefs = "clusterdefinitions"
-	// ResourceAppVersions appVersion resource
-	ResourceAppVersions = "appversions"
+	// ResourceClusterVersions clusterVersion resource
+	ResourceClusterVersions = "clusterversions"
 	// ResourceOpsRequests opsrequests resource
 	ResourceOpsRequests = "opsrequests"
 	// ResourceDeployments deployment resource
@@ -59,8 +59,8 @@ const (
 	KindCluster = "Cluster"
 	// KindClusterDef clusterDefinition kine
 	KindClusterDef = "ClusterDefinition"
-	// KindAppVersion appVersion kind
-	KindAppVersion = "AppVersion"
+	// KindClusterVersion clusterVersion kind
+	KindClusterVersion = "ClusterVersion"
 
 	InstanceLabelKey               = "app.kubernetes.io/instance"
 	ConsensusSetRoleLabelKey       = "cs.dbaas.kubeblocks.io/role"
@@ -127,12 +127,12 @@ func ClusterDefGK() schema.GroupKind {
 	return schema.GroupKind{Group: Group, Kind: KindClusterDef}
 }
 
-func AppVersionGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceAppVersions}
+func ClusterVersionGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceClusterVersions}
 }
 
-func AppVersionGK() schema.GroupKind {
-	return schema.GroupKind{Group: Group, Kind: KindAppVersion}
+func ClusterVersionGK() schema.GroupKind {
+	return schema.GroupKind{Group: Group, Kind: KindClusterVersion}
 }
 
 func BackupJobGVR() schema.GroupVersionResource {

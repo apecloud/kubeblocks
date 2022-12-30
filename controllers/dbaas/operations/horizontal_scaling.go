@@ -34,17 +34,17 @@ func init() {
 // HorizontalScalingAction Modify Cluster.spec.components[*].replicas from the opsRequest
 func HorizontalScalingAction(opsRes *OpsResource) error {
 	var (
-		componentNameMap = getAllComponentsNameMap(opsRes.OpsRequest)
-		componentOps     *dbaasv1alpha1.ComponentOps
-		ok               bool
+		horizontalScalingMap = opsRes.OpsRequest.CovertHorizontalScalingListToMap()
+		horizontalScaling    dbaasv1alpha1.HorizontalScaling
+		ok                   bool
 	)
 
 	for index, component := range opsRes.Cluster.Spec.Components {
-		if componentOps, ok = componentNameMap[component.Name]; !ok || componentOps == nil {
+		if horizontalScaling, ok = horizontalScalingMap[component.Name]; !ok {
 			continue
 		}
-		if componentOps.HorizontalScaling.Replicas != 0 {
-			r := componentOps.HorizontalScaling.Replicas
+		if horizontalScaling.Replicas != 0 {
+			r := horizontalScaling.Replicas
 			opsRes.Cluster.Spec.Components[index].Replicas = &r
 		}
 	}

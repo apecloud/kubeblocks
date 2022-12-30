@@ -76,7 +76,7 @@ kind: Cluster
 metadata:
   name: wesql
 spec:
-  appVersionRef: app-version-consensus
+  clusterVersionRef: cluster-version-consensus
   clusterDefinitionRef: cluster-definition-consensus
   components:
     - name: wesql-test
@@ -132,5 +132,11 @@ spec:
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(comps).ShouldNot(BeNil())
 		Expect(len(comps)).Should(Equal(2))
+	})
+
+	It("build tolerations", func() {
+		raw := []string{"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"}
+		res := buildTolerations(raw)
+		Expect(len(res)).Should(Equal(1))
 	})
 })

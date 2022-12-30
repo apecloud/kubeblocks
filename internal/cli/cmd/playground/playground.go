@@ -355,10 +355,12 @@ func newCreateOptions(cd string, version string) (*cmdcluster.CreateOptions, err
 			Name:      kbClusterName,
 			Client:    dynamicClient,
 		},
-		TerminationPolicy: "WipeOut",
+		UpdatableFlags: cmdcluster.UpdatableFlags{
+			TerminationPolicy: "WipeOut",
+			Monitor:           true,
+		},
 		ClusterDefRef:     cd,
-		AppVersionRef:     version,
-		Monitor:           true,
+		ClusterVersionRef: version,
 	}
 
 	if err = options.Complete(); err != nil {
@@ -367,7 +369,7 @@ func newCreateOptions(cd string, version string) (*cmdcluster.CreateOptions, err
 	return options, nil
 }
 
-func findLatestVersion(versions *dbaasv1alpha1.AppVersionList) *dbaasv1alpha1.AppVersion {
+func findLatestVersion(versions *dbaasv1alpha1.ClusterVersionList) *dbaasv1alpha1.ClusterVersion {
 	if len(versions.Items) == 0 {
 		return nil
 	}
@@ -375,7 +377,7 @@ func findLatestVersion(versions *dbaasv1alpha1.AppVersionList) *dbaasv1alpha1.Ap
 		return &versions.Items[0]
 	}
 
-	var version *dbaasv1alpha1.AppVersion
+	var version *dbaasv1alpha1.ClusterVersion
 	for i, v := range versions.Items {
 		if version == nil {
 			version = &versions.Items[i]

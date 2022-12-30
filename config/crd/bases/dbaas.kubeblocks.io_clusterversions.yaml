@@ -5,16 +5,18 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  name: appversions.dbaas.kubeblocks.io
+  name: clusterversions.dbaas.kubeblocks.io
 spec:
   group: dbaas.kubeblocks.io
   names:
     categories:
     - dbaas
-    kind: AppVersion
-    listKind: AppVersionList
-    plural: appversions
-    singular: appversion
+    kind: ClusterVersion
+    listKind: ClusterVersionList
+    plural: clusterversions
+    shortNames:
+    - cv
+    singular: clusterversion
   scope: Cluster
   versions:
   - additionalPrinterColumns:
@@ -28,7 +30,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: AppVersion is the Schema for the appversions API
+        description: ClusterVersion is the Schema for the ClusterVersions API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -43,18 +45,18 @@ spec:
           metadata:
             type: object
           spec:
-            description: AppVersionSpec defines the desired state of AppVersion
+            description: ClusterVersionSpec defines the desired state of ClusterVersion
             properties:
               clusterDefinitionRef:
                 description: ref ClusterDefinition.
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               components:
-                description: List of components in current AppVersion. Component will
-                  replace the field in ClusterDefinition's component if type is matching
-                  typeName.
+                description: List of components in current ClusterVersion. Component
+                  will replace the field in ClusterDefinition's component if type
+                  is matching typeName.
                 items:
-                  description: AppVersionComponent is an application version component
+                  description: ClusterVersionComponent is an application version component
                     spec.
                   properties:
                     configTemplateRefs:
@@ -7732,7 +7734,7 @@ spec:
             - components
             type: object
           status:
-            description: AppVersionStatus defines the observed state of AppVersion
+            description: ClusterVersionStatus defines the observed state of ClusterVersion
             properties:
               clusterDefGeneration:
                 description: ClusterDefinition generation number.
@@ -7746,7 +7748,7 @@ spec:
                 type: string
               message:
                 description: A human readable message indicating details about why
-                  the appVersion is in this phase.
+                  the ClusterVersion is in this phase.
                 type: string
               observedGeneration:
                 description: generation number

@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   name: etcd
 spec:
-  appVersionRef: app-version-etcd
+  clusterVersionRef: cluster-version-etcd
   clusterDefinitionRef: cluster-definition-etcd
   terminationPolicy: WipeOut
   components:

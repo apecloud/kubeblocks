@@ -25,18 +25,18 @@ import (
 )
 
 const (
-	maxConcurReconAppVersionKey = "MAXCONCURRENTRECONCILES_APPVERSION"
-	maxConcurReconClusterDefKey = "MAXCONCURRENTRECONCILES_CLUSTERDEF"
+	maxConcurReconClusterVersionKey = "MAXCONCURRENTRECONCILES_CLUSTERVERSION"
+	maxConcurReconClusterDefKey     = "MAXCONCURRENTRECONCILES_CLUSTERDEF"
 
 	// name of our custom finalizer
-	dbClusterFinalizerName    = "cluster.kubeblocks.io/finalizer"
-	dbClusterDefFinalizerName = "clusterdefinition.kubeblocks.io/finalizer"
-	appVersionFinalizerName   = "appversion.kubeblocks.io/finalizer"
-	opsRequestFinalizerName   = "opsrequest.kubeblocks.io/finalizer"
+	dbClusterFinalizerName      = "cluster.kubeblocks.io/finalizer"
+	dbClusterDefFinalizerName   = "clusterdefinition.kubeblocks.io/finalizer"
+	clusterVersionFinalizerName = "clusterversion.kubeblocks.io/finalizer"
+	opsRequestFinalizerName     = "opsrequest.kubeblocks.io/finalizer"
 
 	// label keys
 	clusterDefLabelKey         = "clusterdefinition.kubeblocks.io/name"
-	appVersionLabelKey         = "appversion.kubeblocks.io/name"
+	clusterVersionLabelKey     = "clusterversion.kubeblocks.io/name"
 	statefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
 	CSRoleChangedAnnotKey      = "cs.kubeblocks.io/event-handled"
 	CSRoleChangedAnnotHandled  = "true"
@@ -70,6 +70,7 @@ type Component struct {
 	EnabledLogs             []string                               `json:"enabledLogs,omitempty"`
 	LogConfigs              []dbaasv1alpha1.LogConfig              `json:"logConfigs,omitempty"`
 	ConfigTemplates         []dbaasv1alpha1.ConfigTemplate         `json:"configTemplates,omitempty"`
+	HorizontalScalePolicy   *dbaasv1alpha1.HorizontalScalePolicy   `json:"horizontalScalePolicy,omitempty"`
 }
 
 type ResourceDefinition struct {
@@ -97,10 +98,10 @@ type configTemplateBuilder struct {
 	builtInFunctions *intctrlutil.BuiltInObjectsFunc
 
 	// DBaas cluster object
-	component  *Component
-	appVersion *dbaasv1alpha1.AppVersion
-	cluster    *dbaasv1alpha1.Cluster
-	podSpec    *corev1.PodSpec
+	component      *Component
+	clusterVersion *dbaasv1alpha1.ClusterVersion
+	cluster        *dbaasv1alpha1.Cluster
+	podSpec        *corev1.PodSpec
 }
 
 type envVar struct {

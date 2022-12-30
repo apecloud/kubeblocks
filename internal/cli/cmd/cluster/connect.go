@@ -42,7 +42,7 @@ func NewConnectCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	o := &ConnectOptions{ExecOptions: exec.NewExecOptions(f, streams)}
 	input := &exec.ExecInput{
 		Use:      "connect",
-		Short:    "connect to a database cluster",
+		Short:    "Connect to a database cluster",
 		Validate: o.validate,
 		Complete: o.complete,
 		AddFlags: o.addFlags,

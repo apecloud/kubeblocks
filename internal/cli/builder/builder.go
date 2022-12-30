@@ -27,9 +27,9 @@ type Options interface{}
 
 type BuildFn func(cmd *Command) *cobra.Command
 
-type CustomCompleteFn func(o Options, args []string) error
+type CustomCompleteFn func(cmd *Command) error
 
-type CustomFlags func(o Options, cmd *cobra.Command)
+type CustomFlags func(cmd *Command)
 
 type CustomRunFn func(cmd *Command) (bool, error)
 
@@ -123,4 +123,8 @@ func (b *CmdBuilder) Options(o Options) *CmdBuilder {
 
 func (b *CmdBuilder) Build(buildFn BuildFn) *cobra.Command {
 	return buildFn(b.cmd)
+}
+
+func (b *CmdBuilder) GetCmd() *Command {
+	return b.cmd
 }

@@ -373,7 +373,7 @@ func (r *BackupJobReconciler) createVolumeSnapshot(
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: reqCtx.Req.Namespace,
 			Name:      reqCtx.Req.Name,
-			Labels:    buildBackupJobLabels(backupJob.Name),
+			Labels:    buildBackupJobLabels(backupJob),
 		},
 		Spec: snapshotv1.VolumeSnapshotSpec{
 			Source: snapshotv1.VolumeSnapshotSource{
@@ -505,11 +505,10 @@ func (r *BackupJobReconciler) createHooksCommandJob(
 	return r.CreateBatchV1Job(reqCtx, key, backupJob, jobPodSpec)
 }
 
-func buildBackupJobLabels(backupJobName string) map[string]string {
-	return map[string]string{
-		dataProtectionLabelBackupJobNameKey: backupJobName,
-		intctrlutil.AppManagedByLabelKey:    intctrlutil.AppName,
-	}
+func buildBackupJobLabels(backupJob *dataprotectionv1alpha1.BackupJob) map[string]string {
+	labels := backupJob.Labels
+	labels[dataProtectionLabelBackupJobNameKey] = backupJob.Name
+	return labels
 }
 
 func (r *BackupJobReconciler) CreateBatchV1Job(
@@ -523,7 +522,7 @@ func (r *BackupJobReconciler) CreateBatchV1Job(
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: key.Namespace,
 			Name:      key.Name,
-			Labels:    buildBackupJobLabels(backupJob.Name),
+			Labels:    buildBackupJobLabels(backupJob),
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
@@ -567,7 +566,7 @@ func (r *BackupJobReconciler) deleteReferenceBatchV1Jobs(reqCtx intctrlutil.Requ
 
 	if err := r.Client.List(reqCtx.Ctx, jobs,
 		client.InNamespace(reqCtx.Req.Namespace),
-		client.MatchingLabels(buildBackupJobLabels(backupJob.Name))); err != nil {
+		client.MatchingLabels(buildBackupJobLabels(backupJob))); err != nil {
 		return err
 	}
 	for _, job := range jobs.Items {
@@ -598,7 +597,7 @@ func (r *BackupJobReconciler) deleteReferenceVolumeSnapshot(reqCtx intctrlutil.R
 
 	if err := r.Client.List(reqCtx.Ctx, snaps,
 		client.InNamespace(reqCtx.Req.Namespace),
-		client.MatchingLabels(buildBackupJobLabels(backupJob.Name))); err != nil {
+		client.MatchingLabels(buildBackupJobLabels(backupJob))); err != nil {
 		return err
 	}
 	for _, i := range snaps.Items {

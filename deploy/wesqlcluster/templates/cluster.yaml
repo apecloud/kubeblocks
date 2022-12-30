@@ -5,7 +5,7 @@ metadata:
   labels: {{ include "wesqlcluster.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: apecloud-wesql  # ref clusterdefinition.name
-  appVersionRef: wesql-{{ default .Chart.AppVersion .Values.appVersionOverride }} # ref appversion.name
+  clusterVersionRef: wesql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
   terminationPolicy: {{ .Values.terminationPolicy }}
   affinity:
     {{- with .Values.topologyKeys }}

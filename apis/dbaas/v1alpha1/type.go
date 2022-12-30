@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 // Package v1alpha1 contains API Schema definitions for the dbaas v1alpha1 API group
-// +kubebuilder:skip
 package v1alpha1
 
 import (
@@ -25,7 +24,7 @@ import (
 
 const (
 	APIVersion            = "dbaas.kubeblocks.io/v1alpha1"
-	AppVersionKind        = "AppVersion"
+	ClusterVersionKind    = "ClusterVersion"
 	ClusterDefinitionKind = "ClusterDefinition"
 	ClusterKind           = "Cluster"
 	OpsRequestKind        = "OpsRequestKind"
@@ -36,18 +35,19 @@ const (
 type Phase string
 
 const (
-	AvailablePhase       Phase = "Available"
-	UnavailablePhase     Phase = "Unavailable"
-	DeletingPhase        Phase = "Deleting"
-	CreatingPhase        Phase = "Creating"
-	PendingPhase         Phase = "Pending"
-	RunningPhase         Phase = "Running"
-	FailedPhase          Phase = "Failed"
-	UpdatingPhase        Phase = "Updating"
-	VolumeExpandingPhase Phase = "VolumeExpanding"
-	SucceedPhase         Phase = "Succeed"
-	AbnormalPhase        Phase = "Abnormal"
-	ConditionsErrorPhase Phase = "ConditionsError"
+	AvailablePhase         Phase = "Available"
+	UnavailablePhase       Phase = "Unavailable"
+	DeletingPhase          Phase = "Deleting"
+	CreatingPhase          Phase = "Creating"
+	PendingPhase           Phase = "Pending"
+	RunningPhase           Phase = "Running"
+	FailedPhase            Phase = "Failed"
+	UpdatingPhase          Phase = "Updating"
+	VolumeExpandingPhase   Phase = "VolumeExpanding"
+	SucceedPhase           Phase = "Succeed"
+	AbnormalPhase          Phase = "Abnormal"
+	ConditionsErrorPhase   Phase = "ConditionsError"
+	HorizontalScalingPhase Phase = "HorizontalScaling"
 )
 
 // Status define CR .Status.ClusterDefSyncStatus
@@ -115,6 +115,16 @@ const (
 	Halt           TerminationPolicyType = "Halt"
 	Delete         TerminationPolicyType = "Delete"
 	WipeOut        TerminationPolicyType = "WipeOut"
+)
+
+// HScaleDataClonePolicyType defines data clone policy when horizontal scaling.
+// +enum
+type HScaleDataClonePolicyType string
+
+const (
+	HScaleDataClonePolicyNone         HScaleDataClonePolicyType = "None"
+	HScaleDataClonePolicyFromSnapshot HScaleDataClonePolicyType = "Snapshot"
+	HScaleDataClonePolicyFromBackup   HScaleDataClonePolicyType = "Backup"
 )
 
 // PodAntiAffinity define pod anti-affinity strategy.

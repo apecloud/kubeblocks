@@ -1,11 +1,11 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: mysql-restart
+  generateName: mysql-restart-
   namespace: default
 spec:
-  clusterRef: mysql-cluster-01
+  clusterRef: wesql
   type: Restart
   ttlSecondsAfterSucceed: 3600
-  componentOps:
-  - componentNames: [replicasets]
+  restart:
+  - componentName: replicasets

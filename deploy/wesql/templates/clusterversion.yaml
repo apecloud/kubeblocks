@@ -1,7 +1,7 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: AppVersion
+kind: ClusterVersion
 metadata:
-  name: wesql-{{ default .Chart.AppVersion .Values.appVersionOverride }}
+  name: wesql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
   labels:
     {{- include "wesqlapp.labels" . | nindent 4 }}
 spec:

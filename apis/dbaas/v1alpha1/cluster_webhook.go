@@ -139,7 +139,7 @@ func (r *Cluster) validate() error {
 		return nil
 	}
 
-	r.validateAppVersionRef(&allErrs)
+	r.validateClusterVersionRef(&allErrs)
 
 	err := webhookMgr.client.Get(ctx, types.NamespacedName{Name: r.Spec.ClusterDefRef}, clusterDef)
 
@@ -158,15 +158,15 @@ func (r *Cluster) validate() error {
 	return nil
 }
 
-// ValidateAppVersionRef validate spec.appVersionRef is legal
-func (r *Cluster) validateAppVersionRef(allErrs *field.ErrorList) {
-	appVersion := &AppVersion{}
+// ValidateClusterVersionRef validate spec.clusterVersionRef is legal
+func (r *Cluster) validateClusterVersionRef(allErrs *field.ErrorList) {
+	clusterVersion := &ClusterVersion{}
 	err := webhookMgr.client.Get(context.Background(), types.NamespacedName{
 		Namespace: r.Namespace,
-		Name:      r.Spec.AppVersionRef,
-	}, appVersion)
+		Name:      r.Spec.ClusterVersionRef,
+	}, clusterVersion)
 	if err != nil {
-		*allErrs = append(*allErrs, field.Invalid(field.NewPath("spec.appVersionRef"),
+		*allErrs = append(*allErrs, field.Invalid(field.NewPath("spec.clusterVersionRef"),
 			r.Spec.ClusterDefRef, err.Error()))
 	}
 }

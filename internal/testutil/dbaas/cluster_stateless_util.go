@@ -33,24 +33,24 @@ var (
 	StatelessComponentName = "nginx"
 )
 
-func CreateStatelessCluster(testCtx testutil.TestContext, clusterDefName, appVersionName, clusterName string) *dbaasv1alpha1.Cluster {
+func CreateStatelessCluster(testCtx testutil.TestContext, clusterDefName, clusterVersionName, clusterName string) *dbaasv1alpha1.Cluster {
 	clusterYaml := fmt.Sprintf(`apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   annotations:
   labels:
-    appversion.kubeblocks.io/name: %s
+    clusterversion.kubeblocks.io/name: %s
     clusterdefinition.kubeblocks.io/name: %s
   name: %s
   namespace: default
 spec:
-  appVersionRef: %s
+  clusterVersionRef: %s
   clusterDefinitionRef: %s
   components:
   - name: nginx
     type: nginx
     monitor: false
-  terminationPolicy: WipeOut`, appVersionName, clusterDefName, clusterName, appVersionName, clusterDefName)
+  terminationPolicy: WipeOut`, clusterVersionName, clusterDefName, clusterName, clusterVersionName, clusterDefName)
 	cluster := &dbaasv1alpha1.Cluster{}
 	gomega.Expect(yaml.Unmarshal([]byte(clusterYaml), cluster)).Should(gomega.Succeed())
 	gomega.Expect(testCtx.CreateObj(context.Background(), cluster)).Should(gomega.Succeed())

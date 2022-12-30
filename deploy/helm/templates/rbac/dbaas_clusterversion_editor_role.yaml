@@ -1,13 +1,15 @@
-# permissions for end users to edit appversions.
+# permissions for end users to edit clusterversions.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: appversion-editor-role
+  name: {{ include "kubeblocks.fullname" . }}-clusterversion-editor-role
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 rules:
 - apiGroups:
   - dbaas.kubeblocks.io
   resources:
-  - appversions
+  - clusterversions
   verbs:
   - create
   - delete
@@ -19,6 +21,6 @@ rules:
 - apiGroups:
   - dbaas.kubeblocks.io
   resources:
-  - appversions/status
+  - clusterversions/status
   verbs:
   - get

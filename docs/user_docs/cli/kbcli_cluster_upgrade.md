@@ -1,6 +1,6 @@
 ## kbcli cluster upgrade
 
-upgrade the cluster
+Upgrade the cluster
 
 ```
 kbcli cluster upgrade [flags]
@@ -9,7 +9,7 @@ kbcli cluster upgrade [flags]
 ### Options
 
 ```
-      --app-version string           Reference app version (required)
+      --cluster-version string           Reference app version (required)
   -h, --help                         help for upgrade
       --name string                  OpsRequest name. if not specified, it will be randomly generated 
       --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed

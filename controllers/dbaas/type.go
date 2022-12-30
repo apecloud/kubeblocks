@@ -54,10 +54,10 @@ type Component struct {
 	Name                    string                                 `json:"name,omitempty"`
 	Type                    string                                 `json:"type,omitempty"`
 	CharacterType           string                                 `json:"characterType,omitempty"`
-	MinReplicas             int32                                  `json:"minReplicas,omitempty"`
-	MaxReplicas             int32                                  `json:"maxReplicas,omitempty"`
-	DefaultReplicas         int32                                  `json:"defaultReplicas,omitempty"`
-	Replicas                int32                                  `json:"replicas,omitempty"`
+	MinReplicas             int32                                  `json:"minReplicas"`
+	MaxReplicas             int32                                  `json:"maxReplicas"`
+	DefaultReplicas         int32                                  `json:"defaultReplicas"`
+	Replicas                int32                                  `json:"replicas"`
 	PodDisruptionBudgetSpec *policyv1.PodDisruptionBudgetSpec      `json:"podDisruptionBudgetSpec,omitempty"`
 	AntiAffinity            bool                                   `json:"antiAffinity,omitempty"`
 	ComponentType           dbaasv1alpha1.ComponentType            `json:"componentType,omitempty"`

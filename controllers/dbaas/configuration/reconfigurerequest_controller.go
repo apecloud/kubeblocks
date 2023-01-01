@@ -309,6 +309,6 @@ func fromReconfigureStatus(status cfgpolicy.ExecStatus) dbaasv1alpha1.Phase {
 	case cfgpolicy.ESNone:
 		return dbaasv1alpha1.SucceedPhase
 	default:
-		return dbaasv1alpha1.RunningPhase
+		return dbaasv1alpha1.ReconfiguringPhase
 	}
 }

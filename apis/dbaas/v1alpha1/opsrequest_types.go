@@ -55,7 +55,7 @@ type OpsRequestStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// Phase describe OpsRequest phase.
-	// +kubebuilder:validation:Enum={Pending,Running,Failed,Succeed}
+	// +kubebuilder:validation:Enum={Pending,Reconfiguring,Running,Failed,Succeed}
 	Phase Phase `json:"phase,omitempty"`
 
 	// Components record the status information of components with spec.componentOps.componentNames.

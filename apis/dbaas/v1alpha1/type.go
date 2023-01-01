@@ -48,6 +48,7 @@ const (
 	AbnormalPhase          Phase = "Abnormal"
 	ConditionsErrorPhase   Phase = "ConditionsError"
 	HorizontalScalingPhase Phase = "HorizontalScaling"
+	ReconfiguringPhase     Phase = "Reconfiguring"
 )
 
 // Status define CR .Status.ClusterDefSyncStatus

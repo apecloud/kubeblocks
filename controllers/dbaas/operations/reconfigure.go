@@ -18,11 +18,13 @@ package operations
 
 import (
 	"fmt"
+	"time"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func init() {
@@ -39,9 +41,9 @@ func init() {
 			dbaasv1alpha1.AbnormalPhase,
 		},
 		ToClusterPhase:         dbaasv1alpha1.UpdatingPhase,
-		Action:                 reAction.Reconfigure,
+		Action:                 reAction.reconfigure,
 		ActionStartedCondition: dbaasv1alpha1.NewReconfigureCondition,
-		ReconcileAction:        ReconcileActionWithComponentOps,
+		ReconcileAction:        reAction.ReconcileAction,
 	}
 	cfgcore.RegisterConfigEventHandler("ops_status_reconfigure", &reAction)
 	opsManager.RegisterOps(dbaasv1alpha1.ReconfigureType, reconfigureBehaviour)
@@ -83,20 +85,34 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 
 	switch phase {
 	case dbaasv1alpha1.SucceedPhase:
-		return PatchOpsStatus(opsRes, phase, dbaasv1alpha1.NewSucceedCondition(opsRequest))
+		return PatchOpsStatus(opsRes, dbaasv1alpha1.RunningPhase, dbaasv1alpha1.NewSucceedCondition(opsRequest))
 	case dbaasv1alpha1.FailedPhase:
-		return PatchOpsStatus(opsRes, phase, dbaasv1alpha1.NewFailedCondition(opsRequest, err))
-	case dbaasv1alpha1.RunningPhase:
-		return PatchOpsStatus(opsRes, phase, dbaasv1alpha1.NewReconfigureRunningCondition(opsRequest, dbaasv1alpha1.ReasonReconfigureRunning))
+		return PatchOpsStatus(opsRes, dbaasv1alpha1.RunningPhase, dbaasv1alpha1.NewFailedCondition(opsRequest, err))
+	default:
+		return PatchOpsStatus(opsRes, dbaasv1alpha1.RunningPhase, dbaasv1alpha1.NewReconfigureRunningCondition(opsRequest, dbaasv1alpha1.ReasonReconfigureRunning))
 	}
-	return nil
+}
+
+func (r reconfigureAction) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error) {
+	status := opsRes.OpsRequest.Status
+	if len(status.Conditions) == 0 {
+		return status.Phase, 30 * time.Second, nil
+	}
+	condition := status.Conditions[len(status.Conditions)-1]
+	if condition.Type == dbaasv1alpha1.ConditionTypeSucceed && condition.Status == metav1.ConditionTrue {
+		return dbaasv1alpha1.SucceedPhase, 0, nil
+	}
+	if condition.Type == dbaasv1alpha1.ConditionTypeFailed && condition.Status == metav1.ConditionFalse {
+		return dbaasv1alpha1.FailedPhase, 0, nil
+	}
+	return dbaasv1alpha1.RunningPhase, 30 * time.Second, nil
 }
 
 func isReconfigureOpsRequest(request *dbaasv1alpha1.OpsRequest) bool {
 	return request.Spec.Type == dbaasv1alpha1.ReconfigureType
 }
 
-func (r *reconfigureAction) Reconfigure(resource *OpsResource) error {
+func (r *reconfigureAction) reconfigure(resource *OpsResource) error {
 	spec := &resource.OpsRequest.Spec
 	if len(spec.ComponentOpsList) != 1 {
 		return cfgcore.MakeError("require reconfigure only update one component. current component:%d", len(spec.ComponentOpsList))
@@ -164,10 +180,13 @@ func (r *reconfigureAction) performUpgrade(clusterName, componentName string,
 	for _, config := range reconfigure.Configurations {
 		tpl := findTpl(config.Name)
 		if tpl == nil {
-			return cfgcore.MakeError("failed to reconfigure, not exist config[%s], all configs: %v", config.Name, tpls)
+			return processMergedFailed(resource, true,
+				cfgcore.MakeError("failed to reconfigure, not exist config[%s], all configs: %v",
+					config.Name, tpls))
 		}
 		if len(tpl.ConfigConstraintRef) == 0 {
-			return cfgcore.MakeError("current tpl not support reconfigure, tpl: %v", tpl)
+			return processMergedFailed(resource, true,
+				cfgcore.MakeError("current tpl not support reconfigure, tpl: %v", tpl))
 		}
 		if failed, err := updateCfgParams(config, *tpl, client.ObjectKey{
 			Name:      cfgcore.GetComponentCMName(clusterName, componentName, *tpl),

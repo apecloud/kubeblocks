@@ -21,6 +21,11 @@ spec:
       }
       [SectionName=_]: #PARAM
 
+  dynamicParameters:
+    - binlog_stmt_cache_size
+    - x
+    - y
+
   # mysql configuration file format
   formatterConfig:
     formatter: ini

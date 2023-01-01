@@ -19,10 +19,12 @@ package operations
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -32,8 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -96,6 +100,63 @@ allowVolumeExpansion: true
 		Expect(yaml.Unmarshal([]byte(scYAML), sc)).Should(Succeed())
 		Expect(testCtx.CreateObj(ctx, sc)).Should(Succeed())
 		return sc
+	}
+
+	assureCfgTplObj := func(tplName, cmName, ns string) (*corev1.ConfigMap, *dbaasv1alpha1.ConfigurationTemplate) {
+		By("Assuring an cm obj")
+		configmapYAML, err := os.ReadFile("./testdata/configcm.yaml")
+		Expect(err).Should(BeNil())
+		Expect(configmapYAML).ShouldNot(BeNil())
+		configTemplateYaml, err := os.ReadFile("./testdata/configtpl.yaml")
+		Expect(err).Should(BeNil())
+		Expect(configTemplateYaml).ShouldNot(BeNil())
+
+		cfgCM := &corev1.ConfigMap{}
+		cfgCM.SetNamespace(ns)
+		cfgCM.SetName(cmName)
+		cfgTpl := &dbaasv1alpha1.ConfigurationTemplate{}
+		cfgTpl.SetNamespace(ns)
+		cfgTpl.SetName(tplName)
+		Expect(yaml.Unmarshal(configmapYAML, cfgCM)).Should(Succeed())
+		Expect(yaml.Unmarshal(configTemplateYaml, cfgTpl)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, cfgTpl)).Should(Succeed())
+
+		return cfgCM, cfgTpl
+	}
+
+	generateConfigInstanceObj := func(cmName, ns string) *corev1.ConfigMap {
+		configmapYAML, err := os.ReadFile("./testdata/configcm.yaml")
+		Expect(err).Should(BeNil())
+		Expect(configmapYAML).ShouldNot(BeNil())
+
+		cfgCM := &corev1.ConfigMap{}
+		Expect(yaml.Unmarshal(configmapYAML, cfgCM)).Should(Succeed())
+		cfgCM.SetName(cmName)
+		cfgCM.SetNamespace(ns)
+		return cfgCM
+	}
+
+	assureConfigInstanceObj := func(clusterName, componentName, ns string, cdComponent dbaasv1alpha1.ClusterDefinitionComponent) *corev1.ConfigMap {
+		if cdComponent.ConfigSpec == nil {
+			return nil
+		}
+		var cmObj *corev1.ConfigMap
+		for _, tpl := range cdComponent.ConfigSpec.ConfigTemplateRefs {
+			cmInsName := cfgcore.GetComponentCMName(clusterName, componentName, tpl)
+			cfgCM := generateConfigInstanceObj(cmInsName, ns)
+			cfgCM.Labels = map[string]string{
+				intctrlutil.AppNameLabelKey:                    clusterName,
+				intctrlutil.AppInstanceLabelKey:                clusterName,
+				intctrlutil.AppComponentLabelKey:               componentName,
+				cfgcore.CMConfigurationTplNameLabelKey:         tpl.ConfigTplRef,
+				cfgcore.CMConfigurationConstraintsNameLabelKey: tpl.ConfigConstraintRef,
+				cfgcore.CMConfigurationISVTplLabelKey:          tpl.Name,
+			}
+			Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
+			cmObj = cfgCM
+		}
+		return cmObj
 	}
 
 	assureClusterDefObj := func() *dbaasv1alpha1.ClusterDefinition {
@@ -179,6 +240,18 @@ spec:
 `, clusterDefinitionName)
 		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
+		tplObj, cmObj := assureCfgTplObj("mysql-tpl-test", "mysql-cm-test", testCtx.DefaultNamespace)
+		clusterDefinition.Spec.Components[0].ConfigSpec = &dbaasv1alpha1.ConfigurationSpec{
+			ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{
+				{
+					Name:                "mysql-test",
+					ConfigTplRef:        cmObj.Name,
+					ConfigConstraintRef: tplObj.Name,
+					VolumeName:          "mysql-config",
+					Namespace:           testCtx.DefaultNamespace,
+				},
+			},
+		}
 		Expect(testCtx.CreateObj(ctx, clusterDefinition)).Should(Succeed())
 		return clusterDefinition
 	}
@@ -249,7 +322,7 @@ spec:
 	newClusterObj := func(
 		clusterDefObj *dbaasv1alpha1.ClusterDefinition,
 		appVersionObj *dbaasv1alpha1.AppVersion,
-	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.AppVersion, types.NamespacedName) {
+	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.AppVersion, types.NamespacedName, *corev1.ConfigMap) {
 		// setup Cluster obj required default ClusterDefinition and AppVersion objects if not provided
 		if clusterDefObj == nil {
 			clusterDefObj = assureClusterDefObj()
@@ -262,6 +335,7 @@ spec:
 			Namespace: "default",
 		}
 		storageClassName := "csi-hostpath-sc-" + randomStr
+		cfgObj := assureConfigInstanceObj(clusterName, "replicasets", testCtx.DefaultNamespace, clusterDefObj.Spec.Components[0])
 
 		return &dbaasv1alpha1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
@@ -293,7 +367,7 @@ spec:
 					},
 				},
 			},
-		}, clusterDefObj, appVersionObj, key
+		}, clusterDefObj, appVersionObj, key, cfgObj
 	}
 
 	deleteClusterWait := func(key types.NamespacedName) error {
@@ -802,12 +876,74 @@ spec:
 		testWarningEventOnPVC(clusterObject, opsRes)
 	}
 
+	testReconfigure := func(clusterObject *dbaasv1alpha1.Cluster,
+		opsRes *OpsResource,
+		clusterDefObj *dbaasv1alpha1.ClusterDefinition,
+		cfgObj *corev1.ConfigMap) {
+		// mock cluster is Running to support reconfigure ops
+		patch := client.MergeFrom(clusterObject.DeepCopy())
+		clusterObject.Status.Phase = dbaasv1alpha1.RunningPhase
+		Expect(k8sClient.Status().Patch(ctx, clusterObject, patch)).Should(Succeed())
+
+		eventContext := cfgcore.ConfigEventContext{
+			Cfg:       cfgObj,
+			Component: &clusterDefObj.Spec.Components[0],
+			Client:    k8sClient,
+			ReqCtx: intctrlutil.RequestCtx{
+				Ctx:      opsRes.Ctx,
+				Log:      log.FromContext(opsRes.Ctx),
+				Recorder: opsRes.Recorder,
+			},
+			Cluster: clusterObject,
+		}
+
+		By("mock reconfigure success")
+		ops := generateOpsRequestObj("reconfigure-ops-"+randomStr, clusterObject.Name, dbaasv1alpha1.ReconfigureType)
+		ops.Spec.ComponentOpsList = []dbaasv1alpha1.ComponentOps{{
+			ComponentNames: []string{"replicasets"},
+			Reconfigure: &dbaasv1alpha1.UpgradeConfiguration{
+				Configurations: []dbaasv1alpha1.Configuration{{
+					Name: "mysql-test",
+					Keys: []dbaasv1alpha1.ParameterConfig{{
+						Key: "my.cnf",
+						Parameters: []dbaasv1alpha1.ParameterPair{
+							{
+								Key:   "binlog_stmt_cache_size",
+								Value: "4096",
+							},
+							{
+								Key:   "x",
+								Value: "abcd",
+							},
+						},
+					}},
+				}},
+			},
+		}}
+		opsRes.OpsRequest = ops
+		Expect(testCtx.CheckedCreateObj(ctx, ops)).Should(Succeed())
+
+		reAction := reconfigureAction{}
+		Expect(reAction.reconfigure(opsRes)).Should(Succeed())
+		Expect(reAction.Handle(eventContext, ops.Name, dbaasv1alpha1.ReconfiguringPhase, nil)).Should(Succeed())
+		Expect(opsRes.Client.Get(opsRes.Ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+		_, _ = GetOpsManager().Reconcile(opsRes)
+		Expect(opsRes.OpsRequest.Status.Phase).Should(BeEquivalentTo(dbaasv1alpha1.RunningPhase))
+		Expect(reAction.Handle(eventContext, ops.Name, dbaasv1alpha1.SucceedPhase, nil)).Should(Succeed())
+		Expect(opsRes.Client.Get(opsRes.Ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+		_, _ = GetOpsManager().Reconcile(opsRes)
+		Expect(opsRes.OpsRequest.Status.Phase).Should(BeEquivalentTo(dbaasv1alpha1.SucceedPhase))
+
+		// TODO add failed ut
+		By("mock reconfigure failed")
+	}
+
 	Context("Test OpsRequest", func() {
 		It("Should Test all OpsRequest", func() {
 			// init storageClass
 			_ = assureDefaultStorageClassObj()
 
-			clusterObject, _, _, key := newClusterObj(nil, nil)
+			clusterObject, clusterDefObj, _, key, cfgObj := newClusterObj(nil, nil)
 			Expect(testCtx.CreateObj(ctx, clusterObject)).Should(Succeed())
 
 			By("Test Upgrade Ops")
@@ -878,6 +1014,9 @@ spec:
 			}
 			opsRes.OpsRequest = ops
 			_ = HorizontalScalingAction(opsRes)
+
+			By("Test Reconfigure")
+			testReconfigure(clusterObject, opsRes, clusterDefObj, cfgObj)
 
 			By("Test OpsManager.Do function with ComponentOps")
 			_ = GetOpsManager().Do(opsRes)

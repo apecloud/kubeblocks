@@ -251,6 +251,9 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params cfgpolicy.Reconfigu
 	}
 
 	execStatus, err := policy.Upgrade(params)
+	if err := r.handleConfigEvent(params, execStatus, err); err != nil {
+		return intctrlutil.RequeueWithErrorAndRecordEvent(params.Cfg, r.Recorder, err, params.Ctx.Log)
+	}
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(params.Cfg, r.Recorder, err, params.Ctx.Log)
 	}
@@ -267,5 +270,45 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params cfgpolicy.Reconfigu
 		return intctrlutil.Reconciled()
 	default:
 		return intctrlutil.Reconciled()
+	}
+}
+
+func (r *ReconfigureRequestReconciler) handleConfigEvent(params cfgpolicy.ReconfigureParams, status cfgpolicy.ExecStatus, err error) error {
+	var (
+		cm             = params.Cfg
+		lastOpsRequest = ""
+	)
+
+	if len(cm.Annotations) != 0 {
+		lastOpsRequest = cm.Annotations[cfgcore.LastAppliedOpsCRAnnotation]
+	}
+
+	eventContext := cfgcore.ConfigEventContext{
+		Client:         params.Client,
+		ReqCtx:         params.Ctx,
+		Cluster:        params.Cluster,
+		Component:      params.Component,
+		Meta:           params.Meta,
+		Tpl:            params.Tpl,
+		Cfg:            params.Cfg,
+		ComponentUnits: params.ComponentUnits,
+	}
+
+	for _, handler := range cfgcore.GetConfigEventHandlers() {
+		if err := handler.Handle(eventContext, lastOpsRequest, fromReconfigureStatus(status), err); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func fromReconfigureStatus(status cfgpolicy.ExecStatus) dbaasv1alpha1.Phase {
+	switch status {
+	case cfgpolicy.ESFailed:
+		return dbaasv1alpha1.FailedPhase
+	case cfgpolicy.ESNone:
+		return dbaasv1alpha1.SucceedPhase
+	default:
+		return dbaasv1alpha1.RunningPhase
 	}
 }

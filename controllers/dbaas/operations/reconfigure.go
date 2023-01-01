@@ -17,6 +17,8 @@ limitations under the License.
 package operations
 
 import (
+	"fmt"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -41,10 +43,57 @@ func init() {
 		ActionStartedCondition: dbaasv1alpha1.NewReconfigureCondition,
 		ReconcileAction:        ReconcileActionWithComponentOps,
 	}
+	cfgcore.RegisterConfigEventHandler("ops_status_reconfigure", &reAction)
 	opsManager.RegisterOps(dbaasv1alpha1.ReconfigureType, reconfigureBehaviour)
 }
 
 type reconfigureAction struct {
+}
+
+func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, lastOpsRequest string, phase dbaasv1alpha1.Phase, err error) error {
+	var (
+		opsRequest = &dbaasv1alpha1.OpsRequest{}
+		cm         = eventContext.Cfg
+		cli        = eventContext.Client
+		ctx        = eventContext.ReqCtx.Ctx
+		log        = eventContext.ReqCtx.Log
+	)
+
+	opsRes := &OpsResource{
+		Ctx:        ctx,
+		OpsRequest: opsRequest,
+		Recorder:   eventContext.ReqCtx.Recorder,
+		Client:     cli,
+		Cluster:    eventContext.Cluster,
+	}
+
+	if len(lastOpsRequest) == 0 {
+		return nil
+	}
+	if err := cli.Get(ctx, client.ObjectKey{
+		Name:      lastOpsRequest,
+		Namespace: cm.Namespace,
+	}, opsRequest); err != nil {
+		return err
+	}
+	if !isReconfigureOpsRequest(opsRequest) {
+		log.Info(fmt.Sprintf("ops request not reconfigure ops, and pass, cr: %v", client.ObjectKeyFromObject(opsRequest)))
+		return nil
+	}
+
+	switch phase {
+	case dbaasv1alpha1.SucceedPhase:
+		return PatchOpsStatus(opsRes, phase, dbaasv1alpha1.NewSucceedCondition(opsRequest))
+	case dbaasv1alpha1.FailedPhase:
+		return PatchOpsStatus(opsRes, phase, dbaasv1alpha1.NewFailedCondition(opsRequest, err))
+	case dbaasv1alpha1.RunningPhase:
+		return PatchOpsStatus(opsRes, phase, dbaasv1alpha1.NewReconfigureRunningCondition(opsRequest, dbaasv1alpha1.ReasonReconfigureRunning))
+	}
+	return nil
+}
+
+func isReconfigureOpsRequest(request *dbaasv1alpha1.OpsRequest) bool {
+	return request.Spec.Type == dbaasv1alpha1.ReconfigureType
 }
 
 func (r *reconfigureAction) Reconfigure(resource *OpsResource) error {
@@ -58,7 +107,7 @@ func (r *reconfigureAction) Reconfigure(resource *OpsResource) error {
 		return cfgcore.MakeError("require reconfigure only update one component, components: %s", component.ComponentNames)
 	}
 
-	if component.Reconfigure != nil {
+	if component.Reconfigure == nil {
 		return cfgcore.MakeError("invalid reconfigure params.")
 	}
 
@@ -120,12 +169,30 @@ func (r *reconfigureAction) performUpgrade(clusterName, componentName string,
 		if len(tpl.ConfigConstraintRef) == 0 {
 			return cfgcore.MakeError("current tpl not support reconfigure, tpl: %v", tpl)
 		}
-		if err := updateCfgParams(config, *tpl, client.ObjectKey{
+		if failed, err := updateCfgParams(config, *tpl, client.ObjectKey{
 			Name:      cfgcore.GetComponentCMName(clusterName, componentName, *tpl),
 			Namespace: resource.Cluster.Namespace,
-		}, resource.Ctx, resource.Client); err != nil {
-			return cfgcore.WrapError(err, "failed to update param!")
+		}, resource.Ctx, resource.Client, resource.OpsRequest.Name); err != nil {
+			return processMergedFailed(resource, failed, err)
 		}
+		// merged successfully
+		if err := PatchOpsStatus(resource, dbaasv1alpha1.RunningPhase,
+			dbaasv1alpha1.NewReconfigureRunningCondition(resource.OpsRequest, dbaasv1alpha1.ReasonReconfigureMerged)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func processMergedFailed(resource *OpsResource, isInvalid bool, err error) error {
+	if !isInvalid {
+		return cfgcore.WrapError(err, "failed to update param!")
+	}
+
+	// if failed to validate configure
+	if err := PatchOpsStatus(resource, dbaasv1alpha1.FailedPhase,
+		dbaasv1alpha1.NewFailedCondition(resource.OpsRequest, err)); err != nil {
+		return err
 	}
 	return nil
 }

@@ -48,6 +48,11 @@ const (
 	ReasonComponentFailed            = "ComponentFailed"
 	ReasonSuccessful                 = "Successful"
 	ReasonOpsRequestFailed           = "OpsRequestFailed"
+
+	ReasonReconfigureMerged  = "ReconfigureMerged"
+	ReasonReconfigureFailed  = "ReconfigureFailed"
+	ReasonReconfigureSuccess = "ReconfigureSuccess"
+	ReasonReconfigureRunning = "ReconfigureRunning"
 )
 
 func (r *OpsRequest) SetStatusCondition(condition metav1.Condition) {
@@ -178,5 +183,16 @@ func NewReconfigureCondition(ops *OpsRequest) *metav1.Condition {
 		Reason:             "ReconfigureStarted",
 		LastTransitionTime: metav1.NewTime(time.Now()),
 		Message:            fmt.Sprintf("start reconfigure in Cluster: %s", ops.Spec.ClusterRef),
+	}
+}
+
+// NewReconfigureRunningCondition new a condition that the OpsRequest reconfigure workflow
+func NewReconfigureRunningCondition(ops *OpsRequest, reason string) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeReconfigure,
+		Status:             metav1.ConditionTrue,
+		Reason:             reason,
+		LastTransitionTime: metav1.NewTime(time.Now()),
+		Message:            fmt.Sprintf("reconfigure is running: %s", ops.Spec.ClusterRef),
 	}
 }

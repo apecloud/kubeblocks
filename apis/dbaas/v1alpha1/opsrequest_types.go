@@ -30,7 +30,7 @@ type OpsRequestSpec struct {
 
 	// Type defines the operation type.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart}
+	// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfigure}
 	Type OpsType `json:"type"`
 
 	// TTLSecondsAfterSucceed OpsRequest will be deleted after TTLSecondsAfterSucceed second when OpsRequest.status.phase is Succeed.

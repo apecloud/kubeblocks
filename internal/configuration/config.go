@@ -18,12 +18,19 @@ package configuration
 
 import (
 	"bytes"
+
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/spf13/viper"
+	appv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type ConfigLoaderProvider func(option CfgOption) (*cfgWrapper, error)
@@ -33,8 +40,27 @@ const (
 	emptyJSON       = "{}"
 )
 
+type ConfigEventContext struct {
+	Client  client.Client
+	ReqCtx  intctrlutil.RequestCtx
+	Cluster *dbaasv1alpha1.Cluster
+
+	ClusterComponent *dbaasv1alpha1.ClusterComponent
+	Component        *dbaasv1alpha1.ClusterDefinitionComponent
+	ComponentUnits   []appv1.StatefulSet
+
+	Meta *ConfigDiffInformation
+	Cfg  *corev1.ConfigMap
+	Tpl  *dbaasv1alpha1.ConfigurationTemplateSpec
+}
+
+type ConfigEventHandler interface {
+	Handle(eventContext ConfigEventContext, lastOpsRequest string, phase dbaasv1alpha1.Phase, err error) error
+}
+
 var (
-	loaderProvider = map[ConfigType]ConfigLoaderProvider{}
+	loaderProvider        = map[ConfigType]ConfigLoaderProvider{}
+	configEventHandlerMap = make(map[string]ConfigEventHandler)
 )
 
 func init() {
@@ -343,4 +369,12 @@ func CreateMergePatch(oldcfg, target interface{}, option CfgOption) (*ConfigDiff
 	}
 
 	return old.Diff(new.cfgWrapper)
+}
+
+func RegisterConfigEventHandler(name string, handler ConfigEventHandler) {
+	configEventHandlerMap[name] = handler
+}
+
+func GetConfigEventHandlers() map[string]ConfigEventHandler {
+	return configEventHandlerMap
 }

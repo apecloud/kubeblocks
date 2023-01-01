@@ -84,7 +84,8 @@ func updateCfgParams(
 	tpl dbaasv1alpha1.ConfigTemplate,
 	cmKey client.ObjectKey,
 	ctx context.Context,
-	cli client.Client) error {
+	cli client.Client,
+	opsCrName string) (bool, error) {
 	var (
 		cm     = &corev1.ConfigMap{}
 		cfgTpl = &dbaasv1alpha1.ConfigurationTemplate{}
@@ -94,13 +95,13 @@ func updateCfgParams(
 	)
 
 	if err := cli.Get(ctx, cmKey, cm); err != nil {
-		return err
+		return false, err
 	}
 	if err := cli.Get(ctx, client.ObjectKey{
 		Namespace: tpl.Namespace,
 		Name:      tpl.ConfigConstraintRef,
 	}, cfgTpl); err != nil {
-		return err
+		return false, err
 	}
 	if operator, err = cfgcore.NewConfigLoader(cfgcore.CfgOption{
 		Type:    cfgcore.CfgCmType,
@@ -113,7 +114,7 @@ func updateCfgParams(
 			},
 		},
 	}); err != nil {
-		return err
+		return false, err
 	}
 
 	// process special formatter options
@@ -131,26 +132,30 @@ func updateCfgParams(
 	for _, key := range config.Keys {
 		if err := operator.MergeFrom(fromKeyValuePair(key.Parameters),
 			cfgcore.NewCfgOptions(key.Key, options)); err != nil {
-			return err
+			return false, err
 		}
 	}
 
 	newCfg, err := operator.ToCfgContent()
 	if err != nil {
-		return cfgcore.WrapError(err, "failed to generate config file")
+		return false, cfgcore.WrapError(err, "failed to generate config file")
 	}
 
 	configChecker := cfgcore.NewConfigValidator(&cfgTpl.Spec)
 	if err := configChecker.Validate(newCfg); err != nil {
-		return cfgcore.WrapError(err, "failed to validate updated config")
+		return true, cfgcore.WrapError(err, "failed to validate updated config")
 	}
 
-	return persistCfgCM(cm, newCfg, cli, ctx)
+	return false, persistCfgCM(cm, newCfg, cli, ctx, opsCrName)
 }
 
-func persistCfgCM(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client.Client, ctx context.Context) error {
+func persistCfgCM(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client.Client, ctx context.Context, opsCrName string) error {
 	patch := client.MergeFrom(cmObj.DeepCopy())
 	cmObj.Data = newCfg
+	if cmObj.Annotations == nil {
+		cmObj.Annotations = make(map[string]string)
+	}
+	cmObj.Annotations[cfgcore.LastAppliedOpsCRAnnotation] = opsCrName
 	return cli.Patch(ctx, cmObj, patch)
 }
 

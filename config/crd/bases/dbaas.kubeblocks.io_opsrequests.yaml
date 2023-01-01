@@ -204,6 +204,7 @@ spec:
                 - VolumeExpansion
                 - HorizontalScaling
                 - Restart
+                - Reconfigure
                 type: string
             required:
             - clusterRef

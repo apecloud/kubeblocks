@@ -23,6 +23,7 @@ const (
 	ConfigurationTplLabelPrefixKey         = "configuration.kubeblocks.io/cfg-tpl"
 	ConfigurationConstraintsLabelPrefixKey = "configuration.kubeblocks.io/cfg-constraints"
 
+	LastAppliedOpsCRAnnotation                  = "configuration.kubeblocks.io/last-applied-ops-name"
 	LastAppliedConfigAnnotation                 = "configuration.kubeblocks.io/last-applied-configuration"
 	DisableUpgradeInsConfigurationAnnotationKey = "configuration.kubeblocks.io/disable-reconfigure"
 	UpgradePolicyAnnotationKey                  = "configuration.kubeblocks.io/reconfigure-policy"

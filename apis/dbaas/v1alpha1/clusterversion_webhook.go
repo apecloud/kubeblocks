@@ -32,55 +32,55 @@ import (
 )
 
 // log is for logging in this package.
-var appversionlog = logf.Log.WithName("appversion-resource")
+var clusterversionlog = logf.Log.WithName("clusterversion-resource")
 
-func (r *AppVersion) SetupWebhookWithManager(mgr ctrl.Manager) error {
+func (r *ClusterVersion) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/mutate-dbaas-kubeblocks-io-v1alpha1-appversion,mutating=true,failurePolicy=fail,sideEffects=None,groups=dbaas.kubeblocks.io,resources=appversions,verbs=create;update,versions=v1alpha1,name=mappversion.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/mutate-dbaas-kubeblocks-io-v1alpha1-clusterversion,mutating=true,failurePolicy=fail,sideEffects=None,groups=dbaas.kubeblocks.io,resources=clusterversions,verbs=create;update,versions=v1alpha1,name=mclusterversion.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Defaulter = &AppVersion{}
+var _ webhook.Defaulter = &ClusterVersion{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
-func (r *AppVersion) Default() {
-	appversionlog.Info("default", "name", r.Name)
+func (r *ClusterVersion) Default() {
+	clusterversionlog.Info("default", "name", r.Name)
 
 	// TODO(user): fill in your defaulting logic.
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-dbaas-kubeblocks-io-v1alpha1-appversion,mutating=false,failurePolicy=fail,sideEffects=None,groups=dbaas.kubeblocks.io,resources=appversions,verbs=create;update,versions=v1alpha1,name=vappversion.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-dbaas-kubeblocks-io-v1alpha1-clusterversion,mutating=false,failurePolicy=fail,sideEffects=None,groups=dbaas.kubeblocks.io,resources=clusterversions,verbs=create;update,versions=v1alpha1,name=vclusterversion.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Validator = &AppVersion{}
+var _ webhook.Validator = &ClusterVersion{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *AppVersion) ValidateCreate() error {
-	appversionlog.Info("validate create", "name", r.Name)
+func (r *ClusterVersion) ValidateCreate() error {
+	clusterversionlog.Info("validate create", "name", r.Name)
 	return r.validate()
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *AppVersion) ValidateUpdate(old runtime.Object) error {
-	appversionlog.Info("validate update", "name", r.Name)
+func (r *ClusterVersion) ValidateUpdate(old runtime.Object) error {
+	clusterversionlog.Info("validate update", "name", r.Name)
 	// determine whether r.spec content is modified
-	lastAppVersion := old.(*AppVersion)
-	if !reflect.DeepEqual(lastAppVersion.Spec, r.Spec) {
-		return newInvalidError(AppVersionKind, r.Name, "", "AppVersion.spec is immutable, you can not update it.")
+	lastClusterVersion := old.(*ClusterVersion)
+	if !reflect.DeepEqual(lastClusterVersion.Spec, r.Spec) {
+		return newInvalidError(ClusterVersionKind, r.Name, "", "ClusterVersion.spec is immutable, you can not update it.")
 	}
 	return nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *AppVersion) ValidateDelete() error {
-	appversionlog.Info("validate delete", "name", r.Name)
+func (r *ClusterVersion) ValidateDelete() error {
+	clusterversionlog.Info("validate delete", "name", r.Name)
 	return nil
 }
 
-// Validate AppVersion.spec is legal
-func (r *AppVersion) validate() error {
+// Validate ClusterVersion.spec is legal
+func (r *ClusterVersion) validate() error {
 	var (
 		allErrs    field.ErrorList
 		ctx        = context.Background()
@@ -107,20 +107,20 @@ func (r *AppVersion) validate() error {
 
 		if len(noContainersComponents) > 0 {
 			allErrs = append(allErrs, field.NotFound(field.NewPath("spec.components[*].type"),
-				fmt.Sprintf("spec.components[*].type %v missing spec.components[*].containers in ClusterDefinition.spec.components[*] and AppVersion.spec.components[*]", noContainersComponents)))
+				fmt.Sprintf("containers are not defined in ClusterDefinition.spec.components[*]: %v", noContainersComponents)))
 		}
 	}
 
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
-			schema.GroupKind{Group: APIVersion, Kind: AppVersionKind},
+			schema.GroupKind{Group: APIVersion, Kind: ClusterVersionKind},
 			r.Name, allErrs)
 	}
 	return nil
 }
 
-// GetInconsistentComponentsInfo get appVersion invalid component type and no containers component compared with clusterDefinitionDef
-func (r *AppVersion) GetInconsistentComponentsInfo(clusterDef *ClusterDefinition) ([]string, []string) {
+// GetInconsistentComponentsInfo get clusterVersion invalid component type and no containers component compared with clusterDefinitionDef
+func (r *ClusterVersion) GetInconsistentComponentsInfo(clusterDef *ClusterDefinition) ([]string, []string) {
 
 	var (
 		// clusterDefinition components to map. the value of map represents whether there is a default containers
@@ -144,7 +144,7 @@ func (r *AppVersion) GetInconsistentComponentsInfo(clusterDef *ClusterDefinition
 			componentMap[v.Type] = true
 		}
 	}
-	// get no containers components in clusterDefinition and appVersion
+	// get no containers components in clusterDefinition and clusterVersion
 	for k, v := range componentMap {
 		if !v {
 			noContainersComponent = append(noContainersComponent, k)

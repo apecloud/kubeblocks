@@ -60,7 +60,7 @@ type FakeTest struct {
 }
 
 type ISVResource interface {
-	corev1.ConfigMap | appsv1.StatefulSet | dbaasv1alpha1.ClusterDefinition | dbaasv1alpha1.AppVersion | dbaasv1alpha1.ConfigurationTemplate
+	corev1.ConfigMap | appsv1.StatefulSet | dbaasv1alpha1.ClusterDefinition | dbaasv1alpha1.ClusterVersion | dbaasv1alpha1.ConfigurationTemplate
 }
 
 type K8sResource interface {
@@ -80,7 +80,7 @@ type TestWrapper struct {
 
 	// cr object
 	cd  *dbaasv1alpha1.ClusterDefinition
-	av  *dbaasv1alpha1.AppVersion
+	av  *dbaasv1alpha1.ClusterVersion
 	tpl *dbaasv1alpha1.ConfigurationTemplate
 	cm  *corev1.ConfigMap
 }
@@ -109,7 +109,7 @@ func (w *TestWrapper) CreateCluster(name string) *dbaasv1alpha1.Cluster {
 		},
 		Spec: dbaasv1alpha1.ClusterSpec{
 			ClusterDefRef:     w.testEnv.CdName,
-			AppVersionRef:     w.testEnv.AvName,
+			ClusterVersionRef: w.testEnv.AvName,
 			TerminationPolicy: dbaasv1alpha1.Delete,
 		},
 	}
@@ -124,7 +124,7 @@ func (w *TestWrapper) createCrObject(obj client.Object) {
 	}
 }
 
-func (w *TestWrapper) updateAvComTplMeta(appVer *dbaasv1alpha1.AppVersion) {
+func (w *TestWrapper) updateAvComTplMeta(appVer *dbaasv1alpha1.ClusterVersion) {
 	appVer.Spec.ClusterDefinitionRef = w.testEnv.CdName
 	for _, component := range appVer.Spec.Components {
 		if len(component.ConfigTemplateRefs) == 0 {
@@ -177,7 +177,7 @@ func (w *TestWrapper) DeleteAllCR() error {
 
 	// step2: delete appversion cr
 	if err := k8sClient.DeleteAllOf(ctx,
-		&dbaasv1alpha1.AppVersion{},
+		&dbaasv1alpha1.ClusterVersion{},
 		client.HasLabels{testCtx.TestObjLabelKey}); err != nil {
 		return err
 	}
@@ -402,7 +402,7 @@ func CreateDBaasFromISV(testCtx testutil.TestContext, ctx context.Context, k8sCl
 	// createCfgTplFromISV(&testWrapper, testInfo.CfgTplName, testInfo.CfgTemplateYaml)
 
 	createCRFromISVWithT(testWrapper, testInfo.CdName, path.Join(dataPath, testInfo.CdYaml), &dbaasv1alpha1.ClusterDefinition{})
-	createCRFromISVWithT(testWrapper, testInfo.AvName, path.Join(dataPath, testInfo.AvYaml), &dbaasv1alpha1.AppVersion{})
+	createCRFromISVWithT(testWrapper, testInfo.AvName, path.Join(dataPath, testInfo.AvYaml), &dbaasv1alpha1.ClusterVersion{})
 	createCRFromISVWithT(testWrapper, testWrapper.CMName(), path.Join(dataPath, testInfo.CfgCMYaml), &corev1.ConfigMap{})
 	createCRFromISVWithT(testWrapper, testWrapper.TPLName(), path.Join(dataPath, testInfo.CfgTemplateYaml), &dbaasv1alpha1.ConfigurationTemplate{})
 
@@ -420,9 +420,9 @@ func createCRFromISVWithT(t *TestWrapper, tplName string, fileName string, crTyp
 	)
 
 	switch obj := crType.(type) {
-	case *dbaasv1alpha1.AppVersion:
+	case *dbaasv1alpha1.ClusterVersion:
 		crObj, err = createISVCrFromFile(fileName, obj, t.updateAvComTplMeta)
-		t.av = crObj.(*dbaasv1alpha1.AppVersion)
+		t.av = crObj.(*dbaasv1alpha1.ClusterVersion)
 	case *dbaasv1alpha1.ClusterDefinition:
 		crObj, err = createISVCrFromFile(fileName, obj, t.updateComTplMeta)
 		t.cd = crObj.(*dbaasv1alpha1.ClusterDefinition)
@@ -483,7 +483,7 @@ func ValidateISVCR[T any, OBJECT K8sResource](test *TestWrapper, obj client.Obje
 	)
 
 	switch obj.(type) {
-	case *dbaasv1alpha1.AppVersion:
+	case *dbaasv1alpha1.ClusterVersion:
 		objKey = client.ObjectKey{
 			Namespace: ISVClusterScope,
 			Name:      test.testEnv.AvName,

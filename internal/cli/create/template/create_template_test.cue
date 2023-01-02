@@ -1,9 +1,9 @@
 // required, options for command line input for args and flags.
 options: {
-	name:          string
-	namespace:     string
-	clusterDefRef: string
-	appVersionRef: string
+	name:              string
+	namespace:         string
+	clusterDefRef:     string
+	clusterVersionRef: string
 	components: [...]
 	terminationPolicy: string
 }
@@ -18,7 +18,7 @@ content: {
 	}
 	spec: {
 		clusterDefinitionRef: options.clusterDefRef
-		appVersionRef:        options.appVersionRef
+		clusterVersionRef:    options.clusterVersionRef
 		components:           options.components
 		terminationPolicy:    options.terminationPolicy
 	}

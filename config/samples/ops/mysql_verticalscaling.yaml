@@ -1,18 +1,17 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: mysql-verticalscaling
+  generateName: mysql-verticalscaling-
   namespace: default
 spec:
-  clusterRef: mysql-cluster-01
+  clusterRef: wesql
   type: VerticalScaling
-  ttlSecondsAfterSucceed: 60
-  componentOps:
-  - componentNames: [replicasets]
-    verticalScaling:
-      requests:
-        memory: "340Mi"
+  ttlSecondsAfterSucceed: 600
+  verticalScaling:
+  - componentName: replicasets
+    requests:
+        memory: "390Mi"
         cpu: "280m"
-      limits:
-        memory: "500Mi"
+    limits:
+        memory: "470Mi"
         cpu: "300m"

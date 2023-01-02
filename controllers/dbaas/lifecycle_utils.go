@@ -52,7 +52,7 @@ import (
 
 type createParams struct {
 	clusterDefinition *dbaasv1alpha1.ClusterDefinition
-	appVersion        *dbaasv1alpha1.AppVersion
+	clusterVersion    *dbaasv1alpha1.ClusterVersion
 	cluster           *dbaasv1alpha1.Cluster
 	component         *Component
 	applyObjs         *[]client.Object
@@ -82,32 +82,32 @@ func getCacheCUETplValue(key string, valueCreator func() (*intctrlutil.CUETpl, e
 	return v, err
 }
 
-// mergeConfigTemplates merge AppVersion.Components[*].ConfigTemplateRefs and ClusterDefinition.Components[*].ConfigTemplateRefs
-func mergeConfigTemplates(appVersionTpl []dbaasv1alpha1.ConfigTemplate,
+// mergeConfigTemplates merge ClusterVersion.Components[*].ConfigTemplateRefs and ClusterDefinition.Components[*].ConfigTemplateRefs
+func mergeConfigTemplates(clusterVersionTpl []dbaasv1alpha1.ConfigTemplate,
 	cdTpl []dbaasv1alpha1.ConfigTemplate) []dbaasv1alpha1.ConfigTemplate {
-	if len(appVersionTpl) == 0 {
+	if len(clusterVersionTpl) == 0 {
 		return cdTpl
 	}
 
 	if len(cdTpl) == 0 {
-		return appVersionTpl
+		return clusterVersionTpl
 	}
 
-	mergedCfgTpl := make([]dbaasv1alpha1.ConfigTemplate, 0, len(appVersionTpl)+len(cdTpl))
+	mergedCfgTpl := make([]dbaasv1alpha1.ConfigTemplate, 0, len(clusterVersionTpl)+len(cdTpl))
 	mergedTplMap := make(map[string]struct{}, cap(mergedCfgTpl))
 
-	for i := range appVersionTpl {
-		if _, ok := (mergedTplMap)[appVersionTpl[i].VolumeName]; ok {
+	for i := range clusterVersionTpl {
+		if _, ok := (mergedTplMap)[clusterVersionTpl[i].VolumeName]; ok {
 			// TODO: following error should be checked in validation webhook and record Warning event
-			// return nil, fmt.Errorf("ConfigTemplate require not same volumeName [%s]", appVersionTpl[i].Name)
+			// return nil, fmt.Errorf("ConfigTemplate require not same volumeName [%s]", clusterVersionTpl[i].Name)
 			continue
 		}
-		mergedCfgTpl = append(mergedCfgTpl, appVersionTpl[i])
-		mergedTplMap[appVersionTpl[i].VolumeName] = struct{}{}
+		mergedCfgTpl = append(mergedCfgTpl, clusterVersionTpl[i])
+		mergedTplMap[clusterVersionTpl[i].VolumeName] = struct{}{}
 	}
 
 	for i := range cdTpl {
-		// AppVersion replace clusterDefinition
+		// ClusterVersion replace clusterDefinition
 		if _, ok := (mergedTplMap)[cdTpl[i].VolumeName]; ok {
 			continue
 		}
@@ -290,7 +290,7 @@ func mergeComponents(
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition,
 	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
-	appVerComp *dbaasv1alpha1.AppVersionComponent,
+	clusterVersionComp *dbaasv1alpha1.ClusterVersionComponent,
 	clusterComp *dbaasv1alpha1.ClusterComponent) *Component {
 	if clusterDefComp == nil {
 		return nil
@@ -383,10 +383,10 @@ func mergeComponents(
 		component.ConfigTemplates = clusterDefCompObj.ConfigSpec.ConfigTemplateRefs
 	}
 
-	if appVerComp != nil {
-		component.ConfigTemplates = mergeConfigTemplates(appVerComp.ConfigTemplateRefs, component.ConfigTemplates)
-		if appVerComp.PodSpec != nil {
-			for _, c := range appVerComp.PodSpec.Containers {
+	if clusterVersionComp != nil {
+		component.ConfigTemplates = mergeConfigTemplates(clusterVersionComp.ConfigTemplateRefs, component.ConfigTemplates)
+		if clusterVersionComp.PodSpec != nil {
+			for _, c := range clusterVersionComp.PodSpec.Containers {
 				doContainerAttrOverride(c)
 			}
 		}
@@ -512,7 +512,7 @@ func createCluster(
 	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	clusterDefinition *dbaasv1alpha1.ClusterDefinition,
-	appVersion *dbaasv1alpha1.AppVersion,
+	clusterVersion *dbaasv1alpha1.ClusterVersion,
 	cluster *dbaasv1alpha1.Cluster) (shouldRequeue bool, err error) {
 
 	applyObjs := make([]client.Object, 0, 3)
@@ -522,7 +522,7 @@ func createCluster(
 		clusterDefinition: clusterDefinition,
 		applyObjs:         &applyObjs,
 		cacheCtx:          &cacheCtx,
-		appVersion:        appVersion,
+		clusterVersion:    clusterVersion,
 	}
 	if err := prepareSecretObjs(reqCtx, cli, &params); err != nil {
 		return false, err
@@ -547,7 +547,7 @@ func createCluster(
 		})
 	}
 
-	appCompTypes := appVersion.GetTypeMappingComponents()
+	appCompTypes := clusterVersion.GetTypeMappingComponents()
 	clusterCompTypes = cluster.GetTypeMappingComponents()
 
 	prepareComp := func(component *Component) error {
@@ -558,10 +558,10 @@ func createCluster(
 
 	for _, c := range clusterDefComp {
 		typeName := c.TypeName
-		appVersionComponent := appCompTypes[typeName]
+		clusterVersionComponent := appCompTypes[typeName]
 		clusterComps := clusterCompTypes[typeName]
 		for _, clusterComp := range clusterComps {
-			if err := prepareComp(mergeComponents(reqCtx, cluster, clusterDefinition, &c, appVersionComponent, &clusterComp)); err != nil {
+			if err := prepareComp(mergeComponents(reqCtx, cluster, clusterDefinition, &c, clusterVersionComponent, &clusterComp)); err != nil {
 				return false, err
 			}
 		}
@@ -1322,7 +1322,7 @@ func buildCfg(params createParams,
 	podSpec *corev1.PodSpec,
 	ctx context.Context,
 	cli client.Client) ([]client.Object, error) {
-	// Need to merge configTemplateRef of AppVersion.Components[*].ConfigTemplateRefs and
+	// Need to merge configTemplateRef of ClusterVersion.Components[*].ConfigTemplateRefs and
 	// ClusterDefinition.Components[*].ConfigTemplateRefs
 	tpls := params.component.ConfigTemplates
 	if len(tpls) == 0 {
@@ -1333,7 +1333,7 @@ func buildCfg(params createParams,
 	namespaceName := params.cluster.Namespace
 
 	// New ConfigTemplateBuilder
-	cfgTemplateBuilder := newCfgTemplateBuilder(clusterName, namespaceName, params.cluster, params.appVersion)
+	cfgTemplateBuilder := newCfgTemplateBuilder(clusterName, namespaceName, params.cluster, params.clusterVersion)
 	// Prepare built-in objects and built-in functions
 	if err := cfgTemplateBuilder.injectBuiltInObjectsAndFunctions(podSpec, tpls, params.component); err != nil {
 		return nil, err
@@ -1341,7 +1341,7 @@ func buildCfg(params createParams,
 
 	configs := make([]client.Object, 0, len(tpls))
 	volumes := make(map[string]dbaasv1alpha1.ConfigTemplate, len(tpls))
-	// TODO Support Update AppVersionRef of Cluster
+	// TODO Support Update ClusterVersionRef of Cluster
 	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
 	cfgLables := make(map[string]string, len(tpls))
 	for _, tpl := range tpls {

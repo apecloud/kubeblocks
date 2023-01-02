@@ -53,7 +53,7 @@ type OperationsOptions struct {
 	OpsTypeLower string `json:"typeLower"`
 
 	// Upgrade options
-	AppVersionRef string `json:"appVersionRef"`
+	ClusterVersionRef string `json:"clusterVersionRef"`
 
 	// VerticalScaling options
 	RequestCPU    string `json:"requestCPU"`
@@ -65,8 +65,8 @@ type OperationsOptions struct {
 	Replicas int `json:"replicas"`
 
 	// VolumeExpansion options.
-	// VctNames VolumeClaimTemplate names
-	VctNames []string `json:"vctNames,omitempty"`
+	// VCTNames VolumeClaimTemplate names
+	VCTNames []string `json:"vctNames,omitempty"`
 	Storage  string   `json:"storage"`
 }
 
@@ -97,14 +97,14 @@ func (o *OperationsOptions) CompleteRestartOps() error {
 }
 
 func (o *OperationsOptions) validateUpgrade() error {
-	if len(o.AppVersionRef) == 0 {
-		return fmt.Errorf("missing app-version")
+	if len(o.ClusterVersionRef) == 0 {
+		return fmt.Errorf("missing cluster-version")
 	}
 	return nil
 }
 
 func (o *OperationsOptions) validateVolumeExpansion() error {
-	if len(o.VctNames) == 0 {
+	if len(o.VCTNames) == 0 {
 		return fmt.Errorf("missing vct-names")
 	}
 	if len(o.Storage) == 0 {
@@ -178,7 +178,7 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	inputs.Short = "Upgrade the cluster"
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
-		cmd.Flags().StringVar(&o.AppVersionRef, "app-version", "", "Reference app version (required)")
+		cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Reference app version (required)")
 	}
 	return create.BuildCommand(inputs)
 }
@@ -220,7 +220,7 @@ func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 	inputs.Short = "Expand volume with the specified components and volumeClaimTemplates in the cluster"
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
-		cmd.Flags().StringSliceVar(&o.VctNames, "volume-claim-template-names", nil, "VolumeClaimTemplate names in components (required)")
+		cmd.Flags().StringSliceVar(&o.VCTNames, "volume-claim-template-names", nil, "VolumeClaimTemplate names in components (required)")
 		cmd.Flags().StringVar(&o.Storage, "storage", "", "Volume storage size (required)")
 	}
 	return create.BuildCommand(inputs)

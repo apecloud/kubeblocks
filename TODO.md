@@ -14,7 +14,7 @@
     - [x] deploy & sts workloads' labels and spec.template.metadata.labels (check https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/)
 - [x] immutable spec properties handling (via validating webhook)
 - [x] CR status handling
-- [x] checked AppVersion CR status
+- [x] checked ClusterVersion CR status
 - [x] checked ClusterDefinition CR status
 - [x] CR update handling
   - [x] PVC volume expansion (spec.components[].volumeClaimTemplates only works for initial statefulset creation)
@@ -22,13 +22,13 @@
 - [x] merge components from all the CRs
 
 ### ClusterDefinition CR controller
-- [x] track changes and update associated CRs (Cluster, AppVersion) status
-- [x] cannot delete ClusterDefinition CR if any referencing CRs (Cluster, AppVersion)
+- [x] track changes and update associated CRs (Cluster, ClusterVersion) status
+- [x] cannot delete ClusterDefinition CR if any referencing CRs (Cluster, ClusterVersion)
 
-### AppVersion CR controller
+### ClusterVersion CR controller
 - [x] immutable spec handling (via validating webhook)
 - [x] CR status handling
-- [x] cannot delete AppVersion CR if any referencing CRs (Cluster)
+- [x] cannot delete ClusterVersion CR if any referencing CRs (Cluster)
 
 ### Test
 - [x] unit test

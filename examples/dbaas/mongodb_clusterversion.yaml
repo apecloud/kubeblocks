@@ -1,7 +1,7 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: AppVersion
+kind: ClusterVersion
 metadata:
-  name: mongodb-app-version
+  name: mongodb-cluster-version
 spec:
   clusterDefinitionRef: mongodb-cluster-definition
   components:

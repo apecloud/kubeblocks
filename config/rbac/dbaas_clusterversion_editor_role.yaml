@@ -1,20 +1,24 @@
-# permissions for end users to view appversions.
+# permissions for end users to edit clusterversions.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: appversion-viewer-role
+  name: clusterversion-editor-role
 rules:
 - apiGroups:
   - dbaas.kubeblocks.io
   resources:
-  - appversions
+  - clusterversions
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - dbaas.kubeblocks.io
   resources:
-  - appversions/status
+  - clusterversions/status
   verbs:
   - get

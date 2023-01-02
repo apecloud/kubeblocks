@@ -27,7 +27,7 @@ resources:
   controller: true
   domain: kubeblocks.io
   group: dbaas
-  kind: AppVersion
+  kind: ClusterVersion
   path: github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1
   version: v1alpha1
 - api:

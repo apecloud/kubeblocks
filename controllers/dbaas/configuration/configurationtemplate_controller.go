@@ -73,7 +73,7 @@ func (r *ConfigurationTemplateReconciler) Reconcile(ctx context.Context, req ctr
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, configTpl,
 			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(configTpl.GetName()),
 			recordEvent, &dbaasv1alpha1.ClusterDefinitionList{},
-			&dbaasv1alpha1.AppVersionList{}); res != nil || err != nil {
+			&dbaasv1alpha1.ClusterVersionList{}); res != nil || err != nil {
 			return res, err
 		}
 		return nil, nil

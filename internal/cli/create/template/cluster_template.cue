@@ -1,9 +1,9 @@
 // required, command line input options for parameters and flags
 options: {
-	name:          string
-	namespace:     string
-	clusterDefRef: string
-	appVersionRef: string
+	name:              string
+	namespace:         string
+	clusterDefRef:     string
+	clusterVersionRef: string
 	components: [...]
 	terminationPolicy: string
 	podAntiAffinity:   string
@@ -22,7 +22,7 @@ content: {
 	}
 	spec: {
 		clusterDefinitionRef: options.clusterDefRef
-		appVersionRef:        options.appVersionRef
+		clusterVersionRef:    options.clusterVersionRef
 		affinity: {
 			podAntiAffinity: options.podAntiAffinity
 			topologyKeys:    options.topologyKeys

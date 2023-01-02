@@ -5,7 +5,7 @@ metadata:
   labels: {{ include "clickhouse-cluster.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: apecloud-clickhouse  # ref clusterdefinition.name
-  appVersionRef: clickhouse-{{ default .Chart.AppVersion .Values.appVersionOverride }} # ref appversion.name
+  clusterVersionRef: clickhouse-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
   terminationPolicy: {{ $.Values.terminationPolicy }}
   affinity:
     {{- with $.Values.topologyKeys }}

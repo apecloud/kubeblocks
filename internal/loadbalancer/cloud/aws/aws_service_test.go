@@ -254,7 +254,7 @@ var _ = Describe("AwsService", func() {
 		})
 	})
 
-	Context("AllocENI", func() {
+	Context("Create ENI", func() {
 		It("", func() {
 			_, service, mockEC2 := setup(nil)
 
@@ -265,65 +265,6 @@ var _ = Describe("AwsService", func() {
 			}
 			mockEC2.EXPECT().CreateNetworkInterfaceWithContext(gomock.Any(), gomock.Any()).Return(createInterfaceOutput, nil)
 
-			describeInstanceInput := &ec2.DescribeInstancesInput{
-				InstanceIds: []*string{aws.String(instanceID)},
-			}
-			describeInstanceOutput := &ec2.DescribeInstancesOutput{
-				Reservations: []*ec2.Reservation{
-					{
-						Instances: []*ec2.Instance{
-							{
-								InstanceId: aws.String(instanceID),
-								NetworkInterfaces: []*ec2.InstanceNetworkInterface{
-									{
-										Attachment: &ec2.InstanceNetworkInterfaceAttachment{
-											DeviceIndex: aws.Int64(0),
-										},
-									},
-									{
-										Attachment: &ec2.InstanceNetworkInterfaceAttachment{
-											DeviceIndex: aws.Int64(1),
-										},
-									},
-									{
-										Attachment: &ec2.InstanceNetworkInterfaceAttachment{
-											DeviceIndex: aws.Int64(2),
-										},
-									},
-									{
-										Attachment: &ec2.InstanceNetworkInterfaceAttachment{
-											DeviceIndex: aws.Int64(4),
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			}
-			mockEC2.EXPECT().DescribeInstancesWithContext(gomock.Any(), describeInstanceInput).Return(describeInstanceOutput, nil).AnyTimes()
-			number, err := service.awsGetFreeDeviceNumber(instanceID)
-			Expect(err).Should(BeNil())
-			Expect(number).Should(Equal(3))
-
-			attachInput := &ec2.AttachNetworkInterfaceInput{
-				DeviceIndex:        aws.Int64(int64(3)),
-				InstanceId:         aws.String(instanceID),
-				NetworkInterfaceId: aws.String(eniID3),
-			}
-			attachOutput := &ec2.AttachNetworkInterfaceOutput{
-				AttachmentId: aws.String(attachmentID),
-			}
-			mockEC2.EXPECT().AttachNetworkInterfaceWithContext(gomock.Any(), attachInput).Return(attachOutput, nil)
-
-			modifyAttributeInput := &ec2.ModifyNetworkInterfaceAttributeInput{
-				Attachment: &ec2.NetworkInterfaceAttachmentChanges{
-					AttachmentId:        aws.String(attachmentID),
-					DeleteOnTermination: aws.Bool(true),
-				},
-				NetworkInterfaceId: aws.String(eniID3),
-			}
-			mockEC2.EXPECT().ModifyNetworkInterfaceAttributeWithContext(context.Background(), modifyAttributeInput).Return(nil, nil)
 			eniID, err := service.CreateENI(instanceID, subnetID, []string{securityGroupID})
 			Expect(err).Should(BeNil())
 			Expect(eniID).Should(Equal(eniID3))

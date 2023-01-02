@@ -171,50 +171,80 @@ func (r *OpsRequest) validateOps(ctx context.Context, cluster *Cluster, allErrs 
 	case VolumeExpansionType:
 		r.validateVolumeExpansion(allErrs, cluster)
 	case RestartType:
-		supportedComponentMap := covertComponentNamesToMap(cluster.Status.Operations.Restartable)
-		r.commonValidationWithComponentOps(allErrs, cluster, supportedComponentMap, nil)
+		r.validateRestart(allErrs, cluster)
 	}
 }
 
-// validateUpgrade validate spec.clusterOps.upgrade is legal
-func (r *OpsRequest) validateUpgrade(ctx context.Context, allErrs *field.ErrorList, cluster *Cluster) {
-	if !cluster.Status.Operations.Upgradable {
-		addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s, appversion must be greater than 1", r.Spec.ClusterRef))
+// validateUpgrade validate spec.restart is legal
+func (r *OpsRequest) validateRestart(allErrs *field.ErrorList, cluster *Cluster) {
+	restartList := r.Spec.RestartList
+	if len(restartList) == 0 {
+		addInvalidError(allErrs, "spec.restart", restartList, "can not be empty")
 		return
 	}
-	if r.Spec.ClusterOps == nil || r.Spec.ClusterOps.Upgrade == nil {
-		addNotFoundError(allErrs, "spec.clusterOps.upgrade", "")
+	// get component name slice
+	componentNames := make([]string, len(restartList))
+	for i, v := range restartList {
+		componentNames[i] = v.ComponentName
+	}
+	// validate component name is legal
+	supportedComponentMap := covertComponentNamesToMap(cluster.Status.Operations.Restartable)
+	r.validateComponentName(allErrs, cluster, supportedComponentMap, componentNames)
+}
+
+// validateUpgrade validate spec.upgrade is legal
+func (r *OpsRequest) validateUpgrade(ctx context.Context, allErrs *field.ErrorList, cluster *Cluster) {
+	if !cluster.Status.Operations.Upgradable {
+		addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s, ClusterVersion must be greater than 1", r.Spec.ClusterRef))
+		return
+	}
+	if r.Spec.Upgrade == nil {
+		addNotFoundError(allErrs, "spec.upgrade", "")
 		return
 	}
 
-	appVersion := &AppVersion{}
-	appVersionRef := r.Spec.ClusterOps.Upgrade.AppVersionRef
-	if err := webhookMgr.client.Get(ctx, types.NamespacedName{Name: appVersionRef}, appVersion); err != nil {
-		addInvalidError(allErrs, "spec.clusterOps.upgrade.appVersionRef", appVersionRef, err.Error())
-	} else if cluster.Spec.AppVersionRef == r.Spec.ClusterOps.Upgrade.AppVersionRef {
-		addInvalidError(allErrs, "spec.clusterOps.upgrade.appVersionRef", appVersionRef, "can not equals Cluster.spec.appVersionRef")
+	clusterVersion := &ClusterVersion{}
+	clusterVersionRef := r.Spec.Upgrade.ClusterVersionRef
+	if err := webhookMgr.client.Get(ctx, types.NamespacedName{Name: clusterVersionRef}, clusterVersion); err != nil {
+		addInvalidError(allErrs, "spec.upgrade.clusterVersionRef", clusterVersionRef, err.Error())
+	} else if cluster.Spec.ClusterVersionRef == r.Spec.Upgrade.ClusterVersionRef {
+		addInvalidError(allErrs, "spec.upgrade.clusterVersionRef", clusterVersionRef, "can not equals Cluster.spec.clusterVersionRef")
 	}
 }
 
 // validateVerticalScaling validate api is legal when spec.type is VerticalScaling
 func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *Cluster) {
-	supportedComponentMap := covertComponentNamesToMap(cluster.Status.Operations.VerticalScalable)
-	customValidate := func(componentOps *ComponentOps, index int, operationComponent *OperationComponent) *field.Error {
-		if componentOps.VerticalScaling == nil {
-			return field.NotFound(field.NewPath(fmt.Sprintf("spec.componentOps[%d].verticalScaling", index)), "can not be empty")
-		}
-		if invalidValue, err := validateVerticalResourceList(componentOps.VerticalScaling.Requests); err != nil {
-			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].verticalScaling.requests", index)), invalidValue, err.Error())
-		}
-		if invalidValue, err := validateVerticalResourceList(componentOps.VerticalScaling.Limits); err != nil {
-			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].verticalScaling.limits", index)), invalidValue, err.Error())
-		}
-		if invalidValue, err := compareRequestsAndLimits(*componentOps.VerticalScaling); err != nil {
-			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].verticalScaling.requests", index)), invalidValue, err.Error())
-		}
-		return nil
+	verticalScalingList := r.Spec.VerticalScalingList
+	if len(verticalScalingList) == 0 {
+		addInvalidError(allErrs, "spec.verticalScaling", verticalScalingList, "can not be empty")
+		return
 	}
-	r.commonValidationWithComponentOps(allErrs, cluster, supportedComponentMap, customValidate)
+	// validate whether the cluster support vertical scaling
+	supportedComponentMap := covertComponentNamesToMap(cluster.Status.Operations.VerticalScalable)
+	if err := r.validateClusterIsSupported(supportedComponentMap); err != nil {
+		*allErrs = append(*allErrs, err)
+		return
+	}
+	// validate resources is legal and get component name slice
+	componentNames := make([]string, len(verticalScalingList))
+	for i, v := range verticalScalingList {
+		componentNames[i] = v.ComponentName
+		if invalidValue, err := validateVerticalResourceList(v.Requests); err != nil {
+			addInvalidError(allErrs, fmt.Sprintf("spec.verticalScaling[%d].requests", i), invalidValue, err.Error())
+			continue
+		}
+		if invalidValue, err := validateVerticalResourceList(v.Limits); err != nil {
+			addInvalidError(allErrs, fmt.Sprintf("spec.verticalScaling[%d].limits", i), invalidValue, err.Error())
+			continue
+		}
+		if invalidValue, err := compareRequestsAndLimits(*v.ResourceRequirements); err != nil {
+			addInvalidError(allErrs, fmt.Sprintf("spec.verticalScaling[%d].requests", i), invalidValue, err.Error())
+		}
+	}
+
+	// validate component name is legal
+	r.validateComponentName(allErrs, cluster, supportedComponentMap, componentNames)
+
 }
 
 // compareRequestsAndLimits compare the resource requests and limits
@@ -252,124 +282,136 @@ func invalidReplicas(replicas int32, operationComponent *OperationComponent) str
 
 // validateHorizontalScaling validate api is legal when spec.type is HorizontalScaling
 func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.ErrorList) {
-	supportedComponentMap := covertOperationComponentsToMap(cluster.Status.Operations.HorizontalScalable)
-	customValidate := func(componentOps *ComponentOps, index int, operationComponent *OperationComponent) *field.Error {
-		if componentOps.HorizontalScaling == nil {
-			return field.NotFound(field.NewPath(fmt.Sprintf("spec.componentOps[%d].horizontalScaling", index)), "can not be empty")
-		}
-		replicas := componentOps.HorizontalScaling.Replicas
-		replicasMsg := invalidReplicas(replicas, operationComponent)
-		if replicasMsg != "" {
-			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].horizontalScaling.replicas", index)), replicas, replicasMsg)
-		}
-		return nil
+	horizontalScalingList := r.Spec.HorizontalScalingList
+	if len(horizontalScalingList) == 0 {
+		addInvalidError(allErrs, "spec.horizontalScaling", horizontalScalingList, "can not be empty")
+		return
 	}
-	r.commonValidationWithComponentOps(allErrs, cluster, supportedComponentMap, customValidate)
+	// validate whether the cluster support horizontal scaling
+	supportedComponentMap := covertOperationComponentsToMap(cluster.Status.Operations.HorizontalScalable)
+	if err := r.validateClusterIsSupported(supportedComponentMap); err != nil {
+		*allErrs = append(*allErrs, err)
+		return
+	}
+	// validate replicas is legal and get component name slice
+	componentNames := make([]string, len(horizontalScalingList))
+	for i, v := range horizontalScalingList {
+		componentNames[i] = v.ComponentName
+		operationComponent := supportedComponentMap[v.ComponentName]
+		if operationComponent == nil {
+			continue
+		}
+		replicasMsg := invalidReplicas(v.Replicas, operationComponent)
+		if replicasMsg != "" {
+			addInvalidError(allErrs, fmt.Sprintf("spec.horizontalScaling[%d].replicas", i), v.Replicas, replicasMsg)
+		}
+	}
+	r.validateComponentName(allErrs, cluster, supportedComponentMap, componentNames)
 }
 
 // validateVolumeExpansion validate volumeExpansion api is legal when spec.type is VolumeExpansion
 func (r *OpsRequest) validateVolumeExpansion(allErrs *field.ErrorList, cluster *Cluster) {
+	volumeExpansionList := r.Spec.VolumeExpansionList
+	if len(volumeExpansionList) == 0 {
+		addInvalidError(allErrs, "spec.volumeExpansion", volumeExpansionList, "can not be empty")
+		return
+	}
+	// validate whether the cluster support volume expansion
 	supportedComponentMap := covertOperationComponentsToMap(cluster.Status.Operations.VolumeExpandable)
-	customValidate := func(componentOps *ComponentOps, index int, operationComponent *OperationComponent) *field.Error {
+	if err := r.validateClusterIsSupported(supportedComponentMap); err != nil {
+		*allErrs = append(*allErrs, err)
+		return
+	}
+	// validate volumeClaimTemplates is legal and get component name slice
+	componentNames := make([]string, len(volumeExpansionList))
+	for i, v := range volumeExpansionList {
 		var (
-			supportedVctMap = map[string]struct{}{}
-			invalidVctNames []string
+			supportedVCTMap = map[string]struct{}{}
+			invalidVCTNames []string
 		)
-		if componentOps.VolumeExpansion == nil {
-			return field.NotFound(field.NewPath(fmt.Sprintf("spec.componentOps[%d].volumeExpansion", index)), "can not be empty")
+		componentNames[i] = v.ComponentName
+		operationComponent := supportedComponentMap[v.ComponentName]
+		if operationComponent == nil {
+			continue
 		}
 		// covert slice to map
-		for _, v := range operationComponent.VolumeClaimTemplateNames {
-			supportedVctMap[v] = struct{}{}
+		for _, vctName := range operationComponent.VolumeClaimTemplateNames {
+			supportedVCTMap[vctName] = struct{}{}
 		}
 		// check the volumeClaimTemplate is support volumeExpansion
-		for _, v := range componentOps.VolumeExpansion {
-			if _, ok := supportedVctMap[v.Name]; !ok {
-				invalidVctNames = append(invalidVctNames, v.Name)
+		for _, vct := range v.VolumeClaimTemplates {
+			if _, ok := supportedVCTMap[vct.Name]; !ok {
+				invalidVCTNames = append(invalidVCTNames, vct.Name)
 			}
 		}
-		if len(invalidVctNames) > 0 {
-			return field.Invalid(field.NewPath(fmt.Sprintf("spec.componentOps[%d].volumeExpansion[*].name", index)), invalidVctNames, "not support volume expansion, check the StorageClass whether allow volume expansion.")
+		if len(invalidVCTNames) > 0 {
+			message := "not support volume expansion, check the StorageClass whether allow volume expansion."
+			addInvalidError(allErrs, fmt.Sprintf("spec.volumeExpansion[%d].volumeClaimTemplates[*].name", i), invalidVCTNames, message)
 		}
-		return nil
 	}
-	r.commonValidationWithComponentOps(allErrs, cluster, supportedComponentMap, customValidate)
+
+	r.validateComponentName(allErrs, cluster, supportedComponentMap, componentNames)
 }
 
-// commonValidateWithComponentOps do common validation, when the operation in componentOps scope
-func (r *OpsRequest) commonValidationWithComponentOps(allErrs *field.ErrorList, cluster *Cluster,
+// validateClusterIsSupported validate whether cluster support the operation when it in component scope
+func (r *OpsRequest) validateClusterIsSupported(supportedComponentMap map[string]*OperationComponent) *field.Error {
+	if len(supportedComponentMap) > 0 {
+		return nil
+	}
+	var (
+		opsType = r.Spec.Type
+		message string
+	)
+	switch opsType {
+	case VolumeExpansionType:
+		message = fmt.Sprintf("not supported in Cluster: %s, check the StorageClass whether allow volume expansion.", r.Spec.ClusterRef)
+	default:
+		message = fmt.Sprintf("not supported in Cluster: %s", r.Spec.ClusterRef)
+	}
+	return field.Invalid(field.NewPath("spec.type"), opsType, message)
+}
+
+// commonValidateWithComponentOps do common validation, when the operation in component scope
+func (r *OpsRequest) validateComponentName(allErrs *field.ErrorList,
+	cluster *Cluster,
 	supportedComponentMap map[string]*OperationComponent,
-	customValidate func(*ComponentOps, int, *OperationComponent) *field.Error) bool {
+	operationComponentNames []string) {
 	var (
 		clusterComponentNameMap    = map[string]struct{}{}
-		tmpComponentNameMap        = map[string]int{}
 		notFoundComponentNames     []string
 		notSupportedComponentNames []string
-		duplicateComponents        []string
-		operationComponent         *OperationComponent
 		ok                         bool
+		opsType                    = r.Spec.Type
 	)
-	// check whether cluster support the operation when it in component scope
-	if len(supportedComponentMap) == 0 {
-		switch r.Spec.Type {
-		case VolumeExpansionType:
-			addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s, check the StorageClass whether allow volume expansion.", r.Spec.ClusterRef))
-		default:
-			addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s", r.Spec.ClusterRef))
-		}
-		return false
-	}
-	if len(r.Spec.ComponentOpsList) == 0 {
-		addInvalidError(allErrs, "spec.componentOps", r.Spec.ComponentOpsList, "can not be empty")
-		return false
-	}
 	for _, v := range cluster.Spec.Components {
 		clusterComponentNameMap[v.Name] = struct{}{}
 	}
-	for index, componentOps := range r.Spec.ComponentOpsList {
-		if len(componentOps.ComponentNames) == 0 {
-			addNotFoundError(allErrs, fmt.Sprintf("spec.componentOps[%d].componentNames", index), "can not be empty")
+	for _, v := range operationComponentNames {
+		// check component name whether exist in Cluster.spec.components[*].name
+		if _, ok = clusterComponentNameMap[v]; !ok {
+			notFoundComponentNames = append(notFoundComponentNames, v)
 			continue
 		}
-		for _, v := range componentOps.ComponentNames {
-			// check the duplicate component name in r.Spec.ComponentOpsList[*].componentNames
-			if _, ok = tmpComponentNameMap[v]; ok {
-				duplicateComponents = append(duplicateComponents, v)
-				continue
-			}
-			tmpComponentNameMap[v] = index
-			// check component name whether exist in Cluster.spec.components[*].name
-			if _, ok = clusterComponentNameMap[v]; !ok {
-				notFoundComponentNames = append(notFoundComponentNames, v)
-				continue
-			}
-			// check component name whether support the operation
-			if operationComponent, ok = supportedComponentMap[v]; !ok {
-				notSupportedComponentNames = append(notSupportedComponentNames, v)
-				continue
-			}
-			// do custom validation
-			if customValidate == nil {
-				continue
-			}
-			if err := customValidate(&componentOps, index, operationComponent); err != nil {
-				*allErrs = append(*allErrs, err)
-			}
+		// check component name whether support the operation
+		if _, ok = supportedComponentMap[v]; !ok {
+			notSupportedComponentNames = append(notSupportedComponentNames, v)
 		}
-	}
-
-	if len(duplicateComponents) > 0 {
-		addInvalidError(allErrs, "spec.componentOps[*].componentNames", duplicateComponents, "duplicate component name exists")
 	}
 
 	if len(notFoundComponentNames) > 0 {
-		addInvalidError(allErrs, "spec.componentOps[*].componentNames", notFoundComponentNames, "not found in Cluster.spec.components[*].name")
+		addInvalidError(allErrs, fmt.Sprintf("spec.%s[*].componentName", lowercaseInitial(opsType)),
+			notFoundComponentNames, "not found in Cluster.spec.components[*].name")
 	}
 
 	if len(notSupportedComponentNames) > 0 {
-		addInvalidError(allErrs, "spec.componentOps[*].componentNames", notSupportedComponentNames, fmt.Sprintf("not supported %s", r.Spec.Type))
+		addInvalidError(allErrs, fmt.Sprintf("spec.%s[*].componentName", lowercaseInitial(opsType)),
+			notSupportedComponentNames, fmt.Sprintf("not supported the %s operation", opsType))
 	}
-	return true
+}
+
+func lowercaseInitial(opsType OpsType) string {
+	str := string(opsType)
+	return strings.ToLower(str[:1]) + str[1:]
 }
 
 // covertComponentNamesToMap covert supportedComponent slice to map

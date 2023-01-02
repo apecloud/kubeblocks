@@ -6,7 +6,7 @@ replicaCount: 3
 
 terminationPolicy: Halt
 
-appVersionOverride: ""
+clusterVersionOverride: ""
 
 monitor:
   enabled: false

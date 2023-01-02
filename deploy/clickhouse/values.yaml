@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 
 
-appVersionOverride: ""
+clusterVersionOverride: ""
 nameOverride: ""
 fullnameOverride: ""
 

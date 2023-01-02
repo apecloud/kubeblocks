@@ -24,7 +24,7 @@ import (
 
 const (
 	APIVersion            = "dbaas.kubeblocks.io/v1alpha1"
-	AppVersionKind        = "AppVersion"
+	ClusterVersionKind    = "ClusterVersion"
 	ClusterDefinitionKind = "ClusterDefinition"
 	ClusterKind           = "Cluster"
 	OpsRequestKind        = "OpsRequestKind"

@@ -107,10 +107,10 @@ type UpdatableFlags struct {
 
 type CreateOptions struct {
 	// ClusterDefRef reference clusterDefinition
-	ClusterDefRef string                   `json:"clusterDefRef"`
-	AppVersionRef string                   `json:"appVersionRef"`
-	Tolerations   []interface{}            `json:"tolerations,omitempty"`
-	Components    []map[string]interface{} `json:"components"`
+	ClusterDefRef     string                   `json:"clusterDefRef"`
+	ClusterVersionRef string                   `json:"clusterVersionRef"`
+	Tolerations       []interface{}            `json:"tolerations,omitempty"`
+	Components        []map[string]interface{} `json:"components"`
 
 	// ComponentsFilePath components file path
 	ComponentsFilePath string   `json:"-"`
@@ -171,7 +171,7 @@ func (o *CreateOptions) Validate() error {
 		return fmt.Errorf("a valid cluster definition is needed, use --cluster-definition to specify one, run \"kbcli cluster-definition list\" to show all cluster definition")
 	}
 
-	if o.AppVersionRef == "" {
+	if o.ClusterVersionRef == "" {
 		return fmt.Errorf("a valid cluster version is needed, use --cluster-version to specify one, run \"kbcli cluster-version list\" to show all cluster version")
 	}
 
@@ -261,7 +261,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		PreCreate:       o.PreCreate,
 		BuildFlags: func(cmd *cobra.Command) {
 			cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli cluster-definition list\" to show all available cluster definition")
-			cmd.Flags().StringVar(&o.AppVersionRef, "cluster-version", "", "Specify cluster version, run \"kbcli cluster-version list\" to show all available cluster version")
+			cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Specify cluster version, run \"kbcli cluster-version list\" to show all available cluster version")
 			cmd.Flags().StringVar(&o.ComponentsFilePath, "components", "", "Use yaml file, URL, or stdin to specify the cluster components")
 			cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 
@@ -294,7 +294,7 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cluster-version",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.AppVersionGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterVersionGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 }
 

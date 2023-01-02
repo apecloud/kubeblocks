@@ -60,7 +60,7 @@ var _ = Describe("probe_utils", func() {
 
 			clusterDefProbe = &dbaasv1alpha1.ClusterDefinitionProbe{}
 			clusterDefProbe.PeriodSeconds = 1
-			clusterDefProbe.SuccessThreshold = 1
+			clusterDefProbe.TimeoutSeconds = 1
 			clusterDefProbe.FailureThreshold = 1
 			component = &Component{}
 			component.CharacterType = "mysql"

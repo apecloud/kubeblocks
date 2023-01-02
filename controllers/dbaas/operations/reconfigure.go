@@ -109,30 +109,21 @@ func (r reconfigureAction) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.P
 }
 
 func isReconfigureOpsRequest(request *dbaasv1alpha1.OpsRequest) bool {
-	return request.Spec.Type == dbaasv1alpha1.ReconfigureType
+	return request.Spec.Type == dbaasv1alpha1.ReconfigureType && request.Spec.Reconfigure != nil
 }
 
 func (r *reconfigureAction) reconfigure(resource *OpsResource) error {
-	spec := &resource.OpsRequest.Spec
-	if len(spec.ComponentOpsList) != 1 {
-		return cfgcore.MakeError("require reconfigure only update one component. current component:%d", len(spec.ComponentOpsList))
-	}
-
-	component := spec.ComponentOpsList[0]
-	if len(component.ComponentNames) != 1 {
-		return cfgcore.MakeError("require reconfigure only update one component, components: %s", component.ComponentNames)
-	}
-
-	if component.Reconfigure == nil {
+	if !isReconfigureOpsRequest(resource.OpsRequest) {
 		return cfgcore.MakeError("invalid reconfigure params.")
 	}
 
 	var (
+		spec              = &resource.OpsRequest.Spec
 		clusterName       = spec.ClusterRef
-		componentName     = component.ComponentNames[0]
+		componentName     = spec.Reconfigure.ComponentName
 		cluster           = resource.Cluster
 		clusterDefinition = &dbaasv1alpha1.ClusterDefinition{}
-		appVersion        = &dbaasv1alpha1.AppVersion{}
+		appVersion        = &dbaasv1alpha1.ClusterVersion{}
 	)
 
 	if err := resource.Client.Get(resource.Ctx, client.ObjectKey{
@@ -143,10 +134,10 @@ func (r *reconfigureAction) reconfigure(resource *OpsResource) error {
 	}
 
 	if err := resource.Client.Get(resource.Ctx, client.ObjectKey{
-		Name:      cluster.Spec.AppVersionRef,
+		Name:      cluster.Spec.ClusterVersionRef,
 		Namespace: cluster.Namespace,
 	}, appVersion); err != nil {
-		return cfgcore.WrapError(err, "failed to get appversion[%s]", cluster.Spec.AppVersionRef)
+		return cfgcore.WrapError(err, "failed to get appversion[%s]", cluster.Spec.ClusterVersionRef)
 	}
 
 	tpls, err := getConfigTemplatesFromComponent(
@@ -157,7 +148,7 @@ func (r *reconfigureAction) reconfigure(resource *OpsResource) error {
 	if err != nil {
 		return cfgcore.WrapError(err, "failed to get config template[%s]", componentName)
 	}
-	return r.performUpgrade(clusterName, componentName, component.Reconfigure, resource, tpls)
+	return r.performUpgrade(clusterName, componentName, spec.Reconfigure, resource, tpls)
 }
 
 func (r *reconfigureAction) performUpgrade(clusterName, componentName string,

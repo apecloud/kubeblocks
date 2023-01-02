@@ -112,7 +112,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			type args struct {
 				cComponents []dbaasv1alpha1.ClusterComponent
 				dComponents []dbaasv1alpha1.ClusterDefinitionComponent
-				aComponents []dbaasv1alpha1.AppVersionComponent
+				aComponents []dbaasv1alpha1.ClusterVersionComponent
 				comName     string
 			}
 			tests := []struct {
@@ -133,7 +133,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 							},
 						},
 					},
-					aComponents: []dbaasv1alpha1.AppVersionComponent{
+					aComponents: []dbaasv1alpha1.ClusterVersionComponent{
 						{
 							Type:               comType,
 							ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{tpl2},
@@ -158,7 +158,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 							},
 						},
 					},
-					aComponents: []dbaasv1alpha1.AppVersionComponent{
+					aComponents: []dbaasv1alpha1.ClusterVersionComponent{
 						{
 							Type:               comType,
 							ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{tpl2},
@@ -180,7 +180,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 							},
 						},
 					},
-					aComponents: []dbaasv1alpha1.AppVersionComponent{
+					aComponents: []dbaasv1alpha1.ClusterVersionComponent{
 						{
 							Type:               "not exist",
 							ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{tpl2},

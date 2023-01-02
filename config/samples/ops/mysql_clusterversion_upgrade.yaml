@@ -1,9 +1,9 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       AppVersion
+kind:       ClusterVersion
 metadata:
-  name:     appversion-mysql-0.1
+  name:     wesql-8.0.32
 spec:
-  clusterDefinitionRef: mysql-cluster-definition
+  clusterDefinitionRef: wesql
   components:
   - type: replicasets
     podSpec:

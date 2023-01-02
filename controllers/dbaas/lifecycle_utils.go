@@ -53,7 +53,7 @@ import (
 
 type createParams struct {
 	clusterDefinition *dbaasv1alpha1.ClusterDefinition
-	appVersion        *dbaasv1alpha1.AppVersion
+	clusterVersion    *dbaasv1alpha1.ClusterVersion
 	cluster           *dbaasv1alpha1.Cluster
 	component         *Component
 	applyObjs         *[]client.Object
@@ -255,7 +255,7 @@ func mergeComponents(
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition,
 	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
-	appVerComp *dbaasv1alpha1.AppVersionComponent,
+	clusterVersionComp *dbaasv1alpha1.ClusterVersionComponent,
 	clusterComp *dbaasv1alpha1.ClusterComponent) *Component {
 	if clusterDefComp == nil {
 		return nil
@@ -348,10 +348,10 @@ func mergeComponents(
 		component.ConfigTemplates = clusterDefCompObj.ConfigSpec.ConfigTemplateRefs
 	}
 
-	if appVerComp != nil {
-		component.ConfigTemplates = operations.MergeConfigTemplates(appVerComp.ConfigTemplateRefs, component.ConfigTemplates)
-		if appVerComp.PodSpec != nil {
-			for _, c := range appVerComp.PodSpec.Containers {
+	if clusterVersionComp != nil {
+		component.ConfigTemplates = operations.MergeConfigTemplates(clusterVersionComp.ConfigTemplateRefs, component.ConfigTemplates)
+		if clusterVersionComp.PodSpec != nil {
+			for _, c := range clusterVersionComp.PodSpec.Containers {
 				doContainerAttrOverride(c)
 			}
 		}
@@ -477,7 +477,7 @@ func createCluster(
 	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	clusterDefinition *dbaasv1alpha1.ClusterDefinition,
-	appVersion *dbaasv1alpha1.AppVersion,
+	clusterVersion *dbaasv1alpha1.ClusterVersion,
 	cluster *dbaasv1alpha1.Cluster) (shouldRequeue bool, err error) {
 
 	applyObjs := make([]client.Object, 0, 3)
@@ -487,7 +487,7 @@ func createCluster(
 		clusterDefinition: clusterDefinition,
 		applyObjs:         &applyObjs,
 		cacheCtx:          &cacheCtx,
-		appVersion:        appVersion,
+		clusterVersion:    clusterVersion,
 	}
 	if err := prepareSecretObjs(reqCtx, cli, &params); err != nil {
 		return false, err
@@ -512,7 +512,7 @@ func createCluster(
 		})
 	}
 
-	appCompTypes := appVersion.GetTypeMappingComponents()
+	appCompTypes := clusterVersion.GetTypeMappingComponents()
 	clusterCompTypes = cluster.GetTypeMappingComponents()
 
 	prepareComp := func(component *Component) error {
@@ -523,10 +523,10 @@ func createCluster(
 
 	for _, c := range clusterDefComp {
 		typeName := c.TypeName
-		appVersionComponent := appCompTypes[typeName]
+		clusterVersionComponent := appCompTypes[typeName]
 		clusterComps := clusterCompTypes[typeName]
 		for _, clusterComp := range clusterComps {
-			if err := prepareComp(mergeComponents(reqCtx, cluster, clusterDefinition, &c, appVersionComponent, &clusterComp)); err != nil {
+			if err := prepareComp(mergeComponents(reqCtx, cluster, clusterDefinition, &c, clusterVersionComponent, &clusterComp)); err != nil {
 				return false, err
 			}
 		}
@@ -1287,7 +1287,7 @@ func buildCfg(params createParams,
 	podSpec *corev1.PodSpec,
 	ctx context.Context,
 	cli client.Client) ([]client.Object, error) {
-	// Need to merge configTemplateRef of AppVersion.Components[*].ConfigTemplateRefs and
+	// Need to merge configTemplateRef of ClusterVersion.Components[*].ConfigTemplateRefs and
 	// ClusterDefinition.Components[*].ConfigTemplateRefs
 	tpls := params.component.ConfigTemplates
 	if len(tpls) == 0 {
@@ -1298,7 +1298,7 @@ func buildCfg(params createParams,
 	namespaceName := params.cluster.Namespace
 
 	// New ConfigTemplateBuilder
-	cfgTemplateBuilder := newCfgTemplateBuilder(clusterName, namespaceName, params.cluster, params.appVersion)
+	cfgTemplateBuilder := newCfgTemplateBuilder(clusterName, namespaceName, params.cluster, params.clusterVersion)
 	// Prepare built-in objects and built-in functions
 	if err := cfgTemplateBuilder.injectBuiltInObjectsAndFunctions(podSpec, tpls, params.component); err != nil {
 		return nil, err
@@ -1306,7 +1306,7 @@ func buildCfg(params createParams,
 
 	configs := make([]client.Object, 0, len(tpls))
 	volumes := make(map[string]dbaasv1alpha1.ConfigTemplate, len(tpls))
-	// TODO Support Update AppVersionRef of Cluster
+	// TODO Support Update ClusterVersionRef of Cluster
 	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
 	cfgLables := make(map[string]string, len(tpls))
 	for _, tpl := range tpls {

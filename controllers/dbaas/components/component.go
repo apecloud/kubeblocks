@@ -34,7 +34,7 @@ import (
 
 // Component is the interface to use for component status
 type Component interface {
-	// IsRunning when relevant k8s workloads changes, check whether the cluster is running.
+	// IsRunning when relevant k8s workloads changes, check whether the component is running.
 	// you can also reconcile the pods of component util the component is Running here.
 	IsRunning(obj client.Object) (bool, error)
 

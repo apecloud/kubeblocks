@@ -43,7 +43,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 		// Add any steup steps that needs to be executed before each test
 		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -139,11 +139,11 @@ spec:
           {}
 `
 
-	appVerYaml := `
+	clusterVersionYaml := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       AppVersion
+kind:       ClusterVersion
 metadata:
-  name:     appversion-mysql-latest
+  name:     clusterversion-mysql-latest
 spec:
   clusterDefinitionRef: mysql-cluster-definition
   components:
@@ -188,7 +188,7 @@ spec:
 	}
 
 	Context("When updating clusterDefinition", func() {
-		It("Should update status of appVersion at the same time", func() {
+		It("Should update status of clusterVersion at the same time", func() {
 			By("By creating a clusterDefinition")
 			clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 			Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)).Should(Succeed())
@@ -206,39 +206,39 @@ spec:
 				return len(createdClusterDef.Finalizers) > 0 &&
 					createdClusterDef.Status.ObservedGeneration == 1
 			}, time.Second*10, time.Second*1).Should(BeTrue())
-			By("By creating an appVersion")
-			appVersion := &dbaasv1alpha1.AppVersion{}
-			Expect(yaml.Unmarshal([]byte(appVerYaml), appVersion)).Should(Succeed())
-			Expect(testCtx.CreateObj(ctx, appVersion)).Should(Succeed())
-			createdAppVersion := &dbaasv1alpha1.AppVersion{}
+			By("By creating an clusterVersion")
+			clusterVersion := &dbaasv1alpha1.ClusterVersion{}
+			Expect(yaml.Unmarshal([]byte(clusterVersionYaml), clusterVersion)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, clusterVersion)).Should(Succeed())
+			createdClusterVersion := &dbaasv1alpha1.ClusterVersion{}
 			// check reconciled finalizer
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{
-					Namespace: appVersion.Namespace,
-					Name:      appVersion.Name,
-				}, createdAppVersion)
+					Namespace: clusterVersion.Namespace,
+					Name:      clusterVersion.Name,
+				}, createdClusterVersion)
 				if err != nil {
 					return false
 				}
-				return len(createdAppVersion.Finalizers) > 0
+				return len(createdClusterVersion.Finalizers) > 0
 			}, time.Second*10, time.Second*1).Should(BeTrue())
 			By("By updating clusterDefinition's spec")
 			createdClusterDef.Spec.Type = "state.mysql-7"
 			Expect(k8sClient.Update(ctx, createdClusterDef)).Should(Succeed())
-			// check appVersion.Status.ClusterDefSyncStatus to be OutOfSync
+			// check clusterVersion.Status.ClusterDefSyncStatus to be OutOfSync
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{
-					Namespace: appVersion.Namespace,
-					Name:      appVersion.Name,
-				}, createdAppVersion)
+					Namespace: clusterVersion.Namespace,
+					Name:      clusterVersion.Name,
+				}, createdClusterVersion)
 				if err != nil {
 					return false
 				}
-				return createdAppVersion.Status.ClusterDefSyncStatus == "OutOfSync"
+				return createdClusterVersion.Status.ClusterDefSyncStatus == "OutOfSync"
 			}, time.Second*10, time.Second*1).Should(BeTrue())
 
 			By("By deleting clusterDefinition")
-			Expect(k8sClient.Delete(ctx, createdAppVersion)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, createdClusterVersion)).Should(Succeed())
 			Expect(k8sClient.Delete(ctx, createdClusterDef)).Should(Succeed())
 		})
 	})

@@ -53,12 +53,12 @@ jobs:
           echo 'TODO_OPTION_ID='$(jq '.data.organization.projectV2.fields.nodes[] | select(.name== "Status") | .options[] | select(.name=="Todo") |.id' project_data.json) >> $GITHUB_ENV
       - name: PreRelease Issue
         if: |
-          github.event.action == 'published' && github.event.release.prerelease
+          github.event.action == 'published' && github.event.release.prereleased
         run: |
           echo 'TODO_OPTION_ID='$(jq '.data.organization.projectV2.fields.nodes[] | select(.name== "Status") | .options[] | select(.name=="PreRelease") |.id' project_data.json) >> $GITHUB_ENV
       - name: Released Issue
         if: |
-          github.event.action == 'published' && !github.event.release.prerelease
+          github.event.action == 'published' && github.event.release.released
         run: |
           echo 'TODO_OPTION_ID='$(jq '.data.organization.projectV2.fields.nodes[] | select(.name== "Status") | .options[] | select(.name=="Released") |.id' project_data.json) >> $GITHUB_ENV
 

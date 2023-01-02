@@ -1,7 +1,7 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: AppVersion
+kind: ClusterVersion
 metadata:
-  name: mongodb-{{ default .Chart.AppVersion .Values.appVersionOverride }}
+  name: mongodb-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
   labels:
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:

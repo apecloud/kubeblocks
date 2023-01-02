@@ -28,7 +28,7 @@ import (
 )
 
 type ComponentsType interface {
-	dbaasv1alpha1.AppVersionComponent | dbaasv1alpha1.ClusterDefinitionComponent | dbaasv1alpha1.ClusterComponent
+	dbaasv1alpha1.ClusterVersionComponent | dbaasv1alpha1.ClusterDefinitionComponent | dbaasv1alpha1.ClusterComponent
 }
 
 type filterFn[T ComponentsType] func(o T) bool
@@ -45,7 +45,7 @@ func filter[T ComponentsType](components []T, f filterFn[T]) *T {
 func getConfigTemplatesFromComponent(
 	cComponents []dbaasv1alpha1.ClusterComponent,
 	dComponents []dbaasv1alpha1.ClusterDefinitionComponent,
-	aComponents []dbaasv1alpha1.AppVersionComponent,
+	aComponents []dbaasv1alpha1.ClusterVersionComponent,
 	componentName string) ([]dbaasv1alpha1.ConfigTemplate, error) {
 	findCompTypeByName := func(comName string) *dbaasv1alpha1.ClusterComponent {
 		return filter(cComponents, func(o dbaasv1alpha1.ClusterComponent) bool {
@@ -57,7 +57,7 @@ func getConfigTemplatesFromComponent(
 	if cCom == nil {
 		return nil, cfgcore.MakeError("failed to find component[%s]", componentName)
 	}
-	aCom := filter(aComponents, func(o dbaasv1alpha1.AppVersionComponent) bool {
+	aCom := filter(aComponents, func(o dbaasv1alpha1.ClusterVersionComponent) bool {
 		return o.Type == cCom.Type
 	})
 	dCom := filter(dComponents, func(o dbaasv1alpha1.ClusterDefinitionComponent) bool {

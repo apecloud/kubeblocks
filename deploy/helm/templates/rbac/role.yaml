@@ -328,7 +328,7 @@ rules:
 - apiGroups:
   - dbaas.kubeblocks.io
   resources:
-  - appversions
+  - clusterversions
   verbs:
   - create
   - delete
@@ -340,13 +340,13 @@ rules:
 - apiGroups:
   - dbaas.kubeblocks.io
   resources:
-  - appversions/finalizers
+  - clusterversions/finalizers
   verbs:
   - update
 - apiGroups:
   - dbaas.kubeblocks.io
   resources:
-  - appversions/status
+  - clusterversions/status
   verbs:
   - get
   - patch

@@ -265,13 +265,13 @@ func removeFinalizers(client dynamic.Interface) error {
 		}
 	}
 
-	// patch appversion's finalizer
-	appVerList, err := client.Resource(types.AppVersionGVR()).List(ctx, metav1.ListOptions{})
+	// patch clusterversion's finalizer
+	clusterVersionList, err := client.Resource(types.ClusterVersionGVR()).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
-	for _, appVer := range appVerList.Items {
-		if _, err = client.Resource(types.AppVersionGVR()).Patch(ctx, appVer.GetName(), k8sapitypes.JSONPatchType,
+	for _, clusterVersion := range clusterVersionList.Items {
+		if _, err = client.Resource(types.ClusterVersionGVR()).Patch(ctx, clusterVersion.GetName(), k8sapitypes.JSONPatchType,
 			[]byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{}); err != nil {
 			return err
 		}

@@ -53,14 +53,9 @@ jobs:
           echo 'TODO_OPTION_ID='$(jq '.data.organization.projectV2.fields.nodes[] | select(.name== "Status") | .options[] | select(.name=="Todo") |.id' project_data.json) >> $GITHUB_ENV
       - name: PreRelease Issue
         if: |
-          github.event.action == 'published' && github.event.release.prereleased
+          github.event.action == 'published'
         run: |
           echo 'TODO_OPTION_ID='$(jq '.data.organization.projectV2.fields.nodes[] | select(.name== "Status") | .options[] | select(.name=="PreRelease") |.id' project_data.json) >> $GITHUB_ENV
-      - name: Released Issue
-        if: |
-          github.event.action == 'published' && github.event.release.released
-        run: |
-          echo 'TODO_OPTION_ID='$(jq '.data.organization.projectV2.fields.nodes[] | select(.name== "Status") | .options[] | select(.name=="Released") |.id' project_data.json) >> $GITHUB_ENV
 
       - name: Add Issue to project
         env:
@@ -111,7 +106,7 @@ jobs:
           github.event.action == 'published'
         run: |
           cd ${{ github.workspace }}
-          bash ${{ github.workspace }}/.github/utils/issue-release.sh \
+          bash ${{ github.workspace }}/.github/utils/issue-prerelease.sh \
             ${{ env.GITHUB_TOKEN }} \
             ${{ github.repository }} \
             ${{ github.repository_owner }} \

@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -86,7 +86,7 @@ var _ = Describe("StatefulSet Controller", func() {
 	testUpdateStrategy := func(updateStrategy dbaasv1alpha1.UpdateStrategy, componentName string, index int) {
 		clusterDef := &dbaasv1alpha1.ClusterDefinition{}
 		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefName}, clusterDef)).Should(Succeed())
-		clusterDef.Spec.Components[0].ConsensusSpec.UpdateStrategy = dbaasv1alpha1.Serial
+		clusterDef.Spec.Components[0].ConsensusSpec.UpdateStrategy = dbaasv1alpha1.SerialStrategy
 		Expect(k8sClient.Update(context.Background(), clusterDef)).Should(Succeed())
 
 		newSts := &appsv1.StatefulSet{}
@@ -185,10 +185,10 @@ var _ = Describe("StatefulSet Controller", func() {
 			}, timeout, interval).Should(BeTrue())
 
 			By("test updateStrategy with Serial")
-			testUpdateStrategy(dbaasv1alpha1.Serial, componentName, 1)
+			testUpdateStrategy(dbaasv1alpha1.SerialStrategy, componentName, 1)
 
 			By("test updateStrategy with Parallel")
-			testUpdateStrategy(dbaasv1alpha1.Parallel, componentName, 2)
+			testUpdateStrategy(dbaasv1alpha1.ParallelStrategy, componentName, 2)
 		})
 	})
 })

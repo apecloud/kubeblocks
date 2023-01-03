@@ -1,0 +1,1 @@
+cmd/manager/main.go

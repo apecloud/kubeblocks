@@ -42,6 +42,7 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
+	"k8s.io/apimachinery/pkg/types"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -183,3 +184,67 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
+
+// Helper functions to change fields in the desired state and status of resources.
+// Each helper is a wrapper of k8sClient.Patch.
+
+func changeClusterDef(namespacedName types.NamespacedName,
+	action func(clusterDef *dbaasv1alpha1.ClusterDefinition)) error {
+	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+	if err := k8sClient.Get(ctx, namespacedName, clusterDef); err != nil {
+		return err
+	}
+	patch := client.MergeFrom(clusterDef.DeepCopy())
+	action(clusterDef)
+	if err := k8sClient.Patch(ctx, clusterDef, patch); err != nil {
+		return err
+	}
+	return nil
+}
+
+func changeClusterStatus(namespacedName types.NamespacedName,
+	action func(cluster *dbaasv1alpha1.Cluster)) error {
+	cluster := &dbaasv1alpha1.Cluster{}
+	if err := k8sClient.Get(ctx, namespacedName, cluster); err != nil {
+		return err
+	}
+	patch := client.MergeFrom(cluster.DeepCopy())
+	action(cluster)
+	if err := k8sClient.Status().Patch(ctx, cluster, patch); err != nil {
+		return err
+	}
+	return nil
+}
+
+func changeOpsRequestStatus(namespacedName types.NamespacedName,
+	action func(cluster *dbaasv1alpha1.OpsRequest)) error {
+	opsRequest := &dbaasv1alpha1.OpsRequest{}
+	if err := k8sClient.Get(ctx, namespacedName, opsRequest); err != nil {
+		return err
+	}
+	patch := client.MergeFrom(opsRequest.DeepCopy())
+	action(opsRequest)
+	if err := k8sClient.Status().Patch(ctx, opsRequest, patch); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Helper functions to get fields from state or status of resources when writing unit tests.
+// Each helper returns a Gomega assertion function, which should be passed into Eventually() as the first parameter.
+
+func expectClusterStatusPhase(namespacedName types.NamespacedName) func(g Gomega) dbaasv1alpha1.Phase {
+	return func(g Gomega) dbaasv1alpha1.Phase {
+		cluster := &dbaasv1alpha1.Cluster{}
+		g.Expect(k8sClient.Get(ctx, namespacedName, cluster)).To(Succeed())
+		return cluster.Status.Phase
+	}
+}
+
+func expectOpsRequestStatusPhase(namespacedName types.NamespacedName) func(g Gomega) dbaasv1alpha1.Phase {
+	return func(g Gomega) dbaasv1alpha1.Phase {
+		opsRequest := &dbaasv1alpha1.OpsRequest{}
+		g.Expect(k8sClient.Get(ctx, namespacedName, opsRequest)).To(Succeed())
+		return opsRequest.Status.Phase
+	}
+}

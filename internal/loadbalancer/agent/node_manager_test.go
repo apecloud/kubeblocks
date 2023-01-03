@@ -19,16 +19,16 @@ package agent
 import (
 	"context"
 
-	"github.com/go-logr/logr"
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/go-logr/logr"
+	"github.com/golang/mock/gomock"
 	"google.golang.org/grpc"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
-
 	pb "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol"
 )
 

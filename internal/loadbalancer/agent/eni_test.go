@@ -21,14 +21,13 @@ import (
 	"math"
 	"time"
 
-	"google.golang.org/grpc"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	pb "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol"
-
 	"github.com/golang/mock/gomock"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"google.golang.org/grpc"
 
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
 	mockcloud "github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/mocks"

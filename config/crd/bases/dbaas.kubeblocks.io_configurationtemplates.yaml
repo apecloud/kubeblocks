@@ -11,14 +11,13 @@ spec:
   names:
     categories:
     - dbaas
-    - all
     kind: ConfigurationTemplate
     listKind: ConfigurationTemplateList
     plural: configurationtemplates
     shortNames:
     - ctpl
     singular: configurationtemplate
-  scope: Namespaced
+  scope: Cluster
   versions:
   - additionalPrinterColumns:
     - description: status phase
@@ -116,7 +115,38 @@ spec:
                       signal:
                         description: 'signal is valid for unix signal. e.g: SIGHUP
                           url: ../../internal/configuration/configmap/handler.go:allUnixSignals'
-                        pattern: ^SIG[A-Z]+$
+                        enum:
+                        - SIGHUP
+                        - SIGINT
+                        - SIGQUIT
+                        - SIGILL
+                        - SIGTRAP
+                        - SIGABRT
+                        - SIGBUS
+                        - SIGFPE
+                        - SIGKILL
+                        - SIGUSR1
+                        - SIGSEGV
+                        - SIGUSR2
+                        - SIGPIPE
+                        - SIGALRM
+                        - SIGTERM
+                        - SIGSTKFLT
+                        - SIGCHLD
+                        - SIGCONT
+                        - SIGSTOP
+                        - SIGTSTP
+                        - SIGTTIN
+                        - SIGTTOU
+                        - SIGURG
+                        - SIGXCPU
+                        - SIGXFSZ
+                        - SIGVTALRM
+                        - SIGPROF
+                        - SIGWINCH
+                        - SIGIO
+                        - SIGPWR
+                        - SIGSYS
                         type: string
                     required:
                     - processName

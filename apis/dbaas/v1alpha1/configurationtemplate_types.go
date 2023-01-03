@@ -105,8 +105,8 @@ type UnixSignalTrigger struct {
 	// e.g: SIGHUP
 	// url: ../../internal/configuration/configmap/handler.go:allUnixSignals
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^SIG[A-Z]+$`
-	Signal string `json:"signal"`
+	// +kubebuilder:validation:Enum={SIGHUP,SIGINT,SIGQUIT,SIGILL,SIGTRAP,SIGABRT,SIGBUS,SIGFPE,SIGKILL,SIGUSR1,SIGSEGV,SIGUSR2,SIGPIPE,SIGALRM,SIGTERM,SIGSTKFLT,SIGCHLD,SIGCONT,SIGSTOP,SIGTSTP,SIGTTIN,SIGTTOU,SIGURG,SIGXCPU,SIGXFSZ,SIGVTALRM,SIGPROF,SIGWINCH,SIGIO,SIGPWR,SIGSYS}
+	Signal SignalType `json:"signal"`
 
 	// processName is process name, sends unix signal to proc.
 	// +kubebuilder:validation:Required
@@ -122,7 +122,7 @@ type ShellTrigger struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-//+kubebuilder:resource:categories={dbaas, all},scope=Namespaced,shortName=ctpl
+//+kubebuilder:resource:categories={dbaas},scope=Cluster,shortName=ctpl
 //+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 

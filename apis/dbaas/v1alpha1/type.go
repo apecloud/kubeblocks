@@ -186,6 +186,42 @@ const (
 	HTTPType       CfgReloadType = "http"
 )
 
+type SignalType string
+
+const (
+	SIGHUP    SignalType = "SIGHUP"
+	SIGINT    SignalType = "SIGINT"
+	SIGQUIT   SignalType = "SIGQUIT"
+	SIGILL    SignalType = "SIGILL"
+	SIGTRAP   SignalType = "SIGTRAP"
+	SIGABRT   SignalType = "SIGABRT"
+	SIGBUS    SignalType = "SIGBUS"
+	SIGFPE    SignalType = "SIGFPE"
+	SIGKILL   SignalType = "SIGKILL"
+	SIGUSR1   SignalType = "SIGUSR1"
+	SIGSEGV   SignalType = "SIGSEGV"
+	SIGUSR2   SignalType = "SIGUSR2"
+	SIGPIPE   SignalType = "SIGPIPE"
+	SIGALRM   SignalType = "SIGALRM"
+	SIGTERM   SignalType = "SIGTERM"
+	SIGSTKFLT SignalType = "SIGSTKFLT"
+	SIGCHLD   SignalType = "SIGCHLD"
+	SIGCONT   SignalType = "SIGCONT"
+	SIGSTOP   SignalType = "SIGSTOP"
+	SIGTSTP   SignalType = "SIGTSTP"
+	SIGTTIN   SignalType = "SIGTTIN"
+	SIGTTOU   SignalType = "SIGTTOU"
+	SIGURG    SignalType = "SIGURG"
+	SIGXCPU   SignalType = "SIGXCPU"
+	SIGXFSZ   SignalType = "SIGXFSZ"
+	SIGVTALRM SignalType = "SIGVTALRM"
+	SIGPROF   SignalType = "SIGPROF"
+	SIGWINCH  SignalType = "SIGWINCH"
+	SIGIO     SignalType = "SIGIO"
+	SIGPWR    SignalType = "SIGPWR"
+	SIGSYS    SignalType = "SIGSYS"
+)
+
 func RegisterWebhookManager(mgr manager.Manager) {
 	webhookMgr = &webhookManager{mgr.GetClient()}
 }

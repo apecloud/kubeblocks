@@ -58,6 +58,7 @@ func NeedBuildConfigSidecar(reloadOptions *dbaasv1alpha1.ReloadOptions) error {
 func BuildSignalArgs(configuration dbaasv1alpha1.UnixSignalTrigger, volumeDirs []corev1.VolumeMount, criType string, runtimeEndpoint string) []string {
 	args := make([]string, 0)
 	args = append(args, "--process", configuration.ProcessName)
+	args = append(args, "--signal", string(configuration.Signal))
 	if criType != "" {
 		args = append(args, "--container-runtime", criType)
 	}

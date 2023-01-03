@@ -232,7 +232,7 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Service *corev1.ServiceSpec `json:"service,omitempty"`
 
-	// probes setting for db healthy checks.
+	// probes setting for healthy checks.
 	// +optional
 	Probes *ClusterDefinitionProbes `json:"probes,omitempty"`
 

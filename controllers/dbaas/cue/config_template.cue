@@ -10,10 +10,10 @@ meta: {
 	}
 
 	component: {
-		name:         string
-		type:         string
-		configName:   string
-		templateName: string
+		name:                  string
+		type:                  string
+		configName:            string
+		templateName:          string
 		configConstraintsName: string
 		configTemplateName:    string
 	}
@@ -32,14 +32,14 @@ config: {
 			// component name
 			"app.kubernetes.io/component-name": "\(meta.component.name)"
 			"app.kubernetes.io/created-by":     "controller-manager"
-			"app.kubernetes.io/managed-by":    "kubeblocks"
+			"app.kubernetes.io/managed-by":     "kubeblocks"
 
 			// configmap selector for ConfigureController
 			"configuration.kubeblocks.io/ins-configure": "true"
 			// config template name
-			"configuration.kubeblocks.io/configuration-tpl-name": "\(meta.component.templateName)"
+			"configuration.kubeblocks.io/configuration-tpl-name":         "\(meta.component.templateName)"
 			"configuration.kubeblocks.io/configuration-constraints-name": "\(meta.component.configConstraintsName)"
-			"configuration.kubeblocks.io/configtemplate-name": "\(meta.component.configTemplateName)"
+			"configuration.kubeblocks.io/configtemplate-name":            "\(meta.component.configTemplateName)"
 		}
 		annotations: {
 			// enable configmap upgrade

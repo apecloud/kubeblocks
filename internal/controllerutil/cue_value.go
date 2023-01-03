@@ -63,11 +63,11 @@ func NewCUEBuilder(cueTpl CUETpl) CUEBuilder {
 }
 
 func (v *CUEBuilder) FillObj(path string, obj any) error {
-	byte, err := json.Marshal(obj)
+	b, err := json.Marshal(obj)
 	if err != nil {
 		return err
 	}
-	return v.Fill(path, byte)
+	return v.Fill(path, b)
 }
 
 func (v *CUEBuilder) Fill(path string, jsonByte []byte) error {

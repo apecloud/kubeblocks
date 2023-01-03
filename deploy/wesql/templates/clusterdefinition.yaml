@@ -16,7 +16,7 @@ spec:
         roleChangedProbe:
           failureThreshold: {{ .Values.roleChangedProbe.failureThreshold }}
           periodSeconds: {{ .Values.roleChangedProbe.periodSeconds }}
-          successThreshold: {{ .Values.roleChangedProbe.successThreshold }}
+          timeoutSeconds: {{ .Values.roleChangedProbe.timeoutSeconds }}
       monitor:
         builtIn: true
       logConfigs:

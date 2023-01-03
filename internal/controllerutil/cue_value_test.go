@@ -16,7 +16,10 @@ limitations under the License.
 
 package controllerutil
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNewCUETplFromPath(t *testing.T) {
 	_, err := NewCUETplFromPath("cue.cue")
@@ -34,4 +37,103 @@ func TestNewCUETplFromBytes(t *testing.T) {
 
 func TestNewCUETpl(t *testing.T) {
 	NewCUETpl("")
+}
+
+type testCUEInput struct {
+	Replicas int `json:"replicas"`
+}
+
+type testCUEInputIntOmitEmpty struct {
+	Replicas int `json:"replicas,omitempty"`
+}
+
+type testCUEInputBoolOmitEmpty struct {
+	Flag bool `json:"flag,omitempty"`
+}
+
+// This test shows that the omitempty tag should be used with care if the field
+// is used in cue template.
+func TestCUE(t *testing.T) {
+	cueTplIntJSON := `
+input: {
+	replicas:       int32
+}
+output: {
+	replicas:       input.replicas
+}
+`
+	cueTplBoolJSON := `
+input: {
+	flag:       bool
+}
+output: {
+	flag:       input.flag
+}
+`
+
+	testCases := []struct {
+		name  string
+		tpl   string
+		input any
+		err   string
+	}{{
+		name:  "testCUEInput",
+		tpl:   cueTplIntJSON,
+		input: testCUEInput{Replicas: 0},
+	}, {
+		name:  "testCUEInputIntOmitEmptyWithNonZeroValue",
+		tpl:   cueTplIntJSON,
+		input: testCUEInputIntOmitEmpty{Replicas: 1},
+	}, {
+		name:  "testCUEInputIntOmitEmpty",
+		tpl:   cueTplIntJSON,
+		input: testCUEInputIntOmitEmpty{Replicas: 0},
+		err:   "marshal error",
+	}, {
+		name:  "testCUEInputBoolOmitEmptyWithNonZeroValue",
+		tpl:   cueTplBoolJSON,
+		input: testCUEInputBoolOmitEmpty{Flag: true},
+	}, {
+		name:  "testCUEInputBoolOmitEmpty",
+		tpl:   cueTplBoolJSON,
+		input: testCUEInputBoolOmitEmpty{Flag: false},
+		err:   "marshal error",
+	}}
+
+	for _, tc := range testCases {
+		cueTpl := NewCUETpl(tc.tpl)
+		cueValue := NewCUEBuilder(*cueTpl)
+
+		if err := cueValue.FillObj("input", tc.input); err != nil {
+			t.Error("Expected non-nil input error")
+		}
+		_, err := cueValue.Lookup("output")
+		checkErr(t, err, tc.err, tc.name)
+	}
+}
+
+func checkErr(t *testing.T, err error, str, name string) bool {
+	t.Helper()
+	if err == nil {
+		if str != "" {
+			t.Errorf(`err:%s: got ""; want %q`, name, str)
+		}
+		return true
+	}
+	return checkFailed(t, err, str, name)
+}
+
+func checkFailed(t *testing.T, err error, str, name string) bool {
+	t.Helper()
+	if err != nil {
+		got := err.Error()
+		if str == "" {
+			t.Fatalf(`err:%s: got %q; want ""`, name, got)
+		}
+		if !strings.Contains(got, str) {
+			t.Errorf(`err:%s: got %q; want %q`, name, got, str)
+		}
+		return false
+	}
+	return true
 }

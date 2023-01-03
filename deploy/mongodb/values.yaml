@@ -16,4 +16,4 @@ replicaset:
   roleChangedProbe:
     failureThreshold: 2
     periodSeconds: 1
-    successThreshold: 1
+    timeoutSeconds: 1

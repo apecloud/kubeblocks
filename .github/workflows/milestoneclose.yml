@@ -6,9 +6,10 @@ on:
 
 env:
   GITHUB_TOKEN: ${{ secrets.KUBEBLOCKS_TOKEN }}
-  REPO: 'kubeblocks'
+  REPO: kubeblocks
   milestone: 2
-  ISSUELIST: ''
+  ORGANIZATION: apecloud
+  PROJECT_NUMBER: 2
 
 jobs:
    move_issues:
@@ -16,10 +17,7 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
-      - name: Get project data
-        env:
-          ORGANIZATION: apecloud
-          PROJECT_NUMBER: 2
+      - name: Get project data      
         run: |
           gh api graphql -f query='
             query($org: String!, $number: Int!) {

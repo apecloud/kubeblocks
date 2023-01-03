@@ -45,10 +45,11 @@ var _ = Describe("helm util", func() {
 
 	It("Install", func() {
 		o := &InstallOpts{
-			Name:      testing.KubeBlocksChartName,
-			Chart:     testing.KubeBlocksChartURL,
-			Namespace: "default",
-			Version:   version.DefaultKubeBlocksVersion,
+			Name:            testing.KubeBlocksChartName,
+			Chart:           testing.KubeBlocksChartURL,
+			Namespace:       "default",
+			Version:         version.DefaultKubeBlocksVersion,
+			CreateNamespace: false,
 		}
 		cfg := FakeActionConfig()
 		Expect(cfg).ShouldNot(BeNil())

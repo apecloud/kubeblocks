@@ -791,7 +791,14 @@ spec:
 
 	// 		It("Build StatefulSet", func() {
 	// 			envConfigName := "test-env-config-name"
-	// 			sts, err := buildSts(reqCtx, params, envConfigName)
+	// 			newParams := params
+	// 			newComponent := *params.component
+	// 			newComponent.Replicas = 0
+	// 			newParams.component = &newComponent
+	// 			sts, err := buildSts(reqCtx, newParams, envConfigName)
+	// 			Expect(err).Should(BeNil())
+	// 			Expect(sts).ShouldNot(BeNil())
+	// 			sts, err = buildSts(reqCtx, params, envConfigName)
 	// 			Expect(err).Should(BeNil())
 	// 			Expect(sts).ShouldNot(BeNil())
 	// 		})

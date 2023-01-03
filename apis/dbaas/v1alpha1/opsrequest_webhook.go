@@ -64,7 +64,7 @@ func (r *OpsRequest) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-dbaas-kubeblocks-io-v1alpha1-opsrequest,mutating=false,failurePolicy=fail,sideEffects=None,groups=dbaas.kubeblocks.io,resources=opsrequests,verbs=create;update;delete,versions=v1alpha1,name=vopsrequest.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-dbaas-kubeblocks-io-v1alpha1-opsrequest,mutating=false,failurePolicy=fail,sideEffects=None,groups=dbaas.kubeblocks.io,resources=opsrequests,verbs=create;update,versions=v1alpha1,name=vopsrequest.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &OpsRequest{}
 
@@ -92,9 +92,6 @@ func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *OpsRequest) ValidateDelete() error {
 	opsrequestlog.Info("validate delete", "name", r.Name)
-	if r.Status.Phase == RunningPhase {
-		return newInvalidError(OpsRequestKind, r.Name, "status.phase", fmt.Sprintf("delete OpsRequest is forbidden when status.Phase is %s", r.Status.Phase))
-	}
 	return nil
 }
 

@@ -416,9 +416,19 @@ func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, clu
 			notExistOps[v.Name] = struct{}{}
 		}
 	}
-	if len(notExistOps) == 0 {
-		return nil
+	if len(notExistOps) != 0 {
+		return removeClusterInvalidOpsRequestAnnotation(ctx, cli, cluster, opsRequestSlice, notExistOps)
 	}
+	return nil
+}
+
+// removeClusterInvalidOpsRequestAnnotation delete the OpsRequest annotation in cluster when the OpsRequest not existing.
+func removeClusterInvalidOpsRequestAnnotation(
+	ctx context.Context,
+	cli client.Client,
+	cluster *dbaasv1alpha1.Cluster,
+	opsRequestSlice []dbaasv1alpha1.OpsRecorder,
+	notExistOps map[string]struct{}) error {
 	// delete the OpsRequest annotation in cluster when the OpsRequest not existing.
 	newOpsRequestSlice := make([]dbaasv1alpha1.OpsRecorder, 0, len(opsRequestSlice))
 	for _, v := range opsRequestSlice {

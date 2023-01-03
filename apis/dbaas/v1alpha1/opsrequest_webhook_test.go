@@ -353,25 +353,6 @@ var _ = Describe("OpsRequest webhook", func() {
 		return opsRequest
 	}
 
-	testDeleteOps := func(opsRequest *OpsRequest) {
-		patch := client.MergeFrom(opsRequest.DeepCopy())
-		opsRequest.Status.Phase = RunningPhase
-		Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).Should(Succeed())
-		Eventually(func() bool {
-			_ = k8sClient.Get(ctx, client.ObjectKey{Name: opsRequest.Name, Namespace: opsRequest.Namespace}, opsRequest)
-			return opsRequest.Status.Phase == RunningPhase
-		}, timeout, interval).Should(BeTrue())
-		Expect(k8sClient.Delete(ctx, opsRequest).Error()).To(ContainSubstring("delete OpsRequest is forbidden"))
-
-		patch = client.MergeFrom(opsRequest.DeepCopy())
-		opsRequest.Status.Phase = SucceedPhase
-		Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).Should(Succeed())
-		Eventually(func() bool {
-			_ = k8sClient.Get(ctx, client.ObjectKey{Name: opsRequest.Name, Namespace: opsRequest.Namespace}, opsRequest)
-			return opsRequest.Status.Phase == SucceedPhase
-		}, timeout, interval).Should(BeTrue())
-	}
-
 	Context("When clusterVersion create and update", func() {
 		It("Should webhook validate passed", func() {
 			By("By create a clusterDefinition")
@@ -409,8 +390,6 @@ var _ = Describe("OpsRequest webhook", func() {
 			opsRequest = testRestart(cluster)
 
 			testWhenClusterDeleted(cluster, opsRequest)
-
-			testDeleteOps(opsRequest)
 		})
 	})
 })

@@ -173,9 +173,9 @@ spec:
 		}
 		tmpCluster.Annotations[intctrlutil.OpsRequestAnnotationKey] = fmt.Sprintf(`[{"clusterPhase": "%s", "name":"%s"}]`, toClusterPhase, opsRequestName)
 		Expect(k8sClient.Patch(ctx, tmpCluster, patch)).Should(Succeed())
-		Eventually(func() bool {
+		Eventually(func(g Gomega) bool {
 			myCluster := &dbaasv1alpha1.Cluster{}
-			_ = k8sClient.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: testCtx.DefaultNamespace}, myCluster)
+			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: testCtx.DefaultNamespace}, myCluster)).Should(Succeed())
 			return getOpsRequestNameFromAnnotation(myCluster, dbaasv1alpha1.VolumeExpandingPhase) != ""
 		}, timeout, interval).Should(BeTrue())
 	}
@@ -217,16 +217,31 @@ spec:
 		pvcName := fmt.Sprintf("%s-%s-%s-%d", vctName, clusterObject.Name, testdbaas.ConsensusComponentName, index)
 		createPVC(clusterObject.Name, storageClassName, vctName, pvcName)
 		// waiting pvc controller mark annotation to OpsRequest
-		Eventually(func() bool {
+		Eventually(func(g Gomega) bool {
 			tmpOps := &dbaasv1alpha1.OpsRequest{}
-			_ = k8sClient.Get(ctx, client.ObjectKey{Name: ops.Name, Namespace: testCtx.DefaultNamespace}, tmpOps)
-			if tmpOps.Annotations == nil {
-				return false
-			}
-			_, ok := tmpOps.Annotations[intctrlutil.OpsRequestReconcileAnnotationKey]
-			return ok
+			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: ops.Name, Namespace: testCtx.DefaultNamespace}, tmpOps)).Should(Succeed())
+			return tmpOps.Annotations != nil && tmpOps.Annotations[intctrlutil.OpsRequestReconcileAnnotationKey] != ""
 		}, timeout*2, interval).Should(BeTrue())
 		return newOps, pvcName
+	}
+
+	expectOpsRequestCompPhase := func(opsName, componentName string, phase dbaasv1alpha1.Phase) bool {
+		tmpOps := &dbaasv1alpha1.OpsRequest{}
+		err := k8sClient.Get(ctx, client.ObjectKey{Name: opsName, Namespace: testCtx.DefaultNamespace}, tmpOps)
+		if err != nil {
+			return false
+		}
+		statusComponents := tmpOps.Status.Components
+		return statusComponents != nil && statusComponents[componentName].Phase == phase
+	}
+
+	expectOpsRequestPhase := func(opsName string, phase dbaasv1alpha1.Phase) bool {
+		tmpOps := &dbaasv1alpha1.OpsRequest{}
+		err := k8sClient.Get(ctx, client.ObjectKey{Name: opsName, Namespace: testCtx.DefaultNamespace}, tmpOps)
+		if err != nil {
+			return false
+		}
+		return tmpOps.Status.Phase == phase
 	}
 
 	mockVolumeExpansionActionAndReconcile := func(opsRes *OpsResource, newOps *dbaasv1alpha1.OpsRequest) {
@@ -239,12 +254,7 @@ spec:
 		opsRes.OpsRequest = newOps
 		_, err := GetOpsManager().Reconcile(opsRes)
 		Expect(err == nil).Should(BeTrue())
-		Eventually(func() bool {
-			tmpOps := &dbaasv1alpha1.OpsRequest{}
-			_ = k8sClient.Get(ctx, client.ObjectKey{Name: newOps.Name, Namespace: testCtx.DefaultNamespace}, tmpOps)
-			statusComponents := tmpOps.Status.Components
-			return statusComponents != nil && statusComponents[testdbaas.ConsensusComponentName].Phase == dbaasv1alpha1.VolumeExpandingPhase
-		}, timeout, interval).Should(BeTrue())
+		Eventually(expectOpsRequestCompPhase(newOps.Name, testdbaas.ConsensusComponentName, dbaasv1alpha1.VolumeExpandingPhase), timeout, interval).Should(BeTrue())
 	}
 
 	testWarningEventOnPVC := func(clusterObject *dbaasv1alpha1.Cluster, opsRes *OpsResource) {
@@ -271,12 +281,8 @@ spec:
 		pvcEventHandler := PersistentVolumeClaimEventHandler{}
 		reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 		Expect(pvcEventHandler.Handle(k8sClient, reqCtx, eventRecorder, event)).Should(Succeed())
-		Eventually(func() bool {
-			tmpOps := &dbaasv1alpha1.OpsRequest{}
-			_ = k8sClient.Get(ctx, client.ObjectKey{Name: newOps.Name, Namespace: testCtx.DefaultNamespace}, tmpOps)
-			statusComponents := tmpOps.Status.Components
-			return statusComponents != nil && statusComponents[testdbaas.ConsensusComponentName].Phase == dbaasv1alpha1.VolumeExpandingPhase
-		}, timeout, interval).Should(BeTrue())
+		Eventually(expectOpsRequestCompPhase(newOps.Name, testdbaas.ConsensusComponentName, dbaasv1alpha1.VolumeExpandingPhase),
+			timeout, interval).Should(BeTrue())
 
 		// test when the event reach the conditions
 		event.Count = 5
@@ -346,13 +352,38 @@ spec:
 		}, timeout, interval).Should(BeTrue())
 		// waiting OpsRequest.status.phase is succeed
 		_, _ = GetOpsManager().Reconcile(opsRes)
-		Eventually(func() bool {
-			tmpOps := &dbaasv1alpha1.OpsRequest{}
-			_ = k8sClient.Get(ctx, client.ObjectKey{Name: newOps.Name, Namespace: testCtx.DefaultNamespace}, tmpOps)
-			return tmpOps.Status.Phase == dbaasv1alpha1.SucceedPhase
-		}, timeout, interval).Should(BeTrue())
+		Eventually(expectOpsRequestPhase(newOps.Name, dbaasv1alpha1.SucceedPhase), timeout, interval).Should(BeTrue())
 
 		testWarningEventOnPVC(clusterObject, opsRes)
+	}
+
+	updateClusterPhase := func(cluster *dbaasv1alpha1.Cluster, phase dbaasv1alpha1.Phase) error {
+		patch := client.MergeFrom(cluster.DeepCopy())
+		cluster.Status.Phase = phase
+		return k8sClient.Status().Patch(ctx, cluster, patch)
+	}
+
+	testDeleteRunningVolumeExpansion := func(clusterObject *dbaasv1alpha1.Cluster, opsRes *OpsResource) {
+		// init resources for volume expansion
+		newOps, pvcName := initResourcesForVolumeExpansion(clusterObject, opsRes, 2)
+		Expect(updateClusterPhase(clusterObject, dbaasv1alpha1.VolumeExpandingPhase)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, newOps)).Should(Succeed())
+		Eventually(func() error {
+			return k8sClient.Get(ctx, client.ObjectKey{Name: newOps.Name, Namespace: testCtx.DefaultNamespace}, &dbaasv1alpha1.OpsRequest{})
+		}, timeout, interval).Should(Satisfy(apierrors.IsNotFound))
+
+		By("test handle the invalid volumeExpansion OpsRequest")
+		pvc := &corev1.PersistentVolumeClaim{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, pvc)).Should(Succeed())
+		Expect(handleVolumeExpansionWithPVC(intctrlutil.RequestCtx{Ctx: ctx}, k8sClient, pvc)).Should(Succeed())
+
+		Eventually(func(g Gomega) bool {
+			cluster := &dbaasv1alpha1.Cluster{}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterObject.Name,
+				Namespace: testCtx.DefaultNamespace}, cluster)).Should(Succeed())
+			return cluster.Status.Phase == dbaasv1alpha1.RunningPhase
+		}, timeout, interval).Should(BeTrue())
+
 	}
 
 	Context("Test OpsRequest", func() {
@@ -387,6 +418,9 @@ spec:
 
 			By("Test VolumeExpansion")
 			testVolumeExpansion(clusterObject, opsRes, randomStr)
+
+			By("Test delete the Running VolumeExpansion OpsRequest")
+			testDeleteRunningVolumeExpansion(clusterObject, opsRes)
 
 			By("Test VerticalScaling")
 			ops = generateOpsRequestObj("verticalscaling-ops-"+randomStr, clusterObject.Name, dbaasv1alpha1.VerticalScalingType)

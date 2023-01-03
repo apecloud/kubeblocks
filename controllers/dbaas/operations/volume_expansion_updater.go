@@ -17,10 +17,12 @@ limitations under the License.
 package operations
 
 import (
+	"context"
 	"time"
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -64,7 +66,39 @@ func handleVolumeExpansionWithPVC(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return nil
 	}
 	// notice the OpsRequest to reconcile
-	return PatchOpsRequestAnnotation(reqCtx.Ctx, cli, cluster, opsRequestName)
+	err := PatchOpsRequestAnnotation(reqCtx.Ctx, cli, cluster, opsRequestName)
+	// if the OpsRequest is not found, means it is deleted by user.
+	// we should delete the invalid OpsRequest annotation in the cluster and reconcile the cluster phase.
+	if apierrors.IsNotFound(err) {
+		opsRequestSlice, _ := GetOpsRequestSliceFromCluster(cluster)
+		notExistOps := map[string]struct{}{
+			opsRequestName: {},
+		}
+		if err = removeClusterInvalidOpsRequestAnnotation(reqCtx.Ctx, cli, cluster,
+			opsRequestSlice, notExistOps); err != nil {
+			return err
+		}
+		return handleClusterVolumeExpandingPhase(reqCtx.Ctx, cli, cluster)
+	}
+	return err
+}
+
+// handleClusterVolumeExpandingPhase this function will reconcile the cluster status phase when the OpsRequest is deleted.
+func handleClusterVolumeExpandingPhase(ctx context.Context,
+	cli client.Client,
+	cluster *dbaasv1alpha1.Cluster) error {
+	if cluster.Status.Phase != dbaasv1alpha1.VolumeExpandingPhase {
+		return nil
+	}
+	patch := client.MergeFrom(cluster.DeepCopy())
+	for k, v := range cluster.Status.Components {
+		if v.Phase == dbaasv1alpha1.VolumeExpandingPhase {
+			v.Phase = dbaasv1alpha1.RunningPhase
+			cluster.Status.Components[k] = v
+		}
+	}
+	cluster.Status.Phase = dbaasv1alpha1.RunningPhase
+	return cli.Status().Patch(ctx, cluster, patch)
 }
 
 // Handle the warning events on pvcs. if the events is resize failed events, update the OpsRequest.status.

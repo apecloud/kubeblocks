@@ -176,7 +176,7 @@ spec:
 		Eventually(func() bool {
 			myCluster := &dbaasv1alpha1.Cluster{}
 			_ = k8sClient.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: testCtx.DefaultNamespace}, myCluster)
-			return getOpsRequestNameFromAnnotation(myCluster, dbaasv1alpha1.VolumeExpandingPhase) != nil
+			return getOpsRequestNameFromAnnotation(myCluster, dbaasv1alpha1.VolumeExpandingPhase) != ""
 		}, timeout, interval).Should(BeTrue())
 	}
 
@@ -419,7 +419,8 @@ spec:
 			_ = RestartAction(opsRes)
 
 			By("Test HorizontalScaling")
-			ops = generateOpsRequestObj("horizontalscaling-ops-"+randomStr, clusterObject.Name, dbaasv1alpha1.HorizontalScalingType)
+			horizontalOpsName := "horizontalscaling-ops-" + randomStr
+			ops = generateOpsRequestObj(horizontalOpsName, clusterObject.Name, dbaasv1alpha1.HorizontalScalingType)
 			ops.Spec.HorizontalScalingList = []dbaasv1alpha1.HorizontalScaling{
 				{
 					ComponentOps: dbaasv1alpha1.ComponentOps{ComponentName: testdbaas.ConsensusComponentName},
@@ -427,6 +428,12 @@ spec:
 				},
 			}
 			opsRes.OpsRequest = ops
+			Expect(testCtx.CreateObj(ctx, ops)).Should(Succeed())
+			Eventually(func() error {
+				return k8sClient.Get(ctx, client.ObjectKey{Name: ops.Name, Namespace: testCtx.DefaultNamespace},
+					&dbaasv1alpha1.OpsRequest{})
+			}, timeout, interval).Should(Succeed())
+
 			_ = HorizontalScalingAction(opsRes)
 
 			By("Test OpsManager.Do function with ComponentOps")
@@ -436,9 +443,12 @@ spec:
 			_ = GetOpsManager().Do(opsRes)
 			_, _ = GetOpsManager().Reconcile(opsRes)
 			// test getOpsRequestAnnotation function
+			patch = client.MergeFrom(opsRes.Cluster.DeepCopy())
+			opsAnnotationString := fmt.Sprintf(`[{"name":"%s","clusterPhase":"Updating"},{"name":"test-not-exists-ops","clusterPhase":"VolumeExpanding"}]`, horizontalOpsName)
 			opsRes.Cluster.Annotations = map[string]string{
-				intctrlutil.OpsRequestAnnotationKey: fmt.Sprintf(`{"Updating":"horizontalscaling-ops-%s"}`, randomStr),
+				intctrlutil.OpsRequestAnnotationKey: opsAnnotationString,
 			}
+			Expect(k8sClient.Patch(ctx, opsRes.Cluster, patch)).Should(Succeed())
 			_ = GetOpsManager().Do(opsRes)
 
 			By("Test OpsManager.Reconcile when opsRequest is succeed")
@@ -449,18 +459,25 @@ spec:
 				},
 			}
 			_, _ = GetOpsManager().Reconcile(opsRes)
+			Expect(MarkRunningOpsRequestAnnotation(ctx, k8sClient, opsRes.Cluster)).Should(Succeed())
 
 			By("Test the functions in ops_util.go")
-			_ = patchOpsBehaviourNotFound(opsRes)
-			_ = patchClusterPhaseMisMatch(opsRes)
-			_ = patchClusterExistOtherOperation(opsRes, "horizontalscaling-ops-"+randomStr)
-			_ = PatchClusterNotFound(opsRes)
-			_ = patchClusterPhaseWhenExistsOtherOps(opsRes, []OpsRecorder{
+			Expect(patchOpsBehaviourNotFound(opsRes)).Should(Succeed())
+			Expect(patchClusterPhaseMisMatch(opsRes)).Should(Succeed())
+			Expect(patchClusterExistOtherOperation(opsRes, horizontalOpsName)).Should(Succeed())
+			Expect(PatchClusterNotFound(opsRes)).Should(Succeed())
+			opsRecorder := []OpsRecorder{
 				{
 					Name:           "mysql-restart",
-					ToClusterPhase: dbaasv1alpha1.PendingPhase,
+					ToClusterPhase: dbaasv1alpha1.UpdatingPhase,
 				},
-			})
+			}
+			Expect(patchClusterPhaseWhenExistsOtherOps(opsRes, opsRecorder)).Should(Succeed())
+			index, opsRecord := GetOpsRecorderFromSlice(opsRecorder, "mysql-restart")
+			Expect(index == 0 && opsRecord.Name == "mysql-restart").Should(BeTrue())
+
+			By("test PatchClusterOpsAnnotations function")
+			Expect(PatchClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, opsRecorder)).Should(Succeed())
 		})
 	})
 })

@@ -163,11 +163,11 @@ func (r *OpsRequestReconciler) deleteClusterOpsRequestAnnotation(reqCtx intctrlu
 	if opsRequestSlice, err = operations.GetOpsRequestSliceFromCluster(cluster); err != nil {
 		return err
 	}
-	index, _ := operations.GetOpsRecorderFromSlice(opsRequestSlice, opsRequest.Name)
-	if index == nil {
+	index, opsRecord := operations.GetOpsRecorderFromSlice(opsRequestSlice, opsRequest.Name)
+	if opsRecord.Name == "" {
 		return nil
 	}
-	opsRequestSlice = slices.Delete(opsRequestSlice, *index, *index+1)
+	opsRequestSlice = slices.Delete(opsRequestSlice, index, index+1)
 	return operations.PatchClusterOpsAnnotations(reqCtx.Ctx, r.Client, cluster, opsRequestSlice)
 }
 

@@ -166,7 +166,7 @@ var _ = Describe("StatefulSet Controller", func() {
 
 			clusterPatch := client.MergeFrom(cluster.DeepCopy())
 			cluster.Annotations = map[string]string{
-				intctrlutil.OpsRequestAnnotationKey: fmt.Sprintf(`{"Updating":"%s"}`, opsRequestName),
+				intctrlutil.OpsRequestAnnotationKey: fmt.Sprintf(`[{"name":"%s","clusterPhase":"Updating"}]`, opsRequestName),
 			}
 			Expect(k8sClient.Patch(ctx, cluster, clusterPatch)).Should(Succeed())
 

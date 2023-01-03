@@ -78,7 +78,7 @@ func (r *OpsRequest) ValidateCreate() error {
 func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 	opsrequestlog.Info("validate update", "name", r.Name)
 	lastOpsRequest := old.(*OpsRequest)
-	if r.IsForbiddenUpdate() && !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
+	if r.isForbiddenUpdate() && !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
 		return newInvalidError(OpsRequestKind, r.Name, "spec", fmt.Sprintf("update OpsRequest is forbidden when status.Phase is %s", r.Status.Phase))
 	}
 	// we can not delete the OpsRequest when cluster has been deleted. because can not edit the finalizer when cluster not existed.
@@ -99,7 +99,7 @@ func (r *OpsRequest) ValidateDelete() error {
 }
 
 // IsForbiddenUpdate OpsRequest cannot modify the spec when status is in [Succeed,Running,Failed].
-func (r *OpsRequest) IsForbiddenUpdate() bool {
+func (r *OpsRequest) isForbiddenUpdate() bool {
 	return slices.Contains([]Phase{SucceedPhase, RunningPhase, FailedPhase}, r.Status.Phase)
 }
 

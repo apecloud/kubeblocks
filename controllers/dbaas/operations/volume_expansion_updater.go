@@ -60,11 +60,11 @@ func handleVolumeExpansionWithPVC(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	}
 	// check whether the cluster is expanding volume
 	opsRequestName := getOpsRequestNameFromAnnotation(cluster, dbaasv1alpha1.VolumeExpandingPhase)
-	if opsRequestName == nil {
+	if opsRequestName == "" {
 		return nil
 	}
 	// notice the OpsRequest to reconcile
-	return PatchOpsRequestAnnotation(reqCtx.Ctx, cli, cluster, *opsRequestName)
+	return PatchOpsRequestAnnotation(reqCtx.Ctx, cli, cluster, opsRequestName)
 }
 
 // Handle the warning events on pvcs. if the events is resize failed events, update the OpsRequest.status.
@@ -125,11 +125,11 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOn
 	}
 	// get the volume expansion ops which is running on cluster.
 	opsRequestName := getOpsRequestNameFromAnnotation(cluster, dbaasv1alpha1.VolumeExpandingPhase)
-	if opsRequestName == nil {
+	if opsRequestName == "" {
 		return nil
 	}
 	opsRequest := &dbaasv1alpha1.OpsRequest{}
-	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: *opsRequestName, Namespace: pvc.Namespace}, opsRequest); err != nil {
+	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: opsRequestName, Namespace: pvc.Namespace}, opsRequest); err != nil {
 		return err
 	}
 	statusComponents := opsRequest.Status.Components

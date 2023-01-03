@@ -272,7 +272,7 @@ spec:
 					ResourceRequirements: &corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							"cpu":    resource.MustParse("400m"),
-							"memory": resource.MustParse("200Mi"),
+							"memory": resource.MustParse("300Mi"),
 						},
 					},
 				},
@@ -299,6 +299,10 @@ spec:
 				g.Expect(fetchedCluster.Spec.Components[0].Resources.Requests).To(Equal(
 					verticalScalingOpsRequest.Spec.VerticalScalingList[0].Requests))
 			}, timeout, interval).Should(Succeed())
+
+			By("test deleteClusterOpsRequestAnnotation function")
+			opsReconciler := OpsRequestReconciler{Client: k8sClient}
+			Expect(opsReconciler.deleteClusterOpsRequestAnnotation(intctrlutil.RequestCtx{Ctx: ctx}, verticalScalingOpsRequest)).Should(Succeed())
 
 			By("OpsRequest reclaimed after ttl")
 			Eventually(func() error {

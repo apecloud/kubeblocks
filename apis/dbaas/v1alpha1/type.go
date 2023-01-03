@@ -143,6 +143,14 @@ type OpsRequestBehaviour struct {
 	ToClusterPhase    Phase
 }
 
+// OpsRecorder recorder the running OpsRequest info in cluster annotation
+type OpsRecorder struct {
+	// Name OpsRequest name
+	Name string `json:"name"`
+	// ToClusterPhase the cluster phase when the OpsRequest is running
+	ToClusterPhase Phase `json:"clusterPhase"`
+}
+
 var webhookMgr *webhookManager
 
 type webhookManager struct {

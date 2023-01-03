@@ -110,7 +110,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		// update cluster existing operations
 		clusterPatch = client.MergeFrom(cluster.DeepCopy())
 		cluster.Annotations = map[string]string{
-			opsRequestAnnotationKey: `{"Updating":"testOpsName"}`,
+			opsRequestAnnotationKey: `[{"name":"testOpsName","clusterPhase":"Updating"}]`,
 		}
 		Expect(k8sClient.Patch(ctx, cluster, clusterPatch)).Should(Succeed())
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("Existing OpsRequest: testOpsName"))
@@ -390,7 +390,6 @@ var _ = Describe("OpsRequest webhook", func() {
 			opsRequest = testRestart(cluster)
 
 			testWhenClusterDeleted(cluster, opsRequest)
-
 		})
 	})
 })

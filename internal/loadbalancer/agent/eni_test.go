@@ -70,17 +70,6 @@ var getDescribeAllENIResponse = func() *pb.DescribeAllENIsResponse {
 	}
 }
 
-var getDescribeNodeInfoResponse = func() *pb.DescribeNodeInfoResponse {
-	return &pb.DescribeNodeInfoResponse{
-		RequestId: util.GenRequestID(),
-		Info: &pb.InstanceInfo{
-			InstanceId:       instanceID,
-			SubnetId:         subnet1Id,
-			SecurityGroupIds: []string{securityGroupID},
-		},
-	}
-}
-
 var getMockENIs = func() map[string]*pb.ENIMetadata {
 	return map[string]*pb.ENIMetadata{
 		eniID1: {

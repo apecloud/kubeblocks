@@ -96,7 +96,7 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 		}
 	}
 
-	// get app version
+	// get cluster version
 	if o.WithClusterVersion {
 		if err = getResource(types.ClusterVersionGVR(), objs.Cluster.Spec.ClusterVersionRef, "",
 			objs.ClusterVersion); err != nil {

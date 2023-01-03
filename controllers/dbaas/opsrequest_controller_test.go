@@ -34,7 +34,6 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controllerutil"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var _ = Describe("OpsRequest Controller", func() {
@@ -302,7 +301,7 @@ spec:
 
 			By("test deleteClusterOpsRequestAnnotation function")
 			opsReconciler := OpsRequestReconciler{Client: k8sClient}
-			Expect(opsReconciler.deleteClusterOpsRequestAnnotation(intctrlutil.RequestCtx{Ctx: ctx}, verticalScalingOpsRequest)).Should(Succeed())
+			Expect(opsReconciler.deleteClusterOpsRequestAnnotation(controllerutil.RequestCtx{Ctx: ctx}, verticalScalingOpsRequest)).Should(Succeed())
 
 			By("OpsRequest reclaimed after ttl")
 			Eventually(func() error {

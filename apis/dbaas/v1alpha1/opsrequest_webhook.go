@@ -116,7 +116,7 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	// validate whether existing the same type OpsRequest
 	var (
 		opsRequestValue string
-		opsRequestMap   map[Phase]string
+		opsRecorder     []OpsRecorder
 		ok              bool
 	)
 	if cluster.Annotations == nil {
@@ -126,12 +126,13 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 		return nil
 	}
 	// opsRequest annotation value in cluster to map
-	if err := json.Unmarshal([]byte(opsRequestValue), &opsRequestMap); err != nil {
+	if err := json.Unmarshal([]byte(opsRequestValue), &opsRecorder); err != nil {
 		return nil
 	}
-	opsRequestName := opsRequestMap[opsBehaviour.ToClusterPhase]
-	if opsRequestName != "" {
-		return newInvalidError(OpsRequestKind, r.Name, "spec.type", fmt.Sprintf("Existing OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", opsRequestName, cluster.Name))
+	for _, v := range opsRecorder {
+		if v.ToClusterPhase == opsBehaviour.ToClusterPhase {
+			return newInvalidError(OpsRequestKind, r.Name, "spec.type", fmt.Sprintf("Existing OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", v.Name, cluster.Name))
+		}
 	}
 	return nil
 }

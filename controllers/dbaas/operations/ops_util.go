@@ -213,10 +213,10 @@ func patchClusterExistOtherOperation(opsRes *OpsResource, opsRequestName string)
 
 // GetOpsRequestSliceFromCluster get OpsRequest slice from cluster annotations.
 // this record what OpsRequests are running in cluster
-func GetOpsRequestSliceFromCluster(cluster *dbaasv1alpha1.Cluster) ([]OpsRecorder, error) {
+func GetOpsRequestSliceFromCluster(cluster *dbaasv1alpha1.Cluster) ([]dbaasv1alpha1.OpsRecorder, error) {
 	var (
 		opsRequestValue string
-		opsRequestSlice []OpsRecorder
+		opsRequestSlice []dbaasv1alpha1.OpsRecorder
 		ok              bool
 	)
 	if cluster == nil || cluster.Annotations == nil {
@@ -240,23 +240,25 @@ func getOpsRequestNameFromAnnotation(cluster *dbaasv1alpha1.Cluster, toClusterPh
 }
 
 // getOpsRecorderWithClusterPhase get OpsRequest recorder from slice by target cluster phase
-func getOpsRecorderWithClusterPhase(opsRequestSlice []OpsRecorder, toClusterPhase dbaasv1alpha1.Phase) OpsRecorder {
+func getOpsRecorderWithClusterPhase(opsRequestSlice []dbaasv1alpha1.OpsRecorder,
+	toClusterPhase dbaasv1alpha1.Phase) dbaasv1alpha1.OpsRecorder {
 	for _, v := range opsRequestSlice {
 		if v.ToClusterPhase == toClusterPhase {
 			return v
 		}
 	}
-	return OpsRecorder{}
+	return dbaasv1alpha1.OpsRecorder{}
 }
 
 // GetOpsRecorderFromSlice get OpsRequest recorder from slice by target cluster phase
-func GetOpsRecorderFromSlice(opsRequestSlice []OpsRecorder, opsRequestName string) (int, OpsRecorder) {
+func GetOpsRecorderFromSlice(opsRequestSlice []dbaasv1alpha1.OpsRecorder,
+	opsRequestName string) (int, dbaasv1alpha1.OpsRecorder) {
 	for i, v := range opsRequestSlice {
 		if v.Name == opsRequestName {
 			return i, v
 		}
 	}
-	return 0, OpsRecorder{}
+	return 0, dbaasv1alpha1.OpsRecorder{}
 }
 
 // patchOpsRequestToRunning patch OpsRequest.status.phase to Running
@@ -299,7 +301,7 @@ func patchClusterStatus(opsRes *OpsResource, toClusterState dbaasv1alpha1.Phase)
 // we should delete the OpsRequest Annotation in cluster, unlock cluster
 func deleteOpsRequestAnnotationInCluster(opsRes *OpsResource) error {
 	var (
-		opsRequestSlice []OpsRecorder
+		opsRequestSlice []dbaasv1alpha1.OpsRecorder
 		err             error
 	)
 	if opsRequestSlice, err = GetOpsRequestSliceFromCluster(opsRes.Cluster); err != nil {
@@ -320,7 +322,7 @@ func deleteOpsRequestAnnotationInCluster(opsRes *OpsResource) error {
 // addOpsRequestAnnotationToCluster when OpsRequest.phase is Running, we should add the OpsRequest Annotation to Cluster.metadata.Annotations
 func addOpsRequestAnnotationToCluster(opsRes *OpsResource, toClusterPhase dbaasv1alpha1.Phase) error {
 	var (
-		opsRequestSlice []OpsRecorder
+		opsRequestSlice []dbaasv1alpha1.OpsRecorder
 		err             error
 	)
 	if toClusterPhase == "" {
@@ -334,9 +336,9 @@ func addOpsRequestAnnotationToCluster(opsRes *OpsResource, toClusterPhase dbaasv
 		return nil
 	}
 	if opsRequestSlice == nil {
-		opsRequestSlice = make([]OpsRecorder, 0)
+		opsRequestSlice = make([]dbaasv1alpha1.OpsRecorder, 0)
 	}
-	opsRequestSlice = append(opsRequestSlice, OpsRecorder{
+	opsRequestSlice = append(opsRequestSlice, dbaasv1alpha1.OpsRecorder{
 		Name:           opsRes.OpsRequest.Name,
 		ToClusterPhase: toClusterPhase,
 	})
@@ -347,7 +349,7 @@ func addOpsRequestAnnotationToCluster(opsRes *OpsResource, toClusterPhase dbaasv
 func PatchClusterOpsAnnotations(ctx context.Context,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
-	opsRequestSlice []OpsRecorder) error {
+	opsRequestSlice []dbaasv1alpha1.OpsRecorder) error {
 	patch := client.MergeFrom(cluster.DeepCopy())
 	if cluster.Annotations == nil {
 		cluster.Annotations = map[string]string{}
@@ -362,7 +364,7 @@ func PatchClusterOpsAnnotations(ctx context.Context,
 }
 
 // patchClusterPhaseWhenExistsOtherOps
-func patchClusterPhaseWhenExistsOtherOps(opsRes *OpsResource, opsRequestSlice []OpsRecorder) error {
+func patchClusterPhaseWhenExistsOtherOps(opsRes *OpsResource, opsRequestSlice []dbaasv1alpha1.OpsRecorder) error {
 	// If there are other OpsRequests running, modify the cluster.status.phase with other opsRequest's ToClusterPhase
 	if len(opsRequestSlice) == 0 {
 		return nil
@@ -398,7 +400,7 @@ func PatchOpsRequestAnnotation(ctx context.Context, cli client.Client, cluster *
 // then the related OpsRequest can reconcile
 func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster) error {
 	var (
-		opsRequestSlice []OpsRecorder
+		opsRequestSlice []dbaasv1alpha1.OpsRecorder
 		err             error
 	)
 	if opsRequestSlice, err = GetOpsRequestSliceFromCluster(cluster); err != nil {
@@ -418,7 +420,7 @@ func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, clu
 		return nil
 	}
 	// delete the OpsRequest annotation in cluster when the OpsRequest not existing.
-	newOpsRequestSlice := make([]OpsRecorder, 0, len(opsRequestSlice))
+	newOpsRequestSlice := make([]dbaasv1alpha1.OpsRecorder, 0, len(opsRequestSlice))
 	for _, v := range opsRequestSlice {
 		if _, ok := notExistOps[v.Name]; ok {
 			continue

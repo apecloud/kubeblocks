@@ -466,7 +466,7 @@ spec:
 			Expect(patchClusterPhaseMisMatch(opsRes)).Should(Succeed())
 			Expect(patchClusterExistOtherOperation(opsRes, horizontalOpsName)).Should(Succeed())
 			Expect(PatchClusterNotFound(opsRes)).Should(Succeed())
-			opsRecorder := []OpsRecorder{
+			opsRecorder := []dbaasv1alpha1.OpsRecorder{
 				{
 					Name:           "mysql-restart",
 					ToClusterPhase: dbaasv1alpha1.UpdatingPhase,

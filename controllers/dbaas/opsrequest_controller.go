@@ -151,7 +151,7 @@ func (r *OpsRequestReconciler) deleteClusterOpsRequestAnnotation(reqCtx intctrlu
 	opsRequest *dbaasv1alpha1.OpsRequest) error {
 	var (
 		cluster         = &dbaasv1alpha1.Cluster{}
-		opsRequestSlice []operations.OpsRecorder
+		opsRequestSlice []dbaasv1alpha1.OpsRecorder
 		err             error
 	)
 	if err = r.Client.Get(reqCtx.Ctx, client.ObjectKey{

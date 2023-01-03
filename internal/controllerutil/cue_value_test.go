@@ -54,7 +54,7 @@ type testCUEInputBoolOmitEmpty struct {
 // This test shows that the omitempty tag should be used with care if the field
 // is used in cue template.
 func TestCUE(t *testing.T) {
-	cueTplIntJson := `
+	cueTplIntJSON := `
 input: {
 	replicas:       int32
 }
@@ -62,7 +62,7 @@ output: {
 	replicas:       input.replicas
 }
 `
-	cueTplBoolJson := `
+	cueTplBoolJSON := `
 input: {
 	flag:       bool
 }
@@ -78,24 +78,24 @@ output: {
 		err   string
 	}{{
 		name:  "testCUEInput",
-		tpl:   cueTplIntJson,
+		tpl:   cueTplIntJSON,
 		input: testCUEInput{Replicas: 0},
 	}, {
 		name:  "testCUEInputIntOmitEmptyWithNonZeroValue",
-		tpl:   cueTplIntJson,
+		tpl:   cueTplIntJSON,
 		input: testCUEInputIntOmitEmpty{Replicas: 1},
 	}, {
 		name:  "testCUEInputIntOmitEmpty",
-		tpl:   cueTplIntJson,
+		tpl:   cueTplIntJSON,
 		input: testCUEInputIntOmitEmpty{Replicas: 0},
 		err:   "marshal error",
 	}, {
 		name:  "testCUEInputBoolOmitEmptyWithNonZeroValue",
-		tpl:   cueTplBoolJson,
+		tpl:   cueTplBoolJSON,
 		input: testCUEInputBoolOmitEmpty{Flag: true},
 	}, {
 		name:  "testCUEInputBoolOmitEmpty",
-		tpl:   cueTplBoolJson,
+		tpl:   cueTplBoolJSON,
 		input: testCUEInputBoolOmitEmpty{Flag: false},
 		err:   "marshal error",
 	}}

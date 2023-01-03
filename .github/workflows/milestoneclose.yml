@@ -55,7 +55,7 @@ jobs:
             query($org: String!,$repo: String!,$number: Int!){
               repository(owner: $org, name: $repo) {
                 milestone(number: $number) {
-                  issues (first:300)  {
+                  issues (first:3000)  {
                     nodes {
                         number
                     }

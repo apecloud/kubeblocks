@@ -1,0 +1,78 @@
+name: Closed Milestones
+
+on:
+  milestone:
+    types: [closed]
+
+env:
+  GITHUB_TOKEN: ${{ secrets.KUBEBLOCKS_TOKEN }}
+  REPO: 'kubeblocks'
+  milestone: 1
+  ISSUELIST: ''
+
+jobs:
+   move_issues:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - name: Get project data
+        env:
+          ORGANIZATION: apecloud
+          PROJECT_NUMBER: 1
+        run: |
+          gh api graphql -f query='
+            query($org: String!, $number: Int!) {
+              organization(login: $org){
+                projectV2(number: $number) {
+                  id
+                  fields(first:20) {
+                    nodes {
+                      ... on ProjectV2Field {
+                        id
+                        name
+                      }
+                      ... on ProjectV2SingleSelectField {
+                        id
+                        name
+                        options {
+                          id
+                          name
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }' -f org=$ORGANIZATION -F number=$PROJECT_NUMBER > project_data.json
+          echo 'PROJECT_ID='$(jq '.data.organization.projectV2.id' project_data.json) >> $GITHUB_ENV
+          echo 'STATUS_FIELD_ID='$(jq '.data.organization.projectV2.fields.nodes[] | select(.name== "Status") | .id' project_data.json) >> $GITHUB_ENV
+          echo 'TODO_OPTION_ID='$(jq '.data.organization.projectV2.fields.nodes[] | select(.name== "Status") | .options[] | select(.name=="Released") |.id' project_data.json) >> $GITHUB_ENV
+          
+      - name: get issues number
+        run: |
+          gh api graphql -f query='
+            query($org: String!,$repo: String!,$number: Int!){
+              repository(owner: $org, name: $repo) {
+                milestone(number: $number) {
+                  issues (first:300)  {
+                    nodes {
+                        number
+                    }
+                  }
+                }
+              }
+            }' -f org=${{ github.repository_owner }} -f repo=${{ env.REPO }} -F number=${{env.milestone}}  > label_data.json
+          echo 'ISSUELIST='$(jq '.data.repository.milestone.issues.nodes[].number' label_data.json) >> $GITHUB_ENV
+
+      - name: move publish release Issue
+        run: |
+          cd ${{ github.workspace }}
+          bash ${{ github.workspace }}/.github/utils/milestonemoveissue.sh \
+            ${{ env.GITHUB_TOKEN }} \
+            ${{ env.REPO }} \
+            ${{ github.repository_owner }} \
+            $PROJECT_ID \
+            $STATUS_FIELD_ID \
+            ${{ env.TODO_OPTION_ID }} \
+            ${{ env.ISSUELIST }}

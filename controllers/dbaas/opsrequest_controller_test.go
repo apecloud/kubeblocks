@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var _ = Describe("OpsRequest Controller", func() {
@@ -280,16 +280,16 @@ spec:
 			Expect(testCtx.CreateObj(ctx, verticalScalingOpsRequest)).Should(Succeed())
 
 			By("check VerticalScalingOpsRequest running")
-			Eventually(expectOpsRequestStatusPhase(controllerutil.GetNamespacedName(verticalScalingOpsRequest)),
+			Eventually(expectOpsRequestStatusPhase(intctrlutil.GetNamespacedName(verticalScalingOpsRequest)),
 				timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 
 			By("mock VerticalScalingOpsRequest is succeed")
 			if !testCtx.UsingExistingCluster() {
-				Expect(mockOpsRequestSucceed(controllerutil.GetNamespacedName(verticalScalingOpsRequest))).Should(Succeed())
+				Expect(mockOpsRequestSucceed(intctrlutil.GetNamespacedName(verticalScalingOpsRequest))).Should(Succeed())
 			}
 
 			By("check VerticalScalingOpsRequest succeed")
-			Eventually(expectOpsRequestStatusPhase(controllerutil.GetNamespacedName(verticalScalingOpsRequest)),
+			Eventually(expectOpsRequestStatusPhase(intctrlutil.GetNamespacedName(verticalScalingOpsRequest)),
 				timeout, interval).Should(Equal(dbaasv1alpha1.SucceedPhase))
 
 			By("check cluster resource requirements changed")
@@ -302,7 +302,7 @@ spec:
 
 			By("OpsRequest reclaimed after ttl")
 			Eventually(func() error {
-				return k8sClient.Get(ctx, controllerutil.GetNamespacedName(verticalScalingOpsRequest), verticalScalingOpsRequest)
+				return k8sClient.Get(ctx, intctrlutil.GetNamespacedName(verticalScalingOpsRequest), verticalScalingOpsRequest)
 			}, timeout, interval).Should(Satisfy(apierrors.IsNotFound))
 
 			By("Deleting the scope")

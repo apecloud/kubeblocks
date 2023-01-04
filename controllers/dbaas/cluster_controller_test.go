@@ -51,6 +51,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("Cluster Controller", func() {
@@ -109,21 +110,15 @@ var _ = Describe("Cluster Controller", func() {
 		return k8sClient.Patch(ctx, sc, patch)
 	}
 
-	assureCfgTplConfigMapObj := func(cmName string) *corev1.ConfigMap {
+	assureCfgTplConfigMapObj := func() *corev1.ConfigMap {
 		By("Assuring an cm obj")
-		configmapYAML, err := os.ReadFile("./testdata/configcm.yaml")
-		Expect(err).Should(BeNil())
-		Expect(configmapYAML).ShouldNot(BeNil())
-		configTemplateYaml, err := os.ReadFile("./testdata/configtpl.yaml")
-		Expect(err).Should(BeNil())
-		Expect(configTemplateYaml).ShouldNot(BeNil())
+		cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("config/configcm.yaml")
+		Expect(err).Should(Succeed())
+		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigurationTemplate]("config/configtpl.yaml")
+		Expect(err).Should(Succeed())
 
-		cfgCM := &corev1.ConfigMap{}
-		cfgTpl := &dbaasv1alpha1.ConfigurationTemplate{}
 		cfgCM.SetNamespace(testCtx.DefaultNamespace)
 		cfgTpl.SetNamespace(testCtx.DefaultNamespace)
-		Expect(yaml.Unmarshal(configmapYAML, cfgCM)).Should(Succeed())
-		Expect(yaml.Unmarshal(configTemplateYaml, cfgTpl)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, cfgTpl)).Should(Succeed())
 
@@ -256,7 +251,7 @@ spec:
 	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, types.NamespacedName) {
 		// setup Cluster obj required default ClusterDefinition and ClusterVersion objects if not provided
 		if clusterDefObj == nil {
-			assureCfgTplConfigMapObj("")
+			assureCfgTplConfigMapObj()
 			clusterDefObj = assureClusterDefObj()
 		}
 		if clusterVersionObj == nil {
@@ -457,7 +452,7 @@ spec:
 	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, types.NamespacedName) {
 		// setup Cluster obj required default ClusterDefinition and ClusterVersion objects if not provided
 		if clusterDefObj == nil {
-			assureCfgTplConfigMapObj("")
+			assureCfgTplConfigMapObj()
 			clusterDefObj = assureClusterDefWithConsensusObj()
 		}
 		if clusterVersionObj == nil {

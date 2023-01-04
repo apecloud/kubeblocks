@@ -18,6 +18,7 @@ package configuration
 
 import (
 	"bytes"
+	"reflect"
 
 	"os"
 	"path"
@@ -175,8 +176,12 @@ func (c *cfgWrapper) MergeFrom(params map[string]interface{}, option CfgOpOption
 		return MakeError("not any configuration. option:[%v]", option)
 	}
 
+	// TODO support param delete
 	for paramKey, paramValue := range params {
-		cfg.Set(c.generateKey(paramKey, option, cfg), paramValue)
+		vi := reflect.ValueOf(paramValue)
+		if vi.Kind() != reflect.Ptr || !vi.IsNil() {
+			cfg.Set(c.generateKey(paramKey, option, cfg), paramValue)
+		}
 	}
 
 	return nil

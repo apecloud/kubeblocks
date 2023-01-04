@@ -19,7 +19,6 @@ package operations
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -39,6 +38,7 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("OpsRequest Ops", func() {
@@ -107,21 +107,16 @@ allowVolumeExpansion: true
 
 	assureCfgTplObj := func(tplName, cmName, ns string) (*corev1.ConfigMap, *dbaasv1alpha1.ConfigurationTemplate) {
 		By("Assuring an cm obj")
-		configmapYAML, err := os.ReadFile("./testdata/configcm.yaml")
-		Expect(err).Should(BeNil())
-		Expect(configmapYAML).ShouldNot(BeNil())
-		configTemplateYaml, err := os.ReadFile("./testdata/configtpl.yaml")
-		Expect(err).Should(BeNil())
-		Expect(configTemplateYaml).ShouldNot(BeNil())
 
-		cfgCM := &corev1.ConfigMap{}
+		cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("operations_config/configcm.yaml")
+		Expect(err).Should(Succeed())
+		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigurationTemplate]("operations_config/configtpl.yaml")
+		Expect(err).Should(Succeed())
+
 		cfgCM.SetNamespace(ns)
 		cfgCM.SetName(cmName)
-		cfgTpl := &dbaasv1alpha1.ConfigurationTemplate{}
-		cfgTpl.SetNamespace(ns)
 		cfgTpl.SetName(tplName)
-		Expect(yaml.Unmarshal(configmapYAML, cfgCM)).Should(Succeed())
-		Expect(yaml.Unmarshal(configTemplateYaml, cfgTpl)).Should(Succeed())
+		cfgTpl.SetNamespace(ns)
 		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, cfgTpl)).Should(Succeed())
 
@@ -129,12 +124,8 @@ allowVolumeExpansion: true
 	}
 
 	generateConfigInstanceObj := func(cmName, ns string) *corev1.ConfigMap {
-		configmapYAML, err := os.ReadFile("./testdata/configcm.yaml")
-		Expect(err).Should(BeNil())
-		Expect(configmapYAML).ShouldNot(BeNil())
-
-		cfgCM := &corev1.ConfigMap{}
-		Expect(yaml.Unmarshal(configmapYAML, cfgCM)).Should(Succeed())
+		cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("operations_config/configcm.yaml")
+		Expect(err).Should(Succeed())
 		cfgCM.SetName(cmName)
 		cfgCM.SetNamespace(ns)
 		return cfgCM
@@ -432,7 +423,7 @@ spec:
 
 		{
 			By("mock config tpl")
-			tplObj, cmObj := assureCfgTplObj("mysql-tpl-test", "mysql-cm-test", testCtx.DefaultNamespace)
+			cmObj, tplObj := assureCfgTplObj("mysql-tpl-test", "mysql-cm-test", testCtx.DefaultNamespace)
 			By("update clusterdefinition tpl")
 			clusterDefObj.Spec.Components[0].ConfigSpec = &dbaasv1alpha1.ConfigurationSpec{
 				ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{
@@ -464,7 +455,7 @@ spec:
 
 		By("mock reconfigure success")
 		ops := generateOpsRequestObj("reconfigure-ops-"+randomStr, clusterObject.Name, dbaasv1alpha1.ReconfigureType)
-		ops.Spec.Reconfigure = &dbaasv1alpha1.UpgradeConfiguration{
+		ops.Spec.Reconfigure = &dbaasv1alpha1.Reconfigure{
 			Configurations: []dbaasv1alpha1.Configuration{{
 				Name: "mysql-test",
 				Keys: []dbaasv1alpha1.ParameterConfig{{
@@ -472,11 +463,11 @@ spec:
 					Parameters: []dbaasv1alpha1.ParameterPair{
 						{
 							Key:   "binlog_stmt_cache_size",
-							Value: "4096",
+							Value: func() *string { v := "4096"; return &v }(),
 						},
 						{
 							Key:   "x",
-							Value: "abcd",
+							Value: func() *string { v := "abcd"; return &v }(),
 						},
 					},
 				}},

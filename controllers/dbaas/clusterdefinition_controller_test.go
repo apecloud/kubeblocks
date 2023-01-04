@@ -18,7 +18,6 @@ package dbaas
 
 import (
 	"context"
-	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -33,6 +32,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("ClusterDefinition Controller", func() {
@@ -159,17 +159,11 @@ spec:
 	assureCfgTplConfigMapObj := func(cmName, cmNs string) *corev1.ConfigMap {
 		By("By assure an cm obj")
 
-		configmapYAML, err := os.ReadFile("./testdata/configcm.yaml")
-		Expect(err).Should(BeNil())
-		Expect(configmapYAML).ShouldNot(BeNil())
-		configTemplateYaml, err := os.ReadFile("./testdata/configtpl.yaml")
-		Expect(err).Should(BeNil())
-		Expect(configTemplateYaml).ShouldNot(BeNil())
-
-		cfgCM := &corev1.ConfigMap{}
-		cfgTpl := &dbaasv1alpha1.ConfigurationTemplate{}
-		Expect(yaml.Unmarshal(configmapYAML, cfgCM)).Should(Succeed())
-		Expect(yaml.Unmarshal(configTemplateYaml, cfgTpl)).Should(Succeed())
+		By("Assuring an cm obj")
+		cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("config/configcm.yaml")
+		Expect(err).Should(Succeed())
+		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigurationTemplate]("config/configtpl.yaml")
+		Expect(err).Should(Succeed())
 
 		cfgCM.Name = cmName
 		cfgCM.Namespace = cmNs

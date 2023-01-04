@@ -29,6 +29,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	test "github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("ConfigurationTemplate Controller", func() {
@@ -51,7 +52,7 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 			By("By creating a ISV resource")
 			// step1: prepare env
 			testWrapper := CreateDBaasFromISV(testCtx, ctx, k8sClient,
-				"./testdata",
+				test.SubTestDataPath("resources"),
 				FakeTest{
 					// for crd yaml file
 					CfgTemplateYaml: "mysql_config_template.yaml",
@@ -103,7 +104,7 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 
 			// step1: prepare env
 			testWrapper := CreateDBaasFromISV(testCtx, ctx, k8sClient,
-				"./testdata",
+				test.SubTestDataPath("resources"),
 				FakeTest{
 					// for crd yaml file
 					CfgTemplateYaml: "mysql_config_tpl_not_validate.yaml",

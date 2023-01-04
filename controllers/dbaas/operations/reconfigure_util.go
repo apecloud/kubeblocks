@@ -162,7 +162,11 @@ func persistCfgCM(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client.
 func fromKeyValuePair(parameters []dbaasv1alpha1.ParameterPair) map[string]interface{} {
 	m := make(map[string]interface{}, len(parameters))
 	for _, param := range parameters {
-		m[param.Key] = param.Value
+		if param.Value != nil {
+			m[param.Key] = *param.Value
+		} else {
+			m[param.Key] = param.Value
+		}
 	}
 	return m
 }

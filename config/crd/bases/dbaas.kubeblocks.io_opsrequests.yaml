@@ -107,27 +107,44 @@ spec:
                                 items:
                                   properties:
                                     key:
+                                      description: key is name of the parameter to
+                                        be updated.
                                       type: string
                                     value:
+                                      description: parameter values to be updated.
+                                        if set nil, the parameter defined by the key
+                                        field will be deleted from the configuration
+                                        file.
                                       type: string
                                   required:
                                   - key
+                                  - value
                                   type: object
                                 minItems: 1
                                 type: array
                             required:
+                            - key
                             - parameters
                             type: object
                           minItems: 1
                           type: array
+                          x-kubernetes-list-map-keys:
+                          - key
+                          x-kubernetes-list-type: map
                         name:
                           description: name is a config template name.
+                          maxLength: 63
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                       required:
                       - keys
+                      - name
                       type: object
                     minItems: 1
                     type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
                 required:
                 - componentName
                 - configurations

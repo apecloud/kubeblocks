@@ -152,7 +152,7 @@ func (r *reconfigureAction) reconfigure(resource *OpsResource) error {
 }
 
 func (r *reconfigureAction) performUpgrade(clusterName, componentName string,
-	reconfigure *dbaasv1alpha1.UpgradeConfiguration,
+	reconfigure *dbaasv1alpha1.Reconfigure,
 	resource *OpsResource,
 	tpls []dbaasv1alpha1.ConfigTemplate) error {
 	findTpl := func(tplName string) *dbaasv1alpha1.ConfigTemplate {

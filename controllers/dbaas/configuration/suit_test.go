@@ -39,7 +39,6 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/testutil"
-	//+kubebuilder:scaffold:imports
 )
 
 var cfg *rest.Config

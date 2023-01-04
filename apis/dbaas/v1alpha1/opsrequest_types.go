@@ -75,7 +75,7 @@ type OpsRequestSpec struct {
 
 	// reconfigure defines the variables that need to input when updating configuration.
 	// +optional
-	Reconfigure *UpgradeConfiguration `json:"reconfigure,omitempty"`
+	Reconfigure *Reconfigure `json:"reconfigure,omitempty"`
 }
 
 // ComponentOps defines the common variables of component scope operations.
@@ -134,13 +134,17 @@ type HorizontalScaling struct {
 	Replicas int32 `json:"replicas"`
 }
 
-type UpgradeConfiguration struct {
+type Reconfigure struct {
 	ComponentOps `json:",inline"`
 
 	// configurations defines which components perform the operation.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
-	Configurations []Configuration `json:"configurations"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	Configurations []Configuration `json:"configurations" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// TTL(Time to Live) defines the time period during which changing parameters is valid.
 	// +optional
@@ -160,28 +164,36 @@ type UpgradeConfiguration struct {
 
 type Configuration struct {
 	// name is a config template name.
-	// +optional
-	Name string `json:"name,omitempty"`
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
 
 	// keys is used to set the parameters to be updated.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
-	Keys []ParameterConfig `json:"keys"`
+	// +patchMergeKey=key
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=key
+	Keys []ParameterConfig `json:"keys" patchStrategy:"merge,retainKeys" patchMergeKey:"key"`
 }
 
 type ParameterPair struct {
+	// key is name of the parameter to be updated.
 	// +kubebuilder:validation:Required
 	Key string `json:"key"`
 
+	// parameter values to be updated.
+	// if set nil, the parameter defined by the key field will be deleted from the configuration file.
 	// +kubebuilder:validation:Required
-	// +optional
-	Value string `json:"value,omitempty"`
+	Value *string `json:"value"`
 }
 
 type ParameterConfig struct {
 	// key indicates the key name of ConfigMap.
-	// +optional
-	Key string `json:"key,omitempty"`
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
 
 	// Setting the list of parameters for a single configuration file.
 	// +kubebuilder:validation:Required

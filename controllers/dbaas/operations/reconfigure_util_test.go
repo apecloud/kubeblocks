@@ -18,7 +18,6 @@ package operations
 
 import (
 	"context"
-	"os"
 	"reflect"
 
 	"github.com/golang/mock/gomock"
@@ -26,13 +25,13 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	mock_client "github.com/apecloud/kubeblocks/controllers/dbaas/configuration/policy/mocks"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("Reconfigure RollingPolicy", func() {
@@ -56,17 +55,10 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 
 	mockCfgTplObj := func(tpl dbaasv1alpha1.ConfigTemplate) (*corev1.ConfigMap, *dbaasv1alpha1.ConfigurationTemplate) {
 		By("By assure an cm obj")
-		configmapYAML, err := os.ReadFile("./testdata/configcm.yaml")
-		Expect(err).Should(BeNil())
-		Expect(configmapYAML).ShouldNot(BeNil())
-		configTemplateYaml, err := os.ReadFile("./testdata/configtpl.yaml")
-		Expect(err).Should(BeNil())
-		Expect(configTemplateYaml).ShouldNot(BeNil())
-
-		cfgCM := &corev1.ConfigMap{}
-		cfgTpl := &dbaasv1alpha1.ConfigurationTemplate{}
-		Expect(yaml.Unmarshal(configmapYAML, cfgCM)).Should(Succeed())
-		Expect(yaml.Unmarshal(configTemplateYaml, cfgTpl)).Should(Succeed())
+		cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("operations_config/configcm.yaml")
+		Expect(err).Should(Succeed())
+		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigurationTemplate]("operations_config/configtpl.yaml")
+		Expect(err).Should(Succeed())
 
 		cfgCM.Name = tpl.ConfigTplRef
 		cfgCM.Namespace = tpl.Namespace
@@ -213,20 +205,21 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 				ConfigConstraintRef: "cfg_constraint_obj",
 			}
 			updatedCfg := dbaasv1alpha1.Configuration{
-				Keys: []dbaasv1alpha1.ParameterConfig{
-					{
-						Parameters: []dbaasv1alpha1.ParameterPair{
-							{
-								Key:   "x1",
-								Value: "y1",
-							},
-							{
-								Key:   "x2",
-								Value: "y2",
-							},
+				Keys: []dbaasv1alpha1.ParameterConfig{{
+					Parameters: []dbaasv1alpha1.ParameterPair{
+						{
+							Key:   "x1",
+							Value: func() *string { v := "y1"; return &v }(),
 						},
-					},
-				},
+						{
+							Key:   "x2",
+							Value: func() *string { v := "y2"; return &v }(),
+						},
+						{
+							Key:   "server-id",
+							Value: nil, // delete parameter
+						}},
+				}},
 			}
 			diffCfg := `{"mysqld":{"x1":"y1","x2":"y2"}}`
 
@@ -300,7 +293,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 					Parameters: []dbaasv1alpha1.ParameterPair{
 						{
 							Key:   "innodb_autoinc_lock_mode",
-							Value: "100", // invalid value
+							Value: func() *string { v := "100"; return &v }(), // invalid value
 						},
 					},
 				}},

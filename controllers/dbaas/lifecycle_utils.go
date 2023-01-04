@@ -599,6 +599,10 @@ func existsPDBSpec(pdbSpec *policyv1.PodDisruptionBudgetSpec) bool {
 // needBuildPDB check whether the PodDisruptionBudget needs to be built
 func needBuildPDB(params *createParams) bool {
 	if params.component.ComponentType == dbaasv1alpha1.Consensus {
+		// if MinReplicas is non-zero, build pdb
+		if params.component.MinReplicas > 0 {
+			return true
+		}
 		return false
 	}
 	return existsPDBSpec(params.component.PodDisruptionBudgetSpec)

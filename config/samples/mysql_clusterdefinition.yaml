@@ -9,6 +9,7 @@ spec:
     password: "$(RANDOM_PASSWD)"
   components:
     - typeName: replicasets
+      minReplicas: 1
       characterType: mysql
       monitor:
         builtIn: false
@@ -49,7 +50,10 @@ spec:
               - name: MYSQL_ROOT_USER
                 value: root
               - name: MYSQL_ROOT_PASSWORD
-                value: ""
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
               - name: MYSQL_ALLOW_EMPTY_PASSWORD
                 value: "yes"
               - name: MYSQL_DATABASE

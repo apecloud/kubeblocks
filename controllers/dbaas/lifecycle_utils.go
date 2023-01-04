@@ -1719,7 +1719,7 @@ func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder
 	cfgTemplate := &dbaasv1alpha1.ConfigurationTemplate{}
 	if len(tplCfg.ConfigConstraintRef) > 0 {
 		if err := cli.Get(ctx, client.ObjectKey{
-			Namespace: tplCfg.Namespace,
+			Namespace: "",
 			Name:      tplCfg.ConfigConstraintRef,
 		}, cfgTemplate); err != nil {
 			return nil, cfgcore.WrapError(err, "failed to get ConfigurationTemplate, key[%v]", tplCfg)

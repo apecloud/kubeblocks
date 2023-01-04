@@ -1,9 +1,9 @@
-## kbcli cluster list-components
+## kbcli cluster list-events
 
-List cluster components
+List cluster events
 
 ```
-kbcli cluster list-components [flags]
+kbcli cluster list-events [flags]
 ```
 
 ### Examples
@@ -20,7 +20,7 @@ kbcli cluster list-components [flags]
 
 ```
   -A, --all-namespace     If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
-  -h, --help              help for list-components
+  -h, --help              help for list-events
   -o, --output format     prints the output in the specified format. Allowed values: table, json, yaml, wide (default table)
   -l, --selector string   Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
 ```

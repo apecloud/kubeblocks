@@ -56,6 +56,7 @@ var _ = Describe("list", func() {
 		_ = dbaasv1alpha1.AddToScheme(scheme.Scheme)
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 		cluster := testing.FakeCluster(clusterName, namespace)
+		pods := testing.FakePods(3, namespace, clusterName)
 		httpResp := func(obj runtime.Object) *http.Response {
 			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}
 		}
@@ -71,9 +72,11 @@ var _ = Describe("list", func() {
 				return map[string]*http.Response{
 					"/namespaces/" + namespace + "/clusters":      httpResp(&dbaasv1alpha1.ClusterList{Items: []dbaasv1alpha1.Cluster{*cluster}}),
 					"/namespaces/" + namespace + "/clusters/test": httpResp(cluster),
+					"/api/v1/nodes/" + testing.NodeName:           httpResp(testing.FakeNode()),
 					urlPrefix + "/services":                       httpResp(&corev1.ServiceList{}),
 					urlPrefix + "/secrets":                        httpResp(&corev1.SecretList{}),
-					urlPrefix + "/pods":                           httpResp(&corev1.PodList{}),
+					urlPrefix + "/pods":                           httpResp(pods),
+					urlPrefix + "/events":                         httpResp(testing.FakeEvents()),
 				}[req.URL.Path], nil
 			}),
 		}
@@ -99,7 +102,7 @@ var _ = Describe("list", func() {
 		Expect(cmd).ShouldNot(BeNil())
 
 		cmd.Run(cmd, []string{"test"})
-		Expect(len(out.String()) > 0).Should(BeTrue())
+		Expect(out.String()).Should(ContainSubstring(testing.NodeName))
 	})
 
 	It("list components", func() {
@@ -107,7 +110,15 @@ var _ = Describe("list", func() {
 		Expect(cmd).ShouldNot(BeNil())
 
 		cmd.Run(cmd, []string{"test"})
-		Expect(len(out.String()) > 0).Should(BeTrue())
+		Expect(out.String()).Should(ContainSubstring(testing.ComponentName))
+	})
+
+	It("list events", func() {
+		cmd := NewListEventsCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+
+		cmd.Run(cmd, []string{"test"})
+		Expect(out.String()).Should(ContainSubstring("test"))
 	})
 
 	It("output wide", func() {
@@ -116,15 +127,15 @@ var _ = Describe("list", func() {
 
 		Expect(cmd.Flags().Set("output", "wide")).Should(Succeed())
 		cmd.Run(cmd, []string{"test"})
-		Expect(len(out.String()) > 0).Should(BeTrue())
+		Expect(out.String()).Should(ContainSubstring(testing.ClusterVersionName))
 	})
 
-	It("output wide without ", func() {
+	It("output wide without args", func() {
 		cmd := NewListCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 
 		Expect(cmd.Flags().Set("output", "wide")).Should(Succeed())
 		cmd.Run(cmd, []string{})
-		Expect(len(out.String()) > 0).Should(BeTrue())
+		Expect(out.String()).Should(ContainSubstring(testing.ClusterVersionName))
 	})
 })

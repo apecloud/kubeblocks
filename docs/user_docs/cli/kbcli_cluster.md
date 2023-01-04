@@ -45,8 +45,9 @@ Database cluster operation command
 * [kbcli cluster horizontal-scaling](kbcli_cluster_horizontal-scaling.md)	 - Horizontal scaling the specified components in the cluster
 * [kbcli cluster list](kbcli_cluster_list.md)	 - List clusters
 * [kbcli cluster list-backups](kbcli_cluster_list-backups.md)	 - List backup jobs
-* [kbcli cluster list-components](kbcli_cluster_list-components.md)	 - List components
-* [kbcli cluster list-instances](kbcli_cluster_list-instances.md)	 - List instances
+* [kbcli cluster list-components](kbcli_cluster_list-components.md)	 - List cluster components
+* [kbcli cluster list-events](kbcli_cluster_list-events.md)	 - List cluster events
+* [kbcli cluster list-instances](kbcli_cluster_list-instances.md)	 - List cluster instances
 * [kbcli cluster list-logs](kbcli_cluster_list-logs.md)	 - List supported log files in cluster
 * [kbcli cluster list-ops](kbcli_cluster_list-ops.md)	 - Liat all opsRequests
 * [kbcli cluster list-restores](kbcli_cluster_list-restores.md)	 - List all restore jobs

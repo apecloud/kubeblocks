@@ -33,6 +33,7 @@ type ClusterObjects struct {
 	PVCs       *corev1.PersistentVolumeClaimList
 	Nodes      []*corev1.Node
 	ConfigMaps *corev1.ConfigMapList
+	Events     *corev1.EventList
 }
 
 type ClusterInfo struct {

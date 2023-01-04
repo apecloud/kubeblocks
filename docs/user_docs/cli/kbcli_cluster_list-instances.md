@@ -1,6 +1,6 @@
 ## kbcli cluster list-instances
 
-List instances
+List cluster instances
 
 ```
 kbcli cluster list-instances [flags]

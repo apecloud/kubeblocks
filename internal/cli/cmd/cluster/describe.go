@@ -27,9 +27,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -80,7 +78,7 @@ func NewDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 		Use:               "describe",
 		Short:             "Show details of a specific cluster",
 		Example:           describeExample,
-		ValidArgsFunction: utilcomp.ResourceNameCompletionFunc(f, util.GVRToString(types.ClusterGVR())),
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(args))
 			util.CheckErr(o.run())
@@ -128,10 +126,9 @@ func (o *describeOptions) describeCluster(name string) error {
 		Namespace:     o.namespace,
 		GetOptions: cluster.GetOptions{
 			WithClusterDef: true,
-			WithPVC:        true,
 			WithService:    true,
-			WithSecret:     true,
 			WithPod:        true,
+			WithEvent:      true,
 		},
 	}
 
@@ -158,12 +155,8 @@ func (o *describeOptions) describeCluster(name string) error {
 	showImages(comps, o.Out)
 
 	// events
-	var events *corev1.EventList
-	events, err = o.client.CoreV1().Events(o.namespace).Search(scheme.Scheme, o.ClusterObjects.Cluster)
-	if err != nil {
-		return err
-	}
-	showEvents(events, o.Cluster.Name, o.Out)
+	showEvents(o.Events, o.Cluster.Name, o.Out)
+
 	return nil
 }
 
@@ -199,14 +192,15 @@ func showImages(comps []*cluster.ComponentInfo, out io.Writer) {
 }
 
 func showEvents(events *corev1.EventList, name string, out io.Writer) {
+	objs := util.SortEventsByLastTimestamp(events)
+
+	// print last 5 events
 	title := fmt.Sprintf("\nEvents(LAST 5 warnings, see more:kbcli cluster list-events %s):", name)
 	tbl := newTbl(out, title, "TIME", "TYPE", "REASON", "OBJECT", "MESSAGE")
 	cnt := 0
-	for _, e := range events.Items {
-		if e.Type != "Warning" {
-			continue
-		}
-		tbl.AddRow(util.TimeFormat(&e.CreationTimestamp), e.Type, e.Reason, e.InvolvedObject.Name, e.Message)
+	for _, o := range *objs {
+		e := o.(*corev1.Event)
+		tbl.AddRow(util.TimeFormat(&e.LastTimestamp), e.Type, e.Reason, e.InvolvedObject.Name, e.Message)
 		cnt++
 		if cnt == 5 {
 			break

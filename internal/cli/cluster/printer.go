@@ -19,7 +19,10 @@ package cluster
 import (
 	"io"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 type PrintType string
@@ -29,6 +32,7 @@ const (
 	PrintWide       PrintType = "wide"
 	PrintInstances  PrintType = "instances"
 	PrintComponents PrintType = "components"
+	PrintEvents     PrintType = "events"
 )
 
 type tblInfo struct {
@@ -63,6 +67,11 @@ var mapTblInfo = map[PrintType]tblInfo{
 		header:     []interface{}{"NAME", "NAMESPACE", "CLUSTER", "TYPE", "IMAGE"},
 		addRow:     AddComponentRow,
 		getOptions: GetOptions{WithClusterDef: true, WithPod: true},
+	},
+	PrintEvents: {
+		header:     []interface{}{"NAMESPACE", "TIME", "TYPE", "REASON", "OBJECT", "MESSAGE"},
+		addRow:     AddEventRow,
+		getOptions: GetOptions{WithClusterDef: true, WithPod: true, WithEvent: true},
 	},
 }
 
@@ -105,5 +114,13 @@ func AddInstanceRow(tbl *printer.TablePrinter, objs *ClusterObjects) {
 			instance.Status, instance.Role, instance.AccessMode,
 			instance.AZ, instance.Region, instance.CPU, instance.Memory,
 			BuildStorageSize(instance.Storage), instance.Node, instance.CreatedTime)
+	}
+}
+
+func AddEventRow(tbl *printer.TablePrinter, objs *ClusterObjects) {
+	events := util.SortEventsByLastTimestamp(objs.Events)
+	for _, event := range *events {
+		e := event.(*corev1.Event)
+		tbl.AddRow(e.Namespace, util.TimeFormat(&e.LastTimestamp), e.Type, e.Reason, e.InvolvedObject.Name, e.Message)
 	}
 }

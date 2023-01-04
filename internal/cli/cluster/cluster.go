@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubectl/pkg/util/resource"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -42,6 +43,7 @@ type GetOptions struct {
 	WithService        bool
 	WithSecret         bool
 	WithPod            bool
+	WithEvent          bool
 }
 
 type ObjectsGetter struct {
@@ -156,6 +158,27 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 			objs.Nodes = append(objs.Nodes, node)
 		}
 	}
+
+	// get events
+	if o.WithEvent {
+		// get all events about cluster
+		if objs.Events, err = corev1.Events(o.Namespace).Search(scheme.Scheme, objs.Cluster); err != nil {
+			return nil, err
+		}
+
+		// get all events about pods
+		for _, pod := range objs.Pods.Items {
+			events, err := corev1.Events(o.Namespace).Search(scheme.Scheme, &pod)
+			if err != nil {
+				return nil, err
+			}
+			if objs.Events == nil {
+				objs.Events = events
+			} else {
+				objs.Events.Items = append(objs.Events.Items, events.Items...)
+			}
+		}
+	}
 	return objs, nil
 }
 
@@ -193,7 +216,7 @@ func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 	for _, cdComp := range o.ClusterDef.Spec.Components {
 		c := FindClusterComp(o.Cluster, cdComp.TypeName)
 		if c == nil {
-			return nil
+			continue
 		}
 
 		if c.Replicas == nil {

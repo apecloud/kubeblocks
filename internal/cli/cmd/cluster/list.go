@@ -90,7 +90,7 @@ func NewListInstancesCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	o := list.NewListOptions(f, streams, types.ClusterGVR())
 	cmd := &cobra.Command{
 		Use:               "list-instances",
-		Short:             "List instances",
+		Short:             "List cluster instances",
 		Example:           listInstancesExample,
 		Aliases:           []string{"ls-instances"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
@@ -109,13 +109,32 @@ func NewListComponentsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 	o := list.NewListOptions(f, streams, types.ClusterGVR())
 	cmd := &cobra.Command{
 		Use:               "list-components",
-		Short:             "List components",
+		Short:             "List cluster components",
 		Example:           listComponentsExample,
 		Aliases:           []string{"ls-components"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Names = args
 			util.CheckErr(run(o, cluster.PrintComponents))
+		},
+	}
+	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespace", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.")
+	printer.AddOutputFlag(cmd, &o.Format)
+	return cmd
+}
+
+func NewListEventsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := list.NewListOptions(f, streams, types.ClusterGVR())
+	cmd := &cobra.Command{
+		Use:               "list-events",
+		Short:             "List cluster events",
+		Example:           listComponentsExample,
+		Aliases:           []string{"ls-events"},
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
+		Run: func(cmd *cobra.Command, args []string) {
+			o.Names = args
+			util.CheckErr(run(o, cluster.PrintEvents))
 		},
 	}
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespace", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
@@ -160,7 +179,7 @@ func run(o *list.ListOptions, printType cluster.PrintType) error {
 
 	p := cluster.NewPrinter(o.IOStreams.Out, printType)
 	for _, info := range infos {
-		if err := addRow(dynamic, client, info.Namespace, info.Name, p); err != nil {
+		if err = addRow(dynamic, client, info.Namespace, info.Name, p); err != nil {
 			return err
 		}
 	}

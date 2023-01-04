@@ -31,6 +31,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"text/template"
@@ -48,10 +49,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes/scheme"
+	cmdget "k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 
@@ -404,4 +407,18 @@ func BuildLabelSelectorByNames(selector string, names []string) string {
 	} else {
 		return selector + "," + label
 	}
+}
+
+// SortEventsByLastTimestamp sorts events by metadata.creationTimestamp
+func SortEventsByLastTimestamp(events *corev1.EventList) *[]apiruntime.Object {
+	objs := make([]apiruntime.Object, 0, len(events.Items))
+	for i, e := range events.Items {
+		if e.Type != "Warning" {
+			continue
+		}
+		objs = append(objs, &events.Items[i])
+	}
+	sorter := cmdget.NewRuntimeSort("{.lastTimestamp}", objs)
+	sort.Sort(sort.Reverse(sorter))
+	return &objs
 }

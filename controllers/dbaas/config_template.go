@@ -55,7 +55,7 @@ func newCfgTemplateBuilder(clusterName, namespace string, cluster *dbaasv1alpha1
 		clusterName:    clusterName,
 		cluster:        cluster,
 		clusterVersion: version,
-		tplName:        "DBaasTpl",
+		tplName:        "KBTpl",
 	}
 }
 

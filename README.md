@@ -27,7 +27,7 @@
 
 
 ## What is KubeBlocks
-**KubeBlocks**, KubeBlocks is an open-source cloud-prem tool that helps application developers and platform engineers build and manage Kubernetes native data platforms. KubeBlocks is cloud neutral, allowing users to operate resources from public cloud vendors through a unified interface, and the implementation of basic functions always takes into account the best practices of each public cloud infrastructure.
+**KubeBlocks**, is an open-source cloud-prem tool that helps application developers and platform engineers build and manage Kubernetes native data platforms. KubeBlocks is cloud neutral, allowing users to operate resources from public cloud vendors through a unified interface, and the implementation of basic functions always takes into account the best practices of each public cloud infrastructure.
 
 ### Goals
 - Enable developers using one platform to manage any database engines used

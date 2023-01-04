@@ -27,7 +27,7 @@
 
 
 ## What is KubeBlocks
-**KubeBlocks**, running on Kubernetes, is an open-source data manangement platform. KubeBlocks greatly simplifies the process of deploying databases on Kubernetes. It offers a universal view for multicloud and on-premises databases with a consistent database developing and management experience.
+**KubeBlocks**, KubeBlocks is an open-source cloud-prem tool that helps application developers and platform engineers build and manage Kubernetes native data platforms. KubeBlocks is cloud neutral, allowing users to operate resources from public cloud vendors through a unified interface, and the implementation of basic functions always takes into account the best practices of each public cloud infrastructure.
 
 ### Goals
 - Enable developers using one platform to manage any database engines used

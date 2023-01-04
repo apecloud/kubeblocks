@@ -1571,8 +1571,8 @@ spec:
 		})
 	})
 
-	Context("When creating cluster with cluster affinity", func() {
-		It("Should hanle pod affinity correctly", func() {
+	Context("When creating cluster with cluster affinity set", func() {
+		It("Should create pod with cluster affinity", func() {
 			By("Creating a cluster")
 			topologyKey := "testTopologyKey"
 			lableKey := "testNodeLabelKey"
@@ -1602,8 +1602,8 @@ spec:
 		})
 	})
 
-	Context("When creating cluster with cluster affinity and component affinity", func() {
-		It("Should use compoment affinity", func() {
+	Context("When creating cluster with both cluster affinity and component affinity set", func() {
+		It("Should observe the component affinity will override the cluster affinity", func() {
 			By("Creating a cluster")
 			clusterTopologyKey := "testClusterTopologyKey"
 			toCreate, _, _, key := newClusterObj(nil, nil)
@@ -1637,8 +1637,8 @@ spec:
 		})
 	})
 
-	Context("When creating cluster with cluster tolerations", func() {
-		It("Should create pods with tolerations", func() {
+	Context("When creating cluster with cluster tolerations set", func() {
+		It("Should create pods with cluster tolerations", func() {
 			By("Creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
 			var tolerations []corev1.Toleration
@@ -1655,7 +1655,7 @@ spec:
 			By("Checking the tolerations")
 			stsList := listAndCheckStatefulSet(key)
 			podSpec := stsList.Items[0].Spec.Template.Spec
-			Expect(len(podSpec.Tolerations) > 0).Should(BeTrue())
+			Expect(len(podSpec.Tolerations) == 1).Should(BeTrue())
 			toleration := podSpec.Tolerations[0]
 			Expect(toleration.Key == tolerationKey &&
 				toleration.Value == tolerationValue).Should(BeTrue())
@@ -1669,8 +1669,8 @@ spec:
 		})
 	})
 
-	Context("When creating cluster with cluster tolerations and component tolerations", func() {
-		It("Should use component tolerations", func() {
+	Context("When creating cluster with both cluster tolerations and component tolerations set", func() {
+		It("Should observe the component tolerations will override the cluster tolerations", func() {
 			By("Creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
 			var clusterTolerations []corev1.Toleration
@@ -1702,7 +1702,7 @@ spec:
 			By("Checking the tolerations")
 			stsList := listAndCheckStatefulSet(key)
 			podSpec := stsList.Items[0].Spec.Template.Spec
-			Expect(len(podSpec.Tolerations) > 0).Should(BeTrue())
+			Expect(len(podSpec.Tolerations) == 1).Should(BeTrue())
 			toleration := podSpec.Tolerations[0]
 			Expect(toleration.Key == compTolerationKey &&
 				toleration.Value == compTolerationValue).Should(BeTrue())

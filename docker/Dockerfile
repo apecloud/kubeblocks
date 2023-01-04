@@ -44,6 +44,7 @@ RUN curl -L https://dl.k8s.io/release/v1.24.2/bin/${TARGETOS}/${TARGETARCH}/kube
 # Build
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o agamotto cmd/agamotto/main.go
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o reloader cmd/reloader/main.go
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o killer cmd/reloader/container_killer/killer.go
 ## have manager as last build step due to its volatility
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o manager cmd/manager/main.go
 
@@ -74,6 +75,7 @@ COPY config/probe config/probe
 COPY --from=builder /workspace/agamotto /bin
 COPY --from=builder /workspace/manager .
 COPY --from=builder /workspace/reloader /bin
+COPY --from=builder /workspace/killer /bin
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]

@@ -11,11 +11,11 @@ image:
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
 
-runtime:
+# runtime:
   # cri type: auto/containerd/docker
-  criType: auto
+  # criType: auto
   # /var/run/docker.sock
-  runtimeEndpoint:
+  # runtimeEndpoint:
 
 imagePullSecrets: []
 nameOverride: ""

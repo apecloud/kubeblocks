@@ -1399,8 +1399,8 @@ func updateConfigurationManagerWithComponent(
 
 		defaultVarRunVolumePath = "/var/run"
 		criEndpointVolumeName   = "cri-runtime-endpoint"
-		criRuntimeEndpoint      = viper.GetString(cfgcore.CRIRuntimeEndpoint)
-		criType                 = viper.GetString(cfgcore.ConfigCRIType)
+		// criRuntimeEndpoint      = viper.GetString(cfgcore.CRIRuntimeEndpoint)
+		// criType                 = viper.GetString(cfgcore.ConfigCRIType)
 	)
 
 	reloadOptions, err := cfgutil.GetReloadOptions(cli, ctx, cfgTemplates)
@@ -1454,16 +1454,9 @@ func updateConfigurationManagerWithComponent(
 	}
 
 	unixSignalOption := reloadOptions.UnixSignalTrigger
-	configManagerArgs := cfgcm.BuildSignalArgs(
-		*unixSignalOption,
-		volumeDirs,
-		criType,
-		criRuntimeEndpoint)
+	configManagerArgs := cfgcm.BuildSignalArgs(*unixSignalOption, volumeDirs)
 
 	mountPath := defaultVarRunVolumePath
-	if criRuntimeEndpoint != "" && criType != "" && criType != "auto" {
-		mountPath = criRuntimeEndpoint
-	}
 	managerSidecar := &cfgcm.ConfigManagerSidecar{
 		ManagerName: cfgcore.ConfigSidecarName,
 		Image:       viper.GetString(cfgcore.ConfigSidecarIMAGE),

@@ -1212,15 +1212,15 @@ spec:
 			// TODO fix me later, proxy should not have internal headless service
 			// Expect(len(svcList1.Items) == 1).Should(BeTrue())
 			Expect(len(svcList1.Items) > 0).Should(BeTrue())
-			var existsExternalClusterIp bool
+			var existsExternalClusterIP bool
 			for _, svc := range svcList1.Items {
 				Expect(svc.Spec.Type == corev1.ServiceTypeClusterIP).To(BeTrue())
 				if svc.Spec.ClusterIP == corev1.ClusterIPNone {
 					continue
 				}
-				existsExternalClusterIp = true
+				existsExternalClusterIP = true
 			}
-			Expect(existsExternalClusterIp).To(BeTrue())
+			Expect(existsExternalClusterIP).To(BeTrue())
 
 			By("Checking replicasets should have internal headless service")
 			getHeadlessSvcPorts := func(name string) []corev1.ServicePort {

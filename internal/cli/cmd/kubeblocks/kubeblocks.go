@@ -31,6 +31,7 @@ import (
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/utils/strings/slices"
@@ -50,15 +51,17 @@ type Options struct {
 
 	HelmCfg   *action.Configuration
 	Namespace string
-	client    dynamic.Interface
+	dynamic   dynamic.Interface
+	client    *kubernetes.Clientset
 }
 
 type InstallOptions struct {
 	Options
-	Version string
-	Sets    []string
-	Monitor bool
-	Quiet   bool
+	Version         string
+	Sets            []string
+	Monitor         bool
+	Quiet           bool
+	CreateNamespace bool
 }
 
 var (
@@ -112,12 +115,16 @@ func (o *Options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	o.client, err = f.DynamicClient()
+	if o.dynamic, err = f.DynamicClient(); err != nil {
+		return err
+	}
+
+	o.client, err = f.KubernetesClientSet()
 	return err
 }
 
-func (o *Options) precheck() error {
-	precheckList := []string{
+func (o *Options) preCheck() error {
+	preCheckList := []string{
 		"clusters.dbaas.kubeblocks.io",
 	}
 	ctx := context.Background()
@@ -127,14 +134,14 @@ func (o *Options) precheck() error {
 		Version:  types.VersionV1,
 		Resource: "customresourcedefinitions",
 	}
-	crdList, err := o.client.Resource(crdGVR).List(ctx, metav1.ListOptions{})
+	crdList, err := o.dynamic.Resource(crdGVR).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
 	for _, crd := range crdList.Items {
 		// find kubeblocks crds
 		if strings.Contains(crd.GetName(), "kubeblocks.io") &&
-			slices.Contains(precheckList, crd.GetName()) {
+			slices.Contains(preCheckList, crd.GetName()) {
 			group, _, err := unstructured.NestedString(crd.Object, "spec", "group")
 			if err != nil {
 				return err
@@ -145,7 +152,7 @@ func (o *Options) precheck() error {
 				Resource: strings.Split(crd.GetName(), ".")[0],
 			}
 			// find custom resource
-			objList, err := o.client.Resource(gvr).List(ctx, metav1.ListOptions{})
+			objList, err := o.dynamic.Resource(gvr).List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return err
 			}
@@ -153,6 +160,18 @@ func (o *Options) precheck() error {
 				return errors.Errorf("Can not uninstall, you should delete custom resource %s %s first", crd.GetName(), objList.Items[0].GetName())
 			}
 		}
+	}
+	return nil
+}
+
+func (o *InstallOptions) check() error {
+	if o.CreateNamespace {
+		return nil
+	}
+
+	// check if namespace exists
+	if _, err := o.client.CoreV1().Namespaces().Get(context.TODO(), o.Namespace, metav1.GetOptions{}); err != nil {
+		return err
 	}
 	return nil
 }
@@ -190,14 +209,15 @@ func (o *InstallOptions) installChart() (string, error) {
 		sets = append(sets, splitSet...)
 	}
 	chart := helm.InstallOpts{
-		Name:      types.KubeBlocksChartName,
-		Chart:     types.KubeBlocksChartName + "/" + types.KubeBlocksChartName,
-		Wait:      true,
-		Version:   o.Version,
-		Namespace: o.Namespace,
-		Sets:      sets,
-		Login:     true,
-		TryTimes:  2,
+		Name:            types.KubeBlocksChartName,
+		Chart:           types.KubeBlocksChartName + "/" + types.KubeBlocksChartName,
+		Wait:            true,
+		Version:         o.Version,
+		Namespace:       o.Namespace,
+		Sets:            sets,
+		Login:           true,
+		TryTimes:        2,
+		CreateNamespace: o.CreateNamespace,
 	}
 	notes, err := chart.Install(o.HelmCfg)
 	if err != nil {
@@ -239,11 +259,11 @@ func (o *Options) run() error {
 	}
 
 	// remove finalizers
-	if err := removeFinalizers(o.client); err != nil {
+	if err := removeFinalizers(o.dynamic); err != nil {
 		return err
 	}
 
-	if err := deleteCRDs(o.client); err != nil {
+	if err := deleteCRDs(o.dynamic); err != nil {
 		return err
 	}
 
@@ -315,6 +335,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Example: installExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f, cmd))
+			util.CheckErr(o.check())
 			util.CheckErr(o.Run())
 		},
 	}
@@ -322,6 +343,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and install Prometheus, AlertManager and Grafana (default true)")
 	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
+	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "create the namespace if not present")
 
 	return cmd
 }
@@ -337,7 +359,7 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Example: uninstallExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f, cmd))
-			util.CheckErr(o.precheck())
+			util.CheckErr(o.preCheck())
 			util.CheckErr(o.run())
 		},
 	}

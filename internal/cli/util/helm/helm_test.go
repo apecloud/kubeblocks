@@ -17,7 +17,7 @@ limitations under the License.
 package helm
 
 import (
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"helm.sh/helm/v3/pkg/repo"
@@ -45,10 +45,11 @@ var _ = Describe("helm util", func() {
 
 	It("Install", func() {
 		o := &InstallOpts{
-			Name:      testing.KubeBlocksChartName,
-			Chart:     testing.KubeBlocksChartURL,
-			Namespace: "default",
-			Version:   version.DefaultKubeBlocksVersion,
+			Name:            testing.KubeBlocksChartName,
+			Chart:           testing.KubeBlocksChartURL,
+			Namespace:       "default",
+			Version:         version.DefaultKubeBlocksVersion,
+			CreateNamespace: false,
 		}
 		cfg := FakeActionConfig()
 		Expect(cfg).ShouldNot(BeNil())

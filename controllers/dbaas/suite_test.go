@@ -22,29 +22,27 @@ import (
 	"path/filepath"
 	"testing"
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-
-	ctrl "sigs.k8s.io/controller-runtime"
-
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	//+kubebuilder:scaffold:imports
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
@@ -67,9 +65,7 @@ func init() {
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecsWithDefaultAndCustomReporters(t,
-		"Controller Suite",
-		[]Reporter{printer.NewlineReporter{}})
+	RunSpecs(t, "Controller Suite")
 }
 
 var _ = BeforeSuite(func() {
@@ -175,7 +171,7 @@ var _ = BeforeSuite(func() {
 	k8sClient = k8sManager.GetClient()
 	Expect(k8sClient).ToNot(BeNil())
 
-}, 60)
+})
 
 var _ = AfterSuite(func() {
 	cancel()
@@ -183,3 +179,67 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
+
+// Helper functions to change fields in the desired state and status of resources.
+// Each helper is a wrapper of k8sClient.Patch.
+
+func changeClusterDef(namespacedName types.NamespacedName,
+	action func(clusterDef *dbaasv1alpha1.ClusterDefinition)) error {
+	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+	if err := k8sClient.Get(ctx, namespacedName, clusterDef); err != nil {
+		return err
+	}
+	patch := client.MergeFrom(clusterDef.DeepCopy())
+	action(clusterDef)
+	if err := k8sClient.Patch(ctx, clusterDef, patch); err != nil {
+		return err
+	}
+	return nil
+}
+
+func changeClusterStatus(namespacedName types.NamespacedName,
+	action func(cluster *dbaasv1alpha1.Cluster)) error {
+	cluster := &dbaasv1alpha1.Cluster{}
+	if err := k8sClient.Get(ctx, namespacedName, cluster); err != nil {
+		return err
+	}
+	patch := client.MergeFrom(cluster.DeepCopy())
+	action(cluster)
+	if err := k8sClient.Status().Patch(ctx, cluster, patch); err != nil {
+		return err
+	}
+	return nil
+}
+
+func changeOpsRequestStatus(namespacedName types.NamespacedName,
+	action func(cluster *dbaasv1alpha1.OpsRequest)) error {
+	opsRequest := &dbaasv1alpha1.OpsRequest{}
+	if err := k8sClient.Get(ctx, namespacedName, opsRequest); err != nil {
+		return err
+	}
+	patch := client.MergeFrom(opsRequest.DeepCopy())
+	action(opsRequest)
+	if err := k8sClient.Status().Patch(ctx, opsRequest, patch); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Helper functions to get fields from state or status of resources when writing unit tests.
+// Each helper returns a Gomega assertion function, which should be passed into Eventually() as the first parameter.
+
+func expectClusterStatusPhase(namespacedName types.NamespacedName) func(g Gomega) dbaasv1alpha1.Phase {
+	return func(g Gomega) dbaasv1alpha1.Phase {
+		cluster := &dbaasv1alpha1.Cluster{}
+		g.Expect(k8sClient.Get(ctx, namespacedName, cluster)).To(Succeed())
+		return cluster.Status.Phase
+	}
+}
+
+func expectOpsRequestStatusPhase(namespacedName types.NamespacedName) func(g Gomega) dbaasv1alpha1.Phase {
+	return func(g Gomega) dbaasv1alpha1.Phase {
+		opsRequest := &dbaasv1alpha1.OpsRequest{}
+		g.Expect(k8sClient.Get(ctx, namespacedName, opsRequest)).To(Succeed())
+		return opsRequest.Status.Phase
+	}
+}

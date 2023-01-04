@@ -178,7 +178,7 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	inputs.Short = "Upgrade the cluster"
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
-		cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Reference app version (required)")
+		cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Reference cluster version (required)")
 	}
 	return create.BuildCommand(inputs)
 }

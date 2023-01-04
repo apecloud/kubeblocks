@@ -46,14 +46,15 @@ import (
 )
 
 type InstallOpts struct {
-	Name      string
-	Chart     string
-	Namespace string
-	Sets      []string
-	Wait      bool
-	Version   string
-	TryTimes  int
-	Login     bool
+	Name            string
+	Chart           string
+	Namespace       string
+	Sets            []string
+	Wait            bool
+	Version         string
+	TryTimes        int
+	Login           bool
+	CreateNamespace bool
 }
 
 type LoginOpts struct {
@@ -194,7 +195,7 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 	client := action.NewInstall(cfg)
 	client.ReleaseName = i.Name
 	client.Namespace = i.Namespace
-	client.CreateNamespace = true
+	client.CreateNamespace = i.CreateNamespace
 	client.Wait = i.Wait
 	client.Timeout = time.Second * 300
 	client.Version = i.Version

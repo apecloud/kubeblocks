@@ -22,10 +22,11 @@ kbcli kubeblocks install [flags]
 ### Options
 
 ```
-  -h, --help              help for install
-      --monitor           Set monitor enabled and install Prometheus, AlertManager and Grafana (default true) (default true)
-      --set stringArray   Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
-      --version string    KubeBlocks version
+      --create-namespace   create the namespace if not present
+  -h, --help               help for install
+      --monitor            Set monitor enabled and install Prometheus, AlertManager and Grafana (default true) (default true)
+      --set stringArray    Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
+      --version string     KubeBlocks version
 ```
 
 ### Options inherited from parent commands

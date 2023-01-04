@@ -212,11 +212,11 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 
 	// generate plan by UpdateStrategy
 	switch component.ConsensusSpec.UpdateStrategy {
-	case dbaasv1alpha1.Serial:
+	case dbaasv1alpha1.SerialStrategy:
 		generateConsensusSerialPlan(plan, pods)
-	case dbaasv1alpha1.Parallel:
+	case dbaasv1alpha1.ParallelStrategy:
 		generateConsensusParallelPlan(plan, pods)
-	case dbaasv1alpha1.BestEffortParallel:
+	case dbaasv1alpha1.BestEffortParallelStrategy:
 		generateConsensusBestEffortParallelPlan(plan, pods, rolePriorityMap)
 	}
 

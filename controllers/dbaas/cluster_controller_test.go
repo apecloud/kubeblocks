@@ -679,7 +679,7 @@ spec:
 		return changeCluster(clusterName, func(cluster *dbaasv1alpha1.Cluster) {
 			if cluster.Spec.Components == nil || len(cluster.Spec.Components) == 0 {
 				cluster.Spec.Components = []dbaasv1alpha1.ClusterComponent{
-					dbaasv1alpha1.ClusterComponent{
+					{
 						Name:     "replicasets",
 						Type:     "replicasets",
 						Replicas: &replicas,

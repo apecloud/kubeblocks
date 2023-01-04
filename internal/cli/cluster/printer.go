@@ -22,80 +22,88 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 )
 
-type Printer interface {
-	AddRow(objs *ClusterObjects)
-	Print()
+type PrintType string
+
+const (
+	PrintClusters   PrintType = "clusters"
+	PrintWide       PrintType = "wide"
+	PrintInstances  PrintType = "instances"
+	PrintComponents PrintType = "components"
+)
+
+type tblInfo struct {
+	header     []interface{}
+	addRow     func(tbl *printer.TablePrinter, objs *ClusterObjects)
+	getOptions GetOptions
 }
 
-// ClusterPrinter prints cluster info
-type ClusterPrinter struct {
+var mapTblInfo = map[PrintType]tblInfo{
+	PrintClusters: {
+		header: []interface{}{"NAME", "NAMESPACE", "CLUSTER-DEFINITION", "VERSION", "TERMINATION-POLICY", "STATUS", "CREATED-TIME"},
+		addRow: func(tbl *printer.TablePrinter, objs *ClusterObjects) {
+			c := objs.GetClusterInfo()
+			tbl.AddRow(c.Name, c.Namespace, c.ClusterDefinition, c.ClusterVersion, c.TerminationPolicy, c.Status, c.CreatedTime)
+		},
+		getOptions: GetOptions{},
+	},
+	PrintWide: {
+		header: []interface{}{"NAME", "NAMESPACE", "CLUSTER-DEFINITION", "VERSION", "TERMINATION-POLICY", "STATUS", "INTERNAL-ENDPOINTS", "EXTERNAL-ENDPOINTS", "CREATED-TIME"},
+		addRow: func(tbl *printer.TablePrinter, objs *ClusterObjects) {
+			c := objs.GetClusterInfo()
+			tbl.AddRow(c.Name, c.Namespace, c.ClusterDefinition, c.ClusterVersion, c.TerminationPolicy, c.Status, c.InternalEP, c.ExternalEP, c.CreatedTime)
+		},
+		getOptions: GetOptions{WithClusterDef: true, WithService: true, WithPod: true},
+	},
+	PrintInstances: {
+		header:     []interface{}{"NAME", "NAMESPACE", "CLUSTER", "COMPONENT", "STATUS", "ROLE", "ACCESSMODE", "AZ", "REGION", "CPU(REQUEST/LIMIT)", "MEMORY(REQUEST/LIMIT)", "STORAGE", "NODE", "CREATED-TIME"},
+		addRow:     AddInstanceRow,
+		getOptions: GetOptions{WithClusterDef: true, WithPod: true},
+	},
+	PrintComponents: {
+		header:     []interface{}{"NAME", "NAMESPACE", "CLUSTER", "TYPE", "IMAGE"},
+		addRow:     AddComponentRow,
+		getOptions: GetOptions{WithClusterDef: true, WithPod: true},
+	},
+}
+
+// Printer prints cluster info
+type Printer struct {
 	tbl *printer.TablePrinter
+	tblInfo
 }
 
-var _ Printer = &ClusterPrinter{}
-
-func NewClusterPrinter(out io.Writer) *ClusterPrinter {
-	p := &ClusterPrinter{tbl: printer.NewTablePrinter(out)}
-	p.tbl.SetHeader("NAME", "NAMESPACE", "VERSION", "CLUSTER-DEFINITION", "TERMINATION-POLICY", "STATUS", "INTERNAL-ENDPOINTS", "EXTERNAL-ENDPOINTS", "AGE")
+func NewPrinter(out io.Writer, printType PrintType) *Printer {
+	p := &Printer{tbl: printer.NewTablePrinter(out)}
+	p.tblInfo = mapTblInfo[printType]
+	p.tbl.SetHeader(p.tblInfo.header...)
 	return p
 }
 
-func (p *ClusterPrinter) AddRow(objs *ClusterObjects) {
-	c := objs.GetClusterInfo()
-	p.tbl.AddRow(c.Name, c.Namespace, c.ClusterVersion, c.ClusterDefinition, c.TerminationPolicy, c.Status, c.InternalEP, c.ExternalEP, c.Age)
+func (p *Printer) AddRow(objs *ClusterObjects) {
+	p.addRow(p.tbl, objs)
 }
 
-func (p *ClusterPrinter) Print() {
+func (p *Printer) Print() {
 	p.tbl.Print()
 }
 
-// ComponentPrinter prints component info
-type ComponentPrinter struct {
-	tbl *printer.TablePrinter
+func (p *Printer) GetterOptions() GetOptions {
+	return p.getOptions
 }
 
-var _ Printer = &ComponentPrinter{}
-
-func NewComponentPrinter(out io.Writer) *ComponentPrinter {
-	p := &ComponentPrinter{tbl: printer.NewTablePrinter(out)}
-	p.tbl.SetHeader("NAME", "CLUSTER", "TYPE", "REPLICAS(DESIRED/TOTAL)", "IMAGE")
-	return p
-}
-
-func (p *ComponentPrinter) AddRow(objs *ClusterObjects) {
+func AddComponentRow(tbl *printer.TablePrinter, objs *ClusterObjects) {
 	components := objs.GetComponentInfo()
 	for _, c := range components {
-		p.tbl.AddRow(c.Name, c.Cluster, c.Type, c.Replicas, c.Image)
+		tbl.AddRow(c.Name, c.NameSpace, c.Cluster, c.Type, c.Image)
 	}
 }
 
-func (p *ComponentPrinter) Print() {
-	p.tbl.Print()
-}
-
-// InstancePrinter prints instance info
-type InstancePrinter struct {
-	tbl *printer.TablePrinter
-}
-
-var _ Printer = &InstancePrinter{}
-
-func NewInstancePrinter(out io.Writer) *InstancePrinter {
-	p := &InstancePrinter{tbl: printer.NewTablePrinter(out)}
-	p.tbl.SetHeader("NAME", "CLUSTER", "COMPONENT", "STATUS", "ROLE", "ACCESSMODE", "AZ", "REGION", "CPU(REQUEST/LIMIT)", "MEMORY(REQUEST/LIMIT)", "STORAGE", "NODE", "AGE")
-	return p
-}
-
-func (p *InstancePrinter) AddRow(objs *ClusterObjects) {
+func AddInstanceRow(tbl *printer.TablePrinter, objs *ClusterObjects) {
 	instances := objs.GetInstanceInfo()
 	for _, instance := range instances {
-		p.tbl.AddRow(instance.Name, instance.Cluster, instance.Component,
+		tbl.AddRow(instance.Name, instance.Namespace, instance.Cluster, instance.Component,
 			instance.Status, instance.Role, instance.AccessMode,
 			instance.AZ, instance.Region, instance.CPU, instance.Memory,
-			instance.Storage, instance.Node, instance.Age)
+			BuildStorageSize(instance.Storage), instance.Node, instance.CreatedTime)
 	}
-}
-
-func (p *InstancePrinter) Print() {
-	p.tbl.Print()
 }

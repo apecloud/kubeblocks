@@ -20,13 +20,11 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/util/resource"
@@ -36,15 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
-const valueNone = "<none>"
-
-type ObjectsGetter struct {
-	ClientSet     clientset.Interface
-	DynamicClient dynamic.Interface
-
-	Name      string
-	Namespace string
-
+type GetOptions struct {
 	WithClusterDef     bool
 	WithClusterVersion bool
 	WithConfigMap      bool
@@ -54,12 +44,18 @@ type ObjectsGetter struct {
 	WithPod            bool
 }
 
+type ObjectsGetter struct {
+	ClientSet     clientset.Interface
+	DynamicClient dynamic.Interface
+	Name          string
+	Namespace     string
+	GetOptions
+}
+
 func NewClusterObjects() *ClusterObjects {
 	return &ClusterObjects{
-		Cluster:        &dbaasv1alpha1.Cluster{},
-		ClusterDef:     &dbaasv1alpha1.ClusterDefinition{},
-		ClusterVersion: &dbaasv1alpha1.ClusterVersion{},
-		Nodes:          []*corev1.Node{},
+		Cluster: &dbaasv1alpha1.Cluster{},
+		Nodes:   []*corev1.Node{},
 	}
 }
 
@@ -90,18 +86,20 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 
 	// get cluster definition
 	if o.WithClusterDef {
-		if err = getResource(types.ClusterDefGVR(), objs.Cluster.Spec.ClusterDefRef, "",
-			objs.ClusterDef); err != nil {
+		cd := &dbaasv1alpha1.ClusterDefinition{}
+		if err = getResource(types.ClusterDefGVR(), objs.Cluster.Spec.ClusterDefRef, "", cd); err != nil {
 			return nil, err
 		}
+		objs.ClusterDef = cd
 	}
 
 	// get app version
 	if o.WithClusterVersion {
-		if err = getResource(types.ClusterVersionGVR(), objs.Cluster.Spec.ClusterVersionRef, "",
-			objs.ClusterVersion); err != nil {
+		v := &dbaasv1alpha1.ClusterVersion{}
+		if err = getResource(types.ClusterVersionGVR(), objs.Cluster.Spec.ClusterVersionRef, "", v); err != nil {
 			return nil, err
 		}
+		objs.ClusterVersion = v
 	}
 
 	// get services
@@ -170,9 +168,13 @@ func (o *ClusterObjects) GetClusterInfo() *ClusterInfo {
 		ClusterDefinition: c.Spec.ClusterDefRef,
 		TerminationPolicy: string(c.Spec.TerminationPolicy),
 		Status:            string(c.Status.Phase),
-		Age:               duration.HumanDuration(time.Since(c.CreationTimestamp.Time)),
-		InternalEP:        valueNone,
-		ExternalEP:        valueNone,
+		CreatedTime:       util.TimeFormat(&c.CreationTimestamp),
+		InternalEP:        types.None,
+		ExternalEP:        types.None,
+	}
+
+	if o.ClusterDef == nil {
+		return cluster
 	}
 
 	primaryComponent := FindClusterComp(o.Cluster, o.ClusterDef.Spec.Components[0].TypeName)
@@ -188,7 +190,6 @@ func (o *ClusterObjects) GetClusterInfo() *ClusterInfo {
 
 func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 	var comps []*ComponentInfo
-
 	for _, cdComp := range o.ClusterDef.Spec.Components {
 		c := FindClusterComp(o.Cluster, cdComp.TypeName)
 		if c == nil {
@@ -207,20 +208,23 @@ func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 			}
 		}
 
-		image := valueNone
+		image := types.None
 		if len(pods) > 0 {
 			image = pods[0].Spec.Containers[0].Image
 		}
 
 		running, waiting, succeeded, failed := util.GetPodStatus(pods)
 		comp := &ComponentInfo{
-			Name:     c.Name,
-			Type:     c.Type,
-			Cluster:  o.Cluster.Name,
-			Replicas: fmt.Sprintf("%d / %d", *c.Replicas, len(pods)),
-			Status:   fmt.Sprintf("%d / %d / %d / %d ", running, waiting, succeeded, failed),
-			Image:    image,
+			Name:      c.Name,
+			NameSpace: o.Cluster.Namespace,
+			Type:      c.Type,
+			Cluster:   o.Cluster.Name,
+			Replicas:  fmt.Sprintf("%d / %d", *c.Replicas, len(pods)),
+			Status:    fmt.Sprintf("%d / %d / %d / %d ", running, waiting, succeeded, failed),
+			Image:     image,
 		}
+		comp.CPU, comp.Memory = getResourceInfo(c.Resources.Requests, c.Resources.Limits)
+		comp.Storage = o.getStorageInfo(c)
 		comps = append(comps, comp)
 	}
 	return comps
@@ -228,16 +232,16 @@ func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 
 func (o *ClusterObjects) GetInstanceInfo() []*InstanceInfo {
 	var instances []*InstanceInfo
-
 	for _, pod := range o.Pods.Items {
 		instance := &InstanceInfo{
-			Name:       pod.Name,
-			Cluster:    getLabelVal(pod.Labels, types.InstanceLabelKey),
-			Component:  getLabelVal(pod.Labels, types.ComponentLabelKey),
-			Status:     string(pod.Status.Phase),
-			Role:       getLabelVal(pod.Labels, types.ConsensusSetRoleLabelKey),
-			AccessMode: getLabelVal(pod.Labels, types.ConsensusSetAccessModeLabelKey),
-			Age:        duration.HumanDuration(time.Since(pod.CreationTimestamp.Time)),
+			Name:        pod.Name,
+			Namespace:   pod.Namespace,
+			Cluster:     getLabelVal(pod.Labels, types.InstanceLabelKey),
+			Component:   getLabelVal(pod.Labels, types.ComponentLabelKey),
+			Status:      string(pod.Status.Phase),
+			Role:        getLabelVal(pod.Labels, types.ConsensusSetRoleLabelKey),
+			AccessMode:  getLabelVal(pod.Labels, types.ConsensusSetAccessModeLabelKey),
+			CreatedTime: util.TimeFormat(&pod.CreationTimestamp),
 		}
 
 		var component *dbaasv1alpha1.ClusterComponent
@@ -246,34 +250,48 @@ func (o *ClusterObjects) GetInstanceInfo() []*InstanceInfo {
 				component = &o.Cluster.Spec.Components[i]
 			}
 		}
-		getInstanceStorageInfo(component, instance)
+		instance.Storage = o.getStorageInfo(component)
 		getInstanceNodeInfo(o.Nodes, &pod, instance)
-		getInstanceResourceInfo(&pod, instance)
+		instance.CPU, instance.Memory = getResourceInfo(resource.PodRequestsAndLimits(&pod))
 		instances = append(instances, instance)
 	}
 	return instances
 }
 
-func getInstanceStorageInfo(component *dbaasv1alpha1.ClusterComponent, i *InstanceInfo) {
+func (o *ClusterObjects) getStorageInfo(component *dbaasv1alpha1.ClusterComponent) []StorageInfo {
 	if component == nil {
-		i.Storage = valueNone
-		return
+		return nil
 	}
 
-	var volumes []string
-	vcTmpls := component.VolumeClaimTemplates
-	for _, vcTmpl := range vcTmpls {
-		val := vcTmpl.Spec.Resources.Requests[corev1.ResourceStorage]
-		volumes = append(volumes, fmt.Sprintf("%s/%s", vcTmpl.Name, val.String()))
+	getClassName := func(vcTpl *dbaasv1alpha1.ClusterComponentVolumeClaimTemplate) string {
+		if vcTpl.Spec.StorageClassName != nil {
+			return *vcTpl.Spec.StorageClassName
+		}
+
+		// get storage class name from cluster annotations
+		if name, ok := o.Cluster.Annotations[types.StorageClassAnnotationKey]; ok {
+			return name
+		}
+
+		return types.None
 	}
-	i.Storage = strings.Join(volumes, ",")
+
+	var infos []StorageInfo
+	for _, vcTpl := range component.VolumeClaimTemplates {
+		s := StorageInfo{
+			Name: vcTpl.Name,
+		}
+		val := vcTpl.Spec.Resources.Requests[corev1.ResourceStorage]
+		s.StorageClass = getClassName(&vcTpl)
+		s.Size = val.String()
+		s.AccessMode = getAccessModes(vcTpl.Spec.AccessModes)
+		infos = append(infos, s)
+	}
+	return infos
 }
 
 func getInstanceNodeInfo(nodes []*corev1.Node, pod *corev1.Pod, i *InstanceInfo) {
-	i.Node = valueNone
-	i.Region = valueNone
-	i.AZ = valueNone
-
+	i.Node, i.Region, i.AZ = types.None, types.None, types.None
 	if pod.Spec.NodeName == "" {
 		return
 	}
@@ -288,13 +306,12 @@ func getInstanceNodeInfo(nodes []*corev1.Node, pod *corev1.Pod, i *InstanceInfo)
 	i.AZ = getLabelVal(node.Labels, types.ZoneLabelKey)
 }
 
-func getInstanceResourceInfo(pod *corev1.Pod, i *InstanceInfo) {
-	reqs, limits := resource.PodRequestsAndLimits(pod)
+func getResourceInfo(reqs, limits corev1.ResourceList) (string, string) {
+	var cpu, mem string
 	names := []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory}
 	for _, name := range names {
-		res := valueNone
-		limit := limits[name]
-		req := reqs[name]
+		res := types.None
+		limit, req := limits[name], reqs[name]
 
 		// if both limit and request are empty, only output none
 		if !util.ResourceIsEmpty(&limit) || !util.ResourceIsEmpty(&req) {
@@ -303,17 +320,52 @@ func getInstanceResourceInfo(pod *corev1.Pod, i *InstanceInfo) {
 
 		switch name {
 		case corev1.ResourceCPU:
-			i.CPU = res
+			cpu = res
 		case corev1.ResourceMemory:
-			i.Memory = res
+			mem = res
 		}
 	}
+	return cpu, mem
 }
 
 func getLabelVal(labels map[string]string, key string) string {
 	val := labels[key]
 	if len(val) == 0 {
-		return valueNone
+		return types.None
 	}
 	return val
+}
+
+func getAccessModes(modes []corev1.PersistentVolumeAccessMode) string {
+	modes = removeDuplicateAccessModes(modes)
+	var modesStr []string
+	if containsAccessMode(modes, corev1.ReadWriteOnce) {
+		modesStr = append(modesStr, "RWO")
+	}
+	if containsAccessMode(modes, corev1.ReadOnlyMany) {
+		modesStr = append(modesStr, "ROX")
+	}
+	if containsAccessMode(modes, corev1.ReadWriteMany) {
+		modesStr = append(modesStr, "RWX")
+	}
+	return strings.Join(modesStr, ",")
+}
+
+func removeDuplicateAccessModes(modes []corev1.PersistentVolumeAccessMode) []corev1.PersistentVolumeAccessMode {
+	var accessModes []corev1.PersistentVolumeAccessMode
+	for _, m := range modes {
+		if !containsAccessMode(accessModes, m) {
+			accessModes = append(accessModes, m)
+		}
+	}
+	return accessModes
+}
+
+func containsAccessMode(modes []corev1.PersistentVolumeAccessMode, mode corev1.PersistentVolumeAccessMode) bool {
+	for _, m := range modes {
+		if m == mode {
+			return true
+		}
+	}
+	return false
 }

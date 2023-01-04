@@ -1,18 +1,28 @@
-## kbcli cluster upgrade
+## kbcli cluster list-instances
 
-Upgrade the cluster
+List instances
 
 ```
-kbcli cluster upgrade [flags]
+kbcli cluster list-instances [flags]
+```
+
+### Examples
+
+```
+  # list all instances of all clusters in current namespace
+  kbcli cluster list-instances
+  
+  # list all instances of a specified cluster
+  kbcli cluster list-instances my-cluster
 ```
 
 ### Options
 
 ```
-      --cluster-version string       Reference app version (required)
-  -h, --help                         help for upgrade
-      --name string                  OpsRequest name. if not specified, it will be randomly generated 
-      --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
+  -A, --all-namespace     If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
+  -h, --help              help for list-instances
+  -o, --output format     prints the output in the specified format. Allowed values: table, json, yaml, wide (default table)
+  -l, --selector string   Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
 ```
 
 ### Options inherited from parent commands

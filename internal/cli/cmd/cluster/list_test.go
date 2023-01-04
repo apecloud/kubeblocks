@@ -89,30 +89,23 @@ var _ = Describe("list", func() {
 	It("list", func() {
 		cmd := NewListCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
-		Expect(cmd.Flags().Lookup("show-instance").Value.String()).Should(Equal("false"))
-		Expect(cmd.Flags().Lookup("show-component").Value.String()).Should(Equal("false"))
 
 		cmd.Run(cmd, []string{"test"})
-		expected := `NAME   AGE
-test   <unknown>
-`
-		Expect(out.String()).Should(Equal(expected))
+		Expect(out.String()).Should(ContainSubstring(testing.ClusterDefName))
 	})
 
-	It("show instance", func() {
-		cmd := NewListCmd(tf, streams)
+	It("list instances", func() {
+		cmd := NewListInstancesCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 
-		Expect(cmd.Flags().Set("show-instance", "true")).Should(Succeed())
 		cmd.Run(cmd, []string{"test"})
 		Expect(len(out.String()) > 0).Should(BeTrue())
 	})
 
-	It("show component", func() {
-		cmd := NewListCmd(tf, streams)
+	It("list components", func() {
+		cmd := NewListComponentsCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 
-		Expect(cmd.Flags().Set("show-component", "true")).Should(Succeed())
 		cmd.Run(cmd, []string{"test"})
 		Expect(len(out.String()) > 0).Should(BeTrue())
 	})

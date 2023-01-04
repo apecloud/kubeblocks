@@ -329,7 +329,7 @@ func GetNodeByName(nodes []*corev1.Node, name string) *corev1.Node {
 			return node
 		}
 	}
-	return nil
+	return &corev1.Node{}
 }
 
 // ResourceIsEmpty check if resource is empty or not
@@ -381,4 +381,27 @@ func TimeFormat(t *metav1.Time) string {
 	}
 
 	return t.Format(layout)
+}
+
+// CheckEmpty check if string is empty, if yes, return <none> for displaying
+func CheckEmpty(str string) string {
+	if len(str) == 0 {
+		return types.None
+	}
+	return str
+}
+
+// BuildLabelSelectorByNames build the label selector by instance names, the label selector is
+// like "instance-key in (name1, name2)"
+func BuildLabelSelectorByNames(selector string, names []string) string {
+	if len(names) == 0 {
+		return ""
+	}
+
+	label := fmt.Sprintf("%s in (%s)", types.InstanceLabelKey, strings.Join(names, ","))
+	if len(selector) == 0 {
+		return label
+	} else {
+		return selector + "," + label
+	}
 }

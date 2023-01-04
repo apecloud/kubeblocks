@@ -17,76 +17,49 @@ limitations under the License.
 package patch
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	"github.com/apecloud/kubeblocks/internal/cli/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
-
-type testOptions struct {
-	*Options
-}
-
-func (o *testOptions) complete(c *builder.Command) error {
-	if len(c.Args) == 0 {
-		return fmt.Errorf("missing cluster name")
-	}
-	o.Patch = "{terminationPolicy: Delete}"
-	return nil
-}
-
-func (o *testOptions) run(c *builder.Command) (bool, error) {
-	return c != nil, nil
-}
 
 var _ = Describe("Patch", func() {
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
-	var o *testOptions
-	var cb *builder.CmdBuilder
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace("default")
-		o = &testOptions{Options: NewOptions(streams)}
-		cb = builder.NewCmdBuilder().
-			Factory(tf).
-			IOStreams(streams).
-			Short("Test patch.").
-			GVR(types.ClusterGVR()).
-			CustomRun(o.run).
-			CustomComplete(o.complete)
 	})
 
 	AfterEach(func() {
 		tf.Cleanup()
 	})
 
-	It("build", func() {
-		cmd := cb.Build(o.Build)
-		Expect(cmd).ShouldNot(BeNil())
-	})
-
 	It("complete", func() {
-		c := cb.GetCmd()
-		c.Args = []string{"c1"}
-		cb.Build(o.Build)
-		Expect(o.Options.complete(c)).Should(Succeed())
-		Expect(o.Patch).Should(ContainSubstring("terminationPolicy"))
-		Expect(o.Options.validate()).Should(Succeed())
+		cmd := &cobra.Command{}
+		o := NewOptions(tf, streams, types.ClusterGVR())
+		o.AddFlags(cmd)
+		Expect(o.complete(cmd)).Should(HaveOccurred())
+
+		o.Names = []string{"c1"}
+		Expect(o.complete(cmd)).Should(Succeed())
 	})
 
 	It("run", func() {
-		c := cb.GetCmd()
-		c.Args = []string{"c1"}
-		cb.Build(o.Build)
-		Expect(o.Options.complete(c))
-		Expect(o.Options.run(c)).Should(HaveOccurred())
+		cmd := &cobra.Command{}
+		o := NewOptions(tf, streams, types.ClusterGVR())
+		o.AddFlags(cmd)
+		Expect(o.complete(cmd)).Should(HaveOccurred())
+
+		o.Names = []string{"c1"}
+		Expect(o.Run(cmd)).Should(HaveOccurred())
+
+		o.Patch = "{terminationPolicy: Delete}"
+		Expect(o.Run(cmd)).Should(HaveOccurred())
 	})
 })

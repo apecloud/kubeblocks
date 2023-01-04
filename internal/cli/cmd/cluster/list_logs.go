@@ -118,12 +118,14 @@ func (o *ListLogsOptions) Complete(f cmdutil.Factory, args []string) error {
 
 func (o *ListLogsOptions) Run() error {
 	clusterGetter := cluster.ObjectsGetter{
-		ClientSet:      o.clientSet,
-		DynamicClient:  o.dynamicClient,
-		Name:           o.clusterName,
-		Namespace:      o.namespace,
-		WithClusterDef: true,
-		WithPod:        true,
+		ClientSet:     o.clientSet,
+		DynamicClient: o.dynamicClient,
+		Name:          o.clusterName,
+		Namespace:     o.namespace,
+		GetOptions: cluster.GetOptions{
+			WithClusterDef: true,
+			WithPod:        true,
+		},
 	}
 	dataObj, err := clusterGetter.Get()
 	if err != nil {

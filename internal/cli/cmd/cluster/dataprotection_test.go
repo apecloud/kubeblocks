@@ -27,13 +27,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	"github.com/apecloud/kubeblocks/internal/cli/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var _ = Describe("DataProtection", func() {
@@ -69,36 +68,24 @@ var _ = Describe("DataProtection", func() {
 		cmd := NewDeleteBackupCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 
-		clusterName := "test1"
-		clusterLabel := fmt.Sprintf("%s=%s", types.InstanceLabelKey, clusterName)
+		args := []string{"test1"}
+		clusterLabel := util.BuildLabelSelectorByNames("", args)
 
 		By("test delete-backup with cluster")
-		deleteFlags := &delete.DeleteFlags{
-			DeleteFlags: cmddelete.NewDeleteCommandFlags("containing the resource to delete."),
-		}
-		c := &builder.Command{Options: deleteFlags, Args: []string{clusterName}}
-		Expect(completeForDeleteBackup(c)).Should(HaveOccurred())
+		o := delete.NewDeleteOptions(tf, streams, types.BackupJobGVR())
+		Expect(completeForDeleteBackup(o, args)).Should(HaveOccurred())
 
 		By("test delete-backup with cluster and force")
-		deleteFlags = &delete.DeleteFlags{
-			DeleteFlags: cmddelete.NewDeleteCommandFlags("containing the resource to delete."),
-		}
-		deleteForce := true
-		deleteFlags.Force = &deleteForce
-		c.Options = deleteFlags
-		Expect(completeForDeleteBackup(c)).Should(Succeed())
-		Expect(*deleteFlags.LabelSelector == clusterLabel).Should(BeTrue())
+		o.Force = true
+		Expect(completeForDeleteBackup(o, args)).Should(Succeed())
+		Expect(o.LabelSelector == clusterLabel).Should(BeTrue())
 
 		By("test delete-backup with cluster and force and labels")
-		deleteFlags = &delete.DeleteFlags{
-			DeleteFlags: cmddelete.NewDeleteCommandFlags("containing the resource to delete."),
-		}
-		deleteFlags.Force = &deleteForce
+		o.Force = true
 		customLabel := "test=test"
-		deleteFlags.LabelSelector = &customLabel
-		c.Options = deleteFlags
-		Expect(completeForDeleteBackup(c)).Should(Succeed())
-		Expect(*deleteFlags.LabelSelector == customLabel+","+clusterLabel).Should(BeTrue())
+		o.LabelSelector = customLabel
+		Expect(completeForDeleteBackup(o, args)).Should(Succeed())
+		Expect(o.LabelSelector == customLabel+","+clusterLabel).Should(BeTrue())
 	})
 
 	It("list-backup", func() {
@@ -111,36 +98,24 @@ var _ = Describe("DataProtection", func() {
 		cmd := NewDeleteRestoreCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 
-		clusterName := "test1"
-		clusterLabel := fmt.Sprintf("%s=%s", types.InstanceLabelKey, clusterName)
+		args := []string{"test1"}
+		clusterLabel := util.BuildLabelSelectorByNames("", args)
 
 		By("test delete-restore with cluster")
-		deleteFlags := &delete.DeleteFlags{
-			DeleteFlags: cmddelete.NewDeleteCommandFlags("containing the resource to delete."),
-		}
-		c := &builder.Command{Options: deleteFlags, Args: []string{clusterName}}
-		Expect(completeForDeleteRestore(c)).Should(HaveOccurred())
+		o := delete.NewDeleteOptions(tf, streams, types.BackupJobGVR())
+		Expect(completeForDeleteRestore(o, args)).Should(HaveOccurred())
 
 		By("test delete-restore with cluster and force")
-		deleteFlags = &delete.DeleteFlags{
-			DeleteFlags: cmddelete.NewDeleteCommandFlags("containing the resource to delete."),
-		}
-		deleteForce := true
-		deleteFlags.Force = &deleteForce
-		c.Options = deleteFlags
-		Expect(completeForDeleteRestore(c)).Should(Succeed())
-		Expect(*deleteFlags.LabelSelector == clusterLabel).Should(BeTrue())
+		o.Force = true
+		Expect(completeForDeleteRestore(o, args)).Should(Succeed())
+		Expect(o.LabelSelector == clusterLabel).Should(BeTrue())
 
 		By("test delete-restore with cluster and force and labels")
-		deleteFlags = &delete.DeleteFlags{
-			DeleteFlags: cmddelete.NewDeleteCommandFlags("containing the resource to delete."),
-		}
-		deleteFlags.Force = &deleteForce
+		o.Force = true
 		customLabel := "test=test"
-		deleteFlags.LabelSelector = &customLabel
-		c.Options = deleteFlags
-		Expect(completeForDeleteRestore(c)).Should(Succeed())
-		Expect(*deleteFlags.LabelSelector == customLabel+","+clusterLabel).Should(BeTrue())
+		o.LabelSelector = customLabel
+		Expect(completeForDeleteRestore(o, args)).Should(Succeed())
+		Expect(o.LabelSelector == customLabel+","+clusterLabel).Should(BeTrue())
 	})
 
 	It("list-restore", func() {

@@ -26,15 +26,15 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	"github.com/apecloud/kubeblocks/internal/cli/list"
-
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
+	"github.com/apecloud/kubeblocks/internal/cli/list"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
-var listExample = templates.Examples(`
+var (
+	listExample = templates.Examples(`
 		# list all clusters
 		kbcli cluster list
 
@@ -48,137 +48,134 @@ var listExample = templates.Examples(`
 		kbcli cluster list my-cluster -o json
 
 		# list a single cluster in wide output format
-		kbcli cluster list my-cluster -o wide	
+		kbcli cluster list my-cluster -o wide`)
 
-		# list all instances of all clusters
-		kbcli cluster list --show-instance
+	listInstancesExample = templates.Examples(`
+		# list all instances of all clusters in current namespace
+		kbcli cluster list-instances
 
 		# list all instances of a specified cluster
-		kbcli cluster list my-cluster --show-instance
+		kbcli cluster list-instances my-cluster`)
 
-		# list all components of all clusters
-		kbcli cluster list --show-component
+	listComponentsExample = templates.Examples(`
+		# list all components of all clusters in current namespace
+		kbcli cluster list-components
 
 		# list all components of a specified cluster
-		kbcli cluster list my-cluster --show-component`)
-
-type listOptions struct {
-	// showInstance if true, list instance info
-	showInstance bool
-
-	// showComponent if true, list component info
-	showComponent bool
-}
+		kbcli cluster list-components my-cluster`)
+)
 
 func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	return builder.NewCmdBuilder().
-		Short("List all cluster.").
-		Example(listExample).
-		Options(&listOptions{}).
-		Factory(f).
-		GVR(types.ClusterGVR()).
-		IOStreams(streams).
-		CustomFlags(customFlags).
-		CustomRun(customRun).
-		Build(list.Build)
+	o := list.NewListOptions(f, streams, types.ClusterGVR())
+	cmd := &cobra.Command{
+		Use:               "list",
+		Short:             "List clusters",
+		Example:           listExample,
+		Aliases:           []string{"ls"},
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
+		Run: func(cmd *cobra.Command, args []string) {
+			o.Names = args
+			if o.Format == printer.Wide {
+				util.CheckErr(run(o, cluster.PrintWide))
+			} else {
+				util.CheckErr(run(o, cluster.PrintClusters))
+			}
+		},
+	}
+	o.AddFlags(cmd)
+	return cmd
 }
 
-func customFlags(c *builder.Command) {
-	o := c.Options.(*listOptions)
-	cmd := c.Cmd
-	cmd.Flags().BoolVar(&o.showInstance, "show-instance", false, "Show instance info")
-	cmd.Flags().BoolVar(&o.showComponent, "show-component", false, "Show component info")
+func NewListInstancesCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := list.NewListOptions(f, streams, types.ClusterGVR())
+	cmd := &cobra.Command{
+		Use:               "list-instances",
+		Short:             "List instances",
+		Example:           listInstancesExample,
+		Aliases:           []string{"ls-instances"},
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
+		Run: func(cmd *cobra.Command, args []string) {
+			o.Names = args
+			util.CheckErr(run(o, cluster.PrintInstances))
+		},
+	}
+	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespace", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.")
+	printer.AddOutputFlag(cmd, &o.Format)
+	return cmd
 }
 
-// If show-instance, show-component or -o wide is set, output corresponding information,
-// if these flags are set on the same time, only one is valid, their priority order is
-// show-instance, show-component and -o wide.
-func customRun(c *builder.Command) (bool, error) {
-	var printer cluster.Printer
-
-	o := c.Options.(*listOptions)
-	output := c.Cmd.Flags().Lookup("output").Value.String()
-	outputWide := output == "wide"
-	if !o.showInstance && !o.showComponent && !outputWide {
-		return true, nil
+func NewListComponentsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := list.NewListOptions(f, streams, types.ClusterGVR())
+	cmd := &cobra.Command{
+		Use:               "list-components",
+		Short:             "List components",
+		Example:           listComponentsExample,
+		Aliases:           []string{"ls-components"},
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
+		Run: func(cmd *cobra.Command, args []string) {
+			o.Names = args
+			util.CheckErr(run(o, cluster.PrintComponents))
+		},
 	}
-
-	dynamic, err := c.Factory.DynamicClient()
-	if err != nil {
-		return false, err
-	}
-
-	client, err := c.Factory.KubernetesClientSet()
-	if err != nil {
-		return false, err
-	}
-
-	namespace, _, err := c.Factory.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return false, err
-	}
-
-	switch {
-	case o.showInstance:
-		printer = cluster.NewInstancePrinter(c.IOStreams.Out)
-	case o.showComponent:
-		printer = cluster.NewComponentPrinter(c.IOStreams.Out)
-	case outputWide:
-		printer = cluster.NewClusterPrinter(c.IOStreams.Out)
-	}
-
-	if printer != nil {
-		return false, show(dynamic, client, namespace, c.Args, c.IOStreams, printer)
-	}
-	return true, nil
+	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespace", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.")
+	printer.AddOutputFlag(cmd, &o.Format)
+	return cmd
 }
 
-func show(d dynamic.Interface, client *kubernetes.Clientset, namespace string, names []string,
-	streams genericclioptions.IOStreams, printer cluster.Printer) error {
-
-	// cluster names are specified by command args
-	for _, name := range names {
-		if err := addRow(d, client, namespace, name, printer); err != nil {
-			return err
-		}
-	}
-
-	if len(names) > 0 {
-		printer.Print()
-		return nil
-	}
-
-	// do not specify any cluster name, we will get all clusters
-	clusters := &dbaasv1alpha1.ClusterList{}
-	if err := cluster.GetAllCluster(d, namespace, clusters); err != nil {
+func run(o *list.ListOptions, printType cluster.PrintType) error {
+	// if format is JSON or YAML, use default clusterPrinter to output the result.
+	if o.Format == printer.JSON || o.Format == printer.YAML {
+		_, err := o.Run()
 		return err
 	}
 
-	// no clusters found
-	if len(clusters.Items) == 0 {
-		fmt.Fprintln(streams.ErrOut, "No resources found")
+	// get and output the result
+	o.Print = false
+	r, err := o.Run()
+	if err != nil {
+		return err
+	}
+
+	infos, err := r.Infos()
+	if err != nil {
+		return err
+	}
+
+	if len(infos) == 0 {
+		fmt.Fprintln(o.IOStreams.Out, "No clusters found")
 		return nil
 	}
 
-	for _, c := range clusters.Items {
-		if err := addRow(d, client, namespace, c.Name, printer); err != nil {
+	dynamic, err := o.Factory.DynamicClient()
+	if err != nil {
+		return err
+	}
+
+	client, err := o.Factory.KubernetesClientSet()
+	if err != nil {
+		return err
+	}
+
+	p := cluster.NewPrinter(o.IOStreams.Out, printType)
+	for _, info := range infos {
+		if err := addRow(dynamic, client, info.Namespace, info.Name, p); err != nil {
 			return err
 		}
 	}
-	printer.Print()
+	p.Print()
 	return nil
 }
 
-func addRow(d dynamic.Interface, client *kubernetes.Clientset, namespace string, name string, printer cluster.Printer) error {
+func addRow(d dynamic.Interface, client *kubernetes.Clientset,
+	namespace string, name string, printer *cluster.Printer) error {
 	getter := &cluster.ObjectsGetter{
-		Name:           name,
-		Namespace:      namespace,
-		ClientSet:      client,
-		DynamicClient:  d,
-		WithClusterDef: true,
-		WithSecret:     true,
-		WithService:    true,
-		WithPod:        true,
+		Name:          name,
+		Namespace:     namespace,
+		ClientSet:     client,
+		DynamicClient: d,
+		GetOptions:    printer.GetterOptions(),
 	}
 
 	clusterObjs, err := getter.Get()

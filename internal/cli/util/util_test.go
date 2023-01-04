@@ -20,12 +20,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -111,8 +111,13 @@ var _ = Describe("util", func() {
 				},
 			},
 		}
-		Expect(GetNodeByName(nodes, "test")).ShouldNot(BeNil())
-		Expect(GetNodeByName(nodes, "non-exists")).Should(BeNil())
+
+		testFn := func(name string) bool {
+			n := GetNodeByName(nodes, name)
+			return n.Name == name
+		}
+		Expect(testFn("test")).Should(BeTrue())
+		Expect(testFn("non-exists")).Should(BeFalse())
 	})
 
 	It("GetPodStatus", func() {
@@ -135,9 +140,25 @@ var _ = Describe("util", func() {
 		Expect(f).Should(Equal(1))
 	})
 
-	It("time format", func() {
+	It("TimeFormat", func() {
 		t := metav1.Time{Time: time.Now()}
 		fmt.Println(TimeFormat(&t))
+	})
+
+	It("CheckEmpty", func() {
+		res := ""
+		Expect(CheckEmpty(res)).Should(Equal(types.None))
+		res = "test"
+		Expect(CheckEmpty(res)).Should(Equal(res))
+	})
+
+	It("BuildLabelSelectorByNames", func() {
+		Expect(BuildLabelSelectorByNames("", nil)).Should(Equal(""))
+
+		names := []string{"n1", "n2"}
+		expected := fmt.Sprintf("%s in (%s)", types.InstanceLabelKey, strings.Join(names, ","))
+		Expect(BuildLabelSelectorByNames("", names)).Should(Equal(expected))
+		Expect(BuildLabelSelectorByNames("label1", names)).Should(Equal("label1," + expected))
 	})
 
 	It("Others", func() {

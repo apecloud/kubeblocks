@@ -44,30 +44,42 @@ type ClusterInfo struct {
 	Status            string `json:"status,omitempty"`
 	InternalEP        string `json:"internalEP,omitempty"`
 	ExternalEP        string `json:"externalEP,omitempty"`
-	Age               string `json:"age,omitempty"`
+	CreatedTime       string `json:"age,omitempty"`
 }
 
 type ComponentInfo struct {
-	Name     string `json:"name,omitempty"`
-	Type     string `json:"type,omitempty"`
-	Cluster  string `json:"cluster,omitempty"`
-	Status   string `json:"status,omitempty"`
-	Replicas string `json:"replicas,omitempty"`
-	Image    string `json:"image,omitempty"`
+	Name      string `json:"name,omitempty"`
+	NameSpace string `json:"nameSpace,omitempty"`
+	Type      string `json:"type,omitempty"`
+	Cluster   string `json:"cluster,omitempty"`
+	Status    string `json:"status,omitempty"`
+	Replicas  string `json:"replicas,omitempty"`
+	CPU       string `json:"cpu,omitempty"`
+	Memory    string `json:"memory,omitempty"`
+	Image     string `json:"image,omitempty"`
+	Storage   []StorageInfo
+}
+
+type StorageInfo struct {
+	Name         string
+	Size         string
+	StorageClass string
+	AccessMode   string
 }
 
 type InstanceInfo struct {
-	Name       string `json:"name,omitempty"`
-	Cluster    string `json:"cluster,omitempty"`
-	Component  string `json:"component,omitempty"`
-	Status     string `json:"status,omitempty"`
-	Role       string `json:"role,omitempty"`
-	AccessMode string `json:"accessMode,omitempty"`
-	AZ         string `json:"AZ,omitempty"`
-	Region     string `json:"Region,omitempty"`
-	CPU        string `json:"CPU,omitempty"`
-	Memory     string `json:"memory,omitempty"`
-	Storage    string `json:"storage,omitempty"`
-	Node       string `json:"node,omitempty"`
-	Age        string `json:"age,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Namespace   string `json:"namespace,omitempty"`
+	Cluster     string `json:"cluster,omitempty"`
+	Component   string `json:"component,omitempty"`
+	Status      string `json:"status,omitempty"`
+	Role        string `json:"role,omitempty"`
+	AccessMode  string `json:"accessMode,omitempty"`
+	AZ          string `json:"az,omitempty"`
+	Region      string `json:"region,omitempty"`
+	CPU         string `json:"cpu,omitempty"`
+	Memory      string `json:"memory,omitempty"`
+	Storage     []StorageInfo
+	Node        string `json:"node,omitempty"`
+	CreatedTime string `json:"age,omitempty"`
 }

@@ -41,6 +41,8 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	// add subcommands
 	cmd.AddCommand(
 		NewListCmd(f, streams),
+		NewListInstancesCmd(f, streams),
+		NewListComponentsCmd(f, streams),
 		NewDescribeCmd(f, streams),
 		NewCreateCmd(f, streams),
 		NewDeleteCmd(f, streams),

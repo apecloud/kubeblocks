@@ -57,10 +57,10 @@ When the `spec.componentType` is set as `consensus`, `spec.consensusSpec` is req
 `spec.connectionCredential` is used to create a connection secret. 
 
 Requirements for `.spec.connectionCredential`:
-  * 8 random characters `$(RANDOM_PASSWD)` placeholder, 
-  * self reference map object `$(CONN_CREDENTIAL)[.<map key>])`
-  * Connection credential secret name place holder `$(CONN_CREDENTIAL_SECRET_NAME)`
-  * example usage:
+  - 8 random characters `$(RANDOM_PASSWD)` placeholder.
+  - self reference map object `$(CONN_CREDENTIAL)[.<map key>])`
+  - Connection credential secret name place holder should be `$(CONN_CREDENTIAL_SECRET_NAME)`.
+  - Usage example:
     ```
     spec:
       connectionCredential:
@@ -175,6 +175,21 @@ spec:
         docker-entrypoint.sh mysqld --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$cluster_info" --cluster-id=$CLUSTER_ID
 ```
 
+Note:
+
+`envs` automatically injected by KubeBlocks can be used in the above `env` and `args` fields.
+
+KB_POD_NAME - Pod Name
+KB_NAMESPACE - Namespace
+KB_SA_NAME - Service Account Name
+KB_NODENAME - Node Name
+KB_HOSTIP - Host IP address
+KB_PODIP - Pod IP address
+KB_PODIPS - Pod IP addresses
+KB_CLUSTER_NAME - KubeBlock Cluster API object name
+KB_COMP_NAME - Running pod's KubeBlock Cluster API object's .spec.components.name
+KB_CLUSTER_COMP_NAME - Running pod's KubeBlock Cluster API object's <.metadata.name>-<.spec.components..name>, same name is used for Deployment or StatefulSet workload name, and Service object name
+
 ## AppVersion (for providers)
 
 `AppVersion` enables providers to describe the image versions and condition variables of the corresponding database versions.
@@ -235,7 +250,8 @@ It refers to AppVersion and its value should be the same as `AppVersion`.
 
 #### spec.volumeClaimTemplates
 
-`spec.volumeClaimTemplates` points to `statefulset.spec.volumeClaimTemplates`.
+`volumeClaimTemplates` is a list of claims that pods are allowed to refer to. The StatefulSet controller is responsible for mapping network identities to claims in a way that maintains the identity of a pod. Every claim in this list must have at least one matching (by name) `volumeMount` in one container in the template. A claim in this list takes precedence over any volumes in the template with the same name.
+`PersistentVolumeClaim` is a user's request for and claim to a persistent volume.
 
 ### Cluster `status`
 

@@ -423,10 +423,18 @@ func SortEventsByLastTimestamp(events *corev1.EventList, eventType string) *[]ap
 	return &objs
 }
 
-func GetEventTimeStr(event *corev1.Event) string {
-	t := &event.CreationTimestamp
-	if !event.LastTimestamp.Time.IsZero() {
-		t = &event.LastTimestamp
+func GetEventTimeStr(e *corev1.Event) string {
+	t := &e.CreationTimestamp
+	if !e.LastTimestamp.Time.IsZero() {
+		t = &e.LastTimestamp
 	}
 	return TimeFormat(t)
+}
+
+func GetEventObject(e *corev1.Event) string {
+	kind := e.InvolvedObject.Kind
+	if kind == "Pod" {
+		kind = "Instance"
+	}
+	return fmt.Sprintf("%s/%s", kind, e.InvolvedObject.Name)
 }

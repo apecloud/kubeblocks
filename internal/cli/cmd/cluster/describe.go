@@ -201,7 +201,7 @@ func showEvents(events *corev1.EventList, name string, namespace string, out io.
 	cnt := 0
 	for _, o := range *objs {
 		e := o.(*corev1.Event)
-		tbl.AddRow(util.GetEventTimeStr(e), e.Type, e.Reason, e.InvolvedObject.Name, e.Message)
+		tbl.AddRow(util.GetEventTimeStr(e), e.Type, e.Reason, util.GetEventObject(e), e.Message)
 		cnt++
 		if cnt == 5 {
 			break

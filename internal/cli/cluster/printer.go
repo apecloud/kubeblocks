@@ -121,6 +121,6 @@ func AddEventRow(tbl *printer.TablePrinter, objs *ClusterObjects) {
 	events := util.SortEventsByLastTimestamp(objs.Events, "")
 	for _, event := range *events {
 		e := event.(*corev1.Event)
-		tbl.AddRow(e.Namespace, util.GetEventTimeStr(e), e.Type, e.Reason, e.InvolvedObject.Name, e.Message)
+		tbl.AddRow(e.Namespace, util.GetEventTimeStr(e), e.Type, e.Reason, util.GetEventObject(e), e.Message)
 	}
 }

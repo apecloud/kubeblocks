@@ -108,27 +108,20 @@ allowVolumeExpansion: true
 	assureCfgTplObj := func(tplName, cmName, ns string) (*corev1.ConfigMap, *dbaasv1alpha1.ConfigurationTemplate) {
 		By("Assuring an cm obj")
 
-		cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("operations_config/configcm.yaml")
+		cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap](
+			"operations_config/configcm.yaml",
+			testdata.WithNamespacedName(cmName, ns),
+		)
 		Expect(err).Should(Succeed())
-		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigurationTemplate]("operations_config/configtpl.yaml")
+		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigurationTemplate](
+			"operations_config/configtpl.yaml",
+			testdata.WithNamespacedName(tplName, ns))
 		Expect(err).Should(Succeed())
 
-		cfgCM.SetNamespace(ns)
-		cfgCM.SetName(cmName)
-		cfgTpl.SetName(tplName)
-		cfgTpl.SetNamespace(ns)
 		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, cfgTpl)).Should(Succeed())
 
 		return cfgCM, cfgTpl
-	}
-
-	generateConfigInstanceObj := func(cmName, ns string) *corev1.ConfigMap {
-		cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("operations_config/configcm.yaml")
-		Expect(err).Should(Succeed())
-		cfgCM.SetName(cmName)
-		cfgCM.SetNamespace(ns)
-		return cfgCM
 	}
 
 	assureConfigInstanceObj := func(clusterName, componentName, ns string, cdComponent dbaasv1alpha1.ClusterDefinitionComponent) *corev1.ConfigMap {
@@ -138,15 +131,18 @@ allowVolumeExpansion: true
 		var cmObj *corev1.ConfigMap
 		for _, tpl := range cdComponent.ConfigSpec.ConfigTemplateRefs {
 			cmInsName := cfgcore.GetComponentCMName(clusterName, componentName, tpl)
-			cfgCM := generateConfigInstanceObj(cmInsName, ns)
-			cfgCM.Labels = map[string]string{
-				intctrlutil.AppNameLabelKey:                    clusterName,
-				intctrlutil.AppInstanceLabelKey:                clusterName,
-				intctrlutil.AppComponentLabelKey:               componentName,
-				cfgcore.CMConfigurationTplNameLabelKey:         tpl.ConfigTplRef,
-				cfgcore.CMConfigurationConstraintsNameLabelKey: tpl.ConfigConstraintRef,
-				cfgcore.CMConfigurationISVTplLabelKey:          tpl.Name,
-			}
+			cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("operations_config/configcm.yaml",
+				testdata.WithNamespacedName(cmInsName, ns),
+				testdata.WithLabels(
+					intctrlutil.AppNameLabelKey, clusterName,
+					intctrlutil.AppInstanceLabelKey, clusterName,
+					intctrlutil.AppComponentLabelKey, componentName,
+					cfgcore.CMConfigurationTplNameLabelKey, tpl.ConfigTplRef,
+					cfgcore.CMConfigurationConstraintsNameLabelKey, tpl.ConfigConstraintRef,
+					cfgcore.CMConfigurationISVTplLabelKey, tpl.Name,
+				),
+			)
+			Expect(err).Should(Succeed())
 			Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
 			cmObj = cfgCM
 		}

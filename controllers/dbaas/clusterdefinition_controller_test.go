@@ -160,17 +160,14 @@ spec:
 		By("By assure an cm obj")
 
 		By("Assuring an cm obj")
-		cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("config/configcm.yaml")
+		cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("config/configcm.yaml",
+			testdata.WithNamespacedName(cmName, cmNs))
 		Expect(err).Should(Succeed())
-		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigurationTemplate]("config/configtpl.yaml")
+		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigurationTemplate]("config/configtpl.yaml",
+			testdata.WithNamespacedName(cmName, cmNs))
 		Expect(err).Should(Succeed())
 
-		cfgCM.Name = cmName
-		cfgCM.Namespace = cmNs
 		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
-
-		cfgTpl.Name = cmName
-		// cfgTpl.Spec.TplRef = cmName
 		Expect(testCtx.CheckedCreateObj(ctx, cfgTpl)).Should(Succeed())
 
 		// update phase

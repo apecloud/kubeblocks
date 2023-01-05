@@ -17,13 +17,14 @@ limitations under the License.
 package testdata
 
 import (
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"os"
 	"path/filepath"
 	"runtime"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/yaml"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
@@ -45,10 +46,13 @@ type KBResource interface {
 	dbaasv1alpha1.ClusterVersion |
 	dbaasv1alpha1.ConfigurationTemplate |
 	corev1.ConfigMap |
-	appsv1.StatefulSet
+	appsv1.StatefulSet |
+	appsv1.Deployment
 }
 
-func GetResourceFromTestData[T KBResource](yamlFile string) (*T, error) {
+type ResourceOptions func(obj interface{})
+
+func GetResourceFromTestData[T KBResource](yamlFile string, opts ...ResourceOptions) (*T, error) {
 	yamlContext, err := os.ReadFile(SubTestDataPath(yamlFile))
 	if err != nil {
 		return nil, err
@@ -58,5 +62,64 @@ func GetResourceFromTestData[T KBResource](yamlFile string) (*T, error) {
 	if err := yaml.Unmarshal(yamlContext, obj); err != nil {
 		return nil, err
 	}
+
+	for _, ops := range opts {
+		ops(obj)
+	}
 	return obj, nil
+}
+
+func WithName(resourceName string) ResourceOptions {
+	return func(obj interface{}) {
+		if k8sObject, ok := obj.(client.Object); ok {
+			k8sObject.SetName(resourceName)
+		}
+	}
+}
+
+func WithNamespace(ns string) ResourceOptions {
+	return func(obj interface{}) {
+		if k8sObject, ok := obj.(client.Object); ok {
+			k8sObject.SetNamespace(ns)
+		}
+	}
+}
+
+func WithLabels(keysAndValues ...string) ResourceOptions {
+	return func(obj interface{}) {
+		k8sObject, ok := obj.(client.Object)
+		if !ok {
+			return
+		}
+		// ignore mismatching for kvs
+		labels := make(map[string]string, len(keysAndValues)/2)
+		for i := 0; i+1 < len(keysAndValues); i += 2 {
+			labels[keysAndValues[i]] = keysAndValues[i+1]
+		}
+		k8sObject.SetLabels(labels)
+	}
+}
+
+func WithAnnotations(keysAndValues ...string) ResourceOptions {
+	return func(obj interface{}) {
+		k8sObject, ok := obj.(client.Object)
+		if !ok {
+			return
+		}
+		// ignore mismatching for kvs
+		annotations := make(map[string]string, len(keysAndValues)/2)
+		for i := 0; i+1 < len(keysAndValues); i += 2 {
+			annotations[keysAndValues[i]] = keysAndValues[i+1]
+		}
+		k8sObject.SetAnnotations(annotations)
+	}
+}
+
+func WithNamespacedName(resourceName, ns string) ResourceOptions {
+	return func(obj interface{}) {
+		if k8sObject, ok := obj.(client.Object); ok {
+			k8sObject.SetNamespace(ns)
+			k8sObject.SetName(resourceName)
+		}
+	}
 }

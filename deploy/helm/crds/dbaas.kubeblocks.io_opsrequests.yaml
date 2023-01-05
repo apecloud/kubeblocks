@@ -178,7 +178,7 @@ spec:
                 - VolumeExpansion
                 - HorizontalScaling
                 - Restart
-                - Reconfigure
+                - Reconfiguring
                 type: string
               upgrade:
                 description: upgrade specify the cluster version by specifying clusterVersionRef.

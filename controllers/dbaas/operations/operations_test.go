@@ -130,7 +130,7 @@ allowVolumeExpansion: true
 		}
 		var cmObj *corev1.ConfigMap
 		for _, tpl := range cdComponent.ConfigSpec.ConfigTemplateRefs {
-			cmInsName := cfgcore.GetComponentCMName(clusterName, componentName, tpl)
+			cmInsName := cfgcore.GetComponentCfgName(clusterName, componentName, tpl.VolumeName)
 			cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("operations_config/configcm.yaml",
 				testdata.WithNamespacedName(cmInsName, ns),
 				testdata.WithLabels(
@@ -450,7 +450,7 @@ spec:
 		}
 
 		By("mock reconfigure success")
-		ops := generateOpsRequestObj("reconfigure-ops-"+randomStr, clusterObject.Name, dbaasv1alpha1.ReconfigureType)
+		ops := generateOpsRequestObj("reconfigure-ops-"+randomStr, clusterObject.Name, dbaasv1alpha1.ReconfiguringType)
 		ops.Spec.Reconfigure = &dbaasv1alpha1.Reconfigure{
 			Configurations: []dbaasv1alpha1.Configuration{{
 				Name: "mysql-test",

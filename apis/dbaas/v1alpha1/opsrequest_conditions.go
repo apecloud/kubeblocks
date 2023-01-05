@@ -182,7 +182,7 @@ func NewReconfigureCondition(ops *OpsRequest) *metav1.Condition {
 		Status:             metav1.ConditionTrue,
 		Reason:             "ReconfigureStarted",
 		LastTransitionTime: metav1.NewTime(time.Now()),
-		Message:            fmt.Sprintf("start reconfigure in Cluster: %s", ops.Spec.ClusterRef),
+		Message:            fmt.Sprintf("Start to reconfigure in Cluster: %s", ops.Spec.ClusterRef),
 	}
 }
 
@@ -193,6 +193,6 @@ func NewReconfigureRunningCondition(ops *OpsRequest, reason string) *metav1.Cond
 		Status:             metav1.ConditionTrue,
 		Reason:             reason,
 		LastTransitionTime: metav1.NewTime(time.Now()),
-		Message:            fmt.Sprintf("reconfigure is running: %s", ops.Spec.ClusterRef),
+		Message:            fmt.Sprintf("Reconfiguring in Cluster: %s", ops.Spec.ClusterRef),
 	}
 }

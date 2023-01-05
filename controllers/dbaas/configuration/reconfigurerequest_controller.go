@@ -294,7 +294,7 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params cfgpolicy.Reconf
 		ComponentUnits: params.ComponentUnits,
 	}
 
-	for _, handler := range cfgcore.GetConfigEventHandlers() {
+	for _, handler := range cfgcore.ConfigEventHandlerMap {
 		if err := handler.Handle(eventContext, lastOpsRequest, fromReconfigureStatus(status), err); err != nil {
 			return err
 		}

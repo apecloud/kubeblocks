@@ -61,7 +61,7 @@ type ConfigEventHandler interface {
 
 var (
 	loaderProvider        = map[ConfigType]ConfigLoaderProvider{}
-	configEventHandlerMap = make(map[string]ConfigEventHandler)
+	ConfigEventHandlerMap = make(map[string]ConfigEventHandler)
 )
 
 func init() {
@@ -374,12 +374,4 @@ func CreateMergePatch(oldcfg, target interface{}, option CfgOption) (*ConfigDiff
 	}
 
 	return old.Diff(new.cfgWrapper)
-}
-
-func RegisterConfigEventHandler(name string, handler ConfigEventHandler) {
-	configEventHandlerMap[name] = handler
-}
-
-func GetConfigEventHandlers() map[string]ConfigEventHandler {
-	return configEventHandlerMap
 }

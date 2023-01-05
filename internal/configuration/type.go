@@ -18,7 +18,6 @@ package configuration
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -106,14 +105,19 @@ type CfgOption struct {
 	K8sKey *K8sConfig
 }
 
+// GenerateTPLUniqLabelKeyWithConfig generate uniq key for configuration template
+// reference: docs/img/reconfigure-cr-relationship.drawio.png
 func GenerateTPLUniqLabelKeyWithConfig(configKey string) string {
 	return GenerateUniqKeyWithConfig(ConfigurationTplLabelPrefixKey, configKey)
 }
 
+// GenerateUniqKeyWithConfig is similar to getInstanceCfgCMName, generate uniq label or annotations for configuration template
 func GenerateUniqKeyWithConfig(label string, configKey string) string {
-	return fmt.Sprintf("%s-%s", label, strings.ReplaceAll(configKey, "_", "-"))
+	return fmt.Sprintf("%s-%s", label, configKey)
 }
 
+// GenerateConstraintsUniqLabelKeyWithConfig generate uniq key for configure template
+// reference: docs/img/reconfigure-cr-relationship.drawio.png
 func GenerateConstraintsUniqLabelKeyWithConfig(configKey string) string {
 	return GenerateUniqKeyWithConfig(ConfigurationConstraintsLabelPrefixKey, configKey)
 }
@@ -124,14 +128,13 @@ func GetInstanceCMName(obj client.Object, tpl *dbaasv1alpha1.ConfigTemplate) str
 	// return fmt.Sprintf("%s-%s-config", sts.GetName(), tpl.VolumeName)
 }
 
+// getInstanceCfgCMName configmap generation rule for configuration file.
+// {{statefulset.Name}}-{{volumeName}}
 func getInstanceCfgCMName(objName, tplName string) string {
 	return fmt.Sprintf("%s-%s", objName, tplName)
 }
 
+// GetComponentCfgName is similar to getInstanceCfgCMName, without statefulSet object.
 func GetComponentCfgName(clusterName, componentName, tplName string) string {
 	return getInstanceCfgCMName(fmt.Sprintf("%s-%s", clusterName, componentName), tplName)
-}
-
-func GetComponentCMName(clusterName, componentName string, tpl dbaasv1alpha1.ConfigTemplate) string {
-	return GetComponentCfgName(clusterName, componentName, tpl.VolumeName)
 }

@@ -45,8 +45,8 @@ func init() {
 		ActionStartedCondition: dbaasv1alpha1.NewReconfigureCondition,
 		ReconcileAction:        reAction.ReconcileAction,
 	}
-	cfgcore.RegisterConfigEventHandler("ops_status_reconfigure", &reAction)
-	opsManager.RegisterOps(dbaasv1alpha1.ReconfigureType, reconfigureBehaviour)
+	cfgcore.ConfigEventHandlerMap["ops_status_reconfigure"] = &reAction
+	opsManager.RegisterOps(dbaasv1alpha1.ReconfiguringType, reconfigureBehaviour)
 }
 
 type reconfigureAction struct {
@@ -109,7 +109,7 @@ func (r reconfigureAction) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.P
 }
 
 func isReconfigureOpsRequest(request *dbaasv1alpha1.OpsRequest) bool {
-	return request.Spec.Type == dbaasv1alpha1.ReconfigureType && request.Spec.Reconfigure != nil
+	return request.Spec.Type == dbaasv1alpha1.ReconfiguringType && request.Spec.Reconfigure != nil
 }
 
 func (r *reconfigureAction) reconfigure(resource *OpsResource) error {
@@ -180,7 +180,7 @@ func (r *reconfigureAction) performUpgrade(clusterName, componentName string,
 				cfgcore.MakeError("current tpl not support reconfigure, tpl: %v", tpl))
 		}
 		if failed, err := updateCfgParams(config, *tpl, client.ObjectKey{
-			Name:      cfgcore.GetComponentCMName(clusterName, componentName, *tpl),
+			Name:      cfgcore.GetComponentCfgName(clusterName, componentName, tpl.VolumeName),
 			Namespace: resource.Cluster.Namespace,
 		}, resource.Ctx, resource.Client, resource.OpsRequest.Name); err != nil {
 			return processMergedFailed(resource, failed, err)

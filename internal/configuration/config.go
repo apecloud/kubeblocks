@@ -18,12 +18,20 @@ package configuration
 
 import (
 	"bytes"
+	"reflect"
+
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/spf13/viper"
+	appv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type ConfigLoaderProvider func(option CfgOption) (*cfgWrapper, error)
@@ -33,8 +41,27 @@ const (
 	emptyJSON       = "{}"
 )
 
+type ConfigEventContext struct {
+	Client  client.Client
+	ReqCtx  intctrlutil.RequestCtx
+	Cluster *dbaasv1alpha1.Cluster
+
+	ClusterComponent *dbaasv1alpha1.ClusterComponent
+	Component        *dbaasv1alpha1.ClusterDefinitionComponent
+	ComponentUnits   []appv1.StatefulSet
+
+	Meta *ConfigDiffInformation
+	Cfg  *corev1.ConfigMap
+	Tpl  *dbaasv1alpha1.ConfigurationTemplateSpec
+}
+
+type ConfigEventHandler interface {
+	Handle(eventContext ConfigEventContext, lastOpsRequest string, phase dbaasv1alpha1.Phase, err error) error
+}
+
 var (
-	loaderProvider = map[ConfigType]ConfigLoaderProvider{}
+	loaderProvider        = map[ConfigType]ConfigLoaderProvider{}
+	ConfigEventHandlerMap = make(map[string]ConfigEventHandler)
 )
 
 func init() {
@@ -149,8 +176,12 @@ func (c *cfgWrapper) MergeFrom(params map[string]interface{}, option CfgOpOption
 		return MakeError("not any configuration. option:[%v]", option)
 	}
 
+	// TODO support param delete
 	for paramKey, paramValue := range params {
-		cfg.Set(c.generateKey(paramKey, option, cfg), paramValue)
+		vi := reflect.ValueOf(paramValue)
+		if vi.Kind() != reflect.Ptr || !vi.IsNil() {
+			cfg.Set(c.generateKey(paramKey, option, cfg), paramValue)
+		}
 	}
 
 	return nil

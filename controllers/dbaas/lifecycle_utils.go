@@ -45,6 +45,7 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -80,42 +81,6 @@ func getCacheCUETplValue(key string, valueCreator func() (*intctrlutil.CUETpl, e
 	}
 	cacheCtx[key] = v
 	return v, err
-}
-
-// mergeConfigTemplates merge ClusterVersion.Components[*].ConfigTemplateRefs and ClusterDefinition.Components[*].ConfigTemplateRefs
-func mergeConfigTemplates(clusterVersionTpl []dbaasv1alpha1.ConfigTemplate,
-	cdTpl []dbaasv1alpha1.ConfigTemplate) []dbaasv1alpha1.ConfigTemplate {
-	if len(clusterVersionTpl) == 0 {
-		return cdTpl
-	}
-
-	if len(cdTpl) == 0 {
-		return clusterVersionTpl
-	}
-
-	mergedCfgTpl := make([]dbaasv1alpha1.ConfigTemplate, 0, len(clusterVersionTpl)+len(cdTpl))
-	mergedTplMap := make(map[string]struct{}, cap(mergedCfgTpl))
-
-	for i := range clusterVersionTpl {
-		if _, ok := (mergedTplMap)[clusterVersionTpl[i].VolumeName]; ok {
-			// TODO: following error should be checked in validation webhook and record Warning event
-			// return nil, fmt.Errorf("ConfigTemplate require not same volumeName [%s]", clusterVersionTpl[i].Name)
-			continue
-		}
-		mergedCfgTpl = append(mergedCfgTpl, clusterVersionTpl[i])
-		mergedTplMap[clusterVersionTpl[i].VolumeName] = struct{}{}
-	}
-
-	for i := range cdTpl {
-		// ClusterVersion replace clusterDefinition
-		if _, ok := (mergedTplMap)[cdTpl[i].VolumeName]; ok {
-			continue
-		}
-		mergedCfgTpl = append(mergedCfgTpl, cdTpl[i])
-		mergedTplMap[cdTpl[i].VolumeName] = struct{}{}
-	}
-
-	return mergedCfgTpl
 }
 
 func getContainerByName(containers []corev1.Container, name string) (int, *corev1.Container) {
@@ -384,7 +349,7 @@ func mergeComponents(
 	}
 
 	if clusterVersionComp != nil {
-		component.ConfigTemplates = mergeConfigTemplates(clusterVersionComp.ConfigTemplateRefs, component.ConfigTemplates)
+		component.ConfigTemplates = operations.MergeConfigTemplates(clusterVersionComp.ConfigTemplateRefs, component.ConfigTemplates)
 		if clusterVersionComp.PodSpec != nil {
 			for _, c := range clusterVersionComp.PodSpec.Containers {
 				doContainerAttrOverride(c)

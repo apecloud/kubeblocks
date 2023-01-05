@@ -49,13 +49,12 @@ type ConfigurationTemplateSpec struct {
 	// +optional
 	ImmutableParameters []string `json:"immutableParameters,omitempty"`
 
-	// formatter describes the format of the configuration file, the controller
+	// formatterConfig describes the format of the configuration file, the controller
 	// 1. parses configuration file
 	// 2. analyzes the modified parameters
 	// 3. applies corresponding policies.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={ini,xml,yaml,json}
-	Formatter ConfigurationFormatter `json:"formatter"`
+	FormatterConfig *FormatterConfig `json:"formatterConfig"`
 }
 
 // ConfigurationTemplateStatus defines the observed state of ConfigurationTemplate.
@@ -118,6 +117,36 @@ type ShellTrigger struct {
 	// exec used to execute for reload.
 	// +kubebuilder:validation:Required
 	Exec string `json:"exec"`
+}
+
+type FormatterConfig struct {
+	// formatter describes the format of the configuration file
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum={xml,ini,yaml,json}
+	// Formatter ConfigurationFormatter `json:"formatter"`
+	Formatter ConfigurationFormatter `json:"formatter"`
+
+	// The FormatterOptions represents the special options of configuration file.
+	// This is optional for now. If not specified.
+	// +optional
+	FormatterOptions `json:",inline"`
+}
+
+// FormatterOptions represents the special options of configuration file.
+// Only one of its members may be specified.
+type FormatterOptions struct {
+	// iniConfig represents the ini options.
+	// +optional
+	IniConfig *IniConfig `json:"iniConfig,omitempty"`
+
+	// xmlConfig represents the ini options.
+	// XMLConfig *XMLConfig `json:"xmlConfig,omitempty"`
+}
+
+type IniConfig struct {
+	// sectionName describes ini section.
+	// +optional
+	SectionName string `json:"sectionName,omitempty"`
 }
 
 //+kubebuilder:object:root=true

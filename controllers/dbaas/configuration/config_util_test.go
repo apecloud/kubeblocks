@@ -32,6 +32,7 @@ import (
 	mock_client "github.com/apecloud/kubeblocks/controllers/dbaas/configuration/policy/mocks"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	test "github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("ConfigWrapper util test", func() {
@@ -63,7 +64,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 	Context("clusterdefinition CR test", func() {
 		It("Should success without error", func() {
 			testWrapper := CreateDBaasFromISV(testCtx, ctx, k8sClient,
-				"./testdata",
+				test.SubTestDataPath("resources"),
 				FakeTest{
 					// for crd yaml file
 					CfgTemplateYaml: "mysql_config_template.yaml",
@@ -166,7 +167,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 	Context("clusterdefinition CR test without config Constraints", func() {
 		It("Should success without error", func() {
 			testWrapper := CreateDBaasFromISV(testCtx, ctx, k8sClient,
-				"./testdata",
+				test.SubTestDataPath("resources"),
 				FakeTest{
 					// for crd yaml file
 					CfgTemplateYaml: "mysql_config_template.yaml",
@@ -247,7 +248,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 	Context("clusterversion CR test", func() {
 		It("Should success without error", func() {
 			testWrapper := CreateDBaasFromISV(testCtx, ctx, k8sClient,
-				"./testdata",
+				test.SubTestDataPath("resources"),
 				FakeTest{
 					// for crd yaml file
 					CfgTemplateYaml: "mysql_config_template.yaml",

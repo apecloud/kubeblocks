@@ -67,7 +67,7 @@ func TestSchemaValidatorWithOpenSchema(t *testing.T) {
 	tpl := fakeConfigurationTpl("./testdata/mysql.cue", dbaasv1alpha1.INI)
 	validator := &schemaValidator{
 		typeName: tpl.CfgSchemaTopLevelName,
-		cfgType:  tpl.Formatter,
+		cfgType:  tpl.FormatterConfig.Formatter,
 		schema:   tpl.ConfigurationSchema.Schema,
 	}
 
@@ -80,7 +80,9 @@ func fakeConfigurationTpl(cuefile string, cfgFormatter dbaasv1alpha1.Configurati
 		ConfigurationSchema: &dbaasv1alpha1.CustomParametersValidation{
 			Cue: &cueContext,
 		},
-		Formatter: cfgFormatter,
+		FormatterConfig: &dbaasv1alpha1.FormatterConfig{
+			Formatter: cfgFormatter,
+		},
 	}
 }
 

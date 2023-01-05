@@ -30,6 +30,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	test "github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("Reconfigure Controller", func() {
@@ -49,7 +50,7 @@ var _ = Describe("Reconfigure Controller", func() {
 
 			// step1: prepare env
 			testWrapper := CreateDBaasFromISV(testCtx, ctx, k8sClient,
-				"./testdata",
+				test.SubTestDataPath("resources"),
 				FakeTest{
 					// for crd yaml file
 					CfgTemplateYaml: "mysql_config_template.yaml",

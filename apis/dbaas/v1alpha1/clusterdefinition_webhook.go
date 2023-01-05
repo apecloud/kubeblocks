@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -124,6 +125,11 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 	// TODO typeName duplication validate
 
 	for _, component := range r.Spec.Components {
+		if err := r.validateConfigSpec(component.ConfigSpec); err != nil {
+			*allErrs = append(*allErrs, field.Duplicate(field.NewPath("spec.components[*].configSpec.configTemplateRefs"), err))
+			continue
+		}
+
 		if component.ComponentType != Consensus {
 			continue
 		}
@@ -188,4 +194,35 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 			}
 		}
 	}
+}
+
+func (r *ClusterDefinition) validateConfigSpec(configSpec *ConfigurationSpec) error {
+	if configSpec == nil || len(configSpec.ConfigTemplateRefs) <= 1 {
+		return nil
+	}
+	return validateConfigTemplateList(configSpec.ConfigTemplateRefs)
+}
+
+func validateConfigTemplateList(ctpls []ConfigTemplate) error {
+	var (
+		volumeSet = map[string]struct{}{}
+		cmSet     = map[string]struct{}{}
+		tplSet    = map[string]struct{}{}
+	)
+
+	for _, tpl := range ctpls {
+		if _, ok := tplSet[tpl.Name]; ok {
+			return errors.Errorf("configTemplate[%s] already existed.", tpl.Name)
+		}
+		if _, ok := volumeSet[tpl.VolumeName]; ok {
+			return errors.Errorf("volume[%s] already existed.", tpl.VolumeName)
+		}
+		if _, ok := cmSet[tpl.ConfigTplRef]; ok {
+			return errors.Errorf("configmap[%s] already existed.", tpl.ConfigTplRef)
+		}
+		tplSet[tpl.Name] = struct{}{}
+		cmSet[tpl.ConfigTplRef] = struct{}{}
+		volumeSet[tpl.VolumeName] = struct{}{}
+	}
+	return nil
 }

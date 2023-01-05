@@ -18,9 +18,6 @@ package configmap
 
 import (
 	"fmt"
-	"os"
-	"strings"
-	"syscall"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-logr/logr"
@@ -31,40 +28,6 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
 )
-
-var allUnixSignals = map[string]os.Signal{
-	"SIGHUP":  syscall.SIGHUP, // reload signal for mysql 8.x.xxx
-	"SIGINT":  syscall.SIGINT,
-	"SIGQUIT": syscall.SIGQUIT,
-	"SIGILL":  syscall.SIGILL,
-	"SIGTRAP": syscall.SIGTRAP,
-	"SIGABRT": syscall.SIGABRT,
-	"SIGBUS":  syscall.SIGBUS,
-	"SIGFPE":  syscall.SIGFPE,
-	"SIGKILL": syscall.SIGKILL,
-	"SIGUSR1": syscall.SIGUSR1,
-	"SIGSEGV": syscall.SIGSEGV,
-	"SIGUSR2": syscall.SIGUSR2,
-	"SIGPIPE": syscall.SIGPIPE,
-	"SIGALRM": syscall.SIGALRM,
-	"SIGTERM": syscall.SIGTERM,
-	// "SIGSTKFLT": syscall.SIGSTKFLT,
-	"SIGCHLD":   syscall.SIGCHLD,
-	"SIGCONT":   syscall.SIGCONT,
-	"SIGSTOP":   syscall.SIGSTOP,
-	"SIGTSTP":   syscall.SIGTSTP,
-	"SIGTTIN":   syscall.SIGTTIN,
-	"SIGTTOU":   syscall.SIGTTOU,
-	"SIGURG":    syscall.SIGURG,
-	"SIGXCPU":   syscall.SIGXCPU,
-	"SIGXFSZ":   syscall.SIGXFSZ,
-	"SIGVTALRM": syscall.SIGVTALRM,
-	"SIGPROF":   syscall.SIGPROF,
-	"SIGWINCH":  syscall.SIGWINCH,
-	"SIGIO":     syscall.SIGIO,
-	// "SIGPWR":    syscall.SIGPWR,
-	"SIGSYS": syscall.SIGSYS,
-}
 
 var (
 	logger = logr.Discard()
@@ -107,8 +70,8 @@ func findParentPidFromProcessName(processName string) (PID, error) {
 	return InvalidPid, cfgutil.MakeError("not find pid fo process name: [%s]", processName)
 }
 
-func CreateSignalHandler(sig string, processName string) WatchEventHandler {
-	signal, ok := allUnixSignals[strings.ToUpper(sig)]
+func CreateSignalHandler(sig dbaasv1alpha1.SignalType, processName string) WatchEventHandler {
+	signal, ok := allUnixSignals[sig]
 	if !ok {
 		logger.Error(cfgutil.MakeError("not support unix signal: %s", signal), "failed to create signal handler")
 	}
@@ -123,6 +86,6 @@ func CreateSignalHandler(sig string, processName string) WatchEventHandler {
 }
 
 func IsValidUnixSignal(sig dbaasv1alpha1.SignalType) bool {
-	_, ok := allUnixSignals[strings.ToUpper(string(sig))]
+	_, ok := allUnixSignals[sig]
 	return ok
 }

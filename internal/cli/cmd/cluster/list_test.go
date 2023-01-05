@@ -57,7 +57,6 @@ var _ = Describe("list", func() {
 		_ = dbaasv1alpha1.AddToScheme(scheme.Scheme)
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 		cluster := testing.FakeCluster(clusterName, namespace)
-		pods := testing.FakePods(3, namespace, clusterName)
 		httpResp := func(obj runtime.Object) *http.Response {
 			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}
 		}
@@ -66,9 +65,6 @@ var _ = Describe("list", func() {
 			GroupVersion:         schema.GroupVersion{Group: types.Group, Version: types.Version},
 			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 			Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				if req.Method != "GET" {
-					return nil, nil
-				}
 				urlPrefix := "/api/v1/namespaces/" + namespace
 				return map[string]*http.Response{
 					"/namespaces/" + namespace + "/clusters":      httpResp(&dbaasv1alpha1.ClusterList{Items: []dbaasv1alpha1.Cluster{*cluster}}),
@@ -76,7 +72,7 @@ var _ = Describe("list", func() {
 					"/api/v1/nodes/" + testing.NodeName:           httpResp(testing.FakeNode()),
 					urlPrefix + "/services":                       httpResp(&corev1.ServiceList{}),
 					urlPrefix + "/secrets":                        httpResp(&corev1.SecretList{}),
-					urlPrefix + "/pods":                           httpResp(pods),
+					urlPrefix + "/pods":                           httpResp(testing.FakePods(3, namespace, clusterName)),
 					urlPrefix + "/events":                         httpResp(testing.FakeEvents()),
 				}[req.URL.Path], nil
 			}),

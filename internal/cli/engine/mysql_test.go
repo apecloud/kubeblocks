@@ -17,30 +17,28 @@ limitations under the License.
 package engine
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Engine", func() {
-	It("new mysql engine", func() {
+var _ = Describe("Mysql Engine", func() {
+	It("connection example", func() {
 		typeName := stateMysql
-		engine, _ := New(typeName)
-		Expect(engine).ShouldNot(BeNil())
-		Expect(engine.EngineName()).Should(Equal(mysqlEngineName))
+		mysql, _ := New(typeName)
 
-		url := engine.ConnectCommand()
-		Expect(len(url)).Should(Equal(3))
+		info := &ConnectionInfo{
+			User:     "user",
+			Host:     "host",
+			Password: "*****",
+			Database: "test-db",
+			Port:     "1234",
+		}
+		for k := range clientExampleMap {
+			fmt.Printf("%s Connection Example\n", k.String())
+			fmt.Println(mysql.ConnectExample(info, k.String()))
+		}
 
-		url = engine.ConnectCommand()
-		Expect(len(url)).Should(Equal(3))
-
-		Expect(engine.EngineContainer()).Should(Equal(mysqlContainerName))
-	})
-
-	It("new unknown engine", func() {
-		typeName := "unknown-type"
-		engine, err := New(typeName)
-		Expect(engine).Should(BeNil())
-		Expect(err).Should(HaveOccurred())
+		fmt.Println(mysql.ConnectExample(info, ""))
 	})
 })

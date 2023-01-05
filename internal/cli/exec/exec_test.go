@@ -23,8 +23,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -52,90 +50,47 @@ var _ = Describe("Exec", func() {
 		tf.ClientConfigVal = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: scheme.Codecs, GroupVersion: &schema.GroupVersion{Version: "v1"}}}
 
 		testOptions := &testExecOptions{ExecOptions: NewExecOptions(tf, genericclioptions.NewTestIOStreamsDiscard())}
-		input := &ExecInput{
-			Use:      "connect",
-			Short:    "Connect to a database cluster",
-			Example:  "example",
-			Validate: testOptions.validate,
-			Complete: testOptions.complete,
-			AddFlags: testOptions.addFlags,
-			Run: func() (bool, error) {
-				return true, nil
-			},
-		}
-
-		cmd := testOptions.Build(input)
-		Expect(cmd).ShouldNot(BeNil())
-		Expect(cmd.Use).ShouldNot(BeNil())
-		Expect(cmd.Example).ShouldNot(BeNil())
-
 		execOptions := testOptions.ExecOptions
-		Expect(execOptions.Input).ShouldNot(BeNil())
 
-		// Complete without args
-		testOptions.instance = "foo"
-		Expect(execOptions.Complete([]string{})).Should(HaveOccurred())
+		By("complete")
+		testOptions.PodName = "foo"
+		Expect(execOptions.Complete()).Should(Succeed())
 		Expect(execOptions.Config).ShouldNot(BeNil())
-
-		// Complete with args
-		Expect(execOptions.Complete([]string{"test"})).Should(Succeed())
 		Expect(execOptions.Namespace).Should(Equal("test"))
-		Expect(len(testOptions.name) > 0).Should(BeTrue())
-		Expect(testOptions.Pod).ShouldNot(BeNil())
-		Expect(len(testOptions.Command) > 0).Should(BeTrue())
-		Expect(testOptions.ExecOptions.Complete([]string{"test"})).Should(Succeed())
 
-		// Validate
+		By("validate")
+		Expect(testOptions.complete([]string{"test"}))
 		Expect(testOptions.validate()).Should(Succeed())
 		Expect(testOptions.ContainerName).Should(Equal("test"))
 
-		// Run
+		By("run")
 		Expect(testOptions.Run()).Should(HaveOccurred())
 
 		// Corner case test
 		testOptions.ContainerName = ""
-		Expect(testOptions.ExecOptions.Validate()).Should(Succeed())
+		Expect(testOptions.ExecOptions.validate()).Should(Succeed())
 		Expect(testOptions.ContainerName).Should(Equal("bar"))
 		testOptions.Pod = nil
 		testOptions.PodName = ""
-		Expect(testOptions.ExecOptions.Validate()).Should(MatchError("failed to get the pod to execute"))
+		Expect(testOptions.ExecOptions.validate()).Should(MatchError("failed to get the pod to execute"))
 	})
 })
 
 type testExecOptions struct {
-	name     string
-	instance string
+	name string
 	*ExecOptions
 }
 
-func (o *testExecOptions) validate() error {
-	if len(o.name) == 0 {
-		return fmt.Errorf("name must be specified")
-	}
-	return nil
-}
-
-func (o *testExecOptions) addFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&o.instance, "instance", "", "instance name")
-}
-
 func (o *testExecOptions) complete(args []string) error {
+	var err error
 	if len(args) == 0 {
 		return fmt.Errorf("you must specified the cluster name")
 	}
 	o.name = args[0]
-	o.Namespace, _, _ = o.Factory.ToRawKubeConfigLoader().Namespace()
-
-	// find the pod
-	clientSet, err := o.Factory.KubernetesClientSet()
-	if err != nil {
-		return err
-	}
-
-	if o.instance == "" {
+	if o.PodName == "" {
 		return fmt.Errorf("you must specified the intance name")
 	}
-	o.Pod, err = clientSet.CoreV1().Pods(o.Namespace).Get(context.TODO(), o.instance, metav1.GetOptions{})
+	o.Pod, err = o.Client.CoreV1().Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

@@ -27,6 +27,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 var _ = Describe("helper", func() {
@@ -46,7 +47,7 @@ var _ = Describe("helper", func() {
 					Namespace:       "test",
 					ResourceVersion: "10",
 					Labels: map[string]string{
-						"app.kubernetes.io/name": name,
+						types.NameLabelKey: name,
 					},
 				},
 			}
@@ -96,7 +97,7 @@ var _ = Describe("helper", func() {
 	It("get cluster endpoints", func() {
 		cluster := testing.FakeCluster("test", "test")
 		svcs := testing.FakeServices()
-		internalEPs, externalEPs := GetClusterEndpoints(svcs, &cluster.Spec.Components[0])
+		internalEPs, externalEPs := GetComponentEndpoints(svcs, &cluster.Spec.Components[0])
 		Expect(len(internalEPs)).Should(Equal(3))
 		Expect(len(externalEPs)).Should(Equal(1))
 	})

@@ -19,58 +19,115 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/engine"
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
+var connectExample = templates.Examples(`
+		# connect to a specified cluster, default connect to the leader or primary instance
+		kbcli cluster connect my-cluster
+
+		# connect to a specified instance
+		kbcli cluster connect -i my-cluster-instance-0`)
+
 type ConnectOptions struct {
-	clusterName string
-	database    string
+	name        string
+	clientType  string
+	showExample bool
+	engine      engine.Interface
 	*exec.ExecOptions
 }
 
 // NewConnectCmd return the cmd of connecting a cluster
 func NewConnectCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &ConnectOptions{ExecOptions: exec.NewExecOptions(f, streams)}
-	input := &exec.ExecInput{
-		Use:      "connect",
-		Short:    "Connect to a database cluster",
-		Validate: o.validate,
-		Complete: o.complete,
-		AddFlags: o.addFlags,
+	cmd := &cobra.Command{
+		Use:               "connect (NAME | -i INSTANCE-NAME)",
+		Short:             "Connect to a database cluster or instance",
+		Example:           connectExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.ExecOptions.Complete())
+			if o.showExample {
+				util.CheckErr(o.runShowExample(args))
+			} else {
+				util.CheckErr(o.connect(args))
+			}
+		},
 	}
-	return o.Build(input)
+	cmd.Flags().StringVarP(&o.PodName, "instance", "i", "", "The instance name to connect.")
+	cmd.Flags().BoolVar(&o.showExample, "show-example", false, "Show how to connect to cluster or instance from different client.")
+	cmd.Flags().StringVar(&o.clientType, "client", "", "Which client connection example should be output, only valid if --show-example is true.")
+	util.CheckErr(cmd.RegisterFlagCompletionFunc("client", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		var types []string
+		for _, t := range engine.ClientTypes() {
+			if strings.HasPrefix(t, toComplete) {
+				types = append(types, t)
+			}
+		}
+		return types, cobra.ShellCompDirectiveNoFileComp
+	}))
+	return cmd
 }
 
-// complete create exec parameters for connecting cluster, especially logic for connect cmd
-func (o *ConnectOptions) complete(args []string) error {
-	if len(args) == 0 {
-		return fmt.Errorf("you must specify the cluster to connect")
+func (o *ConnectOptions) runShowExample(args []string) error {
+	if len(args) > 1 {
+		return fmt.Errorf("only support to connect one cluster")
 	}
-	o.clusterName = args[0]
 
-	dynamicClient, err := o.Factory.DynamicClient()
+	if len(args) == 0 {
+		return fmt.Errorf("cluster name should be specified when --show-example is true")
+	}
+
+	o.name = args[0]
+
+	// get connection info
+	info, err := o.getConnectionInfo()
 	if err != nil {
 		return err
 	}
 
+	fmt.Fprint(o.Out, o.engine.ConnectExample(info, o.clientType))
+	return nil
+}
+
+// connect create parameters for connecting cluster and connect
+func (o *ConnectOptions) connect(args []string) error {
+	if len(args) > 1 {
+		return fmt.Errorf("only support to connect one cluster")
+	}
+
+	if len(args) == 0 && len(o.PodName) == 0 {
+		return fmt.Errorf("cluster name or instance name should be specified")
+	}
+
+	if len(args) > 0 {
+		o.name = args[0]
+	}
+
 	// get target pod name, if not specified, find default pod from cluster
 	if len(o.PodName) == 0 {
-		if o.PodName, err = cluster.GetDefaultPodName(dynamicClient, o.clusterName, o.Namespace); err != nil {
+		podName, err := cluster.GetDefaultPodName(o.Dynamic, o.name, o.Namespace)
+		if err != nil {
 			return err
 		}
+		o.PodName = podName
 	}
 
 	// get the pod object
-	pod, err := o.ClientSet.CoreV1().Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{})
+	pod, err := o.Client.CoreV1().Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -81,22 +138,10 @@ func (o *ConnectOptions) complete(args []string) error {
 		return err
 	}
 
-	o.Command = engine.ConnectCommand(o.database)
+	o.Command = engine.ConnectCommand()
 	o.ContainerName = engine.EngineName()
 	o.Pod = pod
-	return nil
-}
-
-func (o *ConnectOptions) validate() error {
-	if len(o.clusterName) == 0 {
-		return fmt.Errorf("cluster name must be specified")
-	}
-	return nil
-}
-
-func (o *ConnectOptions) addFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&o.PodName, "instance", "i", "", "The instance name to connect.")
-	cmd.Flags().StringVarP(&o.database, "database", "D", "", "The database name to connect.")
+	return o.ExecOptions.Run()
 }
 
 func getEngineByPod(pod *corev1.Pod) (engine.Interface, error) {
@@ -111,4 +156,84 @@ func getEngineByPod(pod *corev1.Pod) (engine.Interface, error) {
 	}
 
 	return engine, nil
+}
+
+func (o *ConnectOptions) getConnectionInfo() (*engine.ConnectionInfo, error) {
+	info := &engine.ConnectionInfo{}
+	getter := cluster.ObjectsGetter{
+		Client:    o.Client,
+		Dynamic:   o.Dynamic,
+		Name:      o.name,
+		Namespace: o.Namespace,
+		GetOptions: cluster.GetOptions{
+			WithClusterDef: true,
+			WithService:    true,
+			WithSecret:     true,
+		},
+	}
+
+	objs, err := getter.Get()
+	if err != nil {
+		return nil, err
+	}
+
+	// get username and password
+	if info.User, info.Password, err = getUserAndPassword(objs.Secrets); err != nil {
+		return nil, err
+	}
+
+	// get host and port, use external endpoints first, if external endpoints are empty,
+	// use internal endpoints
+	var hostPort []string
+	primaryComponent := cluster.FindClusterComp(objs.Cluster, objs.ClusterDef.Spec.Components[0].TypeName)
+	internalEndpoints, externalEndpoints := cluster.GetComponentEndpoints(objs.Services, primaryComponent)
+	switch {
+	case len(externalEndpoints) > 0:
+		hostPort = strings.Split(externalEndpoints[0], ":")
+	case len(internalEndpoints) > 0:
+		hostPort = strings.Split(internalEndpoints[0], ":")
+	default:
+		return nil, fmt.Errorf("failed to find cluster endpoints")
+	}
+
+	info.Host = hostPort[0]
+	info.Port = hostPort[1]
+
+	// get engine
+	o.engine, err = engine.New(objs.ClusterDef.Spec.Type)
+	if err != nil {
+		return nil, err
+	}
+
+	return info, nil
+}
+
+// get cluster user and password from secrets
+func getUserAndPassword(secrets *corev1.SecretList) (string, string, error) {
+	var (
+		user, password = "", ""
+		err            error
+	)
+
+	if len(secrets.Items) == 0 {
+		return user, password, fmt.Errorf("failed to find the cluster username and password")
+	}
+
+	getSecretVal := func(secret *corev1.Secret, key string) (string, error) {
+		val, ok := secret.Data[key]
+		if !ok {
+			return "", fmt.Errorf("failed to find the cluster %s", key)
+		}
+		return string(val), nil
+	}
+
+	// now, we only use the first secret
+	secret := secrets.Items[0]
+	user, err = getSecretVal(&secret, "username")
+	if err != nil {
+		return user, password, err
+	}
+
+	password, err = getSecretVal(&secret, "password")
+	return user, password, err
 }

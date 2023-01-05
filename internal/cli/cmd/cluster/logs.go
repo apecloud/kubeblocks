@@ -36,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var (
@@ -49,7 +50,8 @@ var (
 		# Return snapshot logs from cluster my-cluster with specify instance my-instance-0 (stdout)
 		kbcli cluster logs my-cluster --instance my-instance-0
 
-		# Return snapshot logs from cluster my-cluster with specify instance my-instance-0 and specify container my-container (stdout)
+		# Return snapshot logs from cluster my-cluster with specify instance my-instance-0 and specify container
+        # my-container (stdout)
 		kbcli cluster logs my-cluster --instance my-instance-0 -c my-container
 
 		# Return slow logs from cluster my-cluster with default primary instance
@@ -61,7 +63,8 @@ var (
 		# Return the specify file logs from cluster my-cluster with specify instance my-instance-0
 		kbcli cluster logs my-cluster --instance my-instance-0 --file-path=/var/log/yum.log
 
-		# Return the specify file logs from cluster my-cluster with specify instance my-instance-0 and specify container my-container
+		# Return the specify file logs from cluster my-cluster with specify instance my-instance-0 and specify
+        # container my-container
 		kbcli cluster logs my-cluster --instance my-instance-0 -c my-container --file-path=/var/log/yum.log`)
 )
 
@@ -83,16 +86,20 @@ func NewLogsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 			IOStreams: streams,
 		},
 	}
-	input := &exec.ExecInput{
-		Use:      "logs",
-		Short:    "Access cluster log file",
-		Example:  logsExample,
-		Validate: l.validate,
-		Complete: l.complete,
-		AddFlags: l.addFlags,
-		Run:      l.run,
+	cmd := &cobra.Command{
+		Use:               "logs NAME",
+		Short:             "Access cluster log file",
+		Example:           logsExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(l.ExecOptions.Complete())
+			util.CheckErr(l.complete(args))
+			util.CheckErr(l.validate())
+			util.CheckErr(l.run())
+		},
 	}
-	return l.Build(input)
+	l.addFlags(cmd)
+	return cmd
 }
 
 func (o *LogsOptions) addFlags(cmd *cobra.Command) {
@@ -108,7 +115,7 @@ func (o *LogsOptions) addFlags(cmd *cobra.Command) {
 	cmd.Flags().DurationVar(&o.logOptions.SinceSeconds, "since", o.logOptions.SinceSeconds, "Only return logs newer than a relative duration like 5s, 2m, or 3h. Defaults to all logs. Only one of since-time / since may be used. Only take effect for stdout&stderr.")
 	cmd.Flags().BoolVarP(&o.logOptions.Previous, "previous", "p", o.logOptions.Previous, "If true, print the logs for the previous instance of the container in a pod if it exists. Only take effect for stdout&stderr.")
 
-	cmd.Flags().StringVar(&o.fileType, "file-type", "", "Log-file type. Can see the output info of logs-list cmd. No set file-path and file-type will output stdout/stderr of target container.")
+	cmd.Flags().StringVar(&o.fileType, "file-type", "", "Log-file type. Can see the output info of list-logs cmd. No set file-path and file-type will output stdout/stderr of target container.")
 	cmd.Flags().StringVar(&o.filePath, "file-path", "", "Log-file path. Specify target file path and have a premium priority. No set file-path and file-type will output stdout/stderr of target container.")
 
 	cmd.MarkFlagsMutuallyExclusive("file-path", "file-type")
@@ -116,11 +123,11 @@ func (o *LogsOptions) addFlags(cmd *cobra.Command) {
 }
 
 // run customs logic for logs
-func (o *LogsOptions) run() (bool, error) {
+func (o *LogsOptions) run() error {
 	if o.isStdoutForContainer() {
-		return false, o.runLogs()
+		return o.runLogs()
 	}
-	return true, nil
+	return o.ExecOptions.Run()
 }
 
 // complete customs complete function for logs
@@ -142,7 +149,7 @@ func (o *LogsOptions) complete(args []string) error {
 			return err
 		}
 	}
-	pod, err := o.ClientSet.CoreV1().Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{})
+	pod, err := o.Client.CoreV1().Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -161,7 +168,7 @@ func (o *LogsOptions) complete(args []string) error {
 	default: // find corresponding file path by file type
 		{
 			clusterGetter := cluster.ObjectsGetter{
-				Client:    o.ClientSet,
+				Client:    o.Client,
 				Dynamic:   dynamicClient,
 				Name:      o.clusterName,
 				Namespace: o.Namespace,

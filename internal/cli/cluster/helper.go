@@ -59,7 +59,7 @@ func GetDefaultPodName(dynamic dynamic.Interface, name string, namespace string)
 func GetClusterTypeByPod(pod *corev1.Pod) (string, error) {
 	var clusterType string
 
-	if name, ok := pod.Labels["app.kubernetes.io/name"]; ok {
+	if name, ok := pod.Labels[types.NameLabelKey]; ok {
 		clusterType = strings.Split(name, "-")[0]
 	}
 
@@ -90,8 +90,8 @@ func FindClusterComp(cluster *dbaasv1alpha1.Cluster, typeName string) *dbaasv1al
 	return nil
 }
 
-// GetClusterEndpoints gets cluster internal and external endpoints
-func GetClusterEndpoints(svcList *corev1.ServiceList, c *dbaasv1alpha1.ClusterComponent) ([]string, []string) {
+// GetComponentEndpoints gets cluster internal and external endpoints
+func GetComponentEndpoints(svcList *corev1.ServiceList, c *dbaasv1alpha1.ClusterComponent) ([]string, []string) {
 	var (
 		internalEndpoints []string
 		externalEndpoints []string

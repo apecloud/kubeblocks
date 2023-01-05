@@ -143,10 +143,13 @@ func RemoveRepo(r *repo.Entry) error {
 func (i *InstallOpts) getInstalled(cfg *action.Configuration) (*release.Release, error) {
 	res, err := action.NewGet(cfg).Run(i.Name)
 	if err != nil {
-		if strings.Contains(err.Error(), "release: not found") {
-			return nil, nil
-		}
 		return nil, err
+	}
+	if res == nil {
+		return nil, driver.ErrReleaseNotFound
+	}
+	if !statusDeployed(res) {
+		return nil, ErrReleaseNotDeployed
 	}
 	return res, nil
 }
@@ -177,9 +180,10 @@ func (i *InstallOpts) Install(cfg *action.Configuration) (string, error) {
 }
 
 func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
-	res, _ := i.getInstalled(cfg)
-	if res != nil {
-		return "", nil
+	var err error
+
+	if _, err = i.getInstalled(cfg); err != nil && !releaseNotFound(err) {
+		return "", err
 	}
 
 	settings := cli.New()
@@ -350,7 +354,7 @@ func (i *InstallOpts) Upgrade(cfg *action.Configuration) (string, error) {
 		}
 		return nil
 	}, &opts); err != nil {
-		return "", errors.Errorf("Upgrade chart %s error: %s", i.Name, err.Error())
+		return "", fmt.Errorf("Upgrade chart %s error: %w", i.Name, err)
 	}
 
 	spinner(true)
@@ -358,9 +362,9 @@ func (i *InstallOpts) Upgrade(cfg *action.Configuration) (string, error) {
 }
 
 func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
-	res, _ := i.getInstalled(cfg)
-	if res == nil {
-		return "", errors.Errorf("%s not installed", i.Name)
+	res, err := i.getInstalled(cfg)
+	if err != nil {
+		return "", err
 	}
 
 	settings := cli.New()

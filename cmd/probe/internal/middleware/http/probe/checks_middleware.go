@@ -32,10 +32,10 @@ const (
 	roleCheckOperation    = "roleCheck"
 	bindingPath           = "/v1.0/bindings"
 
-	// the key is used to bypass the dapr framework and set http status code. 
-	// "status-code" is the key defined by probe, but this will changed like this 
+	// the key is used to bypass the dapr framework and set http status code.
+	// "status-code" is the key defined by probe, but this will changed like this
 	// by dapr framework and http framework in the end.
-	statusCodeHeader      = "Metadata.status-Code"
+	statusCodeHeader = "Metadata.status-Code"
 )
 
 // NewProbeMiddleware returns a new probe middleware.

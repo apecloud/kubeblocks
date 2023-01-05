@@ -13,16 +13,17 @@ The following are sample `OpsRequest` CRs for different operations:
 ### Sample `OpsRequest` for restarting a KubeBlocks cluster
 
 ```
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: dbaas.infracreate.com/v1alpha1
+kind: OpsRequest
 metadata:
-    name: mysql-restart
-    namespace: default
+  name: mysql-restart
+  namespace: default
 spec:
-    clusterRef: mysql-cluster-01
-    ttlSecondsAfterSucceed: 3600
-    type: Restart
-    componentOps:
-    - componentNames: [replicasets]
+  clusterRef: mysql-cluster-01
+  ttlSecondsAfterSucceed: 3600
+  type: Restart
+  restart: 
+  - componentName: replicasets
 status:
     StartTimestamp: "2022-09-27T06:01:31Z"
     completionTimestamp: "2022-09-27T06:02:30Z"
@@ -59,24 +60,22 @@ status:
 ### Sample `OpsRequest` for vertical scaling
 
 ```
-# API Scope: cluster
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: dbaas.infracreate.com/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-verticalScaling
+  generate-name: verticalscaling-
 spec:
   # cluster ref
   clusterRef: myMongoscluster
   type: VerticalScaling 
-  componentOps:
-  - componentNames: [shard1]
-    verticalScaling:
-      requests:
-        memory: "150Mi"
-        cpu: "0.1"
-      limits:
-        memory: "250Mi"
-        cpu: "0.2"
+  verticalScaling:
+  - componentName: shard1
+    requests:
+      memory: "150Mi"
+      cpu: "0.1"
+    limits:
+      memory: "250Mi"
+      cpu: "0.2"
 ```
 
 ### Sample `OpsRequest` for horizontal scaling
@@ -99,7 +98,7 @@ spec:
 ### Sample `OpsRequest` for upgrading a KubeBlocks cluster
 
 ```
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: dbaas.infracreate.com/v1alpha1
 kind: OpsRequest
 metadata:
   name: ops-xxxx
@@ -107,16 +106,15 @@ spec:
   # cluster ref
   clusterRef: myMongoscluster
   type: Upgrade
-  clusterOps:
-    upgrade:
-      # Upgrade the specified clusterversion
-      clusterVersionRef: 5.0.1
+  upgrade:
+    # Upgrade to the specidief appversion
+    clusterVersionRef: 5.0.1
 ```
 
 ### Sample `OpsRequest` for volume expansion
 
 ```
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: dbaas.infracreate.com/v1alpha1
 kind: OpsRequest
 metadata:
   name: ops-xxxx
@@ -124,11 +122,11 @@ spec:
   # cluster ref
   clusterRef: myMongoscluster
   type: VolumeExpansion
-  componentOps:
-  - componentNames: [shard1]
-    volumeExpansion:
+  volumeExpansion:
+  - componentName: shard1
+    volumeClaimTemplates:
     - name: data
-      storage: "2Gi"
+      storage: "2Gi" 
 ```
 
 ## OpsRequest `spec`
@@ -157,15 +155,9 @@ It indicates the cluster-level operation. Its attribute is as follows:
 
 - Upgrade
 
-<<<<<<< HEAD
-    It specifies the information for upgrading appVersion and `spec.type` should be `Upgrade` to make it valid. Its attribute is as follows:
-    - `appVersion` specifies the appVersion object that is used in the current upgrading operation.
-        Value: `AppVersion.metadata.name`
-=======
     It specifies the information for upgrading clusterversion and `spec.type` should be `Upgrade` to make it effective. Its attribute is as follows:
-    - `clusterVersion` specifies the clusterVersion object that will be used in the current upgrading operation.
+    - `clusterVersion` specifies the clusterVersion object used in the current upgrading operation.
         Value: `ClusterVersion.metadata.name`
->>>>>>> main
 
 ### spec.componentOps
 
@@ -177,7 +169,7 @@ It indicates the component-level operation and is an array that supports operati
 
 - verticalScaling
 
-  `verticalScaling` scales up and down the computing resources of a component. Its value is an object of Kubernetes container resources. For example, the mongos component of MongoDB:
+  `verticalScaling` scales up and down the computing resources of a component. Its value is an object of Kubernetes container resources. For example,
 
     ```
     verticalScaling:
@@ -215,7 +207,7 @@ It corresponds to `metadata.generation`.
 
 ### status.phase
 
-OpsRequest task is one-time and is deleted after the operation succeeds.
+`OpsRequest` task is one-time and is deleted after the operation succeeds.
 
 `status.phase` indicates the overall phase of the operation for this OpsRequest. It can have the following four values:
 

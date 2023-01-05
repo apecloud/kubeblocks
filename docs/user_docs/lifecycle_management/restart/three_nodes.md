@@ -5,7 +5,7 @@ This guide shows how to use KubeBlocks to restart a three-node cluster.
 ## Before you start
 
 - [Install KubeBlocks](../../installation/deploy_kubeblocks.md). 
-- Run the commands below to check whether the KubeBlocks is installed successfully and the cluster-related CR (custom resources) are created.
+- Run the commands below to check whether the KubeBlocks is installed successfully and the cluster-related `CR` (custom resources) are created.
   - Run the commands to check whether KubeBlocks is installed successfully.
   ```
   $ kubectl get pod
@@ -35,6 +35,7 @@ This guide shows how to use KubeBlocks to restart a three-node cluster.
 ## Create a three-node cluster for a demo
 
 _Steps_:
+
 1. Prepare a YAML file for a three-node cluster. Below is the YAML file of the single-node cluster. You can find [this demo file, `cluster_three_nodes`](../../../../examples/dbaas/cluster_three_nodes.yaml), in [`kubeblocks/examples/dbaas`](https://github.com/apecloud/kubeblocks/tree/main/examples/dbaas).
 
 ```
@@ -62,7 +63,7 @@ spec:
             volumeMode: Filesystem
 ```
 
-2. Run the command line to create a three-node cluster.
+2. Run the command line below to create a three-node cluster.
 
 ```
 kubectl apply -f cluster_three_nodes.yaml
@@ -280,7 +281,7 @@ Events:
   Normal  OpsRequestProcessedSuccessfully  49s    ops-request-controller  Controller has successfully processed the OpsRequest: ops-restart-threenodes-demo in Cluster: wesql-3nodes
 ```
 
-## (Optional) Destroy
+## (Optional) Destroy resources
 
 Run the following commands to destroy the resources created by this guide:
 

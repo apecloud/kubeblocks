@@ -35,6 +35,7 @@ This guide introduces how to use KubeBlocks to restart a single-node cluster.
 ## Create a single-node cluster for a demo
 
 _Steps_:
+
 1. Prepare a YAML file for a single-node cluster. Below is the YAML file of the single-node cluster. You can find [this demo file, `cluster.yaml`](kubeblocks/examples/../../../../../../examples/dbaas/cluster.yaml), in [`kubeblocks/examples/dbaas`](https://github.com/apecloud/kubeblocks/tree/main/examples/dbaas).
 
 ```
@@ -62,7 +63,7 @@ spec:
             volumeMode: Filesystem
 ```
 
-2. Run the command line to create a single-node cluster.
+2. Run the command line below to create a single-node cluster.
 
 ```
 $ kubectl apply -f cluster.yaml
@@ -79,7 +80,7 @@ NAME            APP-VERSION    PHASE     AGE
 wesql           wesql-8.0.18   Running   22s
 ```
 
-1. Check the operations this cluster supports:
+3. Check the operations this cluster supports:
 
 ```
 $ kubectl describe cluster wesql
@@ -283,7 +284,7 @@ Events:
   Normal  OpsRequestProcessedSuccessfully  50s   ops-request-controller  Controller has successfully processed the OpsRequest: ops-restart-demo in Cluster: wesql
 ```
 
-## (Optional) Destroy
+## (Optional) Destroy resources
 
 Run the following commands to destroy the resources created by this guide:
 

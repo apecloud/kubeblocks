@@ -5,7 +5,7 @@ This guide shows you how to use KubeBlocks to scale up a three-node cluster.
 ## Before you start
 
 - [Install KubeBlocks](../../installation/deploy_kubeblocks.md). 
-- Run the commands below to check whether the KubeBlocks is installed successfully and the cluster-related CR (custom resources) are created.
+- Run the commands below to check whether the KubeBlocks is installed successfully and the cluster-related `CR` (custom resources) are created.
   - Run the commands to check whether KubeBlocks is installed successfully.
   ```
   $ kubectl get pod
@@ -35,6 +35,7 @@ This guide shows you how to use KubeBlocks to scale up a three-node cluster.
 ### Create a three-node cluster for a demo
 
 _Steps_:
+
 1. Prepare a YAML file for a single-node cluster. Below is the YAML file of the three-node cluster. You can find [this demo file, `restart_three_nodes.yaml`](../../../../examples/dbaas/restart_three_nodes.yaml), in [`kubeblocks/examples/dbaas`](https://github.com/apecloud/kubeblocks/tree/main/examples/dbaas).
 
 ```
@@ -62,7 +63,7 @@ spec:
             volumeMode: Filesystem
 ```
 
-2. Run the command line to create a three-node cluster.
+2. Run the command line below to create a three-node cluster.
 
 ```
 kubectl apply -f cluster_three_nodes.yaml
@@ -79,7 +80,7 @@ NAME                   APP-VERSION    PHASE     AGE
 wesql-3nodes           wesql-8.0.18   Running   20s
 ```
 
-1. Check the operations this cluster supports:
+3. Check the operations this cluster supports:
 
 ```
 $ kubectl describe cluster wesql-3nodes
@@ -295,7 +296,7 @@ Events:
   Normal  OpsRequestProcessedSuccessfully  2m23s (x2 over 2m23s)  ops-request-controller  Controller has successfully processed the OpsRequest: ops-vertical-scaling-threenodes-demo in Cluster: wesql-3nodes
 ```
 
-## (Optional) Destroy
+## (Optional) Destroy resources
 
 Run the following commands to destroy the resources created by this guide:
 

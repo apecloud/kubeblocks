@@ -5,7 +5,7 @@ This section shows you how to use KubeBlocks to scale up a cluster.
 ## Before you start
 
 - [Install KubeBlocks](../../installation/deploy_kubeblocks.md). 
-- Run the commands below to check whether the KubeBlocks is installed successfully and the cluster-related CR (custom resources) are created.
+- Run the commands below to check whether the KubeBlocks is installed successfully and the cluster-related `CR` (custom resources) are created.
   - Run the commands to check whether KubeBlocks is installed successfully.
     ```
     $ kubectl get pod
@@ -16,7 +16,7 @@ This section shows you how to use KubeBlocks to scale up a cluster.
       kubeblocks   ClusterIP   10.111.120.68   <none>        9443/TCP   7m3s
       kubernetes   ClusterIP   10.96.0.1       <none>        443/TCP    3d22h
     ```
-  - Run the commands below to check whether the cluster-related CR is installed successfully.
+  - Run the commands below to check whether the cluster-related `CR` is installed successfully.
     ```
     $ kubectl get cd 
       NAME             PHASE       AGE
@@ -35,6 +35,7 @@ This section shows you how to use KubeBlocks to scale up a cluster.
 ## Create a single-node cluster for a demo
 
 _Steps_:
+
 1. Prepare a YAML file for a single-node cluster. Below is the YAML file of the single-node cluster. You can find [this demo file, `cluster.yaml`](kubeblocks/examples/../../../../../../examples/dbaas/cluster.yaml), in [`kubeblocks/examples/dbaas`](https://github.com/apecloud/kubeblocks/tree/main/examples/dbaas).
 
 
@@ -63,7 +64,7 @@ _Steps_:
               volumeMode: Filesystem
   ```
 
-2. Run the command line to create a single-node cluster.
+2. Run the command line below to create a single-node cluster.
 
   ```
   $ kubectl apply -f cluster.yaml
@@ -299,7 +300,7 @@ And the cluster also changes:
     Normal  OpsRequestProcessedSuccessfully  41s   ops-request-controller  Controller has successfully processed the OpsRequest: ops-vertical-scaling-demo in Cluster: wesql
   ```
 
-## (Optional) Destroy
+## (Optional) Destroy resources
 
 Run the following commands to destroy the resources created by this guide:
 

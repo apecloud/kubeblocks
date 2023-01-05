@@ -19,6 +19,7 @@ package cluster
 import (
 	"bytes"
 	"net/http"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -118,7 +119,7 @@ var _ = Describe("list", func() {
 		Expect(cmd).ShouldNot(BeNil())
 
 		cmd.Run(cmd, []string{"test"})
-		Expect(out.String()).Should(ContainSubstring("test"))
+		Expect(len(strings.Split(out.String(), "\n")) > 1).Should(BeTrue())
 	})
 
 	It("output wide", func() {

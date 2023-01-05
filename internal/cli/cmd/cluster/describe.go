@@ -195,7 +195,7 @@ func showEvents(events *corev1.EventList, name string, out io.Writer) {
 	objs := util.SortEventsByLastTimestamp(events)
 
 	// print last 5 events
-	title := fmt.Sprintf("\nEvents(LAST 5 warnings, see more:kbcli cluster list-events %s):", name)
+	title := fmt.Sprintf("\nEvents(last 5 warnings, see more:kbcli cluster list-events %s):", name)
 	tbl := newTbl(out, title, "TIME", "TYPE", "REASON", "OBJECT", "MESSAGE")
 	cnt := 0
 	for _, o := range *objs {

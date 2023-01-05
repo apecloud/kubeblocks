@@ -48,7 +48,7 @@ var _ = BeforeSuite(func() {
 	}
 
 	ctx, cancel = context.WithCancel(context.TODO())
-}, 60)
+})
 
 var _ = AfterSuite(func() {
 })

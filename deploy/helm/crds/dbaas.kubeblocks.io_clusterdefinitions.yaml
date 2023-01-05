@@ -7714,7 +7714,7 @@ spec:
                       - containers
                       type: object
                     probes:
-                      description: probes setting for db healthy checks.
+                      description: probes setting for healthy checks.
                       properties:
                         roleChangedProbe:
                           description: Probe for DB role changed check.

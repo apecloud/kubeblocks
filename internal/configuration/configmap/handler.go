@@ -28,18 +28,42 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 	"go.uber.org/zap"
 
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
 var allUnixSignals = map[string]os.Signal{
-	"SIGHUP":  syscall.SIGHUP,  // reload signal for mysql 8.x.xxx
-	"SIGTERM": syscall.SIGTERM, // shutdown signal
+	"SIGHUP":  syscall.SIGHUP, // reload signal for mysql 8.x.xxx
 	"SIGINT":  syscall.SIGINT,
-	"SIGKILL": syscall.SIGKILL,
-	"SIGSEGV": syscall.SIGSEGV,
 	"SIGQUIT": syscall.SIGQUIT,
+	"SIGILL":  syscall.SIGILL,
+	"SIGTRAP": syscall.SIGTRAP,
+	"SIGABRT": syscall.SIGABRT,
+	"SIGBUS":  syscall.SIGBUS,
+	"SIGFPE":  syscall.SIGFPE,
+	"SIGKILL": syscall.SIGKILL,
 	"SIGUSR1": syscall.SIGUSR1,
+	"SIGSEGV": syscall.SIGSEGV,
 	"SIGUSR2": syscall.SIGUSR2,
+	"SIGPIPE": syscall.SIGPIPE,
+	"SIGALRM": syscall.SIGALRM,
+	"SIGTERM": syscall.SIGTERM,
+	// "SIGSTKFLT": syscall.SIGSTKFLT,
+	"SIGCHLD":   syscall.SIGCHLD,
+	"SIGCONT":   syscall.SIGCONT,
+	"SIGSTOP":   syscall.SIGSTOP,
+	"SIGTSTP":   syscall.SIGTSTP,
+	"SIGTTIN":   syscall.SIGTTIN,
+	"SIGTTOU":   syscall.SIGTTOU,
+	"SIGURG":    syscall.SIGURG,
+	"SIGXCPU":   syscall.SIGXCPU,
+	"SIGXFSZ":   syscall.SIGXFSZ,
+	"SIGVTALRM": syscall.SIGVTALRM,
+	"SIGPROF":   syscall.SIGPROF,
+	"SIGWINCH":  syscall.SIGWINCH,
+	"SIGIO":     syscall.SIGIO,
+	// "SIGPWR":    syscall.SIGPWR,
+	"SIGSYS": syscall.SIGSYS,
 }
 
 var (
@@ -98,7 +122,7 @@ func CreateSignalHandler(sig string, processName string) WatchEventHandler {
 	}
 }
 
-func IsValidUnixSignal(sig string) bool {
-	_, ok := allUnixSignals[strings.ToUpper(sig)]
+func IsValidUnixSignal(sig dbaasv1alpha1.SignalType) bool {
+	_, ok := allUnixSignals[strings.ToUpper(string(sig))]
 	return ok
 }

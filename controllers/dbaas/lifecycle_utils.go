@@ -1364,8 +1364,8 @@ func updateConfigurationManagerWithComponent(
 
 		defaultVarRunVolumePath = "/var/run"
 		criEndpointVolumeName   = "cri-runtime-endpoint"
-		criRuntimeEndpoint      = viper.GetString(cfgcore.CRIRuntimeEndpoint)
-		criType                 = viper.GetString(cfgcore.ConfigCRIType)
+		// criRuntimeEndpoint      = viper.GetString(cfgcore.CRIRuntimeEndpoint)
+		// criType                 = viper.GetString(cfgcore.ConfigCRIType)
 	)
 
 	reloadOptions, err := cfgutil.GetReloadOptions(cli, ctx, cfgTemplates)
@@ -1419,16 +1419,9 @@ func updateConfigurationManagerWithComponent(
 	}
 
 	unixSignalOption := reloadOptions.UnixSignalTrigger
-	configManagerArgs := cfgcm.BuildSignalArgs(
-		*unixSignalOption,
-		volumeDirs,
-		criType,
-		criRuntimeEndpoint)
+	configManagerArgs := cfgcm.BuildSignalArgs(*unixSignalOption, volumeDirs)
 
 	mountPath := defaultVarRunVolumePath
-	if criRuntimeEndpoint != "" && criType != "" && criType != "auto" {
-		mountPath = criRuntimeEndpoint
-	}
 	managerSidecar := &cfgcm.ConfigManagerSidecar{
 		ManagerName: cfgcore.ConfigSidecarName,
 		Image:       viper.GetString(cfgcore.ConfigSidecarIMAGE),
@@ -1691,7 +1684,7 @@ func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder
 	cfgTemplate := &dbaasv1alpha1.ConfigurationTemplate{}
 	if len(tplCfg.ConfigConstraintRef) > 0 {
 		if err := cli.Get(ctx, client.ObjectKey{
-			Namespace: tplCfg.Namespace,
+			Namespace: "",
 			Name:      tplCfg.ConfigConstraintRef,
 		}, cfgTemplate); err != nil {
 			return nil, cfgcore.WrapError(err, "failed to get ConfigurationTemplate, key[%v]", tplCfg)

@@ -22,12 +22,13 @@ import (
 	"os"
 	"time"
 
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/configmap"
 	"github.com/spf13/cobra"
 	zaplogfmt "github.com/sykesm/zap-logfmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/configmap"
 )
 
 var logger *zap.SugaredLogger

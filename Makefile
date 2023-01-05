@@ -356,7 +356,6 @@ reloader: build-checks ## Build agamotto related binaries
 clean-reloader: ## Clean bin/mysqld_exporter.
 	rm -f bin/reloader
 
-
 ##@ DAP
 
 DAPRD_BUILD_PATH = ./cmd/daprd

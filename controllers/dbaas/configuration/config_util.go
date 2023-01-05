@@ -350,7 +350,7 @@ func validateConfigTPLs(cli client.Client, ctx intctrlutil.RequestCtx, configTpl
 
 		configObj := &dbaasv1alpha1.ConfigurationTemplate{}
 		if err := cli.Get(ctx.Ctx, client.ObjectKey{
-			Namespace: configTpl.Namespace,
+			Namespace: "",
 			Name:      configTpl.ConfigConstraintRef,
 		}, configObj); err != nil {
 			ctx.Log.Error(err, "failed to get config template cm object!", "configTplName", configTpl)
@@ -465,7 +465,7 @@ func GetReloadOptions(cli client.Client, ctx context.Context, tpls []dbaasv1alph
 		}
 		cfgConst := &dbaasv1alpha1.ConfigurationTemplate{}
 		if err := cli.Get(ctx, client.ObjectKey{
-			Namespace: tpl.Namespace,
+			Namespace: "",
 			Name:      tpl.ConfigConstraintRef,
 		}, cfgConst); err != nil {
 			return nil, cfgcore.WrapError(err, "failed to get ConfigurationTemplate, key[%v]", tpl)

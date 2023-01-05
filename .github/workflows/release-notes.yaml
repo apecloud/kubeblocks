@@ -40,3 +40,52 @@ jobs:
       - name: Create pull request
         run: |
           gh pr create --title "Create release notes for ${{ env.REL_VERSION }}." --body "Release notes." --base ${{ env.BASE_BRANCH }} --draft
+
+      - name: Get project data
+        env:
+          ORGANIZATION: apecloud
+          PROJECT_NUMBER: 2
+        run: |
+          gh api graphql -f query='
+            query($org: String!, $number: Int!) {
+              organization(login: $org){
+                projectV2(number: $number) {
+                  id
+                  fields(first:20) {
+                    nodes {
+                      ... on ProjectV2Field {
+                        id
+                        name
+                      }
+                      ... on ProjectV2SingleSelectField {
+                        id
+                        name
+                        options {
+                          id
+                          name
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }' -f org=$ORGANIZATION -F number=$PROJECT_NUMBER > project_data.json
+          
+          echo 'PROJECT_ID='$(jq '.data.organization.projectV2.id' project_data.json) >> $GITHUB_ENV
+          echo 'STATUS_FIELD_ID='$(jq '.data.organization.projectV2.fields.nodes[] | select(.name== "Status") | .id' project_data.json) >> $GITHUB_ENV
+
+      - name: Released Issue
+        run: |
+          echo 'TODO_OPTION_ID='$(jq '.data.organization.projectV2.fields.nodes[] | select(.name== "Status") | .options[] | select(.name=="Released") |.id' project_data.json) >> $GITHUB_ENV
+
+      - name: Move Released Issue
+        run: |
+          cd ${{ github.workspace }}
+          bash ${{ github.workspace }}/.github/utils/issue-release.sh \
+            ${{ env.GITHUB_TOKEN }} \
+            ${{ github.repository }} \
+            ${{ github.repository_owner }} \
+            $PROJECT_ID \
+            $STATUS_FIELD_ID \
+            ${{ env.TODO_OPTION_ID }} \
+            ${{ github.workspace }}/docs/release_notes

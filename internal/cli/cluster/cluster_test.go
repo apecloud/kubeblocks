@@ -17,7 +17,7 @@ limitations under the License.
 package cluster
 
 import (
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"

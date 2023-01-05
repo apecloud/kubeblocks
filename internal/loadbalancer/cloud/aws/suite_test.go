@@ -19,12 +19,11 @@ package aws
 import (
 	"testing"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"go.uber.org/zap/zapcore"
 
 	"github.com/spf13/viper"
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
+	"go.uber.org/zap/zapcore"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
@@ -41,9 +40,7 @@ var (
 func TestAws(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecsWithDefaultAndCustomReporters(t,
-		"AWS Cloud Provider Test Suite",
-		[]Reporter{printer.NewlineReporter{}})
+	RunSpecs(t, "AWS Cloud Provider Test Suite")
 }
 
 var _ = BeforeSuite(func() {

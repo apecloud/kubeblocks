@@ -107,9 +107,9 @@ func DeleteCDConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, c
 	return err
 }
 
-func DeleteAVConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, appVersion *dbaasv1alpha1.ClusterVersion) error {
-	_, err := handleConfigTemplate(appVersion, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
-		return true, batchDeleteConfigMapFinalizer[*dbaasv1alpha1.ClusterVersion](cli, ctx, tpls, appVersion)
+func DeleteCVConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, clusterVersion *dbaasv1alpha1.ClusterVersion) error {
+	_, err := handleConfigTemplate(clusterVersion, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
+		return true, batchDeleteConfigMapFinalizer[*dbaasv1alpha1.ClusterVersion](cli, ctx, tpls, clusterVersion)
 	})
 	return err
 }
@@ -175,8 +175,8 @@ func UpdateCDConfigMapFinalizer(client client.Client, ctx intctrlutil.RequestCtx
 	return err
 }
 
-func UpdateAVConfigMapFinalizer(client client.Client, ctx intctrlutil.RequestCtx, appversion *dbaasv1alpha1.ClusterVersion) error {
-	_, err := handleConfigTemplate(appversion,
+func UpdateCVConfigMapFinalizer(client client.Client, ctx intctrlutil.RequestCtx, clusterVersion *dbaasv1alpha1.ClusterVersion) error {
+	_, err := handleConfigTemplate(clusterVersion,
 		func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 			return true, batchUpdateConfigMapFinalizer(client, ctx, tpls)
 		})
@@ -200,6 +200,7 @@ func updateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl
 	cmObj, err := getConfigMapByName(cli, ctx, tpl.ConfigTplRef, tpl.Namespace)
 	if err != nil {
 		ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", cmObj.Name)
+		return err
 	}
 
 	if controllerutil.ContainsFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName) {
@@ -265,7 +266,7 @@ func handleConfigTemplate(object client.Object, handler ConfigTemplateHandler, h
 	case *dbaasv1alpha1.ClusterDefinition:
 		tpls, err = getCfgTplFromCD(cr, handler2...)
 	case *dbaasv1alpha1.ClusterVersion:
-		tpls = getCfgTplFromAV(cr)
+		tpls = getCfgTplFromCV(cr)
 	default:
 		return false, cfgcore.MakeError("not support CR type: %v", cr)
 	}
@@ -280,7 +281,7 @@ func handleConfigTemplate(object client.Object, handler ConfigTemplateHandler, h
 	}
 }
 
-func getCfgTplFromAV(appVer *dbaasv1alpha1.ClusterVersion) []dbaasv1alpha1.ConfigTemplate {
+func getCfgTplFromCV(appVer *dbaasv1alpha1.ClusterVersion) []dbaasv1alpha1.ConfigTemplate {
 	tpls := make([]dbaasv1alpha1.ConfigTemplate, 0)
 	for _, component := range appVer.Spec.Components {
 		if len(component.ConfigTemplateRefs) > 0 {
@@ -319,13 +320,13 @@ func UpdateCDLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.Req
 	})
 }
 
-func CheckAVConfigTemplate(client client.Client, ctx intctrlutil.RequestCtx, appVersion *dbaasv1alpha1.ClusterVersion) (bool, error) {
-	return handleConfigTemplate(appVersion, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
+func CheckCVConfigTemplate(client client.Client, ctx intctrlutil.RequestCtx, clusterVersion *dbaasv1alpha1.ClusterVersion) (bool, error) {
+	return handleConfigTemplate(clusterVersion, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 		return validateConfigTPLs(client, ctx, tpls)
 	})
 }
 
-func UpdateAVLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, appVer *dbaasv1alpha1.ClusterVersion) (bool, error) {
+func UpdateCVLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, appVer *dbaasv1alpha1.ClusterVersion) (bool, error) {
 	return handleConfigTemplate(appVer, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 		patch := client.MergeFrom(appVer.DeepCopy())
 		for _, tpl := range tpls {

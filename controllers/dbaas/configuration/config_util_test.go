@@ -67,8 +67,8 @@ var _ = Describe("ConfigWrapper util test", func() {
 				FakeTest{
 					// for crd yaml file
 					CfgTemplateYaml: "mysql_config_template.yaml",
-					CdYaml:          "mysql_cd.yaml",
-					AvYaml:          "mysql_av.yaml",
+					CDYaml:          "mysql_cd.yaml",
+					CVYaml:          "mysql_av.yaml",
 					CfgCMYaml:       "mysql_config_cm.yaml",
 					StsYaml:         "mysql_sts.yaml",
 				}, true)
@@ -170,8 +170,8 @@ var _ = Describe("ConfigWrapper util test", func() {
 				FakeTest{
 					// for crd yaml file
 					CfgTemplateYaml: "mysql_config_template.yaml",
-					CdYaml:          "mysql_cd.yaml",
-					AvYaml:          "mysql_av.yaml",
+					CDYaml:          "mysql_cd.yaml",
+					CVYaml:          "mysql_av.yaml",
 					CfgCMYaml:       "mysql_config_cm.yaml",
 					StsYaml:         "mysql_sts.yaml",
 				}, true)
@@ -244,15 +244,15 @@ var _ = Describe("ConfigWrapper util test", func() {
 		})
 	})
 
-	Context("appversion CR test", func() {
+	Context("clusterversion CR test", func() {
 		It("Should success without error", func() {
 			testWrapper := CreateDBaasFromISV(testCtx, ctx, k8sClient,
 				"./testdata",
 				FakeTest{
 					// for crd yaml file
 					CfgTemplateYaml: "mysql_config_template.yaml",
-					CdYaml:          "mysql_cd.yaml",
-					AvYaml:          "mysql_av.yaml",
+					CDYaml:          "mysql_cd.yaml",
+					CVYaml:          "mysql_av.yaml",
 					CfgCMYaml:       "mysql_config_cm.yaml",
 					StsYaml:         "mysql_sts.yaml",
 				}, true)
@@ -321,30 +321,30 @@ var _ = Describe("ConfigWrapper util test", func() {
 					return tt.err
 				}).AnyTimes()
 
-			_, err := CheckAVConfigTemplate(mockClient, reqCtx, testWrapper.av)
+			_, err := CheckCVConfigTemplate(mockClient, reqCtx, testWrapper.cv)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get tpl object"))
 
-			_, err = CheckAVConfigTemplate(mockClient, reqCtx, testWrapper.av)
+			_, err = CheckCVConfigTemplate(mockClient, reqCtx, testWrapper.cv)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get tpl object"))
 
-			_, err = CheckAVConfigTemplate(mockClient, reqCtx, testWrapper.av)
+			_, err = CheckCVConfigTemplate(mockClient, reqCtx, testWrapper.cv)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("status not ready"))
 
-			ok, err := CheckAVConfigTemplate(mockClient, reqCtx, testWrapper.av)
+			ok, err := CheckCVConfigTemplate(mockClient, reqCtx, testWrapper.cv)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			ok, err = UpdateAVLabelsWithUsingConfiguration(mockClient, reqCtx, testWrapper.av)
+			ok, err = UpdateCVLabelsWithUsingConfiguration(mockClient, reqCtx, testWrapper.cv)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			err = UpdateAVConfigMapFinalizer(mockClient, reqCtx, testWrapper.av)
+			err = UpdateCVConfigMapFinalizer(mockClient, reqCtx, testWrapper.cv)
 			Expect(err).Should(Succeed())
 
-			err = DeleteAVConfigMapFinalizer(mockClient, reqCtx, testWrapper.av)
+			err = DeleteCVConfigMapFinalizer(mockClient, reqCtx, testWrapper.cv)
 			Expect(err).Should(Succeed())
 		})
 	})
@@ -442,12 +442,12 @@ func updateAVTemplates(wrapper *TestWrapper) {
 	})
 	Expect(err).Should(Succeed())
 
-	if len(wrapper.av.Spec.Components) == 0 {
+	if len(wrapper.cv.Spec.Components) == 0 {
 		return
 	}
 
-	// mock av config templates
-	wrapper.av.Spec.Components[0].ConfigTemplateRefs = tpls
+	// mock cv config templates
+	wrapper.cv.Spec.Components[0].ConfigTemplateRefs = tpls
 }
 
 func setExpectedObject(out client.Object, obj client.Object) {

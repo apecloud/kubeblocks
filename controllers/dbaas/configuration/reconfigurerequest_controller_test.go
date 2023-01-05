@@ -53,8 +53,8 @@ var _ = Describe("Reconfigure Controller", func() {
 				FakeTest{
 					// for crd yaml file
 					CfgTemplateYaml: "mysql_config_template.yaml",
-					CdYaml:          "mysql_cd.yaml",
-					AvYaml:          "mysql_av.yaml",
+					CDYaml:          "mysql_cd.yaml",
+					CVYaml:          "mysql_av.yaml",
 					CfgCMYaml:       "mysql_config_cm.yaml",
 					StsYaml:         "mysql_sts.yaml",
 					MockSts:         true,

@@ -38,22 +38,22 @@ import (
 const (
 	ISVClusterScope = "default"
 
-	ISVTestCdPrefix   = "test-clusterdefinition-"
-	ISVTestAvPrefix   = "test-appversion-"
-	ISVTestTplPrefix  = "test-cfgtpl-"
+	ISVTestCDPrefix   = "test-clusterdefinition-"
+	ISVTestCVPrefix   = "test-clusterversion-"
+	ISVTestTPLPrefix  = "test-cfgtpl-"
 	TestClusterPrefix = "test-cluster-"
 )
 
 type FakeTest struct {
-	CdName     string
-	AvName     string
+	CDName     string
+	CVName     string
 	CfgTplName string
 	Namespace  string
 	MockSts    bool
 
 	// for yaml file
-	CdYaml          string
-	AvYaml          string
+	CDYaml          string
+	CVYaml          string
 	CfgCMYaml       string
 	CfgTemplateYaml string
 	StsYaml         string
@@ -80,7 +80,7 @@ type TestWrapper struct {
 
 	// cr object
 	cd  *dbaasv1alpha1.ClusterDefinition
-	av  *dbaasv1alpha1.ClusterVersion
+	cv  *dbaasv1alpha1.ClusterVersion
 	tpl *dbaasv1alpha1.ConfigurationTemplate
 	cm  *corev1.ConfigMap
 }
@@ -108,8 +108,8 @@ func (w *TestWrapper) CreateCluster(name string) *dbaasv1alpha1.Cluster {
 			Namespace: w.testEnv.Namespace,
 		},
 		Spec: dbaasv1alpha1.ClusterSpec{
-			ClusterDefRef:     w.testEnv.CdName,
-			ClusterVersionRef: w.testEnv.AvName,
+			ClusterDefRef:     w.testEnv.CDName,
+			ClusterVersionRef: w.testEnv.CVName,
 			TerminationPolicy: dbaasv1alpha1.Delete,
 		},
 	}
@@ -124,8 +124,8 @@ func (w *TestWrapper) createCrObject(obj client.Object) {
 	}
 }
 
-func (w *TestWrapper) updateAvComTplMeta(appVer *dbaasv1alpha1.ClusterVersion) {
-	appVer.Spec.ClusterDefinitionRef = w.testEnv.CdName
+func (w *TestWrapper) updateCVComTplMeta(appVer *dbaasv1alpha1.ClusterVersion) {
+	appVer.Spec.ClusterDefinitionRef = w.testEnv.CDName
 	for _, component := range appVer.Spec.Components {
 		if len(component.ConfigTemplateRefs) == 0 {
 			continue
@@ -175,7 +175,7 @@ func (w *TestWrapper) DeleteAllCR() error {
 		return err
 	}
 
-	// step2: delete appversion cr
+	// step2: delete clusterversion cr
 	if err := k8sClient.DeleteAllOf(ctx,
 		&dbaasv1alpha1.ClusterVersion{},
 		client.HasLabels{testCtx.TestObjLabelKey}); err != nil {
@@ -225,8 +225,8 @@ func (w *TestWrapper) DeleteCD() error {
 	return w.cli.Delete(w.ctx, w.cd)
 }
 
-func (w *TestWrapper) DeleteAV() error {
-	return w.cli.Delete(w.ctx, w.av)
+func (w *TestWrapper) DeleteCV() error {
+	return w.cli.Delete(w.ctx, w.cv)
 }
 
 func (w *TestWrapper) DeleteTpl() error {
@@ -353,11 +353,11 @@ func (w *TestWrapper) createStsFromFile(cluster *dbaasv1alpha1.Cluster, componen
 }
 
 func GenRandomCDName() string {
-	return ISVTestCdPrefix + BuildRandomString()
+	return ISVTestCDPrefix + BuildRandomString()
 }
 
-func GenRandomAVName() string {
-	return ISVTestAvPrefix + BuildRandomString()
+func GenRandomCVName() string {
+	return ISVTestCVPrefix + BuildRandomString()
 }
 
 func GenRandomClusterName() string {
@@ -365,7 +365,7 @@ func GenRandomClusterName() string {
 }
 
 func GenRandomTplName() string {
-	return ISVTestTplPrefix + BuildRandomString()
+	return ISVTestTPLPrefix + BuildRandomString()
 }
 
 func BuildRandomString() string {
@@ -381,8 +381,8 @@ func BuildRandomString() string {
 
 func CreateDBaasFromISV(testCtx testutil.TestContext, ctx context.Context, k8sClient client.Client, dataPath string, testInfo FakeTest, autoGenerate bool) *TestWrapper {
 	if autoGenerate {
-		testInfo.CdName = GenRandomCDName()
-		testInfo.AvName = GenRandomAVName()
+		testInfo.CDName = GenRandomCDName()
+		testInfo.CVName = GenRandomCVName()
 		testInfo.CfgTplName = GenRandomTplName()
 		testInfo.Namespace = testCtx.DefaultNamespace
 	}
@@ -396,13 +396,13 @@ func CreateDBaasFromISV(testCtx testutil.TestContext, ctx context.Context, k8sCl
 	}
 
 	// create dbaas
-	// createCdFromISV(&testWrapper, testInfo.CdName, testInfo.CdYaml)
-	// createAvFromISV(&testWrapper, testInfo.AvName, testInfo.AvYaml)
+	// createCdFromISV(&testWrapper, testInfo.CDName, testInfo.CDYaml)
+	// createAvFromISV(&testWrapper, testInfo.CVName, testInfo.CVYaml)
 	// createCmFromISV(&testWrapper, testInfo.CfgTplName, testInfo.CfgTplName)
 	// createCfgTplFromISV(&testWrapper, testInfo.CfgTplName, testInfo.CfgTemplateYaml)
 
-	createCRFromISVWithT(testWrapper, testInfo.CdName, path.Join(dataPath, testInfo.CdYaml), &dbaasv1alpha1.ClusterDefinition{})
-	createCRFromISVWithT(testWrapper, testInfo.AvName, path.Join(dataPath, testInfo.AvYaml), &dbaasv1alpha1.ClusterVersion{})
+	createCRFromISVWithT(testWrapper, testInfo.CDName, path.Join(dataPath, testInfo.CDYaml), &dbaasv1alpha1.ClusterDefinition{})
+	createCRFromISVWithT(testWrapper, testInfo.CVName, path.Join(dataPath, testInfo.CVYaml), &dbaasv1alpha1.ClusterVersion{})
 	createCRFromISVWithT(testWrapper, testWrapper.CMName(), path.Join(dataPath, testInfo.CfgCMYaml), &corev1.ConfigMap{})
 	createCRFromISVWithT(testWrapper, testWrapper.TPLName(), path.Join(dataPath, testInfo.CfgTemplateYaml), &dbaasv1alpha1.ConfigurationTemplate{})
 
@@ -421,8 +421,8 @@ func createCRFromISVWithT(t *TestWrapper, tplName string, fileName string, crTyp
 
 	switch obj := crType.(type) {
 	case *dbaasv1alpha1.ClusterVersion:
-		crObj, err = createISVCrFromFile(fileName, obj, t.updateAvComTplMeta)
-		t.av = crObj.(*dbaasv1alpha1.ClusterVersion)
+		crObj, err = createISVCrFromFile(fileName, obj, t.updateCVComTplMeta)
+		t.cv = crObj.(*dbaasv1alpha1.ClusterVersion)
 	case *dbaasv1alpha1.ClusterDefinition:
 		crObj, err = createISVCrFromFile(fileName, obj, t.updateComTplMeta)
 		t.cd = crObj.(*dbaasv1alpha1.ClusterDefinition)
@@ -486,12 +486,12 @@ func ValidateISVCR[T any, OBJECT K8sResource](test *TestWrapper, obj client.Obje
 	case *dbaasv1alpha1.ClusterVersion:
 		objKey = client.ObjectKey{
 			Namespace: ISVClusterScope,
-			Name:      test.testEnv.AvName,
+			Name:      test.testEnv.CVName,
 		}
 	case *dbaasv1alpha1.ClusterDefinition:
 		objKey = client.ObjectKey{
 			Namespace: ISVClusterScope,
-			Name:      test.testEnv.CdName,
+			Name:      test.testEnv.CDName,
 		}
 	case *dbaasv1alpha1.ConfigurationTemplate:
 		objKey = client.ObjectKey{

@@ -133,16 +133,16 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return intctrlutil.Reconciled()
 	}
 
-	if ok, err := dbaasconfig.CheckAVConfigTemplate(r.Client, reqCtx, clusterVersion); !ok || err != nil {
+	if ok, err := dbaasconfig.CheckCVConfigTemplate(r.Client, reqCtx, clusterVersion); !ok || err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to check config template")
 	}
 
-	if ok, err := dbaasconfig.UpdateAVLabelsWithUsingConfiguration(r.Client, reqCtx, clusterVersion); !ok || err != nil {
+	if ok, err := dbaasconfig.UpdateCVLabelsWithUsingConfiguration(r.Client, reqCtx, clusterVersion); !ok || err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to update using config template info")
 	}
 
 	// Update configmap Finalizer and set Immutable
-	if err := dbaasconfig.UpdateAVConfigMapFinalizer(r.Client, reqCtx, clusterVersion); err != nil {
+	if err := dbaasconfig.UpdateCVConfigMapFinalizer(r.Client, reqCtx, clusterVersion); err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to UpdateConfigMapFinalizer")
 	}
 
@@ -210,7 +210,7 @@ func (r *ClusterVersionReconciler) deleteExternalResources(reqCtx intctrlutil.Re
 	//
 	// Ensure that delete implementation is idempotent and safe to invoke
 	// multiple times for same object.
-	return dbaasconfig.DeleteAVConfigMapFinalizer(r.Client, reqCtx, clusterVersion)
+	return dbaasconfig.DeleteCVConfigMapFinalizer(r.Client, reqCtx, clusterVersion)
 }
 
 // SyncClusterStatusOperationsWithUpgrade sync cluster status.operations.upgradable when delete or create ClusterVersion

@@ -55,8 +55,8 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 				FakeTest{
 					// for crd yaml file
 					CfgTemplateYaml: "mysql_config_template.yaml",
-					CdYaml:          "mysql_cd.yaml",
-					AvYaml:          "mysql_av.yaml",
+					CDYaml:          "mysql_cd.yaml",
+					CVYaml:          "mysql_av.yaml",
 					CfgCMYaml:       "mysql_config_cm.yaml",
 				}, true)
 			Expect(testWrapper.HasError()).Should(Succeed())
@@ -85,7 +85,7 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 
 			By("By delete clusterdefinition and appversion")
 			// step3: delete clusterdefinition and appversion
-			Expect(testWrapper.DeleteAV()).Should(Succeed())
+			Expect(testWrapper.DeleteCV()).Should(Succeed())
 			Expect(testWrapper.DeleteCD()).Should(Succeed())
 
 			Eventually(func() error {
@@ -106,8 +106,8 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 				FakeTest{
 					// for crd yaml file
 					CfgTemplateYaml: "mysql_config_tpl_not_validate.yaml",
-					CdYaml:          "mysql_cd.yaml",
-					AvYaml:          "mysql_av.yaml",
+					CDYaml:          "mysql_cd.yaml",
+					CVYaml:          "mysql_av.yaml",
 					CfgCMYaml:       "mysql_config_cm.yaml",
 				}, true)
 			Expect(testWrapper.HasError()).Should(Succeed())

@@ -68,7 +68,7 @@ func (r *ConfigurationTemplateReconciler) Reconcile(ctx context.Context, req ctr
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, configTpl, cfgcore.ConfigurationTemplateFinalizerName, func() (*ctrl.Result, error) {
 		recordEvent := func() {
 			r.Recorder.Event(configTpl, corev1.EventTypeWarning, "ExistsReferencedResources",
-				"cannot be deleted because of existing referencing ClusterDefinition or AppVersion.")
+				"cannot be deleted because of existing referencing ClusterDefinition or ClusterVersion.")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, configTpl,
 			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(configTpl.GetName()),

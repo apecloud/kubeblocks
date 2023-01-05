@@ -50,9 +50,14 @@ type KBResource interface {
 	appsv1.Deployment
 }
 
-type ResourceOptions func(obj interface{})
+type ResourceOptions func(obj client.Object)
 
 func GetResourceFromTestData[T KBResource](yamlFile string, opts ...ResourceOptions) (*T, error) {
+	toK8sResource := func(o interface{}) client.Object {
+		obj, _ := o.(client.Object)
+		return obj
+	}
+
 	yamlContext, err := os.ReadFile(SubTestDataPath(yamlFile))
 	if err != nil {
 		return nil, err
@@ -63,34 +68,34 @@ func GetResourceFromTestData[T KBResource](yamlFile string, opts ...ResourceOpti
 		return nil, err
 	}
 
+	k8sObj := toK8sResource(obj)
 	for _, ops := range opts {
-		ops(obj)
+		ops(k8sObj)
 	}
 	return obj, nil
 }
 
 func WithName(resourceName string) ResourceOptions {
-	return func(obj interface{}) {
-		if k8sObject, ok := obj.(client.Object); ok {
-			k8sObject.SetName(resourceName)
-		}
+	return func(obj client.Object) {
+		obj.SetName(resourceName)
 	}
 }
 
 func WithNamespace(ns string) ResourceOptions {
-	return func(obj interface{}) {
-		if k8sObject, ok := obj.(client.Object); ok {
-			k8sObject.SetNamespace(ns)
-		}
+	return func(obj client.Object) {
+		obj.SetNamespace(ns)
+	}
+}
+
+func WithNamespacedName(resourceName, ns string) ResourceOptions {
+	return func(k8sObject client.Object) {
+		k8sObject.SetNamespace(ns)
+		k8sObject.SetName(resourceName)
 	}
 }
 
 func WithLabels(keysAndValues ...string) ResourceOptions {
-	return func(obj interface{}) {
-		k8sObject, ok := obj.(client.Object)
-		if !ok {
-			return
-		}
+	return func(k8sObject client.Object) {
 		// ignore mismatching for kvs
 		labels := make(map[string]string, len(keysAndValues)/2)
 		for i := 0; i+1 < len(keysAndValues); i += 2 {
@@ -101,25 +106,12 @@ func WithLabels(keysAndValues ...string) ResourceOptions {
 }
 
 func WithAnnotations(keysAndValues ...string) ResourceOptions {
-	return func(obj interface{}) {
-		k8sObject, ok := obj.(client.Object)
-		if !ok {
-			return
-		}
+	return func(k8sObject client.Object) {
 		// ignore mismatching for kvs
 		annotations := make(map[string]string, len(keysAndValues)/2)
 		for i := 0; i+1 < len(keysAndValues); i += 2 {
 			annotations[keysAndValues[i]] = keysAndValues[i+1]
 		}
 		k8sObject.SetAnnotations(annotations)
-	}
-}
-
-func WithNamespacedName(resourceName, ns string) ResourceOptions {
-	return func(obj interface{}) {
-		if k8sObject, ok := obj.(client.Object); ok {
-			k8sObject.SetNamespace(ns)
-			k8sObject.SetName(resourceName)
-		}
 	}
 }

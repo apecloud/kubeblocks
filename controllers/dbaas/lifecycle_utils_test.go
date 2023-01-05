@@ -427,7 +427,7 @@ spec:
               for i in "${ADDR[@]}"; do
                 idx=$i;
               done;
-            done <<< "$KB_MY_POD_NAME";
+            done <<< "$KB_POD_NAME";
             echo $idx;
             cluster_info="$cluster_info@$(($idx+1))";
             echo $cluster_info;

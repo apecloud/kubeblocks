@@ -29,12 +29,12 @@ import (
 	"strings"
 	"time"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 	"github.com/sethvargo/go-password/password"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -534,10 +534,10 @@ spec:
 		Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
 		fetchedG1 := &dbaasv1alpha1.Cluster{}
-		Eventually(func() bool {
-			_ = k8sClient.Get(ctx, key, fetchedG1)
-			return fetchedG1.Status.ObservedGeneration == 1
-		}, timeout, interval).Should(BeTrue())
+		Eventually(func(g Gomega) {
+			g.Expect(k8sClient.Get(ctx, key, fetchedG1)).To(Succeed())
+			g.Expect(fetchedG1.Status.ObservedGeneration == 1).To(BeTrue())
+		}, timeout, interval).Should(Succeed())
 
 		return fetchedG1, cd, clusterVersion, key
 	}
@@ -612,69 +612,123 @@ spec:
 		})
 	})
 
-	Context("When deleting cluster", func() {
-		It("Should delete cluster resources according to termination policy", func() {
-			By("Creating a cluster")
-			toCreate, _, _, key := newClusterObj(nil, nil)
-			toCreate.Spec.TerminationPolicy = dbaasv1alpha1.DoNotTerminate
-			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
+	Context("When deleting cluster with default termination policy", func() {
+		It("Should delete cluster resources immediately", func() {
+			By("Create a cluster")
+			_, _, _, key := createClusterNCheck()
 
-			fetchedG1 := &dbaasv1alpha1.Cluster{}
-			Eventually(func() bool {
-				_ = k8sClient.Get(ctx, key, fetchedG1)
-				return fetchedG1.Status.ObservedGeneration == 1
-			}, timeout, interval).Should(BeTrue())
+			By("Delete the cluster")
+			Eventually(func(g Gomega) {
+				g.Expect(deleteClusterNWait(key)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
 
-			fetchedG1.Spec.TerminationPolicy = dbaasv1alpha1.WipeOut
-			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
-
-			fetchedG2 := &dbaasv1alpha1.Cluster{}
-			Eventually(func() bool {
-				_ = k8sClient.Get(ctx, key, fetchedG2)
-				return fetchedG2.Status.ObservedGeneration == 2
-			}, timeout, interval).Should(BeTrue())
-
-			By("Deleting the cluster")
-			Eventually(func() bool {
-				if err := deleteClusterNWait(key); err != nil {
-					return false
-				}
+			By("Wait for the cluster to terminate")
+			Eventually(func(g Gomega) {
 				tmp := &dbaasv1alpha1.Cluster{}
-				err := k8sClient.Get(ctx, key, tmp)
-				return apierrors.IsNotFound(err)
-			}, timeout, interval).Should(BeTrue())
+				g.Expect(k8sClient.Get(ctx, key, tmp)).To(Satisfy(apierrors.IsNotFound))
+			}, timeout, interval).Should(Succeed())
 		})
 	})
 
-	Context("When updating cluster replicas", func() {
-		It("Should create/delete pod to match the replicas number", func() {
-			By("Creating a cluster")
-			fetchedG1, _, _, key := createClusterNCheck()
+	Context("When deleting cluster with DoNotTerminate termination policy", func() {
+		It("Should not terminate immediately", func() {
+			By("Create a cluster")
+			_, _, _, key := createClusterNCheck()
 
-			By("Checking the StatefulSet")
-			listAndCheckStatefulSet(key)
+			By("Update the cluster's termination policy to DoNotTerminate")
+			Expect(changeCluster(key, func(cluster *dbaasv1alpha1.Cluster) {
+				cluster.Spec.TerminationPolicy = dbaasv1alpha1.DoNotTerminate
+			})).Should(Succeed())
 
-			By("Updating replicas")
-			if fetchedG1.Spec.Components == nil {
-				fetchedG1.Spec.Components = []dbaasv1alpha1.ClusterComponent{}
+			By("Delete the cluster")
+			Eventually(func(g Gomega) {
+				g.Expect(deleteClusterNWait(key)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			By("Check the cluster do not terminate immediately")
+			checkClusterDoNotTerminate := func(g Gomega) {
+				fetched := &dbaasv1alpha1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
+				g.Expect(fetched.Status.Phase == dbaasv1alpha1.DeletingPhase).To(BeTrue())
+				g.Expect(len(fetched.Finalizers) > 0).To(BeTrue())
 			}
-			updatedReplicas := int32(5)
-			fetchedG1.Spec.Components = append(fetchedG1.Spec.Components, dbaasv1alpha1.ClusterComponent{
-				Name:     "replicasets",
-				Type:     "replicasets",
-				Replicas: &updatedReplicas,
-			})
-			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
+			Eventually(checkClusterDoNotTerminate, timeout, interval).Should(Succeed())
+			Consistently(checkClusterDoNotTerminate, waitDuration, interval).Should(Succeed())
 
-			fetchedG2 := &dbaasv1alpha1.Cluster{}
-			Eventually(func() bool {
-				_ = k8sClient.Get(ctx, key, fetchedG2)
-				return fetchedG2.Status.ObservedGeneration == 2
-			}, timeout*2, interval).Should(BeTrue())
+			By("Update the cluster's termination policy to WipeOut")
+			Expect(changeCluster(key, func(cluster *dbaasv1alpha1.Cluster) {
+				cluster.Spec.TerminationPolicy = dbaasv1alpha1.WipeOut
+			})).Should(Succeed())
 
-			By("Checking the replicas")
+			By("Wait for the cluster to terminate")
+			Eventually(func(g Gomega) {
+				tmp := &dbaasv1alpha1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, key, tmp)).To(Satisfy(apierrors.IsNotFound))
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	changeClusterReplicas := func(clusterName types.NamespacedName, replicas int32) error {
+		return changeCluster(clusterName, func(cluster *dbaasv1alpha1.Cluster) {
+			if cluster.Spec.Components == nil || len(cluster.Spec.Components) == 0 {
+				cluster.Spec.Components = []dbaasv1alpha1.ClusterComponent{
+					{
+						Name:     "replicasets",
+						Type:     "replicasets",
+						Replicas: &replicas,
+					}}
+			} else {
+				*cluster.Spec.Components[0].Replicas = replicas
+			}
+		})
+	}
+
+	Context("When updating cluster's replica number to a valid value", func() {
+		It("Should create/delete pods to match the desired replica number", func() {
+			By("Creating a cluster")
+			_, _, _, key := createClusterNCheck()
+
+			replicasSeq := []int32{5, 3, 1, 0, 2, 4}
+			expectedOG := int64(1)
+			for _, replicas := range replicasSeq {
+				By(fmt.Sprintf("Change replicas to %d", replicas))
+				Expect(changeClusterReplicas(key, replicas)).Should(Succeed())
+				expectedOG++
+
+				By("Checking cluster status and the number of replicas changed")
+				Eventually(func(g Gomega) {
+					fetched := &dbaasv1alpha1.Cluster{}
+					g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
+					g.Expect(fetched.Status.ObservedGeneration == expectedOG).To(BeTrue())
+				}, timeout, interval).Should(Succeed())
+				stsList := listAndCheckStatefulSet(key)
+				Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(replicas))
+			}
+
+			By("Deleting the cluster")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	Context("When updating cluster's replica number to an invalid value", func() {
+		It("Should not success", func() {
+			By("Creating a cluster")
+			_, _, _, key := createClusterNCheck()
+
+			invalidReplicas := int32(-1)
+			By(fmt.Sprintf("Change replicas to %d", invalidReplicas))
+			Expect(changeClusterReplicas(key, invalidReplicas)).Should(Succeed())
+
+			By("Checking cluster status and the number of replicas unchanged")
+			Consistently(func(g Gomega) {
+				fetched := &dbaasv1alpha1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
+				g.Expect(fetched.Status.ObservedGeneration == 1).To(BeTrue())
+			}, waitDuration, interval).Should(Succeed())
 			stsList := listAndCheckStatefulSet(key)
-			Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(updatedReplicas))
+			Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(1))
 
 			By("Deleting the cluster")
 			Eventually(func() error {
@@ -924,15 +978,13 @@ spec:
 			Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
 
 			clusterVersionList := dbaasv1alpha1.ClusterVersionList{}
-			Eventually(func() bool {
-				Expect(k8sClient.List(ctx, &clusterVersionList, client.MatchingLabels{
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.List(ctx, &clusterVersionList, client.MatchingLabels{
 					"clusterdefinition.kubeblocks.io/name": clusterDefKey.Name,
 				}, client.InNamespace(clusterVersionKey.Namespace))).Should(Succeed())
-				if len(clusterVersionList.Items) == 0 {
-					return false
-				}
-				return clusterVersionList.Items[0].Status.Phase == "Available"
-			}, timeout, interval).Should(BeTrue())
+				g.Expect(len(clusterVersionList.Items) > 0).To(BeTrue())
+				g.Expect(clusterVersionList.Items[0].Status.Phase == "Available").To(BeTrue())
+			}, timeout, interval).Should(Succeed())
 
 			By("By creating a cluster")
 			key := types.NamespacedName{Name: "test-wesql-01", Namespace: "default"}
@@ -1141,75 +1193,62 @@ spec:
 	})
 
 	Context("When creating cluster with services", func() {
-		It("Should create services", func() {
+		It("Should create corresponding services correctly", func() {
 			By("Creating a cluster")
-			testServiceType := corev1.ServiceTypeClusterIP
-			toCreate, _, _, key := newClusterObj(nil, nil)
-			toCreate.Spec.Components = append(toCreate.Spec.Components, dbaasv1alpha1.ClusterComponent{
-				Name: "proxy",
-				Type: "proxy",
+			_, _, _, key := createClusterNCheck()
 
-				ServiceType: testServiceType,
-			})
-			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
-
-			fetchedG1 := &dbaasv1alpha1.Cluster{}
-
-			Eventually(func() bool {
-				_ = k8sClient.Get(ctx, key, fetchedG1)
-				return fetchedG1.Status.ObservedGeneration == 1
-			}, timeout, interval).Should(BeTrue())
-
-			By("Checking external ClusterIP services")
-			svcList := &corev1.ServiceList{}
-			Eventually(func() bool {
-				Expect(k8sClient.List(ctx, svcList, client.MatchingLabels{
-					intctrlutil.AppInstanceLabelKey: key.Name,
-				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				for _, svc := range svcList.Items {
-					if svc.Spec.Type == testServiceType {
-						return true
-					}
-				}
-				return false
-			}, timeout, interval).Should(BeTrue())
-
-			By("Checking internal headless services")
-			for _, item := range fetchedG1.Spec.Components {
-				c, err := util.GetComponentDeftByCluster(ctx, k8sClient, fetchedG1, item.Type)
-				Expect(err).ShouldNot(HaveOccurred())
-				if c.ComponentType == dbaasv1alpha1.Stateless {
+			By("Checking proxy should have external ClusterIP service")
+			svcList1 := &corev1.ServiceList{}
+			Expect(k8sClient.List(ctx, svcList1, client.MatchingLabels{
+				intctrlutil.AppInstanceLabelKey:  key.Name,
+				intctrlutil.AppComponentLabelKey: "proxy",
+			}, client.InNamespace(key.Namespace))).Should(Succeed())
+			// TODO fix me later, proxy should not have internal headless service
+			// Expect(len(svcList1.Items) == 1).Should(BeTrue())
+			Expect(len(svcList1.Items) > 0).Should(BeTrue())
+			var existsExternalClusterIP bool
+			for _, svc := range svcList1.Items {
+				Expect(svc.Spec.Type == corev1.ServiceTypeClusterIP).To(BeTrue())
+				if svc.Spec.ClusterIP == corev1.ClusterIPNone {
 					continue
 				}
+				existsExternalClusterIP = true
+			}
+			Expect(existsExternalClusterIP).To(BeTrue())
 
-				Expect(k8sClient.List(ctx, svcList, client.MatchingLabels{
-					intctrlutil.AppInstanceLabelKey:  key.Name,
-					intctrlutil.AppComponentLabelKey: item.Name,
-				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				Expect(len(svcList.Items) > 0).Should(BeTrue())
+			By("Checking replicasets should have internal headless service")
+			getHeadlessSvcPorts := func(name string) []corev1.ServicePort {
+				fetched := &dbaasv1alpha1.Cluster{}
+				Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
+
+				comp, err := util.GetComponentDeftByCluster(ctx, k8sClient, fetched, name)
+				Expect(err).ShouldNot(HaveOccurred())
 
 				var headlessSvcPorts []corev1.ServicePort
-				for _, container := range c.PodSpec.Containers {
+				for _, container := range comp.PodSpec.Containers {
 					for _, port := range container.Ports {
 						// be consistent with headless_service_template.cue
 						headlessSvcPorts = append(headlessSvcPorts, corev1.ServicePort{
 							Name:       port.Name,
 							Protocol:   port.Protocol,
 							Port:       port.ContainerPort,
-							TargetPort: intstr.FromInt(int(port.ContainerPort)),
+							TargetPort: intstr.FromString(port.Name),
 						})
 					}
 				}
-				var exists bool
-				for _, svc := range svcList.Items {
-					if svc.Spec.ClusterIP != corev1.ClusterIPNone {
-						continue
-					}
-					exists = true
-					Expect(reflect.DeepEqual(svc.Spec.Ports, headlessSvcPorts)).Should(BeTrue())
-				}
-				Expect(exists).Should(BeTrue())
+				return headlessSvcPorts
 			}
+
+			svcList2 := &corev1.ServiceList{}
+			Expect(k8sClient.List(ctx, svcList2, client.MatchingLabels{
+				intctrlutil.AppInstanceLabelKey:  key.Name,
+				intctrlutil.AppComponentLabelKey: "replicasets",
+			}, client.InNamespace(key.Namespace))).Should(Succeed())
+			Expect(len(svcList2.Items) == 1).Should(BeTrue())
+			Expect(svcList2.Items[0].Spec.Type == corev1.ServiceTypeClusterIP).To(BeTrue())
+			Expect(svcList2.Items[0].Spec.ClusterIP == corev1.ClusterIPNone).To(BeTrue())
+			Expect(reflect.DeepEqual(svcList2.Items[0].Spec.Ports,
+				getHeadlessSvcPorts("replicasets"))).Should(BeTrue())
 
 			By("Deleting the cluster")
 			Eventually(func() error {
@@ -1526,8 +1565,8 @@ spec:
 		})
 	})
 
-	Context("When creating cluster with cluster affinity", func() {
-		It("Should hanle pod affinity correctly", func() {
+	Context("When creating cluster with cluster affinity set", func() {
+		It("Should create pod with cluster affinity", func() {
 			By("Creating a cluster")
 			topologyKey := "testTopologyKey"
 			lableKey := "testNodeLabelKey"
@@ -1557,8 +1596,8 @@ spec:
 		})
 	})
 
-	Context("When creating cluster with cluster affinity and component affinity", func() {
-		It("Should use compoment affinity", func() {
+	Context("When creating cluster with both cluster affinity and component affinity set", func() {
+		It("Should observe the component affinity will override the cluster affinity", func() {
 			By("Creating a cluster")
 			clusterTopologyKey := "testClusterTopologyKey"
 			toCreate, _, _, key := newClusterObj(nil, nil)
@@ -1592,8 +1631,8 @@ spec:
 		})
 	})
 
-	Context("When creating cluster with cluster tolerations", func() {
-		It("Should create pods with tolerations", func() {
+	Context("When creating cluster with cluster tolerations set", func() {
+		It("Should create pods with cluster tolerations", func() {
 			By("Creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
 			var tolerations []corev1.Toleration
@@ -1610,7 +1649,7 @@ spec:
 			By("Checking the tolerations")
 			stsList := listAndCheckStatefulSet(key)
 			podSpec := stsList.Items[0].Spec.Template.Spec
-			Expect(len(podSpec.Tolerations) > 0).Should(BeTrue())
+			Expect(len(podSpec.Tolerations) == 1).Should(BeTrue())
 			toleration := podSpec.Tolerations[0]
 			Expect(toleration.Key == tolerationKey &&
 				toleration.Value == tolerationValue).Should(BeTrue())
@@ -1624,8 +1663,8 @@ spec:
 		})
 	})
 
-	Context("When creating cluster with cluster tolerations and component tolerations", func() {
-		It("Should use component tolerations", func() {
+	Context("When creating cluster with both cluster tolerations and component tolerations set", func() {
+		It("Should observe the component tolerations will override the cluster tolerations", func() {
 			By("Creating a cluster")
 			toCreate, _, _, key := newClusterObj(nil, nil)
 			var clusterTolerations []corev1.Toleration
@@ -1657,7 +1696,7 @@ spec:
 			By("Checking the tolerations")
 			stsList := listAndCheckStatefulSet(key)
 			podSpec := stsList.Items[0].Spec.Template.Spec
-			Expect(len(podSpec.Tolerations) > 0).Should(BeTrue())
+			Expect(len(podSpec.Tolerations) == 1).Should(BeTrue())
 			toleration := podSpec.Tolerations[0]
 			Expect(toleration.Key == compTolerationKey &&
 				toleration.Value == compTolerationValue).Should(BeTrue())

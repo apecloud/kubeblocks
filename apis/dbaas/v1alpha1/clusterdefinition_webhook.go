@@ -211,6 +211,9 @@ func validateConfigTemplateList(ctpls []ConfigTemplate) error {
 	)
 
 	for _, tpl := range ctpls {
+		if len(tpl.VolumeName) == 0 {
+			return errors.Errorf("ConfigTemplate.VolumeName not empty.")
+		}
 		if _, ok := tplSet[tpl.Name]; ok {
 			return errors.Errorf("configTemplate[%s] already existed.", tpl.Name)
 		}

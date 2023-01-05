@@ -88,9 +88,9 @@ const (
 type UpdateStrategy string
 
 const (
-	Serial             UpdateStrategy = "Serial"
-	BestEffortParallel UpdateStrategy = "BestEffortParallel"
-	Parallel           UpdateStrategy = "Parallel"
+	SerialStrategy             UpdateStrategy = "Serial"
+	BestEffortParallelStrategy UpdateStrategy = "BestEffortParallel"
+	ParallelStrategy           UpdateStrategy = "Parallel"
 )
 
 var DefaultLeader = ConsensusMember{
@@ -143,6 +143,14 @@ const (
 type OpsRequestBehaviour struct {
 	FromClusterPhases []Phase
 	ToClusterPhase    Phase
+}
+
+// OpsRecorder recorder the running OpsRequest info in cluster annotation
+type OpsRecorder struct {
+	// Name OpsRequest name
+	Name string `json:"name"`
+	// ToClusterPhase the cluster phase when the OpsRequest is running
+	ToClusterPhase Phase `json:"clusterPhase"`
 }
 
 var webhookMgr *webhookManager

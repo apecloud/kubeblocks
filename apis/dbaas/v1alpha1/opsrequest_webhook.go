@@ -78,7 +78,7 @@ func (r *OpsRequest) ValidateCreate() error {
 func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 	opsrequestlog.Info("validate update", "name", r.Name)
 	lastOpsRequest := old.(*OpsRequest)
-	if r.Status.Phase == SucceedPhase && !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
+	if r.isForbiddenUpdate() && !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
 		return newInvalidError(OpsRequestKind, r.Name, "spec", fmt.Sprintf("update OpsRequest is forbidden when status.Phase is %s", r.Status.Phase))
 	}
 	// we can not delete the OpsRequest when cluster has been deleted. because can not edit the finalizer when cluster not existed.
@@ -92,8 +92,12 @@ func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *OpsRequest) ValidateDelete() error {
 	opsrequestlog.Info("validate delete", "name", r.Name)
-
 	return nil
+}
+
+// IsForbiddenUpdate OpsRequest cannot modify the spec when status is in [Succeed,Running,Failed].
+func (r *OpsRequest) isForbiddenUpdate() bool {
+	return slices.Contains([]Phase{SucceedPhase, RunningPhase, FailedPhase}, r.Status.Phase)
 }
 
 // validateClusterPhase validate whether the current cluster state supports the OpsRequest
@@ -109,7 +113,7 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	// validate whether existing the same type OpsRequest
 	var (
 		opsRequestValue string
-		opsRequestMap   map[Phase]string
+		opsRecorder     []OpsRecorder
 		ok              bool
 	)
 	if cluster.Annotations == nil {
@@ -119,12 +123,13 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 		return nil
 	}
 	// opsRequest annotation value in cluster to map
-	if err := json.Unmarshal([]byte(opsRequestValue), &opsRequestMap); err != nil {
+	if err := json.Unmarshal([]byte(opsRequestValue), &opsRecorder); err != nil {
 		return nil
 	}
-	opsRequestName := opsRequestMap[opsBehaviour.ToClusterPhase]
-	if opsRequestName != "" {
-		return newInvalidError(OpsRequestKind, r.Name, "spec.type", fmt.Sprintf("Existing OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", opsRequestName, cluster.Name))
+	for _, v := range opsRecorder {
+		if v.ToClusterPhase == opsBehaviour.ToClusterPhase {
+			return newInvalidError(OpsRequestKind, r.Name, "spec.type", fmt.Sprintf("Existing OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", v.Name, cluster.Name))
+		}
 	}
 	return nil
 }

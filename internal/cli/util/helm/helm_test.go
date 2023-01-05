@@ -17,9 +17,14 @@ limitations under the License.
 package helm
 
 import (
-	. "github.com/onsi/ginkgo"
+	"errors"
+
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/chart"
+	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
@@ -43,31 +48,106 @@ var _ = Describe("helm util", func() {
 		Expect(cfg).ShouldNot(BeNil())
 	})
 
-	It("Install", func() {
-		o := &InstallOpts{
-			Name:      testing.KubeBlocksChartName,
-			Chart:     testing.KubeBlocksChartURL,
-			Namespace: "default",
-			Version:   version.DefaultKubeBlocksVersion,
-		}
-		cfg := FakeActionConfig()
-		Expect(cfg).ShouldNot(BeNil())
-		_, err := o.Install(cfg)
-		Expect(err).Should(HaveOccurred())
-		Expect(o.UnInstall(cfg)).Should(HaveOccurred())
+	Context("Install", func() {
+		var o *InstallOpts
+		var cfg *action.Configuration
+
+		BeforeEach(func() {
+			o = &InstallOpts{
+				Name:      testing.KubeBlocksChartName,
+				Chart:     testing.KubeBlocksChartURL,
+				Namespace: "default",
+				Version:   version.DefaultKubeBlocksVersion,
+			}
+			cfg = FakeActionConfig()
+			Expect(cfg).ShouldNot(BeNil())
+		})
+
+		It("Install", func() {
+			_, err := o.Install(cfg)
+			Expect(err).Should(HaveOccurred())
+			Expect(o.UnInstall(cfg)).Should(HaveOccurred()) // release not found
+		})
+
+		It("should ignore when chart is already deployed", func() {
+			err := cfg.Releases.Create(&release.Release{
+				Name:    o.Name,
+				Version: 1,
+				Info: &release.Info{
+					Status: release.StatusDeployed,
+				},
+			})
+			Expect(err).Should(BeNil())
+			_, err = o.Install(cfg)
+			Expect(err.Error()).Should(ContainSubstring("failed to download"))
+			Expect(o.UnInstall(cfg)).Should(BeNil()) // release exists
+		})
+
+		It("should failed when chart is falied installed", func() {
+			err := cfg.Releases.Create(&release.Release{
+				Name:    o.Name,
+				Version: 1,
+				Info: &release.Info{
+					Status: release.StatusFailed,
+				},
+			})
+			Expect(err).Should(BeNil())
+			_, err = o.Install(cfg)
+			Expect(err.Error()).Should(ContainSubstring(ErrReleaseNotDeployed.Error()))
+		})
 	})
 
-	It("Upgrade", func() {
-		o := &InstallOpts{
-			Name:      types.KubeBlocksChartName,
-			Chart:     "kubeblocks-test-chart",
-			Namespace: "default",
-			Version:   version.DefaultKubeBlocksVersion,
-		}
-		cfg := FakeActionConfig()
-		Expect(cfg).ShouldNot(BeNil())
-		_, err := o.Upgrade(cfg)
-		Expect(err).Should(HaveOccurred())
-		Expect(o.UnInstall(cfg)).Should(HaveOccurred())
+	Context("Upgrade", func() {
+		var o *InstallOpts
+		var cfg *action.Configuration
+
+		BeforeEach(func() {
+			o = &InstallOpts{
+				Name:      types.KubeBlocksChartName,
+				Chart:     "kubeblocks-test-chart",
+				Namespace: "default",
+				Version:   version.DefaultKubeBlocksVersion,
+			}
+			cfg = FakeActionConfig()
+			Expect(cfg).ShouldNot(BeNil())
+		})
+
+		It("should fail when release is not found", func() {
+			_, err := o.Upgrade(cfg)
+			Expect(releaseNotFound(err)).Should(BeTrue())
+			Expect(o.UnInstall(cfg)).Should(HaveOccurred()) // release not found
+		})
+
+		It("should failed at fetching charts when release is already deployed", func() {
+			err := cfg.Releases.Create(&release.Release{
+				Name:    o.Name,
+				Version: 1,
+				Info: &release.Info{
+					Status: release.StatusDeployed,
+				},
+				Chart: &chart.Chart{},
+			})
+			Expect(err).Should(BeNil())
+			_, err = o.Upgrade(cfg)
+			Expect(err.Error()).Should(ContainSubstring("failed to download")) // failed at fetching charts
+			Expect(o.UnInstall(cfg)).Should(BeNil())                           // release exists
+		})
+
+		It("should fail when chart is already deployed", func() {
+			err := cfg.Releases.Create(&release.Release{
+				Name:    o.Name,
+				Version: 1,
+				Info: &release.Info{
+					Status: release.StatusFailed,
+				},
+				Chart: &chart.Chart{},
+			})
+			Expect(err).Should(BeNil())
+			_, err = o.Upgrade(cfg)
+			Expect(errors.Is(err, ErrReleaseNotDeployed)).Should(BeTrue())
+			Expect(o.UnInstall(cfg)).Should(BeNil()) // release exists
+		})
+
 	})
+
 })

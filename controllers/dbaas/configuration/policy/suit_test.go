@@ -20,12 +20,11 @@ import (
 	"context"
 	"testing"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
@@ -38,9 +37,7 @@ var (
 func TestReconfigurePolicy(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecsWithDefaultAndCustomReporters(t,
-		"Configuration Policy Suite",
-		[]Reporter{printer.NewlineReporter{}})
+	RunSpecs(t, "Configuration Policy Suite")
 }
 
 var _ = BeforeSuite(func() {

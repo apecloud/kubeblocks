@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
@@ -28,14 +28,18 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("ClusterDefinition Controller", func() {
+
+	const timeout = time.Second * 10
+	const interval = time.Second * 1
+	const waitDuration = time.Second * 5
 
 	var ctx = context.Background()
 
@@ -184,64 +188,50 @@ spec:
 			clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 			Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)).Should(Succeed())
 			Expect(testCtx.CreateObj(ctx, clusterDefinition)).Should(Succeed())
-			createdClusterDef := &dbaasv1alpha1.ClusterDefinition{}
 			// check reconciled finalizer and status
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, types.NamespacedName{
-					Namespace: clusterDefinition.Namespace,
-					Name:      clusterDefinition.Name,
-				}, createdClusterDef)
-				if err != nil {
-					return false
-				}
-				return len(createdClusterDef.Finalizers) > 0 &&
-					createdClusterDef.Status.ObservedGeneration == 1
-			}, time.Second*10, time.Second*1).Should(BeTrue())
-			By("By creating an clusterVersion")
+			Eventually(func(g Gomega) {
+				cd := &dbaasv1alpha1.ClusterDefinition{}
+				g.Expect(k8sClient.Get(ctx, intctrlutil.GetNamespacedName(clusterDefinition), cd)).To(Succeed())
+				g.Expect(len(cd.Finalizers) > 0 &&
+					cd.Status.ObservedGeneration == 1).To(BeTrue())
+			}, timeout, interval).Should(Succeed())
+
+			By("creating an appVersion")
 			clusterVersion := &dbaasv1alpha1.ClusterVersion{}
 			Expect(yaml.Unmarshal([]byte(clusterVersionYaml), clusterVersion)).Should(Succeed())
 			Expect(testCtx.CreateObj(ctx, clusterVersion)).Should(Succeed())
-			createdClusterVersion := &dbaasv1alpha1.ClusterVersion{}
 			// check reconciled finalizer
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, types.NamespacedName{
-					Namespace: clusterVersion.Namespace,
-					Name:      clusterVersion.Name,
-				}, createdClusterVersion)
-				if err != nil {
-					return false
-				}
-				return len(createdClusterVersion.Finalizers) > 0
-			}, time.Second*10, time.Second*1).Should(BeTrue())
-			By("By updating clusterDefinition's spec")
-			createdClusterDef.Spec.Type = "state.mysql-7"
-			Expect(k8sClient.Update(ctx, createdClusterDef)).Should(Succeed())
-			// check clusterVersion.Status.ClusterDefSyncStatus to be OutOfSync
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, types.NamespacedName{
-					Namespace: clusterVersion.Namespace,
-					Name:      clusterVersion.Name,
-				}, createdClusterVersion)
-				if err != nil {
-					return false
-				}
-				return createdClusterVersion.Status.ClusterDefSyncStatus == "OutOfSync"
-			}, time.Second*10, time.Second*1).Should(BeTrue())
+			Eventually(func(g Gomega) {
+				cv := &dbaasv1alpha1.ClusterVersion{}
+				g.Expect(k8sClient.Get(ctx, intctrlutil.GetNamespacedName(clusterVersion), cv)).To(Succeed())
+				g.Expect(len(cv.Finalizers) > 0 &&
+					cv.Status.ObservedGeneration == 1).To(BeTrue())
+			}, timeout, interval).Should(Succeed())
 
-			By("By deleting clusterDefinition")
-			Expect(k8sClient.Delete(ctx, createdClusterVersion)).Should(Succeed())
-			Expect(k8sClient.Delete(ctx, createdClusterDef)).Should(Succeed())
+			By("updating clusterDefinition's spec which then mark appVersion's status as OutOfSync")
+			Expect(changeClusterDef(intctrlutil.GetNamespacedName(clusterDefinition),
+				func(cd *dbaasv1alpha1.ClusterDefinition) {
+					cd.Spec.Type = "state.mysql-7"
+				})).Should(Succeed())
+			// check appVersion.Status.ClusterDefSyncStatus to be OutOfSync
+			Eventually(func(g Gomega) {
+				cv := &dbaasv1alpha1.ClusterVersion{}
+				g.Expect(k8sClient.Get(ctx, intctrlutil.GetNamespacedName(clusterVersion), cv)).To(Succeed())
+				g.Expect(cv.Status.ClusterDefSyncStatus == dbaasv1alpha1.OutOfSyncStatus).To(BeTrue())
+			}, timeout, interval).Should(Succeed())
+
+			By("deleting clusterDefinition")
+			Expect(k8sClient.Delete(ctx, clusterDefinition)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, clusterVersion)).Should(Succeed())
 		})
 	})
 
-	Context("When configmap template invalid", func() {
-		It("Should invalid status of clusterDefinition", func() {
-			By("By creating a clusterDefinition")
-
+	Context("When configmap template refs in clusterDefinition is invalid", func() {
+		It("Should stop proceeding the status of clusterDefinition", func() {
+			By("creating a clusterDefinition")
 			cmName := "mysql-tree-node-template-8.0-test2"
 			clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 			Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)).Should(Succeed())
-
 			clusterDefinition.Name += "-for-test"
 			clusterDefinition.Spec.Components[0].ConfigSpec = &dbaasv1alpha1.ConfigurationSpec{
 				ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{
@@ -254,109 +244,85 @@ spec:
 					},
 				},
 			}
-
 			Expect(testCtx.CreateObj(ctx, clusterDefinition)).Should(Succeed())
-			createdClusterDef := &dbaasv1alpha1.ClusterDefinition{}
-			// check reconciled finalizer and status
 
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, types.NamespacedName{
-					Namespace: clusterDefinition.Namespace,
-					Name:      clusterDefinition.Name,
-				}, createdClusterDef)
-				if err != nil {
-					return false
-				}
-				return len(createdClusterDef.Finalizers) > 0 &&
-					createdClusterDef.Status.ObservedGeneration == 1
-			}, time.Second*10, time.Second*1).Should(BeFalse())
+			By("check the reconciler won't update Status.ObservedGeneration if configmap doesn't exist.")
 
+			// should use Consistently here, since cd.Status.ObservedGeneration is initialized to be zero,
+			// we must watch the value for a while to tell it's not changed by the reconciler.
+			Consistently(func(g Gomega) {
+				cd := &dbaasv1alpha1.ClusterDefinition{}
+				g.Eventually(func() error {
+					return k8sClient.Get(ctx, intctrlutil.GetNamespacedName(clusterDefinition), cd)
+				}, timeout, interval).Should(Succeed())
+				g.Expect(cd.Status.ObservedGeneration == 0).To(BeTrue())
+			}, waitDuration, interval).Should(Succeed())
+
+			By("check the reconciler update Status.ObservedGeneration after configmap is created.")
 			// create configmap
 			assureCfgTplConfigMapObj(cmName, testCtx.DefaultNamespace)
+			Eventually(func(g Gomega) {
+				cd := &dbaasv1alpha1.ClusterDefinition{}
+				g.Expect(k8sClient.Get(ctx, intctrlutil.GetNamespacedName(clusterDefinition), cd)).To(Succeed())
+				g.Expect(cd.Status.ObservedGeneration == 1).To(BeTrue())
 
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, types.NamespacedName{
-					Namespace: clusterDefinition.Namespace,
-					Name:      clusterDefinition.Name,
-				}, createdClusterDef)
-				if err != nil {
-					return false
-				}
-				return len(createdClusterDef.Finalizers) > 0 &&
-					createdClusterDef.Status.ObservedGeneration == 1
-			}, time.Second*10, time.Second*1).Should(BeTrue())
+				// check labels and finalizers
+				g.Expect(cd.Finalizers).ShouldNot(BeEmpty())
+				configCMLabel := cfgcore.GenerateTPLUniqLabelKeyWithConfig(cmName)
+				configTPLLabel := cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(cmName)
+				g.Expect(cd.Labels[configCMLabel]).Should(BeEquivalentTo(cmName))
+				g.Expect(cd.Labels[configTPLLabel]).Should(BeEquivalentTo(cmName))
+			}, timeout, interval).Should(Succeed())
 
-			// check cm
-			log.Log.Info("check configmap finalizer: configuration.kubeblocks.io/finalizer")
-			cmObj := &corev1.ConfigMap{}
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, types.NamespacedName{
+			By("check the reconciler update configmap.Finalizer after configmap is created.")
+			Eventually(func(g Gomega) {
+				cmObj := &corev1.ConfigMap{}
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{
 					Namespace: testCtx.DefaultNamespace,
 					Name:      cmName,
-				}, cmObj)
-				if err != nil {
-					return false
-				}
-				return controllerutil.ContainsFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName)
-			}, time.Second*10, time.Second*1).Should(BeTrue())
+				}, cmObj)).Should(Succeed())
+				g.Expect(controllerutil.ContainsFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName)).To(BeTrue())
+			}, timeout, interval).Should(Succeed())
 
-			log.Log.Info("check clusterdefinition labels: configuration.GenerateTPLUniqLabelKeyWithConfig(testWrapper.TplName()")
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, types.NamespacedName{
-					Namespace: clusterDefinition.Namespace,
-					Name:      clusterDefinition.Name,
-				}, createdClusterDef)
-				if err != nil {
-					return false
-				}
-
-				configLabel := cfgcore.GenerateTPLUniqLabelKeyWithConfig(cmName)
-				tplName, ok := createdClusterDef.Labels[configLabel]
-				return ok && tplName == cmName
-			}, time.Second*10, time.Second*1).Should(BeTrue())
-
-			Expect(k8sClient.Delete(ctx, createdClusterDef)).Should(Succeed())
+			By("deleting clusterDefinition")
+			Expect(k8sClient.Delete(ctx, clusterDefinition)).Should(Succeed())
 		})
 	})
 
-	// API parameters are validated, so this case is no need for test
-	// Context("When configmap template invalid parameter", func() {
-	//	It("Should invalid status of clusterDefinition", func() {
-	//		By("By creating a clusterDefinition")
+	// Validate the parameters by ClusterDefinition webhook
+	// Context("When configmap template in clusterDefinition contains invalid parameter(e.g. VolumeName not exist)", func() {
+	//	It("Should stop proceeding the status of clusterDefinition", func() {
+	//		By("creating a clusterDefinition and an invalid configmap")
 	//		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 	//		Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)).Should(Succeed())
-	//
-	//		cmName := "mysql-tree-node-template-8.0-test-failed"
-	//		clusterDefinition.Name += "-for-failed-test"
+	//		cmName := "mysql-tree-node-template-8.0-volumename-not-exist"
+	//		clusterDefinition.Name += "-volumename-not-exist"
+	//		// missing VolumeName
 	//		clusterDefinition.Spec.Components[0].ConfigSpec = &dbaasv1alpha1.ConfigurationSpec{
 	//			ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{
 	//				{
-	//					Name:                cmName,
-	//					ConfigTplRef:        cmName,
-	//					ConfigConstraintRef: cmName,
-	//					Namespace:           testCtx.DefaultNamespace,
-	//					VolumeName:          "",
+	//					Name:         cmName,
+	//					ConfigTplRef: cmName,
+	//					Namespace:    testCtx.DefaultNamespace,
 	//				},
 	//			},
 	//		}
-	//
 	//		// create configmap
 	//		assureCfgTplConfigMapObj(cmName, testCtx.DefaultNamespace)
 	//		Expect(testCtx.CreateObj(ctx, clusterDefinition)).Should(Succeed())
-	//		createdClusterDef := &dbaasv1alpha1.ClusterDefinition{}
-	//		// check reconciled finalizer and status
-	//		Eventually(func() bool {
-	//			err := k8sClient.Get(ctx, types.NamespacedName{
-	//				Namespace: clusterDefinition.Namespace,
-	//				Name:      clusterDefinition.Name,
-	//			}, createdClusterDef)
-	//			if err != nil {
-	//				return true
-	//			}
-	//			return len(createdClusterDef.Finalizers) > 0 &&
-	//				createdClusterDef.Status.ObservedGeneration == 1
-	//		}, time.Second*100, time.Second*1).Should(BeFalse())
 	//
+	//		By("check the reconciler won't update Status.ObservedGeneration")
+	//		// should use Consistently here, since cd.Status.ObservedGeneration is initialized to be zero,
+	//		// we must watch the value for a while to tell it's not changed by the reconciler.
+	//		Consistently(func(g Gomega) {
+	//			cd := &dbaasv1alpha1.ClusterDefinition{}
+	//			g.Eventually(func() error {
+	//				return k8sClient.Get(ctx, intctrlutil.GetNamespacedName(clusterDefinition), cd)
+	//			}, timeout, interval).Should(Succeed())
+	//			g.Expect(cd.Status.ObservedGeneration == 0).To(BeTrue())
+	//		}, waitDuration, interval).Should(Succeed())
+	//
+	//		By("By deleting clusterDefinition")
 	//		Expect(k8sClient.Delete(ctx, clusterDefinition)).Should(Succeed())
 	//	})
 	// })

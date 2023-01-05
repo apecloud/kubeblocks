@@ -4,7 +4,6 @@ metadata:
   name: mysql-primary-config-8.0.31
 data:
   mysql.cnf: |-
-    # 主节点MySQL的配置文件
     [mysqld]
     log-bin
     gtid_mode=ON

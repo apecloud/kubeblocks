@@ -108,7 +108,6 @@ func NewListInstancesCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	}
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespace", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.")
-	printer.AddOutputFlag(cmd, &o.Format)
 	return cmd
 }
 
@@ -127,7 +126,6 @@ func NewListComponentsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 	}
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespace", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.")
-	printer.AddOutputFlag(cmd, &o.Format)
 	return cmd
 }
 
@@ -146,12 +144,11 @@ func NewListEventsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	}
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespace", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.")
-	printer.AddOutputFlag(cmd, &o.Format)
 	return cmd
 }
 
 func run(o *list.ListOptions, printType cluster.PrintType) error {
-	// if format is JSON or YAML, use default clusterPrinter to output the result.
+	// if format is JSON or YAML, use default printer to output the result.
 	if o.Format == printer.JSON || o.Format == printer.YAML {
 		_, err := o.Run()
 		return err

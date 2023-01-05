@@ -76,6 +76,7 @@ spec:
                       - Stateless
                       - Stateful
                       - Consensus
+                      - Replication
                       type: string
                     configTemplateRefs:
                       description: The configTemplateRefs field provided by provider,
@@ -7696,6 +7697,13 @@ spec:
                       required:
                       - containers
                       type: object
+                    primaryIndex:
+                      default: 0
+                      description: PrimaryIndex determines which index is primary
+                        when componentType is Replication, index number starts from
+                        zero
+                      format: int32
+                      type: integer
                     probes:
                       description: Probes setting for db healthy checks.
                       properties:

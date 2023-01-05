@@ -21,9 +21,12 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/replicationset"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/leaanthony/debme"
@@ -42,6 +45,7 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	componentutil "github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -305,6 +309,7 @@ func mergeComponents(
 		AntiAffinity:          clusterDefCompObj.AntiAffinity,
 		ComponentType:         clusterDefCompObj.ComponentType,
 		ConsensusSpec:         clusterDefCompObj.ConsensusSpec,
+		PrimaryIndex:          clusterDefCompObj.PrimaryIndex,
 		PodSpec:               clusterDefCompObj.PodSpec,
 		Service:               clusterDefCompObj.Service,
 		Probes:                clusterDefCompObj.Probes,
@@ -414,6 +419,10 @@ func mergeComponents(
 		}
 		if len(clusterComp.Tolerations) != 0 {
 			tolerations = clusterComp.Tolerations
+		}
+
+		if clusterComp.PrimaryIndex != nil {
+			component.PrimaryIndex = clusterComp.PrimaryIndex
 		}
 	}
 	if affinity != nil {
@@ -704,6 +713,27 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 			}); err != nil {
 			return err
 		}
+	case dbaasv1alpha1.Replication:
+		var existStsList = &appsv1.StatefulSetList{}
+		// list all statefulSets by cluster and componentKey label, then get math.Max(params.component.Replicas, current exist statefulSet)
+		err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, params.cluster, existStsList, params.component.Name)
+		if err != nil {
+			return err
+		}
+		replicaNum := math.Max(float64(len(existStsList.Items)), float64(params.component.Replicas))
+
+		for index := int32(0); index < int32(replicaNum); index++ {
+			if err := workloadProcessor(
+				func(envConfig *corev1.ConfigMap) (client.Object, error) {
+					rss, err := buildReplicationSet(reqCtx, *params, envConfig.Name, index)
+					if err != nil {
+						return nil, err
+					}
+					return rss, nil
+				}); err != nil {
+				return err
+			}
+		}
 	}
 
 	if needBuildPDB(params) {
@@ -722,6 +752,9 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		if params.component.ComponentType == dbaasv1alpha1.Consensus {
 			addLeaderSelectorLabels(svc, params.component)
 		}
+		if params.component.ComponentType == dbaasv1alpha1.Replication {
+			svc.Spec.Selector[intctrlutil.RoleLabelKey] = string(replicationset.Primary)
+		}
 		*params.applyObjs = append(*params.applyObjs, svc)
 	}
 
@@ -732,7 +765,7 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 func addLeaderSelectorLabels(service *corev1.Service, component *Component) {
 	leader := component.ConsensusSpec.Leader
 	if len(leader.Name) > 0 {
-		service.Spec.Selector[intctrlutil.ConsensusSetRoleLabelKey] = leader.Name
+		service.Spec.Selector[intctrlutil.RoleLabelKey] = leader.Name
 	}
 }
 
@@ -1014,15 +1047,31 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		return nil
 	}
 
+	var stsList []*appsv1.StatefulSet
 	for _, obj := range objs {
 		logger.Info("create or update", "objs", obj)
 		if err := controllerutil.SetOwnerReference(cluster, obj, scheme); err != nil {
 			return false, err
 		}
-		if err := cli.Create(ctx, obj); err == nil {
+
+		// appendToStsList is used to handle statefulSets horizontal scaling when componentType is replication
+		appendToStsList := func(stsList []*appsv1.StatefulSet) []*appsv1.StatefulSet {
+			stsObj, ok := obj.(*appsv1.StatefulSet)
+			if ok {
+				stsList = append(stsList, stsObj)
+			}
+			return stsList
+		}
+
+		err := cli.Create(ctx, obj)
+		if err == nil {
+			stsList = appendToStsList(stsList)
 			continue
-		} else if !apierrors.IsAlreadyExists(err) {
+		}
+		if !apierrors.IsAlreadyExists(err) {
 			return false, err
+		} else {
+			stsList = appendToStsList(stsList)
 		}
 
 		if !controllerutil.ContainsFinalizer(obj, dbClusterFinalizerName) {
@@ -1074,6 +1123,11 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			}
 			continue
 		}
+	}
+
+	err = replicationset.HandleReplicationSet(reqCtx, cli, cluster, stsList)
+	if err != nil {
+		return false, err
 	}
 
 	return shouldRequeue, nil
@@ -1265,6 +1319,49 @@ func injectEnvs(params createParams, envConfigName string, c *corev1.Container) 
 	})
 }
 
+// buildReplicationSet build on stateful set of replication
+func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
+	params createParams,
+	envConfigName string,
+	stsIndex int32) (*appsv1.StatefulSet, error) {
+	sts, err := buildSts(reqCtx, params, envConfigName)
+	if err != nil {
+		return nil, err
+	}
+	// inject replicationSet pod env and role label
+	if sts, err = injectReplicationSetPodEnvAndLabel(params, sts, stsIndex); err != nil {
+		return nil, err
+	}
+	// sts.Name rename and add role label
+	sts.ObjectMeta.Name = fmt.Sprintf("%s-%d", sts.ObjectMeta.Name, stsIndex)
+	sts.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Secondary)
+	if stsIndex == *params.component.PrimaryIndex {
+		sts.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Primary)
+	}
+	sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
+	return sts, nil
+}
+
+func injectReplicationSetPodEnvAndLabel(params createParams, sts *appsv1.StatefulSet, index int32) (*appsv1.StatefulSet, error) {
+	for _, comp := range params.cluster.Spec.Components {
+		svcName := strings.Join([]string{params.cluster.Name, params.component.Name, "headless"}, "-")
+		for i := range sts.Spec.Template.Spec.Containers {
+			c := &sts.Spec.Template.Spec.Containers[i]
+			c.Env = append(c.Env, corev1.EnvVar{
+				Name:      dbaasPrefix + "_PRIMARY_POD_NAME",
+				Value:     fmt.Sprintf("%s-%d-%d.%s", sts.Name, *comp.PrimaryIndex, 0, svcName),
+				ValueFrom: nil,
+			})
+		}
+		if index != *comp.PrimaryIndex {
+			sts.Spec.Template.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Secondary)
+		} else {
+			sts.Spec.Template.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Primary)
+		}
+	}
+	return sts, nil
+}
+
 // buildConsensusSet build on a stateful set
 func buildConsensusSet(reqCtx intctrlutil.RequestCtx,
 	params createParams,
@@ -1389,6 +1486,18 @@ func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
 					followers += follower.Pod
 				}
 				envData[prefix+"FOLLOWERS"] = followers
+			}
+			replicationSetStatus := v.ReplicationSetStatus
+			if replicationSetStatus != nil {
+				envData[prefix+"PRIMARY"] = replicationSetStatus.Primary.Pod
+				secondaries := ""
+				for _, secondary := range replicationSetStatus.Secondaries {
+					if len(secondaries) > 0 {
+						secondaries += ","
+					}
+					secondaries += secondary.Pod
+				}
+				envData[prefix+"SECONDARIES"] = secondaries
 			}
 		}
 	}

@@ -30,6 +30,10 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+const (
+	ComponentStatusDefaultPodName = "Unknown"
+)
+
 // GetClusterByObject get cluster by related k8s workloads.
 func GetClusterByObject(ctx context.Context,
 	cli client.Client,
@@ -163,4 +167,40 @@ func GetComponentTypeName(cluster dbaasv1alpha1.Cluster, componentName string) s
 		}
 	}
 	return componentName
+}
+
+func InitClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster,
+	componentName string,
+	component *dbaasv1alpha1.ClusterDefinitionComponent) {
+	if cluster.Status.Components == nil {
+		cluster.Status.Components = make(map[string]dbaasv1alpha1.ClusterStatusComponent)
+	}
+	if _, ok := cluster.Status.Components[componentName]; !ok {
+		typeName := GetComponentTypeName(*cluster, componentName)
+
+		cluster.Status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{
+			Type:  typeName,
+			Phase: dbaasv1alpha1.RunningPhase,
+		}
+	}
+	componentStatus := cluster.Status.Components[componentName]
+	if component.ComponentType == dbaasv1alpha1.Consensus && componentStatus.ConsensusSetStatus == nil {
+		componentStatus.ConsensusSetStatus = &dbaasv1alpha1.ConsensusSetStatus{
+			Leader: dbaasv1alpha1.ConsensusMemberStatus{
+				Pod:        ComponentStatusDefaultPodName,
+				AccessMode: dbaasv1alpha1.None,
+				Name:       "",
+			},
+		}
+		cluster.Status.Components[componentName] = componentStatus
+	}
+	if component.ComponentType == dbaasv1alpha1.Replication && componentStatus.ReplicationSetStatus == nil {
+		componentStatus.ReplicationSetStatus = &dbaasv1alpha1.ReplicationSetStatus{
+			Primary: dbaasv1alpha1.ReplicationMemberStatus{
+				Pod: ComponentStatusDefaultPodName,
+			},
+		}
+		cluster.Status.Components[componentName] = componentStatus
+	}
+	cluster.Status.Components[componentName] = componentStatus
 }

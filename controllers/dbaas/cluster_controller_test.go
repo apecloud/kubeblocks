@@ -1414,7 +1414,7 @@ spec:
 				// 2 followers
 				leaderCount, followerCount := 0, 0
 				for _, pod := range pods {
-					switch pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] {
+					switch pod.Labels[intctrlutil.RoleLabelKey] {
 					case leader:
 						leaderCount++
 					case follower:
@@ -1483,7 +1483,7 @@ spec:
 			// 2 followers
 			leaderCount, followerCount := 0, 0
 			for _, pod := range pods {
-				switch pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] {
+				switch pod.Labels[intctrlutil.RoleLabelKey] {
 				case leader:
 					leaderCount++
 				case follower:
@@ -1507,7 +1507,7 @@ spec:
 			By("Deleting leader pod")
 			leaderPod := &corev1.Pod{}
 			for _, pod := range pods {
-				if pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] == leader {
+				if pod.Labels[intctrlutil.RoleLabelKey] == leader {
 					leaderPod = &pod
 					break
 				}

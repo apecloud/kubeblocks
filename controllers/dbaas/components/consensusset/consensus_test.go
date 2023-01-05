@@ -140,7 +140,7 @@ var _ = Describe("Consensus Component", func() {
 				mockClusterStatusProbeTimeout(cluster)
 				// mock leader pod is not ready
 				testk8s.UpdatePodStatusNotReady(testCtx, podName)
-				testk8s.DeletePodLabelKey(testCtx, podName, intctrlutil.ConsensusSetRoleLabelKey)
+				testk8s.DeletePodLabelKey(testCtx, podName, intctrlutil.RoleLabelKey)
 				requeue, _ := consensusComponent.HandleProbeTimeoutWhenPodsReady()
 				Expect(requeue == false).Should(BeTrue())
 				validateComponentStatus()

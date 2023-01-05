@@ -81,7 +81,7 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady() (bool, error
 	)
 
 	for _, pod := range podList.Items {
-		role := pod.Labels[intctrlutil.ConsensusSetRoleLabelKey]
+		role := pod.Labels[intctrlutil.RoleLabelKey]
 		if role == consensusSet.ComponentDef.ConsensusSpec.Leader.Name {
 			isFailed = false
 		}
@@ -134,7 +134,7 @@ func (consensusSet *ConsensusSet) CalculatePhaseWhenPodsNotReady(componentName s
 		if v.DeletionTimestamp != nil {
 			return "", nil
 		}
-		labelValue := v.Labels[intctrlutil.ConsensusSetRoleLabelKey]
+		labelValue := v.Labels[intctrlutil.RoleLabelKey]
 		if labelValue == consensusSet.ComponentDef.ConsensusSpec.Leader.Name {
 			isFailed = false
 		}

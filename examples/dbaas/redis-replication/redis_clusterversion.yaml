@@ -1,0 +1,17 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind:       ClusterVersion
+metadata:
+  name:     redis-7.0.5
+spec:
+  clusterDefinitionRef: apecloud-redis
+  components:
+  - type: replication
+    podSpec:
+      initContainers:
+      - name: redis
+        image: registry.hub.docker.com/library/redis:7.0.5
+      containers:
+      - name: redis
+        image: registry.hub.docker.com/library/redis:7.0.5
+      - name: redis-exporter
+        image: oliver006/redis_exporter:latest

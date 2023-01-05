@@ -39,7 +39,7 @@ func TestIsReady(t *testing.T) {
 			Status: v1.ConditionTrue,
 		},
 	}
-	pod.Labels = map[string]string{intctrlutil.ConsensusSetRoleLabelKey: "leader"}
+	pod.Labels = map[string]string{intctrlutil.RoleLabelKey: "leader"}
 	if !isReady(*pod) {
 		t.Errorf("isReady returned false negative")
 	}
@@ -73,8 +73,10 @@ func TestInitClusterComponentStatusIfNeed(t *testing.T) {
 			},
 		},
 	}
-
-	initClusterComponentStatusIfNeed(cluster, componentName)
+	component := &dbaasv1alpha1.ClusterDefinitionComponent{
+		ComponentType: dbaasv1alpha1.Consensus,
+	}
+	util.InitClusterComponentStatusIfNeed(cluster, componentName, component)
 
 	if cluster.Status.Components == nil {
 		t.Errorf("cluster.Status.Components[*] not intialized properly")
@@ -87,7 +89,7 @@ func TestInitClusterComponentStatusIfNeed(t *testing.T) {
 		t.Errorf("cluster.Status.Components[componentName].ConsensusSetStatus not initialized properly")
 	} else if consensusSetStatus.Leader.Name != "" ||
 		consensusSetStatus.Leader.AccessMode != dbaasv1alpha1.None ||
-		consensusSetStatus.Leader.Pod != consensusSetStatusDefaultPodName {
+		consensusSetStatus.Leader.Pod != util.ComponentStatusDefaultPodName {
 		t.Errorf("cluster.Status.Components[componentName].ConsensusSetStatus.Leader not initialized properly")
 	}
 }

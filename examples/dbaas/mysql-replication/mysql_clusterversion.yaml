@@ -1,0 +1,17 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind:       ClusterVersion
+metadata:
+  name:     mysql-8.0.31
+spec:
+  clusterDefinitionRef: apecloud-mysql
+  components:
+  - type: replication
+    podSpec:
+      initContainers:
+      - name: mysql
+        image: registry.hub.docker.com/library/mysql:8.0.31
+      containers:
+      - name: mysql
+        image: registry.hub.docker.com/library/mysql:8.0.31
+      - name: mysql-exporter
+        image: prom/mysqld-exporter:v0.14.0

@@ -204,7 +204,7 @@ func (d *ClusterDescriber) describeTopology(w describe.PrefixWriter) error {
 		pods := d.getPodsOfComponent(c.Name)
 		for _, pod := range pods {
 			instance := pod.Name
-			if role, ok := pod.Labels[types.ConsensusSetRoleLabelKey]; ok {
+			if role, ok := pod.Labels[types.RoleLabelKey]; ok {
 				instance = fmt.Sprintf("%s@%s", instance, role)
 			}
 			w.Write(Level3, "%s\n", instance)
@@ -298,7 +298,7 @@ func describeStorage(vcTmpls []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate
 
 func (d *ClusterDescriber) describeInstance(level int, pod *corev1.Pod, w describe.PrefixWriter) {
 	w.Write(level+1, "%s:\n", pod.Name)
-	role := pod.Labels[types.ConsensusSetRoleLabelKey]
+	role := pod.Labels[types.RoleLabelKey]
 	if len(role) == 0 {
 		role = valueNone
 	}

@@ -25,6 +25,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/replicationset"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/stateful"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/stateless"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
@@ -63,6 +64,9 @@ func NewComponentByType(
 	case dbaasv1alpha1.Consensus:
 		component := util.GetComponentByName(cluster, componentName)
 		return consensusset.NewConsensusSet(ctx, cli, cluster, component, componentDef)
+	case dbaasv1alpha1.Replication:
+		component := util.GetComponentByName(cluster, componentName)
+		return replicationset.NewReplicationSet(ctx, cli, cluster, component, componentDef)
 	case dbaasv1alpha1.Stateful:
 		return stateful.NewStateful(ctx, cli, cluster)
 	case dbaasv1alpha1.Stateless:

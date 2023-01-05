@@ -1,0 +1,23 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: mysql
+  namespace: default
+spec:
+  clusterDefinitionRef: apecloud-mysql
+  clusterVersionRef: mysql-8.0.31
+  terminationPolicy: WipeOut
+  components:
+  - name: mysql-rsts
+    type: replication
+    monitor: false
+    primaryIndex: 0
+    replicas: 2
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi

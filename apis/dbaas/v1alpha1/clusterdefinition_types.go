@@ -148,7 +148,7 @@ type ClusterDefinitionComponent struct {
 	// componentType defines type of the component. On of Stateful, Stateless, Consensus.
 	// Default to Stateless.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus}
+	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus,Replication}
 	// +kubebuilder:default=Stateless
 	ComponentType ComponentType `json:"componentType"`
 
@@ -221,6 +221,11 @@ type ClusterDefinitionComponent struct {
 	// consensusSpec defines consensus related spec if componentType is Consensus, required if componentType is Consensus.
 	// +optional
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
+
+	// PrimaryIndex determines which index is primary when componentType is Replication, index number starts from zero
+	// +kubebuilder:default=0
+	// +optional
+	PrimaryIndex *int32 `json:"primaryIndex,omitempty"`
 
 	// horizontalScalePolicy controls the behavior of horizontal scale.
 	// +optional

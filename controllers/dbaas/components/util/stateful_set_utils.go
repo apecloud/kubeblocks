@@ -18,12 +18,15 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"regexp"
 	"strconv"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
@@ -68,14 +71,14 @@ func GetPodRevision(pod *corev1.Pod) string {
 
 // StatefulSetIsReady check statefulSet is ready.
 func StatefulSetIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals bool) bool {
-	var componentIsRunning = true
+	var stsIsRunning = true
 	// judge whether statefulSet is ready
 	if sts.Status.AvailableReplicas != *sts.Spec.Replicas ||
 		sts.Status.ObservedGeneration != sts.GetGeneration() ||
 		!statefulStatusRevisionIsEquals {
-		componentIsRunning = false
+		stsIsRunning = false
 	}
-	return componentIsRunning
+	return stsIsRunning
 }
 
 // StatefulSetPodsIsReady check pods of statefulSet is ready.
@@ -92,4 +95,63 @@ func CovertToStatefulSet(obj client.Object) *appsv1.StatefulSet {
 		return sts
 	}
 	return nil
+}
+
+// DescendingOrdinalSts is a sort.Interface that Sorts a list of StatefulSet based on the ordinals extracted
+// from the StatefulSet.
+type DescendingOrdinalSts []*appsv1.StatefulSet
+
+var statefulSetRegex = regexp.MustCompile("(.*)-([0-9]+)$")
+
+func (dos DescendingOrdinalSts) Len() int {
+	return len(dos)
+}
+
+func (dos DescendingOrdinalSts) Swap(i, j int) {
+	dos[i], dos[j] = dos[j], dos[i]
+}
+
+func (dos DescendingOrdinalSts) Less(i, j int) bool {
+	return GetOrdinalSts(dos[i]) > GetOrdinalSts(dos[j])
+}
+
+// GetOrdinalSts gets StatefulSet's ordinal. If StatefulSet has no ordinal, -1 is returned.
+func GetOrdinalSts(sts *appsv1.StatefulSet) int {
+	_, ordinal := getParentNameAndOrdinalSts(sts)
+	return ordinal
+}
+
+// getParentNameAndOrdinalSts gets the name of cluster-component and StatefulSet's ordinal as extracted from its Name. If
+// the StatefulSet's Name was not match a statefulSetRegex, its parent is considered to be empty string, and its ordinal is considered
+// to be -1.
+func getParentNameAndOrdinalSts(sts *appsv1.StatefulSet) (string, int) {
+	parent := ""
+	ordinal := -1
+	subMatches := statefulSetRegex.FindStringSubmatch(sts.Name)
+	if len(subMatches) < 3 {
+		return parent, ordinal
+	}
+	parent = subMatches[1]
+	if i, err := strconv.ParseInt(subMatches[2], 10, 32); err == nil {
+		ordinal = int(i)
+	}
+	return parent, ordinal
+}
+
+// GetPodListByStatefulSet get statefulSet pod list
+func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet) ([]corev1.Pod, error) {
+	// get podList owned by stsObj
+	podList := &corev1.PodList{}
+	if err := cli.List(ctx, podList,
+		&client.ListOptions{Namespace: stsObj.Namespace},
+		client.MatchingLabels{intctrlutil.AppComponentLabelKey: stsObj.Labels[intctrlutil.AppComponentLabelKey]}); err != nil {
+		return nil, err
+	}
+	pods := make([]corev1.Pod, 0)
+	for _, pod := range podList.Items {
+		if IsMemberOf(stsObj, &pod) {
+			pods = append(pods, pod)
+		}
+	}
+	return pods, nil
 }

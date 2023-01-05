@@ -17,7 +17,6 @@ limitations under the License.
 package operations
 
 import (
-	"fmt"
 	"time"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -58,7 +57,6 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 		cm         = eventContext.Cfg
 		cli        = eventContext.Client
 		ctx        = eventContext.ReqCtx.Ctx
-		log        = eventContext.ReqCtx.Log
 	)
 
 	opsRes := &OpsResource{
@@ -77,10 +75,6 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 		Namespace: cm.Namespace,
 	}, opsRequest); err != nil {
 		return err
-	}
-	if !isReconfigureOpsRequest(opsRequest) {
-		log.Info(fmt.Sprintf("ops request not reconfigure ops, and pass, cr: %v", client.ObjectKeyFromObject(opsRequest)))
-		return nil
 	}
 
 	switch phase {
@@ -108,14 +102,7 @@ func (r reconfigureAction) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.P
 	return dbaasv1alpha1.RunningPhase, 30 * time.Second, nil
 }
 
-func isReconfigureOpsRequest(request *dbaasv1alpha1.OpsRequest) bool {
-	return request.Spec.Type == dbaasv1alpha1.ReconfiguringType && request.Spec.Reconfigure != nil
-}
-
 func (r *reconfigureAction) reconfigure(resource *OpsResource) error {
-	if !isReconfigureOpsRequest(resource.OpsRequest) {
-		return cfgcore.MakeError("invalid reconfigure params.")
-	}
 
 	var (
 		spec              = &resource.OpsRequest.Spec

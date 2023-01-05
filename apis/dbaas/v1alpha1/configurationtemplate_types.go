@@ -54,7 +54,7 @@ type ConfigurationTemplateSpec struct {
 	// 2. analyzes the modified parameters
 	// 3. applies corresponding policies.
 	// +kubebuilder:validation:Required
-	FormatterConfig *FormatterConfig `json:"formatterConfig,omitempty"`
+	FormatterConfig *FormatterConfig `json:"formatterConfig"`
 }
 
 // ConfigurationTemplateStatus defines the observed state of ConfigurationTemplate.

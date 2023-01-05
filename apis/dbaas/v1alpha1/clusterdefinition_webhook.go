@@ -204,11 +204,10 @@ func (r *ClusterDefinition) validateConfigSpec(configSpec *ConfigurationSpec) er
 }
 
 func validateConfigTemplateList(ctpls []ConfigTemplate) error {
-	type emptyT struct{}
 	var (
-		volumeSet = map[string]emptyT{}
-		cmSet     = map[string]emptyT{}
-		tplSet    = map[string]emptyT{}
+		volumeSet = map[string]struct{}{}
+		cmSet     = map[string]struct{}{}
+		tplSet    = map[string]struct{}{}
 	)
 
 	for _, tpl := range ctpls {
@@ -221,9 +220,9 @@ func validateConfigTemplateList(ctpls []ConfigTemplate) error {
 		if _, ok := cmSet[tpl.ConfigTplRef]; ok {
 			return errors.Errorf("configmap[%s] already existed.", tpl.ConfigTplRef)
 		}
-		tplSet[tpl.Name] = emptyT{}
-		cmSet[tpl.ConfigTplRef] = emptyT{}
-		volumeSet[tpl.VolumeName] = emptyT{}
+		tplSet[tpl.Name] = struct{}{}
+		cmSet[tpl.ConfigTplRef] = struct{}{}
+		volumeSet[tpl.VolumeName] = struct{}{}
 	}
 	return nil
 }

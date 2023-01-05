@@ -143,6 +143,8 @@ spec:
                 items:
                   type: string
                 type: array
+            required:
+            - formatterConfig
             type: object
           status:
             description: ConfigurationTemplateStatus defines the observed state of

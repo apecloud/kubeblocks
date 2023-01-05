@@ -186,21 +186,23 @@ func MergeConfigTemplates(appVersionTpl []dbaasv1alpha1.ConfigTemplate,
 	mergedTplMap := make(map[string]struct{}, cap(mergedCfgTpl))
 
 	for i := range appVersionTpl {
-		if _, ok := (mergedTplMap)[appVersionTpl[i].VolumeName]; ok {
+		volumeName := appVersionTpl[i].VolumeName
+		if _, ok := (mergedTplMap)[volumeName]; ok {
 			// It's been checked in validation webhook
 			continue
 		}
 		mergedCfgTpl = append(mergedCfgTpl, appVersionTpl[i])
-		mergedTplMap[appVersionTpl[i].VolumeName] = struct{}{}
+		mergedTplMap[volumeName] = struct{}{}
 	}
 
 	for i := range cdTpl {
 		// AppVersion replace clusterDefinition
-		if _, ok := (mergedTplMap)[cdTpl[i].VolumeName]; ok {
+		volumeName := cdTpl[i].VolumeName
+		if _, ok := (mergedTplMap)[volumeName]; ok {
 			continue
 		}
 		mergedCfgTpl = append(mergedCfgTpl, cdTpl[i])
-		mergedTplMap[cdTpl[i].VolumeName] = struct{}{}
+		mergedTplMap[volumeName] = struct{}{}
 	}
 
 	return mergedCfgTpl

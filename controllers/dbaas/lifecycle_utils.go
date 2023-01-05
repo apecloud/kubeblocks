@@ -877,7 +877,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		cleanBackupResourcesIfNeeded := func() error {
 			if component.HorizontalScalePolicy == nil ||
 				component.HorizontalScalePolicy.Type != dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot ||
-				isSnapshotAvailable(cli, ctx) {
+				!isSnapshotAvailable(cli, ctx) {
 				return nil
 			}
 			// if all pvc bounded, clean backup resources

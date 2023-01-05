@@ -19,10 +19,10 @@ package dbaas
 import (
 	"encoding/json"
 
-	"github.com/leaanthony/debme"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/leaanthony/debme"
 	corev1 "k8s.io/api/core/v1"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"

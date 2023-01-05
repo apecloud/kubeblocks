@@ -31,7 +31,7 @@ import (
 const (
 	ClusterName        = "fake-cluster-name"
 	Namespace          = "fake-namespace"
-	ClusterVersionName = "fake-clusterversion"
+	ClusterVersionName = "fake-cluster-version"
 	ClusterDefName     = "fake-cluster-definition"
 	ComponentName      = "fake-component-name"
 	ComponentType      = "fake-component-type"
@@ -176,12 +176,12 @@ func FakeClusterDef() *dbaasv1alpha1.ClusterDefinition {
 }
 
 func FakeClusterVersion() *dbaasv1alpha1.ClusterVersion {
-	clusterversion := &dbaasv1alpha1.ClusterVersion{}
-	clusterversion.Name = ClusterVersionName
-	clusterversion.SetLabels(map[string]string{types.ClusterDefLabelKey: ClusterDefName})
-	clusterversion.Spec.ClusterDefinitionRef = ClusterDefName
-	clusterversion.SetCreationTimestamp(metav1.Now())
-	return clusterversion
+	cv := &dbaasv1alpha1.ClusterVersion{}
+	cv.Name = ClusterVersionName
+	cv.SetLabels(map[string]string{types.ClusterDefLabelKey: ClusterDefName})
+	cv.Spec.ClusterDefinitionRef = ClusterDefName
+	cv.SetCreationTimestamp(metav1.Now())
+	return cv
 }
 
 func FakeServices() *corev1.ServiceList {

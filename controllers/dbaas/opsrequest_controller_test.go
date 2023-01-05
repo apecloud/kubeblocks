@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -33,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var _ = Describe("OpsRequest Controller", func() {
@@ -271,7 +272,7 @@ spec:
 					ResourceRequirements: &corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							"cpu":    resource.MustParse("400m"),
-							"memory": resource.MustParse("200Mi"),
+							"memory": resource.MustParse("300Mi"),
 						},
 					},
 				},
@@ -279,16 +280,16 @@ spec:
 			Expect(testCtx.CreateObj(ctx, verticalScalingOpsRequest)).Should(Succeed())
 
 			By("check VerticalScalingOpsRequest running")
-			Eventually(expectOpsRequestStatusPhase(controllerutil.GetNamespacedName(verticalScalingOpsRequest)),
+			Eventually(expectOpsRequestStatusPhase(intctrlutil.GetNamespacedName(verticalScalingOpsRequest)),
 				timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 
 			By("mock VerticalScalingOpsRequest is succeed")
 			if !testCtx.UsingExistingCluster() {
-				Expect(mockOpsRequestSucceed(controllerutil.GetNamespacedName(verticalScalingOpsRequest))).Should(Succeed())
+				Expect(mockOpsRequestSucceed(intctrlutil.GetNamespacedName(verticalScalingOpsRequest))).Should(Succeed())
 			}
 
 			By("check VerticalScalingOpsRequest succeed")
-			Eventually(expectOpsRequestStatusPhase(controllerutil.GetNamespacedName(verticalScalingOpsRequest)),
+			Eventually(expectOpsRequestStatusPhase(intctrlutil.GetNamespacedName(verticalScalingOpsRequest)),
 				timeout, interval).Should(Equal(dbaasv1alpha1.SucceedPhase))
 
 			By("check cluster resource requirements changed")
@@ -299,9 +300,13 @@ spec:
 					verticalScalingOpsRequest.Spec.VerticalScalingList[0].Requests))
 			}, timeout, interval).Should(Succeed())
 
+			By("test deleteClusterOpsRequestAnnotation function")
+			opsReconciler := OpsRequestReconciler{Client: k8sClient}
+			Expect(opsReconciler.deleteClusterOpsRequestAnnotation(intctrlutil.RequestCtx{Ctx: ctx}, verticalScalingOpsRequest)).Should(Succeed())
+
 			By("OpsRequest reclaimed after ttl")
 			Eventually(func() error {
-				return k8sClient.Get(ctx, controllerutil.GetNamespacedName(verticalScalingOpsRequest), verticalScalingOpsRequest)
+				return k8sClient.Get(ctx, intctrlutil.GetNamespacedName(verticalScalingOpsRequest), verticalScalingOpsRequest)
 			}, timeout, interval).Should(Satisfy(apierrors.IsNotFound))
 
 			By("Deleting the scope")

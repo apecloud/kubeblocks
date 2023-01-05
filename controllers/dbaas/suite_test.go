@@ -22,30 +22,27 @@ import (
 	"path/filepath"
 	"testing"
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-
-	ctrl "sigs.k8s.io/controller-runtime"
-
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	//+kubebuilder:scaffold:imports
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/types"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
@@ -68,9 +65,7 @@ func init() {
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecsWithDefaultAndCustomReporters(t,
-		"Controller Suite",
-		[]Reporter{printer.NewlineReporter{}})
+	RunSpecs(t, "Controller Suite")
 }
 
 var _ = BeforeSuite(func() {
@@ -176,7 +171,7 @@ var _ = BeforeSuite(func() {
 	k8sClient = k8sManager.GetClient()
 	Expect(k8sClient).ToNot(BeNil())
 
-}, 60)
+})
 
 var _ = AfterSuite(func() {
 	cancel()
@@ -197,6 +192,20 @@ func changeClusterDef(namespacedName types.NamespacedName,
 	patch := client.MergeFrom(clusterDef.DeepCopy())
 	action(clusterDef)
 	if err := k8sClient.Patch(ctx, clusterDef, patch); err != nil {
+		return err
+	}
+	return nil
+}
+
+func changeCluster(namespacedName types.NamespacedName,
+	action func(cluster *dbaasv1alpha1.Cluster)) error {
+	cluster := &dbaasv1alpha1.Cluster{}
+	if err := k8sClient.Get(ctx, namespacedName, cluster); err != nil {
+		return err
+	}
+	patch := client.MergeFrom(cluster.DeepCopy())
+	action(cluster)
+	if err := k8sClient.Patch(ctx, cluster, patch); err != nil {
 		return err
 	}
 	return nil

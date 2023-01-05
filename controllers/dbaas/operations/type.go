@@ -55,14 +55,6 @@ type OpsResource struct {
 	Recorder   record.EventRecorder
 }
 
-// OpsRecorder recorder the running OpsRequest info in cluster annotation
-type OpsRecorder struct {
-	// Name OpsRequest name
-	Name string `json:"name"`
-	// ToClusterPhase the cluster phase when the OpsRequest is running
-	ToClusterPhase dbaasv1alpha1.Phase `json:"clusterPhase"`
-}
-
 type OpsManager struct {
 	OpsMap map[dbaasv1alpha1.OpsType]*OpsBehaviour
 }

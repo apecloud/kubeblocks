@@ -79,6 +79,7 @@ func getConfigTemplatesFromComponent(
 	return MergeConfigTemplates(avTpls, cdTpls), nil
 }
 
+// updateCfgParams merge parameters of the config into the configmap, and verify final configuration file.
 func updateCfgParams(
 	config dbaasv1alpha1.Configuration,
 	tpl dbaasv1alpha1.ConfigTemplate,

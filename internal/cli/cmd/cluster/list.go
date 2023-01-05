@@ -187,14 +187,14 @@ func run(o *list.ListOptions, printType cluster.PrintType) error {
 	return nil
 }
 
-func addRow(d dynamic.Interface, client *kubernetes.Clientset,
+func addRow(dynamic dynamic.Interface, client *kubernetes.Clientset,
 	namespace string, name string, printer *cluster.Printer) error {
 	getter := &cluster.ObjectsGetter{
-		Name:          name,
-		Namespace:     namespace,
-		ClientSet:     client,
-		DynamicClient: d,
-		GetOptions:    printer.GetterOptions(),
+		Name:       name,
+		Namespace:  namespace,
+		Client:     client,
+		Dynamic:    dynamic,
+		GetOptions: printer.GetterOptions(),
 	}
 
 	clusterObjs, err := getter.Get()

@@ -49,6 +49,7 @@ type ListOptions struct {
 	Namespace     string
 	AllNamespaces bool
 	LabelSelector string
+	FieldSelector string
 	ShowLabels    bool
 	ToPrinter     func(*meta.RESTMapping, bool) (printers.ResourcePrinterFunc, error)
 
@@ -56,7 +57,10 @@ type ListOptions struct {
 	Names  []string
 	GVR    schema.GroupVersionResource
 	Format printer.Format
-	Print  bool
+
+	// print the result or not, if true, use default printer to print, otherwise,
+	// only return the result to caller.
+	Print bool
 
 	genericclioptions.IOStreams
 }
@@ -138,6 +142,7 @@ func (o *ListOptions) Run() (*resource.Result, error) {
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
 		LabelSelectorParam(o.LabelSelector).
+		FieldSelectorParam(o.FieldSelector).
 		ResourceTypeOrNameArgs(true, append([]string{util.GVRToString(o.GVR)}, o.Names...)...).
 		ContinueOnError().
 		Latest().

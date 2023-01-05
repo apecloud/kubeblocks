@@ -47,10 +47,10 @@ type GetOptions struct {
 }
 
 type ObjectsGetter struct {
-	ClientSet     clientset.Interface
-	DynamicClient dynamic.Interface
-	Name          string
-	Namespace     string
+	Client    clientset.Interface
+	Dynamic   dynamic.Interface
+	Name      string
+	Namespace string
 	GetOptions
 }
 
@@ -66,9 +66,9 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 	var err error
 	objs := NewClusterObjects()
 	ctx := context.TODO()
-	corev1 := o.ClientSet.CoreV1()
+	corev1 := o.Client.CoreV1()
 	getResource := func(gvr schema.GroupVersionResource, name string, ns string, res interface{}) error {
-		obj, err := o.DynamicClient.Resource(gvr).Namespace(ns).Get(ctx, name, metav1.GetOptions{}, "")
+		obj, err := o.Dynamic.Resource(gvr).Namespace(ns).Get(ctx, name, metav1.GetOptions{}, "")
 		if err != nil {
 			return err
 		}

@@ -266,6 +266,7 @@ func FakeEvents() *corev1.EventList {
 		e.Name = name
 		e.Type = "Warning"
 		e.SetCreationTimestamp(createTime)
+		e.LastTimestamp = createTime
 		return e
 	}
 

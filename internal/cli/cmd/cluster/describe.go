@@ -120,10 +120,10 @@ func (o *describeOptions) run() error {
 
 func (o *describeOptions) describeCluster(name string) error {
 	clusterGetter := cluster.ObjectsGetter{
-		ClientSet:     o.client,
-		DynamicClient: o.dynamic,
-		Name:          name,
-		Namespace:     o.namespace,
+		Client:    o.client,
+		Dynamic:   o.dynamic,
+		Name:      name,
+		Namespace: o.namespace,
 		GetOptions: cluster.GetOptions{
 			WithClusterDef: true,
 			WithService:    true,
@@ -156,6 +156,7 @@ func (o *describeOptions) describeCluster(name string) error {
 
 	// events
 	showEvents(o.Events, o.Cluster.Name, o.Out)
+	fmt.Fprintln(o.Out)
 
 	return nil
 }

@@ -59,7 +59,7 @@ var mapTblInfo = map[PrintType]tblInfo{
 		getOptions: GetOptions{WithClusterDef: true, WithService: true, WithPod: true},
 	},
 	PrintInstances: {
-		header:     []interface{}{"NAME", "NAMESPACE", "CLUSTER", "COMPONENT", "STATUS", "ROLE", "ACCESSMODE", "AZ", "REGION", "CPU(REQUEST/LIMIT)", "MEMORY(REQUEST/LIMIT)", "STORAGE", "NODE", "CREATED-TIME"},
+		header:     []interface{}{"NAME", "NAMESPACE", "CLUSTER", "COMPONENT", "STATUS", "ROLE", "ACCESSMODE", "AZ", "CPU(REQUEST/LIMIT)", "MEMORY(REQUEST/LIMIT)", "STORAGE", "NODE", "CREATED-TIME"},
 		addRow:     AddInstanceRow,
 		getOptions: GetOptions{WithClusterDef: true, WithPod: true},
 	},
@@ -112,7 +112,7 @@ func AddInstanceRow(tbl *printer.TablePrinter, objs *ClusterObjects) {
 	for _, instance := range instances {
 		tbl.AddRow(instance.Name, instance.Namespace, instance.Cluster, instance.Component,
 			instance.Status, instance.Role, instance.AccessMode,
-			instance.AZ, instance.Region, instance.CPU, instance.Memory,
+			instance.AZ, instance.CPU, instance.Memory,
 			BuildStorageSize(instance.Storage), instance.Node, instance.CreatedTime)
 	}
 }

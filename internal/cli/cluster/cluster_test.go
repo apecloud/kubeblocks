@@ -39,10 +39,10 @@ var _ = Describe("cluster util", func() {
 	It("get cluster objects", func() {
 		clusterName := testing.ClusterName
 		getter := ObjectsGetter{
-			ClientSet:     client,
-			DynamicClient: dynamic,
-			Name:          clusterName,
-			Namespace:     testing.Namespace,
+			Client:    client,
+			Dynamic:   dynamic,
+			Name:      clusterName,
+			Namespace: testing.Namespace,
 			GetOptions: GetOptions{
 				WithClusterDef:     true,
 				WithClusterVersion: true,

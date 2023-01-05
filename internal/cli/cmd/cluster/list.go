@@ -63,6 +63,13 @@ var (
 
 		# list all components of a specified cluster
 		kbcli cluster list-components my-cluster`)
+
+	listEventsExample = templates.Examples(`
+		# list all events of all clusters in current namespace
+		kbcli cluster list-events
+
+		# list all events of a specified cluster
+		kbcli cluster list-events my-cluster`)
 )
 
 func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -129,7 +136,7 @@ func NewListEventsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	cmd := &cobra.Command{
 		Use:               "list-events",
 		Short:             "List cluster events",
-		Example:           listComponentsExample,
+		Example:           listEventsExample,
 		Aliases:           []string{"ls-events"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
 		Run: func(cmd *cobra.Command, args []string) {

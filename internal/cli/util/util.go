@@ -409,16 +409,24 @@ func BuildLabelSelectorByNames(selector string, names []string) string {
 	}
 }
 
-// SortEventsByLastTimestamp sorts events by metadata.creationTimestamp
-func SortEventsByLastTimestamp(events *corev1.EventList) *[]apiruntime.Object {
+// SortEventsByLastTimestamp sorts events by lastTimestamp
+func SortEventsByLastTimestamp(events *corev1.EventList, eventType string) *[]apiruntime.Object {
 	objs := make([]apiruntime.Object, 0, len(events.Items))
 	for i, e := range events.Items {
-		if e.Type != "Warning" {
+		if eventType != "" && e.Type != eventType {
 			continue
 		}
 		objs = append(objs, &events.Items[i])
 	}
 	sorter := cmdget.NewRuntimeSort("{.lastTimestamp}", objs)
-	sort.Sort(sort.Reverse(sorter))
+	sort.Sort(sorter)
 	return &objs
+}
+
+func GetEventTimeStr(event *corev1.Event) string {
+	t := &event.CreationTimestamp
+	if !event.LastTimestamp.Time.IsZero() {
+		t = &event.LastTimestamp
+	}
+	return TimeFormat(t)
 }

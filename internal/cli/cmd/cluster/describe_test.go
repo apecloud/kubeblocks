@@ -107,12 +107,12 @@ var _ = Describe("Expose", func() {
 
 	It("showEvents", func() {
 		out := &bytes.Buffer{}
-		showEvents(testing.FakeEvents(), "test-cluster", out)
+		showEvents(testing.FakeEvents(), "test-cluster", namespace, out)
 		strs := strings.Split(out.String(), "\n")
 
-		// sorted in reverse order
+		// sorted
 		firstEvent := strs[3]
 		secondEvent := strs[4]
-		Expect(strings.Compare(firstEvent, secondEvent) > 0).Should(BeTrue())
+		Expect(strings.Compare(firstEvent, secondEvent) < 0).Should(BeTrue())
 	})
 })

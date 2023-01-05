@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
@@ -142,8 +143,9 @@ var _ = Describe("util", func() {
 	})
 
 	It("TimeFormat", func() {
-		t := metav1.Time{Time: time.Now()}
-		fmt.Println(TimeFormat(&t))
+		t, _ := time.Parse(time.RFC3339, "2023-01-04T01:00:00.000Z")
+		metav1Time := metav1.Time{Time: t}
+		Expect(TimeFormat(&metav1Time)).Should(Equal("Jan 04,2023 01:00 UTC+0000"))
 	})
 
 	It("CheckEmpty", func() {
@@ -160,6 +162,15 @@ var _ = Describe("util", func() {
 		expected := fmt.Sprintf("%s in (%s)", types.InstanceLabelKey, strings.Join(names, ","))
 		Expect(BuildLabelSelectorByNames("", names)).Should(Equal(expected))
 		Expect(BuildLabelSelectorByNames("label1", names)).Should(Equal("label1," + expected))
+	})
+
+	It("Event utils", func() {
+		objs := SortEventsByLastTimestamp(testing.FakeEvents(), "")
+		Expect(len(*objs)).Should(Equal(2))
+		firstEvent := (*objs)[0].(*corev1.Event)
+		secondEvent := (*objs)[1].(*corev1.Event)
+		Expect(firstEvent.LastTimestamp.Before(&secondEvent.LastTimestamp)).Should(BeTrue())
+		Expect(GetEventTimeStr(firstEvent)).Should(ContainSubstring("Jan 04,2023"))
 	})
 
 	It("Others", func() {

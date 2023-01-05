@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -135,7 +134,6 @@ func (o *DeleteOptions) AddFlags(cmd *cobra.Command) {
 
 func (o *DeleteOptions) deleteResult(r *resource.Result) error {
 	found := 0
-	r = r.IgnoreErrors(errors.IsNotFound)
 	var deleteInfos []*resource.Info
 	err := r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
@@ -149,7 +147,11 @@ func (o *DeleteOptions) deleteResult(r *resource.Result) error {
 			options = metav1.NewDeleteOptions(int64(o.GracePeriod))
 		}
 		_, err = o.deleteResource(info, options)
-		return err
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(o.Out, "%s \"%s\" deleted\n", info.Mapping.GroupVersionKind.Kind, info.Name)
+		return nil
 	})
 	if err != nil {
 		return err

@@ -155,7 +155,7 @@ func (o *describeOptions) describeCluster(name string) error {
 	showImages(comps, o.Out)
 
 	// events
-	showEvents(o.Events, o.Cluster.Name, o.Out)
+	showEvents(o.Events, o.Cluster.Name, o.Cluster.Namespace, o.Out)
 	fmt.Fprintln(o.Out)
 
 	return nil
@@ -192,16 +192,16 @@ func showImages(comps []*cluster.ComponentInfo, out io.Writer) {
 	tbl.Print()
 }
 
-func showEvents(events *corev1.EventList, name string, out io.Writer) {
-	objs := util.SortEventsByLastTimestamp(events)
+func showEvents(events *corev1.EventList, name string, namespace string, out io.Writer) {
+	objs := util.SortEventsByLastTimestamp(events, "Warning")
 
 	// print last 5 events
-	title := fmt.Sprintf("\nEvents(last 5 warnings, see more:kbcli cluster list-events %s):", name)
+	title := fmt.Sprintf("\nEvents(last 5 warnings, see more:kbcli cluster list-events -n %s %s):", namespace, name)
 	tbl := newTbl(out, title, "TIME", "TYPE", "REASON", "OBJECT", "MESSAGE")
 	cnt := 0
 	for _, o := range *objs {
 		e := o.(*corev1.Event)
-		tbl.AddRow(util.TimeFormat(&e.LastTimestamp), e.Type, e.Reason, e.InvolvedObject.Name, e.Message)
+		tbl.AddRow(util.GetEventTimeStr(e), e.Type, e.Reason, e.InvolvedObject.Name, e.Message)
 		cnt++
 		if cnt == 5 {
 			break

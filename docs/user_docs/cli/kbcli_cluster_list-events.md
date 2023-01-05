@@ -9,11 +9,11 @@ kbcli cluster list-events [flags]
 ### Examples
 
 ```
-  # list all components of all clusters in current namespace
-  kbcli cluster list-components
+  # list all events of all clusters in current namespace
+  kbcli cluster list-events
   
-  # list all components of a specified cluster
-  kbcli cluster list-components my-cluster
+  # list all events of a specified cluster
+  kbcli cluster list-events my-cluster
 ```
 
 ### Options

@@ -17,6 +17,8 @@ limitations under the License.
 package cluster
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -39,10 +41,17 @@ func NewDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Short:   "Delete clusters",
 		Example: deleteExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			o.Names = args
-			util.CheckErr(o.Run())
+			util.CheckErr(deleteCluster(o, args))
 		},
 	}
 	o.AddFlags(cmd)
 	return cmd
+}
+
+func deleteCluster(o *delete.DeleteOptions, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("missing cluster name")
+	}
+	o.Names = args
+	return o.Run()
 }

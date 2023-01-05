@@ -197,6 +197,20 @@ func changeClusterDef(namespacedName types.NamespacedName,
 	return nil
 }
 
+func changeCluster(namespacedName types.NamespacedName,
+	action func(cluster *dbaasv1alpha1.Cluster)) error {
+	cluster := &dbaasv1alpha1.Cluster{}
+	if err := k8sClient.Get(ctx, namespacedName, cluster); err != nil {
+		return err
+	}
+	patch := client.MergeFrom(cluster.DeepCopy())
+	action(cluster)
+	if err := k8sClient.Patch(ctx, cluster, patch); err != nil {
+		return err
+	}
+	return nil
+}
+
 func changeClusterStatus(namespacedName types.NamespacedName,
 	action func(cluster *dbaasv1alpha1.Cluster)) error {
 	cluster := &dbaasv1alpha1.Cluster{}

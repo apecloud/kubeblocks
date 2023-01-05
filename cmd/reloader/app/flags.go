@@ -99,7 +99,7 @@ type VolumeWatcherOpts struct {
 	ProcessName string
 
 	// Signal is valid for UnixSignal
-	Signal string
+	Signal dbaasv1alpha1.SignalType
 
 	LogLevel       string
 	NotifyHandType NotifyEventType
@@ -119,7 +119,7 @@ func NewVolumeWatcherOpts() *VolumeWatcherOpts {
 		},
 		// for configmap watch
 		NotifyHandType: UnixSignal,
-		Signal:         "SIGHUP",
+		Signal:         dbaasv1alpha1.SIGHUP,
 		LogLevel:       "info",
 	}
 }
@@ -137,9 +137,9 @@ func InstallFlags(flags *pflag.FlagSet, opt *VolumeWatcherOpts) {
 		"process",
 		opt.ProcessName,
 		"the config describe what is db program.")
-	flags.StringVar(&opt.Signal,
+	flags.StringVar((*string)(&opt.Signal),
 		"signal",
-		opt.Signal,
+		string(opt.Signal),
 		"the config describe reload unix signal.")
 	flags.StringVar(&opt.LogLevel,
 		"log-level",

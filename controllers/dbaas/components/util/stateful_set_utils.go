@@ -71,14 +71,13 @@ func GetPodRevision(pod *corev1.Pod) string {
 
 // StatefulSetIsReady check statefulSet is ready.
 func StatefulSetIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals bool) bool {
-	var stsIsRunning = true
 	// judge whether statefulSet is ready
 	if sts.Status.AvailableReplicas != *sts.Spec.Replicas ||
 		sts.Status.ObservedGeneration != sts.GetGeneration() ||
 		!statefulStatusRevisionIsEquals {
-		stsIsRunning = false
+		return false
 	}
-	return stsIsRunning
+	return true
 }
 
 // StatefulSetPodsIsReady check pods of statefulSet is ready.
@@ -97,8 +96,7 @@ func CovertToStatefulSet(obj client.Object) *appsv1.StatefulSet {
 	return nil
 }
 
-// DescendingOrdinalSts is a sort.Interface that Sorts a list of StatefulSet based on the ordinals extracted
-// from the StatefulSet.
+// DescendingOrdinalSts is a sort.Interface that Sorts a list of StatefulSet based on the ordinals extracted from the statefulSet.
 type DescendingOrdinalSts []*appsv1.StatefulSet
 
 var statefulSetRegex = regexp.MustCompile("(.*)-([0-9]+)$")
@@ -122,8 +120,8 @@ func GetOrdinalSts(sts *appsv1.StatefulSet) int {
 }
 
 // getParentNameAndOrdinalSts gets the name of cluster-component and StatefulSet's ordinal as extracted from its Name. If
-// the StatefulSet's Name was not match a statefulSetRegex, its parent is considered to be empty string, and its ordinal is considered
-// to be -1.
+// the StatefulSet's Name was not match a statefulSetRegex, its parent is considered to be empty string,
+// and its ordinal is considered to be -1.
 func getParentNameAndOrdinalSts(sts *appsv1.StatefulSet) (string, int) {
 	parent := ""
 	ordinal := -1
@@ -138,9 +136,8 @@ func getParentNameAndOrdinalSts(sts *appsv1.StatefulSet) (string, int) {
 	return parent, ordinal
 }
 
-// GetPodListByStatefulSet get statefulSet pod list
+// GetPodListByStatefulSet get statefulSet pod list.
 func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet) ([]corev1.Pod, error) {
-	// get podList owned by stsObj
 	podList := &corev1.PodList{}
 	if err := cli.List(ctx, podList,
 		&client.ListOptions{Namespace: stsObj.Namespace},

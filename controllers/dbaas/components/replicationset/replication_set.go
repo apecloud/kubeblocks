@@ -18,15 +18,14 @@ package replicationset
 
 import (
 	"context"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-
-	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type ReplicationSet struct {
@@ -41,8 +40,7 @@ func (rs *ReplicationSet) IsRunning(obj client.Object) (bool, error) {
 	var componentStsList = &appsv1.StatefulSetList{}
 	var componentStatusIsRunning = true
 	sts := util.CovertToStatefulSet(obj)
-	err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.AppComponentLabelKey])
-	if err != nil {
+	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.AppComponentLabelKey]); err != nil {
 		return false, err
 	}
 	for _, stsObj := range componentStsList.Items {
@@ -59,12 +57,10 @@ func (rs *ReplicationSet) PodsReady(obj client.Object) (bool, error) {
 	var podsReady = true
 	var componentStsList = &appsv1.StatefulSetList{}
 	sts := util.CovertToStatefulSet(obj)
-	err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.AppComponentLabelKey])
-	if err != nil {
+	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.AppComponentLabelKey]); err != nil {
 		return false, err
 	}
 	for _, stsObj := range componentStsList.Items {
-
 		if !util.StatefulSetPodsIsReady(&stsObj) {
 			podsReady = false
 		}
@@ -97,7 +93,7 @@ func (rs *ReplicationSet) CalculatePhaseWhenPodsNotReady(componentName string) (
 	}
 
 	for _, v := range podList.Items {
-		// if the pod is terminating, ignore the warning event
+		// if the pod is terminating, ignore the warning event.
 		if v.DeletionTimestamp != nil {
 			return "", nil
 		}
@@ -119,7 +115,7 @@ func (rs *ReplicationSet) CalculatePhaseWhenPodsNotReady(componentName string) (
 			isAbnormal = true
 		}
 	}
-	// if all pod is ready, ignore the warning event
+	// if all pod is ready, ignore the warning event.
 	if allPodIsReady {
 		return "", nil
 	}

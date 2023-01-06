@@ -84,18 +84,18 @@ func (r *Cluster) ValidateDelete() error {
 	return nil
 }
 
-// validatePrimaryIndex check primaryIndex value cannot be larger than replicas
-func (r *Cluster) validatePrimaryIndex(allErrs *field.ErrorList) error {
+// validatePrimaryIndex check primaryIndex value cannot be larger than replicas.
+func (r *Cluster) validatePrimaryIndex(allErrs *field.ErrorList) {
 	for index, component := range r.Spec.Components {
-		if component.PrimaryIndex != nil {
-			if *component.PrimaryIndex > *component.Replicas-1 {
-				path := fmt.Sprintf("spec.components[%d].PrimaryIndex", index)
-				*allErrs = append(*allErrs, field.Invalid(field.NewPath(path),
-					nil, "PrimaryIndex cannot be larger than Replicas."))
-			}
+		if component.PrimaryIndex == nil {
+			continue
+		}
+		if *component.PrimaryIndex > *component.Replicas-1 {
+			path := fmt.Sprintf("spec.components[%d].PrimaryIndex", index)
+			*allErrs = append(*allErrs, field.Invalid(field.NewPath(path),
+				nil, "PrimaryIndex cannot be larger than Replicas."))
 		}
 	}
-	return nil
 }
 
 // validateVolumeClaimTemplates volumeClaimTemplates is forbidden modification except for storage size.
@@ -164,10 +164,7 @@ func (r *Cluster) validate() error {
 		r.validateComponents(&allErrs, clusterDef)
 	}
 
-	err = r.validatePrimaryIndex(&allErrs)
-	if err != nil {
-		return err
-	}
+	r.validatePrimaryIndex(&allErrs)
 
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(

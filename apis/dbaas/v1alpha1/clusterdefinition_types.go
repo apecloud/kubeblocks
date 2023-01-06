@@ -145,7 +145,7 @@ type ClusterDefinitionComponent struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	TypeName string `json:"typeName"`
 
-	// componentType defines type of the component. On of Stateful, Stateless, Consensus.
+	// componentType defines type of the component.
 	// Default to Stateless.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus,Replication}
@@ -222,7 +222,7 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
 
-	// PrimaryIndex determines which index is primary when componentType is Replication, index number starts from zero
+	// primaryIndex determines which index is primary when componentType is Replication, index number starts from zero.
 	// +kubebuilder:default=0
 	// +optional
 	PrimaryIndex *int32 `json:"primaryIndex,omitempty"`

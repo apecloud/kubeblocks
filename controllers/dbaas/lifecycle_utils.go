@@ -26,8 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/apecloud/kubeblocks/controllers/dbaas/components/replicationset"
-
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/leaanthony/debme"
 	"github.com/pkg/errors"
@@ -45,6 +43,7 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/replicationset"
 	componentutil "github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -714,10 +713,10 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 			return err
 		}
 	case dbaasv1alpha1.Replication:
+		// get the maximum value of params.component.Replicas and the number of existing statefulsets under the current component,
+		// then construct statefulsets for creating replicationSet or handling horizontal scaling of the replicationSet.
 		var existStsList = &appsv1.StatefulSetList{}
-		// list all statefulSets by cluster and componentKey label, then get math.Max(params.component.Replicas, current exist statefulSet)
-		err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, params.cluster, existStsList, params.component.Name)
-		if err != nil {
+		if err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, params.cluster, existStsList, params.component.Name); err != nil {
 			return err
 		}
 		replicaNum := math.Max(float64(len(existStsList.Items)), float64(params.component.Replicas))
@@ -1319,7 +1318,7 @@ func injectEnvs(params createParams, envConfigName string, c *corev1.Container) 
 	})
 }
 
-// buildReplicationSet build on stateful set of replication
+// buildReplicationSet build on stateful set of replication.
 func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
 	params createParams,
 	envConfigName string,
@@ -1328,11 +1327,11 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	// inject replicationSet pod env and role label
+	// inject replicationSet pod env and role label.
 	if sts, err = injectReplicationSetPodEnvAndLabel(params, sts, stsIndex); err != nil {
 		return nil, err
 	}
-	// sts.Name rename and add role label
+	// sts.Name rename and add role label.
 	sts.ObjectMeta.Name = fmt.Sprintf("%s-%d", sts.ObjectMeta.Name, stsIndex)
 	sts.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Secondary)
 	if stsIndex == *params.component.PrimaryIndex {

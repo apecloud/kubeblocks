@@ -19,17 +19,17 @@ package replicationset
 import (
 	"context"
 
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
-
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 var _ = Describe("ReplicationSet Util", func() {
@@ -56,16 +56,14 @@ var _ = Describe("ReplicationSet Util", func() {
 	}
 
 	BeforeEach(func() {
-		// Add any setup steps that needs to be executed before each test
 		cleanupObjects()
 	})
 
 	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
 		cleanupObjects()
 	})
 
-	Context("test replicationSet controller", func() {
+	Context("test replicationSet util", func() {
 		It("", func() {
 			_, _, cluster := testdbaas.InitReplicationRedis(testCtx, clusterDefName, clusterVersionName, clusterName)
 			By("init cluster status")
@@ -92,7 +90,7 @@ var _ = Describe("ReplicationSet Util", func() {
 			}
 			Expect(k8sClient.Status().Patch(context.Background(), cluster, patch)).Should(Succeed())
 
-			By("testing sync cluster status with adding pod")
+			By("testing sync cluster status with add pod")
 			var podList []*corev1.Pod
 			set := testk8s.NewFakeStatefulSet(clusterName+componentName+"-3", 3)
 			pod := testk8s.NewFakeStatefulSetPod(set, 0)

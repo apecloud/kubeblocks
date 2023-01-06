@@ -173,7 +173,7 @@ type ClusterComponent struct {
 	// +optional
 	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
 
-	// PrimaryIndex determines which index is primary when componentType is Replication, index number starts from zero
+	// primaryIndex determines which index is primary when componentType is Replication, index number starts from zero.
 	// +optional
 	PrimaryIndex *int32 `json:"primaryIndex,omitempty"`
 }
@@ -213,7 +213,7 @@ type ClusterStatusComponent struct {
 	// +optional
 	ConsensusSetStatus *ConsensusSetStatus `json:"consensusSetStatus,omitempty"`
 
-	// replicationSetStatus role and pod name mapping
+	// replicationSetStatus role and pod name mapping.
 	// +optional
 	ReplicationSetStatus *ReplicationSetStatus `json:"replicationSetStatus,omitempty"`
 }
@@ -251,17 +251,17 @@ type ConsensusMemberStatus struct {
 }
 
 type ReplicationSetStatus struct {
-	// primary status
+	// primary status.
 	// +kubebuilder:validation:Required
 	Primary ReplicationMemberStatus `json:"primary"`
 
-	// secondaries status
+	// secondaries status.
 	// +optional
 	Secondaries []ReplicationMemberStatus `json:"secondaries,omitempty"`
 }
 
 type ReplicationMemberStatus struct {
-	// pod name
+	// pod name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Unknown
 	Pod string `json:"pod"`

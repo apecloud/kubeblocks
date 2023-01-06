@@ -17,7 +17,7 @@ limitations under the License.
 package replicationset
 
 import (
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -52,12 +52,12 @@ var _ = Describe("Replication Component", func() {
 	}
 
 	BeforeEach(func() {
-		// Add any setup steps that needs to be executed before each test
+		// Add any setup steps that needs to be executed before each test.
 		cleanupObjects()
 	})
 
 	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
+		// Add any teardown steps that needs to be executed after each test.
 		cleanupObjects()
 	})
 

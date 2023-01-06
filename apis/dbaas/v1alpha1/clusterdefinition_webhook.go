@@ -119,9 +119,78 @@ func (r *ClusterDefinition) validateLogFilePatternPrefix(allErrs *field.ErrorLis
 	}
 }
 
-// ValidateComponents validate spec.components is legal
+// ValidateComponents validate spec.components is legal.
 func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 	// TODO typeName duplication validate
+	validateConsensus := func(component *ClusterDefinitionComponent) {
+		consensusSpec := component.ConsensusSpec
+		// roleObserveQuery and Leader are required
+		if consensusSpec.Leader.Name == "" {
+			*allErrs = append(*allErrs,
+				field.Required(field.NewPath("spec.components[*].consensusSpec.leader.name"),
+					"leader name can't be blank when componentType is Consensus"))
+		}
+
+		// Leader.Replicas should not be present or should set to 1
+		if *consensusSpec.Leader.Replicas != 0 && *consensusSpec.Leader.Replicas != 1 {
+			*allErrs = append(*allErrs,
+				field.Invalid(field.NewPath("spec.components[*].consensusSpec.leader.replicas"),
+					consensusSpec.Leader.Replicas,
+					"leader replicas can only be 1"))
+		}
+
+		// Leader.replicas + Follower.replicas should be odd
+		candidates := int32(1)
+		for _, member := range consensusSpec.Followers {
+			if member.Replicas != nil {
+				candidates += *member.Replicas
+			}
+		}
+		if candidates%2 == 0 {
+			*allErrs = append(*allErrs,
+				field.Invalid(field.NewPath("spec.components[*].consensusSpec.candidates(leader.replicas+followers[*].replicas)"),
+					candidates,
+					"candidates(leader+followers) should be odd"))
+		}
+		// if component.replicas is 1, then only Leader should be present. just omit if present
+
+		// if Followers.Replicas present, Leader.Replicas(that is 1) + Followers.Replicas + Learner.Replicas should equal to component.defaultReplicas
+		isFollowerPresent := false
+		memberCount := int32(1)
+		for _, member := range consensusSpec.Followers {
+			if member.Replicas != nil && *member.Replicas > 0 {
+				isFollowerPresent = true
+				memberCount += *member.Replicas
+			}
+		}
+		if isFollowerPresent {
+			if consensusSpec.Learner != nil && consensusSpec.Learner.Replicas != nil {
+				memberCount += *consensusSpec.Learner.Replicas
+			}
+			if memberCount != component.DefaultReplicas {
+				*allErrs = append(*allErrs,
+					field.Invalid(field.NewPath("spec.components[*].consensusSpec.defaultReplicas"),
+						component.DefaultReplicas,
+						"#(members) should be equal to defaultReplicas"))
+			}
+		}
+
+	}
+
+	validateReplication := func(component *ClusterDefinitionComponent) {
+		if component.MinReplicas < 1 {
+			*allErrs = append(*allErrs,
+				field.Invalid(field.NewPath("spec.components[*].MinReplicas"),
+					component.MaxReplicas,
+					"component MinReplicas can not be less than 1 when componentType=Replication"))
+		}
+		if component.MaxReplicas > 16 {
+			*allErrs = append(*allErrs,
+				field.Invalid(field.NewPath("spec.components[*].MaxReplicas"),
+					component.MaxReplicas,
+					"component MaxReplicas cannot be larger than 16 when componentType=Replication"))
+		}
+	}
 
 	for _, component := range r.Spec.Components {
 		switch component.ComponentType {
@@ -134,70 +203,9 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 						"consensusSpec is required when componentType=Consensus"))
 				continue
 			}
-
-			// roleObserveQuery and Leader are required
-			if consensusSpec.Leader.Name == "" {
-				*allErrs = append(*allErrs,
-					field.Required(field.NewPath("spec.components[*].consensusSpec.leader.name"),
-						"leader name can't be blank when componentType is Consensus"))
-			}
-
-			// Leader.Replicas should not be present or should set to 1
-			if *consensusSpec.Leader.Replicas != 0 && *consensusSpec.Leader.Replicas != 1 {
-				*allErrs = append(*allErrs,
-					field.Invalid(field.NewPath("spec.components[*].consensusSpec.leader.replicas"),
-						consensusSpec.Leader.Replicas,
-						"leader replicas can only be 1"))
-			}
-
-			// Leader.replicas + Follower.replicas should be odd
-			candidates := int32(1)
-			for _, member := range consensusSpec.Followers {
-				if member.Replicas != nil {
-					candidates += *member.Replicas
-				}
-			}
-			if candidates%2 == 0 {
-				*allErrs = append(*allErrs,
-					field.Invalid(field.NewPath("spec.components[*].consensusSpec.candidates(leader.replicas+followers[*].replicas)"),
-						candidates,
-						"candidates(leader+followers) should be odd"))
-			}
-			// if component.replicas is 1, then only Leader should be present. just omit if present
-
-			// if Followers.Replicas present, Leader.Replicas(that is 1) + Followers.Replicas + Learner.Replicas should equal to component.defaultReplicas
-			isFollowerPresent := false
-			memberCount := int32(1)
-			for _, member := range consensusSpec.Followers {
-				if member.Replicas != nil && *member.Replicas > 0 {
-					isFollowerPresent = true
-					memberCount += *member.Replicas
-				}
-			}
-			if isFollowerPresent {
-				if consensusSpec.Learner != nil && consensusSpec.Learner.Replicas != nil {
-					memberCount += *consensusSpec.Learner.Replicas
-				}
-				if memberCount != component.DefaultReplicas {
-					*allErrs = append(*allErrs,
-						field.Invalid(field.NewPath("spec.components[*].consensusSpec.defaultReplicas"),
-							component.DefaultReplicas,
-							"#(members) should be equal to defaultReplicas"))
-				}
-			}
+			validateConsensus(&component)
 		case Replication:
-			if component.MinReplicas < 1 {
-				*allErrs = append(*allErrs,
-					field.Invalid(field.NewPath("spec.components[*].MinReplicas"),
-						component.MaxReplicas,
-						"component MinReplicas can not be less than 1 when componentType=Replication"))
-			}
-			if component.MaxReplicas > 16 {
-				*allErrs = append(*allErrs,
-					field.Invalid(field.NewPath("spec.components[*].MaxReplicas"),
-						component.MaxReplicas,
-						"component MaxReplicas cannot be larger than 16 when componentType=Replication"))
-			}
+			validateReplication(&component)
 		default:
 			continue
 		}

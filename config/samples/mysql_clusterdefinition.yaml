@@ -1,5 +1,5 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterDefinition
+kind: ClusterDefinition
 metadata:
   name: apecloud-wesql
 spec:

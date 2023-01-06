@@ -114,9 +114,9 @@ var _ = Describe("clusterDefinition webhook", func() {
 func createTestClusterDefinitionObj(name string) (*ClusterDefinition, error) {
 	clusterDefYaml := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterDefinition
+kind: ClusterDefinition
 metadata:
-  name:     %s
+  name: %s
 spec:
   type: state.mysql-8
   components:
@@ -142,9 +142,9 @@ spec:
 func createTestClusterDefinitionObj2(name string) (*ClusterDefinition, error) {
 	clusterDefYaml := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterDefinition
+kind: ClusterDefinition
 metadata:
-  name:     %s
+  name: %s
 spec:
   type: state.mysql-8
   components:
@@ -163,9 +163,9 @@ spec:
 func createTestClusterDefinitionObj3(name string) (*ClusterDefinition, error) {
 	clusterDefYaml := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterDefinition
+kind: ClusterDefinition
 metadata:
-  name:     %s
+  name: %s
 spec:
   type: state.mysql-8
   components:

@@ -139,9 +139,9 @@ spec:
 		By("By assure an clusterVersion obj")
 		clusterVersionYAML := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterVersion
+kind: ClusterVersion
 metadata:
-  name:     cluster-version-ops
+  name: cluster-version-ops
 spec:
   clusterDefinitionRef: cluster-definition-ops
   components:

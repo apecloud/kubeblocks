@@ -14,8 +14,11 @@ spec:
   type: state.clickhouse
   connectionCredential:
     username: "admin"
-    password: "$(RANDOM_PASSWD)"
-    admin-password: "$(CONN_CREDENTIAL).password"
+    admin-password: "$(RANDOM_PASSWD)"
+    endpoint: "http://$(SVC_FQDN):$(SVC_PORT_http)"
+    tcpEndpoint: "$(SVC_FQDN):$(SVC_PORT_tcp)"
+    mysqlEndpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-mysql)"
+    pgEndpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-postgresql)"
   components:
     - typeName: clickhouse
       componentType: Stateful
@@ -35,6 +38,7 @@ spec:
         {{- end }}
       configTemplateRefs:
         - name: clickhouse-tpl
+          namespace: {{ .Release.Namespace }}
           volumeName: config
       service:
         ports:
@@ -167,6 +171,7 @@ spec:
         {{- end }}
       configTemplateRefs:
         - name: clickhouse-keeper-tpl
+          namespace: {{ .Release.Namespace }}
           volumeName: config
       service:
         ports:

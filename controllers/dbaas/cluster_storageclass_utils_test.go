@@ -62,9 +62,9 @@ var _ = Describe("Event Controller", func() {
 	createClusterDef := func() {
 		clusterDefYaml := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterDefinition
+kind: ClusterDefinition
 metadata:
-  name:     %s
+  name: %s
 spec:
   type: state.mysql-8
   components:
@@ -97,9 +97,9 @@ spec:
 	createClusterVersion := func() {
 		clusterVersionYaml := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterVersion
+kind: ClusterVersion
 metadata:
-  name:     %s
+  name: %s
 spec:
   clusterDefinitionRef: %s
   components:

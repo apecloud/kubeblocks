@@ -755,7 +755,7 @@ data:
 			clusterDefKey := types.NamespacedName{Name: "test-apecloud-wesql"}
 			clusterDefYAML := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterDefinition
+kind: ClusterDefinition
 metadata:
   name: %s
 spec:

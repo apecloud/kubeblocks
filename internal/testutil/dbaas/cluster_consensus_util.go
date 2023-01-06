@@ -134,9 +134,9 @@ spec:
 func CreateConsensusMysqlClusterVersion(testCtx testutil.TestContext, clusterDefName, clusterVersionName string) *dbaasv1alpha1.ClusterVersion {
 	clusterVersionYAML := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterVersion
+kind: ClusterVersion
 metadata:
-  name:  %s
+  name: %s
 spec:
   clusterDefinitionRef: %s
   components:

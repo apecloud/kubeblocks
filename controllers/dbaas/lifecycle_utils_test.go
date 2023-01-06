@@ -301,6 +301,12 @@ metadata:
   name: cluster-definition
 spec:
   type: state.mysql-8
+  connectionCredential:
+    username: "admin"
+    admin-password: "$(RANDOM_PASSWD)"
+    tcpEndpoint: "$(SVC_FQDN):$(SVC_PORT_mysql)"
+    paxosEndpoint: "$(SVC_FQDN):$(SVC_PORT_paxos)"
+
   components:
   - typeName: replicasets
     componentType: Stateful
@@ -353,6 +359,14 @@ spec:
             cluster_info="$cluster_info@$(($idx+1))";
             echo $cluster_info;
             docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
+    service:
+      ports:
+        - name: mysql
+          targetPort: mysql
+          port: 3306
+        - name: paxos
+          targetPort: paxos
+          port: 13306
   - typeName: proxy
     componentType: Stateless
     defaultReplicas: 1
@@ -376,9 +390,9 @@ spec:
 		By("By assure an clusterVersion obj")
 		clusterVersionYAML := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterVersion
+kind: ClusterVersion
 metadata:
-  name:     app-version
+  name: app-version
 spec:
   clusterDefinitionRef: cluster-definition
   components:
@@ -569,6 +583,7 @@ spec:
 				&clusterVersion.Spec.Components[0],
 				&cluster.Spec.Components[0])
 			Expect(component).ShouldNot(BeNil())
+
 			By("leave clusterVersion.podSpec nil")
 			clusterVersion.Spec.Components[0].PodSpec = nil
 			component = mergeComponents(
@@ -580,6 +595,7 @@ spec:
 				&cluster.Spec.Components[0])
 			Expect(component).ShouldNot(BeNil())
 			clusterVersion = allFieldsClusterVersionObj(true)
+
 			By("new container in clusterVersion not in clusterDefinition")
 			component = mergeComponents(
 				reqCtx,
@@ -589,6 +605,7 @@ spec:
 				&clusterVersion.Spec.Components[1],
 				&cluster.Spec.Components[0])
 			Expect(len(component.PodSpec.Containers)).Should(Equal(2))
+
 			By("leave clusterComp nil")
 			component = mergeComponents(
 				reqCtx,
@@ -598,6 +615,7 @@ spec:
 				&clusterVersion.Spec.Components[0],
 				nil)
 			Expect(component).ShouldNot(BeNil())
+
 			By("leave clusterDefComp nil")
 			component = mergeComponents(
 				reqCtx,

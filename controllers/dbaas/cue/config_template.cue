@@ -24,9 +24,8 @@ config: {
 		name:      meta.component.configName
 		namespace: meta.cluster.namespace
 		labels: {
-			"app.kubernetes.io/name":     "\(meta.clusterDefinition.type)-\(meta.clusterDefinition.name)"
-			"app.kubernetes.io/instance": meta.cluster.name
-			// "app.kubernetes.io/version" : # TODO
+			"app.kubernetes.io/name":      "\(meta.clusterDefinition.type)-\(meta.clusterDefinition.name)"
+			"app.kubernetes.io/instance":  meta.cluster.name
 			"app.kubernetes.io/component": "\(meta.component.type)-\(meta.component.name)"
 
 			// config template name

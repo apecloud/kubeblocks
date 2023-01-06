@@ -28,7 +28,6 @@ service: {
 			"app.kubernetes.io/instance":       cluster.metadata.name
 			"app.kubernetes.io/component-name": "\(component.name)"
 			"app.kubernetes.io/managed-by":     "kubeblocks"
-			// "app.kubernetes.io/version" : # TODO
 		}
 	}
 	"spec": {

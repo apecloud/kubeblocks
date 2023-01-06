@@ -24,7 +24,6 @@ secret: {
 			"app.kubernetes.io/name":       "\(clusterdefinition.spec.type)-\(clusterdefinition.metadata.name)"
 			"app.kubernetes.io/instance":   cluster.metadata.name
 			"app.kubernetes.io/managed-by": "kubeblocks"
-			// "app.kubernetes.io/version" : # TODO
 		}
 	}
 }

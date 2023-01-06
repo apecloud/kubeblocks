@@ -12,6 +12,7 @@ spec:
       minReplicas: 0
       configTemplateRefs:
         - name: mongodb-scripts
+          namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 493
       componentType: Stateless
@@ -37,6 +38,7 @@ spec:
       minReplicas: 0
       configTemplateRefs:
         - name: mongodb-scripts
+          namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 493
       characterType: mongodb
@@ -86,6 +88,7 @@ spec:
       minReplicas: 3
       configTemplateRefs:
         - name: mongodb-scripts
+          namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 493
       characterType: mongodb

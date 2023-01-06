@@ -55,9 +55,9 @@ var _ = Describe("ClusterDefinition Controller", func() {
 
 	clusterDefYaml := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterDefinition
+kind: ClusterDefinition
 metadata:
-  name:     mysql-cluster-definition
+  name: mysql-cluster-definition
 spec:
   type: state.mysql-8
   components:
@@ -141,9 +141,9 @@ spec:
 
 	clusterVersionYaml := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterVersion
+kind: ClusterVersion
 metadata:
-  name:     clusterversion-mysql-latest
+  name: clusterversion-mysql-latest
 spec:
   clusterDefinitionRef: mysql-cluster-definition
   components:

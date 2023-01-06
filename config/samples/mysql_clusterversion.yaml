@@ -1,7 +1,7 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterVersion
+kind: ClusterVersion
 metadata:
-  name:     clusterversion-mysql-latest
+  name: clusterversion-mysql-latest
 spec:
   clusterDefinitionRef: mysql-cluster-definition
   components:

@@ -9,18 +9,13 @@ kbcli cluster delete-ops [flags]
 ### Options
 
 ```
-  -A, --all-namespaces                  If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
-      --cascade string[="background"]   Must be "background", "orphan", or "foreground". Selects the deletion cascading strategy for the dependents (e.g. Pods created by a ReplicationController). Defaults to background. (default "background")
-      --dry-run string[="unchanged"]    Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
-      --force                           If true, immediately remove resources from API and bypass graceful deletion. Note that immediate deletion of some resources may result in inconsistency or data loss and requires confirmation.
-      --grace-period int                Period of time in seconds given to the resource to terminate gracefully. Ignored if negative. Set to 1 for immediate shutdown. Can only be set to 0 when --force is true (force deletion). (default -1)
-  -h, --help                            help for delete-ops
-      --name strings                    OpsRequest names
-      --now                             If true, resources are signaled for immediate shutdown (same as --grace-period=1).
-  -o, --output string                   Output mode. Use "-o name" for shorter output (resource/name).
-  -l, --selector string                 Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
-      --timeout duration                The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object
-      --wait                            If true, wait for resources to be gone before returning. This waits for finalizers. (default true)
+  -A, --all-namespaces     If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
+      --force              If true, immediately remove resources from API and bypass graceful deletion. Note that immediate deletion of some resources may result in inconsistency or data loss and requires confirmation.
+      --grace-period int   Period of time in seconds given to the resource to terminate gracefully. Ignored if negative. Set to 1 for immediate shutdown. Can only be set to 0 when --force is true (force deletion). (default -1)
+  -h, --help               help for delete-ops
+      --name strings       OpsRequest names
+      --now                If true, resources are signaled for immediate shutdown (same as --grace-period=1).
+  -l, --selector string    Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
 ```
 
 ### Options inherited from parent commands

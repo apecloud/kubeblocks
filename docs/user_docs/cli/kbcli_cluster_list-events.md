@@ -1,27 +1,27 @@
-## kbcli cluster delete
+## kbcli cluster list-events
 
-Delete clusters
+List cluster events
 
 ```
-kbcli cluster delete [flags]
+kbcli cluster list-events [flags]
 ```
 
 ### Examples
 
 ```
-  # delete a cluster named my-cluster
-  kbcli cluster delete my-cluster
+  # list all events of all clusters in current namespace
+  kbcli cluster list-events
+  
+  # list all events of a specified cluster
+  kbcli cluster list-events my-cluster
 ```
 
 ### Options
 
 ```
-  -A, --all-namespaces     If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
-      --force              If true, immediately remove resources from API and bypass graceful deletion. Note that immediate deletion of some resources may result in inconsistency or data loss and requires confirmation.
-      --grace-period int   Period of time in seconds given to the resource to terminate gracefully. Ignored if negative. Set to 1 for immediate shutdown. Can only be set to 0 when --force is true (force deletion). (default -1)
-  -h, --help               help for delete
-      --now                If true, resources are signaled for immediate shutdown (same as --grace-period=1).
-  -l, --selector string    Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
+  -A, --all-namespace     If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
+  -h, --help              help for list-events
+  -l, --selector string   Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
 ```
 
 ### Options inherited from parent commands

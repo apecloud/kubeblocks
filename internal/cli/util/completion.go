@@ -14,16 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package builder
+package util
 
 import (
-	"testing"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	utilcomp "k8s.io/kubectl/pkg/util/completion"
 )
 
-func TestBuilder(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Builder Suite")
+func ResourceNameCompletionFunc(f cmdutil.Factory, gvr schema.GroupVersionResource) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return utilcomp.ResourceNameCompletionFunc(f, GVRToString(gvr))
 }

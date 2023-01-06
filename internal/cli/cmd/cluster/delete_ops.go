@@ -23,67 +23,47 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"github.com/apecloud/kubeblocks/internal/cli/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 func NewDeleteOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	return builder.NewCmdBuilder().
-		Use("delete-ops").
-		Short("Delete a OpsRequest").
-		GVR(types.OpsGVR()).
-		Factory(f).
-		IOStreams(streams).
-		CustomComplete(completeForDeleteOps).
-		CustomFlags(customFlagsForDeleteOps).
-		Build(delete.Build)
-}
-
-func customFlagsForDeleteOps(c *builder.Command) {
-	var (
-		o  *delete.DeleteFlags
-		ok bool
-	)
-	if o, ok = c.Options.(*delete.DeleteFlags); !ok {
-		return
+	o := delete.NewDeleteOptions(f, streams, types.OpsGVR())
+	cmd := &cobra.Command{
+		Use:   "delete-ops",
+		Short: "Delete a OpsRequest",
+		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(completeForDeleteOps(o, args))
+			util.CheckErr(o.Run())
+		},
 	}
-	c.Cmd.Flags().StringSliceVar(&o.ResourceNames, "name", []string{}, "OpsRequest names")
+	cmd.Flags().StringSliceVar(&o.Names, "name", []string{}, "OpsRequest names")
+	o.AddFlags(cmd)
+	return cmd
 }
 
 // completeForDeleteOps complete cmd for delete OpsRequest, if resource name
 // is not specified, construct a label selector based on the cluster name to
 // delete all OpeRequest belonging to the cluster.
-func completeForDeleteOps(c *builder.Command) error {
-	var (
-		flag *delete.DeleteFlags
-		ok   bool
-	)
-	if flag, ok = c.Options.(*delete.DeleteFlags); !ok {
+func completeForDeleteOps(o *delete.DeleteOptions, args []string) error {
+	// If resource name is not empty, delete these resources by name, do not need
+	// to construct the label selector.
+	if len(o.Names) > 0 {
+		o.ConfirmedNames = o.Names
 		return nil
 	}
 
-	args := c.Args
-	// If resource name is not empty, delete these resources by name, do not need
-	// to construct the label selector.
-	if len(flag.ResourceNames) > 0 || len(args) == 0 {
-		return nil
+	if len(args) == 0 {
+		return fmt.Errorf("missing cluster name")
 	}
 
 	if len(args) > 1 {
 		return fmt.Errorf("only support to delete the OpsRequests of one cluster")
 	}
 
-	flag.ClusterName = args[0]
-
+	o.ConfirmedNames = args
 	// If no specify OpsRequest name and cluster name is specified, delete all OpsRequest belonging to the cluster
-	labelString := fmt.Sprintf("%s=%s", types.InstanceLabelKey, flag.ClusterName)
-	if flag.LabelSelector == nil || len(*flag.LabelSelector) == 0 {
-		flag.LabelSelector = &labelString
-	} else {
-		// merge label
-		newLabelSelector := *flag.LabelSelector + "," + labelString
-		flag.LabelSelector = &newLabelSelector
-	}
+	o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)
 	return nil
 }

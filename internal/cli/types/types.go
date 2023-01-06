@@ -81,6 +81,8 @@ const (
 	ResourceBackupJobs     = "backupjobs"
 	ResourceRestoreJobs    = "restorejobs"
 	ResourceBackupPolicies = "backuppolicies"
+
+	None = "<none>"
 )
 
 var (

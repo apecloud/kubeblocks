@@ -34,11 +34,11 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var (
@@ -153,73 +153,59 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 }
 
 func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	return builder.NewCmdBuilder().
-		Use("list-backups").
-		Short("List backup jobs.").
-		Example(listBackupExample).
-		Factory(f).
-		GVR(types.BackupJobGVR()).
-		IOStreams(streams).
-		Build(list.Build)
+	o := list.NewListOptions(f, streams, types.BackupJobGVR())
+	cmd := &cobra.Command{
+		Use:               "list-backups",
+		Short:             "List backup jobs",
+		Aliases:           []string{"ls-backups"},
+		Example:           listBackupExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)
+			o.Names = nil
+			_, err := o.Run()
+			util.CheckErr(err)
+		},
+	}
+	o.AddFlags(cmd)
+	return cmd
 }
 
 func NewDeleteBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	return builder.NewCmdBuilder().
-		Use("delete-backup").
-		Short("Delete a backup job.").
-		Example(deleteBackupExample).
-		GVR(types.BackupJobGVR()).
-		Factory(f).
-		IOStreams(streams).
-		CustomComplete(completeForDeleteBackup).
-		CustomFlags(customFlagsForDeleteBackup).
-		Build(delete.Build)
-}
-
-func customFlagsForDeleteBackup(c *builder.Command) {
-	var (
-		o  *delete.DeleteFlags
-		ok bool
-	)
-	if o, ok = c.Options.(*delete.DeleteFlags); !ok {
-		return
+	o := delete.NewDeleteOptions(f, streams, types.BackupJobGVR())
+	cmd := &cobra.Command{
+		Use:               "delete-backup",
+		Short:             "Delete a backup job",
+		Example:           deleteBackupExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(completeForDeleteBackup(o, args))
+			util.CheckErr(o.Run())
+		},
 	}
-	c.Cmd.Flags().StringSliceVar(&o.ResourceNames, "name", []string{}, "Backup names")
+	cmd.Flags().StringSliceVar(&o.Names, "name", []string{}, "Backup names")
+	o.AddFlags(cmd)
+	return cmd
 }
 
 // completeForDeleteBackup complete cmd for delete backup
-func completeForDeleteBackup(c *builder.Command) error {
-	var (
-		flag *delete.DeleteFlags
-		ok   bool
-	)
-	args := c.Args
-	if flag, ok = c.Options.(*delete.DeleteFlags); !ok {
-		return nil
-	}
-
+func completeForDeleteBackup(o *delete.DeleteOptions, args []string) error {
 	if len(args) == 0 {
 		return errors.New("Missing cluster name")
 	}
 	if len(args) > 1 {
 		return errors.New("Only supported delete the Backup of one cluster")
 	}
-	if !*flag.Force && len(flag.ResourceNames) == 0 {
+	if !o.Force && len(o.Names) == 0 {
 		return errors.New("Missing --name as backup name.")
 	}
-	if *flag.Force && len(flag.ResourceNames) == 0 {
+	if o.Force && len(o.Names) == 0 {
 		// do force action, if specified --force and not specified --name, all backups with the cluster will be deleted
-		flag.ClusterName = args[0]
 		// if no specify backup name and cluster name is specified. it will delete all backups with the cluster
-		labelString := fmt.Sprintf("%s=%s", types.InstanceLabelKey, flag.ClusterName)
-		if flag.LabelSelector == nil || len(*flag.LabelSelector) == 0 {
-			flag.LabelSelector = &labelString
-		} else {
-			// merge label
-			newLabelSelector := *flag.LabelSelector + "," + labelString
-			flag.LabelSelector = &newLabelSelector
-		}
+		o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)
+		o.ConfirmedNames = args
 	}
+	o.ConfirmedNames = o.Names
 	return nil
 }
 
@@ -303,72 +289,58 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 }
 
 func NewListRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	return builder.NewCmdBuilder().
-		Use("list-restores").
-		Short("List all restore jobs.").
-		Example(listRestoreExample).
-		Factory(f).
-		GVR(types.RestoreJobGVR()).
-		IOStreams(streams).
-		Build(list.Build)
+	o := list.NewListOptions(f, streams, types.RestoreJobGVR())
+	cmd := &cobra.Command{
+		Use:               "list-restores",
+		Short:             "List all restore jobs",
+		Aliases:           []string{"ls-restores"},
+		Example:           listRestoreExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)
+			o.Names = nil
+			_, err := o.Run()
+			util.CheckErr(err)
+		},
+	}
+	o.AddFlags(cmd)
+	return cmd
 }
 
 func NewDeleteRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	return builder.NewCmdBuilder().
-		Use("delete-restore").
-		Short("Delete a restore job.").
-		Example(deleteRestoreExample).
-		GVR(types.RestoreJobGVR()).
-		Factory(f).
-		IOStreams(streams).
-		CustomFlags(customFlagsForDeleteRestore).
-		CustomComplete(completeForDeleteRestore).
-		Build(delete.Build)
-}
-
-func customFlagsForDeleteRestore(c *builder.Command) {
-	var (
-		o  *delete.DeleteFlags
-		ok bool
-	)
-	if o, ok = c.Options.(*delete.DeleteFlags); !ok {
-		return
+	o := delete.NewDeleteOptions(f, streams, types.RestoreJobGVR())
+	cmd := &cobra.Command{
+		Use:               "delete-restore",
+		Short:             "Delete a restore job",
+		Example:           deleteRestoreExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(completeForDeleteRestore(o, args))
+			util.CheckErr(o.Run())
+		},
 	}
-	c.Cmd.Flags().StringSliceVar(&o.ResourceNames, "name", []string{}, "Restore names")
+	cmd.Flags().StringSliceVar(&o.Names, "name", []string{}, "Restore names")
+	o.AddFlags(cmd)
+	return cmd
 }
 
 // completeForDeleteRestore complete cmd for delete restore
-func completeForDeleteRestore(c *builder.Command) error {
-	var (
-		flag *delete.DeleteFlags
-		ok   bool
-	)
-	if flag, ok = c.Options.(*delete.DeleteFlags); !ok {
-		return nil
-	}
-
-	args := c.Args
+func completeForDeleteRestore(o *delete.DeleteOptions, args []string) error {
 	if len(args) == 0 {
 		return errors.New("Missing cluster name")
 	}
 	if len(args) > 1 {
 		return errors.New("Only supported delete the restore of one cluster")
 	}
-	if !*flag.Force && len(flag.ResourceNames) == 0 {
+	if !o.Force && len(o.Names) == 0 {
 		return errors.New("Missing --name as restore name.")
 	}
-	if *flag.Force && len(flag.ResourceNames) == 0 {
+	if o.Force && len(o.Names) == 0 {
 		// do force action, if specified --force and not specified --name, all restores with the cluster will be deleted
-		flag.ClusterName = args[0]
 		// if no specify restore name and cluster name is specified. it will delete all restores with the cluster
-		labelString := fmt.Sprintf("%s=%s", types.InstanceLabelKey, flag.ClusterName)
-		if flag.LabelSelector == nil || len(*flag.LabelSelector) == 0 {
-			flag.LabelSelector = &labelString
-		} else {
-			// merge label
-			newLabelSelector := *flag.LabelSelector + "," + labelString
-			flag.LabelSelector = &newLabelSelector
-		}
+		o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)
+		o.ConfirmedNames = args
 	}
+	o.ConfirmedNames = o.Names
 	return nil
 }

@@ -10,3 +10,11 @@
           requests:
             storage: 1Gi
         volumeMode: Filesystem
+    - name: log
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+        volumeMode: Filesystem

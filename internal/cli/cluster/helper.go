@@ -29,6 +29,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 // GetDefaultPodName get the default pod in the cluster
@@ -182,4 +183,20 @@ func FakeClusterObjs() *ClusterObjects {
 	clusterObjs.Nodes = []*corev1.Node{testing.FakeNode()}
 	clusterObjs.Services = testing.FakeServices()
 	return clusterObjs
+}
+
+func BuildStorageSize(storages []StorageInfo) string {
+	var sizes []string
+	for _, s := range storages {
+		sizes = append(sizes, fmt.Sprintf("%s:%s", s.Name, s.Size))
+	}
+	return util.CheckEmpty(strings.Join(sizes, "\n"))
+}
+
+func BuildStorageClass(storages []StorageInfo) string {
+	var scs []string
+	for _, s := range storages {
+		scs = append(scs, s.StorageClass)
+	}
+	return util.CheckEmpty(strings.Join(scs, "\n"))
 }

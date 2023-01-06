@@ -20,85 +20,59 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdpatch "k8s.io/kubectl/pkg/cmd/patch"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	utilcomp "k8s.io/kubectl/pkg/util/completion"
 
-	"github.com/apecloud/kubeblocks/internal/cli/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 type Options struct {
+	Factory cmdutil.Factory
+
+	// resource names
+	Names []string
+	GVR   schema.GroupVersionResource
+
 	*cmdpatch.PatchOptions
 }
 
-func NewOptions(streams genericclioptions.IOStreams) *Options {
-	return &Options{PatchOptions: cmdpatch.NewPatchOptions(streams)}
-}
-
-func (o *Options) Build(c *builder.Command) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:               c.Use,
-		Short:             c.Short,
-		Example:           c.Example,
-		ValidArgsFunction: utilcomp.ResourceNameCompletionFunc(c.Factory, util.GVRToString(c.GVR)),
-		Run: func(cmd *cobra.Command, args []string) {
-			c.Args = args
-			util.CheckErr(o.complete(c))
-			util.CheckErr(o.validate())
-			util.CheckErr(o.run(c))
-		},
-	}
-
-	c.Cmd = cmd
-	o.addFlags(c)
-	return cmd
-}
-
-func (o *Options) addFlags(c *builder.Command) {
-	o.PrintFlags.AddFlags(c.Cmd)
-	cmdutil.AddDryRunFlag(c.Cmd)
-	if c.CustomFlags != nil {
-		c.CustomFlags(c)
+func NewOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, gvr schema.GroupVersionResource) *Options {
+	return &Options{
+		Factory:      f,
+		GVR:          gvr,
+		PatchOptions: cmdpatch.NewPatchOptions(streams),
 	}
 }
 
-func (o *Options) complete(c *builder.Command) error {
-	if len(c.Args) == 0 {
-		return fmt.Errorf("missing %s name", c.GVR.Resource)
+func (o *Options) AddFlags(cmd *cobra.Command) {
+	o.PrintFlags.AddFlags(cmd)
+	cmdutil.AddDryRunFlag(cmd)
+}
+
+func (o *Options) complete(cmd *cobra.Command) error {
+	if len(o.Names) == 0 {
+		return fmt.Errorf("missing %s name", o.GVR.Resource)
 	}
 
 	// for CRD, we always use Merge patch type
 	o.PatchType = "merge"
-	args := append([]string{util.GVRToString(c.GVR)}, c.Args...)
-	if err := o.Complete(c.Factory, c.Cmd, args); err != nil {
+	args := append([]string{util.GVRToString(o.GVR)}, o.Names...)
+	if err := o.Complete(o.Factory, cmd, args); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (o *Options) Run(cmd *cobra.Command) error {
+	if err := o.complete(cmd); err != nil {
 		return err
 	}
 
-	if c.CustomComplete != nil {
-		return c.CustomComplete(c)
-	}
-	return nil
-}
-
-func (o *Options) validate() error {
 	if len(o.Patch) == 0 {
 		return fmt.Errorf("the contents of the patch is empty")
 	}
-	return nil
-}
 
-func (o *Options) run(c *builder.Command) error {
-	var (
-		goon = true
-		err  error
-	)
-	if c.CustomRun != nil {
-		goon, err = c.CustomRun(c)
-	}
-	if goon && err == nil {
-		return o.RunPatch()
-	}
-	return err
+	return o.RunPatch()
 }

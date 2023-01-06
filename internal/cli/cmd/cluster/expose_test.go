@@ -21,12 +21,12 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/client-go/kubernetes/scheme"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/kubernetes/scheme"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"

@@ -19,6 +19,7 @@ package cluster
 import (
 	"bytes"
 	"net/http"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -56,6 +57,7 @@ var _ = Describe("list", func() {
 		_ = dbaasv1alpha1.AddToScheme(scheme.Scheme)
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 		cluster := testing.FakeCluster(clusterName, namespace)
+		pods := testing.FakePods(3, namespace, clusterName)
 		httpResp := func(obj runtime.Object) *http.Response {
 			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}
 		}
@@ -71,9 +73,11 @@ var _ = Describe("list", func() {
 				return map[string]*http.Response{
 					"/namespaces/" + namespace + "/clusters":      httpResp(&dbaasv1alpha1.ClusterList{Items: []dbaasv1alpha1.Cluster{*cluster}}),
 					"/namespaces/" + namespace + "/clusters/test": httpResp(cluster),
+					"/api/v1/nodes/" + testing.NodeName:           httpResp(testing.FakeNode()),
 					urlPrefix + "/services":                       httpResp(&corev1.ServiceList{}),
 					urlPrefix + "/secrets":                        httpResp(&corev1.SecretList{}),
-					urlPrefix + "/pods":                           httpResp(&corev1.PodList{}),
+					urlPrefix + "/pods":                           httpResp(pods),
+					urlPrefix + "/events":                         httpResp(testing.FakeEvents()),
 				}[req.URL.Path], nil
 			}),
 		}
@@ -89,32 +93,33 @@ var _ = Describe("list", func() {
 	It("list", func() {
 		cmd := NewListCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
-		Expect(cmd.Flags().Lookup("show-instance").Value.String()).Should(Equal("false"))
-		Expect(cmd.Flags().Lookup("show-component").Value.String()).Should(Equal("false"))
 
 		cmd.Run(cmd, []string{"test"})
-		expected := `NAME   AGE
-test   <unknown>
-`
-		Expect(out.String()).Should(Equal(expected))
+		Expect(out.String()).Should(ContainSubstring(testing.ClusterDefName))
 	})
 
-	It("show instance", func() {
-		cmd := NewListCmd(tf, streams)
+	It("list instances", func() {
+		cmd := NewListInstancesCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 
-		Expect(cmd.Flags().Set("show-instance", "true")).Should(Succeed())
 		cmd.Run(cmd, []string{"test"})
-		Expect(len(out.String()) > 0).Should(BeTrue())
+		Expect(out.String()).Should(ContainSubstring(testing.NodeName))
 	})
 
-	It("show component", func() {
-		cmd := NewListCmd(tf, streams)
+	It("list components", func() {
+		cmd := NewListComponentsCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 
-		Expect(cmd.Flags().Set("show-component", "true")).Should(Succeed())
 		cmd.Run(cmd, []string{"test"})
-		Expect(len(out.String()) > 0).Should(BeTrue())
+		Expect(out.String()).Should(ContainSubstring(testing.ComponentName))
+	})
+
+	It("list events", func() {
+		cmd := NewListEventsCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+
+		cmd.Run(cmd, []string{"test"})
+		Expect(len(strings.Split(out.String(), "\n")) > 1).Should(BeTrue())
 	})
 
 	It("output wide", func() {
@@ -123,15 +128,15 @@ test   <unknown>
 
 		Expect(cmd.Flags().Set("output", "wide")).Should(Succeed())
 		cmd.Run(cmd, []string{"test"})
-		Expect(len(out.String()) > 0).Should(BeTrue())
+		Expect(out.String()).Should(ContainSubstring(testing.ClusterVersionName))
 	})
 
-	It("output wide without ", func() {
+	It("output wide without args", func() {
 		cmd := NewListCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 
 		Expect(cmd.Flags().Set("output", "wide")).Should(Succeed())
 		cmd.Run(cmd, []string{})
-		Expect(len(out.String()) > 0).Should(BeTrue())
+		Expect(out.String()).Should(ContainSubstring(testing.ClusterVersionName))
 	})
 })

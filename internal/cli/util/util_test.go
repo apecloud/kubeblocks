@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
@@ -111,8 +113,13 @@ var _ = Describe("util", func() {
 				},
 			},
 		}
-		Expect(GetNodeByName(nodes, "test")).ShouldNot(BeNil())
-		Expect(GetNodeByName(nodes, "non-exists")).Should(BeNil())
+
+		testFn := func(name string) bool {
+			n := GetNodeByName(nodes, name)
+			return n.Name == name
+		}
+		Expect(testFn("test")).Should(BeTrue())
+		Expect(testFn("non-exists")).Should(BeFalse())
 	})
 
 	It("GetPodStatus", func() {
@@ -135,9 +142,35 @@ var _ = Describe("util", func() {
 		Expect(f).Should(Equal(1))
 	})
 
-	It("time format", func() {
-		t := metav1.Time{Time: time.Now()}
-		fmt.Println(TimeFormat(&t))
+	It("TimeFormat", func() {
+		t, _ := time.Parse(time.RFC3339, "2023-01-04T01:00:00.000Z")
+		metav1Time := metav1.Time{Time: t}
+		Expect(TimeFormat(&metav1Time)).Should(Equal("Jan 04,2023 01:00 UTC+0000"))
+	})
+
+	It("CheckEmpty", func() {
+		res := ""
+		Expect(CheckEmpty(res)).Should(Equal(types.None))
+		res = "test"
+		Expect(CheckEmpty(res)).Should(Equal(res))
+	})
+
+	It("BuildLabelSelectorByNames", func() {
+		Expect(BuildLabelSelectorByNames("", nil)).Should(Equal(""))
+
+		names := []string{"n1", "n2"}
+		expected := fmt.Sprintf("%s in (%s)", types.InstanceLabelKey, strings.Join(names, ","))
+		Expect(BuildLabelSelectorByNames("", names)).Should(Equal(expected))
+		Expect(BuildLabelSelectorByNames("label1", names)).Should(Equal("label1," + expected))
+	})
+
+	It("Event utils", func() {
+		objs := SortEventsByLastTimestamp(testing.FakeEvents(), "")
+		Expect(len(*objs)).Should(Equal(2))
+		firstEvent := (*objs)[0].(*corev1.Event)
+		secondEvent := (*objs)[1].(*corev1.Event)
+		Expect(firstEvent.LastTimestamp.Before(&secondEvent.LastTimestamp)).Should(BeTrue())
+		Expect(GetEventTimeStr(firstEvent)).Should(ContainSubstring("Jan 04,2023"))
 	})
 
 	It("Others", func() {

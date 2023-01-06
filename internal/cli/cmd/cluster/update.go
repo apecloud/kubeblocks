@@ -30,10 +30,10 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/patch"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var clusterUpdateExample = templates.Examples(`
@@ -54,7 +54,6 @@ var clusterUpdateExample = templates.Examples(`
 `)
 
 type updateOptions struct {
-	name      string
 	namespace string
 	dynamic   dynamic.Interface
 	cluster   *dbaasv1alpha1.Cluster
@@ -63,42 +62,36 @@ type updateOptions struct {
 	*patch.Options
 }
 
-func newUpdateOptions(streams genericclioptions.IOStreams) *updateOptions {
-	return &updateOptions{Options: patch.NewOptions(streams)}
-}
-
 func NewUpdateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := newUpdateOptions(streams)
-	return builder.NewCmdBuilder().
-		Use("update").
-		Short("Update the cluster").
-		Example(clusterUpdateExample).
-		Options(o).
-		IOStreams(streams).
-		Factory(f).
-		GVR(types.ClusterGVR()).
-		CustomFlags(o.addFlags).
-		CustomComplete(o.complete).
-		Build(o.Build)
+	o := &updateOptions{Options: patch.NewOptions(f, streams, types.ClusterGVR())}
+	cmd := &cobra.Command{
+		Use:               "update",
+		Short:             "Update the cluster",
+		Example:           clusterUpdateExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
+		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.complete(cmd, args))
+			util.CheckErr(o.Run(cmd))
+		},
+	}
+	o.UpdatableFlags.addFlags(cmd)
+	o.Options.AddFlags(cmd)
+	return cmd
 }
 
-func (o *updateOptions) addFlags(c *builder.Command) {
-	o.UpdatableFlags.addFlags(c.Cmd)
-}
-
-func (o *updateOptions) complete(c *builder.Command) error {
+func (o *updateOptions) complete(cmd *cobra.Command, args []string) error {
 	var err error
-	if len(c.Args) == 0 {
+	if len(args) == 0 {
 		return fmt.Errorf("missing updated cluster name")
 	}
-	if len(c.Args) > 1 {
+	if len(args) > 1 {
 		return fmt.Errorf("only support to update one cluster")
 	}
-	o.name = c.Args[0]
+	o.Names = args
 
 	// record the flags that been set by user
 	var flags []*pflag.Flag
-	c.Cmd.Flags().Visit(func(flag *pflag.Flag) {
+	cmd.Flags().Visit(func(flag *pflag.Flag) {
 		flags = append(flags, flag)
 	})
 
@@ -107,10 +100,10 @@ func (o *updateOptions) complete(c *builder.Command) error {
 		return nil
 	}
 
-	if o.namespace, _, err = c.Factory.ToRawKubeConfigLoader().Namespace(); err != nil {
+	if o.namespace, _, err = o.Factory.ToRawKubeConfigLoader().Namespace(); err != nil {
 		return err
 	}
-	if o.dynamic, err = c.Factory.DynamicClient(); err != nil {
+	if o.dynamic, err = o.Factory.DynamicClient(); err != nil {
 		return err
 	}
 	return o.buildPatch(flags)
@@ -189,7 +182,7 @@ func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 
 func (o *updateOptions) buildComponents(field string, val string) error {
 	if o.cluster == nil {
-		cluster, err := cluster.GetClusterByName(o.dynamic, o.name, o.namespace)
+		cluster, err := cluster.GetClusterByName(o.dynamic, o.Names[0], o.namespace)
 		if err != nil {
 			return err
 		}

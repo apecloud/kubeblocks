@@ -22,121 +22,171 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	utilcomp "k8s.io/kubectl/pkg/util/completion"
 
-	"github.com/apecloud/kubeblocks/internal/cli/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 )
 
-type DeleteFlags struct {
-	*cmddelete.DeleteFlags
+type DeleteOptions struct {
+	Factory       cmdutil.Factory
+	Namespace     string
+	LabelSelector string
+	AllNamespaces bool
+	Force         bool
+	GracePeriod   int
+	Now           bool
 
-	// ClusterName only used when delete resources not cluster, ClusterName
-	// is the owner of the resources, it will be used to construct a label
-	// selector to filter the resource. If ClusterName is empty, command will
-	// delete resources according to the ResourceNames without any label selector.
-	ClusterName string
+	// Names are the resource names
+	Names []string
+	// ConfirmedNames used to double-check the resource names to delete, sometimes Names are used to build
+	// label selector and be set to nil, ConfirmedNames should be used to record the names to be confirmed.
+	ConfirmedNames []string
+	GVR            schema.GroupVersionResource
+	Result         *resource.Result
 
-	// ResourceNames the resource names that will be deleted, if it is empty,
-	// and ClusterName is specified, use label selector to delete all resource
-	// belonging to the ClusterName
-	ResourceNames []string
+	genericclioptions.IOStreams
 }
 
-// Build a delete command
-func Build(c *builder.Command) *cobra.Command {
-	deleteFlags := newDeleteCommandFlags()
-	cmd := &cobra.Command{
-		Use:               c.Use,
-		Short:             c.Short,
-		Example:           c.Example,
-		ValidArgsFunction: utilcomp.ResourceNameCompletionFunc(c.Factory, util.GVRToString(c.GVR)),
-		Run: func(cmd *cobra.Command, args []string) {
-			c.Args = args
-
-			// If delete resources belonging to cluster, custom complete function
-			// should fill the ResourceName or construct the label selector based
-			// on the ClusterName
-			if c.CustomComplete != nil {
-				util.CheckErr(c.CustomComplete(c))
-			}
-
-			util.CheckErr(validate(deleteFlags, args, c.IOStreams.In))
-
-			o, err := deleteFlags.ToOptions(nil, c.IOStreams)
-			util.CheckErr(err)
-
-			// build args that will be used to
-			args = buildArgs(c, deleteFlags, args)
-
-			// call kubectl delete options methods
-			util.CheckErr(o.Complete(c.Factory, args, cmd))
-			util.CheckErr(o.Validate())
-			util.CheckErr(o.RunDelete(c.Factory))
-		},
+func NewDeleteOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, gvr schema.GroupVersionResource) *DeleteOptions {
+	return &DeleteOptions{
+		Factory:   f,
+		IOStreams: streams,
+		GVR:       gvr,
 	}
-
-	c.Options = deleteFlags
-	c.Cmd = cmd
-	if c.CustomFlags != nil {
-		c.CustomFlags(c)
-	}
-	deleteFlags.AddFlags(cmd)
-	cmdutil.AddDryRunFlag(cmd)
-
-	return cmd
 }
 
-// buildArgs build resource to delete
-func buildArgs(c *builder.Command, deleteFlags *DeleteFlags, args []string) []string {
-	if len(deleteFlags.ResourceNames) > 0 {
-		args = deleteFlags.ResourceNames
-	} else if deleteFlags.ClusterName != "" {
-		// use the cluster label selector to select the resources that should
-		// be deleted, so args should be empty, the original args should have
-		// been used to construct the label selector.
-		args = []string{}
+func (o *DeleteOptions) Run() error {
+	if err := o.complete(); err != nil {
+		return err
 	}
-	args = append([]string{util.GVRToString(c.GVR)}, args...)
-	return args
+
+	// delete results
+	return o.deleteResult(o.Result)
 }
 
-func validate(deleteFlags *DeleteFlags, args []string, in io.Reader) error {
-	// build resource to delete.
-	// if resource names is specified, use it first, otherwise use the args.
-	if len(deleteFlags.ResourceNames) > 0 {
-		args = deleteFlags.ResourceNames
-	}
-	if len(args) < 1 {
-		return fmt.Errorf("missing name")
+func (o *DeleteOptions) complete() error {
+	switch {
+	case o.GracePeriod == 0 && o.Force:
+		fmt.Fprintf(o.ErrOut, "warning: Immediate deletion does not wait for confirmation that the running resource has been terminated.\n")
+	case o.GracePeriod > 0 && o.Force:
+		return fmt.Errorf("--force and --grace-period greater than 0 cannot be specified together")
 	}
 
-	// confirm the name
-	name, err := prompt.NewPrompt("You should enter the name.", "Please enter the name again(separate with commas when more than one):", in).GetInput()
+	if o.Now {
+		if o.GracePeriod != -1 {
+			return fmt.Errorf("--now and --grace-period cannot be specified together")
+		}
+		o.GracePeriod = 1
+	}
+	if o.GracePeriod == 0 && !o.Force {
+		o.GracePeriod = 1
+	}
+	if o.Force && o.GracePeriod < 0 {
+		o.GracePeriod = 0
+	}
+
+	namespace, _, err := o.Factory.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
-	if name != strings.Join(args, ",") {
-		return fmt.Errorf("the entered name \"%s\" does not match \"%s\"", name, strings.Join(args, ","))
+
+	// confirm names to delete, use ConfirmedNames first, if it is empty, use Names
+	names := o.ConfirmedNames
+	if len(names) == 0 {
+		names = o.Names
+	}
+	if err = confirm(names, o.In); err != nil {
+		return err
+	}
+
+	// get the resources to delete
+	r := o.Factory.NewBuilder().
+		Unstructured().
+		ContinueOnError().
+		NamespaceParam(namespace).DefaultNamespace().
+		LabelSelectorParam(o.LabelSelector).
+		AllNamespaces(o.AllNamespaces).
+		ResourceTypeOrNameArgs(false, append([]string{util.GVRToString(o.GVR)}, o.Names...)...).
+		RequireObject(false).
+		Flatten().
+		Do()
+	err = r.Err()
+	if err != nil {
+		return err
+	}
+	o.Result = r
+	return err
+}
+
+func (o *DeleteOptions) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", false, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.")
+	cmd.Flags().BoolVar(&o.Force, "force", false, "If true, immediately remove resources from API and bypass graceful deletion. Note that immediate deletion of some resources may result in inconsistency or data loss and requires confirmation.")
+	cmd.Flags().BoolVar(&o.Now, "now", false, "If true, resources are signaled for immediate shutdown (same as --grace-period=1).")
+	cmd.Flags().IntVar(&o.GracePeriod, "grace-period", -1, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative. Set to 1 for immediate shutdown. Can only be set to 0 when --force is true (force deletion).")
+}
+
+func (o *DeleteOptions) deleteResult(r *resource.Result) error {
+	found := 0
+	var deleteInfos []*resource.Info
+	err := r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
+		deleteInfos = append(deleteInfos, info)
+		found++
+
+		options := &metav1.DeleteOptions{}
+		if o.GracePeriod >= 0 {
+			options = metav1.NewDeleteOptions(int64(o.GracePeriod))
+		}
+		_, err = o.deleteResource(info, options)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(o.Out, "%s \"%s\" deleted\n", info.Mapping.GroupVersionKind.Kind, info.Name)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if found == 0 {
+		fmt.Fprintf(o.Out, "No %s found\n", o.GVR.Resource)
 	}
 
 	return nil
 }
 
-// newDeleteCommandFlags return a kubectl delete command flags, disable some flags that
-// we do not supported.
-func newDeleteCommandFlags() *DeleteFlags {
-	deleteCmdFlags := cmddelete.NewDeleteCommandFlags("containing the resource to delete.")
+func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav1.DeleteOptions) (runtime.Object, error) {
+	response, err := resource.
+		NewHelper(info.Client, info.Mapping).
+		DryRun(false).
+		DeleteWithOptions(info.Namespace, info.Name, deleteOptions)
+	if err != nil {
+		return nil, cmdutil.AddSourceToErr("deleting", info.Source, err)
+	}
+	return response, nil
+}
 
-	// disable some flags
-	deleteCmdFlags.FieldSelector = nil
-	deleteCmdFlags.Raw = nil
-	deleteCmdFlags.All = nil
-	deleteCmdFlags.IgnoreNotFound = nil
-	deleteCmdFlags.FileNameFlags = nil
+// confirm let user double-check what to delete
+func confirm(names []string, in io.Reader) error {
+	if len(names) == 0 {
+		return nil
+	}
 
-	return &DeleteFlags{DeleteFlags: deleteCmdFlags}
+	entered, err := prompt.NewPrompt("You should enter the name.", "Please enter the name again(separate with commas when more than one):", in).GetInput()
+	if err != nil {
+		return err
+	}
+	if entered != strings.Join(names, ",") {
+		return fmt.Errorf("the entered name \"%s\" does not match \"%s\"", entered, strings.Join(names, ","))
+	}
+
+	return nil
 }

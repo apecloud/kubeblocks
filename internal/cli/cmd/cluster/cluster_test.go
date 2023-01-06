@@ -17,20 +17,17 @@ limitations under the License.
 package cluster
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	"github.com/apecloud/kubeblocks/internal/cli/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var _ = Describe("Cluster", func() {
@@ -161,28 +158,24 @@ var _ = Describe("Cluster", func() {
 
 	It("list and delete operations", func() {
 		clusterName := "wesql"
-		clusterLabel := fmt.Sprintf("%s=%s", types.InstanceLabelKey, clusterName)
+		args := []string{clusterName}
+		clusterLabel := util.BuildLabelSelectorByNames("", args)
 		testLabel := "kubeblocks.io/test=test"
 
 		By("test delete OpsRequest with cluster")
-		deleteFlags := &delete.DeleteFlags{
-			DeleteFlags: cmddelete.NewDeleteCommandFlags("containing the resource to delete."),
-		}
-		c := &builder.Command{Options: deleteFlags, Args: []string{clusterName}}
-		Expect(completeForDeleteOps(c)).Should(Succeed())
-		Expect(*deleteFlags.LabelSelector == clusterLabel).Should(BeTrue())
+		o := delete.NewDeleteOptions(tf, streams, types.OpsGVR())
+		Expect(completeForDeleteOps(o, args)).Should(Succeed())
+		Expect(o.LabelSelector == clusterLabel).Should(BeTrue())
 
 		By("test delete OpsRequest with cluster and custom label")
-		deleteFlags.LabelSelector = &testLabel
-		Expect(completeForDeleteOps(c)).Should(Succeed())
-		Expect(*deleteFlags.LabelSelector == testLabel+","+clusterLabel).Should(BeTrue())
+		o.LabelSelector = testLabel
+		Expect(completeForDeleteOps(o, args)).Should(Succeed())
+		Expect(o.LabelSelector == testLabel+","+clusterLabel).Should(BeTrue())
 
 		By("test delete OpsRequest with name")
-		deleteFlags.ClusterName = ""
-		deleteFlags.ResourceNames = []string{"test1"}
-		c.Args = []string{}
-		Expect(completeForDeleteOps(c)).Should(Succeed())
-		Expect(deleteFlags.ClusterName == "").Should(BeTrue())
+		o.Names = []string{"test1"}
+		Expect(completeForDeleteOps(o, nil)).Should(Succeed())
+		Expect(len(o.ConfirmedNames)).Should(Equal(1))
 	})
 
 	It("connect", func() {

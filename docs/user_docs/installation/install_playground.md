@@ -16,9 +16,6 @@ KuebBlocks playground creates an easy-to-use database environment for Kubernetes
 
 ## Deploy a playground on a local host
 
-> **Note** <br>
-> During the deployment process, files will be downloaded from Docker image and downloading might be slow. It is recommended to enable VPN while downloading. ***# Is this a promblem for overseas users?***
-
 _Steps_:
 
 1. Run this command to install `playground`.

@@ -5,7 +5,7 @@ This guide shows how to use KubeBlocks to restart a three-node cluster.
 ## Before you start
 
 - [Install KubeBlocks](../../installation/deploy_kubeblocks.md). 
-- Run the commands below to check whether the KubeBlocks is installed successfully and the cluster-related `CR` (custom resources) are created.
+- Run the commands below to check whether KubeBlocks is installed successfully and the cluster-related `CR` (custom resources) are created.
   - Run the commands to check whether KubeBlocks is installed successfully.
   ```
   $ kubectl get pod
@@ -23,7 +23,7 @@ This guide shows how to use KubeBlocks to restart a three-node cluster.
     apecloud-wesql   Available   7m13s
   $ kubectl get appversion
     NAME           PHASE       AGE
-    wesql-8.0.18   Available   7m23s
+    wesql-8.0.30   Available   7m23s
   $ kubectl get cm
     NAME                  DATA   AGE
     mysql-3node-tpl-8.0   1      7m28s
@@ -32,11 +32,11 @@ This guide shows how to use KubeBlocks to restart a three-node cluster.
   - [KubeBlocks OpsRequest](../configure_ops_request.md) 
   - [Restarting overview](Overview.md) 
 
-## Create a three-node cluster for a demo
+## Step 1. Create a three-node cluster for a demo
 
 _Steps_:
 
-1. Prepare a YAML file for a three-node cluster. Below is the YAML file of the single-node cluster. You can find [this demo file, `cluster_three_nodes`](../../../../examples/dbaas/cluster_three_nodes.yaml), in [`kubeblocks/examples/dbaas`](https://github.com/apecloud/kubeblocks/tree/main/examples/dbaas).
+1. Prepare a YAML file for a three-node cluster. Below is the YAML file of the single-node cluster. 
 
 ```
 apiVersion: dbaas.kubeblocks.io/v1alpha1
@@ -44,12 +44,12 @@ kind: Cluster
 metadata:
   name: wesql-3nodes
 spec:
-  appVersionRef: wesql-8.0.18
+  appVersionRef: wesql-8.0.30
   clusterDefinitionRef: apecloud-wesql
   terminationPolicy: WipeOut
   components:
     - name: wesql-demo
-      type: replicasets
+      type: wesql
       monitor: false
       replicas: 3
       volumeClaimTemplates:
@@ -76,7 +76,7 @@ Wait a few seconds and when the cluster phase changes to  `Running`, the cluster
 ```
 $ kubectl get cluster
 NAME                   APP-VERSION    PHASE     AGE
-wesql-3nodes           wesql-8.0.18   Running   20s
+wesql-3nodes           wesql-8.0.30   Running   20s
 ```
 
 3. Check the operations this cluster supports:
@@ -106,10 +106,10 @@ Status:
 
 When the `status.phase` is `Running`, you can run `OpsRequest` to restart this cluster.
 
-## Restart a three-node cluster
+## Step 2. Restart a three-node cluster
 
 _Steps_:
-1. Prepare a YAML file for restarting a three-node cluster. Below is the YAML file of the `OpsRequest` CR. You can find [this demo file, `restart_three_nodes.yaml`](../../../../examples/dbaas/restart_three_nodes.yaml), in [`kubeblocks/examples/dbaas`](https://github.com/apecloud/kubeblocks/tree/main/examples/dbaas).
+1. Prepare a YAML file for restarting a three-node cluster. Below is the YAML file of the `OpsRequest` CR. 
 
 ```
 apiVersion: dbaas.kubeblocks.io/v1alpha1
@@ -141,7 +141,7 @@ ops-restart            Running   45s
 ```
 $ kubectl get cluster
 NAME                   APP-VERSION    PHASE      AGE
-wesql-3nodes           wesql-8.0.18   Updating   16m 
+wesql-3nodes           wesql-8.0.30   Updating   16m 
 ```
 
 ### Results
@@ -159,7 +159,7 @@ And the cluster also changes:
 ```
 $ kubectl get cluster
 NAME                   APP-VERSION    PHASE      AGE
-wesql-3nodes           wesql-8.0.18   Running    17m
+wesql-3nodes           wesql-8.0.30   Running    17m
 ```
 
 4. View the details of `OpsRequest`.
@@ -281,7 +281,7 @@ Events:
   Normal  OpsRequestProcessedSuccessfully  49s    ops-request-controller  Controller has successfully processed the OpsRequest: ops-restart-threenodes-demo in Cluster: wesql-3nodes
 ```
 
-## (Optional) Destroy resources
+## Step 3. (Optional) Destroy resources
 
 Run the following commands to destroy the resources created by this guide:
 

@@ -13,7 +13,7 @@ kbcli cluster create NAME [flags]
 | **Flag**             |  **Default**              |  **Description**                          |
 | :--                  | :--                       |  :--                                      |
 | cluster-definition   | wesql-clusterdefintiion   | The quoted `ClusterDefinition`.           |
-| app-version          | wesql-appersion-8.0.29    | The default value is the latest version of WeSQL. It will change when a new version is released. |
+| app-version          | wesql-appersion-8.0.30    | The default value is the latest version of WeSQL. It will change when a new version is released. |
 | termination-policy   | Halt                      | The halt strategy.                        |
 | components           | N/A                       | It specifies the path of the YAML file and is used to configure `component`. |
 <!--| class                | N/A                       | The smallest class is set as the defalut. |
@@ -97,19 +97,22 @@ kbcli cluster list [flags]
 
 ## Connect to a cluster
 
-***Commands below do not use `kbcli` command. Need further development.***
-
-Run this command to allow your local host to access the database instances.
+Run the command below to allow your local host to access the database instances.
 
 ```
-kubectl --kubeconfig ~/.kube/kbcli-playground port-forward --address 0.0.0.0 service/mycluster 3306
+kbcli cluster connnect NAME
 ```
 
-Run the command below to connect to the database instance in another terminal.
+You can use the option, `-i`, to specify an instance name. For example, 
 
 ```
-  MYSQL_ROOT_PASSWORD=$(kubectl --kubeconfig ~/.kube/kbcli-playground get secret --namespace default mycluster-cluster-secret -o jsonpath="{.data.rootPassword}" | base64 -d)
-  mysql -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD"
+kbcli cluster connect -i mycluster-0
+```
+
+Run the command below to view the instance list.
+
+```
+kbcli cluster list-instances mycluster
 ```
 
 ## Restart a cluster
@@ -122,7 +125,7 @@ kbcli cluster restart NAME
 
 ## Upgrade a cluster
 
-Specify an appversion by using the option `--app-version` and upgrade the cluster to this version. For more options information, see [kbcli cluster upgrade](../cli/kbcli_cluster_upgrade.md).
+Specify an appversion by using the option `--app-version` and upgrade the cluster to this version. For more options information, see [`kbcli cluster upgrade`](../cli/kbcli_cluster_upgrade.md).
 
 ```
 kbcli cluster upgrade NAME --app-version=<AppVersionName>
@@ -130,7 +133,7 @@ kbcli cluster upgrade NAME --app-version=<AppVersionName>
 
 ## Vertically scale a cluster
 
-Specify your requirements by using options to scale up a cluster. For more options information, see [kbcli cluster vertical-scaling](../cli/kbcli_cluster_vertical-scaling.md).
+Specify your requirements by using options to scale up a cluster. For more options information, see [`kbcli cluster vertical-scaling`](../cli/kbcli_cluster_vertical-scaling.md).
 
 _Example_
 
@@ -143,7 +146,7 @@ kbcli cluster vertical-scaling wesql-demo \
 
 ## Horizontally scale a cluster
 
-Specify a cluster and its role group by using options to scale out this cluster. For more options information, see [kbcli cluster horizontal-scale](../cli/kbcli_cluster_horizontal-scaling.md)
+Specify a cluster and its role group by using options to scale out this cluster. For more options information, see [`kbcli cluster horizontal-scale`](../cli/kbcli_cluster_horizontal-scaling.md).
 
 - The `role-group-names` option stands for the roleGroupNames of the nodes that need to be expanded. It is an array and needs to be separated by commas.
 
@@ -159,7 +162,7 @@ kbcli cluster horizontal-scaling wesql-demo \
 
 ## Expand the cluster volume
 
-Run `kbcli cluster volume-expansion` to expand the cluster volume. For more options information, see [kbcli cluster volume-expansion](../cli/kbcli_cluster_volume-expansion.md).
+Run `kbcli cluster volume-expansion` to expand the cluster volume. For more options information, see [`kbcli cluster volume-expansion`](../cli/kbcli_cluster_volume-expansion.md).
 
 - The `component-names` option can be used to specify a cluster.
 - The `storage` option can be used to specify the expected volume expansion size. 

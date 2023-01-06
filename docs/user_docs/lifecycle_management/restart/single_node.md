@@ -5,7 +5,7 @@ This guide introduces how to use KubeBlocks to restart a single-node cluster.
 ## Before you start
 
 - [Install KubeBlocks](../../installation/deploy_kubeblocks.md). 
-- Run the commands below to check whether the KubeBlocks is installed successfully and the cluster-related `CR` (custom resources) are created.
+- Run the commands below to check whether KubeBlocks is installed successfully and the cluster-related `CR` (custom resources) are created.
   - Run the commands to check whether KubeBlocks is installed successfully.
   ```
   $ kubectl get pod
@@ -23,7 +23,7 @@ This guide introduces how to use KubeBlocks to restart a single-node cluster.
     apecloud-wesql   Available   7m13s
   $ kubectl get appversion
     NAME           PHASE       AGE
-    wesql-8.0.18   Available   7m23s
+    wesql-8.0.30   Available   7m23s
   $ kubectl get cm
     NAME                  DATA   AGE
     mysql-3node-tpl-8.0   1      7m28s
@@ -32,11 +32,11 @@ This guide introduces how to use KubeBlocks to restart a single-node cluster.
   - [KubeBlocks OpsRequest](../configure_ops_request.md) 
   - [Restarting overview](Overview.md) 
 
-## Create a single-node cluster for a demo
+## Step 1. Create a single-node cluster for a demo
 
 _Steps_:
 
-1. Prepare a YAML file for a single-node cluster. Below is the YAML file of the single-node cluster. You can find [this demo file, `cluster.yaml`](kubeblocks/examples/../../../../../../examples/dbaas/cluster.yaml), in [`kubeblocks/examples/dbaas`](https://github.com/apecloud/kubeblocks/tree/main/examples/dbaas).
+1. Prepare a YAML file for a single-node cluster. Below is the YAML file of the single-node cluster. 
 
 ```
 apiVersion: dbaas.kubeblocks.io/v1alpha1
@@ -44,12 +44,12 @@ kind: Cluster
 metadata:
   name: wesql
 spec:
-  appVersionRef: wesql-8.0.18
+  appVersionRef: wesql-8.0.30
   clusterDefinitionRef: apecloud-wesql
   terminationPolicy: WipeOut
   components:
     - name: wesql-demo
-      type: replicasets
+      type: wesql
       monitor: false
       replicas: 1
       volumeClaimTemplates:
@@ -77,7 +77,7 @@ Wait a few seconds and when the cluster phase changes to  `Running`, the cluster
 ```
 $ kubectl get cluster
 NAME            APP-VERSION    PHASE     AGE
-wesql           wesql-8.0.18   Running   22s
+wesql           wesql-8.0.30   Running   22s
 ```
 
 3. Check the operations this cluster supports:
@@ -109,11 +109,11 @@ Status:
 ### Result
 When the `status.phase` is `Running`, you can run `OpsRequest` to restart this cluster.
 
-## Restart a single-node cluster
+## Step 2. Restart a single-node cluster
 
 _Steps_:
 
-1. Prepare a YAML file for restarting a single-node cluster. Below is the YAML file of the `OpsRequest` CR. You can find [this demo file, `restart.yaml`](../../../../examples/dbaas/restart.yaml), in [`kubeblocks/examples/dbaas`](https://github.com/apecloud/kubeblocks/tree/main/examples/dbaas).
+1. Prepare a YAML file for restarting a single-node cluster. Below is the YAML file of the `OpsRequest` CR. 
 
 ```
 apiVersion: dbaas.kubeblocks.io/v1alpha1
@@ -145,7 +145,7 @@ ops-restart-demo            Running   12s
 ```
 $ kubectl get cluster
 NAME            APP-VERSION    PHASE      AGE
-wesql           wesql-8.0.18   Updating   11m46s 
+wesql           wesql-8.0.30   Updating   11m46s 
 ```
 
 ### Results
@@ -162,7 +162,7 @@ And the cluster also changes:
 ```
 $ kubectl get cluster
 NAME            APP-VERSION    PHASE      AGE
-wesql           wesql-8.0.18   Running    12m26s
+wesql           wesql-8.0.30   Running    12m26s
 ```
 
 4. (Optional) View the details of `OpsRequest`.
@@ -284,7 +284,7 @@ Events:
   Normal  OpsRequestProcessedSuccessfully  50s   ops-request-controller  Controller has successfully processed the OpsRequest: ops-restart-demo in Cluster: wesql
 ```
 
-## (Optional) Destroy resources
+## Step 3. (Optional) Destroy resources
 
 Run the following commands to destroy the resources created by this guide:
 

@@ -5,7 +5,7 @@ This section shows you how to use KubeBlocks to scale up a cluster.
 ## Before you start
 
 - [Install KubeBlocks](../../installation/deploy_kubeblocks.md). 
-- Run the commands below to check whether the KubeBlocks is installed successfully and the cluster-related `CR` (custom resources) are created.
+- Run the commands below to check whether KubeBlocks is installed successfully and the cluster-related `CR` (custom resources) are created.
   - Run the commands to check whether KubeBlocks is installed successfully.
     ```
     $ kubectl get pod
@@ -23,7 +23,7 @@ This section shows you how to use KubeBlocks to scale up a cluster.
       apecloud-wesql   Available   7m13s
     $ kubectl get appversion
       NAME           PHASE       AGE
-      wesql-8.0.18   Available   7m23s
+      wesql-8.0.30   Available   7m23s
     $ kubectl get cm
       NAME                  DATA   AGE
       mysql-3node-tpl-8.0   1      7m28s
@@ -32,11 +32,11 @@ This section shows you how to use KubeBlocks to scale up a cluster.
   - [KubeBlocks OpsRequest](../configure_ops_request.md)
   - [Vertical scaling overview](Overview.md) 
 
-## Create a single-node cluster for a demo
+## Step 1. Create a single-node cluster for a demo
 
 _Steps_:
 
-1. Prepare a YAML file for a single-node cluster. Below is the YAML file of the single-node cluster. You can find [this demo file, `cluster.yaml`](kubeblocks/examples/../../../../../../examples/dbaas/cluster.yaml), in [`kubeblocks/examples/dbaas`](https://github.com/apecloud/kubeblocks/tree/main/examples/dbaas).
+1. Prepare a YAML file for a single-node cluster. Below is the YAML file of the single-node cluster. 
 
 
   ```
@@ -45,12 +45,12 @@ _Steps_:
   metadata:
     name: wesql
   spec:
-    appVersionRef: wesql-8.0.18
+    appVersionRef: wesql-8.0.30
     clusterDefinitionRef: apecloud-wesql
     terminationPolicy: WipeOut
     components:
       - name: wesql-demo
-        type: replicasets
+        type: wesql
         monitor: false
         replicas: 1
         volumeClaimTemplates:
@@ -78,7 +78,7 @@ Wait a few seconds and when the cluster phase changes to  `Running`, the cluster
 ```
 $ kubectl get cluster
 NAME            APP-VERSION    PHASE     AGE
-wesql           wesql-8.0.18   Running   22s
+wesql           wesql-8.0.30   Running   22s
 ```
 
 3. Check the operations this cluster supports:
@@ -111,11 +111,11 @@ wesql           wesql-8.0.18   Running   22s
 
 When the `status.phase` is `Running`, you can run `OpsRequest` to restart this cluster.
 
-## Vertically scale a cluster
+## Step 2. Vertically scale a cluster
 
 _Steps_:
 
-1. Prepare a YAML file for vertically scaling a single-node cluster. Below is the YAML file of the `OpsRequest` CR. You can find [this demo file, `vertical_scaling.yaml`](../../../../examples/dbaas/vertical_scaling.yaml), in [`kubeblocks/examples/dbaas`](https://github.com/apecloud/kubeblocks/tree/main/examples/dbaas).
+1. Prepare a YAML file for vertically scaling a single-node cluster. Below is the YAML file of the `OpsRequest` CR. 
 
   ```
   apiVersion: dbaas.kubeblocks.io/v1alpha1
@@ -154,7 +154,7 @@ _Steps_:
   ```
   $ kubectl get cluster
   NAME            APP-VERSION    PHASE      AGE
-  wesql           wesql-8.0.18   Updating   8m46s
+  wesql           wesql-8.0.30   Updating   8m46s
   ```
 
 ### Results
@@ -171,7 +171,7 @@ And the cluster also changes:
   ```
   $ kubectl get cluster
   NAME            APP-VERSION    PHASE      AGE
-  wesql           wesql-8.0.18   Running  9m16s
+  wesql           wesql-8.0.30   Running  9m16s
   ```
 
 4. View the details of `OpsRequest`.
@@ -300,7 +300,7 @@ And the cluster also changes:
     Normal  OpsRequestProcessedSuccessfully  41s   ops-request-controller  Controller has successfully processed the OpsRequest: ops-vertical-scaling-demo in Cluster: wesql
   ```
 
-## (Optional) Destroy resources
+## Step 3. (Optional) Destroy resources
 
 Run the following commands to destroy the resources created by this guide:
 

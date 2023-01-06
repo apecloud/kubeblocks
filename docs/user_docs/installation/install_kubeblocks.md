@@ -30,7 +30,7 @@ Run this command to install KubeBlocks.
 kbcli kubeblocks install 
 ```
 
-To enable database monitoring by default, set `--monitor=true` and run the following command. For detailed information, see _Monitor database_. ***Links to be added.***
+To enable database monitoring by default, set `--monitor=true` and run the following command. For detailed information, see [Monitor database](../database_observability/monitor_database.md).
 
 ```
 kbcli kubeblocks install --monitor=true

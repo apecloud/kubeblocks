@@ -10,7 +10,7 @@ This guide describes the details of KubeBlocks lifecycle API. KubeBlocks API is 
 
 #### spec.type
 
-`spec.type` is required. You can fill it as the following examples do: state.redis, mq.mqtt, mq.kafkal, state.mysql-8, state.mysql-7.
+`spec.type` is required. You can fill it in as the following examples do: state.redis, mq.mqtt, mq.kafkal, state.mysql-8, state.mysql-7.
 
 #### spec.componentType
 
@@ -54,7 +54,7 @@ When the `spec.componentType` is set as `consensus`, `spec.consensusSpec` is req
 
 #### spec.connectionCredential
 
-`spec.connectionCredential` is used to create a connection secret. 
+`spec.connectionCredential` is used to create a connection credential secret. 
 
 Requirements for `.spec.connectionCredential`:
   - 8 random characters `$(RANDOM_PASSWD)` placeholder.
@@ -179,16 +179,16 @@ Note:
 
 `envs` automatically injected by KubeBlocks can be used in the above `env` and `args` fields.
 
-KB_POD_NAME - Pod Name
-KB_NAMESPACE - Namespace
-KB_SA_NAME - Service Account Name
-KB_NODENAME - Node Name
-KB_HOSTIP - Host IP address
-KB_PODIP - Pod IP address
-KB_PODIPS - Pod IP addresses
-KB_CLUSTER_NAME - KubeBlock Cluster API object name
-KB_COMP_NAME - Running pod's KubeBlock Cluster API object's .spec.components.name
-KB_CLUSTER_COMP_NAME - Running pod's KubeBlock Cluster API object's <.metadata.name>-<.spec.components..name>, same name is used for Deployment or StatefulSet workload name, and Service object name
+- KB_POD_NAME - Pod Name
+- KB_NAMESPACE - Namespace
+- KB_SA_NAME - Service Account Name
+- KB_NODENAME - Node Name
+- KB_HOSTIP - Host IP address
+- KB_PODIP - Pod IP address
+- KB_PODIPS - Pod IP addresses
+- KB_CLUSTER_NAME - KubeBlock Cluster API object name
+- KB_COMP_NAME - Running pod's KubeBlock Cluster API object's .spec.components.name
+- KB_CLUSTER_COMP_NAME - Running pod's KubeBlock Cluster API object's <.metadata.name>-<.spec.components..name>, same name is used for Deployment or StatefulSet workload name, and Service object name
 
 ## AppVersion (for providers)
 
@@ -218,7 +218,7 @@ metadata:
 spec:
   clusterDefinitionRef: apecloud-wesql
   components:
-    - type: replicasets
+    - type: wesql
       podSpec:
         containers:
           - name: mysql
@@ -263,7 +263,7 @@ It refers to AppVersion and its value should be the same as `AppVersion`.
 
 ### Example
 
-The following are examples for ApeCloud MySQL three nodes.
+The following are examples of ApeCloud MySQL three-node clusters.
 
 - Standard version:
 
@@ -274,7 +274,7 @@ The following are examples for ApeCloud MySQL three nodes.
     name: mysql-a-series-standard
   spec:
       clusterDefinitionRef: wesql
-      appVersionRef: wesql-8.0.18
+      appVersionRef: wesql-8.0.30
       components:
         - name: "mysql-a-1"
           type: mysql-a
@@ -290,7 +290,7 @@ The following are examples for ApeCloud MySQL three nodes.
       name: mysql-a-series-enterprise
   spec:
       clusterDefinitionRef: wesql
-      appVersionRef: wesql-8.0.18
+      appVersionRef: wesql-8.0.30
       components:
         - name: "mysql-a-2"
           type: mysql-a

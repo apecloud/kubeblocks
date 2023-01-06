@@ -71,7 +71,7 @@ Use `kbcli` and a YAML file to create a cluster with specified component specifi
    kbcli cluster create apecloud-cluster --cluster-definition=apecloud-wesql  --cluster-version=wesql-8.0.30 --components=mycluster.yaml --termination-policy=Halt
    ```
 
-## Step 5. View the cluster details
+## Step 3. View the cluster details
 
 After the cluster is well-created, you can view its information and status.
 
@@ -85,7 +85,7 @@ After the cluster is well-created, you can view its information and status.
    kbcli cluster describe apecloud-cluster
    ```
 
-## Step 6. Connect to the cluster
+## Step 4. Connect to the cluster
 
 1. Run this command to connect to this cluster.
    ```
@@ -95,7 +95,7 @@ After the cluster is well-created, you can view its information and status.
 2. Choose a language or MySQL client to view the cluster connection information.
 
 
-## Step 7. (Optional) Delete the cluster (termination policy)
+## Step 5. (Optional) Delete the cluster (termination policy)
 
    Run this command to delete the created cluster.
    ```

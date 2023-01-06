@@ -41,8 +41,7 @@ const (
 	clusterDefLabelKey         = "clusterdefinition.kubeblocks.io/name"
 	clusterVersionLabelKey     = "clusterversion.kubeblocks.io/name"
 	statefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
-	CSRoleChangedAnnotKey      = "cs.kubeblocks.io/event-handled"
-	CSRoleChangedAnnotHandled  = "true"
+	csRoleChangedAnnotKey      = "cs.kubeblocks.io/event-handled"
 	clusterAccountLabelKey     = "account.kubeblocks.io/name"
 
 	// annotations keys

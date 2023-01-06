@@ -332,6 +332,12 @@ metadata:
   name: cluster-definition
 spec:
   type: state.mysql
+  connectionCredential:
+    username: "admin"
+    admin-password: "$(RANDOM_PASSWD)"
+    tcpEndpoint: "$(SVC_FQDN):$(SVC_PORT_mysql)"
+    paxosEndpoint: "$(SVC_FQDN):$(SVC_PORT_paxos)"
+
   components:
   - typeName: replicasets
     componentType: Stateful
@@ -386,6 +392,14 @@ spec:
             cluster_info="$cluster_info@$(($idx+1))";
             echo $cluster_info;
             docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
+    service:
+      ports:
+        - name: mysql
+          targetPort: mysql
+          port: 3306
+        - name: paxos
+          targetPort: paxos
+          port: 13306
   - typeName: proxy
     componentType: Stateless
     defaultReplicas: 1
@@ -409,9 +423,9 @@ spec:
 		By("By assure an clusterVersion obj")
 		clusterVersionYAML := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterVersion
+kind: ClusterVersion
 metadata:
-  name:     cluster-version
+  name: cluster-version
 spec:
   clusterDefinitionRef: cluster-definition
   components:
@@ -620,6 +634,7 @@ spec:
 			Expect(component).ShouldNot(BeNil())
 
 			clusterVersion = allFieldsClusterVersionObj(true)
+
 			By("new container in clusterVersion not in clusterDefinition")
 			component = mergeComponents(
 				reqCtx,

@@ -509,12 +509,8 @@ func reconcileClusterWorkloads(
 		cacheCtx:          &cacheCtx,
 		clusterVersion:    clusterVersion,
 	}
-	if err := prepareSecretObjs(reqCtx, cli, &params); err != nil {
-		return false, err
-	}
-
-	clusterDefComps := clusterDefinition.Spec.Components
-	clusterCompMap := cluster.GetTypeMappingComponents()
+	clusterDefComp := clusterDefinition.Spec.Components
+	clusterCompTypes := cluster.GetTypeMappingComponents()
 
 	// add default component if unspecified in Cluster.spec.components
 	for _, c := range clusterDefComps {
@@ -535,9 +531,17 @@ func reconcileClusterWorkloads(
 	clusterCompMap = cluster.GetTypeMappingComponents()
 	clusterVersionCompMap := clusterVersion.GetTypeMappingComponents()
 
+	process1stComp := true
+
 	prepareComp := func(component *Component) error {
 		iParams := params
 		iParams.component = component
+		if process1stComp && component.Service != nil {
+			if err := prepareConnCredential(reqCtx, cli, &iParams); err != nil {
+				return err
+			}
+			process1stComp = false
+		}
 		return prepareComponentObjs(reqCtx, cli, &iParams)
 	}
 
@@ -551,7 +555,6 @@ func reconcileClusterWorkloads(
 			}
 		}
 	}
-
 	return checkedCreateObjs(reqCtx, cli, &params)
 }
 
@@ -564,7 +567,7 @@ func checkedCreateObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj int
 	return createOrReplaceResources(reqCtx, cli, params.cluster, params.clusterDefinition, *params.applyObjs)
 }
 
-func prepareSecretObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) error {
+func prepareConnCredential(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) error {
 	params, ok := obj.(*createParams)
 	if !ok {
 		return fmt.Errorf("invalid arg")
@@ -575,7 +578,9 @@ func prepareSecretObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj int
 		return err
 	}
 	// must make sure secret resources are created before others
-	*params.applyObjs = append(*params.applyObjs, secret)
+	applyObjs := make([]client.Object, 0, len(*params.applyObjs)+1)
+	applyObjs = append(applyObjs, secret)
+	*params.applyObjs = append(applyObjs, *params.applyObjs...)
 	return nil
 }
 
@@ -1209,6 +1214,12 @@ func buildConnCredential(params createParams) (*corev1.Secret, error) {
 	// 1st pass replace primary placeholder
 	m := map[string]string{
 		"$(RANDOM_PASSWD)": randomString(8),
+		"$(SVC_FQDN)":      fmt.Sprintf("%s-%s.%s.svc", params.cluster.Name, params.component.Name, params.cluster.Namespace),
+	}
+	if params.component.Service != nil {
+		for _, p := range params.component.Service.Ports {
+			m[fmt.Sprintf("$(SVC_PORT_%s", p.Name)] = strconv.Itoa(int(p.Port))
+		}
 	}
 	replaceData(m)
 

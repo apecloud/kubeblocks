@@ -32,6 +32,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 	"github.com/sethvargo/go-password/password"
@@ -47,10 +48,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 )
 
 var _ = Describe("Cluster Controller", func() {
@@ -744,10 +745,167 @@ spec:
 		})
 	})
 
-	Context("When horizontal scaling", func() {
-		It("Should create backup resources accordingly", func() {
+	createCustomizedClusterNCheck := func(customizeCluster func(toCreate *dbaasv1alpha1.Cluster)) (
+		*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, types.NamespacedName) {
+		By("Creating a cluster")
+		toCreate, cd, clusterVersion, key := newClusterObj(nil, nil)
+		customizeCluster(toCreate)
+		Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
+		fetchedG1 := &dbaasv1alpha1.Cluster{}
+		Eventually(func(g Gomega) {
+			g.Expect(k8sClient.Get(ctx, key, fetchedG1)).To(Succeed())
+			g.Expect(fetchedG1.Status.ObservedGeneration == 1).To(BeTrue())
+		}, timeout, interval).Should(Succeed())
+
+		return fetchedG1, cd, clusterVersion, key
+	}
+
+	Context("When horizontal scaling out a cluster", func() {
+		It("Should trigger a backup process(snapshot) and "+
+			"create pvcs from backup for newly created replicas", func() {
+			compName := "replicasets"
+			volumeName := "data"
+
+			By("Creating a cluster with VolumeClaimTemplate")
+			var pvcSpec corev1.PersistentVolumeClaimSpec
+			pvcSpec.AccessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
+			pvcSpec.Resources.Requests = corev1.ResourceList{
+				corev1.ResourceStorage: resource.MustParse("1Gi"),
+			}
+			initialReplicas := int32(1)
+			_, clusterDef, _, key := createCustomizedClusterNCheck(func(toCreate *dbaasv1alpha1.Cluster) {
+				toCreate.Spec.Components = []dbaasv1alpha1.ClusterComponent{{
+					Name:     compName,
+					Type:     compName,
+					Replicas: &initialReplicas,
+					VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{{
+						Name: "data",
+						Spec: &pvcSpec,
+					}},
+				}}
+			})
+
+			By("Set HorizontalScalePolicy")
+			Expect(changeClusterDef(intctrlutil.GetNamespacedName(clusterDef),
+				func(clusterDef *dbaasv1alpha1.ClusterDefinition) {
+					clusterDef.Spec.Components[0].HorizontalScalePolicy =
+						&dbaasv1alpha1.HorizontalScalePolicy{Type: dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot}
+				}))
+
+			By("Creating a BackupPolicyTemplate")
+			backupPolicyTplKey := types.NamespacedName{Name: "test-backup-policy-template-mysql"}
+			backupPolicyTemplateYaml := fmt.Sprintf(`
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupPolicyTemplate
+metadata:
+  name: %s
+  labels:
+    clusterdefinition.kubeblocks.io/name: %s
+spec:
+  schedule: "0 2 * * *"
+  ttl: 168h0m0s
+  # !!DISCUSS Number of backup retries on fail.
+  onFailAttempted: 3
+  hooks:
+    ContainerName: mysql
+    image: rancher/kubectl:v1.23.7
+    preCommands:
+    - touch /data/mysql/data/.restore; sync
+  backupToolName: mysql-xtrabackup
+`, backupPolicyTplKey.Name, clusterDef.Name)
+			backupPolicyTemplate := dataprotectionv1alpha1.BackupPolicyTemplate{}
+			Expect(yaml.Unmarshal([]byte(backupPolicyTemplateYaml), &backupPolicyTemplate)).Should(Succeed())
+			Expect(testCtx.CheckedCreateObj(ctx, &backupPolicyTemplate)).Should(Succeed())
+
+			By("Creating PVC for the first replica")
+			for i := 0; i < int(initialReplicas); i++ {
+				pvcYAML := fmt.Sprintf(`
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: %s-%s-%s-%d
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: test-sc
+  volumeMode: Filesystem
+  volumeName: test-pvc
+`, volumeName, key.Name, compName, i)
+				pvc := corev1.PersistentVolumeClaim{}
+				Expect(yaml.Unmarshal([]byte(pvcYAML), &pvc)).Should(Succeed())
+				Expect(k8sClient.Create(ctx, &pvc)).Should(Succeed())
+			}
+
+			stsList := listAndCheckStatefulSet(key)
+			Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(initialReplicas))
+
+			updatedReplicas := int32(3)
+			By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
+			Expect(changeClusterReplicas(key, updatedReplicas)).Should(Succeed())
+
+			By("Checking BackupJob created")
+			Eventually(func() bool {
+				backupJobList := dataprotectionv1alpha1.BackupJobList{}
+				Expect(k8sClient.List(ctx, &backupJobList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				return len(backupJobList.Items) == 1
+			}, timeout, interval).Should(BeTrue())
+
+			By("Mocking VolumeSnapshot and set it as ReadyToUse")
+			snapshotKey := types.NamespacedName{Name: fmt.Sprintf("%s-%s-scaling",
+				key.Name, compName), Namespace: "default"}
+			pvcName := fmt.Sprintf("%s-%s-%s-0", volumeName, key.Name, compName)
+			volumeSnapshotYaml := fmt.Sprintf(`
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: %s
+  namespace: %s
+  labels:
+    app.kubernetes.io/created-by: kubeblocks
+    app.kubernetes.io/instance: %s
+    app.kubernetes.io/component-name: %s
+spec:
+  source:
+    persistentVolumeClaimName: %s
+`, snapshotKey.Name, snapshotKey.Namespace, key.Name, compName, pvcName)
+			volumeSnapshot := snapshotv1.VolumeSnapshot{}
+			Expect(yaml.Unmarshal([]byte(volumeSnapshotYaml), &volumeSnapshot)).Should(Succeed())
+			Expect(testCtx.CheckedCreateObj(ctx, &volumeSnapshot)).Should(Succeed())
+			readyToUse := true
+			volumeSnapshotStatus := snapshotv1.VolumeSnapshotStatus{ReadyToUse: &readyToUse}
+			volumeSnapshot.Status = &volumeSnapshotStatus
+			Expect(k8sClient.Status().Update(ctx, &volumeSnapshot)).Should(Succeed())
+
+			By("Checking cluster status and the number of replicas changed")
+			Eventually(func(g Gomega) {
+				fetched := &dbaasv1alpha1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
+				g.Expect(fetched.Status.ObservedGeneration == 2).To(BeTrue())
+			}, timeout, interval).Should(Succeed())
+			stsList = listAndCheckStatefulSet(key)
+			Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(updatedReplicas))
+
+			By("Deleting the cluster")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	// TODO move integration tests(which relies on a real K8s cluster) out of UT
+	Context("When horizontal scaling in real env", func() {
+		It("Should create backup resources accordingly", func() {
 			useExistingCluster, _ := strconv.ParseBool(os.Getenv("USE_EXISTING_CLUSTER"))
+			if !useExistingCluster {
+				return
+			}
 
 			configTplKey := types.NamespacedName{Name: "test-mysql-3node-tpl-8.0", Namespace: "default"}
 			configTplYAML := fmt.Sprintf(`
@@ -949,9 +1107,8 @@ spec:
 `, clusterDefKey.Name, configTplKey.Name)
 			clusterDef := &dbaasv1alpha1.ClusterDefinition{}
 			Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDef)).Should(Succeed())
-			if useExistingCluster {
-				clusterDef.Spec.Components[0].HorizontalScalePolicy = &dbaasv1alpha1.HorizontalScalePolicy{Type: "Snapshot"}
-			}
+			clusterDef.Spec.Components[0].HorizontalScalePolicy =
+				&dbaasv1alpha1.HorizontalScalePolicy{Type: dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot}
 			Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
 
 			By("Create real ClusterVersion")
@@ -1117,6 +1274,14 @@ spec:
 			fetchedG1.Spec.Components[0].Replicas = &updatedReplicas
 			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
 
+			Eventually(func() bool {
+				backupJobList := dataprotectionv1alpha1.BackupJobList{}
+				Expect(k8sClient.List(ctx, &backupJobList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				return len(backupJobList.Items) == 1
+			}, timeout, interval).Should(BeTrue())
+
 			fetchedG2 := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
 				_ = k8sClient.Get(ctx, key, fetchedG2)
@@ -1163,15 +1328,13 @@ spec:
 				return fetchedG3.Status.ObservedGeneration == 3
 			}, timeout, interval).Should(BeTrue())
 
-			if useExistingCluster {
-				Eventually(func() bool {
-					backupJobList := dataprotectionv1alpha1.BackupJobList{}
-					Expect(k8sClient.List(ctx, &backupJobList, client.MatchingLabels{
-						"app.kubernetes.io/instance": key.Name,
-					}, client.InNamespace(key.Namespace))).Should(Succeed())
-					return len(backupJobList.Items) == 1
-				}, timeout, interval).Should(BeTrue())
-			}
+			Eventually(func() bool {
+				backupJobList := dataprotectionv1alpha1.BackupJobList{}
+				Expect(k8sClient.List(ctx, &backupJobList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				return len(backupJobList.Items) == 1
+			}, timeout, interval).Should(BeTrue())
 
 			Eventually(func() bool {
 				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{

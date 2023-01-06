@@ -23,7 +23,6 @@ require (
 	github.com/k3d-io/k3d/v5 v5.4.4
 	github.com/leaanthony/debme v1.2.1
 	github.com/manifoldco/promptui v0.9.0
-	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/ginkgo/v2 v2.6.1
 	github.com/onsi/gomega v1.24.1
 	github.com/pingcap/go-tpc v1.0.8
@@ -66,14 +65,12 @@ require (
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/miekg/dns v1.1.50 // indirect
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
-	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/russross/blackfriday v1.6.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	golang.org/x/tools v0.4.0 // indirect
-	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 )
 
 require (

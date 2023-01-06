@@ -109,6 +109,7 @@ webhooks:
     operations:
     - CREATE
     - UPDATE
+    - DELETE
     resources:
     - clusters
   sideEffects: None

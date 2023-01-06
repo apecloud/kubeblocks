@@ -153,6 +153,20 @@ var _ = Describe("cluster webhook", func() {
 			patch = client.MergeFrom(cluster.DeepCopy())
 			cluster.Spec.Components[0].Resources.Requests[corev1.ResourceMemory] = resource.MustParse("80Mi")
 			Expect(k8sClient.Patch(ctx, cluster, patch)).Should(Succeed())
+
+			By("set terminationPolicy to DoNotTerminate")
+			patch = client.MergeFrom(cluster.DeepCopy())
+			cluster.Spec.TerminationPolicy = DoNotTerminate
+			Expect(k8sClient.Patch(ctx, cluster, patch)).Should(Succeed())
+			By("try to delete cluster")
+			Expect(k8sClient.Delete(ctx, cluster).Error()).To(ContainSubstring("can not delete cluster"))
+
+			By("update terminationPolicy to Halt")
+			patch = client.MergeFrom(cluster.DeepCopy())
+			cluster.Spec.TerminationPolicy = Halt
+			Expect(k8sClient.Patch(ctx, cluster, patch)).Should(Succeed())
+			By("try to delete cluster")
+			Expect(k8sClient.Delete(ctx, cluster)).Should(Succeed())
 		})
 	})
 })

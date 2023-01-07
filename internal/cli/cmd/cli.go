@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/options"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/troubleshoot"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/version"
 )
 
@@ -89,6 +90,7 @@ A Command Line Interface for KubeBlocks`,
 		version.NewVersionCmd(f),
 		backupconfig.NewBackupConfigCmd(f, ioStreams),
 		dashboard.NewDashboardCmd(f, ioStreams),
+		troubleshoot.NewTroubleshootCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}

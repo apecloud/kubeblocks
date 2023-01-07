@@ -108,7 +108,7 @@ spec:
 		Expect(len(cluster.Spec.Components[0].EnabledLogs)).Should(Equal(2))
 	})
 
-	Context("multipleSourceComponent Test", func() {
+	Context("MultipleSourceComponent Test", func() {
 		defer GinkgoRecover()
 		fileName := "https://kubernetes.io/docs/tasks/debug/"
 		streams := genericclioptions.IOStreams{
@@ -116,12 +116,12 @@ spec:
 			Out:    os.Stdout,
 			ErrOut: os.Stdout,
 		}
-		bytes, err := multipleSourceComponents(fileName, streams)
+		bytes, err := MultipleSourceComponents(fileName, streams.In)
 		Expect(bytes).ShouldNot(BeNil())
 		Expect(err).ShouldNot(HaveOccurred())
 		// corner case for no existing local file
 		fileName = "no-existing-file"
-		bytes, err = multipleSourceComponents(fileName, streams)
+		bytes, err = MultipleSourceComponents(fileName, streams.In)
 		Expect(bytes).Should(BeNil())
 		Expect(err).Should(HaveOccurred())
 	})

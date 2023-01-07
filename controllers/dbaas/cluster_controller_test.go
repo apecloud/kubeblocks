@@ -54,7 +54,7 @@ import (
 )
 
 var _ = Describe("Cluster Controller", func() {
-	const timeout = time.Second * 10
+	const timeout = time.Second * 100000
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
 
@@ -1264,6 +1264,106 @@ spec:
 	})
 
 	Context("When updating cluster PVC storage size", func() {
+		It("Should update PVC request storage size accordingly", func() {
+			volumeName := "data"
+
+			By("Creating a cluster with volume claim")
+			replicas := int32(1)
+			toCreate, _, _, key := newClusterObj(nil, nil)
+			toCreate.Spec.Components = make([]dbaasv1alpha1.ClusterComponent, 1)
+			toCreate.Spec.Components[0] = dbaasv1alpha1.ClusterComponent{
+				Name:     "replicasets",
+				Type:     "replicasets",
+				Replicas: &replicas,
+				VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{{
+					Name: volumeName,
+					Spec: &corev1.PersistentVolumeClaimSpec{
+						AccessModes: []corev1.PersistentVolumeAccessMode{
+							corev1.ReadWriteOnce,
+						},
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse("1Gi"),
+							},
+						},
+					}},
+				},
+			}
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
+
+			fetchedG1 := &dbaasv1alpha1.Cluster{}
+
+			Eventually(func() bool {
+				_ = k8sClient.Get(ctx, key, fetchedG1)
+				return fetchedG1.Status.ObservedGeneration == 1
+			}, timeout, interval).Should(BeTrue())
+
+			By("Checking the replicas")
+			stsList := listAndCheckStatefulSet(key)
+			sts := &stsList.Items[0]
+			Expect(*sts.Spec.Replicas == replicas).Should(BeTrue())
+
+			By("Mock the PVC")
+			for i := 0; i < int(replicas); i++ {
+				pvcYAML := fmt.Sprintf(`
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: %s-%s-%d
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: test-sc
+  volumeMode: Filesystem
+  volumeName: test-pvc
+`, volumeName, sts.Name, i)
+				pvc := corev1.PersistentVolumeClaim{}
+				Expect(yaml.Unmarshal([]byte(pvcYAML), &pvc)).Should(Succeed())
+				Expect(k8sClient.Create(ctx, &pvc)).Should(Succeed())
+			}
+
+			By("Updating the PVC storage size")
+			comp := &fetchedG1.Spec.Components[0]
+			newStorageValue := resource.MustParse("2Gi")
+			comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
+
+			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
+
+			fetchedG2 := &dbaasv1alpha1.Cluster{}
+			Eventually(func() bool {
+				_ = k8sClient.Get(ctx, key, fetchedG2)
+				return fetchedG2.Status.ObservedGeneration == 2
+			}, timeout*2, interval).Should(BeTrue())
+
+			By("Checking the PVC")
+			stsList = listAndCheckStatefulSet(key)
+			for _, sts := range stsList.Items {
+				for _, vct := range sts.Spec.VolumeClaimTemplates {
+					for i := *sts.Spec.Replicas - 1; i >= 0; i-- {
+						pvc := &corev1.PersistentVolumeClaim{}
+						pvcKey := types.NamespacedName{
+							Namespace: key.Namespace,
+							Name:      fmt.Sprintf("%s-%s-%d", vct.Name, sts.Name, i),
+						}
+						Expect(k8sClient.Get(ctx, pvcKey, pvc)).Should(Succeed())
+						Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(newStorageValue))
+					}
+				}
+			}
+
+			By("Deleting the cluster")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout*2, interval).Should(Succeed())
+		})
+	})
+
+	// TODO move integration tests(which relies on a real K8s cluster) out of UT
+	Context("When updating cluster PVC storage size in real K8s cluster", func() {
 		It("Should update PVC request storage size accordingly", func() {
 			By("Checking available storageclasses")
 			scList := &storagev1.StorageClassList{}

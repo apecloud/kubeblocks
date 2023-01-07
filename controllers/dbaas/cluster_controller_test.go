@@ -54,7 +54,7 @@ import (
 )
 
 var _ = Describe("Cluster Controller", func() {
-	const timeout = time.Second * 100000
+	const timeout = time.Second * 10
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
 
@@ -1267,8 +1267,22 @@ spec:
 		It("Should update PVC request storage size accordingly", func() {
 			volumeName := "data"
 
+			By("Create a StorageClass which allows resize")
+			StorageClassYaml := `
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+   name: sc-mock
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+`
+			storageClass := &storagev1.StorageClass{}
+			Expect(yaml.Unmarshal([]byte(StorageClassYaml), storageClass)).Should(Succeed())
+			Expect(testCtx.CheckedCreateObj(ctx, storageClass)).Should(Succeed())
+
 			By("Creating a cluster with volume claim")
-			replicas := int32(1)
+			replicas := int32(2)
 			toCreate, _, _, key := newClusterObj(nil, nil)
 			toCreate.Spec.Components = make([]dbaasv1alpha1.ClusterComponent, 1)
 			toCreate.Spec.Components[0] = dbaasv1alpha1.ClusterComponent{
@@ -1281,6 +1295,7 @@ spec:
 						AccessModes: []corev1.PersistentVolumeAccessMode{
 							corev1.ReadWriteOnce,
 						},
+						StorageClassName: &storageClass.Name,
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceStorage: resource.MustParse("1Gi"),
@@ -1291,19 +1306,18 @@ spec:
 			}
 			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
-			fetchedG1 := &dbaasv1alpha1.Cluster{}
-
-			Eventually(func() bool {
-				_ = k8sClient.Get(ctx, key, fetchedG1)
-				return fetchedG1.Status.ObservedGeneration == 1
-			}, timeout, interval).Should(BeTrue())
+			Eventually(func(g Gomega) {
+				fetchedG1 := &dbaasv1alpha1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, key, fetchedG1)).To(Succeed())
+				g.Expect(fetchedG1.Status.ObservedGeneration == 1).To(BeTrue())
+			}, timeout, interval).Should(Succeed())
 
 			By("Checking the replicas")
 			stsList := listAndCheckStatefulSet(key)
 			sts := &stsList.Items[0]
 			Expect(*sts.Spec.Replicas == replicas).Should(BeTrue())
 
-			By("Mock the PVC")
+			By("Mock PVCs in Bound Status")
 			for i := 0; i < int(replicas); i++ {
 				pvcYAML := fmt.Sprintf(`
 apiVersion: v1
@@ -1317,29 +1331,30 @@ spec:
   resources:
     requests:
       storage: 1Gi
-  storageClassName: test-sc
-  volumeMode: Filesystem
-  volumeName: test-pvc
-`, volumeName, sts.Name, i)
+  storageClassName: %s
+`, volumeName, sts.Name, i, storageClass.Name)
 				pvc := corev1.PersistentVolumeClaim{}
 				Expect(yaml.Unmarshal([]byte(pvcYAML), &pvc)).Should(Succeed())
 				Expect(k8sClient.Create(ctx, &pvc)).Should(Succeed())
+				pvc.Status.Phase = corev1.ClaimBound // only bound pvc allows resize
+				Expect(k8sClient.Status().Update(ctx, &pvc)).Should(Succeed())
 			}
 
 			By("Updating the PVC storage size")
-			comp := &fetchedG1.Spec.Components[0]
 			newStorageValue := resource.MustParse("2Gi")
-			comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
+			Expect(changeCluster(key, func(cluster *dbaasv1alpha1.Cluster) {
+				comp := &cluster.Spec.Components[0]
+				comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
+			})).Should(Succeed())
 
-			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
+			By("Checking the resize operation finished")
+			Eventually(func(g Gomega) {
+				fetchedG2 := &dbaasv1alpha1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, key, fetchedG2)).To(Succeed())
+				g.Expect(fetchedG2.Status.ObservedGeneration == 2).To(BeTrue())
+			}, timeout*2, interval).Should(Succeed())
 
-			fetchedG2 := &dbaasv1alpha1.Cluster{}
-			Eventually(func() bool {
-				_ = k8sClient.Get(ctx, key, fetchedG2)
-				return fetchedG2.Status.ObservedGeneration == 2
-			}, timeout*2, interval).Should(BeTrue())
-
-			By("Checking the PVC")
+			By("Checking PVCs are resized")
 			stsList = listAndCheckStatefulSet(key)
 			for _, sts := range stsList.Items {
 				for _, vct := range sts.Spec.VolumeClaimTemplates {

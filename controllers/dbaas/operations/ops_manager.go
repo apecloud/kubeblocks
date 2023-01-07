@@ -122,13 +122,13 @@ func (opsMgr *OpsManager) validateClusterPhaseAndOperations(opsRes *OpsResource,
 		isOkClusterPhase = true
 		break
 	}
-	opsRequestAnnotation := getOpsRequestNameFromAnnotation(opsRes.Cluster, behaviour.ToClusterPhase)
-	if behaviour.ToClusterPhase != "" && opsRequestAnnotation != nil {
+	opsRequestName := getOpsRequestNameFromAnnotation(opsRes.Cluster, behaviour.ToClusterPhase)
+	if behaviour.ToClusterPhase != "" && opsRequestName != "" {
 		// OpsRequest is reentry
-		if *opsRequestAnnotation == opsRes.OpsRequest.Name {
+		if opsRequestName == opsRes.OpsRequest.Name {
 			return true, nil
 		}
-		return false, patchClusterExistOtherOperation(opsRes, *opsRequestAnnotation)
+		return false, patchClusterExistOtherOperation(opsRes, opsRequestName)
 	}
 
 	if !isOkClusterPhase {

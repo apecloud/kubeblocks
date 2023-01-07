@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	"golang.org/x/exp/slices"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -66,7 +67,7 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		Recorder: r.Recorder,
 	}
 	opsRequest := &dbaasv1alpha1.OpsRequest{}
-	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, opsRequest); err != nil {
+	if err = r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, opsRequest); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	// when the opsRequest is Running, we can not delete it until user deletes the finalizer.
@@ -141,12 +142,33 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *OpsRequestReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, opsRequest *dbaasv1alpha1.OpsRequest) error {
-	//
-	// delete any external resources associated with the cronJob
-	//
-	// Ensure that delete implementation is idempotent and safe to invoke
-	// multiple times for same object.
-	return nil
+	// if the OpsRequest is deleted, we should clear the OpsRequest annotation in reference cluster.
+	// this is mainly to prevent OpsRequest from being deleted by mistake, resulting in inconsistency.
+	return r.deleteClusterOpsRequestAnnotation(reqCtx, opsRequest)
+}
+
+func (r *OpsRequestReconciler) deleteClusterOpsRequestAnnotation(reqCtx intctrlutil.RequestCtx,
+	opsRequest *dbaasv1alpha1.OpsRequest) error {
+	var (
+		cluster         = &dbaasv1alpha1.Cluster{}
+		opsRequestSlice []dbaasv1alpha1.OpsRecorder
+		err             error
+	)
+	if err = r.Client.Get(reqCtx.Ctx, client.ObjectKey{
+		Namespace: opsRequest.GetNamespace(),
+		Name:      opsRequest.Spec.ClusterRef,
+	}, cluster); err != nil {
+		return err
+	}
+	if opsRequestSlice, err = operations.GetOpsRequestSliceFromCluster(cluster); err != nil {
+		return err
+	}
+	index, opsRecord := operations.GetOpsRecorderFromSlice(opsRequestSlice, opsRequest.Name)
+	if opsRecord.Name == "" {
+		return nil
+	}
+	opsRequestSlice = slices.Delete(opsRequestSlice, index, index+1)
+	return operations.PatchClusterOpsAnnotations(reqCtx.Ctx, r.Client, cluster, opsRequestSlice)
 }
 
 // setOwnerReference st

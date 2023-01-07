@@ -31,6 +31,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"text/template"
@@ -48,10 +49,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes/scheme"
+	cmdget "k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 
@@ -329,7 +332,7 @@ func GetNodeByName(nodes []*corev1.Node, name string) *corev1.Node {
 			return node
 		}
 	}
-	return nil
+	return &corev1.Node{}
 }
 
 // ResourceIsEmpty check if resource is empty or not
@@ -381,4 +384,57 @@ func TimeFormat(t *metav1.Time) string {
 	}
 
 	return t.Format(layout)
+}
+
+// CheckEmpty check if string is empty, if yes, return <none> for displaying
+func CheckEmpty(str string) string {
+	if len(str) == 0 {
+		return types.None
+	}
+	return str
+}
+
+// BuildLabelSelectorByNames build the label selector by instance names, the label selector is
+// like "instance-key in (name1, name2)"
+func BuildLabelSelectorByNames(selector string, names []string) string {
+	if len(names) == 0 {
+		return ""
+	}
+
+	label := fmt.Sprintf("%s in (%s)", types.InstanceLabelKey, strings.Join(names, ","))
+	if len(selector) == 0 {
+		return label
+	} else {
+		return selector + "," + label
+	}
+}
+
+// SortEventsByLastTimestamp sorts events by lastTimestamp
+func SortEventsByLastTimestamp(events *corev1.EventList, eventType string) *[]apiruntime.Object {
+	objs := make([]apiruntime.Object, 0, len(events.Items))
+	for i, e := range events.Items {
+		if eventType != "" && e.Type != eventType {
+			continue
+		}
+		objs = append(objs, &events.Items[i])
+	}
+	sorter := cmdget.NewRuntimeSort("{.lastTimestamp}", objs)
+	sort.Sort(sorter)
+	return &objs
+}
+
+func GetEventTimeStr(e *corev1.Event) string {
+	t := &e.CreationTimestamp
+	if !e.LastTimestamp.Time.IsZero() {
+		t = &e.LastTimestamp
+	}
+	return TimeFormat(t)
+}
+
+func GetEventObject(e *corev1.Event) string {
+	kind := e.InvolvedObject.Kind
+	if kind == "Pod" {
+		kind = "Instance"
+	}
+	return fmt.Sprintf("%s/%s", kind, e.InvolvedObject.Name)
 }

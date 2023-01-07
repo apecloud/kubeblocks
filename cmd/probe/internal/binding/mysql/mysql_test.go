@@ -20,9 +20,10 @@ package mysql
 import (
 	"context"
 	"errors"
+	"testing"
+
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/components-contrib/metadata"
-	"testing"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 	"github.com/dapr/kit/logger"

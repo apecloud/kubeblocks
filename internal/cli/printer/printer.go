@@ -23,10 +23,17 @@ import (
 )
 
 var (
+	boxStyle = table.BoxStyle{
+		PaddingLeft:   "",
+		PaddingRight:  "\t",
+		PageSeparator: "\n",
+		UnfinishedRow: " ~",
+	}
+
 	// StyleKubeCtl renders a Table like kubectl
 	StyleKubeCtl = table.Style{
 		Name:    "StyleKubeCtl",
-		Box:     table.StyleBoxDefault,
+		Box:     boxStyle,
 		Color:   table.ColorOptionsDefault,
 		Format:  table.FormatOptionsDefault,
 		HTML:    table.DefaultHTMLOptions,

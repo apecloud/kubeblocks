@@ -19,16 +19,14 @@ package network
 import (
 	"testing"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 )
 
 func TestNetwork(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecsWithDefaultAndCustomReporters(t,
-		"Network Test Suite",
-		[]Reporter{printer.NewlineReporter{}})
+
+	RunSpecs(t, "Network Test Suite")
 }
 
 var _ = BeforeSuite(func() {

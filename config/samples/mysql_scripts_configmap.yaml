@@ -20,9 +20,8 @@ data:
       echo "$host"
       leader_idx=${leader##*-}
       leader_host=$(eval echo \$KB_REPLICASETS_"$leader_idx"_HOSTNAME)
-      echo "mysql -h$leader_host -uroot -e \"call dbms_consensus.add_follower('$host:13306');\" & "
-      # TODO: password
-      mysql -h$leader_host -uroot -e "call dbms_consensus.add_follower('$host:13306');" & 
+      echo "mysql -h$leader_host -uroot -p"$MYSQL_ROOT_PASSWORD" -e \"call dbms_consensus.add_follower('$host:13306');\" & "
+      mysql -h$leader_host -uroot -p"$MYSQL_ROOT_PASSWORD" -e "call dbms_consensus.add_follower('$host:13306');" & 
       pid=$!; sleep 1; 
       if ! ps $pid > /dev/null; then 
         wait $pid; 

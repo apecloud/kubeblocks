@@ -17,7 +17,7 @@ limitations under the License.
 package testing
 
 import (
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
@@ -72,5 +72,15 @@ var _ = Describe("test fake", func() {
 	It("fake dynamic set", func() {
 		dynamic := FakeDynamicClient()
 		Expect(dynamic).ShouldNot(BeNil())
+	})
+
+	It("fake PVCs", func() {
+		pvcs := FakePVCs()
+		Expect(pvcs).ShouldNot(BeNil())
+	})
+
+	It("fake events", func() {
+		events := FakeEvents()
+		Expect(events).ShouldNot(BeNil())
 	})
 })

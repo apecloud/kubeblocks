@@ -18,6 +18,7 @@ package testing
 
 import (
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -31,7 +32,7 @@ import (
 const (
 	ClusterName        = "fake-cluster-name"
 	Namespace          = "fake-namespace"
-	ClusterVersionName = "fake-clusterversion"
+	ClusterVersionName = "fake-cluster-version"
 	ClusterDefName     = "fake-cluster-definition"
 	ComponentName      = "fake-component-name"
 	ComponentType      = "fake-component-type"
@@ -176,12 +177,12 @@ func FakeClusterDef() *dbaasv1alpha1.ClusterDefinition {
 }
 
 func FakeClusterVersion() *dbaasv1alpha1.ClusterVersion {
-	clusterversion := &dbaasv1alpha1.ClusterVersion{}
-	clusterversion.Name = ClusterVersionName
-	clusterversion.SetLabels(map[string]string{types.ClusterDefLabelKey: ClusterDefName})
-	clusterversion.Spec.ClusterDefinitionRef = ClusterDefName
-	clusterversion.SetCreationTimestamp(metav1.Now())
-	return clusterversion
+	cv := &dbaasv1alpha1.ClusterVersion{}
+	cv.Name = ClusterVersionName
+	cv.SetLabels(map[string]string{types.ClusterDefLabelKey: ClusterDefName})
+	cv.Spec.ClusterDefinitionRef = ClusterDefName
+	cv.SetCreationTimestamp(metav1.Now())
+	return cv
 }
 
 func FakeServices() *corev1.ServiceList {
@@ -256,4 +257,38 @@ func FakePVCs() *corev1.PersistentVolumeClaimList {
 	}
 	pvcs.Items = append(pvcs.Items, pvc)
 	return pvcs
+}
+
+func FakeEvents() *corev1.EventList {
+	eventList := &corev1.EventList{}
+	fakeEvent := func(name string, createTime metav1.Time) corev1.Event {
+		e := corev1.Event{}
+		e.Name = name
+		e.Type = "Warning"
+		e.SetCreationTimestamp(createTime)
+		e.LastTimestamp = createTime
+		return e
+	}
+
+	parseTime := func(t string) time.Time {
+		time, _ := time.Parse(time.RFC3339, t)
+		return time
+	}
+
+	for _, e := range []struct {
+		name       string
+		createTime metav1.Time
+	}{
+		{
+			name:       "e1",
+			createTime: metav1.NewTime(parseTime("2023-01-04T00:00:00.000Z")),
+		},
+		{
+			name:       "e2",
+			createTime: metav1.NewTime(parseTime("2023-01-04T01:00:00.000Z")),
+		},
+	} {
+		eventList.Items = append(eventList.Items, fakeEvent(e.name, e.createTime))
+	}
+	return eventList
 }

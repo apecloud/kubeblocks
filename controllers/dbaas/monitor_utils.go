@@ -24,9 +24,8 @@ import (
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
-
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // ClusterDefinition Type Const Define
@@ -58,11 +57,11 @@ type MysqlMonitor struct {
 func buildMysqlContainer(key string, monitor *MysqlMonitor) (*corev1.Container, error) {
 	cueFS, _ := debme.FS(CueTemplates, "cue/monitor")
 
-	cueTpl, err := controllerutil.NewCUETplFromBytes(cueFS.ReadFile("mysql_template.cue"))
+	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("mysql_template.cue"))
 	if err != nil {
 		return nil, err
 	}
-	cueValue := controllerutil.NewCUEBuilder(*cueTpl)
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
 
 	mysqlMonitorStrByte, err := json.Marshal(monitor)
 	if err != nil {

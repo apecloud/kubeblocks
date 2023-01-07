@@ -1267,7 +1267,7 @@ spec:
 		It("Should update PVC request storage size accordingly", func() {
 			volumeName := "data"
 
-			By("Create a StorageClass which allows resize")
+			By("Mock a StorageClass which allows resize")
 			StorageClassYaml := `
 apiVersion: storage.k8s.io/v1
 kind: StorageClass

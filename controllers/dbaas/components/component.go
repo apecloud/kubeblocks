@@ -34,7 +34,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// NewComponentByType news a component object by cluster, clusterDefinition and componentName
+// NewComponentByType news a component object
 func NewComponentByType(
 	ctx context.Context,
 	cli client.Client,

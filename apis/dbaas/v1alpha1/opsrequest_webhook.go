@@ -242,8 +242,6 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context,
 	clusterVersionRef := r.Spec.Upgrade.ClusterVersionRef
 	if err := k8sClient.Get(ctx, types.NamespacedName{Name: clusterVersionRef}, clusterVersion); err != nil {
 		addInvalidError(allErrs, "spec.upgrade.clusterVersionRef", clusterVersionRef, err.Error())
-	} else if cluster.Spec.ClusterVersionRef == clusterVersionRef {
-		addInvalidError(allErrs, "spec.upgrade.clusterVersionRef", clusterVersionRef, "can not equals Cluster.spec.clusterVersionRef")
 	}
 }
 

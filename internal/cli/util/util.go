@@ -51,6 +51,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/duration"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -384,6 +385,23 @@ func TimeFormat(t *metav1.Time) string {
 	}
 
 	return t.Format(layout)
+}
+
+// GetHumanReadableDuration returns a succint representation of the provided startTime and endTime
+// with limited precision for consumption by humans.
+func GetHumanReadableDuration(startTime metav1.Time, endTime metav1.Time) string {
+	if startTime.IsZero() {
+		return "<Unknown>"
+	}
+	if endTime.IsZero() {
+		endTime = metav1.NewTime(time.Now())
+	}
+	d := endTime.Sub(startTime.Time)
+	// if the
+	if d < time.Second {
+		d = time.Second
+	}
+	return duration.HumanDuration(d)
 }
 
 // CheckEmpty check if string is empty, if yes, return <none> for displaying

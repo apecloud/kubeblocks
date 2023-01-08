@@ -49,6 +49,7 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	consensusset "github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -1564,54 +1565,182 @@ spec:
 		})
 	})
 
-	// Consensus associate test cases
+	mockPodsForConsensusTest := func(cluster *dbaasv1alpha1.Cluster, number int) []corev1.Pod {
+		podYaml := `
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    controller-revision-hash: mock-version
+  name: my-name
+  namespace: default
+spec:
+  containers:
+  - args:
+    command:
+    - /bin/bash
+    - -c
+    env:
+    - name: KB_POD_NAME
+      valueFrom:
+        fieldRef:
+          apiVersion: v1
+          fieldPath: metadata.name
+    - name: KB_REPLICASETS_N
+      value: "3"
+    - name: KB_REPLICASETS_0_HOSTNAME
+      value: clusterepuglf-wesql-test-0
+    - name: KB_REPLICASETS_1_HOSTNAME
+      value: clusterepuglf-wesql-test-1
+    - name: KB_REPLICASETS_2_HOSTNAME
+      value: clusterepuglf-wesql-test-2
+    image: docker.io/apecloud/wesql-server:latest
+    imagePullPolicy: IfNotPresent
+    name: mysql
+    ports:
+    - containerPort: 3306
+      name: mysql
+      protocol: TCP
+    - containerPort: 13306
+      name: paxos
+      protocol: TCP
+    volumeMounts:
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-2rhsb
+      readOnly: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  restartPolicy: Always
+  serviceAccount: default
+  serviceAccountName: default
+
+  volumes:
+  - name: kube-api-access-2rhsb
+    projected:
+      defaultMode: 420
+      sources:
+      - serviceAccountToken:
+          expirationSeconds: 3607
+          path: token
+      - configMap:
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: kube-root-ca.crt
+      - downwardAPI:
+          items:
+          - fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+            path: namespace
+`
+		pods := make([]corev1.Pod, 0)
+		componentName := cluster.Spec.Components[0].Name
+		clusterName := cluster.Name
+		stsName := cluster.Name + "-" + componentName
+		for i := 0; i < number; i++ {
+			pod := corev1.Pod{}
+			Expect(yaml.Unmarshal([]byte(podYaml), &pod)).Should(Succeed())
+			pod.Name = stsName + "-" + strconv.Itoa(i)
+			pod.Labels[intctrlutil.AppInstanceLabelKey] = clusterName
+			pod.Labels[intctrlutil.AppComponentLabelKey] = componentName
+			pods = append(pods, pod)
+		}
+
+		return pods
+	}
+
+	mockRoleChangedEvent := func(key types.NamespacedName, sts *appsv1.StatefulSet) []corev1.Event {
+		eventYaml := `
+apiVersion: v1
+kind: Event
+metadata:
+  name: myevent
+  namespace: default
+type: Warning
+reason: Unhealthy
+reportingComponent: ""
+message: 'Readiness probe failed: {"event":"roleUnchanged","originalRole":"Leader","role":"Follower"}'
+involvedObject:
+  apiVersion: v1
+  fieldPath: spec.containers{kb-rolechangedcheck}
+  kind: Pod
+  name: wesql-main-2
+  namespace: default
+`
+		pods, err := consensusset.GetPodListByStatefulSet(ctx, k8sClient, sts)
+		Expect(err).To(Succeed())
+
+		events := make([]corev1.Event, 0)
+		for _, pod := range pods {
+			event := corev1.Event{}
+			Expect(yaml.Unmarshal([]byte(eventYaml), &event)).Should(Succeed())
+			event.Name = pod.Name + "-event"
+			event.InvolvedObject.Name = pod.Name
+			event.InvolvedObject.UID = pod.UID
+			events = append(events, event)
+		}
+		events[0].Message = `Readiness probe failed: {"event":"roleUnchanged","originalRole":"Leader","role":"Leader"}`
+		return events
+	}
+
+	getStsPodsName := func(sts *appsv1.StatefulSet) []string {
+		pods, err := consensusset.GetPodListByStatefulSet(ctx, k8sClient, sts)
+		Expect(err).To(Succeed())
+
+		names := make([]string, 0)
+		for _, pod := range pods {
+			names = append(names, pod.Name)
+		}
+		return names
+	}
+
 	Context("When creating cluster with componentType = Consensus", func() {
 		It("Should success with: "+
 			"1 pod with 'leader' role label set, "+
 			"2 pods with 'follower' role label set,"+
 			"1 service routes to 'leader' pod", func() {
 			By("Creating a cluster with componentType = Consensus")
+			replicas := 3
+
 			toCreate, _, _, key := newClusterWithConsensusObj(nil, nil)
 			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
-			By("Waiting the cluster is created")
-			cluster := &dbaasv1alpha1.Cluster{}
+			By("Waiting for cluster creation")
+			Eventually(func(g Gomega) {
+				fetched := &dbaasv1alpha1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
+				g.Expect(fetched.Status.ObservedGeneration == 1).To(BeTrue())
+			}, timeout, interval).Should(Succeed())
 
-			// TODO: testEnv doesn't support pod creation yet. remove the following codes when it does
-			if testEnv.UseExistingCluster == nil || !*testEnv.UseExistingCluster {
-				// create fake pods of StatefulSet
-				pods := createFakePod(toCreate, 3)
-				for _, pod := range pods {
-					Expect(testCtx.CreateObj(ctx, &pod)).Should(Succeed())
-				}
+			stsList := listAndCheckStatefulSet(key)
+			sts := &stsList.Items[0]
 
-				stsList := listAndCheckStatefulSet(key)
-				sts := &stsList.Items[0]
-				events := createFakeRoleChangedEvent(key, sts)
-				for _, event := range events {
-					Expect(testCtx.CreateObj(ctx, &event)).Should(Succeed())
-				}
-				// fake pods and stateful set creation done
-				time.Sleep(interval * 5)
+			By("Creating mock pods in StatefulSet")
+			pods := mockPodsForConsensusTest(toCreate, replicas)
+			for _, pod := range pods {
+				Expect(testCtx.CreateObj(ctx, &pod)).Should(Succeed())
+				// mock the status to pass the isReady(pod) check in consensus_set
+				pod.Status.Conditions = []corev1.PodCondition{{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionTrue,
+				}}
+				Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
+			}
 
-				Eventually(func() bool {
-					if err := k8sClient.Get(ctx, key, cluster); err != nil {
-						return false
-					}
-					return cluster.Status.Phase == dbaasv1alpha1.CreatingPhase
-				}, timeout*3, interval*5).Should(BeTrue())
+			By("Creating mock role changed events")
+			// pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] will be filled with the role
+			events := mockRoleChangedEvent(key, sts)
+			for _, event := range events {
+				Expect(testCtx.CreateObj(ctx, &event)).Should(Succeed())
+			}
 
-				podList := &corev1.PodList{}
-				Expect(k8sClient.List(ctx, podList, client.InNamespace(key.Namespace))).Should(Succeed())
-				pods = make([]corev1.Pod, 0)
-				for _, pod := range podList.Items {
-					if util.IsMemberOf(sts, &pod) {
-						pods = append(pods, pod)
-					}
-				}
-
+			By("Checking pods' role are changed accordingly")
+			Eventually(func(g Gomega) {
+				pods, err := consensusset.GetPodListByStatefulSet(ctx, k8sClient, sts)
+				g.Expect(err).To(Succeed())
 				// should have 3 pods
-				Expect(len(pods)).Should(Equal(3))
+				g.Expect(len(pods)).To(Equal(3))
 				// 1 leader
 				// 2 followers
 				leaderCount, followerCount := 0, 0
@@ -1623,21 +1752,77 @@ spec:
 						followerCount++
 					}
 				}
-				Expect(leaderCount).Should(Equal(1))
-				Expect(followerCount).Should(Equal(2))
+				g.Expect(leaderCount).Should(Equal(1))
+				g.Expect(followerCount).Should(Equal(2))
+			}, timeout, interval).Should(Succeed())
 
+			By("Updating StatefulSet's status")
+			sts.Status.UpdateRevision = "mock-version"
+			sts.Status.Replicas = int32(replicas)
+			sts.Status.AvailableReplicas = int32(replicas)
+			sts.Status.CurrentReplicas = int32(replicas)
+			sts.Status.ReadyReplicas = int32(replicas)
+			sts.Status.ObservedGeneration = sts.Generation
+			Expect(k8sClient.Status().Update(ctx, sts)).Should(Succeed())
+
+			// TODO why the code above(update to stateful set) cannot trigger Reconcile of ClusterController
+			Expect(changeClusterStatus(key, func(cluster *dbaasv1alpha1.Cluster) {
+				cluster.Status.Message = "trigger Reconcile"
+			})).Should(Succeed())
+
+			By("Checking pods' role are updated in cluster status")
+			Eventually(func(g Gomega) {
+
+				podList := &corev1.PodList{}
+				Expect(k8sClient.List(ctx, podList, client.InNamespace(key.Namespace))).Should(Succeed())
+
+				fetched := &dbaasv1alpha1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
+				compName := fetched.Spec.Components[0].Name
+				g.Expect(fetched.Status.Components != nil).To(BeTrue())
+				g.Expect(fetched.Status.Components).To(HaveKey(compName))
+				consensusStatus := fetched.Status.Components[compName].ConsensusSetStatus
+				g.Expect(consensusStatus != nil).To(BeTrue())
+				g.Expect(consensusStatus.Leader.Pod).To(BeElementOf(getStsPodsName(sts)))
+				g.Expect(len(consensusStatus.Followers) == 2).To(BeTrue())
+				g.Expect(consensusStatus.Followers[0].Pod).To(BeElementOf(getStsPodsName(sts)))
+				g.Expect(consensusStatus.Followers[1].Pod).To(BeElementOf(getStsPodsName(sts)))
+			}, timeout, interval).Should(Succeed())
+
+			By("Waiting the cluster be running")
+			Eventually(func(g Gomega) {
+				fetched := &dbaasv1alpha1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
+				g.Expect(fetched.Status.Phase == dbaasv1alpha1.RunningPhase).To(BeTrue())
+			}, timeout, interval).Should(Succeed())
+
+			By("Deleting the cluster")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	// TODO move integration tests(which relies on a real K8s cluster) out of UT
+	Context("When creating cluster with componentType = Consensus in real K8s cluster", func() {
+		It("Should success with: "+
+			"1 pod with 'leader' role label set, "+
+			"2 pods with 'follower' role label set,"+
+			"1 service routes to 'leader' pod", func() {
+			if !testCtx.UsingExistingCluster() {
 				return
 			}
-			// end remove
 
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, key, cluster)
-				if err != nil {
-					return false
-				}
+			By("Creating a cluster with componentType = Consensus")
+			toCreate, _, _, key := newClusterWithConsensusObj(nil, nil)
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
-				return cluster.Status.Phase == dbaasv1alpha1.RunningPhase
-			}, timeout*3, interval*5).Should(BeTrue())
+			By("Waiting the cluster is created")
+			Eventually(func(g Gomega) {
+				fetched := &dbaasv1alpha1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
+				g.Expect(fetched.Status.Phase == dbaasv1alpha1.RunningPhase).To(BeTrue())
+			}, timeout*3, interval*5).Should(Succeed())
 
 			By("Checking pods' role label")
 			ip := getLocalIP()
@@ -1670,15 +1855,8 @@ spec:
 
 			stsList := listAndCheckStatefulSet(key)
 			sts := &stsList.Items[0]
-			podList := &corev1.PodList{}
-			Expect(k8sClient.List(ctx, podList, client.InNamespace(key.Namespace))).Should(Succeed())
-			pods := make([]corev1.Pod, 0)
-			for _, pod := range podList.Items {
-				if util.IsMemberOf(sts, &pod) {
-					pods = append(pods, pod)
-				}
-			}
-
+			pods, err := consensusset.GetPodListByStatefulSet(ctx, k8sClient, sts)
+			Expect(err).To(Succeed())
 			// should have 3 pods
 			Expect(len(pods)).Should(Equal(3))
 			// 1 leader
@@ -1716,13 +1894,13 @@ spec:
 			}
 			Expect(k8sClient.Delete(ctx, leaderPod)).Should(Succeed())
 			time.Sleep(interval * 2)
-			Eventually(func() bool {
-				Expect(k8sClient.Get(ctx, types.NamespacedName{
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{
 					Namespace: sts.Namespace,
 					Name:      sts.Name,
-				}, sts)).Should(Succeed())
-				return sts.Status.AvailableReplicas == 3
-			}, timeout, interval).Should(BeTrue())
+				}, sts)).To(Succeed())
+				g.Expect(sts.Status.AvailableReplicas == 3).To(BeTrue())
+			}, timeout, interval).Should(Succeed())
 
 			time.Sleep(interval * 2)
 			Expect(observeRoleOfServiceLoop(&svc)).Should(Equal(leader))
@@ -1915,130 +2093,6 @@ spec:
 		})
 	})
 })
-
-func createFakeRoleChangedEvent(key types.NamespacedName, sts *appsv1.StatefulSet) []corev1.Event {
-	eventYaml := `
-apiVersion: v1
-kind: Event
-metadata:
-  name: myevent
-  namespace: default
-type: Warning
-reason: Unhealthy
-reportingComponent: ""
-message: 'Readiness probe failed: {"event":"roleUnchanged","originalRole":"Leader","role":"Follower"}'
-involvedObject:
-  apiVersion: v1
-  fieldPath: spec.containers{kb-rolechangedcheck}
-  kind: Pod
-  name: wesql-main-2
-  namespace: default
-`
-	podList := &corev1.PodList{}
-	Expect(k8sClient.List(ctx, podList, client.InNamespace(key.Namespace))).Should(Succeed())
-	pods := make([]corev1.Pod, 0)
-	for _, pod := range podList.Items {
-		if util.IsMemberOf(sts, &pod) {
-			pods = append(pods, pod)
-		}
-	}
-	events := make([]corev1.Event, 0)
-	for _, pod := range pods {
-		event := corev1.Event{}
-		Expect(yaml.Unmarshal([]byte(eventYaml), &event)).Should(Succeed())
-		event.Name = pod.Name + "-event"
-		event.InvolvedObject.Name = pod.Name
-		event.InvolvedObject.UID = pod.UID
-		events = append(events, event)
-	}
-	events[0].Message = `Readiness probe failed: {"event":"roleUnchanged","originalRole":"Leader","role":"Leader"}`
-	return events
-}
-
-func createFakePod(cluster *dbaasv1alpha1.Cluster, number int) []corev1.Pod {
-	podYaml := `
-apiVersion: v1
-kind: Pod
-metadata:
-  labels:
-    controller-revision-hash: wesql-test-859d7565b6
-  name: my-name
-  namespace: default
-spec:
-  containers:
-  - args:
-    command:
-    - /bin/bash
-    - -c
-    env:
-    - name: KB_POD_NAME
-      valueFrom:
-        fieldRef:
-          apiVersion: v1
-          fieldPath: metadata.name
-    - name: KB_REPLICASETS_N
-      value: "3"
-    - name: KB_REPLICASETS_0_HOSTNAME
-      value: clusterepuglf-wesql-test-0
-    - name: KB_REPLICASETS_1_HOSTNAME
-      value: clusterepuglf-wesql-test-1
-    - name: KB_REPLICASETS_2_HOSTNAME
-      value: clusterepuglf-wesql-test-2
-    image: docker.io/apecloud/wesql-server:latest
-    imagePullPolicy: IfNotPresent
-    name: mysql
-    ports:
-    - containerPort: 3306
-      name: mysql
-      protocol: TCP
-    - containerPort: 13306
-      name: paxos
-      protocol: TCP
-    volumeMounts:
-    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-      name: kube-api-access-2rhsb
-      readOnly: true
-  dnsPolicy: ClusterFirst
-  enableServiceLinks: true
-  restartPolicy: Always
-  serviceAccount: default
-  serviceAccountName: default
-  
-  volumes:
-  - name: kube-api-access-2rhsb
-    projected:
-      defaultMode: 420
-      sources:
-      - serviceAccountToken:
-          expirationSeconds: 3607
-          path: token
-      - configMap:
-          items:
-          - key: ca.crt
-            path: ca.crt
-          name: kube-root-ca.crt
-      - downwardAPI:
-          items:
-          - fieldRef:
-              apiVersion: v1
-              fieldPath: metadata.namespace
-            path: namespace
-`
-	pods := make([]corev1.Pod, 0)
-	componentName := cluster.Spec.Components[0].Name
-	clusterName := cluster.Name
-	stsName := cluster.Name + "-" + componentName
-	for i := 0; i < number; i++ {
-		pod := corev1.Pod{}
-		Expect(yaml.Unmarshal([]byte(podYaml), &pod)).Should(Succeed())
-		pod.Name = stsName + "-" + strconv.Itoa(i)
-		pod.Labels[intctrlutil.AppInstanceLabelKey] = clusterName
-		pod.Labels[intctrlutil.AppComponentLabelKey] = componentName
-		pods = append(pods, pod)
-	}
-
-	return pods
-}
 
 const (
 	// configurations to connect to Mysql, either a data source name represent by URL.

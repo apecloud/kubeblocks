@@ -154,32 +154,33 @@ func drawPreflightTable(analyzeResults []*analyzerunner.AnalyzeResult) {
 	for i, analyzeResult := range analyzeResults {
 		title := analyzeResult.Title
 		if analyzeResult.Strict {
-			title = title + fmt.Sprintf(" (Strict: %t)", analyzeResult.Strict)
+			title += fmt.Sprintf(" (Strict: %t)", analyzeResult.Strict)
 		}
-		if analyzeResult.IsPass {
+		switch {
+		case analyzeResult.IsPass:
 			title = fmt.Sprintf("✔  %s", title)
-		} else if analyzeResult.IsWarn {
+		case analyzeResult.IsWarn:
 			title = fmt.Sprintf("⚠️  %s", title)
-		} else if analyzeResult.IsFail {
+		case analyzeResult.IsFail:
 			title = fmt.Sprintf("✘  %s", title)
 		}
 		table.Rows = append(table.Rows, []string{
 			title,
 		})
-
-		if analyzeResult.IsPass {
+		switch {
+		case analyzeResult.IsPass:
 			if i == selectedResult {
 				table.RowStyles[i] = ui.NewStyle(ui.ColorGreen, ui.ColorClear, ui.ModifierReverse)
 			} else {
 				table.RowStyles[i] = ui.NewStyle(ui.ColorGreen, ui.ColorClear)
 			}
-		} else if analyzeResult.IsWarn {
+		case analyzeResult.IsWarn:
 			if i == selectedResult {
 				table.RowStyles[i] = ui.NewStyle(ui.ColorYellow, ui.ColorClear, ui.ModifierReverse)
 			} else {
 				table.RowStyles[i] = ui.NewStyle(ui.ColorYellow, ui.ColorClear)
 			}
-		} else if analyzeResult.IsFail {
+		case analyzeResult.IsFail:
 			if i == selectedResult {
 				table.RowStyles[i] = ui.NewStyle(ui.ColorRed, ui.ColorClear, ui.ModifierReverse)
 			} else {
@@ -197,11 +198,12 @@ func drawDetails(analysisResult *analyzerunner.AnalyzeResult) {
 	title := widgets.NewParagraph()
 	title.Text = analysisResult.Title
 	title.Border = false
-	if analysisResult.IsPass {
+	switch {
+	case analysisResult.IsPass:
 		title.TextStyle = ui.NewStyle(ui.ColorGreen, ui.ColorClear, ui.ModifierBold)
-	} else if analysisResult.IsWarn {
+	case analysisResult.IsWarn:
 		title.TextStyle = ui.NewStyle(ui.ColorYellow, ui.ColorClear, ui.ModifierBold)
-	} else if analysisResult.IsFail {
+	case analysisResult.IsFail:
 		title.TextStyle = ui.NewStyle(ui.ColorRed, ui.ColorClear, ui.ModifierBold)
 	}
 	height := estimateNumberOfLines(title.Text, termWidth/2)
@@ -255,29 +257,28 @@ func save(preflightName string, outputPath string, analyzeResults []*analyzerunn
 	results := fmt.Sprintf("%s Preflight Checks\n\n", util.AppName(preflightName))
 	for _, analyzeResult := range analyzeResults {
 		result := ""
-
-		if analyzeResult.IsPass {
+		switch {
+		case analyzeResult.IsPass:
 			result = "Check PASS\n"
-		} else if analyzeResult.IsWarn {
+		case analyzeResult.IsWarn:
 			result = "Check WARN\n"
-		} else if analyzeResult.IsFail {
+		case analyzeResult.IsFail:
 			result = "Check FAIL\n"
 		}
-
-		result = result + fmt.Sprintf("Title: %s\n", analyzeResult.Title)
-		result = result + fmt.Sprintf("Message: %s\n", analyzeResult.Message)
+		result += fmt.Sprintf("Title: %s\n", analyzeResult.Title)
+		result += fmt.Sprintf("Message: %s\n", analyzeResult.Message)
 
 		if analyzeResult.URI != "" {
-			result = result + fmt.Sprintf("URI: %s\n", analyzeResult.URI)
+			result += fmt.Sprintf("URI: %s\n", analyzeResult.URI)
 		}
 
 		if analyzeResult.Strict {
-			result = result + fmt.Sprintf("Strict: %t\n", analyzeResult.Strict)
+			result += fmt.Sprintf("Strict: %t\n", analyzeResult.Strict)
 		}
 
-		result = result + "\n------------\n"
+		result += "\n------------\n"
 
-		results = results + result
+		results += result
 	}
 
 	if err := os.WriteFile(filename, []byte(results), 0644); err != nil {

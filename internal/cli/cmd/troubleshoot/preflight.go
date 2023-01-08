@@ -193,7 +193,9 @@ func (p *preflightOptions) run() error {
 	}
 	// wait for collection end
 	stopProgressCollection()
-	progressCollection.Wait()
+	if err = progressCollection.Wait(); err != nil {
+		return err
+	}
 	// display analyzeResults
 	if *p.Interactive {
 		if len(analyzeResults) == 0 {

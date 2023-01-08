@@ -32,9 +32,9 @@ func ConcatPreflightSpec(target *troubleshootv1beta2.Preflight, source *troubles
 		return source
 	}
 	newSpec := target.DeepCopy()
-	newSpec.Spec.Collectors = append(target.Spec.Collectors, source.Spec.Collectors...)
-	newSpec.Spec.RemoteCollectors = append(target.Spec.RemoteCollectors, source.Spec.RemoteCollectors...)
-	newSpec.Spec.Analyzers = append(target.Spec.Analyzers, source.Spec.Analyzers...)
+	newSpec.Spec.Collectors = append(newSpec.Spec.Collectors, source.Spec.Collectors...)
+	newSpec.Spec.RemoteCollectors = append(newSpec.Spec.RemoteCollectors, source.Spec.RemoteCollectors...)
+	newSpec.Spec.Analyzers = append(newSpec.Spec.Analyzers, source.Spec.Analyzers...)
 	return newSpec
 }
 
@@ -44,9 +44,9 @@ func ConcatHostPreflightSpec(target *troubleshootv1beta2.HostPreflight, source *
 		return source
 	}
 	newSpec := target.DeepCopy()
-	newSpec.Spec.Collectors = append(target.Spec.Collectors, source.Spec.Collectors...)
-	newSpec.Spec.RemoteCollectors = append(target.Spec.RemoteCollectors, source.Spec.RemoteCollectors...)
-	newSpec.Spec.Analyzers = append(target.Spec.Analyzers, source.Spec.Analyzers...)
+	newSpec.Spec.Collectors = append(newSpec.Spec.Collectors, source.Spec.Collectors...)
+	newSpec.Spec.RemoteCollectors = append(newSpec.Spec.RemoteCollectors, source.Spec.RemoteCollectors...)
+	newSpec.Spec.Analyzers = append(newSpec.Spec.Analyzers, source.Spec.Analyzers...)
 	return newSpec
 }
 

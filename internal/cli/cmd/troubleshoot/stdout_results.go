@@ -114,27 +114,27 @@ func showStdoutResultsStructured(preflightName string, analyzeResults []*analyze
 		if analyzeResult.Strict {
 			resultOutput.Strict = analyzeResult.Strict
 		}
-
-		if analyzeResult.IsPass {
+		switch {
+		case analyzeResult.IsPass:
 			output.Pass = append(output.Pass, resultOutput)
-		} else if analyzeResult.IsWarn {
+		case analyzeResult.IsWarn:
 			output.Warn = append(output.Warn, resultOutput)
-		} else if analyzeResult.IsFail {
+		case analyzeResult.IsFail:
 			output.Fail = append(output.Fail, resultOutput)
 		}
 	}
-
 	return &output
 }
 
 func outputResult(analyzeResult *analyzerunner.AnalyzeResult) bool {
-	if analyzeResult.IsPass {
+	switch {
+	case analyzeResult.IsPass:
 		fmt.Printf("   --- PASS %s\n", analyzeResult.Title)
 		fmt.Printf("      --- %s\n", analyzeResult.Message)
-	} else if analyzeResult.IsWarn {
+	case analyzeResult.IsWarn:
 		fmt.Printf("   --- WARN: %s\n", analyzeResult.Title)
 		fmt.Printf("      --- %s\n", analyzeResult.Message)
-	} else if analyzeResult.IsFail {
+	case analyzeResult.IsFail:
 		fmt.Printf("   --- FAIL: %s\n", analyzeResult.Title)
 		fmt.Printf("      --- %s\n", analyzeResult.Message)
 	}

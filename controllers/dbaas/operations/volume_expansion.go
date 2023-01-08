@@ -89,7 +89,7 @@ func (ve volumeExpansion) Action(opsRes *OpsResource) error {
 	return opsRes.Client.Update(opsRes.Ctx, opsRes.Cluster)
 }
 
-// ReconcileAction it will be performed when action is done and loop util OpsRequest.status.phase is Succeed/Failed.
+// ReconcileAction it will be performed when action is done and loops util OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for volume expansion opsRequest.
 func (ve volumeExpansion) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error) {
 	var (
@@ -167,12 +167,12 @@ func (ve volumeExpansion) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Ph
 	return opsRequestPhase, requeueAfter, err
 }
 
-// GetRealAffectedComponentMap get the real affected component map for the operation
+// GetRealAffectedComponentMap gets the real affected component map for the operation
 func (ve volumeExpansion) GetRealAffectedComponentMap(opsRequest *dbaasv1alpha1.OpsRequest) realAffectedComponentMap {
 	return opsRequest.GetVolumeExpansionComponentNameMap()
 }
 
-// SaveLastConfiguration record last configuration to the OpsRequest.status.lastConfiguration
+// SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (ve volumeExpansion) SaveLastConfiguration(opsRes *OpsResource) error {
 	opsRequest := opsRes.OpsRequest
 	componentNameMap := opsRequest.GetComponentNameMap()

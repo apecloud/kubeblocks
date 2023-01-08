@@ -158,7 +158,7 @@ func removeStatelessExpiredPod(podList *corev1.PodList,
 	return newProgressDetails
 }
 
-// handleComponentStatusProgress handle the component status progressDetails.
+// handleComponentStatusProgress handles the component status progressDetails.
 // if all the pods of the component are affected, you can use this common function to reconcile the progressDetails.
 func handleComponentStatusProgress(
 	opsRes *OpsResource,
@@ -230,7 +230,7 @@ func handleStatelessProgress(opsRes *OpsResource,
 	return succeedCount
 }
 
-// handleStatefulSetProgress handle the component progressDetails which using statefulSet workloads.
+// handleStatefulSetProgress handles the component progressDetails which using statefulSet workloads.
 func handleStatefulSetProgress(opsRes *OpsResource,
 	podList *corev1.PodList,
 	pgRes progressResource,

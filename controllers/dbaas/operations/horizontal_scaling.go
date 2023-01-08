@@ -69,13 +69,13 @@ func (hs horizontalScalingOpsHandler) Action(opsRes *OpsResource) error {
 	return opsRes.Client.Update(opsRes.Ctx, opsRes.Cluster)
 }
 
-// ReconcileAction it will be performed when action is done and loop util OpsRequest.status.phase is Succeed/Failed.
+// ReconcileAction it will be performed when action is done and loops util OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for horizontal scaling opsRequest.
 func (hs horizontalScalingOpsHandler) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error) {
 	return ReconcileActionWithComponentOps(opsRes, "", hs.handleComponentProgressDetails)
 }
 
-// GetRealAffectedComponentMap get the real affected component map for the operation
+// GetRealAffectedComponentMap gets the real affected component map for the operation
 func (hs horizontalScalingOpsHandler) GetRealAffectedComponentMap(opsRequest *dbaasv1alpha1.OpsRequest) realAffectedComponentMap {
 	realChangedMap := realAffectedComponentMap{}
 	hsMap := opsRequest.CovertHorizontalScalingListToMap()
@@ -91,7 +91,7 @@ func (hs horizontalScalingOpsHandler) GetRealAffectedComponentMap(opsRequest *db
 	return realChangedMap
 }
 
-// SaveLastConfiguration record last configuration to the OpsRequest.status.lastConfiguration
+// SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (hs horizontalScalingOpsHandler) SaveLastConfiguration(opsRes *OpsResource) error {
 	opsRequest := opsRes.OpsRequest
 	lastComponentInfo := map[string]dbaasv1alpha1.LastComponentConfiguration{}
@@ -134,7 +134,7 @@ func (hs horizontalScalingOpsHandler) getComponentLastReplicas(opsRequest *dbaas
 	return nil
 }
 
-// handleComponentProgressDetails handle the component progressDetails when horizontal scale the replicas.
+// handleComponentProgressDetails handles the component progressDetails when horizontal scale the replicas.
 func (hs horizontalScalingOpsHandler) handleComponentProgressDetails(opsRes *OpsResource,
 	pgRes progressResource,
 	statusComponent *dbaasv1alpha1.OpsRequestStatusComponent) (expectProgressCount int32, succeedCount int32, err error) {
@@ -152,7 +152,7 @@ func (hs horizontalScalingOpsHandler) handleComponentProgressDetails(opsRes *Ops
 	if lastComponentReplicas == nil {
 		return
 	}
-	// if replicas is no changed, return
+	// if replicas are no changed, return
 	if *lastComponentReplicas == *expectReplicas {
 		return
 	}

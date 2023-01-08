@@ -38,7 +38,7 @@ type OpsHandler interface {
 	// if you do not want to be reconciled when the operation fails,
 	// you need to call PatchOpsStatus function in ops_util.go and set OpsRequest.status.phase to Failed
 	Action(opsResource *OpsResource) error
-	// ReconcileAction loop until the operation is completed.
+	// ReconcileAction loops until the operation is completed.
 	// return OpsRequest.status.phase and requeueAfter time
 	ReconcileAction(opsResource *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error)
 	// ActionStartedCondition append to OpsRequest.status.conditions when start performing Action function

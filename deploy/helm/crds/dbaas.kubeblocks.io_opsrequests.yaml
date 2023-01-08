@@ -241,18 +241,17 @@ spec:
                       description: progressDetails describe the progress details of
                         the component for this operation.
                       items:
-                        description: ProgressDetail contains the detail for the component
-                          process progress.
+                        description: ProgressDetail contains the details for the component
+                          processing progress.
                         properties:
                           endTime:
-                            description: startTime the time of the object already
-                              processing completed.
+                            description: endTime the completion time of object processing.
                             format: date-time
                             type: string
                           group:
-                            description: group describe which group the current object
-                              belongs. if the objects of component are belongs the
-                              same group, we can ignore this field.
+                            description: group describes which group the current object
+                              belongs to. if the objects of a component belong to
+                              the same group, we can ignore it.
                             type: string
                           message:
                             description: message is a human readable message indicating
@@ -262,8 +261,7 @@ spec:
                             description: ObjectKey the unique key of the object.
                             type: string
                           startTime:
-                            description: startTime the time of starting to process
-                              the object.
+                            description: startTime the start time of object processing.
                             format: date-time
                             type: string
                           status:

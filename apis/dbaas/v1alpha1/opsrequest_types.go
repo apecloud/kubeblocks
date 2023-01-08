@@ -167,10 +167,10 @@ type OpsRequestStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-// ProgressDetail contains the detail for the component process progress.
+// ProgressDetail contains the details for the component processing progress.
 type ProgressDetail struct {
-	// group describe which group the current object belongs.
-	// if the objects of component are belongs the same group, we can ignore this field.
+	// group describes which group the current object belongs to.
+	// if the objects of a component belong to the same group, we can ignore it.
 	// +optional
 	Group string `json:"group,omitempty"`
 
@@ -187,11 +187,11 @@ type ProgressDetail struct {
 	// +optional
 	Message string `json:"message,omitempty"`
 
-	// startTime the time of starting to process the object.
+	// startTime the start time of object processing.
 	// +optional
 	StartTime metav1.Time `json:"startTime,omitempty"`
 
-	// startTime the time of the object already processing completed.
+	// endTime the completion time of object processing.
 	// +optional
 	EndTime metav1.Time `json:"endTime,omitempty"`
 }

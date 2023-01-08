@@ -53,18 +53,18 @@ func (u upgradeOpsHandler) Action(opsRes *OpsResource) error {
 	return opsRes.Client.Update(opsRes.Ctx, opsRes.Cluster)
 }
 
-// ReconcileAction it will be performed when action is done and loop util OpsRequest.status.phase is Succeed/Failed.
+// ReconcileAction it will be performed when action is done and loops util OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for upgrade opsRequest.
 func (u upgradeOpsHandler) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error) {
 	return ReconcileActionWithComponentOps(opsRes, "upgrade", handleComponentStatusProgress)
 }
 
-// GetRealAffectedComponentMap get the real affected component map for the operation
+// GetRealAffectedComponentMap gets the real affected component map for the operation
 func (u upgradeOpsHandler) GetRealAffectedComponentMap(opsRequest *dbaasv1alpha1.OpsRequest) realAffectedComponentMap {
 	return opsRequest.GetUpgradeComponentNameMap()
 }
 
-// SaveLastConfiguration record last configuration to the OpsRequest.status.lastConfiguration
+// SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (u upgradeOpsHandler) SaveLastConfiguration(opsRes *OpsResource) error {
 	statusComponents, err := u.getUpgradeStatusComponents(opsRes)
 	if err != nil {

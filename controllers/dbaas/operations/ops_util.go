@@ -36,7 +36,7 @@ type handleStatusProgressWithComponent func(opsRes *OpsResource,
 	pgRes progressResource,
 	statusComponent *dbaasv1alpha1.OpsRequestStatusComponent) (expectProgressCount int32, succeedCount int32, err error)
 
-// ReconcileActionWithComponentOps it will be performed when action is done and loop util OpsRequest.status.phase is Succeed/Failed.
+// ReconcileActionWithComponentOps it will be performed when action is done and loops util OpsRequest.status.phase is Succeed/Failed.
 // if OpsRequest.spec.componentOps is not null, you can use it to OpsBehaviour.ReconcileAction.
 // return the OpsRequest.status.phase
 func ReconcileActionWithComponentOps(opsRes *OpsResource,

@@ -59,13 +59,13 @@ func (vs verticalScalingHandler) Action(opsRes *OpsResource) error {
 	return opsRes.Client.Update(opsRes.Ctx, opsRes.Cluster)
 }
 
-// ReconcileAction it will be performed when action is done and loop util OpsRequest.status.phase is Succeed/Failed.
+// ReconcileAction it will be performed when action is done and loops util OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for vertical scaling opsRequest.
 func (vs verticalScalingHandler) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error) {
 	return ReconcileActionWithComponentOps(opsRes, "vertical scale", handleComponentStatusProgress)
 }
 
-// SaveLastConfiguration record last configuration to the OpsRequest.status.lastConfiguration
+// SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (vs verticalScalingHandler) SaveLastConfiguration(opsRes *OpsResource) error {
 	componentNameMap := opsRes.OpsRequest.GetComponentNameMap()
 	lastComponentInfo := map[string]dbaasv1alpha1.LastComponentConfiguration{}
@@ -84,7 +84,7 @@ func (vs verticalScalingHandler) SaveLastConfiguration(opsRes *OpsResource) erro
 	return opsRes.Client.Status().Patch(opsRes.Ctx, opsRes.OpsRequest, patch)
 }
 
-// GetRealAffectedComponentMap get the real affected component map for the operation
+// GetRealAffectedComponentMap gets the real affected component map for the operation
 func (vs verticalScalingHandler) GetRealAffectedComponentMap(opsRequest *dbaasv1alpha1.OpsRequest) realAffectedComponentMap {
 	realChangedMap := realAffectedComponentMap{}
 	vsMap := opsRequest.CovertVerticalScalingListToMap()

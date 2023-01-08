@@ -670,7 +670,7 @@ func (r *ClusterReconciler) handleComponentStatus(ctx context.Context,
 	return nil
 }
 
-// handleComponentStatusWithStatefulSet handle the component status with statefulSet. One statefulSet corresponds to one component.
+// handleComponentStatusWithStatefulSet handles the component status with statefulSet. One statefulSet corresponds to one component.
 func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Context,
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition) (bool, error) {
@@ -709,7 +709,7 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 	return needSyncComponentStatus, nil
 }
 
-// handleComponentStatusWithDeployment handle the component status with deployment. One deployment corresponds to one component.
+// handleComponentStatusWithDeployment handles the component status with deployment. One deployment corresponds to one component.
 func (r *ClusterReconciler) handleComponentStatusWithDeployment(ctx context.Context, cluster *dbaasv1alpha1.Cluster) (bool, error) {
 	var (
 		needSyncComponentStatus bool

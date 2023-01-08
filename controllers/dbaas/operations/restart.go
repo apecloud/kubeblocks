@@ -61,18 +61,18 @@ func (r restartOpsHandler) Action(opsRes *OpsResource) error {
 	return restartStatefulSet(opsRes, componentNameMap)
 }
 
-// ReconcileAction it will be performed when action is done and loop util OpsRequest.status.phase is Succeed/Failed.
+// ReconcileAction it will be performed when action is done and loops util OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for volume expansion opsRequest.
 func (r restartOpsHandler) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error) {
 	return ReconcileActionWithComponentOps(opsRes, "restart", handleComponentStatusProgress)
 }
 
-// GetRealAffectedComponentMap get the real affected component map for the operation
+// GetRealAffectedComponentMap gets the real affected component map for the operation
 func (r restartOpsHandler) GetRealAffectedComponentMap(opsRequest *dbaasv1alpha1.OpsRequest) realAffectedComponentMap {
 	return opsRequest.GetRestartComponentNameMap()
 }
 
-// SaveLastConfiguration record last configuration to the OpsRequest.status.lastConfiguration
+// SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (r restartOpsHandler) SaveLastConfiguration(opsRes *OpsResource) error {
 	return nil
 }

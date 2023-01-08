@@ -1772,10 +1772,6 @@ involvedObject:
 
 			By("Checking pods' role are updated in cluster status")
 			Eventually(func(g Gomega) {
-
-				podList := &corev1.PodList{}
-				Expect(k8sClient.List(ctx, podList, client.InNamespace(key.Namespace))).Should(Succeed())
-
 				fetched := &dbaasv1alpha1.Cluster{}
 				g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
 				compName := fetched.Spec.Components[0].Name

@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/troubleshoot"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -89,6 +91,7 @@ A Command Line Interface for KubeBlocks`,
 		version.NewVersionCmd(f),
 		backupconfig.NewBackupConfigCmd(f, ioStreams),
 		dashboard.NewDashboardCmd(f, ioStreams),
+		troubleshoot.NewTroubleshootCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}

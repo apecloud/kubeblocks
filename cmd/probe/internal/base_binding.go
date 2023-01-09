@@ -209,7 +209,8 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 	// roleChanged events to maintain pod label accurately in cases of:
 	// 1 roleChanged event loss;
 	// 2 pod role label deleted or updated incorrectly.
-	if p.roleUnchangedCount%p.roleUnchangedThreshold == 0 {
+	if p.roleUnchangedCount%p.roleUnchangedThreshold == 0 ||
+		(p.roleUnchangedCount < 60 && p.roleUnchangedCount%2 == 0) {
 		response.Metadata[StatusCode] = CheckFailedHTTPCode
 	}
 	msg, _ := json.Marshal(result)

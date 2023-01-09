@@ -781,7 +781,7 @@ spec:
 					Type:     compName,
 					Replicas: &initialReplicas,
 					VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{{
-						Name: "data",
+						Name: volumeName,
 						Spec: &pvcSpec,
 					}},
 				}}
@@ -1764,11 +1764,6 @@ involvedObject:
 			sts.Status.ReadyReplicas = int32(replicas)
 			sts.Status.ObservedGeneration = sts.Generation
 			Expect(k8sClient.Status().Update(ctx, sts)).Should(Succeed())
-
-			// TODO why the code above(update to stateful set) cannot trigger Reconcile of ClusterController
-			Expect(changeClusterStatus(key, func(cluster *dbaasv1alpha1.Cluster) {
-				cluster.Status.Message = "trigger Reconcile"
-			})).Should(Succeed())
 
 			By("Checking pods' role are updated in cluster status")
 			Eventually(func(g Gomega) {

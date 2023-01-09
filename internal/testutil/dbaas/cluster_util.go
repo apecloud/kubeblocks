@@ -172,23 +172,19 @@ func CreateHybridCompsClusterVersionForUpgrade(testCtx testutil.TestContext,
 }
 
 // ExpectClusterComponentPhase check the component phase of cluster is the expected phase.
-func ExpectClusterComponentPhase(testCtx testutil.TestContext, clusterName, componentName string, expectPhase dbaasv1alpha1.Phase) bool {
+func ExpectClusterComponentPhase(testCtx testutil.TestContext, clusterName, componentName string, expectPhase dbaasv1alpha1.Phase) {
 	tmpCluster := &dbaasv1alpha1.Cluster{}
-	err := testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: clusterName,
-		Namespace: testCtx.DefaultNamespace}, tmpCluster)
-	if err != nil {
-		return false
-	}
-	statusComponent := tmpCluster.Status.Components[componentName]
-	return statusComponent.Phase == expectPhase
+	gomega.Expect(testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: clusterName,
+		Namespace: testCtx.DefaultNamespace}, tmpCluster)).Should(gomega.Succeed())
+	gomega.Expect(tmpCluster.Status.Components[componentName]).Should(gomega.Equal(expectPhase))
 }
 
-// ExpectClusterPhase check the cluster phase is the expected phase.
-func ExpectClusterPhase(testCtx testutil.TestContext, clusterName string, expectPhase dbaasv1alpha1.Phase) bool {
+// GetClusterPhase check the cluster phase is the expected phase.
+func GetClusterPhase(testCtx testutil.TestContext, clusterName string) dbaasv1alpha1.Phase {
 	cluster := &dbaasv1alpha1.Cluster{}
 	err := testCtx.Cli.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)
 	if err != nil {
-		return false
+		return ""
 	}
-	return cluster.Status.Phase == expectPhase
+	return cluster.Status.Phase
 }

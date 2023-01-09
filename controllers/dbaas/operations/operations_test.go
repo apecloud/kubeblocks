@@ -102,7 +102,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		testdbaas.CreateOpsRequest(testCtx, ops)
 		By("test save last configuration and OpsRequest phase is Running")
 		Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
-		Eventually(testdbaas.ExpectOpsRequestPhase(testCtx, ops.Name, dbaasv1alpha1.RunningPhase)).Should(BeTrue())
+		Eventually(testdbaas.GetOpsRequestPhase(testCtx, ops.Name), timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 
 		By("test vertical scale action function")
 		vsHandler := verticalScalingHandler{}
@@ -167,21 +167,23 @@ var _ = Describe("OpsRequest Controller", func() {
 		initClusterForOps(opsRes)
 		opsRes.OpsRequest = ops
 		Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
-		Eventually(testdbaas.ExpectOpsRequestPhase(testCtx, ops.Name, dbaasv1alpha1.RunningPhase)).Should(BeTrue())
+		Eventually(testdbaas.GetOpsRequestPhase(testCtx, ops.Name), timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 
 		By("test restart action and reconcile function")
 		testdbaas.MockConsensusComponentStatefulSet(testCtx, clusterName)
 		testdbaas.MockStatelessComponentDeploy(testCtx, clusterName)
 		rHandler := restartOpsHandler{}
 		_ = rHandler.Action(opsRes)
-		_, _, err := rHandler.ReconcileAction(opsRes)
+		_, err := GetOpsManager().Reconcile(opsRes)
 		Expect(err == nil).Should(BeTrue())
 
 		if !testCtx.UsingExistingCluster() {
 			By("mock testing the updates of consensus component")
+			Expect(ops.Status.Components[testdbaas.ConsensusComponentName].Phase).Should(Equal(dbaasv1alpha1.UpdatingPhase))
 			testConsensusSetPodUpdating(opsRes, consensusPodList)
 
 			By("mock testing the updates of stateless component")
+			Expect(ops.Status.Components[testdbaas.StatelessComponentName].Phase).Should(Equal(dbaasv1alpha1.UpdatingPhase))
 			testStatelessPodUpdating(opsRes, statelessPod)
 		}
 	}

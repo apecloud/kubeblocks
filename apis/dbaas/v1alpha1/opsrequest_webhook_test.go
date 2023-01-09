@@ -93,6 +93,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("By testing spec.upgrade.clusterVersionRef when it equals Cluster.spec.clusterVersionRef")
 		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: clusterVersionName}
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("can not equals Cluster.spec.clusterVersionRef"))
+		opsRequest.Spec.Upgrade.ClusterVersionRef = clusterVersionNameForUpgrade
 
 		By("Test Cluster Phase")
 		OpsRequestBehaviourMapper[UpgradeType] = OpsRequestBehaviour{

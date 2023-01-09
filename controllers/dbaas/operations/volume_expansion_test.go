@@ -209,8 +209,8 @@ spec:
 		opsRes.OpsRequest = newOps
 		_, err := GetOpsManager().Reconcile(opsRes)
 		Expect(err == nil).Should(BeTrue())
-		Eventually(testdbaas.ExpectOpsRequestCompPhase(testCtx, newOps.Name, testdbaas.ConsensusComponentName,
-			dbaasv1alpha1.VolumeExpandingPhase), timeout, interval).Should(BeTrue())
+		Eventually(testdbaas.GetOpsRequestCompPhase(testCtx, newOps.Name, testdbaas.ConsensusComponentName),
+			timeout, interval).Should(Equal(dbaasv1alpha1.VolumeExpandingPhase))
 	}
 
 	testWarningEventOnPVC := func(clusterObject *dbaasv1alpha1.Cluster, opsRes *OpsResource) {
@@ -237,8 +237,7 @@ spec:
 		pvcEventHandler := PersistentVolumeClaimEventHandler{}
 		reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 		Expect(pvcEventHandler.Handle(k8sClient, reqCtx, eventRecorder, event)).Should(Succeed())
-		Eventually(testdbaas.ExpectOpsRequestCompPhase(testCtx, newOps.Name, testdbaas.ConsensusComponentName,
-			dbaasv1alpha1.VolumeExpandingPhase), timeout, interval).Should(BeTrue())
+		Eventually(testdbaas.GetOpsRequestCompPhase(testCtx, newOps.Name, testdbaas.ConsensusComponentName), timeout, interval).Should(Equal(dbaasv1alpha1.VolumeExpandingPhase))
 
 		// test when the event reach the conditions
 		event.Count = 5
@@ -338,9 +337,9 @@ spec:
 		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, pvc)).Should(Succeed())
 		Expect(handleVolumeExpansionWithPVC(intctrlutil.RequestCtx{Ctx: ctx}, k8sClient, pvc)).Should(Succeed())
 
-		Eventually(func() bool {
-			return testdbaas.ExpectClusterPhase(testCtx, clusterObject.Name, dbaasv1alpha1.RunningPhase)
-		}, timeout, interval).Should(BeTrue())
+		Eventually(func() dbaasv1alpha1.Phase {
+			return testdbaas.GetClusterPhase(testCtx, clusterObject.Name)
+		}, timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 	}
 
 	Context("Test OpsRequest", func() {

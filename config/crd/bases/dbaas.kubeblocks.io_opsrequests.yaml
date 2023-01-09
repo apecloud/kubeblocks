@@ -226,7 +226,8 @@ spec:
                         in ClusterDefinition.
                       type: string
                     phase:
-                      description: phase describe the component phase, reference ClusterDefinition.status.component.phase.
+                      description: phase describes the component phase, reference
+                        ClusterDefinition.status.component.phase.
                       enum:
                       - Running
                       - Failed

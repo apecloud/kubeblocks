@@ -221,7 +221,7 @@ type LastConfiguration struct {
 }
 
 type OpsRequestStatusComponent struct {
-	// phase describe the component phase, reference ClusterDefinition.status.component.phase.
+	// phase describes the component phase, reference ClusterDefinition.status.component.phase.
 	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted,VolumeExpanding}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
@@ -351,7 +351,7 @@ func (r *OpsRequest) CovertVolumeExpansionListToMap() map[string]VolumeExpansion
 	return volumeExpansionMap
 }
 
-// GetUpgradeComponentNameMap get the component name map with upgrade operation.
+// GetUpgradeComponentNameMap gets the component name map with upgrade operation.
 func (r *OpsRequest) GetUpgradeComponentNameMap() map[string]struct{} {
 	if r.Spec.Upgrade == nil {
 		return nil

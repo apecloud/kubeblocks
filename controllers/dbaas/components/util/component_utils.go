@@ -165,7 +165,7 @@ func GetComponentTypeName(cluster dbaasv1alpha1.Cluster, componentName string) s
 	return componentName
 }
 
-// GetComponentReplicas get the actual replicas of component
+// GetComponentReplicas gets the actual replicas of component
 func GetComponentReplicas(component *dbaasv1alpha1.ClusterComponent,
 	componentDef *dbaasv1alpha1.ClusterDefinitionComponent) int32 {
 	replicas := componentDef.DefaultReplicas

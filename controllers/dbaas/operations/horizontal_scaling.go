@@ -44,7 +44,7 @@ func init() {
 	opsMgr.RegisterOps(dbaasv1alpha1.HorizontalScalingType, horizontalScalingBehaviour)
 }
 
-// ActionStartedCondition the started condition when handle the horizontal scaling request.
+// ActionStartedCondition the started condition when handling the horizontal scaling request.
 func (hs horizontalScalingOpsHandler) ActionStartedCondition(opsRequest *dbaasv1alpha1.OpsRequest) *metav1.Condition {
 	return dbaasv1alpha1.NewHorizontalScalingCondition(opsRequest)
 }
@@ -179,7 +179,7 @@ func (hs horizontalScalingOpsHandler) handleComponentProgressDetails(opsRes *Ops
 	return expectProgressCount, succeedCount, err
 }
 
-// handleScaleOutProgress handle the progressDetails of scale out the replicas.
+// handleScaleOutProgress handles the progressDetails of scale out the replicas.
 func (hs horizontalScalingOpsHandler) handleScaleOutProgress(
 	opsRes *OpsResource,
 	pgRes progressResource,
@@ -188,7 +188,7 @@ func (hs horizontalScalingOpsHandler) handleScaleOutProgress(
 	currComponent := components.NewComponentByType(opsRes.Ctx, opsRes.Client,
 		opsRes.Cluster, pgRes.clusterComponentDef, pgRes.clusterComponent)
 	for _, v := range podList.Items {
-		// only focus on the newly created pod when scale out the replicas.
+		// only focus on the newly created pod when scaling out the replicas.
 		if v.CreationTimestamp.Before(&opsRes.OpsRequest.Status.StartTimestamp) {
 			continue
 		}
@@ -217,7 +217,7 @@ func (hs horizontalScalingOpsHandler) handleScaleOutProgress(
 	return succeedCount, nil
 }
 
-// handleScaleDownProgress handle the progressDetails of scale down the replicas.
+// handleScaleDownProgress handles the progressDetails of scale down the replicas.
 func (hs horizontalScalingOpsHandler) handleScaleDownProgress(opsRes *OpsResource,
 	pgRes progressResource,
 	podList *corev1.PodList,

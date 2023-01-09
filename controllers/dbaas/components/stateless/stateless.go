@@ -110,12 +110,12 @@ func DeploymentIsReady(deploy *appsv1.Deployment) bool {
 		componentIsRunning = true
 		newRSAvailable     = true
 	)
-	// we should check the new replicaSet is available.
+	// we should check if the new replicaSet is available.
 	condition := deploymentutil.GetDeploymentCondition(deploy.Status, appsv1.DeploymentProgressing)
 	if condition == nil || condition.Reason != NewRSAvailableReason || condition.Status != corev1.ConditionTrue {
 		newRSAvailable = false
 	}
-	// if status.AvailableReplicas equals targetReplicas and status.replicas not equals targetReplicas, means Deployment is rolling updating.
+	// if status.AvailableReplicas equals targetReplicas and status.replicas not equals targetReplicas, means Deployment is in rolling updating.
 	if deploy.Status.AvailableReplicas != targetReplicas ||
 		deploy.Status.Replicas != targetReplicas ||
 		deploy.Status.ObservedGeneration != deploy.GetGeneration() ||

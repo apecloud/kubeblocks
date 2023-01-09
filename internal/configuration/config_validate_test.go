@@ -75,10 +75,9 @@ func TestSchemaValidatorWithOpenSchema(t *testing.T) {
 }
 
 func fakeConfigurationTpl(cuefile string, cfgFormatter dbaasv1alpha1.ConfigurationFormatter) *dbaasv1alpha1.ConfigurationTemplateSpec {
-	cueContext := loadTestData(cuefile)
 	return &dbaasv1alpha1.ConfigurationTemplateSpec{
 		ConfigurationSchema: &dbaasv1alpha1.CustomParametersValidation{
-			Cue: &cueContext,
+			CUE: loadTestData(cuefile),
 		},
 		FormatterConfig: &dbaasv1alpha1.FormatterConfig{
 			Formatter: cfgFormatter,

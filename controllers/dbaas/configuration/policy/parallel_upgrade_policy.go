@@ -24,11 +24,11 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
-func init() {
-	RegisterPolicy(dbaasv1alpha1.RestartPolicy, &parallelUpgradePolicy{})
+type parallelUpgradePolicy struct {
 }
 
-type parallelUpgradePolicy struct {
+func init() {
+	RegisterPolicy(dbaasv1alpha1.RestartPolicy, &parallelUpgradePolicy{})
 }
 
 func (p *parallelUpgradePolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {

@@ -18,6 +18,7 @@ package controllerutil
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -29,6 +30,26 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
+
+// statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
+var statefulPodRegex = regexp.MustCompile("(.*)-([0-9]+)$")
+
+// GetParentNameAndOrdinal gets the name of pod's parent StatefulSet and pod's ordinal as extracted from its Name. If
+// the Pod was not created by a StatefulSet, its parent is considered to be empty string, and its ordinal is considered
+// to be -1.
+func GetParentNameAndOrdinal(pod *corev1.Pod) (string, int) {
+	parent := ""
+	ordinal := -1
+	subMatches := statefulPodRegex.FindStringSubmatch(pod.Name)
+	if len(subMatches) < 3 {
+		return parent, ordinal
+	}
+	parent = subMatches[1]
+	if i, err := strconv.ParseInt(subMatches[2], 10, 32); err == nil {
+		ordinal = int(i)
+	}
+	return parent, ordinal
+}
 
 // GetContainerUsingConfig function description:
 // Search the container using the configmap of config from the pod

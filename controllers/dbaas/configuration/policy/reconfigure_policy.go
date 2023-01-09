@@ -35,6 +35,25 @@ import (
 
 type ExecStatus int
 
+type ReconfigureParams struct {
+	Restart bool
+	TplName string
+	Meta    *cfgcore.ConfigDiffInformation
+	Cfg     *corev1.ConfigMap
+	Tpl     *dbaasv1alpha1.ConfigurationTemplateSpec
+
+	// for grpc factory
+	ReconfigureClientFactory createReconfigureClient
+
+	ContainerNames   []string
+	Client           client.Client
+	Ctx              intctrlutil.RequestCtx
+	Cluster          *dbaasv1alpha1.Cluster
+	ClusterComponent *dbaasv1alpha1.ClusterComponent
+	Component        *dbaasv1alpha1.ClusterDefinitionComponent
+	ComponentUnits   []appv1.StatefulSet
+}
+
 const (
 	ESNone ExecStatus = iota
 	ESRetry
@@ -57,25 +76,6 @@ var (
 
 func init() {
 	RegisterPolicy(dbaasv1alpha1.AutoReload, &AutoReloadPolicy{})
-}
-
-type ReconfigureParams struct {
-	Restart bool
-	TplName string
-	Meta    *cfgcore.ConfigDiffInformation
-	Cfg     *corev1.ConfigMap
-	Tpl     *dbaasv1alpha1.ConfigurationTemplateSpec
-
-	// for grpc factory
-	ReconfigureClientFactory createReconfigureClient
-
-	ContainerNames   []string
-	Client           client.Client
-	Ctx              intctrlutil.RequestCtx
-	Cluster          *dbaasv1alpha1.Cluster
-	ClusterComponent *dbaasv1alpha1.ClusterComponent
-	Component        *dbaasv1alpha1.ClusterDefinitionComponent
-	ComponentUnits   []appv1.StatefulSet
 }
 
 func (param *ReconfigureParams) ComponentType() dbaasv1alpha1.ComponentType {

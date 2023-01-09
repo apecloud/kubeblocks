@@ -170,7 +170,9 @@ func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int) {
 		roleJ := pods[j].Labels[intctrlutil.ConsensusSetRoleLabelKey]
 
 		if rolePriorityMap[roleI] == rolePriorityMap[roleJ] {
-			return strings.Compare(pods[i].Name, pods[j].Name) < 0
+			_, ordinal1 := intctrlutil.GetParentNameAndOrdinal(&pods[i])
+			_, ordinal2 := intctrlutil.GetParentNameAndOrdinal(&pods[j])
+			return ordinal1 < ordinal2
 		}
 
 		return rolePriorityMap[roleI] < rolePriorityMap[roleJ]
@@ -209,19 +211,6 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 
 	rolePriorityMap := ComposeRolePriorityMap(component)
 	SortPods(pods, rolePriorityMap)
-
-	//// make a Serial pod list,
-	//// e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
-	// sort.SliceStable(pods, func(i, j int) bool {
-	//	roleI := pods[i].Labels[intctrlutil.ConsensusSetRoleLabelKey]
-	//	roleJ := pods[j].Labels[intctrlutil.ConsensusSetRoleLabelKey]
-	//
-	//	if rolePriorityMap[roleI] == rolePriorityMap[roleJ] {
-	//		return strings.Compare(pods[i].Name, pods[j].Name) < 0
-	//	}
-	//
-	//	return rolePriorityMap[roleI] < rolePriorityMap[roleJ]
-	// })
 
 	// generate plan by UpdateStrategy
 	switch component.ConsensusSpec.UpdateStrategy {

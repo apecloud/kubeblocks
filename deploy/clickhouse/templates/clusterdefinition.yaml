@@ -38,6 +38,7 @@ spec:
           - name: clickhouse-tpl
             configTplRef: clickhouse-tpl
             volumeName: config
+            namespace: {{ .Release.Namespace }}
       service:
         ports:
           - name: http
@@ -172,6 +173,7 @@ spec:
           - name: clickhouse-keeper-tpl
             configTplRef: clickhouse-keeper-tpl
             volumeName: config
+            namespace: {{ .Release.Namespace }}
       service:
         ports:
           - name: tcp

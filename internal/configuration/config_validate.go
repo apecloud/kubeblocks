@@ -86,10 +86,10 @@ func NewConfigValidator(configTemplate *dbaasv1alpha1.ConfigurationTemplateSpec)
 	switch {
 	case meta == nil:
 		validator = &EmptyValidator{}
-	case meta.Cue != nil:
+	case len(meta.CUE) != 0:
 		validator = &configCueValidator{
 			cfgType:   configTemplate.FormatterConfig.Formatter,
-			cueScript: *meta.Cue,
+			cueScript: meta.CUE,
 		}
 	case meta.Schema != nil:
 		validator = &schemaValidator{

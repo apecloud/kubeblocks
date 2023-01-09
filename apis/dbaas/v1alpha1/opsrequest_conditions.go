@@ -51,7 +51,7 @@ const (
 
 	ReasonReconfigureMerged  = "ReconfigureMerged"
 	ReasonReconfigureFailed  = "ReconfigureFailed"
-	ReasonReconfigureSuccess = "ReconfigureSuccess"
+	ReasonReconfigureSucceed = "ReconfigureSucceed"
 	ReasonReconfigureRunning = "ReconfigureRunning"
 )
 

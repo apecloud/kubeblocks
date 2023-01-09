@@ -18,6 +18,7 @@ package policy
 
 import (
 	"os"
+	"time"
 
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
@@ -29,7 +30,7 @@ import (
 )
 
 const (
-	defaultMinReadySeconds = 10 // 10s
+	defaultMinReadySeconds = time.Second * 10 // 10s
 )
 
 type rollingUpgradePolicy struct {

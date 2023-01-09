@@ -15,6 +15,7 @@ spec:
           - name: mongodb-scripts
             configTplRef: mongodb-scripts
             volumeName: scripts
+            namespace: {{ .Release.Namespace }}
             defaultMode: 493
       componentType: Stateless
       service:
@@ -42,6 +43,7 @@ spec:
           - name: mongodb-scripts
             configTplRef: mongodb-scripts
             volumeName: scripts
+            namespace: {{ .Release.Namespace }}
             defaultMode: 493
       characterType: mongodb
       componentType: Consensus
@@ -93,6 +95,7 @@ spec:
           - name: mongodb-scripts
             configTplRef: mongodb-scripts
             volumeName: scripts
+            namespace: {{ .Release.Namespace }}
             defaultMode: 493
       characterType: mongodb
       componentType: Consensus

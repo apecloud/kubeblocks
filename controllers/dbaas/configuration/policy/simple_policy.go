@@ -25,11 +25,11 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-func init() {
-	RegisterPolicy(dbaasv1alpha1.NormalPolicy, &simplePolicy{})
+type simplePolicy struct {
 }
 
-type simplePolicy struct {
+func init() {
+	RegisterPolicy(dbaasv1alpha1.NormalPolicy, &simplePolicy{})
 }
 
 func (s *simplePolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {

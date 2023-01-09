@@ -84,7 +84,7 @@ type CustomParametersValidation struct {
 
 	// cue that to let provider verify user configuration through cue language.
 	// +optional
-	Cue *string `json:"cue,omitempty"`
+	CUE string `json:"cue,omitempty"`
 }
 
 // ReloadOptions defines reload options

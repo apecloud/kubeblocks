@@ -89,11 +89,11 @@ func getConfigMapByName(cli client.Client, ctx intctrlutil.RequestCtx, cmName, n
 func checkConfigurationTemplate(ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplate) (bool, error) {
 	// validate configuration template
 	isConfigSchemaFn := func(tpl *dbaasv1alpha1.CustomParametersValidation) (bool, error) {
-		if tpl == nil || tpl.Cue == nil {
+		if tpl == nil || len(tpl.CUE) == 0 {
 			return true, nil
 		}
 
-		err := cfgcore.CueValidate(*tpl.Cue)
+		err := cfgcore.CueValidate(tpl.CUE)
 		return err == nil, err
 	}
 
@@ -444,8 +444,8 @@ func getConfigurationVersion(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, 
 
 func updateConfigurationSchema(tpl *dbaasv1alpha1.ConfigurationTemplateSpec) error {
 	schema := tpl.ConfigurationSchema
-	if schema != nil && schema.Cue != nil && len(*schema.Cue) > 0 && schema.Schema == nil {
-		customSchema, err := cfgcore.GenerateOpenAPISchema(*schema.Cue, tpl.CfgSchemaTopLevelName)
+	if schema != nil && len(schema.CUE) > 0 && schema.Schema == nil {
+		customSchema, err := cfgcore.GenerateOpenAPISchema(schema.CUE, tpl.CfgSchemaTopLevelName)
 		if err != nil {
 			return err
 		}
@@ -488,9 +488,10 @@ func getComponentFromClusterDefinition(
 		return nil, err
 	}
 
-	for _, component := range clusterDef.Spec.Components {
+	for i, _ := range clusterDef.Spec.Components {
+		component := &clusterDef.Spec.Components[i]
 		if component.TypeName == typeName {
-			return &component, nil
+			return component, nil
 		}
 	}
 	return nil, nil

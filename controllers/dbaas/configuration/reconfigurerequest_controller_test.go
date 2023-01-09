@@ -18,7 +18,6 @@ package configuration
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -112,19 +111,11 @@ var _ = Describe("Reconfigure Controller", func() {
 				})).Should(Succeed())
 
 			// check update configmap
-			fmt.Println("------------------------------------------")
-			fmt.Printf("old config hash: %s\n", configHash)
-			fmt.Println("------------------------------------------")
 			Eventually(func() bool {
 				ok, _ := ValidateCR(testWrapper, &corev1.ConfigMap{},
 					testWrapper.WithCRName(insCfgCMName),
 					func(cm *corev1.ConfigMap) bool {
 						newHash := cm.Labels[cfgcore.CMInsConfigurationHashLabelKey]
-						fmt.Println("------------------------------------------")
-						fmt.Printf("old config hash: %s\n", configHash)
-						fmt.Printf("new config hash: %s\n", newHash)
-						fmt.Printf("last reconfigure: %s : %s\n", cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey], ReconfigureAutoReloadType)
-						fmt.Println("------------------------------------------")
 						return newHash != configHash &&
 							cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey] == ReconfigureAutoReloadType
 					})
@@ -146,10 +137,6 @@ var _ = Describe("Reconfigure Controller", func() {
 				ok, _ := ValidateCR(testWrapper, &corev1.ConfigMap{},
 					testWrapper.WithCRName(insCfgCMName),
 					func(cm *corev1.ConfigMap) bool {
-						newHash := cm.Labels[cfgcore.CMInsConfigurationHashLabelKey]
-						fmt.Println("------------------------------------------")
-						fmt.Printf("new config hash: %s\n", newHash)
-						fmt.Println("------------------------------------------")
 						return cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey] == ReconfigureNoChangeType
 					})
 				return ok
@@ -170,10 +157,6 @@ var _ = Describe("Reconfigure Controller", func() {
 				ok, _ := ValidateCR(testWrapper, &corev1.ConfigMap{},
 					testWrapper.WithCRName(insCfgCMName),
 					func(cm *corev1.ConfigMap) bool {
-						newHash := cm.Labels[cfgcore.CMInsConfigurationHashLabelKey]
-						fmt.Println("------------------------------------------")
-						fmt.Printf("new config hash: %s\n", newHash)
-						fmt.Println("------------------------------------------")
 						return cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey] == ReconfigureSimpleType
 					})
 				return ok

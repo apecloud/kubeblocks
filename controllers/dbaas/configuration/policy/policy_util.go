@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
-	component "github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -79,8 +78,8 @@ func getStatefulSetPods(params ReconfigureParams) ([]corev1.Pod, error) {
 	}
 
 	sort.SliceStable(pods, func(i, j int) bool {
-		_, ordinal1 := component.GetParentNameAndOrdinal(&pods[i])
-		_, ordinal2 := component.GetParentNameAndOrdinal(&pods[j])
+		_, ordinal1 := intctrlutil.GetParentNameAndOrdinal(&pods[i])
+		_, ordinal2 := intctrlutil.GetParentNameAndOrdinal(&pods[j])
 		return ordinal1 < ordinal2
 	})
 	return pods, nil

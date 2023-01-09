@@ -13,7 +13,6 @@ template: {
 		},
 	]
 
-	//"registry.cn-hangzhou.aliyuncs.com/google_containers/etcd:3.5.0-0"
 	image:           parameter.sidecarImage
 	imagePullPolicy: "IfNotPresent"
 	volumeMounts:    parameter.volumes

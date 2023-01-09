@@ -171,20 +171,22 @@ func CreateHybridCompsClusterVersionForUpgrade(testCtx testutil.TestContext,
 		[]string{"docker.io/apecloud/wesql-server:8.0.30", "nginx:1.14.2"})
 }
 
-// ExpectClusterComponentPhase check the component phase of cluster is the expected phase.
-func ExpectClusterComponentPhase(testCtx testutil.TestContext, clusterName, componentName string, expectPhase dbaasv1alpha1.Phase) {
-	tmpCluster := &dbaasv1alpha1.Cluster{}
-	gomega.Expect(testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: clusterName,
-		Namespace: testCtx.DefaultNamespace}, tmpCluster)).Should(gomega.Succeed())
-	gomega.Expect(tmpCluster.Status.Components[componentName]).Should(gomega.Equal(expectPhase))
+// GetClusterComponentPhase check the component phase of cluster is the expected phase.
+func GetClusterComponentPhase(testCtx testutil.TestContext, clusterName, componentName string) func(g gomega.Gomega) dbaasv1alpha1.Phase {
+	return func(g gomega.Gomega) dbaasv1alpha1.Phase {
+		tmpCluster := &dbaasv1alpha1.Cluster{}
+		g.Expect(testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: clusterName,
+			Namespace: testCtx.DefaultNamespace}, tmpCluster)).Should(gomega.Succeed())
+		return tmpCluster.Status.Components[componentName].Phase
+	}
 }
 
 // GetClusterPhase check the cluster phase is the expected phase.
-func GetClusterPhase(testCtx testutil.TestContext, clusterName string) dbaasv1alpha1.Phase {
-	cluster := &dbaasv1alpha1.Cluster{}
-	err := testCtx.Cli.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)
-	if err != nil {
-		return ""
+func GetClusterPhase(testCtx testutil.TestContext, clusterName string) func(g gomega.Gomega) dbaasv1alpha1.Phase {
+	return func(g gomega.Gomega) dbaasv1alpha1.Phase {
+		cluster := &dbaasv1alpha1.Cluster{}
+		g.Expect(testCtx.Cli.Get(ctx, client.ObjectKey{Name: clusterName,
+			Namespace: testCtx.DefaultNamespace}, cluster)).Should(gomega.Succeed())
+		return cluster.Status.Phase
 	}
-	return cluster.Status.Phase
 }

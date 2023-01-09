@@ -87,6 +87,7 @@ func MockStatefulSetReady(sts *apps.StatefulSet) {
 	sts.Status.AvailableReplicas = *sts.Spec.Replicas
 	sts.Status.ObservedGeneration = sts.Generation
 	sts.Status.Replicas = *sts.Spec.Replicas
+	sts.Status.ReadyReplicas = *sts.Spec.Replicas
 	sts.Status.CurrentRevision = sts.Status.UpdateRevision
 }
 

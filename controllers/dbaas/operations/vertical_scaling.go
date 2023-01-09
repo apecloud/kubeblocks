@@ -29,12 +29,13 @@ import (
 
 type verticalScalingHandler struct{}
 
+var _ OpsHandler = verticalScalingHandler{}
+
 func init() {
-	var vs OpsHandler = verticalScalingHandler{}
 	verticalScalingBehaviour := OpsBehaviour{
 		FromClusterPhases: []dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase},
 		ToClusterPhase:    dbaasv1alpha1.UpdatingPhase,
-		OpsHandler:        vs,
+		OpsHandler:        verticalScalingHandler{},
 	}
 
 	opsMgr := GetOpsManager()

@@ -37,6 +37,8 @@ type Stateful struct {
 	Cluster *dbaasv1alpha1.Cluster
 }
 
+var _ types.Component = &Stateful{}
+
 func (stateful *Stateful) IsRunning(obj client.Object) (bool, error) {
 	sts := util.CovertToStatefulSet(obj)
 	if sts == nil {

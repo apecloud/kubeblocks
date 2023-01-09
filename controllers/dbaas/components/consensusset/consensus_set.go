@@ -37,6 +37,8 @@ type ConsensusSet struct {
 	Component    *dbaasv1alpha1.ClusterComponent
 }
 
+var _ types.Component = &ConsensusSet{}
+
 func (consensusSet *ConsensusSet) IsRunning(obj client.Object) (bool, error) {
 	sts := util.CovertToStatefulSet(obj)
 	if statefulStatusRevisionIsEquals, err := handleConsensusSetUpdate(consensusSet.Ctx, consensusSet.Cli, consensusSet.Cluster, sts); err != nil {

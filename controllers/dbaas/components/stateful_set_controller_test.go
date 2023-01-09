@@ -30,6 +30,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 var _ = Describe("StatefulSet Controller", func() {
@@ -97,11 +98,8 @@ var _ = Describe("StatefulSet Controller", func() {
 		Expect(k8sClient.Status().Patch(context.Background(), newSts, stsPatch)).Should(Succeed())
 
 		By("waiting the component is Running")
-		Eventually(func() bool {
-			cluster := &dbaasv1alpha1.Cluster{}
-			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)
-			return cluster.Status.Components[componentName].Phase == dbaasv1alpha1.RunningPhase
-		}, timeout, interval).Should(BeTrue())
+		Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, componentName),
+			timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 	}
 
 	testUsingEnvTest := func(sts *appsv1.StatefulSet) {
@@ -119,10 +117,7 @@ var _ = Describe("StatefulSet Controller", func() {
 		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: sts.Name, Namespace: testCtx.DefaultNamespace}, newSts)).Should(Succeed())
 		stsPatch := client.MergeFrom(newSts.DeepCopy())
 		newSts.Status.UpdateRevision = fmt.Sprintf("%s-%s-%s", clusterName, testdbaas.ConsensusComponentName, testdbaas.RevisionID)
-		newSts.Status.ObservedGeneration = 2
-		newSts.Status.AvailableReplicas = 3
-		newSts.Status.ReadyReplicas = 3
-		newSts.Status.Replicas = 3
+		testk8s.MockStatefulSetReady(newSts)
 		Expect(k8sClient.Status().Patch(context.Background(), newSts, stsPatch)).Should(Succeed())
 	}
 
@@ -178,7 +173,7 @@ var _ = Describe("StatefulSet Controller", func() {
 			}
 
 			By("waiting the component is Running")
-			testdbaas.ExpectClusterComponentPhase(testCtx, clusterName, componentName, dbaasv1alpha1.RunningPhase)
+			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, componentName), timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 
 			By("test updateStrategy with Serial")
 			testUpdateStrategy(dbaasv1alpha1.SerialStrategy, componentName, 1)

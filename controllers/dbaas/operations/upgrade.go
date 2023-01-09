@@ -30,12 +30,13 @@ import (
 
 type upgradeOpsHandler struct{}
 
+var _ OpsHandler = upgradeOpsHandler{}
+
 func init() {
-	var u OpsHandler = upgradeOpsHandler{}
 	upgradeBehaviour := OpsBehaviour{
 		FromClusterPhases: []dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase},
 		ToClusterPhase:    dbaasv1alpha1.UpdatingPhase,
-		OpsHandler:        u,
+		OpsHandler:        upgradeOpsHandler{},
 	}
 
 	opsMgr := GetOpsManager()

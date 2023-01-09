@@ -337,9 +337,8 @@ spec:
 		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, pvc)).Should(Succeed())
 		Expect(handleVolumeExpansionWithPVC(intctrlutil.RequestCtx{Ctx: ctx}, k8sClient, pvc)).Should(Succeed())
 
-		Eventually(func() dbaasv1alpha1.Phase {
-			return testdbaas.GetClusterPhase(testCtx, clusterObject.Name)
-		}, timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
+		Eventually(testdbaas.GetClusterPhase(testCtx, clusterObject.Name),
+			timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 	}
 
 	Context("Test OpsRequest", func() {

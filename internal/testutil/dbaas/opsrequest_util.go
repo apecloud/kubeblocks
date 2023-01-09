@@ -74,17 +74,17 @@ func CreateOpsRequest(testCtx testutil.TestContext, opsRequest *dbaasv1alpha1.Op
 }
 
 // GetOpsRequestCompPhase get the component phase of OpsRequest.
-func GetOpsRequestCompPhase(testCtx testutil.TestContext, opsName, componentName string) dbaasv1alpha1.Phase {
-	tmpOps := &dbaasv1alpha1.OpsRequest{}
-	err := testCtx.Cli.Get(ctx, client.ObjectKey{Name: opsName, Namespace: testCtx.DefaultNamespace}, tmpOps)
-	if err != nil {
-		return ""
+func GetOpsRequestCompPhase(testCtx testutil.TestContext, opsName, componentName string) func(g gomega.Gomega) dbaasv1alpha1.Phase {
+	return func(g gomega.Gomega) dbaasv1alpha1.Phase {
+		tmpOps := &dbaasv1alpha1.OpsRequest{}
+		g.Expect(testCtx.Cli.Get(ctx, client.ObjectKey{Name: opsName,
+			Namespace: testCtx.DefaultNamespace}, tmpOps)).Should(gomega.Succeed())
+		statusComponents := tmpOps.Status.Components
+		if statusComponents == nil {
+			return ""
+		}
+		return statusComponents[componentName].Phase
 	}
-	statusComponents := tmpOps.Status.Components
-	if statusComponents == nil {
-		return ""
-	}
-	return statusComponents[componentName].Phase
 }
 
 // GetOpsRequestPhase get the opsRequest phase.

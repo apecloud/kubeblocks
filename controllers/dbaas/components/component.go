@@ -151,7 +151,7 @@ func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
 				if phase, err := component.CalculatePhaseWhenPodsNotReady(componentName); err != nil {
 					return false, err
 				} else if phase != "" {
-					statusComponent.Phase = cluster.Status.Phase
+					statusComponent.Phase = phase
 					needSync = true
 				}
 			}

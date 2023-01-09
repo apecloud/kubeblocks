@@ -43,6 +43,8 @@ type Stateless struct {
 	Cluster *dbaasv1alpha1.Cluster
 }
 
+var _ types.Component = &Stateless{}
+
 func (stateless *Stateless) IsRunning(obj client.Object) (bool, error) {
 	return stateless.PodsReady(obj)
 }

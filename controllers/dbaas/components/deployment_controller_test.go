@@ -80,10 +80,13 @@ var _ = Describe("Deployment Controller", func() {
 				},
 			}
 			Expect(k8sClient.Status().Patch(context.Background(), cluster, patch)).Should(Succeed())
+			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, componentName),
+				timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 
 			By(" check component is Failed/Abnormal")
 			deploy := testdbaas.MockStatelessComponentDeploy(testCtx, clusterName)
-			testdbaas.ExpectClusterComponentPhase(testCtx, clusterName, componentName, dbaasv1alpha1.FailedPhase)
+			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, componentName),
+				timeout, interval).Should(Equal(dbaasv1alpha1.FailedPhase))
 
 			By("mock deployment is ready")
 			newDeployment := &appsv1.Deployment{}
@@ -105,7 +108,8 @@ var _ = Describe("Deployment Controller", func() {
 			}, timeout, interval).Should(BeTrue())
 
 			By("waiting the component is Running")
-			testdbaas.ExpectClusterComponentPhase(testCtx, clusterName, componentName, dbaasv1alpha1.RunningPhase)
+			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, componentName),
+				timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 		})
 	})
 })

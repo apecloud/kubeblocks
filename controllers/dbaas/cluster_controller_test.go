@@ -1428,6 +1428,121 @@ spec:
 
 	Context("When updating cluster PVC storage size", func() {
 		It("Should update PVC request storage size accordingly", func() {
+			volumeName := "data"
+
+			By("Mock a StorageClass which allows resize")
+			StorageClassYaml := `
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+   name: sc-mock
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+`
+			storageClass := &storagev1.StorageClass{}
+			Expect(yaml.Unmarshal([]byte(StorageClassYaml), storageClass)).Should(Succeed())
+			Expect(testCtx.CheckedCreateObj(ctx, storageClass)).Should(Succeed())
+
+			By("Creating a cluster with volume claim")
+			replicas := int32(2)
+			toCreate, _, _, key := newClusterObj(nil, nil)
+			toCreate.Spec.Components = make([]dbaasv1alpha1.ClusterComponent, 1)
+			toCreate.Spec.Components[0] = dbaasv1alpha1.ClusterComponent{
+				Name:     "replicasets",
+				Type:     "replicasets",
+				Replicas: &replicas,
+				VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{{
+					Name: volumeName,
+					Spec: &corev1.PersistentVolumeClaimSpec{
+						AccessModes: []corev1.PersistentVolumeAccessMode{
+							corev1.ReadWriteOnce,
+						},
+						StorageClassName: &storageClass.Name,
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse("1Gi"),
+							},
+						},
+					}},
+				},
+			}
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				fetchedG1 := &dbaasv1alpha1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, key, fetchedG1)).To(Succeed())
+				g.Expect(fetchedG1.Status.ObservedGeneration == 1).To(BeTrue())
+			}, timeout, interval).Should(Succeed())
+
+			By("Checking the replicas")
+			stsList := listAndCheckStatefulSet(key)
+			sts := &stsList.Items[0]
+			Expect(*sts.Spec.Replicas == replicas).Should(BeTrue())
+
+			By("Mock PVCs in Bound Status")
+			for i := 0; i < int(replicas); i++ {
+				pvcYAML := fmt.Sprintf(`
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: %s-%s-%d
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: %s
+`, volumeName, sts.Name, i, storageClass.Name)
+				pvc := corev1.PersistentVolumeClaim{}
+				Expect(yaml.Unmarshal([]byte(pvcYAML), &pvc)).Should(Succeed())
+				Expect(k8sClient.Create(ctx, &pvc)).Should(Succeed())
+				pvc.Status.Phase = corev1.ClaimBound // only bound pvc allows resize
+				Expect(k8sClient.Status().Update(ctx, &pvc)).Should(Succeed())
+			}
+
+			By("Updating the PVC storage size")
+			newStorageValue := resource.MustParse("2Gi")
+			Expect(changeCluster(key, func(cluster *dbaasv1alpha1.Cluster) {
+				comp := &cluster.Spec.Components[0]
+				comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
+			})).Should(Succeed())
+
+			By("Checking the resize operation finished")
+			Eventually(func(g Gomega) {
+				fetchedG2 := &dbaasv1alpha1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, key, fetchedG2)).To(Succeed())
+				g.Expect(fetchedG2.Status.ObservedGeneration == 2).To(BeTrue())
+			}, timeout*2, interval).Should(Succeed())
+
+			By("Checking PVCs are resized")
+			stsList = listAndCheckStatefulSet(key)
+			for _, sts := range stsList.Items {
+				for _, vct := range sts.Spec.VolumeClaimTemplates {
+					for i := *sts.Spec.Replicas - 1; i >= 0; i-- {
+						pvc := &corev1.PersistentVolumeClaim{}
+						pvcKey := types.NamespacedName{
+							Namespace: key.Namespace,
+							Name:      fmt.Sprintf("%s-%s-%d", vct.Name, sts.Name, i),
+						}
+						Expect(k8sClient.Get(ctx, pvcKey, pvc)).Should(Succeed())
+						Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(newStorageValue))
+					}
+				}
+			}
+
+			By("Deleting the cluster")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout*2, interval).Should(Succeed())
+		})
+	})
+
+	// TODO move integration tests(which relies on a real K8s cluster) out of UT
+	Context("When updating cluster PVC storage size in real K8s cluster", func() {
+		It("Should update PVC request storage size accordingly", func() {
 			By("Checking available storageclasses")
 			scList := &storagev1.StorageClassList{}
 			defaultStorageClass := &storagev1.StorageClass{}

@@ -33,7 +33,7 @@ import (
 type restartOpsHandler struct{}
 
 func init() {
-	r := restartOpsHandler{}
+	var r OpsHandler = restartOpsHandler{}
 	restartBehaviour := OpsBehaviour{
 		FromClusterPhases: []dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase},
 		ToClusterPhase:    dbaasv1alpha1.UpdatingPhase,
@@ -72,7 +72,8 @@ func (r restartOpsHandler) GetRealAffectedComponentMap(opsRequest *dbaasv1alpha1
 	return opsRequest.GetRestartComponentNameMap()
 }
 
-// SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
+// SaveLastConfiguration this operation only restart the pods of the component, no changes in Cluster.spec.
+// empty implementation here.
 func (r restartOpsHandler) SaveLastConfiguration(opsRes *OpsResource) error {
 	return nil
 }

@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/types"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 )
 
@@ -61,6 +62,7 @@ func (stateless *Stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int3
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
 }
 
+// HandleProbeTimeoutWhenPodsReady the stateless component has no role detection, empty implementation here.
 func (stateless *Stateless) HandleProbeTimeoutWhenPodsReady() (bool, error) {
 	return false, nil
 }
@@ -95,7 +97,7 @@ func (stateless *Stateless) CalculatePhaseWhenPodsNotReady(componentName string)
 
 func NewStateless(ctx context.Context,
 	cli client.Client,
-	cluster *dbaasv1alpha1.Cluster) *Stateless {
+	cluster *dbaasv1alpha1.Cluster) types.Component {
 	return &Stateless{
 		Ctx:     ctx,
 		Cli:     cli,

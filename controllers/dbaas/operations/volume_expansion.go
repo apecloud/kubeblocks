@@ -41,7 +41,7 @@ const (
 )
 
 func init() {
-	ve := volumeExpansion{}
+	var ve OpsHandler = volumeExpansion{}
 	// the volume expansion operation only support online expanding now, so this operation not affect the cluster availability.
 	volumeExpansionBehaviour := OpsBehaviour{
 		FromClusterPhases: []dbaasv1alpha1.Phase{

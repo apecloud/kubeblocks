@@ -31,7 +31,7 @@ import (
 type upgradeOpsHandler struct{}
 
 func init() {
-	u := upgradeOpsHandler{}
+	var u OpsHandler = upgradeOpsHandler{}
 	upgradeBehaviour := OpsBehaviour{
 		FromClusterPhases: []dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase},
 		ToClusterPhase:    dbaasv1alpha1.UpdatingPhase,

@@ -25,8 +25,6 @@ import (
 	"strings"
 	"time"
 
-	opsutil "github.com/apecloud/kubeblocks/controllers/dbaas/operations/util"
-
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -46,6 +44,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/stateless"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
+	opsutil "github.com/apecloud/kubeblocks/controllers/dbaas/operations/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )

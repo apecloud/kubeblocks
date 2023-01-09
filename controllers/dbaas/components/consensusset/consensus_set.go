@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/types"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/dbaas/operations/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -167,7 +168,7 @@ func NewConsensusSet(ctx context.Context,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
 	component *dbaasv1alpha1.ClusterComponent,
-	componentDef *dbaasv1alpha1.ClusterDefinitionComponent) *ConsensusSet {
+	componentDef *dbaasv1alpha1.ClusterDefinitionComponent) types.Component {
 	return &ConsensusSet{
 		Ctx:          ctx,
 		Cli:          cli,

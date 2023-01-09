@@ -413,9 +413,10 @@ func getComponentByUsingCM(stsList *appv1.StatefulSetList, cfg client.ObjectKey)
 }
 
 func getClusterComponentsByName(components []dbaasv1alpha1.ClusterComponent, componentName string) *dbaasv1alpha1.ClusterComponent {
-	for _, component := range components {
+	for i := range components {
+		component := &components[i]
 		if component.Name == componentName {
-			return &component
+			return component
 		}
 	}
 	return nil
@@ -487,8 +488,7 @@ func getComponentFromClusterDefinition(
 	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
 		return nil, err
 	}
-
-	for i, _ := range clusterDef.Spec.Components {
+	for i := range clusterDef.Spec.Components {
 		component := &clusterDef.Spec.Components[i]
 		if component.TypeName == typeName {
 			return component, nil

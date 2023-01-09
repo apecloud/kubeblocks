@@ -18,7 +18,6 @@ package policy
 
 import (
 	"os"
-	"time"
 
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
@@ -30,7 +29,9 @@ import (
 )
 
 const (
-	defaultMinReadySeconds = time.Second * 10 // 10s
+	// StatefulSetSpec.Spec.MinReadySeconds
+	// units: s
+	defaultMinReadySeconds = 10
 )
 
 type rollingUpgradePolicy struct {

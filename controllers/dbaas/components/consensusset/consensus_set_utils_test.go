@@ -23,7 +23,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	apps "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -112,10 +111,10 @@ func TestGetPodRevision(t *testing.T) {
 }
 
 func TestSortPods(t *testing.T) {
-	createMockPods := func(replicas int, stsName string) []corev1.Pod {
-		pods := make([]corev1.Pod, replicas)
+	createMockPods := func(replicas int, stsName string) []v1.Pod {
+		pods := make([]v1.Pod, replicas)
 		for i := 0; i < replicas; i++ {
-			pods[i] = corev1.Pod{
+			pods[i] = v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      stsName + "-" + strconv.Itoa(i),
 					Namespace: "default",
@@ -127,9 +126,9 @@ func TestSortPods(t *testing.T) {
 		}
 		return pods
 	}
-	randSort := func(pods []corev1.Pod) []corev1.Pod {
+	randSort := func(pods []v1.Pod) []v1.Pod {
 		n := len(pods)
-		newPod := make([]corev1.Pod, n)
+		newPod := make([]v1.Pod, n)
 		copy(newPod, pods)
 		for i := n; i > 0; i-- {
 			randIndex := rand.Intn(i)
@@ -139,13 +138,13 @@ func TestSortPods(t *testing.T) {
 	}
 
 	type args struct {
-		pods            []corev1.Pod
+		pods            []v1.Pod
 		rolePriorityMap map[string]int
 	}
 	tests := []struct {
 		name    string
 		args    args
-		want    []corev1.Pod
+		want    []v1.Pod
 		wantErr bool
 	}{{
 		name: "test_normal",

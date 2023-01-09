@@ -47,11 +47,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 )
 
 var _ = Describe("Cluster Controller", func() {
@@ -657,7 +658,8 @@ spec:
 			checkClusterDoNotTerminate := func(g Gomega) {
 				fetched := &dbaasv1alpha1.Cluster{}
 				g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
-				g.Expect(fetched.Status.Phase == dbaasv1alpha1.DeletingPhase).To(BeTrue())
+				g.Expect(strings.Contains(fetched.Status.Message,
+					fmt.Sprintf("spec.terminationPolicy %s is preventing deletion.", fetched.Spec.TerminationPolicy)))
 				g.Expect(len(fetched.Finalizers) > 0).To(BeTrue())
 			}
 			Eventually(checkClusterDoNotTerminate, timeout, interval).Should(Succeed())

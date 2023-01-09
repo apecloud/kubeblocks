@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/types"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -35,6 +36,8 @@ type ConsensusSet struct {
 	ComponentDef *dbaasv1alpha1.ClusterDefinitionComponent
 	Component    *dbaasv1alpha1.ClusterComponent
 }
+
+var _ types.Component = &ConsensusSet{}
 
 func (consensusSet *ConsensusSet) IsRunning(obj client.Object) (bool, error) {
 	sts := util.CovertToStatefulSet(obj)

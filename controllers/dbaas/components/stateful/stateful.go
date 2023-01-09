@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/types"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 )
 
@@ -31,6 +32,8 @@ type Stateful struct {
 	Ctx     context.Context
 	Cluster *dbaasv1alpha1.Cluster
 }
+
+var _ types.Component = &Stateful{}
 
 func (stateful *Stateful) IsRunning(obj client.Object) (bool, error) {
 	sts := util.CovertToStatefulSet(obj)

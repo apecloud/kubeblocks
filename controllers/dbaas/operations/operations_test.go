@@ -343,7 +343,8 @@ var _ = Describe("OpsRequest Controller", func() {
 				testdbaas.MockStatelessPod(ctx, testCtx, clusterName, testdbaas.StatelessComponentName, podName)
 				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, statelessPod)).Should(Succeed())
 			}
-			// the opsRequest will use startTime to check some condition, if no sleeps, maybe
+			// the opsRequest will use startTime to check some condition.
+			// if there is no sleep for 1 second, unstable error may occur.
 			time.Sleep(time.Second)
 
 			// test upgrade OpsRequest

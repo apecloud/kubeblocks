@@ -113,7 +113,13 @@ var _ = Describe("OpsRequest webhook", func() {
 			opsRequestAnnotationKey: `[{"name":"testOpsName","clusterPhase":"Updating"}]`,
 		}
 		Expect(k8sClient.Patch(ctx, cluster, clusterPatch)).Should(Succeed())
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("Existing OpsRequest: testOpsName"))
+		Eventually(func() string {
+			err := testCtx.CreateObj(ctx, opsRequest)
+			if err == nil {
+				return ""
+			}
+			return err.Error()
+		}, timeout, interval).Should(ContainSubstring("Existing OpsRequest: testOpsName"))
 		// delete annotations cluster phase to Running
 		clusterPatch = client.MergeFrom(cluster.DeepCopy())
 		cluster.Annotations = nil

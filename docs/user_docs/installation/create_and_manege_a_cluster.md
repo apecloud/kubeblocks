@@ -179,7 +179,7 @@ kbcli cluster volume-expansion wesql-demo --component-names="replicasets" \
 
 For detailed information about `kbcli cluster` commands, refer to the CLI reference book.
 
-- [KubeBlocks commands overview](../cli/kubeblocks%20commands%20overview.md)
+- [KubeBlocks commands overview](../cli/kubeblocks_commands_overview.md)
 - [`kbcli cluster create`](../cli/kbcli_cluster_create.md)
 - [`kbcli cluster delete`](../cli/kbcli_cluster_delete.md)
 - [`kbcli cluster describe`](../cli/kbcli_cluster_describe.md)

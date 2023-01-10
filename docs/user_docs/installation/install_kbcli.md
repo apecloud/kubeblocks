@@ -2,7 +2,7 @@
 
 `kbcli` is the KubeBlocks CLI tool. This section introduces how to install and uninstall `kbcli`. 
 
-For more information on the KubeBlocks CLIs, refer to [KubeBlocks commands overview](../cli/kubeblocks%20commands%20overview.md).
+For more information on the KubeBlocks CLIs, refer to [KubeBlocks commands overview](../cli/kubeblocks_commands_overview.md).
 
 ## Before you start
 

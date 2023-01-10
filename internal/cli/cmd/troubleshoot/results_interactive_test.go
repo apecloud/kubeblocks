@@ -20,9 +20,10 @@ import (
 	"os"
 	"time"
 
-	tb "github.com/nsf/termbox-go"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	tb "github.com/nsf/termbox-go"
 	analyzerunner "github.com/replicatedhq/troubleshoot/pkg/analyze"
 )
 

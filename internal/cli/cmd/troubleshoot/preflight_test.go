@@ -21,19 +21,19 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/replicatedhq/troubleshoot/pkg/preflight"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes/scheme"
 	clientfake "k8s.io/client-go/rest/fake"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-
-	"github.com/replicatedhq/troubleshoot/pkg/preflight"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 var _ = Describe("Preflight Test", func() {

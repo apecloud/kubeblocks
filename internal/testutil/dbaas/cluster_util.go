@@ -60,14 +60,14 @@ func CreateClusterWithHybridComps(ctx context.Context,
 	clusterDefName,
 	clusterVersionName,
 	clusterName,
-	StatelessComName,
-	ConsensusComName string) *dbaasv1alpha1.Cluster {
+	statelessComName,
+	consensusComName string) *dbaasv1alpha1.Cluster {
 	clusterBytes, err := testdata.GetTestDataFileContent("hybrid/hybrid_cluster.yaml")
 	if err != nil {
 		return nil
 	}
 	clusterYaml := fmt.Sprintf(string(clusterBytes), clusterVersionName, clusterDefName, clusterName, clusterVersionName,
-		clusterDefName, StatelessComName, ConsensusComName)
+		clusterDefName, statelessComName, consensusComName)
 	cluster := &dbaasv1alpha1.Cluster{}
 	gomega.Expect(yaml.Unmarshal([]byte(clusterYaml), cluster)).Should(gomega.Succeed())
 	return CreateK8sResource(ctx, testCtx, cluster).(*dbaasv1alpha1.Cluster)

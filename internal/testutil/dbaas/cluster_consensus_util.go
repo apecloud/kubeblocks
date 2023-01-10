@@ -40,6 +40,8 @@ var (
 	RevisionID             = "6fdd48d9cd"
 )
 
+// InitConsensusMysql initializes a cluster environment which only contains a component of ConsensusSet type for testing,
+// includes ClusterDefinition/ClusterVersion/Cluster resources.
 func InitConsensusMysql(testCtx testutil.TestContext,
 	clusterDefName,
 	clusterVersionName,
@@ -50,7 +52,7 @@ func InitConsensusMysql(testCtx testutil.TestContext,
 	return clusterDef, clusterVersion, cluster
 }
 
-// CreateConsensusMysqlCluster create a mysql cluster with a consensus component
+// CreateConsensusMysqlCluster creates a mysql cluster with a component of ConsensusSet type.
 func CreateConsensusMysqlCluster(testCtx testutil.TestContext, clusterDefName, clusterVersionName, clusterName string) *dbaasv1alpha1.Cluster {
 	clusterYaml := fmt.Sprintf(`apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: Cluster
@@ -91,7 +93,7 @@ spec:
 	return cluster
 }
 
-// CreateConsensusMysqlClusterDef create a mysql clusterDefinition with a consensus component
+// CreateConsensusMysqlClusterDef creates a mysql clusterDefinition with a component of ConsensusSet type.
 func CreateConsensusMysqlClusterDef(testCtx testutil.TestContext, clusterDefName string) *dbaasv1alpha1.ClusterDefinition {
 	clusterDefYaml := fmt.Sprintf(`apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
@@ -128,7 +130,7 @@ spec:
 	return clusterDef
 }
 
-// CreateConsensusMysqlClusterVersion create a mysql clusterVersion with a consensus component
+// CreateConsensusMysqlClusterVersion creates a mysql clusterVersion with a component of ConsensusSet type.
 func CreateConsensusMysqlClusterVersion(testCtx testutil.TestContext, clusterDefName, clusterVersionName string) *dbaasv1alpha1.ClusterVersion {
 	clusterVersionYAML := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
@@ -153,7 +155,7 @@ spec:
 	return clusterVersion
 }
 
-// MockConsensusComponentStatefulSet mock the component statefulSet, just using in envTest
+// MockConsensusComponentStatefulSet mocks the component statefulSet, just using in envTest
 func MockConsensusComponentStatefulSet(testCtx testutil.TestContext, clusterName string) *appsv1.StatefulSet {
 	stsName := clusterName + "-" + ConsensusComponentName
 	statefulSetYaml := fmt.Sprintf(`apiVersion: apps/v1
@@ -262,7 +264,7 @@ spec:
 	return sts
 }
 
-// MockConsensusComponentStsPod mock create pod, just using in envTest
+// MockConsensusComponentStsPod mocks to create the pod of the consensus StatefulSet, just using in envTest
 func MockConsensusComponentStsPod(testCtx testutil.TestContext, clusterName, podName, podRole, accessMode string) *corev1.Pod {
 	podYaml := fmt.Sprintf(`apiVersion: v1
 kind: Pod
@@ -357,7 +359,7 @@ spec:
 	return pod
 }
 
-// MockConsensusComponentPods mock the component pods, just using in envTest
+// MockConsensusComponentPods mocks the component pods, just using in envTest
 func MockConsensusComponentPods(testCtx testutil.TestContext, clusterName string) []*corev1.Pod {
 	podList := make([]*corev1.Pod, 3)
 	for i := 0; i < 3; i++ {

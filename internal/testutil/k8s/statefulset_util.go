@@ -38,6 +38,7 @@ var (
 	testFinalizer = "test.kubeblocks.io/finalizer"
 )
 
+// NewFakeStatefulSet news a fake StatefulSet workload object for testing.
 func NewFakeStatefulSet(name string, replicas int) *apps.StatefulSet {
 	template := corev1.PodTemplateSpec{
 		Spec: corev1.PodSpec{
@@ -77,12 +78,14 @@ func NewFakeStatefulSet(name string, replicas int) *apps.StatefulSet {
 	}
 }
 
+// NewFakeStatefulSetPod news a fake pod of the StatefulSet workload for testing.
 func NewFakeStatefulSetPod(set *apps.StatefulSet, ordinal int) *corev1.Pod {
 	pod := &corev1.Pod{}
 	pod.Name = fmt.Sprintf("%s-%d", set.Name, ordinal)
 	return pod
 }
 
+// MockStatefulSetReady mocks the StatefulSet workload is ready.
 func MockStatefulSetReady(sts *apps.StatefulSet) {
 	sts.Status.AvailableReplicas = *sts.Spec.Replicas
 	sts.Status.ObservedGeneration = sts.Generation
@@ -91,6 +94,7 @@ func MockStatefulSetReady(sts *apps.StatefulSet) {
 	sts.Status.CurrentRevision = sts.Status.UpdateRevision
 }
 
+// DeletePodLabelKey deletes the specified label of the pod.
 func DeletePodLabelKey(testCtx testutil.TestContext, podName, labelKey string) {
 	pod := &corev1.Pod{}
 	gomega.Expect(testCtx.Cli.Get(ctx, client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, pod)).Should(gomega.Succeed())
@@ -107,6 +111,7 @@ func DeletePodLabelKey(testCtx testutil.TestContext, podName, labelKey string) {
 	}, timeout, interval).Should(gomega.BeTrue())
 }
 
+// UpdatePodStatusNotReady updates the pod status to make it not ready.
 func UpdatePodStatusNotReady(testCtx testutil.TestContext, podName string) {
 	pod := &corev1.Pod{}
 	gomega.Expect(testCtx.Cli.Get(ctx, client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, pod)).Should(gomega.Succeed())

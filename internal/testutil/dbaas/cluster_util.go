@@ -28,6 +28,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
+// InitClusterWithHybridComps initializes a cluster environment for testing, includes ClusterDefinition/ClusterVersion/Cluster resources.
 func InitClusterWithHybridComps(testCtx testutil.TestContext,
 	clusterDefName,
 	clusterVersionName,
@@ -39,7 +40,7 @@ func InitClusterWithHybridComps(testCtx testutil.TestContext,
 	return clusterDef, clusterVersion, cluster
 }
 
-// CreateClusterWithHybridComps create a mysql cluster with hybrid components
+// CreateClusterWithHybridComps creates a cluster with hybrid components for testing.
 func CreateClusterWithHybridComps(testCtx testutil.TestContext, clusterDefName, clusterVersionName, clusterName string) *dbaasv1alpha1.Cluster {
 	clusterYaml := fmt.Sprintf(`apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: Cluster
@@ -85,7 +86,7 @@ spec:
 	return cluster
 }
 
-// CreateClusterDefWithHybridComps create a mysql clusterDefinition with hybrid components
+// CreateClusterDefWithHybridComps creates a clusterDefinition with hybrid components for testing.
 func CreateClusterDefWithHybridComps(testCtx testutil.TestContext, clusterDefName string) *dbaasv1alpha1.ClusterDefinition {
 	clusterDefYaml := fmt.Sprintf(`apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
@@ -130,7 +131,7 @@ spec:
 	return clusterDef
 }
 
-// CreateClusterVersionWithHybridComps create a mysql clusterVersion with hybrid components
+// CreateClusterVersionWithHybridComps creates a clusterVersion with hybrid components for testing.
 func CreateClusterVersionWithHybridComps(testCtx testutil.TestContext,
 	clusterDefName,
 	clusterVersionName string,
@@ -164,6 +165,7 @@ spec:
 	return clusterVersion
 }
 
+// CreateHybridCompsClusterVersionForUpgrade creates a clusterVersion with hybrid components for upgrading test.
 func CreateHybridCompsClusterVersionForUpgrade(testCtx testutil.TestContext,
 	clusterDefName,
 	clusterVersionName string) *dbaasv1alpha1.ClusterVersion {
@@ -171,7 +173,7 @@ func CreateHybridCompsClusterVersionForUpgrade(testCtx testutil.TestContext,
 		[]string{"docker.io/apecloud/wesql-server:8.0.30", "nginx:1.14.2"})
 }
 
-// GetClusterComponentPhase check the component phase of cluster is the expected phase.
+// GetClusterComponentPhase gets the component phase of testing cluster for verification.
 func GetClusterComponentPhase(testCtx testutil.TestContext, clusterName, componentName string) func(g gomega.Gomega) dbaasv1alpha1.Phase {
 	return func(g gomega.Gomega) dbaasv1alpha1.Phase {
 		tmpCluster := &dbaasv1alpha1.Cluster{}
@@ -181,7 +183,7 @@ func GetClusterComponentPhase(testCtx testutil.TestContext, clusterName, compone
 	}
 }
 
-// GetClusterPhase check the cluster phase is the expected phase.
+// GetClusterPhase gets the testing cluster phase for verification.
 func GetClusterPhase(testCtx testutil.TestContext, clusterName string) func(g gomega.Gomega) dbaasv1alpha1.Phase {
 	return func(g gomega.Gomega) dbaasv1alpha1.Phase {
 		cluster := &dbaasv1alpha1.Cluster{}

@@ -35,6 +35,7 @@ var (
 	StatelessComponentType = "proxy"
 )
 
+// CreateStatelessCluster creates a cluster with a component of Stateless type for testing.
 func CreateStatelessCluster(testCtx testutil.TestContext, clusterDefName, clusterVersionName, clusterName string) *dbaasv1alpha1.Cluster {
 	clusterYaml := fmt.Sprintf(`apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: Cluster
@@ -64,6 +65,7 @@ spec:
 	return cluster
 }
 
+// MockStatelessComponentDeploy mocks a deployment workload of the stateless component.
 func MockStatelessComponentDeploy(testCtx testutil.TestContext, clusterName string) *appsv1.Deployment {
 	deployName := clusterName + "-" + StatelessComponentName
 	deploymentYaml := fmt.Sprintf(`apiVersion: apps/v1
@@ -118,6 +120,7 @@ spec:
 	return deploy
 }
 
+// MockStatelessPod mocks the pods of the deployment workload.
 func MockStatelessPod(testCtx testutil.TestContext, clusterName, componentName, podName string) *corev1.Pod {
 	podYaml := fmt.Sprintf(`apiVersion: v1
 kind: Pod

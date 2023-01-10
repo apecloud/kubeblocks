@@ -114,6 +114,7 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource,
 	return opsRequestPhase, 0, nil
 }
 
+// GetClusterDefByName gets the ClusterDefinition object by the name.
 func GetClusterDefByName(ctx context.Context, cli client.Client, clusterDefName string) (*dbaasv1alpha1.ClusterDefinition, error) {
 	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: clusterDefName}, clusterDef); err != nil {
@@ -160,18 +161,21 @@ func PatchOpsStatus(opsRes *OpsResource,
 	return opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch)
 }
 
+// PatchClusterNotFound patches ClusterNotFound condition to the OpsRequest.status.conditions.
 func PatchClusterNotFound(opsRes *OpsResource) error {
 	message := fmt.Sprintf("spec.clusterRef %s is not found", opsRes.OpsRequest.Spec.ClusterRef)
 	condition := dbaasv1alpha1.NewValidateFailedCondition(dbaasv1alpha1.ReasonClusterNotFound, message)
 	return PatchOpsStatus(opsRes, dbaasv1alpha1.FailedPhase, condition)
 }
 
+// patchOpsHandlerNotSupported patches OpsNotSupported condition to the OpsRequest.status.conditions.
 func patchOpsHandlerNotSupported(opsRes *OpsResource) error {
 	message := fmt.Sprintf("spec.type %s is not supported by operator", opsRes.OpsRequest.Spec.Type)
 	condition := dbaasv1alpha1.NewValidateFailedCondition(dbaasv1alpha1.ReasonOpsTypeNotSupported, message)
 	return PatchOpsStatus(opsRes, dbaasv1alpha1.FailedPhase, condition)
 }
 
+// PatchValidateErrorCondition patches ValidateError condition to the OpsRequest.status.conditions.
 func PatchValidateErrorCondition(opsRes *OpsResource, errMessage string) error {
 	condition := dbaasv1alpha1.NewValidateFailedCondition(dbaasv1alpha1.ReasonValidateError, errMessage)
 	return PatchOpsStatus(opsRes, dbaasv1alpha1.FailedPhase, condition)

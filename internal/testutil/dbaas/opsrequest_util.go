@@ -28,6 +28,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
+// CreateRestartOpsRequest creates a OpsRequest of restart type for testing.
 func CreateRestartOpsRequest(testCtx testutil.TestContext, clusterName, opsRequestName string, componentNames []string) *dbaasv1alpha1.OpsRequest {
 	opsRequestYaml := fmt.Sprintf(`apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: OpsRequest
@@ -47,6 +48,7 @@ spec:
 	return CreateOpsRequest(testCtx, ops)
 }
 
+// GenerateOpsRequestObj only generates the OpsRequest Object, instead of actually creating this resource.
 func GenerateOpsRequestObj(opsRequestName, clusterName string, opsType dbaasv1alpha1.OpsType) *dbaasv1alpha1.OpsRequest {
 	opsYaml := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
@@ -62,6 +64,7 @@ spec:
 	return opsRequest
 }
 
+// CreateOpsRequest calls the api to create the OpsRequest resource.
 func CreateOpsRequest(testCtx testutil.TestContext, opsRequest *dbaasv1alpha1.OpsRequest) *dbaasv1alpha1.OpsRequest {
 	gomega.Expect(testCtx.CreateObj(ctx, opsRequest)).Should(gomega.Succeed())
 	// wait until cluster created
@@ -73,7 +76,7 @@ func CreateOpsRequest(testCtx testutil.TestContext, opsRequest *dbaasv1alpha1.Op
 	return newOps
 }
 
-// GetOpsRequestCompPhase get the component phase of OpsRequest.
+// GetOpsRequestCompPhase gets the component phase of testing OpsRequest  for verification.
 func GetOpsRequestCompPhase(testCtx testutil.TestContext, opsName, componentName string) func(g gomega.Gomega) dbaasv1alpha1.Phase {
 	return func(g gomega.Gomega) dbaasv1alpha1.Phase {
 		tmpOps := &dbaasv1alpha1.OpsRequest{}
@@ -87,7 +90,7 @@ func GetOpsRequestCompPhase(testCtx testutil.TestContext, opsName, componentName
 	}
 }
 
-// GetOpsRequestPhase get the opsRequest phase.
+// GetOpsRequestPhase gets the testing opsRequest phase for verification.
 func GetOpsRequestPhase(testCtx testutil.TestContext, opsName string) func(g gomega.Gomega) dbaasv1alpha1.Phase {
 	return func(g gomega.Gomega) dbaasv1alpha1.Phase {
 		tmpOps := &dbaasv1alpha1.OpsRequest{}

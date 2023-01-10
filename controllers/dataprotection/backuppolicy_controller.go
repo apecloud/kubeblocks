@@ -20,7 +20,6 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
-	"k8s.io/apimachinery/pkg/types"
 	"sort"
 	"time"
 
@@ -30,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"

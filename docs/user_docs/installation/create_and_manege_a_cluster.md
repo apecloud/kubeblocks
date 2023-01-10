@@ -53,7 +53,7 @@ Here is an example of how to create a KubeBlocks cluster using a YAML file.
   > You can specify the engine type and version by adding `--cluster-definition` and `--app-version` flags. For example,
   >
   > ```
-  > kbcli cluster create ac-cluster --cluster-definition=apecloud-mysql  --cluster-version=wesql-8.0.30 --components=mycluster.yaml --termination-policy=WipeOut
+  > kbcli cluster create ac-cluster --cluster-definition=apecloud-wesql  --cluster-version=wesql-8.0.30 --components=mycluster.yaml --termination-policy=WipeOut
   > ```
 
 ## Delete a cluster

@@ -27,13 +27,13 @@ _Steps_:
 1. Installing `kbcli` by curl and make are supported.
 
   - curl
-  `kbcli` can run on macOS, Linux, and Windows. Copy and run the command below.
-    ```
-    curl -fsSL http://161.189.136.182:8000/apecloud/kubeblocks/install_kbcli.sh |bash
-    ```
+     `kbcli` can run on macOS, Linux, and Windows. Copy and run the command below.
+     ```
+     curl -fsSL http://161.189.136.182:8000/apecloud/kubeblocks/install_cli.sh |bash    
+     ```
 
    - make
-    Download the source code and execute the following commands under the root directory of the source code. Make and generate `kbcli` executive file. Make sure the executive file is under the `bin/kbcli` path.
+     Download the source code and execute the following commands under the root directory of the source code. Make and generate `kbcli` executive file. Make sure the executive file is under the `bin/kbcli` path.
 
       ```
       # Switch to the `main` branch
@@ -47,9 +47,9 @@ _Steps_:
       ```
 
 2. Run this command to check the version after installation.
-  ```
-  kbcli version
-  ```
+   ```
+   kbcli version
+   ```
 
 ## Uninstall `kbcli`
 

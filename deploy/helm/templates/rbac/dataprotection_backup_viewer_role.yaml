@@ -1,15 +1,15 @@
-# permissions for end users to view backupjobs.
+# permissions for end users to view backups.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "kubeblocks.fullname" . }}-backupjob-viewer-role
+  name: {{ include "kubeblocks.fullname" . }}-backup-viewer-role
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - backupjobs
+  - backups
   verbs:
   - get
   - list
@@ -17,6 +17,6 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - backupjobs/status
+  - backups/status
   verbs:
   - get

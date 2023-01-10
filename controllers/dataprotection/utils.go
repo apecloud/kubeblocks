@@ -45,7 +45,7 @@ func checkResourceExists(
 }
 
 // byBackupStartTime sorts a list of jobs by start timestamp, using their names as a tie breaker.
-type byBackupStartTime []dataprotectionv1alpha1.BackupJob
+type byBackupStartTime []dataprotectionv1alpha1.Backup
 
 func (o byBackupStartTime) Len() int      { return len(o) }
 func (o byBackupStartTime) Swap(i, j int) { o[i], o[j] = o[j], o[i] }

@@ -197,7 +197,7 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - backupjobs
+  - backups
   verbs:
   - create
   - delete
@@ -209,13 +209,13 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - backupjobs/finalizers
+  - backups/finalizers
   verbs:
   - update
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - backupjobs/status
+  - backups/status
   verbs:
   - get
   - patch

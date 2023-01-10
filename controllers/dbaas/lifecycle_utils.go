@@ -1606,24 +1606,24 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		return
 	}
 
-	createBackupJob := func(backupPolicyName string) error {
-		backupJobList := dataprotectionv1alpha1.BackupJobList{}
+	createBackup := func(backupPolicyName string) error {
+		backupList := dataprotectionv1alpha1.BackupList{}
 		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.AppComponentLabelKey])
-		if err := cli.List(ctx, &backupJobList, ml); err != nil {
+		if err := cli.List(ctx, &backupList, ml); err != nil {
 			return err
 		}
-		if len(backupJobList.Items) > 0 {
+		if len(backupList.Items) > 0 {
 			return nil
 		}
-		backupJob, err := buildBackupJob(sts, backupPolicyName, backupKey)
+		backup, err := buildBackup(sts, backupPolicyName, backupKey)
 		if err != nil {
 			return err
 		}
 		scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
-		if err := controllerutil.SetOwnerReference(cluster, backupJob, scheme); err != nil {
+		if err := controllerutil.SetOwnerReference(cluster, backup, scheme); err != nil {
 			return err
 		}
-		if err := cli.Create(ctx, backupJob); err != nil {
+		if err := cli.Create(ctx, backup); err != nil {
 			return intctrlutil.IgnoreIsAlreadyExists(err)
 		}
 		return nil
@@ -1633,7 +1633,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return err
 	}
-	if err := createBackupJob(backupPolicyName); err != nil {
+	if err := createBackup(backupPolicyName); err != nil {
 		return err
 	}
 
@@ -1659,13 +1659,13 @@ func deleteBackup(ctx context.Context, cli client.Client, clusterName string, co
 		return nil
 	}
 
-	deleteBackupJob := func() error {
-		backupJobList := dataprotectionv1alpha1.BackupJobList{}
-		if err := cli.List(ctx, &backupJobList, ml); err != nil {
+	deleteBackup := func() error {
+		backupList := dataprotectionv1alpha1.BackupList{}
+		if err := cli.List(ctx, &backupList, ml); err != nil {
 			return err
 		}
-		for _, backupJob := range backupJobList.Items {
-			if err := cli.Delete(ctx, &backupJob); err != nil {
+		for _, backup := range backupList.Items {
+			if err := cli.Delete(ctx, &backup); err != nil {
 				return client.IgnoreNotFound(err)
 			}
 		}
@@ -1676,7 +1676,7 @@ func deleteBackup(ctx context.Context, cli client.Client, clusterName string, co
 		return err
 	}
 
-	return deleteBackupJob()
+	return deleteBackup()
 }
 
 func buildBackupPolicy(sts *appsv1.StatefulSet,
@@ -1694,19 +1694,19 @@ func buildBackupPolicy(sts *appsv1.StatefulSet,
 	return &backupPolicy, nil
 }
 
-func buildBackupJob(sts *appsv1.StatefulSet,
+func buildBackup(sts *appsv1.StatefulSet,
 	backupPolicyName string,
-	backupJobKey types.NamespacedName) (*dataprotectionv1alpha1.BackupJob, error) {
-	backupJob := dataprotectionv1alpha1.BackupJob{}
+	backupKey types.NamespacedName) (*dataprotectionv1alpha1.Backup, error) {
+	backup := dataprotectionv1alpha1.Backup{}
 	if err := buildFromCUE("backup_job_template.cue", map[string]any{
 		"sts":                sts,
 		"backup_policy_name": backupPolicyName,
-		"backup_job_key":     backupJobKey,
-	}, "backup_job", &backupJob); err != nil {
+		"backup_job_key":     backupKey,
+	}, "backup_job", &backup); err != nil {
 		return nil, err
 	}
 
-	return &backupJob, nil
+	return &backup, nil
 }
 
 func createPVCFromSnapshot(ctx context.Context,

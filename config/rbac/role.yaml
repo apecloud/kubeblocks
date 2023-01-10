@@ -196,32 +196,6 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - backupjobs
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backupjobs/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backupjobs/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
   - backuppolicies
   verbs:
   - create
@@ -267,6 +241,32 @@ rules:
   - dataprotection.kubeblocks.io
   resources:
   - backuppolicytemplates/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backups/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backups/status
   verbs:
   - get
   - patch

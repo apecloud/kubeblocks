@@ -72,7 +72,7 @@ var _ = Describe("DataProtection", func() {
 		clusterLabel := util.BuildLabelSelectorByNames("", args)
 
 		By("test delete-backup with cluster")
-		o := delete.NewDeleteOptions(tf, streams, types.BackupJobGVR())
+		o := delete.NewDeleteOptions(tf, streams, types.BackupGVR())
 		Expect(completeForDeleteBackup(o, args)).Should(HaveOccurred())
 
 		By("test delete-backup with cluster and force")
@@ -102,7 +102,7 @@ var _ = Describe("DataProtection", func() {
 		clusterLabel := util.BuildLabelSelectorByNames("", args)
 
 		By("test delete-restore with cluster")
-		o := delete.NewDeleteOptions(tf, streams, types.BackupJobGVR())
+		o := delete.NewDeleteOptions(tf, streams, types.BackupGVR())
 		Expect(completeForDeleteRestore(o, args)).Should(HaveOccurred())
 
 		By("test delete-restore with cluster and force")
@@ -149,7 +149,7 @@ var _ = Describe("DataProtection", func() {
 		// mock labels backup
 		labels := fmt.Sprintf(`{"metadata":{"labels": {"app.kubernetes.io/instance":"%s"}}}`, clusterName)
 		patchByte := []byte(labels)
-		_, _ = tf.FakeDynamicClient.Resource(types.BackupJobGVR()).Namespace("default").Patch(context.TODO(), backupName,
+		_, _ = tf.FakeDynamicClient.Resource(types.BackupGVR()).Namespace("default").Patch(context.TODO(), backupName,
 			k8sapitypes.MergePatchType, patchByte, metav1.PatchOptions{})
 
 		// create restore cluster

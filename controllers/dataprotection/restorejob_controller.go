@@ -205,11 +205,11 @@ func (r *RestoreJobReconciler) deleteExternalResources(reqCtx intctrlutil.Reques
 	return nil
 }
 
-func (r *RestoreJobReconciler) getBatchV1Job(reqCtx intctrlutil.RequestCtx, backupJob *dataprotectionv1alpha1.RestoreJob) (*batchv1.Job, error) {
+func (r *RestoreJobReconciler) getBatchV1Job(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.RestoreJob) (*batchv1.Job, error) {
 	job := &batchv1.Job{}
 	jobNameSpaceName := types.NamespacedName{
 		Namespace: reqCtx.Req.Namespace,
-		Name:      backupJob.Name,
+		Name:      backup.Name,
 	}
 	if err := r.Client.Get(reqCtx.Ctx, jobNameSpaceName, job); err != nil {
 		// not found backup job, do nothing
@@ -224,13 +224,13 @@ func (r *RestoreJobReconciler) getPodSpec(reqCtx intctrlutil.RequestCtx, restore
 	logger := reqCtx.Log
 
 	// get backup job
-	backupJob := &dataprotectionv1alpha1.BackupJob{}
-	backupJobNameSpaceName := types.NamespacedName{
+	backup := &dataprotectionv1alpha1.Backup{}
+	backupNameSpaceName := types.NamespacedName{
 		Namespace: reqCtx.Req.Namespace,
 		Name:      restoreJob.Spec.BackupJobName,
 	}
-	if err := r.Get(reqCtx.Ctx, backupJobNameSpaceName, backupJob); err != nil {
-		logger.Error(err, "Unable to get backupJob for restore.", "backupJob", backupJobNameSpaceName)
+	if err := r.Get(reqCtx.Ctx, backupNameSpaceName, backup); err != nil {
+		logger.Error(err, "Unable to get backup for restore.", "backup", backupNameSpaceName)
 		return podSpec, err
 	}
 
@@ -238,10 +238,10 @@ func (r *RestoreJobReconciler) getPodSpec(reqCtx intctrlutil.RequestCtx, restore
 	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
 	backupPolicyNameSpaceName := types.NamespacedName{
 		Namespace: reqCtx.Req.Namespace,
-		Name:      backupJob.Spec.BackupPolicyName,
+		Name:      backup.Spec.BackupPolicyName,
 	}
 	if err := r.Client.Get(reqCtx.Ctx, backupPolicyNameSpaceName, backupPolicy); err != nil {
-		logger.Error(err, "Unable to get backupPolicy for backupJob.", "BackupPolicy", backupPolicyNameSpaceName)
+		logger.Error(err, "Unable to get backupPolicy for backup.", "BackupPolicy", backupPolicyNameSpaceName)
 		return podSpec, err
 	}
 
@@ -252,7 +252,7 @@ func (r *RestoreJobReconciler) getPodSpec(reqCtx intctrlutil.RequestCtx, restore
 		Name:      backupPolicy.Spec.BackupToolName,
 	}
 	if err := r.Client.Get(reqCtx.Ctx, backupToolNameSpaceName, backupTool); err != nil {
-		logger.Error(err, "Unable to get backupTool for backupJob.", "BackupTool", backupToolNameSpaceName)
+		logger.Error(err, "Unable to get backupTool for backup.", "BackupTool", backupToolNameSpaceName)
 		return podSpec, err
 	}
 
@@ -282,7 +282,7 @@ func (r *RestoreJobReconciler) getPodSpec(reqCtx intctrlutil.RequestCtx, restore
 	// build env for restore
 	envBackupName := corev1.EnvVar{
 		Name:  "BACKUP_NAME",
-		Value: backupJob.Name,
+		Value: backup.Name,
 	}
 
 	container.Env = []corev1.EnvVar{envBackupName}

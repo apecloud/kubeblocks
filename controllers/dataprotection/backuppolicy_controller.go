@@ -211,13 +211,13 @@ func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alph
 }
 
 func (r *BackupPolicyReconciler) RemoveExpiredBackups(reqCtx intctrlutil.RequestCtx) error {
-	backupJobs := dataprotectionv1alpha1.BackupJobList{}
-	if err := r.Client.List(reqCtx.Ctx, &backupJobs,
+	backups := dataprotectionv1alpha1.BackupList{}
+	if err := r.Client.List(reqCtx.Ctx, &backups,
 		client.InNamespace(reqCtx.Req.Namespace)); err != nil {
 		return err
 	}
 	now := metav1.Now()
-	for _, item := range backupJobs.Items {
+	for _, item := range backups.Items {
 		if item.Status.Expiration.Before(&now) {
 			if err := DeleteObjectBackground(r.Client, reqCtx.Ctx, &item); err != nil {
 				// failed delete backups, return error info.
@@ -228,7 +228,7 @@ func (r *BackupPolicyReconciler) RemoveExpiredBackups(reqCtx intctrlutil.Request
 	return nil
 }
 
-func buildBackupLabels(backupPolicy *dataprotectionv1alpha1.BackupPolicy) map[string]string {
+func buildBackupSetLabels(backupPolicy *dataprotectionv1alpha1.BackupPolicy) map[string]string {
 	return map[string]string{
 		intctrlutil.AppInstanceLabelKey:  backupPolicy.Labels[intctrlutil.AppInstanceLabelKey],
 		dataProtectionLabelAutoBackupKey: "true",
@@ -240,17 +240,17 @@ func (r *BackupPolicyReconciler) RemoveOldestBackups(reqCtx intctrlutil.RequestC
 		return nil
 	}
 
-	backupJobs := dataprotectionv1alpha1.BackupJobList{}
-	if err := r.Client.List(reqCtx.Ctx, &backupJobs,
+	backups := dataprotectionv1alpha1.BackupList{}
+	if err := r.Client.List(reqCtx.Ctx, &backups,
 		client.InNamespace(reqCtx.Req.Namespace),
-		client.MatchingLabels(buildBackupLabels(backupPolicy))); err != nil {
+		client.MatchingLabels(buildBackupSetLabels(backupPolicy))); err != nil {
 		return err
 	}
-	numToDelete := len(backupJobs.Items) - int(backupPolicy.Spec.BackupsHistoryLimit)
+	numToDelete := len(backups.Items) - int(backupPolicy.Spec.BackupsHistoryLimit)
 	if numToDelete <= 0 {
 		return nil
 	}
-	backupItems := backupJobs.Items
+	backupItems := backups.Items
 	sort.Sort(byBackupStartTime(backupItems))
 	for i := 0; i < numToDelete; i++ {
 		if err := DeleteObjectBackground(r.Client, reqCtx.Ctx, &backupItems[i]); err != nil {

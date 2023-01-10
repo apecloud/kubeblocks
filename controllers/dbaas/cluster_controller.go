@@ -533,7 +533,7 @@ func (r *ClusterReconciler) deleteBackups(reqCtx intctrlutil.RequestCtx, cluster
 		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
 	}
 	// clean backups
-	backups := &dataprotectionv1alpha1.BackupJobList{}
+	backups := &dataprotectionv1alpha1.BackupList{}
 	if err := r.List(reqCtx.Ctx, backups, inNS, ml); err != nil {
 		return err
 	}

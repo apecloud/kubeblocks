@@ -78,7 +78,7 @@ const (
 	// DataProtection definitions
 	DPGroup                = "dataprotection.kubeblocks.io"
 	DPVersion              = "v1alpha1"
-	ResourceBackupJobs     = "backupjobs"
+	ResourceBackups        = "backups"
 	ResourceRestoreJobs    = "restorejobs"
 	ResourceBackupPolicies = "backuppolicies"
 
@@ -137,8 +137,8 @@ func ClusterVersionGK() schema.GroupKind {
 	return schema.GroupKind{Group: Group, Kind: KindClusterVersion}
 }
 
-func BackupJobGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceBackupJobs}
+func BackupGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceBackups}
 }
 
 func RestoreJobGVR() schema.GroupVersionResource {

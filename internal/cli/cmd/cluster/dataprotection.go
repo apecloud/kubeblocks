@@ -134,7 +134,7 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Short:           "Create a backup",
 		Example:         createBackupExample,
 		CueTemplateName: "backupjob_template.cue",
-		ResourceName:    types.ResourceBackupJobs,
+		ResourceName:    types.ResourceBackups,
 		Group:           types.DPGroup,
 		Version:         types.DPVersion,
 		BaseOptionsObj:  &o.BaseOptions,
@@ -153,7 +153,7 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 }
 
 func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := list.NewListOptions(f, streams, types.BackupJobGVR())
+	o := list.NewListOptions(f, streams, types.BackupGVR())
 	cmd := &cobra.Command{
 		Use:               "list-backups",
 		Short:             "List backup jobs",
@@ -172,7 +172,7 @@ func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 }
 
 func NewDeleteBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := delete.NewDeleteOptions(f, streams, types.BackupJobGVR())
+	o := delete.NewDeleteOptions(f, streams, types.BackupGVR())
 	cmd := &cobra.Command{
 		Use:               "delete-backup",
 		Short:             "Delete a backup job",
@@ -215,12 +215,12 @@ type CreateRestoreOptions struct {
 
 func (o *CreateRestoreOptions) Complete() error {
 	// get backup job
-	gvr := schema.GroupVersionResource{Group: types.DPGroup, Version: types.DPVersion, Resource: types.ResourceBackupJobs}
-	backupJobObj, err := o.Client.Resource(gvr).Namespace(o.Namespace).Get(context.TODO(), o.Backup, metav1.GetOptions{})
+	gvr := schema.GroupVersionResource{Group: types.DPGroup, Version: types.DPVersion, Resource: types.ResourceBackups}
+	backupObj, err := o.Client.Resource(gvr).Namespace(o.Namespace).Get(context.TODO(), o.Backup, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	srcClusterName, clusterExists, err := unstructured.NestedString(backupJobObj.Object, "metadata", "labels", "app.kubernetes.io/instance")
+	srcClusterName, clusterExists, err := unstructured.NestedString(backupObj.Object, "metadata", "labels", "app.kubernetes.io/instance")
 	if err != nil {
 		return err
 	}

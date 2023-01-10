@@ -35,23 +35,50 @@ import (
 
 type ExecStatus int
 
-type ReconfigureParams struct {
-	Restart bool
-	TplName string
-	Meta    *cfgcore.ConfigDiffInformation
-	Cfg     *corev1.ConfigMap
-	Tpl     *dbaasv1alpha1.ConfigurationTemplateSpec
+type ReconfigurePolicy interface {
+	// Upgrade is to enable the configuration to take effect.
+	Upgrade(params ReconfigureParams) (ExecStatus, error)
 
-	// for grpc factory
+	// GetPolicyName return name of policy.
+	GetPolicyName() string
+}
+
+type AutoReloadPolicy struct{}
+
+type ReconfigureParams struct {
+	// Only support restart pod or container.
+	Restart bool
+
+	// Name is a config template name.
+	TplName string
+
+	// Configuration files patch.
+	Meta *cfgcore.ConfigDiffInformation
+
+	// Configmap object of the configuration template instance in the component.
+	Cfg *corev1.ConfigMap
+
+	// ConfigConstraint pointer
+	Tpl *dbaasv1alpha1.ConfigurationTemplateSpec
+
+	// For grpc factory
 	ReconfigureClientFactory createReconfigureClient
 
-	ContainerNames   []string
-	Client           client.Client
-	Ctx              intctrlutil.RequestCtx
-	Cluster          *dbaasv1alpha1.Cluster
+	// List of container, using this config volume.
+	ContainerNames []string
+
+	Client client.Client
+	Ctx    intctrlutil.RequestCtx
+
+	Cluster *dbaasv1alpha1.Cluster
+
+	// Associated component for cluster.
 	ClusterComponent *dbaasv1alpha1.ClusterComponent
-	Component        *dbaasv1alpha1.ClusterDefinitionComponent
-	ComponentUnits   []appv1.StatefulSet
+	// Associated component for clusterdefinition.
+	Component *dbaasv1alpha1.ClusterDefinitionComponent
+
+	// List of StatefulSet, using this config template.
+	ComponentUnits []appv1.StatefulSet
 }
 
 const (
@@ -73,6 +100,8 @@ var (
 		return cfgproto.NewReconfigureClient(conn), nil
 	}
 )
+
+var upgradePolicyMap = map[dbaasv1alpha1.UpgradePolicy]ReconfigurePolicy{}
 
 func init() {
 	RegisterPolicy(dbaasv1alpha1.AutoReload, &AutoReloadPolicy{})
@@ -141,18 +170,9 @@ func (param *ReconfigureParams) podMinReadySeconds() int32 {
 	return cfgcore.Max(minReadySeconds, viper.GetInt32(cfgcore.PodMinReadySecondsEnv))
 }
 
-type ReconfigurePolicy interface {
-	Upgrade(params ReconfigureParams) (ExecStatus, error)
-	GetPolicyName() string
-}
-
-var upgradePolicyMap = map[dbaasv1alpha1.UpgradePolicy]ReconfigurePolicy{}
-
 func RegisterPolicy(policy dbaasv1alpha1.UpgradePolicy, action ReconfigurePolicy) {
 	upgradePolicyMap[policy] = action
 }
-
-type AutoReloadPolicy struct{}
 
 func (receiver AutoReloadPolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
 	_ = params

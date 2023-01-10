@@ -302,6 +302,7 @@ func generateConsensusSerialPlan(plan *util.Plan, pods []corev1.Pod) {
 	}
 }
 
+// ComposeRolePriorityMap generates a priority map based on roles.
 func ComposeRolePriorityMap(component dbaasv1alpha1.ClusterDefinitionComponent) map[string]int {
 	if component.ConsensusSpec == nil {
 		component.ConsensusSpec = &dbaasv1alpha1.ConsensusSetSpec{Leader: dbaasv1alpha1.DefaultLeader}

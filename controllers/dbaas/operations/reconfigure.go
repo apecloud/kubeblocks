@@ -135,10 +135,10 @@ func (r *reconfigureAction) reconfigure(resource *OpsResource) error {
 	if err != nil {
 		return cfgcore.WrapError(err, "failed to get config template[%s]", componentName)
 	}
-	return r.performPersist(clusterName, componentName, spec.Reconfigure, resource, tpls)
+	return r.performPersistCfg(clusterName, componentName, spec.Reconfigure, resource, tpls)
 }
 
-func (r *reconfigureAction) performPersist(clusterName, componentName string,
+func (r *reconfigureAction) performPersistCfg(clusterName, componentName string,
 	reconfigure *dbaasv1alpha1.Reconfigure,
 	resource *OpsResource,
 	tpls []dbaasv1alpha1.ConfigTemplate) error {

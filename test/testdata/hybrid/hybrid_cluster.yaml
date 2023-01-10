@@ -12,7 +12,7 @@ spec:
   clusterDefinitionRef: %s
   components:
   - name: %s
-    type: proxy
+    type: stateless
     replicas: 1
     monitor: false
   - monitor: false

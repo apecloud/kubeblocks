@@ -14,5 +14,5 @@ spec:
       containers:
       - image: %s
         imagePullPolicy: IfNotPresent
-        name: nginx
-    type: proxy
+        name: busybox
+    type: stateless

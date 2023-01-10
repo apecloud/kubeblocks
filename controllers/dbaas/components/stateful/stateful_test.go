@@ -39,6 +39,7 @@ var _ = Describe("Stateful Component", func() {
 		clusterDefName     = "mysql1-clusterdef-" + randomStr
 		clusterVersionName = "mysql1-clusterversion-" + randomStr
 		clusterName        = "mysql1-" + randomStr
+		consensusCompName  = "consensus"
 		timeout            = 10 * time.Second
 		interval           = time.Second
 	)
@@ -69,14 +70,14 @@ var _ = Describe("Stateful Component", func() {
 	Context("Stateful Component test", func() {
 		It("Stateful Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			_, _, cluster := testdbaas.InitConsensusMysql(ctx, testCtx, clusterDefName, clusterVersionName, clusterName)
-
-			_ = testdbaas.MockConsensusComponentStatefulSet(ctx, testCtx, clusterName)
+			_, _, cluster := testdbaas.InitConsensusMysql(ctx, testCtx, clusterDefName,
+				clusterVersionName, clusterName, consensusCompName)
+			_ = testdbaas.MockConsensusComponentStatefulSet(ctx, testCtx, clusterName, consensusCompName)
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
 				_ = k8sClient.List(ctx, stsList, client.InNamespace(testCtx.DefaultNamespace), client.MatchingLabels{
 					intctrlutil.AppInstanceLabelKey:  clusterName,
-					intctrlutil.AppComponentLabelKey: testdbaas.ConsensusComponentName,
+					intctrlutil.AppComponentLabelKey: consensusCompName,
 				}, client.Limit(1))
 				return len(stsList.Items) > 0
 			}, timeout, interval).Should(BeTrue())
@@ -93,12 +94,12 @@ var _ = Describe("Stateful Component", func() {
 			Expect(podsReady == false).Should(BeTrue())
 			if testCtx.UsingExistingCluster() {
 				Eventually(func() bool {
-					phase, _ := stateful.CalculatePhaseWhenPodsNotReady(testdbaas.ConsensusComponentName)
+					phase, _ := stateful.CalculatePhaseWhenPodsNotReady(consensusCompName)
 					return phase == ""
 				}, timeout*5, interval).Should(BeTrue())
 			} else {
-				podList := testdbaas.MockConsensusComponentPods(ctx, testCtx, clusterName)
-				phase, _ := stateful.CalculatePhaseWhenPodsNotReady(testdbaas.ConsensusComponentName)
+				podList := testdbaas.MockConsensusComponentPods(ctx, testCtx, clusterName, consensusCompName)
+				phase, _ := stateful.CalculatePhaseWhenPodsNotReady(consensusCompName)
 				Expect(phase == dbaasv1alpha1.FailedPhase).Should(BeTrue())
 				Expect(k8sClient.Status().Patch(ctx, sts, patch)).Should(Succeed())
 				By("test stateful component is abnormal")
@@ -107,7 +108,7 @@ var _ = Describe("Stateful Component", func() {
 					g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: sts.Name, Namespace: testCtx.DefaultNamespace}, tmpSts)).Should(Succeed())
 					return tmpSts.Status.AvailableReplicas == availableReplicas
 				}, timeout, interval).Should(BeTrue())
-				phase, _ = stateful.CalculatePhaseWhenPodsNotReady(testdbaas.ConsensusComponentName)
+				phase, _ = stateful.CalculatePhaseWhenPodsNotReady(consensusCompName)
 				Expect(phase == dbaasv1alpha1.AbnormalPhase).Should(BeTrue())
 
 				By("test pod is ready")

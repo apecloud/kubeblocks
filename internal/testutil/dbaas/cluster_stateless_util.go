@@ -30,11 +30,6 @@ import (
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
-const (
-	StatelessComponentName = "nginx"
-	StatelessComponentType = "proxy"
-)
-
 // CreateStatelessCluster creates a cluster with a component of Stateless type for testing.
 func CreateStatelessCluster(ctx context.Context, testCtx testutil.TestContext, clusterDefName, clusterVersionName, clusterName string) *dbaasv1alpha1.Cluster {
 	clusterBytes, err := testdata.GetTestDataFileContent("stateless/cluster.yaml")
@@ -48,13 +43,13 @@ func CreateStatelessCluster(ctx context.Context, testCtx testutil.TestContext, c
 }
 
 // MockStatelessComponentDeploy mocks a deployment workload of the stateless component.
-func MockStatelessComponentDeploy(ctx context.Context, testCtx testutil.TestContext, clusterName string) *appsv1.Deployment {
+func MockStatelessComponentDeploy(ctx context.Context, testCtx testutil.TestContext, clusterName, componentName string) *appsv1.Deployment {
 	deployBytes, err := testdata.GetTestDataFileContent("stateless/deployment.yaml")
 	if err != nil {
 		return nil
 	}
-	deployName := clusterName + "-" + StatelessComponentName
-	deploymentYaml := fmt.Sprintf(string(deployBytes), StatelessComponentName, clusterName, deployName, StatelessComponentName, clusterName, StatelessComponentName, clusterName)
+	deployName := clusterName + "-" + componentName
+	deploymentYaml := fmt.Sprintf(string(deployBytes), componentName, clusterName, deployName, componentName, clusterName, componentName, clusterName)
 	deploy := &appsv1.Deployment{}
 	gomega.Expect(yaml.Unmarshal([]byte(deploymentYaml), deploy)).Should(gomega.Succeed())
 	return CreateK8sResource(ctx, testCtx, deploy).(*appsv1.Deployment)

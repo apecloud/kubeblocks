@@ -39,10 +39,11 @@ var _ = Describe("Deployment Controller", func() {
 		randomStr          = testCtx.GetRandomStr()
 		timeout            = time.Second * 10
 		interval           = time.Second
-		clusterDefName     = "nginx-definition1-" + randomStr
-		clusterVersionName = "nginx-cluster-version1-" + randomStr
-		clusterName        = "nginx1-" + randomStr
+		clusterDefName     = "stateless-definition1-" + randomStr
+		clusterVersionName = "stateless-cluster-version1-" + randomStr
+		clusterName        = "stateless1-" + randomStr
 		namespace          = "default"
+		statelessCompName  = "stateless"
 	)
 
 	cleanupObjects := func() {
@@ -71,21 +72,20 @@ var _ = Describe("Deployment Controller", func() {
 			}
 			cluster := testdbaas.CreateStatelessCluster(ctx, testCtx, clusterDefName, clusterVersionName, clusterName)
 			By("patch cluster to Running")
-			componentName := "nginx"
 			patch := client.MergeFrom(cluster.DeepCopy())
 			cluster.Status.Phase = dbaasv1alpha1.RunningPhase
 			cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
-				componentName: {
+				statelessCompName: {
 					Phase: dbaasv1alpha1.RunningPhase,
 				},
 			}
 			Expect(k8sClient.Status().Patch(context.Background(), cluster, patch)).Should(Succeed())
-			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, componentName),
+			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, statelessCompName),
 				timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 
 			By(" check component is Failed/Abnormal")
-			deploy := testdbaas.MockStatelessComponentDeploy(ctx, testCtx, clusterName)
-			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, componentName),
+			deploy := testdbaas.MockStatelessComponentDeploy(ctx, testCtx, clusterName, statelessCompName)
+			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, statelessCompName),
 				timeout, interval).Should(Equal(dbaasv1alpha1.FailedPhase))
 
 			By("mock deployment is ready")
@@ -108,7 +108,7 @@ var _ = Describe("Deployment Controller", func() {
 			}, timeout, interval).Should(BeTrue())
 
 			By("waiting the component is Running")
-			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, componentName),
+			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, statelessCompName),
 				timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 		})
 	})

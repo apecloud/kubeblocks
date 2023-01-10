@@ -50,7 +50,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		clusterName           = "cluster-for-ops-" + randomStr
 		storageClassName      = "csi-hostpath-sc-" + randomStr
 		vctName               = "data"
-		// replicaSetComponent   = "replicasets"
+		consensusCompName     = "consensus"
 	)
 
 	cleanupObjects := func() {
@@ -125,7 +125,7 @@ spec:
       storage: 2Gi
   volumeMode: Filesystem
   storageClassName: %s
-`, testdbaas.ConsensusComponentName, clusterName, vctName, pvcName, scName)
+`, consensusCompName, clusterName, vctName, pvcName, scName)
 		pvc := &corev1.PersistentVolumeClaim{}
 		Expect(yaml.Unmarshal([]byte(pvcYaml), pvc)).Should(Succeed())
 		err := testCtx.CreateObj(context.Background(), pvc)
@@ -159,7 +159,7 @@ spec:
 		ops := testdbaas.GenerateOpsRequestObj("volumeexpansion-ops-"+currRandomStr, clusterObject.Name, dbaasv1alpha1.VolumeExpansionType)
 		ops.Spec.VolumeExpansionList = []dbaasv1alpha1.VolumeExpansion{
 			{
-				ComponentOps: dbaasv1alpha1.ComponentOps{ComponentName: testdbaas.ConsensusComponentName},
+				ComponentOps: dbaasv1alpha1.ComponentOps{ComponentName: consensusCompName},
 				VolumeClaimTemplates: []dbaasv1alpha1.OpsRequestVolumeClaimTemplate{
 					{
 						Name:    vctName,
@@ -175,7 +175,7 @@ spec:
 			VolumeExpandable: []dbaasv1alpha1.OperationComponent{
 				{
 					VolumeClaimTemplateNames: []string{vctName},
-					Name:                     testdbaas.ConsensusComponentName,
+					Name:                     consensusCompName,
 				},
 			},
 		}
@@ -188,7 +188,7 @@ spec:
 		mockDoOperationOnCluster(clusterObject, ops.Name, dbaasv1alpha1.VolumeExpandingPhase)
 
 		// create-pvc
-		pvcName := fmt.Sprintf("%s-%s-%s-%d", vctName, clusterObject.Name, testdbaas.ConsensusComponentName, index)
+		pvcName := fmt.Sprintf("%s-%s-%s-%d", vctName, clusterObject.Name, consensusCompName, index)
 		createPVC(clusterObject.Name, storageClassName, vctName, pvcName)
 		// waiting pvc controller mark annotation to OpsRequest
 		Eventually(func(g Gomega) bool {
@@ -209,7 +209,7 @@ spec:
 		opsRes.OpsRequest = newOps
 		_, err := GetOpsManager().Reconcile(opsRes)
 		Expect(err == nil).Should(BeTrue())
-		Eventually(testdbaas.GetOpsRequestCompPhase(ctx, testCtx, newOps.Name, testdbaas.ConsensusComponentName),
+		Eventually(testdbaas.GetOpsRequestCompPhase(ctx, testCtx, newOps.Name, consensusCompName),
 			timeout, interval).Should(Equal(dbaasv1alpha1.VolumeExpandingPhase))
 	}
 
@@ -237,7 +237,7 @@ spec:
 		pvcEventHandler := PersistentVolumeClaimEventHandler{}
 		reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 		Expect(pvcEventHandler.Handle(k8sClient, reqCtx, eventRecorder, event)).Should(Succeed())
-		Eventually(testdbaas.GetOpsRequestCompPhase(ctx, testCtx, newOps.Name, testdbaas.ConsensusComponentName), timeout, interval).Should(Equal(dbaasv1alpha1.VolumeExpandingPhase))
+		Eventually(testdbaas.GetOpsRequestCompPhase(ctx, testCtx, newOps.Name, consensusCompName), timeout, interval).Should(Equal(dbaasv1alpha1.VolumeExpandingPhase))
 
 		// test when the event reach the conditions
 		event.Count = 5
@@ -247,7 +247,7 @@ spec:
 		Eventually(func() bool {
 			tmpOps := &dbaasv1alpha1.OpsRequest{}
 			_ = k8sClient.Get(ctx, client.ObjectKey{Name: newOps.Name, Namespace: testCtx.DefaultNamespace}, tmpOps)
-			progressDetails := tmpOps.Status.Components[testdbaas.ConsensusComponentName].ProgressDetails
+			progressDetails := tmpOps.Status.Components[consensusCompName].ProgressDetails
 			if len(progressDetails) == 0 {
 				return false
 			}
@@ -292,7 +292,7 @@ spec:
 		Eventually(func() bool {
 			tmpOps := &dbaasv1alpha1.OpsRequest{}
 			_ = k8sClient.Get(ctx, client.ObjectKey{Name: newOps.Name, Namespace: testCtx.DefaultNamespace}, tmpOps)
-			progressDetails := tmpOps.Status.Components[testdbaas.ConsensusComponentName].ProgressDetails
+			progressDetails := tmpOps.Status.Components[consensusCompName].ProgressDetails
 			progressDetail := FindStatusProgressDetail(progressDetails, getPVCProgressObjectKey(pvcName))
 			return progressDetail != nil && progressDetail.Status == dbaasv1alpha1.ProcessingProgressStatus
 		}, timeout, interval).Should(BeTrue())
@@ -343,7 +343,8 @@ spec:
 
 	Context("Test OpsRequest", func() {
 		It("Should Test all OpsRequest", func() {
-			_, _, clusterObject := testdbaas.InitConsensusMysql(ctx, testCtx, clusterDefinitionName, clusterVersionName, clusterName)
+			_, _, clusterObject := testdbaas.InitConsensusMysql(ctx, testCtx, clusterDefinitionName,
+				clusterVersionName, clusterName, consensusCompName)
 			// init storageClass
 			_ = assureDefaultStorageClassObj()
 
@@ -358,14 +359,14 @@ spec:
 			patch := client.MergeFrom(clusterObject.DeepCopy())
 			clusterObject.Status.Phase = dbaasv1alpha1.RunningPhase
 			clusterObject.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
-				testdbaas.ConsensusComponentName: {
+				consensusCompName: {
 					Phase: dbaasv1alpha1.RunningPhase,
 				},
 			}
 			clusterObject.Status.Operations = &dbaasv1alpha1.Operations{
 				VolumeExpandable: []dbaasv1alpha1.OperationComponent{
 					{
-						Name:                     testdbaas.ConsensusComponentName,
+						Name:                     consensusCompName,
 						VolumeClaimTemplateNames: []string{vctName},
 					},
 				},

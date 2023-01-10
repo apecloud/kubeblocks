@@ -138,6 +138,8 @@ var _ = Describe("Consensus Component", func() {
 		clusterName        = "mysql-" + randomStr
 		timeout            = 10 * time.Second
 		interval           = time.Second
+		consensusCompType  = "consensus"
+		consensusCompName  = "consensus"
 	)
 
 	cleanupObjects := func() {
@@ -167,16 +169,17 @@ var _ = Describe("Consensus Component", func() {
 	Context("Consensus Component test", func() {
 		It("Consensus Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			_, _, cluster := testdbaas.InitConsensusMysql(ctx, testCtx, clusterDefName, clusterVersionName, clusterName)
-			sts := testdbaas.MockConsensusComponentStatefulSet(ctx, testCtx, clusterName)
+			_, _, cluster := testdbaas.InitConsensusMysql(ctx, testCtx, clusterDefName,
+				clusterVersionName, clusterName, consensusCompName)
+			sts := testdbaas.MockConsensusComponentStatefulSet(ctx, testCtx, clusterName, consensusCompName)
 			if !testCtx.UsingExistingCluster() {
-				_ = testdbaas.MockConsensusComponentPods(ctx, testCtx, clusterName)
+				_ = testdbaas.MockConsensusComponentPods(ctx, testCtx, clusterName, consensusCompName)
 			} else {
 				timeout = 3 * timeout
 			}
 
 			By("test GetComponentDeftByCluster function")
-			componentDef, _ := GetComponentDeftByCluster(ctx, k8sClient, cluster, testdbaas.ConsensusComponentType)
+			componentDef, _ := GetComponentDeftByCluster(ctx, k8sClient, cluster, consensusCompType)
 			Expect(componentDef != nil).Should(BeTrue())
 
 			By("test GetClusterByObject function")
@@ -185,24 +188,24 @@ var _ = Describe("Consensus Component", func() {
 
 			By("test GetComponentPodList function")
 			Eventually(func() bool {
-				podList, _ := GetComponentPodList(ctx, k8sClient, cluster, testdbaas.ConsensusComponentName)
+				podList, _ := GetComponentPodList(ctx, k8sClient, cluster, consensusCompName)
 				return len(podList.Items) > 0
 			}, timeout, interval).Should(BeTrue())
 
 			By("test GetObjectListByComponentName function")
 			stsList := &appsv1.StatefulSetList{}
-			_ = GetObjectListByComponentName(ctx, k8sClient, cluster, stsList, testdbaas.ConsensusComponentName)
+			_ = GetObjectListByComponentName(ctx, k8sClient, cluster, stsList, consensusCompName)
 			Expect(len(stsList.Items) > 0).Should(BeTrue())
 
 			By("test CheckRelatedPodIsTerminating function")
-			isTerminating, _ := CheckRelatedPodIsTerminating(ctx, k8sClient, cluster, testdbaas.ConsensusComponentName)
+			isTerminating, _ := CheckRelatedPodIsTerminating(ctx, k8sClient, cluster, consensusCompName)
 			Expect(isTerminating).Should(BeFalse())
 
 			By("test GetStatusComponentMessageKey function")
 			Expect(GetStatusComponentMessageKey("Pod", "mysql-01")).To(Equal("Pod/mysql-01"))
 
 			By("test GetComponentReplicas function")
-			component := GetComponentByName(cluster, testdbaas.ConsensusComponentName)
+			component := GetComponentByName(cluster, consensusCompName)
 			Expect(GetComponentReplicas(component, componentDef)).To(Equal(int32(3)))
 		})
 	})

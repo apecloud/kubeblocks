@@ -33,11 +33,8 @@ import (
 )
 
 const (
-	timeout                = 10 * time.Second
-	interval               = time.Second
-	ConsensusComponentName = "mysql-test"
-	ConsensusComponentType = "consensus"
-	RevisionID             = "6fdd48d9cd"
+	timeout  = 10 * time.Second
+	interval = time.Second
 )
 
 // InitConsensusMysql initializes a cluster environment which only contains a component of ConsensusSet type for testing,
@@ -45,20 +42,27 @@ const (
 func InitConsensusMysql(ctx context.Context, testCtx testutil.TestContext,
 	clusterDefName,
 	clusterVersionName,
-	clusterName string) (*dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, *dbaasv1alpha1.Cluster) {
+	clusterName,
+	consensusCompName string) (*dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, *dbaasv1alpha1.Cluster) {
 	clusterDef := CreateConsensusMysqlClusterDef(ctx, testCtx, clusterDefName)
 	clusterVersion := CreateConsensusMysqlClusterVersion(ctx, testCtx, clusterDefName, clusterVersionName)
-	cluster := CreateConsensusMysqlCluster(ctx, testCtx, clusterDefName, clusterVersionName, clusterName)
+	cluster := CreateConsensusMysqlCluster(ctx, testCtx, clusterDefName, clusterVersionName, clusterName, consensusCompName)
 	return clusterDef, clusterVersion, cluster
 }
 
 // CreateConsensusMysqlCluster creates a mysql cluster with a component of ConsensusSet type.
-func CreateConsensusMysqlCluster(ctx context.Context, testCtx testutil.TestContext, clusterDefName, clusterVersionName, clusterName string) *dbaasv1alpha1.Cluster {
+func CreateConsensusMysqlCluster(ctx context.Context,
+	testCtx testutil.TestContext,
+	clusterDefName,
+	clusterVersionName,
+	clusterName,
+	consensusCompName string) *dbaasv1alpha1.Cluster {
 	clusterBytes, err := testdata.GetTestDataFileContent("consensusset/wesql.yaml")
 	if err != nil {
 		return nil
 	}
-	clusterYaml := fmt.Sprintf(string(clusterBytes), clusterVersionName, clusterDefName, clusterName, clusterVersionName, clusterDefName, ConsensusComponentName)
+	clusterYaml := fmt.Sprintf(string(clusterBytes), clusterVersionName, clusterDefName, clusterName,
+		clusterVersionName, clusterDefName, consensusCompName)
 	cluster := &dbaasv1alpha1.Cluster{}
 	gomega.Expect(yaml.Unmarshal([]byte(clusterYaml), cluster)).Should(gomega.Succeed())
 	return CreateK8sResource(ctx, testCtx, cluster).(*dbaasv1alpha1.Cluster)
@@ -89,25 +93,34 @@ func CreateConsensusMysqlClusterVersion(ctx context.Context, testCtx testutil.Te
 }
 
 // MockConsensusComponentStatefulSet mocks the component statefulSet, just using in envTest
-func MockConsensusComponentStatefulSet(ctx context.Context, testCtx testutil.TestContext, clusterName string) *appsv1.StatefulSet {
+func MockConsensusComponentStatefulSet(ctx context.Context,
+	testCtx testutil.TestContext,
+	clusterName,
+	consensusCompName string) *appsv1.StatefulSet {
 	stsBytes, err := testdata.GetTestDataFileContent("consensusset/stateful_set.yaml")
 	if err != nil {
 		return nil
 	}
-	stsName := clusterName + "-" + ConsensusComponentName
-	statefulSetYaml := fmt.Sprintf(string(stsBytes), ConsensusComponentName, clusterName, stsName, ConsensusComponentName, clusterName, ConsensusComponentName, clusterName, "%")
+	stsName := clusterName + "-" + consensusCompName
+	statefulSetYaml := fmt.Sprintf(string(stsBytes), consensusCompName, clusterName,
+		stsName, consensusCompName, clusterName, consensusCompName, clusterName, "%")
 	sts := &appsv1.StatefulSet{}
 	gomega.Expect(yaml.Unmarshal([]byte(statefulSetYaml), sts)).Should(gomega.Succeed())
 	return CreateK8sResource(ctx, testCtx, sts).(*appsv1.StatefulSet)
 }
 
 // MockConsensusComponentStsPod mocks to create the pod of the consensus StatefulSet, just using in envTest
-func MockConsensusComponentStsPod(ctx context.Context, testCtx testutil.TestContext, clusterName, podName, podRole, accessMode string) *corev1.Pod {
+func MockConsensusComponentStsPod(ctx context.Context,
+	testCtx testutil.TestContext,
+	clusterName,
+	consensusCompName,
+	podName,
+	podRole, accessMode string) *corev1.Pod {
 	podBytes, err := testdata.GetTestDataFileContent("consensusset/stateful_set_pod.yaml")
 	if err != nil {
 		return nil
 	}
-	podYaml := fmt.Sprintf(string(podBytes), ConsensusComponentName, clusterName, clusterName, ConsensusComponentName, accessMode, podRole, podName, "%")
+	podYaml := fmt.Sprintf(string(podBytes), consensusCompName, clusterName, clusterName, consensusCompName, accessMode, podRole, podName, "%")
 	pod := &corev1.Pod{}
 	gomega.Expect(yaml.Unmarshal([]byte(podYaml), pod)).Should(gomega.Succeed())
 	pod = CreateK8sResource(ctx, testCtx, pod).(*corev1.Pod)
@@ -123,10 +136,13 @@ func MockConsensusComponentStsPod(ctx context.Context, testCtx testutil.TestCont
 }
 
 // MockConsensusComponentPods mocks the component pods, just using in envTest
-func MockConsensusComponentPods(ctx context.Context, testCtx testutil.TestContext, clusterName string) []*corev1.Pod {
+func MockConsensusComponentPods(ctx context.Context,
+	testCtx testutil.TestContext,
+	clusterName,
+	consensusCompName string) []*corev1.Pod {
 	podList := make([]*corev1.Pod, 3)
 	for i := 0; i < 3; i++ {
-		podName := fmt.Sprintf("%s-%s-%d", clusterName, ConsensusComponentName, i)
+		podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusCompName, i)
 		podRole := "follower"
 		accessMode := "Readonly"
 		if i == 0 {
@@ -134,7 +150,7 @@ func MockConsensusComponentPods(ctx context.Context, testCtx testutil.TestContex
 			accessMode = "ReadWrite"
 		}
 		// mock StatefulSet to create all pods
-		pod := MockConsensusComponentStsPod(ctx, testCtx, clusterName, podName, podRole, accessMode)
+		pod := MockConsensusComponentStsPod(ctx, testCtx, clusterName, consensusCompName, podName, podRole, accessMode)
 		podList[i] = pod
 	}
 	return podList

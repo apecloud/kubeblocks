@@ -33,6 +33,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		clusterDefinitionName = "cluster-definition-" + randomStr
 		clusterVersionName    = "clusterversion-" + randomStr
 		clusterName           = "cluster-" + randomStr
+		consensusCompName     = "consensus"
 	)
 
 	cleanupObjects := func() {
@@ -54,12 +55,13 @@ var _ = Describe("OpsRequest Controller", func() {
 
 	Context("Test OpsRequest", func() {
 		It("Should Test all OpsRequest", func() {
-			cluster := testdbaas.CreateConsensusMysqlCluster(ctx, testCtx, clusterDefinitionName, clusterVersionName, clusterName)
+			cluster := testdbaas.CreateConsensusMysqlCluster(ctx, testCtx, clusterDefinitionName,
+				clusterVersionName, clusterName, consensusCompName)
 			By("init restart OpsRequest")
 			testOpsName := "restart-" + randomStr
 			ops := testdbaas.GenerateOpsRequestObj(testOpsName, clusterName, dbaasv1alpha1.RestartType)
 			ops.Spec.RestartList = []dbaasv1alpha1.ComponentOps{
-				{ComponentName: testdbaas.ConsensusComponentName},
+				{ComponentName: consensusCompName},
 			}
 			testdbaas.CreateOpsRequest(ctx, testCtx, ops)
 

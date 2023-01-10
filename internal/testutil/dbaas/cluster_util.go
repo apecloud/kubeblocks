@@ -34,11 +34,14 @@ func InitClusterWithHybridComps(ctx context.Context,
 	testCtx testutil.TestContext,
 	clusterDefName,
 	clusterVersionName,
-	clusterName string) (*dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, *dbaasv1alpha1.Cluster) {
+	clusterName,
+	statelessComName,
+	consensusComName string) (*dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, *dbaasv1alpha1.Cluster) {
 	clusterDef := CreateClusterDefWithHybridComps(ctx, testCtx, clusterDefName)
 	clusterVersion := CreateClusterVersionWithHybridComps(ctx, testCtx, clusterDefName,
-		clusterVersionName, []string{"docker.io/apecloud/wesql-server:latest", "nginx:latest"})
-	cluster := CreateClusterWithHybridComps(ctx, testCtx, clusterDefName, clusterVersionName, clusterName)
+		clusterVersionName, []string{"docker.io/apecloud/wesql-server:latest", "busybox:latest"})
+	cluster := CreateClusterWithHybridComps(ctx, testCtx, clusterDefName,
+		clusterVersionName, clusterName, statelessComName, consensusComName)
 	return clusterDef, clusterVersion, cluster
 }
 
@@ -52,13 +55,19 @@ func CreateK8sResource(ctx context.Context, testCtx testutil.TestContext, obj cl
 }
 
 // CreateClusterWithHybridComps creates a cluster with hybrid components for testing.
-func CreateClusterWithHybridComps(ctx context.Context, testCtx testutil.TestContext, clusterDefName, clusterVersionName, clusterName string) *dbaasv1alpha1.Cluster {
+func CreateClusterWithHybridComps(ctx context.Context,
+	testCtx testutil.TestContext,
+	clusterDefName,
+	clusterVersionName,
+	clusterName,
+	StatelessComName,
+	ConsensusComName string) *dbaasv1alpha1.Cluster {
 	clusterBytes, err := testdata.GetTestDataFileContent("hybrid/hybrid_cluster.yaml")
 	if err != nil {
 		return nil
 	}
 	clusterYaml := fmt.Sprintf(string(clusterBytes), clusterVersionName, clusterDefName, clusterName, clusterVersionName,
-		clusterDefName, StatelessComponentName, ConsensusComponentName)
+		clusterDefName, StatelessComName, ConsensusComName)
 	cluster := &dbaasv1alpha1.Cluster{}
 	gomega.Expect(yaml.Unmarshal([]byte(clusterYaml), cluster)).Should(gomega.Succeed())
 	return CreateK8sResource(ctx, testCtx, cluster).(*dbaasv1alpha1.Cluster)
@@ -98,7 +107,7 @@ func CreateHybridCompsClusterVersionForUpgrade(ctx context.Context,
 	clusterDefName,
 	clusterVersionName string) *dbaasv1alpha1.ClusterVersion {
 	return CreateClusterVersionWithHybridComps(ctx, testCtx, clusterDefName, clusterVersionName,
-		[]string{"docker.io/apecloud/wesql-server:8.0.30", "nginx:1.14.2"})
+		[]string{"docker.io/apecloud/wesql-server:8.0.30", "busybox:1.30.0"})
 }
 
 // GetClusterComponentPhase gets the component phase of testing cluster for verification.

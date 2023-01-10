@@ -10,8 +10,8 @@ spec:
     minReplicas: 0
     podSpec:
       containers:
-      - name: nginx
-    typeName: proxy
+      - name: busybox
+    typeName: stateless
   - antiAffinity: false
     componentType: Consensus
     typeName: consensus

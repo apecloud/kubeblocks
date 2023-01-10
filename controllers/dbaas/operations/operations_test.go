@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/dbaas/operations/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
@@ -97,9 +98,8 @@ var _ = Describe("OpsRequest Controller", func() {
 				},
 			},
 		}
-		opsRes.OpsRequest = ops
+		opsRes.OpsRequest = testdbaas.CreateOpsRequest(testCtx, ops)
 		initClusterForOps(opsRes)
-		testdbaas.CreateOpsRequest(testCtx, ops)
 		By("test save last configuration and OpsRequest phase is Running")
 		Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
 		Eventually(testdbaas.GetOpsRequestPhase(testCtx, ops.Name), timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
@@ -111,37 +111,43 @@ var _ = Describe("OpsRequest Controller", func() {
 		Expect(err == nil).Should(BeTrue())
 	}
 
-	expectProgressDetailStatus := func(opsRes *OpsResource,
+	getProgressDetailStatus := func(opsRes *OpsResource,
 		componentName string,
-		pod *corev1.Pod,
-		expectStatus dbaasv1alpha1.ProgressStatus) {
+		pod *corev1.Pod) dbaasv1alpha1.ProgressStatus {
 		objectKey := GetProgressObjectKey(pod.Kind, pod.Name)
-		progressDetail := opsRes.OpsRequest.Status.Components[componentName].ProgressDetails
-		Expect(FindStatusProgressDetail(progressDetail, objectKey).Status == expectStatus).Should(BeTrue())
+		progressDetails := opsRes.OpsRequest.Status.Components[componentName].ProgressDetails
+		progressDetail := FindStatusProgressDetail(progressDetails, objectKey)
+		var status dbaasv1alpha1.ProgressStatus
+		if progressDetail != nil {
+			status = progressDetail.Status
+		}
+		return status
 	}
 
-	testConsensusSetPodUpdating := func(opsRes *OpsResource, consensusPodList []*corev1.Pod) {
+	testConsensusSetPodUpdating := func(opsRes *OpsResource, consensusPodList []corev1.Pod) {
 		By("mock pod of statefulSet updating by deleting the pod")
-		pod := consensusPodList[0]
+		pod := &consensusPodList[0]
 		testk8s.MockPodIsTerminating(testCtx, pod)
 		_, _ = GetOpsManager().Reconcile(opsRes)
-		expectProgressDetailStatus(opsRes, testdbaas.ConsensusComponentName, consensusPodList[0], dbaasv1alpha1.ProcessingProgressStatus)
+		Expect(getProgressDetailStatus(opsRes, testdbaas.ConsensusComponentName, pod)).Should(Equal(dbaasv1alpha1.ProcessingProgressStatus))
 
 		By("mock one pod of StatefulSet to update successfully")
-		testk8s.RemovePodFinalizer(testCtx, consensusPodList[0])
+		testk8s.RemovePodFinalizer(testCtx, pod)
 		testdbaas.MockConsensusComponentStsPod(testCtx, clusterName, pod.Name, "leader", "ReadWrite")
-		Eventually(func() string {
-			_, _ = GetOpsManager().Reconcile(opsRes)
-			expectProgressDetailStatus(opsRes, testdbaas.ConsensusComponentName, pod, dbaasv1alpha1.SucceedProgressStatus)
-			return opsRes.OpsRequest.Status.Progress
-		}, timeout, interval).Should(Equal("1/4"))
+
+		_, _ = GetOpsManager().Reconcile(opsRes)
+		Expect(getProgressDetailStatus(opsRes, testdbaas.ConsensusComponentName, pod)).Should(Equal(dbaasv1alpha1.SucceedProgressStatus))
+		Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/4"))
 	}
 
 	testStatelessPodUpdating := func(opsRes *OpsResource, pod *corev1.Pod) {
 		By("create a new pod")
-		newPod := testdbaas.MockStatelessPod(testCtx, clusterName, testdbaas.StatelessComponentName, "nginx-"+testCtx.GetRandomStr())
+		newPodName := "nginx-" + testCtx.GetRandomStr()
+		testdbaas.MockStatelessPod(testCtx, clusterName, testdbaas.StatelessComponentName, newPodName)
+		newPod := &corev1.Pod{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: newPodName, Namespace: testCtx.DefaultNamespace}, newPod)).Should(Succeed())
 		_, _ = GetOpsManager().Reconcile(opsRes)
-		expectProgressDetailStatus(opsRes, testdbaas.StatelessComponentName, newPod, dbaasv1alpha1.ProcessingProgressStatus)
+		Expect(getProgressDetailStatus(opsRes, testdbaas.StatelessComponentName, newPod)).Should(Equal(dbaasv1alpha1.ProcessingProgressStatus))
 		Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/4"))
 
 		By("mock new pod is ready")
@@ -150,22 +156,21 @@ var _ = Describe("OpsRequest Controller", func() {
 		testk8s.MockPodAvailable(newPod, lastTransTime)
 		Expect(k8sClient.Status().Patch(ctx, newPod, patch)).Should(Succeed())
 		_, _ = GetOpsManager().Reconcile(opsRes)
-		expectProgressDetailStatus(opsRes, testdbaas.StatelessComponentName, newPod, dbaasv1alpha1.SucceedProgressStatus)
+		Expect(getProgressDetailStatus(opsRes, testdbaas.StatelessComponentName, newPod)).Should(Equal(dbaasv1alpha1.SucceedProgressStatus))
 		Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/4"))
 	}
 
-	testRestart := func(opsRes *OpsResource, consensusPodList []*corev1.Pod, statelessPod *corev1.Pod) {
+	testRestart := func(opsRes *OpsResource, consensusPodList []corev1.Pod, statelessPod *corev1.Pod) {
 		By("Test Restart")
 		ops := testdbaas.GenerateOpsRequestObj("restart-ops-"+randomStr, clusterName, dbaasv1alpha1.RestartType)
 		ops.Spec.RestartList = []dbaasv1alpha1.ComponentOps{
 			{ComponentName: testdbaas.ConsensusComponentName},
 			{ComponentName: testdbaas.StatelessComponentName},
 		}
-		testdbaas.CreateOpsRequest(testCtx, ops)
 
 		By("test restart OpsRequest is Running")
 		initClusterForOps(opsRes)
-		opsRes.OpsRequest = ops
+		opsRes.OpsRequest = testdbaas.CreateOpsRequest(testCtx, ops)
 		Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
 		Eventually(testdbaas.GetOpsRequestPhase(testCtx, ops.Name), timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 
@@ -179,11 +184,10 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		if !testCtx.UsingExistingCluster() {
 			By("mock testing the updates of consensus component")
-			Expect(ops.Status.Components[testdbaas.ConsensusComponentName].Phase).Should(Equal(dbaasv1alpha1.UpdatingPhase))
 			testConsensusSetPodUpdating(opsRes, consensusPodList)
 
 			By("mock testing the updates of stateless component")
-			Expect(ops.Status.Components[testdbaas.StatelessComponentName].Phase).Should(Equal(dbaasv1alpha1.UpdatingPhase))
+			Expect(opsRes.OpsRequest.Status.Components[testdbaas.StatelessComponentName].Phase).Should(Equal(dbaasv1alpha1.UpdatingPhase))
 			testStatelessPodUpdating(opsRes, statelessPod)
 		}
 	}
@@ -194,12 +198,11 @@ var _ = Describe("OpsRequest Controller", func() {
 		_ = testdbaas.CreateHybridCompsClusterVersionForUpgrade(testCtx, clusterDefinitionName, newClusterVersionName)
 		ops := testdbaas.GenerateOpsRequestObj("upgrade-ops-"+randomStr, clusterObject.Name, dbaasv1alpha1.UpgradeType)
 		ops.Spec.Upgrade = &dbaasv1alpha1.Upgrade{ClusterVersionRef: newClusterVersionName}
-		testdbaas.CreateOpsRequest(testCtx, ops)
-		opsRes.OpsRequest = ops
+		opsRes.OpsRequest = testdbaas.CreateOpsRequest(testCtx, ops)
 
 		By("test upgrade OpsRequest phase is Running")
 		Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
-		Expect(ops.Status.Phase == dbaasv1alpha1.RunningPhase).Should(BeTrue())
+		Expect(opsRes.OpsRequest.Status.Phase == dbaasv1alpha1.RunningPhase).Should(BeTrue())
 
 		By("Test OpsManager.MainEnter function ")
 		_, _ = GetOpsManager().Reconcile(opsRes)
@@ -214,11 +217,10 @@ var _ = Describe("OpsRequest Controller", func() {
 				Replicas:     int32(replicas),
 			},
 		}
-		testdbaas.CreateOpsRequest(testCtx, ops)
-		return ops
+		return testdbaas.CreateOpsRequest(testCtx, ops)
 	}
 
-	testHorizontalScaling := func(opsRes *OpsResource, podList []*corev1.Pod) {
+	testHorizontalScaling := func(opsRes *OpsResource, podList []corev1.Pod) {
 		By("Test HorizontalScaling with scale down replicas")
 		opsRes.OpsRequest = createHorizontalScaling(1)
 		initClusterForOps(opsRes)
@@ -234,14 +236,15 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		if !testCtx.UsingExistingCluster() {
 			By("mock the pod is terminating")
-			testk8s.MockPodIsTerminating(testCtx, podList[0])
+			pod := &podList[0]
+			testk8s.MockPodIsTerminating(testCtx, pod)
 			_, _ = GetOpsManager().Reconcile(opsRes)
-			expectProgressDetailStatus(opsRes, testdbaas.ConsensusComponentName, podList[0], dbaasv1alpha1.ProcessingProgressStatus)
+			Expect(getProgressDetailStatus(opsRes, testdbaas.ConsensusComponentName, pod)).Should(Equal(dbaasv1alpha1.ProcessingProgressStatus))
 
 			By("mock the pod is deleted and progressDetail status should be succeed")
-			testk8s.RemovePodFinalizer(testCtx, podList[0])
+			testk8s.RemovePodFinalizer(testCtx, pod)
 			_, _ = GetOpsManager().Reconcile(opsRes)
-			expectProgressDetailStatus(opsRes, testdbaas.ConsensusComponentName, podList[0], dbaasv1alpha1.SucceedProgressStatus)
+			Expect(getProgressDetailStatus(opsRes, testdbaas.ConsensusComponentName, pod)).Should(Equal(dbaasv1alpha1.SucceedProgressStatus))
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/2"))
 		}
 
@@ -277,9 +280,11 @@ var _ = Describe("OpsRequest Controller", func() {
 		if !testCtx.UsingExistingCluster() {
 			By("mock scale up pods")
 			podName := fmt.Sprintf("%s-%s-%d", clusterName, testdbaas.ConsensusComponentName, 0)
-			pod := testdbaas.MockConsensusComponentStsPod(testCtx, clusterName, podName, "leader", "ReadWrite")
+			testdbaas.MockConsensusComponentStsPod(testCtx, clusterName, podName, "leader", "ReadWrite")
+			pod := &corev1.Pod{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, pod)).Should(Succeed())
 			_, _ = GetOpsManager().Reconcile(opsRes)
-			expectProgressDetailStatus(opsRes, testdbaas.ConsensusComponentName, pod, dbaasv1alpha1.SucceedProgressStatus)
+			Expect(getProgressDetailStatus(opsRes, testdbaas.ConsensusComponentName, pod)).Should(Equal(dbaasv1alpha1.SucceedProgressStatus))
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/1"))
 		}
 	}
@@ -323,15 +328,23 @@ var _ = Describe("OpsRequest Controller", func() {
 			Expect(k8sClient.Status().Patch(context.Background(), clusterObject, patch)).Should(Succeed())
 
 			var (
-				consensusPodList []*corev1.Pod
-				statelessPod     *corev1.Pod
+				consensusPodList []corev1.Pod
+				statelessPod     = &corev1.Pod{}
 			)
 			if !testCtx.UsingExistingCluster() {
 				// mock the pods of consensusSet component
-				consensusPodList = testdbaas.MockConsensusComponentPods(testCtx, clusterName)
+				testdbaas.MockConsensusComponentPods(testCtx, clusterName)
+				podList, err := util.GetComponentPodList(opsRes.Ctx, opsRes.Client, opsRes.Cluster, testdbaas.ConsensusComponentName)
+				Expect(err).Should(Succeed())
+				consensusPodList = podList.Items
+
 				// mock the pods od stateless component
-				statelessPod = testdbaas.MockStatelessPod(testCtx, clusterName, testdbaas.StatelessComponentName, "nginx-"+randomStr)
+				podName := "nginx-" + randomStr
+				testdbaas.MockStatelessPod(testCtx, clusterName, testdbaas.StatelessComponentName, podName)
+				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, statelessPod)).Should(Succeed())
 			}
+			// the opsRequest will use startTime to check some condition, if no sleeps, maybe
+			time.Sleep(time.Second)
 
 			// test upgrade OpsRequest
 			testUpgrade(opsRes, clusterObject)

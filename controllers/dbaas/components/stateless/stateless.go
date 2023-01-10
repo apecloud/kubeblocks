@@ -46,6 +46,9 @@ type Stateless struct {
 var _ types.Component = &Stateless{}
 
 func (stateless *Stateless) IsRunning(obj client.Object) (bool, error) {
+	if obj == nil {
+		return false, nil
+	}
 	return stateless.PodsReady(obj)
 }
 
@@ -61,6 +64,9 @@ func (stateless *Stateless) PodsReady(obj client.Object) (bool, error) {
 }
 
 func (stateless *Stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+	if pod == nil {
+		return false
+	}
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
 }
 

@@ -87,7 +87,9 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	componentDef := util.GetComponentDefFromClusterDefinition(clusterDef, typeName)
 	clusterComponent := util.GetComponentByName(cluster, componentName)
 	component := NewComponentByType(ctx, r.Client, cluster, componentDef, clusterComponent)
-
+	if component == nil {
+		return intctrlutil.Reconciled()
+	}
 	if requeueAfter, err := handleComponentStatusAndSyncCluster(reqCtx, r.Client, sts, cluster, component); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	} else if requeueAfter != 0 {

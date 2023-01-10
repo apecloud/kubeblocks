@@ -29,6 +29,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/testutil"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var (
@@ -54,300 +55,63 @@ func InitConsensusMysql(testCtx testutil.TestContext,
 
 // CreateConsensusMysqlCluster creates a mysql cluster with a component of ConsensusSet type.
 func CreateConsensusMysqlCluster(testCtx testutil.TestContext, clusterDefName, clusterVersionName, clusterName string) *dbaasv1alpha1.Cluster {
-	clusterYaml := fmt.Sprintf(`apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  labels:
-    clusterversion.kubeblocks.io/name: %s
-    clusterdefinition.kubeblocks.io/name: %s
-    app.kubernetes.io/managed-by: kubeblocks
-  name: %s
-  namespace: default
-spec:
-  clusterVersionRef: %s
-  clusterDefinitionRef: %s
-  components:
-  - monitor: false
-    name: %s
-    replicas: 3
-    type: consensus
-    enabledLogs: 
-    - error
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 2Gi
-  terminationPolicy: WipeOut
-`, clusterVersionName, clusterDefName, clusterName, clusterVersionName, clusterDefName, ConsensusComponentName)
+	clusterBytes, err := testdata.GetTestDataFileContent("consensusset/wesql.yaml")
+	if err != nil {
+		return nil
+	}
+	clusterYaml := fmt.Sprintf(string(clusterBytes), clusterVersionName, clusterDefName, clusterName, clusterVersionName, clusterDefName, ConsensusComponentName)
 	cluster := &dbaasv1alpha1.Cluster{}
 	gomega.Expect(yaml.Unmarshal([]byte(clusterYaml), cluster)).Should(gomega.Succeed())
-	gomega.Expect(testCtx.CreateObj(context.Background(), cluster)).Should(gomega.Succeed())
-	// wait until cluster created
-	gomega.Eventually(func() error {
-		return testCtx.Cli.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)
-	}, timeout, interval).Should(gomega.Succeed())
-	return cluster
+	return CreateK8sResource(testCtx, cluster).(*dbaasv1alpha1.Cluster)
 }
 
 // CreateConsensusMysqlClusterDef creates a mysql clusterDefinition with a component of ConsensusSet type.
 func CreateConsensusMysqlClusterDef(testCtx testutil.TestContext, clusterDefName string) *dbaasv1alpha1.ClusterDefinition {
-	clusterDefYaml := fmt.Sprintf(`apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: ClusterDefinition
-metadata:
-  name: %s
-spec:
-  components:
-  - antiAffinity: false
-    componentType: Consensus
-    typeName: consensus
-    logConfigs:
-    - filePathPattern: /data/mysql/log/mysqld.err
-      name: error
-    podSpec:
-      containers:
-      - name: mysql
-    consensusSpec:
-      followers:
-      - accessMode: Readonly
-        name: follower
-      leader:
-        accessMode: ReadWrite
-        name: leader
-      updateStrategy: BestEffortParallel
-    defaultReplicas: 3
-  type: state.mysql-8`, clusterDefName)
+	clusterDefBytes, err := testdata.GetTestDataFileContent("consensusset/wesql_cd.yaml")
+	if err != nil {
+		return nil
+	}
+	clusterDefYaml := fmt.Sprintf(string(clusterDefBytes), clusterDefName)
 	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
 	gomega.Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDef)).Should(gomega.Succeed())
-	gomega.Expect(testCtx.CreateObj(context.Background(), clusterDef)).Should(gomega.Succeed())
-	// wait until clusterDef created
-	gomega.Eventually(func() error {
-		return testCtx.Cli.Get(ctx, client.ObjectKey{Name: clusterDefName}, clusterDef)
-	}, timeout, interval).Should(gomega.Succeed())
-	return clusterDef
+	return CreateK8sResource(testCtx, clusterDef).(*dbaasv1alpha1.ClusterDefinition)
 }
 
 // CreateConsensusMysqlClusterVersion creates a mysql clusterVersion with a component of ConsensusSet type.
 func CreateConsensusMysqlClusterVersion(testCtx testutil.TestContext, clusterDefName, clusterVersionName string) *dbaasv1alpha1.ClusterVersion {
-	clusterVersionYAML := fmt.Sprintf(`
-apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterVersion
-metadata:
-  name:  %s
-spec:
-  clusterDefinitionRef: %s
-  components:
-  - type: consensus
-    podSpec:
-      containers:
-      - name: mysql
-        image: docker.io/apecloud/wesql-server:latest
-`, clusterVersionName, clusterDefName)
+	clusterVersionBytes, err := testdata.GetTestDataFileContent("consensusset/wesql_cv.yaml")
+	if err != nil {
+		return nil
+	}
+	clusterVersionYAML := fmt.Sprintf(string(clusterVersionBytes), clusterVersionName, clusterDefName)
 	clusterVersion := &dbaasv1alpha1.ClusterVersion{}
 	gomega.Expect(yaml.Unmarshal([]byte(clusterVersionYAML), clusterVersion)).Should(gomega.Succeed())
-	gomega.Expect(testCtx.CreateObj(ctx, clusterVersion)).Should(gomega.Succeed())
-	gomega.Eventually(func() error {
-		return testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: clusterVersionName, Namespace: testCtx.DefaultNamespace}, clusterVersion)
-	}, timeout, interval).Should(gomega.Succeed())
-	return clusterVersion
+	return CreateK8sResource(testCtx, clusterVersion).(*dbaasv1alpha1.ClusterVersion)
 }
 
 // MockConsensusComponentStatefulSet mocks the component statefulSet, just using in envTest
 func MockConsensusComponentStatefulSet(testCtx testutil.TestContext, clusterName string) *appsv1.StatefulSet {
+	stsBytes, err := testdata.GetTestDataFileContent("consensusset/stateful_set.yaml")
+	if err != nil {
+		return nil
+	}
 	stsName := clusterName + "-" + ConsensusComponentName
-	statefulSetYaml := fmt.Sprintf(`apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  labels:
-    app.kubernetes.io/component-name: %s
-    app.kubernetes.io/instance: %s
-    app.kubernetes.io/name: state.mysql-8-cluster-definition-consensus
-    app.kubernetes.io/managed-by: kubeblocks
-  name: %s
-  namespace: default
-spec:
-  podManagementPolicy: Parallel
-  replicas: 3
-  selector:
-    matchLabels:
-      app.kubernetes.io/component-name: %s
-      app.kubernetes.io/instance: %s
-      app.kubernetes.io/name: state.mysql-8-cluster-definition-consensus
-      kubeblocks.io/test: test
-      app.kubernetes.io/managed-by: kubeblocks
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/component-name: %s
-        app.kubernetes.io/instance: %s
-        app.kubernetes.io/name: state.mysql-8-cluster-definition-consensus
-        kubeblocks.io/test: test
-        app.kubernetes.io/managed-by: kubeblocks
-    spec:
-      containers:
-      - args:
-        - |
-          cluster_info=""; for (( i=0; i<$KB_consensus_N; i++ )); do
-            if [ $i -ne 0 ]; then
-              cluster_info="$cluster_info;";
-            fi;
-            host=$(eval echo \$KB_consensus_"$i"_HOSTNAME)
-            cluster_info="$cluster_info$host:13306";
-          done; idx=0; while IFS='-' read -ra ADDR; do
-            for i in "${ADDR[@]}"; do
-              idx=$i;
-            done;
-          done <<< "$KB_POD_NAME"; echo $idx; cluster_info="$cluster_info@$(($idx+1))"; echo $cluster_info; docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
-        command:
-        - /bin/bash
-        - -c
-        env:
-        - name: MYSQL_ROOT_HOST
-          value: '%s'
-        - name: MYSQL_ROOT_USER
-          value: root
-        - name: MYSQL_ROOT_PASSWORD
-        - name: MYSQL_ALLOW_EMPTY_PASSWORD
-          value: "yes"
-        - name: MYSQL_DATABASE
-          value: mydb
-        - name: MYSQL_USER
-          value: u1
-        - name: MYSQL_PASSWORD
-          value: u1
-        - name: CLUSTER_ID
-          value: "1"
-        - name: CLUSTER_START_INDEX
-          value: "1"
-        - name: REPLICATIONUSER
-          value: replicator
-        - name: REPLICATION_PASSWORD
-        - name: MYSQL_TEMPLATE_CONFIG
-        - name: MYSQL_CUSTOM_CONFIG
-        - name: MYSQL_DYNAMIC_CONFIG
-        - name: KB_POD_NAME
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: metadata.name
-        - name: KB_consensus_N
-          value: "3"
-        image: docker.io/apecloud/wesql-server:latest
-        imagePullPolicy: IfNotPresent
-        name: mysql
-        resources:
-          limits:
-            cpu: 280m
-            memory: 380Mi
-        ports:
-        - containerPort: 3306
-          name: mysql
-          protocol: TCP
-        - containerPort: 13306
-          name: paxos
-          protocol: TCP
-        terminationMessagePath: /dev/termination-log
-        terminationMessagePolicy: File
-  updateStrategy:
-    type: OnDelete`, ConsensusComponentName, clusterName, stsName, ConsensusComponentName, clusterName, ConsensusComponentName, clusterName, "%")
+	statefulSetYaml := fmt.Sprintf(string(stsBytes), ConsensusComponentName, clusterName, stsName, ConsensusComponentName, clusterName, ConsensusComponentName, clusterName, "%")
 	sts := &appsv1.StatefulSet{}
 	gomega.Expect(yaml.Unmarshal([]byte(statefulSetYaml), sts)).Should(gomega.Succeed())
-	gomega.Expect(testCtx.CreateObj(context.Background(), sts)).Should(gomega.Succeed())
-	// wait until statefulset created
-	gomega.Eventually(func() bool {
-		err := testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: stsName, Namespace: testCtx.DefaultNamespace}, &appsv1.StatefulSet{})
-		return err == nil
-	}, timeout, interval).Should(gomega.BeTrue())
-	return sts
+	return CreateK8sResource(testCtx, sts).(*appsv1.StatefulSet)
 }
 
 // MockConsensusComponentStsPod mocks to create the pod of the consensus StatefulSet, just using in envTest
 func MockConsensusComponentStsPod(testCtx testutil.TestContext, clusterName, podName, podRole, accessMode string) *corev1.Pod {
-	podYaml := fmt.Sprintf(`apiVersion: v1
-kind: Pod
-metadata:
-  labels:
-    app.kubernetes.io/component-name: %s
-    app.kubernetes.io/instance: %s
-    app.kubernetes.io/name: state.mysql-8-cluster-definition-consensus
-    controller-revision-hash: %s-%s-6fdd48d9cd
-    cs.dbaas.kubeblocks.io/access-mode: %s
-    cs.dbaas.kubeblocks.io/role: %s
-    app.kubernetes.io/managed-by: kubeblocks
-  name: %s
-  namespace: default
-spec:
-  containers:
-  - args:
-    - |
-      cluster_info=""; for (( i=0; i<$KB_consensus_N; i++ )); do
-        if [ $i -ne 0 ]; then
-          cluster_info="$cluster_info;";
-        fi;
-        host=$(eval echo \$KB_consensus_"$i"_HOSTNAME)
-        cluster_info="$cluster_info$host:13306";
-      done; idx=0; while IFS='-' read -ra ADDR; do
-        for i in "${ADDR[@]}"; do
-          idx=$i;
-        done;
-      done <<< "$KB_POD_NAME"; echo $idx; cluster_info="$cluster_info@$(($idx+1))"; echo $cluster_info; docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
-    command:
-    - /bin/bash
-    - -c
-    env:
-    - name: MYSQL_ROOT_HOST
-      value: '%s'
-    - name: MYSQL_ROOT_USER
-      value: root
-    - name: MYSQL_ROOT_PASSWORD
-    - name: MYSQL_ALLOW_EMPTY_PASSWORD
-      value: "yes"
-    - name: MYSQL_DATABASE
-      value: mydb
-    - name: MYSQL_USER
-      value: u1
-    - name: MYSQL_PASSWORD
-      value: u1
-    - name: CLUSTER_ID
-      value: "1"
-    - name: CLUSTER_START_INDEX
-      value: "1"
-    - name: REPLICATIONUSER
-      value: replicator
-    - name: REPLICATION_PASSWORD
-    - name: MYSQL_TEMPLATE_CONFIG
-    - name: MYSQL_CUSTOM_CONFIG
-    - name: MYSQL_DYNAMIC_CONFIG
-    - name: KB_POD_NAME
-      valueFrom:
-        fieldRef:
-          apiVersion: v1
-          fieldPath: metadata.name
-    - name: KB_consensus_N
-      value: "3"
-    image: docker.io/apecloud/wesql-server:latest
-    imagePullPolicy: IfNotPresent
-    name: mysql
-    ports:
-    - containerPort: 3306
-      name: mysql
-      protocol: TCP
-    - containerPort: 13306
-      name: paxos
-      protocol: TCP
-    resources: {}
-    terminationMessagePath: /dev/termination-log
-    terminationMessagePolicy: File`, ConsensusComponentName, clusterName, clusterName, ConsensusComponentName, accessMode, podRole, podName, "%")
+	podBytes, err := testdata.GetTestDataFileContent("consensusset/stateful_set_pod.yaml")
+	if err != nil {
+		return nil
+	}
+	podYaml := fmt.Sprintf(string(podBytes), ConsensusComponentName, clusterName, clusterName, ConsensusComponentName, accessMode, podRole, podName, "%")
 	pod := &corev1.Pod{}
 	gomega.Expect(yaml.Unmarshal([]byte(podYaml), pod)).Should(gomega.Succeed())
-	gomega.Expect(testCtx.CreateObj(context.Background(), pod)).Should(gomega.Succeed())
-	// wait until pod created
-	gomega.Eventually(func() error {
-		return testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, &corev1.Pod{})
-	}, timeout, interval).Should(gomega.Succeed())
+	pod = CreateK8sResource(testCtx, pod).(*corev1.Pod)
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Status.Conditions = []corev1.PodCondition{
 		{

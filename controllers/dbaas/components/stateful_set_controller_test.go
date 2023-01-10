@@ -91,15 +91,16 @@ var _ = Describe("StatefulSet Controller", func() {
 		Expect(k8sClient.Update(context.Background(), clusterDef)).Should(Succeed())
 
 		newSts := &appsv1.StatefulSet{}
-		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName + "-" + testdbaas.ConsensusComponentName,
+		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName + "-" + componentName,
 			Namespace: testCtx.DefaultNamespace}, newSts)).Should(Succeed())
 		stsPatch := client.MergeFrom(newSts.DeepCopy())
-		newSts.Status.CurrentRevision = fmt.Sprintf("wesql-mysql-test-%dfdd48d8cd", index)
+		// mock consensus component is not ready
+		newSts.Status.UpdateRevision = fmt.Sprintf("%s-%s-%dfdd48d8cd", clusterName, componentName, index)
 		Expect(k8sClient.Status().Patch(context.Background(), newSts, stsPatch)).Should(Succeed())
 
-		By("waiting the component is Running")
+		By("waiting the component is Updating")
 		Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, componentName),
-			timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
+			timeout, interval).Should(Equal(dbaasv1alpha1.UpdatingPhase))
 	}
 
 	testUsingEnvTest := func(sts *appsv1.StatefulSet) {
@@ -149,11 +150,10 @@ var _ = Describe("StatefulSet Controller", func() {
 			_ = testdbaas.CreateRestartOpsRequest(testCtx, clusterName, opsRequestName, []string{testdbaas.ConsensusComponentName})
 			sts := testdbaas.MockConsensusComponentStatefulSet(testCtx, clusterName)
 			By("patch cluster to Updating")
-			componentName := "mysql-test"
 			patch := client.MergeFrom(cluster.DeepCopy())
 			cluster.Status.Phase = dbaasv1alpha1.UpdatingPhase
 			cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
-				componentName: {
+				testdbaas.ConsensusComponentName: {
 					Phase: dbaasv1alpha1.RunningPhase,
 				},
 			}
@@ -173,13 +173,13 @@ var _ = Describe("StatefulSet Controller", func() {
 			}
 
 			By("waiting the component is Running")
-			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, componentName), timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
+			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, testdbaas.ConsensusComponentName), timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 
 			By("test updateStrategy with Serial")
-			testUpdateStrategy(dbaasv1alpha1.SerialStrategy, componentName, 1)
+			testUpdateStrategy(dbaasv1alpha1.SerialStrategy, testdbaas.ConsensusComponentName, 1)
 
 			By("test updateStrategy with Parallel")
-			testUpdateStrategy(dbaasv1alpha1.ParallelStrategy, componentName, 2)
+			testUpdateStrategy(dbaasv1alpha1.ParallelStrategy, testdbaas.ConsensusComponentName, 2)
 		})
 	})
 })

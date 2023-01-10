@@ -26,23 +26,16 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/testutil"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 // CreateRestartOpsRequest creates a OpsRequest of restart type for testing.
 func CreateRestartOpsRequest(testCtx testutil.TestContext, clusterName, opsRequestName string, componentNames []string) *dbaasv1alpha1.OpsRequest {
-	opsRequestYaml := fmt.Sprintf(`apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: OpsRequest
-metadata:
-  name: %s
-  labels:
-    app.kubernetes.io/instance: %s
-    app.kubernetes.io/managed-by: kubeblocks
-  namespace: default
-spec:
-  clusterRef: %s
-  componentOps:
-  - componentNames: %v
-  type: Restart`, opsRequestName, clusterName, clusterName, componentNames)
+	opsBytes, err := testdata.GetTestDataFileContent("operations/restart.yaml")
+	if err != nil {
+		return nil
+	}
+	opsRequestYaml := fmt.Sprintf(string(opsBytes), opsRequestName, clusterName, clusterName, componentNames)
 	ops := &dbaasv1alpha1.OpsRequest{}
 	gomega.Expect(yaml.Unmarshal([]byte(opsRequestYaml), ops)).Should(gomega.Succeed())
 	return CreateOpsRequest(testCtx, ops)
@@ -50,15 +43,11 @@ spec:
 
 // GenerateOpsRequestObj only generates the OpsRequest Object, instead of actually creating this resource.
 func GenerateOpsRequestObj(opsRequestName, clusterName string, opsType dbaasv1alpha1.OpsType) *dbaasv1alpha1.OpsRequest {
-	opsYaml := fmt.Sprintf(`
-apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: OpsRequest
-metadata:
-  name: %s
-  namespace: default
-spec:
-  clusterRef: %s
-  type: %s`, opsRequestName, clusterName, opsType)
+	opsBytes, err := testdata.GetTestDataFileContent("operations/opsrequest.yaml")
+	if err != nil {
+		return nil
+	}
+	opsYaml := fmt.Sprintf(string(opsBytes), opsRequestName, clusterName, opsType)
 	opsRequest := &dbaasv1alpha1.OpsRequest{}
 	_ = yaml.Unmarshal([]byte(opsYaml), opsRequest)
 	return opsRequest

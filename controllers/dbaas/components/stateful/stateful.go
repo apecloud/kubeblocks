@@ -40,20 +40,26 @@ type Stateful struct {
 var _ types.Component = &Stateful{}
 
 func (stateful *Stateful) IsRunning(obj client.Object) (bool, error) {
-	sts := util.CovertToStatefulSet(obj)
-	if sts == nil {
+	if obj == nil {
 		return false, nil
 	}
+	sts := util.CovertToStatefulSet(obj)
 	statefulStatusRevisionIsEquals := sts.Status.UpdateRevision == sts.Status.CurrentRevision
 	return util.StatefulSetIsReady(sts, statefulStatusRevisionIsEquals), nil
 }
 
 func (stateful *Stateful) PodsReady(obj client.Object) (bool, error) {
+	if obj == nil {
+		return false, nil
+	}
 	sts := util.CovertToStatefulSet(obj)
 	return util.StatefulSetPodsIsReady(sts), nil
 }
 
 func (stateful *Stateful) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+	if pod == nil {
+		return false
+	}
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
 }
 

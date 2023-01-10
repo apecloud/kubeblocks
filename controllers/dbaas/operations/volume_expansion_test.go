@@ -182,7 +182,7 @@ spec:
 		Expect(k8sClient.Status().Patch(ctx, clusterObject, patch)).Should(Succeed())
 
 		// create opsRequest
-		newOps := testdbaas.CreateOpsRequest(testCtx, ops)
+		ops = testdbaas.CreateOpsRequest(testCtx, ops)
 
 		By("mock do operation on cluster")
 		mockDoOperationOnCluster(clusterObject, ops.Name, dbaasv1alpha1.VolumeExpandingPhase)
@@ -196,7 +196,7 @@ spec:
 			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: ops.Name, Namespace: testCtx.DefaultNamespace}, tmpOps)).Should(Succeed())
 			return tmpOps.Annotations != nil && tmpOps.Annotations[intctrlutil.OpsRequestReconcileAnnotationKey] != ""
 		}, timeout*2, interval).Should(BeTrue())
-		return newOps, pvcName
+		return ops, pvcName
 	}
 
 	mockVolumeExpansionActionAndReconcile := func(opsRes *OpsResource, newOps *dbaasv1alpha1.OpsRequest) {

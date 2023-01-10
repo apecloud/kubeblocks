@@ -61,7 +61,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			ops.Spec.RestartList = []dbaasv1alpha1.ComponentOps{
 				{ComponentName: testdbaas.ConsensusComponentName},
 			}
-			testdbaas.CreateOpsRequest(testCtx, ops)
+			ops = testdbaas.CreateOpsRequest(testCtx, ops)
 
 			By("test PatchOpsRequestReconcileAnnotation function")
 			Expect(PatchOpsRequestReconcileAnnotation(ctx, k8sClient, cluster, testOpsName)).Should(Succeed())

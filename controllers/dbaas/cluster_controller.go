@@ -691,6 +691,9 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 		componentDef := util.GetComponentDefFromClusterDefinition(clusterDef, typeName)
 		component := util.GetComponentByName(cluster, componentName)
 		currComponent := components.NewComponentByType(ctx, r.Client, cluster, componentDef, component)
+		if currComponent == nil {
+			continue
+		}
 		componentIsRunning, err := currComponent.IsRunning(&sts)
 		if err != nil {
 			return false, err

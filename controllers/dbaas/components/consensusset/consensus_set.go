@@ -40,6 +40,9 @@ type ConsensusSet struct {
 var _ types.Component = &ConsensusSet{}
 
 func (consensusSet *ConsensusSet) IsRunning(obj client.Object) (bool, error) {
+	if obj == nil {
+		return false, nil
+	}
 	sts := util.CovertToStatefulSet(obj)
 	if statefulStatusRevisionIsEquals, err := handleConsensusSetUpdate(consensusSet.Ctx, consensusSet.Cli, consensusSet.Cluster, sts); err != nil {
 		return false, err
@@ -49,11 +52,17 @@ func (consensusSet *ConsensusSet) IsRunning(obj client.Object) (bool, error) {
 }
 
 func (consensusSet *ConsensusSet) PodsReady(obj client.Object) (bool, error) {
+	if obj == nil {
+		return false, nil
+	}
 	sts := util.CovertToStatefulSet(obj)
 	return util.StatefulSetPodsIsReady(sts), nil
 }
 
 func (consensusSet *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+	if pod == nil {
+		return false
+	}
 	return isReady(*pod)
 }
 
@@ -171,6 +180,9 @@ func NewConsensusSet(ctx context.Context,
 	cluster *dbaasv1alpha1.Cluster,
 	component *dbaasv1alpha1.ClusterComponent,
 	componentDef *dbaasv1alpha1.ClusterDefinitionComponent) types.Component {
+	if component == nil || componentDef == nil {
+		return nil
+	}
 	return &ConsensusSet{
 		Ctx:          ctx,
 		Cli:          cli,

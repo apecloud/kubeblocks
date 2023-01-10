@@ -161,11 +161,13 @@ func (o *LogsOptions) complete(args []string) error {
 	default: // find corresponding file path by file type
 		{
 			clusterGetter := cluster.ObjectsGetter{
-				ClientSet:      o.ClientSet,
-				DynamicClient:  dynamicClient,
-				Name:           o.clusterName,
-				Namespace:      o.Namespace,
-				WithClusterDef: true,
+				Client:    o.ClientSet,
+				Dynamic:   dynamicClient,
+				Name:      o.clusterName,
+				Namespace: o.Namespace,
+				GetOptions: cluster.GetOptions{
+					WithClusterDef: true,
+				},
 			}
 			obj, err := clusterGetter.Get()
 			if err != nil {

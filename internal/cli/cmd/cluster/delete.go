@@ -17,14 +17,16 @@ limitations under the License.
 package cluster
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	"github.com/apecloud/kubeblocks/internal/cli/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var deleteExample = templates.Examples(`
@@ -33,12 +35,23 @@ var deleteExample = templates.Examples(`
 `)
 
 func NewDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	return builder.NewCmdBuilder().
-		Use("delete").
-		Short("Delete a cluster").
-		Example(deleteExample).
-		GVR(types.ClusterGVR()).
-		Factory(f).
-		IOStreams(streams).
-		Build(delete.Build)
+	o := delete.NewDeleteOptions(f, streams, types.ClusterGVR())
+	cmd := &cobra.Command{
+		Use:     "delete",
+		Short:   "Delete clusters",
+		Example: deleteExample,
+		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(deleteCluster(o, args))
+		},
+	}
+	o.AddFlags(cmd)
+	return cmd
+}
+
+func deleteCluster(o *delete.DeleteOptions, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("missing cluster name")
+	}
+	o.Names = args
+	return o.Run()
 }

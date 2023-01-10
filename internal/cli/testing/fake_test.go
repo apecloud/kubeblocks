@@ -73,4 +73,14 @@ var _ = Describe("test fake", func() {
 		dynamic := FakeDynamicClient()
 		Expect(dynamic).ShouldNot(BeNil())
 	})
+
+	It("fake PVCs", func() {
+		pvcs := FakePVCs()
+		Expect(pvcs).ShouldNot(BeNil())
+	})
+
+	It("fake events", func() {
+		events := FakeEvents()
+		Expect(events).ShouldNot(BeNil())
+	})
 })

@@ -39,21 +39,23 @@ var _ = Describe("cluster util", func() {
 	It("get cluster objects", func() {
 		clusterName := testing.ClusterName
 		getter := ObjectsGetter{
-			ClientSet:          client,
-			DynamicClient:      dynamic,
-			Name:               clusterName,
-			Namespace:          testing.Namespace,
-			WithClusterDef:     true,
-			WithClusterVersion: true,
-			WithConfigMap:      true,
-			WithService:        true,
-			WithSecret:         true,
-			WithPVC:            true,
-			WithPod:            true,
+			Client:    client,
+			Dynamic:   dynamic,
+			Name:      clusterName,
+			Namespace: testing.Namespace,
+			GetOptions: GetOptions{
+				WithClusterDef:     true,
+				WithClusterVersion: true,
+				WithConfigMap:      true,
+				WithService:        true,
+				WithSecret:         true,
+				WithPVC:            true,
+				WithPod:            true,
+			},
 		}
 
 		objs, err := getter.Get()
-		Expect(err).ShouldNot(HaveOccurred())
+		Expect(err).Should(Succeed())
 		Expect(objs).ShouldNot(BeNil())
 		Expect(objs.Cluster.Name).Should(Equal(clusterName))
 		Expect(objs.ClusterDef.Name).Should(Equal(testing.ClusterDefName))

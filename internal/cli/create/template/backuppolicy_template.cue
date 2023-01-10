@@ -25,7 +25,7 @@ content: {
 				}
 			}
 			secret: {
-				name:        options.clusterName
+				name:        options.clusterName + "-conn-credential"
 				keyUser:     "username"
 				keyPassword: "password"
 			}
@@ -33,10 +33,10 @@ content: {
 
 		hooks: {
 			preCommands: [
-				"touch /data/mysql/data/.restore; sync",
+				"touch /data/mysql/data/.restore_new_cluster; sync",
 			]
 			postCommands: [
-				"rm -f /data/mysql/data/.restore; sync",
+				"rm -f /data/mysql/data/.restore_new_cluster; sync",
 			]
 		}
 

@@ -71,8 +71,8 @@ spec:
                     description: which container can exec command
                     type: string
                   image:
-                    default: rancher/kubectl:v1.23.7
-                    description: 'exec command with image TODO(dsj): use kubeblocks'
+                    default: docker.io/apecloud/kubeblocks
+                    description: exec command with image
                     type: string
                   postCommands:
                     description: post backup to perform commands
@@ -1679,6 +1679,16 @@ spec:
             properties:
               failureReason:
                 description: the reason if backup policy check failed.
+                type: string
+              lastScheduleTime:
+                description: Information when was the last time the job was successfully
+                  scheduled.
+                format: date-time
+                type: string
+              lastSuccessfulTime:
+                description: Information when was the last time the job successfully
+                  completed.
+                format: date-time
                 type: string
               phase:
                 description: 'backup policy phase valid value: available, failed,

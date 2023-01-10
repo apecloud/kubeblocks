@@ -122,8 +122,7 @@ type BackupPolicyHook struct {
 	PostCommands []string `json:"postCommands,omitempty"`
 
 	// exec command with image
-	// TODO(dsj): use kubeblocks
-	// +kubebuilder:default="rancher/kubectl:v1.23.7"
+	// +kubebuilder:default="docker.io/apecloud/kubeblocks"
 	// +optional
 	Image string `json:"image,omitempty"`
 
@@ -142,6 +141,14 @@ type BackupPolicyStatus struct {
 	// the reason if backup policy check failed.
 	// +optional
 	FailureReason string `json:"failureReason,omitempty"`
+
+	// Information when was the last time the job was successfully scheduled.
+	// +optional
+	LastScheduleTime *metav1.Time `json:"lastScheduleTime,omitempty"`
+
+	// Information when was the last time the job successfully completed.
+	// +optional
+	LastSuccessfulTime *metav1.Time `json:"lastSuccessfulTime,omitempty"`
 }
 
 // +kubebuilder:object:root=true

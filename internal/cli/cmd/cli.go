@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/troubleshoot"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -37,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/options"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/troubleshoot"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/version"
 )
 

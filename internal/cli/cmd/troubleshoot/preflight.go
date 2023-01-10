@@ -125,10 +125,6 @@ func (p *preflightOptions) run() error {
 		preflightName     string
 		err               error
 	)
-	// register the scheme of troubleshoot API and decode function
-	if err = troubleshootclientsetscheme.AddToScheme(scheme.Scheme); err != nil {
-		return err
-	}
 	// load preflight content
 	if preflightSpec, hostPreflightSpec, preflightName, err = p.loadPreflightSpec(); err != nil {
 		return err
@@ -173,6 +169,10 @@ func (p *preflightOptions) loadPreflightSpec() (*troubleshootv1beta2.Preflight, 
 		preflightName     string
 		err               error
 	)
+	// register the scheme of troubleshoot API and decode function
+	if err = troubleshootclientsetscheme.AddToScheme(scheme.Scheme); err != nil {
+		return preflightSpec, hostPreflightSpec, preflightName, err
+	}
 	for _, fileName := range p.yamlCheckFiles {
 		// support to load yaml from stdin, local file and URI
 		if preflightContent, err = cluster.MultipleSourceComponents(fileName, os.Stdin); err != nil {

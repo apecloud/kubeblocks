@@ -17,8 +17,19 @@ limitations under the License.
 package troubleshoot
 
 import (
+	"net/http"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/kubernetes/scheme"
+	clientfake "k8s.io/client-go/rest/fake"
+
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 
 	"github.com/replicatedhq/troubleshoot/pkg/preflight"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -26,18 +37,53 @@ import (
 )
 
 var _ = Describe("Preflight Test", func() {
-	var streams genericclioptions.IOStreams
-	var tf *cmdtesting.TestFactory
+	const (
+		namespace   = "test"
+		clusterName = "test"
+	)
+
+	var (
+		streams genericclioptions.IOStreams
+		tf      *cmdtesting.TestFactory
+		cluster = testing.FakeCluster(clusterName, namespace)
+		pods    = testing.FakePods(3, namespace, clusterName)
+	)
+
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
-		tf = cmdtesting.NewTestFactory().WithNamespace("default")
+		tf = testing.NewTestFactory(namespace)
+		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+		httpResp := func(obj runtime.Object) *http.Response {
+			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}
+		}
+
+		tf.UnstructuredClient = &clientfake.RESTClient{
+			GroupVersion:         schema.GroupVersion{Group: types.Group, Version: types.Version},
+			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+			Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				if req.Method != "GET" {
+					return nil, nil
+				}
+				urlPrefix := "/api/v1/namespaces/" + namespace
+				mapping := map[string]*http.Response{
+					"/api/v1/nodes/" + testing.NodeName: httpResp(testing.FakeNode()),
+					urlPrefix + "/services":             httpResp(&corev1.ServiceList{}),
+					urlPrefix + "/events":               httpResp(&corev1.EventList{}),
+					urlPrefix + "/pods":                 httpResp(pods),
+				}
+				return mapping[req.URL.Path], nil
+			}),
+		}
+
+		tf.Client = tf.UnstructuredClient
+		tf.FakeDynamicClient = testing.FakeDynamicClient(cluster, testing.FakeClusterDef(), testing.FakeClusterVersion())
 	})
 
 	AfterEach(func() {
 		tf.Cleanup()
 	})
 
-	It("Complete and Validate Test", func() {
+	It("complete and validate Test", func() {
 		p := &preflightOptions{
 			factory:        tf,
 			IOStreams:      streams,
@@ -48,5 +94,23 @@ var _ = Describe("Preflight Test", func() {
 		Expect(p.complete([]string{"file1", "file2"})).Should(Succeed())
 		Expect(len(p.yamlCheckFiles)).Should(Equal(2))
 		Expect(p.validate()).Should(Succeed())
+	})
+
+	It("loadPreflightSpec Test", func() {
+		p := &preflightOptions{
+			factory:        tf,
+			IOStreams:      streams,
+			PreflightFlags: preflight.NewPreflightFlags(),
+		}
+		p.yamlCheckFiles = []string{"../../testing/testdata/preflight.yaml", "../../testing/testdata/hostpreflight.yaml"}
+		*p.Interactive = false
+
+		Eventually(func(g Gomega) {
+			preflightSpec, hostPreflightSpec, preflightName, err := p.loadPreflightSpec()
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(len(preflightSpec.Spec.Analyzers)).Should(Equal(1))
+			g.Expect(len(hostPreflightSpec.Spec.Analyzers)).Should(Equal(1))
+			g.Expect(preflightName).NotTo(BeNil())
+		}).Should(Succeed())
 	})
 })

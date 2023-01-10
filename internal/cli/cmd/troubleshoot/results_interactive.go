@@ -47,7 +47,7 @@ func showInteractiveResults(preflightName string, analyzeResults []*analyzerunne
 	uiEvents := ui.PollEvents()
 	for e := range uiEvents {
 		switch e.ID {
-		case "<C-c>":
+		case "<C-c>", "":
 			return nil
 		case "q":
 			if isShowingSaved {
@@ -231,6 +231,9 @@ func drawDetails(analysisResult *analyzerunner.AnalyzeResult) {
 }
 
 func estimateNumberOfLines(text string, width int) int {
+	if width == 0 {
+		return 0
+	}
 	lines := len(text)/width + 1
 	return lines
 }

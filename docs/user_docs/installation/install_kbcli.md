@@ -24,27 +24,11 @@ The following dependencies are required for deploying `kbcli`.
 ## Install `kbcli`
 
 _Steps_:
-1. Installing `kbcli` by curl and make are supported.
+1. Run the command below to instal `kbcli`. `kbcli` can run on macOS, Linux, and Windows.
 
-  - curl
-     `kbcli` can run on macOS, Linux, and Windows. Copy and run the command below.
-     ```
-     curl -fsSL http://161.189.136.182:8000/apecloud/kubeblocks/install_cli.sh |bash    
-     ```
-
-   - make
-     Download the source code and execute the following commands under the root directory of the source code. Make and generate `kbcli` executive file. Make sure the executive file is under the `bin/kbcli` path.
-
-      ```
-      # Switch to the `main` branch
-      git checkout main
-      git pull
-
-      # Make `kbcli`
-      GIT_VERSION=`git describe --always --abbrev=0 --tag`
-      VERSION=`echo "${GIT_VERSION/v/}"`
-      make kbcli
-      ```
+    ```
+    curl -fsSL http://161.189.136.182:8000/apecloud/kubeblocks/install_cli.sh |bash    
+    ```
 
 2. Run this command to check the version after installation.
    ```
@@ -57,12 +41,6 @@ Run this command to uninstall `kbcli`.
 
 ```
 sudo rm /usr/local/bin/kbcli
-```
-
-If you install `kbcli` by make, run the command below to clean the generated `kbcli`.
-
-```
-make clean-kbcli
 ```
 
 ## Next step

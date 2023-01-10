@@ -21,57 +21,51 @@ Install all the followings:
 
 ## Step 1. Install `kbcli`
 
-Choose one of the methods to install `kbcli`.
+1. Run the command below to install `kbcli`.
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
-<Tabs>
-  <TabItem value="curl" label="make" default>
+    ```
     curl -fsSL http://161.189.136.182:8000/apecloud/kubeblocks/install_cli.sh |bash
-  </TabItem>
-  <TabItem value="orange" label="Orange">
-    # Switch to `main` branch
-        git checkout main
-        git pull
+    ```
 
-    # Make `kbcli`
-        GIT_VERSION=`git describe --always --abbrev=0 --tag`
-        VERSION=`echo "${GIT_VERSION/v/}"`
-        make kbcli
-  </TabItem>
-</Tabs>
+2. Run `kbcli version` to check the `kbcli` version and make sure `kbcli` is installed successfully. When the status is `Running`, the instance is deployed successfully.
 
-Run `kbcli version` to check the `kbcli` version and make sure `kbcli` is installed successfully.
+## Step 2. Install KubeBlocks
 
-When the status is `Running`, the instance is deployed successfully.
+Run the command below to install KubeBlocks.
 
-## Step 2. Create a single-node MySQL cluster
+```
+kbcli kubeblocks install
+```
+
+> Note:
+> You can use `--version` to specify the version of KubeBlocks. Fins the latest version of KubeBlocks on the [Release](https://github.com/apecloud/kubeblocks/releases) page.
+
+
+## Step 3. Create a single-node MySQL cluster
 
 Use `kbcli` and a YAML file to create a cluster with specified component specifications.
 
-1. Create a component configuration file, named as `mycluster.yaml`. The specifications you can refer to are as follows. You can find this example file in the GitHub repository.
+1. Create a component configuration file, named as `mycluster.yaml`. The specifications you can refer to are as follows. 
    ```
    - name: apecloud-mysql
         type: replicasets
-        monitor: false
+        replica: 1
         volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-        volumeMode: Filesystem
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
     ```
 
 2. Run the command below to create a cluster.
    ```
-   kbcli cluster create apecloud-cluster --cluster-definition=apecloud-wesql  --cluster-version=wesql-8.0.30 --components=mycluster.yaml --termination-policy=Halt
+   kbcli cluster create apecloud-cluster --cluster-definition=apecloud-wesql  --cluster-version=wesql-8.0.30 --components=mycluster.yaml --termination-policy=WipeOut
    ```
 
-## Step 3. View the cluster details
+## Step 4. View the cluster details
 
 After the cluster is well-created, you can view its information and status.
 
@@ -85,7 +79,7 @@ After the cluster is well-created, you can view its information and status.
    kbcli cluster describe apecloud-cluster
    ```
 
-## Step 4. Connect to the cluster
+## Step 5. Connect to the cluster
 
 1. Run this command to connect to this cluster.
    ```
@@ -95,12 +89,11 @@ After the cluster is well-created, you can view its information and status.
 2. Choose a language or MySQL client to view the cluster connection information.
 
 
-## Step 5. (Optional) Delete the cluster (termination policy)
-
-   Run this command to delete the created cluster.
-   ```
-   kbcli cluster delete apecloud-cluster
-   ```
+## Step 6. (Optional) Delete the cluster (termination policy)
+Run this command to delete the created cluster.
+```
+kbcli cluster delete apecloud-cluster
+```
 
 
 ## Next steps

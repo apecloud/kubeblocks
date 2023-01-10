@@ -1381,6 +1381,7 @@ func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
 	for j := 0; j < int(params.component.Replicas); j++ {
 		envData[prefix+strconv.Itoa(j)+"_HOSTNAME"] = fmt.Sprintf("%s.%s", params.cluster.Name+"-"+params.component.Name+"-"+strconv.Itoa(j), svcName)
 	}
+	// TODO following code seems to be redundant with updateConsensusRoleInfo in consensus_set_utils.go
 	// build consensus env from cluster.status
 	if params.cluster.Status.Components != nil {
 		if v, ok := params.cluster.Status.Components[params.component.Type]; ok {

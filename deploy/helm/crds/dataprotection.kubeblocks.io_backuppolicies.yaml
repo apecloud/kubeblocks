@@ -48,6 +48,21 @@ spec:
                   one tool.
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
+              backupType:
+                default: snapshot
+                description: Backup Type. full or incremental or snapshot. if unset,
+                  default is snapshot.
+                enum:
+                - full
+                - incremental
+                - snapshot
+                type: string
+              backupsHistoryLimit:
+                default: 7
+                description: The number of automatic backups to retain. Value must
+                  be non-negative integer. 0 means NO limit on the number of backups.
+                format: int32
+                type: integer
               hooks:
                 description: execute hook commands for backup.
                 properties:

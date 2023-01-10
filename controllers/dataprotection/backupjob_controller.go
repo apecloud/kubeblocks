@@ -159,7 +159,10 @@ func (r *BackupJobReconciler) doNewPhaseAction(
 
 	// update Phase to InProgress
 	backupJob.Status.Phase = dataprotectionv1alpha1.BackupJobInProgress
-	backupJob.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now()}
+	backupJob.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+	backupJob.Status.Expiration = &metav1.Time{
+		Time: backupJob.Status.StartTimestamp.Add(backupJob.Spec.TTL.Duration),
+	}
 	if err := r.Client.Status().Update(reqCtx.Ctx, backupJob); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -204,7 +207,12 @@ func (r *BackupJobReconciler) doInProgressPhaseAction(
 		}
 
 		backupJob.Status.Phase = dataprotectionv1alpha1.BackupJobCompleted
-		backupJob.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
+		backupJob.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+		snap := &snapshotv1.VolumeSnapshot{}
+		exists, _ := checkResourceExists(reqCtx.Ctx, r.Client, key, snap)
+		if exists {
+			backupJob.Status.TotalSize = snap.Status.RestoreSize.String()
+		}
 	} else {
 		// 1. create and ensure backup tool job finished
 		// 2. get job phase and update
@@ -228,7 +236,7 @@ func (r *BackupJobReconciler) doInProgressPhaseAction(
 		if jobStatusConditions[0].Type == batchv1.JobComplete {
 			// update Phase to in Completed
 			backupJob.Status.Phase = dataprotectionv1alpha1.BackupJobCompleted
-			backupJob.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
+			backupJob.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
 		} else if jobStatusConditions[0].Type == batchv1.JobFailed {
 			backupJob.Status.Phase = dataprotectionv1alpha1.BackupJobFailed
 			backupJob.Status.FailureReason = job.Status.Conditions[0].Reason
@@ -237,6 +245,10 @@ func (r *BackupJobReconciler) doInProgressPhaseAction(
 
 	// finally, update backupJob status
 	r.Recorder.Event(backupJob, corev1.EventTypeNormal, "CreatedBackupJob", "Completed backupJob.")
+	if backupJob.Status.CompletionTimestamp != nil {
+		backupJob.Status.Duration = &metav1.Duration{
+			Duration: backupJob.Status.CompletionTimestamp.Sub(backupJob.Status.StartTimestamp.Time)}
+	}
 	if err := r.Client.Status().Update(reqCtx.Ctx, backupJob); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -706,9 +718,18 @@ func (r *BackupJobReconciler) BuildBackupToolPodSpec(reqCtx intctrlutil.RequestC
 		return podSpec, err
 	}
 
+	// build pod dns string
+	// ref: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/
+	hostDNS := []string{clusterPod.Name}
+	if clusterPod.Spec.Hostname != "" {
+		hostDNS[0] = clusterPod.Spec.Hostname
+	}
+	if clusterPod.Spec.Subdomain != "" {
+		hostDNS = append(hostDNS, clusterPod.Spec.Subdomain)
+	}
 	envDBHost := corev1.EnvVar{
 		Name:  "DB_HOST",
-		Value: clusterPod.Name,
+		Value: strings.Join(hostDNS, "."),
 	}
 
 	envDBUser := corev1.EnvVar{

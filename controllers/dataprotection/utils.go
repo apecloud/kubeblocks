@@ -20,6 +20,8 @@ import (
 	"context"
 	"strings"
 
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -39,4 +41,36 @@ func checkResourceExists(
 	}
 	// if found, return true
 	return true, nil
+}
+
+// byBackupStartTime sorts a list of jobs by start timestamp, using their names as a tie breaker.
+type byBackupStartTime []dataprotectionv1alpha1.BackupJob
+
+func (o byBackupStartTime) Len() int      { return len(o) }
+func (o byBackupStartTime) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+
+func (o byBackupStartTime) Less(i, j int) bool {
+	if o[i].Status.StartTimestamp == nil && o[j].Status.StartTimestamp != nil {
+		return false
+	}
+	if o[i].Status.StartTimestamp != nil && o[j].Status.StartTimestamp == nil {
+		return true
+	}
+	if o[i].Status.StartTimestamp.Equal(o[j].Status.StartTimestamp) {
+		return o[i].Name < o[j].Name
+	}
+	return o[i].Status.StartTimestamp.Before(o[j].Status.StartTimestamp)
+}
+
+func DeleteObjectBackground(cli client.Client, ctx context.Context, obj client.Object) error {
+	deletePropagation := metav1.DeletePropagationBackground
+	deleteOptions := &client.DeleteOptions{
+		PropagationPolicy: &deletePropagation,
+	}
+
+	if err := cli.Delete(ctx, obj, deleteOptions); err != nil {
+		// failed delete backups, return error info.
+		return err
+	}
+	return nil
 }

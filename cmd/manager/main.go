@@ -20,7 +20,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -179,6 +178,15 @@ func main() {
 		Recorder: mgr.GetEventRecorderFor("backup-policy-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "BackupPolicy")
+		os.Exit(1)
+	}
+
+	if err = (&dataprotectioncontrollers.CronJobReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("cronjob-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "CronJob")
 		os.Exit(1)
 	}
 

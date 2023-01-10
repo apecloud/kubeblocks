@@ -91,6 +91,10 @@ type BackupJobStatus struct {
 	// +optional
 	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
 
+	// The duration time of backup execution.
+	// +optional
+	Duration *metav1.Duration `json:"duration,omitempty"`
+
 	// backup total size
 	// +optional
 	TotalSize string `json:"totalSize,omitempty"`
@@ -117,7 +121,8 @@ type BackupJobStatus struct {
 // +kubebuilder:resource:categories={dbaas},scope=Namespaced
 // +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="COMPLETIONTIME",type=date,JSONPath=`.status.completionTimestamp`
-// +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
+// +kubebuilder:printcolumn:name="TOTALSIZE",type=string,JSONPath=`.status.totalSize`
+// +kubebuilder:printcolumn:name="DURATION",type=string,JSONPath=`.status.duration`
 
 // BackupJob is the Schema for the backupjobs API (defined by User)
 type BackupJob struct {

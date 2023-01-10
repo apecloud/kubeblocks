@@ -24,9 +24,12 @@ spec:
     - jsonPath: .status.completionTimestamp
       name: COMPLETIONTIME
       type: date
-    - jsonPath: .metadata.creationTimestamp
-      name: AGE
-      type: date
+    - jsonPath: .status.totalSize
+      name: TOTALSIZE
+      type: string
+    - jsonPath: .status.duration
+      name: DURATION
+      type: string
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -84,6 +87,9 @@ spec:
               completionTimestamp:
                 description: Date/time when the backup finished being processed.
                 format: date-time
+                type: string
+              duration:
+                description: The duration time of backup execution.
                 type: string
               expiration:
                 description: The date and time when the Backup is eligible for garbage

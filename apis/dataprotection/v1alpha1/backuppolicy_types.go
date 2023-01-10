@@ -32,6 +32,18 @@ type BackupPolicySpec struct {
 	// +optional
 	Schedule string `json:"schedule,omitempty"`
 
+	// Backup Type. full or incremental or snapshot. if unset, default is snapshot.
+	// +kubebuilder:validation:Enum={full,incremental,snapshot}
+	// +kubebuilder:default=snapshot
+	// +optional
+	BackupType string `json:"backupType,omitempty"`
+
+	// The number of automatic backups to retain. Value must be non-negative integer.
+	// 0 means NO limit on the number of backups.
+	// +kubebuilder:default=7
+	// +optional
+	BackupsHistoryLimit int32 `json:"backupsHistoryLimit,omitempty"`
+
 	// which backup tool to perform database backup, only support one tool.
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional

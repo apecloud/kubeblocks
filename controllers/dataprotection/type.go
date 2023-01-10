@@ -34,6 +34,7 @@ const (
 
 	// label keys
 	dataProtectionLabelBackupTypeKey     = "dataprotection.kubeblocks.io/backup-type"
+	dataProtectionLabelAutoBackupKey     = "dataprotection.kubeblocks.io/autobackup"
 	dataProtectionLabelBackupJobNameKey  = "backupjobs.dataprotection.kubeblocks.io/name"
 	dataProtectionLabelRestoreJobNameKey = "restorejobs.dataprotection.kubeblocks.io/name"
 

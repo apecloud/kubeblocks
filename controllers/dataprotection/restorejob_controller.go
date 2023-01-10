@@ -124,7 +124,7 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 		// update Phase to InProgress
 		restoreJob.Status.Phase = dataprotectionv1alpha1.RestoreJobInProgressPhy
-		restoreJob.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now()}
+		restoreJob.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
 		if err := r.Client.Status().Update(ctx, restoreJob); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
@@ -142,7 +142,7 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				if jobStatusConditions[0].Type == batchv1.JobComplete {
 					// update Phase to in Completed
 					restoreJob.Status.Phase = dataprotectionv1alpha1.RestoreJobCompleted
-					restoreJob.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
+					restoreJob.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
 					// get stateful service and
 					// set stateful set replicate 1
 					patch := []byte(`{"spec":{"replicas":1}}`)

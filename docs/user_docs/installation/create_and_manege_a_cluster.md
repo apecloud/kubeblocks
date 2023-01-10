@@ -30,17 +30,17 @@ Here is an example of how to create a KubeBlocks cluster using a YAML file.
   1. Prepare a YAML file for configuring a component. 
 
     ```
-     - name: ac-mysql
-     type: replicasets
-     replicas: 1
-     volumeClaimTemplates:
-     - name: data
-       spec:
-         accessModes:
-           - ReadWriteOnce
-         resources:
-           requests:
-             storage: 1Gi
+    - name: ac-mysql
+      type: replicasets
+      replicas: 1
+      volumeClaimTemplates:
+      - name: data
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
     ```
 
   2. Run this command to create a cluster in the default specification and engine.

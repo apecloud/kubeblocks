@@ -29,26 +29,25 @@ Here is an example of how to create a KubeBlocks cluster using a YAML file.
 
   1. Prepare a YAML file for configuring a component. 
 
-```
-     - name: wesql-demo
-      type: replicasets
-      monitor: false
-      volumeClaimTemplates:
-        - name: data
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 1Gi
-            volumeMode: Filesystem
-```
+    ```
+     - name: ac-mysql
+     type: replicasets
+     replicas: 1
+     volumeClaimTemplates:
+     - name: data
+       spec:
+         accessModes:
+           - ReadWriteOnce
+         resources:
+           requests:
+             storage: 1Gi
+    ```
 
   2. Run this command to create a cluster in the default specification and engine.
 
-```
-    kbcli cluster create wesql-cluster --components=mycluster.yaml
-```
+    ```
+    kbcli cluster create ac-cluster --components=mycluster.yaml
+    ```
 
   > **Note:**
   > You can specify the engine type and version by adding `--cluster-definition` and `--app-version` flags. For example,
@@ -70,7 +69,7 @@ _Example_
 Add the cluster name and run this command to delete this specified database cluster.
 
 ```
-kbcli cluster delete wesql-demo
+kbcli cluster delete ac-cluster
 ```
 
 ## Describe a cluster

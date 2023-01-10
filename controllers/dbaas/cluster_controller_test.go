@@ -47,12 +47,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	consensusset "github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 )
 
 var _ = Describe("Cluster Controller", func() {
@@ -62,6 +63,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	const leader = "leader"
 	const follower = "follower"
+	const volumeName = "data"
 
 	clusterObjKey := types.NamespacedName{
 		Name:      "my-cluster",
@@ -488,7 +490,7 @@ spec:
 						Type: "replicasets",
 						VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{
 							{
-								Name: "data",
+								Name: volumeName,
 								Spec: &corev1.PersistentVolumeClaimSpec{
 									AccessModes: []corev1.PersistentVolumeAccessMode{
 										corev1.ReadWriteOnce,
@@ -766,7 +768,6 @@ spec:
 		It("Should trigger a backup process(snapshot) and "+
 			"create pvcs from backup for newly created replicas", func() {
 			compName := "replicasets"
-			volumeName := "data"
 
 			By("Creating a cluster with VolumeClaimTemplate")
 			var pvcSpec corev1.PersistentVolumeClaimSpec
@@ -1429,7 +1430,6 @@ spec:
 
 	Context("When updating cluster PVC storage size", func() {
 		It("Should update PVC request storage size accordingly", func() {
-			volumeName := "data"
 
 			By("Mock a StorageClass which allows resize")
 			StorageClassYaml := `
@@ -1578,7 +1578,7 @@ spec:
 				Type: "replicasets",
 				VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{
 					{
-						Name: "data",
+						Name: volumeName,
 						Spec: &corev1.PersistentVolumeClaimSpec{
 							AccessModes: []corev1.PersistentVolumeAccessMode{
 								corev1.ReadWriteOnce,

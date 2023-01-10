@@ -196,18 +196,6 @@ ifeq (, $(shell sed -n "/^127.0.0.1[[:space:]]*host.$(EXISTING_CLUSTER_TYPE).int
 endif
 endif
 
-.PHONY: test-probe
-test-probe:
-	cd ./cmd/probe && $(GO) test ./... -coverprofile cover.out
-
-.PHONY: cover-report-probe
-cover-report-probe: ## Generate cover.html from cmd/probe/cover.out
-	cd ./cmd/probe && $(GO) tool cover -html=cover.out -o cover.html
-ifeq ($(GOOS), darwin)
-	open ./cmd/probe/cover.html
-else
-	echo "open cmd/probe/cover.html with a HTML viewer."
-endif
 
 .PHONY: test-current-ctx
 test-current-ctx: manifests generate fmt vet add-k8s-host ## Run operator controller tests with current $KUBECONFIG context. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
@@ -315,7 +303,7 @@ run-delve: manifests generate fmt vet  ## Run Delve debugger.
 	dlv --listen=:$(DEBUG_PORT) --headless=true --api-version=2 --accept-multiclient debug $(GO_PACKAGE) -- $(ARGUMENTS)
 
 
-##@ Agamotto
+##@ agamotto cmd
 
 AGAMOTTO_LD_FLAGS = "-s -w \
     -X github.com/prometheus/common/version.Version=$(VERSION) \
@@ -337,29 +325,43 @@ agamotto: build-checks ## Build agamotto related binaries
 clean-agamotto: ## Clean bin/mysqld_exporter.
 	rm -f bin/agamotto
 
-##@ DAP
+##@ probe cmd
 
-DAPRD_BUILD_PATH = ./cmd/daprd
-DAPRD_LD_FLAGS = "-s -w"
+PROBE_BUILD_PATH = ./cmd/probe
+PROBE_LD_FLAGS = "-s -w"
 
-bin/daprd.%: ## Cross build bin/daprd.$(OS).$(ARCH) .
-	cd $(DAPRD_BUILD_PATH) && GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${DAPRD_LD_FLAGS} -o ../../$@  ./main.go
+bin/probe.%: ## Cross build bin/daprd.$(OS).$(ARCH) .
+	cd $(PROBE_BUILD_PATH) && GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${PROBE_LD_FLAGS} -o ../../$@  ./main.go
 
-daprd-mod-vendor:
-	cd $(DAPRD_BUILD_PATH) && $(GO) mod tidy -compat=1.19
-	cd $(DAPRD_BUILD_PATH) && $(GO) mod vendor
-	cd $(DAPRD_BUILD_PATH) && $(GO) mod verify
+# probe-mod-vendor:
+# 	cd $(PROBE_BUILD_PATH) && $(GO) mod tidy -compat=1.19
+# 	cd $(PROBE_BUILD_PATH) && $(GO) mod vendor
+# 	cd $(PROBE_BUILD_PATH) && $(GO) mod verify
 
-.PHONY: daprd
-daprd: OS=$(shell $(GO) env GOOS)
-daprd: ARCH=$(shell $(GO) env GOARCH)
-daprd: daprd-mod-vendor # build-checks ## Build daprd related binaries
-	$(MAKE) bin/daprd.${OS}.${ARCH}
-	mv bin/daprd.${OS}.${ARCH} bin/daprd
+.PHONY: probe
+probe: OS=$(shell $(GO) env GOOS)
+probe: ARCH=$(shell $(GO) env GOARCH)
+probe: mod-vendor # build-checks ## Build daprd related binaries
+	$(MAKE) bin/probe.${OS}.${ARCH}
+	mv bin/probe.${OS}.${ARCH} bin/probe
 
-.PHONY: clean
-clean-daprd: ## Clean bin/mysqld_exporter.
-	rm -f bin/daprd
+.PHONY: clean-probe
+clean-probe: ## Clean bin/probe
+	rm -f bin/probe
+
+.PHONY: test-probe
+test-probe: ## Test cmd/probe module.
+	cd ./cmd/probe && $(GO) test ./... -coverprofile cover.out
+
+.PHONY: cover-report-probe
+cover-report-probe: ## Generate cover.html from cmd/probe/cover.out
+	cd ./cmd/probe && $(GO) tool cover -html=cover.out -o cover.html
+ifeq ($(GOOS), darwin)
+	open ./cmd/probe/cover.html
+else
+	echo "open cmd/probe/cover.html with a HTML viewer."
+endif
+
 
 ##@ Deployment
 
@@ -638,10 +640,10 @@ brew-install-prerequisite: ## Use `brew install` to install required dependencie
 	brew install go@1.19 kubebuilder delve golangci-lint staticcheck kustomize step cue oras jq yq git-hooks-go
 
 ##@ Minikube
-K8S_VERSION ?= v1.22.15
+K8S_VERSION ?= v1.25.3
 MINIKUBE_REGISTRY_MIRROR ?= https://tenxhptk.mirror.aliyuncs.com
 MINIKUBE_IMAGE_REPO ?= registry.cn-hangzhou.aliyuncs.com/google_containers
-MINIKUBE_START_ARGS = --memory=4g --cpus=4
+MINIKUBE_START_ARGS = --memory=3g --cpus=4 --vm-driver=docker
 
 KICBASE_IMG=$(MINIKUBE_IMAGE_REPO)/kicbase:v0.0.33
 PAUSE_IMG=$(MINIKUBE_IMAGE_REPO)/pause:3.5
@@ -679,11 +681,11 @@ pull-all-images: # Pull required container images
 # minikube-start: IMG_CACHE_CMD=ssh --native-ssh=false docker pull
 minikube-start: IMG_CACHE_CMD=image load --daemon=true
 minikube-start: pull-all-images minikube ## Start minikube cluster.
-ifneq (, $(shell which minikube))
-ifeq (, $(shell $(MINIKUBE) status -n minikube -ojson | jq -r '.Host' | grep Running))
+# ifneq (, $(shell which minikube))
+# ifeq (, $(shell $(MINIKUBE) status -n minikube -ojson | jq -r '.Host' | grep Running))
 	$(MINIKUBE) start --kubernetes-version=$(K8S_VERSION) --registry-mirror=$(REGISTRY_MIRROR) --image-repository=$(MINIKUBE_IMAGE_REPO) $(MINIKUBE_START_ARGS)
-endif
-endif
+# endif
+# endif
 	$(MINIKUBE) update-context
 	$(MINIKUBE) $(IMG_CACHE_CMD) $(HOSTPATHPLUGIN_IMG)
 	$(MINIKUBE) $(IMG_CACHE_CMD) $(LIVENESSPROBE_IMG)

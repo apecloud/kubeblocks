@@ -37,6 +37,8 @@ type Etcd struct {
 	base     internal.ProbeBase
 }
 
+var _ internal.ProbeOperation = &Etcd{}
+
 const (
 	endpoint = "endpoint"
 

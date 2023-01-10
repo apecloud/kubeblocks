@@ -48,16 +48,16 @@ Use `kbcli` and a YAML file to create a cluster with specified component specifi
 1. Create a component configuration file, named as `mycluster.yaml`. The specifications you can refer to are as follows. 
    ```
    - name: apecloud-mysql
-        type: replicasets
-        replica: 1
-        volumeClaimTemplates:
-        - name: data
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 1Gi
+     type: replicasets
+     replicas: 1
+     volumeClaimTemplates:
+     - name: data
+       spec:
+         accessModes:
+           - ReadWriteOnce
+         resources:
+           requests:
+             storage: 1Gi
     ```
 
 2. Run the command below to create a cluster.

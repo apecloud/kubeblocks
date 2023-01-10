@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -36,15 +36,15 @@ import (
 
 var _ = Describe("SystemAccount Controller", func() {
 	var (
-		timeout           = time.Second * 20
-		interval          = time.Second
-		clusterName       = "cluster-sysaccount"
-		clusterDefName    = "def-sysaccount"
-		typeName          = "mycomponent"
-		clusterEngineType = "state.mysql-8"
-		appversionName    = "app-version-sysaccount"
-		backupPolicyName  = "backup-policy-demo"
-		databaseEngine    = "mysql"
+		timeout            = time.Second * 20
+		interval           = time.Second
+		clusterName        = "cluster-sysaccount"
+		clusterDefName     = "def-sysaccount"
+		typeName           = "mycomponent"
+		clusterEngineType  = "state.mysql-8"
+		ClusterVersionName = "app-version-sysaccount"
+		backupPolicyName   = "backup-policy-demo"
+		databaseEngine     = "mysql"
 	)
 	var ctx = context.Background()
 
@@ -52,7 +52,7 @@ var _ = Describe("SystemAccount Controller", func() {
 		// Add any steup steps that needs to be executed before each test
 		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.AppVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
+		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -183,14 +183,14 @@ var _ = Describe("SystemAccount Controller", func() {
 		return clusterDefinition
 	}
 
-	mockAppVersion := func(appverName string, clusterDefName string, typeName string) *dbaasv1alpha1.AppVersion {
-		appVersion := &dbaasv1alpha1.AppVersion{
+	mockClusterVersion := func(appverName string, clusterDefName string, typeName string) *dbaasv1alpha1.ClusterVersion {
+		ClusterVersion := &dbaasv1alpha1.ClusterVersion{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: appverName,
 			},
-			Spec: dbaasv1alpha1.AppVersionSpec{
+			Spec: dbaasv1alpha1.ClusterVersionSpec{
 				ClusterDefinitionRef: clusterDefName,
-				Components: []dbaasv1alpha1.AppVersionComponent{
+				Components: []dbaasv1alpha1.ClusterVersionComponent{
 					{
 						Type: typeName,
 						PodSpec: &corev1.PodSpec{
@@ -200,7 +200,7 @@ var _ = Describe("SystemAccount Controller", func() {
 				},
 			},
 		}
-		return appVersion
+		return ClusterVersion
 	}
 
 	mockCluster := func(clusterDefName, appVerName, typeName, clusterName string, replicas int32) *dbaasv1alpha1.Cluster {
@@ -210,8 +210,8 @@ var _ = Describe("SystemAccount Controller", func() {
 				Name:      clusterName,
 			},
 			Spec: dbaasv1alpha1.ClusterSpec{
-				AppVersionRef: appVerName,
-				ClusterDefRef: clusterDefName,
+				ClusterVersionRef: appVerName,
+				ClusterDefRef:     clusterDefName,
 				Components: []dbaasv1alpha1.ClusterComponent{
 					{
 						Name:     typeName,
@@ -272,22 +272,22 @@ var _ = Describe("SystemAccount Controller", func() {
 		return createdClusterDef
 	}
 
-	assureAppVersion := func() *dbaasv1alpha1.AppVersion {
+	assureClusterVersion := func() *dbaasv1alpha1.ClusterVersion {
 		// create app version
-		appVersion := mockAppVersion(appversionName, clusterDefName, typeName)
-		Expect(testCtx.CheckedCreateObj(ctx, appVersion)).Should(Succeed())
+		ClusterVersion := mockClusterVersion(ClusterVersionName, clusterDefName, typeName)
+		Expect(testCtx.CheckedCreateObj(ctx, ClusterVersion)).Should(Succeed())
 		// assure cluster def is ready
-		createdAppversion := &dbaasv1alpha1.AppVersion{}
+		createdClusterVersion := &dbaasv1alpha1.ClusterVersion{}
 		Eventually(func() bool {
-			err := k8sClient.Get(ctx, client.ObjectKey{Name: appversionName}, createdAppversion)
+			err := k8sClient.Get(ctx, client.ObjectKey{Name: ClusterVersionName}, createdClusterVersion)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
-		return createdAppversion
+		return createdClusterVersion
 	}
 
 	assureCluster := func(replicas int32) *dbaasv1alpha1.Cluster {
 		By("Creating cluster")
-		cluster := mockCluster(clusterDefName, appversionName, typeName, clusterName, replicas)
+		cluster := mockCluster(clusterDefName, ClusterVersionName, typeName, clusterName, replicas)
 		Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
 		createdCluster := &dbaasv1alpha1.Cluster{}
 		Eventually(func() bool {
@@ -421,9 +421,9 @@ var _ = Describe("SystemAccount Controller", func() {
 				Skip("Mocked Cluster is not fully implemented to run in real cluster.")
 			}
 			createdClusterDef := assureClusterDef()
-			appVersion := assureAppVersion()
+			ClusterVersion := assureClusterVersion()
 
-			By("Assuring ClusterDef and AppVersion are Available")
+			By("Assuring ClusterDef and ClusterVersion are Available")
 			tmpClusterDef := &dbaasv1alpha1.ClusterDefinition{}
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, client.ObjectKey{Name: createdClusterDef.Name, Namespace: createdClusterDef.Namespace}, tmpClusterDef)
@@ -433,13 +433,13 @@ var _ = Describe("SystemAccount Controller", func() {
 				return tmpClusterDef.Status.Phase == dbaasv1alpha1.AvailablePhase
 			}, timeout, interval).Should(BeTrue())
 
-			tmpAppversion := &dbaasv1alpha1.AppVersion{}
+			tmpClusterVersion := &dbaasv1alpha1.ClusterVersion{}
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx, client.ObjectKey{Name: appVersion.Name, Namespace: appVersion.Namespace}, tmpAppversion)
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: ClusterVersion.Name, Namespace: ClusterVersion.Namespace}, tmpClusterVersion)
 				if err != nil {
 					return false
 				}
-				return tmpAppversion.Status.Phase == dbaasv1alpha1.AvailablePhase
+				return tmpClusterVersion.Status.Phase == dbaasv1alpha1.AvailablePhase
 			}, timeout, interval).Should(BeTrue())
 
 			// make sure cluster is under creation

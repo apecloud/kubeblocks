@@ -19,7 +19,6 @@ package dbaas
 import (
 	"fmt"
 	"strings"
-	"text/template"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -32,11 +31,6 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
-
-type secretDataConfig struct {
-	Username string
-	Password string
-}
 
 // SecretMapStore is a cache, recording all (key, secret) pair for accounts to be created.
 type secretMapStore struct {
@@ -135,7 +129,7 @@ func (r *systemAccountExpectationsManager) createExpectation(key string) (*syste
 		return exp, nil
 	}
 
-	exp = &systemAccountExpectation{toCreate: 0, key: key}
+	exp = &systemAccountExpectation{toCreate: dbaasv1alpha1.KBAccountInvalid, key: key}
 	err = r.Add(exp)
 	return exp, err
 }
@@ -196,22 +190,20 @@ func newCustomizedEngine(execConfig *dbaasv1alpha1.CmdExecutorConfig, dbcluster 
 	}
 }
 
-func replaceEnvsValues(clusterName string, sysAccounts *dbaasv1alpha1.SystemAccountSpec) {
-	replceNamedVars := func(namedValues map[string]string, needle string, limits int, matchAll bool) string {
-		for k, v := range namedValues {
-			r := strings.Replace(needle, k, v, limits)
-			// early termination on matching, when matchAll = false
-			if r != needle && !matchAll {
-				return r
-			}
-			needle = r
+func replceNamedVars(namedValues map[string]string, needle string, limits int, matchAll bool) string {
+	for k, v := range namedValues {
+		r := strings.Replace(needle, k, v, limits)
+		// early termination on matching, when matchAll = false
+		if r != needle && !matchAll {
+			return r
 		}
-		return needle
+		needle = r
 	}
+	return needle
+}
 
+func replaceEnvsValues(clusterName string, sysAccounts *dbaasv1alpha1.SystemAccountSpec) {
 	namedValues := getEnvReplacementMapForConnCrential(clusterName)
-	namedValuesInStmts := getEnvReplacementMapForAccount()
-
 	// replace systemAccounts.cmdExecutorConfig.env[].valueFrom.secretKeyRef.name variables
 	cmdConfig := sysAccounts.CmdExecutorConfig
 	if cmdConfig != nil {
@@ -229,19 +221,13 @@ func replaceEnvsValues(clusterName string, sysAccounts *dbaasv1alpha1.SystemAcco
 
 	accounts := sysAccounts.Accounts
 	for _, acc := range accounts {
-		switch acc.ProvisionPolicy.Type {
-		case dbaasv1alpha1.ReferToExisting:
+		if acc.ProvisionPolicy.Type == dbaasv1alpha1.ReferToExisting {
 			// replace systemAccounts.accounts[*].provisionPolciy.secretRef.name variables
 			secretRef := acc.ProvisionPolicy.SecretRef
 			name := replceNamedVars(namedValues, secretRef.Name, 1, false)
 			if name != secretRef.Name {
 				secretRef.Name = name
 			}
-		case dbaasv1alpha1.CreateByStmt:
-			// replace username and password from systemAccounts.accounts[*].provisionPolciy.statements
-			stmts := acc.ProvisionPolicy.Statements
-			stmts.CreationStatement = replceNamedVars(namedValuesInStmts, stmts.CreationStatement, -1, true)
-			stmts.DeletionStatement = replceNamedVars(namedValuesInStmts, stmts.DeletionStatement, -1, true)
 		}
 	}
 }
@@ -312,29 +298,14 @@ func renderJob(engine *customizedEngine, namespace, clusterName, clusterDefType,
 	return job
 }
 
-func renderStmt(tpl string, config secretDataConfig) (string, error) {
-	tmpl, err := template.New("secret-tmpl").Parse(tpl)
-	if err != nil {
-		return "", err
-	}
-
-	var buf strings.Builder
-	err = tmpl.Execute(&buf, config)
-	if err != nil {
-		return "nil", err
-	}
-	return buf.String(), nil
-
-}
-
-func renderSecretWithPwd(namespace, clusterName, clusterDefType, clusterDefName, compName, username string, config secretDataConfig) *corev1.Secret {
+func renderSecretWithPwd(namespace, clusterName, clusterDefType, clusterDefName, compName, username, passwd string) *corev1.Secret {
 	secretData := map[string][]byte{}
-	secretData[accountNameForSecret] = []byte(config.Username)
-	secretData[accountPasswdForSecret] = []byte(config.Password)
+	secretData[accountNameForSecret] = []byte(username)
+	secretData[accountPasswdForSecret] = []byte(passwd)
 
 	ml := getLabelsForSecretsAndJobs(clusterName, clusterDefType, clusterDefName, compName)
-	ml[clusterAccountLabelKey] = config.Username
-	return renderSecret(namespace, clusterName, compName, config.Username, ml, secretData)
+	ml[clusterAccountLabelKey] = username
+	return renderSecret(namespace, clusterName, compName, username, ml, secretData)
 }
 
 func renderSecretByCopy(namespace, clusterName, clusterDefType, clusterDefName, compName, username string, fromSecret *corev1.Secret) *corev1.Secret {
@@ -413,7 +384,7 @@ func getEngineType(clusterDefType string, compDef dbaasv1alpha1.ClusterDefinitio
 }
 
 func getCreationStmtForAccount(namespace, clusterName, clusterDefType, clusterDefName, compName string, passConfig dbaasv1alpha1.PasswordConfig,
-	accountConfig dbaasv1alpha1.SystemAccountConfig) ([]string, *corev1.Secret, error) {
+	accountConfig dbaasv1alpha1.SystemAccountConfig) ([]string, *corev1.Secret) {
 	// generated password with mixedcases = true
 	passwd, _ := password.Generate((int)(passConfig.Length), (int)(passConfig.NumDigits), (int)(passConfig.NumSymbols), false, false)
 	// refine pasword to upper or lower cases w.r.t configuration
@@ -425,25 +396,19 @@ func getCreationStmtForAccount(namespace, clusterName, clusterDefType, clusterDe
 	}
 
 	userName := (string)(accountConfig.Name)
-	config := secretDataConfig{
-		Username: userName,
-		Password: passwd,
-	}
+
+	namedVars := getEnvReplacementMapForAccount(userName, passwd)
 
 	creationStmt := make([]string, 0)
 	// drop if exists + create if not exists
 	statements := accountConfig.ProvisionPolicy.Statements
-	stmt, err := renderStmt(statements.DeletionStatement, config)
-	if err != nil {
-		return nil, nil, err
-	}
+	stmt := replceNamedVars(namedVars, statements.DeletionStatement, -1, true)
+
+	creationStmt = append(creationStmt, stmt)
+	stmt = replceNamedVars(namedVars, statements.CreationStatement, -1, true)
+
 	creationStmt = append(creationStmt, stmt)
 
-	stmt, err = renderStmt(statements.CreationStatement, config)
-	if err != nil {
-		return nil, nil, err
-	}
-	creationStmt = append(creationStmt, stmt)
-	secret := renderSecretWithPwd(namespace, clusterName, clusterDefType, clusterDefName, compName, userName, config)
-	return creationStmt, secret, nil
+	secret := renderSecretWithPwd(namespace, clusterName, clusterDefType, clusterDefName, compName, userName, passwd)
+	return creationStmt, secret
 }

@@ -17,9 +17,9 @@ limitations under the License.
 package dbaas
 
 import (
+	"strings"
 	"testing"
 
-	"github.com/sethvargo/go-password/password"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -93,8 +93,8 @@ func mockCluster(clusterDefName, appVerName, typeName, clusterName string, repli
 			Name:      clusterName,
 		},
 		Spec: dbaasv1alpha1.ClusterSpec{
-			AppVersionRef: appVerName,
-			ClusterDefRef: clusterDefName,
+			ClusterVersionRef: appVerName,
+			ClusterDefRef:     clusterDefName,
 			Components: []dbaasv1alpha1.ClusterComponent{
 				{
 					Name:     typeName,
@@ -110,14 +110,14 @@ func mockCluster(clusterDefName, appVerName, typeName, clusterName string, repli
 
 func privateSetup() (*dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.Cluster, error) {
 	var (
-		clusterDefName = "myclusterdef"
-		appversionName = "myappversion"
-		clusterType    = " state.mysql-8"
-		typeName       = "mycomponent"
-		clusterName    = "mycluster"
+		clusterDefName     = "myclusterdef"
+		ClusterVersionName = "myClusterVersion"
+		clusterType        = " state.mysql-8"
+		typeName           = "mycomponent"
+		clusterName        = "mycluster"
 	)
 	clusterDef := mockClusterDefinition(clusterDefName, clusterType, typeName)
-	cluster := mockCluster(clusterDefName, appversionName, typeName, clusterName, 3)
+	cluster := mockCluster(clusterDefName, ClusterVersionName, typeName, clusterName, 3)
 	return clusterDef, cluster, nil
 }
 
@@ -208,32 +208,22 @@ func TestRenderJob(t *testing.T) {
 	}
 
 	engine := newCustomizedEngine(cmdExecutorConfig, cluster, cluster.Spec.Components[0].Name)
-	for _, comp := range clusterDef.Spec.Components {
-		var creationStmt []string
-		var stmt string
-		config := comp.SystemAccounts.Accounts
-		passwd, _ := password.Generate(6, 0, 0, false, false)
-		for _, acc := range config {
-			secretConfig := secretDataConfig{
-				Username: string(acc.Name),
-				Password: passwd,
-			}
-			policyStmt := acc.ProvisionPolicy.Statements
-			stmt, _ = renderStmt(policyStmt.DeletionStatement, secretConfig)
-			creationStmt = append(creationStmt, stmt)
+	accountsSetting := clusterDef.Spec.Components[0].SystemAccounts
+	for _, acc := range accountsSetting.Accounts {
+		creationStmt, secrets := getCreationStmtForAccount(cluster.Namespace, cluster.Name, clusterDef.Spec.Type, clusterDef.Name,
+			cluster.Spec.Components[0].Name, accountsSetting.PasswordConfig, acc)
+		assert.NotNil(t, secrets)
 
-			stmt, _ = renderStmt(policyStmt.CreationStatement, secretConfig)
-			creationStmt = append(creationStmt, stmt)
-
-			secret := renderSecretWithPwd(cluster.Namespace, cluster.Name, clusterDef.Spec.Type, clusterDef.Name, cluster.Spec.Components[0].Name, (string)(dbaasv1alpha1.AdminAccount), secretConfig)
-			assert.NotNil(t, secret)
-
-			secretCpy := renderSecretByCopy(cluster.Namespace, cluster.Name, clusterDef.Spec.Type, clusterDef.Name, cluster.Spec.Components[0].Name, (string)(dbaasv1alpha1.AdminAccount), secret)
-			assert.NotNil(t, secretCpy)
-			assert.Equal(t, secret.Data, secretCpy.Data)
+		for _, stmt := range creationStmt {
+			assert.False(t, strings.Contains(stmt, "$(USERNAME)"))
+			assert.False(t, strings.Contains(stmt, "$(PASSWD)"))
 		}
-		job := renderJob(engine, cluster.Namespace, cluster.Name, clusterDef.Spec.Type, clusterDef.Name, cluster.Spec.Components[0].Name, (string)(dbaasv1alpha1.AdminAccount), creationStmt, "10.0.0.1")
-		assert.NotNil(t, job)
-	}
 
+		job := renderJob(engine, cluster.Namespace, cluster.Name, clusterDef.Spec.Type,
+			clusterDef.Name, cluster.Spec.Components[0].Name, string(acc.Name), creationStmt, "10.0.0.1")
+		assert.NotNil(t, job)
+		envList := job.Spec.Template.Spec.Containers[0].Env
+		assert.GreaterOrEqual(t, len(envList), 1)
+		assert.Equal(t, job.Spec.Template.Spec.Containers[0].Image, cmdExecutorConfig.Image)
+	}
 }

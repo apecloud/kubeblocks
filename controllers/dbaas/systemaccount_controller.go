@@ -36,6 +36,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	"github.com/go-logr/logr"
+
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -54,12 +56,14 @@ type SystemAccountReconciler struct {
 type backupPolicyChangePredicate struct {
 	predicate.Funcs
 	ExpectionManager *systemAccountExpectationsManager
+	Log              logr.Logger
 }
 
 // jobCompleditionPredicate implements a default delete predicate function on job deletion.
-type jobCompleditionPredicate struct {
+type jobCompletitionPredicate struct {
 	predicate.Funcs
 	reconciler *SystemAccountReconciler
+	Log        logr.Logger
 }
 
 // SysAccountDeletion and SysAccountCreation are used as event reasons.
@@ -85,7 +89,7 @@ const (
 var _ predicate.Predicate = &backupPolicyChangePredicate{}
 
 // predidates on Delete event from Job CR
-var _ predicate.Predicate = &jobCompleditionPredicate{}
+var _ predicate.Predicate = &jobCompletitionPredicate{}
 
 // SystemAccountController does not a cresponding resource, but wathes the create/delete/update of resource like cluster,
 // clusterdefinition, backuppolicy, jobs, secrets
@@ -159,7 +163,11 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			// expectations: collect extra accounts, trigger by other recources, to be created
 			// TODO: @shanshan. This part should be updated when BackupPolicy API is updated in the future.
 			charKey := expectationKey(cluster.Namespace, cluster.Name, engineType)
-			if charExpect, charExists, _ := r.ExpectionManager.getExpectation(charKey); charExists {
+			charExpect, charExists, err := r.ExpectionManager.getExpectation(charKey)
+			if err != nil {
+				return err
+			}
+			if charExists {
 				charToCreate := charExpect.getExpectation()
 				toCreate |= charToCreate
 			}
@@ -249,10 +257,10 @@ func (r *SystemAccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Secret{}).
 		Watches(&source.Kind{Type: &dataprotectionv1alpha1.BackupPolicy{}},
 			handler.EnqueueRequestsFromMapFunc(r.findClusterForBackupPolicy),
-			builder.WithPredicates(&backupPolicyChangePredicate{ExpectionManager: r.ExpectionManager})).
+			builder.WithPredicates(&backupPolicyChangePredicate{ExpectionManager: r.ExpectionManager, Log: log.FromContext(context.TODO())})).
 		Watches(&source.Kind{Type: &batchv1.Job{}},
 			&handler.EnqueueRequestForObject{},
-			builder.WithPredicates(&jobCompleditionPredicate{reconciler: r})).
+			builder.WithPredicates(&jobCompletitionPredicate{reconciler: r, Log: log.FromContext(context.TODO())})).
 		Complete(r)
 }
 
@@ -268,11 +276,8 @@ func (r *SystemAccountReconciler) createByStmt(reqCtx intctrlutil.RequestCtx,
 	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
 	policy := account.ProvisionPolicy
 
-	stmts, secret, err := getCreationStmtForAccount(reqCtx.Req.Namespace, reqCtx.Req.Name, clusterDefType, clusterDefName,
+	stmts, secret := getCreationStmtForAccount(reqCtx.Req.Namespace, reqCtx.Req.Name, clusterDefType, clusterDefName,
 		compName, compDef.SystemAccounts.PasswordConfig, account)
-	if err != nil {
-		return err
-	}
 
 	uprefErr := controllerutil.SetOwnerReference(cluster, secret, scheme)
 	if uprefErr != nil {
@@ -299,13 +304,13 @@ func (r *SystemAccountReconciler) createByReferingToExisting(reqCtx intctrlutil.
 	secret := &corev1.Secret{}
 	secretRef := account.ProvisionPolicy.SecretRef
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: secretRef.Namespace, Name: secretRef.Name}, secret); err != nil {
-		reqCtx.Log.Error(err, "Failed to find secret %s", secretRef.Name)
+		reqCtx.Log.Error(err, "Failed to find secret", "secret", secretRef.Name)
 		return err
 	}
 	// and make a copy of it
 	newSecret := renderSecretByCopy(reqCtx.Req.Namespace, reqCtx.Req.Name, clusterDefType, clusterDefName, compName, (string)(account.Name), secret)
 	if err := r.Client.Create(reqCtx.Ctx, newSecret); err != nil {
-		reqCtx.Log.Error(err, "Failed to create secret %s", newSecret.Name)
+		reqCtx.Log.Error(err, "Failed to find secret", "secret", newSecret.Name)
 		return err
 	}
 	return nil
@@ -413,9 +418,16 @@ func (r *backupPolicyChangePredicate) Create(e event.CreateEvent) bool {
 
 	if clusterName, exists := ml[intctrlutil.AppInstanceLabelKey]; exists {
 		key := expectationKey(backupPolicy.Namespace, clusterName, databaseEngine)
-		expect, exists, _ := r.ExpectionManager.getExpectation(key)
+		expect, exists, err := r.ExpectionManager.getExpectation(key)
+		if err != nil {
+			r.Log.Error(err, "failed to get expectation for BackupPolicy by key", "BackupPolicy key", key)
+			return false
+		}
 		if !exists {
-			expect, _ = r.ExpectionManager.createExpectation(key)
+			expect, err = r.ExpectionManager.createExpectation(key)
+			if err != nil {
+				r.Log.Error(err, "failed to create expectation for BackupPolicy by key", "BackupPolicy key", key)
+			}
 		}
 		expect.set(dbaasv1alpha1.KBAccountDataprotection)
 		return true
@@ -441,7 +453,10 @@ func (r *backupPolicyChangePredicate) Delete(e event.DeleteEvent) bool {
 
 		if clusterName, exists := ml[intctrlutil.AppInstanceLabelKey]; exists {
 			key := expectationKey(backupPolicy.Namespace, clusterName, databaseEngine)
-			_ = r.ExpectionManager.deleteExpectation(key)
+			err := r.ExpectionManager.deleteExpectation(key)
+			if err != nil {
+				r.Log.Error(err, "failed to delete expectation for BackupPolicy", "BackupPolicy key", key)
+			}
 		}
 		return false
 	}
@@ -449,7 +464,7 @@ func (r *backupPolicyChangePredicate) Delete(e event.DeleteEvent) bool {
 
 // Delete implements default DeleteEvent filter on job deletion.
 // If the job for creating account completes successfully, corresponding secret will be created.
-func (r *jobCompleditionPredicate) Delete(e event.DeleteEvent) bool {
+func (r *jobCompletitionPredicate) Delete(e event.DeleteEvent) bool {
 	if e.Object == nil {
 		return false
 	}
@@ -475,7 +490,11 @@ func (r *jobCompleditionPredicate) Delete(e event.DeleteEvent) bool {
 				// job for cluster-component-account succeeded
 				// create secret for this account
 				key := concatSecretName(job.Namespace, clusterName, componentName, accountName)
-				entry, ok, _ := r.reconciler.SecretMapStore.getSecret(key)
+				entry, ok, err := r.reconciler.SecretMapStore.getSecret(key)
+				if err != nil {
+					r.Log.Error(err, "failed to get secret by key", "secret key", key)
+					return false
+				}
 				if !ok {
 					return false
 				}
@@ -487,7 +506,9 @@ func (r *jobCompleditionPredicate) Delete(e event.DeleteEvent) bool {
 							"Created Accounts for cluster: %s, component: %s, accounts: %s", cluster.Name, componentName, accountName)
 					}
 					// delete secret from cache store
-					_ = r.reconciler.SecretMapStore.deleteSecret(key)
+					if err = r.reconciler.SecretMapStore.deleteSecret(key); err != nil {
+						r.Log.Error(err, "failed to delete secret by key", "secret key", key)
+					}
 					break
 				}
 			}

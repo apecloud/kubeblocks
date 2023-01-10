@@ -283,9 +283,9 @@ func getEnvReplacementMapForConnCrential(clusterName string) map[string]string {
 	}
 }
 
-func getEnvReplacementMapForAccount() map[string]string {
+func getEnvReplacementMapForAccount(name, passwd string) map[string]string {
 	return map[string]string{
-		"$(USERNAME)": "{{ .Username }}",
-		"$(PASSWD)":   "{{ .Password }}",
+		"$(USERNAME)": name,
+		"$(PASSWD)":   passwd,
 	}
 }

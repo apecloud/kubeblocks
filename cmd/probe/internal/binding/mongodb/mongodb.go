@@ -24,13 +24,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 )
 
 // MongoDB is a binding implementation for MongoDB.

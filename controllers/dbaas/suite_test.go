@@ -43,6 +43,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
@@ -146,6 +147,20 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	err = (&components.StatefulSetReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("stateful-set-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&components.DeploymentReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("deployment-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
 	err = (&k8score.StorageClassReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
@@ -192,6 +207,20 @@ func changeClusterDef(namespacedName types.NamespacedName,
 	patch := client.MergeFrom(clusterDef.DeepCopy())
 	action(clusterDef)
 	if err := k8sClient.Patch(ctx, clusterDef, patch); err != nil {
+		return err
+	}
+	return nil
+}
+
+func changeCluster(namespacedName types.NamespacedName,
+	action func(cluster *dbaasv1alpha1.Cluster)) error {
+	cluster := &dbaasv1alpha1.Cluster{}
+	if err := k8sClient.Get(ctx, namespacedName, cluster); err != nil {
+		return err
+	}
+	patch := client.MergeFrom(cluster.DeepCopy())
+	action(cluster)
+	if err := k8sClient.Patch(ctx, cluster, patch); err != nil {
 		return err
 	}
 	return nil

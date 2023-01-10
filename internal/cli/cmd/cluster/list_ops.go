@@ -20,18 +20,38 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
 
-	"github.com/apecloud/kubeblocks/internal/cli/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
+var listOpsExample = templates.Examples(`
+		# list all opsRequests
+		kbcli cluster list-ops
+
+		# list all opsRequests of specified cluster
+		kbcli cluster list-ops my-cluster`)
+
 func NewListOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	return builder.NewCmdBuilder().
-		Use("list-ops").
-		Short("List all opsRequest.").
-		Factory(f).
-		GVR(types.OpsGVR()).
-		IOStreams(streams).
-		Build(list.Build)
+	o := list.NewListOptions(f, streams, types.OpsGVR())
+	cmd := &cobra.Command{
+		Use:               "list-ops",
+		Short:             "Liat all opsRequests",
+		Aliases:           []string{"ls-ops"},
+		Example:           listOpsExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			// build label selector that used to get ops
+			o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)
+			// args are the cluster names, for ops, we only use the label selector to get ops, so resources names
+			// is not needed.
+			o.Names = nil
+			_, err := o.Run()
+			util.CheckErr(err)
+		},
+	}
+	o.AddFlags(cmd)
+	return cmd
 }

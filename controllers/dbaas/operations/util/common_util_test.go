@@ -54,14 +54,14 @@ var _ = Describe("OpsRequest Controller", func() {
 
 	Context("Test OpsRequest", func() {
 		It("Should Test all OpsRequest", func() {
-			cluster := testdbaas.CreateConsensusMysqlCluster(testCtx, clusterDefinitionName, clusterVersionName, clusterName)
+			cluster := testdbaas.CreateConsensusMysqlCluster(ctx, testCtx, clusterDefinitionName, clusterVersionName, clusterName)
 			By("init restart OpsRequest")
 			testOpsName := "restart-" + randomStr
 			ops := testdbaas.GenerateOpsRequestObj(testOpsName, clusterName, dbaasv1alpha1.RestartType)
 			ops.Spec.RestartList = []dbaasv1alpha1.ComponentOps{
 				{ComponentName: testdbaas.ConsensusComponentName},
 			}
-			ops = testdbaas.CreateOpsRequest(testCtx, ops)
+			testdbaas.CreateOpsRequest(ctx, testCtx, ops)
 
 			By("test PatchOpsRequestReconcileAnnotation function")
 			Expect(PatchOpsRequestReconcileAnnotation(ctx, k8sClient, cluster, testOpsName)).Should(Succeed())

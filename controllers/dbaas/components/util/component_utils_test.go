@@ -167,10 +167,10 @@ var _ = Describe("Consensus Component", func() {
 	Context("Consensus Component test", func() {
 		It("Consensus Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			_, _, cluster := testdbaas.InitConsensusMysql(testCtx, clusterDefName, clusterVersionName, clusterName)
-			sts := testdbaas.MockConsensusComponentStatefulSet(testCtx, clusterName)
+			_, _, cluster := testdbaas.InitConsensusMysql(ctx, testCtx, clusterDefName, clusterVersionName, clusterName)
+			sts := testdbaas.MockConsensusComponentStatefulSet(ctx, testCtx, clusterName)
 			if !testCtx.UsingExistingCluster() {
-				_ = testdbaas.MockConsensusComponentPods(testCtx, clusterName)
+				_ = testdbaas.MockConsensusComponentPods(ctx, testCtx, clusterName)
 			} else {
 				timeout = 3 * timeout
 			}

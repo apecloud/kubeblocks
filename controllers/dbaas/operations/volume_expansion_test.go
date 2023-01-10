@@ -182,7 +182,7 @@ spec:
 		Expect(k8sClient.Status().Patch(ctx, clusterObject, patch)).Should(Succeed())
 
 		// create opsRequest
-		ops = testdbaas.CreateOpsRequest(testCtx, ops)
+		ops = testdbaas.CreateOpsRequest(ctx, testCtx, ops)
 
 		By("mock do operation on cluster")
 		mockDoOperationOnCluster(clusterObject, ops.Name, dbaasv1alpha1.VolumeExpandingPhase)
@@ -209,7 +209,7 @@ spec:
 		opsRes.OpsRequest = newOps
 		_, err := GetOpsManager().Reconcile(opsRes)
 		Expect(err == nil).Should(BeTrue())
-		Eventually(testdbaas.GetOpsRequestCompPhase(testCtx, newOps.Name, testdbaas.ConsensusComponentName),
+		Eventually(testdbaas.GetOpsRequestCompPhase(ctx, testCtx, newOps.Name, testdbaas.ConsensusComponentName),
 			timeout, interval).Should(Equal(dbaasv1alpha1.VolumeExpandingPhase))
 	}
 
@@ -237,7 +237,7 @@ spec:
 		pvcEventHandler := PersistentVolumeClaimEventHandler{}
 		reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 		Expect(pvcEventHandler.Handle(k8sClient, reqCtx, eventRecorder, event)).Should(Succeed())
-		Eventually(testdbaas.GetOpsRequestCompPhase(testCtx, newOps.Name, testdbaas.ConsensusComponentName), timeout, interval).Should(Equal(dbaasv1alpha1.VolumeExpandingPhase))
+		Eventually(testdbaas.GetOpsRequestCompPhase(ctx, testCtx, newOps.Name, testdbaas.ConsensusComponentName), timeout, interval).Should(Equal(dbaasv1alpha1.VolumeExpandingPhase))
 
 		// test when the event reach the conditions
 		event.Count = 5
@@ -337,13 +337,13 @@ spec:
 		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, pvc)).Should(Succeed())
 		Expect(handleVolumeExpansionWithPVC(intctrlutil.RequestCtx{Ctx: ctx}, k8sClient, pvc)).Should(Succeed())
 
-		Eventually(testdbaas.GetClusterPhase(testCtx, clusterObject.Name),
+		Eventually(testdbaas.GetClusterPhase(ctx, testCtx, clusterObject.Name),
 			timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 	}
 
 	Context("Test OpsRequest", func() {
 		It("Should Test all OpsRequest", func() {
-			_, _, clusterObject := testdbaas.InitConsensusMysql(testCtx, clusterDefinitionName, clusterVersionName, clusterName)
+			_, _, clusterObject := testdbaas.InitConsensusMysql(ctx, testCtx, clusterDefinitionName, clusterVersionName, clusterName)
 			// init storageClass
 			_ = assureDefaultStorageClassObj()
 

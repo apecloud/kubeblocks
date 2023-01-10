@@ -17,6 +17,7 @@ limitations under the License.
 package dbaas
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/onsi/gomega"
@@ -29,13 +30,13 @@ import (
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
-var (
+const (
 	StatelessComponentName = "nginx"
 	StatelessComponentType = "proxy"
 )
 
 // CreateStatelessCluster creates a cluster with a component of Stateless type for testing.
-func CreateStatelessCluster(testCtx testutil.TestContext, clusterDefName, clusterVersionName, clusterName string) *dbaasv1alpha1.Cluster {
+func CreateStatelessCluster(ctx context.Context, testCtx testutil.TestContext, clusterDefName, clusterVersionName, clusterName string) *dbaasv1alpha1.Cluster {
 	clusterBytes, err := testdata.GetTestDataFileContent("stateless/cluster.yaml")
 	if err != nil {
 		return nil
@@ -43,11 +44,11 @@ func CreateStatelessCluster(testCtx testutil.TestContext, clusterDefName, cluste
 	clusterYaml := fmt.Sprintf(string(clusterBytes), clusterVersionName, clusterDefName, clusterName, clusterVersionName, clusterDefName)
 	cluster := &dbaasv1alpha1.Cluster{}
 	gomega.Expect(yaml.Unmarshal([]byte(clusterYaml), cluster)).Should(gomega.Succeed())
-	return CreateK8sResource(testCtx, cluster).(*dbaasv1alpha1.Cluster)
+	return CreateK8sResource(ctx, testCtx, cluster).(*dbaasv1alpha1.Cluster)
 }
 
 // MockStatelessComponentDeploy mocks a deployment workload of the stateless component.
-func MockStatelessComponentDeploy(testCtx testutil.TestContext, clusterName string) *appsv1.Deployment {
+func MockStatelessComponentDeploy(ctx context.Context, testCtx testutil.TestContext, clusterName string) *appsv1.Deployment {
 	deployBytes, err := testdata.GetTestDataFileContent("stateless/deployment.yaml")
 	if err != nil {
 		return nil
@@ -56,11 +57,11 @@ func MockStatelessComponentDeploy(testCtx testutil.TestContext, clusterName stri
 	deploymentYaml := fmt.Sprintf(string(deployBytes), StatelessComponentName, clusterName, deployName, StatelessComponentName, clusterName, StatelessComponentName, clusterName)
 	deploy := &appsv1.Deployment{}
 	gomega.Expect(yaml.Unmarshal([]byte(deploymentYaml), deploy)).Should(gomega.Succeed())
-	return CreateK8sResource(testCtx, deploy).(*appsv1.Deployment)
+	return CreateK8sResource(ctx, testCtx, deploy).(*appsv1.Deployment)
 }
 
 // MockStatelessPod mocks the pods of the deployment workload.
-func MockStatelessPod(testCtx testutil.TestContext, clusterName, componentName, podName string) *corev1.Pod {
+func MockStatelessPod(ctx context.Context, testCtx testutil.TestContext, clusterName, componentName, podName string) *corev1.Pod {
 	podBytes, err := testdata.GetTestDataFileContent("stateless/deployment_pod.yaml")
 	if err != nil {
 		return nil
@@ -68,5 +69,5 @@ func MockStatelessPod(testCtx testutil.TestContext, clusterName, componentName, 
 	podYaml := fmt.Sprintf(string(podBytes), podName, componentName, clusterName)
 	pod := &corev1.Pod{}
 	gomega.Expect(yaml.Unmarshal([]byte(podYaml), pod)).Should(gomega.Succeed())
-	return CreateK8sResource(testCtx, pod).(*corev1.Pod)
+	return CreateK8sResource(ctx, testCtx, pod).(*corev1.Pod)
 }

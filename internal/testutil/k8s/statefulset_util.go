@@ -31,8 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
-var (
-	ctx           = context.Background()
+const (
 	timeout       = 10 * time.Second
 	interval      = time.Second
 	testFinalizer = "test.kubeblocks.io/finalizer"
@@ -95,7 +94,7 @@ func MockStatefulSetReady(sts *apps.StatefulSet) {
 }
 
 // DeletePodLabelKey deletes the specified label of the pod.
-func DeletePodLabelKey(testCtx testutil.TestContext, podName, labelKey string) {
+func DeletePodLabelKey(ctx context.Context, testCtx testutil.TestContext, podName, labelKey string) {
 	pod := &corev1.Pod{}
 	gomega.Expect(testCtx.Cli.Get(ctx, client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, pod)).Should(gomega.Succeed())
 	if pod.Labels == nil {
@@ -112,7 +111,7 @@ func DeletePodLabelKey(testCtx testutil.TestContext, podName, labelKey string) {
 }
 
 // UpdatePodStatusNotReady updates the pod status to make it not ready.
-func UpdatePodStatusNotReady(testCtx testutil.TestContext, podName string) {
+func UpdatePodStatusNotReady(ctx context.Context, testCtx testutil.TestContext, podName string) {
 	pod := &corev1.Pod{}
 	gomega.Expect(testCtx.Cli.Get(ctx, client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, pod)).Should(gomega.Succeed())
 	patch := client.MergeFrom(pod.DeepCopy())
@@ -126,7 +125,7 @@ func UpdatePodStatusNotReady(testCtx testutil.TestContext, podName string) {
 }
 
 // MockPodIsTerminating mock pod is terminating.
-func MockPodIsTerminating(testCtx testutil.TestContext, pod *corev1.Pod) {
+func MockPodIsTerminating(ctx context.Context, testCtx testutil.TestContext, pod *corev1.Pod) {
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Finalizers = []string{testFinalizer}
 	gomega.Expect(testCtx.Cli.Patch(ctx, pod, patch)).Should(gomega.Succeed())
@@ -139,7 +138,7 @@ func MockPodIsTerminating(testCtx testutil.TestContext, pod *corev1.Pod) {
 }
 
 // RemovePodFinalizer remove the pod finalizer to delete the pod finally.
-func RemovePodFinalizer(testCtx testutil.TestContext, pod *corev1.Pod) {
+func RemovePodFinalizer(ctx context.Context, testCtx testutil.TestContext, pod *corev1.Pod) {
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Finalizers = []string{}
 	gomega.Expect(testCtx.Cli.Patch(ctx, pod, patch)).Should(gomega.Succeed())

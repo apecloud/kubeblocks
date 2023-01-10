@@ -105,7 +105,7 @@ var _ = Describe("StatefulSet Controller", func() {
 
 	testUsingEnvTest := func(sts *appsv1.StatefulSet) {
 		By("create pod of statefulset")
-		_ = testdbaas.MockConsensusComponentPods(testCtx, clusterName)
+		_ = testdbaas.MockConsensusComponentPods(ctx, testCtx, clusterName)
 
 		By("mock restart cluster")
 		sts.Spec.Template.Annotations = map[string]string{
@@ -146,9 +146,9 @@ var _ = Describe("StatefulSet Controller", func() {
 
 	Context("test controller", func() {
 		It("test statefulSet controller", func() {
-			_, _, cluster := testdbaas.InitConsensusMysql(testCtx, clusterDefName, clusterVersionName, clusterName)
-			_ = testdbaas.CreateRestartOpsRequest(testCtx, clusterName, opsRequestName, []string{testdbaas.ConsensusComponentName})
-			sts := testdbaas.MockConsensusComponentStatefulSet(testCtx, clusterName)
+			_, _, cluster := testdbaas.InitConsensusMysql(ctx, testCtx, clusterDefName, clusterVersionName, clusterName)
+			_ = testdbaas.CreateRestartOpsRequest(ctx, testCtx, clusterName, opsRequestName, []string{testdbaas.ConsensusComponentName})
+			sts := testdbaas.MockConsensusComponentStatefulSet(ctx, testCtx, clusterName)
 			By("patch cluster to Updating")
 			patch := client.MergeFrom(cluster.DeepCopy())
 			cluster.Status.Phase = dbaasv1alpha1.UpdatingPhase

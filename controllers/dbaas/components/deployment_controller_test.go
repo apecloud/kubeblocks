@@ -69,7 +69,7 @@ var _ = Describe("Deployment Controller", func() {
 			if testCtx.UsingExistingCluster() {
 				timeout = 3 * timeout
 			}
-			cluster := testdbaas.CreateStatelessCluster(testCtx, clusterDefName, clusterVersionName, clusterName)
+			cluster := testdbaas.CreateStatelessCluster(ctx, testCtx, clusterDefName, clusterVersionName, clusterName)
 			By("patch cluster to Running")
 			componentName := "nginx"
 			patch := client.MergeFrom(cluster.DeepCopy())
@@ -84,7 +84,7 @@ var _ = Describe("Deployment Controller", func() {
 				timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 
 			By(" check component is Failed/Abnormal")
-			deploy := testdbaas.MockStatelessComponentDeploy(testCtx, clusterName)
+			deploy := testdbaas.MockStatelessComponentDeploy(ctx, testCtx, clusterName)
 			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, componentName),
 				timeout, interval).Should(Equal(dbaasv1alpha1.FailedPhase))
 

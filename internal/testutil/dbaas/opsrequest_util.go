@@ -30,7 +30,7 @@ import (
 )
 
 // CreateRestartOpsRequest creates a OpsRequest of restart type for testing.
-func CreateRestartOpsRequest(testCtx testutil.TestContext, clusterName, opsRequestName string, componentNames []string) *dbaasv1alpha1.OpsRequest {
+func CreateRestartOpsRequest(ctx context.Context, testCtx testutil.TestContext, clusterName, opsRequestName string, componentNames []string) *dbaasv1alpha1.OpsRequest {
 	opsBytes, err := testdata.GetTestDataFileContent("operations/restart.yaml")
 	if err != nil {
 		return nil
@@ -38,7 +38,7 @@ func CreateRestartOpsRequest(testCtx testutil.TestContext, clusterName, opsReque
 	opsRequestYaml := fmt.Sprintf(string(opsBytes), opsRequestName, clusterName, clusterName, componentNames)
 	ops := &dbaasv1alpha1.OpsRequest{}
 	gomega.Expect(yaml.Unmarshal([]byte(opsRequestYaml), ops)).Should(gomega.Succeed())
-	return CreateOpsRequest(testCtx, ops)
+	return CreateOpsRequest(ctx, testCtx, ops)
 }
 
 // GenerateOpsRequestObj only generates the OpsRequest Object, instead of actually creating this resource.
@@ -54,7 +54,7 @@ func GenerateOpsRequestObj(opsRequestName, clusterName string, opsType dbaasv1al
 }
 
 // CreateOpsRequest calls the api to create the OpsRequest resource.
-func CreateOpsRequest(testCtx testutil.TestContext, opsRequest *dbaasv1alpha1.OpsRequest) *dbaasv1alpha1.OpsRequest {
+func CreateOpsRequest(ctx context.Context, testCtx testutil.TestContext, opsRequest *dbaasv1alpha1.OpsRequest) *dbaasv1alpha1.OpsRequest {
 	gomega.Expect(testCtx.CreateObj(ctx, opsRequest)).Should(gomega.Succeed())
 	// wait until cluster created
 	newOps := &dbaasv1alpha1.OpsRequest{}
@@ -66,7 +66,7 @@ func CreateOpsRequest(testCtx testutil.TestContext, opsRequest *dbaasv1alpha1.Op
 }
 
 // GetOpsRequestCompPhase gets the component phase of testing OpsRequest  for verification.
-func GetOpsRequestCompPhase(testCtx testutil.TestContext, opsName, componentName string) func(g gomega.Gomega) dbaasv1alpha1.Phase {
+func GetOpsRequestCompPhase(ctx context.Context, testCtx testutil.TestContext, opsName, componentName string) func(g gomega.Gomega) dbaasv1alpha1.Phase {
 	return func(g gomega.Gomega) dbaasv1alpha1.Phase {
 		tmpOps := &dbaasv1alpha1.OpsRequest{}
 		g.Expect(testCtx.Cli.Get(ctx, client.ObjectKey{Name: opsName,
@@ -80,7 +80,7 @@ func GetOpsRequestCompPhase(testCtx testutil.TestContext, opsName, componentName
 }
 
 // GetOpsRequestPhase gets the testing opsRequest phase for verification.
-func GetOpsRequestPhase(testCtx testutil.TestContext, opsName string) func(g gomega.Gomega) dbaasv1alpha1.Phase {
+func GetOpsRequestPhase(ctx context.Context, testCtx testutil.TestContext, opsName string) func(g gomega.Gomega) dbaasv1alpha1.Phase {
 	return func(g gomega.Gomega) dbaasv1alpha1.Phase {
 		tmpOps := &dbaasv1alpha1.OpsRequest{}
 		g.Expect(testCtx.Cli.Get(ctx, client.ObjectKey{Name: opsName, Namespace: testCtx.DefaultNamespace},

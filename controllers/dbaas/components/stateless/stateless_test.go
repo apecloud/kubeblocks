@@ -66,8 +66,8 @@ var _ = Describe("Stateful Component", func() {
 	Context("Stateless Component test", func() {
 		It("Stateless Component test", func() {
 			By(" init cluster, deployment")
-			cluster := testdbaas.CreateStatelessCluster(testCtx, clusterDefName, clusterVersionName, clusterName)
-			deploy := testdbaas.MockStatelessComponentDeploy(testCtx, clusterName)
+			cluster := testdbaas.CreateStatelessCluster(ctx, testCtx, clusterDefName, clusterVersionName, clusterName)
+			deploy := testdbaas.MockStatelessComponentDeploy(ctx, testCtx, clusterName)
 			statelessComponent := NewStateless(ctx, k8sClient, cluster)
 
 			By("test pods are not ready")
@@ -112,7 +112,7 @@ var _ = Describe("Stateful Component", func() {
 
 			By("test pod is ready")
 			podName := "nginx-" + randomStr
-			pod := testdbaas.MockStatelessPod(testCtx, clusterName, componentName, podName)
+			pod := testdbaas.MockStatelessPod(ctx, testCtx, clusterName, componentName, podName)
 			lastTransTime := metav1.NewTime(time.Now().Add(-1 * (intctrlutil.DefaultMinReadySeconds + 1) * time.Second))
 			testk8s.MockPodAvailable(pod, lastTransTime)
 			Expect(statelessComponent.PodIsAvailable(pod, intctrlutil.DefaultMinReadySeconds)).Should(BeTrue())

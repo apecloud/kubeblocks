@@ -97,9 +97,9 @@ var _ = Describe("Consensus Component", func() {
 	Context("Consensus Component test", func() {
 		It("Consensus Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			clusterDef, _, cluster := testdbaas.InitConsensusMysql(testCtx, clusterDefName, clusterVersionName, clusterName)
+			clusterDef, _, cluster := testdbaas.InitConsensusMysql(ctx, testCtx, clusterDefName, clusterVersionName, clusterName)
 
-			sts := testdbaas.MockConsensusComponentStatefulSet(testCtx, clusterName)
+			sts := testdbaas.MockConsensusComponentStatefulSet(ctx, testCtx, clusterName)
 			componentName := testdbaas.ConsensusComponentName
 			typeName := util.GetComponentTypeName(*cluster, componentName)
 			componentDef := util.GetComponentDefFromClusterDefinition(clusterDef, typeName)
@@ -134,15 +134,15 @@ var _ = Describe("Consensus Component", func() {
 				Expect(requeue == false).Should(BeTrue())
 				validateComponentStatus()
 			} else {
-				podList := testdbaas.MockConsensusComponentPods(testCtx, clusterName)
+				podList := testdbaas.MockConsensusComponentPods(ctx, testCtx, clusterName)
 				By("test pod is not available")
 				Expect(consensusComponent.PodIsAvailable(podList[0], intctrlutil.DefaultMinReadySeconds)).Should(BeTrue())
 
 				By("test handle probe timed out")
 				mockClusterStatusProbeTimeout(cluster)
 				// mock leader pod is not ready
-				testk8s.UpdatePodStatusNotReady(testCtx, podName)
-				testk8s.DeletePodLabelKey(testCtx, podName, intctrlutil.ConsensusSetRoleLabelKey)
+				testk8s.UpdatePodStatusNotReady(ctx, testCtx, podName)
+				testk8s.DeletePodLabelKey(ctx, testCtx, podName, intctrlutil.ConsensusSetRoleLabelKey)
 				requeue, _ := consensusComponent.HandleProbeTimeoutWhenPodsReady()
 				Expect(requeue == false).Should(BeTrue())
 				validateComponentStatus()

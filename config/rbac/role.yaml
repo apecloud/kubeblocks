@@ -70,6 +70,7 @@ rules:
   resources:
   - cronjobs/finalizers
   verbs:
+  - patch
   - update
 - apiGroups:
   - batch

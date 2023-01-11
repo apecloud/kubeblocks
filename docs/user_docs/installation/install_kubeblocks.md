@@ -36,6 +36,8 @@ To enable database monitoring by default, set `--monitor=true` and run the follo
 kbcli kubeblocks install --monitor=true
 ```
 
+> Note:
+> You can use `--version` to specify the version of KubeBlocks. Find the latest version of KubeBlocks on the [Release](https://github.com/apecloud/kubeblocks/releases) page.
 
 ## Uninstall KubeBlocks
 

@@ -40,7 +40,7 @@ kbcli kubeblocks install
 ```
 
 > Note:
-> You can use `--version` to specify the version of KubeBlocks. Fins the latest version of KubeBlocks on the [Release](https://github.com/apecloud/kubeblocks/releases) page.
+> You can use `--version` to specify the version of KubeBlocks. Find the latest version of KubeBlocks on the [Release](https://github.com/apecloud/kubeblocks/releases) page.
 
 
 ## Step 3. Create a single-node MySQL cluster

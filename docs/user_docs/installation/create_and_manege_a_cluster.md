@@ -10,13 +10,13 @@ Run this command to create a cluster.
 kbcli cluster create NAME [flags]
 ```
 
-| **Flag**             |  **Default**              |  **Description**                          |
-| :--                  | :--                       |  :--                                      |
-| cluster-definition   | wesql-clusterdefintiion   | The quoted `ClusterDefinition`.           |
-| app-version          | wesql-appersion-8.0.30    | The default value is the latest version of WeSQL. It will change when a new version is released. |
-| termination-policy   | Halt                      | The halt strategy.                        |
-| components           | N/A                       | It specifies the path of the YAML file and is used to configure `component`. |
-<!--| class                | N/A                       | The smallest class is set as the defalut. |
+| **Flag**             |  **Default**  |  **Description**                                                             |
+| :--                  | :--           |  :--                                                                         |
+| cluster-definition   | N/A           | It is required. It refers to the quoted `ClusterDefinition`.                 |
+| cluster-version      | N/A           | It is required. It refers to the version applied to the cluster.             |
+| termination-policy   | N/A           | It is required. It refers to the termination policy.                         |
+| components           | N/A           | It specifies the path of the YAML file and is used to configure `component`. |
+<!--| class            | N/A           | The smallest class is set as the default.                                    |
 
 > **Note**
 > `class` stands for the built-in specifications, including resource and node amount. But this feature is not supported.-->
@@ -50,7 +50,7 @@ Here is an example of how to create a KubeBlocks cluster using a YAML file.
     ```
 
   > **Note:**
-  > You can specify the engine type and version by adding `--cluster-definition` and `--app-version` flags. For example,
+  > You can specify the engine type and version by adding `--cluster-definition` and `--cluster-version` flags. For example,
   >
   > ```
   > kbcli cluster create ac-cluster --cluster-definition=apecloud-wesql  --cluster-version=wesql-8.0.30 --components=mycluster.yaml --termination-policy=WipeOut
@@ -91,8 +91,7 @@ kbcli cluster list [flags]
 | **Flag**     |  **Default**  |  **Description**                               |
 | :--          | :--           |  :--                                           |
 | -A           | N/A           | Get the data in all namespaces.                |
-| -o           | N/A           | Set the output format. `YAML`, `JSON`, and `Wide` are supported. |
-| --no-headers | False         | The system does not output header information. |
+| -o           | table         | Set the output format. `table`, `YAML`, `JSON`, and `Wide` are supported. |
 
 ## Connect to a cluster
 
@@ -105,13 +104,13 @@ kbcli cluster connnect NAME
 You can use the option, `-i`, to specify an instance name. For example, 
 
 ```
-kbcli cluster connect -i mycluster-0
+kbcli cluster connect -i ac-cluster-0
 ```
 
 Run the command below to view the instance list.
 
 ```
-kbcli cluster list-instances mycluster
+kbcli cluster list-instances ac-cluster
 ```
 
 ## Restart a cluster
@@ -124,10 +123,10 @@ kbcli cluster restart NAME
 
 ## Upgrade a cluster
 
-Specify an appversion by using the option `--app-version` and upgrade the cluster to this version. For more options information, see [`kbcli cluster upgrade`](../cli/kbcli_cluster_upgrade.md).
+Specify a cluster version by using the option `--cluster-version` and upgrade the cluster to this version. For more options information, see [`kbcli cluster upgrade`](../cli/kbcli_cluster_upgrade.md).
 
 ```
-kbcli cluster upgrade NAME --app-version=<AppVersionName>
+kbcli cluster upgrade NAME --cluster-version=<ClusterVersionName>
 ```
 
 ## Vertically scale a cluster
@@ -137,8 +136,8 @@ Specify your requirements by using options to scale up a cluster. For more optio
 _Example_
 
 ```
-kbcli cluster vertical-scaling wesql-demo \
---component-names="replicasets" \
+kbcli cluster vertical-scaling ac-cluster \
+--component-names="ac-mysql" \
 --requests.memory="300Mi" --requests.cpu="0.3" \
 --limits.memory="500Mi" --limits.cpu="0.5"
 ```
@@ -154,9 +153,9 @@ Specify a cluster and its role group by using options to scale out this cluster.
 _Example_
 
 ```
-kbcli cluster horizontal-scaling wesql-demo \
- --component-names="replicasets" \
- --role-group-names="primary" --replicas=3
+kbcli cluster horizontal-scaling ac-cluster \
+--component-names="ac-mysql" \
+--role-group-names="primary" --replicas=3
 ```
 
 ## Expand the cluster volume
@@ -170,7 +169,8 @@ Run `kbcli cluster volume-expansion` to expand the cluster volume. For more opti
 _Example_
 
 ```
-kbcli cluster volume-expansion wesql-demo --component-names="replicasets" \
+kbcli cluster volume-expansion ac-cluster\ 
+--component-names="ac-mysql" \
 --vct-names="data" --storage="2Gi"
 ```
 

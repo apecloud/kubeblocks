@@ -49,7 +49,7 @@ func (r restartOpsHandler) ActionStartedCondition(opsRequest *dbaasv1alpha1.OpsR
 	return dbaasv1alpha1.NewRestartingCondition(opsRequest)
 }
 
-// Action restart components by updating StatefulSet.
+// Action restarts components by updating StatefulSet.
 func (r restartOpsHandler) Action(opsRes *OpsResource) error {
 	if opsRes.OpsRequest.Status.StartTimestamp.IsZero() {
 		return fmt.Errorf("status.startTimestamp can not be null")
@@ -61,7 +61,7 @@ func (r restartOpsHandler) Action(opsRes *OpsResource) error {
 	return restartStatefulSet(opsRes, componentNameMap)
 }
 
-// ReconcileAction it will be performed when action is done and loops util OpsRequest.status.phase is Succeed/Failed.
+// ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for volume expansion opsRequest.
 func (r restartOpsHandler) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error) {
 	return ReconcileActionWithComponentOps(opsRes, "restart", handleComponentStatusProgress)
@@ -78,7 +78,7 @@ func (r restartOpsHandler) SaveLastConfiguration(opsRes *OpsResource) error {
 	return nil
 }
 
-// restartStatefulSet restart statefulSet workload
+// restartStatefulSet restarts statefulSet workload
 func restartStatefulSet(opsRes *OpsResource, componentNameMap map[string]struct{}) error {
 	var (
 		statefulSetList = &appv1.StatefulSetList{}
@@ -101,7 +101,7 @@ func restartStatefulSet(opsRes *OpsResource, componentNameMap map[string]struct{
 	return nil
 }
 
-// restartDeployment restart deployment workload
+// restartDeployment restarts deployment workload
 func restartDeployment(opsRes *OpsResource, componentNameMap map[string]struct{}) error {
 	var (
 		deploymentList = &appv1.DeploymentList{}
@@ -124,7 +124,7 @@ func restartDeployment(opsRes *OpsResource, componentNameMap map[string]struct{}
 	return nil
 }
 
-// isRestarted check whether the component has been restarted
+// isRestarted checks whether the component has been restarted
 func isRestarted(opsRes *OpsResource, object client.Object, componentNameMap map[string]struct{}, podTemplate *corev1.PodTemplateSpec) bool {
 	cName := object.GetLabels()[intctrlutil.AppComponentLabelKey]
 	if _, ok := componentNameMap[cName]; !ok {

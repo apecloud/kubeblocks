@@ -68,7 +68,7 @@ func (stateful *Stateful) HandleProbeTimeoutWhenPodsReady() (bool, error) {
 	return false, nil
 }
 
-func (stateful *Stateful) CalculatePhaseWhenPodsNotReady(componentName string) (dbaasv1alpha1.Phase, error) {
+func (stateful *Stateful) GetPhaseWhenPodsNotReady(componentName string) (dbaasv1alpha1.Phase, error) {
 	var (
 		isFailed          = true
 		isAbnormal        bool

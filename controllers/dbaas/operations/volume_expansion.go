@@ -62,7 +62,7 @@ func (ve volumeExpansionOpsHandler) ActionStartedCondition(opsRequest *dbaasv1al
 	return dbaasv1alpha1.NewVolumeExpandingCondition(opsRequest)
 }
 
-// Action Modify Cluster.spec.components[*].VolumeClaimTemplates[*].spec.resources
+// Action modifies Cluster.spec.components[*].VolumeClaimTemplates[*].spec.resources
 func (ve volumeExpansionOpsHandler) Action(opsRes *OpsResource) error {
 	var (
 		volumeExpansionMap = opsRes.OpsRequest.CovertVolumeExpansionListToMap()
@@ -90,7 +90,7 @@ func (ve volumeExpansionOpsHandler) Action(opsRes *OpsResource) error {
 	return opsRes.Client.Update(opsRes.Ctx, opsRes.Cluster)
 }
 
-// ReconcileAction it will be performed when action is done and loops util OpsRequest.status.phase is Succeed/Failed.
+// ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for volume expansion opsRequest.
 func (ve volumeExpansionOpsHandler) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error) {
 	var (

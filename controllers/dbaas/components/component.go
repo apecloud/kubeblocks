@@ -33,7 +33,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// NewComponentByType new a component object by cluster, clusterDefinition and componentName
+// NewComponentByType news a component object by cluster, clusterDefinition and componentName
 func NewComponentByType(
 	ctx context.Context,
 	cli client.Client,
@@ -51,7 +51,7 @@ func NewComponentByType(
 	return nil
 }
 
-// handleComponentStatusAndSyncCluster handle component status. if the component status changed, sync cluster.status.components
+// handleComponentStatusAndSyncCluster handles component status. if the component status changed, sync cluster.status.components
 func handleComponentStatusAndSyncCluster(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	obj client.Object,
@@ -92,7 +92,7 @@ func handleComponentStatusAndSyncCluster(reqCtx intctrlutil.RequestCtx,
 	return requeueAfter, opsutil.MarkRunningOpsRequestAnnotation(reqCtx.Ctx, cli, cluster)
 }
 
-// patchClusterComponentStatus patch Cluster.status.component status
+// patchClusterComponentStatus patches Cluster.status.component status
 func patchClusterComponentStatus(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
@@ -109,7 +109,7 @@ func patchClusterComponentStatus(reqCtx intctrlutil.RequestCtx,
 	return cli.Status().Patch(reqCtx.Ctx, cluster, patch)
 }
 
-// NeedSyncStatusComponents Determine whether the component status needs to be modified
+// NeedSyncStatusComponents Determines whether the component status needs to be modified
 func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
 	component types.Component,
 	componentName string,
@@ -148,7 +148,7 @@ func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
 			// if no operations are running in cluster and pods of component are not ready,
 			// means the component is Failed or Abnormal.
 			if util.IsCompleted(cluster.Status.Phase) {
-				if phase, err := component.CalculatePhaseWhenPodsNotReady(componentName); err != nil {
+				if phase, err := component.GetPhaseWhenPodsNotReady(componentName); err != nil {
 					return false, err
 				} else if phase != "" {
 					statusComponent.Phase = phase

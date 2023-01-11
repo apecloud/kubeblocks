@@ -81,11 +81,11 @@ var _ = Describe("Stateful Component", func() {
 			Expect(podsReady == false).Should(BeTrue())
 			if testCtx.UsingExistingCluster() {
 				Eventually(func() bool {
-					phase, _ := statelessComponent.CalculatePhaseWhenPodsNotReady(statelessCompName)
+					phase, _ := statelessComponent.GetPhaseWhenPodsNotReady(statelessCompName)
 					return phase == ""
 				}, timeout*5, interval).Should(BeTrue())
 			} else {
-				phase, _ := statelessComponent.CalculatePhaseWhenPodsNotReady(statelessCompName)
+				phase, _ := statelessComponent.GetPhaseWhenPodsNotReady(statelessCompName)
 				Expect(phase == dbaasv1alpha1.FailedPhase).Should(BeTrue())
 				Expect(k8sClient.Status().Patch(ctx, deploy, patch)).Should(Succeed())
 				Eventually(func(g Gomega) bool {
@@ -93,7 +93,7 @@ var _ = Describe("Stateful Component", func() {
 					g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: deploy.Name, Namespace: testCtx.DefaultNamespace}, tmpDeploy)).Should(Succeed())
 					return tmpDeploy.Status.AvailableReplicas == availableReplicas
 				}, timeout, interval).Should(BeTrue())
-				phase, _ = statelessComponent.CalculatePhaseWhenPodsNotReady(statelessCompName)
+				phase, _ = statelessComponent.GetPhaseWhenPodsNotReady(statelessCompName)
 				Expect(phase == dbaasv1alpha1.AbnormalPhase).Should(BeTrue())
 			}
 

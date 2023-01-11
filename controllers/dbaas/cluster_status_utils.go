@@ -273,7 +273,7 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 	if component == nil {
 		return nil
 	}
-	phase, err = component.CalculatePhaseWhenPodsNotReady(componentName)
+	phase, err = component.GetPhaseWhenPodsNotReady(componentName)
 	if err != nil {
 		return err
 	}

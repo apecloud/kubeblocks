@@ -36,7 +36,7 @@ type handleStatusProgressWithComponent func(opsRes *OpsResource,
 	pgRes progressResource,
 	statusComponent *dbaasv1alpha1.OpsRequestStatusComponent) (expectProgressCount int32, succeedCount int32, err error)
 
-// ReconcileActionWithComponentOps it will be performed when action is done and loops util OpsRequest.status.phase is Succeed/Failed.
+// ReconcileActionWithComponentOps will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // if OpsRequest.spec.componentOps is not null, you can use it to OpsBehaviour.ReconcileAction.
 // return the OpsRequest.status.phase
 func ReconcileActionWithComponentOps(opsRes *OpsResource,
@@ -123,12 +123,12 @@ func GetClusterDefByName(ctx context.Context, cli client.Client, clusterDefName 
 	return clusterDef, nil
 }
 
-// opsRequestIsCompleted check OpsRequest is completed
+// opsRequestIsCompleted checks if OpsRequest is completed
 func opsRequestIsCompleted(phase dbaasv1alpha1.Phase) bool {
 	return slices.Index([]dbaasv1alpha1.Phase{dbaasv1alpha1.FailedPhase, dbaasv1alpha1.SucceedPhase}, phase) != -1
 }
 
-// PatchOpsStatus patch OpsRequest.status
+// PatchOpsStatus patches OpsRequest.status
 func PatchOpsStatus(opsRes *OpsResource,
 	phase dbaasv1alpha1.Phase,
 	condition ...*metav1.Condition) error {
@@ -181,14 +181,14 @@ func PatchValidateErrorCondition(opsRes *OpsResource, errMessage string) error {
 	return PatchOpsStatus(opsRes, dbaasv1alpha1.FailedPhase, condition)
 }
 
-// getOpsRequestNameFromAnnotation get OpsRequest.name from cluster.annotations
+// getOpsRequestNameFromAnnotation gets OpsRequest.name from cluster.annotations
 func getOpsRequestNameFromAnnotation(cluster *dbaasv1alpha1.Cluster, toClusterPhase dbaasv1alpha1.Phase) string {
 	opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
 	opsRecorder := getOpsRecorderWithClusterPhase(opsRequestSlice, toClusterPhase)
 	return opsRecorder.Name
 }
 
-// getOpsRecorderWithClusterPhase get OpsRequest recorder from slice by target cluster phase
+// getOpsRecorderWithClusterPhase gets OpsRequest recorder from slice by target cluster phase
 func getOpsRecorderWithClusterPhase(opsRequestSlice []dbaasv1alpha1.OpsRecorder,
 	toClusterPhase dbaasv1alpha1.Phase) dbaasv1alpha1.OpsRecorder {
 	for _, v := range opsRequestSlice {
@@ -199,7 +199,7 @@ func getOpsRecorderWithClusterPhase(opsRequestSlice []dbaasv1alpha1.OpsRecorder,
 	return dbaasv1alpha1.OpsRecorder{}
 }
 
-// GetOpsRecorderFromSlice get OpsRequest recorder from slice by target cluster phase
+// GetOpsRecorderFromSlice gets OpsRequest recorder from slice by target cluster phase
 func GetOpsRecorderFromSlice(opsRequestSlice []dbaasv1alpha1.OpsRecorder,
 	opsRequestName string) (int, dbaasv1alpha1.OpsRecorder) {
 	for i, v := range opsRequestSlice {
@@ -210,7 +210,7 @@ func GetOpsRecorderFromSlice(opsRequestSlice []dbaasv1alpha1.OpsRecorder,
 	return 0, dbaasv1alpha1.OpsRecorder{}
 }
 
-// patchOpsRequestToRunning patch OpsRequest.status.phase to Running
+// patchOpsRequestToRunning patches OpsRequest.status.phase to Running
 func patchOpsRequestToRunning(opsRes *OpsResource, opsHandler OpsHandler) error {
 	var condition *metav1.Condition
 	validatePassCondition := dbaasv1alpha1.NewValidatePassedCondition(opsRes.OpsRequest.Name)
@@ -218,7 +218,7 @@ func patchOpsRequestToRunning(opsRes *OpsResource, opsHandler OpsHandler) error 
 	return PatchOpsStatus(opsRes, dbaasv1alpha1.RunningPhase, validatePassCondition, condition)
 }
 
-// patchClusterStatus update Cluster.status to record cluster and components information
+// patchClusterStatus updates Cluster.status to record cluster and components information
 func patchClusterStatus(opsRes *OpsResource, opsBehaviour OpsBehaviour) error {
 	toClusterState := opsBehaviour.ToClusterPhase
 	if toClusterState == "" {
@@ -308,7 +308,7 @@ func patchClusterPhaseWhenExistsOtherOps(opsRes *OpsResource, opsRequestSlice []
 	return nil
 }
 
-// isOpsRequestFailedPhase check the OpsRequest phase is Failed
+// isOpsRequestFailedPhase checks the OpsRequest phase is Failed
 func isOpsRequestFailedPhase(opsRequestPhase dbaasv1alpha1.Phase) bool {
 	return opsRequestPhase == dbaasv1alpha1.FailedPhase
 }

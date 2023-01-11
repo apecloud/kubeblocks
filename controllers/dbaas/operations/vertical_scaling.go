@@ -46,7 +46,7 @@ func (vs verticalScalingHandler) ActionStartedCondition(opsRequest *dbaasv1alpha
 	return dbaasv1alpha1.NewHorizontalScalingCondition(opsRequest)
 }
 
-// Action Modify cluster component resources according to
+// Action modifies cluster component resources according to
 // the definition of opsRequest with spec.componentNames and spec.componentOps.verticalScaling
 func (vs verticalScalingHandler) Action(opsRes *OpsResource) error {
 	verticalScalingMap := opsRes.OpsRequest.CovertVerticalScalingListToMap()
@@ -59,7 +59,7 @@ func (vs verticalScalingHandler) Action(opsRes *OpsResource) error {
 	return opsRes.Client.Update(opsRes.Ctx, opsRes.Cluster)
 }
 
-// ReconcileAction it will be performed when action is done and loops util OpsRequest.status.phase is Succeed/Failed.
+// ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for vertical scaling opsRequest.
 func (vs verticalScalingHandler) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error) {
 	return ReconcileActionWithComponentOps(opsRes, "vertical scale", handleComponentStatusProgress)

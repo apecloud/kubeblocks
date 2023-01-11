@@ -86,7 +86,7 @@ func (opsMgr *OpsManager) Do(opsRes *OpsResource) error {
 }
 
 // Reconcile entry function when OpsRequest.status.phase is Running.
-// loops until the operation is completed.
+// loops till the operation is completed.
 func (opsMgr *OpsManager) Reconcile(opsRes *OpsResource) (time.Duration, error) {
 	var (
 		opsBehaviour    OpsBehaviour

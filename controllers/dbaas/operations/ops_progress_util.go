@@ -31,7 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 )
 
-// GetProgressObjectKey get progress object key from the object of client.Object.
+// GetProgressObjectKey gets progress object key from the object of client.Object.
 func GetProgressObjectKey(kind, name string) string {
 	return fmt.Sprintf("%s/%s", kind, name)
 }
@@ -42,7 +42,7 @@ func isCompletedProgressStatus(status dbaasv1alpha1.ProgressStatus) bool {
 		dbaasv1alpha1.FailedProgressStatus}, status)
 }
 
-// SetStatusComponentProgressDetail set the corresponding progressDetail in progressDetails to newProgressDetail.
+// SetStatusComponentProgressDetail sets the corresponding progressDetail in progressDetails to newProgressDetail.
 // progressDetails must be non-nil.
 // 1. the startTime and endTime will be filled automatically.
 // 2. if the progressDetail of the specified objectKey not exists, it will be appended to the progressDetails.
@@ -76,7 +76,7 @@ func SetStatusComponentProgressDetail(
 	sendProgressDetailEvent(recorder, opsRequest, newProgressDetail)
 }
 
-// FindStatusProgressDetail find the progressDetail of the specified objectKey in progressDetails.
+// FindStatusProgressDetail finds the progressDetail of the specified objectKey in progressDetails.
 func FindStatusProgressDetail(progressDetails []dbaasv1alpha1.ProgressDetail,
 	objectKey string) *dbaasv1alpha1.ProgressDetail {
 	for i := range progressDetails {
@@ -87,7 +87,7 @@ func FindStatusProgressDetail(progressDetails []dbaasv1alpha1.ProgressDetail,
 	return nil
 }
 
-// getProgressDetailEventType get the event type with progressDetail status.
+// getProgressDetailEventType gets the event type with progressDetail status.
 func getProgressDetailEventType(status dbaasv1alpha1.ProgressStatus) string {
 	if status == dbaasv1alpha1.FailedProgressStatus {
 		return corev1.EventTypeWarning
@@ -95,7 +95,7 @@ func getProgressDetailEventType(status dbaasv1alpha1.ProgressStatus) string {
 	return corev1.EventTypeNormal
 }
 
-// getProgressDetailEventReason get the event reason with progressDetail status.
+// getProgressDetailEventReason gets the event reason with progressDetail status.
 func getProgressDetailEventReason(status dbaasv1alpha1.ProgressStatus) string {
 	switch status {
 	case dbaasv1alpha1.SucceedProgressStatus:
@@ -108,7 +108,7 @@ func getProgressDetailEventReason(status dbaasv1alpha1.ProgressStatus) string {
 	return ""
 }
 
-// sendProgressDetailEvent send the progress detail changed events.
+// sendProgressDetailEvent sends the progress detail changed events.
 func sendProgressDetailEvent(recorder record.EventRecorder,
 	opsRequest *dbaasv1alpha1.OpsRequest,
 	progressDetail dbaasv1alpha1.ProgressDetail) {
@@ -120,7 +120,7 @@ func sendProgressDetailEvent(recorder record.EventRecorder,
 		getProgressDetailEventReason(status), progressDetail.Message)
 }
 
-// updateProgressDetailTime update the progressDetail startTime or endTime according to the status.
+// updateProgressDetailTime updates the progressDetail startTime or endTime according to the status.
 func updateProgressDetailTime(progressDetail *dbaasv1alpha1.ProgressDetail) {
 	if progressDetail.Status == dbaasv1alpha1.ProcessingProgressStatus &&
 		progressDetail.StartTime.IsZero() {
@@ -132,7 +132,7 @@ func updateProgressDetailTime(progressDetail *dbaasv1alpha1.ProgressDetail) {
 	}
 }
 
-// covertPodObjectKeyMap covert the object key map from the pod list.
+// covertPodObjectKeyMap coverts the object key map from the pod list.
 func covertPodObjectKeyMap(podList *corev1.PodList) map[string]struct{} {
 	podObjectKeyMap := map[string]struct{}{}
 	for _, v := range podList.Items {
@@ -181,7 +181,7 @@ func handleComponentStatusProgress(
 	return expectProgressCount, succeedCount, err
 }
 
-// handleStatelessProgress handle the stateless component progressDetails.
+// handleStatelessProgress handles the stateless component progressDetails.
 // the stateless component changes will use the Deployment updating policy.
 func handleStatelessProgress(opsRes *OpsResource,
 	podList *corev1.PodList,
@@ -302,7 +302,7 @@ func getProgressFailedMessage(opsMessageKey, objectKey, componentName, podMessag
 	return fmt.Sprintf("Failed to %s: %s in Component: %s, message: %s", opsMessageKey, objectKey, componentName, podMessage)
 }
 
-// getFailedPodMessage get the failed pod message from cluster status component
+// getFailedPodMessage gets the failed pod message from cluster status component
 func getFailedPodMessage(cluster *dbaasv1alpha1.Cluster, componentName string, pod *corev1.Pod) string {
 	clusterStatusComponent := cluster.Status.Components[componentName]
 	componentMessage := clusterStatusComponent.GetMessage()

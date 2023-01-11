@@ -127,7 +127,7 @@ var _ = Describe("Consensus Component", func() {
 			podName := sts.Name + "-0"
 			if testCtx.UsingExistingCluster() {
 				Eventually(func() bool {
-					phase, _ := consensusComponent.CalculatePhaseWhenPodsNotReady(consensusCompName)
+					phase, _ := consensusComponent.GetPhaseWhenPodsNotReady(consensusCompName)
 					return phase == ""
 				}, timeout*5, interval).Should(BeTrue())
 
@@ -155,7 +155,7 @@ var _ = Describe("Consensus Component", func() {
 				Expect(isRunning == false).Should(BeTrue())
 
 				By("test component phase when pods not ready")
-				phase, _ := consensusComponent.CalculatePhaseWhenPodsNotReady(consensusCompName)
+				phase, _ := consensusComponent.GetPhaseWhenPodsNotReady(consensusCompName)
 				Expect(phase == dbaasv1alpha1.FailedPhase).Should(BeTrue())
 			}
 		})

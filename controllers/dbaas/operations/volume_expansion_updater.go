@@ -53,7 +53,7 @@ func init() {
 	k8score.EventHandlerMap["volume-expansion"] = PersistentVolumeClaimEventHandler{}
 }
 
-// handleVolumeExpansionOperation handle the pvc for the volume expansion OpsRequest.
+// handleVolumeExpansionOperation handles the pvc for the volume expansion OpsRequest.
 // it will be triggered when the PersistentVolumeClaim has changed.
 func handleVolumeExpansionWithPVC(reqCtx intctrlutil.RequestCtx, cli client.Client, pvc *corev1.PersistentVolumeClaim) error {
 	clusterName := pvc.Labels[intctrlutil.AppInstanceLabelKey]
@@ -102,7 +102,7 @@ func handleClusterVolumeExpandingPhase(ctx context.Context,
 	return cli.Status().Patch(ctx, cluster, patch)
 }
 
-// Handle the warning events on pvcs. if the events is resize failed events, update the OpsRequest.status.
+// Handle the warning events on pvcs. if the events are resize failed events, update the OpsRequest.status.
 func (pvcEventHandler PersistentVolumeClaimEventHandler) Handle(cli client.Client,
 	reqCtx intctrlutil.RequestCtx,
 	recorder record.EventRecorder,
@@ -125,7 +125,7 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) Handle(cli client.Clien
 		return err
 	}
 
-	// check the pvc is managed by kubeblocks
+	// check if the pvc is managed by kubeblocks
 	if !intctrlutil.WorkloadFilterPredicate(pvc) {
 		return nil
 	}
@@ -134,7 +134,7 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) Handle(cli client.Clien
 	return pvcEventHandler.handlePVCFailedStatusOnOpsRequest(cli, reqCtx, recorder, event, pvc)
 }
 
-// isTargetResizeFailedEvents check the event is the resize failed events.
+// isTargetResizeFailedEvents checks the event is the resize failed events.
 func (pvcEventHandler PersistentVolumeClaimEventHandler) isTargetResizeFailedEvents(event *corev1.Event) bool {
 	// ignores ExternalExpanding event, this event is always exists when using csi driver.
 	return event.Type == corev1.EventTypeWarning && event.InvolvedObject.Kind == intctrlutil.PersistentVolumeClaimKind &&

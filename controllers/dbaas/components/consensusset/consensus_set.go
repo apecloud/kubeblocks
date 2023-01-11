@@ -127,7 +127,7 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady() (bool, error
 	return false, opsutil.MarkRunningOpsRequestAnnotation(consensusSet.Ctx, consensusSet.Cli, cluster)
 }
 
-func (consensusSet *ConsensusSet) CalculatePhaseWhenPodsNotReady(componentName string) (dbaasv1alpha1.Phase, error) {
+func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string) (dbaasv1alpha1.Phase, error) {
 	var (
 		isFailed      = true
 		isAbnormal    bool

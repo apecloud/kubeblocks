@@ -38,17 +38,17 @@ type OpsHandler interface {
 	// if you do not want to be reconciled when the operation fails,
 	// you need to call PatchOpsStatus function in ops_util.go and set OpsRequest.status.phase to Failed
 	Action(opsResource *OpsResource) error
-	// ReconcileAction loops until the operation is completed.
-	// return OpsRequest.status.phase and requeueAfter time
+	// ReconcileAction loops till the operation is completed.
+	// return OpsRequest.status.phase and requeueAfter time.
 	ReconcileAction(opsResource *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error)
 	// ActionStartedCondition append to OpsRequest.status.conditions when start performing Action function
 	ActionStartedCondition(opsRequest *dbaasv1alpha1.OpsRequest) *metav1.Condition
 
-	// SaveLastConfiguration save last configuration to the OpsRequest.status.lastConfiguration,
+	// SaveLastConfiguration saves last configuration to the OpsRequest.status.lastConfiguration,
 	// and this method will be executed together when opsRequest to running.
 	SaveLastConfiguration(opsResource *OpsResource) error
 
-	// GetRealAffectedComponentMap return a changed configuration componentName map by
+	// GetRealAffectedComponentMap returns a changed configuration componentName map by
 	// compared current configuration with the last configuration.
 	// we only changed the component status of cluster.status to the ToClusterPhase
 	// of OpsBehaviour, which component name is in the returned componentName map.

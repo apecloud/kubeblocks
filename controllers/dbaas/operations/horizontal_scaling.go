@@ -49,7 +49,7 @@ func (hs horizontalScalingOpsHandler) ActionStartedCondition(opsRequest *dbaasv1
 	return dbaasv1alpha1.NewHorizontalScalingCondition(opsRequest)
 }
 
-// Action Modify Cluster.spec.components[*].replicas from the opsRequest
+// Action modifies Cluster.spec.components[*].replicas from the opsRequest
 func (hs horizontalScalingOpsHandler) Action(opsRes *OpsResource) error {
 	var (
 		horizontalScalingMap = opsRes.OpsRequest.CovertHorizontalScalingListToMap()
@@ -69,7 +69,7 @@ func (hs horizontalScalingOpsHandler) Action(opsRes *OpsResource) error {
 	return opsRes.Client.Update(opsRes.Ctx, opsRes.Cluster)
 }
 
-// ReconcileAction it will be performed when action is done and loops util OpsRequest.status.phase is Succeed/Failed.
+// ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for horizontal scaling opsRequest.
 func (hs horizontalScalingOpsHandler) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error) {
 	return ReconcileActionWithComponentOps(opsRes, "", hs.handleComponentProgressDetails)

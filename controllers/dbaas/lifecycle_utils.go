@@ -475,9 +475,7 @@ func getComponent(componentList []Component, name string) *Component {
 }
 
 func replacePlaceholderTokens(cluster *dbaasv1alpha1.Cluster, component *Component) {
-	namedValues := map[string]string{
-		"$(CONN_CREDENTIAL_SECRET_NAME)": fmt.Sprintf("%s-conn-credential", cluster.GetName()),
-	}
+	namedValues := getEnvReplacementMapForConnCrential(cluster.GetName())
 
 	// replace env[].valueFrom.secretKeyRef.name variables
 	for _, cc := range [][]corev1.Container{component.PodSpec.InitContainers, component.PodSpec.Containers} {
@@ -1381,6 +1379,7 @@ func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
 	for j := 0; j < int(params.component.Replicas); j++ {
 		envData[prefix+strconv.Itoa(j)+"_HOSTNAME"] = fmt.Sprintf("%s.%s", params.cluster.Name+"-"+params.component.Name+"-"+strconv.Itoa(j), svcName)
 	}
+	// TODO following code seems to be redundant with updateConsensusRoleInfo in consensus_set_utils.go
 	// build consensus env from cluster.status
 	if params.cluster.Status.Components != nil {
 		if v, ok := params.cluster.Status.Components[params.component.Type]; ok {

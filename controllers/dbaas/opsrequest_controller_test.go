@@ -130,6 +130,7 @@ spec:
       - name: nginx
 `
 		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
+
 		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, clusterDefinition)).Should(Succeed())
 		return clusterDefinition

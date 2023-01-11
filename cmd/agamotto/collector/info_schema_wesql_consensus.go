@@ -19,6 +19,7 @@ package collector
 import (
 	"context"
 	"database/sql"
+
 	"github.com/prometheus/mysqld_exporter/collector"
 
 	"github.com/go-kit/log"
@@ -39,6 +40,11 @@ const (
 	informationSchema = "info_schema"
 
 	// SQL Query
+	wesqlCheckQuery = `
+	SELECT 1
+	FROM performance_schema.global_variables
+	WHERE VARIABLE_NAME = 'wesql_version';
+	`
 	wesqlConsensusQuery = `
 	SELECT CURRENT_TERM,COMMIT_INDEX,LAST_LOG_TERM,LAST_LOG_INDEX,ROLE,LAST_APPLY_INDEX
 	FROM information_schema.WESQL_CLUSTER_LOCAL
@@ -92,6 +98,13 @@ func (ScrapeWesqlConsensus) Version() float64 {
 
 // Scrape collects data from database connection and sends it over channel as prometheus metric.
 func (ScrapeWesqlConsensus) Scrape(ctx context.Context, db *sql.DB, ch chan<- prometheus.Metric, logger log.Logger) error {
+	var i int
+	err := db.QueryRowContext(ctx, wesqlCheckQuery).Scan(&i)
+	// wesql check fail, return nil for skip report metrics
+	if err != nil {
+		return nil
+	}
+
 	rows, err := db.QueryContext(ctx, wesqlConsensusQuery)
 	if err != nil {
 		return err

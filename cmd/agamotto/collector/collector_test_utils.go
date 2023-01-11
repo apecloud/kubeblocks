@@ -18,8 +18,6 @@ limitations under the License.
 package collector
 
 import (
-	"strings"
-
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 )
@@ -49,12 +47,4 @@ func readMetric(m prometheus.Metric) MetricResult {
 		return MetricResult{labels: labels, value: pb.GetUntyped().GetValue(), metricType: dto.MetricType_UNTYPED}
 	}
 	panic("Unsupported metric type")
-}
-
-func sanitizeQuery(q string) string {
-	q = strings.Join(strings.Fields(q), " ")
-	q = strings.ReplaceAll(q, "(", "\\(")
-	q = strings.ReplaceAll(q, ")", "\\)")
-	q = strings.ReplaceAll(q, "*", "\\*")
-	return q
 }

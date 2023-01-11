@@ -152,7 +152,7 @@ func (hs horizontalScalingOpsHandler) handleComponentProgressDetails(opsRes *Ops
 	if lastComponentReplicas == nil {
 		return
 	}
-	// if replicas are no changed, return
+	// if replicas are not changed, return
 	if *lastComponentReplicas == *expectReplicas {
 		return
 	}
@@ -172,14 +172,14 @@ func (hs horizontalScalingOpsHandler) handleComponentProgressDetails(opsRes *Ops
 	}
 	succeedCount, err = hs.handleScaleOutProgress(opsRes, pgRes, podList, statusComponent)
 	// if the component type is Stateless, remove the progressDetails of the expired pods.
-	// because a replicaSet may attempt to create a pod multiple times until it succeeds when scale out the replicas.
+	// because a replicaSet may attempt to create a pod multiple times till it succeeds when scale out the replicas.
 	if pgRes.clusterComponentDef.ComponentType == dbaasv1alpha1.Stateless {
 		statusComponent.ProgressDetails = removeStatelessExpiredPod(podList, statusComponent.ProgressDetails)
 	}
 	return expectProgressCount, succeedCount, err
 }
 
-// handleScaleOutProgress handles the progressDetails of scale out the replicas.
+// handleScaleOutProgress handles the progressDetails of scaled out replicas.
 func (hs horizontalScalingOpsHandler) handleScaleOutProgress(
 	opsRes *OpsResource,
 	pgRes progressResource,
@@ -226,7 +226,7 @@ func (hs horizontalScalingOpsHandler) handleScaleOutProgress(
 	return succeedCount, nil
 }
 
-// handleScaleDownProgress handles the progressDetails of scale down the replicas.
+// handleScaleDownProgress handles the progressDetails of scaled down replicas.
 func (hs horizontalScalingOpsHandler) handleScaleDownProgress(opsRes *OpsResource,
 	pgRes progressResource,
 	podList *corev1.PodList,
@@ -249,7 +249,7 @@ func (hs horizontalScalingOpsHandler) handleScaleDownProgress(opsRes *OpsResourc
 	}
 
 	// The deployment controller will not watch the cleaning events of the old replicaSet pods.
-	// so when component status is completed, we should handle the progressDetails to succeed.
+	// so when component status is completed, we should forward the progressDetails to succeed.
 	markStatelessPodsSucceed := false
 	if pgRes.clusterComponentDef.ComponentType == dbaasv1alpha1.Stateless &&
 		util.IsCompleted(statusComponent.Phase) {

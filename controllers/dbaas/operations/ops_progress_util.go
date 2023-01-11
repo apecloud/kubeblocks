@@ -36,7 +36,7 @@ func GetProgressObjectKey(kind, name string) string {
 	return fmt.Sprintf("%s/%s", kind, name)
 }
 
-// isCompletedProgressStatus the progress detail status is Failed or Succeed, means it is completed.
+// isCompletedProgressStatus the progress detail is in final state, either Failed or Succeed.
 func isCompletedProgressStatus(status dbaasv1alpha1.ProgressStatus) bool {
 	return slices.Contains([]dbaasv1alpha1.ProgressStatus{dbaasv1alpha1.SucceedProgressStatus,
 		dbaasv1alpha1.FailedProgressStatus}, status)
@@ -45,7 +45,7 @@ func isCompletedProgressStatus(status dbaasv1alpha1.ProgressStatus) bool {
 // SetStatusComponentProgressDetail sets the corresponding progressDetail in progressDetails to newProgressDetail.
 // progressDetails must be non-nil.
 // 1. the startTime and endTime will be filled automatically.
-// 2. if the progressDetail of the specified objectKey not exists, it will be appended to the progressDetails.
+// 2. if the progressDetail of the specified objectKey does not exist, it will be appended to the progressDetails.
 func SetStatusComponentProgressDetail(
 	recorder record.EventRecorder,
 	opsRequest *dbaasv1alpha1.OpsRequest,
@@ -64,8 +64,7 @@ func SetStatusComponentProgressDetail(
 	if existingProgressDetail.Status == newProgressDetail.Status {
 		return
 	}
-	// if existing progress detail is Failed status and new progress detail is not Succeed status,
-	// ignores the new progress detail.
+	// if existing progress detail is 'Failed' and new progress detail is not 'Succeed', ignores the new one.
 	if existingProgressDetail.Status == dbaasv1alpha1.FailedProgressStatus &&
 		newProgressDetail.Status != dbaasv1alpha1.SucceedProgressStatus {
 		return
@@ -142,9 +141,9 @@ func covertPodObjectKeyMap(podList *corev1.PodList) map[string]struct{} {
 	return podObjectKeyMap
 }
 
-// removeStatelessExpiredPod if the object of progressDetail is not existing in k8s cluster, means the pod is deleted.
-// Some scenes, a replicaSet may attempt to create a pod multiple times until it succeeds.
-// so some pod will be expired, we should clear them.
+// removeStatelessExpiredPod if the object of progressDetail is not existing in k8s cluster, it indicates the pod is deleted.
+// For example, a replicaSet may attempt to create a pod multiple times till it succeeds.
+// so some pod may be expired, we should clear them.
 func removeStatelessExpiredPod(podList *corev1.PodList,
 	progressDetails []dbaasv1alpha1.ProgressDetail) []dbaasv1alpha1.ProgressDetail {
 	podObjectKeyMap := covertPodObjectKeyMap(podList)
@@ -158,7 +157,7 @@ func removeStatelessExpiredPod(podList *corev1.PodList,
 }
 
 // handleComponentStatusProgress handles the component status progressDetails.
-// if all the pods of the component are affected, you can use this common function to reconcile the progressDetails.
+// if all the pods of the component are affected, use this common function to reconcile the progressDetails.
 func handleComponentStatusProgress(
 	opsRes *OpsResource,
 	pgRes progressResource,
@@ -182,7 +181,7 @@ func handleComponentStatusProgress(
 }
 
 // handleStatelessProgress handles the stateless component progressDetails.
-// the stateless component changes will use the Deployment updating policy.
+// For stateless component changes, it applies the Deployment updating policy.
 func handleStatelessProgress(opsRes *OpsResource,
 	podList *corev1.PodList,
 	pgRes progressResource,
@@ -199,7 +198,7 @@ func handleStatelessProgress(opsRes *OpsResource,
 	}
 	opsRequest := opsRes.OpsRequest
 	for _, v := range podList.Items {
-		// maybe the resources is equals last resources and the pod is not updated, then the pod will not rebuild too.
+		// maybe the resources are equal with last resources and the pod is not updated, then the pod will not be rebuilt.
 		// and the component status also is already Running/Failed/Abnormal, the progressDetails are already completed.
 		if v.CreationTimestamp.Before(&opsRequest.Status.StartTimestamp) &&
 			!util.IsCompleted(statusComponent.Phase) {

@@ -50,7 +50,7 @@ func (opsMgr *OpsManager) Do(opsRes *OpsResource) error {
 		return patchOpsHandlerNotSupported(opsRes)
 	}
 
-	// validate OpsRequest.spec is legal
+	// validate OpsRequest.spec
 	isCreateOps := opsRequest.Status.ObservedGeneration == 0
 	if err = opsRequest.Validate(opsRes.Ctx, opsRes.Client, opsRes.Cluster, isCreateOps); err != nil {
 		if err = PatchValidateErrorCondition(opsRes, err.Error()); err != nil {

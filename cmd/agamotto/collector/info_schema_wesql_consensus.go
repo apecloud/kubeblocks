@@ -19,11 +19,17 @@ package collector
 import (
 	"context"
 	"database/sql"
+	"github.com/prometheus/mysqld_exporter/collector"
 
 	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/mysqld_exporter/collector"
 )
+
+// ScrapeWesqlConsensus collect metrics from information_schema.WESQL_CLUSTER_LOCAL
+type ScrapeWesqlConsensus struct{}
+
+// check interface
+var _ collector.Scraper = ScrapeWesqlConsensus{}
 
 const (
 	// Exporter namespace.
@@ -69,9 +75,6 @@ var (
 	)
 )
 
-// ScrapeWesqlConsensus collect metrics from information_schema.WESQL_CLUSTER_LOCAL
-type ScrapeWesqlConsensus struct{}
-
 // Name of the Scraper. Should be unique.
 func (ScrapeWesqlConsensus) Name() string {
 	return informationSchema + ".wesql_consensus"
@@ -96,8 +99,12 @@ func (ScrapeWesqlConsensus) Scrape(ctx context.Context, db *sql.DB, ch chan<- pr
 	defer rows.Close()
 
 	var (
-		currentTerm, commitIndex, lastLogTerm, lastLogIndex, lastApplyIndex int64
-		instanceRole                                                        string
+		currentTerm    int64
+		commitIndex    int64
+		lastLogTerm    int64
+		lastLogIndex   int64
+		lastApplyIndex int64
+		instanceRole   string
 	)
 
 	for rows.Next() {
@@ -122,10 +129,6 @@ func (ScrapeWesqlConsensus) Scrape(ctx context.Context, db *sql.DB, ch chan<- pr
 		ch <- prometheus.MustNewConstMetric(
 			wesqlConsensusLastApplyIndexDesc, prometheus.GaugeValue, float64(lastApplyIndex), instanceRole,
 		)
-		break
 	}
 	return nil
 }
-
-// check interface
-var _ collector.Scraper = ScrapeWesqlConsensus{}

@@ -36,7 +36,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
-var _ = Describe("Backup Controller", func() {
+var _ = Describe("Backup Policy Controller", func() {
 	type Key = types.NamespacedName
 	const timeout = time.Second * 20
 	const interval = time.Second

@@ -386,6 +386,11 @@ func handleDeletePVCCronJobEvent(ctx context.Context,
 }
 
 func checkedDeleteDeletePVCCronJob(ctx context.Context, cli client.Client, name string, namespace string) error {
+	// name check
+	// backup policy also generates cronjobs, which cannot be deleted
+	if !strings.HasPrefix(name, "delete-pvc-") {
+		return nil
+	}
 	// label check
 	cronJob := v1.CronJob{}
 	if err := cli.Get(ctx, types.NamespacedName{

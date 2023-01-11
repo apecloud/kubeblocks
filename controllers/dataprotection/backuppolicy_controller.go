@@ -114,6 +114,9 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 	for k, v := range backupPolicy.Spec.Target.LabelsSelector.MatchLabels {
+		if backupPolicy.Labels == nil {
+			backupPolicy.SetLabels(map[string]string{})
+		}
 		backupPolicy.Labels[k] = v
 	}
 	if err = r.Client.Patch(reqCtx.Ctx, backupPolicy, patch); err != nil {
@@ -210,6 +213,9 @@ func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alph
 
 	// set labels
 	for k, v := range backupPolicy.Labels {
+		if cronjob.Labels == nil {
+			cronjob.SetLabels(map[string]string{})
+		}
 		cronjob.Labels[k] = v
 	}
 	return &cronjob, nil

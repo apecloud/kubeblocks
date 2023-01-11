@@ -75,7 +75,6 @@ func init() {
 	viper.SetDefault("VOLUMESNAPSHOT", false)
 	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:0.2.0-beta.1")
 	viper.SetDefault("PROBE_SERVICE_PORT", 3501)
-	viper.SetDefault("CONFIG_MANAGER_GRPC_PORT", 9901)
 	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
 }
 
@@ -262,6 +261,15 @@ func main() {
 		Recorder: mgr.GetEventRecorderFor("configuration-template-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ConfigConstraint")
+		os.Exit(1)
+	}
+
+	if err = (&dbaascontrollers.SystemAccountReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("system-account-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SystemAccount")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

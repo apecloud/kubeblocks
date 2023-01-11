@@ -66,6 +66,12 @@ rules:
   - update
   - watch
 - apiGroups:
+  - batch
+  resources:
+  - jobs/status
+  verbs:
+  - get
+- apiGroups:
   - coordination.k8s.io
   resources:
   - leases

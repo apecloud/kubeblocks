@@ -24,6 +24,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -119,7 +120,7 @@ func (o *CreateBackupOptions) Validate() error {
 	//   and backupPolicy reference to the cluster.
 	//   so it need apply the backupPolicy after the first backupPolicy created.
 	// 2. create a backupJob.
-	if err := policyOptions.BaseOptions.RunAsApply(inputs); err != nil {
+	if err := policyOptions.BaseOptions.Run(inputs); err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
 	o.BackupPolicy = policyOptions.Name

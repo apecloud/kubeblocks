@@ -26,6 +26,7 @@ import (
 	"github.com/leaanthony/debme"
 	"github.com/spf13/viper"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -112,7 +113,9 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			}
 		}
 	}
-	backupPolicy.SetLabels(backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
+	for k, v := range backupPolicy.Spec.Target.LabelsSelector.MatchLabels {
+		backupPolicy.Labels[k] = v
+	}
 	if err = r.Client.Patch(reqCtx.Ctx, backupPolicy, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -139,11 +142,11 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	err = r.Client.Create(reqCtx.Ctx, cronjob)
-	if err != nil {
-		// ignore already exists.
-		if !errors.IsAlreadyExists(err) {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
+	// ignore already exists.
+	if err != nil && !errors.IsAlreadyExists(err) {
+		r.Recorder.Eventf(backupPolicy, corev1.EventTypeWarning, "CreatingBackupPolicy",
+			"Failed to create cronjob %s.", err.Error())
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
 	// update status phase
@@ -220,7 +223,7 @@ func (r *BackupPolicyReconciler) RemoveExpiredBackups(reqCtx intctrlutil.Request
 	}
 	now := metav1.Now()
 	for _, item := range backups.Items {
-		if item.Status.Expiration.Before(&now) {
+		if item.Status.Expiration != nil && item.Status.Expiration.Before(&now) {
 			if err := DeleteObjectBackground(r.Client, reqCtx.Ctx, &item); err != nil {
 				// failed delete backups, return error info.
 				return err
@@ -230,7 +233,7 @@ func (r *BackupPolicyReconciler) RemoveExpiredBackups(reqCtx intctrlutil.Request
 	return nil
 }
 
-func buildBackupSetLabels(backupPolicy *dataprotectionv1alpha1.BackupPolicy) map[string]string {
+func buildBackupLabelsForRemove(backupPolicy *dataprotectionv1alpha1.BackupPolicy) map[string]string {
 	return map[string]string{
 		intctrlutil.AppInstanceLabelKey:  backupPolicy.Labels[intctrlutil.AppInstanceLabelKey],
 		dataProtectionLabelAutoBackupKey: "true",
@@ -245,7 +248,7 @@ func (r *BackupPolicyReconciler) RemoveOldestBackups(reqCtx intctrlutil.RequestC
 	backups := dataprotectionv1alpha1.BackupList{}
 	if err := r.Client.List(reqCtx.Ctx, &backups,
 		client.InNamespace(reqCtx.Req.Namespace),
-		client.MatchingLabels(buildBackupSetLabels(backupPolicy))); err != nil {
+		client.MatchingLabels(buildBackupLabelsForRemove(backupPolicy))); err != nil {
 		return err
 	}
 	numToDelete := len(backups.Items) - int(backupPolicy.Spec.BackupsHistoryLimit)
@@ -282,10 +285,7 @@ func (r *BackupPolicyReconciler) deleteExternalResources(reqCtx intctrlutil.Requ
 		Name:      backupPolicy.Name,
 	}
 	if err := r.Client.Get(reqCtx.Ctx, key, cronjob); err != nil {
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return err
+		return client.IgnoreNotFound(err)
 	}
 	if controllerutil.ContainsFinalizer(cronjob, dataProtectionFinalizerName) {
 		patch := client.MergeFrom(cronjob.DeepCopy())
@@ -309,10 +309,7 @@ func (r *BackupPolicyReconciler) patchCronJob(
 
 	cronJob := &batchv1.CronJob{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, cronJob); err != nil {
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return err
+		return client.IgnoreNotFound(err)
 	}
 	patch := client.MergeFrom(cronJob.DeepCopy())
 	cronJob.Spec.Schedule = backupPolicy.Spec.Schedule

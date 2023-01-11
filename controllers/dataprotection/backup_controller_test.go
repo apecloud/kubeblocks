@@ -41,6 +41,7 @@ var _ = Describe("Backup Controller", func() {
 	const timeout = time.Second * 20
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
+	const TRUE = "true"
 
 	var ctx = context.Background()
 
@@ -423,7 +424,7 @@ spec:
 		statefulSet := &appv1.StatefulSet{}
 		Expect(yaml.Unmarshal([]byte(statefulYaml), statefulSet)).Should(Succeed())
 		statefulSet.SetNamespace(testCtx.DefaultNamespace)
-		statefulSet.Spec.Template.GetLabels()[testCtx.TestObjLabelKey] = "true"
+		statefulSet.Spec.Template.GetLabels()[testCtx.TestObjLabelKey] = TRUE
 		Expect(testCtx.CheckedCreateObj(ctx, statefulSet)).Should(Succeed())
 
 		if viper.GetBool("USE_EXISTING_CLUSTER") {
@@ -431,7 +432,7 @@ spec:
 		}
 		pod := &corev1.Pod{}
 		Expect(yaml.Unmarshal([]byte(podYaml), pod)).Should(Succeed())
-		pod.GetLabels()[testCtx.TestObjLabelKey] = "true"
+		pod.GetLabels()[testCtx.TestObjLabelKey] = TRUE
 		Expect(testCtx.CheckedCreateObj(ctx, pod)).Should(Succeed())
 		return statefulSet
 	}

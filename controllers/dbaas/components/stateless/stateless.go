@@ -123,8 +123,8 @@ func DeploymentIsReady(deploy *appsv1.Deployment) bool {
 	)
 
 	if HasProgressDeadline(deploy) {
-		// if the progressDeadline is existing, we should check if the new replicaSet is available.
-		// when progressDeadline is not existing, the deployment controller will remove the DeploymentProgressing condition.
+		// if the deployment.Spec.ProgressDeadlineSeconds exists, we should check if the new replicaSet is available.
+		// when deployment.Spec.ProgressDeadlineSeconds does not exist, the deployment controller will remove the DeploymentProgressing condition.
 		condition := deploymentutil.GetDeploymentCondition(deploy.Status, appsv1.DeploymentProgressing)
 		if condition == nil || condition.Reason != NewRSAvailableReason || condition.Status != corev1.ConditionTrue {
 			newRSAvailable = false

@@ -1,17 +1,28 @@
 ## kbcli cluster connect
 
-Connect to a database cluster
+Connect to a database cluster or instance
 
 ```
-kbcli cluster connect [flags]
+kbcli cluster connect (NAME | -i INSTANCE-NAME) [flags]
+```
+
+### Examples
+
+```
+  # connect to a specified cluster, default connect to the leader or primary instance
+  kbcli cluster connect my-cluster
+  
+  # connect to a specified instance
+  kbcli cluster connect -i my-cluster-instance-0
 ```
 
 ### Options
 
 ```
-  -D, --database string   The database name to connect.
+      --client string     Which client connection example should be output, only valid if --show-example is true.
   -h, --help              help for connect
   -i, --instance string   The instance name to connect.
+      --show-example      Show how to connect to cluster or instance from different client.
 ```
 
 ### Options inherited from parent commands

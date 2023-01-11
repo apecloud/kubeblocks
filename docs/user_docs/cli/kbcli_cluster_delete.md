@@ -3,7 +3,7 @@
 Delete clusters
 
 ```
-kbcli cluster delete [flags]
+kbcli cluster delete NAME [flags]
 ```
 
 ### Examples

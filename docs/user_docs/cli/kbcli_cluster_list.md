@@ -3,7 +3,7 @@
 List clusters
 
 ```
-kbcli cluster list [flags]
+kbcli cluster list [NAME] [flags]
 ```
 
 ### Examples

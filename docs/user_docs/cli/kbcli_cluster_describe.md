@@ -3,7 +3,7 @@
 Show details of a specific cluster
 
 ```
-kbcli cluster describe [flags]
+kbcli cluster describe NAME [flags]
 ```
 
 ### Examples

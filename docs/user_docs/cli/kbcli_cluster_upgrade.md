@@ -1,6 +1,6 @@
 ## kbcli cluster upgrade
 
-Upgrade the cluster
+Upgrade the cluster version
 
 ```
 kbcli cluster upgrade [flags]

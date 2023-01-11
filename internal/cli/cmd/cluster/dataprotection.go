@@ -48,7 +48,7 @@ var (
 	`)
 	listBackupExample = templates.Examples(`
 		# list all backup
-		kbcli cluster list-backup
+		kbcli cluster list-backups
 	`)
 	deleteBackupExample = templates.Examples(`
 		# delete a backup named backup-name
@@ -133,7 +133,7 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Use:             "backup",
 		Short:           "Create a backup",
 		Example:         createBackupExample,
-		CueTemplateName: "backupjob_template.cue",
+		CueTemplateName: "backup_template.cue",
 		ResourceName:    types.ResourceBackups,
 		Group:           types.DPGroup,
 		Version:         types.DPVersion,
@@ -156,7 +156,7 @@ func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	o := list.NewListOptions(f, streams, types.BackupGVR())
 	cmd := &cobra.Command{
 		Use:               "list-backups",
-		Short:             "List backup jobs",
+		Short:             "List backups",
 		Aliases:           []string{"ls-backups"},
 		Example:           listBackupExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),

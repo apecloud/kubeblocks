@@ -184,20 +184,44 @@ func (o *ConnectOptions) getConnectionInfo() (*engine.ConnectionInfo, error) {
 
 	// get host and port, use external endpoints first, if external endpoints are empty,
 	// use internal endpoints
-	var hostPort []string
+	var private = false
 	primaryComponent := cluster.FindClusterComp(objs.Cluster, objs.ClusterDef.Spec.Components[0].TypeName)
-	internalEndpoints, externalEndpoints := cluster.GetComponentEndpoints(objs.Services, primaryComponent)
-	switch {
-	case len(externalEndpoints) > 0:
-		hostPort = strings.Split(externalEndpoints[0], ":")
-	case len(internalEndpoints) > 0:
-		hostPort = strings.Split(internalEndpoints[0], ":")
-	default:
+	svcs := cluster.GetComponentServices(objs.Services, primaryComponent)
+	getEndpoint := func(getIPFn func(*corev1.Service) string) *corev1.Service {
+		for _, svc := range svcs {
+			var ip = getIPFn(svc)
+			if ip != "" && ip != "None" {
+				info.Host = ip
+				info.Port = fmt.Sprintf("%d", svc.Spec.Ports[0].Port)
+				return svc
+			}
+		}
+		return nil
+	}
+
+	// if there is public endpoint, use it to build connection info
+	svc := getEndpoint(cluster.GetExternalIP)
+
+	// if cluster does not have public endpoint, use local host to connect
+	if svc == nil {
+		svc = getEndpoint(func(svc *corev1.Service) string {
+			return svc.Spec.ClusterIP
+		})
+		private = true
+	}
+
+	// does not find any endpoints
+	if svc == nil {
 		return nil, fmt.Errorf("failed to find cluster endpoints")
 	}
 
-	info.Host = hostPort[0]
-	info.Port = hostPort[1]
+	// if cluster does not have public endpoints, tell user to use port-forward command and
+	// connect cluster from local host
+	if private {
+		fmt.Fprintf(o.Out, "# cluster %s does not have public endpoints, you can run following command and connect cluster from local host\n"+
+			"kubectl port-forward service/%s %s:%s\n\n", objs.Cluster.Name, svc.Name, info.Port, info.Port)
+		info.Host = "127.0.0.1"
+	}
 
 	// get engine
 	o.engine, err = engine.New(objs.ClusterDef.Spec.Type)

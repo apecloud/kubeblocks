@@ -105,20 +105,11 @@ func GetComponentEndpoints(svcList *corev1.ServiceList, c *dbaasv1alpha1.Cluster
 		return result
 	}
 
-	getExternalIP := func(svc *corev1.Service) string {
-		if svc.GetAnnotations()[types.ServiceLBTypeAnnotationKey] != types.ServiceLBTypeAnnotationValue {
-			return ""
-		}
-		return svc.GetAnnotations()[types.ServiceFloatingIPAnnotationKey]
-	}
-
-	for _, svc := range svcList.Items {
-		if svc.GetLabels()[types.ComponentLabelKey] != c.Name {
-			continue
-		}
+	svcs := GetComponentServices(svcList, c)
+	for _, svc := range svcs {
 		var (
 			internalIP = svc.Spec.ClusterIP
-			externalIP = getExternalIP(&svc)
+			externalIP = GetExternalIP(svc)
 		)
 		if internalIP != "" && internalIP != "None" {
 			internalEndpoints = append(internalEndpoints, getEndpoints(internalIP, svc.Spec.Ports)...)
@@ -128,6 +119,26 @@ func GetComponentEndpoints(svcList *corev1.ServiceList, c *dbaasv1alpha1.Cluster
 		}
 	}
 	return internalEndpoints, externalEndpoints
+}
+
+// GetComponentServices gets component services
+func GetComponentServices(svcList *corev1.ServiceList, c *dbaasv1alpha1.ClusterComponent) []*corev1.Service {
+	var svcs []*corev1.Service
+	for i, svc := range svcList.Items {
+		if svc.GetLabels()[types.ComponentLabelKey] != c.Name {
+			continue
+		}
+		svcs = append(svcs, &svcList.Items[i])
+	}
+	return svcs
+}
+
+// GetExternalIP get external IP from service annotation
+func GetExternalIP(svc *corev1.Service) string {
+	if svc.GetAnnotations()[types.ServiceLBTypeAnnotationKey] != types.ServiceLBTypeAnnotationValue {
+		return ""
+	}
+	return svc.GetAnnotations()[types.ServiceFloatingIPAnnotationKey]
 }
 
 func GetClusterDefByName(dynamic dynamic.Interface, name string) (*dbaasv1alpha1.ClusterDefinition, error) {

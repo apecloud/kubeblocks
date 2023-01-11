@@ -45,14 +45,14 @@ mysql -h %s -P %s -u %s -p%s
 		},
 
 		DJANGO: func(info *ConnectionInfo) string {
-			return fmt.Sprintf(`// .env
+			return fmt.Sprintf(`# .env
 DB_HOST=%s
 DB_NAME=%s
 DB_USER=%s
 DB_PASSWORD=%s
 DB_PORT=%s
 
-// settings.py
+# settings.py
 DATABASES = {
   'default': {
     'ENGINE': 'django.db.backends.mysql',
@@ -67,14 +67,14 @@ DATABASES = {
 		},
 
 		DOTNET: func(info *ConnectionInfo) string {
-			return fmt.Sprintf(`// appsettings.json
+			return fmt.Sprintf(`# appsettings.json
 {
   "ConnectionStrings": {
     "Default": "server=%s;port=%s;database=%s;user=%s;password=%s;SslMode=VerifyFull;"
   },
 }
 
-// Startup.cs
+# Startup.cs
 public void ConfigureServices(IServiceCollection services)
 {
     services.AddTransient<MySqlConnection>(_ => new MySqlConnection(Configuration["ConnectionStrings:Default"]));
@@ -83,7 +83,7 @@ public void ConfigureServices(IServiceCollection services)
 		},
 
 		GO: func(info *ConnectionInfo) string {
-			const goConnectExample = `// main.go
+			const goConnectExample = `# main.go
 package main
 
 import (
@@ -108,7 +108,7 @@ func main() {
     log.Println("Successfully connected!")
 }
 `
-			dsn := fmt.Sprintf(`// .env
+			dsn := fmt.Sprintf(`# .env
 DSN=%s:%s@tcp(%s:%s)/%s?tls=true
 `, info.User, info.Password, info.Host, info.Port, info.Database)
 			return fmt.Sprintf("%s\n%s", dsn, goConnectExample)
@@ -124,10 +124,10 @@ Connection conn = DriverManager.getConnection(
 		},
 
 		NODEJS: func(info *ConnectionInfo) string {
-			return fmt.Sprintf(`// .env
+			return fmt.Sprintf(`# .env
 DATABASE_URL='mysql://%s:%s@%s:%s/%s?ssl={"rejectUnauthorized":true}'
 
-// app.js
+# app.js
 require('dotenv').config();
 const mysql = require('mysql2');
 const connection = mysql.createConnection(process.env.DATABASE_URL);
@@ -137,14 +137,14 @@ connection.end();
 		},
 
 		PHP: func(info *ConnectionInfo) string {
-			return fmt.Sprintf(`// .env
+			return fmt.Sprintf(`# .env
 HOST=%s
 PORT=%s
 USERNAME=%s
 PASSWORD=%s
 DATABASE=%s
 
-// index.php
+# index.php
 <?php
   $mysqli = mysqli_init();
   $mysqli->real_connect($_ENV["HOST"], $_ENV["USERNAME"], $_ENV["PASSWORD"], $_ENV["DATABASE"], $_ENV["PORT"]);
@@ -154,10 +154,10 @@ DATABASE=%s
 		},
 
 		PRISMA: func(info *ConnectionInfo) string {
-			return fmt.Sprintf(`// .env
+			return fmt.Sprintf(`# .env
 DATABASE_URL='mysql://%s:%s@%s:%s/%s?sslaccept=strict'
 
-// schema.prisma
+# schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -171,17 +171,17 @@ datasource db {
 		},
 
 		PYTHON: func(info *ConnectionInfo) string {
-			return fmt.Sprintf(`// run the following command in the terminal to install dependencies
-$ pip install python-dotenv mysqlclient
+			return fmt.Sprintf(`# run the following command in the terminal to install dependencies
+pip install python-dotenv mysqlclient
 
-// .env
+# .env
 HOST=%s
 PORT=%s
 USERNAME=%s
 PASSWORD=%s
 DATABASE=%s
 
-// main.py
+# main.py
 from dotenv import load_dotenv
 load_dotenv()
 import os
@@ -199,10 +199,10 @@ connection = MySQLdb.connect(
 		},
 
 		RAILS: func(info *ConnectionInfo) string {
-			return fmt.Sprintf(`// Gemfile
+			return fmt.Sprintf(`# Gemfile
 gem 'mysql2'
 
-// config/database.yml
+# config/database.yml
 development:
   <<: *default
   adapter: mysql2
@@ -215,10 +215,10 @@ development:
 		},
 
 		RUST: func(info *ConnectionInfo) string {
-			return fmt.Sprintf(`// run the following command in the terminal
+			return fmt.Sprintf(`# run the following command in the terminal
 export DATABASE_URL="mysql://%s:%s@%s:%s/%s"
 
-// src/main.rs
+# src/main.rs
 use std::env;
 
 fn main() {
@@ -229,7 +229,7 @@ fn main() {
     println!("Successfully connected!");
 }
 
-// Cargo.toml
+# Cargo.toml
 [package]
 name = "kubeblocks_hello_world"
 version = "0.0.1"
@@ -240,7 +240,7 @@ mysql = "*"
 		},
 
 		SYMFONY: func(info *ConnectionInfo) string {
-			return fmt.Sprintf(`// .env
+			return fmt.Sprintf(`# .env
 DATABASE_URL='mysql://%s:%s@%s:%s/%s'
 `, info.User, info.Password, info.Host, info.Port, info.Database)
 		},

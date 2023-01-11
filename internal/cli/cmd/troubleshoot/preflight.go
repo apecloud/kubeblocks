@@ -36,6 +36,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes/scheme"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -53,6 +54,15 @@ const (
 	flagOutput                    = "output"
 	flagDebug                     = "debug"
 	flagNamespace                 = "namespace"
+)
+
+var (
+	preflightExample = templates.Examples(`
+		# Run preflight checks against customized preflight-check.yaml
+		kbcli troubleshoot preflight preflight-check.yaml
+
+		# Run preflight checks and display AnalyzeResults with non-interactive mode
+		kbcli troubleshoot preflight preflight-check.yaml --interactive=false`)
 )
 
 // preflightOptions declares the arguments accepted by the preflight command
@@ -73,7 +83,7 @@ func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	cmd := &cobra.Command{
 		Use:     "preflight",
 		Short:   "Run and retrieve preflight checks for kubeblocks",
-		Example: "",
+		Example: preflightExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(p.complete(args))
 			util.CheckErr(p.validate())

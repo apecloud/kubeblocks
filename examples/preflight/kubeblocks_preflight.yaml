@@ -66,6 +66,7 @@ spec:
           - pass:
               message: This cluster has enough nodes.
     - customResourceDefinition:
+        checkName: Required Storage CRD
         customResourceDefinitionName: volumesnapshots.snapshot.storage.k8s.io
         outcomes:
           - fail:

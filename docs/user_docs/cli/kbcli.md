@@ -58,5 +58,6 @@ kbcli [flags]
 * [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands
 * [kbcli options](kbcli_options.md)	 - Print the list of flags inherited by all commands
 * [kbcli playground](kbcli_playground.md)	 - Bootstrap a KubeBlocks in local host
+* [kbcli troubleshoot](kbcli_troubleshoot.md)	 - Troubleshooting for KubeBlocks
 * [kbcli version](kbcli_version.md)	 - Print the version information
 

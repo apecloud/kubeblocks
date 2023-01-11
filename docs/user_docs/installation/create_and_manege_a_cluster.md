@@ -43,18 +43,11 @@ Here is an example of how to create a KubeBlocks cluster using a YAML file.
               storage: 1Gi
     ```
 
-  2. Run this command to create a cluster in the default specification and engine.
-
+  2. Specify the `cluster-definition`, `cluster-version`, `terminationPolicy`, and `components` and run `kbcli cluster create NAME` to create a cluster.
+   
     ```
-    kbcli cluster create ac-cluster --components=mycluster.yaml
+    kbcli cluster create ac-cluster --cluster-definition=apecloud-wesql  --cluster-version=wesql-8.0.30 --components=mycluster.yaml --termination-policy=WipeOut
     ```
-
-  > **Note:**
-  > You can specify the engine type and version by adding `--cluster-definition` and `--cluster-version` flags. For example,
-  >
-  > ```
-  > kbcli cluster create ac-cluster --cluster-definition=apecloud-wesql  --cluster-version=wesql-8.0.30 --components=mycluster.yaml --termination-policy=WipeOut
-  > ```
 
 ## Delete a cluster
 
@@ -104,7 +97,7 @@ kbcli cluster connnect NAME
 You can use the option, `-i`, to specify an instance name. For example, 
 
 ```
-kbcli cluster connect -i ac-cluster-0
+kbcli cluster connect ac-cluster -i ac-cluster-ac-mysql-0
 ```
 
 Run the command below to view the instance list.
@@ -164,14 +157,15 @@ Run `kbcli cluster volume-expansion` to expand the cluster volume. For more opti
 
 - The `component-names` option can be used to specify a cluster.
 - The `storage` option can be used to specify the expected volume expansion size. 
-- The `vct-names` option stands for the name of the VolumeClaimTemplate. It is an array and needs to be separated by commas. 
+- The `volume-claim-template-names` option stands for the name of the VolumeClaimTemplate. It is an array and needs to be separated by commas. 
 
 _Example_
 
 ```
-kbcli cluster volume-expansion ac-cluster\ 
+kbcli cluster volume-expansion ac-cluster \
 --component-names="ac-mysql" \
---vct-names="data" --storage="2Gi"
+--volume-claim-template-names="data" \
+--storage="2Gi"
 ```
 
 ## Reference

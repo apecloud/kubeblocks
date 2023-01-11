@@ -124,6 +124,12 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 	// TODO typeName duplication validate
 
 	for _, component := range r.Spec.Components {
+		// validate system account defiined in spec.components[].systemAccounts
+		sysAccountSpec := component.SystemAccounts
+		if sysAccountSpec != nil {
+			sysAccountSpec.validateSysAccounts(allErrs)
+		}
+
 		if component.ComponentType != Consensus {
 			continue
 		}
@@ -187,5 +193,43 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 						"#(members) should be equal to defaultReplicas"))
 			}
 		}
+	}
+}
+
+// validateSysAccounts validate spec.components[].systemAccounts
+func (r *SystemAccountSpec) validateSysAccounts(allErrs *field.ErrorList) {
+	accountName := make(map[AccountName]bool)
+	for _, sysAccount := range r.Accounts {
+		// validate provision policy
+		provisionPolicy := sysAccount.ProvisionPolicy
+		if provisionPolicy.Type == CreateByStmt && sysAccount.ProvisionPolicy.Statements == nil {
+			*allErrs = append(*allErrs,
+				field.Invalid(field.NewPath("spec.components[*].systemAccounts.accounts.provisionPolicy.statements"),
+					sysAccount.Name, "statements should not be empty when provisionPolicy = CreateByStmt."))
+			continue
+		}
+
+		if provisionPolicy.Type == ReferToExisting && sysAccount.ProvisionPolicy.SecretRef == nil {
+			*allErrs = append(*allErrs,
+				field.Invalid(field.NewPath("spec.components[*].systemAccounts.accounts.provisionPolicy.secretRef"),
+					sysAccount.Name, "SecretRef should not be empty when provisionPolicy = ReferToExisting. "))
+			continue
+		}
+		// account names should be unique
+		if _, exists := accountName[sysAccount.Name]; exists {
+			*allErrs = append(*allErrs,
+				field.Invalid(field.NewPath("spec.components[*].systemAccounts.accounts"),
+					sysAccount.Name, "duplicated system account names are not allowd."))
+			continue
+		} else {
+			accountName[sysAccount.Name] = true
+		}
+	}
+
+	passwdConfig := r.PasswordConfig
+	if passwdConfig.Length < passwdConfig.NumDigits+passwdConfig.NumSymbols {
+		*allErrs = append(*allErrs,
+			field.Invalid(field.NewPath("spec.components[*].systemAccounts.passwordConfig"),
+				passwdConfig, "numDigits plus numSymbols exceeds password length. "))
 	}
 }

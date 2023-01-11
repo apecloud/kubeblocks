@@ -14,6 +14,15 @@ kbcli cluster connect (NAME | -i INSTANCE-NAME) [flags]
   
   # connect to a specified instance
   kbcli cluster connect -i my-cluster-instance-0
+  
+  # show cli connection example
+  kbcli cluster connect my-cluster --show-example --client=cli
+  
+  # show java connection example
+  kbcli cluster connect my-cluster --show-example --client=java
+  
+  # show all connection examples
+  kbcli cluster connect my-cluster --show-example
 ```
 
 ### Options

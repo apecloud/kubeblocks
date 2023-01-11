@@ -286,7 +286,7 @@ type ClusterDefinitionProbe struct {
 
 	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
 	// +kubebuilder:default=3
-	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Minimum=2
 	FailureThreshold int32 `json:"failureThreshold,omitempty"`
 
 	// commands used to execute for probe.

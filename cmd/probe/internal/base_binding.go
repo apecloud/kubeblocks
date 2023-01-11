@@ -38,7 +38,7 @@ const (
 	CommandSQLKey = "sql"
 
 	defaultCheckFailedThreshold   = 10
-	defaultRoleUnchangedThreshold = 60
+	defaultRoleUnchangedThreshold = 300
 )
 
 type ProbeBase struct {
@@ -89,10 +89,10 @@ func (p *ProbeBase) Init() {
 	}
 
 	roleUnchangedThreshold := viper.GetInt("KB_ROLE_UNCHANGED_THRESHOLD")
-	if roleUnchangedThreshold < 10 {
-		p.roleUnchangedThreshold = 10
-	} else if roleUnchangedThreshold > 60 {
+	if roleUnchangedThreshold < 60 {
 		p.roleUnchangedThreshold = 60
+	} else if roleUnchangedThreshold > 300 {
+		p.roleUnchangedThreshold = 300
 	} else {
 		p.roleUnchangedThreshold = roleUnchangedThreshold
 	}
@@ -209,8 +209,7 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 	// roleChanged events to maintain pod label accurately in cases of:
 	// 1 roleChanged event loss;
 	// 2 pod role label deleted or updated incorrectly.
-	if p.roleUnchangedCount%p.roleUnchangedThreshold == 0 ||
-		(p.roleUnchangedCount < 60 && p.roleUnchangedCount%2 == 0) {
+	if p.roleUnchangedCount < p.roleUnchangedThreshold && p.roleUnchangedCount%2 == 0 {
 		response.Metadata[StatusCode] = CheckFailedHTTPCode
 	}
 	msg, _ := json.Marshal(result)

@@ -67,7 +67,7 @@ func newCfgDiffMeta(testData string, add, delete map[string]interface{}) *cfgcor
 
 func TestIsUpdateDynamicParameters(t *testing.T) {
 	type args struct {
-		tpl  *dbaasv1alpha1.ConfigurationTemplateSpec
+		tpl  *dbaasv1alpha1.ConfigConstraintSpec
 		diff *cfgcore.ConfigDiffInformation
 	}
 	tests := []struct {
@@ -79,7 +79,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// null
 		args: args{
-			tpl:  &dbaasv1alpha1.ConfigurationTemplateSpec{},
+			tpl:  &dbaasv1alpha1.ConfigConstraintSpec{},
 			diff: newCfgDiffMeta(`null`, nil, nil),
 		},
 		want:    false,
@@ -88,7 +88,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// error
 		args: args{
-			tpl:  &dbaasv1alpha1.ConfigurationTemplateSpec{},
+			tpl:  &dbaasv1alpha1.ConfigConstraintSpec{},
 			diff: newCfgDiffMeta(`invalid json formatter`, nil, nil),
 		},
 		want:    false,
@@ -97,7 +97,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// add/delete config file
 		args: args{
-			tpl:  &dbaasv1alpha1.ConfigurationTemplateSpec{},
+			tpl:  &dbaasv1alpha1.ConfigConstraintSpec{},
 			diff: newCfgDiffMeta(`{}`, map[string]interface{}{"a": "b"}, nil),
 		},
 		want:    false,
@@ -106,7 +106,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// not set static or dynamic parameters
 		args: args{
-			tpl:  &dbaasv1alpha1.ConfigurationTemplateSpec{},
+			tpl:  &dbaasv1alpha1.ConfigConstraintSpec{},
 			diff: newCfgDiffMeta(`{"a":"b"}`, nil, nil),
 		},
 		want:    false,
@@ -115,7 +115,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// static parameters contains
 		args: args{
-			tpl: &dbaasv1alpha1.ConfigurationTemplateSpec{
+			tpl: &dbaasv1alpha1.ConfigConstraintSpec{
 				StaticParameters: []string{"param1", "param2", "param3"},
 			},
 			diff: newCfgDiffMeta(`{"param3":"b"}`, nil, nil),
@@ -126,7 +126,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// static parameters not contains
 		args: args{
-			tpl: &dbaasv1alpha1.ConfigurationTemplateSpec{
+			tpl: &dbaasv1alpha1.ConfigConstraintSpec{
 				StaticParameters: []string{"param1", "param2", "param3"},
 			},
 			diff: newCfgDiffMeta(`{"param4":"b"}`, nil, nil),
@@ -137,7 +137,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// dynamic parameters contains
 		args: args{
-			tpl: &dbaasv1alpha1.ConfigurationTemplateSpec{
+			tpl: &dbaasv1alpha1.ConfigConstraintSpec{
 				DynamicParameters: []string{"param1", "param2", "param3"},
 			},
 			diff: newCfgDiffMeta(`{"param1":"b", "param3": 20}`, nil, nil),
@@ -148,7 +148,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// dynamic parameters not contains
 		args: args{
-			tpl: &dbaasv1alpha1.ConfigurationTemplateSpec{
+			tpl: &dbaasv1alpha1.ConfigConstraintSpec{
 				DynamicParameters: []string{"param1", "param2", "param3"},
 			},
 			diff: newCfgDiffMeta(`{"param1":"b", "param4": 20}`, nil, nil),
@@ -159,7 +159,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 		name: "test",
 		// dynamic/static parameters not contains
 		args: args{
-			tpl: &dbaasv1alpha1.ConfigurationTemplateSpec{
+			tpl: &dbaasv1alpha1.ConfigConstraintSpec{
 				DynamicParameters: []string{"dparam1", "dparam2", "dparam3"},
 				StaticParameters:  []string{"sparam1", "sparam2", "sparam3"},
 			},

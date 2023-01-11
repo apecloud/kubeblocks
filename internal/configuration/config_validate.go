@@ -77,7 +77,7 @@ func (e EmptyValidator) Validate(cfg map[string]string) error {
 	return nil
 }
 
-func NewConfigValidator(configTemplate *dbaasv1alpha1.ConfigurationTemplateSpec) ConfigValidator {
+func NewConfigValidator(configTemplate *dbaasv1alpha1.ConfigConstraintSpec) ConfigValidator {
 	var (
 		meta      = configTemplate.ConfigurationSchema
 		validator ConfigValidator

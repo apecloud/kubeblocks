@@ -29,7 +29,7 @@ type ConfigType string
 
 const (
 	CfgCmType    ConfigType = "configmap"
-	CfgTplType   ConfigType = "configurationTemplate"
+	CfgTplType   ConfigType = "configConstraint"
 	CfgLocalType ConfigType = "local"
 	CfgRawType   ConfigType = "raw"
 )

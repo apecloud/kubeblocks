@@ -21,8 +21,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ConfigurationTemplateSpec defines the desired state of ConfigurationTemplate
-type ConfigurationTemplateSpec struct {
+// ConfigConstraintSpec defines the desired state of ConfigConstraint
+type ConfigConstraintSpec struct {
 	// reloadOptions indicates whether the process supports reload.
 	// if set, the controller will determine the behavior of the engine instance based on the configuration templates,
 	// restart or reload depending on whether any parameters in the StaticParameters have been modified.
@@ -57,8 +57,8 @@ type ConfigurationTemplateSpec struct {
 	FormatterConfig *FormatterConfig `json:"formatterConfig"`
 }
 
-// ConfigurationTemplateStatus defines the observed state of ConfigurationTemplate.
-type ConfigurationTemplateStatus struct {
+// ConfigConstraintStatus defines the observed state of ConfigConstraint.
+type ConfigConstraintStatus struct {
 	// phase is status of configuration template, when set to AvailablePhase, it can be referenced by ClusterDefinition or AppVersion.
 	// +kubebuilder:validation:Enum={Available,Unavailable,Deleting}
 	// +optional
@@ -69,7 +69,7 @@ type ConfigurationTemplateStatus struct {
 	Message string `json:"message,omitempty"`
 
 	// observedGeneration is the latest generation observed for this
-	// ClusterDefinition. It refers to the ConfigurationTemplate's generation, which is
+	// ClusterDefinition. It refers to the ConfigConstraint's generation, which is
 	// updated by the API Server.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
@@ -155,24 +155,24 @@ type IniConfig struct {
 //+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// ConfigurationTemplate is the Schema for the configurationtemplates API
-type ConfigurationTemplate struct {
+// ConfigConstraint is the Schema for the configconstraint API
+type ConfigConstraint struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ConfigurationTemplateSpec   `json:"spec,omitempty"`
-	Status ConfigurationTemplateStatus `json:"status,omitempty"`
+	Spec   ConfigConstraintSpec   `json:"spec,omitempty"`
+	Status ConfigConstraintStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// ConfigurationTemplateList contains a list of ConfigurationTemplates.
-type ConfigurationTemplateList struct {
+// ConfigConstraintList contains a list of ConfigConstraints.
+type ConfigConstraintList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ConfigurationTemplate `json:"items"`
+	Items           []ConfigConstraint `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ConfigurationTemplate{}, &ConfigurationTemplateList{})
+	SchemeBuilder.Register(&ConfigConstraint{}, &ConfigConstraintList{})
 }

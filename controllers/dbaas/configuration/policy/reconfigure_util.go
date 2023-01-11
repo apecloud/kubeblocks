@@ -44,7 +44,7 @@ func getUpdateParameterList(cfg *cfgcore.ConfigDiffInformation) ([]string, error
 	return params, nil
 }
 
-func isUpdateDynamicParameters(tpl *dbaasv1alpha1.ConfigurationTemplateSpec, cfg *cfgcore.ConfigDiffInformation) (bool, error) {
+func isUpdateDynamicParameters(tpl *dbaasv1alpha1.ConfigConstraintSpec, cfg *cfgcore.ConfigDiffInformation) (bool, error) {
 	// TODO(zt) how to process new or delete file
 	if len(cfg.DeleteConfig) > 0 || len(cfg.AddConfig) > 0 {
 		return false, nil

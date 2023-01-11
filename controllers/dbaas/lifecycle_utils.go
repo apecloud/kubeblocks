@@ -1686,13 +1686,13 @@ func buildCfgManagerContainer(params createParams, sidecarRenderedParam *cfgcm.C
 
 // processConfigMapTemplate Render config file using template engine
 func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder *configTemplateBuilder, tplCfg dbaasv1alpha1.ConfigTemplate) (map[string]string, error) {
-	cfgTemplate := &dbaasv1alpha1.ConfigurationTemplate{}
+	cfgTemplate := &dbaasv1alpha1.ConfigConstraint{}
 	if len(tplCfg.ConfigConstraintRef) > 0 {
 		if err := cli.Get(ctx, client.ObjectKey{
 			Namespace: "",
 			Name:      tplCfg.ConfigConstraintRef,
 		}, cfgTemplate); err != nil {
-			return nil, cfgcore.WrapError(err, "failed to get ConfigurationTemplate, key[%v]", tplCfg)
+			return nil, cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", tplCfg)
 		}
 	}
 

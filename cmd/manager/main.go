@@ -256,12 +256,12 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
 		os.Exit(1)
 	}
-	if err = (&configuration.ConfigurationTemplateReconciler{
+	if err = (&configuration.ConfigConstraintReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("configuration-template-controller"),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ConfigurationTemplate")
+		setupLog.Error(err, "unable to create controller", "controller", "ConfigConstraint")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

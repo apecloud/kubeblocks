@@ -5,18 +5,18 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  name: configurationtemplates.dbaas.kubeblocks.io
+  name: configconstraints.dbaas.kubeblocks.io
 spec:
   group: dbaas.kubeblocks.io
   names:
     categories:
     - dbaas
-    kind: ConfigurationTemplate
-    listKind: ConfigurationTemplateList
-    plural: configurationtemplates
+    kind: ConfigConstraint
+    listKind: ConfigConstraintList
+    plural: configconstraints
     shortNames:
     - ctpl
-    singular: configurationtemplate
+    singular: configconstraint
   scope: Cluster
   versions:
   - additionalPrinterColumns:
@@ -30,8 +30,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ConfigurationTemplate is the Schema for the configurationtemplates
-          API
+        description: ConfigConstraint is the Schema for the configconstraint API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -46,7 +45,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ConfigurationTemplateSpec defines the desired state of ConfigurationTemplate
+            description: ConfigConstraintSpec defines the desired state of ConfigConstraint
             properties:
               cfgSchemaTopLevelName:
                 description: cfgSchemaTopLevelName is cue type name, which generates
@@ -177,15 +176,14 @@ spec:
             - formatterConfig
             type: object
           status:
-            description: ConfigurationTemplateStatus defines the observed state of
-              ConfigurationTemplate.
+            description: ConfigConstraintStatus defines the observed state of ConfigConstraint.
             properties:
               message:
                 description: message field describes the reasons of abnormal status.
                 type: string
               observedGeneration:
                 description: observedGeneration is the latest generation observed
-                  for this ClusterDefinition. It refers to the ConfigurationTemplate's
+                  for this ClusterDefinition. It refers to the ConfigConstraint's
                   generation, which is updated by the API Server.
                 format: int64
                 type: integer

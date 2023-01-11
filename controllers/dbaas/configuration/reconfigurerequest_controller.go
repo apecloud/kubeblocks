@@ -99,7 +99,7 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return intctrlutil.Reconciled()
 	}
 
-	tpl := &dbaasv1alpha1.ConfigurationTemplate{}
+	tpl := &dbaasv1alpha1.ConfigConstraint{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: config.Namespace,
 		Name:      config.Labels[cfgcore.CMConfigurationConstraintsNameLabelKey],
@@ -122,7 +122,7 @@ func checkConfigurationObject(object client.Object) bool {
 	return checkConfigurationLabels(object, ConfigurationRequiredLabels)
 }
 
-func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, config *corev1.ConfigMap, tpl *dbaasv1alpha1.ConfigurationTemplate) (ctrl.Result, error) {
+func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, config *corev1.ConfigMap, tpl *dbaasv1alpha1.ConfigConstraint) (ctrl.Result, error) {
 
 	var (
 		stsLists   = appv1.StatefulSetList{}

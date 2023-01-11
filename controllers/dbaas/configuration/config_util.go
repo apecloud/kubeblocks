@@ -86,7 +86,7 @@ func getConfigMapByName(cli client.Client, ctx intctrlutil.RequestCtx, cmName, n
 	return configObj, nil
 }
 
-func checkConfigurationTemplate(ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplate) (bool, error) {
+func checkConfigurationTemplate(ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigConstraint) (bool, error) {
 	// validate configuration template
 	isConfigSchemaFn := func(tpl *dbaasv1alpha1.CustomParametersValidation) (bool, error) {
 		if tpl == nil || len(tpl.CUE) == 0 {
@@ -237,7 +237,7 @@ func deleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl
 	return cli.Patch(ctx.Ctx, cmObj, patch)
 }
 
-func checkConfigTPL(ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplate, schemaFn ValidateConfigSchema) (bool, error) {
+func checkConfigTPL(ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigConstraint, schemaFn ValidateConfigSchema) (bool, error) {
 	// validate schema
 	if ok, err := schemaFn(tpl.Spec.ConfigurationSchema); !ok || err != nil {
 		ctx.Log.Error(err, "failed to validate template schema!", "configMapName", fmt.Sprintf("%v", tpl.Spec.ConfigurationSchema))
@@ -339,7 +339,7 @@ func UpdateCVLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.Req
 
 func validateConfigTPLs(cli client.Client, ctx intctrlutil.RequestCtx, configTpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 	// check ConfigTemplate Validate
-	foundConfTplFn := func(configTpl dbaasv1alpha1.ConfigTemplate) (*dbaasv1alpha1.ConfigurationTemplate, error) {
+	foundConfTplFn := func(configTpl dbaasv1alpha1.ConfigTemplate) (*dbaasv1alpha1.ConfigConstraint, error) {
 		if _, err := getConfigMapByName(cli, ctx, configTpl.ConfigTplRef, configTpl.Namespace); err != nil {
 			ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", configTpl.ConfigTplRef)
 			return nil, err
@@ -349,7 +349,7 @@ func validateConfigTPLs(cli client.Client, ctx intctrlutil.RequestCtx, configTpl
 			return nil, nil
 		}
 
-		configObj := &dbaasv1alpha1.ConfigurationTemplate{}
+		configObj := &dbaasv1alpha1.ConfigConstraint{}
 		if err := cli.Get(ctx.Ctx, client.ObjectKey{
 			Namespace: "",
 			Name:      configTpl.ConfigConstraintRef,
@@ -381,7 +381,7 @@ func validateConfigTPLs(cli client.Client, ctx intctrlutil.RequestCtx, configTpl
 	return true, nil
 }
 
-func validateConfTplStatus(configStatus dbaasv1alpha1.ConfigurationTemplateStatus) bool {
+func validateConfTplStatus(configStatus dbaasv1alpha1.ConfigConstraintStatus) bool {
 	return configStatus.Phase == dbaasv1alpha1.AvailablePhase
 }
 
@@ -422,7 +422,7 @@ func getClusterComponentsByName(components []dbaasv1alpha1.ClusterComponent, com
 	return nil
 }
 
-func getConfigurationVersion(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigurationTemplateSpec) (*cfgcore.ConfigDiffInformation, error) {
+func getConfigurationVersion(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigConstraintSpec) (*cfgcore.ConfigDiffInformation, error) {
 	lastConfig, err := getLastVersionConfig(cfg)
 	if err != nil {
 		return nil, cfgcore.WrapError(err, "failed to get last version data. config[%v]", client.ObjectKeyFromObject(cfg))
@@ -443,7 +443,7 @@ func getConfigurationVersion(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, 
 	}, option)
 }
 
-func updateConfigurationSchema(tpl *dbaasv1alpha1.ConfigurationTemplateSpec) error {
+func updateConfigurationSchema(tpl *dbaasv1alpha1.ConfigConstraintSpec) error {
 	schema := tpl.ConfigurationSchema
 	if schema != nil && len(schema.CUE) > 0 && schema.Schema == nil {
 		customSchema, err := cfgcore.GenerateOpenAPISchema(schema.CUE, tpl.CfgSchemaTopLevelName)
@@ -465,12 +465,12 @@ func GetReloadOptions(cli client.Client, ctx context.Context, tpls []dbaasv1alph
 		if !NeedReloadVolume(tpl) {
 			continue
 		}
-		cfgConst := &dbaasv1alpha1.ConfigurationTemplate{}
+		cfgConst := &dbaasv1alpha1.ConfigConstraint{}
 		if err := cli.Get(ctx, client.ObjectKey{
 			Namespace: "",
 			Name:      tpl.ConfigConstraintRef,
 		}, cfgConst); err != nil {
-			return nil, cfgcore.WrapError(err, "failed to get ConfigurationTemplate, key[%v]", tpl)
+			return nil, cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", tpl)
 		}
 		if cfgConst.Spec.ReloadOptions != nil {
 			return cfgConst.Spec.ReloadOptions, nil

@@ -52,7 +52,7 @@ type ConfigEventContext struct {
 
 	Meta *ConfigDiffInformation
 	Cfg  *corev1.ConfigMap
-	Tpl  *dbaasv1alpha1.ConfigurationTemplateSpec
+	Tpl  *dbaasv1alpha1.ConfigConstraintSpec
 }
 
 type ConfigEventHandler interface {

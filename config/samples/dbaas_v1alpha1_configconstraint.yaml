@@ -1,6 +1,6 @@
 apiVersion: dbaas.infracreate.com/v1alpha1
-kind: ConfigurationTemplate
+kind: ConfigConstraint
 metadata:
-  name: configurationtemplate-sample
+  name: configconstraint-sample
 spec:
   # TODO(user): Add fields here

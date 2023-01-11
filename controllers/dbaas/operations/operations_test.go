@@ -105,7 +105,7 @@ allowVolumeExpansion: true
 		return sc
 	}
 
-	assureCfgTplObj := func(tplName, cmName, ns string) (*corev1.ConfigMap, *dbaasv1alpha1.ConfigurationTemplate) {
+	assureCfgTplObj := func(tplName, cmName, ns string) (*corev1.ConfigMap, *dbaasv1alpha1.ConfigConstraint) {
 		By("Assuring an cm obj")
 
 		cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap](
@@ -113,7 +113,7 @@ allowVolumeExpansion: true
 			testdata.WithNamespacedName(cmName, ns),
 		)
 		Expect(err).Should(Succeed())
-		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigurationTemplate](
+		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigConstraint](
 			"operations_config/configtpl.yaml",
 			testdata.WithNamespacedName(tplName, ns))
 		Expect(err).Should(Succeed())

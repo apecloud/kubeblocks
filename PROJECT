@@ -93,7 +93,7 @@ resources:
   controller: true
   domain: kubeblocks.io
   group: dbaas
-  kind: ConfigurationTemplate
+  kind: ConfigConstraint
   path: github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1
   version: v1alpha1
 version: "3"

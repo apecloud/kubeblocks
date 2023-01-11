@@ -44,7 +44,7 @@ type KBResource interface {
 	dbaasv1alpha1.Cluster |
 	dbaasv1alpha1.ClusterDefinition |
 	dbaasv1alpha1.ClusterVersion |
-	dbaasv1alpha1.ConfigurationTemplate |
+	dbaasv1alpha1.ConfigConstraint |
 	corev1.ConfigMap |
 	appsv1.StatefulSet |
 	appsv1.Deployment

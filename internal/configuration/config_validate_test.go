@@ -35,7 +35,7 @@ var toMap = func(str string) map[string]string {
 func TestSchemaValidatorWithCue(t *testing.T) {
 	// not config validate
 	{
-		validator := NewConfigValidator(&dbaasv1alpha1.ConfigurationTemplateSpec{})
+		validator := NewConfigValidator(&dbaasv1alpha1.ConfigConstraintSpec{})
 		require.NotNil(t, validator)
 		require.Nil(t, validator.Validate(nil))
 	}
@@ -74,8 +74,8 @@ func TestSchemaValidatorWithOpenSchema(t *testing.T) {
 	require.Nil(t, validator.Validate(toMap(loadTestData("./testdata/mysql.cnf"))))
 }
 
-func fakeConfigurationTpl(cuefile string, cfgFormatter dbaasv1alpha1.ConfigurationFormatter) *dbaasv1alpha1.ConfigurationTemplateSpec {
-	return &dbaasv1alpha1.ConfigurationTemplateSpec{
+func fakeConfigurationTpl(cuefile string, cfgFormatter dbaasv1alpha1.ConfigurationFormatter) *dbaasv1alpha1.ConfigConstraintSpec {
+	return &dbaasv1alpha1.ConfigConstraintSpec{
 		ConfigurationSchema: &dbaasv1alpha1.CustomParametersValidation{
 			CUE: loadTestData(cuefile),
 		},

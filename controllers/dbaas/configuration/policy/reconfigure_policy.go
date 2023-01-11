@@ -59,7 +59,7 @@ type ReconfigureParams struct {
 	Cfg *corev1.ConfigMap
 
 	// ConfigConstraint pointer
-	Tpl *dbaasv1alpha1.ConfigurationTemplateSpec
+	Tpl *dbaasv1alpha1.ConfigConstraintSpec
 
 	// For grpc factory
 	ReconfigureClientFactory createReconfigureClient
@@ -183,7 +183,7 @@ func (receiver AutoReloadPolicy) GetPolicyName() string {
 	return string(dbaasv1alpha1.AutoReload)
 }
 
-func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigurationTemplateSpec, cfg *cfgcore.ConfigDiffInformation, policy dbaasv1alpha1.UpgradePolicy, restart bool) (ReconfigurePolicy, error) {
+func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigConstraintSpec, cfg *cfgcore.ConfigDiffInformation, policy dbaasv1alpha1.UpgradePolicy, restart bool) (ReconfigurePolicy, error) {
 	if !cfg.IsModify {
 		// not exec here
 		return nil, cfgcore.MakeError("cfg not modify. [%v]", cfg)

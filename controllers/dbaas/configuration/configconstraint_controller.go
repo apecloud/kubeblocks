@@ -32,27 +32,27 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// ConfigurationTemplateReconciler reconciles a ConfigurationTemplate object
-type ConfigurationTemplateReconciler struct {
+// ConfigConstraintReconciler reconciles a ConfigConstraint object
+type ConfigConstraintReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=configurationtemplates,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=configurationtemplates/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=configurationtemplates/finalizers,verbs=update
+//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=configconstraint,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=configconstraint/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=configconstraint/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the ConfigurationTemplate object against the actual cluster state, and then
+// the ConfigConstraint object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.2/pkg/reconcile
-func (r *ConfigurationTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
@@ -60,18 +60,18 @@ func (r *ConfigurationTemplateReconciler) Reconcile(ctx context.Context, req ctr
 		Recorder: r.Recorder,
 	}
 
-	configTpl := &dbaasv1alpha1.ConfigurationTemplate{}
-	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, configTpl); err != nil {
+	configCSTR := &dbaasv1alpha1.ConfigConstraint{}
+	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, configCSTR); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, configTpl, cfgcore.ConfigurationTemplateFinalizerName, func() (*ctrl.Result, error) {
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, configCSTR, cfgcore.ConfigurationTemplateFinalizerName, func() (*ctrl.Result, error) {
 		recordEvent := func() {
-			r.Recorder.Event(configTpl, corev1.EventTypeWarning, "ExistsReferencedResources",
+			r.Recorder.Event(configCSTR, corev1.EventTypeWarning, "ExistsReferencedResources",
 				"cannot be deleted because of existing referencing ClusterDefinition or ClusterVersion.")
 		}
-		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, configTpl,
-			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(configTpl.GetName()),
+		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, configCSTR,
+			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(configCSTR.GetName()),
 			recordEvent, &dbaasv1alpha1.ClusterDefinitionList{},
 			&dbaasv1alpha1.ClusterVersionList{}); res != nil || err != nil {
 			return res, err
@@ -82,33 +82,33 @@ func (r *ConfigurationTemplateReconciler) Reconcile(ctx context.Context, req ctr
 		return *res, err
 	}
 
-	if configTpl.Status.ObservedGeneration == configTpl.GetObjectMeta().GetGeneration() {
+	if configCSTR.Status.ObservedGeneration == configCSTR.GetObjectMeta().GetGeneration() {
 		return intctrlutil.Reconciled()
 	}
 
-	if ok, err := checkConfigurationTemplate(reqCtx, configTpl); !ok || err != nil {
+	if ok, err := checkConfigurationTemplate(reqCtx, configCSTR); !ok || err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "ValidateConfigurationTemplate")
 	}
 
-	statusPatch := client.MergeFrom(configTpl.DeepCopy())
-	// configTpl.Spec.ConfigurationSchema.Schema = cfgcore.GenerateOpenAPISchema(configTpl.Spec.ConfigurationSchema.CUE)
-	if err := updateConfigurationSchema(&configTpl.Spec); err != nil {
+	statusPatch := client.MergeFrom(configCSTR.DeepCopy())
+	// configCSTR.Spec.ConfigurationSchema.Schema = cfgcore.GenerateOpenAPISchema(configCSTR.Spec.ConfigurationSchema.CUE)
+	if err := updateConfigurationSchema(&configCSTR.Spec); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to generate configuration open api schema")
 	}
-	configTpl.Status.ObservedGeneration = configTpl.GetObjectMeta().GetGeneration()
-	configTpl.Status.Phase = dbaasv1alpha1.AvailablePhase
-	if err = r.Client.Status().Patch(reqCtx.Ctx, configTpl, statusPatch); err != nil {
+	configCSTR.Status.ObservedGeneration = configCSTR.GetObjectMeta().GetGeneration()
+	configCSTR.Status.Phase = dbaasv1alpha1.AvailablePhase
+	if err = r.Client.Status().Patch(reqCtx.Ctx, configCSTR, statusPatch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	intctrlutil.RecordCreatedEvent(r.Recorder, configTpl)
+	intctrlutil.RecordCreatedEvent(r.Recorder, configCSTR)
 
 	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ConfigurationTemplateReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ConfigConstraintReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&dbaasv1alpha1.ConfigurationTemplate{}).
+		For(&dbaasv1alpha1.ConfigConstraint{}).
 		// for other resource
 		Owns(&corev1.ConfigMap{}).
 		Complete(r)

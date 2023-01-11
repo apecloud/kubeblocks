@@ -352,8 +352,8 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 	Context("common funcs test", func() {
 		It("GetReloadOptions Should success without error", func() {
-			mockTpl := dbaasv1alpha1.ConfigurationTemplate{
-				Spec: dbaasv1alpha1.ConfigurationTemplateSpec{
+			mockTpl := dbaasv1alpha1.ConfigConstraint{
+				Spec: dbaasv1alpha1.ConfigConstraintSpec{
 					ReloadOptions: &dbaasv1alpha1.ReloadOptions{
 						UnixSignalTrigger: &dbaasv1alpha1.UnixSignalTrigger{
 							Signal:      "HUB",

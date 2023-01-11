@@ -405,7 +405,7 @@ rules:
 - apiGroups:
   - dbaas.kubeblocks.io
   resources:
-  - configurationtemplates
+  - configconstraint
   verbs:
   - create
   - delete
@@ -417,13 +417,13 @@ rules:
 - apiGroups:
   - dbaas.kubeblocks.io
   resources:
-  - configurationtemplates/finalizers
+  - configconstraint/finalizers
   verbs:
   - update
 - apiGroups:
   - dbaas.kubeblocks.io
   resources:
-  - configurationtemplates/status
+  - configconstraint/status
   verbs:
   - get
   - patch

@@ -32,7 +32,7 @@ import (
 	test "github.com/apecloud/kubeblocks/test/testdata"
 )
 
-var _ = Describe("ConfigurationTemplate Controller", func() {
+var _ = Describe("ConfigConstraint Controller", func() {
 	var ctx = context.Background()
 
 	BeforeEach(func() {
@@ -63,10 +63,10 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 			Expect(testWrapper.HasError()).Should(Succeed())
 
 			// step2: check configuration template cr status and finalizer
-			By("By check configurationtemplate status")
+			By("check ConfigConstraint status")
 			Eventually(func() bool {
-				ok, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigurationTemplate{},
-					func(tpl *dbaasv1alpha1.ConfigurationTemplate) bool {
+				ok, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigConstraint{},
+					func(tpl *dbaasv1alpha1.ConfigConstraint) bool {
 						return validateConfTplStatus(tpl.Status) &&
 							validateFinalizerFlag(tpl)
 					})
@@ -76,11 +76,11 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 			By("By delete configuration template cr")
 			Expect(testWrapper.DeleteTpl()).Should(Succeed())
 			// Configuration template not deleted
-			By("check whether the configurationtemplate has been deleted")
-			log.Log.Info("expect that configurationtemplate is not deleted.")
+			By("check whether the ConfigConstraint has been deleted")
+			log.Log.Info("expect that ConfigConstraint is not deleted.")
 			Eventually(func() error {
-				_, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigurationTemplate{},
-					func(tpl *dbaasv1alpha1.ConfigurationTemplate) error { return nil })
+				_, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigConstraint{},
+					func(tpl *dbaasv1alpha1.ConfigConstraint) error { return nil })
 				return err
 			}, time.Second*10, time.Second*1).Should(Succeed())
 
@@ -90,8 +90,8 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 			Expect(testWrapper.DeleteCD()).Should(Succeed())
 
 			Eventually(func() error {
-				_, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigurationTemplate{},
-					func(tpl *dbaasv1alpha1.ConfigurationTemplate) error { return nil })
+				_, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigConstraint{},
+					func(tpl *dbaasv1alpha1.ConfigConstraint) error { return nil })
 				return err
 			}, time.Second*100, time.Second*1).ShouldNot(Succeed())
 			Expect(testWrapper.DeleteAllCR()).Should(Succeed())
@@ -115,8 +115,8 @@ var _ = Describe("ConfigurationTemplate Controller", func() {
 			Expect(testWrapper.HasError()).Should(Succeed())
 
 			Eventually(func() bool {
-				ok, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigurationTemplate{},
-					func(tpl *dbaasv1alpha1.ConfigurationTemplate) bool {
+				ok, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigConstraint{},
+					func(tpl *dbaasv1alpha1.ConfigConstraint) bool {
 						return validateConfTplStatus(tpl.Status)
 					})
 				return err == nil && ok

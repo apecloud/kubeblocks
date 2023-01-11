@@ -60,7 +60,7 @@ type FakeTest struct {
 }
 
 type ISVResource interface {
-	corev1.ConfigMap | appsv1.StatefulSet | dbaasv1alpha1.ClusterDefinition | dbaasv1alpha1.ClusterVersion | dbaasv1alpha1.ConfigurationTemplate
+	corev1.ConfigMap | appsv1.StatefulSet | dbaasv1alpha1.ClusterDefinition | dbaasv1alpha1.ClusterVersion | dbaasv1alpha1.ConfigConstraint
 }
 
 type K8sResource interface {
@@ -81,7 +81,7 @@ type TestWrapper struct {
 	// cr object
 	cd  *dbaasv1alpha1.ClusterDefinition
 	cv  *dbaasv1alpha1.ClusterVersion
-	tpl *dbaasv1alpha1.ConfigurationTemplate
+	tpl *dbaasv1alpha1.ConfigConstraint
 	cm  *corev1.ConfigMap
 }
 
@@ -191,7 +191,7 @@ func (w *TestWrapper) DeleteAllCR() error {
 
 	// step4: delete config templateion cr
 	if err := k8sClient.DeleteAllOf(ctx,
-		&dbaasv1alpha1.ConfigurationTemplate{},
+		&dbaasv1alpha1.ConfigConstraint{},
 		client.InNamespace(clusterNS),
 		client.HasLabels{testCtx.TestObjLabelKey}); err != nil {
 		return err
@@ -404,7 +404,7 @@ func CreateDBaasFromISV(testCtx testutil.TestContext, ctx context.Context, k8sCl
 	createCRFromISVWithT(testWrapper, testInfo.CDName, path.Join(dataPath, testInfo.CDYaml), &dbaasv1alpha1.ClusterDefinition{})
 	createCRFromISVWithT(testWrapper, testInfo.CVName, path.Join(dataPath, testInfo.CVYaml), &dbaasv1alpha1.ClusterVersion{})
 	createCRFromISVWithT(testWrapper, testWrapper.CMName(), path.Join(dataPath, testInfo.CfgCMYaml), &corev1.ConfigMap{})
-	createCRFromISVWithT(testWrapper, testWrapper.TPLName(), path.Join(dataPath, testInfo.CfgTemplateYaml), &dbaasv1alpha1.ConfigurationTemplate{})
+	createCRFromISVWithT(testWrapper, testWrapper.TPLName(), path.Join(dataPath, testInfo.CfgTemplateYaml), &dbaasv1alpha1.ConfigConstraint{})
 
 	return testWrapper
 }
@@ -426,11 +426,11 @@ func createCRFromISVWithT(t *TestWrapper, tplName string, fileName string, crTyp
 	case *dbaasv1alpha1.ClusterDefinition:
 		crObj, err = createISVCrFromFile(fileName, obj, t.updateComTplMeta)
 		t.cd = crObj.(*dbaasv1alpha1.ClusterDefinition)
-	case *dbaasv1alpha1.ConfigurationTemplate:
-		crObj, err = createISVCrFromFile(fileName, obj, func(tpl *dbaasv1alpha1.ConfigurationTemplate) {
+	case *dbaasv1alpha1.ConfigConstraint:
+		crObj, err = createISVCrFromFile(fileName, obj, func(tpl *dbaasv1alpha1.ConfigConstraint) {
 			// tpl.Spec.TplRef = t.testEnv.CfgTplName
 		})
-		t.tpl = crObj.(*dbaasv1alpha1.ConfigurationTemplate)
+		t.tpl = crObj.(*dbaasv1alpha1.ConfigConstraint)
 	// case *dbaasv1alpha1.Cluster:
 	//	crObj, err = createISVCrFromFile(fileName, obj)
 	case *corev1.ConfigMap:
@@ -493,7 +493,7 @@ func ValidateISVCR[T any, OBJECT K8sResource](test *TestWrapper, obj client.Obje
 			Namespace: ISVClusterScope,
 			Name:      test.testEnv.CDName,
 		}
-	case *dbaasv1alpha1.ConfigurationTemplate:
+	case *dbaasv1alpha1.ConfigConstraint:
 		objKey = client.ObjectKey{
 			Namespace: ISVClusterScope,
 			Name:      test.TPLName(),

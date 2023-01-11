@@ -119,7 +119,7 @@ var _ = Describe("Cluster Controller", func() {
 		cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("config/configcm.yaml",
 			testdata.WithNamespace(testCtx.DefaultNamespace))
 		Expect(err).Should(Succeed())
-		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigurationTemplate]("config/configtpl.yaml")
+		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigConstraint]("config/configtpl.yaml")
 		Expect(err).Should(Succeed())
 
 		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())

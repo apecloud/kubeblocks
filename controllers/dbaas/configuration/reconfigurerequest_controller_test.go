@@ -68,8 +68,8 @@ var _ = Describe("Reconfigure Controller", func() {
 
 			// step2: Check configuration template status
 			Eventually(func() bool {
-				ok, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigurationTemplate{},
-					func(tpl *dbaasv1alpha1.ConfigurationTemplate) bool {
+				ok, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigConstraint{},
+					func(tpl *dbaasv1alpha1.ConfigConstraint) bool {
 						return validateConfTplStatus(tpl.Status)
 					})
 				return err == nil && ok

@@ -167,7 +167,7 @@ spec:
 		cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("config/configcm.yaml",
 			testdata.WithNamespacedName(cmName, cmNs))
 		Expect(err).Should(Succeed())
-		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigurationTemplate]("config/configtpl.yaml",
+		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigConstraint]("config/configtpl.yaml",
 			testdata.WithNamespacedName(cmName, cmNs))
 		Expect(err).Should(Succeed())
 

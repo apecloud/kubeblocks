@@ -53,12 +53,12 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 		reflect.Indirect(outVal).Set(reflect.Indirect(objVal))
 	}
 
-	mockCfgTplObj := func(tpl dbaasv1alpha1.ConfigTemplate) (*corev1.ConfigMap, *dbaasv1alpha1.ConfigurationTemplate) {
+	mockCfgTplObj := func(tpl dbaasv1alpha1.ConfigTemplate) (*corev1.ConfigMap, *dbaasv1alpha1.ConfigConstraint) {
 		By("By assure an cm obj")
 		cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("operations_config/configcm.yaml",
 			testdata.WithNamespacedName(tpl.ConfigTplRef, tpl.Namespace))
 		Expect(err).Should(Succeed())
-		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigurationTemplate]("operations_config/configtpl.yaml",
+		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigConstraint]("operations_config/configtpl.yaml",
 			testdata.WithNamespacedName(tpl.ConfigConstraintRef, tpl.Namespace))
 		Expect(err).Should(Succeed())
 		return cfgCM, cfgTpl

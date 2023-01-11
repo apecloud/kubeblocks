@@ -89,7 +89,7 @@ func updateCfgParams(
 	opsCrName string) (bool, error) {
 	var (
 		cm     = &corev1.ConfigMap{}
-		cfgTpl = &dbaasv1alpha1.ConfigurationTemplate{}
+		cfgTpl = &dbaasv1alpha1.ConfigConstraint{}
 
 		err      error
 		operator cfgcore.ConfigOperator

@@ -173,6 +173,15 @@ func getEnvByName(args interface{}, envName string) (string, error) {
 	return "", nil
 }
 
+// getContainerMemory for general built-in
+func getContainerMemory(args interface{}) (int64, error) {
+	container, err := fromJSONObject[corev1.Container](args)
+	if err != nil {
+		return 0, err
+	}
+	return intctrlutil.GetMemorySize(*container), nil
+}
+
 // getArgByName for general built-in
 func getArgByName(args interface{}, argName string) string {
 	// TODO Support parse command args

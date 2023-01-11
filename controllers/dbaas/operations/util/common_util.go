@@ -63,7 +63,7 @@ func PatchOpsRequestReconcileAnnotation(ctx context.Context, cli client.Client, 
 }
 
 // GetOpsRequestSliceFromCluster gets OpsRequest slice from cluster annotations.
-// this record what OpsRequests are running in cluster
+// this records what OpsRequests are running in cluster
 func GetOpsRequestSliceFromCluster(cluster *dbaasv1alpha1.Cluster) ([]dbaasv1alpha1.OpsRecorder, error) {
 	var (
 		opsRequestValue string

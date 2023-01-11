@@ -39,10 +39,7 @@ You can also deploy `playground` on AWS EC2 by following the steps below.
 
 Make sure the following requirements are met.
 
-- AWS access key: An AWS access key is required and this account should have the searching and changing permission of VPC/Internet Gateway/Subnet/Route Table/Security Group/EC2 resources. ***Environment dependencies are required. Need to be confirmed and added. ***
-- EKS
-- Self-owned Kubernetes
-- A fresh and clean start
+- AWS access key: An AWS access key is required and this account should have the searching and changing permission of VPC/Internet Gateway/Subnet/Route Table/Security Group/EC2 resources. 
 
 > **Caution** <br>
 > DO NOT switch your network during the deployment and using process. Switching network will change the IP address, which results in connection failure.
@@ -57,31 +54,32 @@ kbcli playground init --access-key xxx --access-secret xxx --cloud-provider aws
   The following information will be displayed when a playground is installed successfully.
 
 ```
-Notes:
-KubeBlocks Playground v0.2.0 Start SUCCESSFULLY!
-MySQL Standalone Cluster "mycluster" has been CREATED!
+KubeBlocks playground init SUCCESSFULLY!
+Cluster "mycluster" has been CREATED!
 
-1. Basic commands for dbcluster:
-  kbcli --kubeconfig ~/.kube/opencli-playground dbcluster list                          # list all database clusters
-  kbcli --kubeconfig ~/.kube/opencli-playground dbcluster describe mycluster       # get dbcluster information
-  kbcli bench --host 54.222.159.218 tpcc mycluster                                  # run tpcc benchmark 1min on dbcluster
+1. Basic commands for cluster:
 
-2. To connect to mysql database:
-  MYSQL_ROOT_PASSWORD=$(kubectl --kubeconfig ~/.kube/kbcli-playground get secret --namespace default mycluster-cluster-secret -o jsonpath="{.data.rootPassword}" | base64 -d)
-  mysqlsh -h 54.222.159.218 -uroot -p"$MYSQL_ROOT_PASSWORD"
+  export KUBECONFIG=/Users/admin/.kube/kubeblocks-playground
 
-3. To view the Grafana:
-  open http://54.222.159.218:9100/d/549c2bf8936f7767ea6ac47c47b00f2a/mysql_for_demo
-  User: admin
-  Password: prom-operator
+  kbcli cluster list                     # list database cluster and check its status
+  kbcli cluster describe mycluster       # get cluster information
+
+2. Connect to database
+
+  kbcli cluster connect mycluster
+
+3. View the Grafana:
+
+  kbcli dashboard open kubeblocks-grafana
 
 4. Uninstall Playground:
+
   kbcli playground destroy
 
 --------------------------------------------------------------------
-To view this guide next time:         kbcli playground guide
-To get more help information:         kbcli help
-To login to remote host:              ssh -i ~/.kubeblocks/ssh/id_rsa ec2-user@54.222.159.218
+To view this guide: kbcli playground guide
+To get more help: kbcli help
+
 Use "kbcli [command] --help" for more information about a command.
 ```
 

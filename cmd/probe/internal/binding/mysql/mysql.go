@@ -227,11 +227,15 @@ func (m *Mysql) GetRole(ctx context.Context, sql string) (string, error) {
 	var role string
 	var serverId string
 	for rows.Next() {
-		if err := rows.Scan(&curLeader, &role, &serverId); err != nil {
+		if err = rows.Scan(&curLeader, &role, &serverId); err != nil {
 			m.logger.Errorf("checkRole error: %", err)
+			return role, err
 		}
 	}
-	return role, nil
+	if _, ok := dbRoles[role]; !ok {
+		err = errors.Errorf("role %s is not configed in cluster definition %v", role, dbRoles)
+	}
+	return role, err
 }
 
 // design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad

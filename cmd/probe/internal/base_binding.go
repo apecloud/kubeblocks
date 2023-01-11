@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/dapr/components-contrib/bindings"
@@ -37,7 +38,7 @@ const (
 	// CommandSQLKey keys from request's metadata.
 	CommandSQLKey = "sql"
 
-	defaultCheckFailedThreshold   = 10
+	defaultCheckFailedThreshold   = 1800
 	defaultRoleUnchangedThreshold = 300
 )
 
@@ -45,6 +46,7 @@ type ProbeBase struct {
 	Operation               ProbeOperation
 	Logger                  logger.Logger
 	oriRole                 string
+	dbRoles                 map[string]AccessMode
 	runningCheckFailedCount int
 	roleCheckFailedCount    int
 	roleUnchangedCount      int
@@ -82,21 +84,25 @@ func init() {
 func (p *ProbeBase) Init() {
 	p.dbPort = p.Operation.GetRunningPort()
 	p.checkFailedThreshold = viper.GetInt("KB_CHECK_FAILED_THRESHOLD")
-	if p.checkFailedThreshold < 10 {
-		p.checkFailedThreshold = 10
-	} else if p.checkFailedThreshold > 60 {
-		p.checkFailedThreshold = 60
+	if p.checkFailedThreshold < 300 {
+		p.checkFailedThreshold = 300
+	} else if p.checkFailedThreshold > 3600 {
+		p.checkFailedThreshold = 3600
 	}
 
-	roleUnchangedThreshold := viper.GetInt("KB_ROLE_UNCHANGED_THRESHOLD")
-	if roleUnchangedThreshold < 60 {
+	p.roleUnchangedThreshold = viper.GetInt("KB_ROLE_UNCHANGED_THRESHOLD")
+	if p.roleUnchangedThreshold < 60 {
 		p.roleUnchangedThreshold = 60
-	} else if roleUnchangedThreshold > 300 {
+	} else if p.roleUnchangedThreshold > 300 {
 		p.roleUnchangedThreshold = 300
-	} else {
-		p.roleUnchangedThreshold = roleUnchangedThreshold
 	}
 
+	if viper.IsSet("KB_SERVICE_ROLES") {
+		val := viper.GetString("KB_SERVICE_ROLES")
+		if err := json.Unmarshal([]byte(val), &p.dbRoles); err != nil {
+			fmt.Println(errors.Wrap(err, "KB_DB_ROLES env format error").Error())
+		}
+	}
 }
 
 func (p *ProbeBase) Operations() []bindings.OperationKind {
@@ -193,6 +199,13 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 		return msg, nil
 	}
 
+	if isValid, message := p.roleValidate(role); !isValid {
+		result.Event = "roleInvalid"
+		result.Message = message
+		msg, _ := json.Marshal(result)
+		return msg, nil
+	}
+
 	result.Role = role
 	if p.oriRole != role {
 		result.Event = "roleChanged"
@@ -215,6 +228,20 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 	msg, _ := json.Marshal(result)
 	p.Logger.Infof(string(msg))
 	return msg, nil
+}
+
+func (p *ProbeBase) roleValidate(role string) (bool, string) {
+	var msg string
+	isValid := false
+	for r := range p.dbRoles {
+		if strings.EqualFold(r, role) {
+			isValid = true
+		}
+	}
+	if !isValid {
+		msg = fmt.Sprintf("role %s is not configed in cluster definition %v", role, p.dbRoles)
+	}
+	return isValid, msg
 }
 
 // runningCheck checks whether the binding service is in running status:

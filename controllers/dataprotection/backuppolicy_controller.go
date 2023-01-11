@@ -205,8 +205,10 @@ func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alph
 		return nil, err
 	}
 
-	cronjob.SetLabels(backupPolicy.Labels)
-
+	// set labels
+	for k, v := range backupPolicy.Labels {
+		cronjob.Labels[k] = v
+	}
 	return &cronjob, nil
 }
 

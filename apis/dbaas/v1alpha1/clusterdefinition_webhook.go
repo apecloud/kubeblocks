@@ -125,7 +125,10 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 
 	for _, component := range r.Spec.Components {
 		// validate system account defiined in spec.components[].systemAccounts
-		r.validateSysAccounts(component, allErrs)
+		sysAccountSpec := component.SystemAccounts
+		if sysAccountSpec != nil {
+			sysAccountSpec.validateSysAccounts(allErrs)
+		}
 
 		if component.ComponentType != Consensus {
 			continue
@@ -194,13 +197,9 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 }
 
 // validateSysAccounts validate spec.components[].systemAccounts
-func (r *ClusterDefinition) validateSysAccounts(component ClusterDefinitionComponent, allErrs *field.ErrorList) {
-	if component.SystemAccounts == nil {
-		return
-	}
-
+func (r *SystemAccountSpec) validateSysAccounts(allErrs *field.ErrorList) {
 	accountName := make(map[AccountName]bool)
-	for _, sysAccount := range component.SystemAccounts.Accounts {
+	for _, sysAccount := range r.Accounts {
 		// validate provision policy
 		provisionPolicy := sysAccount.ProvisionPolicy
 		if provisionPolicy.Type == CreateByStmt && sysAccount.ProvisionPolicy.Statements == nil {
@@ -227,7 +226,7 @@ func (r *ClusterDefinition) validateSysAccounts(component ClusterDefinitionCompo
 		}
 	}
 
-	passwdConfig := component.SystemAccounts.PasswordConfig
+	passwdConfig := r.PasswordConfig
 	if passwdConfig.Length < passwdConfig.NumDigits+passwdConfig.NumSymbols {
 		*allErrs = append(*allErrs,
 			field.Invalid(field.NewPath("spec.components[*].systemAccounts.passwordConfig"),

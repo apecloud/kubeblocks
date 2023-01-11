@@ -49,6 +49,16 @@ type systemAccountExpectation struct {
 	key      string
 }
 
+// customizedEngine helps render jobs.
+type customizedEngine struct {
+	cluster       *dbaasv1alpha1.Cluster
+	componentName string
+	image         string
+	command       []string
+	args          []string
+	envVarList    []corev1.EnvVar
+}
+
 // SystemAccountExpectationsManager is a cache, recording a key-expectation pair for each cluster
 // In each expectation we records accounts to create, and to delete.
 // Requirements are collected from objects:
@@ -94,16 +104,22 @@ func (r *secretMapStore) addSecret(key string, value *corev1.Secret) error {
 
 func (r *secretMapStore) getSecret(key string) (*secretMapEntry, bool, error) {
 	exp, exists, err := r.GetByKey(key)
-	if err == nil && exists {
+	if err != nil {
+		return nil, false, err
+	}
+	if exists {
 		return exp.(*secretMapEntry), true, nil
 	}
-	return nil, false, err
+	return nil, false, nil
 }
 
 func (r *secretMapStore) deleteSecret(key string) error {
-	if exp, exists, err := r.GetByKey(key); err == nil && exists {
-		err = r.Delete(exp)
+	exp, exist, err := r.GetByKey(key)
+	if err != nil {
 		return err
+	}
+	if exist {
+		return r.Delete(exp)
 	}
 	return nil
 }
@@ -125,6 +141,7 @@ func (r *systemAccountExpectationsManager) createExpectation(key string) (*syste
 	if err != nil {
 		return nil, err
 	}
+
 	if exists {
 		return exp, nil
 	}
@@ -136,27 +153,26 @@ func (r *systemAccountExpectationsManager) createExpectation(key string) (*syste
 
 func (r *systemAccountExpectationsManager) getExpectation(cluster string) (*systemAccountExpectation, bool, error) {
 	exp, exists, err := r.GetByKey(cluster)
-	if err == nil && exists {
+	if err != nil {
+		return nil, false, err
+	}
+	if exists {
 		return exp.(*systemAccountExpectation), true, nil
 	}
-	return nil, false, err
+	return nil, false, nil
 }
 
 func (r *systemAccountExpectationsManager) deleteExpectation(cluster string) error {
-	if exp, exists, err := r.GetByKey(cluster); err == nil && exists {
-		err = r.Delete(exp)
+	exp, exists, err := r.GetByKey(cluster)
+	if err != nil {
 		return err
 	}
-	return nil
-}
 
-type customizedEngine struct {
-	cluster       *dbaasv1alpha1.Cluster
-	componentName string
-	image         string
-	command       []string
-	args          []string
-	envVarList    []corev1.EnvVar
+	if exists {
+		return r.Delete(exp)
+	}
+
+	return nil
 }
 
 func (e *customizedEngine) getImage() string {

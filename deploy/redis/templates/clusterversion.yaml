@@ -1,0 +1,15 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: redis-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+    {{- include "redis.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: apecloud-redis
+  components:
+  - type: replication
+    podSpec:
+      containers:
+      - name: redis
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}

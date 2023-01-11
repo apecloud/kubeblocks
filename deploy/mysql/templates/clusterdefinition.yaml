@@ -2,24 +2,34 @@ apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
   name: apecloud-mysql
+  labels:
+    {{- include "mysql.labels" . | nindent 4 }}
 spec:
-  type: state.mysql-8
+  type: state.mysql
+  connectionCredential:
+    username: ""
+    password: ""
   components:
     - typeName: replication
+      componentType: Replication
       defaultReplicas: 2
       minReplicas: 1
       maxReplicas: 16
-      componentType: Replication
-      replicationSpec:
       service:
         ports:
           - protocol: TCP
             port: 3306
       configTemplateRefs:
         - name: mysql-primary-config-8.0.31
+          namespace: {{ .Release.Namespace }}
           volumeName: primary
         - name: mysql-secondary-config-8.0.31
+          namespace: {{ .Release.Namespace }}
           volumeName: secondary
+        - name: mysql-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
       monitor:
         builtIn: false
         exporterConfig:
@@ -29,22 +39,7 @@ spec:
         initContainers:
           - name: mysql-init-container
             image: mysql:8.0.31
-            command:
-              - /bin/bash
-              - "-c"
-              - | 
-                set -ex
-                echo [mysqld] > /etc/mysql/conf.d/server-id.cnf
-                [[ $KB_POD_NAME =~ -([0-9]+)-([0-9]+)$ ]] || exit 1
-                ordinal=${BASH_REMATCH[1]}
-                echo server-id=$((100 + $ordinal)) >> /etc/mysql/conf.d/server-id.cnf
-                PRIMARY_ROLE=primary
-                KB_ROLE_NAME=`cat /etc/conf/role/labels`
-                if [ $KB_ROLE_NAME = "$PRIMARY_ROLE" ]; then
-                  cp /etc/mnt/primary/mysql.cnf /etc/mysql/conf.d
-                else
-                  cp /etc/mnt/secondary/mysql.cnf /etc/mysql/conf.d
-                fi
+            command: ["/scripts/init.sh"]
             volumeMounts:
               - name: data
                 mountPath: /var/lib/mysql
@@ -56,6 +51,8 @@ spec:
                 mountPath: /etc/mnt/secondary
               - name: pod-role
                 mountPath: /etc/conf/role
+              - name: scripts
+                mountPath: /scripts
         containers:
           - name: mysql
             image: mysql:8.0.31
@@ -73,26 +70,15 @@ spec:
                 mountPath: /etc/mnt/secondary
               - name: pod-role
                 mountPath: /etc/conf/role
+              - name: scripts
+                mountPath: /scripts
             env:
               - name: MYSQL_ALLOW_EMPTY_PASSWORD
                 value: "1"
             lifecycle:
               postStart:
                 exec:
-                  command:
-                    - /bin/bash
-                    - "-c"
-                    - |
-                      set -ex
-                      SECONDARY_ROLE=secondary
-                      KB_ROLE_NAME=`cat /etc/conf/role/labels`
-                      if [ $KB_ROLE_NAME = "$SECONDARY_ROLE" ]; then
-                        until mysql -h $KB_PRIMARY_POD_NAME -P3306 -e "SELECT 1"; do sleep 1; done
-                        mysql -e "CHANGE MASTER TO MASTER_HOST='$KB_PRIMARY_POD_NAME',MASTER_PORT=3306,MASTER_USER='root',MASTER_PASSWORD='',master_auto_position=1,MASTER_CONNECT_RETRY=10;START SLAVE;"
-                      else
-                        echo "primary instance skip create a replication relationship."
-                        exit 0
-                      fi
+                  command: ["/scripts/setup.sh"]
           - name: mysql-exporter
             image: prom/mysqld-exporter:v0.14.0
             imagePullPolicy: IfNotPresent
@@ -128,6 +114,3 @@ spec:
                 - path: "labels"
                   fieldRef:
                     fieldPath: metadata.labels['kubeblocks.io/role']
-  connectionCredential:
-    user: ""
-    password: ""

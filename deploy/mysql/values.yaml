@@ -1,0 +1,38 @@
+# Default values for mysql.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  repository: mysql
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: 8.0.31
+
+## @section Mysql&reg; Primary configuration parameters
+primary:
+  ## @param config template name
+  ## name: mysql-primary-config-8.0.31
+  configTemplate:
+    ## @param config template context
+    configuration: |-
+      [mysqld]
+      log-bin
+      gtid_mode=ON
+      enforce-gtid-consistency=true
+
+## @section Mysql&reg; Secondary configuration parameters
+secondary:
+  ## @param config template name
+  ## name: mysql-secondary-config-8.0.31
+  configTemplate:
+    ## @param config template context
+    configuration: |-
+      [mysqld]
+      super-read-only
+      gtid_mode=ON
+      enforce-gtid-consistency=true
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+clusterVersionOverride: ""

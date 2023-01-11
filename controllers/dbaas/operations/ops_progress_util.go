@@ -211,7 +211,6 @@ func handleStatelessProgress(opsRes *OpsResource,
 				getProgressSucceedMessage(pgRes.opsMessageKey, objectKey, pgRes.clusterComponent.Name))
 			SetStatusComponentProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
 				&statusComponent.ProgressDetails, progressDetail)
-			fmt.Printf("PodName: %s, progressStatus: %s\n", v.Name, progressDetail.Status)
 			continue
 		}
 		if util.IsFailedOrAbnormal(statusComponent.Phase) {

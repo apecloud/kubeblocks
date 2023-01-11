@@ -18,6 +18,7 @@ package stateless
 
 import (
 	"context"
+	"math"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -120,18 +121,28 @@ func DeploymentIsReady(deploy *appsv1.Deployment) bool {
 		componentIsRunning = true
 		newRSAvailable     = true
 	)
-	// we should check if the new replicaSet is available.
-	condition := deploymentutil.GetDeploymentCondition(deploy.Status, appsv1.DeploymentProgressing)
-	if condition == nil || condition.Reason != NewRSAvailableReason || condition.Status != corev1.ConditionTrue {
-		newRSAvailable = false
+
+	if HasProgressDeadline(deploy) {
+		// if the progressDeadline is existing, we should check if the new replicaSet is available.
+		// when progressDeadline is not existing, the deployment controller will remove the DeploymentProgressing condition.
+		condition := deploymentutil.GetDeploymentCondition(deploy.Status, appsv1.DeploymentProgressing)
+		if condition == nil || condition.Reason != NewRSAvailableReason || condition.Status != corev1.ConditionTrue {
+			newRSAvailable = false
+		}
 	}
-	// if status.availableReplicas is equal with targetReplicas
-	// and status.replicas is not equal with targetReplicas, means that deployment is in rolling updating.
+	// check if the deployment of component is updated completely and ready.
 	if deploy.Status.AvailableReplicas != targetReplicas ||
 		deploy.Status.Replicas != targetReplicas ||
 		deploy.Status.ObservedGeneration != deploy.GetGeneration() ||
+		deploy.Status.UpdatedReplicas != targetReplicas ||
 		!newRSAvailable {
 		componentIsRunning = false
 	}
 	return componentIsRunning
+}
+
+// HasProgressDeadline checks if the Deployment d is expected to surface the reason
+// "ProgressDeadlineExceeded" when the Deployment progress takes longer than expected time.
+func HasProgressDeadline(d *appsv1.Deployment) bool {
+	return d.Spec.ProgressDeadlineSeconds != nil && *d.Spec.ProgressDeadlineSeconds != math.MaxInt32
 }

@@ -28,6 +28,7 @@ func MockDeploymentReady(deploy *appsv1.Deployment, rsAvailableReason string) {
 	deploy.Status.ReadyReplicas = *deploy.Spec.Replicas
 	deploy.Status.Replicas = *deploy.Spec.Replicas
 	deploy.Status.ObservedGeneration = deploy.Generation
+	deploy.Status.UpdatedReplicas = *deploy.Spec.Replicas
 	deploy.Status.Conditions = []appsv1.DeploymentCondition{
 		{
 			Type:   appsv1.DeploymentProgressing,

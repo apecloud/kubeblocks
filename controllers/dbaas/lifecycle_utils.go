@@ -475,9 +475,7 @@ func getComponent(componentList []Component, name string) *Component {
 }
 
 func replacePlaceholderTokens(cluster *dbaasv1alpha1.Cluster, component *Component) {
-	namedValues := map[string]string{
-		"$(CONN_CREDENTIAL_SECRET_NAME)": fmt.Sprintf("%s-conn-credential", cluster.GetName()),
-	}
+	namedValues := getEnvReplacementMapForConnCrential(cluster.GetName())
 
 	// replace env[].valueFrom.secretKeyRef.name variables
 	for _, cc := range [][]corev1.Container{component.PodSpec.InitContainers, component.PodSpec.Containers} {

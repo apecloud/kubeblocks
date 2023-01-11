@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pg-config
+data:
+  {{- if .Values.primary.configuration }}
+  postgresql.conf: |-
+    {{- include "common.tplvalues.render" ( dict "value" .Values.primary.configuration "context" $ ) | nindent 4 }}
+  {{- end }}
+  {{- if .Values.primary.pgHbaConfiguration }}
+  pg_hba.conf: |
+    {{- include "common.tplvalues.render" ( dict "value" .Values.primary.pgHbaConfiguration "context" $ ) | nindent 4 }}
+  {{- end }}
+  setup.sh: |-
+    #!/bin/bash
+    exec /entrypoint.sh /run.sh

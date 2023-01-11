@@ -1,0 +1,244 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: apecloud-postgresql
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  type: state.postgresql
+  connectionCredential:
+    username: postgres
+    postgres-password: "$(RANDOM_PASSWD)"
+  components:
+    - typeName: postgresql
+      componentType: Stateful
+      characterType: postgresql
+      defaultReplicas: 1
+      probes:
+      monitor:
+        builtIn: false
+      logConfigs:
+        {{- range $name,$pattern := .Values.logConfigs }}
+        - name: {{ $name }}
+          filePathPattern: {{ $pattern }}
+        {{- end }}
+      configTemplateRefs:
+        - name: pg-config
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
+      service:
+        ports:
+          - name: tcp-postgresql
+            protocol: TCP
+            port: 5432
+            targetPort: tcp-postgresql
+          - name: http-metrics-postgresql
+            port: 9187
+            targetPort: http-metrics
+            nodeport: null
+      podSpec:
+        containers:
+          - name: postgresql
+            imagePullPolicy: IfNotPresent
+            securityContext:
+              runAsUser: 1001            
+            volumeMounts:
+              - name: dshm
+                mountPath: /dev/shm
+              - name: data
+                mountPath: /bitnami/postgresql
+              - name: scripts
+                mountPath: /scripts
+            ports:
+              - name: tcp-postgresql
+                containerPort: 5432
+            livenessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - exec pg_isready -U "postgres" -h 127.0.0.1 -p 5432
+            readinessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - -e
+                  
+                  - |
+                    exec pg_isready -U "postgres" -h 127.0.0.1 -p 5432
+                    [ -f /opt/bitnami/postgresql/tmp/.initialized ] || [ -f /bitnami/postgresql/.initialized ]                
+            env:
+              {{- $customUser := include "postgresql.username" . }}
+              - name: POSTGRESQL_PORT_NUMBER
+                value: {{ .Values.containerPorts.postgresql | quote }}
+              - name: POSTGRESQL_VOLUME_DIR
+                value: {{ .Values.primary.persistence.mountPath | quote }}
+              {{- if .Values.primary.persistence.mountPath }}
+              - name: PGDATA
+                value: {{ .Values.postgresqlDataDir | quote }}
+              {{- end }}
+              # Authentication
+              {{- if and (not (empty $customUser)) (ne $customUser "postgres") }}
+              - name: POSTGRES_USER
+                value: {{ $customUser | quote }}
+              {{- if .Values.auth.enablePostgresUser }}
+              {{- if .Values.auth.usePasswordFiles }}
+              - name: POSTGRES_POSTGRES_PASSWORD_FILE
+                value: "/opt/bitnami/postgresql/secrets/postgres-password"
+              {{- else }}
+              - name: POSTGRES_POSTGRES_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: postgres-password
+              {{- end }}
+              {{- end }}
+              {{- end }}
+              {{- if .Values.auth.usePasswordFiles }}
+              - name: POSTGRES_PASSWORD_FILE
+                value: {{ printf "/opt/bitnami/postgresql/secrets/%s" (ternary "password" "postgres-password" (and (not (empty $customUser)) (ne $customUser "postgres"))) }}
+              {{- else }}
+              - name: POSTGRES_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: postgres-password
+              {{- end }}
+              {{- if (include "postgresql.database" .) }}
+              - name: POSTGRES_DB
+                value: {{ (include "postgresql.database" .) | quote }}
+              {{- end }}
+              # Initdb
+              {{- if .Values.primary.initdb.args }}
+              - name: POSTGRES_INITDB_ARGS
+                value: {{ .Values.primary.initdb.args | quote }}
+              {{- end }}
+              {{- if .Values.primary.initdb.postgresqlWalDir }}
+              - name: POSTGRES_INITDB_WALDIR
+                value: {{ .Values.primary.initdb.postgresqlWalDir | quote }}
+              {{- end }}
+              {{- if .Values.primary.initdb.user }}
+              - name: POSTGRESQL_INITSCRIPTS_USERNAME
+                value: {{ .Values.primary.initdb.user }}
+              {{- end }}
+              {{- if .Values.primary.initdb.password }}
+              - name: POSTGRESQL_INITSCRIPTS_PASSWORD
+                value: {{ .Values.primary.initdb.password | quote }}
+              {{- end }}
+              # Standby
+              {{- if .Values.primary.standby.enabled }}
+              - name: POSTGRES_MASTER_HOST
+                value: {{ .Values.primary.standby.primaryHost }}
+              - name: POSTGRES_MASTER_PORT_NUMBER
+                value: {{ .Values.primary.standby.primaryPort | quote }}
+              {{- end }}
+              # Audit
+              - name: POSTGRESQL_LOG_HOSTNAME
+                value: {{ .Values.audit.logHostname | quote }}
+              - name: POSTGRESQL_LOG_CONNECTIONS
+                value: {{ .Values.audit.logConnections | quote }}
+              - name: POSTGRESQL_LOG_DISCONNECTIONS
+                value: {{ .Values.audit.logDisconnections | quote }}
+              {{- if .Values.audit.logLinePrefix }}
+              - name: POSTGRESQL_LOG_LINE_PREFIX
+                value: {{ .Values.audit.logLinePrefix | quote }}
+              {{- end }}
+              {{- if .Values.audit.logTimezone }}
+              - name: POSTGRESQL_LOG_TIMEZONE
+                value: {{ .Values.audit.logTimezone | quote }}
+              {{- end }}
+              {{- if .Values.audit.pgAuditLog }}
+              - name: POSTGRESQL_PGAUDIT_LOG
+                value: {{ .Values.audit.pgAuditLog | quote }}
+              {{- end }}
+              - name: POSTGRESQL_PGAUDIT_LOG_CATALOG
+                value: {{ .Values.audit.pgAuditLogCatalog | quote }}
+              # Others
+              - name: POSTGRESQL_CLIENT_MIN_MESSAGES
+                value: {{ .Values.audit.clientMinMessages | quote }}
+              - name: POSTGRESQL_SHARED_PRELOAD_LIBRARIES
+                value: {{ .Values.postgresqlSharedPreloadLibraries | quote }}
+              {{- if .Values.primary.extraEnvVars }}
+              {{- include "tplvalues.render" (dict "value" .Values.primary.extraEnvVars "context" $) | nindent 12 }}
+              {{- end }}
+            {{- if or .Values.primary.extraEnvVarsCM .Values.primary.extraEnvVarsSecret }}
+            envFrom:
+              {{- if .Values.primary.extraEnvVarsCM }}
+              - configMapRef:
+                  name: {{ .Values.primary.extraEnvVarsCM }}
+              {{- end }}
+              {{- if .Values.primary.extraEnvVarsSecret }}
+              - secretRef:
+                  name: {{ .Values.primary.extraEnvVarsSecret }}
+              {{- end }}
+            {{- end }}
+
+          {{- if .Values.metrics.enabled }}       
+          - name: metrics
+            image:  {{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1001         
+            env:
+              {{- $database := required "In order to enable metrics you need to specify a database (.Values.auth.database or .Values.global.postgresql.auth.database)" (include "postgresql.database" .) }}
+              {{- $sslmode := false }}    
+              - name: DATA_SOURCE_URI
+                value: {{ printf "127.0.0.1:%d/%s?sslmode=%s" (int (include "postgresql.service.port" .)) $database $sslmode }}
+              - name: DATA_SOURCE_PASS
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: postgres-password
+              - name: DATA_SOURCE_USER
+                value: "postgres"
+            ports:
+              - name: http-metrics
+                containerPort: {{ .Values.metrics.containerPorts.metrics }}     
+            {{- if .Values.metrics.startupProbe.enabled }}
+            startupProbe: {{- include "tplvalues.render" (dict "value" (omit .Values.metrics.startupProbe "enabled") "context" $) | nindent 12 }}
+              tcpSocket:
+                port: http-metrics
+            {{- else if .Values.metrics.customStartupProbe }}
+            startupProbe: {{- include "tplvalues.render" (dict "value" .Values.metrics.customStartupProbe "context" $) | nindent 12 }}
+            {{- end }}                
+            {{- if .Values.metrics.livenessProbe.enabled }}        
+            livenessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              httpGet:
+                path: /
+                port: http-metrics
+            {{- end }}    
+            {{- if .Values.metrics.readinessProbe.enabled }}    
+            readinessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              httpGet:
+                path: /
+                port: http-metrics
+            {{- end }}       
+            volumeMounts:
+          {{- end }}
+        volumes:
+          - name: dshm
+            emptyDir:
+              medium: Memory        

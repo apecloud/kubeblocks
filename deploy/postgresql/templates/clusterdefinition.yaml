@@ -1,0 +1,115 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: apecloud-postgresql
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  type: state.postgresql
+  connectionCredential:
+    username: postgres
+    password: "$(RANDOM_PASSWD)"
+  components:
+    - typeName: postgresql
+      componentType: Stateful
+      characterType: postgresql
+      defaultReplicas: 1
+      probes:
+      monitor:
+        builtIn: false
+      logConfigs:
+        {{- range $name,$pattern := .Values.logConfigs }}
+        - name: {{ $name }}
+          filePathPattern: {{ $pattern }}
+        {{- end }}
+      configTemplateRefs:
+        - name: pg-config
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+      service:
+        ports:
+          - protocol: TCP
+            port: 5432
+            targetPort: tcp-postgresql
+      podSpec:
+        containers:
+          - name: postgresql
+            imagePullPolicy: IfNotPresent
+            securityContext:
+              runAsUser: 1001            
+            volumeMounts:
+              - name: dshm
+                mountPath: /dev/shm
+              - name: data
+                mountPath: /bitnami/postgresql
+              - name: scripts
+                mountPath: /scripts
+            ports:
+              - name: tcp-postgresql
+                containerPort: 5432
+            livenessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - exec pg_isready -U "postgres" -h 127.0.0.1 -p 5432
+            readinessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - -e
+                  
+                  - |
+                    exec pg_isready -U "postgres" -h 127.0.0.1 -p 5432
+                    [ -f /opt/bitnami/postgresql/tmp/.initialized ] || [ -f /bitnami/postgresql/.initialized ]                
+            env:
+              - name: POSTGRESQL_PORT_NUMBER
+                value: "5432"
+              - name: POSTGRESQL_VOLUME_DIR
+                value: "/bitnami/postgresql"
+              - name: PGDATA
+                value: "/bitnami/postgresql/data"
+              # Authentication
+              - name: POSTGRES_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+              # Replication
+              # Initdb
+              # Standby
+              # LDAP
+              - name: POSTGRESQL_ENABLE_LDAP
+                value: "no"
+              # TLS
+              - name: POSTGRESQL_ENABLE_TLS
+                value: "no"
+              # Audit
+              - name: POSTGRESQL_LOG_HOSTNAME
+                value: "false"
+              - name: POSTGRESQL_LOG_CONNECTIONS
+                value: "false"
+              - name: POSTGRESQL_LOG_DISCONNECTIONS
+                value: "false"
+              - name: POSTGRESQL_PGAUDIT_LOG_CATALOG
+                value: "off"
+              # Others
+              - name: POSTGRESQL_CLIENT_MIN_MESSAGES
+                value: "error"
+              - name: POSTGRESQL_SHARED_PRELOAD_LIBRARIES
+                value: "pgaudit"    
+        volumes:
+          - name: dshm
+            emptyDir:
+              medium: Memory        

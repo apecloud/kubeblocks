@@ -361,6 +361,9 @@ func handleDeletePVCCronJobEvent(ctx context.Context,
 	if object, err = getEventInvolvedObject(ctx, cli, event); err != nil {
 		return err
 	}
+	if object == nil {
+		return nil
+	}
 	labels := object.GetLabels()
 	cluster := dbaasv1alpha1.Cluster{}
 	if err = cli.Get(ctx, client.ObjectKey{Name: labels[intctrlutil.AppInstanceLabelKey],

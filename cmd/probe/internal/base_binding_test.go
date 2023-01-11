@@ -25,6 +25,7 @@ import (
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
+	"github.com/spf13/viper"
 )
 
 type fakeBinding struct{}
@@ -62,6 +63,7 @@ func TestInit(t *testing.T) {
 
 func TestInvoke(t *testing.T) {
 	p := mockProbeBase()
+	viper.SetDefault("KB_SERVICE_ROLES", "{\"follower\":\"Readonly\",\"leader\":\"ReadWrite\"}")
 	p.Init()
 
 	t.Run("runningCheck", func(t *testing.T) {

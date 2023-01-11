@@ -37,7 +37,7 @@ cronjob: {
 					"""
 kubectl create -f - <<EOF
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
-kind: BackupJob
+kind: Backup
 metadata:
   labels:
     app.kubernetes.io/instance: \(options.cluster)

@@ -140,6 +140,7 @@ var _ = Describe("Consensus Component", func() {
 		interval           = time.Second
 		consensusCompType  = "consensus"
 		consensusCompName  = "consensus"
+		statelessCompName  = "stateless"
 	)
 
 	cleanupObjects := func() {
@@ -169,9 +170,10 @@ var _ = Describe("Consensus Component", func() {
 	Context("Consensus Component test", func() {
 		It("Consensus Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			_, _, cluster := testdbaas.InitConsensusMysql(ctx, testCtx, clusterDefName,
-				clusterVersionName, clusterName, consensusCompName)
+			_, _, cluster := testdbaas.InitClusterWithHybridComps(ctx, testCtx, clusterDefName,
+				clusterVersionName, clusterName, statelessCompName, consensusCompName)
 			sts := testdbaas.MockConsensusComponentStatefulSet(ctx, testCtx, clusterName, consensusCompName)
+			testdbaas.MockStatelessComponentDeploy(ctx, testCtx, clusterName, statelessCompName)
 			if !testCtx.UsingExistingCluster() {
 				_ = testdbaas.MockConsensusComponentPods(ctx, testCtx, clusterName, consensusCompName)
 			} else {
@@ -207,6 +209,14 @@ var _ = Describe("Consensus Component", func() {
 			By("test GetComponentReplicas function")
 			component := GetComponentByName(cluster, consensusCompName)
 			Expect(GetComponentReplicas(component, componentDef)).To(Equal(int32(3)))
+
+			By("test GetComponentStsMinReadySeconds")
+			minReadySeconds, _ := GetComponentWorkloadMinReadySeconds(ctx, k8sClient, cluster,
+				dbaasv1alpha1.Stateless, statelessCompName)
+			Expect(minReadySeconds).To(Equal(int32(10)))
+			minReadySeconds, _ = GetComponentWorkloadMinReadySeconds(ctx, k8sClient, cluster,
+				dbaasv1alpha1.Consensus, statelessCompName)
+			Expect(minReadySeconds).To(Equal(int32(0)))
 		})
 	})
 })

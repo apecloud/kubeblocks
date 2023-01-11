@@ -78,6 +78,3 @@ const (
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
 	CronJob                   = "CronJob"
 )
-
-// DefaultMinReadySeconds the default minReadySeconds of the StatefulSet or Deployment.
-const DefaultMinReadySeconds = 10

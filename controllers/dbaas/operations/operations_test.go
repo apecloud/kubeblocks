@@ -154,7 +154,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/4"))
 
 		By("mock new pod is ready")
-		lastTransTime := metav1.NewTime(time.Now().Add(-1 * (intctrlutil.DefaultMinReadySeconds + 1) * time.Second))
+		lastTransTime := metav1.NewTime(time.Now().Add(-11 * time.Second))
 		patch := client.MergeFrom(newPod.DeepCopy())
 		testk8s.MockPodAvailable(newPod, lastTransTime)
 		Expect(k8sClient.Status().Patch(ctx, newPod, patch)).Should(Succeed())

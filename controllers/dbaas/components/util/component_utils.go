@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"golang.org/x/exp/slices"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -173,4 +174,50 @@ func GetComponentReplicas(component *dbaasv1alpha1.ClusterComponent,
 		replicas = *component.Replicas
 	}
 	return replicas
+}
+
+// GetComponentDeployMinReadySeconds get the deployment minReadySeconds of the component.
+func GetComponentDeployMinReadySeconds(ctx context.Context,
+	cli client.Client,
+	cluster *dbaasv1alpha1.Cluster,
+	componentName string) (minReadySeconds int32, err error) {
+	deployList := &appsv1.DeploymentList{}
+	if err = GetObjectListByComponentName(ctx, cli, cluster, deployList, componentName); err != nil {
+		return
+	}
+	if len(deployList.Items) > 0 {
+		minReadySeconds = deployList.Items[0].Spec.MinReadySeconds
+		return
+	}
+	return minReadySeconds, err
+}
+
+// GetComponentStsMinReadySeconds get the statefulSet minReadySeconds of the component.
+func GetComponentStsMinReadySeconds(ctx context.Context,
+	cli client.Client,
+	cluster *dbaasv1alpha1.Cluster,
+	componentName string) (minReadySeconds int32, err error) {
+	stsList := &appsv1.StatefulSetList{}
+	if err = GetObjectListByComponentName(ctx, cli, cluster, stsList, componentName); err != nil {
+		return
+	}
+	if len(stsList.Items) > 0 {
+		minReadySeconds = stsList.Items[0].Spec.MinReadySeconds
+		return
+	}
+	return minReadySeconds, err
+}
+
+// GetComponentWorkloadMinReadySeconds get the workload minReadySeconds of the component.
+func GetComponentWorkloadMinReadySeconds(ctx context.Context,
+	cli client.Client,
+	cluster *dbaasv1alpha1.Cluster,
+	componentType dbaasv1alpha1.ComponentType,
+	componentName string) (minReadySeconds int32, err error) {
+	switch componentType {
+	case dbaasv1alpha1.Stateless:
+		return GetComponentDeployMinReadySeconds(ctx, cli, cluster, componentName)
+	default:
+		return GetComponentStsMinReadySeconds(ctx, cli, cluster, componentName)
+	}
 }

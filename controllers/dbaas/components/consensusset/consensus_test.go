@@ -36,13 +36,14 @@ import (
 
 var _ = Describe("Consensus Component", func() {
 	var (
-		randomStr          = testCtx.GetRandomStr()
-		clusterDefName     = "mysql-clusterdef-" + randomStr
-		clusterVersionName = "mysql-clusterversion-" + randomStr
-		clusterName        = "mysql-" + randomStr
-		timeout            = 10 * time.Second
-		interval           = time.Second
-		consensusCompName  = "consensus"
+		randomStr                    = testCtx.GetRandomStr()
+		clusterDefName               = "mysql-clusterdef-" + randomStr
+		clusterVersionName           = "mysql-clusterversion-" + randomStr
+		clusterName                  = "mysql-" + randomStr
+		timeout                      = 10 * time.Second
+		interval                     = time.Second
+		consensusCompName            = "consensus"
+		defaultMinReadySeconds int32 = 10
 	)
 
 	cleanupObjects := func() {
@@ -138,7 +139,7 @@ var _ = Describe("Consensus Component", func() {
 			} else {
 				podList := testdbaas.MockConsensusComponentPods(ctx, testCtx, clusterName, consensusCompName)
 				By("test pod is not available")
-				Expect(consensusComponent.PodIsAvailable(podList[0], intctrlutil.DefaultMinReadySeconds)).Should(BeTrue())
+				Expect(consensusComponent.PodIsAvailable(podList[0], defaultMinReadySeconds)).Should(BeTrue())
 
 				By("test handle probe timed out")
 				mockClusterStatusProbeTimeout(cluster)

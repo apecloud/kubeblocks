@@ -27,7 +27,6 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type horizontalScalingOpsHandler struct{}
@@ -186,8 +185,17 @@ func (hs horizontalScalingOpsHandler) handleScaleOutProgress(
 	pgRes progressResource,
 	podList *corev1.PodList,
 	statusComponent *dbaasv1alpha1.OpsRequestStatusComponent) (succeedCount int32, err error) {
+	var componentName = pgRes.clusterComponent.Name
 	currComponent := components.NewComponentByType(opsRes.Ctx, opsRes.Client,
 		opsRes.Cluster, pgRes.clusterComponentDef, pgRes.clusterComponent)
+	if currComponent == nil {
+		return
+	}
+	minReadySeconds, err := util.GetComponentWorkloadMinReadySeconds(opsRes.Ctx,
+		opsRes.Client, opsRes.Cluster, pgRes.clusterComponentDef.ComponentType, componentName)
+	if err != nil {
+		return
+	}
 	for _, v := range podList.Items {
 		// only focus on the newly created pod when scaling out the replicas.
 		if v.CreationTimestamp.Before(&opsRes.OpsRequest.Status.StartTimestamp) {
@@ -195,9 +203,9 @@ func (hs horizontalScalingOpsHandler) handleScaleOutProgress(
 		}
 		objectKey := GetProgressObjectKey(v.Kind, v.Name)
 		progressDetail := dbaasv1alpha1.ProgressDetail{ObjectKey: objectKey}
-		if currComponent.PodIsAvailable(&v, intctrlutil.DefaultMinReadySeconds) {
+		if currComponent.PodIsAvailable(&v, minReadySeconds) {
 			succeedCount += 1
-			message := fmt.Sprintf("Successfully created pod: %s in Component: %s", objectKey, pgRes.clusterComponent.Name)
+			message := fmt.Sprintf("Successfully created pod: %s in Component: %s", objectKey, componentName)
 			progressDetail.SetStatusAndMessage(dbaasv1alpha1.SucceedProgressStatus, message)
 			SetStatusComponentProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
 				&statusComponent.ProgressDetails, progressDetail)
@@ -206,8 +214,8 @@ func (hs horizontalScalingOpsHandler) handleScaleOutProgress(
 
 		if util.IsFailedOrAbnormal(statusComponent.Phase) {
 			// means the pod is failed.
-			podMessage := getFailedPodMessage(opsRes.Cluster, pgRes.clusterComponent.Name, &v)
-			message := fmt.Sprintf("Failed to create pod: %s in Component: %s, message: %s", objectKey, pgRes.clusterComponent.Name, podMessage)
+			podMessage := getFailedPodMessage(opsRes.Cluster, componentName, &v)
+			message := fmt.Sprintf("Failed to create pod: %s in Component: %s, message: %s", objectKey, componentName, podMessage)
 			progressDetail.SetStatusAndMessage(dbaasv1alpha1.FailedProgressStatus, message)
 		} else {
 			progressDetail.SetStatusAndMessage(dbaasv1alpha1.ProcessingProgressStatus, "Start to create pod: "+objectKey)

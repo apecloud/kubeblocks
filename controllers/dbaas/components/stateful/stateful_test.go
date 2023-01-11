@@ -43,6 +43,7 @@ var _ = Describe("Stateful Component", func() {
 		timeout            = 10 * time.Second
 		interval           = time.Second
 	)
+	const defaultMinReadySeconds = 10
 	cleanupObjects := func() {
 		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -112,9 +113,9 @@ var _ = Describe("Stateful Component", func() {
 				Expect(phase == dbaasv1alpha1.AbnormalPhase).Should(BeTrue())
 
 				By("test pod is ready")
-				lastTransTime := metav1.NewTime(time.Now().Add(-1 * (intctrlutil.DefaultMinReadySeconds + 1) * time.Second))
+				lastTransTime := metav1.NewTime(time.Now().Add(-1 * (defaultMinReadySeconds + 1) * time.Second))
 				testk8s.MockPodAvailable(podList[0], lastTransTime)
-				Expect(stateful.PodIsAvailable(podList[0], intctrlutil.DefaultMinReadySeconds)).Should(BeTrue())
+				Expect(stateful.PodIsAvailable(podList[0], defaultMinReadySeconds)).Should(BeTrue())
 			}
 
 			By("test pods are ready")

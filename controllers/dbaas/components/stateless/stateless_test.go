@@ -28,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -43,6 +42,7 @@ var _ = Describe("Stateful Component", func() {
 		interval           = time.Second
 		statelessCompName  = "stateless"
 	)
+	const defaultMinReadySeconds = 10
 
 	cleanupObjects := func() {
 		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
@@ -113,9 +113,9 @@ var _ = Describe("Stateful Component", func() {
 			By("test pod is ready")
 			podName := "nginx-" + randomStr
 			pod := testdbaas.MockStatelessPod(ctx, testCtx, clusterName, statelessCompName, podName)
-			lastTransTime := metav1.NewTime(time.Now().Add(-1 * (intctrlutil.DefaultMinReadySeconds + 1) * time.Second))
+			lastTransTime := metav1.NewTime(time.Now().Add(-1 * (defaultMinReadySeconds + 1) * time.Second))
 			testk8s.MockPodAvailable(pod, lastTransTime)
-			Expect(statelessComponent.PodIsAvailable(pod, intctrlutil.DefaultMinReadySeconds)).Should(BeTrue())
+			Expect(statelessComponent.PodIsAvailable(pod, defaultMinReadySeconds)).Should(BeTrue())
 		})
 	})
 

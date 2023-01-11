@@ -445,7 +445,7 @@ func removeFinalizer[T intctrlutil.Object, PT intctrlutil.PObject[T],
 		return &res, err
 	}
 	var wrapper W
-	for _, obj := range wrapper.GetItems(objList) {
+	for _, obj := range wrapper.GetItems(&objList) {
 		pobj := PT(&obj)
 		if !controllerutil.ContainsFinalizer(pobj, dbClusterFinalizerName) {
 			continue

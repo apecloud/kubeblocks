@@ -28,26 +28,26 @@ type PObjList[T Object, L ObjList[T]] interface {
 // ObjListWrapper A wrapper of resource objects, since golang generics currently
 // doesn't support fields access use a workaround mentioned in https://github.com/golang/go/issues/48522
 type ObjListWrapper[T Object, L ObjList[T]] interface {
-	GetItems(l L) []T
+	GetItems(l *L) []T
 }
 
 // SecretListWrapper ObjListWrapper of corev1.SecretList
 type SecretListWrapper struct{}
 
-func (w SecretListWrapper) GetItems(list corev1.SecretList) []corev1.Secret {
+func (w SecretListWrapper) GetItems(list *corev1.SecretList) []corev1.Secret {
 	return list.Items
 }
 
 // ServiceListWrapper ObjListWrapper of corev1.ServiceList
 type ServiceListWrapper struct{}
 
-func (w ServiceListWrapper) GetItems(list corev1.ServiceList) []corev1.Service {
+func (w ServiceListWrapper) GetItems(list *corev1.ServiceList) []corev1.Service {
 	return list.Items
 }
 
 // StatefulSetListWrapper ObjListWrapper of appsv1.StatefulSetList
 type StatefulSetListWrapper struct{}
 
-func (w StatefulSetListWrapper) GetItems(list appsv1.StatefulSetList) []appsv1.StatefulSet {
+func (w StatefulSetListWrapper) GetItems(list *appsv1.StatefulSetList) []appsv1.StatefulSet {
 	return list.Items
 }

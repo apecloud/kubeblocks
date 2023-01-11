@@ -232,7 +232,13 @@ func (m *Mysql) GetRole(ctx context.Context, sql string) (string, error) {
 			return role, err
 		}
 	}
-	if _, ok := dbRoles[role]; !ok {
+	isRoleConfiged := false
+	for r := range dbRoles {
+		if strings.EqualFold(r, role) {
+			isRoleConfiged = true
+		}
+	}
+	if !isRoleConfiged {
 		err = errors.Errorf("role %s is not configed in cluster definition %v", role, dbRoles)
 	}
 	return role, err

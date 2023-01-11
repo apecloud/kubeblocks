@@ -1,6 +1,6 @@
 # Install KubeBlocks
 
-`dbcli kubeblocks` command is used to manage KubeBlocks.
+`kbcli kubeblocks` command is used to manage KubeBlocks.
 
 ## Before you start
 

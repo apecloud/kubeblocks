@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package troubleshoot
+package interactive
 
 import (
 	"fmt"
@@ -35,8 +35,8 @@ var (
 	isShowingSaved = false
 )
 
-// showInteractiveResults displays the results with interactive mode
-func showInteractiveResults(preflightName string, analyzeResults []*analyzerunner.AnalyzeResult, outputPath string) error {
+// ShowInteractiveResults displays the results with interactive mode
+func ShowInteractiveResults(preflightName string, analyzeResults []*analyzerunner.AnalyzeResult, outputPath string) error {
 	if err := ui.Init(); err != nil {
 		return errors.Wrap(err, "failed to create terminal ui")
 	}
@@ -47,7 +47,7 @@ func showInteractiveResults(preflightName string, analyzeResults []*analyzerunne
 	uiEvents := ui.PollEvents()
 	for e := range uiEvents {
 		switch e.ID {
-		case "<C-c>", "":
+		case "<C-c>":
 			return nil
 		case "q":
 			if isShowingSaved {
@@ -238,6 +238,7 @@ func estimateNumberOfLines(text string, width int) int {
 	return lines
 }
 
+// save exports analyzeResults to local file against customize outputPath.
 func save(preflightName string, outputPath string, analyzeResults []*analyzerunner.AnalyzeResult) (string, error) {
 	filename := ""
 	if outputPath != "" {

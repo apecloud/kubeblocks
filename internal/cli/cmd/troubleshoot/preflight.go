@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/troubleshoot/interactive"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
@@ -58,7 +59,7 @@ const (
 
 var (
 	preflightExample = templates.Examples(`
-		# Run preflight checks against customized preflight-check.yaml
+		# Run preflight checks against the customized rules of preflight-check.yaml
 		kbcli troubleshoot preflight preflight-check.yaml
 
 		# Run preflight checks and display AnalyzeResults with non-interactive mode
@@ -164,7 +165,7 @@ func (p *preflightOptions) run() error {
 	_ = progressCollection.Wait()
 	// display analyzeResults
 	if *p.Interactive {
-		return showInteractiveResults(preflightName, analyzeResults, *p.Output)
+		return interactive.ShowInteractiveResults(preflightName, analyzeResults, *p.Output)
 	} else {
 		return showStdoutResults(preflightName, analyzeResults, *p.Format)
 	}
@@ -197,7 +198,7 @@ func (p *preflightOptions) loadPreflightSpec() (*troubleshootv1beta2.Preflight, 
 			preflightName = preflightSpec.Name
 		} else if spec, ok := obj.(*troubleshootv1beta2.HostPreflight); ok {
 			hostPreflightSpec = ConcatHostPreflightSpec(hostPreflightSpec, spec)
-			preflightName = preflightSpec.Name
+			preflightName = hostPreflightSpec.Name
 		}
 	}
 	return preflightSpec, hostPreflightSpec, preflightName, nil

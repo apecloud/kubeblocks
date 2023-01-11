@@ -113,4 +113,19 @@ var _ = Describe("Preflight Test", func() {
 			g.Expect(preflightName).NotTo(BeNil())
 		}).Should(Succeed())
 	})
+
+	It("run Test", func() {
+		p := &preflightOptions{
+			factory:        tf,
+			IOStreams:      streams,
+			PreflightFlags: preflight.NewPreflightFlags(),
+		}
+		p.yamlCheckFiles = []string{"../../testing/testdata/hostpreflight.yaml"}
+		By("non-interactive mode")
+		*p.Interactive = false
+		Eventually(func(g Gomega) {
+			err := p.run()
+			g.Expect(err).NotTo(HaveOccurred())
+		}).Should(Succeed())
+	})
 })

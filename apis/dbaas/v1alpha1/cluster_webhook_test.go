@@ -181,6 +181,12 @@ var _ = Describe("cluster webhook", func() {
 			*rsCluster.Spec.Components[0].PrimaryIndex = int32(1)
 			*rsCluster.Spec.Components[0].Replicas = int32(2)
 			Expect(k8sClient.Patch(ctx, rsCluster, patch)).Should(Succeed())
+
+			By("By updating cluster.Spec.Components[0].PrimaryIndex less than 0, expect not succeed")
+			patch = client.MergeFrom(cluster.DeepCopy())
+			*rsCluster.Spec.Components[0].PrimaryIndex = int32(-1)
+			*rsCluster.Spec.Components[0].Replicas = int32(2)
+			Expect(k8sClient.Patch(ctx, rsCluster, patch)).ShouldNot(Succeed())
 		})
 	})
 })

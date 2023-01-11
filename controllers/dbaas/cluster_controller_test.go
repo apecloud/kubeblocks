@@ -51,7 +51,6 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -1783,7 +1782,7 @@ involvedObject:
   name: wesql-main-2
   namespace: default
 `
-		pods, err := consensusset.GetPodListByStatefulSet(ctx, k8sClient, sts)
+		pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
 		Expect(err).To(Succeed())
 
 		events := make([]corev1.Event, 0)
@@ -1800,7 +1799,7 @@ involvedObject:
 	}
 
 	getStsPodsName := func(sts *appsv1.StatefulSet) []string {
-		pods, err := consensusset.GetPodListByStatefulSet(ctx, k8sClient, sts)
+		pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
 		Expect(err).To(Succeed())
 
 		names := make([]string, 0)
@@ -1852,7 +1851,7 @@ involvedObject:
 
 			By("Checking pods' role are changed accordingly")
 			Eventually(func(g Gomega) {
-				pods, err := consensusset.GetPodListByStatefulSet(ctx, k8sClient, sts)
+				pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
 				g.Expect(err).To(Succeed())
 				// should have 3 pods
 				g.Expect(len(pods)).To(Equal(3))
@@ -1961,7 +1960,7 @@ involvedObject:
 
 			stsList := listAndCheckStatefulSet(key)
 			sts := &stsList.Items[0]
-			pods, err := consensusset.GetPodListByStatefulSet(ctx, k8sClient, sts)
+			pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
 			Expect(err).To(Succeed())
 			// should have 3 pods
 			Expect(len(pods)).Should(Equal(3))

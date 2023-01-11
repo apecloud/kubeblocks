@@ -234,7 +234,6 @@ func patchClusterStatus(opsRes *OpsResource, opsBehaviour OpsBehaviour) error {
 			if _, ok := realChangeCompMap[k]; ok {
 				v.Phase = toClusterState
 				opsRes.Cluster.Status.Components[k] = v
-				fmt.Printf("ComponentStatus: %s %s \n", k, v.Phase)
 			}
 		}
 	}

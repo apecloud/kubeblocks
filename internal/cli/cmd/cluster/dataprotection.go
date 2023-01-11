@@ -175,7 +175,7 @@ func NewDeleteBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	o := delete.NewDeleteOptions(f, streams, types.BackupGVR())
 	cmd := &cobra.Command{
 		Use:               "delete-backup",
-		Short:             "Delete a backup job",
+		Short:             "Delete a backup",
 		Example:           deleteBackupExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {

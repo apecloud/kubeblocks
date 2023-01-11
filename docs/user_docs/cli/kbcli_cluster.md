@@ -38,7 +38,7 @@ Database cluster operation command
 * [kbcli cluster connect](kbcli_cluster_connect.md)	 - Connect to a database cluster
 * [kbcli cluster create](kbcli_cluster_create.md)	 - Create a database cluster
 * [kbcli cluster delete](kbcli_cluster_delete.md)	 - Delete clusters
-* [kbcli cluster delete-backup](kbcli_cluster_delete-backup.md)	 - Delete a backup job
+* [kbcli cluster delete-backup](kbcli_cluster_delete-backup.md)	 - Delete a backup
 * [kbcli cluster delete-ops](kbcli_cluster_delete-ops.md)	 - Delete a OpsRequest
 * [kbcli cluster delete-restore](kbcli_cluster_delete-restore.md)	 - Delete a restore job
 * [kbcli cluster describe](kbcli_cluster_describe.md)	 - Show details of a specific cluster

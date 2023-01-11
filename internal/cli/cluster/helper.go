@@ -90,7 +90,7 @@ func FindClusterComp(cluster *dbaasv1alpha1.Cluster, typeName string) *dbaasv1al
 	return nil
 }
 
-// GetComponentEndpoints gets cluster internal and external endpoints
+// GetComponentEndpoints gets component internal and external endpoints
 func GetComponentEndpoints(svcList *corev1.ServiceList, c *dbaasv1alpha1.ClusterComponent) ([]string, []string) {
 	var (
 		internalEndpoints []string

@@ -40,7 +40,16 @@ var connectExample = templates.Examples(`
 		kbcli cluster connect my-cluster
 
 		# connect to a specified instance
-		kbcli cluster connect -i my-cluster-instance-0`)
+		kbcli cluster connect -i my-cluster-instance-0
+
+		# show cli connection example
+		kbcli cluster connect my-cluster --show-example --client=cli
+
+		# show java connection example
+		kbcli cluster connect my-cluster --show-example --client=java
+
+		# show all connection examples
+		kbcli cluster connect my-cluster --show-example`)
 
 type ConnectOptions struct {
 	name        string

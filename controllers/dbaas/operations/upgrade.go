@@ -78,7 +78,7 @@ func (u upgradeOpsHandler) SaveLastConfiguration(opsRes *OpsResource) error {
 	return opsRes.Client.Status().Patch(opsRes.Ctx, opsRes.OpsRequest, patch)
 }
 
-// getUpgradeStatusComponents compare the ClusterVersions before and after upgrade, and get the changed components map.
+// getUpgradeStatusComponents compares the ClusterVersions before and after upgrade, and get the changed components map.
 func (u upgradeOpsHandler) getUpgradeStatusComponents(opsRes *OpsResource) (map[string]dbaasv1alpha1.OpsRequestStatusComponent, error) {
 	lastClusterVersionCompMap, err := u.getClusterVersionComponentMap(opsRes.Ctx, opsRes.Client,
 		opsRes.Cluster.Spec.ClusterVersionRef)
@@ -90,7 +90,7 @@ func (u upgradeOpsHandler) getUpgradeStatusComponents(opsRes *OpsResource) (map[
 	if err != nil {
 		return nil, err
 	}
-	// get the changed component type map
+	// get the changed components type map
 	changedComponentMap := map[string]struct{}{}
 	for k, v := range clusterVersionCompMap {
 		lastComp := lastClusterVersionCompMap[k]
@@ -98,7 +98,7 @@ func (u upgradeOpsHandler) getUpgradeStatusComponents(opsRes *OpsResource) (map[
 			changedComponentMap[k] = struct{}{}
 		}
 	}
-	// get the changed component name map, and record the component infos to OpsRequest.status.
+	// get the changed components name map, and record the components infos to OpsRequest.status.
 	statusComponentMap := map[string]dbaasv1alpha1.OpsRequestStatusComponent{}
 	for k, v := range opsRes.Cluster.Status.Components {
 		if _, ok := changedComponentMap[v.Type]; !ok {
@@ -111,7 +111,7 @@ func (u upgradeOpsHandler) getUpgradeStatusComponents(opsRes *OpsResource) (map[
 	return statusComponentMap, nil
 }
 
-// getClusterVersionComponentMap get the ClusterVersion and covert the component list to map.
+// getClusterVersionComponentMap gets the ClusterVersion and coverts the component list to map.
 func (u upgradeOpsHandler) getClusterVersionComponentMap(ctx context.Context,
 	cli client.Client, clusterVersionName string) (map[string]dbaasv1alpha1.ClusterVersionComponent, error) {
 	clusterVersion := &dbaasv1alpha1.ClusterVersion{}

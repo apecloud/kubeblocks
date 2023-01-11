@@ -215,7 +215,7 @@ func (r *ClusterVersionReconciler) deleteExternalResources(reqCtx intctrlutil.Re
 	return nil
 }
 
-// SyncClusterStatusOperationsWithUpgrade sync cluster status.operations.upgradable when delete or create ClusterVersion
+// SyncClusterStatusOperationsWithUpgrade syncs cluster status.operations.upgradable when delete or create ClusterVersion
 func (r *ClusterVersionReconciler) syncClusterStatusOperationsWithUpgrade(ctx context.Context, clusterVersion *dbaasv1alpha1.ClusterVersion) error {
 	var (
 		clusterList        = &dbaasv1alpha1.ClusterList{}

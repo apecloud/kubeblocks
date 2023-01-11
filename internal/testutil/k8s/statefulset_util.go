@@ -124,7 +124,7 @@ func UpdatePodStatusNotReady(ctx context.Context, testCtx testutil.TestContext, 
 	}, timeout, interval).Should(gomega.BeTrue())
 }
 
-// MockPodIsTerminating mock pod is terminating.
+// MockPodIsTerminating mocks pod is terminating.
 func MockPodIsTerminating(ctx context.Context, testCtx testutil.TestContext, pod *corev1.Pod) {
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Finalizers = []string{testFinalizer}
@@ -137,7 +137,7 @@ func MockPodIsTerminating(ctx context.Context, testCtx testutil.TestContext, pod
 	}, timeout, interval).Should(gomega.BeTrue())
 }
 
-// RemovePodFinalizer remove the pod finalizer to delete the pod finally.
+// RemovePodFinalizer removes the pod finalizer to delete the pod finally.
 func RemovePodFinalizer(ctx context.Context, testCtx testutil.TestContext, pod *corev1.Pod) {
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Finalizers = []string{}

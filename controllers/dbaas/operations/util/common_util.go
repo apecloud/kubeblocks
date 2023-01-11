@@ -28,7 +28,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// PatchClusterOpsAnnotations patch OpsRequest annotation in Cluster.annotations
+// PatchClusterOpsAnnotations patches OpsRequest annotation in Cluster.annotations
 func PatchClusterOpsAnnotations(ctx context.Context,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
@@ -46,7 +46,7 @@ func PatchClusterOpsAnnotations(ctx context.Context,
 	return cli.Patch(ctx, cluster, patch)
 }
 
-// PatchOpsRequestReconcileAnnotation patch the reconcile annotation to OpsRequest
+// PatchOpsRequestReconcileAnnotation patches the reconcile annotation to OpsRequest
 func PatchOpsRequestReconcileAnnotation(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, opsRequestName string) error {
 	opsRequest := &dbaasv1alpha1.OpsRequest{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: opsRequestName, Namespace: cluster.Namespace}, opsRequest); err != nil {
@@ -62,7 +62,7 @@ func PatchOpsRequestReconcileAnnotation(ctx context.Context, cli client.Client, 
 	return cli.Patch(ctx, opsRequest, patch)
 }
 
-// GetOpsRequestSliceFromCluster get OpsRequest slice from cluster annotations.
+// GetOpsRequestSliceFromCluster gets OpsRequest slice from cluster annotations.
 // this record what OpsRequests are running in cluster
 func GetOpsRequestSliceFromCluster(cluster *dbaasv1alpha1.Cluster) ([]dbaasv1alpha1.OpsRecorder, error) {
 	var (
@@ -83,7 +83,7 @@ func GetOpsRequestSliceFromCluster(cluster *dbaasv1alpha1.Cluster) ([]dbaasv1alp
 	return opsRequestSlice, nil
 }
 
-// MarkRunningOpsRequestAnnotation mark reconcile annotation to the OpsRequest which is running in the cluster.
+// MarkRunningOpsRequestAnnotation marks reconcile annotation to the OpsRequest which is running in the cluster.
 // then the related OpsRequest can reconcile
 func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster) error {
 	var (
@@ -109,7 +109,7 @@ func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, clu
 	return nil
 }
 
-// RemoveClusterInvalidOpsRequestAnnotation delete the OpsRequest annotation in cluster when the OpsRequest not existing.
+// RemoveClusterInvalidOpsRequestAnnotation deletes the OpsRequest annotation in cluster when the OpsRequest not existing.
 func RemoveClusterInvalidOpsRequestAnnotation(
 	ctx context.Context,
 	cli client.Client,

@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// MockDeploymentReady mock deployment is ready
+// MockDeploymentReady mocks deployment is ready
 func MockDeploymentReady(deploy *appsv1.Deployment, rsAvailableReason string) {
 	deploy.Status.AvailableReplicas = *deploy.Spec.Replicas
 	deploy.Status.ReadyReplicas = *deploy.Spec.Replicas
@@ -38,7 +38,7 @@ func MockDeploymentReady(deploy *appsv1.Deployment, rsAvailableReason string) {
 	}
 }
 
-// MockPodAvailable mock pod is available
+// MockPodAvailable mocks pod is available
 func MockPodAvailable(pod *corev1.Pod, lastTransitionTime metav1.Time) {
 	pod.Status.Conditions = []corev1.PodCondition{
 		{

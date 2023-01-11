@@ -47,17 +47,17 @@ const (
 	EventOccursTimes int32 = 3
 )
 
-// isTargetKindForEvent check the event involve object is the target resources
+// isTargetKindForEvent checks the event involve object is the target resources
 func isTargetKindForEvent(event *corev1.Event) bool {
 	return slices.Index([]string{intctrlutil.PodKind, intctrlutil.DeploymentKind, intctrlutil.StatefulSetKind}, event.InvolvedObject.Kind) != -1
 }
 
-// isOperationsPhaseForCluster determine whether operations are in progress according to the cluster status except volumeExpanding.
+// isOperationsPhaseForCluster determines whether operations are in progress according to the cluster status except volumeExpanding.
 func isOperationsPhaseForCluster(phase dbaasv1alpha1.Phase) bool {
 	return slices.Index([]dbaasv1alpha1.Phase{dbaasv1alpha1.CreatingPhase, dbaasv1alpha1.UpdatingPhase}, phase) != -1
 }
 
-// getFinalEventMessageForRecorder get final event message by event involved object kind for recorded it
+// getFinalEventMessageForRecorder gets final event message by event involved object kind for recorded it
 func getFinalEventMessageForRecorder(event *corev1.Event) string {
 	if event.InvolvedObject.Kind == intctrlutil.PodKind {
 		return fmt.Sprintf("Pod %s: %s", event.InvolvedObject.Name, event.Message)
@@ -65,7 +65,7 @@ func getFinalEventMessageForRecorder(event *corev1.Event) string {
 	return event.Message
 }
 
-// isExistsEventMsg check whether the event is exists
+// isExistsEventMsg checks whether the event is exists
 func isExistsEventMsg(statusComponentMessage map[string]string, event *corev1.Event) bool {
 	if statusComponentMessage == nil {
 		return false
@@ -79,7 +79,7 @@ func isExistsEventMsg(statusComponentMessage map[string]string, event *corev1.Ev
 
 }
 
-// updateStatusComponentMessage update status component message map
+// updateStatusComponentMessage updates status component message map
 func updateStatusComponentMessage(statusComponent *dbaasv1alpha1.ClusterStatusComponent, event *corev1.Event) {
 	var (
 		kind = event.InvolvedObject.Kind
@@ -98,7 +98,7 @@ func updateStatusComponentMessage(statusComponent *dbaasv1alpha1.ClusterStatusCo
 	statusComponent.Message.SetObjectMessage(kind, name, message)
 }
 
-// needSyncComponentStatusForEvent check whether the component status needs to be synchronized the cluster status by event
+// needSyncComponentStatusForEvent checks whether the component status needs to be synchronized the cluster status by event
 func needSyncComponentStatusForEvent(cluster *dbaasv1alpha1.Cluster, componentName string, phase dbaasv1alpha1.Phase, event *corev1.Event) bool {
 	var (
 		status          = &cluster.Status
@@ -132,7 +132,7 @@ func needSyncComponentStatusForEvent(cluster *dbaasv1alpha1.Cluster, componentNa
 	return false
 }
 
-// getEventInvolvedObject get event involved object for StatefulSet/Deployment/Pod workload
+// getEventInvolvedObject gets event involved object for StatefulSet/Deployment/Pod workload
 func getEventInvolvedObject(ctx context.Context, cli client.Client, event *corev1.Event) (client.Object, error) {
 	objectKey := client.ObjectKey{
 		Name:      event.InvolvedObject.Name,
@@ -158,7 +158,7 @@ func getEventInvolvedObject(ctx context.Context, cli client.Client, event *corev
 	return nil, err
 }
 
-// handleClusterStatusPhaseByEvent handle the Cluster.status.phase when warning event happened.
+// handleClusterStatusPhaseByEvent handles the Cluster.status.phase when warning event happened.
 func handleClusterStatusPhaseByEvent(cluster *dbaasv1alpha1.Cluster, componentMap map[string]string, clusterAvailabilityMap map[string]bool) {
 	var (
 		isFailed                       bool
@@ -218,7 +218,7 @@ func getClusterAvailabilityEffect(componentDef *dbaasv1alpha1.ClusterDefinitionC
 	}
 }
 
-// getComponentRelatedInfo get componentMap, clusterAvailabilityMap and component definition information
+// getComponentRelatedInfo gets componentMap, clusterAvailabilityMap and component definition information
 func getComponentRelatedInfo(cluster *dbaasv1alpha1.Cluster, clusterDef *dbaasv1alpha1.ClusterDefinition, componentName string) (map[string]string, map[string]bool, dbaasv1alpha1.ClusterDefinitionComponent) {
 	var (
 		typeName     string
@@ -241,7 +241,7 @@ func getComponentRelatedInfo(cluster *dbaasv1alpha1.Cluster, clusterDef *dbaasv1
 	return componentMap, clusterAvailabilityEffectMap, componentDef
 }
 
-// handleClusterStatusByEvent handle the cluster status when warning event happened
+// handleClusterStatusByEvent handles the cluster status when warning event happened
 func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder record.EventRecorder, event *corev1.Event) error {
 	var (
 		cluster    = &dbaasv1alpha1.Cluster{}
@@ -289,7 +289,7 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 	return opsutil.MarkRunningOpsRequestAnnotation(ctx, cli, cluster)
 }
 
-// handleEventForClusterStatus handle event for cluster Warning and Failed phase
+// handleEventForClusterStatus handles event for cluster Warning and Failed phase
 func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorder record.EventRecorder, event *corev1.Event) error {
 
 	type predicateProcessor struct {

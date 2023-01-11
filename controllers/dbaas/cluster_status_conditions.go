@@ -51,13 +51,13 @@ const (
 	// ConditionTypeReady all components are running
 	ConditionTypeReady = "Ready"
 
-	// ReasonPreCheckSucceed preCheck succeed for provisioning started
+	// ReasonPreCheckSucceed preChecks succeed for provisioning started
 	ReasonPreCheckSucceed = "PreCheckSucceed"
-	// ReasonPreCheckFailed preCheck failed for provisioning started
+	// ReasonPreCheckFailed preChecks failed for provisioning started
 	ReasonPreCheckFailed = "PreCheckFailed"
-	// ReasonApplyResourcesFailed apply resources failed to create or change the cluster
+	// ReasonApplyResourcesFailed applies resources failed to create or change the cluster
 	ReasonApplyResourcesFailed = "ApplyResourcesFailed"
-	// ReasonApplyResourcesSucceed apply resources succeed to create or change the cluster
+	// ReasonApplyResourcesSucceed applies resources succeed to create or change the cluster
 	ReasonApplyResourcesSucceed = "ApplyResourcesSucceed"
 	// ReasonReplicasNotReady the pods of components are not ready
 	ReasonReplicasNotReady = "ReplicasNotReady"
@@ -69,7 +69,7 @@ const (
 	ReasonClusterReady = "ClusterReady"
 )
 
-// updateClusterConditions update cluster.status condition and record event.
+// updateClusterConditions updates cluster.status condition and records event.
 func (conMgr clusterConditionManager) updateStatusConditions(condition metav1.Condition) error {
 	patch := client.MergeFrom(conMgr.cluster.DeepCopy())
 	changed := conMgr.handleConditionForClusterPhase(condition)
@@ -89,7 +89,7 @@ func (conMgr clusterConditionManager) updateStatusConditions(condition metav1.Co
 	return nil
 }
 
-// handleConditionForClusterPhase check whether the condition can repair by cluster.
+// handleConditionForClusterPhase checks whether the condition can repair by cluster.
 // if it cannot be repaired after 30 seconds, modify the cluster status to ConditionsError
 func (conMgr clusterConditionManager) handleConditionForClusterPhase(condition metav1.Condition) bool {
 	if condition.Status == metav1.ConditionTrue {
@@ -111,7 +111,7 @@ func (conMgr clusterConditionManager) handleConditionForClusterPhase(condition m
 	return false
 }
 
-// setProvisioningStartedCondition set the provisioning started condition in cluster conditions.
+// setProvisioningStartedCondition sets the provisioning started condition in cluster conditions.
 func (conMgr clusterConditionManager) setProvisioningStartedCondition() error {
 	condition := metav1.Condition{
 		Type:    ConditionTypeProvisioningStarted,
@@ -122,7 +122,7 @@ func (conMgr clusterConditionManager) setProvisioningStartedCondition() error {
 	return conMgr.updateStatusConditions(condition)
 }
 
-// setPreCheckErrorCondition set the error condition when preCheck failed.
+// setPreCheckErrorCondition sets the error condition when preCheck failed.
 func (conMgr clusterConditionManager) setPreCheckErrorCondition(err error) error {
 	reason := ReasonPreCheckFailed
 	if apierrors.IsNotFound(err) {
@@ -137,7 +137,7 @@ func (conMgr clusterConditionManager) setPreCheckErrorCondition(err error) error
 	return conMgr.updateStatusConditions(condition)
 }
 
-// setUnavailableCondition set the condition that reference CRs are unavailable.
+// setUnavailableCondition sets the condition that reference CRs are unavailable.
 func (conMgr clusterConditionManager) setReferenceCRUnavailableCondition(message string) error {
 	condition := metav1.Condition{
 		Type:    ConditionTypeProvisioningStarted,
@@ -148,7 +148,7 @@ func (conMgr clusterConditionManager) setReferenceCRUnavailableCondition(message
 	return conMgr.updateStatusConditions(condition)
 }
 
-// setApplyResourcesFailedCondition set apply resources failed condition in cluster conditions.
+// setApplyResourcesFailedCondition sets applied resources failed condition in cluster conditions.
 func (conMgr clusterConditionManager) setApplyResourcesFailedCondition(err error) error {
 	condition := metav1.Condition{
 		Type:    ConditionTypeApplyResources,
@@ -159,7 +159,7 @@ func (conMgr clusterConditionManager) setApplyResourcesFailedCondition(err error
 	return conMgr.updateStatusConditions(condition)
 }
 
-// newApplyResourcesCondition new a condition when apply resources succeed.
+// newApplyResourcesCondition news a condition when applied resources succeed.
 func newApplyResourcesCondition() metav1.Condition {
 	return metav1.Condition{
 		Type:    ConditionTypeApplyResources,
@@ -169,7 +169,7 @@ func newApplyResourcesCondition() metav1.Condition {
 	}
 }
 
-// newAllReplicasPodsReadyConditions new a condition when all pods of components are ready
+// newAllReplicasPodsReadyConditions news a condition when all pods of components are ready
 func newAllReplicasPodsReadyConditions() metav1.Condition {
 	return metav1.Condition{
 		Type:    ConditionTypeReplicasReady,
@@ -179,7 +179,7 @@ func newAllReplicasPodsReadyConditions() metav1.Condition {
 	}
 }
 
-// newReplicasNotReadyCondition new a condition when pods of components are not ready
+// newReplicasNotReadyCondition news a condition when pods of components are not ready
 func newReplicasNotReadyCondition(message string) metav1.Condition {
 	return metav1.Condition{
 		Type:    ConditionTypeReplicasReady,
@@ -189,7 +189,7 @@ func newReplicasNotReadyCondition(message string) metav1.Condition {
 	}
 }
 
-// newClusterReadyCondition new a condition when all components of cluster are running
+// newClusterReadyCondition news a condition when all components of cluster are running
 func newClusterReadyCondition(clusterName string) metav1.Condition {
 	return metav1.Condition{
 		Type:    ConditionTypeReady,
@@ -199,7 +199,7 @@ func newClusterReadyCondition(clusterName string) metav1.Condition {
 	}
 }
 
-// newComponentsNotReadyCondition new a condition when components of cluster are not ready
+// newComponentsNotReadyCondition news a condition when components of cluster are not ready
 func newComponentsNotReadyCondition(message string) metav1.Condition {
 	return metav1.Condition{
 		Type:    ConditionTypeReady,

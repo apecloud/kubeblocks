@@ -102,10 +102,10 @@ func (r *OpsRequest) isForbiddenUpdate() bool {
 	return slices.Contains([]Phase{SucceedPhase, RunningPhase, FailedPhase}, r.Status.Phase)
 }
 
-// validateClusterPhase validate whether the current cluster state supports the OpsRequest
+// validateClusterPhase validates whether the current cluster state supports the OpsRequest
 func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	opsBehaviour := OpsRequestBehaviourMapper[r.Spec.Type]
-	// if the OpsType is no cluster phases, ignores it
+	// if the OpsType has no cluster phases, ignores it
 	if len(opsBehaviour.FromClusterPhases) == 0 {
 		return nil
 	}
@@ -136,7 +136,7 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	return nil
 }
 
-// getCluster get cluster with webhook client
+// getCluster gets cluster with webhook client
 func (r *OpsRequest) getCluster(ctx context.Context, k8sClient client.Client) (*Cluster, error) {
 	if k8sClient == nil {
 		return nil, nil
@@ -149,7 +149,7 @@ func (r *OpsRequest) getCluster(ctx context.Context, k8sClient client.Client) (*
 	return cluster, nil
 }
 
-// Validate validate OpsRequest is legal
+// Validate validates OpsRequest
 func (r *OpsRequest) Validate(ctx context.Context,
 	k8sClient client.Client,
 	cluster *Cluster,
@@ -181,7 +181,7 @@ func (r *OpsRequest) validateEntry(isCreate bool) error {
 	return r.Validate(ctx, k8sClient, cluster, isCreate)
 }
 
-// validateOps validate ops attributes is legal
+// validateOps validates ops attributes
 func (r *OpsRequest) validateOps(ctx context.Context,
 	k8sClient client.Client,
 	cluster *Cluster,
@@ -205,7 +205,7 @@ func (r *OpsRequest) validateOps(ctx context.Context,
 	}
 }
 
-// validateUpgrade validate spec.restart is legal
+// validateUpgrade validates spec.restart
 func (r *OpsRequest) validateRestart(allErrs *field.ErrorList, cluster *Cluster) {
 	restartList := r.Spec.RestartList
 	if len(restartList) == 0 {
@@ -222,7 +222,7 @@ func (r *OpsRequest) validateRestart(allErrs *field.ErrorList, cluster *Cluster)
 	r.validateComponentName(allErrs, cluster, supportedComponentMap, componentNames)
 }
 
-// validateUpgrade validate spec.clusterOps.upgrade is legal
+// validateUpgrade validates spec.clusterOps.upgrade
 func (r *OpsRequest) validateUpgrade(ctx context.Context,
 	k8sClient client.Client,
 	allErrs *field.ErrorList,
@@ -245,7 +245,7 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context,
 	}
 }
 
-// validateVerticalScaling validate api is legal when spec.type is VerticalScaling
+// validateVerticalScaling validates api when spec.type is VerticalScaling
 func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *Cluster) {
 	verticalScalingList := r.Spec.VerticalScalingList
 	if len(verticalScalingList) == 0 {
@@ -280,7 +280,7 @@ func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *
 
 }
 
-// compareRequestsAndLimits compare the resource requests and limits
+// compareRequestsAndLimits compares the resource requests and limits
 func compareRequestsAndLimits(resources corev1.ResourceRequirements) (string, error) {
 	requests := resources.Requests
 	limits := resources.Limits
@@ -297,12 +297,12 @@ func compareRequestsAndLimits(resources corev1.ResourceRequirements) (string, er
 	return "", nil
 }
 
-// compareQuantity compare requests quantity and limits quantity
+// compareQuantity compares requests quantity and limits quantity
 func compareQuantity(requestQuantity, limitQuantity *resource.Quantity) bool {
 	return requestQuantity != nil && limitQuantity != nil && requestQuantity.Cmp(*limitQuantity) > 0
 }
 
-// invalidReplicas verify whether the replicas is invalid
+// invalidReplicas verifies whether the replicas is invalid
 func invalidReplicas(replicas int32, operationComponent *OperationComponent) string {
 	if operationComponent.Min != 0 && replicas < operationComponent.Min {
 		return fmt.Sprintf("replicas must greater than %d", operationComponent.Min)
@@ -313,7 +313,7 @@ func invalidReplicas(replicas int32, operationComponent *OperationComponent) str
 	return ""
 }
 
-// validateHorizontalScaling validate api is legal when spec.type is HorizontalScaling
+// validateHorizontalScaling validates api when spec.type is HorizontalScaling
 func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.ErrorList) {
 	horizontalScalingList := r.Spec.HorizontalScalingList
 	if len(horizontalScalingList) == 0 {
@@ -326,7 +326,7 @@ func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.
 		*allErrs = append(*allErrs, err)
 		return
 	}
-	// validate replicas is legal and get component name slice
+	// validate replicas and get component name slice
 	componentNames := make([]string, len(horizontalScalingList))
 	for i, v := range horizontalScalingList {
 		componentNames[i] = v.ComponentName
@@ -342,7 +342,7 @@ func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.
 	r.validateComponentName(allErrs, cluster, supportedComponentMap, componentNames)
 }
 
-// validateVolumeExpansion validate volumeExpansion api is legal when spec.type is VolumeExpansion
+// validateVolumeExpansion validates volumeExpansion api when spec.type is VolumeExpansion
 func (r *OpsRequest) validateVolumeExpansion(allErrs *field.ErrorList, cluster *Cluster) {
 	volumeExpansionList := r.Spec.VolumeExpansionList
 	if len(volumeExpansionList) == 0 {
@@ -386,7 +386,7 @@ func (r *OpsRequest) validateVolumeExpansion(allErrs *field.ErrorList, cluster *
 	r.validateComponentName(allErrs, cluster, supportedComponentMap, componentNames)
 }
 
-// validateClusterIsSupported validate whether cluster support the operation when it in component scope
+// validateClusterIsSupported validates whether cluster supports the operation when it in component scope
 func (r *OpsRequest) validateClusterIsSupported(supportedComponentMap map[string]*OperationComponent) *field.Error {
 	if len(supportedComponentMap) > 0 {
 		return nil
@@ -404,7 +404,7 @@ func (r *OpsRequest) validateClusterIsSupported(supportedComponentMap map[string
 	return field.Invalid(field.NewPath("spec.type"), opsType, message)
 }
 
-// commonValidateWithComponentOps do common validation, when the operation in component scope
+// commonValidateWithComponentOps does common validation, when the operation in component scope
 func (r *OpsRequest) validateComponentName(allErrs *field.ErrorList,
 	cluster *Cluster,
 	supportedComponentMap map[string]*OperationComponent,
@@ -425,7 +425,7 @@ func (r *OpsRequest) validateComponentName(allErrs *field.ErrorList,
 			notFoundComponentNames = append(notFoundComponentNames, v)
 			continue
 		}
-		// check component name whether support the operation
+		// check if the component supports the operation
 		if _, ok = supportedComponentMap[v]; !ok {
 			notSupportedComponentNames = append(notSupportedComponentNames, v)
 		}
@@ -447,7 +447,7 @@ func lowercaseInitial(opsType OpsType) string {
 	return strings.ToLower(str[:1]) + str[1:]
 }
 
-// covertComponentNamesToMap covert supportedComponent slice to map
+// covertComponentNamesToMap coverts supportedComponent slice to map
 func covertComponentNamesToMap(componentNames []string) map[string]*OperationComponent {
 	supportedComponentMap := map[string]*OperationComponent{}
 	for _, v := range componentNames {
@@ -456,7 +456,7 @@ func covertComponentNamesToMap(componentNames []string) map[string]*OperationCom
 	return supportedComponentMap
 }
 
-// covertOperationComponentsToMap covert supportedOperationComponent slice to map
+// covertOperationComponentsToMap coverts supportedOperationComponent slice to map
 func covertOperationComponentsToMap(componentNames []OperationComponent) map[string]*OperationComponent {
 	supportedComponentMap := map[string]*OperationComponent{}
 	for _, v := range componentNames {
@@ -465,7 +465,7 @@ func covertOperationComponentsToMap(componentNames []OperationComponent) map[str
 	return supportedComponentMap
 }
 
-// checkResourceList check k8s resourceList is legal
+// checkResourceList checks if k8s resourceList is legal
 func validateVerticalResourceList(resourceList map[corev1.ResourceName]resource.Quantity) (string, error) {
 	for k := range resourceList {
 		if k != corev1.ResourceCPU && k != corev1.ResourceMemory && !strings.HasPrefix(k.String(), corev1.ResourceHugePagesPrefix) {

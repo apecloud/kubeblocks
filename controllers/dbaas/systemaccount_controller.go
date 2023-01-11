@@ -133,12 +133,6 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
 	}
 
-	// clusterdef is under deletion, do nothing
-	if !clusterdefinition.GetDeletionTimestamp().IsZero() {
-		reqCtx.Log.Info("ClusterDefinition is under deletion.", "clusterdefinition", clusterDefNS)
-		return intctrlutil.Reconciled()
-	}
-
 	// wait till the cluster is running
 	if cluster.Status.Phase != dbaasv1alpha1.RunningPhase && cluster.Status.Phase != dbaasv1alpha1.CreatingPhase {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "Cluster is not ready yet", "cluster", cluster.Name)

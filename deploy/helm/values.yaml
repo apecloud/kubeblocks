@@ -152,11 +152,48 @@ prometheus:
       ## If true, alertmanager will create/use a Persistent Volume Claim
       ## If false, use emptyDir
       ##
-      enabled: false
+      enabled: true
 
       ## alertmanager data Persistent Volume size
       ##
-      size: 2Gi
+      size: 512Mi
+
+      ## alertmanager data Persistent Volume Storage Class
+      ## If defined, storageClassName: <storageClass>
+      ## If set to "-", storageClassName: "", which disables dynamic provisioning
+      ## If undefined (the default) or set to null, no storageClassName spec is
+      ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+      ##   GKE, AWS & OpenStack)
+      ##
+      # storageClass: "-"
+
+    ## Use a StatefulSet if replicaCount needs to be greater than 1 (see below)
+    ##
+    replicaCount: 1
+
+    statefulSet:
+      ## If true, use a statefulset instead of a deployment for pod management.
+      ## This allows to scale replicas to more than 1 pod
+      ##
+      enabled: true
+
+      ## Alertmanager headless service to use for the statefulset
+      ##
+      headless:
+        ## Enabling peer mesh service end points for enabling the HA alert manager
+        ## Ref: https://github.com/prometheus/alertmanager/blob/master/README.md
+        enableMeshPeer: true
+
+    ## alertmanager resource requests and limits
+    ## Ref: http://kubernetes.io/docs/user-guide/compute-resources/
+    ##
+    resources: {}
+      # limits:
+      #   cpu: 10m
+      #   memory: 32Mi
+      # requests:
+      #   cpu: 10m
+      #   memory: 32Mi
 
   kubeStateMetrics:
     ## If false, kube-state-metrics sub-chart will not be installed
@@ -176,13 +213,17 @@ prometheus:
     global:
       ## How frequently to scrape targets by default
       ##
-      scrape_interval: 30s
+      scrape_interval: 15s
       ## How long until a scrape request times out
       ##
       scrape_timeout: 10s
       ## How frequently to evaluate rules
       ##
-      evaluation_interval: 30s
+      evaluation_interval: 15s
+
+    ## https://prometheus.io/docs/prometheus/latest/configuration/configuration/#remote_write
+    ##
+    remoteWrite: []
 
     ## Prefix used to register routes, overriding externalUrl route.
     ## Useful for proxies that rewrite URLs.
@@ -193,11 +234,45 @@ prometheus:
       ## If true, Prometheus server will create/use a Persistent Volume Claim
       ## If false, use emptyDir
       ##
-      enabled: false
+      enabled: true
 
       ## Prometheus server data Persistent Volume size
       ##
-      size: 8Gi
+      size: 1Gi
+
+      ## Prometheus server data Persistent Volume Storage Class
+      ## If defined, storageClassName: <storageClass>
+      ## If set to "-", storageClassName: "", which disables dynamic provisioning
+      ## If undefined (the default) or set to null, no storageClassName spec is
+      ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+      ##   GKE, AWS & OpenStack)
+      ##
+      # storageClass: "-"
+
+    ## Use a StatefulSet if replicaCount needs to be greater than 1 (see below)
+    ##
+    replicaCount: 1
+
+    statefulSet:
+      ## If true, use a statefulset instead of a deployment for pod management.
+      ## This allows to scale replicas to more than 1 pod
+      ##
+      enabled: true
+
+    ## Prometheus server resource requests and limits
+    ## Ref: http://kubernetes.io/docs/user-guide/compute-resources/
+    ##
+    resources: {}
+      # limits:
+      #   cpu: 500m
+      #   memory: 512Mi
+      # requests:
+      #   cpu: 500m
+      #   memory: 512Mi
+
+    ## Prometheus' data retention period (default if not specified is 15 days)
+    ##
+    retention: "15d"
 
   serverFiles:
     prometheus.yml:
@@ -450,6 +525,19 @@ grafana:
   ## If false, grafana sub-chart will not be installed
   ##
   enabled: false
+
+  replicas: 1
+
+  ## Grafana server resource requests and limits
+  ## Ref: http://kubernetes.io/docs/user-guide/compute-resources/
+  ##
+  resources: {}
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
 
   ## Timezone for the default dashboards
   ## Other options are: browser or a specific timezone, i.e. Europe/Luxembourg

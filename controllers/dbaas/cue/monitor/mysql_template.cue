@@ -9,7 +9,7 @@ container: {
 	"name":            "inject-mysql-exporter"
 	"imagePullPolicy": "\(monitor.imagePullPolicy)"
 	"image":           "\(monitor.image)"
-	"command": ["/bin/agamotto"]
+	"command": ["/bin/agamotto", "--collect.info_schema.wesql_consensus"]
 	"env": [
 		{
 			"name": "MYSQL_USER"

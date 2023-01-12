@@ -42,6 +42,7 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -77,7 +78,8 @@ func getCacheCUETplValue(key string, valueCreator func() (*intctrlutil.CUETpl, e
 	return v, err
 }
 
-// mergeConfigTemplates merge ClusterVersion.Components[*].ConfigTemplateRefs and ClusterDefinition.Components[*].ConfigTemplateRefs
+// mergeConfigTemplates merge multi-ways of input ConfigTemplate arrays into one,
+// only keeping elements with different VolumeName.
 func mergeConfigTemplates(clusterVersionTpl []dbaasv1alpha1.ConfigTemplate,
 	cdTpl []dbaasv1alpha1.ConfigTemplate) []dbaasv1alpha1.ConfigTemplate {
 	if len(clusterVersionTpl) == 0 {
@@ -280,6 +282,8 @@ func mergeMonitorConfig(
 	}
 }
 
+// mergeComponents generates a new Component object, which is a mixture of
+// component-related configs from input Cluster, ClusterDef and ClusterVersion.
 func mergeComponents(
 	reqCtx intctrlutil.RequestCtx,
 	cluster *dbaasv1alpha1.Cluster,
@@ -439,7 +443,7 @@ func mergeComponents(
 	if err != nil {
 		reqCtx.Log.Error(err, "build probe container failed.")
 	}
-	replaceValues(cluster, component)
+	replacePlaceholderTokens(cluster, component)
 
 	return component
 }
@@ -471,10 +475,8 @@ func getComponent(componentList []Component, name string) *Component {
 	return nil
 }
 
-func replaceValues(cluster *dbaasv1alpha1.Cluster, component *Component) {
-	namedValues := map[string]string{
-		"$(CONN_CREDENTIAL_SECRET_NAME)": fmt.Sprintf("%s-conn-credential", cluster.GetName()),
-	}
+func replacePlaceholderTokens(cluster *dbaasv1alpha1.Cluster, component *Component) {
+	namedValues := getEnvReplacementMapForConnCrential(cluster.GetName())
 
 	// replace env[].valueFrom.secretKeyRef.name variables
 	for _, cc := range [][]corev1.Container{component.PodSpec.InitContainers, component.PodSpec.Containers} {
@@ -520,15 +522,15 @@ func createCluster(
 		return false, err
 	}
 
-	clusterDefComp := clusterDefinition.Spec.Components
-	clusterCompTypes := cluster.GetTypeMappingComponents()
+	clusterDefComps := clusterDefinition.Spec.Components
+	clusterCompMap := cluster.GetTypeMappingComponents()
 
 	// add default component if unspecified in Cluster.spec.components
-	for _, c := range clusterDefComp {
+	for _, c := range clusterDefComps {
 		if c.DefaultReplicas <= 0 {
 			continue
 		}
-		if _, ok := clusterCompTypes[c.TypeName]; ok {
+		if _, ok := clusterCompMap[c.TypeName]; ok {
 			continue
 		}
 		r := c.DefaultReplicas
@@ -539,8 +541,8 @@ func createCluster(
 		})
 	}
 
-	appCompTypes := clusterVersion.GetTypeMappingComponents()
-	clusterCompTypes = cluster.GetTypeMappingComponents()
+	clusterCompMap = cluster.GetTypeMappingComponents()
+	clusterVersionCompMap := clusterVersion.GetTypeMappingComponents()
 
 	prepareComp := func(component *Component) error {
 		iParams := params
@@ -548,12 +550,12 @@ func createCluster(
 		return prepareComponentObjs(reqCtx, cli, &iParams)
 	}
 
-	for _, c := range clusterDefComp {
+	for _, c := range clusterDefComps {
 		typeName := c.TypeName
-		clusterVersionComponent := appCompTypes[typeName]
-		clusterComps := clusterCompTypes[typeName]
+		clusterVersionComp := clusterVersionCompMap[typeName]
+		clusterComps := clusterCompMap[typeName]
 		for _, clusterComp := range clusterComps {
-			if err := prepareComp(mergeComponents(reqCtx, cluster, clusterDefinition, &c, clusterVersionComponent, &clusterComp)); err != nil {
+			if err := prepareComp(mergeComponents(reqCtx, cluster, clusterDefinition, &c, clusterVersionComp, &clusterComp)); err != nil {
 				return false, err
 			}
 		}
@@ -604,6 +606,9 @@ func needBuildPDB(params *createParams) bool {
 	return existsPDBSpec(params.component.PodDisruptionBudgetSpec)
 }
 
+// prepareComponentObjs generate all necessary sub-resources objects used in component,
+// like Secret, ConfigMap, Service, StatefulSet, Deployment, Volume, PodDisruptionBudget etc.
+// Generated resources are cached in (obj.(*createParams)).applyObjs.
 func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) error {
 	params, ok := obj.(*createParams)
 	if !ok {
@@ -877,7 +882,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		cleanBackupResourcesIfNeeded := func() error {
 			if component.HorizontalScalePolicy == nil ||
 				component.HorizontalScalePolicy.Type != dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot ||
-				isSnapshotAvailable(cli, ctx) {
+				!isSnapshotAvailable(cli, ctx) {
 				return nil
 			}
 			// if all pvc bounded, clean backup resources
@@ -1375,14 +1380,21 @@ func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
 	for j := 0; j < int(params.component.Replicas); j++ {
 		envData[prefix+strconv.Itoa(j)+"_HOSTNAME"] = fmt.Sprintf("%s.%s", params.cluster.Name+"-"+params.component.Name+"-"+strconv.Itoa(j), svcName)
 	}
+	// TODO following code seems to be redundant with updateConsensusRoleInfo in consensus_set_utils.go
 	// build consensus env from cluster.status
 	if params.cluster.Status.Components != nil {
-		if v, ok := params.cluster.Status.Components[params.component.Type]; ok {
+		if v, ok := params.cluster.Status.Components[params.component.Name]; ok {
 			consensusSetStatus := v.ConsensusSetStatus
 			if consensusSetStatus != nil {
-				envData[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
+				if consensusSetStatus.Leader.Pod != consensusset.ConsensusSetStatusDefaultPodName {
+					envData[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
+				}
+
 				followers := ""
 				for _, follower := range consensusSetStatus.Followers {
+					if follower.Pod == consensusset.ConsensusSetStatusDefaultPodName {
+						continue
+					}
 					if len(followers) > 0 {
 						followers += ","
 					}
@@ -1778,7 +1790,7 @@ func isVolumeSnapshotReadyToUse(cli client.Client,
 	if err := cli.List(ctx, &vsList, ml); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
-	if len(vsList.Items) == 0 {
+	if len(vsList.Items) == 0 || vsList.Items[0].Status == nil {
 		return false, nil
 	}
 	return *vsList.Items[0].Status.ReadyToUse, nil

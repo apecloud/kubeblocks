@@ -1428,7 +1428,7 @@ func checkAndUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]dbaasv
 	)
 	// sort the volumes
 	volumeKeys := maps.Keys(volumes)
-	sort.Sort(sort.StringSlice(volumeKeys))
+	sort.Strings(volumeKeys)
 	// Update PodTemplate Volumes
 	for _, cmName := range volumeKeys {
 		tpl := volumes[cmName]

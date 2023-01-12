@@ -28,6 +28,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+// ReplicationSet is a component object by cluster, ClusterDefinitionComponent and ClusterComponent
 type ReplicationSet struct {
 	Cli          client.Client
 	Ctx          context.Context
@@ -36,6 +37,8 @@ type ReplicationSet struct {
 	Component    *dbaasv1alpha1.ClusterComponent
 }
 
+// IsRunning is the implementation of the type Component interface method,
+// which is used to check whether the replicationSet component is running normally.
 func (rs *ReplicationSet) IsRunning(obj client.Object) (bool, error) {
 	var componentStsList = &appsv1.StatefulSetList{}
 	var componentStatusIsRunning = true
@@ -53,6 +56,8 @@ func (rs *ReplicationSet) IsRunning(obj client.Object) (bool, error) {
 	return componentStatusIsRunning, nil
 }
 
+// PodsReady is the implementation of the type Component interface method,
+// which is used to check whether all the pods of replicationSet component is ready.
 func (rs *ReplicationSet) PodsReady(obj client.Object) (bool, error) {
 	var podsReady = true
 	var componentStsList = &appsv1.StatefulSetList{}
@@ -68,10 +73,15 @@ func (rs *ReplicationSet) PodsReady(obj client.Object) (bool, error) {
 	return podsReady, nil
 }
 
+// HandleProbeTimeoutWhenPodsReady is the implementation of the type Component interface method,
+// and replicationSet does not need to do role probe detection, so it returns true directly.
 func (rs *ReplicationSet) HandleProbeTimeoutWhenPodsReady() (bool, error) {
 	return true, nil
 }
 
+// CalculatePhaseWhenPodsNotReady is the implementation of the type Component interface method,
+// when the pods of replicationSet are not ready, calculate the component phase is Failed or Abnormal.
+// if return an empty phase, means the pods of component are ready and skips it.
 func (rs *ReplicationSet) CalculatePhaseWhenPodsNotReady(componentName string) (dbaasv1alpha1.Phase, error) {
 	var (
 		isFailed         = true

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"golang.org/x/exp/slices"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,7 +31,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// GetClusterByObject get cluster by related k8s workloads.
+// GetClusterByObject gets cluster by related k8s workloads.
 func GetClusterByObject(ctx context.Context,
 	cli client.Client,
 	obj client.Object) (*dbaasv1alpha1.Cluster, error) {
@@ -48,7 +49,7 @@ func GetClusterByObject(ctx context.Context,
 	return cluster, nil
 }
 
-// IsCompleted check whether the component has completed the operation
+// IsCompleted checks whether the component has completed the operation
 func IsCompleted(phase dbaasv1alpha1.Phase) bool {
 	return slices.Index([]dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase}, phase) != -1
 }
@@ -57,7 +58,7 @@ func IsFailedOrAbnormal(phase dbaasv1alpha1.Phase) bool {
 	return slices.Index([]dbaasv1alpha1.Phase{dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase}, phase) != -1
 }
 
-// GetComponentMatchLabels get the labels for matching the cluster component
+// GetComponentMatchLabels gets the labels for matching the cluster component
 func GetComponentMatchLabels(clusterName, componentName string) client.ListOption {
 	return client.MatchingLabels{
 		intctrlutil.AppInstanceLabelKey:  clusterName,
@@ -66,7 +67,7 @@ func GetComponentMatchLabels(clusterName, componentName string) client.ListOptio
 	}
 }
 
-// GetComponentPodList get the pod list by cluster and componentName
+// GetComponentPodList gets the pod list by cluster and componentName
 func GetComponentPodList(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, componentName string) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	err := cli.List(ctx, podList, client.InNamespace(cluster.Namespace),
@@ -78,7 +79,7 @@ func GetStatusComponentMessageKey(kind, name string) string {
 	return fmt.Sprintf("%s/%s", kind, name)
 }
 
-// IsProbeTimeout check the pod is probe timeout, timeout durations are one minute
+// IsProbeTimeout checks the pod is probe timeout, timeout durations are one minute
 func IsProbeTimeout(podsReadyTime *metav1.Time) bool {
 	if podsReadyTime == nil {
 		return false
@@ -97,14 +98,14 @@ func CalculateComponentPhase(isFailed, isAbnormal bool) dbaasv1alpha1.Phase {
 	return componentPhase
 }
 
-// GetObjectListByComponentName get k8s workload list with component
+// GetObjectListByComponentName gets k8s workload list with component
 func GetObjectListByComponentName(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, objectList client.ObjectList, componentName string) error {
 	matchLabels := GetComponentMatchLabels(cluster.Name, componentName)
 	inNamespace := client.InNamespace(cluster.Namespace)
 	return cli.List(ctx, objectList, matchLabels, inNamespace)
 }
 
-// CheckRelatedPodIsTerminating check related pods is terminating for Stateless/Stateful
+// CheckRelatedPodIsTerminating checks related pods is terminating for Stateless/Stateful
 func CheckRelatedPodIsTerminating(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, componentName string) (bool, error) {
 	podList := &corev1.PodList{}
 	if err := cli.List(ctx, podList, client.InNamespace(cluster.Namespace),
@@ -120,7 +121,7 @@ func CheckRelatedPodIsTerminating(ctx context.Context, cli client.Client, cluste
 	return false, nil
 }
 
-// GetComponentByName get component by name on cluster
+// GetComponentByName gets component by name on cluster
 func GetComponentByName(cluster *dbaasv1alpha1.Cluster, componentName string) *dbaasv1alpha1.ClusterComponent {
 	for _, v := range cluster.Spec.Components {
 		if v.Name == componentName {
@@ -130,7 +131,7 @@ func GetComponentByName(cluster *dbaasv1alpha1.Cluster, componentName string) *d
 	return nil
 }
 
-// GetComponentDeftByCluster get component from ClusterDefinition with typeName
+// GetComponentDeftByCluster gets component from ClusterDefinition with typeName
 func GetComponentDeftByCluster(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, typeName string) (*dbaasv1alpha1.ClusterDefinitionComponent, error) {
 	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
@@ -145,7 +146,7 @@ func GetComponentDeftByCluster(ctx context.Context, cli client.Client, cluster *
 	return nil, nil
 }
 
-// GetComponentDefFromClusterDefinition get component from ClusterDefinition with typeName
+// GetComponentDefFromClusterDefinition gets component from ClusterDefinition with typeName
 func GetComponentDefFromClusterDefinition(clusterDef *dbaasv1alpha1.ClusterDefinition, typeName string) *dbaasv1alpha1.ClusterDefinitionComponent {
 	for _, component := range clusterDef.Spec.Components {
 		if component.TypeName == typeName {
@@ -155,7 +156,7 @@ func GetComponentDefFromClusterDefinition(clusterDef *dbaasv1alpha1.ClusterDefin
 	return nil
 }
 
-// GetComponentTypeName get component type name
+// GetComponentTypeName gets component type name
 func GetComponentTypeName(cluster dbaasv1alpha1.Cluster, componentName string) string {
 	for _, component := range cluster.Spec.Components {
 		if componentName == component.Name {
@@ -163,4 +164,60 @@ func GetComponentTypeName(cluster dbaasv1alpha1.Cluster, componentName string) s
 		}
 	}
 	return componentName
+}
+
+// GetComponentReplicas gets the actual replicas of component
+func GetComponentReplicas(component *dbaasv1alpha1.ClusterComponent,
+	componentDef *dbaasv1alpha1.ClusterDefinitionComponent) int32 {
+	replicas := componentDef.DefaultReplicas
+	if component.Replicas != nil {
+		replicas = *component.Replicas
+	}
+	return replicas
+}
+
+// GetComponentDeployMinReadySeconds gets the deployment minReadySeconds of the component.
+func GetComponentDeployMinReadySeconds(ctx context.Context,
+	cli client.Client,
+	cluster *dbaasv1alpha1.Cluster,
+	componentName string) (minReadySeconds int32, err error) {
+	deployList := &appsv1.DeploymentList{}
+	if err = GetObjectListByComponentName(ctx, cli, cluster, deployList, componentName); err != nil {
+		return
+	}
+	if len(deployList.Items) > 0 {
+		minReadySeconds = deployList.Items[0].Spec.MinReadySeconds
+		return
+	}
+	return minReadySeconds, err
+}
+
+// GetComponentStsMinReadySeconds gets the statefulSet minReadySeconds of the component.
+func GetComponentStsMinReadySeconds(ctx context.Context,
+	cli client.Client,
+	cluster *dbaasv1alpha1.Cluster,
+	componentName string) (minReadySeconds int32, err error) {
+	stsList := &appsv1.StatefulSetList{}
+	if err = GetObjectListByComponentName(ctx, cli, cluster, stsList, componentName); err != nil {
+		return
+	}
+	if len(stsList.Items) > 0 {
+		minReadySeconds = stsList.Items[0].Spec.MinReadySeconds
+		return
+	}
+	return minReadySeconds, err
+}
+
+// GetComponentWorkloadMinReadySeconds gets the workload minReadySeconds of the component.
+func GetComponentWorkloadMinReadySeconds(ctx context.Context,
+	cli client.Client,
+	cluster *dbaasv1alpha1.Cluster,
+	componentType dbaasv1alpha1.ComponentType,
+	componentName string) (minReadySeconds int32, err error) {
+	switch componentType {
+	case dbaasv1alpha1.Stateless:
+		return GetComponentDeployMinReadySeconds(ctx, cli, cluster, componentName)
+	default:
+		return GetComponentStsMinReadySeconds(ctx, cli, cluster, componentName)
+	}
 }

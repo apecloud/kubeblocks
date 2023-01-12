@@ -1,0 +1,8 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: %s
+  namespace: default
+spec:
+  clusterRef: %s
+  type: %s

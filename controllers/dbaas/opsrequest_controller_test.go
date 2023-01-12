@@ -130,6 +130,7 @@ spec:
       - name: nginx
 `
 		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
+
 		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, clusterDefinition)).Should(Succeed())
 		return clusterDefinition
@@ -269,7 +270,7 @@ spec:
 			verticalScalingOpsRequest.Spec.VerticalScalingList = []dbaasv1alpha1.VerticalScaling{
 				{
 					ComponentOps: dbaasv1alpha1.ComponentOps{ComponentName: clusterObj.Spec.Components[0].Name}, // "wesql"
-					ResourceRequirements: &corev1.ResourceRequirements{
+					ResourceRequirements: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							"cpu":    resource.MustParse("400m"),
 							"memory": resource.MustParse("300Mi"),
@@ -321,7 +322,7 @@ func mockOpsRequestSucceed(namespacedName types.NamespacedName) error {
 	return changeOpsRequestStatus(namespacedName,
 		func(or *dbaasv1alpha1.OpsRequest) {
 			or.Status.Phase = dbaasv1alpha1.SucceedPhase
-			or.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
+			or.Status.CompletionTimestamp = metav1.Time{Time: time.Now()}
 		})
 }
 

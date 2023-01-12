@@ -18,8 +18,12 @@ package stateful
 
 import (
 	"context"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -36,24 +40,35 @@ type Stateful struct {
 var _ types.Component = &Stateful{}
 
 func (stateful *Stateful) IsRunning(obj client.Object) (bool, error) {
-	sts := util.CovertToStatefulSet(obj)
-	if sts == nil {
+	if obj == nil {
 		return false, nil
 	}
+	sts := util.CovertToStatefulSet(obj)
 	statefulStatusRevisionIsEquals := sts.Status.UpdateRevision == sts.Status.CurrentRevision
 	return util.StatefulSetIsReady(sts, statefulStatusRevisionIsEquals), nil
 }
 
 func (stateful *Stateful) PodsReady(obj client.Object) (bool, error) {
+	if obj == nil {
+		return false, nil
+	}
 	sts := util.CovertToStatefulSet(obj)
 	return util.StatefulSetPodsIsReady(sts), nil
 }
 
+func (stateful *Stateful) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+	if pod == nil {
+		return false
+	}
+	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
+}
+
+// HandleProbeTimeoutWhenPodsReady the Stateful component has no role detection, empty implementation here.
 func (stateful *Stateful) HandleProbeTimeoutWhenPodsReady() (bool, error) {
 	return false, nil
 }
 
-func (stateful *Stateful) CalculatePhaseWhenPodsNotReady(componentName string) (dbaasv1alpha1.Phase, error) {
+func (stateful *Stateful) GetPhaseWhenPodsNotReady(componentName string) (dbaasv1alpha1.Phase, error) {
 	var (
 		isFailed          = true
 		isAbnormal        bool
@@ -83,7 +98,7 @@ func (stateful *Stateful) CalculatePhaseWhenPodsNotReady(componentName string) (
 
 func NewStateful(ctx context.Context,
 	cli client.Client,
-	cluster *dbaasv1alpha1.Cluster) *Stateful {
+	cluster *dbaasv1alpha1.Cluster) types.Component {
 	return &Stateful{
 		Ctx:     ctx,
 		Cli:     cli,

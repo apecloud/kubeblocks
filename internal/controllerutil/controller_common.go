@@ -17,6 +17,9 @@ limitations under the License.
 package controllerutil
 
 import (
+	"bytes"
+	"context"
+	"io"
 	"reflect"
 	"strings"
 	"time"
@@ -25,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -214,4 +218,23 @@ func IgnoreIsAlreadyExists(err error) error {
 		return err
 	}
 	return nil
+}
+
+// GetPodLogs fetches logs from specific pod.
+func GetPodLogs(client *kubernetes.Clientset, pod corev1.Pod, podLogOpts corev1.PodLogOptions) (string, error) {
+	req := client.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &podLogOpts)
+	podLogs, err := req.Stream(context.Background())
+	if err != nil {
+		return "", err
+	}
+	defer podLogs.Close()
+
+	buf := new(bytes.Buffer)
+	_, err = io.Copy(buf, podLogs)
+	if err != nil {
+		return "", err
+	}
+	str := buf.String()
+
+	return str, err
 }

@@ -225,5 +225,7 @@ func TestRenderJob(t *testing.T) {
 		envList := job.Spec.Template.Spec.Containers[0].Env
 		assert.GreaterOrEqual(t, len(envList), 1)
 		assert.Equal(t, job.Spec.Template.Spec.Containers[0].Image, cmdExecutorConfig.Image)
+		assert.Equal(t, *job.Spec.BackoffLimit, defaultSysAccountJobBackOffLimits)
+		assert.Equal(t, *job.Spec.TTLSecondsAfterFinished, defaultSysAccountJobTTLSeconds)
 	}
 }

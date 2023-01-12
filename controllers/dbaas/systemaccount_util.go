@@ -31,6 +31,15 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+const (
+	// set backoff limits to 2 times
+	defaultSysAccountJobBackOffLimits int32 = 6
+	defaultSysAccountJobTTLSeconds    int32 = 1
+)
+const (
+	dashSeparator = '-'
+)
+
 // SecretMapStore is a cache, recording all (key, secret) pair for accounts to be created.
 type secretMapStore struct {
 	cache.Store
@@ -267,8 +276,8 @@ func renderJob(engine *customizedEngine, namespace, clusterName, clusterDefType,
 	ml := getLabelsForSecretsAndJobs(clusterName, clusterDefType, clusterDefName, compName)
 	ml[clusterAccountLabelKey] = username
 
-	// set job ttl to 1 seconds
-	var defaultTTLSeconds int32 = 1
+	var defaultTTLSeconds = defaultSysAccountJobTTLSeconds
+	var defaultBackOffLimits = defaultSysAccountJobBackOffLimits
 
 	// inject one more system env variables
 	statementEnv := corev1.EnvVar{
@@ -290,6 +299,7 @@ func renderJob(engine *customizedEngine, namespace, clusterName, clusterDefType,
 		},
 		Spec: batchv1.JobSpec{
 			TTLSecondsAfterFinished: &defaultTTLSeconds,
+			BackoffLimit:            &defaultBackOffLimits,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: namespace,
@@ -391,11 +401,12 @@ func updateFacts(accountName dbaasv1alpha1.AccountName, detectedFacts *dbaasv1al
 }
 
 func concatSecretName(ns, clusterName, component string, username string) string {
-	return fmt.Sprintf("%s-%s-%s-%s", ns, clusterName, component, username)
+	return expectationKey(ns, clusterName, component) + string(dashSeparator) + username
 }
 
 func expectationKey(ns, clusterName, component string) string {
-	return fmt.Sprintf("%s-%s-%s", ns, clusterName, component)
+	// return fmt.Sprintf("%s-%s-%s", ns, clusterName, component)
+	return ns + string(dashSeparator) + clusterName + string(dashSeparator) + component
 }
 
 // getClusterAndEngineType infers cluster type and engine type we supported at the moment.

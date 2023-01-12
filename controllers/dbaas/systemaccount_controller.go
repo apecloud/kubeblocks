@@ -18,8 +18,10 @@ package dbaas
 
 import (
 	"context"
+	"sync"
 	"time"
 
+	"github.com/go-logr/logr"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,10 +38,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/go-logr/logr"
-
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	util "github.com/apecloud/kubeblocks/internal/cli/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -56,14 +57,14 @@ type SystemAccountReconciler struct {
 type backupPolicyChangePredicate struct {
 	predicate.Funcs
 	ExpectionManager *systemAccountExpectationsManager
-	Log              logr.Logger
+	backPolicyLog    logr.Logger
 }
 
 // jobCompleditionPredicate implements a default delete predicate function on job deletion.
 type jobCompletitionPredicate struct {
 	predicate.Funcs
 	reconciler *SystemAccountReconciler
-	Log        logr.Logger
+	jobLog     logr.Logger
 }
 
 // SysAccountDeletion and SysAccountCreation are used as event reasons.
@@ -85,19 +86,29 @@ const (
 	accountPasswdForSecret = "password"
 )
 
-// predicates on Create and Delete events from BackupPolicy CR
+// compile-time assert that the local data object satisfies the predicate.Predicate interface.
 var _ predicate.Predicate = &backupPolicyChangePredicate{}
 
-// predidates on Delete event from Job CR
+// compile-time assert that the local data object satisfies the predicate.Predicate interface.
 var _ predicate.Predicate = &jobCompletitionPredicate{}
+
+var (
+	// systemAccountLog is a logger for use during runtime
+	systemAccountLog logr.Logger
+)
+
+func init() {
+	systemAccountLog = log.Log.WithName("systemAccountRuntime")
+}
 
 // SystemAccountController does not a cresponding resource, but wathes the create/delete/update of resource like cluster,
 // clusterdefinition, backuppolicy, jobs, secrets
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters,verbs=get;list;watch;
-//+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters/status,verbs=get
-//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;watch;
-//+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=batch,resources=jobs/status,verbs=get
+// +kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters,verbs=get;list;watch;
+// +kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters/status,verbs=get
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;watch;
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs/status,verbs=get
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -117,6 +128,11 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 	reqCtx.Log.Info("get cluster", "cluster", req.NamespacedName)
 
+	// handle failed pods created by jobs
+	if err := r.handleFailedPodsFromJobs(reqCtx); err != nil {
+		reqCtx.Log.Error(err, "failed to get jobs")
+	}
+
 	cluster := &dbaasv1alpha1.Cluster{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -128,7 +144,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	clusterdefinition := &dbaasv1alpha1.ClusterDefinition{}
-	clusterDefNS := types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Spec.ClusterDefRef}
+	clusterDefNS := types.NamespacedName{Name: cluster.Spec.ClusterDefRef}
 	if err := r.Client.Get(reqCtx.Ctx, clusterDefNS, clusterdefinition); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
 	}
@@ -219,7 +235,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 			isReady, svcEP, headlessEP, err := r.isComponentReady(reqCtx, cluster.Name, compName)
 			if err != nil {
-				return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
+				return intctrlutil.RequeueWithError(err, reqCtx.Log, "failed to get endpoints")
 			}
 
 			// either service or endpoint is not ready, increase counter and continue to process next component
@@ -249,13 +265,60 @@ func (r *SystemAccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dbaasv1alpha1.Cluster{}).
 		Owns(&corev1.Secret{}).
+		Owns(&batchv1.Job{}, builder.WithPredicates(&jobCompletitionPredicate{reconciler: r, jobLog: systemAccountLog.WithName("jobCompletitionPredicate")})).
 		Watches(&source.Kind{Type: &dataprotectionv1alpha1.BackupPolicy{}},
 			handler.EnqueueRequestsFromMapFunc(r.findClusterForBackupPolicy),
-			builder.WithPredicates(&backupPolicyChangePredicate{ExpectionManager: r.ExpectionManager, Log: log.FromContext(context.TODO())})).
-		Watches(&source.Kind{Type: &batchv1.Job{}},
-			&handler.EnqueueRequestForObject{},
-			builder.WithPredicates(&jobCompletitionPredicate{reconciler: r, Log: log.FromContext(context.TODO())})).
+			builder.WithPredicates(&backupPolicyChangePredicate{ExpectionManager: r.ExpectionManager, backPolicyLog: systemAccountLog.WithName("backupPolicyChangePredicate")})).
 		Complete(r)
+}
+
+// handleFailedPodsFromJobs proactively delete failed pods create by system account jobs.
+func (r *SystemAccountReconciler) handleFailedPodsFromJobs(reqCtx intctrlutil.RequestCtx) error {
+	jobList := &batchv1.JobList{}
+	if err := r.Client.List(reqCtx.Ctx, jobList, client.HasLabels{clusterAccountLabelKey}); err != nil {
+		return err
+	}
+
+	f := util.NewFactory()
+	clientset, err := f.KubernetesClientSet()
+	if err != nil {
+		return err
+	}
+	// create pod options to get logs
+	podLogOptions := corev1.PodLogOptions{}
+
+	// for each job, delete failed pods
+	for _, job := range jobList.Items {
+		// list pods belong to this jobs
+		pods := &corev1.PodList{}
+		ml := job.Spec.Template.Labels
+		if err := r.Client.List(reqCtx.Ctx, pods, client.InNamespace(job.Namespace), client.MatchingLabels(ml)); err != nil {
+			return err
+		}
+		// record pod logs and delete pod on failure
+		wg := sync.WaitGroup{}
+		wg.Add(len(pods.Items))
+		for _, pod := range pods.Items {
+			go func(p corev1.Pod) {
+				defer wg.Done()
+				if p.Status.Phase != corev1.PodFailed {
+					return
+				}
+				// log errors
+				if errLog, err := intctrlutil.GetPodLogs(clientset, p, podLogOptions); err != nil {
+					reqCtx.Log.Error(err, "failed to get pod logs")
+					return
+				} else {
+					id := types.NamespacedName{Namespace: p.Namespace, Name: p.Name}
+					reqCtx.Log.Info("Pod created by Job runs into error", id.String(), errLog)
+				}
+				// and delete pods. errors are ignored here, as pods will be deleted by job controller finally.
+				_ = r.Client.Delete(reqCtx.Ctx, &p)
+			}(pod)
+		}
+		wg.Wait()
+	}
+	return nil
 }
 
 func (r *SystemAccountReconciler) createByStmt(reqCtx intctrlutil.RequestCtx,
@@ -403,13 +466,13 @@ func (r *backupPolicyChangePredicate) Create(e event.CreateEvent) bool {
 		key := expectationKey(backupPolicy.Namespace, clusterName, databaseEngine)
 		expect, exists, err := r.ExpectionManager.getExpectation(key)
 		if err != nil {
-			r.Log.Error(err, "failed to get expectation for BackupPolicy by key", "BackupPolicy key", key)
+			r.backPolicyLog.Error(err, "failed to get expectation for BackupPolicy by key", "BackupPolicy key", key)
 			return false
 		}
 		if !exists {
 			expect, err = r.ExpectionManager.createExpectation(key)
 			if err != nil {
-				r.Log.Error(err, "failed to create expectation for BackupPolicy by key", "BackupPolicy key", key)
+				r.backPolicyLog.Error(err, "failed to create expectation for BackupPolicy by key", "BackupPolicy key", key)
 			}
 		}
 		expect.set(dbaasv1alpha1.KBAccountDataprotection)
@@ -438,7 +501,7 @@ func (r *backupPolicyChangePredicate) Delete(e event.DeleteEvent) bool {
 			key := expectationKey(backupPolicy.Namespace, clusterName, databaseEngine)
 			err := r.ExpectionManager.deleteExpectation(key)
 			if err != nil {
-				r.Log.Error(err, "failed to delete expectation for BackupPolicy", "BackupPolicy key", key)
+				r.backPolicyLog.Error(err, "failed to delete expectation for BackupPolicy", "BackupPolicy key", key)
 			}
 		}
 		return false
@@ -475,7 +538,7 @@ func (r *jobCompletitionPredicate) Delete(e event.DeleteEvent) bool {
 				key := concatSecretName(job.Namespace, clusterName, componentName, accountName)
 				entry, ok, err := r.reconciler.SecretMapStore.getSecret(key)
 				if err != nil {
-					r.Log.Error(err, "failed to get secret by key", "secret key", key)
+					r.jobLog.Error(err, "failed to get secret by key", "secret key", key)
 					return false
 				}
 				if !ok {
@@ -490,7 +553,7 @@ func (r *jobCompletitionPredicate) Delete(e event.DeleteEvent) bool {
 					}
 					// delete secret from cache store
 					if err = r.reconciler.SecretMapStore.deleteSecret(key); err != nil {
-						r.Log.Error(err, "failed to delete secret by key", "secret key", key)
+						r.jobLog.Error(err, "failed to delete secret by key", "secret key", key)
 					}
 					break
 				}

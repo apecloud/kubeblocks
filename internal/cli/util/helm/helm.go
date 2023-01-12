@@ -425,30 +425,7 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 			return "", errors.Wrapf(err, "failed to update CRD %s", obj.Name)
 		}
 
-		//var originalCrd *chart.CRD
-		//for _, oldObj := range installed.Chart.CRDObjects() {
-		//	if oldObj.Name == obj.Name {
-		//		originalCrd = &oldObj
-		//		break
-		//	}
-		//}
-		//if originalCrd == nil {
-		//	if _, err := cfg.KubeClient.Create(target); err != nil {
-		//		if apierrors.IsAlreadyExists(err) {
-		//			crdName := target[0].Name
-		//			cfg.Log("CRD %s is already present. Skipping.", crdName)
-		//			continue
-		//		}
-		//		return "", errors.Wrapf(err, "failed to update CRD %s", obj.Name)
-		//	}
-		//	continue
-		//}
-		//original, err := cfg.KubeClient.Build(bytes.NewBuffer(originalCrd.File.Data), false)
-		//if err != nil {
-		//	return "", errors.Wrapf(err, "failed to update CRDs")
-		//}
-
-		// Send them to Kube
+		// update with original equals to target, so no crd deleted
 		if _, err := cfg.KubeClient.Update(target, target, false); err != nil {
 			return "", errors.Wrapf(err, "failed to update CRD %s", obj.Name)
 		}

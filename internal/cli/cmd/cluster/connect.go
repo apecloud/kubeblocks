@@ -128,11 +128,24 @@ func (o *ConnectOptions) connect(args []string) error {
 
 	// get target pod name, if not specified, find default pod from cluster
 	if len(o.PodName) == 0 {
-		podName, err := cluster.GetDefaultPodName(o.Dynamic, o.name, o.Namespace)
-		if err != nil {
-			return err
+		infos := cluster.GetSimpleInstanceInfos(o.Dynamic, o.name, o.Namespace)
+		if infos == nil {
+			return fmt.Errorf("failed to find the instance to connect, please check cluster status")
 		}
-		o.PodName = podName
+
+		// first element is the default instance to connect
+		o.PodName = infos[0].Name
+
+		// output all instance infos
+		var nameRoles = make([]string, len(infos))
+		for i, info := range infos {
+			if len(info.Role) == 0 {
+				nameRoles[i] = info.Name
+			} else {
+				nameRoles[i] = fmt.Sprintf("%s(%s)", info.Name, info.Role)
+			}
+		}
+		fmt.Fprintf(o.Out, "Connect to instance %s: out of %s\n", o.PodName, strings.Join(nameRoles, ", "))
 	}
 
 	// get the pod object

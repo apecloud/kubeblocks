@@ -31,12 +31,11 @@ import (
 )
 
 var _ = Describe("helper", func() {
-	It("Get default pod name from cluster", func() {
+	It("Get instance info from cluster", func() {
 		cluster := testing.FakeCluster("test", "test")
 		dynamic := testing.FakeDynamicClient(cluster)
-		name, err := GetDefaultPodName(dynamic, "test", "test")
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(len(name) > 0).Should(BeTrue())
+		infos := GetSimpleInstanceInfos(dynamic, "test", "test")
+		Expect(len(infos) == 1).Should(BeTrue())
 	})
 
 	It("Get type from pod", func() {

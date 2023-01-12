@@ -32,27 +32,48 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
-// GetDefaultPodName get the default pod in the cluster
-func GetDefaultPodName(dynamic dynamic.Interface, name string, namespace string) (string, error) {
+// GetSimpleInstanceInfos return simple instance info that only contains instance name and role, the default
+// instance should be the first element in the returned array.
+func GetSimpleInstanceInfos(dynamic dynamic.Interface, name string, namespace string) []*InstanceInfo {
+	var infos []*InstanceInfo
 	obj, err := dynamic.Resource(types.ClusterGVR()).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
-		return "", err
+		return nil
 	}
 
 	cluster := &dbaasv1alpha1.Cluster{}
 	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cluster); err != nil {
-		return "", err
+		return nil
 	}
 
 	// travel all components, check type
 	for _, c := range cluster.Status.Components {
+		var info *InstanceInfo
 		if c.ConsensusSetStatus != nil {
-			return c.ConsensusSetStatus.Leader.Pod, nil
+			buildInfoByStatus := func(status *dbaasv1alpha1.ConsensusMemberStatus) {
+				if status == nil {
+					return
+				}
+				info = &InstanceInfo{Role: status.Name, Name: status.Pod}
+				infos = append(infos, info)
+			}
+
+			// leader must be first
+			buildInfoByStatus(&c.ConsensusSetStatus.Leader)
+
+			// followers
+			for _, f := range c.ConsensusSetStatus.Followers {
+				buildInfoByStatus(&f)
+			}
+
+			// learner
+			buildInfoByStatus(c.ConsensusSetStatus.Learner)
 		}
+
 		// TODO: now we only support consensus set
 	}
 
-	return "", fmt.Errorf("failed to find the pod to exec command")
+	return infos
 }
 
 // GetClusterTypeByPod gets the cluster type from pod label

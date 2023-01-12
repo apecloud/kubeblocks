@@ -123,7 +123,7 @@ var _ = Describe("logs", func() {
 		// Complete without args
 		Expect(l.complete([]string{})).Should(MatchError("you must specify the cluster name to retrieve logs"))
 		// Complete with args
-		l.instName = "foo"
+		l.PodName = "foo"
 		l.Client, _ = l.Factory.KubernetesClientSet()
 		l.filePath = "/var/log"
 		Expect(l.complete([]string{"cluster-name"})).Should(HaveOccurred())

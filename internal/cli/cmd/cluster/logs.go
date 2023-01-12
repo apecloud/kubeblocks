@@ -71,7 +71,6 @@ var (
 // LogsOptions declares the arguments accepted by the logs command
 type LogsOptions struct {
 	clusterName string
-	instName    string
 	fileType    string
 	filePath    string
 	*exec.ExecOptions
@@ -103,7 +102,7 @@ func NewLogsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 }
 
 func (o *LogsOptions) addFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&o.instName, "instance", "i", "", "Instance name.")
+	cmd.Flags().StringVarP(&o.PodName, "instance", "i", "", "Instance name.")
 	cmd.Flags().StringVarP(&o.logOptions.Container, "container", "c", "", "Container name.")
 	cmd.Flags().BoolVarP(&o.logOptions.Follow, "follow", "f", false, "Specify if the logs should be streamed.")
 	cmd.Flags().Int64Var(&o.logOptions.Tail, "tail", -1, "Lines of recent log file to display. Defaults to -1 with showing all log lines.")
@@ -137,17 +136,14 @@ func (o *LogsOptions) complete(args []string) error {
 	}
 	o.clusterName = args[0]
 
-	dynamicClient, err := o.Factory.DynamicClient()
-	if err != nil {
-		return err
-	}
-
-	o.PodName = o.instName
 	// no set podName and find the default pod of cluster
 	if len(o.PodName) == 0 {
-		if o.PodName, err = cluster.GetDefaultPodName(dynamicClient, o.clusterName, o.Namespace); err != nil {
-			return err
+		infos := cluster.GetSimpleInstanceInfos(o.Dynamic, o.clusterName, o.Namespace)
+		if infos == nil {
+			return fmt.Errorf("failed to find the default instance, please check cluster status")
 		}
+		// first element is the default instance to connect
+		o.PodName = infos[0].Name
 	}
 	pod, err := o.Client.CoreV1().Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{})
 	if err != nil {
@@ -169,7 +165,7 @@ func (o *LogsOptions) complete(args []string) error {
 		{
 			clusterGetter := cluster.ObjectsGetter{
 				Client:    o.Client,
-				Dynamic:   dynamicClient,
+				Dynamic:   o.Dynamic,
 				Name:      o.clusterName,
 				Namespace: o.Namespace,
 				GetOptions: cluster.GetOptions{

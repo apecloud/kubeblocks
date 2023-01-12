@@ -248,8 +248,7 @@ DATABASE_URL='mysql://%s:%s@%s:%s/%s'
 }
 
 func (m *mysql) ConnectCommand() []string {
-	mysqlCmd := []string{mysqlClient}
-	mysqlCmd = append(mysqlCmd, "-p"+mysqlDefaultPassword)
+	mysqlCmd := []string{"MYSQL_PWD=" + mysqlDefaultPassword, mysqlClient}
 	return []string{"sh", "-c", strings.Join(mysqlCmd, " ")}
 }
 

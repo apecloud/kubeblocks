@@ -30,7 +30,7 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
-const nameSpace = "test"
+const namespace = "test"
 
 var _ = Describe("kubeblocks", func() {
 	var streams genericclioptions.IOStreams
@@ -40,7 +40,7 @@ var _ = Describe("kubeblocks", func() {
 		svcs := &corev1.ServiceList{}
 		svc := corev1.Service{}
 		svc.SetName("kubeblocks-grafana")
-		svc.SetNamespace(nameSpace)
+		svc.SetNamespace(namespace)
 		svc.SetLabels(map[string]string{
 			"app.kubernetes.io/instance": "kubeblocks",
 			"app.kubernetes.io/name":     "grafana",
@@ -51,7 +51,7 @@ var _ = Describe("kubeblocks", func() {
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
-		tf = cmdtesting.NewTestFactory().WithNamespace(nameSpace)
+		tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,

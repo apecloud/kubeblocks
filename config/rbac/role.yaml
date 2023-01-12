@@ -80,9 +80,6 @@ rules:
   - ""
   resources:
   - configmaps
-  - resourcequotas
-  - secrets
-  - services
   verbs:
   - create
   - delete
@@ -95,9 +92,6 @@ rules:
   - ""
   resources:
   - configmaps/finalizers
-  - resourcequotas/finalizers
-  - secrets/finalizers
-  - services/finalizers
   verbs:
   - update
 - apiGroups:
@@ -164,7 +158,66 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - resourcequotas
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - resourcequotas/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
   - resourcequotas/status
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - services/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
   - services/status
   verbs:
   - get

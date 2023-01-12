@@ -81,9 +81,6 @@ rules:
   - ""
   resources:
   - configmaps
-  - resourcequotas
-  - secrets
-  - services
   verbs:
   - create
   - delete
@@ -96,9 +93,6 @@ rules:
   - ""
   resources:
   - configmaps/finalizers
-  - resourcequotas/finalizers
-  - secrets/finalizers
-  - services/finalizers
   verbs:
   - update
 - apiGroups:
@@ -165,7 +159,66 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - resourcequotas
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - resourcequotas/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
   - resourcequotas/status
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - services/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
   - services/status
   verbs:
   - get
@@ -302,32 +355,6 @@ rules:
 - apiGroups:
   - dbaas.kubeblocks.io
   resources:
-  - clusterversions
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - dbaas.kubeblocks.io
-  resources:
-  - clusterversions/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - dbaas.kubeblocks.io
-  resources:
-  - clusterversions/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - dbaas.kubeblocks.io
-  resources:
   - clusterdefinitions
   verbs:
   - create
@@ -373,6 +400,32 @@ rules:
   - dbaas.kubeblocks.io
   resources:
   - clusters/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dbaas.kubeblocks.io
+  resources:
+  - clusterversions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dbaas.kubeblocks.io
+  resources:
+  - clusterversions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dbaas.kubeblocks.io
+  resources:
+  - clusterversions/status
   verbs:
   - get
   - patch

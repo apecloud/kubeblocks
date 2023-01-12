@@ -19,8 +19,8 @@ package kubeblocks
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"github.com/spf13/cobra"
+	appv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -206,5 +206,31 @@ var _ = Describe("kubeblocks", func() {
 
 		client := testing.FakeDynamicClient(&clusterCrd, &clusterDefCrd, &clusterVersionCrd)
 		Expect(deleteCRDs(client)).Should(Succeed())
+	})
+
+	It("checkIfKubeBlocksInstalled", func() {
+		By("KubeBlocks is not installed")
+		client := testing.FakeClientSet()
+		Expect(checkIfKubeBlocksInstalled(client)).Should(Succeed())
+
+		mockDeploy := func(version string) *appv1.Deployment {
+			deploy := &appv1.Deployment{}
+			label := map[string]string{
+				"app.kubernetes.io/name": types.KubeBlocksChartName,
+			}
+			if len(version) > 0 {
+				label["app.kubernetes.io/version"] = version
+			}
+			deploy.SetLabels(label)
+			return deploy
+		}
+
+		By("KubeBlocks is installed")
+		client = testing.FakeClientSet(mockDeploy(""))
+		Expect(checkIfKubeBlocksInstalled(client).Error()).Should(ContainSubstring("has been installed"))
+
+		By("KubeBlocks 0.1.0 is installed")
+		client = testing.FakeClientSet(mockDeploy("0.1.0"))
+		Expect(checkIfKubeBlocksInstalled(client).Error()).Should(ContainSubstring("0.1.0 has been installed"))
 	})
 })

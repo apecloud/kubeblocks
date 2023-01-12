@@ -101,17 +101,17 @@ func (o *Options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	kubeconfig, err := cmd.Flags().GetString("kubeconfig")
+	config, err := cmd.Flags().GetString("kubeconfig")
 	if err != nil {
 		return err
 	}
 
-	kubecontext, err := cmd.Flags().GetString("context")
+	context, err := cmd.Flags().GetString("context")
 	if err != nil {
 		return err
 	}
 
-	if o.HelmCfg, err = helm.NewActionConfig(o.Namespace, kubeconfig, helm.WithContext(kubecontext)); err != nil {
+	if o.HelmCfg, err = helm.NewActionConfig(o.Namespace, config, helm.WithContext(context)); err != nil {
 		return err
 	}
 
@@ -165,11 +165,15 @@ func (o *Options) preCheck() error {
 }
 
 func (o *InstallOptions) check() error {
-	if o.CreateNamespace {
-		return nil
+	// check if KubeBlocks has been installed
+	if err := checkIfKubeBlocksInstalled(o.Options.client); err != nil {
+		return err
 	}
 
 	// check if namespace exists
+	if o.CreateNamespace {
+		return nil
+	}
 	if _, err := o.client.CoreV1().Namespaces().Get(context.TODO(), o.Namespace, metav1.GetOptions{}); err != nil {
 		return err
 	}
@@ -296,7 +300,7 @@ func removeFinalizers(client dynamic.Interface) error {
 		}
 	}
 
-	// patch clusterversion's finalizer
+	// patch ClusterVersion's finalizer
 	clusterVersionList, err := client.Resource(types.ClusterVersionGVR()).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return err
@@ -375,4 +379,29 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		},
 	}
 	return cmd
+}
+
+// check if KubeBlocks has been installed
+func checkIfKubeBlocksInstalled(client kubernetes.Interface) error {
+	kbDeploys, err := client.AppsV1().Deployments(metav1.NamespaceAll).List(context.TODO(),
+		metav1.ListOptions{LabelSelector: "app.kubernetes.io/name=" + types.KubeBlocksChartName})
+	if err != nil {
+		return err
+	}
+
+	if len(kbDeploys.Items) == 0 {
+		return nil
+	}
+
+	var versions []string
+	for _, deploy := range kbDeploys.Items {
+		labels := deploy.GetLabels()
+		if labels == nil {
+			continue
+		}
+		if v, ok := labels["app.kubernetes.io/version"]; ok {
+			versions = append(versions, v)
+		}
+	}
+	return fmt.Errorf("KubeBlocks %s has been installed", strings.Join(versions, " "))
 }

@@ -43,6 +43,8 @@ import (
 	"gopkg.in/ini.v1"
 
 	"github.com/prometheus/mysqld_exporter/collector"
+
+	customCollector "github.com/apecloud/kubeblocks/cmd/agamotto/collector"
 )
 
 var (
@@ -106,6 +108,7 @@ var scrapers = map[collector.Scraper]bool{
 	collector.ScrapeHeartbeat{}:                           false,
 	collector.ScrapeSlaveHosts{}:                          false,
 	collector.ScrapeReplicaHost{}:                         false,
+	customCollector.ScrapeWesqlConsensus{}:                false,
 }
 
 func parseMycnf(config interface{}) (string, error) {

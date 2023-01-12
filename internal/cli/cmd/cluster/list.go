@@ -20,6 +20,10 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -70,12 +74,16 @@ var (
 
 		# list all events of a specified cluster
 		kbcli cluster list-events my-cluster`)
+
+	listUsersExample = templates.Examples(`
+		# list all users of a specified cluster
+		kbcli cluster list-users my-cluster`)
 )
 
 func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := list.NewListOptions(f, streams, types.ClusterGVR())
 	cmd := &cobra.Command{
-		Use:               "list",
+		Use:               "list [NAME]",
 		Short:             "List clusters",
 		Example:           listExample,
 		Aliases:           []string{"ls"},
@@ -147,6 +155,24 @@ func NewListEventsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	return cmd
 }
 
+func NewListUsersCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := list.NewListOptions(f, streams, schema.GroupVersionResource{Group: corev1.GroupName, Resource: "secrets", Version: "v1"})
+	cmd := &cobra.Command{
+		Use:               "list-users NAME",
+		Short:             "List cluster users",
+		Example:           listUsersExample,
+		Aliases:           []string{"ls-users"},
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
+		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(listUsers(o, args))
+		},
+	}
+	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespace", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.")
+	printer.AddOutputFlag(cmd, &o.Format)
+	return cmd
+}
+
 func run(o *list.ListOptions, printType cluster.PrintType) error {
 	// if format is JSON or YAML, use default printer to output the result.
 	if o.Format == printer.JSON || o.Format == printer.YAML {
@@ -207,5 +233,43 @@ func addRow(dynamic dynamic.Interface, client *kubernetes.Clientset,
 	}
 
 	printer.AddRow(clusterObjs)
+	return nil
+}
+
+func listUsers(o *list.ListOptions, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("missing cluster name")
+	}
+
+	o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)
+	// if format is JSON or YAML, use default printer to output the result.
+	if o.Format == printer.JSON || o.Format == printer.YAML {
+		_, err := o.Run()
+		return err
+	}
+
+	// get and output the result
+	o.Print = false
+	r, err := o.Run()
+	if err != nil {
+		return err
+	}
+
+	infos, err := r.Infos()
+	if err != nil {
+		return err
+	}
+
+	tbl := printer.NewTablePrinter(o.Out)
+	tbl.SetHeader("NAMESPACE", "CLUSTER", "USERNAME", "SECRET", "CREATED-TIME")
+	for _, info := range infos {
+		s := &corev1.Secret{}
+		obj := info.Object.(*unstructured.Unstructured)
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, s); err != nil {
+			return err
+		}
+		tbl.AddRow(s.Namespace, s.Labels[types.InstanceLabelKey], string(s.Data["username"]), s.Name, util.TimeFormat(&s.CreationTimestamp))
+	}
+	tbl.Print()
 	return nil
 }

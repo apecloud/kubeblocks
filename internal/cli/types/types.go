@@ -62,6 +62,7 @@ const (
 	// KindClusterVersion clusterVersion kind
 	KindClusterVersion = "ClusterVersion"
 
+	NameLabelKey                   = "app.kubernetes.io/name"
 	InstanceLabelKey               = "app.kubernetes.io/instance"
 	ConsensusSetAccessModeLabelKey = "cs.dbaas.kubeblocks.io/access-mode"
 	ComponentLabelKey              = "app.kubernetes.io/component-name"

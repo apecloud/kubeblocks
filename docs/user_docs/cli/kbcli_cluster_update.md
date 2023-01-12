@@ -1,9 +1,9 @@
 ## kbcli cluster update
 
-Update the cluster
+Update the cluster settings, such as enable or disable monitor or log
 
 ```
-kbcli cluster update [flags]
+kbcli cluster update NAME [flags]
 ```
 
 ### Examples
@@ -68,5 +68,5 @@ kbcli cluster update [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Database cluster operation command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster operation command
 

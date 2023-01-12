@@ -201,7 +201,7 @@ func (o *ClusterObjects) GetClusterInfo() *ClusterInfo {
 	}
 
 	primaryComponent := FindClusterComp(o.Cluster, o.ClusterDef.Spec.Components[0].TypeName)
-	internalEndpoints, externalEndpoints := GetClusterEndpoints(o.Services, primaryComponent)
+	internalEndpoints, externalEndpoints := GetComponentEndpoints(o.Services, primaryComponent)
 	if len(internalEndpoints) > 0 {
 		cluster.InternalEP = strings.Join(internalEndpoints, ",")
 	}

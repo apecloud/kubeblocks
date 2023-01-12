@@ -48,7 +48,7 @@ var _ = Describe("listLogs test", func() {
 			GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				body := cmdtesting.ObjBody(codec, execPod())
+				body := cmdtesting.ObjBody(codec, mockPod())
 				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 			}),
 		}
@@ -111,9 +111,7 @@ var _ = Describe("listLogs test", func() {
 		}
 		dataObj.Pods.Items = append(dataObj.Pods.Items, pod)
 		o := &ListLogsOptions{
-			exec: &exec.ExecOptions{
-				Input: &exec.ExecInput{},
-			},
+			exec: &exec.ExecOptions{},
 			IOStreams: genericclioptions.IOStreams{
 				Out:    os.Stdout,
 				ErrOut: os.Stdout,

@@ -3,7 +3,7 @@
 Show details of a specific cluster
 
 ```
-kbcli cluster describe [flags]
+kbcli cluster describe NAME [flags]
 ```
 
 ### Examples
@@ -44,5 +44,5 @@ kbcli cluster describe [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Database cluster operation command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster operation command
 

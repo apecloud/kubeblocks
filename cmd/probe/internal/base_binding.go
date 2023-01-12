@@ -245,6 +245,7 @@ func (p *ProbeBase) roleValidate(role string) (bool, string) {
 	for r := range p.dbRoles {
 		if strings.EqualFold(r, role) {
 			isValid = true
+			break
 		}
 	}
 	if !isValid {

@@ -39,7 +39,7 @@ type Component interface {
 }
 
 const (
-	// ProbeTimeoutReason the event reason when all pods of the probe role timed out.
+	// ProbeTimeoutReason the event reason when all pods of the component probe role timed out.
 	ProbeTimeoutReason = "ProbeTimeout"
 
 	// ProbeTimeout the probe timeout

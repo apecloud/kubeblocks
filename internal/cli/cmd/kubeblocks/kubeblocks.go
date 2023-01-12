@@ -196,7 +196,7 @@ func (o *InstallOptions) Run() error {
 
 	// print notes
 	if !o.Quiet {
-		o.printNotes(o.Monitor)
+		o.printNotes()
 	}
 
 	return nil
@@ -226,7 +226,7 @@ func (o *InstallOptions) installChart() (string, error) {
 	return notes, nil
 }
 
-func (o *InstallOptions) printNotes(monitor bool) {
+func (o *InstallOptions) printNotes() {
 	fmt.Fprintf(o.Out, `
 KubeBlocks %s Install SUCCESSFULLY!
 
@@ -238,7 +238,7 @@ KubeBlocks %s Install SUCCESSFULLY!
 -> Uninstall KubeBlocks:
     kbcli kubeblocks uninstall
 `, o.Version)
-	if monitor {
+	if o.Monitor {
 		fmt.Fprint(o.Out, `
 -> To view the monitor components console(Grafana/Prometheus/AlertManager):
     kbcli dashboard list        # list all monitor components

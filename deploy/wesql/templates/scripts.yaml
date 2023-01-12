@@ -12,7 +12,7 @@ data:
     sub_follower=`echo "$followers" | grep "$KB_POD_NAME"`
     echo $KB_POD_NAME
     echo $sub_follower
-    if [ -z "$leader" -o "$KB_POD_NAME" = "$leader" -o ! -z "$sub_follower" ]; then 
+    if [ -z "$leader" -o "$KB_POD_NAME" = "$leader" -o ! -z "$sub_follower" ]; then
       echo "no need to call add"
     else 
       idx=${KB_POD_NAME##*-}

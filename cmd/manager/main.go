@@ -246,6 +246,15 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "OpsRequest")
 		os.Exit(1)
 	}
+
+	if err = (&dbaascontrollers.SystemAccountReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("system-account-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SystemAccount")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err = (&k8scorecontrollers.EventReconciler{

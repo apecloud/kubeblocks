@@ -146,11 +146,10 @@ func (o *DeleteOptions) deleteResult(r *resource.Result) error {
 		if o.GracePeriod >= 0 {
 			options = metav1.NewDeleteOptions(int64(o.GracePeriod))
 		}
-		_, err = o.deleteResource(info, options)
-		if err != nil {
+		if _, err = o.deleteResource(info, options); err != nil {
 			return err
 		}
-		fmt.Fprintf(o.Out, "%s \"%s\" deleted\n", info.Mapping.GroupVersionKind.Kind, info.Name)
+		fmt.Fprintf(o.Out, "%s %s deleted\n", info.Mapping.GroupVersionKind.Kind, info.Name)
 		return nil
 	})
 	if err != nil {

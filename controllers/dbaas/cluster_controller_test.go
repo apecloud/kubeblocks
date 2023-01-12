@@ -69,7 +69,6 @@ var _ = Describe("Cluster Controller", func() {
 		Name:      "my-cluster",
 		Namespace: "default",
 	}
-	volumeName := "data"
 	var deleteClusterNWait func(key types.NamespacedName) error
 	var deleteClusterVersionNWait func(key types.NamespacedName) error
 	var deleteClusterDefNWait func(key types.NamespacedName) error

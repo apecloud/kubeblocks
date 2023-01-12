@@ -79,10 +79,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		Log:      log.FromContext(ctx).WithValues("backup", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
-	// 1. Get backupjob obj
-	// 2. if not found, get batchv1 job obj
-	// 3. if not found, get volumesnapshot obj
-
+	// Get backup obj
 	backup := &dataprotectionv1alpha1.Backup{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, backup); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -97,7 +94,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return *res, err
 	}
 
-	// backup job reconcile logic here
+	// backup reconcile logic here
 	switch backup.Status.Phase {
 	case "", dataprotectionv1alpha1.BackupNew:
 		return r.doNewPhaseAction(reqCtx, backup)
@@ -571,7 +568,7 @@ func (r *BackupReconciler) getBatchV1Job(reqCtx intctrlutil.RequestCtx, backup *
 		Name:      backup.Name,
 	}
 	if err := r.Client.Get(reqCtx.Ctx, jobNameSpaceName, job); err != nil {
-		// not found backup job, do nothing
+		// not found backup, do nothing
 		reqCtx.Log.Info(err.Error())
 		return nil, err
 	}
@@ -676,7 +673,7 @@ func (r *BackupReconciler) GetTargetClusterPod(
 		types.NamespacedName{
 			Namespace: clusterStatefulSet.Namespace,
 			// TODO(dsj): dependency ConsensusSet defined "follower" label to filter
-			// Temporary get first pod to build backup job volume info
+			// Temporary get first pod to build backup volume info
 			Name: clusterStatefulSet.Name + "-0",
 		}, clusterPod); err != nil {
 		return nil, err

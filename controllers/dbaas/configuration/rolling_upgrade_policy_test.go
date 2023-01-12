@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package policy
+package configuration
 
 import (
 	"context"
@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	mock_client "github.com/apecloud/kubeblocks/controllers/dbaas/configuration/policy/mocks"
+	mock_client "github.com/apecloud/kubeblocks/controllers/dbaas/configuration/mocks"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 	mock_proto "github.com/apecloud/kubeblocks/internal/configuration/proto/mocks"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -42,7 +42,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 	var (
 		mockClient        *mock_client.MockClient
 		ctrl              *gomock.Controller
-		mockParam         ReconfigureParams
+		mockParam         reconfigureParams
 		reconfigureClient *mock_proto.MockReconfigureClient
 
 		defaultReplica = 3
@@ -66,7 +66,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 		}
 	}
 
-	createReconfigureParam := func(compType dbaasv1alpha1.ComponentType, replicas int) ReconfigureParams {
+	createReconfigureParam := func(compType dbaasv1alpha1.ComponentType, replicas int) reconfigureParams {
 		return newMockReconfigureParams("rollingPolicy", mockClient,
 			withMockStatefulSet(replicas, nil),
 			withConfigTpl("for_test", map[string]string{

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package policy
+package configuration
 
 import (
 	"math"
@@ -35,9 +35,9 @@ import (
 
 type ExecStatus int
 
-type ReconfigurePolicy interface {
+type reconfigurePolicy interface {
 	// Upgrade is to enable the configuration to take effect.
-	Upgrade(params ReconfigureParams) (ExecStatus, error)
+	Upgrade(params reconfigureParams) (ExecStatus, error)
 
 	// GetPolicyName return name of policy.
 	GetPolicyName() string
@@ -45,7 +45,7 @@ type ReconfigurePolicy interface {
 
 type AutoReloadPolicy struct{}
 
-type ReconfigureParams struct {
+type reconfigureParams struct {
 	// Only support restart pod or container.
 	Restart bool
 
@@ -101,13 +101,13 @@ var (
 	}
 )
 
-var upgradePolicyMap = map[dbaasv1alpha1.UpgradePolicy]ReconfigurePolicy{}
+var upgradePolicyMap = map[dbaasv1alpha1.UpgradePolicy]reconfigurePolicy{}
 
 func init() {
 	RegisterPolicy(dbaasv1alpha1.AutoReload, &AutoReloadPolicy{})
 }
 
-func (param *ReconfigureParams) ComponentType() dbaasv1alpha1.ComponentType {
+func (param *reconfigureParams) ComponentType() dbaasv1alpha1.ComponentType {
 	return param.Component.ComponentType
 }
 
@@ -116,7 +116,7 @@ func GetClientFactory() createReconfigureClient {
 	return newGRPCClient
 }
 
-func (param *ReconfigureParams) getConfigKey() string {
+func (param *reconfigureParams) getConfigKey() string {
 	for _, tpl := range param.Component.ConfigSpec.ConfigTemplateRefs {
 		if tpl.Name == param.TplName {
 			return tpl.VolumeName
@@ -125,7 +125,7 @@ func (param *ReconfigureParams) getConfigKey() string {
 	return ""
 }
 
-func (param *ReconfigureParams) getModifyVersion() string {
+func (param *reconfigureParams) getModifyVersion() string {
 	hash, err := cfgcore.ComputeHash(param.Cfg.Data)
 	if err != nil {
 		param.Ctx.Log.Error(err, "failed to cal configuration version!")
@@ -135,7 +135,7 @@ func (param *ReconfigureParams) getModifyVersion() string {
 	return hash
 }
 
-func (param *ReconfigureParams) maxRollingReplicas() int32 {
+func (param *reconfigureParams) maxRollingReplicas() int32 {
 	var (
 		defaultRolling int32 = 1
 		r              int32
@@ -161,20 +161,20 @@ func (param *ReconfigureParams) maxRollingReplicas() int32 {
 	return cfgcore.Max(r, defaultRolling)
 }
 
-func (param *ReconfigureParams) getTargetReplicas() int {
+func (param *reconfigureParams) getTargetReplicas() int {
 	return int(*param.ClusterComponent.Replicas)
 }
 
-func (param *ReconfigureParams) podMinReadySeconds() int32 {
+func (param *reconfigureParams) podMinReadySeconds() int32 {
 	minReadySeconds := param.ComponentUnits[0].Spec.MinReadySeconds
 	return cfgcore.Max(minReadySeconds, viper.GetInt32(cfgcore.PodMinReadySecondsEnv))
 }
 
-func RegisterPolicy(policy dbaasv1alpha1.UpgradePolicy, action ReconfigurePolicy) {
+func RegisterPolicy(policy dbaasv1alpha1.UpgradePolicy, action reconfigurePolicy) {
 	upgradePolicyMap[policy] = action
 }
 
-func (receiver AutoReloadPolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
+func (receiver AutoReloadPolicy) Upgrade(params reconfigureParams) (ExecStatus, error) {
 	_ = params
 	return ESNone, nil
 }
@@ -183,7 +183,7 @@ func (receiver AutoReloadPolicy) GetPolicyName() string {
 	return string(dbaasv1alpha1.AutoReload)
 }
 
-func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigConstraintSpec, cfg *cfgcore.ConfigDiffInformation, policy dbaasv1alpha1.UpgradePolicy, restart bool) (ReconfigurePolicy, error) {
+func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigConstraintSpec, cfg *cfgcore.ConfigDiffInformation, policy dbaasv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
 	if !cfg.IsModify {
 		// not exec here
 		return nil, cfgcore.MakeError("cfg not modify. [%v]", cfg)

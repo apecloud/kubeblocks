@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package policy
+package configuration
 
 import (
 	"context"
@@ -32,7 +32,7 @@ import (
 
 type createReconfigureClient func(addr string) (cfgproto.ReconfigureClient, error)
 
-type GetPodsFunc func(params ReconfigureParams) ([]corev1.Pod, error)
+type GetPodsFunc func(params reconfigureParams) ([]corev1.Pod, error)
 
 type RestartContainerFunc func(pod *corev1.Pod, containerName []string, createConnFn createReconfigureClient) error
 
@@ -62,11 +62,11 @@ func GetReplicationRollingUpgradeFuncs() RollingUpgradeFuncs {
 	}
 }
 
-func getReplicationSetPods(params ReconfigureParams) ([]corev1.Pod, error) {
+func getReplicationSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 	panic("")
 }
 
-func getStatefulSetPods(params ReconfigureParams) ([]corev1.Pod, error) {
+func getStatefulSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 	if len(params.ComponentUnits) != 1 {
 		return nil, cfgcore.MakeError("statefulSet component require only one statefulset, actual %d component", len(params.ComponentUnits))
 	}
@@ -85,7 +85,7 @@ func getStatefulSetPods(params ReconfigureParams) ([]corev1.Pod, error) {
 	return pods, nil
 }
 
-func getConsensusPods(params ReconfigureParams) ([]corev1.Pod, error) {
+func getConsensusPods(params reconfigureParams) ([]corev1.Pod, error) {
 	if len(params.ComponentUnits) > 1 {
 		return nil, cfgcore.MakeError("consensus component require only one statefulset, actual %d component", len(params.ComponentUnits))
 	}

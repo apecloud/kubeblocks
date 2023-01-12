@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package policy
+package configuration
 
 import (
 	corev1 "k8s.io/api/core/v1"
@@ -31,7 +31,7 @@ func init() {
 	RegisterPolicy(dbaasv1alpha1.RestartPolicy, &parallelUpgradePolicy{})
 }
 
-func (p *parallelUpgradePolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
+func (p *parallelUpgradePolicy) Upgrade(params reconfigureParams) (ExecStatus, error) {
 	if finished, err := p.restartPods(params); err != nil {
 		return ESAndRetryFailed, err
 	} else if !finished {
@@ -45,7 +45,7 @@ func (p *parallelUpgradePolicy) GetPolicyName() string {
 	return string(dbaasv1alpha1.RestartPolicy)
 }
 
-func (p *parallelUpgradePolicy) restartPods(params ReconfigureParams) (bool, error) {
+func (p *parallelUpgradePolicy) restartPods(params reconfigureParams) (bool, error) {
 	var (
 		funcs         RollingUpgradeFuncs
 		cType         = params.ComponentType()

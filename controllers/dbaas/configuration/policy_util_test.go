@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package policy
+package configuration
 
 import (
 	"fmt"
@@ -75,10 +75,10 @@ func newMockStatefulSet(replicas int, name string, labels map[string]string) app
 	}
 }
 
-type ParamsOps func(params *ReconfigureParams)
+type ParamsOps func(params *reconfigureParams)
 
 func withMockStatefulSet(replicas int, labels map[string]string) ParamsOps {
-	return func(params *ReconfigureParams) {
+	return func(params *reconfigureParams) {
 		rand, _ := password.Generate(12, 8, 0, true, false)
 		stsName := "test_" + rand
 		params.ComponentUnits = []appsv1.StatefulSet{
@@ -88,7 +88,7 @@ func withMockStatefulSet(replicas int, labels map[string]string) ParamsOps {
 }
 
 func withClusterComponent(replicas int) ParamsOps {
-	return func(params *ReconfigureParams) {
+	return func(params *reconfigureParams) {
 		params.ClusterComponent = &dbaasv1alpha1.ClusterComponent{
 			Replicas: func() *int32 { rep := int32(replicas); return &rep }(),
 		}
@@ -96,13 +96,13 @@ func withClusterComponent(replicas int) ParamsOps {
 }
 
 func withGRPCClient(clientFactory createReconfigureClient) ParamsOps {
-	return func(params *ReconfigureParams) {
+	return func(params *reconfigureParams) {
 		params.ReconfigureClientFactory = clientFactory
 	}
 }
 
 func withConfigTpl(tplName string, data map[string]string) ParamsOps {
-	return func(params *ReconfigureParams) {
+	return func(params *reconfigureParams) {
 		params.Cfg = &corev1.ConfigMap{
 			Data: data,
 		}
@@ -111,7 +111,7 @@ func withConfigTpl(tplName string, data map[string]string) ParamsOps {
 }
 
 func withCDComponent(compType dbaasv1alpha1.ComponentType, tpls []dbaasv1alpha1.ConfigTemplate) ParamsOps {
-	return func(params *ReconfigureParams) {
+	return func(params *reconfigureParams) {
 		params.Component = &dbaasv1alpha1.ClusterDefinitionComponent{
 			ConfigSpec: &dbaasv1alpha1.ConfigurationSpec{
 				ConfigTemplateRefs: tpls,
@@ -134,8 +134,8 @@ func withCDComponent(compType dbaasv1alpha1.ComponentType, tpls []dbaasv1alpha1.
 	}
 }
 
-func newMockReconfigureParams(testName string, cli client.Client, paramOps ...ParamsOps) ReconfigureParams {
-	params := ReconfigureParams{
+func newMockReconfigureParams(testName string, cli client.Client, paramOps ...ParamsOps) reconfigureParams {
+	params := reconfigureParams{
 		Restart: true,
 		Client:  cli,
 		Ctx: intctrlutil.RequestCtx{

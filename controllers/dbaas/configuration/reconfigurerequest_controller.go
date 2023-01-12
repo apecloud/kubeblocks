@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	cfgpolicy "github.com/apecloud/kubeblocks/controllers/dbaas/configuration/policy"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -213,7 +212,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		return intctrlutil.Reconciled()
 	}
 
-	return r.performUpgrade(cfgpolicy.ReconfigureParams{
+	return r.performUpgrade(reconfigureParams{
 		TplName:                  configTplName,
 		Meta:                     versionMeta,
 		Cfg:                      config,
@@ -226,7 +225,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		Component:                component,
 		ClusterComponent:         clusterComponent,
 		Restart:                  !cfgcm.IsSupportReload(tpl.Spec.ReloadOptions),
-		ReconfigureClientFactory: cfgpolicy.GetClientFactory(),
+		ReconfigureClientFactory: GetClientFactory(),
 	})
 }
 
@@ -243,8 +242,8 @@ func (r *ReconfigureRequestReconciler) updateCfgStatus(reqCtx intctrlutil.Reques
 	return intctrlutil.Reconciled()
 }
 
-func (r *ReconfigureRequestReconciler) performUpgrade(params cfgpolicy.ReconfigureParams) (ctrl.Result, error) {
-	policy, err := cfgpolicy.NewReconfigurePolicy(params.Tpl, params.Meta, getUpgradePolicy(params.Cfg), params.Restart)
+func (r *ReconfigureRequestReconciler) performUpgrade(params reconfigureParams) (ctrl.Result, error) {
+	policy, err := NewReconfigurePolicy(params.Tpl, params.Meta, getUpgradePolicy(params.Cfg), params.Restart)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(params.Cfg, r.Recorder, err, params.Ctx.Log)
 	}
@@ -258,11 +257,11 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params cfgpolicy.Reconfigu
 	}
 
 	switch execStatus {
-	case cfgpolicy.ESRetry, cfgpolicy.ESAndRetryFailed:
+	case ESRetry, ESAndRetryFailed:
 		return intctrlutil.RequeueAfter(ConfigReconcileInterval, params.Ctx.Log, "")
-	case cfgpolicy.ESNone:
+	case ESNone:
 		return r.updateCfgStatus(params.Ctx, params.Cfg, policy.GetPolicyName())
-	case cfgpolicy.ESFailed:
+	case ESFailed:
 		if err := setCfgUpgradeFlag(params.Client, params.Ctx, params.Cfg, false); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, params.Ctx.Log, "")
 		}
@@ -272,7 +271,7 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params cfgpolicy.Reconfigu
 	}
 }
 
-func (r *ReconfigureRequestReconciler) handleConfigEvent(params cfgpolicy.ReconfigureParams, status cfgpolicy.ExecStatus, err error) error {
+func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParams, status ExecStatus, err error) error {
 	var (
 		cm             = params.Cfg
 		lastOpsRequest = ""
@@ -301,11 +300,11 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params cfgpolicy.Reconf
 	return nil
 }
 
-func fromReconfigureStatus(status cfgpolicy.ExecStatus) dbaasv1alpha1.Phase {
+func fromReconfigureStatus(status ExecStatus) dbaasv1alpha1.Phase {
 	switch status {
-	case cfgpolicy.ESFailed:
+	case ESFailed:
 		return dbaasv1alpha1.FailedPhase
-	case cfgpolicy.ESNone:
+	case ESNone:
 		return dbaasv1alpha1.SucceedPhase
 	default:
 		return dbaasv1alpha1.ReconfiguringPhase

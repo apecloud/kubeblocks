@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package policy
+package configuration
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
@@ -32,7 +32,7 @@ func init() {
 	RegisterPolicy(dbaasv1alpha1.NormalPolicy, &simplePolicy{})
 }
 
-func (s *simplePolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
+func (s *simplePolicy) Upgrade(params reconfigureParams) (ExecStatus, error) {
 	params.Ctx.Log.V(1).Info("simple policy begin....")
 
 	switch params.ComponentType() {
@@ -48,7 +48,7 @@ func (s *simplePolicy) GetPolicyName() string {
 	return string(dbaasv1alpha1.NormalPolicy)
 }
 
-func rollingStatefulSets(param ReconfigureParams) (ExecStatus, error) {
+func rollingStatefulSets(param reconfigureParams) (ExecStatus, error) {
 	var (
 		units      = param.ComponentUnits
 		client     = param.Client

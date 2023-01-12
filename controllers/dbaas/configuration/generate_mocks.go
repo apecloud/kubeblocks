@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package policy
+package configuration
 
 //go:generate go run github.com/golang/mock/mockgen -destination mocks/k8sclient_mocks.go sigs.k8s.io/controller-runtime/pkg/client Client

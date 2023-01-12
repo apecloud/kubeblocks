@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package policy
+package configuration
 
 import (
 	"os"
@@ -45,7 +45,7 @@ func init() {
 	viper.SetDefault(cfgcore.PodMinReadySecondsEnv, defaultMinReadySeconds)
 }
 
-func (r *rollingUpgradePolicy) Upgrade(params ReconfigureParams) (ExecStatus, error) {
+func (r *rollingUpgradePolicy) Upgrade(params reconfigureParams) (ExecStatus, error) {
 	var (
 		funcs RollingUpgradeFuncs
 		cType = params.ComponentType()
@@ -66,7 +66,7 @@ func (r *rollingUpgradePolicy) GetPolicyName() string {
 	return string(dbaasv1alpha1.RollingPolicy)
 }
 
-func canPerformUpgrade(pods []corev1.Pod, params ReconfigureParams) bool {
+func canPerformUpgrade(pods []corev1.Pod, params reconfigureParams) bool {
 	target := params.getTargetReplicas()
 	if len(pods) == target {
 		return true
@@ -82,7 +82,7 @@ func canPerformUpgrade(pods []corev1.Pod, params ReconfigureParams) bool {
 	return true
 }
 
-func performRollingUpgrade(params ReconfigureParams, funcs RollingUpgradeFuncs) (ExecStatus, error) {
+func performRollingUpgrade(params reconfigureParams, funcs RollingUpgradeFuncs) (ExecStatus, error) {
 	pods, err := funcs.GetPodsFunc(params)
 	if err != nil {
 		return ESAndRetryFailed, err

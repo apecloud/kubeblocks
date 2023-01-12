@@ -69,6 +69,8 @@ const (
 	ReasonCreatedCR = "CreatedCR"
 	// ReasonRunTaskFailed run task failed
 	ReasonRunTaskFailed = "RunTaskFailed"
+	// ReasonDeleteFailed delete failed
+	ReasonDeleteFailed = "DeleteFailed"
 )
 
 const (

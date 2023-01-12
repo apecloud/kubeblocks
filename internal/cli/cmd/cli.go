@@ -31,6 +31,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/backupconfig"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/bench"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterdefinition"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterversion"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/dashboard"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/options"
@@ -91,6 +93,8 @@ A Command Line Interface for KubeBlocks`,
 		backupconfig.NewBackupConfigCmd(f, ioStreams),
 		dashboard.NewDashboardCmd(f, ioStreams),
 		troubleshoot.NewTroubleshootCmd(f, ioStreams),
+		clusterversion.NewClusterVersionCmd(f, ioStreams),
+		clusterdefinition.NewClusterDefinitionCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}

@@ -1,20 +1,25 @@
-## kbcli cluster volume-expansion
+## kbcli cluster list-users
 
-Expand volume with the specified components and volumeClaimTemplates in the cluster
+List cluster users
 
 ```
-kbcli cluster volume-expansion [flags]
+kbcli cluster list-users NAME [flags]
+```
+
+### Examples
+
+```
+  # list all users of a specified cluster
+  kbcli cluster list-users my-cluster
 ```
 
 ### Options
 
 ```
-      --component-names strings                Component names to this operations (required)
-  -h, --help                                  help for volume-expansion
-      --name string                           OpsRequest name. if not specified, it will be randomly generated 
-      --storage string                        Volume storage size (required)
-      --ttlSecondsAfterSucceed int            Time to live after the OpsRequest succeed
-      --volume-claim-template-names strings   VolumeClaimTemplate names in components (required)
+  -A, --all-namespace     If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
+  -h, --help              help for list-users
+  -o, --output format     prints the output in the specified format. Allowed values: table, json, yaml, wide (default table)
+  -l, --selector string   Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
 ```
 
 ### Options inherited from parent commands

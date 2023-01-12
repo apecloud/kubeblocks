@@ -53,7 +53,9 @@ kbcli [flags]
 
 * [kbcli backup-config](kbcli_backup-config.md)	 - KubeBlocks backup config
 * [kbcli bench](kbcli_bench.md)	 - Run a benchmark
-* [kbcli cluster](kbcli_cluster.md)	 - Database cluster operation command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster operation command
+* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command
+* [kbcli clusterversion](kbcli_clusterversion.md)	 - ClusterVersion command
 * [kbcli dashboard](kbcli_dashboard.md)	 - List and open the KubeBlocks dashboards
 * [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands
 * [kbcli options](kbcli_options.md)	 - Print the list of flags inherited by all commands

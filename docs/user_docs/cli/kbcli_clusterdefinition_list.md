@@ -1,20 +1,26 @@
-## kbcli cluster volume-expansion
+## kbcli clusterdefinition list
 
-Expand volume with the specified components and volumeClaimTemplates in the cluster
+List ClusterDefinitions
 
 ```
-kbcli cluster volume-expansion [flags]
+kbcli clusterdefinition list [flags]
+```
+
+### Examples
+
+```
+  # list all ClusterDefinition
+  kbcli clusterdefinition list
 ```
 
 ### Options
 
 ```
-      --component-names strings                Component names to this operations (required)
-  -h, --help                                  help for volume-expansion
-      --name string                           OpsRequest name. if not specified, it will be randomly generated 
-      --storage string                        Volume storage size (required)
-      --ttlSecondsAfterSucceed int            Time to live after the OpsRequest succeed
-      --volume-claim-template-names strings   VolumeClaimTemplate names in components (required)
+  -A, --all-namespace     If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
+  -h, --help              help for list
+  -o, --output format     prints the output in the specified format. Allowed values: table, json, yaml, wide (default table)
+  -l, --selector string   Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
+      --show-labels       When printing, show all labels as the last column (default hide labels column)
 ```
 
 ### Options inherited from parent commands
@@ -42,5 +48,5 @@ kbcli cluster volume-expansion [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster operation command
+* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command
 

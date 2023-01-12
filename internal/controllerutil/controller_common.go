@@ -30,6 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
 // Reconciled returns an empty result with nil error to signal a successful reconcile
@@ -115,8 +117,16 @@ func HandleCRDeletion(reqCtx RequestCtx,
 			// Because if the resource has dependencies, it will not be automatically deleted.
 			// so it can prevent users from manually deleting it without event records
 			if reqCtx.Recorder != nil {
-				reqCtx.Recorder.Eventf(cr, corev1.EventTypeNormal, ReasonDeletingCR, "Deleting %s: %s",
-					strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
+				cluster, ok := cr.(*v1alpha1.Cluster)
+				// throw warning event if terminationPolicy set to DoNotTerminate
+				if ok && cluster.Spec.TerminationPolicy == v1alpha1.DoNotTerminate {
+					reqCtx.Recorder.Eventf(cr, corev1.EventTypeWarning, ReasonDeleteFailed,
+						"Deleting %s: %s failed due to terminationPolicy set to DoNotTerminate",
+						strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
+				} else {
+					reqCtx.Recorder.Eventf(cr, corev1.EventTypeNormal, ReasonDeletingCR, "Deleting %s: %s",
+						strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
+				}
 			}
 
 			// our finalizer is present, so lets handle any external dependency

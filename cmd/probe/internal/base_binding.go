@@ -239,7 +239,7 @@ func (p *ProbeBase) roleValidate(role string) (bool, string) {
 		}
 	}
 	if !isValid {
-		msg = fmt.Sprintf("role %s is not configed in cluster definition %v", role, p.dbRoles)
+		msg = fmt.Sprintf("role %s is not configured in cluster definition %v", role, p.dbRoles)
 	}
 	return isValid, msg
 }

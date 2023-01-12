@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	cuelang.org/go v0.4.3
+	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/ahmetalpbalkan/go-cursor v0.0.0-20131010032410-8136607ea412
 	github.com/aws/aws-sdk-go v1.43.29
@@ -298,7 +299,7 @@ require (
 	github.com/pkg/browser v0.0.0-20210115035449-ce105d075bb4 // indirect
 	github.com/posener/complete v1.2.3 // indirect
 	github.com/prometheus/client_golang v1.12.2
-	github.com/prometheus/client_model v0.2.0 // indirect
+	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.37.0
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect

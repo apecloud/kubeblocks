@@ -148,7 +148,7 @@ fmt: ## Run go fmt against code.
 
 .PHONY: vet
 vet: ## Run go vet against code.
-	GOOS=linux $(GO) vet ./...
+	GOOS=darwin $(GO) vet ./...
 
 .PHONY: cue-fmt
 cue-fmt: cuetool ## Run cue fmt against code.

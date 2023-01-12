@@ -63,7 +63,7 @@ func (consensusSet *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySecond
 	if pod == nil {
 		return false
 	}
-	return isReady(*pod)
+	return util.PodIsReady(*pod)
 }
 
 func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady() (bool, error) {

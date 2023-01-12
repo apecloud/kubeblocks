@@ -31,10 +31,11 @@ import (
 
 var _ = Describe("Replication Component", func() {
 	var (
-		randomStr          = testCtx.GetRandomStr()
-		clusterName        = "cluster-replication" + randomStr
-		clusterDefName     = "cluster-def-replication-" + randomStr
-		clusterVersionName = "cluster-version-replication-" + randomStr
+		randomStr           = testCtx.GetRandomStr()
+		clusterName         = "cluster-replication" + randomStr
+		clusterDefName      = "cluster-def-replication-" + randomStr
+		clusterVersionName  = "cluster-version-replication-" + randomStr
+		replicationCompName = "replication"
 	)
 
 	cleanupObjects := func() {
@@ -64,9 +65,10 @@ var _ = Describe("Replication Component", func() {
 	Context("Replication Component test", func() {
 		It("Replication Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			clusterDef, _, cluster := testdbaas.InitReplicationRedis(testCtx, clusterDefName, clusterVersionName, clusterName)
+			clusterDef, _, cluster := testdbaas.InitReplicationRedis(ctx, testCtx, clusterDefName,
+				clusterVersionName, clusterName, replicationCompName)
 
-			sts := testdbaas.MockReplicationComponentStatefulSet(testCtx, clusterName)
+			sts := testdbaas.MockReplicationComponentStatefulSet(ctx, testCtx, clusterName, replicationCompName)
 			componentName := testdbaas.ReplicationComponentName
 			typeName := util.GetComponentTypeName(*cluster, componentName)
 			componentDef := util.GetComponentDefFromClusterDefinition(clusterDef, typeName)
@@ -88,7 +90,7 @@ var _ = Describe("Replication Component", func() {
 			Expect(requeue == true).Should(BeTrue())
 
 			By("test component phase when pods not ready")
-			phase, _ := replicationComponent.CalculatePhaseWhenPodsNotReady(testdbaas.ReplicationComponentName)
+			phase, _ := replicationComponent.GetPhaseWhenPodsNotReady(testdbaas.ReplicationComponentName)
 			Expect(phase == dbaasv1alpha1.FailedPhase).Should(BeTrue())
 		})
 	})

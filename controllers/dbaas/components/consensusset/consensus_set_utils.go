@@ -162,7 +162,7 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 		// if pod is the latest version, we do nothing
 		if util.GetPodRevision(&pod) == stsObj.Status.UpdateRevision {
 			// wait until ready
-			return !isReady(pod), nil
+			return !util.PodIsReady(pod), nil
 		}
 
 		// delete the pod to trigger associate StatefulSet to re-create it
@@ -457,7 +457,7 @@ func setConsensusSetStatusRoles(consensusSetStatus *dbaasv1alpha1.ConsensusSetSt
 	}
 
 	for _, pod := range pods {
-		if !isReady(pod) {
+		if !util.PodIsReady(pod) {
 			continue
 		}
 
@@ -491,28 +491,6 @@ func setConsensusSetStatusRole(consensusSetStatus *dbaasv1alpha1.ConsensusSetSta
 	}
 
 	return needUpdate
-}
-
-func isReady(pod corev1.Pod) bool {
-	if pod.Status.Conditions == nil {
-		return false
-	}
-
-	if pod.DeletionTimestamp != nil {
-		return false
-	}
-
-	if _, ok := pod.Labels[intctrlutil.RoleLabelKey]; !ok {
-		return false
-	}
-
-	for _, condition := range pod.Status.Conditions {
-		if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
-			return true
-		}
-	}
-
-	return false
 }
 
 func updateConsensusRoleInfo(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, componentDef dbaasv1alpha1.ClusterDefinitionComponent, componentName string, pods []corev1.Pod) error {

@@ -73,16 +73,25 @@ func (rs *ReplicationSet) PodsReady(obj client.Object) (bool, error) {
 	return podsReady, nil
 }
 
+// PodIsAvailable is the implementation of the type Component interface method,
+// Check whether the status of a Pod of the replicationSet is ready, including the role label on the Pod
+func (rs *ReplicationSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+	if pod == nil {
+		return false
+	}
+	return util.PodIsReady(*pod)
+}
+
 // HandleProbeTimeoutWhenPodsReady is the implementation of the type Component interface method,
 // and replicationSet does not need to do role probe detection, so it returns true directly.
 func (rs *ReplicationSet) HandleProbeTimeoutWhenPodsReady() (bool, error) {
 	return true, nil
 }
 
-// CalculatePhaseWhenPodsNotReady is the implementation of the type Component interface method,
+// GetPhaseWhenPodsNotReady is the implementation of the type Component interface method,
 // when the pods of replicationSet are not ready, calculate the component phase is Failed or Abnormal.
 // if return an empty phase, means the pods of component are ready and skips it.
-func (rs *ReplicationSet) CalculatePhaseWhenPodsNotReady(componentName string) (dbaasv1alpha1.Phase, error) {
+func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (dbaasv1alpha1.Phase, error) {
 	var (
 		isFailed         = true
 		isAbnormal       bool
@@ -137,6 +146,9 @@ func NewReplicationSet(ctx context.Context,
 	cluster *dbaasv1alpha1.Cluster,
 	component *dbaasv1alpha1.ClusterComponent,
 	componentDef *dbaasv1alpha1.ClusterDefinitionComponent) *ReplicationSet {
+	if component == nil || componentDef == nil {
+		return nil
+	}
 	return &ReplicationSet{
 		Ctx:          ctx,
 		Cli:          cli,

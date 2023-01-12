@@ -45,7 +45,6 @@ func NewComponentByType(
 	case dbaasv1alpha1.Consensus:
 		return consensusset.NewConsensusSet(ctx, cli, cluster, component, componentDef)
 	case dbaasv1alpha1.Replication:
-		component := util.GetComponentByName(cluster, componentName)
 		return replicationset.NewReplicationSet(ctx, cli, cluster, component, componentDef)
 	case dbaasv1alpha1.Stateful:
 		return stateful.NewStateful(ctx, cli, cluster)

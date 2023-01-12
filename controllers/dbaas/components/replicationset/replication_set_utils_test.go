@@ -35,10 +35,11 @@ import (
 var _ = Describe("ReplicationSet Util", func() {
 
 	var (
-		randomStr          = testCtx.GetRandomStr()
-		clusterName        = "cluster-replication" + randomStr
-		clusterDefName     = "cluster-def-replication-" + randomStr
-		clusterVersionName = "cluster-version-replication-" + randomStr
+		randomStr           = testCtx.GetRandomStr()
+		clusterName         = "cluster-replication" + randomStr
+		clusterDefName      = "cluster-def-replication-" + randomStr
+		clusterVersionName  = "cluster-version-replication-" + randomStr
+		replicationCompName = "replication"
 	)
 
 	cleanupObjects := func() {
@@ -65,7 +66,7 @@ var _ = Describe("ReplicationSet Util", func() {
 
 	Context("test replicationSet util", func() {
 		It("", func() {
-			_, _, cluster := testdbaas.InitReplicationRedis(testCtx, clusterDefName, clusterVersionName, clusterName)
+			_, _, cluster := testdbaas.InitReplicationRedis(ctx, testCtx, clusterDefName, clusterVersionName, clusterName, replicationCompName)
 			By("init cluster status")
 			componentName := "rsts-comp"
 			patch := client.MergeFrom(cluster.DeepCopy())

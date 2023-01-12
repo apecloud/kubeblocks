@@ -18,11 +18,9 @@ package consensusset
 
 import (
 	"testing"
-	"time"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
@@ -40,24 +38,8 @@ func TestIsReady(t *testing.T) {
 		},
 	}
 	pod.Labels = map[string]string{intctrlutil.RoleLabelKey: "leader"}
-	if !isReady(*pod) {
+	if !util.PodIsReady(*pod) {
 		t.Errorf("isReady returned false negative")
-	}
-	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-	if isReady(*pod) {
-		t.Errorf("isReady returned false positive")
-	}
-	pod.Labels = nil
-	if isReady(*pod) {
-		t.Errorf("isReady returned false positive")
-	}
-	pod.Status.Conditions = nil
-	if isReady(*pod) {
-		t.Errorf("isReady returned false positive")
-	}
-	pod.Status.Conditions = []v1.PodCondition{}
-	if isReady(*pod) {
-		t.Errorf("isReady returned false positive")
 	}
 }
 

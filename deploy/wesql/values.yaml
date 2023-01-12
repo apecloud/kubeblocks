@@ -109,7 +109,7 @@ configTemplate:
     # loose_cluster_log_type_node=OFF
 
     #server & instances
-    thread_stack={{ $$thread_stack }}
+    thread_stack={{ $thread_stack }}
     thread_cache_size=60
     # ulimit -n
     open_files_limit=1048576
@@ -147,26 +147,26 @@ configTemplate:
 
     log_statements_unsafe_for_binlog=OFF
     log_error_verbosity=2
-    log_output=TABLE
+    log_output=FILE
     {{- if hasKey $.component "enabledLogs" }}
     {{- if mustHas "error" $.component.enabledLogs }}
     # Mysql error log
     log_error={{ $data_root }}/log/mysqld-error.log
     {{- end }}
 
+
     {{- if mustHas "slow" $.component.enabledLogs }}
     # MySQL Slow log
     slow_query_log=ON
     long_query_time=5
-    log_output=FILE
     slow_query_log_file={{ $data_root }}/log/mysqld-slowquery.log
     {{- end }}
-    {{- end }}
     
+    {{- if mustHas "general" $.component.enabledLogs }}
     # SQL access log, default off 
-    general_log=OFF
-    {{- if $log_root }}
-    general_log_file={{ $log_root }}/mysqld.log
+    general_log=ON
+    general_log_file={{ $data_root }}/log/mysqld.log
+    {{- end }}
     {{- end }}
     
     #innodb
@@ -189,7 +189,7 @@ configTemplate:
     # binlog
     # master_info_repository=TABLE
     # From mysql8.0.23 is deprecated.
-    binlog_cache_size={{ $$binlog_cache_size }}
+    binlog_cache_size={{ $binlog_cache_size }}
     # AWS binlog_format=MIXED, Aliyun is ROW
     binlog_format=MIXED
     binlog_row_image=FULL
@@ -223,8 +223,9 @@ fullnameOverride: ""
 clusterVersionOverride: ""
 
 logConfigs:
-  error: /data/mysql/log/mysqld.err
-  slow: /data/mysql/log/*slow.log
+  error: /data/mysql/log/mysqld-error.log
+  slow: /data/mysql/log/mysqld-slowquery.log
+  general: /data/mysql/log/mysqld.log
 
 roleChangedProbe:
   failureThreshold: 2

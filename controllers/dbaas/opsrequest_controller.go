@@ -31,6 +31,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
+	opsutil "github.com/apecloud/kubeblocks/controllers/dbaas/operations/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -86,16 +87,18 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		Recorder:   r.Recorder,
 		Client:     r.Client,
 	}
-	// update status.phase to pending
-	if opsRequest.Status.Phase == "" {
+
+	switch opsRequest.Status.Phase {
+	case "":
+		// update status.phase to pending
 		if err = operations.PatchOpsStatus(opsRes, dbaasv1alpha1.PendingPhase, dbaasv1alpha1.NewProgressingCondition(opsRequest)); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()
-	}
-
-	if opsRequest.Status.Phase == dbaasv1alpha1.SucceedPhase {
+	case dbaasv1alpha1.SucceedPhase:
 		return r.handleSucceedOpsRequest(reqCtx, opsRequest)
+	case dbaasv1alpha1.FailedPhase:
+		return intctrlutil.Reconciled()
 	}
 
 	// patch cluster label to OpsRequest
@@ -160,7 +163,7 @@ func (r *OpsRequestReconciler) deleteClusterOpsRequestAnnotation(reqCtx intctrlu
 	}, cluster); err != nil {
 		return err
 	}
-	if opsRequestSlice, err = operations.GetOpsRequestSliceFromCluster(cluster); err != nil {
+	if opsRequestSlice, err = opsutil.GetOpsRequestSliceFromCluster(cluster); err != nil {
 		return err
 	}
 	index, opsRecord := operations.GetOpsRecorderFromSlice(opsRequestSlice, opsRequest.Name)
@@ -168,7 +171,7 @@ func (r *OpsRequestReconciler) deleteClusterOpsRequestAnnotation(reqCtx intctrlu
 		return nil
 	}
 	opsRequestSlice = slices.Delete(opsRequestSlice, index, index+1)
-	return operations.PatchClusterOpsAnnotations(reqCtx.Ctx, r.Client, cluster, opsRequestSlice)
+	return opsutil.PatchClusterOpsAnnotations(reqCtx.Ctx, r.Client, cluster, opsRequestSlice)
 }
 
 // setOwnerReference st
@@ -217,7 +220,7 @@ func (r *OpsRequestReconciler) setClusterToOpsResource(opsRes *operations.OpsRes
 
 // handleSucceedOpsRequest the opsRequest will be deleted after one hour when status.phase is Succeed
 func (r *OpsRequestReconciler) handleSucceedOpsRequest(reqCtx intctrlutil.RequestCtx, opsRequest *dbaasv1alpha1.OpsRequest) (ctrl.Result, error) {
-	if opsRequest.Status.CompletionTimestamp == nil || opsRequest.Spec.TTLSecondsAfterSucceed == 0 {
+	if opsRequest.Status.CompletionTimestamp.IsZero() || opsRequest.Spec.TTLSecondsAfterSucceed == 0 {
 		return intctrlutil.Reconciled()
 	}
 	ttlSecondsAfterSucceed := time.Duration(opsRequest.Spec.TTLSecondsAfterSucceed) * time.Second

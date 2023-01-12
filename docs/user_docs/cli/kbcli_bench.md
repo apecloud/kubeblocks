@@ -19,6 +19,7 @@ Run a benchmark
       --silence             Don't print error when running workload
   -T, --threads int         Thread concurrency (default 1)
       --time duration       Total execution time (default 2562047h47m16.854775807s)
+  -U, --user string         Database user (default "root")
 ```
 
 ### Options inherited from parent commands
@@ -41,7 +42,6 @@ Run a benchmark
   -s, --server string                  The address and port of the Kubernetes API server
       --tls-server-name string         Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
       --token string                   Bearer token for authentication to the API server
-      --user string                    The name of the kubeconfig user to use
 ```
 
 ### SEE ALSO

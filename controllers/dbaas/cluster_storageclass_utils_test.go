@@ -158,7 +158,7 @@ spec:
   - monitor: false
     name: wesql-test
     replicas: 3
-    type: replicasets
+    type: consensus
     volumeClaimTemplates:
     - name: data
       spec:

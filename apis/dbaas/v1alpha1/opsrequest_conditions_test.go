@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 )
 
 func TestNewAllCondition(t *testing.T) {
@@ -35,4 +36,14 @@ func TestNewAllCondition(t *testing.T) {
 	NewValidateFailedCondition(ReasonClusterPhaseMisMatch, "fail")
 	NewFailedCondition(opsRequest, nil)
 	NewFailedCondition(opsRequest, errors.New("opsRequest run failed"))
+}
+
+func TestSetStatusCondition(t *testing.T) {
+	opsRequest := createTestOpsRequest("mysql-test", "mysql-restart", RestartType)
+	progressingCondition := NewProgressingCondition(opsRequest)
+	opsRequest.SetStatusCondition(*progressingCondition)
+	checkCondition := meta.FindStatusCondition(opsRequest.Status.Conditions, progressingCondition.Type)
+	if checkCondition == nil {
+		t.Errorf(`Condition: %s should exist in OpsRequest.status.conditions`, progressingCondition.Type)
+	}
 }

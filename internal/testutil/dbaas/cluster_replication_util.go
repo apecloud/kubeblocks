@@ -19,13 +19,15 @@ package dbaas
 import (
 	"context"
 	"fmt"
+
 	"github.com/apecloud/kubeblocks/test/testdata"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/testutil"
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
 var (

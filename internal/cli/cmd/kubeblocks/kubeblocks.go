@@ -240,9 +240,14 @@ KubeBlocks %s Install SUCCESSFULLY!
 `, o.Version)
 	if monitor {
 		fmt.Fprint(o.Out, `
--> To view the monitor component console(Grafana/Prometheus/AlertManager):
-    kbcli dashboard list
-    kbcli dashboard open <component name>
+-> To view the monitor components console(Grafana/Prometheus/AlertManager):
+    kbcli dashboard list        # list all monitor components
+    kbcli dashboard open <name> # open the console in the default browser
+`)
+	} else {
+		fmt.Fprint(o.Out, `
+Notes: Monitor components(Grafana/Prometheus/AlertManager) is not installed,
+    use 'kbcli kubeblocks update --monitor=true' to install later.
 `)
 	}
 }

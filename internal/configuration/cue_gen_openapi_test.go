@@ -24,6 +24,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 func TestGenerateOpenApiSchema(t *testing.T) {
@@ -85,7 +87,7 @@ func TestGenerateOpenApiSchema(t *testing.T) {
 }
 
 func getContentFromFile(file string) []byte {
-	content, err := os.ReadFile("./testdata/" + file)
+	content, err := os.ReadFile(testdata.SubTestDataPath("./cue_testdata/" + file))
 	if err != nil {
 		return nil
 	}

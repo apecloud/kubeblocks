@@ -66,9 +66,6 @@ var _ = Describe("list", func() {
 			GroupVersion:         schema.GroupVersion{Group: types.Group, Version: types.Version},
 			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 			Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				if req.Method != "GET" {
-					return nil, nil
-				}
 				urlPrefix := "/api/v1/namespaces/" + namespace
 				return map[string]*http.Response{
 					"/namespaces/" + namespace + "/clusters":      httpResp(&dbaasv1alpha1.ClusterList{Items: []dbaasv1alpha1.Cluster{*cluster}}),

@@ -1,20 +1,11 @@
-## kbcli cluster volume-expansion
+## kbcli clusterdefinition
 
-Expand volume with the specified components and volumeClaimTemplates in the cluster
-
-```
-kbcli cluster volume-expansion [flags]
-```
+ClusterDefinition command
 
 ### Options
 
 ```
-      --component-names strings                Component names to this operations (required)
-  -h, --help                                  help for volume-expansion
-      --name string                           OpsRequest name. if not specified, it will be randomly generated 
-      --storage string                        Volume storage size (required)
-      --ttlSecondsAfterSucceed int            Time to live after the OpsRequest succeed
-      --volume-claim-template-names strings   VolumeClaimTemplate names in components (required)
+  -h, --help   help for clusterdefinition
 ```
 
 ### Options inherited from parent commands
@@ -42,5 +33,6 @@ kbcli cluster volume-expansion [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster operation command
+* [kbcli](kbcli.md)	 - KubeBlocks CLI
+* [kbcli clusterdefinition list](kbcli_clusterdefinition_list.md)	 - List ClusterDefinitions
 

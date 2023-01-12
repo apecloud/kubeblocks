@@ -63,6 +63,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	const leader = "leader"
 	const follower = "follower"
+	const volumeName = "data"
 
 	clusterObjKey := types.NamespacedName{
 		Name:      "my-cluster",

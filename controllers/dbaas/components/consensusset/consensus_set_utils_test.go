@@ -87,7 +87,7 @@ func TestInitClusterComponentStatusIfNeed(t *testing.T) {
 		t.Errorf("cluster.Status.Components[componentName].ConsensusSetStatus not initialized properly")
 	} else if consensusSetStatus.Leader.Name != "" ||
 		consensusSetStatus.Leader.AccessMode != dbaasv1alpha1.None ||
-		consensusSetStatus.Leader.Pod != consensusSetStatusDefaultPodName {
+		consensusSetStatus.Leader.Pod != ConsensusSetStatusDefaultPodName {
 		t.Errorf("cluster.Status.Components[componentName].ConsensusSetStatus.Leader not initialized properly")
 	}
 }

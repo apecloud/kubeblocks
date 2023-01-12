@@ -33,6 +33,10 @@ spec:
       jsonPath: .status.phase
       name: STATUS
       type: string
+    - description: Operation processing progress.
+      jsonPath: .status.progress
+      name: PROGRESS
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
@@ -57,7 +61,7 @@ spec:
             description: OpsRequestSpec defines the desired state of OpsRequest
             properties:
               clusterRef:
-                description: clusterRef reference clusterDefinition.
+                description: clusterRef references clusterDefinition.
                 type: string
               horizontalScaling:
                 description: horizontalScaling defines what component need to horizontal
@@ -113,10 +117,10 @@ spec:
                 - Restart
                 type: string
               upgrade:
-                description: upgrade specify the cluster version by specifying clusterVersionRef.
+                description: upgrade specifies the cluster version by specifying clusterVersionRef.
                 properties:
                   clusterVersionRef:
-                    description: clusterVersionRef reference ClusterVersion name.
+                    description: clusterVersionRef references ClusterVersion name.
                     type: string
                 required:
                 - clusterVersionRef
@@ -171,13 +175,13 @@ spec:
                       description: componentName cluster component name.
                       type: string
                     volumeClaimTemplates:
-                      description: volumeClaimTemplates specify the storage size and
-                        volumeClaimTemplate name.
+                      description: volumeClaimTemplates specifies the storage size
+                        and volumeClaimTemplate name.
                       items:
                         properties:
                           name:
-                            description: name reference volumeClaimTemplate name from
-                              cluster components.
+                            description: name references volumeClaimTemplate name
+                              from cluster components.
                             type: string
                           storage:
                             anyOf:
@@ -209,10 +213,6 @@ spec:
           status:
             description: OpsRequestStatus defines the observed state of OpsRequest
             properties:
-              StartTimestamp:
-                description: startTimestamp The time when the OpsRequest started processing.
-                format: date-time
-                type: string
               completionTimestamp:
                 description: completionTimestamp defines the OpsRequest completion
                   time.
@@ -221,8 +221,13 @@ spec:
               components:
                 additionalProperties:
                   properties:
+                    componentType:
+                      description: componentType references component type of component
+                        in ClusterDefinition.
+                      type: string
                     phase:
-                      description: phase describe the component phase, reference ClusterDefinition.status.component.phase.
+                      description: phase describes the component phase, reference
+                        ClusterDefinition.status.component.phase.
                       enum:
                       - Running
                       - Failed
@@ -233,53 +238,57 @@ spec:
                       - Deleted
                       - VolumeExpanding
                       type: string
-                    volumeClaimTemplates:
-                      additionalProperties:
+                    progressDetails:
+                      description: progressDetails describes the progress details
+                        of the component for this operation.
+                      items:
+                        description: ProgressDetail contains the details for the component
+                          processing progress.
                         properties:
-                          message:
+                          endTime:
+                            description: endTime is the completion time of object
+                              processing.
+                            format: date-time
                             type: string
-                          persistentVolumeClaims:
-                            additionalProperties:
-                              properties:
-                                message:
-                                  type: string
-                                status:
-                                  description: Phase defines the CR .Status.Phase
-                                  enum:
-                                  - Running
-                                  - Pending
-                                  - Failed
-                                  - Succeed
-                                  type: string
-                              type: object
-                            description: persistentVolumeClaimStatus describe the
-                              persistentVolumeClaim status
-                            type: object
-                          requestStorage:
-                            anyOf:
-                            - type: integer
-                            - type: string
-                            description: Request storage size.
-                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                            x-kubernetes-int-or-string: true
+                          group:
+                            description: group describes which group the current object
+                              belongs to. if the objects of a component belong to
+                              the same group, we can ignore it.
+                            type: string
+                          message:
+                            description: message is a human readable message indicating
+                              details about the object condition.
+                            type: string
+                          objectKey:
+                            description: objectKey is the unique key of the object.
+                            type: string
+                          startTime:
+                            description: startTime is the start time of object processing.
+                            format: date-time
+                            type: string
                           status:
-                            description: Phase defines the CR .Status.Phase
+                            description: status describes the state of processing
+                              the object.
                             enum:
-                            - Running
+                            - Processing
                             - Pending
                             - Failed
                             - Succeed
                             type: string
+                        required:
+                        - objectKey
+                        - status
                         type: object
-                      description: volumeClaimTemplates describe the volumeClaimTemplates
-                        status when spec.type is VolumeExpansion
-                      type: object
+                      type: array
+                    type:
+                      description: type name of the component.
+                      type: string
                   type: object
-                description: components define the recorded the status information
+                description: components defines the recorded the status information
                   of changed components for operation request.
                 type: object
               conditions:
-                description: conditions describe opsRequest detail status.
+                description: conditions describes opsRequest detail status.
                 items:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource. --- This struct is intended for direct
@@ -347,6 +356,68 @@ spec:
                   - type
                   type: object
                 type: array
+              lastConfiguration:
+                description: lastConfiguration records the last configuration before
+                  this operation take effected.
+                properties:
+                  clusterVersionRef:
+                    description: clusterVersionRef references ClusterVersion name.
+                    type: string
+                  components:
+                    additionalProperties:
+                      properties:
+                        limits:
+                          additionalProperties:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          description: 'Limits describes the maximum amount of compute
+                            resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                          type: object
+                        replicas:
+                          description: replicas are the last replicas of the component.
+                          format: int32
+                          type: integer
+                        requests:
+                          additionalProperties:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          description: 'Requests describes the minimum amount of compute
+                            resources required. If Requests is omitted for a container,
+                            it defaults to Limits if that is explicitly specified,
+                            otherwise to an implementation-defined value. More info:
+                            https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                          type: object
+                        volumeClaimTemplates:
+                          description: volumeClaimTemplates records the last volumeClaimTemplates
+                            of the component.
+                          items:
+                            properties:
+                              name:
+                                description: name references volumeClaimTemplate name
+                                  from cluster components.
+                                type: string
+                              storage:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: Request storage size.
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                            required:
+                            - name
+                            - storage
+                            type: object
+                          type: array
+                      type: object
+                    description: components records last configuration of the component.
+                    type: object
+                type: object
               observedGeneration:
                 description: observedGeneration is the most recent generation observed
                   for this Cluster. It corresponds to the Cluster's generation, which
@@ -354,13 +425,23 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: phase describe OpsRequest phase.
+                description: phase describes OpsRequest phase.
                 enum:
                 - Pending
                 - Running
                 - Failed
                 - Succeed
                 type: string
+              progress:
+                default: -/-
+                pattern: ^(\d+|\-)/(\d+|\-)$
+                type: string
+              startTimestamp:
+                description: startTimestamp The time when the OpsRequest started processing.
+                format: date-time
+                type: string
+            required:
+            - progress
             type: object
         type: object
     served: true

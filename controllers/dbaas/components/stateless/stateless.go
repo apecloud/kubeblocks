@@ -18,13 +18,25 @@ package stateless
 
 import (
 	"context"
+	"math"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/types"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 )
+
+// NewRSAvailableReason is added in a deployment when its newest replica set is made available
+// ie. the number of new pods that have passed readiness checks and run for at least minReadySeconds
+// is at least the minimum available pods that need to run for the deployment.
+const NewRSAvailableReason = "NewReplicaSetAvailable"
 
 type Stateless struct {
 	Cli     client.Client
@@ -32,7 +44,12 @@ type Stateless struct {
 	Cluster *dbaasv1alpha1.Cluster
 }
 
+var _ types.Component = &Stateless{}
+
 func (stateless *Stateless) IsRunning(obj client.Object) (bool, error) {
+	if obj == nil {
+		return false, nil
+	}
 	return stateless.PodsReady(obj)
 }
 
@@ -47,11 +64,19 @@ func (stateless *Stateless) PodsReady(obj client.Object) (bool, error) {
 	return DeploymentIsReady(deploy), nil
 }
 
+func (stateless *Stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+	if pod == nil {
+		return false
+	}
+	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
+}
+
+// HandleProbeTimeoutWhenPodsReady the stateless component has no role detection, empty implementation here.
 func (stateless *Stateless) HandleProbeTimeoutWhenPodsReady() (bool, error) {
 	return false, nil
 }
 
-func (stateless *Stateless) CalculatePhaseWhenPodsNotReady(componentName string) (dbaasv1alpha1.Phase, error) {
+func (stateless *Stateless) GetPhaseWhenPodsNotReady(componentName string) (dbaasv1alpha1.Phase, error) {
 	var (
 		isFailed          = true
 		isAbnormal        bool
@@ -81,7 +106,7 @@ func (stateless *Stateless) CalculatePhaseWhenPodsNotReady(componentName string)
 
 func NewStateless(ctx context.Context,
 	cli client.Client,
-	cluster *dbaasv1alpha1.Cluster) *Stateless {
+	cluster *dbaasv1alpha1.Cluster) types.Component {
 	return &Stateless{
 		Ctx:     ctx,
 		Cli:     cli,
@@ -94,11 +119,30 @@ func DeploymentIsReady(deploy *appsv1.Deployment) bool {
 	var (
 		targetReplicas     = *deploy.Spec.Replicas
 		componentIsRunning = true
+		newRSAvailable     = true
 	)
+
+	if HasProgressDeadline(deploy) {
+		// if the deployment.Spec.ProgressDeadlineSeconds exists, we should check if the new replicaSet is available.
+		// when deployment.Spec.ProgressDeadlineSeconds does not exist, the deployment controller will remove the DeploymentProgressing condition.
+		condition := deploymentutil.GetDeploymentCondition(deploy.Status, appsv1.DeploymentProgressing)
+		if condition == nil || condition.Reason != NewRSAvailableReason || condition.Status != corev1.ConditionTrue {
+			newRSAvailable = false
+		}
+	}
+	// check if the deployment of component is updated completely and ready.
 	if deploy.Status.AvailableReplicas != targetReplicas ||
 		deploy.Status.Replicas != targetReplicas ||
-		deploy.Status.ObservedGeneration != deploy.GetGeneration() {
+		deploy.Status.ObservedGeneration != deploy.GetGeneration() ||
+		deploy.Status.UpdatedReplicas != targetReplicas ||
+		!newRSAvailable {
 		componentIsRunning = false
 	}
 	return componentIsRunning
+}
+
+// HasProgressDeadline checks if the Deployment d is expected to surface the reason
+// "ProgressDeadlineExceeded" when the Deployment progress takes longer than expected time.
+func HasProgressDeadline(d *appsv1.Deployment) bool {
+	return d.Spec.ProgressDeadlineSeconds != nil && *d.Spec.ProgressDeadlineSeconds != math.MaxInt32
 }

@@ -44,7 +44,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/stateless"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
+	opsutil "github.com/apecloud/kubeblocks/controllers/dbaas/operations/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -166,7 +166,7 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 	return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
 }
 
-// handleRoleChangedEvent handle role changed event and return role.
+// handleRoleChangedEvent handles role changed event and return role.
 func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) (string, error) {
 	// get role
 	message := &probeMessage{}
@@ -495,7 +495,7 @@ func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *d
 	return nil
 }
 
-// checkReferencingCRStatus check cluster referenced CR is available
+// checkReferencingCRStatus checks if cluster referenced CR is available
 func (r *ClusterReconciler) checkReferencedCRStatus(
 	reqCtx intctrlutil.RequestCtx,
 	conMgr clusterConditionManager,
@@ -518,13 +518,13 @@ func (r *ClusterReconciler) needCheckClusterForReady(cluster *dbaasv1alpha1.Clus
 		cluster.Status.Phase) == -1
 }
 
-// existsOperations check the cluster are doing operations
+// existsOperations checks if the cluster are doing operations
 func (r *ClusterReconciler) existsOperations(cluster *dbaasv1alpha1.Cluster) bool {
-	opsRequestMap, _ := operations.GetOpsRequestSliceFromCluster(cluster)
+	opsRequestMap, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
 	return len(opsRequestMap) > 0
 }
 
-// updateClusterPhase update cluster.status.phase
+// updateClusterPhase updates cluster.status.phase
 func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster) error {
 	needPatch := false
 	patch := client.MergeFrom(cluster.DeepCopy())
@@ -550,7 +550,7 @@ func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctr
 	return nil
 }
 
-// updateClusterPhaseWhenConditionsError when cluster status is ConditionsError and the cluster apply resources successful,
+// updateClusterPhaseWhenConditionsError when cluster status is ConditionsError and the cluster applies resources successful,
 // we should update the cluster to the correct state
 func (r *ClusterReconciler) updateClusterPhaseWhenConditionsError(cluster *dbaasv1alpha1.Cluster) {
 	if cluster.Status.Phase != dbaasv1alpha1.ConditionsErrorPhase {
@@ -560,7 +560,7 @@ func (r *ClusterReconciler) updateClusterPhaseWhenConditionsError(cluster *dbaas
 		cluster.Status.Phase = dbaasv1alpha1.CreatingPhase
 		return
 	}
-	opsRequestSlice, _ := operations.GetOpsRequestSliceFromCluster(cluster)
+	opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
 	// if no operations in cluster, means user update the cluster.spec directly
 	if len(opsRequestSlice) == 0 {
 		cluster.Status.Phase = dbaasv1alpha1.UpdatingPhase
@@ -570,7 +570,7 @@ func (r *ClusterReconciler) updateClusterPhaseWhenConditionsError(cluster *dbaas
 	cluster.Status.Phase = opsRequestSlice[0].ToClusterPhase
 }
 
-// checkAndPatchToRunning patch Cluster.status.phase to Running
+// checkAndPatchToRunning patches Cluster.status.phase to Running
 func (r *ClusterReconciler) checkAndPatchToRunning(ctx context.Context,
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition) error {
@@ -635,7 +635,7 @@ func (r *ClusterReconciler) checkAndPatchToRunning(ctx context.Context,
 		// send an event when Cluster.status.phase change to Running
 		r.Recorder.Eventf(cluster, corev1.EventTypeNormal, string(dbaasv1alpha1.RunningPhase), "Cluster: %s is ready, current phase is Running.", cluster.Name)
 		// mark OpsRequest annotation to reconcile for cluster scope OpsRequest
-		return operations.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
+		return opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
 	}
 	return nil
 }
@@ -664,12 +664,12 @@ func (r *ClusterReconciler) handleComponentStatus(ctx context.Context,
 		if err = r.Client.Status().Patch(ctx, cluster, patch); err != nil {
 			return err
 		}
-		return operations.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
+		return opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
 	}
 	return nil
 }
 
-// handleComponentStatusWithStatefulSet handle the component status with statefulSet. One statefulSet corresponds to one component.
+// handleComponentStatusWithStatefulSet handles the component status with statefulSet. One statefulSet corresponds to one component.
 func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Context,
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition) (bool, error) {
@@ -689,7 +689,11 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 		}
 		typeName := util.GetComponentTypeName(*cluster, componentName)
 		componentDef := util.GetComponentDefFromClusterDefinition(clusterDef, typeName)
-		currComponent := components.NewComponentByType(ctx, r.Client, cluster, componentDef, componentName)
+		component := util.GetComponentByName(cluster, componentName)
+		currComponent := components.NewComponentByType(ctx, r.Client, cluster, componentDef, component)
+		if currComponent == nil {
+			continue
+		}
 		componentIsRunning, err := currComponent.IsRunning(&sts)
 		if err != nil {
 			return false, err
@@ -707,7 +711,7 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 	return needSyncComponentStatus, nil
 }
 
-// handleComponentStatusWithDeployment handle the component status with deployment. One deployment corresponds to one component.
+// handleComponentStatusWithDeployment handles the component status with deployment. One deployment corresponds to one component.
 func (r *ClusterReconciler) handleComponentStatusWithDeployment(ctx context.Context, cluster *dbaasv1alpha1.Cluster) (bool, error) {
 	var (
 		needSyncComponentStatus bool
@@ -722,8 +726,8 @@ func (r *ClusterReconciler) handleComponentStatusWithDeployment(ctx context.Cont
 			continue
 		}
 		deployIsReady := stateless.DeploymentIsReady(&deploy)
-		stateless := stateless.NewStateless(ctx, r.Client, cluster)
-		if ok, err := components.NeedSyncStatusComponents(cluster, stateless,
+		statelessComponent := stateless.NewStateless(ctx, r.Client, cluster)
+		if ok, err := components.NeedSyncStatusComponents(cluster, statelessComponent,
 			componentName, deployIsReady, deployIsReady); err != nil {
 			return false, err
 		} else if ok {
@@ -779,7 +783,7 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 	return r.Client.Status().Patch(ctx, cluster, patch)
 }
 
-// getSupportHorizontalScalingComponents Get the components that support horizontalScaling
+// getSupportHorizontalScalingComponents gets the components that support horizontalScaling
 func getSupportHorizontalScalingComponents(
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition) ([]dbaasv1alpha1.OperationComponent, []string) {
@@ -807,7 +811,7 @@ func getSupportHorizontalScalingComponents(
 	return horizontalScalableComponents, clusterComponentNames
 }
 
-// getObjectList get k8s workload list with cluster
+// getObjectList gets k8s workload list with cluster
 func getObjectListForCluster(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, objectList client.ObjectList) error {
 	matchLabels := client.MatchingLabels{
 		intctrlutil.AppInstanceLabelKey:  cluster.Name,

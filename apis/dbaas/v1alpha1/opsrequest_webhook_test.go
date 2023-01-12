@@ -21,15 +21,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sethvargo/go-password/password"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/sethvargo/go-password/password"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("OpsRequest webhook", func() {
@@ -94,6 +93,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("By testing spec.upgrade.clusterVersionRef when it equals Cluster.spec.clusterVersionRef")
 		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: clusterVersionName}
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("can not equals Cluster.spec.clusterVersionRef"))
+		opsRequest.Spec.Upgrade.ClusterVersionRef = clusterVersionNameForUpgrade
 
 		By("Test Cluster Phase")
 		OpsRequestBehaviourMapper[UpgradeType] = OpsRequestBehaviour{
@@ -113,7 +113,13 @@ var _ = Describe("OpsRequest webhook", func() {
 			opsRequestAnnotationKey: `[{"name":"testOpsName","clusterPhase":"Updating"}]`,
 		}
 		Expect(k8sClient.Patch(ctx, cluster, clusterPatch)).Should(Succeed())
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("Existing OpsRequest: testOpsName"))
+		Eventually(func() string {
+			err := testCtx.CreateObj(ctx, opsRequest)
+			if err == nil {
+				return ""
+			}
+			return err.Error()
+		}, timeout, interval).Should(ContainSubstring("Existing OpsRequest: testOpsName"))
 		// delete annotations cluster phase to Running
 		clusterPatch = client.MergeFrom(cluster.DeepCopy())
 		cluster.Annotations = nil
@@ -167,7 +173,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VerticalScalingType)
 		verticalScaling := VerticalScaling{}
 		verticalScaling.ComponentName = "proxy"
-		verticalScaling.ResourceRequirements = &corev1.ResourceRequirements{
+		verticalScaling.ResourceRequirements = corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
 				"cpu":    resource.MustParse("100m"),
 				"memory": resource.MustParse("100Mi"),
@@ -186,7 +192,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		opsRequest.Spec.VerticalScalingList = []VerticalScaling{
 			{
 				ComponentOps: ComponentOps{ComponentName: replicaSetComponentName},
-				ResourceRequirements: &corev1.ResourceRequirements{
+				ResourceRequirements: corev1.ResourceRequirements{
 					Requests: corev1.ResourceList{
 						"cpu":    resource.MustParse("200m"),
 						"memory": resource.MustParse("100Mi"),

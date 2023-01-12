@@ -660,7 +660,8 @@ spec:
 			checkClusterDoNotTerminate := func(g Gomega) {
 				fetched := &dbaasv1alpha1.Cluster{}
 				g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
-				g.Expect(fetched.Status.Phase == dbaasv1alpha1.DeletingPhase).To(BeTrue())
+				g.Expect(strings.Contains(fetched.Status.Message,
+					fmt.Sprintf("spec.terminationPolicy %s is preventing deletion.", fetched.Spec.TerminationPolicy)))
 				g.Expect(len(fetched.Finalizers) > 0).To(BeTrue())
 			}
 			Eventually(checkClusterDoNotTerminate, timeout, interval).Should(Succeed())

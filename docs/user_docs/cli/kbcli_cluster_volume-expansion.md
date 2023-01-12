@@ -42,5 +42,5 @@ kbcli cluster volume-expansion [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Database cluster operation command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster operation command
 

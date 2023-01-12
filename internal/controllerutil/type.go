@@ -24,6 +24,14 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+// RequestCtx wrapper for reconcile procedure context parameters
+type RequestCtx struct {
+	Ctx      context.Context
+	Req      ctrl.Request
+	Log      logr.Logger
+	Recorder record.EventRecorder
+}
+
 const (
 	AppName = "kubeblocks"
 	// common label and annotation keys
@@ -64,6 +72,8 @@ const (
 	ReasonCreatedCR = "CreatedCR"
 	// ReasonRunTaskFailed run task failed
 	ReasonRunTaskFailed = "RunTaskFailed"
+	// ReasonDeleteFailed delete failed
+	ReasonDeleteFailed = "DeleteFailed"
 )
 
 const (
@@ -73,14 +83,6 @@ const (
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
 	CronJob                   = "CronJob"
 )
-
-// RequestCtx wrapper for reconcile procedure context parameters
-type RequestCtx struct {
-	Ctx      context.Context
-	Req      ctrl.Request
-	Log      logr.Logger
-	Recorder record.EventRecorder
-}
 
 const (
 	// BackupRetain always retained, unless manually deleted by the user

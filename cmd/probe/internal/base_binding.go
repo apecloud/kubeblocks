@@ -230,6 +230,10 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 	return msg, nil
 }
 
+// DB may have some internal roles that need not be exposed to end user,
+// and not configured in cluster definition, eg. wesql's Candidate.
+// roleValidate is used to filter the internal roles and decrease the number
+// of report events to reduce the possibility of event conflictions.
 func (p *ProbeBase) roleValidate(role string) (bool, string) {
 	var msg string
 	isValid := false

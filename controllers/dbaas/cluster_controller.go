@@ -126,7 +126,7 @@ func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *db
 		if cluster.Status.ClusterDefGeneration != clusterDef.GetObjectMeta().GetGeneration() {
 			patch := client.MergeFrom(cluster.DeepCopy())
 			// sync status.Operations.HorizontalScalable
-			horizontalScalableComponents, _ := getSupportHorizontalScalingComponents(&cluster, clusterDef)
+			horizontalScalableComponents := getSupportHorizontalScalingComponents(&cluster, clusterDef)
 			if cluster.Status.Operations == nil {
 				cluster.Status.Operations = &dbaasv1alpha1.Operations{}
 			}
@@ -419,11 +419,7 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 		return &res, err
 	}
 
-	ml := client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
-		intctrlutil.AppNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
-	}
-	inNS := client.InNamespace(cluster.Namespace)
+	ml, inNS := getListOption(cluster, clusterDef)
 
 	if ret, err := removeFinalizer[appsv1.StatefulSet, *appsv1.StatefulSet, appsv1.StatefulSetList,
 		*appsv1.StatefulSetList, intctrlutil.StatefulSetListWrapper](r, reqCtx, inNS, ml); err != nil {
@@ -477,12 +473,7 @@ func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *d
 		return err
 	}
 
-	inNS := client.InNamespace(cluster.Namespace)
-	ml := client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
-		intctrlutil.AppNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
-	}
-
+	ml, inNS := getListOption(cluster, clusterDef)
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	if err := r.List(reqCtx.Ctx, pvcList, inNS, ml); err != nil {
 		return err
@@ -653,7 +644,7 @@ func (r *ClusterReconciler) handleComponentStatus(ctx context.Context,
 	)
 	patch := client.MergeFrom(cluster.DeepCopy())
 	// handle stateless component status
-	if needSyncDeploymentStatus, err = r.handleComponentStatusWithDeployment(ctx, cluster); err != nil {
+	if needSyncDeploymentStatus, err = r.handleComponentStatusWithDeployment(ctx, cluster, clusterDef); err != nil {
 		return err
 	}
 	// handle stateful/consensus component status
@@ -679,7 +670,7 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 		err                     error
 	)
 
-	if err = getObjectListForCluster(ctx, r.Client, cluster, statefulSetList); err != nil {
+	if err = getWorkloadListForCluster(ctx, r.Client, cluster, clusterDef, statefulSetList); err != nil {
 		return false, err
 	}
 	for _, sts := range statefulSetList.Items {
@@ -712,12 +703,12 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 }
 
 // handleComponentStatusWithDeployment handles the component status with deployment. One deployment corresponds to one component.
-func (r *ClusterReconciler) handleComponentStatusWithDeployment(ctx context.Context, cluster *dbaasv1alpha1.Cluster) (bool, error) {
+func (r *ClusterReconciler) handleComponentStatusWithDeployment(ctx context.Context, cluster *dbaasv1alpha1.Cluster, clusterDef *dbaasv1alpha1.ClusterDefinition) (bool, error) {
 	var (
 		needSyncComponentStatus bool
 		deploymentList          = &appsv1.DeploymentList{}
 	)
-	if err := getObjectListForCluster(ctx, r.Client, cluster, deploymentList); err != nil {
+	if err := getWorkloadListForCluster(ctx, r.Client, cluster, clusterDef, deploymentList); err != nil {
 		return false, err
 	}
 	for _, deploy := range deploymentList.Items {
@@ -759,9 +750,9 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 		operations.VolumeExpandable = volumeExpansionComponents
 	}
 	// determine whether to support horizontalScaling
-	horizontalScalableComponents, clusterComponentNames := getSupportHorizontalScalingComponents(cluster, clusterDef)
-	operations.HorizontalScalable = horizontalScalableComponents
+	operations.HorizontalScalable = getSupportHorizontalScalingComponents(cluster, clusterDef)
 	// set default supported operations
+	clusterComponentNames := getComponentsNames(cluster)
 	operations.Restartable = clusterComponentNames
 	operations.VerticalScalable = clusterComponentNames
 
@@ -783,20 +774,29 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 	return r.Client.Status().Patch(ctx, cluster, patch)
 }
 
+// getComponentsNames get all components' names
+func getComponentsNames(
+	cluster *dbaasv1alpha1.Cluster) []string {
+	clusterComponentNames := make([]string, 0)
+	for _, v := range cluster.Spec.Components {
+		clusterComponentNames = append(clusterComponentNames, v.Name)
+	}
+	return clusterComponentNames
+}
+
 // getSupportHorizontalScalingComponents gets the components that support horizontalScaling
 func getSupportHorizontalScalingComponents(
 	cluster *dbaasv1alpha1.Cluster,
-	clusterDef *dbaasv1alpha1.ClusterDefinition) ([]dbaasv1alpha1.OperationComponent, []string) {
-	var (
-		clusterComponentNames        = make([]string, 0)
-		horizontalScalableComponents = make([]dbaasv1alpha1.OperationComponent, 0)
-	)
+	clusterDef *dbaasv1alpha1.ClusterDefinition) []dbaasv1alpha1.OperationComponent {
+	horizontalScalableComponents := make([]dbaasv1alpha1.OperationComponent, 0)
+
 	// determine whether to support horizontalScaling
 	for _, v := range cluster.Spec.Components {
-		clusterComponentNames = append(clusterComponentNames, v.Name)
 		for _, component := range clusterDef.Spec.Components {
-			if v.Type != component.TypeName || (component.MinReplicas != 0 &&
-				component.MaxReplicas == component.MinReplicas) {
+			if v.Type != component.TypeName {
+				continue
+			}
+			if component.MinReplicas != 0 && component.MaxReplicas == component.MinReplicas {
 				continue
 			}
 			horizontalScalableComponents = append(horizontalScalableComponents, dbaasv1alpha1.OperationComponent{
@@ -808,15 +808,21 @@ func getSupportHorizontalScalingComponents(
 		}
 	}
 
-	return horizontalScalableComponents, clusterComponentNames
+	return horizontalScalableComponents
 }
 
-// getObjectList gets k8s workload list with cluster
-func getObjectListForCluster(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, objectList client.ObjectList) error {
-	matchLabels := client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:  cluster.Name,
-		intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
-	}
-	inNamespace := client.InNamespace(cluster.Namespace)
+// getWorkloadListForCluster gets k8s workload list with cluster
+func getWorkloadListForCluster(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, clusterDef *dbaasv1alpha1.ClusterDefinition, objectList client.ObjectList) error {
+	matchLabels, inNamespace := getListOption(cluster, clusterDef)
 	return cli.List(ctx, objectList, matchLabels, inNamespace)
+}
+
+// getListOption gets opts parameters for cli.List interface
+func getListOption(cluster *dbaasv1alpha1.Cluster, clusterDef *dbaasv1alpha1.ClusterDefinition) (ml client.MatchingLabels, inNS client.InNamespace) {
+	ml = client.MatchingLabels{
+		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
+		intctrlutil.AppNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
+	}
+	inNS = client.InNamespace(cluster.Namespace)
+	return
 }

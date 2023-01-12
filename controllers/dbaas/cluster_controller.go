@@ -537,8 +537,13 @@ func (r *ClusterReconciler) deleteBackups(reqCtx intctrlutil.RequestCtx, cluster
 		return err
 	}
 	for _, backup := range backups.Items {
-		if err := r.Delete(reqCtx.Ctx, &backup); err != nil {
-			return err
+		// check backup delete protection label
+		deleteProtection, exists := backup.GetLabels()[intctrlutil.BackupProtectionLabelKey]
+		// not found backup-protection or value is Delete, delete it.
+		if !exists || deleteProtection == intctrlutil.BackupDelete {
+			if err := r.Delete(reqCtx.Ctx, &backup); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

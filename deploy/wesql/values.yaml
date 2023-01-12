@@ -109,7 +109,7 @@ configTemplate:
     # loose_cluster_log_type_node=OFF
 
     #server & instances
-    thread_stack={{ $$thread_stack }}
+    thread_stack={{ $thread_stack }}
     thread_cache_size=60
     # ulimit -n
     open_files_limit=1048576
@@ -161,11 +161,13 @@ configTemplate:
     long_query_time=5
     slow_query_log_file={{ $data_root }}/log/mysqld-slowquery.log
     {{- end }}
-    {{- end }}
     
+    {{- if mustHas "general" $.component.enabledLogs }}
     # SQL access log, default off 
-    general_log=OFF
+    general_log=ON
     general_log_file={{ $data_root }}/log/mysqld.log
+    {{- end }}
+    {{- end }}
     
     #innodb
     innodb_doublewrite_batch_size=16
@@ -187,7 +189,7 @@ configTemplate:
     # binlog
     # master_info_repository=TABLE
     # From mysql8.0.23 is deprecated.
-    binlog_cache_size={{ $$binlog_cache_size }}
+    binlog_cache_size={{ $binlog_cache_size }}
     # AWS binlog_format=MIXED, Aliyun is ROW
     binlog_format=MIXED
     binlog_row_image=FULL
@@ -223,6 +225,7 @@ clusterVersionOverride: ""
 logConfigs:
   error: /data/mysql/log/mysqld-error.log
   slow: /data/mysql/log/mysqld-slowquery.log
+  general: /data/mysql/log/mysqld.log
 
 roleChangedProbe:
   failureThreshold: 2

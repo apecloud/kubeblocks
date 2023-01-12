@@ -193,7 +193,6 @@ func InitClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster,
 				Name:       "",
 			},
 		}
-		cluster.Status.Components[componentName] = componentStatus
 	}
 	if component.ComponentType == dbaasv1alpha1.Replication && componentStatus.ReplicationSetStatus == nil {
 		componentStatus.ReplicationSetStatus = &dbaasv1alpha1.ReplicationSetStatus{
@@ -201,7 +200,6 @@ func InitClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster,
 				Pod: ComponentStatusDefaultPodName,
 			},
 		}
-		cluster.Status.Components[componentName] = componentStatus
 	}
 	cluster.Status.Components[componentName] = componentStatus
 }

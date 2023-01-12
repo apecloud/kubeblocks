@@ -728,11 +728,7 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		for index := int32(0); index < int32(replicaNum); index++ {
 			if err := workloadProcessor(
 				func(envConfig *corev1.ConfigMap) (client.Object, error) {
-					rss, err := buildReplicationSet(reqCtx, *params, envConfig.Name, index)
-					if err != nil {
-						return nil, err
-					}
-					return rss, nil
+					return buildReplicationSet(reqCtx, *params, envConfig.Name, index)
 				}); err != nil {
 				return err
 			}
@@ -1128,8 +1124,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
-	err = replicationset.HandleReplicationSet(reqCtx, cli, cluster, stsList)
-	if err != nil {
+	if err := replicationset.HandleReplicationSet(reqCtx, cli, cluster, stsList); err != nil {
 		return false, err
 	}
 
@@ -1499,9 +1494,14 @@ func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
 			}
 			replicationSetStatus := v.ReplicationSetStatus
 			if replicationSetStatus != nil {
-				envData[prefix+"PRIMARY"] = replicationSetStatus.Primary.Pod
+				if replicationSetStatus.Primary.Pod != componentutil.ComponentStatusDefaultPodName {
+					envData[prefix+"PRIMARY"] = replicationSetStatus.Primary.Pod
+				}
 				secondaries := ""
 				for _, secondary := range replicationSetStatus.Secondaries {
+					if secondary.Pod == componentutil.ComponentStatusDefaultPodName {
+						continue
+					}
 					if len(secondaries) > 0 {
 						secondaries += ","
 					}

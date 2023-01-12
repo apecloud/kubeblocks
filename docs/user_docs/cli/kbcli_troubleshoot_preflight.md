@@ -1,25 +1,36 @@
-## kbcli bench
+## kbcli troubleshoot preflight
 
-Run a benchmark
+Run and retrieve preflight checks for kubeblocks
+
+```
+kbcli troubleshoot preflight [flags]
+```
+
+### Examples
+
+```
+  # Run preflight checks against customized preflight-check.yaml
+  kbcli troubleshoot preflight preflight-check.yaml
+  
+  # Run preflight checks and display AnalyzeResults with non-interactive mode
+  kbcli troubleshoot preflight preflight-check.yaml --interactive=false
+```
 
 ### Options
 
 ```
-      --count int           Total execution count, 0 means infinite
-  -D, --db string           Database name (default "kb_test")
-  -d, --driver string       Database driver: mysql (default "mysql")
-      --dropdata            Cleanup data before prepare
-  -h, --help                help for bench
-  -H, --host string         Database host (default "127.0.0.1")
-      --ignore-error        Ignore error when running workload
-      --interval duration   Output interval time (default 5s)
-      --max-procs int       runtime.GOMAXPROCS
-  -p, --password string     Database password (default "sakila")
-  -P, --port int            Database port (default 3306)
-      --silence             Don't print error when running workload
-  -T, --threads int         Thread concurrency (default 1)
-      --time duration       Total execution time (default 2562047h47m16.854775807s)
-  -U, --user string         Database user (default "root")
+      --collect-without-permissions   always run preflight checks even if some require permissions that preflight does not have (default true)
+      --collector-image string        the full name of the collector image to use
+      --collector-pullpolicy string   the pull policy of the collector image
+      --debug                         enable debug logging
+      --format string                 output format, one of human, json, yaml. only used when interactive is set to false (default "human")
+  -h, --help                          help for preflight
+      --interactive                   interactive preflights (default true)
+  -n, --namespace string              If present, the namespace scope for this CLI request
+  -o, --output string                 specify the output file path for the preflight checks
+      --selector string               selector (label query) to filter remote collection nodes on.
+      --since string                  force pod logs collectors to return logs newer than a relative duration like 5s, 2m, or 3h.
+      --since-time string             force pod logs collectors to return logs after a specific date (RFC3339)
 ```
 
 ### Options inherited from parent commands
@@ -37,15 +48,14 @@ Run a benchmark
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
-  -n, --namespace string               If present, the namespace scope for this CLI request
       --request-timeout string         The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests. (default "0")
   -s, --server string                  The address and port of the Kubernetes API server
       --tls-server-name string         Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
       --token string                   Bearer token for authentication to the API server
+      --user string                    The name of the kubeconfig user to use
 ```
 
 ### SEE ALSO
 
-* [kbcli](kbcli.md)	 - KubeBlocks CLI
-* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark
+* [kbcli troubleshoot](kbcli_troubleshoot.md)	 - Troubleshooting for KubeBlocks
 

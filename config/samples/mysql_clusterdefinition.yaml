@@ -6,7 +6,7 @@ spec:
   type: state.mysql-8
   connectionCredential:
     username: root
-    password: ""
+    password: "$(RANDOM_PASSWD)"
   components:
     - typeName: replicasets
       characterType: mysql

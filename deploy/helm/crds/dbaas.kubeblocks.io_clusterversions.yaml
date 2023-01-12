@@ -20,6 +20,10 @@ spec:
   scope: Cluster
   versions:
   - additionalPrinterColumns:
+    - description: ClusterDefinition referenced by cluster.
+      jsonPath: .spec.clusterDefinitionRef
+      name: CLUSTER-DEFINITION
+      type: string
     - description: status phase
       jsonPath: .status.phase
       name: STATUS

@@ -225,7 +225,7 @@ func (m *Mysql) GetRole(ctx context.Context, sql string) (string, error) {
 			return role, err
 		}
 	}
-	return role, err
+	return role, nil
 }
 
 // design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad

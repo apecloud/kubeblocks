@@ -97,8 +97,8 @@ func (p *ProbeBase) Init() {
 		p.roleDetectionThreshold = 300
 	}
 
-	if viper.IsSet("KB_SERVICE_ROLES") {
-		val := viper.GetString("KB_SERVICE_ROLES")
+	val := viper.GetString("KB_SERVICE_ROLES")
+	if val != "" {
 		if err := json.Unmarshal([]byte(val), &p.dbRoles); err != nil {
 			fmt.Println(errors.Wrap(err, "KB_DB_ROLES env format error").Error())
 		}

@@ -62,6 +62,10 @@ containers = {{ (index $.podSpec.containers 0 ).name }}
 {{- $buffer_pool_size_tmp = $.componentResource.memorySize }}
 {{- end }}
 innodb_buffer_pool_size = {{ $buffer_pool_size_tmp | int64 }}
+{{- $thread_stack := 262144 }}
+{{- $binlog_cache_size := 32768 }}
+{{- $single_thread_memory := add $thread_stack $binlog_cache_size }}
+single_thread_memory = {{ $single_thread_memory }}
 `
 		mysqlCfgRenderedContext = `
 #test
@@ -71,6 +75,7 @@ component_name = replicasets
 component_replica = 5
 containers = mytest
 innodb_buffer_pool_size = 8589934592
+single_thread_memory = 294912
 `
 	)
 

@@ -78,7 +78,7 @@ configTemplate:
     {{- $sort_buffer_size := 262144 }}
     {{- $read_buffer_size := 262144 }}
     {{- $read_rnd_buffer_size := 524288 }}
-    {{- $single_thread_memory := $thread_stack + $binlog_cache_size + $join_buffer_size + $sort_buffer_size + $read_buffer_size + $read_rnd_buffer_size }}
+    {{- $single_thread_memory := add $thread_stack $binlog_cache_size $join_buffer_size $sort_buffer_size $read_buffer_size $read_rnd_buffer_size }}
 
     {{- if gt $phy_memory 0 }}
     # Global_Buffer = innodb_buffer_pool_size = PhysicalMemory *3/4

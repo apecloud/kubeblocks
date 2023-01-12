@@ -10,4 +10,4 @@ spec:
   - componentName: replicasets
     volumeClaimTemplates:
     - name: data
-      storage: "4Gi"
+      storage: "9Gi"

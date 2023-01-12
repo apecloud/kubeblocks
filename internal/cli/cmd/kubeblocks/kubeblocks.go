@@ -190,14 +190,14 @@ func (o *InstallOptions) Run() error {
 	}
 
 	// install KubeBlocks chart
-	notes, err := o.installChart()
+	_, err := o.installChart()
 	if err != nil {
 		return err
 	}
 
 	// print notes
 	if !o.Quiet {
-		o.printNotes(notes)
+		o.printNotes()
 	}
 
 	return nil
@@ -216,14 +216,14 @@ func (o *InstallOptions) Upgrade() error {
 	}
 
 	// upgrade KubeBlocks chart
-	notes, err := o.upgradeChart()
+	_, err := o.upgradeChart()
 	if err != nil {
 		return err
 	}
 
 	// print notes
 	if !o.Quiet {
-		o.printNotes(notes)
+		o.printNotes()
 	}
 
 	return nil
@@ -276,7 +276,7 @@ func (o *InstallOptions) upgradeChart() (string, error) {
 	return notes, nil
 }
 
-func (o *InstallOptions) printNotes(notes string) {
+func (o *InstallOptions) printNotes() {
 	fmt.Fprintf(o.Out, `
 KubeBlocks %s Install SUCCESSFULLY!
 
@@ -288,7 +288,18 @@ KubeBlocks %s Install SUCCESSFULLY!
 -> Uninstall KubeBlocks:
     kbcli kubeblocks uninstall
 `, o.Version)
-	fmt.Fprint(o.Out, notes)
+	if o.Monitor {
+		fmt.Fprint(o.Out, `
+-> To view the monitor components console(Grafana/Prometheus/AlertManager):
+    kbcli dashboard list        # list all monitor components
+    kbcli dashboard open <name> # open the console in the default browser
+`)
+	} else {
+		fmt.Fprint(o.Out, `
+Notes: Monitor components(Grafana/Prometheus/AlertManager) is not installed,
+    use 'kbcli kubeblocks update --monitor=true' to install later.
+`)
+	}
 }
 
 func (o *Options) run() error {

@@ -1,6 +1,6 @@
 ## kbcli cluster
 
-Database cluster operation command
+Cluster operation command
 
 ### Options
 
@@ -51,6 +51,7 @@ Database cluster operation command
 * [kbcli cluster list-logs](kbcli_cluster_list-logs.md)	 - List supported log files in cluster
 * [kbcli cluster list-ops](kbcli_cluster_list-ops.md)	 - Liat all opsRequests
 * [kbcli cluster list-restores](kbcli_cluster_list-restores.md)	 - List all restore jobs
+* [kbcli cluster list-users](kbcli_cluster_list-users.md)	 - List cluster users
 * [kbcli cluster logs](kbcli_cluster_logs.md)	 - Access cluster log file
 * [kbcli cluster restart](kbcli_cluster_restart.md)	 - Restart the specified components in the cluster
 * [kbcli cluster restore](kbcli_cluster_restore.md)	 - Restore a new cluster from backup

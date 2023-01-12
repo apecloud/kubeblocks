@@ -27,7 +27,7 @@ import (
 func TestGetInconsistentComponentsInfoWithoutResult(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	// init appVersion
+	// init ClusterVersion
 	clusterVersion := &ClusterVersion{}
 	clusterVersionYaml := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1

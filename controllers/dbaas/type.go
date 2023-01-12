@@ -40,6 +40,7 @@ const (
 	statefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
 	CSRoleChangedAnnotKey      = "cs.kubeblocks.io/event-handled"
 	CSRoleChangedAnnotHandled  = "true"
+	clusterAccountLabelKey     = "account.kubeblocks.io/name"
 )
 
 type MonitorConfig struct {

@@ -204,7 +204,7 @@ func (o *InstallOptions) Run() error {
 }
 
 func (o *InstallOptions) Upgrade() error {
-	fmt.Fprintf(o.Out, "Install KubeBlocks %s\n", o.Version)
+	fmt.Fprintf(o.Out, "Upgrading KubeBlocks to %s\n", o.Version)
 
 	if o.Monitor {
 		o.Sets = append(o.Sets, kMonitorParam)

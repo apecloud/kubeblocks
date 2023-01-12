@@ -13,7 +13,12 @@ cronjob: {
 	metadata: {
 		name:      "delete-pvc-\(pvc.Name)"
 		namespace: pvc.Namespace
-		labels:    sts.metadata.labels
+		labels: {
+			"cluster.kubeblocks.io/lifecycle": "delete-pvc"
+			for k, v in sts.metadata.labels {
+				"\(k)": "\(v)"
+			}
+		}
 	}
 	spec: {
 		schedule: string

@@ -387,11 +387,6 @@ func handleDeletePVCCronJobEvent(ctx context.Context,
 }
 
 func checkedDeleteDeletePVCCronJob(ctx context.Context, cli client.Client, name string, namespace string) error {
-	// name check
-	// backup policy also generates cronjobs, which cannot be deleted
-	if !strings.HasPrefix(name, "delete-pvc-") {
-		return nil
-	}
 	// label check
 	cronJob := v1.CronJob{}
 	if err := cli.Get(ctx, types.NamespacedName{
@@ -401,6 +396,12 @@ func checkedDeleteDeletePVCCronJob(ctx context.Context, cli client.Client, name 
 		return client.IgnoreNotFound(err)
 	}
 	if cronJob.ObjectMeta.Labels[intctrlutil.AppManagedByLabelKey] != intctrlutil.AppName {
+		return nil
+	}
+	// check delete-pvc-cronjob label.
+	// the reason for this is that the backup policy also creates cronjobs,
+	// which need to be distinguished by the label.
+	if cronJob.ObjectMeta.Labels[lifecycleLabelKey] != lifecycleDeletePVCLabel {
 		return nil
 	}
 	// if managed by kubeblocks, then it must be the cronjob used to delete pvc, delete it since it's completed

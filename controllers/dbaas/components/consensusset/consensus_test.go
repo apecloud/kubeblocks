@@ -36,12 +36,14 @@ import (
 
 var _ = Describe("Consensus Component", func() {
 	var (
-		randomStr          = testCtx.GetRandomStr()
-		clusterDefName     = "mysql-clusterdef-" + randomStr
-		clusterVersionName = "mysql-clusterversion-" + randomStr
-		clusterName        = "mysql-" + randomStr
-		timeout            = 10 * time.Second
-		interval           = time.Second
+		randomStr                    = testCtx.GetRandomStr()
+		clusterDefName               = "mysql-clusterdef-" + randomStr
+		clusterVersionName           = "mysql-clusterversion-" + randomStr
+		clusterName                  = "mysql-" + randomStr
+		timeout                      = 10 * time.Second
+		interval                     = time.Second
+		consensusCompName            = "consensus"
+		defaultMinReadySeconds int32 = 10
 	)
 
 	cleanupObjects := func() {
@@ -73,7 +75,7 @@ var _ = Describe("Consensus Component", func() {
 		clusterPatch := client.MergeFrom(cluster.DeepCopy())
 		podsReady := true
 		cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
-			testdbaas.ConsensusComponentName: {
+			consensusCompName: {
 				PodsReady:     &podsReady,
 				PodsReadyTime: &metav1.Time{Time: time.Now().Add(-2 * time.Minute)},
 			},
@@ -90,17 +92,18 @@ var _ = Describe("Consensus Component", func() {
 		Eventually(func() bool {
 			tmpCluster := &dbaasv1alpha1.Cluster{}
 			_ = k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, tmpCluster)
-			return tmpCluster.Status.Components[testdbaas.ConsensusComponentName].Phase == dbaasv1alpha1.FailedPhase
+			return tmpCluster.Status.Components[consensusCompName].Phase == dbaasv1alpha1.FailedPhase
 		}, timeout, interval).Should(BeTrue())
 	}
 
 	Context("Consensus Component test", func() {
 		It("Consensus Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			clusterDef, _, cluster := testdbaas.InitConsensusMysql(testCtx, clusterDefName, clusterVersionName, clusterName)
+			clusterDef, _, cluster := testdbaas.InitConsensusMysql(ctx, testCtx, clusterDefName,
+				clusterVersionName, clusterName, consensusCompName)
 
-			sts := testdbaas.MockConsensusComponentStatefulSet(testCtx, clusterName)
-			componentName := testdbaas.ConsensusComponentName
+			sts := testdbaas.MockConsensusComponentStatefulSet(ctx, testCtx, clusterName, consensusCompName)
+			componentName := consensusCompName
 			typeName := util.GetComponentTypeName(*cluster, componentName)
 			componentDef := util.GetComponentDefFromClusterDefinition(clusterDef, typeName)
 			component := util.GetComponentByName(cluster, componentName)
@@ -124,7 +127,7 @@ var _ = Describe("Consensus Component", func() {
 			podName := sts.Name + "-0"
 			if testCtx.UsingExistingCluster() {
 				Eventually(func() bool {
-					phase, _ := consensusComponent.CalculatePhaseWhenPodsNotReady(testdbaas.ConsensusComponentName)
+					phase, _ := consensusComponent.GetPhaseWhenPodsNotReady(consensusCompName)
 					return phase == ""
 				}, timeout*5, interval).Should(BeTrue())
 
@@ -134,13 +137,15 @@ var _ = Describe("Consensus Component", func() {
 				Expect(requeue == false).Should(BeTrue())
 				validateComponentStatus()
 			} else {
-				testdbaas.MockConsensusComponentPods(testCtx, clusterName)
+				podList := testdbaas.MockConsensusComponentPods(ctx, testCtx, clusterName, consensusCompName)
+				By("test pod is not available")
+				Expect(consensusComponent.PodIsAvailable(podList[0], defaultMinReadySeconds)).Should(BeTrue())
 
 				By("test handle probe timed out")
 				mockClusterStatusProbeTimeout(cluster)
 				// mock leader pod is not ready
-				testk8s.UpdatePodStatusNotReady(testCtx, podName)
-				testk8s.DeletePodLabelKey(testCtx, podName, intctrlutil.RoleLabelKey)
+				testk8s.UpdatePodStatusNotReady(ctx, testCtx, podName)
+				testk8s.DeletePodLabelKey(ctx, testCtx, podName, intctrlutil.RoleLabelKey)
 				requeue, _ := consensusComponent.HandleProbeTimeoutWhenPodsReady()
 				Expect(requeue == false).Should(BeTrue())
 				validateComponentStatus()
@@ -150,10 +155,9 @@ var _ = Describe("Consensus Component", func() {
 				Expect(isRunning == false).Should(BeTrue())
 
 				By("test component phase when pods not ready")
-				phase, _ := consensusComponent.CalculatePhaseWhenPodsNotReady(testdbaas.ConsensusComponentName)
+				phase, _ := consensusComponent.GetPhaseWhenPodsNotReady(consensusCompName)
 				Expect(phase == dbaasv1alpha1.FailedPhase).Should(BeTrue())
 			}
 		})
 	})
-
 })

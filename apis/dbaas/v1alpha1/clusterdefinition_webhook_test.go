@@ -105,7 +105,82 @@ var _ = Describe("clusterDefinition webhook", func() {
 			rel3 := int32(2)
 			clusterDef.Spec.Components[0].ConsensusSpec.Learner = &ConsensusMember{Name: "learner", AccessMode: None, Replicas: &rel3}
 			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
+		})
 
+		It("Validate Cluster Definition System Accounts", func() {
+			By("By creating a new clusterDefinition")
+			clusterDef, _ := createTestClusterDefinitionObj3(clusterDefinitionName3)
+			cmdExecConfig := &CmdExecutorConfig{
+				Image:   "mysql-8.0.30",
+				Command: []string{"mysql", "-e", "$(KB_ACCOUNT_STATEMENT)"},
+			}
+			By("By creating a new clusterDefinition with duplicated accounts")
+			mockAccounts := []SystemAccountConfig{
+				{
+					Name: AdminAccount,
+					ProvisionPolicy: ProvisionPolicy{
+						Type: CreateByStmt,
+						Statements: &ProvisionStatements{
+							CreationStatement: `CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; `,
+							DeletionStatement: "DROP USER IF EXISTS $(USERNAME);",
+						},
+					},
+				},
+				{
+					Name: AdminAccount,
+					ProvisionPolicy: ProvisionPolicy{
+						Type: CreateByStmt,
+						Statements: &ProvisionStatements{
+							CreationStatement: `CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; `,
+							DeletionStatement: "DROP USER IF EXISTS $(USERNAME);",
+						},
+					},
+				},
+			}
+			passwdConfig := PasswordConfig{
+				Length: 10,
+			}
+			clusterDef.Spec.Components[0].SystemAccounts = &SystemAccountSpec{
+				CmdExecutorConfig: cmdExecConfig,
+				PasswordConfig:    passwdConfig,
+				Accounts:          mockAccounts,
+			}
+			Expect(testCtx.CreateObj(ctx, clusterDef)).ShouldNot(Succeed())
+
+			// fix duplication error
+			mockAccounts[1].Name = ProbeAccount
+			By("By creating a new clusterDefinition with invalid password setting")
+			// test password config
+			invalidPasswdConfig := PasswordConfig{
+				Length:     10,
+				NumDigits:  10,
+				NumSymbols: 10,
+			}
+			clusterDef.Spec.Components[0].SystemAccounts = &SystemAccountSpec{
+				CmdExecutorConfig: cmdExecConfig,
+				PasswordConfig:    invalidPasswdConfig,
+				Accounts:          mockAccounts,
+			}
+			Expect(testCtx.CreateObj(ctx, clusterDef)).ShouldNot(Succeed())
+
+			By("By creating a new clusterDefinition with statements missing")
+			mockAccounts[0].ProvisionPolicy.Type = ReferToExisting
+			clusterDef.Spec.Components[0].SystemAccounts = &SystemAccountSpec{
+				CmdExecutorConfig: cmdExecConfig,
+				PasswordConfig:    passwdConfig,
+				Accounts:          mockAccounts,
+			}
+			Expect(testCtx.CreateObj(ctx, clusterDef)).ShouldNot(Succeed())
+			// reset account setting
+			mockAccounts[0].ProvisionPolicy.Type = CreateByStmt
+
+			By("By creating a new clusterDefinition with valid accounts")
+			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
+			// wait until ClusterDefinition created
+			Eventually(func() bool {
+				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName3}, clusterDef)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
 		})
 	})
 })

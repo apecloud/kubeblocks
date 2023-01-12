@@ -137,6 +137,15 @@ const (
 	Required  PodAntiAffinity = "Required"
 )
 
+type ProgressStatus string
+
+const (
+	PendingProgressStatus    ProgressStatus = "Pending"
+	ProcessingProgressStatus ProgressStatus = "Processing"
+	FailedProgressStatus     ProgressStatus = "Failed"
+	SucceedProgressStatus    ProgressStatus = "Succeed"
+)
+
 // OpsRequestBehaviour record what cluster status that can trigger this OpsRequest
 // and what status that the cluster enters after trigger OpsRequest.
 type OpsRequestBehaviour struct {
@@ -151,6 +160,79 @@ type OpsRecorder struct {
 	// ToClusterPhase the cluster phase when the OpsRequest is running
 	ToClusterPhase Phase `json:"clusterPhase"`
 }
+
+// ProvisionPolicyType defines the policy for creating accounts.
+// +enum
+type ProvisionPolicyType string
+
+const (
+	// CreateByStmt will create account w.r.t. deleteion and creation statement given by provider.
+	CreateByStmt ProvisionPolicyType = "CreateByStmt"
+	// ReferToExisting will not create account, but create a secret by copying data from referred secret file.
+	ReferToExisting ProvisionPolicyType = "ReferToExisting"
+)
+
+// ProvisionScope defines the scope (within component) of provision.
+// +enum
+type ProvisionScope string
+
+const (
+	// AllPods will create accounts for all pods belong to the component.
+	AllPods ProvisionScope = "AllPods"
+	// AndyPods will only create accounts on one pod.
+	AnyPods ProvisionScope = "AnyPods"
+)
+
+// KBAccountType is used for bitwise operation.
+type KBAccountType uint8
+
+// System accounts represented in bit.
+const (
+	KBAccountAdmin          KBAccountType = 1
+	KBAccountDataprotection               = 1 << 1
+	KBAccountProbe                        = 1 << 2
+	KBAccountMonitor                      = 1 << 3
+	KBAccountReplicator                   = 1 << 4
+	KBAccountInvalid                      = 0
+)
+
+// AccountName defines system account names.
+// +enum
+type AccountName string
+
+const (
+	AdminAccount          AccountName = "kbadmin"
+	DataprotectionAccount AccountName = "kbdataprotection"
+	ProbeAccount          AccountName = "kbprobe"
+	MonitorAccount        AccountName = "kbmonitoring"
+	ReplicatorAccount     AccountName = "kbreplicator"
+)
+
+func (r AccountName) GetAccountID() KBAccountType {
+	switch r {
+	case AdminAccount:
+		return KBAccountAdmin
+	case DataprotectionAccount:
+		return KBAccountDataprotection
+	case ProbeAccount:
+		return KBAccountProbe
+	case MonitorAccount:
+		return KBAccountMonitor
+	case ReplicatorAccount:
+		return KBAccountReplicator
+	}
+	return KBAccountInvalid
+}
+
+// LetterCase defines cases to use in password generation.
+// +enum
+type LetterCase string
+
+const (
+	LowerCases LetterCase = "LowerCases"
+	UpperCases LetterCase = "UpperCases"
+	MixedCases LetterCase = "MixedCases"
+)
 
 var webhookMgr *webhookManager
 

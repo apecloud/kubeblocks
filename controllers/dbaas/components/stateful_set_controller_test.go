@@ -30,6 +30,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 var _ = Describe("StatefulSet Controller", func() {
@@ -42,6 +43,8 @@ var _ = Describe("StatefulSet Controller", func() {
 		clusterDefName     = "cluster-definition-consensus-" + randomStr
 		clusterVersionName = "cluster-version-operations-" + randomStr
 		opsRequestName     = "wesql-restart-test-" + randomStr
+		revisionID         = "6fdd48d9cd"
+		consensusCompName  = "consensus"
 	)
 
 	cleanupObjects := func() {
@@ -90,23 +93,21 @@ var _ = Describe("StatefulSet Controller", func() {
 		Expect(k8sClient.Update(context.Background(), clusterDef)).Should(Succeed())
 
 		newSts := &appsv1.StatefulSet{}
-		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName + "-" + testdbaas.ConsensusComponentName,
+		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName + "-" + componentName,
 			Namespace: testCtx.DefaultNamespace}, newSts)).Should(Succeed())
 		stsPatch := client.MergeFrom(newSts.DeepCopy())
-		newSts.Status.CurrentRevision = fmt.Sprintf("wesql-mysql-test-%dfdd48d8cd", index)
+		// mock consensus component is not ready
+		newSts.Status.UpdateRevision = fmt.Sprintf("%s-%s-%dfdd48d8cd", clusterName, componentName, index)
 		Expect(k8sClient.Status().Patch(context.Background(), newSts, stsPatch)).Should(Succeed())
 
-		By("waiting the component is Running")
-		Eventually(func() bool {
-			cluster := &dbaasv1alpha1.Cluster{}
-			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)
-			return cluster.Status.Components[componentName].Phase == dbaasv1alpha1.RunningPhase
-		}, timeout, interval).Should(BeTrue())
+		By("waiting the component is Updating")
+		Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, componentName),
+			timeout, interval).Should(Equal(dbaasv1alpha1.UpdatingPhase))
 	}
 
 	testUsingEnvTest := func(sts *appsv1.StatefulSet) {
 		By("create pod of statefulset")
-		testdbaas.MockConsensusComponentPods(testCtx, clusterName)
+		_ = testdbaas.MockConsensusComponentPods(ctx, testCtx, clusterName, consensusCompName)
 
 		By("mock restart cluster")
 		sts.Spec.Template.Annotations = map[string]string{
@@ -118,11 +119,8 @@ var _ = Describe("StatefulSet Controller", func() {
 		newSts := &appsv1.StatefulSet{}
 		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: sts.Name, Namespace: testCtx.DefaultNamespace}, newSts)).Should(Succeed())
 		stsPatch := client.MergeFrom(newSts.DeepCopy())
-		newSts.Status.UpdateRevision = fmt.Sprintf("%s-%s-%s", clusterName, testdbaas.ConsensusComponentName, testdbaas.RevisionID)
-		newSts.Status.ObservedGeneration = 2
-		newSts.Status.AvailableReplicas = 3
-		newSts.Status.ReadyReplicas = 3
-		newSts.Status.Replicas = 3
+		newSts.Status.UpdateRevision = fmt.Sprintf("%s-%s-%s", clusterName, consensusCompName, revisionID)
+		testk8s.MockStatefulSetReady(newSts)
 		Expect(k8sClient.Status().Patch(context.Background(), newSts, stsPatch)).Should(Succeed())
 	}
 
@@ -130,13 +128,13 @@ var _ = Describe("StatefulSet Controller", func() {
 		newSts := &appsv1.StatefulSet{}
 		// wait for StatefulSet to create all pods
 		Eventually(func() bool {
-			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName + "-" + testdbaas.ConsensusComponentName,
+			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName + "-" + consensusCompName,
 				Namespace: testCtx.DefaultNamespace}, newSts)
 			return newSts.Status.ObservedGeneration == 1
 		}, timeout, interval).Should(BeTrue())
 		By("patch pod label of StatefulSet")
 		for i := 0; i < 3; i++ {
-			podName := fmt.Sprintf("%s-%s-%d", clusterName, testdbaas.ConsensusComponentName, i)
+			podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusCompName, i)
 			podRole := "follower"
 			accessMode := "Readonly"
 			if i == 0 {
@@ -149,17 +147,17 @@ var _ = Describe("StatefulSet Controller", func() {
 	}
 
 	Context("test controller", func() {
-		It("", func() {
-			_, _, cluster := testdbaas.InitConsensusMysql(testCtx, clusterDefName, clusterVersionName, clusterName)
-			_ = testdbaas.CreateRestartOpsRequest(testCtx, clusterName, opsRequestName, []string{testdbaas.ConsensusComponentName})
-			sts := testdbaas.MockConsensusComponentStatefulSet(testCtx, clusterName)
+		It("test statefulSet controller", func() {
+			_, _, cluster := testdbaas.InitConsensusMysql(ctx, testCtx, clusterDefName,
+				clusterVersionName, clusterName, consensusCompName)
+			_ = testdbaas.CreateRestartOpsRequest(ctx, testCtx, clusterName, opsRequestName, []string{consensusCompName})
+			sts := testdbaas.MockConsensusComponentStatefulSet(ctx, testCtx, clusterName, consensusCompName)
 			By("patch cluster to Updating")
-			componentName := "mysql-test"
 			patch := client.MergeFrom(cluster.DeepCopy())
 			cluster.Status.Phase = dbaasv1alpha1.UpdatingPhase
 			cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
-				componentName: {
-					Phase: dbaasv1alpha1.UpdatingPhase,
+				consensusCompName: {
+					Phase: dbaasv1alpha1.RunningPhase,
 				},
 			}
 			Expect(k8sClient.Status().Patch(context.Background(), cluster, patch)).Should(Succeed())
@@ -178,17 +176,13 @@ var _ = Describe("StatefulSet Controller", func() {
 			}
 
 			By("waiting the component is Running")
-			Eventually(func() bool {
-				cluster := &dbaasv1alpha1.Cluster{}
-				_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)
-				return cluster.Status.Components[componentName].Phase == dbaasv1alpha1.RunningPhase
-			}, timeout, interval).Should(BeTrue())
+			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, consensusCompName), timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 
 			By("test updateStrategy with Serial")
-			testUpdateStrategy(dbaasv1alpha1.SerialStrategy, componentName, 1)
+			testUpdateStrategy(dbaasv1alpha1.SerialStrategy, consensusCompName, 1)
 
 			By("test updateStrategy with Parallel")
-			testUpdateStrategy(dbaasv1alpha1.ParallelStrategy, componentName, 2)
+			testUpdateStrategy(dbaasv1alpha1.ParallelStrategy, consensusCompName, 2)
 		})
 	})
 })

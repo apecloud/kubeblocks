@@ -47,6 +47,116 @@ type ClusterDefinitionSpec struct {
 	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
 }
 
+// SystemAccountSpec specifies information to create system accounts.
+type SystemAccountSpec struct {
+	// cmdExecutorConfig configs how to get client SDK and perform statements.
+	// +kubebuilder:validation:Required
+	CmdExecutorConfig *CmdExecutorConfig `json:"cmdExecutorConfig"`
+	// passwordConfig defines the pattern to generate password.
+	// +kubebuilder:validation:Required
+	PasswordConfig PasswordConfig `json:"passwordConfig"`
+	// accounts defines system account config settings.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	Accounts []SystemAccountConfig `json:"accounts" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+}
+
+// CmdExecutorConfig specifies how to perform creation and deletion statements.
+type CmdExecutorConfig struct {
+	// image for Connector.
+	// +kubebuilder:validation:Required
+	Image string `json:"image"`
+	// command to perform statements.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	Command []string `json:"command"`
+	// args is used to perform statements.
+	// +optional
+	Args []string `json:"args,omitempty"`
+	// envs is a list of environment variables.
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+}
+
+// PasswordConfig helps provide to customize complexity of passowrd generation pattern.
+type PasswordConfig struct {
+	// length defines the length of password.
+	// +kubebuilder:validation:Maximum=32
+	// +kubebuilder:validation:Minimum=8
+	// +kubebuilder:default=10
+	// +optional
+	Length int32 `json:"length,omitempty"`
+	//  numDigits defines number of digits.
+	// +kubebuilder:validation:Maximum=20
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=2
+	// +optional
+	NumDigits int32 `json:"numDigits,omitempty"`
+	// numSymbols defines number of symbols.
+	// +kubebuilder:validation:Maximum=20
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=0
+	// +optional
+	NumSymbols int32 `json:"numSymbols,omitempty"`
+	// letterCase defines to use lower-cases, upper-cases or mixed-cases of letters.
+	// +kubebuilder:default=MixedCases
+	// +optional
+	LetterCase LetterCase `json:"letterCase,omitempty"`
+}
+
+// SystemAccountConfig specifies how to create and delete system accounts.
+type SystemAccountConfig struct {
+	// name is the name of a system account.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum={kbadmin,kbdataprotection,kbprobe,kbmonitoring,kbreplicator}
+	Name AccountName `json:"name"`
+	// provisionPolicy defines how to create account.
+	// +kubebuilder:validation:Required
+	ProvisionPolicy ProvisionPolicy `json:"provisionPolicy"`
+}
+
+// ProvisionPolicy defines the policy details for creating accounts.
+type ProvisionPolicy struct {
+	// type defines the way to provision an account, either `CreateByStmt` or `ReferToExisting`.
+	// +kubebuilder:validation:Required
+	Type ProvisionPolicyType `json:"type"`
+	// scope is the scope to provision account, and the scope could be `anyPod` or `allPods`.
+	// +kubebuilder:default=AnyPods
+	Scope ProvisionScope `json:"scope"`
+	// statements will be used when Type is CreateByStmt.
+	// +optional
+	Statements *ProvisionStatements `json:"statements,omitempty"`
+	// secretRef will be used when Type is ReferToExisting.
+	// +optional
+	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
+}
+
+// ProvisionSecretRef defines the information of secret referred to.
+type ProvisionSecretRef struct {
+	// name refers to the name of secret.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+	// namespace refers to the namesapce of secret.
+	// +kubebuilder:validation:Required
+	Namespace string `json:"namespace"`
+}
+
+// ProvisionStatements defines the statements used to create accounts.
+type ProvisionStatements struct {
+	// creation specifies statement how to create this account with required privileges.
+	// +kubebuilder:validation:Required
+	CreationStatement string `json:"creation"`
+	// deletion specifies statement how to delete this account.
+	// +kubebuilder:validation:Required
+	DeletionStatement string `json:"deletion"`
+}
+
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
 type ClusterDefinitionStatus struct {
 	// ClusterDefinition phase -
@@ -230,6 +340,9 @@ type ClusterDefinitionComponent struct {
 	// horizontalScalePolicy controls the behavior of horizontal scale.
 	// +optional
 	HorizontalScalePolicy *HorizontalScalePolicy `json:"horizontalScalePolicy,omitempty"`
+	// Statement to create system account.
+	// +optional
+	SystemAccounts *SystemAccountSpec `json:"systemAccounts,omitempty"`
 }
 
 type HorizontalScalePolicy struct {

@@ -52,7 +52,7 @@ func TestIsFailedOrAbnormal(t *testing.T) {
 }
 
 func TestIsProbeTimeout(t *testing.T) {
-	podsReadyTime := &metav1.Time{Time: time.Now().Add(-2 * time.Minute)}
+	podsReadyTime := &metav1.Time{Time: time.Now().Add(-10 * time.Minute)}
 	if !IsProbeTimeout(podsReadyTime) {
 		t.Error("probe timed out should be true")
 	}

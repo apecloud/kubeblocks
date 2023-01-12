@@ -46,6 +46,9 @@ const (
 
 	// StorageClassAnnotationKey StorageClass annotation key in Cluster
 	StorageClassAnnotationKey = "kubeblocks.io/storage-class"
+
+	// BackupProtectionLabelKey Backup delete protection policy label
+	BackupProtectionLabelKey = "kubeblocks.io/backup-protection"
 )
 
 const (
@@ -78,3 +81,14 @@ type RequestCtx struct {
 	Log      logr.Logger
 	Recorder record.EventRecorder
 }
+
+const (
+	// BackupRetain always retained, unless manually deleted by the user
+	BackupRetain = "Retain"
+
+	// BackupRetainUntilExpired retain backup until it expires
+	BackupRetainUntilExpired = "RetainUntilExpired"
+
+	// BackupDelete (default)delete backup immediately when cluster's terminationPolicy is WipeOut
+	BackupDelete = "Delete"
+)

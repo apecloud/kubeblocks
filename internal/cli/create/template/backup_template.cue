@@ -14,6 +14,9 @@ content: {
 	metadata: {
 		name:      options.backupName
 		namespace: options.namespace
+		labels: {
+			"kubeblocks.io/backup-protection": "retain"
+		}
 	}
 	spec: {
 		backupType:       options.backupType

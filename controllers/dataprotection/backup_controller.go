@@ -160,8 +160,10 @@ func (r *BackupReconciler) doNewPhaseAction(
 	// update Phase to InProgress
 	backup.Status.Phase = dataprotectionv1alpha1.BackupInProgress
 	backup.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
-	backup.Status.Expiration = &metav1.Time{
-		Time: backup.Status.StartTimestamp.Add(backup.Spec.TTL.Duration),
+	if backup.Spec.TTL != nil {
+		backup.Status.Expiration = &metav1.Time{
+			Time: backup.Status.StartTimestamp.Add(backup.Spec.TTL.Duration),
+		}
 	}
 	if err := r.Client.Status().Update(reqCtx.Ctx, backup); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")

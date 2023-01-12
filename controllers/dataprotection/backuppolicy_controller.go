@@ -229,6 +229,10 @@ func (r *BackupPolicyReconciler) RemoveExpiredBackups(reqCtx intctrlutil.Request
 	}
 	now := metav1.Now()
 	for _, item := range backups.Items {
+		// ignore retained backup.
+		if item.GetLabels()[intctrlutil.BackupProtectionLabelKey] == intctrlutil.BackupRetain {
+			return nil
+		}
 		if item.Status.Expiration != nil && item.Status.Expiration.Before(&now) {
 			if err := DeleteObjectBackground(r.Client, reqCtx.Ctx, &item); err != nil {
 				// failed delete backups, return error info.

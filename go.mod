@@ -5,6 +5,7 @@ go 1.19
 require (
 	cuelang.org/go v0.4.3
 	github.com/Masterminds/sprig/v3 v3.2.2
+	github.com/StudioSol/set v1.0.0
 	github.com/aws/aws-sdk-go v1.43.29
 	github.com/bhmj/jsonslice v1.1.2
 	github.com/briandowns/spinner v1.18.1

@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"reflect"
 
+	"github.com/StudioSol/set"
+
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
@@ -54,22 +56,22 @@ func isUpdateDynamicParameters(tpl *dbaasv1alpha1.ConfigConstraintSpec, cfg *cfg
 	if err != nil {
 		return false, err
 	}
-	updateParams := cfgcore.NewSetFromList(params)
+	updateParams := set.NewLinkedHashSetString(params...)
 
 	// if has StaticParameters, update static parameter
 	if len(tpl.StaticParameters) > 0 {
-		staticParams := cfgcore.NewSetFromList(tpl.StaticParameters)
+		staticParams := set.NewLinkedHashSetString(tpl.StaticParameters...)
 		union := cfgcore.Union(staticParams, updateParams)
-		if !union.Empty() {
+		if union.Length() > 0 {
 			return false, nil
 		}
 	}
 
 	// if has dynamic parameters, all updated param in dynamic params
 	if len(tpl.DynamicParameters) > 0 {
-		dynamicParams := cfgcore.NewSetFromList(tpl.DynamicParameters)
+		dynamicParams := set.NewLinkedHashSetString(tpl.DynamicParameters...)
 		union := cfgcore.Difference(updateParams, dynamicParams)
-		return union.Empty(), nil
+		return union.Length() == 0, nil
 	}
 
 	// default static parameters

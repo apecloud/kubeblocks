@@ -227,8 +227,8 @@ type ConfigDiffInformation struct {
 }
 
 func (c *cfgWrapper) Diff(target *cfgWrapper) (*ConfigDiffInformation, error) {
-	fromOMap := NewSetFromMap(c.indexer)
-	fromNMap := NewSetFromMap(target.indexer)
+	fromOMap := ToSet(c.indexer)
+	fromNMap := ToSet(target.indexer)
 
 	addSet := Difference(fromNMap, fromOMap)
 	deleteSet := Difference(fromOMap, fromNMap)
@@ -236,25 +236,25 @@ func (c *cfgWrapper) Diff(target *cfgWrapper) (*ConfigDiffInformation, error) {
 
 	reconfigureInfo := &ConfigDiffInformation{
 		IsModify:     false,
-		AddConfig:    make(map[string]interface{}, addSet.Size()),
-		DeleteConfig: make(map[string]interface{}, deleteSet.Size()),
-		UpdateConfig: make(map[string][]byte, updateSet.Size()),
+		AddConfig:    make(map[string]interface{}, addSet.Length()),
+		DeleteConfig: make(map[string]interface{}, deleteSet.Length()),
+		UpdateConfig: make(map[string][]byte, updateSet.Length()),
 
 		Target:      target,
 		LastVersion: c,
 	}
 
-	for elem := range *addSet {
+	for elem := range addSet.Iter() {
 		reconfigureInfo.AddConfig[elem] = target.indexer[elem].AllSettings()
 		reconfigureInfo.IsModify = true
 	}
 
-	for elem := range *deleteSet {
+	for elem := range deleteSet.Iter() {
 		reconfigureInfo.DeleteConfig[elem] = c.indexer[elem].AllSettings()
 		reconfigureInfo.IsModify = true
 	}
 
-	for elem := range *updateSet {
+	for elem := range updateSet.Iter() {
 		old := c.indexer[elem]
 		new := target.indexer[elem]
 

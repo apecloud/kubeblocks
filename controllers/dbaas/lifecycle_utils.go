@@ -1471,9 +1471,9 @@ func updateStatefulLabelsWithTemplate(sts *appsv1.StatefulSet, allLabels map[str
 
 	// delete not exist configmap label
 	deletedLabels := cfgcore.MapKeyDifference(existLabels, allLabels)
-	deletedLabels.ForEach(func(key string) {
-		delete(sts.Labels, key)
-	})
+	for l := range deletedLabels.Iter() {
+		delete(sts.Labels, l)
+	}
 
 	for key, val := range allLabels {
 		sts.Labels[key] = val

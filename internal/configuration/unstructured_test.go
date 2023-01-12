@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/StudioSol/set"
 	"github.com/stretchr/testify/require"
 )
 
@@ -127,9 +128,9 @@ func Contains(left, right []string) bool {
 		return false
 	}
 
-	sets := NewSetFromList(left)
+	sets := set.NewLinkedHashSetString(left...)
 	for _, k := range right {
-		if !sets.Contains(k) {
+		if !sets.InArray(k) {
 			return false
 		}
 	}

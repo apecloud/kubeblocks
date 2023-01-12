@@ -17,78 +17,59 @@ limitations under the License.
 package configuration
 
 import (
-	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/StudioSol/set"
 )
 
 func TestDifference(t *testing.T) {
 	type args struct {
-		left  *Set
-		right *Set
+		left  *set.LinkedHashSetString
+		right *set.LinkedHashSetString
 	}
 	tests := []struct {
 		name string
 		args args
-		want *Set
+		want *set.LinkedHashSetString
 	}{{
 		name: "test1",
 		args: args{
-			left: NewSetFromList([]string{
-				"a", "b", "e", "g",
-			}),
-			right: NewSetFromList([]string{}),
+			left:  set.NewLinkedHashSetString("a", "b", "e", "g"),
+			right: set.NewLinkedHashSetString(),
 		},
-		want: NewSetFromList([]string{
-			"b", "a", "e", "g",
-		}),
+		want: set.NewLinkedHashSetString("b", "a", "e", "g"),
 	}, {
 		name: "empty_test",
 		args: args{
-			left:  NewSetFromList([]string{}),
-			right: NewSetFromList([]string{}),
+			left:  set.NewLinkedHashSetString(),
+			right: set.NewLinkedHashSetString(),
 		},
-		want: NewSetFromList([]string{}),
+		want: set.NewLinkedHashSetString(),
 	}, {
 		name: "test2",
 		args: args{
-			left: NewSetFromList([]string{
-				"a", "b", "e", "g",
-			}),
-			right: NewSetFromList([]string{
-				"a", "g", "x", "z",
-			}),
+			left:  set.NewLinkedHashSetString("a", "b", "e", "g"),
+			right: set.NewLinkedHashSetString("a", "g", "x", "z"),
 		},
-		want: NewSetFromList([]string{
-			"b", "e",
-		}),
+		want: set.NewLinkedHashSetString("b", "e"),
 	}, {
 		name: "test_contained",
 		args: args{
-			left: NewSetFromList([]string{
-				"a", "b", "e", "g",
-			}),
-			right: NewSetFromList([]string{
-				"a", "g",
-			}),
+			left:  set.NewLinkedHashSetString("a", "b", "e", "g"),
+			right: set.NewLinkedHashSetString("a", "g"),
 		},
-		want: NewSetFromList([]string{
-			"b", "e",
-		}),
+		want: set.NewLinkedHashSetString("b", "e"),
 	}, {
 		name: "test_contained2",
 		args: args{
-			left: NewSetFromList([]string{"a"}),
-			right: NewSetFromList([]string{
-				"a", "g",
-			}),
+			left:  set.NewLinkedHashSetString("a"),
+			right: set.NewLinkedHashSetString("a", "g"),
 		},
-		want: NewSetFromList([]string{}),
+		want: set.NewLinkedHashSetString(),
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := Difference(tt.args.left, tt.args.right); !reflect.DeepEqual(got, tt.want) {
+			if got := Difference(tt.args.left, tt.args.right); !EqSet(got, tt.want) {
 				t.Errorf("Difference() = %v, want %v", got, tt.want)
 			}
 		})
@@ -103,7 +84,7 @@ func TestMapKeyDifference(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want *Set
+		want *set.LinkedHashSetString
 	}{{
 		name: "test_map",
 		args: args{
@@ -118,32 +99,13 @@ func TestMapKeyDifference(t *testing.T) {
 				"f": 5,
 			},
 		},
-		want: NewSetFromList([]string{"b", "c"}),
+		want: set.NewLinkedHashSetString("b", "c"),
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := MapKeyDifference(tt.args.left, tt.args.right); !reflect.DeepEqual(got, tt.want) {
+			if got := MapKeyDifference(tt.args.left, tt.args.right); !EqSet(got, tt.want) {
 				t.Errorf("MapKeyDifference() = %v, want %v", got, tt.want)
 			}
 		})
 	}
-}
-
-func TestSet_ForEach(t *testing.T) {
-	s := NewSetFromList([]string{"a", "b", "c"})
-	require.Equal(t, s.Size(), 3)
-	require.True(t, s.Contains("b"))
-	require.False(t, s.Contains("bb"))
-
-	require.Equal(t, Union(s, NewSetFromList([]string{"a"})).Size(), 1)
-	require.True(t, Union(s, NewSetFromList([]string{"bb"})).Empty())
-
-	require.True(t, Union(NewSetFromList([]string{}), NewSetFromList([]string{})).Empty())
-
-	count := 0
-	s.ForEach(func(key string) {
-		count++
-	})
-
-	require.Equal(t, count, s.Size())
 }

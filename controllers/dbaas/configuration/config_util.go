@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/StudioSol/set"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -393,7 +394,7 @@ func getComponentByUsingCM(stsList *appv1.StatefulSetList, cfg client.ObjectKey)
 	}
 
 	sts := make([]appv1.StatefulSet, 0, stsLen)
-	containers := cfgcore.NewSet()
+	containers := set.NewLinkedHashSetString()
 	for _, s := range stsList.Items {
 		volumeMounted := intctrlutil.GetVolumeMountName(s.Spec.Template.Spec.Volumes, cfg.Name)
 		if volumeMounted == nil {
@@ -406,10 +407,10 @@ func getComponentByUsingCM(stsList *appv1.StatefulSetList, cfg client.ObjectKey)
 			})
 		if len(contains) > 0 {
 			sts = append(sts, s)
-			containers.InsertArray(contains)
+			containers.Add(contains...)
 		}
 	}
-	return sts, containers.ToList()
+	return sts, containers.AsSlice()
 }
 
 func getClusterComponentsByName(components []dbaasv1alpha1.ClusterComponent, componentName string) *dbaasv1alpha1.ClusterComponent {

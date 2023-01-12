@@ -73,7 +73,7 @@ func (d *dockerContainerV2) Kill(ctx context.Context, containerIDs []string, sig
 	}
 
 	errs := make([]error, 0, len(containerIDs))
-	d.logger.Debugf("all docker container: %v", cfgcore.NewSetFromMap(allContainer).ToList())
+	d.logger.Debugf("all docker container: %v", cfgcore.ToSet(allContainer).AsSlice())
 	for _, containerID := range containerIDs {
 		d.logger.Infof("stopping docker container: %s", containerID)
 		container, ok := allContainer[containerID]

@@ -19,6 +19,7 @@ package configuration
 import (
 	"testing"
 
+	"github.com/StudioSol/set"
 	"github.com/stretchr/testify/require"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -48,11 +49,9 @@ func TestGetUpdateParameterList(t *testing.T) {
 `
 	params, err := getUpdateParameterList(newCfgDiffMeta(testData, nil, nil))
 	require.Nil(t, err)
-	require.Equal(t, cfgcore.NewSetFromList(
-		[]string{
-			"a", "c_1", "c_0", "msld", "cd", "f", "test1", "test2",
-		}),
-		cfgcore.NewSetFromList(params))
+	require.True(t, cfgcore.EqSet(
+		set.NewLinkedHashSetString("a", "c_1", "c_0", "msld", "cd", "f", "test1", "test2"),
+		set.NewLinkedHashSetString(params...)))
 }
 
 func newCfgDiffMeta(testData string, add, delete map[string]interface{}) *cfgcore.ConfigDiffInformation {

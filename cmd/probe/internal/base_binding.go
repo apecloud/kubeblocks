@@ -235,6 +235,11 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 // roleValidate is used to filter the internal roles and decrease the number
 // of report events to reduce the possibility of event conflictions.
 func (p *ProbeBase) roleValidate(role string) (bool, string) {
+	// do not validate when db roles setting is missing
+	if len(p.dbRoles) == 0 {
+		return true, ""
+	}
+
 	var msg string
 	isValid := false
 	for r := range p.dbRoles {

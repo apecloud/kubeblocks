@@ -24,6 +24,14 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+// RequestCtx wrapper for reconcile procedure context parameters
+type RequestCtx struct {
+	Ctx      context.Context
+	Req      ctrl.Request
+	Log      logr.Logger
+	Recorder record.EventRecorder
+}
+
 const (
 	AppName = "kubeblocks"
 	// common label and annotation keys
@@ -72,11 +80,3 @@ const (
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
 	CronJob                   = "CronJob"
 )
-
-// RequestCtx wrapper for reconcile procedure context parameters
-type RequestCtx struct {
-	Ctx      context.Context
-	Req      ctrl.Request
-	Log      logr.Logger
-	Recorder record.EventRecorder
-}

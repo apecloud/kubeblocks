@@ -41,6 +41,7 @@ const (
 
 	ReasonClusterPhaseMisMatch       = "ClusterPhaseMisMatch"
 	ReasonOpsTypeNotSupported        = "OpsTypeNotSupported"
+	ReasonValidateError              = "ValidateError"
 	ReasonClusterExistOtherOperation = "ClusterExistOtherOperation"
 	ReasonClusterNotFound            = "ClusterNotFound"
 	ReasonStarting                   = "Starting"

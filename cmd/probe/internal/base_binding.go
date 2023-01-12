@@ -39,7 +39,7 @@ const (
 	CommandSQLKey = "sql"
 
 	defaultCheckFailedThreshold   = 1800
-	defaultRoleUnchangedThreshold = 300
+	defaultRoleDetectionThreshold = 300
 )
 
 type ProbeBase struct {
@@ -51,12 +51,12 @@ type ProbeBase struct {
 	roleCheckFailedCount    int
 	roleUnchangedCount      int
 	checkFailedThreshold    int
-	// roleUnchangedThreshold is used to set the report period of role changed event even role unchanged,
+	// roleDetectionThreshold is used to set the report duration of role event after role changed,
 	// then event controller can always get rolechanged events to maintain pod label accurately
 	// in cases of:
 	// 1 rolechanged event lost;
 	// 2 pod role label deleted or updated incorrectly.
-	roleUnchangedThreshold int
+	roleDetectionThreshold int
 	dbPort                 int
 }
 
@@ -78,7 +78,7 @@ type ProbeOperation interface {
 
 func init() {
 	viper.SetDefault("KB_CHECK_FAILED_THRESHOLD", defaultCheckFailedThreshold)
-	viper.SetDefault("KB_ROLE_UNCHANGED_THRESHOLD", defaultRoleUnchangedThreshold)
+	viper.SetDefault("KB_ROLE_DETECTION_THRESHOLD", defaultRoleDetectionThreshold)
 }
 
 func (p *ProbeBase) Init() {
@@ -90,11 +90,11 @@ func (p *ProbeBase) Init() {
 		p.checkFailedThreshold = 3600
 	}
 
-	p.roleUnchangedThreshold = viper.GetInt("KB_ROLE_UNCHANGED_THRESHOLD")
-	if p.roleUnchangedThreshold < 60 {
-		p.roleUnchangedThreshold = 60
-	} else if p.roleUnchangedThreshold > 300 {
-		p.roleUnchangedThreshold = 300
+	p.roleDetectionThreshold = viper.GetInt("KB_ROLE_DETECTION_THRESHOLD")
+	if p.roleDetectionThreshold < 60 {
+		p.roleDetectionThreshold = 60
+	} else if p.roleDetectionThreshold > 300 {
+		p.roleDetectionThreshold = 300
 	}
 
 	if viper.IsSet("KB_SERVICE_ROLES") {
@@ -217,12 +217,12 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 	}
 
 	// roleUnchangedCount is the count of consecutive role unchanged checks.
-	// if observed role unchanged consecutively in roleUnchangedThreshold times,
+	// if observed role unchanged consecutively in roleDetectionThreshold times after role changed,
 	// we emit the current role again，then event controller can always get
 	// roleChanged events to maintain pod label accurately in cases of:
 	// 1 roleChanged event loss;
 	// 2 pod role label deleted or updated incorrectly.
-	if p.roleUnchangedCount < p.roleUnchangedThreshold && p.roleUnchangedCount%2 == 0 {
+	if p.roleUnchangedCount < p.roleDetectionThreshold && p.roleUnchangedCount%2 == 0 {
 		response.Metadata[StatusCode] = CheckFailedHTTPCode
 	}
 	msg, _ := json.Marshal(result)

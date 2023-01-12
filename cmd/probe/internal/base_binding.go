@@ -199,6 +199,7 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 		return msg, nil
 	}
 
+	p.roleCheckFailedCount = 0
 	if isValid, message := p.roleValidate(role); !isValid {
 		result.Event = "roleInvalid"
 		result.Message = message

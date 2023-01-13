@@ -29,6 +29,9 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+// DescendingOrdinalSts is a sort.Interface that Sorts a list of StatefulSet based on the ordinals extracted from the statefulSet.
+type DescendingOrdinalSts []*appsv1.StatefulSet
+
 // statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
 var statefulPodRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 
@@ -102,19 +105,19 @@ func CovertToStatefulSet(obj client.Object) *appsv1.StatefulSet {
 	return nil
 }
 
-// DescendingOrdinalSts is a sort.Interface that Sorts a list of StatefulSet based on the ordinals extracted from the statefulSet.
-type DescendingOrdinalSts []*appsv1.StatefulSet
-
 var statefulSetRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 
+// Len is the implementation of the sort.Interface, Calculate the length of the list of DescendingOrdinalSts
 func (dos DescendingOrdinalSts) Len() int {
 	return len(dos)
 }
 
+// Swap is the implementation of the sort.Interface, Exchange two items in DescendingOrdinalSts
 func (dos DescendingOrdinalSts) Swap(i, j int) {
 	dos[i], dos[j] = dos[j], dos[i]
 }
 
+// Less is the implementation of the sort.Interface, sort the size of the statefulSet ordinal in descending order
 func (dos DescendingOrdinalSts) Less(i, j int) bool {
 	return GetOrdinalSts(dos[i]) > GetOrdinalSts(dos[j])
 }

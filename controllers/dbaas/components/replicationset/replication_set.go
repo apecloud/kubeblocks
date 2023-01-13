@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/types"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -36,6 +37,8 @@ type ReplicationSet struct {
 	ComponentDef *dbaasv1alpha1.ClusterDefinitionComponent
 	Component    *dbaasv1alpha1.ClusterComponent
 }
+
+var _ types.Component = &ReplicationSet{}
 
 // IsRunning is the implementation of the type Component interface method,
 // which is used to check whether the replicationSet component is running normally.

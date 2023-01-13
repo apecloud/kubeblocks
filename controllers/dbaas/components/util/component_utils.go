@@ -170,6 +170,7 @@ func GetComponentTypeName(cluster dbaasv1alpha1.Cluster, componentName string) s
 	return componentName
 }
 
+// InitClusterComponentStatusIfNeed Initialize the state of the corresponding component in cluster.status.components
 func InitClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster,
 	componentName string,
 	component *dbaasv1alpha1.ClusterDefinitionComponent) {

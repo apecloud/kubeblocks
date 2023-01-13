@@ -90,6 +90,7 @@ func (r *Cluster) validatePrimaryIndex(allErrs *field.ErrorList) {
 		if component.PrimaryIndex == nil {
 			continue
 		}
+
 		if *component.PrimaryIndex > *component.Replicas-1 {
 			path := fmt.Sprintf("spec.components[%d].PrimaryIndex", index)
 			*allErrs = append(*allErrs, field.Invalid(field.NewPath(path),

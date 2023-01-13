@@ -223,6 +223,7 @@ func RemoveReplicationSetClusterStatus(cli client.Client, ctx context.Context, s
 	return nil
 }
 
+// needUpdateReplicationSetStatus Check if the target pod node needs to be updated in cluster.status
 func needUpdateReplicationSetStatus(replicationStatus *dbaasv1alpha1.ReplicationSetStatus, podList []*corev1.Pod) bool {
 	needUpdate := false
 	for _, pod := range podList {
@@ -252,6 +253,7 @@ func needUpdateReplicationSetStatus(replicationStatus *dbaasv1alpha1.Replication
 	return needUpdate
 }
 
+// needRemoveReplicationSetStatus Check if the target pod node needs to be removed from cluster.status
 func needRemoveReplicationSetStatus(replicationStatus *dbaasv1alpha1.ReplicationSetStatus, podList []corev1.Pod) (bool, error) {
 	needRemove := false
 	for _, pod := range podList {
@@ -269,6 +271,10 @@ func needRemoveReplicationSetStatus(replicationStatus *dbaasv1alpha1.Replication
 	return needRemove, nil
 }
 
+// CheckStsIsPrimary Check whether it is the primary statefulSet through the label tag on sts
 func CheckStsIsPrimary(sts *appsv1.StatefulSet) bool {
-	return sts.Labels[intctrlutil.RoleLabelKey] == string(Primary)
+	if sts != nil && sts.Labels != nil {
+		return sts.Labels[intctrlutil.RoleLabelKey] == string(Primary)
+	}
+	return false
 }

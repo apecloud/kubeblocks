@@ -144,6 +144,7 @@ spec:
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     primaryIndex:
+                      default: 0
                       description: primaryIndex determines which index is primary
                         when componentType is Replication, index number starts from
                         zero.

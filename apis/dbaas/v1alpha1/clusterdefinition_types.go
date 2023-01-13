@@ -259,7 +259,6 @@ type ClusterDefinitionComponent struct {
 	// Default to Stateless.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus,Replication}
-	// +kubebuilder:default=Stateless
 	ComponentType ComponentType `json:"componentType"`
 
 	// CharacterType defines well-known database component name, such as mongos(mongodb), proxy(redis), wesql(mysql)
@@ -331,12 +330,6 @@ type ClusterDefinitionComponent struct {
 	// consensusSpec defines consensus related spec if componentType is Consensus, required if componentType is Consensus.
 	// +optional
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
-
-	// primaryIndex determines which index is primary when componentType is Replication, index number starts from zero.
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:default=0
-	// +optional
-	PrimaryIndex *int32 `json:"primaryIndex,omitempty"`
 
 	// horizontalScalePolicy controls the behavior of horizontal scale.
 	// +optional

@@ -52,10 +52,6 @@ const (
 )
 
 const (
-	RoleEmpty = ""
-)
-
-const (
 	leaderPriority            = 1 << 5
 	followerReadWritePriority = 1 << 4
 	followerReadonlyPriority  = 1 << 3
@@ -283,7 +279,7 @@ func generateConsensusSerialPlan(plan *util.Plan, pods []corev1.Pod) {
 
 func composeRolePriorityMap(component dbaasv1alpha1.ClusterDefinitionComponent) map[string]int {
 	rolePriorityMap := make(map[string]int, 0)
-	rolePriorityMap[RoleEmpty] = emptyPriority
+	rolePriorityMap[""] = emptyPriority
 	rolePriorityMap[component.ConsensusSpec.Leader.Name] = leaderPriority
 	if component.ConsensusSpec.Learner != nil {
 		rolePriorityMap[component.ConsensusSpec.Learner.Name] = learnerPriority

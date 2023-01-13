@@ -69,7 +69,6 @@ spec:
                         when BuiltIn is true.
                       type: string
                     componentType:
-                      default: Stateless
                       description: componentType defines type of the component. Default
                         to Stateless.
                       enum:
@@ -7744,14 +7743,6 @@ spec:
                       required:
                       - containers
                       type: object
-                    primaryIndex:
-                      default: 0
-                      description: primaryIndex determines which index is primary
-                        when componentType is Replication, index number starts from
-                        zero.
-                      format: int32
-                      minimum: 0
-                      type: integer
                     probes:
                       description: Probes setting for db healthy checks.
                       properties:

@@ -313,7 +313,6 @@ func mergeComponents(
 		AntiAffinity:          clusterDefCompObj.AntiAffinity,
 		ComponentType:         clusterDefCompObj.ComponentType,
 		ConsensusSpec:         clusterDefCompObj.ConsensusSpec,
-		PrimaryIndex:          clusterDefCompObj.PrimaryIndex,
 		PodSpec:               clusterDefCompObj.PodSpec,
 		Service:               clusterDefCompObj.Service,
 		Probes:                clusterDefCompObj.Probes,

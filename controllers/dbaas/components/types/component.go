@@ -43,5 +43,5 @@ const (
 	ProbeTimeoutReason = "ProbeTimeout"
 
 	// ProbeTimeout the probe timeout
-	ProbeTimeout = 3 * time.Minute
+	ProbeTimeout = 1 * time.Minute
 )

@@ -31,7 +31,6 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/leaanthony/debme"
 	"github.com/pkg/errors"
-	"github.com/sethvargo/go-password/password"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/maps"
 	appsv1 "k8s.io/api/apps/v1"
@@ -41,6 +40,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -1101,7 +1101,6 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		if _, ok := obj.(*corev1.Secret); ok {
 			continue
 		}
-
 		// ConfigMap kind objects should only be applied once
 		//
 		// The Config is not allowed to be modified.
@@ -1113,7 +1112,6 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			}
 			continue
 		}
-
 		stsProto, ok := obj.(*appsv1.StatefulSet)
 		if ok {
 			requeue, err := handleSts(stsProto)
@@ -1160,13 +1158,11 @@ func buildSvc(params createParams, headless bool) (*corev1.Service, error) {
 	}, "service", &svc); err != nil {
 		return nil, err
 	}
-
 	return &svc, nil
 }
 
 func randomString(length int) string {
-	res, _ := password.Generate(length, 0, 0, false, false)
-	return res
+	return rand.String(length)
 }
 
 func buildConnCredential(params createParams) (*corev1.Secret, error) {

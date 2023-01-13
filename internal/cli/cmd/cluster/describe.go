@@ -75,7 +75,7 @@ func newOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *describ
 func NewDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newOptions(f, streams)
 	cmd := &cobra.Command{
-		Use:               "describe",
+		Use:               "describe NAME",
 		Short:             "Show details of a specific cluster",
 		Example:           describeExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
@@ -211,7 +211,7 @@ func showEvents(events *corev1.EventList, name string, namespace string, out io.
 }
 
 func showNetwork(svcList *corev1.ServiceList, c *dbaasv1alpha1.ClusterComponent, out io.Writer) {
-	internalEndpoints, externalEndpoints := cluster.GetClusterEndpoints(svcList, c)
+	internalEndpoints, externalEndpoints := cluster.GetComponentEndpoints(svcList, c)
 	if len(internalEndpoints) == 0 && len(externalEndpoints) == 0 {
 		return
 	}

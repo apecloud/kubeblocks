@@ -83,7 +83,7 @@ var (
 func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := list.NewListOptions(f, streams, types.ClusterGVR())
 	cmd := &cobra.Command{
-		Use:               "list",
+		Use:               "list [NAME]",
 		Short:             "List clusters",
 		Example:           listExample,
 		Aliases:           []string{"ls"},

@@ -74,7 +74,7 @@ var _ = Describe("DataProtection", func() {
 			Expect(cmd).ShouldNot(BeNil())
 			// must succeed otherwise exit 1 and make test fails
 			_ = cmd.Flags().Set("backup-type", "snapshot")
-			cmd.Run(nil, []string{testing.ClusterName})
+			cmd.Run(cmd, []string{testing.ClusterName})
 		})
 	})
 

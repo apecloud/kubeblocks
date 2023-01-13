@@ -27,12 +27,6 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
-const (
-	// annotation keys
-
-	RestartAnnotationKey = "kubeblocks.io/restart"
-)
-
 type OpsHandler interface {
 	// Action The action running time should be short. if it fails, it will be reconciled by the OpsRequest controller.
 	// if you do not want to be reconciled when the operation fails,

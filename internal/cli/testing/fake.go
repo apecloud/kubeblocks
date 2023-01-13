@@ -60,7 +60,7 @@ func FakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
 						Leader: dbaasv1alpha1.ConsensusMemberStatus{
 							Name:       "leader",
 							AccessMode: dbaasv1alpha1.ReadWrite,
-							Pod:        "leader-pod",
+							Pod:        fmt.Sprintf("%s-pod-0", name),
 						},
 					},
 				},
@@ -121,6 +121,7 @@ func FakePods(replicas int, namespace string, cluster string) *corev1.PodList {
 			types.InstanceLabelKey:         cluster,
 			types.ConsensusSetRoleLabelKey: role,
 			types.ComponentLabelKey:        ComponentName,
+			types.NameLabelKey:             "state.mysql-apecloud-wesql",
 		}
 		pod.Spec.NodeName = NodeName
 		pod.Spec.Containers = []corev1.Container{
@@ -148,6 +149,8 @@ func FakeSecrets(namespace string, cluster string) *corev1.SecretList {
 	secret.Data = map[string][]byte{
 		corev1.ServiceAccountTokenKey: []byte("fake-secret-token"),
 		"fake-secret-key":             []byte("fake-secret-value"),
+		"username":                    []byte("test-user"),
+		"password":                    []byte("test-password"),
 	}
 	return &corev1.SecretList{Items: []corev1.Secret{secret}}
 }
@@ -175,6 +178,7 @@ func FakeClusterDef() *dbaasv1alpha1.ClusterDefinition {
 			DefaultReplicas: 2,
 		},
 	}
+	clusterDef.Spec.Type = "state.mysql"
 	return clusterDef
 }
 

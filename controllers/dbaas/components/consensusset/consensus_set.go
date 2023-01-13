@@ -40,6 +40,9 @@ type ConsensusSet struct {
 var _ types.Component = &ConsensusSet{}
 
 func (consensusSet *ConsensusSet) IsRunning(obj client.Object) (bool, error) {
+	// TODO The function name (IsRunning) sounds like it should be side-effect free,
+	// TODO however, a lot of changes are done here, including setting cluster status,
+	// TODO it may even delete some pod. Should be revised.
 	if obj == nil {
 		return false, nil
 	}

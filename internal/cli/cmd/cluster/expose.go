@@ -53,8 +53,9 @@ func NewExposeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	o := &ExposeOptions{IOStreams: streams}
 
 	cmd := &cobra.Command{
-		Use:   "expose",
-		Short: "Expose a database cluster",
+		Use:               "expose NAME",
+		Short:             "Expose a database cluster",
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.Validate(args))
 			util.CheckErr(o.Complete(f, args))

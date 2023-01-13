@@ -55,6 +55,9 @@ const (
 	// StorageClassAnnotationKey StorageClass annotation key in Cluster
 	StorageClassAnnotationKey = "kubeblocks.io/storage-class"
 
+	// RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
+	RestartAnnotationKey = "kubeblocks.io/restart"
+
 	// BackupProtectionLabelKey Backup delete protection policy label
 	BackupProtectionLabelKey = "kubeblocks.io/backup-protection"
 )

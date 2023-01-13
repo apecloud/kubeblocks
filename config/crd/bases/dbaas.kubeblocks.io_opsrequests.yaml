@@ -132,6 +132,24 @@ spec:
                   description: VerticalScaling defines the variables that need to
                     input when scaling compute resources.
                   properties:
+                    claims:
+                      description: "Claims lists the names of resources, defined in
+                        spec.resourceClaims, that are used by this container. \n This
+                        is an alpha field and requires enabling the DynamicResourceAllocation
+                        feature gate. \n This field is immutable."
+                      items:
+                        description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                        properties:
+                          name:
+                            description: Name must match the name of one entry in
+                              pod.spec.resourceClaims of the Pod where this field
+                              is used. It makes that resource available inside a container.
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      type: array
+                      x-kubernetes-list-type: set
                     componentName:
                       description: componentName cluster component name.
                       type: string
@@ -293,8 +311,8 @@ spec:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource. --- This struct is intended for direct
                     use as an array at the field path .status.conditions.  For example,
-                    type FooStatus struct{ // Represents the observations of a foo's
-                    current state. // Known .status.conditions.type are: \"Available\",
+                    \n type FooStatus struct{ // Represents the observations of a
+                    foo's current state. // Known .status.conditions.type are: \"Available\",
                     \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge
                     // +listType=map // +listMapKey=type Conditions []metav1.Condition
                     `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\"
@@ -366,6 +384,25 @@ spec:
                   components:
                     additionalProperties:
                       properties:
+                        claims:
+                          description: "Claims lists the names of resources, defined
+                            in spec.resourceClaims, that are used by this container.
+                            \n This is an alpha field and requires enabling the DynamicResourceAllocation
+                            feature gate. \n This field is immutable."
+                          items:
+                            description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                            properties:
+                              name:
+                                description: Name must match the name of one entry
+                                  in pod.spec.resourceClaims of the Pod where this
+                                  field is used. It makes that resource available
+                                  inside a container.
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          type: array
+                          x-kubernetes-list-type: set
                         limits:
                           additionalProperties:
                             anyOf:

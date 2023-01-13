@@ -135,9 +135,9 @@ func isRestarted(opsRes *OpsResource, object client.Object, componentNameMap map
 	}
 	hasRestarted := true
 	startTimestamp := opsRes.OpsRequest.Status.StartTimestamp
-	stsRestartTimeStamp := podTemplate.Annotations[RestartAnnotationKey]
+	stsRestartTimeStamp := podTemplate.Annotations[intctrlutil.RestartAnnotationKey]
 	if res, _ := time.Parse(time.RFC3339, stsRestartTimeStamp); startTimestamp.After(res) {
-		podTemplate.Annotations[RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
+		podTemplate.Annotations[intctrlutil.RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
 		hasRestarted = false
 	}
 	return hasRestarted

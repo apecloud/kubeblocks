@@ -56,6 +56,9 @@ const (
 
 	// RoleLabelKey consensusSet and replicationSet role label key
 	RoleLabelKey = "kubeblocks.io/role"
+
+	// RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
+	RestartAnnotationKey = "kubeblocks.io/restart"
 )
 
 const (

@@ -92,14 +92,17 @@ type BackupStatus struct {
 	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
 
 	// The duration time of backup execution.
+	// When converted to a string, the form is "1h2m0.5s".
 	// +optional
 	Duration *metav1.Duration `json:"duration,omitempty"`
 
 	// backup total size
+	// string with capacity units in the form of "1Gi", "1Mi", "1Ki".
 	// +optional
 	TotalSize string `json:"totalSize,omitempty"`
 
 	// backup total size
+	// string with capacity units in the form of "1Gi", "1Mi", "1Ki".
 	// +optional
 	UploadTotalSize string `json:"uploadTotalSize,omitempty"`
 

@@ -89,7 +89,8 @@ spec:
                 format: date-time
                 type: string
               duration:
-                description: The duration time of backup execution.
+                description: The duration time of backup execution. When converted
+                  to a string, the form is "1h2m0.5s".
                 type: string
               expiration:
                 description: The date and time when the Backup is eligible for garbage
@@ -112,10 +113,12 @@ spec:
                 format: date-time
                 type: string
               totalSize:
-                description: backup total size
+                description: backup total size string with capacity units in the form
+                  of "1Gi", "1Mi", "1Ki".
                 type: string
               uploadTotalSize:
-                description: backup total size
+                description: backup total size string with capacity units in the form
+                  of "1Gi", "1Mi", "1Ki".
                 type: string
             type: object
         type: object

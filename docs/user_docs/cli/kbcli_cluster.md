@@ -36,7 +36,7 @@ Cluster operation command
 * [kbcli](kbcli.md)	 - KubeBlocks CLI
 * [kbcli cluster backup](kbcli_cluster_backup.md)	 - Create a backup
 * [kbcli cluster connect](kbcli_cluster_connect.md)	 - Connect to a database cluster or instance
-* [kbcli cluster create](kbcli_cluster_create.md)	 - Create a database cluster
+* [kbcli cluster create](kbcli_cluster_create.md)	 - Create a cluster
 * [kbcli cluster delete](kbcli_cluster_delete.md)	 - Delete clusters
 * [kbcli cluster delete-backup](kbcli_cluster_delete-backup.md)	 - Delete a backup job
 * [kbcli cluster delete-ops](kbcli_cluster_delete-ops.md)	 - Delete a OpsRequest

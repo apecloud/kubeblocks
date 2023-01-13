@@ -17,6 +17,8 @@ limitations under the License.
 package kubeblocks
 
 import (
+	"bytes"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -98,9 +100,7 @@ var _ = Describe("kubeblocks", func() {
 		Expect(len(o.Sets)).To(Equal(1))
 		Expect(o.Sets[0]).To(Equal(kMonitorParam))
 
-		notes, err := o.installChart()
-		Expect(err).Should(HaveOccurred())
-		Expect(notes).Should(Equal(""))
+		Expect(o.installChart()).Should(HaveOccurred())
 
 		o.printNotes()
 	})
@@ -212,7 +212,10 @@ var _ = Describe("kubeblocks", func() {
 	It("checkIfKubeBlocksInstalled", func() {
 		By("KubeBlocks is not installed")
 		client := testing.FakeClientSet()
-		Expect(checkIfKubeBlocksInstalled(client)).Should(Succeed())
+		installed, version, err := checkIfKubeBlocksInstalled(client)
+		Expect(err).Should(Succeed())
+		Expect(installed).Should(Equal(false))
+		Expect(version).Should(BeEmpty())
 
 		mockDeploy := func(version string) *appv1.Deployment {
 			deploy := &appv1.Deployment{}
@@ -228,10 +231,48 @@ var _ = Describe("kubeblocks", func() {
 
 		By("KubeBlocks is installed")
 		client = testing.FakeClientSet(mockDeploy(""))
-		Expect(checkIfKubeBlocksInstalled(client).Error()).Should(ContainSubstring("has been installed"))
+		installed, version, err = checkIfKubeBlocksInstalled(client)
+		Expect(err).Should(Succeed())
+		Expect(installed).Should(Equal(true))
+		Expect(version).Should(BeEmpty())
 
 		By("KubeBlocks 0.1.0 is installed")
 		client = testing.FakeClientSet(mockDeploy("0.1.0"))
-		Expect(checkIfKubeBlocksInstalled(client).Error()).Should(ContainSubstring("0.1.0 has been installed"))
+		installed, version, err = checkIfKubeBlocksInstalled(client)
+		Expect(err).Should(Succeed())
+		Expect(installed).Should(Equal(true))
+		Expect(version).Should(Equal("0.1.0"))
+	})
+
+	It("confirmUninstall", func() {
+		in := &bytes.Buffer{}
+		_, _ = in.Write([]byte("\n"))
+		Expect(confirmUninstall(in)).Should(HaveOccurred())
+
+		in.Reset()
+		_, _ = in.Write([]byte("uninstall-kubeblocks\n"))
+		Expect(confirmUninstall(in)).Should(Succeed())
+	})
+
+	It("deleteDeploys", func() {
+		const namespace = "test"
+		client := testing.FakeClientSet()
+		Expect(deleteDeploys(client, "")).Should(Succeed())
+
+		mockDeploy := func(label map[string]string) *appv1.Deployment {
+			deploy := &appv1.Deployment{}
+			deploy.SetLabels(label)
+			deploy.SetNamespace(namespace)
+			return deploy
+		}
+		client = testing.FakeClientSet(mockDeploy(map[string]string{
+			"types.InstanceLabelKey": types.KubeBlocksChartName,
+		}))
+		Expect(deleteDeploys(client, namespace)).Should(Succeed())
+
+		client = testing.FakeClientSet(mockDeploy(map[string]string{
+			"release": types.KubeBlocksChartName,
+		}))
+		Expect(deleteDeploys(client, namespace)).Should(Succeed())
 	})
 })

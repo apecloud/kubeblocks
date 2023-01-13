@@ -17,7 +17,6 @@ limitations under the License.
 package backupconfig
 
 import (
-	"fmt"
 	"strings"
 
 	"k8s.io/kubectl/pkg/util/templates"
@@ -56,13 +55,13 @@ type upgradeOptions struct {
 // adjust for test
 var helmAddRepo = helm.AddRepo
 
-func (i *configOptions) upgrade() (string, error) {
+func (i *configOptions) upgrade() error {
 	entry := &repo.Entry{
 		Name: types.KubeBlocksChartName,
 		URL:  types.KubeBlocksChartURL,
 	}
 	if err := helmAddRepo(entry); err != nil {
-		return "", err
+		return err
 	}
 
 	var sets []string
@@ -81,12 +80,7 @@ func (i *configOptions) upgrade() (string, error) {
 		Sets:      sets,
 	}
 
-	notes, err := chart.Upgrade(i.HelmCfg)
-	if err != nil {
-		return "", err
-	}
-
-	return notes, nil
+	return chart.Upgrade(i.HelmCfg)
 }
 
 func (o *upgradeOptions) complete(f cmdutil.Factory, cmd *cobra.Command) error {
@@ -112,8 +106,6 @@ func (o *upgradeOptions) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 }
 
 func (o *upgradeOptions) run() error {
-	fmt.Fprintf(o.Out, "Config backup...\n")
-
 	config := configOptions{
 		HelmCfg:   o.cfg,
 		Namespace: o.Namespace,
@@ -121,11 +113,14 @@ func (o *upgradeOptions) run() error {
 		Sets:      o.Sets,
 	}
 
-	if _, err := config.upgrade(); err != nil {
-		return errors.Wrap(err, "Failed to update backup config")
+	spinner := util.Spinner(o.Out, "Config backup")
+	defer spinner(false)
+
+	if err := config.upgrade(); err != nil {
+		return errors.Wrap(err, "failed to update backup config")
 	}
 
-	fmt.Fprintf(o.Out, "Backup config SUCCESSFULLY!\n")
+	spinner(true)
 	return nil
 }
 

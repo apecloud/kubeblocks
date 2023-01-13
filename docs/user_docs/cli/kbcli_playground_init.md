@@ -13,7 +13,9 @@ kbcli playground init [flags]
       --access-secret string        Cloud provider access secret
       --cloud-provider string       Cloud provider type (default "local")
       --cluster-definition string   Cluster definition (default "apecloud-wesql")
+      --cluster-version string      Cluster definition
   -h, --help                        help for init
+      --kubeblocks-version string   KubeBlocks version
       --region string               Cloud provider region
       --verbose                     Output more log info
 ```

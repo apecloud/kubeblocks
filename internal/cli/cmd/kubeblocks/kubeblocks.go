@@ -19,12 +19,14 @@ package kubeblocks
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/repo"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,6 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 	"github.com/apecloud/kubeblocks/version"
 )
 
@@ -51,8 +54,8 @@ type Options struct {
 
 	HelmCfg   *action.Configuration
 	Namespace string
+	Client    *kubernetes.Clientset
 	dynamic   dynamic.Interface
-	client    *kubernetes.Clientset
 }
 
 type InstallOptions struct {
@@ -73,8 +76,7 @@ var (
 	kbcli kubeblocks install --version=0.2.0
 
 	# Install KubeBlocks with other settings, for example, set replicaCount to 3
-	kbcli kubeblocks install --set replicaCount=3
-`)
+	kbcli kubeblocks install --set replicaCount=3`)
 
 	uninstallExample = templates.Examples(`
 		# uninstall KubeBlocks
@@ -96,7 +98,6 @@ func NewKubeBlocksCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 
 func (o *Options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
-
 	if o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace(); err != nil {
 		return err
 	}
@@ -119,11 +120,16 @@ func (o *Options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	o.client, err = f.KubernetesClientSet()
+	o.Client, err = f.KubernetesClientSet()
 	return err
 }
 
 func (o *Options) preCheck() error {
+	// wait user to confirm
+	if err := confirmUninstall(o.In); err != nil {
+		return err
+	}
+
 	preCheckList := []string{
 		"clusters.dbaas.kubeblocks.io",
 	}
@@ -157,46 +163,55 @@ func (o *Options) preCheck() error {
 				return err
 			}
 			if len(objList.Items) > 0 {
-				return errors.Errorf("Can not uninstall, you should delete custom resource %s %s first", crd.GetName(), objList.Items[0].GetName())
+				return errors.Errorf("failed to uninstall, you should delete custom resource %s %s first", crd.GetName(), objList.Items[0].GetName())
 			}
 		}
 	}
 	return nil
 }
 
-func (o *InstallOptions) check() error {
+func (o *InstallOptions) Run() error {
 	// check if KubeBlocks has been installed
-	if err := checkIfKubeBlocksInstalled(o.Options.client); err != nil {
+	installed, version, err := checkIfKubeBlocksInstalled(o.Client)
+	if err != nil {
 		return err
+	}
+
+	if installed {
+		fmt.Fprintf(o.Out, "KubeBlocks %s already exists\n", version)
+		// print notes
+		if !o.Quiet {
+			o.printNotes()
+		}
+		return nil
 	}
 
 	// check if namespace exists
-	if o.CreateNamespace {
-		return nil
+	if !o.CreateNamespace {
+		if _, err = o.Client.CoreV1().Namespaces().Get(context.TODO(), o.Namespace, metav1.GetOptions{}); err != nil {
+			return err
+		}
 	}
-	if _, err := o.client.CoreV1().Namespaces().Get(context.TODO(), o.Namespace, metav1.GetOptions{}); err != nil {
-		return err
-	}
-	return nil
-}
 
-func (o *InstallOptions) Run() error {
-	fmt.Fprintf(o.Out, "Install KubeBlocks %s\n", o.Version)
+	spinner := util.Spinner(o.Out, "Install KubeBlocks %s", o.Version)
+	defer spinner(false)
 
 	if o.Monitor {
 		o.Sets = append(o.Sets, kMonitorParam)
 	}
 
 	// Add repo, if exists, will update it
-	if err := helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}); err != nil {
+	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}); err != nil {
 		return err
 	}
 
 	// install KubeBlocks chart
-	_, err := o.installChart()
-	if err != nil {
+	if err = o.installChart(); err != nil {
 		return err
 	}
+
+	// successfully installed
+	spinner(true)
 
 	// print notes
 	if !o.Quiet {
@@ -206,7 +221,7 @@ func (o *InstallOptions) Run() error {
 	return nil
 }
 
-func (o *InstallOptions) installChart() (string, error) {
+func (o *InstallOptions) installChart() error {
 	var sets []string
 	for _, set := range o.Sets {
 		splitSet := strings.Split(set, ",")
@@ -223,11 +238,7 @@ func (o *InstallOptions) installChart() (string, error) {
 		TryTimes:        2,
 		CreateNamespace: o.CreateNamespace,
 	}
-	notes, err := chart.Install(o.HelmCfg)
-	if err != nil {
-		return "", err
-	}
-	return notes, nil
+	return chart.Install(o.HelmCfg)
 }
 
 func (o *InstallOptions) printNotes() {
@@ -257,31 +268,36 @@ Notes: Monitor components(Grafana/Prometheus/AlertManager) is not installed,
 }
 
 func (o *Options) run() error {
-	fmt.Fprintln(o.Out, "Uninstall KubeBlocks")
+	printErr := func(err error) {
+		if err == nil || apierrors.IsNotFound(err) {
+			return
+		}
+		fmt.Fprintln(o.Out, err.Error())
+	}
+
+	installed, version, _ := checkIfKubeBlocksInstalled(o.Client)
+	if installed {
+		fmt.Fprintf(o.Out, "Uninstall KubeBlocks %s\n", version)
+	}
 
 	// uninstall chart
 	chart := helm.InstallOpts{
 		Name:      types.KubeBlocksChartName,
 		Namespace: o.Namespace,
 	}
-	if err := chart.UnInstall(o.HelmCfg); err != nil {
-		return err
-	}
+	printErr(chart.UnInstall(o.HelmCfg))
 
 	// remove repo
-	if err := helm.RemoveRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}); err != nil {
-		return err
-	}
+	printErr(helm.RemoveRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}))
 
 	// remove finalizers
-	if err := removeFinalizers(o.dynamic); err != nil {
-		return err
-	}
+	printErr(removeFinalizers(o.dynamic))
 
-	if err := deleteCRDs(o.dynamic); err != nil {
-		return err
-	}
+	// delete CRDs
+	printErr(deleteCRDs(o.dynamic))
 
+	// delete remained deployments
+	printErr(deleteDeploys(o.Client, o.Namespace))
 	fmt.Fprintln(o.Out, "Successfully uninstall KubeBlocks")
 	return nil
 }
@@ -328,12 +344,38 @@ func deleteCRDs(cli dynamic.Interface) error {
 	}
 	for _, crd := range crdList.Items {
 		if strings.Contains(crd.GetName(), "kubeblocks.io") {
-			if err := cli.Resource(crdGVR).Delete(ctx, crd.GetName(), metav1.DeleteOptions{}); err != nil {
+			if err = cli.Resource(crdGVR).Delete(ctx, crd.GetName(), metav1.DeleteOptions{}); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+func deleteDeploys(client kubernetes.Interface, namespace string) error {
+	deleteFn := func(labelSelector string) error {
+		deploys, err := client.AppsV1().Deployments(namespace).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: labelSelector,
+		})
+		if err != nil {
+			return err
+		}
+
+		for _, pod := range deploys.Items {
+			if err = client.AppsV1().Deployments(namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	// delete all deployments which label matches app.kubernetes.io/instance=kubeblocks
+	if err := deleteFn(fmt.Sprintf("%s=%s", types.InstanceLabelKey, types.KubeBlocksChartName)); err != nil {
+		return err
+	}
+
+	// delete all deployments which label matches release=kubeblocks, like prometheus-server
+	return deleteFn(fmt.Sprintf("release=%s", types.KubeBlocksChartName))
 }
 
 func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -350,7 +392,6 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Example: installExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f, cmd))
-			util.CheckErr(o.check())
 			util.CheckErr(o.Run())
 		},
 	}
@@ -382,15 +423,15 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 }
 
 // check if KubeBlocks has been installed
-func checkIfKubeBlocksInstalled(client kubernetes.Interface) error {
+func checkIfKubeBlocksInstalled(client kubernetes.Interface) (bool, string, error) {
 	kbDeploys, err := client.AppsV1().Deployments(metav1.NamespaceAll).List(context.TODO(),
 		metav1.ListOptions{LabelSelector: "app.kubernetes.io/name=" + types.KubeBlocksChartName})
 	if err != nil {
-		return err
+		return false, "", err
 	}
 
 	if len(kbDeploys.Items) == 0 {
-		return nil
+		return false, "", nil
 	}
 
 	var versions []string
@@ -403,5 +444,18 @@ func checkIfKubeBlocksInstalled(client kubernetes.Interface) error {
 			versions = append(versions, v)
 		}
 	}
-	return fmt.Errorf("KubeBlocks %s has been installed", strings.Join(versions, " "))
+	return true, strings.Join(versions, " "), nil
+}
+
+func confirmUninstall(in io.Reader) error {
+	const confirmStr = "uninstall-kubeblocks"
+	entered, err := prompt.NewPrompt(fmt.Sprintf("You should type \"%s\"", confirmStr),
+		fmt.Sprintf("Please type \"%s\" to confirm:", confirmStr), in).GetInput()
+	if err != nil {
+		return err
+	}
+	if entered != confirmStr {
+		return fmt.Errorf("typed string \"%s\" does not match \"%s\"", entered, confirmStr)
+	}
+	return nil
 }

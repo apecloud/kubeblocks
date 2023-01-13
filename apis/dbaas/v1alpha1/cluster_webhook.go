@@ -95,11 +95,6 @@ func (r *Cluster) validatePrimaryIndex(allErrs *field.ErrorList) {
 			*allErrs = append(*allErrs, field.Invalid(field.NewPath(path),
 				nil, "PrimaryIndex cannot be larger than Replicas."))
 		}
-		if *component.PrimaryIndex < 0 {
-			path := fmt.Sprintf("spec.components[%d].PrimaryIndex", index)
-			*allErrs = append(*allErrs, field.Invalid(field.NewPath(path),
-				nil, "The minimum value of primaryIndex cannot be less than zero."))
-		}
 	}
 }
 

@@ -174,6 +174,7 @@ type ClusterComponent struct {
 	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
 
 	// primaryIndex determines which index is primary when componentType is Replication, index number starts from zero.
+	// +kubebuilder:validation:Minimum=0
 	// +optional
 	PrimaryIndex *int32 `json:"primaryIndex,omitempty"`
 }

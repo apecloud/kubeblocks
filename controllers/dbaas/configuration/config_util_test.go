@@ -119,7 +119,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 				Return(nil)
 
 			mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 					tests, ok := testDatas[key]
 					if !ok {
 						return cfgcore.MakeError("not exist")
@@ -218,7 +218,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 			accessCounter := map[client.ObjectKey]int{}
 
 			mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 					tests, ok := testDatas[key]
 					if !ok {
 						return cfgcore.MakeError("not exist")
@@ -305,7 +305,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 				Return(nil)
 
 			mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 					tests, ok := testDatas[key]
 					if !ok {
 						return cfgcore.MakeError("not exist")
@@ -417,7 +417,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 			}}
 
 			mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 					if strings.Contains(key.Name, "not_exist") {
 						return cfgcore.MakeError("not exist config!")
 					}

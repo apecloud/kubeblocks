@@ -246,7 +246,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 
 			mockClient.EXPECT().
 				Get(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 					tests, ok := mockK8sObjs[key]
 					if !ok {
 						return cfgcore.MakeError("not exist")

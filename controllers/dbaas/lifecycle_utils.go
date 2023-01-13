@@ -21,6 +21,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sethvargo/go-password/password"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/maps"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -43,6 +45,7 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
 	cfgutil "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
@@ -886,8 +889,10 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		tempAnnotations := stsObj.Spec.Template.Annotations
 		stsObj.Spec.Template = stsProto.Spec.Template
 		// keep the original template annotations.
-		// if annotations exist and are replaced, the statefulSet will be updated
-		stsObj.Spec.Template.Annotations = tempAnnotations
+		// if annotations exist and are replaced, the statefulSet will be updated.
+		if restartAnnotation, ok := tempAnnotations[intctrlutil.RestartAnnotationKey]; ok {
+			stsObj.Spec.Template.Annotations[intctrlutil.RestartAnnotationKey] = restartAnnotation
+		}
 		stsObj.Spec.Replicas = stsProto.Spec.Replicas
 		stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
 		if err := cli.Update(ctx, stsObj); err != nil {
@@ -1493,12 +1498,18 @@ func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
 	// TODO following code seems to be redundant with updateConsensusRoleInfo in consensus_set_utils.go
 	// build consensus env from cluster.status
 	if params.cluster.Status.Components != nil {
-		if v, ok := params.cluster.Status.Components[params.component.Type]; ok {
+		if v, ok := params.cluster.Status.Components[params.component.Name]; ok {
 			consensusSetStatus := v.ConsensusSetStatus
 			if consensusSetStatus != nil {
-				envData[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
+				if consensusSetStatus.Leader.Pod != consensusset.ConsensusSetStatusDefaultPodName {
+					envData[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
+				}
+
 				followers := ""
 				for _, follower := range consensusSetStatus.Followers {
+					if follower.Pod == consensusset.ConsensusSetStatusDefaultPodName {
+						continue
+					}
 					if len(followers) > 0 {
 						followers += ","
 					}
@@ -1526,9 +1537,12 @@ func checkAndUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]dbaasv
 		err        error
 		podVolumes = podSpec.Volumes
 	)
-
+	// sort the volumes
+	volumeKeys := maps.Keys(volumes)
+	sort.Strings(volumeKeys)
 	// Update PodTemplate Volumes
-	for cmName, tpl := range volumes {
+	for _, cmName := range volumeKeys {
+		tpl := volumes[cmName]
 		if podVolumes, err = intctrlutil.CheckAndUpdateVolume(podVolumes, tpl.VolumeName, func(volumeName string) corev1.Volume {
 			return corev1.Volume{
 				Name: volumeName,

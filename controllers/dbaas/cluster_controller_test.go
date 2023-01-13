@@ -640,7 +640,7 @@ spec:
 			_, _, _, key := createClusterNCheck()
 
 			By("Update the cluster's termination policy to DoNotTerminate")
-			Expect(changeCluster(key, func(cluster *dbaasv1alpha1.Cluster) {
+			Expect(changeSpec(key, func(cluster *dbaasv1alpha1.Cluster) {
 				cluster.Spec.TerminationPolicy = dbaasv1alpha1.DoNotTerminate
 			})).Should(Succeed())
 
@@ -653,14 +653,15 @@ spec:
 			checkClusterDoNotTerminate := func(g Gomega) {
 				fetched := &dbaasv1alpha1.Cluster{}
 				g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
-				g.Expect(fetched.Status.Phase == dbaasv1alpha1.DeletingPhase).To(BeTrue())
+				g.Expect(strings.Contains(fetched.Status.Message,
+					fmt.Sprintf("spec.terminationPolicy %s is preventing deletion.", fetched.Spec.TerminationPolicy)))
 				g.Expect(len(fetched.Finalizers) > 0).To(BeTrue())
 			}
 			Eventually(checkClusterDoNotTerminate, timeout, interval).Should(Succeed())
 			Consistently(checkClusterDoNotTerminate, waitDuration, interval).Should(Succeed())
 
 			By("Update the cluster's termination policy to WipeOut")
-			Expect(changeCluster(key, func(cluster *dbaasv1alpha1.Cluster) {
+			Expect(changeSpec(key, func(cluster *dbaasv1alpha1.Cluster) {
 				cluster.Spec.TerminationPolicy = dbaasv1alpha1.WipeOut
 			})).Should(Succeed())
 
@@ -673,7 +674,7 @@ spec:
 	})
 
 	changeClusterReplicas := func(clusterName types.NamespacedName, replicas int32) error {
-		return changeCluster(clusterName, func(cluster *dbaasv1alpha1.Cluster) {
+		return changeSpec(clusterName, func(cluster *dbaasv1alpha1.Cluster) {
 			if cluster.Spec.Components == nil || len(cluster.Spec.Components) == 0 {
 				cluster.Spec.Components = []dbaasv1alpha1.ClusterComponent{
 					{
@@ -782,7 +783,7 @@ spec:
 			})
 
 			By("Set HorizontalScalePolicy")
-			Expect(changeClusterDef(intctrlutil.GetNamespacedName(clusterDef),
+			Expect(changeSpec(intctrlutil.GetNamespacedName(clusterDef),
 				func(clusterDef *dbaasv1alpha1.ClusterDefinition) {
 					clusterDef.Spec.Components[0].HorizontalScalePolicy =
 						&dbaasv1alpha1.HorizontalScalePolicy{Type: dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot}
@@ -1500,7 +1501,7 @@ spec:
 
 			By("Updating the PVC storage size")
 			newStorageValue := resource.MustParse("2Gi")
-			Expect(changeCluster(key, func(cluster *dbaasv1alpha1.Cluster) {
+			Expect(changeSpec(key, func(cluster *dbaasv1alpha1.Cluster) {
 				comp := &cluster.Spec.Components[0]
 				comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
 			})).Should(Succeed())
@@ -2157,8 +2158,13 @@ involvedObject:
 		})
 	})
 
-	Context("When creating cluster with components", func() {
+	// TODO move integration tests(which relies on a real K8s cluster) out of UT
+	Context("When creating cluster with components in real K8s", func() {
 		It("Should create cluster with running status", func() {
+			if !testCtx.UsingExistingCluster() {
+				return
+			}
+
 			By("Checking the controller-manager status")
 			if !isCMAvailable() {
 				By("The controller-manager is not available, test skipped")

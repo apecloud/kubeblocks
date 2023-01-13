@@ -196,7 +196,7 @@ spec:
 					cd.Status.ObservedGeneration == 1).To(BeTrue())
 			}, timeout, interval).Should(Succeed())
 
-			By("creating an appVersion")
+			By("creating an clusterVersion")
 			clusterVersion := &dbaasv1alpha1.ClusterVersion{}
 			Expect(yaml.Unmarshal([]byte(clusterVersionYaml), clusterVersion)).Should(Succeed())
 			Expect(testCtx.CreateObj(ctx, clusterVersion)).Should(Succeed())
@@ -208,12 +208,12 @@ spec:
 					cv.Status.ObservedGeneration == 1).To(BeTrue())
 			}, timeout, interval).Should(Succeed())
 
-			By("updating clusterDefinition's spec which then mark appVersion's status as OutOfSync")
-			Expect(changeClusterDef(intctrlutil.GetNamespacedName(clusterDefinition),
+			By("updating clusterDefinition's spec which then mark clusterVersion's status as OutOfSync")
+			Expect(changeSpec(intctrlutil.GetNamespacedName(clusterDefinition),
 				func(cd *dbaasv1alpha1.ClusterDefinition) {
 					cd.Spec.Type = "state.mysql-7"
 				})).Should(Succeed())
-			// check appVersion.Status.ClusterDefSyncStatus to be OutOfSync
+			// check ClusterVersion.Status.ClusterDefSyncStatus to be OutOfSync
 			Eventually(func(g Gomega) {
 				cv := &dbaasv1alpha1.ClusterVersion{}
 				g.Expect(k8sClient.Get(ctx, intctrlutil.GetNamespacedName(clusterVersion), cv)).To(Succeed())

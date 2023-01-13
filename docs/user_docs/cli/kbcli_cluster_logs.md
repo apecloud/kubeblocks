@@ -3,7 +3,7 @@
 Access cluster log file
 
 ```
-kbcli cluster logs [flags]
+kbcli cluster logs NAME [flags]
 ```
 
 ### Examples
@@ -18,7 +18,8 @@ kbcli cluster logs [flags]
   # Return snapshot logs from cluster my-cluster with specify instance my-instance-0 (stdout)
   kbcli cluster logs my-cluster --instance my-instance-0
   
-  # Return snapshot logs from cluster my-cluster with specify instance my-instance-0 and specify container my-container (stdout)
+  # Return snapshot logs from cluster my-cluster with specify instance my-instance-0 and specify container
+  # my-container (stdout)
   kbcli cluster logs my-cluster --instance my-instance-0 -c my-container
   
   # Return slow logs from cluster my-cluster with default primary instance
@@ -30,7 +31,8 @@ kbcli cluster logs [flags]
   # Return the specify file logs from cluster my-cluster with specify instance my-instance-0
   kbcli cluster logs my-cluster --instance my-instance-0 --file-path=/var/log/yum.log
   
-  # Return the specify file logs from cluster my-cluster with specify instance my-instance-0 and specify container my-container
+  # Return the specify file logs from cluster my-cluster with specify instance my-instance-0 and specify
+  # container my-container
   kbcli cluster logs my-cluster --instance my-instance-0 -c my-container --file-path=/var/log/yum.log
 ```
 
@@ -39,7 +41,7 @@ kbcli cluster logs [flags]
 ```
   -c, --container string    Container name.
       --file-path string    Log-file path. Specify target file path and have a premium priority. No set file-path and file-type will output stdout/stderr of target container.
-      --file-type string    Log-file type. Can see the output info of logs-list cmd. No set file-path and file-type will output stdout/stderr of target container.
+      --file-type string    Log-file type. Can see the output info of list-logs cmd. No set file-path and file-type will output stdout/stderr of target container.
   -f, --follow              Specify if the logs should be streamed.
   -h, --help                help for logs
       --ignore-errors       If watching / following pod logs, allow for any errors that occur to be non-fatal. Only take effect for stdout&stderr.
@@ -78,5 +80,5 @@ kbcli cluster logs [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Database cluster operation command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster operation command
 

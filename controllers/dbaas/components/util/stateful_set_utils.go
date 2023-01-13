@@ -45,11 +45,15 @@ func GetPodRevision(pod *corev1.Pod) string {
 	return pod.Labels[appsv1.StatefulSetRevisionLabel]
 }
 
-// StatefulSetIsReady check statefulSet is ready.
+// StatefulSetIsReady checks if statefulSet is ready.
 func StatefulSetIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals bool) bool {
-	var componentIsRunning = true
+	var (
+		componentIsRunning = true
+		targetReplicas     = *sts.Spec.Replicas
+	)
 	// judge whether statefulSet is ready
-	if sts.Status.AvailableReplicas != *sts.Spec.Replicas ||
+	if sts.Status.AvailableReplicas != targetReplicas ||
+		sts.Status.Replicas != targetReplicas ||
 		sts.Status.ObservedGeneration != sts.GetGeneration() ||
 		!statefulStatusRevisionIsEquals {
 		componentIsRunning = false
@@ -57,9 +61,11 @@ func StatefulSetIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals 
 	return componentIsRunning
 }
 
-// StatefulSetPodsIsReady check pods of statefulSet is ready.
+// StatefulSetPodsIsReady checks if pods of statefulSet are ready.
 func StatefulSetPodsIsReady(sts *appsv1.StatefulSet) bool {
-	return sts.Status.AvailableReplicas == *sts.Spec.Replicas &&
+	targetReplicas := *sts.Spec.Replicas
+	return sts.Status.AvailableReplicas == targetReplicas &&
+		sts.Status.Replicas == targetReplicas &&
 		sts.Status.ObservedGeneration == sts.GetGeneration()
 }
 

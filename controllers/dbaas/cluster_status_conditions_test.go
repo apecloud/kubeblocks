@@ -42,6 +42,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		clusterVersionName = "mysql-cluster-version-" + randomStr
 		timeout            = time.Second * 10
 		interval           = time.Second
+		consensusCompName  = "consensus"
 	)
 	cleanupObjects := func() {
 		// Add any setup steps that needs to be executed before each test
@@ -72,7 +73,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 	Context("test cluster conditions", func() {
 		It("test cluster conditions", func() {
 			By("init cluster")
-			_ = testdbaas.CreateConsensusMysqlCluster(testCtx, clusterDefName, clusterVersionName, clusterName)
+			_ = testdbaas.CreateConsensusMysqlCluster(ctx, testCtx, clusterDefName,
+				clusterVersionName, clusterName, consensusCompName)
 			By("test when clusterDefinition not found")
 			cluster := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
@@ -94,8 +96,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			}, timeout*2, interval).Should(BeTrue())
 
 			By("test when clusterVersion not Available")
-			_ = testdbaas.CreateConsensusMysqlClusterDef(testCtx, clusterDefName)
-			_ = testdbaas.CreateConsensusMysqlClusterVersion(testCtx, clusterDefName, clusterVersionName)
+			_ = testdbaas.CreateConsensusMysqlClusterDef(ctx, testCtx, clusterDefName)
+			_ = testdbaas.CreateConsensusMysqlClusterVersion(ctx, testCtx, clusterDefName, clusterVersionName)
 			// mock clusterVersion unavailable
 			Eventually(func() bool {
 				clusterVersion := &dbaasv1alpha1.ClusterVersion{}
@@ -130,7 +132,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			Eventually(func() bool {
 				clusterVersion := &dbaasv1alpha1.ClusterVersion{}
 				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterVersionName}, clusterVersion)).Should(Succeed())
-				clusterVersion.Spec.Components[0].Type = testdbaas.ConsensusComponentType
+				clusterVersion.Spec.Components[0].Type = "consensus"
 				err := k8sClient.Update(ctx, clusterVersion)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())

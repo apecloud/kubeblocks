@@ -52,7 +52,7 @@ const (
 )
 
 const (
-	consensusSetStatusDefaultPodName = "Unknown"
+	ConsensusSetStatusDefaultPodName = "Unknown"
 	RoleEmpty                        = ""
 )
 
@@ -66,7 +66,7 @@ const (
 	// unknownPriority           = 0
 )
 
-// GetPodListByStatefulSet get statefulSet pod list
+// GetPodListByStatefulSet gets statefulSet pod list
 func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet) ([]corev1.Pod, error) {
 	// get podList owned by stsObj
 	podList := &corev1.PodList{}
@@ -84,7 +84,7 @@ func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *app
 	return pods, nil
 }
 
-// handleConsensusSetUpdate handle ConsensusSet component when it to do updating
+// handleConsensusSetUpdate handles ConsensusSet component when it to do updating
 // return true means stateful set reconcile done
 func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, stsObj *appsv1.StatefulSet) (bool, error) {
 	// get typeName from stsObj.name
@@ -118,7 +118,7 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 	newConsensusSetStatus := &dbaasv1alpha1.ConsensusSetStatus{
 		Leader: dbaasv1alpha1.ConsensusMemberStatus{
 			Name:       "",
-			Pod:        consensusSetStatusDefaultPodName,
+			Pod:        ConsensusSetStatusDefaultPodName,
 			AccessMode: dbaasv1alpha1.None,
 		},
 	}
@@ -420,7 +420,7 @@ func initClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster, componentN
 	if componentStatus.ConsensusSetStatus == nil {
 		componentStatus.ConsensusSetStatus = &dbaasv1alpha1.ConsensusSetStatus{
 			Leader: dbaasv1alpha1.ConsensusMemberStatus{
-				Pod:        consensusSetStatusDefaultPodName,
+				Pod:        ConsensusSetStatusDefaultPodName,
 				AccessMode: dbaasv1alpha1.None,
 				Name:       "",
 			},
@@ -483,7 +483,7 @@ func setConsensusSetStatusLearner(consensusSetStatus *dbaasv1alpha1.ConsensusSet
 func resetConsensusSetStatusRole(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus, podName string) {
 	// reset leader
 	if consensusSetStatus.Leader.Pod == podName {
-		consensusSetStatus.Leader.Pod = consensusSetStatusDefaultPodName
+		consensusSetStatus.Leader.Pod = ConsensusSetStatusDefaultPodName
 		consensusSetStatus.Leader.AccessMode = dbaasv1alpha1.None
 		consensusSetStatus.Leader.Name = ""
 	}

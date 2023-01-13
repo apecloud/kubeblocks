@@ -32,7 +32,7 @@ RUN go mod download
 
 # Copy the go source
 COPY cmd/manager/main.go cmd/manager/main.go
-COPY cmd/agamotto/main.go cmd/agamotto/main.go
+COPY cmd/agamotto/ cmd/agamotto/
 COPY cmd/reloader cmd/reloader
 COPY apis/ apis/
 COPY internal/ internal/

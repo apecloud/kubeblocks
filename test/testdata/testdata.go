@@ -29,17 +29,6 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
-var testDataRoot string
-
-func init() {
-	_, file, _, _ := runtime.Caller(0)
-	testDataRoot = filepath.Dir(file)
-}
-
-func SubTestDataPath(subPath string) string {
-	return filepath.Join(testDataRoot, subPath)
-}
-
 type KBResource interface {
 	dbaasv1alpha1.Cluster |
 	dbaasv1alpha1.ClusterDefinition |
@@ -51,6 +40,23 @@ type KBResource interface {
 }
 
 type ResourceOptions func(obj client.Object)
+
+var testDataRoot string
+
+func init() {
+	_, file, _, _ := runtime.Caller(0)
+	testDataRoot = filepath.Dir(file)
+}
+
+// SubTestDataPath gets the file path which belongs to test data directory or its subdirectories.
+func SubTestDataPath(subPath string) string {
+	return filepath.Join(testDataRoot, subPath)
+}
+
+// GetTestDataFileContent gets the file content which belongs to test data directory or its subdirectories.
+func GetTestDataFileContent(filePath string) ([]byte, error) {
+	return os.ReadFile(SubTestDataPath(filePath))
+}
 
 func GetResourceFromTestData[T KBResource](yamlFile string, opts ...ResourceOptions) (*T, error) {
 	toK8sResource := func(o interface{}) client.Object {

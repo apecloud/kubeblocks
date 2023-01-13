@@ -26,29 +26,40 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type reconfigureAction struct {
+}
+
 func init() {
 	var (
 		reAction   = reconfigureAction{}
 		opsManager = GetOpsManager()
 	)
 
-	reconfigureBehaviour := &OpsBehaviour{
+	reconfigureBehaviour := OpsBehaviour{
 		FromClusterPhases: []dbaasv1alpha1.Phase{
 			// all phase
 			dbaasv1alpha1.RunningPhase,
 			dbaasv1alpha1.FailedPhase,
 			dbaasv1alpha1.AbnormalPhase,
 		},
-		ToClusterPhase:         dbaasv1alpha1.UpdatingPhase,
-		Action:                 reAction.reconfigure,
-		ActionStartedCondition: dbaasv1alpha1.NewReconfigureCondition,
-		ReconcileAction:        reAction.ReconcileAction,
+		ToClusterPhase: dbaasv1alpha1.UpdatingPhase,
+		OpsHandler:     &reAction,
+		//ReconcileAction:        reAction.ReconcileAction,
 	}
 	cfgcore.ConfigEventHandlerMap["ops_status_reconfigure"] = &reAction
 	opsManager.RegisterOps(dbaasv1alpha1.ReconfiguringType, reconfigureBehaviour)
 }
 
-type reconfigureAction struct {
+func (r *reconfigureAction) ActionStartedCondition(opsRequest *dbaasv1alpha1.OpsRequest) *metav1.Condition {
+	return dbaasv1alpha1.NewReconfigureCondition(opsRequest)
+}
+
+func (r *reconfigureAction) SaveLastConfiguration(_ *OpsResource) error {
+	return nil
+}
+
+func (r *reconfigureAction) GetRealAffectedComponentMap(opsRequest *dbaasv1alpha1.OpsRequest) realAffectedComponentMap {
+	return make(map[string]struct{})
 }
 
 func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, lastOpsRequest string, phase dbaasv1alpha1.Phase, err error) error {
@@ -102,7 +113,7 @@ func (r reconfigureAction) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.P
 	return dbaasv1alpha1.RunningPhase, 30 * time.Second, nil
 }
 
-func (r *reconfigureAction) reconfigure(resource *OpsResource) error {
+func (r *reconfigureAction) Action(resource *OpsResource) error {
 
 	var (
 		spec              = &resource.OpsRequest.Spec

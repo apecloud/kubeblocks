@@ -24,16 +24,22 @@ const (
 	stateMysql8 = "state.mysql-8"
 )
 
-type ExecInfo struct {
-	Command       []string
-	ContainerName string
-}
-
 type Interface interface {
-	ConnectCommand(database string) []string
+	ConnectCommand() []string
 	EngineName() string
 	EngineContainer() string
+	ConnectExample(info *ConnectionInfo, client string) string
 }
+
+type ConnectionInfo struct {
+	Host     string
+	User     string
+	Password string
+	Database string
+	Port     string
+}
+
+type buildConnectExample func(info *ConnectionInfo) string
 
 func New(typeName string) (Interface, error) {
 	switch typeName {

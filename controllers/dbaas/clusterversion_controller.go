@@ -213,7 +213,7 @@ func (r *ClusterVersionReconciler) deleteExternalResources(reqCtx intctrlutil.Re
 	return dbaasconfig.DeleteCVConfigMapFinalizer(r.Client, reqCtx, clusterVersion)
 }
 
-// SyncClusterStatusOperationsWithUpgrade sync cluster status.operations.upgradable when delete or create ClusterVersion
+// SyncClusterStatusOperationsWithUpgrade syncs cluster status.operations.upgradable when delete or create ClusterVersion
 func (r *ClusterVersionReconciler) syncClusterStatusOperationsWithUpgrade(ctx context.Context, clusterVersion *dbaasv1alpha1.ClusterVersion) error {
 	var (
 		clusterList        = &dbaasv1alpha1.ClusterList{}
@@ -235,16 +235,13 @@ func (r *ClusterVersionReconciler) syncClusterStatusOperationsWithUpgrade(ctx co
 		upgradable = true
 	}
 	for _, v := range clusterList.Items {
-		var patch client.Patch
-		if v.Status.Operations != nil {
-			if v.Status.Operations.Upgradable == upgradable {
-				continue
-			}
-			patch = client.MergeFrom(v.DeepCopy())
-		} else {
-			patch = client.MergeFrom(v.DeepCopy())
+		if v.Status.Operations == nil {
 			v.Status.Operations = &dbaasv1alpha1.Operations{}
 		}
+		if v.Status.Operations.Upgradable == upgradable {
+			continue
+		}
+		patch := client.MergeFrom(v.DeepCopy())
 		v.Status.Operations.Upgradable = upgradable
 		if err = r.Client.Status().Patch(ctx, &v, patch); err != nil {
 			return err

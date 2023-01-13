@@ -316,25 +316,34 @@ prometheus:
               labels:
                 severity: critical
               annotations:
-                summary: "Container CPU usage is high (> 90%) (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
+                summary: "Container CPU usage is very high (> 90%) (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
                 description: "Container CPU usage is above 90%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
             - alert: ContainerMemoryUsage
-              expr: '(sum(container_memory_working_set_bytes{container!="",container!="POD"}) BY (instance,pod,container) / sum(container_spec_memory_limit_bytes{container!="",container!="POD"} > 0) BY (instance,pod,container) * 100) > 80'
+              expr: 'sum(container_memory_working_set_bytes{container!="",container!="POD"}) BY (instance,pod,container) / sum(container_spec_memory_limit_bytes{container!="",container!="POD"} > 0) BY (instance,pod,container) * 100 > 90'
               for: 2m
               labels:
                 severity: warning
               annotations:
-                summary: "Container Memory usage (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
-                description: "Container Memory usage is above 80%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "Container Memory usage is high (> 90%) (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
+                description: "Container Memory usage is above 90%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: ContainerMemoryUsagePredict
+              expr: 'sum(predict_linear(container_memory_working_set_bytes{container!="",container!="POD"}[15m], 30*60)) BY (instance,pod,container) - sum(container_spec_memory_limit_bytes{container!="",container!="POD"} > 0) BY (instance,pod,container) >= 0'
+              for: 0m
+              labels:
+                severity: critical
+              annotations:
+                summary: "Container Memory usage may exceed the limit 30 minutes later (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
+                description: "Container Memory usage may exceed the limit 30 minutes later\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
             - alert: ContainerVolumeUsage
-              expr: '(sum(container_fs_usage_bytes{id="/"}) BY (instance,device) / sum(container_fs_limit_bytes{id="/"}) BY (instance,device)) * 100 > 90'
+              expr: 'sum(container_fs_usage_bytes) BY (instance,device) / sum(container_fs_limit_bytes) BY (instance,device) * 100 > 90'
               for: 2m
               labels:
                 severity: warning
               annotations:
-                summary: "Device Volume usage (node: {{ $labels.instance }}, device: {{ $labels.device }})"
+                summary: "Device Volume usage is high (> 90%) (node: {{ $labels.instance }}, device: {{ $labels.device }})"
                 description: "Device Volume usage is above 90%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
             - alert: ContainerHighCpuThrottleRate
@@ -356,7 +365,7 @@ prometheus:
               labels:
                 severity: critical
               annotations:
-                summary: "MySQL down (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                summary: "MySQL is down (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
                 description: "MySQL instance is down on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
             - alert: MysqlRestarted

@@ -108,6 +108,7 @@ func createTestClusterVersionObj(clusterDefinitionName, clusterVersionName strin
 	return clusterVersion
 }
 
+// createTestReplicationSetClusterVersionObj create a replication clusterVersion object, other webhook_test called this function, carefully for modifying the function.
 func createTestReplicationSetClusterVersionObj(clusterDefinitionName, clusterVersionName string) *ClusterVersion {
 	clusterVersion := &ClusterVersion{
 		ObjectMeta: metav1.ObjectMeta{

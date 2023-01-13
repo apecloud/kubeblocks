@@ -295,7 +295,7 @@ spec:
 	return clusterDefinition, err
 }
 
-// createTestReplicationSetClusterDefinitionObj  other webhook_test called this function, carefully for modifying the function
+// createTestReplicationSetClusterDefinitionObj  other webhook_test called this function, carefully for modifying the function.
 func createTestReplicationSetClusterDefinitionObj(name string) (*ClusterDefinition, error) {
 	clusterDefYaml := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1

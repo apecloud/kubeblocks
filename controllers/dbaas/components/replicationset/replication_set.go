@@ -144,6 +144,7 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (dbaasv
 	return util.CalculateComponentPhase(isFailed, isAbnormal), nil
 }
 
+// NewReplicationSet create a new ReplicationSet object.
 func NewReplicationSet(ctx context.Context,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,

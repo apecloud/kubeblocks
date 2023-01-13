@@ -35,6 +35,9 @@ type DescendingOrdinalSts []*appsv1.StatefulSet
 // statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
 var statefulPodRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 
+// statefulSetRegex is a regular expression that extracts StatefulSet's ordinal from the Name of StatefulSet
+var statefulSetRegex = regexp.MustCompile("(.*)-([0-9]+)$")
+
 // getParentNameAndOrdinal gets the name of pod's parent StatefulSet and pod's ordinal as extracted from its Name. If
 // the Pod was not created by a StatefulSet, its parent is considered to be empty string, and its ordinal is considered
 // to be -1.
@@ -105,19 +108,17 @@ func CovertToStatefulSet(obj client.Object) *appsv1.StatefulSet {
 	return nil
 }
 
-var statefulSetRegex = regexp.MustCompile("(.*)-([0-9]+)$")
-
-// Len is the implementation of the sort.Interface, Calculate the length of the list of DescendingOrdinalSts
+// Len is the implementation of the sort.Interface, Calculate the length of the list of DescendingOrdinalSts.
 func (dos DescendingOrdinalSts) Len() int {
 	return len(dos)
 }
 
-// Swap is the implementation of the sort.Interface, Exchange two items in DescendingOrdinalSts
+// Swap is the implementation of the sort.Interface, Exchange two items in DescendingOrdinalSts.
 func (dos DescendingOrdinalSts) Swap(i, j int) {
 	dos[i], dos[j] = dos[j], dos[i]
 }
 
-// Less is the implementation of the sort.Interface, sort the size of the statefulSet ordinal in descending order
+// Less is the implementation of the sort.Interface, sort the size of the statefulSet ordinal in descending order.
 func (dos DescendingOrdinalSts) Less(i, j int) bool {
 	return GetOrdinalSts(dos[i]) > GetOrdinalSts(dos[j])
 }

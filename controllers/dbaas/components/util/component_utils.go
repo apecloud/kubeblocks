@@ -261,7 +261,7 @@ func GetComponentWorkloadMinReadySeconds(ctx context.Context,
 	}
 }
 
-// GetComponentDefaultReplicas get component default replicas
+// GetComponentDefaultReplicas get component default replicas.
 func GetComponentDefaultReplicas(ctx context.Context,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,

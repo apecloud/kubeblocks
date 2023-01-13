@@ -75,42 +75,26 @@ Return true if a configmap object should be created for PostgreSQL primary with 
 Return PostgreSQL service port
 */}}
 {{- define "postgresql.service.port" -}}
-{{- if .Values.global.postgresql.service.ports.postgresql }}
-    {{- .Values.global.postgresql.service.ports.postgresql -}}
-{{- else -}}
-    {{- .Values.primary.service.ports.postgresql -}}
-{{- end -}}
+{{- .Values.primary.service.ports.postgresql -}}
 {{- end -}}
 
 {{/*
 Return the name for a custom user to create
 */}}
 {{- define "postgresql.username" -}}
-{{- if .Values.global.postgresql.auth.username }}
-    {{- .Values.global.postgresql.auth.username -}}
-{{- else -}}
-    {{- .Values.auth.username -}}
-{{- end -}}
+{{- .Values.auth.username -}}
 {{- end -}}
 
 {{/*
 Return the name for a custom database to create
 */}}
 {{- define "postgresql.database" -}}
-{{- if .Values.global.postgresql.auth.database }}
-    {{- .Values.global.postgresql.auth.database -}}
-{{- else if .Values.auth.database -}}
-    {{- .Values.auth.database -}}
-{{- end -}}
+{{- .Values.auth.database -}}
 {{- end -}}
 
 {{/*
 Get the password secret.
 */}}
 {{- define "postgresql.secretName" -}}
-{{- if .Values.global.postgresql.auth.existingSecret }}
-    {{- printf "%s" (tpl .Values.global.postgresql.auth.existingSecret $) -}}
-{{- else if .Values.auth.existingSecret -}}
-    {{- printf "%s" (tpl .Values.auth.existingSecret $) -}}
-{{- end -}}
+{{- printf "%s" (tpl .Values.auth.existingSecret $) -}}
 {{- end -}}

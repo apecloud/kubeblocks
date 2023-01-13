@@ -24,4 +24,4 @@ persistence:
   enabled: true
   data:
     storageClassName:
-    size: 4Gi
+    size: 1Gi

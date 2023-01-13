@@ -301,14 +301,23 @@ prometheus:
                 summary: "Container absent (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
                 description: "A container is absent for 5 min\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
-            - alert: ContainerCpuUsage
-              expr: 'sum(rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[3m])) BY (instance,pod,container) * 100 > 80'
+            - alert: ContainerCpuUsageWarning
+              expr: 'sum(rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[2m])) BY (instance,pod,container) * 100 > 70'
               for: 2m
               labels:
                 severity: warning
               annotations:
-                summary: "Container CPU usage (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
-                description: "Container CPU usage is above 80%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "Container CPU usage is high (> 70%) (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
+                description: "Container CPU usage is above 70%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: ContainerCpuUsageCritical
+              expr: 'sum(rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[2m])) BY (instance,pod,container) * 100 > 90'
+              for: 1m
+              labels:
+                severity: critical
+              annotations:
+                summary: "Container CPU usage is high (> 90%) (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
+                description: "Container CPU usage is above 90%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
             - alert: ContainerMemoryUsage
               expr: '(sum(container_memory_working_set_bytes{container!="",container!="POD"}) BY (instance,pod,container) / sum(container_spec_memory_limit_bytes{container!="",container!="POD"} > 0) BY (instance,pod,container) * 100) > 80'
@@ -320,16 +329,16 @@ prometheus:
                 description: "Container Memory usage is above 80%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
             - alert: ContainerVolumeUsage
-              expr: '(1 - (sum(container_fs_inodes_free{id="/"}) BY (instance,device) / sum(container_fs_inodes_total{id="/"}) BY (instance,device))) * 100 > 80'
+              expr: '(sum(container_fs_usage_bytes{id="/"}) BY (instance,device) / sum(container_fs_limit_bytes{id="/"}) BY (instance,device)) * 100 > 90'
               for: 2m
               labels:
                 severity: warning
               annotations:
                 summary: "Device Volume usage (node: {{ $labels.instance }}, device: {{ $labels.device }})"
-                description: "Device Volume usage is above 80%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                description: "Device Volume usage is above 90%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
             - alert: ContainerHighCpuThrottleRate
-              expr: 'rate(container_cpu_cfs_throttled_seconds_total{container!="",container!="POD"}[3m]) > 1'
+              expr: 'rate(container_cpu_cfs_throttled_seconds_total{container!="",container!="POD"}[2m]) > 1'
               for: 2m
               labels:
                 severity: warning

@@ -37,12 +37,13 @@ const (
 
 // General Built-in functions
 const (
-	builtInGetVolumeFunctionName    = "getVolumePathByName"
-	builtInGetPvcFunctionName       = "getPVCByName"
-	builtInGetEnvFunctionName       = "getEnvByName"
-	builtInGetArgFunctionName       = "getArgByName"
-	builtInGetPortFunctionName      = "getPortByName"
-	builtInGetContainerFunctionName = "getContainerByName"
+	builtInGetVolumeFunctionName          = "getVolumePathByName"
+	builtInGetPvcFunctionName             = "getPVCByName"
+	builtInGetEnvFunctionName             = "getEnvByName"
+	builtInGetArgFunctionName             = "getArgByName"
+	builtInGetPortFunctionName            = "getPortByName"
+	builtInGetContainerFunctionName       = "getContainerByName"
+	builtInGetContainerMemoryFunctionName = "getContainerMemory"
 
 	// BuiltinMysqlCalBufferFunctionName Mysql Built-in
 	// TODO: This function migrate to configuration template
@@ -119,13 +120,14 @@ func (c *configTemplateBuilder) injectBuiltInObjectsAndFunctions(
 func injectBuiltInFunctions(tplBuilder *configTemplateBuilder, component *Component) error {
 	// TODO add built-in function
 	tplBuilder.builtInFunctions = &intctrlutil.BuiltInObjectsFunc{
-		builtInMysqlCalBufferFunctionName: calDBPoolSize,
-		builtInGetVolumeFunctionName:      getVolumeMountPathByName,
-		builtInGetPvcFunctionName:         getPVCByName,
-		builtInGetEnvFunctionName:         getEnvByName,
-		builtInGetPortFunctionName:        getPortByName,
-		builtInGetArgFunctionName:         getArgByName,
-		builtInGetContainerFunctionName:   getPodContainerByName,
+		builtInMysqlCalBufferFunctionName:     calDBPoolSize,
+		builtInGetVolumeFunctionName:          getVolumeMountPathByName,
+		builtInGetPvcFunctionName:             getPVCByName,
+		builtInGetEnvFunctionName:             getEnvByName,
+		builtInGetPortFunctionName:            getPortByName,
+		builtInGetArgFunctionName:             getArgByName,
+		builtInGetContainerFunctionName:       getPodContainerByName,
+		builtInGetContainerMemoryFunctionName: getContainerMemory,
 	}
 	return nil
 }

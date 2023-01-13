@@ -38,6 +38,8 @@ const (
 	// CommandSQLKey keys from request's metadata.
 	CommandSQLKey = "sql"
 
+	roleEventRecordQPS            = 1. / 60.
+	roleEventRecordFrequency      = int(1 / roleEventRecordQPS)
 	defaultCheckFailedThreshold   = 1800
 	defaultRoleDetectionThreshold = 300
 )
@@ -223,7 +225,7 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 	// roleChanged events to maintain pod label accurately in cases of:
 	// 1 roleChanged event loss;
 	// 2 pod role label deleted or updated incorrectly.
-	if p.roleUnchangedCount < p.roleDetectionThreshold && p.roleUnchangedCount%2 == 0 {
+	if p.roleUnchangedCount < p.roleDetectionThreshold && p.roleUnchangedCount%roleEventRecordFrequency == 0 {
 		response.Metadata[StatusCode] = CheckFailedHTTPCode
 	}
 	msg, _ := json.Marshal(result)

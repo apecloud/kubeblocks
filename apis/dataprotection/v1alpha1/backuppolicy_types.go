@@ -100,15 +100,15 @@ type BackupPolicySecret struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// which key name for user
+	// UserKeyword the map keyword of the user in the connection credential secret
 	// +kubebuilder:default=username
 	// +optional
-	KeyUser string `json:"keyUser,omitempty"`
+	UserKeyword string `json:"userKeyword,omitempty"`
 
-	// which key name for password
+	// PasswordKeyword the map keyword of the password in the connection credential secret
 	// +kubebuilder:default=password
 	// +optional
-	KeyPassword string `json:"keyPassword,omitempty"`
+	PasswordKeyword string `json:"passwordKeyword,omitempty"`
 }
 
 // BackupPolicyHook defined for the database execute commands before and after backup.

@@ -165,8 +165,6 @@ spec:
         app.kubernetes.io/instance: wesql-cluster	
     secret:
       name: wesql-cluster
-      keyUser: username
-      keyPassword: password
   hooks:
     preCommands:
     - touch /data/mysql/.restore;sync

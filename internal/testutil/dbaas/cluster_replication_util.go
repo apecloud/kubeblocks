@@ -20,18 +20,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/apecloud/kubeblocks/test/testdata"
-
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/testutil"
-)
-
-var (
-	ReplicationComponentName = "redis-rsts"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 func InitReplicationRedis(ctx context.Context,
@@ -57,8 +52,7 @@ func CreateReplicationCluster(
 	if err != nil {
 		return nil
 	}
-	clusterYaml := fmt.Sprintf(string(clusterBytes), clusterVersionName, clusterDefName, clusterName,
-		clusterVersionName, clusterDefName, replicationCompName)
+	clusterYaml := fmt.Sprintf(string(clusterBytes), clusterName, clusterDefName, clusterVersionName, replicationCompName)
 	cluster := &dbaasv1alpha1.Cluster{}
 	gomega.Expect(yaml.Unmarshal([]byte(clusterYaml), cluster)).Should(gomega.Succeed())
 	return CreateK8sResource(ctx, testCtx, cluster).(*dbaasv1alpha1.Cluster)
@@ -98,7 +92,7 @@ func MockReplicationComponentStatefulSet(ctx context.Context,
 	}
 	stsName := clusterName + "-" + replicationCompName
 	statefulSetYaml := fmt.Sprintf(string(stsBytes), replicationCompName, clusterName,
-		stsName, replicationCompName, clusterName, replicationCompName, clusterName, "%")
+		stsName, replicationCompName, clusterName, replicationCompName, clusterName)
 	sts := &appsv1.StatefulSet{}
 	gomega.Expect(yaml.Unmarshal([]byte(statefulSetYaml), sts)).Should(gomega.Succeed())
 	return CreateK8sResource(ctx, testCtx, sts).(*appsv1.StatefulSet)

@@ -67,9 +67,8 @@ var _ = Describe("Replication Component", func() {
 			By(" init cluster, statefulSet, pods")
 			clusterDef, _, cluster := testdbaas.InitReplicationRedis(ctx, testCtx, clusterDefName,
 				clusterVersionName, clusterName, replicationCompName)
-
 			sts := testdbaas.MockReplicationComponentStatefulSet(ctx, testCtx, clusterName, replicationCompName)
-			componentName := testdbaas.ReplicationComponentName
+			componentName := replicationCompName
 			typeName := util.GetComponentTypeName(*cluster, componentName)
 			componentDef := util.GetComponentDefFromClusterDefinition(clusterDef, typeName)
 			component := util.GetComponentByName(cluster, componentName)
@@ -90,7 +89,7 @@ var _ = Describe("Replication Component", func() {
 			Expect(requeue == true).Should(BeTrue())
 
 			By("test component phase when pods not ready")
-			phase, _ := replicationComponent.GetPhaseWhenPodsNotReady(testdbaas.ReplicationComponentName)
+			phase, _ := replicationComponent.GetPhaseWhenPodsNotReady(replicationCompName)
 			Expect(phase == dbaasv1alpha1.FailedPhase).Should(BeTrue())
 		})
 	})

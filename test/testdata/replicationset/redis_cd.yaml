@@ -10,3 +10,4 @@ spec:
       minReplicas: 1
       maxReplicas: 16
       componentType: Replication
+      updateStrategy: OnDelete

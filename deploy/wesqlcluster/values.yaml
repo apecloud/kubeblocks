@@ -6,7 +6,7 @@ replicaCount: 3
 
 terminationPolicy: Delete
 
-clusterVersionOverride: "8.0.30-5"
+clusterVersionOverride: ""
 
 monitor:
   enabled: false

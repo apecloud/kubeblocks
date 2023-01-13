@@ -233,7 +233,7 @@ metadata:
   labels:
     app.kubernetes.io/component-name: %s
     app.kubernetes.io/instance: %s
-    cs.dbaas.kubeblocks.io/role: %s
+    kubeblocks.io/role: %s
     app.kubernetes.io/managed-by: kubeblocks
   name: %s
   namespace: default

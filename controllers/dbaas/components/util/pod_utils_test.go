@@ -31,10 +31,15 @@ import (
 func TestPodIsReady(t *testing.T) {
 	set := testk8s.NewFakeStatefulSet("foo", 3)
 	pod := testk8s.NewFakeStatefulSetPod(set, 1)
-
-	testk8s.DeletePodLabelKey(ctx, testCtx, pod.Name, intctrlutil.RoleLabelKey)
-	if podIsReady := PodIsReady(*pod); podIsReady {
-		t.Errorf("Extracted the wrong parent name expected %t found %t", false, podIsReady)
+	pod.Status.Conditions = []v1.PodCondition{
+		{
+			Type:   v1.PodReady,
+			Status: v1.ConditionTrue,
+		},
+	}
+	pod.Labels = map[string]string{intctrlutil.RoleLabelKey: "leader"}
+	if !PodIsReady(*pod) {
+		t.Errorf("isReady returned false negative")
 	}
 
 	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}

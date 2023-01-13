@@ -61,6 +61,13 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 	// delete the StatefulSets with the largest sequence number which is not the primary role
 	clusterCompReplicasMap := make(map[string]int32, len(cluster.Spec.Components))
 	for _, clusterComp := range cluster.Spec.Components {
+		if clusterComp.Replicas == nil {
+			defaultReplicas, err := util.GetComponentDefaultReplicas(reqCtx.Ctx, cli, cluster, clusterComp.Type)
+			if err != nil {
+				return err
+			}
+			clusterComp.Replicas = &defaultReplicas
+		}
 		clusterCompReplicasMap[clusterComp.Name] = *clusterComp.Replicas
 	}
 

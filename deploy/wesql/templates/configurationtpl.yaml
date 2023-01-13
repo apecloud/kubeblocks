@@ -1,7 +1,7 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ConfigConstraint
 metadata:
-  name: mysql-3node-cfg-constraints-8.0
+  name: wesql-cfg-constraints-8.0
 spec:
   # configmap reference
   # tplRef: mysql-3node-tpl-8.0

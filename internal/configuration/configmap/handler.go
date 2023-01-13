@@ -42,21 +42,21 @@ func SetLogger(zapLogger *zap.Logger) {
 func findParentPidFromProcessName(processName string) (PID, error) {
 	allProcess, err := process.Processes()
 	if err != nil {
-		return InvalidPid, err
+		return InvalidPID, err
 	}
 
 	psGraph := map[PID]int32{}
 	for _, proc := range allProcess {
 		name, err := proc.Name()
 		if err != nil {
-			return InvalidPid, cfgutil.WrapError(err, "failed to get process name from pid[%d]", proc.Pid)
+			return InvalidPID, cfgutil.WrapError(err, "failed to get process name from pid[%d]", proc.Pid)
 		}
 		if name != processName {
 			continue
 		}
 		ppid, err := proc.Ppid()
 		if err != nil {
-			return InvalidPid, cfgutil.WrapError(err, "failed to get parent pid from pid[%d]", proc.Pid)
+			return InvalidPID, cfgutil.WrapError(err, "failed to get parent pid from pid[%d]", proc.Pid)
 		}
 		psGraph[PID(proc.Pid)] = ppid
 	}
@@ -67,7 +67,7 @@ func findParentPidFromProcessName(processName string) (PID, error) {
 		}
 	}
 
-	return InvalidPid, cfgutil.MakeError("not find pid fo process name: [%s]", processName)
+	return InvalidPID, cfgutil.MakeError("not find pid fo process name: [%s]", processName)
 }
 
 func CreateSignalHandler(sig dbaasv1alpha1.SignalType, processName string) WatchEventHandler {

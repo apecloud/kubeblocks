@@ -28,7 +28,7 @@ spec:
         configTemplateRefs:
           - name: mysql-3node-tpl
             configTplRef: mysql-3node-tpl-8.0
-            configConstraintRef: mysql-3node-cfg-constraints-8.0
+            configConstraintRef: wesql-cfg-constraints-8.0
             volumeName: mysql-config
             namespace: {{ .Release.Namespace }}
           - name: wesql-scripts

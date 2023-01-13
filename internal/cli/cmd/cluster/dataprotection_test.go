@@ -27,8 +27,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/kubernetes/scheme"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -40,7 +43,7 @@ var _ = Describe("DataProtection", func() {
 	var tf *cmdtesting.TestFactory
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
-		tf = cmdtesting.NewTestFactory().WithNamespace("default")
+		tf = cmdtesting.NewTestFactory().WithNamespace(testing.Namespace)
 	})
 
 	AfterEach(func() {
@@ -48,18 +51,30 @@ var _ = Describe("DataProtection", func() {
 	})
 
 	Context("backup", func() {
-		It("without name", func() {
-			o := &CreateBackupOptions{}
+		It("validate create backup", func() {
+			By("without cluster name")
+			o := &CreateBackupOptions{
+				BaseOptions: create.BaseOptions{
+					Client:    testing.FakeDynamicClient(),
+					IOStreams: streams,
+				},
+			}
 			o.IOStreams = streams
 			Expect(o.Validate()).To(MatchError("missing cluster name"))
+
+			By("not found connection secret")
+			o.Name = testing.ClusterName
+			Expect(o.Validate()).Should(HaveOccurred())
 		})
 
-		It("new command", func() {
+		It("run backup command", func() {
+			secrets := testing.FakeSecrets(testing.Namespace, testing.ClusterName)
+			tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, &secrets.Items[0])
 			cmd := NewCreateBackupCmd(tf, streams)
 			Expect(cmd).ShouldNot(BeNil())
 			// must succeed otherwise exit 1 and make test fails
 			_ = cmd.Flags().Set("backup-type", "snapshot")
-			cmd.Run(nil, []string{"test1"})
+			cmd.Run(nil, []string{testing.ClusterName})
 		})
 	})
 
@@ -124,11 +139,12 @@ var _ = Describe("DataProtection", func() {
 	})
 
 	It("restore", func() {
-		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef(), testing.FakeClusterVersion())
 		timestamp := time.Now().Format("20060102150405")
 		backupName := "backup-test-" + timestamp
 		clusterName := "source-cluster-" + timestamp
 		newClusterName := "new-cluster-" + timestamp
+		secrets := testing.FakeSecrets(testing.Namespace, clusterName)
+		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, &secrets.Items[0], testing.FakeClusterDef(), testing.FakeClusterVersion())
 
 		// create test cluster
 		cmd := NewCreateCmd(tf, streams)
@@ -149,7 +165,7 @@ var _ = Describe("DataProtection", func() {
 		// mock labels backup
 		labels := fmt.Sprintf(`{"metadata":{"labels": {"app.kubernetes.io/instance":"%s"}}}`, clusterName)
 		patchByte := []byte(labels)
-		_, _ = tf.FakeDynamicClient.Resource(types.BackupGVR()).Namespace("default").Patch(context.TODO(), backupName,
+		_, _ = tf.FakeDynamicClient.Resource(types.BackupGVR()).Namespace(testing.Namespace).Patch(context.TODO(), backupName,
 			k8sapitypes.MergePatchType, patchByte, metav1.PatchOptions{})
 
 		// create restore cluster

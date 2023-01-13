@@ -1,9 +1,10 @@
 // required, command line input options for parameters and flags
 options: {
-	name:        string
-	namespace:   string
-	clusterName: string
-	ttl:         string
+	name:             string
+	namespace:        string
+	clusterName:      string
+	ttl:              string
+	connectionSecret: string
 }
 
 // required, k8s api resource content
@@ -25,9 +26,7 @@ content: {
 				}
 			}
 			secret: {
-				name:        options.clusterName + "-conn-credential"
-				keyUser:     "username"
-				keyPassword: "password"
+				name: options.connectionSecret
 			}
 		}
 

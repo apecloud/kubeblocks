@@ -40,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/list"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var (
@@ -79,8 +80,9 @@ type CreateBackupOptions struct {
 }
 
 type CreateBackupPolicyOptions struct {
-	ClusterName string `json:"clusterName,omitempty"`
-	TTL         string `json:"ttl,omitempty"`
+	ClusterName      string `json:"clusterName,omitempty"`
+	TTL              string `json:"ttl,omitempty"`
+	ConnectionSecret string `json:"connectionSecret,omitempty"`
 	create.BaseOptions
 }
 
@@ -99,11 +101,17 @@ func (o *CreateBackupOptions) Validate() error {
 		return fmt.Errorf("missing cluster name")
 	}
 
+	connectionSecret, err := o.getConnectionSecret()
+	if err != nil {
+		return err
+	}
+
 	// apply backup policy
 	policyOptions := CreateBackupPolicyOptions{
-		TTL:         o.TTL,
-		ClusterName: o.Name,
-		BaseOptions: o.BaseOptions,
+		TTL:              o.TTL,
+		ClusterName:      o.Name,
+		ConnectionSecret: connectionSecret,
+		BaseOptions:      o.BaseOptions,
 	}
 	policyOptions.Name = "backup-policy-" + o.Namespace + "-" + o.Name
 	inputs := create.Inputs{
@@ -126,6 +134,24 @@ func (o *CreateBackupOptions) Validate() error {
 	o.BackupPolicy = policyOptions.Name
 
 	return nil
+}
+
+func (o *CreateBackupOptions) getConnectionSecret() (string, error) {
+	// find secret from cluster label
+	opts := metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s,%s=%s",
+			intctrlutil.AppInstanceLabelKey, o.Name,
+			intctrlutil.AppManagedByLabelKey, intctrlutil.AppName),
+	}
+	gvr := schema.GroupVersionResource{Version: "v1", Resource: "secrets"}
+	secretObjs, err := o.Client.Resource(gvr).Namespace(o.Namespace).List(context.TODO(), opts)
+	if err != nil {
+		return "", err
+	}
+	if len(secretObjs.Items) == 0 {
+		return "", fmt.Errorf("not found connection credential for cluster %s", o.Name)
+	}
+	return secretObjs.Items[0].GetName(), nil
 }
 
 func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {

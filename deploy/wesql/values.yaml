@@ -137,7 +137,7 @@ configTemplate:
     host_cache_size=867
     connect_timeout=10
 
-    character-sets-dir=/usr/share/mysql-8.0/charsets
+    # character-sets-dir=/usr/share/mysql-8.0/charsets
 
     port={{ $mysql_port }}
     mysqlx-port=33060

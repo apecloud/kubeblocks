@@ -5,12 +5,12 @@ metadata:
   labels:
     {{- include "wesqlapp.labels" . | nindent 4 }}
 spec:
-  type: state.mysql
+  type: state.mysql-8
   connectionCredential:
     username: root
     password: "$(RANDOM_PASSWD)"
   components:
-    - typeName: replicasets
+    - typeName: mysql
       characterType: mysql
       probes:
         roleChangedProbe:

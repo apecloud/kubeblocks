@@ -4,9 +4,9 @@
 
 replicaCount: 3
 
-terminationPolicy: Halt
+terminationPolicy: Delete
 
-clusterVersionOverride: ""
+clusterVersionOverride: "8.0.30-5"
 
 monitor:
   enabled: false

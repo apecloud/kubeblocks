@@ -20,6 +20,7 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -69,7 +70,7 @@ func (consensusSet *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySecond
 	return isReady(*pod)
 }
 
-func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady() (bool, error) {
+func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder record.EventRecorder) (bool, error) {
 	var (
 		statusComponent dbaasv1alpha1.ClusterStatusComponent
 		ok              bool
@@ -125,6 +126,9 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady() (bool, error
 	cluster.Status.Components[componentName] = statusComponent
 	if err = consensusSet.Cli.Status().Patch(consensusSet.Ctx, cluster, patch); err != nil {
 		return true, err
+	}
+	if recorder != nil {
+		recorder.Eventf(cluster, corev1.EventTypeWarning, types.ProbeTimeoutReason, "pod role detection timed out in Component: "+consensusSet.Component.Name)
 	}
 	// when component status changed, mark OpsRequest to reconcile.
 	return false, opsutil.MarkRunningOpsRequestAnnotation(consensusSet.Ctx, consensusSet.Cli, cluster)

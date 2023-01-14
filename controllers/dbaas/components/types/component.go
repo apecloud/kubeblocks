@@ -1,7 +1,10 @@
 package types
 
 import (
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -28,9 +31,17 @@ type Component interface {
 	// we should handle the component phase when the role probe timeout and return a bool.
 	// if return true, means probe is not timing out and need to requeue after an interval time to handle probe timeout again.
 	// else return false, means probe has timed out and needs to update the component phase to Failed or Abnormal.
-	HandleProbeTimeoutWhenPodsReady() (bool, error)
+	HandleProbeTimeoutWhenPodsReady(recorder record.EventRecorder) (bool, error)
 
 	// GetPhaseWhenPodsNotReady when the pods of component are not ready, calculate the component phase is Failed or Abnormal.
 	// if return an empty phase, means the pods of component are ready and skips it.
 	GetPhaseWhenPodsNotReady(componentName string) (dbaasv1alpha1.Phase, error)
 }
+
+const (
+	// ProbeTimeoutReason the event reason when all pods of the component probe role timed out.
+	ProbeTimeoutReason = "ProbeTimeout"
+
+	// ProbeTimeout the probe timeout
+	ProbeTimeout = 1 * time.Minute
+)

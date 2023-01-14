@@ -77,7 +77,7 @@ var _ = Describe("Consensus Component", func() {
 		cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
 			consensusCompName: {
 				PodsReady:     &podsReady,
-				PodsReadyTime: &metav1.Time{Time: time.Now().Add(-2 * time.Minute)},
+				PodsReadyTime: &metav1.Time{Time: time.Now().Add(-10 * time.Minute)},
 			},
 		}
 		Expect(k8sClient.Status().Patch(ctx, cluster, clusterPatch)).Should(Succeed())
@@ -133,7 +133,7 @@ var _ = Describe("Consensus Component", func() {
 
 				By("test handle probe timed out")
 				mockClusterStatusProbeTimeout(cluster)
-				requeue, _ := consensusComponent.HandleProbeTimeoutWhenPodsReady()
+				requeue, _ := consensusComponent.HandleProbeTimeoutWhenPodsReady(nil)
 				Expect(requeue == false).Should(BeTrue())
 				validateComponentStatus()
 			} else {
@@ -146,7 +146,7 @@ var _ = Describe("Consensus Component", func() {
 				// mock leader pod is not ready
 				testk8s.UpdatePodStatusNotReady(ctx, testCtx, podName)
 				testk8s.DeletePodLabelKey(ctx, testCtx, podName, intctrlutil.ConsensusSetRoleLabelKey)
-				requeue, _ := consensusComponent.HandleProbeTimeoutWhenPodsReady()
+				requeue, _ := consensusComponent.HandleProbeTimeoutWhenPodsReady(nil)
 				Expect(requeue == false).Should(BeTrue())
 				validateComponentStatus()
 

@@ -147,6 +147,6 @@ func NewBackupConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	}
 
 	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
-
+	util.CheckErr(cmd.MarkFlagRequired("set"))
 	return cmd
 }

@@ -95,15 +95,14 @@ var _ = Describe("kubeblocks", func() {
 				Client:    testing.FakeClientSet(),
 				dynamic:   testing.FakeDynamicClient(),
 			},
-			Version: version.DefaultKubeBlocksVersion,
-			Monitor: true,
+			Version:         version.DefaultKubeBlocksVersion,
+			Monitor:         true,
+			CreateNamespace: true,
 		}
 		Expect(o.Run()).Should(HaveOccurred())
 		Expect(len(o.Sets)).To(Equal(1))
 		Expect(o.Sets[0]).To(Equal(kMonitorParam))
-
 		Expect(o.installChart()).Should(HaveOccurred())
-
 		o.printNotes()
 	})
 

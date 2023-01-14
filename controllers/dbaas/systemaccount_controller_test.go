@@ -18,6 +18,7 @@ package dbaas
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/types"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -36,7 +37,7 @@ import (
 
 var _ = Describe("SystemAccount Controller", func() {
 	var (
-		timeout            = time.Second * 20
+		timeout            = time.Second * 10
 		interval           = time.Second
 		clusterName        = "cluster-sysaccount"
 		clusterDefName     = "def-sysaccount"
@@ -265,10 +266,9 @@ var _ = Describe("SystemAccount Controller", func() {
 		Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
 		// assure cluster def is ready
 		createdClusterDef := &dbaasv1alpha1.ClusterDefinition{}
-		Eventually(func() bool {
-			err := k8sClient.Get(ctx, client.ObjectKey{Name: clusterDefName}, createdClusterDef)
-			return err == nil
-		}, timeout, interval).Should(BeTrue())
+		Eventually(func() error {
+			return k8sClient.Get(ctx, client.ObjectKey{Name: clusterDefName}, createdClusterDef)
+		}, timeout, interval).Should(Succeed())
 		return createdClusterDef
 	}
 
@@ -278,10 +278,9 @@ var _ = Describe("SystemAccount Controller", func() {
 		Expect(testCtx.CheckedCreateObj(ctx, ClusterVersion)).Should(Succeed())
 		// assure cluster def is ready
 		createdClusterVersion := &dbaasv1alpha1.ClusterVersion{}
-		Eventually(func() bool {
-			err := k8sClient.Get(ctx, client.ObjectKey{Name: ClusterVersionName}, createdClusterVersion)
-			return err == nil
-		}, timeout, interval).Should(BeTrue())
+		Eventually(func() error {
+			return k8sClient.Get(ctx, client.ObjectKey{Name: ClusterVersionName}, createdClusterVersion)
+		}, timeout, interval).Should(Succeed())
 		return createdClusterVersion
 	}
 
@@ -290,21 +289,20 @@ var _ = Describe("SystemAccount Controller", func() {
 		cluster := mockCluster(clusterDefName, ClusterVersionName, typeName, clusterName, replicas)
 		Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
 		createdCluster := &dbaasv1alpha1.Cluster{}
-		Eventually(func() bool {
-			err := k8sClient.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, createdCluster)
-			return err == nil
-		}, timeout, interval).Should(BeTrue())
+		Eventually(func() error {
+			return k8sClient.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, createdCluster)
+		}, timeout, interval).Should(Succeed())
 		return createdCluster
 	}
 
-	patchCluster := func(cluster *dbaasv1alpha1.Cluster) {
+	patchCluster := func(key types.NamespacedName) {
 		By("Patching Cluster to trigger reconcile")
-		patch := client.MergeFrom(cluster.DeepCopy())
-		if cluster.Annotations == nil {
-			cluster.Annotations = make(map[string]string)
-		}
-		cluster.Annotations["mockmode"] = "testing"
-		Expect(k8sClient.Patch(ctx, cluster, patch)).Should(Succeed())
+		Eventually(changeSpec(key, func(cluster *dbaasv1alpha1.Cluster) {
+			if cluster.Annotations == nil {
+				cluster.Annotations = make(map[string]string)
+			}
+			cluster.Annotations["mockmode"] = "testing"
+		}), timeout, interval).Should(Succeed())
 	}
 
 	assureBackupPolicy := func(policyName, engintName, clusterName string) *dataprotectionv1alpha1.BackupPolicy {
@@ -313,10 +311,9 @@ var _ = Describe("SystemAccount Controller", func() {
 		Expect(testCtx.CheckedCreateObj(ctx, policy)).Should(Succeed())
 
 		createdPolicy := &dataprotectionv1alpha1.BackupPolicy{}
-		Eventually(func() bool {
-			err := k8sClient.Get(ctx, client.ObjectKey{Name: policy.Name, Namespace: policy.Namespace}, createdPolicy)
-			return err == nil
-		}, timeout, interval).Should(BeTrue())
+		Eventually(func() error {
+			return k8sClient.Get(ctx, client.ObjectKey{Name: policy.Name, Namespace: policy.Namespace}, createdPolicy)
+		}, timeout, interval).Should(Succeed())
 		return createdPolicy
 	}
 
@@ -396,10 +393,9 @@ var _ = Describe("SystemAccount Controller", func() {
 		Expect(testCtx.CheckedCreateObj(ctx, ep)).Should(Succeed())
 		// assure cluster def is ready
 		createdEP := &corev1.Endpoints{}
-		Eventually(func() bool {
-			err := k8sClient.Get(ctx, client.ObjectKey{Name: epname, Namespace: namespace}, createdEP)
-			return err == nil
-		}, timeout, interval).Should(BeTrue())
+		Eventually(func() error {
+			return k8sClient.Get(ctx, client.ObjectKey{Name: epname, Namespace: namespace}, createdEP)
+		}, timeout, interval).Should(Succeed())
 		return createdEP
 	}
 
@@ -408,10 +404,9 @@ var _ = Describe("SystemAccount Controller", func() {
 		Expect(testCtx.CheckedCreateObj(ctx, ep)).Should(Succeed())
 		// assure cluster def is ready
 		createdEP := &corev1.Endpoints{}
-		Eventually(func() bool {
-			err := k8sClient.Get(ctx, client.ObjectKey{Name: epname, Namespace: namespace}, createdEP)
-			return err == nil
-		}, timeout, interval).Should(BeTrue())
+		Eventually(func() error {
+			return k8sClient.Get(ctx, client.ObjectKey{Name: epname, Namespace: namespace}, createdEP)
+		}, timeout, interval).Should(Succeed())
 		return createdEP
 	}
 
@@ -424,8 +419,8 @@ var _ = Describe("SystemAccount Controller", func() {
 			ClusterVersion := assureClusterVersion()
 
 			By("Assuring ClusterDef and ClusterVersion are Available")
-			tmpClusterDef := &dbaasv1alpha1.ClusterDefinition{}
 			Eventually(func() bool {
+				tmpClusterDef := &dbaasv1alpha1.ClusterDefinition{}
 				err := k8sClient.Get(ctx, client.ObjectKey{Name: createdClusterDef.Name, Namespace: createdClusterDef.Namespace}, tmpClusterDef)
 				if err != nil {
 					return false
@@ -433,8 +428,8 @@ var _ = Describe("SystemAccount Controller", func() {
 				return tmpClusterDef.Status.Phase == dbaasv1alpha1.AvailablePhase
 			}, timeout, interval).Should(BeTrue())
 
-			tmpClusterVersion := &dbaasv1alpha1.ClusterVersion{}
 			Eventually(func() bool {
+				tmpClusterVersion := &dbaasv1alpha1.ClusterVersion{}
 				err := k8sClient.Get(ctx, client.ObjectKey{Name: ClusterVersion.Name, Namespace: ClusterVersion.Namespace}, tmpClusterVersion)
 				if err != nil {
 					return false
@@ -451,38 +446,97 @@ var _ = Describe("SystemAccount Controller", func() {
 			_ = assureEndpont(cluster.Namespace, serviceName)
 			_ = assureHeadlessEndpont(cluster.Namespace, headlessServiceName)
 
-			patchCluster(cluster)
+			patchCluster(intctrlutil.GetNamespacedName(cluster))
 
-			By("Verify accounts to be created")
-			Eventually(func() bool {
-				return len(systemAccountReconciler.ExpectionManager.ListKeys()) == 0
-			}, timeout*2, interval).Should(BeTrue())
+			ml := getLabelsForSecretsAndJobs(cluster.Name, createdClusterDef.Spec.Type, createdClusterDef.Name, compName)
 
-			By("Assure Secret created")
+			getAccounts := func(g Gomega) dbaasv1alpha1.KBAccountType {
+				secrets := &corev1.SecretList{}
+				g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
+				jobs := &batchv1.JobList{}
+				g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
+				return getAccountFacts(secrets, jobs)
+			}
+
+			By("Verify two accounts to be created")
+			Eventually(func(g Gomega) {
+				accounts := getAccounts(g)
+				g.Expect(accounts).To(BeEquivalentTo(dbaasv1alpha1.KBAccountAdmin | dbaasv1alpha1.KBAccountProbe))
+			}, timeout, interval).Should(Succeed())
+
+			By("Assure some Secrets creation are cached")
+			secretsToCreate1 := 0
 			Eventually(func() bool {
-				return len(systemAccountReconciler.SecretMapStore.ListKeys()) > 0
+				secretsToCreate1 = len(systemAccountReconciler.SecretMapStore.ListKeys())
+				return secretsToCreate1 > 0
 			}, timeout, interval).Should(BeTrue())
 
 			By("Create a Backup Policy")
 			policy := assureBackupPolicy(backupPolicyName, databaseEngine, clusterName)
-			policyLabels := policy.Spec.Target.LabelsSelector.MatchLabels
 
-			clusterList := &dbaasv1alpha1.ClusterList{}
-			err := k8sClient.List(ctx, clusterList, client.InNamespace(cluster.Namespace), client.MatchingLabels(policyLabels))
-			Expect(err).NotTo(HaveOccurred())
-
+			By("Check the BackupPolicy creation filters run")
 			policyKey := expectationKey(policy.Namespace, clusterName, databaseEngine)
-			Eventually(func() bool {
+			Eventually(func(g Gomega) {
 				exp, exists, _ := systemAccountReconciler.ExpectionManager.getExpectation(policyKey)
-				return exists && exp.toCreate&dbaasv1alpha1.KBAccountDataprotection > 0
-			}, timeout*2, interval).Should(BeTrue())
+				g.Expect(exists).To(BeTrue())
+				g.Expect(exp.toCreate&dbaasv1alpha1.KBAccountDataprotection > 0).To(BeTrue())
+			}, timeout, interval).Should(Succeed())
 
-			By("Check DeletePolicy After Cluster is Created")
-			Expect(k8sClient.Delete(ctx, policy)).To(Succeed())
+			By("Verify three accounts have been created in total")
+			Eventually(func(g Gomega) {
+				accounts := getAccounts(g)
+				g.Expect(accounts).To(BeEquivalentTo(dbaasv1alpha1.KBAccountAdmin | dbaasv1alpha1.KBAccountDataprotection | dbaasv1alpha1.KBAccountProbe))
+			}, timeout, interval).Should(Succeed())
+
+			By("Assure more Secrets creation are cached")
+			secretsToCreate2 := 0
 			Eventually(func() bool {
+				secretsToCreate2 = len(systemAccountReconciler.SecretMapStore.ListKeys())
+				return secretsToCreate2 > secretsToCreate1
+			}, timeout, interval).Should(BeTrue())
+
+			secretsCreated := 0
+			Eventually(func(g Gomega) {
+				secrets := &corev1.SecretList{}
+				g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
+				secretsCreated = len(secrets.Items)
+			}, timeout, interval).Should(Succeed())
+
+			By("Mock all jobs completed and deleted")
+			Eventually(func(g Gomega) {
+				jobs := &batchv1.JobList{}
+				g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
+				for _, job := range jobs.Items {
+					g.Expect(changeStatus(intctrlutil.GetNamespacedName(&job), func(job *batchv1.Job) {
+						job.Status.Conditions = []batchv1.JobCondition{{
+							Type:   batchv1.JobComplete,
+							Status: corev1.ConditionTrue,
+						}}
+					})).To(Succeed())
+					g.Expect(k8sClient.Delete(ctx, &job)).To(Succeed())
+					g.Expect(changeSpec(intctrlutil.GetNamespacedName(&job), func(job *batchv1.Job) {
+						job.SetFinalizers([]string{})
+					})).To(Succeed())
+				}
+			}, timeout, interval).Should(Succeed())
+
+			By("Check all secrets creation are completed")
+			Eventually(func(g Gomega) {
+				secrets := &corev1.SecretList{}
+				g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
+				g.Expect(len(secrets.Items) == secretsCreated+secretsToCreate2).To(BeTrue())
+				g.Expect(len(systemAccountReconciler.SecretMapStore.ListKeys()) == 0).To(BeTrue())
+			}, timeout, interval).Should(Succeed())
+
+			By("Check the BackupPolicy deletion filter triggered after the Cluster is deleted")
+			Eventually(func() error {
+				return k8sClient.Delete(ctx, policy)
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
 				_, exists, _ := systemAccountReconciler.ExpectionManager.getExpectation(policyKey)
-				return !exists
-			}, timeout*2, interval).Should(BeTrue())
+				g.Expect(exists).To(BeFalse())
+			}, timeout, interval).Should(Succeed())
 		})
 	})
 })

@@ -180,8 +180,8 @@ var _ = Describe("Consensus Component", func() {
 				timeout = 3 * timeout
 			}
 
-			By("test GetComponentDeftByCluster function")
-			componentDef, _ := GetComponentDeftByCluster(ctx, k8sClient, cluster, consensusCompType)
+			By("test GetComponentDefByCluster function")
+			componentDef, _ := GetComponentDefByCluster(ctx, k8sClient, cluster, consensusCompType)
 			Expect(componentDef != nil).Should(BeTrue())
 
 			By("test GetClusterByObject function")

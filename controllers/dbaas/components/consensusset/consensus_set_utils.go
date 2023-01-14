@@ -68,7 +68,7 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 	typeName := util.GetComponentTypeName(*cluster, stsObj.Labels[intctrlutil.AppComponentLabelKey])
 
 	// get component from ClusterDefinition by typeName
-	component, err := util.GetComponentDeftByCluster(ctx, cli, cluster, typeName)
+	component, err := util.GetComponentDefByCluster(ctx, cli, cluster, typeName)
 	if err != nil {
 		return false, err
 	}
@@ -314,7 +314,7 @@ func UpdateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCt
 	// get componentDef this pod belongs to
 	componentName := pod.Labels[intctrlutil.AppComponentLabelKey]
 	typeName := util.GetComponentTypeName(*cluster, componentName)
-	componentDef, err := util.GetComponentDeftByCluster(ctx, cli, cluster, typeName)
+	componentDef, err := util.GetComponentDefByCluster(ctx, cli, cluster, typeName)
 	if err != nil {
 		return err
 	}

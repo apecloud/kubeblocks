@@ -135,8 +135,8 @@ func GetComponentByName(cluster *dbaasv1alpha1.Cluster, componentName string) *d
 	return nil
 }
 
-// GetComponentDeftByCluster gets component from ClusterDefinition with typeName
-func GetComponentDeftByCluster(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, typeName string) (*dbaasv1alpha1.ClusterDefinitionComponent, error) {
+// GetComponentDefByCluster gets component from ClusterDefinition with typeName
+func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, typeName string) (*dbaasv1alpha1.ClusterDefinitionComponent, error) {
 	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
 		return nil, err
@@ -267,7 +267,7 @@ func GetComponentDefaultReplicas(ctx context.Context,
 	cluster *dbaasv1alpha1.Cluster,
 	componentName string) (int32, error) {
 	typeName := GetComponentTypeName(*cluster, componentName)
-	component, err := GetComponentDeftByCluster(ctx, cli, cluster, typeName)
+	component, err := GetComponentDefByCluster(ctx, cli, cluster, typeName)
 	if err != nil {
 		return -1, err
 	}

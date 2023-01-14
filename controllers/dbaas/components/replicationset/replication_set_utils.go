@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"sort"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -47,7 +49,7 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 
 	filter := func(stsObj *appsv1.StatefulSet) (bool, error) {
 		typeName := util.GetComponentTypeName(*cluster, stsObj.Labels[intctrlutil.AppComponentLabelKey])
-		component, err := util.GetComponentDeftByCluster(reqCtx.Ctx, cli, cluster, typeName)
+		component, err := util.GetComponentDefByCluster(reqCtx.Ctx, cli, cluster, typeName)
 		if err != nil {
 			return false, err
 		}
@@ -127,12 +129,13 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 		sort.Sort(util.DescendingOrdinalSts(dos))
 
 		// remove cluster status and delete sts
-		err = RemoveReplicationSetClusterStatus(cli, reqCtx.Ctx, dos[:stsToDelNum])
-		if err != nil {
+		if err := RemoveReplicationSetClusterStatus(cli, reqCtx.Ctx, dos[:stsToDelNum]); err != nil {
 			return err
 		}
 		for i := int32(0); i < stsToDelNum; i++ {
-			if err := cli.Delete(reqCtx.Ctx, dos[i]); err != nil {
+			if err := cli.Delete(reqCtx.Ctx, dos[i]); err == nil || apierrors.IsNotFound(err) {
+				continue
+			} else {
 				return err
 			}
 		}
@@ -168,7 +171,7 @@ func SyncReplicationSetClusterStatus(cli client.Client,
 
 	componentName := podList[0].Labels[intctrlutil.AppComponentLabelKey]
 	typeName := util.GetComponentTypeName(*cluster, componentName)
-	componentDef, err := util.GetComponentDeftByCluster(ctx, cli, cluster, typeName)
+	componentDef, err := util.GetComponentDefByCluster(ctx, cli, cluster, typeName)
 	if err != nil {
 		return err
 	}

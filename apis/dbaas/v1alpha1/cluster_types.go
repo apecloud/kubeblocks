@@ -387,6 +387,19 @@ func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) error {
 	return nil
 }
 
+// ValidatePrimaryIndex validates primaryIndex in cluster API gyaml, and returns metav1.Condition when detect invalid values.
+func (r *Cluster) ValidatePrimaryIndex(cd *ClusterDefinition) error {
+	for _, comp := range r.Spec.Components {
+		// when comp.Replicas is not nil, it will be verified in cluster_webhook, skip here
+		if comp.Replicas != nil {
+			return nil
+		}
+		// validate PrimaryIndex with clusterDefinition component defaultReplicas
+		return cd.ValidatePrimaryIndex(comp.Type, comp.PrimaryIndex)
+	}
+	return nil
+}
+
 // GetTypeMappingComponents return Type name mapping ClusterComponents.
 func (r *Cluster) GetTypeMappingComponents() map[string][]ClusterComponent {
 	m := map[string][]ClusterComponent{}

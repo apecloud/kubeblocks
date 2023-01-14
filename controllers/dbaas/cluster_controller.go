@@ -295,6 +295,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
+	// validate primaryIndex and send warning event log necessarily
+	if err = cluster.ValidatePrimaryIndex(clusterdefinition); err != nil {
+		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	}
+
 	// preCheck succeed, starting the cluster provisioning
 	if err = clusterConditionMgr.setProvisioningStartedCondition(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")

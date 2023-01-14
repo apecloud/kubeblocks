@@ -17,8 +17,10 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -518,4 +520,20 @@ func (r *ClusterDefinition) ValidateEnabledLogConfigs(typeName string, enabledLo
 		}
 	}
 	return invalidLogNames
+}
+
+// ValidatePrimaryIndex When the replicas of the component in the cluster API is empty,
+// check that the value of primaryIndex cannot be greater than the defaultReplicas in the clusterDefinition API
+func (r *ClusterDefinition) ValidatePrimaryIndex(typeName string, primaryIndex *int32) error {
+	message := make([]string, 0)
+	for _, comp := range r.Spec.Components {
+		if !strings.EqualFold(typeName, comp.TypeName) {
+			continue
+		}
+		if *primaryIndex > comp.DefaultReplicas-1 {
+			message = append(message, fmt.Sprintf("component %s's PrimaryIndex cannot be larger than defaultReplicas.", typeName))
+			return errors.New(strings.Join(message, ";"))
+		}
+	}
+	return nil
 }

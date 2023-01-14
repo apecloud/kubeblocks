@@ -92,6 +92,8 @@ var _ = Describe("kubeblocks", func() {
 				IOStreams: streams,
 				HelmCfg:   helm.FakeActionConfig(),
 				Namespace: "default",
+				Client:    testing.FakeClientSet(),
+				dynamic:   testing.FakeDynamicClient(),
 			},
 			Version: version.DefaultKubeBlocksVersion,
 			Monitor: true,
@@ -127,9 +129,11 @@ var _ = Describe("kubeblocks", func() {
 			IOStreams: streams,
 			HelmCfg:   helm.FakeActionConfig(),
 			Namespace: "default",
+			Client:    testing.FakeClientSet(),
+			dynamic:   testing.FakeDynamicClient(),
 		}
 
-		Expect(o.run()).Should(MatchError(MatchRegexp("release: not found")))
+		Expect(o.run()).Should(Succeed())
 	})
 
 	It("remove finalizer", func() {

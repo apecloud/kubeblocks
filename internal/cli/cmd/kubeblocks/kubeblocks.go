@@ -54,7 +54,7 @@ type Options struct {
 
 	HelmCfg   *action.Configuration
 	Namespace string
-	Client    *kubernetes.Clientset
+	Client    kubernetes.Interface
 	dynamic   dynamic.Interface
 }
 

@@ -81,7 +81,7 @@ var _ = Describe("helm util", func() {
 			Expect(o.UnInstall(cfg)).Should(BeNil()) // release exists
 		})
 
-		It("should failed when chart is falied installed", func() {
+		It("should failed when chart is failed installed", func() {
 			err := cfg.Releases.Create(&release.Release{
 				Name:    o.Name,
 				Version: 1,
@@ -90,7 +90,7 @@ var _ = Describe("helm util", func() {
 				},
 			})
 			Expect(err).Should(BeNil())
-			Expect(o.Install(cfg)).Should(ContainSubstring(ErrReleaseNotDeployed.Error()))
+			Expect(o.Install(cfg)).Should(MatchError(ErrReleaseNotDeployed))
 		})
 	})
 

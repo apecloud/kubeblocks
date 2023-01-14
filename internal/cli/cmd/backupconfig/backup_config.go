@@ -17,6 +17,7 @@ limitations under the License.
 package backupconfig
 
 import (
+	"fmt"
 	"strings"
 
 	"k8s.io/kubectl/pkg/util/templates"
@@ -115,12 +116,12 @@ func (o *upgradeOptions) run() error {
 
 	spinner := util.Spinner(o.Out, "Config backup")
 	defer spinner(false)
-
 	if err := config.upgrade(); err != nil {
 		return errors.Wrap(err, "failed to update backup config")
 	}
-
 	spinner(true)
+
+	fmt.Fprintf(o.Out, "Backup config SUCCESSFULLY!\n")
 	return nil
 }
 

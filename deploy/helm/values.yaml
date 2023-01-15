@@ -274,8 +274,171 @@ prometheus:
     ##
     retention: "15d"
 
+  ## Sample prometheus rules/alerts
+  ## NOTE: Please review these carefully as thresholds and behavior may not meet
+  ##       your SLOs or labels.
+  ##
+  ruleFiles:
+    cadvisor_alert_rules.yml: |
+      groups:
+        - name: GoogleCadvisor
+          rules:
+            - alert: ContainerKilled
+              expr: 'time() - container_last_seen{container!="",container!="POD"} > 60'
+              for: 0m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Container killed (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
+                description: "A container has disappeared\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: ContainerAbsent
+              expr: 'absent(container_last_seen{container!="",container!="POD"})'
+              for: 5m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Container absent (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
+                description: "A container is absent for 5 min\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: ContainerCpuUsageWarning
+              expr: 'sum(rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[2m])) BY (instance,pod,container) * 100 > 70'
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Container CPU usage is high (> 70%) (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
+                description: "Container CPU usage is above 70%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: ContainerCpuUsageCritical
+              expr: 'sum(rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[2m])) BY (instance,pod,container) * 100 > 90'
+              for: 1m
+              labels:
+                severity: critical
+              annotations:
+                summary: "Container CPU usage is very high (> 90%) (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
+                description: "Container CPU usage is above 90%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: ContainerMemoryUsage
+              expr: 'sum(container_memory_working_set_bytes{container!="",container!="POD"}) BY (instance,pod,container) / sum(container_spec_memory_limit_bytes{container!="",container!="POD"} > 0) BY (instance,pod,container) * 100 > 90'
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Container Memory usage is high (> 90%) (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
+                description: "Container Memory usage is above 90%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: ContainerMemoryUsagePredict
+              expr: 'sum(predict_linear(container_memory_working_set_bytes{container!="",container!="POD"}[15m], 30*60)) BY (instance,pod,container) - sum(container_spec_memory_limit_bytes{container!="",container!="POD"} > 0) BY (instance,pod,container) >= 0'
+              for: 0m
+              labels:
+                severity: critical
+              annotations:
+                summary: "Container Memory usage may exceed the limit 30 minutes later (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
+                description: "Container Memory usage may exceed the limit 30 minutes later\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: ContainerVolumeUsage
+              expr: 'sum(container_fs_usage_bytes) BY (instance,device) / sum(container_fs_limit_bytes) BY (instance,device) * 100 > 90'
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Device Volume usage is high (> 90%) (node: {{ $labels.instance }}, device: {{ $labels.device }})"
+                description: "Device Volume usage is above 90%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: ContainerHighCpuThrottleRate
+              expr: 'rate(container_cpu_cfs_throttled_seconds_total{container!="",container!="POD"}[2m]) > 1'
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Container high throttle rate (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
+                description: "Container is being throttled\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+    mysql_alert_rules.yml: |
+      groups:
+        - name: MysqldExporter
+          rules:
+            - alert: MysqlDown
+              expr: 'max_over_time(mysql_up[1m]) == 0'
+              for: 1m
+              labels:
+                severity: critical
+              annotations:
+                summary: "MySQL is down (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "MySQL instance is down on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: MysqlRestarted
+              expr: 'mysql_global_status_uptime < 60'
+              for: 0m
+              labels:
+                severity: info
+              annotations:
+                summary: "MySQL restarted (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "MySQL has just been restarted, less than one minute ago on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: MysqlTooManyConnections
+              expr: 'sum(max_over_time(mysql_global_status_threads_connected[1m]) / mysql_global_variables_max_connections) BY (namespace,app_kubernetes_io_instance,pod) * 100 > 80'
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "MySQL too many connections (> 80%) (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "More than 80% of MySQL connections are in use on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: MysqlConnectionErrors
+              expr: 'sum(increase(mysql_global_status_connection_errors_total[1m])) BY (namespace,app_kubernetes_io_instance,pod) > 0'
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "MySQL connection errors (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "MySQL server has some connection errors on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: MysqlHighThreadsRunning
+              expr: 'sum(max_over_time(mysql_global_status_threads_running[1m]) / mysql_global_variables_max_connections) BY (namespace,app_kubernetes_io_instance,pod) * 100 > 60'
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "MySQL high threads running (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "More than 60% of MySQL connections are in running state on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: MysqlSlowQueries
+              expr: 'sum(increase(mysql_global_status_slow_queries[1m])) BY (namespace,app_kubernetes_io_instance,pod) > 0'
+              for: 2m
+              labels:
+                severity: info
+              annotations:
+                summary: "MySQL slow queries (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "MySQL server has some new slow query on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: MysqlInnodbLogWaits
+              expr: 'sum(rate(mysql_global_status_innodb_log_waits[5m])) BY (namespace,app_kubernetes_io_instance,pod) > 10'
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "MySQL InnoDB log waits (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "MySQL innodb log writes stalling on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: MysqlInnodbBufferPoolHits
+              expr: 'sum(rate(mysql_global_status_innodb_buffer_pool_reads[5m]) / rate(mysql_global_status_innodb_buffer_pool_read_requests[5m])) BY (namespace,app_kubernetes_io_instance,pod) * 100 > 5'
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "MySQL InnoDB high read requests rate hitting disk (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "High number of logical reads that InnoDB could not satisfy from the buffer pool, and had to read directly from disk on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
   serverFiles:
     prometheus.yml:
+      rule_files:
+        - /etc/config/recording_rules.yml
+        - /etc/config/alerting_rules.yml
+        - /etc/config/cadvisor_alert_rules.yml
+        - /etc/config/mysql_alert_rules.yml
+
       scrape_configs:
         - job_name: prometheus
           static_configs:

@@ -23,13 +23,11 @@ ENV GOPRIVATE=github.com/apecloud
 ENV GOPROXY=${GOPROXY}
 
 WORKDIR /workspace
-COPY go.work go.work
-COPY go.work.sum go.work.sum
-# # Copy the Go Modules manifests
-# COPY go.mod go.mod
-# COPY go.sum go.sum
-# # cache deps before building and copying source so that we don't need to re-download as much
-# # and so that source changes don't invalidate our downloaded layer
+# Copy the Go Modules manifests
+COPY go.mod go.mod
+COPY go.sum go.sum
+# cache deps before building and copying source so that we don't need to re-download as much
+# and so that source changes don't invalidate our downloaded layer
 # RUN go mod download
 
 # Copy the go source
@@ -55,6 +53,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_
 
 # Build
 
+# curl binary layer
 FROM --platform=${TARGETPLATFORM} tarampampam/curl:7.85.0 as binary-downloader
 
 # Use distroless as minimal base image to package the manager binary

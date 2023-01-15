@@ -1,8 +1,6 @@
 go 1.19
 
 use (
-	./cmd/agamotto
-	./cmd/loadbalancer
-	./cmd/manager
+	.
 	./cmd/probe
 )

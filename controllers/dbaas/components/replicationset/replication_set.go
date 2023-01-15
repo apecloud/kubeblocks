@@ -19,6 +19,8 @@ package replicationset
 import (
 	"context"
 
+	"k8s.io/client-go/tools/record"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -87,7 +89,7 @@ func (rs *ReplicationSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32)
 
 // HandleProbeTimeoutWhenPodsReady is the implementation of the type Component interface method,
 // and replicationSet does not need to do role probe detection, so it returns true directly.
-func (rs *ReplicationSet) HandleProbeTimeoutWhenPodsReady() (bool, error) {
+func (rs *ReplicationSet) HandleProbeTimeoutWhenPodsReady(recorder record.EventRecorder) (bool, error) {
 	return true, nil
 }
 

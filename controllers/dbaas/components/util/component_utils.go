@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -88,7 +89,7 @@ func IsProbeTimeout(podsReadyTime *metav1.Time) bool {
 	if podsReadyTime == nil {
 		return false
 	}
-	return time.Now().After(podsReadyTime.Add(time.Minute))
+	return time.Now().After(podsReadyTime.Add(types.ProbeTimeout))
 }
 
 func CalculateComponentPhase(isFailed, isAbnormal bool) dbaasv1alpha1.Phase {

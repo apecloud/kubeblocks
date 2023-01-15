@@ -23,6 +23,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -64,7 +65,7 @@ func (stateful *Stateful) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32)
 }
 
 // HandleProbeTimeoutWhenPodsReady the Stateful component has no role detection, empty implementation here.
-func (stateful *Stateful) HandleProbeTimeoutWhenPodsReady() (bool, error) {
+func (stateful *Stateful) HandleProbeTimeoutWhenPodsReady(recorder record.EventRecorder) (bool, error) {
 	return false, nil
 }
 

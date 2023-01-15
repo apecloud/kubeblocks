@@ -21,6 +21,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -57,6 +58,7 @@ func NewComponentByType(
 // handleComponentStatusAndSyncCluster handles component status. if the component status changed, sync cluster.status.components
 func handleComponentStatusAndSyncCluster(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
+	recorder record.EventRecorder,
 	obj client.Object,
 	cluster *dbaasv1alpha1.Cluster,
 	component types.Component) (time.Duration, error) {
@@ -78,7 +80,7 @@ func handleComponentStatusAndSyncCluster(reqCtx intctrlutil.RequestCtx,
 		return requeueAfter, nil
 	}
 	if podsReady {
-		if requeueWhenPodsReady, err = component.HandleProbeTimeoutWhenPodsReady(); err != nil {
+		if requeueWhenPodsReady, err = component.HandleProbeTimeoutWhenPodsReady(recorder); err != nil {
 			return requeueAfter, nil
 		}
 	}

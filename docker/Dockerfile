@@ -23,6 +23,9 @@ ENV GOPRIVATE=github.com/apecloud
 ENV GOPROXY=${GOPROXY}
 
 WORKDIR /workspace
+# Download binaries
+RUN curl -L https://dl.k8s.io/release/v1.24.2/bin/${TARGETOS}/${TARGETARCH}/kubectl -o kubectl && chmod +x kubectl
+
 # Copy the Go Modules manifests
 COPY go.mod go.mod
 COPY go.sum go.sum
@@ -31,28 +34,20 @@ COPY go.sum go.sum
 # RUN go mod download
 
 # Copy the go source
-COPY cmd/manager/ cmd/manager/
 COPY cmd/agamotto/ cmd/agamotto/
+COPY cmd/probe/ cmd/probe/
+COPY cmd/manager/ cmd/manager/
 COPY apis/ apis/
 COPY internal/ internal/
 COPY controllers/ controllers/
 
-# Download binaries
-RUN curl -L https://dl.k8s.io/release/v1.24.2/bin/${TARGETOS}/${TARGETARCH}/kubectl -o kubectl && chmod +x kubectl
-
-# Build
+# Build agamotto
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o agamotto cmd/agamotto/main.go
+# Build probe
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o probe cmd/probe/main.go
 ## have manager as last build step due to its volatility
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o manager cmd/manager/main.go
 
-# Build the probe binary
-WORKDIR /workspace/cmd/probe
-COPY cmd/probe/go.mod go.mod
-COPY cmd/probe/go.sum go.sum
-COPY cmd/probe/main.go main.go
-COPY cmd/probe/internal internal
-# Build
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o probe main.go
 
 # curl binary layer
 FROM --platform=${TARGETPLATFORM} tarampampam/curl:7.85.0 as binary-downloader
@@ -64,9 +59,9 @@ FROM katanomi/distroless-static:nonroot
 WORKDIR /
 COPY --from=binary-downloader /bin/curl /bin
 COPY --from=builder /workspace/kubectl /bin
-COPY --from=builder /workspace/cmd/probe/probe /bin
-COPY config/probe config/probe
 COPY --from=builder /workspace/agamotto /bin
+COPY --from=builder /workspace/probe /bin
+COPY config/probe config/probe
 COPY --from=builder /workspace/manager .
 USER 65532:65532
 

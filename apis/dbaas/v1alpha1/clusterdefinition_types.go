@@ -28,7 +28,7 @@ import (
 type ClusterDefinitionSpec struct {
 	// Cluster definition type define well known cluster types. The valid will keep consistent
 	// with known DAPR component type (https://docs.dapr.io/reference/components-reference/). For
-	// component that has yet provided by DAPR, then it's suggested the follow and naming scheme 
+	// component that has yet provided by DAPR, then it's suggested the follow and naming scheme
 	// as DAPR componet, i.e., a state store related Cluster starts with "state.<app-name>".
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=24

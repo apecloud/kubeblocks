@@ -48,7 +48,7 @@ import (
 )
 
 var (
-	webConfig     = webflag.AddFlags(kingpin.CommandLine)
+	webConfig     = webflag.AddFlags(kingpin.CommandLine, "0.0.0.0")
 	listenAddress = kingpin.Flag(
 		"web.listen-address",
 		"Address to listen on for web interface and telemetry.",

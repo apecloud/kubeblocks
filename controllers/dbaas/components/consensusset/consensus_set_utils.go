@@ -162,6 +162,7 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 	return plan.WalkOneStep()
 }
 
+// SortPods sorts pods by their role priority
 func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int) {
 	// make a Serial pod list,
 	// e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name

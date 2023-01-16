@@ -55,7 +55,7 @@ type Options struct {
 	HelmCfg   *action.Configuration
 	Namespace string
 	Client    kubernetes.Interface
-	dynamic   dynamic.Interface
+	Dynamic   dynamic.Interface
 }
 
 type InstallOptions struct {
@@ -65,6 +65,7 @@ type InstallOptions struct {
 	Monitor         bool
 	Quiet           bool
 	CreateNamespace bool
+	CheckResource   bool
 }
 
 var (
@@ -86,11 +87,12 @@ var (
 // NewKubeBlocksCmd creates the kubeblocks command
 func NewKubeBlocksCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "kubeblocks [install | uninstall]",
+		Use:   "kubeblocks [install | upgrade | uninstall]",
 		Short: "KubeBlocks operation commands",
 	}
 	cmd.AddCommand(
 		newInstallCmd(f, streams),
+		newUpgradeCmd(f, streams),
 		newUninstallCmd(f, streams),
 	)
 	return cmd
@@ -116,7 +118,7 @@ func (o *Options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	if o.dynamic, err = f.DynamicClient(); err != nil {
+	if o.Dynamic, err = f.DynamicClient(); err != nil {
 		return err
 	}
 
@@ -132,6 +134,7 @@ func (o *Options) preCheck() error {
 
 	preCheckList := []string{
 		"clusters.dbaas.kubeblocks.io",
+		"backuptools.dataprotection.kubeblocks.io",
 	}
 	ctx := context.Background()
 	// delete crds
@@ -141,7 +144,7 @@ func (o *Options) preCheck() error {
 		Resource: "customresourcedefinitions",
 	}
 	crs := map[string][]string{}
-	crdList, err := o.dynamic.Resource(crdGVR).List(ctx, metav1.ListOptions{})
+	crdList, err := o.Dynamic.Resource(crdGVR).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -159,7 +162,7 @@ func (o *Options) preCheck() error {
 				Resource: strings.Split(crd.GetName(), ".")[0],
 			}
 			// find custom resource
-			objList, err := o.dynamic.Resource(gvr).List(ctx, metav1.ListOptions{})
+			objList, err := o.Dynamic.Resource(gvr).List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return err
 			}
@@ -170,8 +173,7 @@ func (o *Options) preCheck() error {
 	}
 
 	if len(crs) > 0 {
-		errMsg := bytes.Buffer{}
-		errMsg.WriteString("failed to uninstall, the following custom resources need to be removed first:\n")
+		errMsg := bytes.NewBufferString("failed to uninstall, the following custom resources need to be removed first:\n")
 		for k, v := range crs {
 			errMsg.WriteString(fmt.Sprintf("  %s: %s\n", k, strings.Join(v, ",")))
 		}
@@ -204,13 +206,8 @@ func (o *InstallOptions) Run() error {
 		}
 	}
 
-	objs, err := getKBObjects(o.Client, o.dynamic, o.Namespace)
-	if err != nil {
-		fmt.Fprintf(o.ErrOut, "Detect whether there are resources left by KubeBlocks before: %s\n", err.Error())
-	}
-
-	if checkIfRemainedResource(objs) {
-		return fmt.Errorf("there are resources left by KubeBlocks before, try to run \"kbcli kubeblocks uninstall\" to clean up")
+	if err = o.checkResource(); err != nil {
+		return err
 	}
 
 	spinner := util.Spinner(o.Out, "Install KubeBlocks %s", o.Version)
@@ -227,6 +224,51 @@ func (o *InstallOptions) Run() error {
 
 	// install KubeBlocks chart
 	if err = o.installChart(); err != nil {
+		return err
+	}
+
+	// successfully installed
+	spinner(true)
+
+	// print notes
+	if !o.Quiet {
+		o.printNotes()
+	}
+
+	return nil
+}
+
+func (o *InstallOptions) checkResource() error {
+	if !o.CheckResource {
+		return nil
+	}
+
+	objs, err := getKBObjects(o.Client, o.Dynamic, o.Namespace)
+	if err != nil {
+		fmt.Fprintf(o.ErrOut, "Detect whether there are resources left by KubeBlocks before: %s\n", err.Error())
+	}
+
+	if checkIfRemainedResource(objs) {
+		return fmt.Errorf("there are resources left by KubeBlocks before, try to run \"kbcli kubeblocks uninstall\" to clean up")
+	}
+	return nil
+}
+
+func (o *InstallOptions) Upgrade() error {
+	spinner := util.Spinner(o.Out, "Upgrading KubeBlocks to %s", o.Version)
+	defer spinner(false)
+
+	if o.Monitor {
+		o.Sets = append(o.Sets, kMonitorParam)
+	}
+
+	// Add repo, if exists, will update it
+	if err := helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}); err != nil {
+		return err
+	}
+
+	// upgrade KubeBlocks chart
+	if err := o.upgradeChart(); err != nil {
 		return err
 	}
 
@@ -261,6 +303,25 @@ func (o *InstallOptions) installChart() error {
 	return chart.Install(o.HelmCfg)
 }
 
+func (o *InstallOptions) upgradeChart() error {
+	var sets []string
+	for _, set := range o.Sets {
+		splitSet := strings.Split(set, ",")
+		sets = append(sets, splitSet...)
+	}
+	chart := helm.InstallOpts{
+		Name:      types.KubeBlocksChartName,
+		Chart:     types.KubeBlocksChartName + "/" + types.KubeBlocksChartName,
+		Wait:      true,
+		Version:   o.Version,
+		Namespace: o.Namespace,
+		Sets:      sets,
+		Login:     true,
+		TryTimes:  2,
+	}
+	return chart.Upgrade(o.HelmCfg)
+}
+
 func (o *InstallOptions) printNotes() {
 	fmt.Fprintf(o.Out, `
 KubeBlocks %s Install SUCCESSFULLY!
@@ -288,8 +349,7 @@ Notes: Monitor components(Grafana/Prometheus/AlertManager) is not installed,
 }
 
 func (o *Options) run() error {
-	printMsg := func(msg string, err error) {
-		spinner := util.Spinner(o.Out, msg)
+	printErr := func(spinner func(result bool), err error) {
 		if err == nil || apierrors.IsNotFound(err) ||
 			strings.Contains(err.Error(), "release: not found") {
 			spinner(true)
@@ -304,32 +364,35 @@ func (o *Options) run() error {
 	chart := helm.InstallOpts{
 		Name:      types.KubeBlocksChartName,
 		Namespace: o.Namespace,
-		Wait:      true,
 	}
-	printMsg(fmt.Sprintf("Uninstall helm release %s %s", types.KubeBlocksChartName, version),
-		chart.UnInstall(o.HelmCfg))
+	spinner := util.Spinner(o.Out, fmt.Sprintf("Uninstall helm release %s %s", types.KubeBlocksChartName, version))
+	printErr(spinner, chart.UnInstall(o.HelmCfg))
 
 	// remove repo
-	printMsg("Remove helm repo "+types.KubeBlocksChartName,
-		helm.RemoveRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}))
+	spinner = util.Spinner(o.Out, "Remove helm repo "+types.KubeBlocksChartName)
+	printErr(spinner, helm.RemoveRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}))
 
 	// get KubeBlocks objects and try to remove them
-	objs, err := getKBObjects(o.Client, o.dynamic, o.Namespace)
+	objs, err := getKBObjects(o.Client, o.Dynamic, o.Namespace)
 	if err != nil {
 		fmt.Fprintf(o.ErrOut, "Get KubeBlocks Ojects throw some errors %s", err.Error())
 	}
 
 	// remove finalizers
-	printMsg("Remove ClusterDefinition and ClusterVersion", removeFinalizers(o.dynamic, objs))
+	spinner = util.Spinner(o.Out, "Remove ClusterDefinition and ClusterVersion")
+	printErr(spinner, removeFinalizers(o.Dynamic, objs))
 
 	// delete CRDs
-	printMsg("Remove CRDs", deleteCRDs(o.dynamic, objs.crds))
+	spinner = util.Spinner(o.Out, "Remove CRDs")
+	printErr(spinner, deleteCRDs(o.Dynamic, objs.crds))
 
 	// delete deployments
-	printMsg("Remove deployments", deleteDeploys(o.Client, objs.deploys))
+	spinner = util.Spinner(o.Out, "Remove deployments")
+	printErr(spinner, deleteDeploys(o.Client, objs.deploys))
 
 	// delete services
-	printMsg("Remove services", deleteServices(o.Client, objs.svcs))
+	spinner = util.Spinner(o.Out, "Remove services")
+	printErr(spinner, deleteServices(o.Client, objs.svcs))
 	fmt.Fprintln(o.Out, "Uninstall KubeBlocks done")
 	return nil
 }
@@ -356,6 +419,31 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
 	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "create the namespace if not present")
+	cmd.Flags().BoolVar(&o.CheckResource, "check-resource", true, "check if there are some resources remained")
+
+	return cmd
+}
+
+func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &InstallOptions{
+		Options: Options{
+			IOStreams: streams,
+		},
+	}
+
+	cmd := &cobra.Command{
+		Use:     "upgrade",
+		Short:   "Upgrade KubeBlocks",
+		Args:    cobra.NoArgs,
+		Example: installExample,
+		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.complete(f, cmd))
+			util.CheckErr(o.Upgrade())
+		},
+	}
+
+	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
+	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
 
 	return cmd
 }

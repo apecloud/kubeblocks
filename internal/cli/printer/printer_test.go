@@ -17,8 +17,13 @@ limitations under the License.
 package printer
 
 import (
+	"fmt"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	clitesting "github.com/apecloud/kubeblocks/internal/cli/testing"
 )
 
 var (
@@ -42,4 +47,46 @@ func TestPrintTable(t *testing.T) {
 		printer.AddRow(row...)
 	}
 	printer.Print()
+}
+
+func TestPrintPairStringToLine(t *testing.T) {
+	doPrintPairStringToLineAssert(nil, t)
+	spaceCount := 0
+	doPrintPairStringToLineAssert(&spaceCount, t)
+	spaceCount = 3
+	doPrintPairStringToLineAssert(&spaceCount, t)
+}
+
+func doPrintPairStringToLineAssert(spaceCount *int, t *testing.T) {
+	done := clitesting.Capture()
+	key, value := "key", "value"
+	var expectSpaceCount int
+	if spaceCount == nil {
+		PrintPairStringToLine(key, value)
+		expectSpaceCount = 2
+	} else {
+		PrintPairStringToLine(key, value, *spaceCount)
+		expectSpaceCount = *spaceCount
+	}
+
+	capturedOutput, err := done()
+	if err != nil {
+		t.Error("capture stdout failed:" + err.Error())
+	}
+	var spaceStr string
+	for i := 0; i < expectSpaceCount; i++ {
+		spaceStr += " "
+	}
+	assert.Equal(t, fmt.Sprintf("%s%-20s%s", spaceStr, key+":", value+"\n"), capturedOutput)
+}
+
+func TestPrintLineWithTabSeparator(t *testing.T) {
+	done := clitesting.Capture()
+	key, value := "key", "value"
+	PrintLineWithTabSeparator(NewPair(key, value))
+	capturedOutput, err := done()
+	if err != nil {
+		t.Error("capture stdout failed:" + err.Error())
+	}
+	assert.Equal(t, fmt.Sprintf("%s: %s\t\n", key, value), capturedOutput)
 }

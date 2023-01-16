@@ -21,6 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"github.com/spf13/cobra"
 	appv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -92,7 +93,7 @@ var _ = Describe("kubeblocks", func() {
 				HelmCfg:   helm.FakeActionConfig(),
 				Namespace: "default",
 				Client:    testing.FakeClientSet(),
-				dynamic:   testing.FakeDynamicClient(),
+				Dynamic:   testing.FakeDynamicClient(),
 			},
 			Version:         version.DefaultKubeBlocksVersion,
 			Monitor:         true,
@@ -102,6 +103,46 @@ var _ = Describe("kubeblocks", func() {
 		Expect(len(o.Sets)).To(Equal(1))
 		Expect(o.Sets[0]).To(Equal(kMonitorParam))
 		Expect(o.installChart()).Should(HaveOccurred())
+		o.printNotes()
+	})
+
+	It("check upgrade", func() {
+		var cfg string
+		cmd = newUpgradeCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+		Expect(cmd.HasSubCommands()).Should(BeFalse())
+
+		o := &InstallOptions{
+			Options: Options{
+				IOStreams: streams,
+			},
+		}
+
+		By("command without kubeconfig flag")
+		Expect(o.complete(tf, cmd)).Should(HaveOccurred())
+
+		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
+		cmd.Flags().StringVar(&cfg, "context", "", "The name of the kubeconfig context to use.")
+		Expect(o.complete(tf, cmd)).To(Succeed())
+		Expect(o.HelmCfg).ShouldNot(BeNil())
+		Expect(o.Namespace).To(Equal("test"))
+	})
+
+	It("run upgrade", func() {
+		o := &InstallOptions{
+			Options: Options{
+				IOStreams: streams,
+				HelmCfg:   helm.FakeActionConfig(),
+				Namespace: "default",
+			},
+			Version: version.DefaultKubeBlocksVersion,
+			Monitor: true,
+		}
+		Expect(o.Upgrade()).Should(HaveOccurred())
+		Expect(len(o.Sets)).To(Equal(1))
+		Expect(o.Sets[0]).To(Equal(kMonitorParam))
+		Expect(o.upgradeChart()).Should(HaveOccurred())
+
 		o.printNotes()
 	})
 
@@ -128,7 +169,7 @@ var _ = Describe("kubeblocks", func() {
 			HelmCfg:   helm.FakeActionConfig(),
 			Namespace: "default",
 			Client:    testing.FakeClientSet(),
-			dynamic:   testing.FakeDynamicClient(),
+			Dynamic:   testing.FakeDynamicClient(),
 		}
 
 		Expect(o.run()).Should(Succeed())

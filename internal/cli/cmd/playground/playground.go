@@ -306,9 +306,14 @@ func printGuide(cloudProvider string, hostIP string, init bool) error {
 }
 
 func (o *initOptions) installKubeBlocks() error {
-	client, err := util.NewFactory().KubernetesClientSet()
+	f := util.NewFactory()
+	client, err := f.KubernetesClientSet()
 	if err != nil {
-		return nil
+		return err
+	}
+	dynamic, err := f.DynamicClient()
+	if err != nil {
+		return err
 	}
 	insOpts := kubeblocks.InstallOptions{
 		Options: kubeblocks.Options{
@@ -316,10 +321,12 @@ func (o *initOptions) installKubeBlocks() error {
 			Namespace: defaultNamespace,
 			IOStreams: o.IOStreams,
 			Client:    client,
+			Dynamic:   dynamic,
 		},
-		Version: o.kbVersion,
-		Monitor: true,
-		Quiet:   true,
+		Version:       o.kbVersion,
+		Monitor:       true,
+		Quiet:         true,
+		CheckResource: false,
 	}
 	return insOpts.Run()
 }

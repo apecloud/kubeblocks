@@ -1,11 +1,19 @@
-## kbcli kubeblocks
+## kbcli cluster horizontal-scale
 
-KubeBlocks operation commands
+Horizontal scale the specified components in the cluster
+
+```
+kbcli cluster horizontal-scale [flags]
+```
 
 ### Options
 
 ```
-  -h, --help   help for kubeblocks
+      --component-names strings       Component names to this operations (required)
+  -h, --help                         help for horizontal-scale
+      --name string                  OpsRequest name. if not specified, it will be randomly generated 
+      --replicas int                 Replicas with the specified components (default -1)
+      --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
 ```
 
 ### Options inherited from parent commands
@@ -33,8 +41,5 @@ KubeBlocks operation commands
 
 ### SEE ALSO
 
-* [kbcli](kbcli.md)	 - KubeBlocks CLI
-* [kbcli kubeblocks install](kbcli_kubeblocks_install.md)	 - Install KubeBlocks
-* [kbcli kubeblocks uninstall](kbcli_kubeblocks_uninstall.md)	 - Uninstall KubeBlocks
-* [kbcli kubeblocks upgrade](kbcli_kubeblocks_upgrade.md)	 - Upgrade KubeBlocks
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster operation command
 

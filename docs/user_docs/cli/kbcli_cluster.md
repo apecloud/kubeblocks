@@ -42,7 +42,8 @@ Cluster operation command
 * [kbcli cluster delete-ops](kbcli_cluster_delete-ops.md)	 - Delete a OpsRequest
 * [kbcli cluster delete-restore](kbcli_cluster_delete-restore.md)	 - Delete a restore job
 * [kbcli cluster describe](kbcli_cluster_describe.md)	 - Show details of a specific cluster
-* [kbcli cluster horizontal-scaling](kbcli_cluster_horizontal-scaling.md)	 - Horizontal scaling the specified components in the cluster
+* [kbcli cluster describe-ops](kbcli_cluster_describe-ops.md)	 - Show details of a specific OpsRequest
+* [kbcli cluster horizontal-scale](kbcli_cluster_horizontal-scale.md)	 - Horizontal scale the specified components in the cluster
 * [kbcli cluster list](kbcli_cluster_list.md)	 - List clusters
 * [kbcli cluster list-backups](kbcli_cluster_list-backups.md)	 - List backup jobs
 * [kbcli cluster list-components](kbcli_cluster_list-components.md)	 - List cluster components
@@ -57,6 +58,6 @@ Cluster operation command
 * [kbcli cluster restore](kbcli_cluster_restore.md)	 - Restore a new cluster from backup
 * [kbcli cluster update](kbcli_cluster_update.md)	 - Update the cluster settings, such as enable or disable monitor or log
 * [kbcli cluster upgrade](kbcli_cluster_upgrade.md)	 - Upgrade the cluster version
-* [kbcli cluster vertical-scaling](kbcli_cluster_vertical-scaling.md)	 - Vertical scaling the specified components in the cluster
-* [kbcli cluster volume-expansion](kbcli_cluster_volume-expansion.md)	 - Expand volume with the specified components and volumeClaimTemplates in the cluster
+* [kbcli cluster vertical-scale](kbcli_cluster_vertical-scale.md)	 - Vertical scale the specified components in the cluster
+* [kbcli cluster volume-expand](kbcli_cluster_volume-expand.md)	 - Expand volume with the specified components and volumeClaimTemplates in the cluster
 

@@ -419,7 +419,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
 	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "create the namespace if not present")
-	cmd.Flags().BoolVar(&o.CheckResource, "check-resource", true, "check if there are some resources remained")
+	cmd.Flags().BoolVar(&o.CheckResource, "check-resource", true, "check if there are some resources remained before install")
 
 	return cmd
 }

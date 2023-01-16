@@ -1,11 +1,30 @@
-## kbcli kubeblocks
+## kbcli kubeblocks upgrade
 
-KubeBlocks operation commands
+Upgrade KubeBlocks
+
+```
+kbcli kubeblocks upgrade [flags]
+```
+
+### Examples
+
+```
+  # Install KubeBlocks
+  kbcli kubeblocks install
+  
+  # Install KubeBlocks with specified version
+  kbcli kubeblocks install --version=0.2.0
+  
+  # Install KubeBlocks with other settings, for example, set replicaCount to 3
+  kbcli kubeblocks install --set replicaCount=3
+```
 
 ### Options
 
 ```
-  -h, --help   help for kubeblocks
+  -h, --help              help for upgrade
+      --set stringArray   Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
+      --version string    KubeBlocks version
 ```
 
 ### Options inherited from parent commands
@@ -33,8 +52,5 @@ KubeBlocks operation commands
 
 ### SEE ALSO
 
-* [kbcli](kbcli.md)	 - KubeBlocks CLI
-* [kbcli kubeblocks install](kbcli_kubeblocks_install.md)	 - Install KubeBlocks
-* [kbcli kubeblocks uninstall](kbcli_kubeblocks_uninstall.md)	 - Uninstall KubeBlocks
-* [kbcli kubeblocks upgrade](kbcli_kubeblocks_upgrade.md)	 - Upgrade KubeBlocks
+* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands
 

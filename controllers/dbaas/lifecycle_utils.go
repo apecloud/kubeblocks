@@ -1671,7 +1671,7 @@ func deleteBackup(ctx context.Context, cli client.Client, clusterName string, co
 		return nil
 	}
 
-	deleteBackup := func() error {
+	deleteRelatedBackups := func() error {
 		backupList := dataprotectionv1alpha1.BackupList{}
 		if err := cli.List(ctx, &backupList, ml); err != nil {
 			return err
@@ -1688,7 +1688,7 @@ func deleteBackup(ctx context.Context, cli client.Client, clusterName string, co
 		return err
 	}
 
-	return deleteBackup()
+	return deleteRelatedBackups()
 }
 
 func buildBackupPolicy(sts *appsv1.StatefulSet,

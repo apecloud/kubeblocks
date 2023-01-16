@@ -70,7 +70,7 @@ func DeleteObjectBackground(cli client.Client, ctx context.Context, obj client.O
 	}
 
 	if err := cli.Delete(ctx, obj, deleteOptions); err != nil {
-		// failed delete backups, return error info.
+		// failed to delete backups, return error info.
 		return err
 	}
 	return nil

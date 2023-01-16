@@ -91,9 +91,9 @@ const (
 	// BackupRetain always retained, unless manually deleted by the user
 	BackupRetain = "Retain"
 
-	// BackupRetainUntilExpired retain backup until it expires
+	// BackupRetainUntilExpired retains backup till it expires
 	BackupRetainUntilExpired = "RetainUntilExpired"
 
-	// BackupDelete (default)delete backup immediately when cluster's terminationPolicy is WipeOut
+	// BackupDelete (default) deletes backup immediately when cluster's terminationPolicy is WipeOut
 	BackupDelete = "Delete"
 )

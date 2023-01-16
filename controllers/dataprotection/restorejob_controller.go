@@ -96,7 +96,7 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		// get backup tool
 		// get backup job
 		// build a job pod sec
-		jobPodSpec, err := r.getPodSpec(reqCtx, restoreJob)
+		jobPodSpec, err := r.buildPodSpec(reqCtx, restoreJob)
 		if err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
@@ -138,21 +138,23 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			restoreJob.Status.Phase = dataprotectionv1alpha1.RestoreJobNew
 		} else {
 			jobStatusConditions := job.Status.Conditions
-			if len(jobStatusConditions) > 0 {
-				if jobStatusConditions[0].Type == batchv1.JobComplete {
-					// update Phase to in Completed
-					restoreJob.Status.Phase = dataprotectionv1alpha1.RestoreJobCompleted
-					restoreJob.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
-					// get stateful service and
-					// set stateful set replicate 1
-					patch := []byte(`{"spec":{"replicas":1}}`)
-					if err := r.patchTargetCluster(reqCtx, restoreJob, patch); err != nil {
-						return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-					}
-				} else if jobStatusConditions[0].Type == batchv1.JobFailed {
-					restoreJob.Status.Phase = dataprotectionv1alpha1.RestoreJobFailed
-					restoreJob.Status.FailureReason = job.Status.Conditions[0].Reason
+			if len(jobStatusConditions) == 0 {
+				return intctrlutil.RequeueAfter(5*time.Second, reqCtx.Log, "")
+			}
+
+			if jobStatusConditions[0].Type == batchv1.JobComplete {
+				// update Phase to in Completed
+				restoreJob.Status.Phase = dataprotectionv1alpha1.RestoreJobCompleted
+				restoreJob.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+				// get stateful service and
+				// set stateful set replicate to 1
+				patch := []byte(`{"spec":{"replicas":1}}`)
+				if err := r.patchTargetCluster(reqCtx, restoreJob, patch); err != nil {
+					return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 				}
+			} else if jobStatusConditions[0].Type == batchv1.JobFailed {
+				restoreJob.Status.Phase = dataprotectionv1alpha1.RestoreJobFailed
+				restoreJob.Status.FailureReason = job.Status.Conditions[0].Reason
 			}
 		}
 		// reconcile until status is completed or failed
@@ -219,7 +221,7 @@ func (r *RestoreJobReconciler) getBatchV1Job(reqCtx intctrlutil.RequestCtx, back
 	return job, nil
 }
 
-func (r *RestoreJobReconciler) getPodSpec(reqCtx intctrlutil.RequestCtx, restoreJob *dataprotectionv1alpha1.RestoreJob) (corev1.PodSpec, error) {
+func (r *RestoreJobReconciler) buildPodSpec(reqCtx intctrlutil.RequestCtx, restoreJob *dataprotectionv1alpha1.RestoreJob) (corev1.PodSpec, error) {
 	var podSpec corev1.PodSpec
 	logger := reqCtx.Log
 

@@ -38,26 +38,9 @@ var statefulPodRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 // statefulSetRegex is a regular expression that extracts StatefulSet's ordinal from the Name of StatefulSet
 var statefulSetRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 
-// getParentNameAndOrdinal gets the name of pod's parent StatefulSet and pod's ordinal as extracted from its Name. If
-// the Pod was not created by a StatefulSet, its parent is considered to be empty string, and its ordinal is considered
-// to be -1.
-func getParentNameAndOrdinal(pod *corev1.Pod) (string, int) {
-	parent := ""
-	ordinal := -1
-	subMatches := statefulPodRegex.FindStringSubmatch(pod.Name)
-	if len(subMatches) < 3 {
-		return parent, ordinal
-	}
-	parent = subMatches[1]
-	if i, err := strconv.ParseInt(subMatches[2], 10, 32); err == nil {
-		ordinal = int(i)
-	}
-	return parent, ordinal
-}
-
 // getParentName gets the name of pod's parent StatefulSet. If pod has not parent, the empty string is returned.
 func getParentName(pod *corev1.Pod) string {
-	parent, _ := getParentNameAndOrdinal(pod)
+	parent, _ := intctrlutil.GetParentNameAndOrdinal(pod)
 	return parent
 }
 

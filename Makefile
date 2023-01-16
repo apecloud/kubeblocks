@@ -128,7 +128,7 @@ help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 .PHONY: all
-all: manager kbcli agamotto ## Make all cmd binaries.
+all: manager kbcli agamotto reloader ## Make all cmd binaries.
 
 ##@ Development
 
@@ -336,6 +336,25 @@ agamotto: build-checks ## Build agamotto related binaries
 .PHONY: clean
 clean-agamotto: ## Clean bin/mysqld_exporter.
 	rm -f bin/agamotto
+
+
+##@ reloader
+
+RELOADER_LD_FLAGS = "-s -w"
+
+bin/reloader.%: ## Cross build bin/reloader.$(OS).$(ARCH) .
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${RELOADER_LD_FLAGS} -o $@ ./cmd/reloader/main.go
+
+.PHONY: reloader
+reloader: OS=$(shell $(GO) env GOOS)
+reloader: ARCH=$(shell $(GO) env GOARCH)
+reloader: build-checks ## Build agamotto related binaries
+	$(MAKE) bin/reloader.${OS}.${ARCH}
+	mv bin/reloader.${OS}.${ARCH} bin/reloader
+
+.PHONY: clean
+clean-reloader: ## Clean bin/mysqld_exporter.
+	rm -f bin/reloader
 
 ##@ DAP
 

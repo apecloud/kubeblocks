@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-tree-node-template-8.0
+  namespace: default
+data:
+  my.cnf: |-
+    [mysqld]
+    innodb-buffer-pool-size=512M
+    log-bin=master-bin
+    gtid_mode=OFF
+
+    pid-file=/var/run/mysqld/mysqld.pid
+    socket=/var/run/mysqld/mysqld.sock
+    
+    ### adjust parameter position
+    innodb_autoinc_lock_mode=1
+    consensus_auto_leader_transfer=ON
+
+    port=3306
+    general_log=0
+    server-id=1
+    slow_query_log=0
+    
+    ### add restart parameter
+    automatic_sp_privileges=OFF
+
+    [client]
+    socket=/var/run/mysqld/mysqld.sock
+    host=localhost

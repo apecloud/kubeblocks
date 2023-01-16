@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -130,6 +131,15 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 		}
 	}
 
+	validateConfigSpec := func(component *ClusterDefinitionComponent) {
+		configSpec := component.ConfigSpec
+		if configSpec != nil {
+			if err := r.validateConfigSpec(component.ConfigSpec); err != nil {
+				*allErrs = append(*allErrs, field.Duplicate(field.NewPath("spec.components[*].configSpec.configTemplateRefs"), err))
+			}
+		}
+	}
+
 	validateConsensus := func(component *ClusterDefinitionComponent) {
 		consensusSpec := component.ConsensusSpec
 		// roleObserveQuery and Leader are required
@@ -203,6 +213,9 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 		// validate system account defined in spec.components[].systemAccounts
 		validateSystemAccount(&component)
 
+		// validate config spec
+		validateConfigSpec(&component)
+
 		switch component.ComponentType {
 		case Consensus:
 			// if consensus
@@ -258,4 +271,38 @@ func (r *SystemAccountSpec) validateSysAccounts(allErrs *field.ErrorList) {
 			field.Invalid(field.NewPath("spec.components[*].systemAccounts.passwordConfig"),
 				passwdConfig, "numDigits plus numSymbols exceeds password length. "))
 	}
+}
+
+func (r *ClusterDefinition) validateConfigSpec(configSpec *ConfigurationSpec) error {
+	if configSpec == nil || len(configSpec.ConfigTemplateRefs) <= 1 {
+		return nil
+	}
+	return validateConfigTemplateList(configSpec.ConfigTemplateRefs)
+}
+
+func validateConfigTemplateList(ctpls []ConfigTemplate) error {
+	var (
+		volumeSet = map[string]struct{}{}
+		cmSet     = map[string]struct{}{}
+		tplSet    = map[string]struct{}{}
+	)
+
+	for _, tpl := range ctpls {
+		if len(tpl.VolumeName) == 0 {
+			return errors.Errorf("ConfigTemplate.VolumeName not empty.")
+		}
+		if _, ok := tplSet[tpl.Name]; ok {
+			return errors.Errorf("configTemplate[%s] already existed.", tpl.Name)
+		}
+		if _, ok := volumeSet[tpl.VolumeName]; ok {
+			return errors.Errorf("volume[%s] already existed.", tpl.VolumeName)
+		}
+		if _, ok := cmSet[tpl.ConfigTplRef]; ok {
+			return errors.Errorf("configmap[%s] already existed.", tpl.ConfigTplRef)
+		}
+		tplSet[tpl.Name] = struct{}{}
+		cmSet[tpl.ConfigTplRef] = struct{}{}
+		volumeSet[tpl.VolumeName] = struct{}{}
+	}
+	return nil
 }

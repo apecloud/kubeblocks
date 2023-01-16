@@ -16,7 +16,7 @@ spec:
   {{- end }}
   components:
     - name: wesql # user-defined
-      type: replicasets # ref clusterdefinition components.typename
+      type: mysql # ref clusterdefinition components.typename
       monitor: {{ .Values.monitor.enabled | default false }}
       replicas: {{ .Values.replicaCount | default 3 }}
       enabledLogs: {{ .Values.enabledLogs | toJson | indent 4 }}

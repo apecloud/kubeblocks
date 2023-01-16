@@ -37,7 +37,7 @@ const (
 	testFinalizer = "test.kubeblocks.io/finalizer"
 )
 
-// NewFakeStatefulSet news a fake StatefulSet workload object for testing.
+// NewFakeStatefulSet creates a fake StatefulSet workload object for testing.
 func NewFakeStatefulSet(name string, replicas int) *apps.StatefulSet {
 	template := corev1.PodTemplateSpec{
 		Spec: corev1.PodSpec{
@@ -77,7 +77,7 @@ func NewFakeStatefulSet(name string, replicas int) *apps.StatefulSet {
 	}
 }
 
-// NewFakeStatefulSetPod news a fake pod of the StatefulSet workload for testing.
+// NewFakeStatefulSetPod creates a fake pod of the StatefulSet workload for testing.
 func NewFakeStatefulSetPod(set *apps.StatefulSet, ordinal int) *corev1.Pod {
 	pod := &corev1.Pod{}
 	pod.Name = fmt.Sprintf("%s-%d", set.Name, ordinal)

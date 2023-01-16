@@ -36,24 +36,24 @@ import (
 
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update;patch;delete
 
-type ConsensusRole string
+type consensusRole string
 
 type consensusMemberExt struct {
 	name          string
-	consensusRole ConsensusRole
+	consensusRole consensusRole
 	accessMode    dbaasv1alpha1.AccessMode
 	podName       string
 }
 
 const (
-	Leader   ConsensusRole = "Leader"
-	Follower ConsensusRole = "Follower"
-	Learner  ConsensusRole = "Learner"
+	roleLeader   consensusRole = "Leader"
+	roleFollower consensusRole = "Follower"
+	roleLearner  consensusRole = "Learner"
 )
 
 const (
-	ConsensusSetStatusDefaultPodName = "Unknown"
-	RoleEmpty                        = ""
+	DefaultPodName = "Unknown"
+	RoleEmpty      = ""
 )
 
 const (
@@ -118,7 +118,7 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 	newConsensusSetStatus := &dbaasv1alpha1.ConsensusSetStatus{
 		Leader: dbaasv1alpha1.ConsensusMemberStatus{
 			Name:       "",
-			Pod:        ConsensusSetStatusDefaultPodName,
+			Pod:        DefaultPodName,
 			AccessMode: dbaasv1alpha1.None,
 		},
 	}
@@ -329,6 +329,7 @@ func ComposeRolePriorityMap(component dbaasv1alpha1.ClusterDefinitionComponent) 
 	return rolePriorityMap
 }
 
+// UpdateConsensusSetRoleLabel updates pod role label when internal container role changed
 func UpdateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx, pod *corev1.Pod, role string) error {
 	ctx := reqCtx.Ctx
 
@@ -363,7 +364,8 @@ func UpdateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCt
 
 	return cli.Patch(ctx, pod, patch)
 }
-func putConsensusMemberExt(roleMap map[string]consensusMemberExt, name string, role ConsensusRole, accessMode dbaasv1alpha1.AccessMode) {
+
+func putConsensusMemberExt(roleMap map[string]consensusMemberExt, name string, role consensusRole, accessMode dbaasv1alpha1.AccessMode) {
 	if roleMap == nil {
 		return
 	}
@@ -386,20 +388,20 @@ func composeConsensusRoleMap(componentDef dbaasv1alpha1.ClusterDefinitionCompone
 
 	putConsensusMemberExt(roleMap,
 		componentDef.ConsensusSpec.Leader.Name,
-		Leader,
+		roleLeader,
 		componentDef.ConsensusSpec.Leader.AccessMode)
 
 	for _, follower := range componentDef.ConsensusSpec.Followers {
 		putConsensusMemberExt(roleMap,
 			follower.Name,
-			Follower,
+			roleFollower,
 			follower.AccessMode)
 	}
 
 	if componentDef.ConsensusSpec.Learner != nil {
 		putConsensusMemberExt(roleMap,
 			componentDef.ConsensusSpec.Learner.Name,
-			Learner,
+			roleLearner,
 			componentDef.ConsensusSpec.Learner.AccessMode)
 	}
 
@@ -421,7 +423,7 @@ func initClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster, componentN
 	if componentStatus.ConsensusSetStatus == nil {
 		componentStatus.ConsensusSetStatus = &dbaasv1alpha1.ConsensusSetStatus{
 			Leader: dbaasv1alpha1.ConsensusMemberStatus{
-				Pod:        ConsensusSetStatusDefaultPodName,
+				Pod:        DefaultPodName,
 				AccessMode: dbaasv1alpha1.None,
 				Name:       "",
 			},
@@ -484,7 +486,7 @@ func setConsensusSetStatusLearner(consensusSetStatus *dbaasv1alpha1.ConsensusSet
 func resetConsensusSetStatusRole(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus, podName string) {
 	// reset leader
 	if consensusSetStatus.Leader.Pod == podName {
-		consensusSetStatus.Leader.Pod = ConsensusSetStatusDefaultPodName
+		consensusSetStatus.Leader.Pod = DefaultPodName
 		consensusSetStatus.Leader.AccessMode = dbaasv1alpha1.None
 		consensusSetStatus.Leader.Name = ""
 	}
@@ -534,11 +536,11 @@ func setConsensusSetStatusRole(consensusSetStatus *dbaasv1alpha1.ConsensusSetSta
 	// update cluster.status
 	needUpdate := false
 	switch memberExt.consensusRole {
-	case Leader:
+	case roleLeader:
 		needUpdate = setConsensusSetStatusLeader(consensusSetStatus, memberExt)
-	case Follower:
+	case roleFollower:
 		needUpdate = setConsensusSetStatusFollower(consensusSetStatus, memberExt)
-	case Learner:
+	case roleLearner:
 		needUpdate = setConsensusSetStatusLearner(consensusSetStatus, memberExt)
 	}
 
@@ -579,14 +581,14 @@ func updateConsensusRoleInfo(ctx context.Context, cli client.Client, cluster *db
 			continue
 		}
 		switch memberExt.consensusRole {
-		case Leader:
+		case roleLeader:
 			leader = pod.Name
-		case Follower:
+		case roleFollower:
 			if len(followers) > 0 {
 				followers += ","
 			}
 			followers += pod.Name
-		case Learner:
+		case roleLearner:
 			// TODO: CT
 		}
 	}

@@ -891,6 +891,9 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		// keep the original template annotations.
 		// if annotations exist and are replaced, the statefulSet will be updated.
 		if restartAnnotation, ok := tempAnnotations[intctrlutil.RestartAnnotationKey]; ok {
+			if stsObj.Spec.Template.Annotations == nil {
+				stsObj.Spec.Template.Annotations = map[string]string{}
+			}
 			stsObj.Spec.Template.Annotations[intctrlutil.RestartAnnotationKey] = restartAnnotation
 		}
 		stsObj.Spec.Replicas = stsProto.Spec.Replicas

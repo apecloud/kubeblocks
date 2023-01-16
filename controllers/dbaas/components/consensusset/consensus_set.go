@@ -158,8 +158,9 @@ func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string)
 			return "", nil
 		}
 		labelValue := v.Labels[intctrlutil.ConsensusSetRoleLabelKey]
-		if labelValue == consensusSet.ComponentDef.ConsensusSpec.Leader.Name {
+		if labelValue == consensusSet.ComponentDef.ConsensusSpec.Leader.Name && intctrlutil.PodIsReady(&v) {
 			isFailed = false
+			continue
 		}
 		// if no role label, the pod is not ready
 		if labelValue == "" {

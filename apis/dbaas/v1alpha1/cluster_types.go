@@ -387,15 +387,25 @@ func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) error {
 	return nil
 }
 
-// ValidatePrimaryIndex validates primaryIndex in cluster API gyaml, and returns metav1.Condition when detect invalid values.
+// ValidatePrimaryIndex validates primaryIndex in cluster API yaml, When the replicas of the component in the cluster API is empty,
+// check that the value of primaryIndex cannot be greater than the defaultReplicas in the clusterDefinition API.
 func (r *Cluster) ValidatePrimaryIndex(cd *ClusterDefinition) error {
+	message := make([]string, 0)
 	for _, comp := range r.Spec.Components {
 		// when comp.Replicas is not nil, it will be verified in cluster_webhook, skip here
 		if comp.Replicas != nil {
 			return nil
 		}
 		// validate PrimaryIndex with clusterDefinition component defaultReplicas
-		return cd.ValidatePrimaryIndex(comp.Type, comp.PrimaryIndex)
+		for _, clusterDefComp := range cd.Spec.Components {
+			if !strings.EqualFold(comp.Type, clusterDefComp.TypeName) {
+				continue
+			}
+			if *comp.PrimaryIndex > clusterDefComp.DefaultReplicas-1 {
+				message = append(message, fmt.Sprintf("component %s's PrimaryIndex cannot be larger than defaultReplicas.", comp.Type))
+				return errors.New(strings.Join(message, ";"))
+			}
+		}
 	}
 	return nil
 }

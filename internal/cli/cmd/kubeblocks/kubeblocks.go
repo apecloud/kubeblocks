@@ -304,6 +304,7 @@ func (o *Options) run() error {
 	chart := helm.InstallOpts{
 		Name:      types.KubeBlocksChartName,
 		Namespace: o.Namespace,
+		Wait:      true,
 	}
 	printMsg(fmt.Sprintf("Uninstall helm release %s %s", types.KubeBlocksChartName, version),
 		chart.UnInstall(o.HelmCfg))

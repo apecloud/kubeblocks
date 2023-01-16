@@ -38,6 +38,7 @@ import (
 type kbObjects struct {
 	clusterDefs     *unstructured.UnstructuredList
 	clusterVersions *unstructured.UnstructuredList
+	backupTools     *unstructured.UnstructuredList
 	crds            *unstructured.UnstructuredList
 	deploys         *appv1.DeploymentList
 	svcs            *corev1.ServiceList
@@ -60,71 +61,71 @@ func getKBObjects(client kubernetes.Interface, dynamic dynamic.Interface, namesp
 	ctx := context.TODO()
 
 	// get ClusterDefinition
-	if objs.clusterDefs, err = dynamic.Resource(types.ClusterDefGVR()).List(ctx, metav1.ListOptions{}); err != nil {
-		appendErr(err)
-	}
+	objs.clusterDefs, err = dynamic.Resource(types.ClusterDefGVR()).List(ctx, metav1.ListOptions{})
+	appendErr(err)
 
 	// get ClusterVersion
-	if objs.clusterVersions, err = dynamic.Resource(types.ClusterVersionGVR()).List(ctx, metav1.ListOptions{}); err != nil {
-		appendErr(err)
-	}
+	objs.clusterVersions, err = dynamic.Resource(types.ClusterVersionGVR()).List(ctx, metav1.ListOptions{})
+	appendErr(err)
+
+	// get BackupTool
+	objs.backupTools, err = dynamic.Resource(types.BackupToolGVR()).List(ctx, metav1.ListOptions{})
+	appendErr(err)
 
 	// get CRDs
-	if objs.crds, err = dynamic.Resource(types.CRDGVR()).List(ctx, metav1.ListOptions{}); err != nil {
-		appendErr(err)
+	crds, err := dynamic.Resource(types.CRDGVR()).List(ctx, metav1.ListOptions{})
+	appendErr(err)
+	objs.crds = &unstructured.UnstructuredList{}
+	for i, crd := range crds.Items {
+		if !strings.Contains(crd.GetName(), "kubeblocks.io") {
+			continue
+		}
+		objs.crds.Items = append(objs.crds.Items, crds.Items[i])
 	}
 
 	// get deployments
-	getDeploysFn := func(labelSelector string) error {
+	getDeploysFn := func(labelSelector string) {
 		deploys, err := client.AppsV1().Deployments(namespace).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: labelSelector,
 		})
 		if err != nil {
-			return err
+			appendErr(err)
+			return
 		}
 		if objs.deploys == nil {
 			objs.deploys = deploys
 		} else {
 			objs.deploys.Items = append(objs.deploys.Items, deploys.Items...)
 		}
-		return nil
 	}
 
 	// get all deployments which label matches app.kubernetes.io/instance=kubeblocks
-	if err = getDeploysFn(fmt.Sprintf("%s=%s", types.InstanceLabelKey, types.KubeBlocksChartName)); err != nil {
-		appendErr(err)
-	}
+	getDeploysFn(fmt.Sprintf("%s=%s", types.InstanceLabelKey, types.KubeBlocksChartName))
 
 	// get all deployments which label matches release=kubeblocks, like prometheus-server
-	if err = getDeploysFn(fmt.Sprintf("release=%s", types.KubeBlocksChartName)); err != nil {
-		appendErr(err)
-	}
+	getDeploysFn(fmt.Sprintf("release=%s", types.KubeBlocksChartName))
 
 	// get services
-	getSvcsFn := func(labelSelector string) error {
+	getSvcsFn := func(labelSelector string) {
 		svcs, err := client.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{
 			LabelSelector: labelSelector,
 		})
 		if err != nil {
-			return err
+			appendErr(err)
+			return
 		}
 		if objs.svcs == nil {
 			objs.svcs = svcs
 		} else {
 			objs.svcs.Items = append(objs.svcs.Items, svcs.Items...)
 		}
-		return nil
 	}
 
 	// get all services which label matches app.kubernetes.io/instance=kubeblocks
-	if err = getSvcsFn(fmt.Sprintf("%s=%s", types.InstanceLabelKey, types.KubeBlocksChartName)); err != nil {
-		appendErr(err)
-	}
+	getSvcsFn(fmt.Sprintf("%s=%s", types.InstanceLabelKey, types.KubeBlocksChartName))
 
 	// get all services which label matches release=kubeblocks, like prometheus-server
-	if err = getSvcsFn(fmt.Sprintf("release=%s", types.KubeBlocksChartName)); err != nil {
-		appendErr(err)
-	}
+	getSvcsFn(fmt.Sprintf("release=%s", types.KubeBlocksChartName))
 
 	return objs, utilerrors.NewAggregate(allErrs)
 }
@@ -149,7 +150,12 @@ func removeFinalizers(client dynamic.Interface, objs *kbObjects) error {
 	}
 
 	// patch ClusterVersion's finalizer
-	return removeFn(types.ClusterVersionGVR(), objs.clusterVersions)
+	if err := removeFn(types.ClusterVersionGVR(), objs.clusterVersions); err != nil {
+		return err
+	}
+
+	// patch BackupTool's finalizer
+	return removeFn(types.ClusterDefGVR(), objs.backupTools)
 }
 
 func deleteCRDs(cli dynamic.Interface, crds *unstructured.UnstructuredList) error {

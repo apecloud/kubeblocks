@@ -37,7 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/version"
 )
 
-const nameSpace = "test"
+const namespace = "test"
 
 var _ = Describe("kubeblocks", func() {
 	var cmd *cobra.Command
@@ -46,7 +46,7 @@ var _ = Describe("kubeblocks", func() {
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
-		tf = cmdtesting.NewTestFactory().WithNamespace(nameSpace)
+		tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
 		tf.Client = &clientfake.RESTClient{}
 
 		// use a fake URL to test
@@ -99,7 +99,7 @@ var _ = Describe("kubeblocks", func() {
 			Monitor:         true,
 			CreateNamespace: true,
 		}
-		Expect(o.Run()).Should(HaveOccurred())
+		Expect(o.Install()).Should(HaveOccurred())
 		Expect(len(o.Sets)).To(Equal(1))
 		Expect(o.Sets[0]).To(Equal(kMonitorParam))
 		Expect(o.installChart()).Should(HaveOccurred())
@@ -159,7 +159,7 @@ var _ = Describe("kubeblocks", func() {
 			IOStreams: streams,
 		}
 		Expect(o.complete(tf, cmd)).Should(Succeed())
-		Expect(o.Namespace).Should(Equal(nameSpace))
+		Expect(o.Namespace).Should(Equal(namespace))
 		Expect(o.HelmCfg).ShouldNot(BeNil())
 	})
 
@@ -172,7 +172,7 @@ var _ = Describe("kubeblocks", func() {
 			Dynamic:   testing.FakeDynamicClient(),
 		}
 
-		Expect(o.run()).Should(Succeed())
+		Expect(o.uninstall()).Should(Succeed())
 	})
 
 	It("remove finalizer", func() {

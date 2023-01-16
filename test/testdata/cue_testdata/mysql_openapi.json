@@ -1,0 +1,63 @@
+{
+  "type": "object",
+  "properties": {
+    "spec": {
+      "description": "mysql config validator",
+      "type": "object",
+      "required": [
+        "mysqld"
+      ],
+      "properties": {
+        "client": {
+          "description": "ingore client parameter validate\nmysql client: a set of name/value pairs.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "mysqld": {
+          "description": "mysql server param: a set of name/value pairs.",
+          "type": "object",
+          "required": [
+            "automatic_sp_privileges",
+            "auto_increment_increment"
+          ],
+          "properties": {
+            "auto_increment_increment": {
+              "description": "[1~65535] default ON",
+              "type": "integer",
+              "default": 1,
+              "maximum": 65535,
+              "minimum": 1
+            },
+            "automatic_sp_privileges": {
+              "description": "[OFF|ON] default ON",
+              "type": "string",
+              "default": "ON",
+              "enum": [
+                "ON",
+                "OFF"
+              ]
+            },
+            "binlog_stmt_cache_size": {
+              "type": "integer",
+              "default": 2097152,
+              "maximum": 16777216,
+              "minimum": 4096
+            },
+            "innodb_autoinc_lock_mode": {
+              "description": "[0|1|2] default: 2",
+              "type": "integer",
+              "default": 2,
+              "enum": [
+                2,
+                1,
+                0
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

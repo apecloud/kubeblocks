@@ -10,10 +10,13 @@ spec:
     - typeName: mongos
       defaultReplicas: 1
       minReplicas: 0
-      configTemplateRefs:
-        - name: mongodb-scripts
-          volumeName: scripts
-          defaultMode: 493
+      configSpec:
+        configTemplateRefs:
+          - name: mongodb-scripts
+            configTplRef: mongodb-scripts
+            volumeName: scripts
+            namespace: {{ .Release.Namespace }}
+            defaultMode: 493
       componentType: Stateless
       service:
         ports:
@@ -35,10 +38,13 @@ spec:
     - typeName: configsvr
       defaultReplicas: 3
       minReplicas: 0
-      configTemplateRefs:
-        - name: mongodb-scripts
-          volumeName: scripts
-          defaultMode: 493
+      configSpec:
+        configTemplateRefs:
+          - name: mongodb-scripts
+            configTplRef: mongodb-scripts
+            volumeName: scripts
+            namespace: {{ .Release.Namespace }}
+            defaultMode: 493
       characterType: mongodb
       componentType: Consensus
       consensusSpec:
@@ -84,10 +90,13 @@ spec:
     - typeName: shard
       defaultReplicas: 3
       minReplicas: 3
-      configTemplateRefs:
-        - name: mongodb-scripts
-          volumeName: scripts
-          defaultMode: 493
+      configSpec:
+        configTemplateRefs:
+          - name: mongodb-scripts
+            configTplRef: mongodb-scripts
+            volumeName: scripts
+            namespace: {{ .Release.Namespace }}
+            defaultMode: 493
       characterType: mongodb
       componentType: Consensus
       consensusSpec:

@@ -189,12 +189,13 @@ type KBAccountType uint8
 
 // System accounts represented in bit.
 const (
-	KBAccountAdmin          KBAccountType = 1
+	KBAccountInvalid        KBAccountType = 0
+	KBAccountAdmin                        = 1
 	KBAccountDataprotection               = 1 << 1
 	KBAccountProbe                        = 1 << 2
 	KBAccountMonitor                      = 1 << 3
 	KBAccountReplicator                   = 1 << 4
-	KBAccountInvalid                      = 0
+	KBAccountMAX                          = KBAccountReplicator // KBAccountMAX indicates the max value of KBAccountType, used for validation.
 )
 
 // AccountName defines system account names.

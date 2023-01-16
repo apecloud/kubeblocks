@@ -17,109 +17,16 @@ limitations under the License.
 package dbaas
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/yaml"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	testdata "github.com/apecloud/kubeblocks/test/testdata"
 )
-
-const (
-	leader   = "leader"
-	follower = "follower"
-)
-
-func mockContainer() corev1.Container {
-	container := corev1.Container{
-		Name:            "test",
-		Image:           "busybox",
-		ImagePullPolicy: corev1.PullIfNotPresent,
-		Command:         []string{"sleep 5d"},
-	}
-	return container
-}
-
-func mockClusterDefinition(clusterDefName string, clusterEngineType string, typeName string) *dbaasv1alpha1.ClusterDefinition {
-	clusterDefinition := &dbaasv1alpha1.ClusterDefinition{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      clusterDefName,
-			Namespace: "default",
-		},
-		Spec: dbaasv1alpha1.ClusterDefinitionSpec{
-			Type: clusterEngineType,
-			Components: []dbaasv1alpha1.ClusterDefinitionComponent{
-				{
-					TypeName:        typeName,
-					DefaultReplicas: 3,
-					MinReplicas:     0,
-					ComponentType:   dbaasv1alpha1.Consensus,
-					ConsensusSpec: &dbaasv1alpha1.ConsensusSetSpec{
-						Leader:    dbaasv1alpha1.ConsensusMember{Name: leader, AccessMode: dbaasv1alpha1.ReadWrite},
-						Followers: []dbaasv1alpha1.ConsensusMember{{Name: follower, AccessMode: dbaasv1alpha1.Readonly}},
-					},
-					Service: &corev1.ServiceSpec{Ports: []corev1.ServicePort{{Protocol: corev1.ProtocolTCP, Port: 3306}}},
-					Probes: &dbaasv1alpha1.ClusterDefinitionProbes{
-						RoleChangedProbe: &dbaasv1alpha1.ClusterDefinitionProbe{PeriodSeconds: 1},
-					},
-					PodSpec: &corev1.PodSpec{
-						Containers: []corev1.Container{mockContainer()},
-					},
-					SystemAccounts: &dbaasv1alpha1.SystemAccountSpec{
-						Accounts: []dbaasv1alpha1.SystemAccountConfig{
-							{
-								Name: dbaasv1alpha1.AdminAccount,
-								ProvisionPolicy: dbaasv1alpha1.ProvisionPolicy{
-									Type: dbaasv1alpha1.CreateByStmt,
-									Statements: &dbaasv1alpha1.ProvisionStatements{
-										CreationStatement: `CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; GRANT ALL PRIVILEGES ON *.* TO $(USERNAME);`,
-										DeletionStatement: `DROP USER IF EXISTS $(USERNAME);`},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-	return clusterDefinition
-}
-func mockCluster(clusterDefName, appVerName, typeName, clusterName string, replicas int32) *dbaasv1alpha1.Cluster {
-	clusterObj := &dbaasv1alpha1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      clusterName,
-		},
-		Spec: dbaasv1alpha1.ClusterSpec{
-			ClusterVersionRef: appVerName,
-			ClusterDefRef:     clusterDefName,
-			Components: []dbaasv1alpha1.ClusterComponent{
-				{
-					Name:     typeName,
-					Type:     typeName,
-					Replicas: &replicas,
-				},
-			},
-			TerminationPolicy: dbaasv1alpha1.WipeOut,
-		},
-	}
-	return clusterObj
-}
-
-func privateSetup() (*dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.Cluster, error) {
-	var (
-		clusterDefName     = "myclusterdef"
-		ClusterVersionName = "myClusterVersion"
-		clusterType        = " state.mysql"
-		typeName           = "mycomponent"
-		clusterName        = "mycluster"
-	)
-	clusterDef := mockClusterDefinition(clusterDefName, clusterType, typeName)
-	cluster := mockCluster(clusterDefName, ClusterVersionName, typeName, clusterName, 3)
-	return clusterDef, cluster, nil
-}
 
 func TestUpdateFacts(t *testing.T) {
 	type testCase struct {
@@ -200,30 +107,74 @@ func TestExepectation(t *testing.T) {
 }
 
 func TestRenderJob(t *testing.T) {
-	// for simplicity, create cluster and cluster definition from template and do some mutations.
-	clusterDef, cluster, _ := privateSetup()
-	cmdExecutorConfig := &dbaasv1alpha1.CmdExecutorConfig{
-		Image:   "mysql-8.0.30",
-		Command: []string{"mysql", "-e", "$(KB_ACCOUNT_STATEMENT)"},
+	var (
+		randomStr             = testCtx.GetRandomStr()
+		clusterDefinitionName = "cluster-definition-" + randomStr
+		clusterVersionName    = "clusterversion-" + randomStr
+		clusterName           = "cluster-" + randomStr
+		consensusCompName     = "consensus" + randomStr
+	)
+
+	mockClusterDef := func(filePath string) *dbaasv1alpha1.ClusterDefinition {
+		clusterDefBytes, err := testdata.GetTestDataFileContent(filePath)
+		assert.Nil(t, err)
+		clusterDefYaml := fmt.Sprintf(string(clusterDefBytes), clusterDefinitionName)
+		clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+		err = yaml.Unmarshal([]byte(clusterDefYaml), clusterDef)
+		assert.Nil(t, err)
+		return clusterDef
 	}
 
-	engine := newCustomizedEngine(cmdExecutorConfig, cluster, cluster.Spec.Components[0].Name)
+	mockCluster := func(filePath string) *dbaasv1alpha1.Cluster {
+		clusterBytes, err := testdata.GetTestDataFileContent(filePath)
+		assert.Nil(t, err)
+		clusterYaml := fmt.Sprintf(string(clusterBytes), clusterVersionName, clusterDefinitionName, clusterName,
+			clusterVersionName, clusterDefinitionName, consensusCompName)
+		cluster := &dbaasv1alpha1.Cluster{}
+		err = yaml.Unmarshal([]byte(clusterYaml), cluster)
+		assert.Nil(t, err)
+		return cluster
+	}
+
+	clusterDef := mockClusterDef("consensusset/wesql_cd_sysacct.yaml")
+	assert.NotNil(t, clusterDef)
+	assert.NotNil(t, clusterDef.Spec.Components[0].SystemAccounts)
+	cluster := mockCluster("consensusset/wesql.yaml")
+	assert.NotNil(t, cluster)
+
 	accountsSetting := clusterDef.Spec.Components[0].SystemAccounts
+	replaceEnvsValues(cluster.Name, accountsSetting)
+	cmdExecutorConfig := accountsSetting.CmdExecutorConfig
+
+	engine := newCustomizedEngine(cmdExecutorConfig, cluster, consensusCompName)
+	assert.NotNil(t, engine)
 	for _, acc := range accountsSetting.Accounts {
-		creationStmt, secrets := getCreationStmtForAccount(cluster.Namespace, cluster.Name, clusterDef.Spec.Type, clusterDef.Name,
-			cluster.Spec.Components[0].Name, accountsSetting.PasswordConfig, acc)
-		assert.NotNil(t, secrets)
-
-		for _, stmt := range creationStmt {
-			assert.False(t, strings.Contains(stmt, "$(USERNAME)"))
-			assert.False(t, strings.Contains(stmt, "$(PASSWD)"))
+		switch acc.ProvisionPolicy.Type {
+		case dbaasv1alpha1.CreateByStmt:
+			creationStmt, secrets := getCreationStmtForAccount(cluster.Namespace, cluster.Name, clusterDef.Spec.Type, clusterDef.Name,
+				consensusCompName, accountsSetting.PasswordConfig, acc)
+			// make sure all variables have been replaced
+			for _, stmt := range creationStmt {
+				assert.False(t, strings.Contains(stmt, "$(USERNAME)"))
+				assert.False(t, strings.Contains(stmt, "$(PASSWD)"))
+			}
+			job := renderJob(engine, cluster.Namespace, cluster.Name, clusterDef.Spec.Type,
+				clusterDef.Name, consensusCompName, string(acc.Name), creationStmt, "10.0.0.1")
+			assert.NotNil(t, job)
+			envList := job.Spec.Template.Spec.Containers[0].Env
+			assert.GreaterOrEqual(t, len(envList), 1)
+			assert.Equal(t, job.Spec.Template.Spec.Containers[0].Image, cmdExecutorConfig.Image)
+			assert.NotNil(t, secrets)
+		case dbaasv1alpha1.ReferToExisting:
+			assert.False(t, strings.Contains(acc.ProvisionPolicy.SecretRef.Name, "$(CONN_CREDENTIAL_SECRET_NAME)"))
 		}
-
-		job := renderJob(engine, cluster.Namespace, cluster.Name, clusterDef.Spec.Type,
-			clusterDef.Name, cluster.Spec.Components[0].Name, string(acc.Name), creationStmt, "10.0.0.1")
-		assert.NotNil(t, job)
-		envList := job.Spec.Template.Spec.Containers[0].Env
-		assert.GreaterOrEqual(t, len(envList), 1)
-		assert.Equal(t, job.Spec.Template.Spec.Containers[0].Image, cmdExecutorConfig.Image)
 	}
+}
+
+func TestAccountNum(t *testing.T) {
+	totalAccounts := getAllSysAccounts()
+	accountNum := len(totalAccounts)
+	assert.Greater(t, accountNum, 0)
+	expectedMaxKBAccountType := 1 << (accountNum - 1)
+	assert.Equal(t, expectedMaxKBAccountType, dbaasv1alpha1.KBAccountMAX)
 }

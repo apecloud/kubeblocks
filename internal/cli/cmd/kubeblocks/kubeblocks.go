@@ -84,11 +84,12 @@ var (
 // NewKubeBlocksCmd creates the kubeblocks command
 func NewKubeBlocksCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "kubeblocks [install | uninstall]",
+		Use:   "kubeblocks [install | upgrade | uninstall]",
 		Short: "KubeBlocks operation commands",
 	}
 	cmd.AddCommand(
 		newInstallCmd(f, streams),
+		newUpgradeCmd(f, streams),
 		newUninstallCmd(f, streams),
 	)
 	return cmd
@@ -202,6 +203,32 @@ func (o *InstallOptions) Run() error {
 	return nil
 }
 
+func (o *InstallOptions) Upgrade() error {
+	fmt.Fprintf(o.Out, "Upgrading KubeBlocks to %s\n", o.Version)
+
+	if o.Monitor {
+		o.Sets = append(o.Sets, kMonitorParam)
+	}
+
+	// Add repo, if exists, will update it
+	if err := helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}); err != nil {
+		return err
+	}
+
+	// upgrade KubeBlocks chart
+	_, err := o.upgradeChart()
+	if err != nil {
+		return err
+	}
+
+	// print notes
+	if !o.Quiet {
+		o.printNotes()
+	}
+
+	return nil
+}
+
 func (o *InstallOptions) installChart() (string, error) {
 	var sets []string
 	for _, set := range o.Sets {
@@ -220,6 +247,29 @@ func (o *InstallOptions) installChart() (string, error) {
 		CreateNamespace: o.CreateNamespace,
 	}
 	notes, err := chart.Install(o.HelmCfg)
+	if err != nil {
+		return "", err
+	}
+	return notes, nil
+}
+
+func (o *InstallOptions) upgradeChart() (string, error) {
+	var sets []string
+	for _, set := range o.Sets {
+		splitSet := strings.Split(set, ",")
+		sets = append(sets, splitSet...)
+	}
+	chart := helm.InstallOpts{
+		Name:      types.KubeBlocksChartName,
+		Chart:     types.KubeBlocksChartName + "/" + types.KubeBlocksChartName,
+		Wait:      true,
+		Version:   o.Version,
+		Namespace: o.Namespace,
+		Sets:      sets,
+		Login:     true,
+		TryTimes:  2,
+	}
+	notes, err := chart.Upgrade(o.HelmCfg)
 	if err != nil {
 		return "", err
 	}
@@ -355,6 +405,31 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
 	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "create the namespace if not present")
+
+	return cmd
+}
+
+func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &InstallOptions{
+		Options: Options{
+			IOStreams: streams,
+		},
+	}
+
+	cmd := &cobra.Command{
+		Use:     "upgrade",
+		Short:   "Upgrade KubeBlocks",
+		Args:    cobra.NoArgs,
+		Example: installExample,
+		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.complete(f, cmd))
+			util.CheckErr(o.check())
+			util.CheckErr(o.Upgrade())
+		},
+	}
+
+	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
+	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
 
 	return cmd
 }

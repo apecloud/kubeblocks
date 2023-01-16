@@ -17,6 +17,7 @@ limitations under the License.
 package helm
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -362,7 +363,7 @@ func (i *InstallOpts) Upgrade(cfg *action.Configuration) (string, error) {
 }
 
 func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
-	res, err := i.getInstalled(cfg)
+	installed, err := i.getInstalled(cfg)
 	if err != nil {
 		return "", err
 	}
@@ -373,7 +374,11 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 	client.Namespace = i.Namespace
 	client.Wait = i.Wait
 	client.Timeout = time.Second * 300
-	client.Version = res.Chart.AppVersion()
+	if len(i.Version) > 0 {
+		client.Version = i.Version
+	} else {
+		client.Version = installed.Chart.AppVersion()
+	}
 	client.ReuseValues = true
 
 	cp, err := client.ChartPathOptions.LocateChart(i.Chart, settings)
@@ -411,6 +416,22 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 		fmt.Println("Upgrade has been cancelled")
 		cancel()
 	}()
+
+	// update crds before helm upgrade
+	for _, obj := range chartRequested.CRDObjects() {
+		// Read in the resources
+		target, err := cfg.KubeClient.Build(bytes.NewBuffer(obj.File.Data), false)
+		if err != nil {
+			return "", errors.Wrapf(err, "failed to update CRD %s", obj.Name)
+		}
+
+		// helm only use the original.Info part for looking up original CRD in Update interface
+		// so set original with target as they have same .Info part
+		original := target
+		if _, err := cfg.KubeClient.Update(original, target, false); err != nil {
+			return "", errors.Wrapf(err, "failed to update CRD %s", obj.Name)
+		}
+	}
 
 	released, err := client.RunWithContext(ctx, i.Name, chartRequested, vals)
 	if err != nil {

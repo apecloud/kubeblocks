@@ -826,3 +826,13 @@ func getSupportHorizontalScalingComponents(
 
 	return horizontalScalableComponents
 }
+
+// getListOption gets opts parameters for cli.List interface
+func getListOption(cluster *dbaasv1alpha1.Cluster, clusterDef *dbaasv1alpha1.ClusterDefinition) (ml client.MatchingLabels, inNS client.InNamespace) {
+	ml = client.MatchingLabels{
+		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
+		intctrlutil.AppNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
+	}
+	inNS = client.InNamespace(cluster.Namespace)
+	return
+}

@@ -67,7 +67,7 @@ func NewProgressingCondition(ops *OpsRequest) *metav1.Condition {
 	}
 }
 
-// NewValidatePassedCondition news a condition that the operation validate passed
+// NewValidatePassedCondition creates a condition that the operation validation.
 func NewValidatePassedCondition(opsRequestName string) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeValidated,
@@ -78,7 +78,7 @@ func NewValidatePassedCondition(opsRequestName string) *metav1.Condition {
 	}
 }
 
-// NewValidateFailedCondition news a condition that the operation validate passed
+// NewValidateFailedCondition creates a condition that the operation validation.
 func NewValidateFailedCondition(reason, message string) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeValidated,
@@ -89,7 +89,7 @@ func NewValidateFailedCondition(reason, message string) *metav1.Condition {
 	}
 }
 
-// NewFailedCondition news a condition that the OpsRequest processing failed
+// NewFailedCondition creates a condition that the OpsRequest processing failed
 func NewFailedCondition(ops *OpsRequest, err error) *metav1.Condition {
 	msg := fmt.Sprintf("Failed to process OpsRequest: %s in cluster: %s", ops.Name, ops.Spec.ClusterRef)
 	if err != nil {
@@ -104,7 +104,7 @@ func NewFailedCondition(ops *OpsRequest, err error) *metav1.Condition {
 	}
 }
 
-// NewSucceedCondition news a condition that the controller has successfully processed the OpsRequest
+// NewSucceedCondition creates a condition that the controller has successfully processed the OpsRequest
 func NewSucceedCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeSucceed,
@@ -116,7 +116,7 @@ func NewSucceedCondition(ops *OpsRequest) *metav1.Condition {
 	}
 }
 
-// NewRestartingCondition news a condition that the operation start to restart components
+// NewRestartingCondition creates a condition that the operation starts to restart components
 func NewRestartingCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeRestarting,
@@ -127,7 +127,7 @@ func NewRestartingCondition(ops *OpsRequest) *metav1.Condition {
 	}
 }
 
-// NewVerticalScalingCondition news a condition that the OpsRequest start to vertical scaling cluster
+// NewVerticalScalingCondition creates a condition that the OpsRequest starts to vertical scale cluster
 func NewVerticalScalingCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeVerticalScaling,
@@ -138,7 +138,7 @@ func NewVerticalScalingCondition(ops *OpsRequest) *metav1.Condition {
 	}
 }
 
-// NewHorizontalScalingCondition news a condition that the OpsRequest start horizontal scaling cluster
+// NewHorizontalScalingCondition creates a condition that the OpsRequest starts to horizontal scale cluster
 func NewHorizontalScalingCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeHorizontalScaling,
@@ -149,7 +149,7 @@ func NewHorizontalScalingCondition(ops *OpsRequest) *metav1.Condition {
 	}
 }
 
-// NewVolumeExpandingCondition news a condition that the OpsRequest start to expand volume
+// NewVolumeExpandingCondition creates a condition that the OpsRequest starts to expand volume
 func NewVolumeExpandingCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeVolumeExpanding,
@@ -160,7 +160,7 @@ func NewVolumeExpandingCondition(ops *OpsRequest) *metav1.Condition {
 	}
 }
 
-// NewUpgradingCondition news a condition that the OpsRequest start to upgrade cluster
+// NewUpgradingCondition creates a condition that the OpsRequest starts to upgrade cluster
 func NewUpgradingCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeUpgrading,

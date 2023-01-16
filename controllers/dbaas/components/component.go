@@ -34,7 +34,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// NewComponentByType news a component object
+// NewComponentByType creates a component object
 func NewComponentByType(
 	ctx context.Context,
 	cli client.Client,

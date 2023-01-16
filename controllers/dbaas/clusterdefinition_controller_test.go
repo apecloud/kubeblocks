@@ -24,11 +24,15 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("ClusterDefinition Controller", func() {
@@ -156,41 +160,25 @@ spec:
         image: "prom/mysqld-exporter:v0.14.0"
 `
 
-	configTemplateYaml := `
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: mysql-tree-node-template-8.0-test
-  namespace: default
-data:
-  my.cnf: |-
-    [mysqld]
-    innodb-buffer-pool-size=512M
-    log-bin=master-bin
-    gtid_mode=OFF
-    consensus_auto_leader_transfer=ON
-    
-    pid-file=/var/run/mysqld/mysqld.pid
-    socket=/var/run/mysqld/mysqld.sock
-
-    port=3306
-    general_log=0
-    server-id=1
-    slow_query_log=0
-    
-    [client]
-    socket=/var/run/mysqld/mysqld.sock
-    host=localhost
-`
-
 	assureCfgTplConfigMapObj := func(cmName, cmNs string) *corev1.ConfigMap {
 		By("By assure an cm obj")
 
-		cfgCM := &corev1.ConfigMap{}
-		Expect(yaml.Unmarshal([]byte(configTemplateYaml), cfgCM)).Should(Succeed())
-		cfgCM.Name = cmNs
-		cfgCM.Name = cmName
+		By("Assuring an cm obj")
+		cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("config/configcm.yaml",
+			testdata.WithNamespacedName(cmName, cmNs))
+		Expect(err).Should(Succeed())
+		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigConstraint]("config/configtpl.yaml",
+			testdata.WithNamespacedName(cmName, cmNs))
+		Expect(err).Should(Succeed())
+
 		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, cfgTpl)).Should(Succeed())
+
+		// update phase
+		patch := client.MergeFrom(cfgTpl.DeepCopy())
+		cfgTpl.Status.Phase = dbaasv1alpha1.AvailablePhase
+		Expect(k8sClient.Status().Patch(context.Background(), cfgTpl, patch)).Should(Succeed())
+
 		return cfgCM
 	}
 
@@ -221,7 +209,7 @@ data:
 			}, timeout, interval).Should(Succeed())
 
 			By("updating clusterDefinition's spec which then mark clusterVersion's status as OutOfSync")
-			Expect(changeClusterDef(intctrlutil.GetNamespacedName(clusterDefinition),
+			Expect(changeSpec(intctrlutil.GetNamespacedName(clusterDefinition),
 				func(cd *dbaasv1alpha1.ClusterDefinition) {
 					cd.Spec.Type = "state.mysql-7"
 				})).Should(Succeed())
@@ -245,11 +233,15 @@ data:
 			clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 			Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)).Should(Succeed())
 			clusterDefinition.Name += "-for-test"
-			clusterDefinition.Spec.Components[0].ConfigTemplateRefs = []dbaasv1alpha1.ConfigTemplate{
-				{
-					Name:       cmName,
-					Namespace:  testCtx.DefaultNamespace,
-					VolumeName: "xxx",
+			clusterDefinition.Spec.Components[0].ConfigSpec = &dbaasv1alpha1.ConfigurationSpec{
+				ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{
+					{
+						Name:                cmName,
+						ConfigTplRef:        cmName,
+						ConfigConstraintRef: cmName,
+						Namespace:           testCtx.DefaultNamespace,
+						VolumeName:          "xxx",
+					},
 				},
 			}
 			Expect(testCtx.CreateObj(ctx, clusterDefinition)).Should(Succeed())
@@ -273,6 +265,23 @@ data:
 				cd := &dbaasv1alpha1.ClusterDefinition{}
 				g.Expect(k8sClient.Get(ctx, intctrlutil.GetNamespacedName(clusterDefinition), cd)).To(Succeed())
 				g.Expect(cd.Status.ObservedGeneration == 1).To(BeTrue())
+
+				// check labels and finalizers
+				g.Expect(cd.Finalizers).ShouldNot(BeEmpty())
+				configCMLabel := cfgcore.GenerateTPLUniqLabelKeyWithConfig(cmName)
+				configTPLLabel := cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(cmName)
+				g.Expect(cd.Labels[configCMLabel]).Should(BeEquivalentTo(cmName))
+				g.Expect(cd.Labels[configTPLLabel]).Should(BeEquivalentTo(cmName))
+			}, timeout, interval).Should(Succeed())
+
+			By("check the reconciler update configmap.Finalizer after configmap is created.")
+			Eventually(func(g Gomega) {
+				cmObj := &corev1.ConfigMap{}
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      cmName,
+				}, cmObj)).Should(Succeed())
+				g.Expect(controllerutil.ContainsFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName)).To(BeTrue())
 			}, timeout, interval).Should(Succeed())
 
 			By("deleting clusterDefinition")
@@ -280,37 +289,41 @@ data:
 		})
 	})
 
-	Context("When configmap template in clusterDefinition contains invalid parameter(e.g. VolumeName not exist)", func() {
-		It("Should stop proceeding the status of clusterDefinition", func() {
-			By("creating a clusterDefinition and an invalid configmap")
-			clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
-			Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)).Should(Succeed())
-			cmName := "mysql-tree-node-template-8.0-volumename-not-exist"
-			clusterDefinition.Name += "-volumename-not-exist"
-			// missing VolumeName
-			clusterDefinition.Spec.Components[0].ConfigTemplateRefs = []dbaasv1alpha1.ConfigTemplate{
-				{
-					Name:      cmName,
-					Namespace: testCtx.DefaultNamespace,
-				},
-			}
-			// create configmap
-			assureCfgTplConfigMapObj(cmName, testCtx.DefaultNamespace)
-			Expect(testCtx.CreateObj(ctx, clusterDefinition)).Should(Succeed())
-
-			By("check the reconciler won't update Status.ObservedGeneration")
-			// should use Consistently here, since cd.Status.ObservedGeneration is initialized to be zero,
-			// we must watch the value for a while to tell it's not changed by the reconciler.
-			Consistently(func(g Gomega) {
-				cd := &dbaasv1alpha1.ClusterDefinition{}
-				g.Eventually(func() error {
-					return k8sClient.Get(ctx, intctrlutil.GetNamespacedName(clusterDefinition), cd)
-				}, timeout, interval).Should(Succeed())
-				g.Expect(cd.Status.ObservedGeneration == 0).To(BeTrue())
-			}, waitDuration, interval).Should(Succeed())
-
-			By("By deleting clusterDefinition")
-			Expect(k8sClient.Delete(ctx, clusterDefinition)).Should(Succeed())
-		})
-	})
+	// Validate the parameters by ClusterDefinition webhook
+	// Context("When configmap template in clusterDefinition contains invalid parameter(e.g. VolumeName not exist)", func() {
+	//	It("Should stop proceeding the status of clusterDefinition", func() {
+	//		By("creating a clusterDefinition and an invalid configmap")
+	//		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
+	//		Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)).Should(Succeed())
+	//		cmName := "mysql-tree-node-template-8.0-volumename-not-exist"
+	//		clusterDefinition.Name += "-volumename-not-exist"
+	//		// missing VolumeName
+	//		clusterDefinition.Spec.Components[0].ConfigSpec = &dbaasv1alpha1.ConfigurationSpec{
+	//			ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{
+	//				{
+	//					Name:         cmName,
+	//					ConfigTplRef: cmName,
+	//					Namespace:    testCtx.DefaultNamespace,
+	//				},
+	//			},
+	//		}
+	//		// create configmap
+	//		assureCfgTplConfigMapObj(cmName, testCtx.DefaultNamespace)
+	//		Expect(testCtx.CreateObj(ctx, clusterDefinition)).Should(Succeed())
+	//
+	//		By("check the reconciler won't update Status.ObservedGeneration")
+	//		// should use Consistently here, since cd.Status.ObservedGeneration is initialized to be zero,
+	//		// we must watch the value for a while to tell it's not changed by the reconciler.
+	//		Consistently(func(g Gomega) {
+	//			cd := &dbaasv1alpha1.ClusterDefinition{}
+	//			g.Eventually(func() error {
+	//				return k8sClient.Get(ctx, intctrlutil.GetNamespacedName(clusterDefinition), cd)
+	//			}, timeout, interval).Should(Succeed())
+	//			g.Expect(cd.Status.ObservedGeneration == 0).To(BeTrue())
+	//		}, waitDuration, interval).Should(Succeed())
+	//
+	//		By("By deleting clusterDefinition")
+	//		Expect(k8sClient.Delete(ctx, clusterDefinition)).Should(Succeed())
+	//	})
+	// })
 })

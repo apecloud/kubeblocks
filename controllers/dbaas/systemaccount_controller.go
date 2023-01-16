@@ -338,7 +338,6 @@ func (r *SystemAccountReconciler) isComponentReady(reqCtx intctrlutil.RequestCtx
 // TODO: @shanshan, should verify accounts on database cluster as well.
 func (r *SystemAccountReconciler) getAccountFacts(reqCtx intctrlutil.RequestCtx,
 	namespace, clusterName string, clusterDefType, clusterDefName, compName string) (dbaasv1alpha1.KBAccountType, error) {
-	var detectedFacts dbaasv1alpha1.KBAccountType
 	// get account facts, i.e., secrets created
 	ml := getLabelsForSecretsAndJobs(clusterName, clusterDefType, clusterDefName, compName)
 
@@ -347,23 +346,13 @@ func (r *SystemAccountReconciler) getAccountFacts(reqCtx intctrlutil.RequestCtx,
 		return dbaasv1alpha1.KBAccountInvalid, err
 	}
 
-	// parse account name from secret's label
-	for _, secret := range secrets.Items {
-		if accountName, exists := secret.ObjectMeta.Labels[clusterAccountLabelKey]; exists {
-			updateFacts((dbaasv1alpha1.AccountName(accountName)), &detectedFacts)
-		}
-	}
-
 	// get all running jobs
 	jobs := &batchv1.JobList{}
 	if err := r.Client.List(reqCtx.Ctx, jobs, client.InNamespace(namespace), ml); err != nil {
 		return dbaasv1alpha1.KBAccountInvalid, err
 	}
-	for _, job := range jobs.Items {
-		if accountName, exists := job.ObjectMeta.Labels[clusterAccountLabelKey]; exists {
-			updateFacts((dbaasv1alpha1.AccountName(accountName)), &detectedFacts)
-		}
-	}
+
+	detectedFacts := getAccountFacts(secrets, jobs)
 	return detectedFacts, nil
 }
 

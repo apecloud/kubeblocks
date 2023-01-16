@@ -29,13 +29,16 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/dbaas/operations/util"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("OpsRequest Controller", func() {
@@ -80,6 +83,50 @@ var _ = Describe("OpsRequest Controller", func() {
 	initClusterForOps := func(opsRes *OpsResource) {
 		Expect(opsutil.PatchClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
 		opsRes.Cluster.Status.Phase = dbaasv1alpha1.RunningPhase
+	}
+
+	assureCfgTplObj := func(tplName, cmName, ns string) (*corev1.ConfigMap, *dbaasv1alpha1.ConfigConstraint) {
+		By("Assuring an cm obj")
+
+		cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap](
+			"operations_config/configcm.yaml",
+			testdata.WithNamespacedName(cmName, ns),
+		)
+		Expect(err).Should(Succeed())
+		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigConstraint](
+			"operations_config/configtpl.yaml",
+			testdata.WithNamespacedName(tplName, ns))
+		Expect(err).Should(Succeed())
+
+		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, cfgTpl)).Should(Succeed())
+
+		return cfgCM, cfgTpl
+	}
+
+	assureConfigInstanceObj := func(clusterName, componentName, ns string, cdComponent dbaasv1alpha1.ClusterDefinitionComponent) *corev1.ConfigMap {
+		if cdComponent.ConfigSpec == nil {
+			return nil
+		}
+		var cmObj *corev1.ConfigMap
+		for _, tpl := range cdComponent.ConfigSpec.ConfigTemplateRefs {
+			cmInsName := cfgcore.GetComponentCfgName(clusterName, componentName, tpl.VolumeName)
+			cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("operations_config/configcm.yaml",
+				testdata.WithNamespacedName(cmInsName, ns),
+				testdata.WithLabels(
+					intctrlutil.AppNameLabelKey, clusterName,
+					intctrlutil.AppInstanceLabelKey, clusterName,
+					intctrlutil.AppComponentLabelKey, componentName,
+					cfgcore.CMConfigurationTplNameLabelKey, tpl.ConfigTplRef,
+					cfgcore.CMConfigurationConstraintsNameLabelKey, tpl.ConfigConstraintRef,
+					cfgcore.CMConfigurationISVTplLabelKey, tpl.Name,
+				),
+			)
+			Expect(err).Should(Succeed())
+			Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
+			cmObj = cfgCM
+		}
+		return cmObj
 	}
 
 	testVerticalScaling := func(opsRes *OpsResource) {
@@ -293,9 +340,97 @@ var _ = Describe("OpsRequest Controller", func() {
 		}
 	}
 
+	testReconfigure := func(clusterObject *dbaasv1alpha1.Cluster,
+		opsRes *OpsResource,
+		clusterDefObj *dbaasv1alpha1.ClusterDefinition) {
+		var (
+			cfgObj *corev1.ConfigMap
+		)
+
+		By("Test Reconfigure")
+		{
+			// mock cluster is Running to support reconfigure ops
+			By("mock cluster status")
+			patch := client.MergeFrom(clusterObject.DeepCopy())
+			clusterObject.Status.Phase = dbaasv1alpha1.RunningPhase
+			Expect(k8sClient.Status().Patch(ctx, clusterObject, patch)).Should(Succeed())
+		}
+
+		{
+			By("mock config tpl")
+			cmObj, tplObj := assureCfgTplObj("mysql-tpl-test", "mysql-cm-test", testCtx.DefaultNamespace)
+			By("update clusterdefinition tpl")
+			clusterDefObj.Spec.Components[0].ConfigSpec = &dbaasv1alpha1.ConfigurationSpec{
+				ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{
+					{
+						Name:                "mysql-test",
+						ConfigTplRef:        cmObj.Name,
+						ConfigConstraintRef: tplObj.Name,
+						VolumeName:          "mysql-config",
+						Namespace:           testCtx.DefaultNamespace,
+					},
+				},
+			}
+			Expect(k8sClient.Update(ctx, clusterDefObj)).Should(Succeed())
+			By("mock config cm object")
+			cfgObj = assureConfigInstanceObj(clusterName, consensusCompName, testCtx.DefaultNamespace, clusterDefObj.Spec.Components[0])
+		}
+
+		By("mock event context")
+		eventContext := cfgcore.ConfigEventContext{
+			Cfg:       cfgObj,
+			Component: &clusterDefObj.Spec.Components[0],
+			Client:    k8sClient,
+			ReqCtx: intctrlutil.RequestCtx{
+				Ctx:      opsRes.Ctx,
+				Log:      log.FromContext(opsRes.Ctx),
+				Recorder: opsRes.Recorder,
+			},
+			Cluster: clusterObject,
+		}
+
+		By("mock reconfigure success")
+		ops := testdbaas.GenerateOpsRequestObj("reconfigure-ops-"+randomStr, clusterName, dbaasv1alpha1.ReconfiguringType)
+		ops.Spec.Reconfigure = &dbaasv1alpha1.Reconfigure{
+			Configurations: []dbaasv1alpha1.Configuration{{
+				Name: "mysql-test",
+				Keys: []dbaasv1alpha1.ParameterConfig{{
+					Key: "my.cnf",
+					Parameters: []dbaasv1alpha1.ParameterPair{
+						{
+							Key:   "binlog_stmt_cache_size",
+							Value: func() *string { v := "4096"; return &v }(),
+						},
+						{
+							Key:   "x",
+							Value: func() *string { v := "abcd"; return &v }(),
+						},
+					},
+				}},
+			}},
+			ComponentOps: dbaasv1alpha1.ComponentOps{ComponentName: consensusCompName},
+		}
+		opsRes.OpsRequest = ops
+		Expect(testCtx.CheckedCreateObj(ctx, ops)).Should(Succeed())
+
+		reAction := reconfigureAction{}
+		Expect(reAction.Action(opsRes)).Should(Succeed())
+		Expect(reAction.Handle(eventContext, ops.Name, dbaasv1alpha1.ReconfiguringPhase, nil)).Should(Succeed())
+		Expect(opsRes.Client.Get(opsRes.Ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+		_, _ = GetOpsManager().Reconcile(opsRes)
+		Expect(opsRes.OpsRequest.Status.Phase).Should(BeEquivalentTo(dbaasv1alpha1.RunningPhase))
+		Expect(reAction.Handle(eventContext, ops.Name, dbaasv1alpha1.SucceedPhase, nil)).Should(Succeed())
+		Expect(opsRes.Client.Get(opsRes.Ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+		_, _ = GetOpsManager().Reconcile(opsRes)
+		Expect(opsRes.OpsRequest.Status.Phase).Should(BeEquivalentTo(dbaasv1alpha1.SucceedPhase))
+
+		// TODO add failed ut
+		By("mock reconfigure failed")
+	}
+
 	Context("Test OpsRequest", func() {
 		It("Should Test all OpsRequest", func() {
-			_, _, clusterObject := testdbaas.InitClusterWithHybridComps(ctx, testCtx, clusterDefinitionName,
+			clusterDef, _, clusterObject := testdbaas.InitClusterWithHybridComps(ctx, testCtx, clusterDefinitionName,
 				clusterVersionName, clusterName, statelessCompName, consensusCompName)
 			opsRes := &OpsResource{
 				Ctx:      context.Background(),
@@ -360,6 +495,8 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			// test restart consensus component and stateless component
 			testRestart(opsRes, consensusPodList, statelessPod)
+
+			testReconfigure(clusterObject, opsRes, clusterDef)
 
 			// test horizontalScaling and test the progressDetail
 			testHorizontalScaling(opsRes, consensusPodList)

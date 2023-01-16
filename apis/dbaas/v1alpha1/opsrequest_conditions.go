@@ -40,10 +40,10 @@ const (
 
 	// condition and event reasons
 
-	ReasonReconfigureMerged  = "ReconfigureMerged"
-	ReasonReconfigureFailed  = "ReconfigureFailed"
-	ReasonReconfigureSucceed = "ReconfigureSucceed"
-	ReasonReconfigureRunning = "ReconfigureRunning"
+	ReasonReconfigureMerged    = "ReconfigureMerged"
+	ReasonReconfigureFailed    = "ReconfigureFailed"
+	ReasonReconfigureSucceed   = "ReconfigureSucceed"
+	ReasonReconfigureRunning   = "ReconfigureRunning"
 	ReasonClusterPhaseMisMatch = "ClusterPhaseMisMatch"
 	ReasonOpsTypeNotSupported  = "OpsTypeNotSupported"
 	ReasonValidateError        = "ValidateError"

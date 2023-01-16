@@ -177,7 +177,7 @@ type ClusterComponent struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=0
 	// +optional
-	PrimaryIndex *int32 `json:"primaryIndex,omitempty"`
+	PrimaryIndex int32 `json:"primaryIndex,omitempty"`
 }
 
 type ComponentMessageMap map[string]string
@@ -401,7 +401,7 @@ func (r *Cluster) ValidatePrimaryIndex(cd *ClusterDefinition) error {
 			if !strings.EqualFold(comp.Type, clusterDefComp.TypeName) {
 				continue
 			}
-			if *comp.PrimaryIndex > clusterDefComp.DefaultReplicas-1 {
+			if comp.PrimaryIndex > clusterDefComp.DefaultReplicas-1 {
 				message = append(message, fmt.Sprintf("component %s's PrimaryIndex cannot be larger than defaultReplicas.", comp.Type))
 				return errors.New(strings.Join(message, ";"))
 			}

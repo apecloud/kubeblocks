@@ -172,19 +172,19 @@ var _ = Describe("cluster webhook", func() {
 
 			By("By updating cluster.Spec.Components[0].PrimaryIndex larger than cluster.Spec.Components[0].Replicas, expect not succeed")
 			patch = client.MergeFrom(cluster.DeepCopy())
-			*rsCluster.Spec.Components[0].PrimaryIndex = int32(3)
+			rsCluster.Spec.Components[0].PrimaryIndex = int32(3)
 			*rsCluster.Spec.Components[0].Replicas = int32(3)
 			Expect(k8sClient.Patch(ctx, rsCluster, patch)).ShouldNot(Succeed())
 
 			By("By updating cluster.Spec.Components[0].PrimaryIndex less than cluster.Spec.Components[0].Replicas, expect succeed")
 			patch = client.MergeFrom(cluster.DeepCopy())
-			*rsCluster.Spec.Components[0].PrimaryIndex = int32(1)
+			rsCluster.Spec.Components[0].PrimaryIndex = int32(1)
 			*rsCluster.Spec.Components[0].Replicas = int32(2)
 			Expect(k8sClient.Patch(ctx, rsCluster, patch)).Should(Succeed())
 
 			By("By updating cluster.Spec.Components[0].PrimaryIndex less than 0, expect not succeed")
 			patch = client.MergeFrom(cluster.DeepCopy())
-			*rsCluster.Spec.Components[0].PrimaryIndex = int32(-1)
+			rsCluster.Spec.Components[0].PrimaryIndex = int32(-1)
 			*rsCluster.Spec.Components[0].Replicas = int32(2)
 			Expect(k8sClient.Patch(ctx, rsCluster, patch)).ShouldNot(Succeed())
 		})

@@ -395,9 +395,7 @@ func mergeComponents(
 			tolerations = clusterComp.Tolerations
 		}
 
-		if clusterComp.PrimaryIndex != nil {
-			component.PrimaryIndex = clusterComp.PrimaryIndex
-		}
+		component.PrimaryIndex = clusterComp.PrimaryIndex
 	}
 	if affinity != nil {
 		component.PodSpec.Affinity = buildPodAffinity(cluster, affinity, component)
@@ -1307,7 +1305,7 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
 	// sts.Name rename and add role label.
 	sts.ObjectMeta.Name = fmt.Sprintf("%s-%d", sts.ObjectMeta.Name, stsIndex)
 	sts.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Secondary)
-	if stsIndex == *params.component.PrimaryIndex {
+	if stsIndex == params.component.PrimaryIndex {
 		sts.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Primary)
 	}
 	sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
@@ -1321,11 +1319,11 @@ func injectReplicationSetPodEnvAndLabel(params createParams, sts *appsv1.Statefu
 			c := &sts.Spec.Template.Spec.Containers[i]
 			c.Env = append(c.Env, corev1.EnvVar{
 				Name:      dbaasPrefix + "_PRIMARY_POD_NAME",
-				Value:     fmt.Sprintf("%s-%d-%d.%s", sts.Name, *comp.PrimaryIndex, 0, svcName),
+				Value:     fmt.Sprintf("%s-%d-%d.%s", sts.Name, comp.PrimaryIndex, 0, svcName),
 				ValueFrom: nil,
 			})
 		}
-		if index != *comp.PrimaryIndex {
+		if index != comp.PrimaryIndex {
 			sts.Spec.Template.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Secondary)
 		} else {
 			sts.Spec.Template.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Primary)

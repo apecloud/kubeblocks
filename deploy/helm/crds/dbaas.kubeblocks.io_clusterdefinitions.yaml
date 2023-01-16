@@ -69,8 +69,7 @@ spec:
                         characterType when builtIn is true.
                       type: string
                     componentType:
-                      description: componentType defines type of the component. Default
-                        to Stateless.
+                      description: componentType defines type of the component.
                       enum:
                       - Stateless
                       - Stateful

@@ -1838,7 +1838,7 @@ involvedObject:
 			}
 
 			By("Creating mock role changed events")
-			// pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] will be filled with the role
+			// pod.Labels[intctrlutil.RoleLabelKey] will be filled with the role
 			events := mockRoleChangedEvent(key, sts)
 			for _, event := range events {
 				Expect(testCtx.CreateObj(ctx, &event)).Should(Succeed())

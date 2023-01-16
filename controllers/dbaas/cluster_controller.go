@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
@@ -415,6 +416,19 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 			return &res, err
 		}
+		// The backup policy must be cleaned up when the cluster is deleted.
+		// Automatic backup scheduling needs to be stopped at this point.
+		if err := r.deleteBackupPolicies(reqCtx, cluster); err != nil && !apierrors.IsNotFound(err) {
+			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return &res, err
+		}
+		if cluster.Spec.TerminationPolicy == dbaasv1alpha1.WipeOut {
+			// wipe out all backups
+			if err := r.deleteBackups(reqCtx, cluster); err != nil && !apierrors.IsNotFound(err) {
+				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+				return &res, err
+			}
+		}
 	}
 
 	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
@@ -496,6 +510,38 @@ func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *d
 	for _, pvc := range pvcList.Items {
 		if err := r.Delete(reqCtx.Ctx, &pvc); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func (r *ClusterReconciler) deleteBackupPolicies(reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster) error {
+	inNS := client.InNamespace(cluster.Namespace)
+	ml := client.MatchingLabels{
+		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
+	}
+	// clean backupPolicies
+	return r.Client.DeleteAllOf(reqCtx.Ctx, &dataprotectionv1alpha1.BackupPolicy{}, inNS, ml)
+}
+
+func (r *ClusterReconciler) deleteBackups(reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster) error {
+	inNS := client.InNamespace(cluster.Namespace)
+	ml := client.MatchingLabels{
+		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
+	}
+	// clean backups
+	backups := &dataprotectionv1alpha1.BackupList{}
+	if err := r.List(reqCtx.Ctx, backups, inNS, ml); err != nil {
+		return err
+	}
+	for _, backup := range backups.Items {
+		// check backup delete protection label
+		deleteProtection, exists := backup.GetLabels()[intctrlutil.BackupProtectionLabelKey]
+		// not found backup-protection or value is Delete, delete it.
+		if !exists || deleteProtection == intctrlutil.BackupDelete {
+			if err := r.Delete(reqCtx.Ctx, &backup); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

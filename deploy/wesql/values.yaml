@@ -7,7 +7,7 @@ image:
   repository: docker.io/apecloud/wesql-server
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: 8.0.30-4.alpha4.20221117.gba56235
+  tag: 8.0.30-5.alpha2.20230105.gd6b8719
 
 ## MySQL Cluster parameters
 cluster:

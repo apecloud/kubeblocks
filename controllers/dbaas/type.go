@@ -41,6 +41,12 @@ const (
 	CSRoleChangedAnnotKey      = "cs.kubeblocks.io/event-handled"
 	CSRoleChangedAnnotHandled  = "true"
 	clusterAccountLabelKey     = "account.kubeblocks.io/name"
+
+	// annotations keys
+	lifecycleAnnotationKey = "cluster.kubeblocks.io/lifecycle"
+
+	// annotations values
+	lifecycleDeletePVCAnnotation = "delete-pvc"
 )
 
 type MonitorConfig struct {

@@ -1,15 +1,15 @@
-# permissions for end users to edit backupjobs.
+# permissions for end users to edit backups.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "kubeblocks.fullname" . }}-backupjob-editor-role
+  name: {{ include "kubeblocks.fullname" . }}-backup-editor-role
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - backupjobs
+  - backups
   verbs:
   - create
   - delete
@@ -21,6 +21,6 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - backupjobs/status
+  - backups/status
   verbs:
   - get

@@ -36,4 +36,5 @@ KubeBlocks operation commands
 * [kbcli](kbcli.md)	 - KubeBlocks CLI
 * [kbcli kubeblocks install](kbcli_kubeblocks_install.md)	 - Install KubeBlocks
 * [kbcli kubeblocks uninstall](kbcli_kubeblocks_uninstall.md)	 - Uninstall KubeBlocks
+* [kbcli kubeblocks upgrade](kbcli_kubeblocks_upgrade.md)	 - Upgrade KubeBlocks
 

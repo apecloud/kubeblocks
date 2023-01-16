@@ -137,12 +137,12 @@ func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 		return nil
 	}
 
-	gvr := schema.GroupVersionResource{Group: types.DPGroup, Version: types.DPVersion, Resource: types.ResourceBackupJobs}
-	backupJobObj, err := o.Client.Resource(gvr).Namespace(o.Namespace).Get(context.TODO(), backup, metav1.GetOptions{})
+	gvr := schema.GroupVersionResource{Group: types.DPGroup, Version: types.DPVersion, Resource: types.ResourceBackups}
+	backupObj, err := o.Client.Resource(gvr).Namespace(o.Namespace).Get(context.TODO(), backup, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	backupType, _, _ := unstructured.NestedString(backupJobObj.Object, "spec", "backupType")
+	backupType, _, _ := unstructured.NestedString(backupObj.Object, "spec", "backupType")
 	if backupType != "snapshot" {
 		return fmt.Errorf("only support snapshot backup, specified backup type is '%v'", backupType)
 	}
@@ -249,7 +249,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	o := &CreateOptions{BaseOptions: create.BaseOptions{IOStreams: streams}}
 	inputs := create.Inputs{
 		Use:             "create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOut --components=file-path",
-		Short:           "Create a database cluster",
+		Short:           "Create a cluster",
 		Example:         clusterCreateExample,
 		CueTemplateName: CueTemplateName,
 		ResourceName:    types.ResourceClusters,

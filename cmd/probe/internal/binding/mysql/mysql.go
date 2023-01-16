@@ -77,7 +77,6 @@ var (
 	defaultDbPort = 3306
 	dbUser        = "root"
 	dbPasswd      = ""
-	dbRoles       = map[string]internal.AccessMode{}
 )
 
 // NewMysql returns a new MySQL output binding.
@@ -95,12 +94,6 @@ func (m *Mysql) Init(metadata bindings.Metadata) error {
 		dbPasswd = viper.GetString("KB_SERVICE_PASSWORD")
 	}
 
-	if viper.IsSet("KB_SERVICE_ROLES") {
-		val := viper.GetString("KB_SERVICE_ROLES")
-		if err := json.Unmarshal([]byte(val), &dbRoles); err != nil {
-			fmt.Println(errors.Wrap(err, "KB_DB_ROLES env format error").Error())
-		}
-	}
 	m.logger.Debug("Initializing MySQL binding")
 	m.metadata = metadata
 
@@ -227,8 +220,9 @@ func (m *Mysql) GetRole(ctx context.Context, sql string) (string, error) {
 	var role string
 	var serverId string
 	for rows.Next() {
-		if err := rows.Scan(&curLeader, &role, &serverId); err != nil {
+		if err = rows.Scan(&curLeader, &role, &serverId); err != nil {
 			m.logger.Errorf("checkRole error: %", err)
+			return role, err
 		}
 	}
 	return role, nil
@@ -244,7 +238,7 @@ func (m *Mysql) StatusCheck(ctx context.Context, sql string, resp *bindings.Invo
 	// roSql := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, statusCheckType)
 	// var err error
 	// var data []byte
-	// switch dbRoles[strings.ToLower(oriRole)] {
+	// switch m.base.dbRoles[strings.ToLower(oriRole)] {
 	// case internal.ReadWrite:
 	// 	var count int64
 	// 	count, err = m.exec(ctx, rwSql)
@@ -252,7 +246,7 @@ func (m *Mysql) StatusCheck(ctx context.Context, sql string, resp *bindings.Invo
 	// case internal.Readonly:
 	// 	data, err = m.query(ctx, roSql)
 	// default:
-	// 	msg := fmt.Sprintf("unknown access mode for role %s: %v", oriRole, dbRoles)
+	// 	msg := fmt.Sprintf("unknown access mode for role %s: %v", oriRole, m.base.dbRoles)
 	// 	m.logger.Info(msg)
 	// 	data = []byte(msg)
 	// }

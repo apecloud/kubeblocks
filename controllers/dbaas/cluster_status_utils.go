@@ -398,6 +398,12 @@ func checkedDeleteDeletePVCCronJob(ctx context.Context, cli client.Client, name 
 	if cronJob.ObjectMeta.Labels[intctrlutil.AppManagedByLabelKey] != intctrlutil.AppName {
 		return nil
 	}
+	// check the delete-pvc-cronjob annotation.
+	// the reason for this is that the backup policy also creates cronjobs,
+	// which need to be distinguished by the annotation.
+	if cronJob.ObjectMeta.Annotations[lifecycleAnnotationKey] != lifecycleDeletePVCAnnotation {
+		return nil
+	}
 	// if managed by kubeblocks, then it must be the cronjob used to delete pvc, delete it since it's completed
 	if err := cli.Delete(ctx, &cronJob); err != nil {
 		return client.IgnoreNotFound(err)

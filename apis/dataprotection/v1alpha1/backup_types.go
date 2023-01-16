@@ -20,9 +20,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// BackupJobSpec defines the desired state of BackupJob
-type BackupJobSpec struct {
-	// which backupPolicy to perform this backupJob
+// BackupSpec defines the desired state of Backup
+type BackupSpec struct {
+	// which backupPolicy to perform this backup
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	BackupPolicyName string `json:"backupPolicyName"`
@@ -30,11 +30,11 @@ type BackupJobSpec struct {
 	// Backup Type. full or incremental or snapshot. if unset, default is full.
 	// +kubebuilder:validation:Enum={full,incremental,snapshot}
 	// +kubebuilder:default=full
-	BackupType BackupJobType `json:"backupType"`
+	BackupType BackupType `json:"backupType"`
 
 	// if backupType is incremental, parentBackupName is required.
 	// +optional
-	ParentBackupJobName string `json:"parentBackupJobName,omitempty"`
+	ParentBackupName string `json:"parentBackupName,omitempty"`
 
 	// TTL is a time.Duration-parsable string describing how long
 	// the Backup should be retained for.
@@ -42,41 +42,41 @@ type BackupJobSpec struct {
 	TTL *metav1.Duration `json:"ttl,omitempty"`
 }
 
-// BackupJobPhase The current phase. Valid values are New, InProgress, Completed, Failed.
+// BackupPhase The current phase. Valid values are New, InProgress, Completed, Failed.
 // +enum
-type BackupJobPhase string
+type BackupPhase string
 
-// These are the valid statuses of BackupJob.
+// These are the valid statuses of Backup.
 const (
-	BackupJobNew BackupJobPhase = "New"
+	BackupNew BackupPhase = "New"
 
-	BackupJobInProgress BackupJobPhase = "InProgress"
+	BackupInProgress BackupPhase = "InProgress"
 
-	BackupJobCompleted BackupJobPhase = "Completed"
+	BackupCompleted BackupPhase = "Completed"
 
-	BackupJobFailed BackupJobPhase = "Failed"
+	BackupFailed BackupPhase = "Failed"
 )
 
-// BackupJobType the job type, marked job is full or incremental.
+// BackupType the job type, marked job is full or incremental.
 // +enum
-type BackupJobType string
+type BackupType string
 
 const (
-	BackupTypeFull BackupJobType = "full"
+	BackupTypeFull BackupType = "full"
 
-	BackupTypeIncremental BackupJobType = "incremental"
+	BackupTypeIncremental BackupType = "incremental"
 
-	BackupTypeSnapshot BackupJobType = "snapshot"
+	BackupTypeSnapshot BackupType = "snapshot"
 )
 
-// BackupJobStatus defines the observed state of BackupJob
-type BackupJobStatus struct {
+// BackupStatus defines the observed state of Backup
+type BackupStatus struct {
 	// +optional
-	Phase BackupJobPhase `json:"phase,omitempty"`
+	Phase BackupPhase `json:"phase,omitempty"`
 
-	// record parentBackupJobName if backupType is incremental.
+	// record parentBackupName if backupType is incremental.
 	// +optional
-	ParentBackupJobName string `json:"parentBackupJobName,omitempty"`
+	ParentBackupName string `json:"parentBackupName,omitempty"`
 
 	// The date and time when the Backup is eligible for garbage collection.
 	// 'null' means the Backup is NOT be cleaned except delete manual.
@@ -91,11 +91,18 @@ type BackupJobStatus struct {
 	// +optional
 	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
 
+	// The duration time of backup execution.
+	// When converted to a string, the form is "1h2m0.5s".
+	// +optional
+	Duration *metav1.Duration `json:"duration,omitempty"`
+
 	// backup total size
+	// string with capacity units in the form of "1Gi", "1Mi", "1Ki".
 	// +optional
 	TotalSize string `json:"totalSize,omitempty"`
 
 	// backup total size
+	// string with capacity units in the form of "1Gi", "1Mi", "1Ki".
 	// +optional
 	UploadTotalSize string `json:"uploadTotalSize,omitempty"`
 
@@ -117,26 +124,27 @@ type BackupJobStatus struct {
 // +kubebuilder:resource:categories={dbaas},scope=Namespaced
 // +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="COMPLETIONTIME",type=date,JSONPath=`.status.completionTimestamp`
-// +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
+// +kubebuilder:printcolumn:name="TOTALSIZE",type=string,JSONPath=`.status.totalSize`
+// +kubebuilder:printcolumn:name="DURATION",type=string,JSONPath=`.status.duration`
 
-// BackupJob is the Schema for the backupjobs API (defined by User)
-type BackupJob struct {
+// Backup is the Schema for the backups API (defined by User)
+type Backup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   BackupJobSpec   `json:"spec,omitempty"`
-	Status BackupJobStatus `json:"status,omitempty"`
+	Spec   BackupSpec   `json:"spec,omitempty"`
+	Status BackupStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// BackupJobList contains a list of BackupJob
-type BackupJobList struct {
+// BackupList contains a list of Backup
+type BackupList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []BackupJob `json:"items"`
+	Items           []Backup `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&BackupJob{}, &BackupJobList{})
+	SchemeBuilder.Register(&Backup{}, &BackupList{})
 }

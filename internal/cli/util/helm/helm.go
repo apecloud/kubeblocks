@@ -17,6 +17,7 @@ limitations under the License.
 package helm
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -41,9 +42,9 @@ import (
 	"helm.sh/helm/v3/pkg/repo"
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
-
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
+
+const timeOut = time.Second * 600
 
 type InstallOpts struct {
 	Name            string
@@ -155,28 +156,23 @@ func (i *InstallOpts) getInstalled(cfg *action.Configuration) (*release.Release,
 }
 
 // Install will install a Chart
-func (i *InstallOpts) Install(cfg *action.Configuration) (string, error) {
+func (i *InstallOpts) Install(cfg *action.Configuration) error {
 	ctx := context.Background()
 	opts := retry.Options{
 		MaxRetry: 1 + i.TryTimes,
 	}
 
-	spinner := util.Spinner(os.Stdout, "Install %s", i.Chart)
-	defer spinner(false)
-
-	var notes string
 	if err := retry.IfNecessary(ctx, func() error {
 		var err1 error
-		if notes, err1 = i.tryInstall(cfg); err1 != nil {
+		if _, err1 = i.tryInstall(cfg); err1 != nil {
 			return err1
 		}
 		return nil
 	}, &opts); err != nil {
-		return "", errors.Errorf("install chart %s error: %s", i.Name, err.Error())
+		return err
 	}
 
-	spinner(true)
-	return notes, nil
+	return nil
 }
 
 func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
@@ -201,7 +197,7 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 	client.Namespace = i.Namespace
 	client.CreateNamespace = i.CreateNamespace
 	client.Wait = i.Wait
-	client.Timeout = time.Second * 300
+	client.Timeout = timeOut
 	client.Version = i.Version
 
 	cp, err := client.ChartPathOptions.LocateChart(i.Chart, settings)
@@ -254,25 +250,21 @@ func (i *InstallOpts) UnInstall(cfg *action.Configuration) error {
 		MaxRetry: 1 + i.TryTimes,
 	}
 
-	spinner := util.Spinner(os.Stdout, "Uninstall %s", i.Name)
-	defer spinner(false)
 	if err := retry.IfNecessary(ctx, func() error {
 		if err := i.tryUnInstall(cfg); err != nil {
 			return err
 		}
 		return nil
 	}, &opts); err != nil {
-		return errors.Errorf("uninstall chart %s error: %s", i.Name, err.Error())
+		return err
 	}
-
-	spinner(true)
 	return nil
 }
 
 func (i *InstallOpts) tryUnInstall(cfg *action.Configuration) error {
 	client := action.NewUninstall(cfg)
 	client.Wait = i.Wait
-	client.Timeout = time.Second * 300
+	client.Timeout = timeOut
 
 	// Create context and prepare the handle of SIGTERM
 	ctx := context.Background()
@@ -337,32 +329,27 @@ func FakeActionConfig() *action.Configuration {
 }
 
 // Upgrade will upgrade a Chart
-func (i *InstallOpts) Upgrade(cfg *action.Configuration) (string, error) {
+func (i *InstallOpts) Upgrade(cfg *action.Configuration) error {
 	ctx := context.Background()
 	opts := retry.Options{
 		MaxRetry: 1 + i.TryTimes,
 	}
 
-	spinner := util.Spinner(os.Stdout, "Upgrade %s", i.Chart)
-	defer spinner(false)
-
-	var notes string
 	if err := retry.IfNecessary(ctx, func() error {
 		var err1 error
-		if notes, err1 = i.tryUpgrade(cfg); err1 != nil {
+		if _, err1 = i.tryUpgrade(cfg); err1 != nil {
 			return err1
 		}
 		return nil
 	}, &opts); err != nil {
-		return "", fmt.Errorf("Upgrade chart %s error: %w", i.Name, err)
+		return err
 	}
 
-	spinner(true)
-	return notes, nil
+	return nil
 }
 
 func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
-	res, err := i.getInstalled(cfg)
+	installed, err := i.getInstalled(cfg)
 	if err != nil {
 		return "", err
 	}
@@ -372,8 +359,12 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 	client := action.NewUpgrade(cfg)
 	client.Namespace = i.Namespace
 	client.Wait = i.Wait
-	client.Timeout = time.Second * 300
-	client.Version = res.Chart.AppVersion()
+	client.Timeout = timeOut
+	if len(i.Version) > 0 {
+		client.Version = i.Version
+	} else {
+		client.Version = installed.Chart.AppVersion()
+	}
 	client.ReuseValues = true
 
 	cp, err := client.ChartPathOptions.LocateChart(i.Chart, settings)
@@ -411,6 +402,22 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 		fmt.Println("Upgrade has been cancelled")
 		cancel()
 	}()
+
+	// update crds before helm upgrade
+	for _, obj := range chartRequested.CRDObjects() {
+		// Read in the resources
+		target, err := cfg.KubeClient.Build(bytes.NewBuffer(obj.File.Data), false)
+		if err != nil {
+			return "", errors.Wrapf(err, "failed to update CRD %s", obj.Name)
+		}
+
+		// helm only use the original.Info part for looking up original CRD in Update interface
+		// so set original with target as they have same .Info part
+		original := target
+		if _, err := cfg.KubeClient.Update(original, target, false); err != nil {
+			return "", errors.Wrapf(err, "failed to update CRD %s", obj.Name)
+		}
+	}
 
 	released, err := client.RunWithContext(ctx, i.Name, chartRequested, vals)
 	if err != nil {

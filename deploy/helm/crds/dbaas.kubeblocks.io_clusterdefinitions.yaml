@@ -7786,7 +7786,7 @@ spec:
                               description: Minimum consecutive failures for the probe
                                 to be considered failed after having succeeded.
                               format: int32
-                              minimum: 1
+                              minimum: 2
                               type: integer
                             periodSeconds:
                               default: 1
@@ -7826,7 +7826,7 @@ spec:
                               description: Minimum consecutive failures for the probe
                                 to be considered failed after having succeeded.
                               format: int32
-                              minimum: 1
+                              minimum: 2
                               type: integer
                             periodSeconds:
                               default: 1
@@ -7866,7 +7866,7 @@ spec:
                               description: Minimum consecutive failures for the probe
                                 to be considered failed after having succeeded.
                               format: int32
-                              minimum: 1
+                              minimum: 2
                               type: integer
                             periodSeconds:
                               default: 1

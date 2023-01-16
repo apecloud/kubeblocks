@@ -196,19 +196,6 @@ ifeq (, $(shell sed -n "/^127.0.0.1[[:space:]]*host.$(EXISTING_CLUSTER_TYPE).int
 endif
 endif
 
-.PHONY: test-probe
-test-probe:
-	cd ./cmd/probe && $(GO) test ./... -coverprofile cover.out
-
-.PHONY: cover-report-probe
-cover-report-probe: ## Generate cover.html from cmd/probe/cover.out
-	cd ./cmd/probe && $(GO) tool cover -html=cover.out -o cover.html
-ifeq ($(GOOS), darwin)
-	open ./cmd/probe/cover.html
-else
-	echo "open cmd/probe/cover.html with a HTML viewer."
-endif
-
 .PHONY: test-current-ctx
 test-current-ctx: manifests generate fmt vet add-k8s-host ## Run operator controller tests with current $KUBECONFIG context. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_PACKAGE)... -p 1 -coverprofile cover.out
@@ -337,7 +324,6 @@ agamotto: build-checks ## Build agamotto related binaries
 clean-agamotto: ## Clean bin/mysqld_exporter.
 	rm -f bin/agamotto
 
-
 ##@ reloader
 
 RELOADER_LD_FLAGS = "-s -w"
@@ -356,29 +342,43 @@ reloader: build-checks ## Build agamotto related binaries
 clean-reloader: ## Clean bin/mysqld_exporter.
 	rm -f bin/reloader
 
-##@ DAP
+##@ PROBE
 
-DAPRD_BUILD_PATH = ./cmd/daprd
-DAPRD_LD_FLAGS = "-s -w"
 
-bin/daprd.%: ## Cross build bin/daprd.$(OS).$(ARCH) .
-	cd $(DAPRD_BUILD_PATH) && GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${DAPRD_LD_FLAGS} -o ../../$@  ./main.go
+PROBE_BUILD_PATH = ./cmd/probe
+PROBE_LD_FLAGS = "-s -w"
 
-daprd-mod-vendor:
-	cd $(DAPRD_BUILD_PATH) && $(GO) mod tidy -compat=1.19
-	cd $(DAPRD_BUILD_PATH) && $(GO) mod vendor
-	cd $(DAPRD_BUILD_PATH) && $(GO) mod verify
+bin/probe.%: ## Cross build bin/probe.$(OS).$(ARCH) .
+	cd $(PROBE_BUILD_PATH) && GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${PROBE_LD_FLAGS} -o ../../$@  ./main.go
 
-.PHONY: daprd
-daprd: OS=$(shell $(GO) env GOOS)
-daprd: ARCH=$(shell $(GO) env GOARCH)
-daprd: daprd-mod-vendor # build-checks ## Build daprd related binaries
-	$(MAKE) bin/daprd.${OS}.${ARCH}
-	mv bin/daprd.${OS}.${ARCH} bin/daprd
+probe-mod-vendor:
+	cd $(PROBE_BUILD_PATH) && $(GO) mod tidy -compat=1.19
+	cd $(PROBE_BUILD_PATH) && $(GO) mod vendor
+	cd $(PROBE_BUILD_PATH) && $(GO) mod verify
+
+.PHONY: probe
+probe: OS=$(shell $(GO) env GOOS)
+probe: ARCH=$(shell $(GO) env GOARCH)
+probe: probe-mod-vendor # build-checks ## Build probe related binaries
+	$(MAKE) bin/probe.${OS}.${ARCH}
+	mv bin/probe.${OS}.${ARCH} bin/probe
 
 .PHONY: clean
-clean-daprd: ## Clean bin/mysqld_exporter.
-	rm -f bin/daprd
+clean-probe: ## Clean bin/mysqld_exporter.
+	rm -f bin/probe
+
+.PHONY: test-probe
+test-probe:
+	cd ./cmd/probe && $(GO) test ./... -coverprofile cover.out
+
+.PHONY: cover-report-probe
+cover-report-probe: ## Generate cover.html from cmd/probe/cover.out
+	cd ./cmd/probe && $(GO) tool cover -html=cover.out -o cover.html
+ifeq ($(GOOS), darwin)
+	open ./cmd/probe/cover.html
+else
+	echo "open cmd/probe/cover.html with a HTML viewer."
+endif
 
 ##@ Deployment
 

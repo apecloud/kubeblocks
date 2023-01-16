@@ -57,6 +57,31 @@ rules:
 - apiGroups:
   - batch
   resources:
+  - cronjobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - cronjobs/finalizers
+  verbs:
+  - patch
+  - update
+- apiGroups:
+  - batch
+  resources:
+  - cronjobs/status
+  verbs:
+  - get
+- apiGroups:
+  - batch
+  resources:
   - jobs
   verbs:
   - create
@@ -204,7 +229,7 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - backupjobs
+  - backups
   verbs:
   - create
   - delete
@@ -216,13 +241,13 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - backupjobs/finalizers
+  - backups/finalizers
   verbs:
   - update
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - backupjobs/status
+  - backups/status
   verbs:
   - get
   - patch

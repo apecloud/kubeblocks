@@ -9,7 +9,7 @@ kbcli troubleshoot preflight [flags]
 ### Examples
 
 ```
-  # Run preflight checks against customized preflight-check.yaml
+  # Run preflight checks against the customized rules of preflight-check.yaml
   kbcli troubleshoot preflight preflight-check.yaml
   
   # Run preflight checks and display AnalyzeResults with non-interactive mode

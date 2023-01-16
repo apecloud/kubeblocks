@@ -59,6 +59,9 @@ const (
 
 	// RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
 	RestartAnnotationKey = "kubeblocks.io/restart"
+
+	// BackupProtectionLabelKey Backup delete protection policy label
+	BackupProtectionLabelKey = "kubeblocks.io/backup-protection"
 )
 
 const (
@@ -84,4 +87,15 @@ const (
 	PodKind                   = "Pod"
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
 	CronJob                   = "CronJob"
+)
+
+const (
+	// BackupRetain always retained, unless manually deleted by the user
+	BackupRetain = "Retain"
+
+	// BackupRetainUntilExpired retains backup till it expires
+	BackupRetainUntilExpired = "RetainUntilExpired"
+
+	// BackupDelete (default) deletes backup immediately when cluster's terminationPolicy is WipeOut
+	BackupDelete = "Delete"
 )

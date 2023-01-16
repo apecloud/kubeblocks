@@ -5,16 +5,16 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  name: backupjobs.dataprotection.kubeblocks.io
+  name: backups.dataprotection.kubeblocks.io
 spec:
   group: dataprotection.kubeblocks.io
   names:
     categories:
     - dbaas
-    kind: BackupJob
-    listKind: BackupJobList
-    plural: backupjobs
-    singular: backupjob
+    kind: Backup
+    listKind: BackupList
+    plural: backups
+    singular: backup
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -24,13 +24,16 @@ spec:
     - jsonPath: .status.completionTimestamp
       name: COMPLETIONTIME
       type: date
-    - jsonPath: .metadata.creationTimestamp
-      name: AGE
-      type: date
+    - jsonPath: .status.totalSize
+      name: TOTALSIZE
+      type: string
+    - jsonPath: .status.duration
+      name: DURATION
+      type: string
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: BackupJob is the Schema for the backupjobs API (defined by User)
+        description: Backup is the Schema for the backups API (defined by User)
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -45,10 +48,10 @@ spec:
           metadata:
             type: object
           spec:
-            description: BackupJobSpec defines the desired state of BackupJob
+            description: BackupSpec defines the desired state of Backup
             properties:
               backupPolicyName:
-                description: which backupPolicy to perform this backupJob
+                description: which backupPolicy to perform this backup
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               backupType:
@@ -60,7 +63,7 @@ spec:
                 - incremental
                 - snapshot
                 type: string
-              parentBackupJobName:
+              parentBackupName:
                 description: if backupType is incremental, parentBackupName is required.
                 type: string
               ttl:
@@ -72,7 +75,7 @@ spec:
             - backupType
             type: object
           status:
-            description: BackupJobStatus defines the observed state of BackupJob
+            description: BackupStatus defines the observed state of Backup
             properties:
               CheckPoint:
                 description: backup check point, for incremental backup.
@@ -85,6 +88,10 @@ spec:
                 description: Date/time when the backup finished being processed.
                 format: date-time
                 type: string
+              duration:
+                description: The duration time of backup execution. When converted
+                  to a string, the form is "1h2m0.5s".
+                type: string
               expiration:
                 description: The date and time when the Backup is eligible for garbage
                   collection. 'null' means the Backup is NOT be cleaned except delete
@@ -94,11 +101,11 @@ spec:
               failureReason:
                 description: the reason if backup failed.
                 type: string
-              parentBackupJobName:
-                description: record parentBackupJobName if backupType is incremental.
+              parentBackupName:
+                description: record parentBackupName if backupType is incremental.
                 type: string
               phase:
-                description: BackupJobPhase The current phase. Valid values are New,
+                description: BackupPhase The current phase. Valid values are New,
                   InProgress, Completed, Failed.
                 type: string
               startTimestamp:
@@ -106,10 +113,12 @@ spec:
                 format: date-time
                 type: string
               totalSize:
-                description: backup total size
+                description: backup total size string with capacity units in the form
+                  of "1Gi", "1Mi", "1Ki".
                 type: string
               uploadTotalSize:
-                description: backup total size
+                description: backup total size string with capacity units in the form
+                  of "1Gi", "1Mi", "1Ki".
                 type: string
             type: object
         type: object

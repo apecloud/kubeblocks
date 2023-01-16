@@ -32,6 +32,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 var _ = Describe("test cluster Failed/Abnormal phase", func() {
@@ -226,7 +227,7 @@ spec:
 		return sts
 	}
 
-	createStsPod := func(podName, podRole, componentName string) {
+	createStsPod := func(podName, podRole, componentName string) *corev1.Pod {
 		podYaml := fmt.Sprintf(`apiVersion: v1
 kind: Pod
 metadata:
@@ -246,10 +247,11 @@ spec:
 		Expect(yaml.Unmarshal([]byte(podYaml), pod)).Should(Succeed())
 		Expect(testCtx.CreateObj(context.Background(), pod)).Should(Succeed())
 		// wait until pod created
-		Eventually(func() bool {
-			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: podName, Namespace: namespace}, &corev1.Pod{})
-			return err == nil
-		}, timeout, interval).Should(BeTrue())
+		Eventually(func() error {
+			return k8sClient.Get(context.Background(), client.ObjectKey{Name: podName, Namespace: namespace}, &corev1.Pod{})
+		}, timeout, interval).Should(Succeed())
+		return pod
+
 	}
 
 	createDeployment := func(componentName, deployName string) {
@@ -305,26 +307,23 @@ spec:
 
 	handleAndCheckComponentStatus := func(componentName string, event *corev1.Event,
 		expectPhase dbaasv1alpha1.Phase, checkClusterPhase bool, ltimeout time.Duration) {
-		Eventually(func() bool {
+		Eventually(func(g Gomega) dbaasv1alpha1.Phase {
 			Expect(handleEventForClusterStatus(ctx, k8sClient, clusterRecorder, event)).Should(Succeed())
 			newCluster := &dbaasv1alpha1.Cluster{}
-			if err := k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: namespace}, newCluster); err != nil {
-				return false
-			}
+			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: namespace}, newCluster)).Should(Succeed())
 			statusComponents := newCluster.Status.Components
 			if statusComponents == nil {
-				return false
+				return ""
 			}
 			if _, ok := statusComponents[componentName]; !ok {
-				return false
+				return ""
 			}
 
 			if checkClusterPhase {
-				return statusComponents[componentName].Phase == expectPhase &&
-					newCluster.Status.Phase == expectPhase
+				return newCluster.Status.Phase
 			}
-			return statusComponents[componentName].Phase == expectPhase
-		}, ltimeout, interval).Should(BeTrue())
+			return statusComponents[componentName].Phase
+		}, ltimeout, interval).Should(Equal(expectPhase))
 
 	}
 
@@ -381,10 +380,16 @@ spec:
 			event.Message = "0/1 nodes can scheduled, cpu insufficient"
 			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, false, timeout)
 
-			By("test Abnormal phase for consensus component")
+			By("test Failed phase for consensus component when leader pod is not ready")
 			setInvolvedObject(event, intctrlutil.StatefulSetKind, stsName)
 			podName1 := stsName + "-1"
-			createStsPod(podName1, "leader", componentName)
+			pod := createStsPod(podName1, "leader", componentName)
+			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, false, timeout)
+
+			By("test Abnormal phase for consensus component")
+			patch := client.MergeFrom(pod.DeepCopy())
+			testk8s.MockPodAvailable(pod, metav1.NewTime(time.Now()))
+			Expect(k8sClient.Status().Patch(ctx, pod, patch)).Should(Succeed())
 			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.AbnormalPhase, false, timeout)
 
 			By("watch warning event from Deployment and component type is Stateless")

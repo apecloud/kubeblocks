@@ -183,12 +183,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&dataprotectioncontrollers.BackupJobReconciler{
+	if err = (&dataprotectioncontrollers.CronJobReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("backup-job-controller"),
+		Recorder: mgr.GetEventRecorderFor("cronjob-controller"),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BackupJob")
+		setupLog.Error(err, "unable to create controller", "controller", "CronJob")
+		os.Exit(1)
+	}
+
+	if err = (&dataprotectioncontrollers.BackupReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("backup-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Backup")
 		os.Exit(1)
 	}
 

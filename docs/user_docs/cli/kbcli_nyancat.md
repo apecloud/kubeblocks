@@ -1,31 +1,14 @@
-## kbcli
+## kbcli nyancat
 
-KubeBlocks CLI
-
-### Synopsis
-
-```
-
-=============================================
- __    __ _______   ______  __       ______ 
-|  \  /  \       \ /      \|  \     |      \
-| ▓▓ /  ▓▓ ▓▓▓▓▓▓▓\  ▓▓▓▓▓▓\ ▓▓      \▓▓▓▓▓▓
-| ▓▓/  ▓▓| ▓▓__/ ▓▓ ▓▓   \▓▓ ▓▓       | ▓▓  
-| ▓▓  ▓▓ | ▓▓    ▓▓ ▓▓     | ▓▓       | ▓▓  
-| ▓▓▓▓▓\ | ▓▓▓▓▓▓▓\ ▓▓   __| ▓▓       | ▓▓  
-| ▓▓ \▓▓\| ▓▓__/ ▓▓ ▓▓__/  \ ▓▓_____ _| ▓▓_ 
-| ▓▓  \▓▓\ ▓▓    ▓▓\▓▓    ▓▓ ▓▓     \   ▓▓ \
- \▓▓   \▓▓\▓▓▓▓▓▓▓  \▓▓▓▓▓▓ \▓▓▓▓▓▓▓▓\▓▓▓▓▓▓
-
-=============================================
-A Command Line Interface for KubeBlocks
-```
-
-```
-kbcli [flags]
-```
+Nyan Cat demo application operation commands
 
 ### Options
+
+```
+  -h, --help   help for nyancat
+```
+
+### Options inherited from parent commands
 
 ```
       --as string                      Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
@@ -37,7 +20,6 @@ kbcli [flags]
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
-  -h, --help                           help for kbcli
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
@@ -51,16 +33,7 @@ kbcli [flags]
 
 ### SEE ALSO
 
-* [kbcli backup-config](kbcli_backup-config.md)	 - KubeBlocks backup config
-* [kbcli bench](kbcli_bench.md)	 - Run a benchmark
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster operation command
-* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command
-* [kbcli clusterversion](kbcli_clusterversion.md)	 - ClusterVersion command
-* [kbcli dashboard](kbcli_dashboard.md)	 - List and open the KubeBlocks dashboards
-* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands
-* [kbcli nyancat](kbcli_nyancat.md)	 - Nyan Cat demo application operation commands
-* [kbcli options](kbcli_options.md)	 - Print the list of flags inherited by all commands
-* [kbcli playground](kbcli_playground.md)	 - Bootstrap a KubeBlocks in local host
-* [kbcli troubleshoot](kbcli_troubleshoot.md)	 - Troubleshooting for KubeBlocks
-* [kbcli version](kbcli_version.md)	 - Print the version information
+* [kbcli](kbcli.md)	 - KubeBlocks CLI
+* [kbcli nyancat install](kbcli_nyancat_install.md)	 - Install Nyan Cat demo appliaction.
+* [kbcli nyancat uninstall](kbcli_nyancat_uninstall.md)	 - Uninstall Nyan Cat demo appliaction.
 

@@ -91,6 +91,9 @@ var (
 	// KubeBlocksChartName helm name for installing kubeblocks
 	KubeBlocksChartName = "kubeblocks"
 
+	// NyanCatChartName helm chart repo name
+	NyanCatChartName = "nyancat"
+
 	// KubeBlocksChartURL the helm chart for installing kubeblocks
 	KubeBlocksChartURL = "https://apecloud.github.io/helm-charts"
 )

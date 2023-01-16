@@ -30,7 +30,7 @@ type OpsRequestSpec struct {
 
 	// type defines the operation type.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart}
+	// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring}
 	Type OpsType `json:"type"`
 
 	// ttlSecondsAfterSucceed OpsRequest will be deleted after TTLSecondsAfterSucceed second when OpsRequest.status.phase is Succeed.
@@ -72,6 +72,10 @@ type OpsRequestSpec struct {
 	// +listType=map
 	// +listMapKey=componentName
 	VerticalScalingList []VerticalScaling `json:"verticalScaling,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+
+	// reconfigure defines the variables that need to input when updating configuration.
+	// +optional
+	Reconfigure *Reconfigure `json:"reconfigure,omitempty"`
 }
 
 // ComponentOps defines the common variables of component scope operations.
@@ -128,6 +132,73 @@ type HorizontalScaling struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	Replicas int32 `json:"replicas"`
+}
+
+type Reconfigure struct {
+	ComponentOps `json:",inline"`
+
+	// configurations defines which components perform the operation.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	Configurations []Configuration `json:"configurations" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+
+	// TTL(Time to Live) defines the time period during which changing parameters is valid.
+	// +optional
+	// TTL *int64 `json:"ttl,omitempty"`
+
+	// triggeringTime defines the time at which the changing parameter to be applied.
+	// +kubebuilder:validation:MaxLength=19
+	// +kubebuilder:validation:MinLength=19
+	// +kubebuilder:validation:Pattern:=`^([0-9]{2})/([0-9]{2})/([0-9]{4}) ([0-9]{2}):([0-9]{2}):([0-9]{2})$`
+	// +optional
+	// TriggeringTime *string `json:"triggeringTime,omitempty"`
+
+	// selector indicates the component for reconfigure
+	// +optional
+	// Selector *metav1.LabelSelector `json:"selector,omitempty"`
+}
+
+type Configuration struct {
+	// name is a config template name.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// keys is used to set the parameters to be updated.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +patchMergeKey=key
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=key
+	Keys []ParameterConfig `json:"keys" patchStrategy:"merge,retainKeys" patchMergeKey:"key"`
+}
+
+type ParameterPair struct {
+	// key is name of the parameter to be updated.
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
+
+	// parameter values to be updated.
+	// if set nil, the parameter defined by the key field will be deleted from the configuration file.
+	// +kubebuilder:validation:Required
+	Value *string `json:"value"`
+}
+
+type ParameterConfig struct {
+	// key indicates the key name of ConfigMap.
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
+
+	// Setting the list of parameters for a single configuration file.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	Parameters []ParameterPair `json:"parameters"`
 }
 
 // OpsRequestStatus defines the observed state of OpsRequest

@@ -12,10 +12,12 @@ spec:
       characterType: mysql
       monitor:
         builtIn: false
-      configTemplateRefs:
-        - name: mysql-3node-tpl-8.0
-          namespace: default
-          volumeName: mysql-config
+      configSpec:
+        configTemplateRefs:
+          - name: mysql-tree-node-template-8.0
+            configTplRef: mysql-tree-node-template-8.0
+            configConstraintRef: mysql-tree-node-template-8.0
+            volumeName: mysql-config
       componentType: Consensus
       consensusSpec:
         leader:
@@ -87,5 +89,8 @@ spec:
                 name: data
               - mountPath: /opt/mysql
                 name: mysql-config
+<<<<<<< HEAD
+=======
               - name: scripts
                 mountPath: /scripts
+>>>>>>> main

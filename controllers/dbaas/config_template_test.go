@@ -158,8 +158,10 @@ single_thread_memory = 294912
 		}
 		cfgTemplate = []dbaasv1alpha1.ConfigTemplate{
 			{
-				Name:       "mysql-config-8.0.2",
-				VolumeName: "config1",
+				Name:                "mysql-config-8.0.2",
+				ConfigTplRef:        "mysql-config-8.0.2",
+				ConfigConstraintRef: "mysql-config-8.0.2",
+				VolumeName:          "config1",
 			},
 		}
 	})

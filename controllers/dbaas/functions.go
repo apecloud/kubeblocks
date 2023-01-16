@@ -18,6 +18,7 @@ package dbaas
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 
@@ -225,13 +226,17 @@ func getAvailableContainerPorts(containers []corev1.Container, containerPorts []
 		return nil, err
 	}
 
-	iterAvailPort := func(p int32) int32 {
+	iterAvailPort := func(p int32) (int32, error) {
+		sentinel := p
 		for {
 			if _, ok := set[p]; !ok {
 				set[p] = true
-				return p
+				return p, nil
 			}
 			p++
+			if p == sentinel {
+				return -1, errors.New("no available port for container")
+			}
 			if p <= 0 || p > 65536 {
 				p = 1024
 			}
@@ -239,7 +244,9 @@ func getAvailableContainerPorts(containers []corev1.Container, containerPorts []
 	}
 
 	for i, p := range containerPorts {
-		containerPorts[i] = iterAvailPort(p)
+		if containerPorts[i], err = iterAvailPort(p); err != nil {
+			return []int32{}, err
+		}
 	}
 	return containerPorts, nil
 }

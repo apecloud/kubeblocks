@@ -48,6 +48,7 @@ const (
 	AbnormalPhase          Phase = "Abnormal"
 	ConditionsErrorPhase   Phase = "ConditionsError"
 	HorizontalScalingPhase Phase = "HorizontalScaling"
+	ReconfiguringPhase     Phase = "Reconfiguring"
 )
 
 // Status define CR .Status.ClusterDefSyncStatus
@@ -68,6 +69,7 @@ const (
 	HorizontalScalingType OpsType = "HorizontalScaling"
 	VolumeExpansionType   OpsType = "VolumeExpansion"
 	UpgradeType           OpsType = "Upgrade"
+	ReconfiguringType     OpsType = "Reconfiguring"
 	RestartType           OpsType = "Restart"
 )
 
@@ -238,6 +240,79 @@ var webhookMgr *webhookManager
 type webhookManager struct {
 	client client.Client
 }
+
+type ScopeType string
+
+const (
+	ScopeBothType   ScopeType = "ScopeBoth"
+	ScopeFileType   ScopeType = "ScopeFile"
+	ScopeMemoryType ScopeType = "ScopeMemory"
+)
+
+type ConfigurationFormatter string
+
+const (
+	INI    ConfigurationFormatter = "ini"
+	YAML   ConfigurationFormatter = "yaml"
+	JSON   ConfigurationFormatter = "json"
+	XML    ConfigurationFormatter = "xml"
+	HCL    ConfigurationFormatter = "hcl"
+	DOTENV ConfigurationFormatter = "dotenv"
+)
+
+type UpgradePolicy string
+
+const (
+	NormalPolicy  UpgradePolicy = "simple"
+	RestartPolicy UpgradePolicy = "parallel"
+	RollingPolicy UpgradePolicy = "rolling"
+	AutoReload    UpgradePolicy = "autoReload"
+)
+
+type CfgReloadType string
+
+const (
+	UnixSignalType CfgReloadType = "signal"
+	SQLType        CfgReloadType = "sql"
+	ShellType      CfgReloadType = "exec"
+	HTTPType       CfgReloadType = "http"
+)
+
+type SignalType string
+
+const (
+	SIGHUP    SignalType = "SIGHUP"
+	SIGINT    SignalType = "SIGINT"
+	SIGQUIT   SignalType = "SIGQUIT"
+	SIGILL    SignalType = "SIGILL"
+	SIGTRAP   SignalType = "SIGTRAP"
+	SIGABRT   SignalType = "SIGABRT"
+	SIGBUS    SignalType = "SIGBUS"
+	SIGFPE    SignalType = "SIGFPE"
+	SIGKILL   SignalType = "SIGKILL"
+	SIGUSR1   SignalType = "SIGUSR1"
+	SIGSEGV   SignalType = "SIGSEGV"
+	SIGUSR2   SignalType = "SIGUSR2"
+	SIGPIPE   SignalType = "SIGPIPE"
+	SIGALRM   SignalType = "SIGALRM"
+	SIGTERM   SignalType = "SIGTERM"
+	SIGSTKFLT SignalType = "SIGSTKFLT"
+	SIGCHLD   SignalType = "SIGCHLD"
+	SIGCONT   SignalType = "SIGCONT"
+	SIGSTOP   SignalType = "SIGSTOP"
+	SIGTSTP   SignalType = "SIGTSTP"
+	SIGTTIN   SignalType = "SIGTTIN"
+	SIGTTOU   SignalType = "SIGTTOU"
+	SIGURG    SignalType = "SIGURG"
+	SIGXCPU   SignalType = "SIGXCPU"
+	SIGXFSZ   SignalType = "SIGXFSZ"
+	SIGVTALRM SignalType = "SIGVTALRM"
+	SIGPROF   SignalType = "SIGPROF"
+	SIGWINCH  SignalType = "SIGWINCH"
+	SIGIO     SignalType = "SIGIO"
+	SIGPWR    SignalType = "SIGPWR"
+	SIGSYS    SignalType = "SIGSYS"
+)
 
 func RegisterWebhookManager(mgr manager.Manager) {
 	webhookMgr = &webhookManager{mgr.GetClient()}

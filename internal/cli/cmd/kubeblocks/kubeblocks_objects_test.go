@@ -19,38 +19,64 @@ package kubeblocks
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	clientfake "k8s.io/client-go/rest/fake"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	appv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
-var _ = Describe("kubeblocks", func() {
-	var cmd *cobra.Command
-	var streams genericclioptions.IOStreams
-	var tf *cmdtesting.TestFactory
+var _ = Describe("kubeblocks objects", func() {
+	It("deleteDeploys", func() {
+		client := testing.FakeClientSet()
+		Expect(deleteDeploys(client, nil)).Should(Succeed())
 
-	BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
-		tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
-		tf.Client = &clientfake.RESTClient{}
+		mockDeploy := func(label map[string]string) *appv1.Deployment {
+			deploy := &appv1.Deployment{}
+			deploy.SetLabels(label)
+			deploy.SetNamespace(namespace)
+			return deploy
+		}
 
-		// use a fake URL to test
-		types.KubeBlocksChartName = testing.KubeBlocksChartName
-		types.KubeBlocksChartURL = testing.KubeBlocksChartURL
+		labels := map[string]string{
+			"types.InstanceLabelKey": types.KubeBlocksChartName,
+			"release":                types.KubeBlocksChartName,
+		}
+		for k, v := range labels {
+			client = testing.FakeClientSet(mockDeploy(map[string]string{
+				k: v,
+			}))
+			objs, _ := getKBObjects(client, testing.FakeDynamicClient(), namespace)
+			Expect(deleteDeploys(client, objs.deploys)).Should(Succeed())
+		}
 	})
 
-	AfterEach(func() {
-		tf.Cleanup()
+	It("deleteServices", func() {
+		client := testing.FakeClientSet()
+		Expect(deleteServices(client, nil)).Should(Succeed())
+
+		mockService := func(label map[string]string) *corev1.Service {
+			svc := &corev1.Service{}
+			svc.SetLabels(label)
+			svc.SetNamespace(namespace)
+			return svc
+		}
+
+		labels := map[string]string{
+			"types.InstanceLabelKey": types.KubeBlocksChartName,
+			"release":                types.KubeBlocksChartName,
+		}
+		for k, v := range labels {
+			client = testing.FakeClientSet(mockService(map[string]string{
+				k: v,
+			}))
+			objs, _ := getKBObjects(client, testing.FakeDynamicClient(), namespace)
+			Expect(deleteServices(client, objs.svcs)).Should(Succeed())
+		}
 	})
 
-	It("kubeblocks", func() {
-		cmd = NewKubeBlocksCmd(tf, streams)
-		Expect(cmd).ShouldNot(BeNil())
-		Expect(cmd.HasSubCommands()).Should(BeTrue())
+	It("newDeleteOpts", func() {
+		opts := newDeleteOpts()
+		Expect(*opts.GracePeriodSeconds).Should(Equal(int64(0)))
 	})
 })

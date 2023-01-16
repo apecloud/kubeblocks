@@ -155,7 +155,7 @@ func removeFinalizers(client dynamic.Interface, objs *kbObjects) error {
 	}
 
 	// patch BackupTool's finalizer
-	return removeFn(types.ClusterDefGVR(), objs.backupTools)
+	return removeFn(types.BackupToolGVR(), objs.backupTools)
 }
 
 func deleteCRDs(cli dynamic.Interface, crds *unstructured.UnstructuredList) error {

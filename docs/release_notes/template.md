@@ -43,8 +43,22 @@ to `backups.dataprotection.kubeblocks.io`
     ```
     kubectl delete crd backupjobs.dataprotection.kubeblocks.io
     ```
+- Rename CRD name `appversions.dbaas.kubeblocks.io` to `clusterversions.dbaas.kubeblocks.io`
+  - before you upgrade kubeblocks, please back up your Cluster CR yaml first.
+    ```
+    kubectl get cluster -oyaml > clusters.yaml
+    ```
+    then we replace all spec.appVersionRef to spec.clusterVersionRef in the clusters.yaml.
   
-
+    finally, we handle OpsRequest CR in the same way.
+  - after you upgrade kubeblocks, you can delete the CRD `appversions.dbaas.kubeblocks.io`
+    ```
+    kubectl delete crd appversions.dbaas.kubeblocks.io
+    ```
+    finally, we use the above backup of Clusters and OpsRequests to configure them.
+    ```
+    kubectl apply -f clusters.yaml
+    ```
 ## Breaking Changes
 
 $kubeblocks_breaking_changes

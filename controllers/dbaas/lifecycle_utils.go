@@ -1004,14 +1004,13 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		if err := controllerutil.SetOwnerReference(cluster, obj, scheme); err != nil {
 			return false, err
 		}
+		if !controllerutil.ContainsFinalizer(obj, dbClusterFinalizerName) {
+			controllerutil.AddFinalizer(obj, dbClusterFinalizerName)
+		}
 		if err := cli.Create(ctx, obj); err == nil {
 			continue
 		} else if !apierrors.IsAlreadyExists(err) {
 			return false, err
-		}
-
-		if !controllerutil.ContainsFinalizer(obj, dbClusterFinalizerName) {
-			controllerutil.AddFinalizer(obj, dbClusterFinalizerName)
 		}
 
 		// Secret kind objects should only be applied once

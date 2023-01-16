@@ -4,7 +4,7 @@ This section shows you how to use KubeBlocks to scale up a cluster.
 
 ## Before you start
 
-- [Install KubeBlocks](../../installation/deploy_kubeblocks.md). 
+- [Install KubeBlocks](../../installation/install_kubeblocks.md). 
 - Run the commands below to check whether KubeBlocks is installed successfully and the cluster-related `CR` (custom resources) are created.
   - Run the commands to check whether KubeBlocks is installed successfully.
     ```

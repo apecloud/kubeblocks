@@ -67,6 +67,12 @@ rules:
   - update
   - watch
 - apiGroups:
+  - batch
+  resources:
+  - jobs/status
+  verbs:
+  - get
+- apiGroups:
   - coordination.k8s.io
   resources:
   - leases
@@ -77,6 +83,32 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - configmap
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - configmap/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - configmap/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - ""
   resources:
@@ -373,6 +405,32 @@ rules:
   - dbaas.kubeblocks.io
   resources:
   - clusters/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dbaas.kubeblocks.io
+  resources:
+  - configconstraints
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dbaas.kubeblocks.io
+  resources:
+  - configconstraints/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dbaas.kubeblocks.io
+  resources:
+  - configconstraints/status
   verbs:
   - get
   - patch

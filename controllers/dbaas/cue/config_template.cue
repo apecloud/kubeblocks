@@ -10,10 +10,12 @@ meta: {
 	}
 
 	component: {
-		name:         string
-		type:         string
-		configName:   string
-		templateName: string
+		name:                  string
+		type:                  string
+		configName:            string
+		templateName:          string
+		configConstraintsName: string
+		configTemplateName:    string
 	}
 }
 
@@ -24,20 +26,24 @@ config: {
 		name:      meta.component.configName
 		namespace: meta.cluster.namespace
 		labels: {
-			"app.kubernetes.io/name":     "\(meta.clusterDefinition.type)-\(meta.clusterDefinition.name)"
+			"app.kubernetes.io/name": "\(meta.clusterDefinition.type)-\(meta.clusterDefinition.name)"
+			// cluster name
 			"app.kubernetes.io/instance": meta.cluster.name
-			// "app.kubernetes.io/version" : # TODO
-			"app.kubernetes.io/component": "\(meta.component.type)-\(meta.component.name)"
+			// component name
+			"app.kubernetes.io/component-name": "\(meta.component.name)"
+			"app.kubernetes.io/created-by":     "controller-manager"
+			"app.kubernetes.io/managed-by":     "kubeblocks"
 
-			// config template name
-			"app.kubernetes.io/configtemplate-name": "\(meta.component.templateName)"
 			// configmap selector for ConfigureController
-			"app.kubernetes.io/ins-configure": "true"
-			"app.kubernetes.io/managed-by":    "kubeblocks"
+			"configuration.kubeblocks.io/ins-configure": "true"
+			// config template name
+			"configuration.kubeblocks.io/configuration-tpl-name":         "\(meta.component.templateName)"
+			"configuration.kubeblocks.io/configuration-constraints-name": "\(meta.component.configConstraintsName)"
+			"configuration.kubeblocks.io/configtemplate-name":            "\(meta.component.configTemplateName)"
 		}
 		annotations: {
 			// enable configmap upgrade
-			"app.kubernetes.io/rolling-upgrade": "true"
+			"configuration.kubeblocks.io/disable-reconfigure": "false"
 		}
 
 		data: {

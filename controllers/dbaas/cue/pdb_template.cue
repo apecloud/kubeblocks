@@ -31,11 +31,8 @@ pdb: {
 		}
 	}
 	"spec": {
-		if component.minAvailable != _|_ {
-			minAvailable: component.minAvailable
-		}
-		if component.maxUnavailable != _|_ {
-			maxUnavailable: component.maxUnavailable
+		if component.minReplicas != _|_ {
+			minAvailable: component.minReplicas
 		}
 		selector: {
 			matchLabels: {

@@ -62,6 +62,10 @@ containers = {{ (index $.podSpec.containers 0 ).name }}
 {{- $buffer_pool_size_tmp = $.componentResource.memorySize }}
 {{- end }}
 innodb_buffer_pool_size = {{ $buffer_pool_size_tmp | int64 }}
+{{- $thread_stack := 262144 }}
+{{- $binlog_cache_size := 32768 }}
+{{- $single_thread_memory := add $thread_stack $binlog_cache_size }}
+single_thread_memory = {{ $single_thread_memory }}
 `
 		mysqlCfgRenderedContext = `
 #test
@@ -71,6 +75,7 @@ component_name = replicasets
 component_replica = 5
 containers = mytest
 innodb_buffer_pool_size = 8589934592
+single_thread_memory = 294912
 `
 	)
 
@@ -153,8 +158,10 @@ innodb_buffer_pool_size = 8589934592
 		}
 		cfgTemplate = []dbaasv1alpha1.ConfigTemplate{
 			{
-				Name:       "mysql-config-8.0.2",
-				VolumeName: "config1",
+				Name:                "mysql-config-8.0.2",
+				ConfigTplRef:        "mysql-config-8.0.2",
+				ConfigConstraintRef: "mysql-config-8.0.2",
+				VolumeName:          "config1",
 			},
 		}
 	})
@@ -218,12 +225,14 @@ innodb_buffer_pool_size = 8589934592
 				"f":                 "{{ getVolumePathByName ( getContainerByName $.podSpec.containers \"mytest\") \"data\" }}",
 				"i":                 "{{ getEnvByName ( index $.podSpec.containers 0 ) \"a\" }}",
 				"j":                 "{{ ( getPVCByName $.podSpec.volumes \"config\" ).configMap.name }}",
+				"h":                 "{{ getContainerMemory ( index $.podSpec.containers 0 ) }}",
 				"invalid_volume":    "{{ getVolumePathByName ( index $.podSpec.containers 0 ) \"invalid\" }}",
 				"invalid_port":      "{{ getPortByName ( index $.podSpec.containers 0 ) \"invalid\" }}",
 				"invalid_container": "{{ getContainerByName $.podSpec.containers  \"invalid\" }}",
 				"invalid_resource":  "{{ callBufferSizeByResource ( index $.podSpec.containers 1 ) }}",
 				"invalid_env":       "{{ getEnvByName ( index $.podSpec.containers 0 ) \"invalid\" }}",
 				"invalid_pvc":       "{{ getPVCByName $.podSpec.volumes \"invalid\" }}",
+				"invalid_memory":    "{{ getContainerMemory ( index $.podSpec.containers 1 ) }}",
 			})
 
 			Expect(err).Should(BeNil())
@@ -243,12 +252,14 @@ innodb_buffer_pool_size = 8589934592
 			Expect(rendered["i"]).Should(BeEquivalentTo("b"))
 			// for test volume
 			Expect(rendered["j"]).Should(BeEquivalentTo("cluster_name_for_test"))
+			Expect(rendered["h"]).Should(BeEquivalentTo(strconv.Itoa(8 * 1024 * 1024 * 1024)))
 			Expect(rendered["invalid_volume"]).Should(BeEquivalentTo(""))
 			Expect(rendered["invalid_port"]).Should(BeEquivalentTo("<no value>"))
 			Expect(rendered["invalid_container"]).Should(BeEquivalentTo("<no value>"))
 			Expect(rendered["invalid_env"]).Should(BeEquivalentTo(""))
 			Expect(rendered["invalid_pvc"]).Should(BeEquivalentTo("<no value>"))
 			Expect(rendered["invalid_resource"]).Should(BeEquivalentTo(""))
+			Expect(rendered["invalid_memory"]).Should(BeEquivalentTo("0"))
 		})
 
 		It("test array null check", func() {

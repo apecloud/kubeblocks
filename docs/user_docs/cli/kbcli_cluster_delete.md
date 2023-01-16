@@ -3,7 +3,7 @@
 Delete clusters
 
 ```
-kbcli cluster delete [flags]
+kbcli cluster delete NAME [flags]
 ```
 
 ### Examples
@@ -49,5 +49,5 @@ kbcli cluster delete [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Database cluster operation command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster operation command
 

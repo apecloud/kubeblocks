@@ -18,37 +18,16 @@ limitations under the License.
 package util
 
 import (
-	"regexp"
-	"strconv"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
-
-// statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
-var statefulPodRegex = regexp.MustCompile("(.*)-([0-9]+)$")
-
-// getParentNameAndOrdinal gets the name of pod's parent StatefulSet and pod's ordinal as extracted from its Name. If
-// the Pod was not created by a StatefulSet, its parent is considered to be empty string, and its ordinal is considered
-// to be -1.
-func getParentNameAndOrdinal(pod *corev1.Pod) (string, int) {
-	parent := ""
-	ordinal := -1
-	subMatches := statefulPodRegex.FindStringSubmatch(pod.Name)
-	if len(subMatches) < 3 {
-		return parent, ordinal
-	}
-	parent = subMatches[1]
-	if i, err := strconv.ParseInt(subMatches[2], 10, 32); err == nil {
-		ordinal = int(i)
-	}
-	return parent, ordinal
-}
 
 // getParentName gets the name of pod's parent StatefulSet. If pod has not parent, the empty string is returned.
 func getParentName(pod *corev1.Pod) string {
-	parent, _ := getParentNameAndOrdinal(pod)
+	parent, _ := intctrlutil.GetParentNameAndOrdinal(pod)
 	return parent
 }
 
@@ -66,11 +45,15 @@ func GetPodRevision(pod *corev1.Pod) string {
 	return pod.Labels[appsv1.StatefulSetRevisionLabel]
 }
 
-// StatefulSetIsReady check statefulSet is ready.
+// StatefulSetIsReady checks if statefulSet is ready.
 func StatefulSetIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals bool) bool {
-	var componentIsRunning = true
+	var (
+		componentIsRunning = true
+		targetReplicas     = *sts.Spec.Replicas
+	)
 	// judge whether statefulSet is ready
-	if sts.Status.AvailableReplicas != *sts.Spec.Replicas ||
+	if sts.Status.AvailableReplicas != targetReplicas ||
+		sts.Status.Replicas != targetReplicas ||
 		sts.Status.ObservedGeneration != sts.GetGeneration() ||
 		!statefulStatusRevisionIsEquals {
 		componentIsRunning = false
@@ -78,9 +61,11 @@ func StatefulSetIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals 
 	return componentIsRunning
 }
 
-// StatefulSetPodsIsReady check pods of statefulSet is ready.
+// StatefulSetPodsIsReady checks if pods of statefulSet are ready.
 func StatefulSetPodsIsReady(sts *appsv1.StatefulSet) bool {
-	return sts.Status.AvailableReplicas == *sts.Spec.Replicas &&
+	targetReplicas := *sts.Spec.Replicas
+	return sts.Status.AvailableReplicas == targetReplicas &&
+		sts.Status.Replicas == targetReplicas &&
 		sts.Status.ObservedGeneration == sts.GetGeneration()
 }
 

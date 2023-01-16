@@ -55,18 +55,18 @@ spec:
                 description: List of components belonging to the cluster.
                 items:
                   description: ClusterDefinitionComponent is a group of pods, pods
-                    in one component usually share the same data
+                    belong to same component usually share the same data
                   properties:
                     antiAffinity:
                       default: false
                       description: antiAffinity defines components should have anti-affinity
-                        constraint to same component type.
+                        constraint for pods with same component type.
                       type: boolean
                     characterType:
-                      description: CharacterType defines well-known database component
-                        name, such as mongos(mongodb), proxy(redis), wesql(mysql)
-                        DBaas will generate proper monitor configs for wellknown CharacterType
-                        when BuiltIn is true.
+                      description: characterType defines well-known database component
+                        name, such as mongos(mongodb), proxy(redis), mariadb(mysql)
+                        KubeBlocks will generate proper monitor configs for well-known
+                        characterType when builtIn is true.
                       type: string
                     componentType:
                       default: Stateless
@@ -77,53 +77,70 @@ spec:
                       - Stateful
                       - Consensus
                       type: string
-                    configTemplateRefs:
-                      description: The configTemplateRefs field provided by provider,
-                        and finally this configTemplateRefs will be rendered into
-                        the user's own configuration file according to the user's
-                        cluster.
-                      items:
-                        properties:
-                          defaultMode:
-                            description: 'defaultMode is optional: mode bits used
-                              to set permissions on created files by default. Must
-                              be an octal value between 0000 and 0777 or a decimal
-                              value between 0 and 511. YAML accepts both octal and
-                              decimal values, JSON requires decimal values for mode
-                              bits. Defaults to 0644. Directories within the path
-                              are not affected by this setting. This might be in conflict
-                              with other options that affect the file mode, like fsGroup,
-                              and the result can be other mode bits set.'
-                            format: int32
-                            type: integer
-                          name:
-                            description: Specify the name of the referenced the configuration
-                              template ConfigMap object.
-                            maxLength: 63
-                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                            type: string
-                          namespace:
-                            default: default
-                            description: Specify the namespace of the referenced the
-                              configuration template ConfigMap object. An empty namespace
-                              is equivalent to the "default" namespace.
-                            maxLength: 63
-                            type: string
-                          volumeName:
-                            description: VolumeName is the volume name of PodTemplate,
-                              which the configuration file produced through the configuration
-                              template will be mounted to the corresponding volume.
-                              The volume name must be defined in podSpec.containers[*].volumeMounts.
-                            maxLength: 32
-                            type: string
-                        required:
-                        - name
-                        - volumeName
-                        type: object
-                      type: array
-                      x-kubernetes-list-map-keys:
-                      - name
-                      x-kubernetes-list-type: map
+                    configSpec:
+                      description: configSpec defines configuration related spec.
+                      properties:
+                        configTemplateRefs:
+                          description: The configTemplateRefs field provided by provider,
+                            and finally this configTemplateRefs will be rendered into
+                            the user's own configuration file according to the user's
+                            cluster.
+                          items:
+                            properties:
+                              configConstraintRef:
+                                description: Specify the name of the referenced the
+                                  configuration constraints object.
+                                maxLength: 63
+                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                type: string
+                              configTplRef:
+                                description: Specify the name of the referenced the
+                                  configuration template ConfigMap object.
+                                maxLength: 63
+                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                type: string
+                              defaultMode:
+                                description: 'defaultMode is optional: mode bits used
+                                  to set permissions on created files by default.
+                                  Must be an octal value between 0000 and 0777 or
+                                  a decimal value between 0 and 511. YAML accepts
+                                  both octal and decimal values, JSON requires decimal
+                                  values for mode bits. Defaults to 0644. Directories
+                                  within the path are not affected by this setting.
+                                  This might be in conflict with other options that
+                                  affect the file mode, like fsGroup, and the result
+                                  can be other mode bits set.'
+                                format: int32
+                                type: integer
+                              name:
+                                description: Specify the name of configuration template.
+                                maxLength: 63
+                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                type: string
+                              namespace:
+                                default: default
+                                description: Specify the namespace of the referenced
+                                  the configuration template ConfigMap object. An
+                                  empty namespace is equivalent to the "default" namespace.
+                                maxLength: 63
+                                type: string
+                              volumeName:
+                                description: VolumeName is the volume name of PodTemplate,
+                                  which the configuration file produced through the
+                                  configuration template will be mounted to the corresponding
+                                  volume. The volume name must be defined in podSpec.containers[*].volumeMounts.
+                                maxLength: 32
+                                type: string
+                            required:
+                            - configTplRef
+                            - name
+                            - volumeName
+                            type: object
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
+                      type: object
                     consensusSpec:
                       description: consensusSpec defines consensus related spec if
                         componentType is Consensus, required if componentType is Consensus.
@@ -236,8 +253,8 @@ spec:
                       type: object
                     defaultReplicas:
                       default: 0
-                      description: DefaultReplicas default replicas in this component
-                        if user not specify.
+                      description: defaultReplicas default replicas in this component
+                        when not specified.
                       format: int32
                       minimum: 0
                       type: integer
@@ -275,19 +292,19 @@ spec:
                           type: string
                       type: object
                     logConfigs:
-                      description: LogConfigs is detail log file config which provided
+                      description: logConfigs is detail log file config which provided
                         by provider.
                       items:
                         properties:
                           filePathPattern:
-                            description: FilePathPattern log file path pattern which
+                            description: filePathPattern log file path pattern which
                               indicate how to find this file corresponding to variable
                               (log path) in database kernel. please don't set this
                               casually.
                             maxLength: 4096
                             type: string
                           name:
-                            description: Name log type name, such as slow for MySQL
+                            description: name log type name, such as slow for MySQL
                               slow log file.
                             maxLength: 128
                             type: string
@@ -300,34 +317,34 @@ spec:
                       - name
                       x-kubernetes-list-type: map
                     maxReplicas:
-                      description: MaxReplicas maximum replicas pod for component
+                      description: maxReplicas maximum replicas pod for component
                         pod count.
                       format: int32
                       minimum: 0
                       type: integer
                     minReplicas:
                       default: 0
-                      description: MinReplicas minimum replicas for component pod
+                      description: minReplicas minimum replicas for component pod
                         count.
                       format: int32
                       minimum: 0
                       type: integer
                     monitor:
-                      description: Monitor is monitoring config which provided by
+                      description: monitor is monitoring config which provided by
                         provider.
                       properties:
                         builtIn:
                           default: false
-                          description: BuiltIn is a switch to enable KubeBlocks builtIn
-                            monitoring. If BuiltIn is true and CharacterType is wellknown,
+                          description: builtIn is a switch to enable KubeBlocks builtIn
+                            monitoring. If BuiltIn is true and CharacterType is well-known,
                             ExporterConfig and Sidecar container will generate automatically.
-                            Otherwise, provider should set BuiltIn to false and provide
+                            Otherwise, provider should set builtIn to false and provide
                             ExporterConfig and Sidecar container own.
                           type: boolean
                         exporterConfig:
-                          description: Exporter provided by provider, which specify
-                            necessary information to Time Series Database. ExporterConfig
-                            is valid when BuiltIn is false.
+                          description: exporterConfig provided by provider, which
+                            specify necessary information to Time Series Database.
+                            exporterConfig is valid when builtIn is false.
                           properties:
                             scrapePath:
                               default: /metrics
@@ -347,7 +364,7 @@ spec:
                           type: object
                       type: object
                     pdbSpec:
-                      description: PDBSpec pod disruption budget spec. This is mutually
+                      description: pdbSpec pod disruption budget spec. This is mutually
                         exclusive with the component type of Consensus.
                       properties:
                         maxUnavailable:
@@ -7744,7 +7761,7 @@ spec:
                       - containers
                       type: object
                     probes:
-                      description: Probes setting for db healthy checks.
+                      description: probes setting for healthy checks.
                       properties:
                         roleChangedProbe:
                           description: Probe for DB role changed check.
@@ -8209,6 +8226,258 @@ spec:
                             fields do not apply to ExternalName services. More info:
                             https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types'
                           type: string
+                      type: object
+                    systemAccounts:
+                      description: Statement to create system account.
+                      properties:
+                        accounts:
+                          description: accounts defines system account config settings.
+                          items:
+                            description: SystemAccountConfig specifies how to create
+                              and delete system accounts.
+                            properties:
+                              name:
+                                description: name is the name of a system account.
+                                enum:
+                                - kbadmin
+                                - kbdataprotection
+                                - kbprobe
+                                - kbmonitoring
+                                - kbreplicator
+                                type: string
+                              provisionPolicy:
+                                description: provisionPolicy defines how to create
+                                  account.
+                                properties:
+                                  scope:
+                                    default: AnyPods
+                                    description: scope is the scope to provision account,
+                                      and the scope could be `anyPod` or `allPods`.
+                                    type: string
+                                  secretRef:
+                                    description: secretRef will be used when Type
+                                      is ReferToExisting.
+                                    properties:
+                                      name:
+                                        description: name refers to the name of secret.
+                                        type: string
+                                      namespace:
+                                        description: namespace refers to the namesapce
+                                          of secret.
+                                        type: string
+                                    required:
+                                    - name
+                                    - namespace
+                                    type: object
+                                  statements:
+                                    description: statements will be used when Type
+                                      is CreateByStmt.
+                                    properties:
+                                      creation:
+                                        description: creation specifies statement
+                                          how to create this account with required
+                                          privileges.
+                                        type: string
+                                      deletion:
+                                        description: deletion specifies statement
+                                          how to delete this account.
+                                        type: string
+                                    required:
+                                    - creation
+                                    - deletion
+                                    type: object
+                                  type:
+                                    description: type defines the way to provision
+                                      an account, either `CreateByStmt` or `ReferToExisting`.
+                                    type: string
+                                required:
+                                - scope
+                                - type
+                                type: object
+                            required:
+                            - name
+                            - provisionPolicy
+                            type: object
+                          minItems: 1
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
+                        cmdExecutorConfig:
+                          description: cmdExecutorConfig configs how to get client
+                            SDK and perform statements.
+                          properties:
+                            args:
+                              description: args is used to perform statements.
+                              items:
+                                type: string
+                              type: array
+                            command:
+                              description: command to perform statements.
+                              items:
+                                type: string
+                              minItems: 1
+                              type: array
+                            env:
+                              description: envs is a list of environment variables.
+                              items:
+                                description: EnvVar represents an environment variable
+                                  present in a Container.
+                                properties:
+                                  name:
+                                    description: Name of the environment variable.
+                                      Must be a C_IDENTIFIER.
+                                    type: string
+                                  value:
+                                    description: 'Variable references $(VAR_NAME)
+                                      are expanded using the previously defined environment
+                                      variables in the container and any service environment
+                                      variables. If a variable cannot be resolved,
+                                      the reference in the input string will be unchanged.
+                                      Double $$ are reduced to a single $, which allows
+                                      for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)"
+                                      will produce the string literal "$(VAR_NAME)".
+                                      Escaped references will never be expanded, regardless
+                                      of whether the variable exists or not. Defaults
+                                      to "".'
+                                    type: string
+                                  valueFrom:
+                                    description: Source for the environment variable's
+                                      value. Cannot be used if value is not empty.
+                                    properties:
+                                      configMapKeyRef:
+                                        description: Selects a key of a ConfigMap.
+                                        properties:
+                                          key:
+                                            description: The key to select.
+                                            type: string
+                                          name:
+                                            description: 'Name of the referent. More
+                                              info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                              TODO: Add other useful fields. apiVersion,
+                                              kind, uid?'
+                                            type: string
+                                          optional:
+                                            description: Specify whether the ConfigMap
+                                              or its key must be defined
+                                            type: boolean
+                                        required:
+                                        - key
+                                        type: object
+                                      fieldRef:
+                                        description: 'Selects a field of the pod:
+                                          supports metadata.name, metadata.namespace,
+                                          `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,
+                                          spec.nodeName, spec.serviceAccountName,
+                                          status.hostIP, status.podIP, status.podIPs.'
+                                        properties:
+                                          apiVersion:
+                                            description: Version of the schema the
+                                              FieldPath is written in terms of, defaults
+                                              to "v1".
+                                            type: string
+                                          fieldPath:
+                                            description: Path of the field to select
+                                              in the specified API version.
+                                            type: string
+                                        required:
+                                        - fieldPath
+                                        type: object
+                                      resourceFieldRef:
+                                        description: 'Selects a resource of the container:
+                                          only resources limits and requests (limits.cpu,
+                                          limits.memory, limits.ephemeral-storage,
+                                          requests.cpu, requests.memory and requests.ephemeral-storage)
+                                          are currently supported.'
+                                        properties:
+                                          containerName:
+                                            description: 'Container name: required
+                                              for volumes, optional for env vars'
+                                            type: string
+                                          divisor:
+                                            anyOf:
+                                            - type: integer
+                                            - type: string
+                                            description: Specifies the output format
+                                              of the exposed resources, defaults to
+                                              "1"
+                                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                            x-kubernetes-int-or-string: true
+                                          resource:
+                                            description: 'Required: resource to select'
+                                            type: string
+                                        required:
+                                        - resource
+                                        type: object
+                                      secretKeyRef:
+                                        description: Selects a key of a secret in
+                                          the pod's namespace
+                                        properties:
+                                          key:
+                                            description: The key of the secret to
+                                              select from.  Must be a valid secret
+                                              key.
+                                            type: string
+                                          name:
+                                            description: 'Name of the referent. More
+                                              info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                              TODO: Add other useful fields. apiVersion,
+                                              kind, uid?'
+                                            type: string
+                                          optional:
+                                            description: Specify whether the Secret
+                                              or its key must be defined
+                                            type: boolean
+                                        required:
+                                        - key
+                                        type: object
+                                    type: object
+                                required:
+                                - name
+                                type: object
+                              type: array
+                            image:
+                              description: image for Connector.
+                              type: string
+                          required:
+                          - command
+                          - image
+                          type: object
+                        passwordConfig:
+                          description: passwordConfig defines the pattern to generate
+                            password.
+                          properties:
+                            length:
+                              default: 10
+                              description: length defines the length of password.
+                              format: int32
+                              maximum: 32
+                              minimum: 8
+                              type: integer
+                            letterCase:
+                              default: MixedCases
+                              description: letterCase defines to use lower-cases,
+                                upper-cases or mixed-cases of letters.
+                              type: string
+                            numDigits:
+                              default: 2
+                              description: numDigits defines number of digits.
+                              format: int32
+                              maximum: 20
+                              minimum: 0
+                              type: integer
+                            numSymbols:
+                              default: 0
+                              description: numSymbols defines number of symbols.
+                              format: int32
+                              maximum: 20
+                              minimum: 0
+                              type: integer
+                          type: object
+                      required:
+                      - accounts
+                      - cmdExecutorConfig
+                      - passwordConfig
                       type: object
                     typeName:
                       description: Type name of the component, it can be any valid

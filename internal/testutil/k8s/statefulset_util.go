@@ -24,18 +24,20 @@ import (
 	"github.com/onsi/gomega"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
-var (
-	ctx      = context.Background()
-	timeout  = 10 * time.Second
-	interval = time.Second
+const (
+	timeout       = 10 * time.Second
+	interval      = time.Second
+	testFinalizer = "test.kubeblocks.io/finalizer"
 )
 
+// NewFakeStatefulSet creates a fake StatefulSet workload object for testing.
 func NewFakeStatefulSet(name string, replicas int) *apps.StatefulSet {
 	template := corev1.PodTemplateSpec{
 		Spec: corev1.PodSpec{
@@ -75,19 +77,24 @@ func NewFakeStatefulSet(name string, replicas int) *apps.StatefulSet {
 	}
 }
 
+// NewFakeStatefulSetPod creates a fake pod of the StatefulSet workload for testing.
 func NewFakeStatefulSetPod(set *apps.StatefulSet, ordinal int) *corev1.Pod {
 	pod := &corev1.Pod{}
 	pod.Name = fmt.Sprintf("%s-%d", set.Name, ordinal)
 	return pod
 }
 
+// MockStatefulSetReady mocks the StatefulSet workload is ready.
 func MockStatefulSetReady(sts *apps.StatefulSet) {
 	sts.Status.AvailableReplicas = *sts.Spec.Replicas
 	sts.Status.ObservedGeneration = sts.Generation
+	sts.Status.Replicas = *sts.Spec.Replicas
+	sts.Status.ReadyReplicas = *sts.Spec.Replicas
 	sts.Status.CurrentRevision = sts.Status.UpdateRevision
 }
 
-func DeletePodLabelKey(testCtx testutil.TestContext, podName, labelKey string) {
+// DeletePodLabelKey deletes the specified label of the pod.
+func DeletePodLabelKey(ctx context.Context, testCtx testutil.TestContext, podName, labelKey string) {
 	pod := &corev1.Pod{}
 	gomega.Expect(testCtx.Cli.Get(ctx, client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, pod)).Should(gomega.Succeed())
 	if pod.Labels == nil {
@@ -103,7 +110,8 @@ func DeletePodLabelKey(testCtx testutil.TestContext, podName, labelKey string) {
 	}, timeout, interval).Should(gomega.BeTrue())
 }
 
-func UpdatePodStatusNotReady(testCtx testutil.TestContext, podName string) {
+// UpdatePodStatusNotReady updates the pod status to make it not ready.
+func UpdatePodStatusNotReady(ctx context.Context, testCtx testutil.TestContext, podName string) {
 	pod := &corev1.Pod{}
 	gomega.Expect(testCtx.Cli.Get(ctx, client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, pod)).Should(gomega.Succeed())
 	patch := client.MergeFrom(pod.DeepCopy())
@@ -114,4 +122,27 @@ func UpdatePodStatusNotReady(testCtx testutil.TestContext, podName string) {
 		_ = testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, tmpPod)
 		return tmpPod.Status.Conditions == nil
 	}, timeout, interval).Should(gomega.BeTrue())
+}
+
+// MockPodIsTerminating mocks pod is terminating.
+func MockPodIsTerminating(ctx context.Context, testCtx testutil.TestContext, pod *corev1.Pod) {
+	patch := client.MergeFrom(pod.DeepCopy())
+	pod.Finalizers = []string{testFinalizer}
+	gomega.Expect(testCtx.Cli.Patch(ctx, pod, patch)).Should(gomega.Succeed())
+	gomega.Expect(testCtx.Cli.Delete(ctx, pod)).Should(gomega.Succeed())
+	gomega.Eventually(func() bool {
+		tmpPod := &corev1.Pod{}
+		_ = testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: pod.Name, Namespace: testCtx.DefaultNamespace}, tmpPod)
+		return !tmpPod.DeletionTimestamp.IsZero()
+	}, timeout, interval).Should(gomega.BeTrue())
+}
+
+// RemovePodFinalizer removes the pod finalizer to delete the pod finally.
+func RemovePodFinalizer(ctx context.Context, testCtx testutil.TestContext, pod *corev1.Pod) {
+	patch := client.MergeFrom(pod.DeepCopy())
+	pod.Finalizers = []string{}
+	gomega.Expect(testCtx.Cli.Patch(ctx, pod, patch)).Should(gomega.Succeed())
+	gomega.Eventually(func() error {
+		return testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: pod.Name, Namespace: testCtx.DefaultNamespace}, &corev1.Pod{})
+	}, timeout, interval).Should(gomega.Satisfy(apierrors.IsNotFound))
 }

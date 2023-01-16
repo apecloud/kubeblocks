@@ -101,7 +101,7 @@ var _ = Describe("logs", func() {
 			GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				body := cmdtesting.ObjBody(codec, execPod())
+				body := cmdtesting.ObjBody(codec, mockPod())
 				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 			}),
 		}
@@ -114,16 +114,8 @@ var _ = Describe("logs", func() {
 				IOStreams: stream,
 			},
 		}
-		input := &exec.ExecInput{
-			Use:      "logs",
-			Short:    "Access up-to-date cluster log file",
-			Example:  logsExample,
-			Validate: l.validate,
-			Complete: l.complete,
-			AddFlags: l.addFlags,
-			Run:      l.run,
-		}
-		cmd := l.Build(input)
+
+		cmd := NewLogsCmd(tf, stream)
 		Expect(cmd).ShouldNot(BeNil())
 		Expect(cmd.Use).ShouldNot(BeNil())
 		Expect(cmd.Example).ShouldNot(BeNil())
@@ -131,8 +123,8 @@ var _ = Describe("logs", func() {
 		// Complete without args
 		Expect(l.complete([]string{})).Should(MatchError("you must specify the cluster name to retrieve logs"))
 		// Complete with args
-		l.instName = "foo"
-		l.ClientSet, _ = l.Factory.KubernetesClientSet()
+		l.PodName = "foo"
+		l.Client, _ = l.Factory.KubernetesClientSet()
 		l.filePath = "/var/log"
 		Expect(l.complete([]string{"cluster-name"})).Should(HaveOccurred())
 		Expect(l.clusterName).Should(Equal("cluster-name"))

@@ -101,7 +101,50 @@ var _ = Describe("kubeblocks", func() {
 		Expect(err).Should(HaveOccurred())
 		Expect(notes).Should(Equal(""))
 
-		o.printNotes("")
+		o.printNotes()
+	})
+
+	It("check upgrade", func() {
+		var cfg string
+		cmd = newUpgradeCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+		Expect(cmd.HasSubCommands()).Should(BeFalse())
+
+		o := &InstallOptions{
+			Options: Options{
+				IOStreams: streams,
+			},
+		}
+
+		By("command without kubeconfig flag")
+		Expect(o.complete(tf, cmd)).Should(HaveOccurred())
+
+		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
+		cmd.Flags().StringVar(&cfg, "context", "", "The name of the kubeconfig context to use.")
+		Expect(o.complete(tf, cmd)).To(Succeed())
+		Expect(o.HelmCfg).ShouldNot(BeNil())
+		Expect(o.Namespace).To(Equal("test"))
+	})
+
+	It("run upgrade", func() {
+		o := &InstallOptions{
+			Options: Options{
+				IOStreams: streams,
+				HelmCfg:   helm.FakeActionConfig(),
+				Namespace: "default",
+			},
+			Version: version.DefaultKubeBlocksVersion,
+			Monitor: true,
+		}
+		Expect(o.Upgrade()).Should(HaveOccurred())
+		Expect(len(o.Sets)).To(Equal(1))
+		Expect(o.Sets[0]).To(Equal(kMonitorParam))
+
+		notes, err := o.upgradeChart()
+		Expect(err).Should(HaveOccurred())
+		Expect(notes).Should(Equal(""))
+
+		o.printNotes()
 	})
 
 	It("check uninstall", func() {

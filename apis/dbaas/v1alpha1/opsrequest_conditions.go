@@ -35,18 +35,20 @@ const (
 	ConditionTypeVerticalScaling   = "VerticalScaling"
 	ConditionTypeHorizontalScaling = "HorizontalScaling"
 	ConditionTypeVolumeExpanding   = "VolumeExpanding"
+	ConditionTypeReconfigure       = "Reconfigure"
 	ConditionTypeUpgrading         = "Upgrading"
 
 	// condition and event reasons
 
-	ReasonClusterPhaseMisMatch       = "ClusterPhaseMisMatch"
-	ReasonOpsTypeNotSupported        = "OpsTypeNotSupported"
-	ReasonClusterExistOtherOperation = "ClusterExistOtherOperation"
-	ReasonClusterNotFound            = "ClusterNotFound"
-	ReasonStarting                   = "Starting"
-	ReasonComponentFailed            = "ComponentFailed"
-	ReasonSuccessful                 = "Successful"
-	ReasonOpsRequestFailed           = "OpsRequestFailed"
+	ReasonReconfigureMerged    = "ReconfigureMerged"
+	ReasonReconfigureFailed    = "ReconfigureFailed"
+	ReasonReconfigureSucceed   = "ReconfigureSucceed"
+	ReasonReconfigureRunning   = "ReconfigureRunning"
+	ReasonClusterPhaseMisMatch = "ClusterPhaseMisMatch"
+	ReasonOpsTypeNotSupported  = "OpsTypeNotSupported"
+	ReasonValidateError        = "ValidateError"
+	ReasonClusterNotFound      = "ClusterNotFound"
+	ReasonOpsRequestFailed     = "OpsRequestFailed"
 )
 
 func (r *OpsRequest) SetStatusCondition(condition metav1.Condition) {
@@ -60,12 +62,12 @@ func NewProgressingCondition(ops *OpsRequest) *metav1.Condition {
 		Status:             metav1.ConditionTrue,
 		Reason:             "OpsRequestProgressingStarted",
 		LastTransitionTime: metav1.NewTime(time.Now()),
-		Message: fmt.Sprintf("Controller has started to progress the OpsRequest: %s in Cluster: %s",
+		Message: fmt.Sprintf("Start to process the OpsRequest: %s in Cluster: %s",
 			ops.Name, ops.Spec.ClusterRef),
 	}
 }
 
-// NewValidatePassedCondition new a condition that the operation validate passed
+// NewValidatePassedCondition creates a condition that the operation validation.
 func NewValidatePassedCondition(opsRequestName string) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeValidated,
@@ -76,7 +78,7 @@ func NewValidatePassedCondition(opsRequestName string) *metav1.Condition {
 	}
 }
 
-// NewValidateFailedCondition new a condition that the operation validate passed
+// NewValidateFailedCondition creates a condition that the operation validation.
 func NewValidateFailedCondition(reason, message string) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeValidated,
@@ -87,7 +89,7 @@ func NewValidateFailedCondition(reason, message string) *metav1.Condition {
 	}
 }
 
-// NewFailedCondition new a condition that the OpsRequest processing failed
+// NewFailedCondition creates a condition that the OpsRequest processing failed
 func NewFailedCondition(ops *OpsRequest, err error) *metav1.Condition {
 	msg := fmt.Sprintf("Failed to process OpsRequest: %s in cluster: %s", ops.Name, ops.Spec.ClusterRef)
 	if err != nil {
@@ -102,69 +104,91 @@ func NewFailedCondition(ops *OpsRequest, err error) *metav1.Condition {
 	}
 }
 
-// NewSucceedCondition new a condition that the controller has successfully processed the OpsRequest
+// NewSucceedCondition creates a condition that the controller has successfully processed the OpsRequest
 func NewSucceedCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeSucceed,
 		Status:             metav1.ConditionTrue,
 		Reason:             "OpsRequestProcessedSuccessfully",
 		LastTransitionTime: metav1.NewTime(time.Now()),
-		Message: fmt.Sprintf("Controller has successfully processed the OpsRequest: %s in Cluster: %s",
+		Message: fmt.Sprintf("Successfully processed the OpsRequest: %s in Cluster: %s",
 			ops.Name, ops.Spec.ClusterRef),
 	}
 }
 
-// NewRestartingCondition new a condition that the operation start to restart components
+// NewRestartingCondition creates a condition that the operation starts to restart components
 func NewRestartingCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeRestarting,
 		Status:             metav1.ConditionTrue,
 		Reason:             "RestartingStarted",
 		LastTransitionTime: metav1.NewTime(time.Now()),
-		Message:            fmt.Sprintf("start restarting database in Cluster: %s", ops.Spec.ClusterRef),
+		Message:            fmt.Sprintf("Start to restart database in Cluster: %s", ops.Spec.ClusterRef),
 	}
 }
 
-// NewVerticalScalingCondition new a condition that the OpsRequest start to vertical scaling cluster
+// NewVerticalScalingCondition creates a condition that the OpsRequest starts to vertical scale cluster
 func NewVerticalScalingCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeVerticalScaling,
 		Status:             metav1.ConditionTrue,
 		Reason:             "VerticalScalingStarted",
 		LastTransitionTime: metav1.NewTime(time.Now()),
-		Message:            fmt.Sprintf("start vertical scaling in Cluster: %s", ops.Spec.ClusterRef),
+		Message:            fmt.Sprintf("Start to vertical scale in Cluster: %s", ops.Spec.ClusterRef),
 	}
 }
 
-// NewHorizontalScalingCondition new a condition that the OpsRequest start horizontal scaling cluster
+// NewHorizontalScalingCondition creates a condition that the OpsRequest starts to horizontal scale cluster
 func NewHorizontalScalingCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeHorizontalScaling,
 		Status:             metav1.ConditionTrue,
 		Reason:             "HorizontalScalingStarted",
 		LastTransitionTime: metav1.NewTime(time.Now()),
-		Message:            fmt.Sprintf("start horizontal scaling in Cluster: %s", ops.Spec.ClusterRef),
+		Message:            fmt.Sprintf("Start to horizontal scale in Cluster: %s", ops.Spec.ClusterRef),
 	}
 }
 
-// NewVolumeExpandingCondition new a condition that the OpsRequest start to expand volume
+// NewVolumeExpandingCondition creates a condition that the OpsRequest starts to expand volume
 func NewVolumeExpandingCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeVolumeExpanding,
 		Status:             metav1.ConditionTrue,
 		Reason:             "VolumeExpandingStarted",
 		LastTransitionTime: metav1.NewTime(time.Now()),
-		Message:            fmt.Sprintf("start expanding the volume in Cluster: %s", ops.Spec.ClusterRef),
+		Message:            fmt.Sprintf("Start to expand the volume in Cluster: %s", ops.Spec.ClusterRef),
 	}
 }
 
-// NewUpgradingCondition new a condition that the OpsRequest start to upgrade cluster
+// NewUpgradingCondition creates a condition that the OpsRequest starts to upgrade cluster
 func NewUpgradingCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeUpgrading,
 		Status:             metav1.ConditionTrue,
 		Reason:             "UpgradingStarted",
 		LastTransitionTime: metav1.NewTime(time.Now()),
-		Message:            fmt.Sprintf("start upgrading in Cluster: %s", ops.Spec.ClusterRef),
+		Message:            fmt.Sprintf("Start to upgrade in Cluster: %s", ops.Spec.ClusterRef),
+	}
+}
+
+// NewReconfigureCondition new a condition that the OpsRequest updating component configuration
+func NewReconfigureCondition(ops *OpsRequest) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeReconfigure,
+		Status:             metav1.ConditionTrue,
+		Reason:             "ReconfigureStarted",
+		LastTransitionTime: metav1.NewTime(time.Now()),
+		Message:            fmt.Sprintf("Start to reconfigure in Cluster: %s", ops.Spec.ClusterRef),
+	}
+}
+
+// NewReconfigureRunningCondition new a condition that the OpsRequest reconfigure workflow
+func NewReconfigureRunningCondition(ops *OpsRequest, reason string) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeReconfigure,
+		Status:             metav1.ConditionTrue,
+		Reason:             reason,
+		LastTransitionTime: metav1.NewTime(time.Now()),
+		Message:            fmt.Sprintf("Reconfiguring in Cluster: %s", ops.Spec.ClusterRef),
 	}
 }

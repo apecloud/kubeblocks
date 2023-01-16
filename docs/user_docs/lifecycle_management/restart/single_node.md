@@ -4,7 +4,7 @@ This guide introduces how to use KubeBlocks to restart a single-node cluster.
 
 ## Before you start
 
-- [Install KubeBlocks](../../installation/deploy_kubeblocks.md). 
+- [Install KubeBlocks](../../installation/install_kubeblocks.md). 
 - Run the commands below to check whether KubeBlocks is installed successfully and the cluster-related `CR` (custom resources) are created.
   - Run the commands to check whether KubeBlocks is installed successfully.
   ```

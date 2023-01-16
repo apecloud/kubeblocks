@@ -22,28 +22,36 @@ import (
 
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+type restartOpsHandler struct{}
+
+var _ OpsHandler = restartOpsHandler{}
+
 func init() {
-	restartBehaviour := &OpsBehaviour{
-		FromClusterPhases:      []dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase},
-		ToClusterPhase:         dbaasv1alpha1.UpdatingPhase,
-		Action:                 RestartAction,
-		ActionStartedCondition: dbaasv1alpha1.NewRestartingCondition,
-		ReconcileAction:        ReconcileActionWithComponentOps,
+	restartBehaviour := OpsBehaviour{
+		FromClusterPhases: []dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase},
+		ToClusterPhase:    dbaasv1alpha1.UpdatingPhase,
+		OpsHandler:        restartOpsHandler{},
 	}
 
 	opsMgr := GetOpsManager()
 	opsMgr.RegisterOps(dbaasv1alpha1.RestartType, restartBehaviour)
 }
 
-// RestartAction restart components by updating StatefulSet.
-func RestartAction(opsRes *OpsResource) error {
-	if opsRes.OpsRequest.Status.StartTimestamp == nil {
+// ActionStartedCondition the started condition when handle the restart request.
+func (r restartOpsHandler) ActionStartedCondition(opsRequest *dbaasv1alpha1.OpsRequest) *metav1.Condition {
+	return dbaasv1alpha1.NewRestartingCondition(opsRequest)
+}
+
+// Action restarts components by updating StatefulSet.
+func (r restartOpsHandler) Action(opsRes *OpsResource) error {
+	if opsRes.OpsRequest.Status.StartTimestamp.IsZero() {
 		return fmt.Errorf("status.startTimestamp can not be null")
 	}
 	componentNameMap := opsRes.OpsRequest.GetRestartComponentNameMap()
@@ -53,7 +61,24 @@ func RestartAction(opsRes *OpsResource) error {
 	return restartStatefulSet(opsRes, componentNameMap)
 }
 
-// restartStatefulSet restart statefulSet workload
+// ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
+// the Reconcile function for volume expansion opsRequest.
+func (r restartOpsHandler) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.Phase, time.Duration, error) {
+	return ReconcileActionWithComponentOps(opsRes, "restart", handleComponentStatusProgress)
+}
+
+// GetRealAffectedComponentMap gets the real affected component map for the operation
+func (r restartOpsHandler) GetRealAffectedComponentMap(opsRequest *dbaasv1alpha1.OpsRequest) realAffectedComponentMap {
+	return opsRequest.GetRestartComponentNameMap()
+}
+
+// SaveLastConfiguration this operation only restart the pods of the component, no changes in Cluster.spec.
+// empty implementation here.
+func (r restartOpsHandler) SaveLastConfiguration(opsRes *OpsResource) error {
+	return nil
+}
+
+// restartStatefulSet restarts statefulSet workload
 func restartStatefulSet(opsRes *OpsResource, componentNameMap map[string]struct{}) error {
 	var (
 		statefulSetList = &appv1.StatefulSetList{}
@@ -76,7 +101,7 @@ func restartStatefulSet(opsRes *OpsResource, componentNameMap map[string]struct{
 	return nil
 }
 
-// restartDeployment restart deployment workload
+// restartDeployment restarts deployment workload
 func restartDeployment(opsRes *OpsResource, componentNameMap map[string]struct{}) error {
 	var (
 		deploymentList = &appv1.DeploymentList{}
@@ -99,7 +124,7 @@ func restartDeployment(opsRes *OpsResource, componentNameMap map[string]struct{}
 	return nil
 }
 
-// isRestarted check whether the component has been restarted
+// isRestarted checks whether the component has been restarted
 func isRestarted(opsRes *OpsResource, object client.Object, componentNameMap map[string]struct{}, podTemplate *corev1.PodTemplateSpec) bool {
 	cName := object.GetLabels()[intctrlutil.AppComponentLabelKey]
 	if _, ok := componentNameMap[cName]; !ok {
@@ -110,9 +135,9 @@ func isRestarted(opsRes *OpsResource, object client.Object, componentNameMap map
 	}
 	hasRestarted := true
 	startTimestamp := opsRes.OpsRequest.Status.StartTimestamp
-	stsRestartTimeStamp := podTemplate.Annotations[RestartAnnotationKey]
+	stsRestartTimeStamp := podTemplate.Annotations[intctrlutil.RestartAnnotationKey]
 	if res, _ := time.Parse(time.RFC3339, stsRestartTimeStamp); startTimestamp.After(res) {
-		podTemplate.Annotations[RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
+		podTemplate.Annotations[intctrlutil.RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
 		hasRestarted = false
 	}
 	return hasRestarted

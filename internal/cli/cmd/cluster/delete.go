@@ -37,7 +37,7 @@ var deleteExample = templates.Examples(`
 func NewDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := delete.NewDeleteOptions(f, streams, types.ClusterGVR())
 	cmd := &cobra.Command{
-		Use:     "delete",
+		Use:     "delete NAME",
 		Short:   "Delete clusters",
 		Example: deleteExample,
 		Run: func(cmd *cobra.Command, args []string) {

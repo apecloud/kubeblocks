@@ -17,6 +17,7 @@ limitations under the License.
 package printer
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -67,4 +68,43 @@ func (t *TablePrinter) AddRow(row ...interface{}) {
 
 func (t *TablePrinter) Print() {
 	t.tbl.Render()
+}
+
+// PrintPairStringToLine print pair string for a line , the format is as follows "<space>*<key>:\t<value>".
+// spaceCount is the space character count which is placed in the offset of field string.
+// the default values of tabCount is 2.
+func PrintPairStringToLine(name, value string, spaceCount ...int) {
+	scn := 2
+	// only the first variable of tabCount is effective.
+	if len(spaceCount) > 0 {
+		scn = spaceCount[0]
+	}
+	var (
+		spaceString string
+		i           int
+	)
+	for i = 0; i < scn; i++ {
+		spaceString += " "
+	}
+	line := fmt.Sprintf("%s%-20s%s", spaceString, name+":", value)
+	fmt.Println(line)
+}
+
+type Pair string
+
+func NewPair(key, value string) Pair {
+	return Pair(fmt.Sprintf("%s: %s", key, value))
+}
+
+func PrintLineWithTabSeparator(ps ...Pair) {
+	var line string
+	for _, v := range ps {
+		line += string(v) + "\t"
+	}
+	fmt.Println(line)
+}
+
+func PrintTitle(title string) {
+	titleTpl := fmt.Sprintf("\n%s:", title)
+	fmt.Println(titleTpl)
 }

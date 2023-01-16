@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -124,6 +125,16 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 	// TODO typeName duplication validate
 
 	for _, component := range r.Spec.Components {
+		if err := r.validateConfigSpec(component.ConfigSpec); err != nil {
+			*allErrs = append(*allErrs, field.Duplicate(field.NewPath("spec.components[*].configSpec.configTemplateRefs"), err))
+			continue
+		}
+		// validate system account defiined in spec.components[].systemAccounts
+		sysAccountSpec := component.SystemAccounts
+		if sysAccountSpec != nil {
+			sysAccountSpec.validateSysAccounts(allErrs)
+		}
+
 		if component.ComponentType != Consensus {
 			continue
 		}
@@ -188,4 +199,76 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 			}
 		}
 	}
+}
+
+// validateSysAccounts validate spec.components[].systemAccounts
+func (r *SystemAccountSpec) validateSysAccounts(allErrs *field.ErrorList) {
+	accountName := make(map[AccountName]bool)
+	for _, sysAccount := range r.Accounts {
+		// validate provision policy
+		provisionPolicy := sysAccount.ProvisionPolicy
+		if provisionPolicy.Type == CreateByStmt && sysAccount.ProvisionPolicy.Statements == nil {
+			*allErrs = append(*allErrs,
+				field.Invalid(field.NewPath("spec.components[*].systemAccounts.accounts.provisionPolicy.statements"),
+					sysAccount.Name, "statements should not be empty when provisionPolicy = CreateByStmt."))
+			continue
+		}
+
+		if provisionPolicy.Type == ReferToExisting && sysAccount.ProvisionPolicy.SecretRef == nil {
+			*allErrs = append(*allErrs,
+				field.Invalid(field.NewPath("spec.components[*].systemAccounts.accounts.provisionPolicy.secretRef"),
+					sysAccount.Name, "SecretRef should not be empty when provisionPolicy = ReferToExisting. "))
+			continue
+		}
+		// account names should be unique
+		if _, exists := accountName[sysAccount.Name]; exists {
+			*allErrs = append(*allErrs,
+				field.Invalid(field.NewPath("spec.components[*].systemAccounts.accounts"),
+					sysAccount.Name, "duplicated system account names are not allowd."))
+			continue
+		} else {
+			accountName[sysAccount.Name] = true
+		}
+	}
+
+	passwdConfig := r.PasswordConfig
+	if passwdConfig.Length < passwdConfig.NumDigits+passwdConfig.NumSymbols {
+		*allErrs = append(*allErrs,
+			field.Invalid(field.NewPath("spec.components[*].systemAccounts.passwordConfig"),
+				passwdConfig, "numDigits plus numSymbols exceeds password length. "))
+	}
+}
+
+func (r *ClusterDefinition) validateConfigSpec(configSpec *ConfigurationSpec) error {
+	if configSpec == nil || len(configSpec.ConfigTemplateRefs) <= 1 {
+		return nil
+	}
+	return validateConfigTemplateList(configSpec.ConfigTemplateRefs)
+}
+
+func validateConfigTemplateList(ctpls []ConfigTemplate) error {
+	var (
+		volumeSet = map[string]struct{}{}
+		cmSet     = map[string]struct{}{}
+		tplSet    = map[string]struct{}{}
+	)
+
+	for _, tpl := range ctpls {
+		if len(tpl.VolumeName) == 0 {
+			return errors.Errorf("ConfigTemplate.VolumeName not empty.")
+		}
+		if _, ok := tplSet[tpl.Name]; ok {
+			return errors.Errorf("configTemplate[%s] already existed.", tpl.Name)
+		}
+		if _, ok := volumeSet[tpl.VolumeName]; ok {
+			return errors.Errorf("volume[%s] already existed.", tpl.VolumeName)
+		}
+		if _, ok := cmSet[tpl.ConfigTplRef]; ok {
+			return errors.Errorf("configmap[%s] already existed.", tpl.ConfigTplRef)
+		}
+		tplSet[tpl.Name] = struct{}{}
+		cmSet[tpl.ConfigTplRef] = struct{}{}
+		volumeSet[tpl.VolumeName] = struct{}{}
+	}
+	return nil
 }

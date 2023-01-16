@@ -111,6 +111,32 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - configmap
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - configmap/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - configmap/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
   - configmaps
   - resourcequotas
   - secrets
@@ -404,6 +430,32 @@ rules:
   - dbaas.kubeblocks.io
   resources:
   - clusters/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dbaas.kubeblocks.io
+  resources:
+  - configconstraints
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dbaas.kubeblocks.io
+  resources:
+  - configconstraints/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dbaas.kubeblocks.io
+  resources:
+  - configconstraints/status
   verbs:
   - get
   - patch

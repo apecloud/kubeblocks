@@ -54,6 +54,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("Cluster Controller", func() {
@@ -113,37 +114,21 @@ var _ = Describe("Cluster Controller", func() {
 		return k8sClient.Patch(ctx, sc, patch)
 	}
 
-	assureCfgTplConfigMapObj := func(cmName string) *corev1.ConfigMap {
+	assureCfgTplConfigMapObj := func() *corev1.ConfigMap {
 		By("Assuring an cm obj")
-		clusterVersionYaml := `
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: mysql-tree-node-template-8.0
-  namespace: default
-data:
-  my.cnf: |-
-    [mysqld]
-    innodb-buffer-pool-size=512M
-    log-bin=master-bin
-    gtid_mode=OFF
-    consensus_auto_leader_transfer=ON
-    
-    pid-file=/var/run/mysqld/mysqld.pid
-    socket=/var/run/mysqld/mysqld.sock
+		cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("config/configcm.yaml",
+			testdata.WithNamespace(testCtx.DefaultNamespace))
+		Expect(err).Should(Succeed())
+		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigConstraint]("config/configtpl.yaml")
+		Expect(err).Should(Succeed())
 
-    port=3306
-    general_log=0
-    server-id=1
-    slow_query_log=0
-    
-    [client]
-    socket=/var/run/mysqld/mysqld.sock
-    host=localhost
-`
-		cfgCM := &corev1.ConfigMap{}
-		Expect(yaml.Unmarshal([]byte(clusterVersionYaml), cfgCM)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, cfgTpl)).Should(Succeed())
+
+		// update phase status
+		patch := client.MergeFrom(cfgTpl.DeepCopy())
+		cfgTpl.Status.Phase = dbaasv1alpha1.AvailablePhase
+		Expect(k8sClient.Status().Patch(context.Background(), cfgTpl, patch)).Should(Succeed())
 		return cfgCM
 	}
 
@@ -159,9 +144,13 @@ spec:
   components:
   - typeName: replicasets
     componentType: Stateful
-    configTemplateRefs: 
-    - name: mysql-tree-node-template-8.0 
-      volumeName: mysql-config
+    configSpec:
+      configTemplateRefs:
+      - name: mysql-tree-node-template-8.0
+        configTplRef: mysql-tree-node-template-8.0
+        configConstraintRef: mysql-tree-node-template-8.0
+        namespace: default
+        volumeName: mysql-config
     defaultReplicas: 1
     podSpec:
       containers:
@@ -236,9 +225,13 @@ spec:
   clusterDefinitionRef: cluster-definition
   components:
   - type: replicasets
-    configTemplateRefs: 
-    - name: mysql-tree-node-template-8.0 
-      volumeName: mysql-config
+    configSpec:
+      configTemplateRefs:
+      - name: mysql-tree-node-template-8.0
+        configTplRef: mysql-tree-node-template-8.0
+        configConstraintRef: mysql-tree-node-template-8.0
+        namespace: default
+        volumeName: mysql-config
     podSpec:
       containers:
       - name: mysql
@@ -261,7 +254,7 @@ spec:
 	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, types.NamespacedName) {
 		// setup Cluster obj required default ClusterDefinition and ClusterVersion objects if not provided
 		if clusterDefObj == nil {
-			assureCfgTplConfigMapObj("")
+			assureCfgTplConfigMapObj()
 			clusterDefObj = assureClusterDefObj()
 		}
 		if clusterVersionObj == nil {
@@ -462,7 +455,7 @@ spec:
 	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, types.NamespacedName) {
 		// setup Cluster obj required default ClusterDefinition and ClusterVersion objects if not provided
 		if clusterDefObj == nil {
-			assureCfgTplConfigMapObj("")
+			assureCfgTplConfigMapObj()
 			clusterDefObj = assureClusterDefWithConsensusObj()
 		}
 		if clusterVersionObj == nil {
@@ -982,6 +975,7 @@ spec:
         builtIn: false
       configTemplateRefs:
         - name: %s
+          configTplRef: %s
           volumeName: mysql-config
       componentType: Consensus
       consensusSpec:
@@ -1107,7 +1101,7 @@ spec:
                 - path: "annotations"
                   fieldRef:
                     fieldPath: metadata.annotations
-`, clusterDefKey.Name, configTplKey.Name)
+`, clusterDefKey.Name, configTplKey.Name, configTplKey.Name)
 			clusterDef := &dbaasv1alpha1.ClusterDefinition{}
 			Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDef)).Should(Succeed())
 			clusterDef.Spec.Components[0].HorizontalScalePolicy =

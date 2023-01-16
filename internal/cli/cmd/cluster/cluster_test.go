@@ -23,6 +23,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
@@ -129,13 +130,13 @@ var _ = Describe("Cluster", func() {
 
 		By("validate upgrade when cluster-version is null")
 		o.Name = "test"
-		o.OpsType = OpsTypeUpgrade
+		o.OpsType = dbaasv1alpha1.UpgradeType
 		Expect(o.Validate()).To(MatchError("missing cluster-version"))
 		o.ClusterVersionRef = "test-cluster-version"
 		Expect(o.Validate()).Should(Succeed())
 
 		By("validate volumeExpansion when components is null")
-		o.OpsType = OpsTypeVolumeExpansion
+		o.OpsType = dbaasv1alpha1.VolumeExpansionType
 		Expect(o.Validate()).To(MatchError("missing component-names"))
 
 		By("validate volumeExpansion when vct-names is null")
@@ -148,7 +149,7 @@ var _ = Describe("Cluster", func() {
 		Expect(o.Validate()).Should(Succeed())
 
 		By("validate horizontalScaling when replicas less than -1 ")
-		o.OpsType = OpsTypeHorizontalScaling
+		o.OpsType = dbaasv1alpha1.HorizontalScalingType
 		o.Replicas = -2
 		Expect(o.Validate()).To(MatchError("replicas required natural number"))
 

@@ -5,8 +5,8 @@ metadata:
 data:
   setup.sh: |
     #!/bin/bash
-    leader=$KB_REPLICASETS_LEADER
-    followers=$KB_REPLICASETS_FOLLOWERS
+    leader=$KB_MYSQL_LEADER
+    followers=$KB_MYSQL_FOLLOWERS
     echo $leader
     echo $followers
     sub_follower=`echo "$followers" | grep "$KB_POD_NAME"`
@@ -16,10 +16,10 @@ data:
       echo "no need to call add"
     else 
       idx=${KB_POD_NAME##*-}
-      host=$(eval echo \$KB_REPLICASETS_"$idx"_HOSTNAME)
+      host=$(eval echo \$KB_MYSQL_"$idx"_HOSTNAME)
       echo "$host"
       leader_idx=${leader##*-}
-      leader_host=$(eval echo \$KB_REPLICASETS_"$leader_idx"_HOSTNAME)
+      leader_host=$(eval echo \$KB_MYSQL_"$leader_idx"_HOSTNAME)
       if [ ! -z $leader_host ]; then 
         host_flag="-h$leader_host"
       fi
@@ -42,22 +42,22 @@ data:
       fi
       rm /tmp/setup_error.log
     fi
-    cluster_info=""; for (( i=0; i< $KB_REPLICASETS_N; i++ )); do
+    cluster_info=""; for (( i=0; i< $KB_MYSQL_N; i++ )); do
       if [ $i -ne 0 ]; then
         cluster_info="$cluster_info;";
       fi;
-      host=$(eval echo \$KB_REPLICASETS_"$i"_HOSTNAME)
+      host=$(eval echo \$KB_MYSQL_"$i"_HOSTNAME)
       cluster_info="$cluster_info$host:13306";
     done; 
     idx=${KB_POD_NAME##*-}
     echo $idx
-    host=$(eval echo \$KB_REPLICASETS_"$idx"_HOSTNAME)
+    host=$(eval echo \$KB_MYSQL_"$idx"_HOSTNAME)
     cluster_info="$cluster_info@$(($idx+1))"; 
     echo $cluster_info; 
     mkdir -p /data/mysql/data;
     mkdir -p /data/mysql/log;
     chmod +777 -R /data/mysql; 
-    leader=$KB_REPLICASETS_LEADER
+    leader=$KB_MYSQL_LEADER
     echo $leader
     if [ -z $leader ]; then
       echo "docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info=\"$cluster_info\" --cluster-id=$CLUSTER_ID"

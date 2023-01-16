@@ -1,6 +1,14 @@
 name: RELEASE-IMAGE
 
 on:
+  schedule:
+    - cron: '0 0 * * 1-5' # Runs at 00:00 UTC on Mon to Friday
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'image tag'
+        required: false
+        default: 'latest'
   release:
     types:
       - published
@@ -38,6 +46,11 @@ jobs:
           docker login --username ${{ secrets.DOCKER_REGISTRY_USER }} \
             --password ${{ secrets.DOCKER_REGISTRY_PASSWORD }} ${{ env.DOCKER_REGISTRY_URL }}
           
-          RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ env.RELEASE_VERSION }} 1`
+          RELEASE_VERSION="latest"
+          if [[ ! -z "${{ github.event.inputs.image_tag }}" ]]; then
+            RELEASE_VERSION="${{ github.event.inputs.image_tag }}"
+          elif [[ ! -z "${{ env.RELEASE_VERSION }}" ]]; then
+            RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ env.RELEASE_VERSION }} 1`
+          fi
           
           BUILDX_ENABLED=true VERSION=$RELEASE_VERSION make push-manager-image

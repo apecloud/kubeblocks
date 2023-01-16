@@ -14,6 +14,16 @@ jobs:
     runs-on: [self-hosted, eks-fargate-runner ]
     steps:
       - uses: JashBook/checkout@main
+      - name: make manifests check
+        run: |
+          SHA=${{ github.sha }}
+          make manifests
+          FILE_CHANGES=`git diff --name-only $SHA`
+          if [[ ! -z "$FILE_CHANGES" ]]; then
+            echo $FILE_CHANGES
+            echo "make manifests causes inconsistent files"
+            exit 1
+          fi
       - name: make mod-vendor and lint
         run: |
           mkdir -p ./bin

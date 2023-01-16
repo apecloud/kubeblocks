@@ -78,7 +78,8 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	stateless := stateless.NewStateless(reqCtx.Ctx, r.Client, cluster)
-	if requeueAfter, err := handleComponentStatusAndSyncCluster(reqCtx, r.Client, deploy, cluster, stateless); err != nil {
+	if requeueAfter, err := handleComponentStatusAndSyncCluster(reqCtx, r.Client, r.Recorder,
+		deploy, cluster, stateless); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	} else if requeueAfter != 0 {
 		// if the reconcileAction need requeue, do it

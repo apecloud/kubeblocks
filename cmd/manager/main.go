@@ -38,6 +38,7 @@ import (
 	dataprotectioncontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	dbaascontrollers "github.com/apecloud/kubeblocks/controllers/dbaas"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/internal/webhook"
 	//+kubebuilder:scaffold:imports
@@ -244,6 +245,31 @@ func main() {
 		Recorder: mgr.GetEventRecorderFor("ops-request-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "OpsRequest")
+		os.Exit(1)
+	}
+	if err = (&configuration.ReconfigureRequestReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
+		os.Exit(1)
+	}
+	if err = (&configuration.ConfigConstraintReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("configuration-template-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ConfigConstraint")
+		os.Exit(1)
+	}
+
+	if err = (&dbaascontrollers.SystemAccountReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("system-account-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SystemAccount")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

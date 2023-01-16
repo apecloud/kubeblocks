@@ -71,9 +71,10 @@ func NewListLogsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	}
 
 	cmd := &cobra.Command{
-		Use:     "list-logs",
-		Short:   "List supported log files in cluster",
-		Example: logsListExample,
+		Use:               "list-logs NAME",
+		Short:             "List supported log files in cluster",
+		Example:           logsListExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.Validate(args))
 			util.CheckErr(o.Complete(f, args))
@@ -109,7 +110,6 @@ func (o *ListLogsOptions) Complete(f cmdutil.Factory, args []string) error {
 	}
 	o.dynamicClient, err = f.DynamicClient()
 	o.exec = exec.NewExecOptions(o.factory, o.IOStreams)
-	o.exec.Input = &exec.ExecInput{}
 	o.exec.Config = config
 	// hide unnecessary output
 	o.exec.Quiet = true
@@ -118,12 +118,14 @@ func (o *ListLogsOptions) Complete(f cmdutil.Factory, args []string) error {
 
 func (o *ListLogsOptions) Run() error {
 	clusterGetter := cluster.ObjectsGetter{
-		ClientSet:      o.clientSet,
-		DynamicClient:  o.dynamicClient,
-		Name:           o.clusterName,
-		Namespace:      o.namespace,
-		WithClusterDef: true,
-		WithPod:        true,
+		Client:    o.clientSet,
+		Dynamic:   o.dynamicClient,
+		Name:      o.clusterName,
+		Namespace: o.namespace,
+		GetOptions: cluster.GetOptions{
+			WithClusterDef: true,
+			WithPod:        true,
+		},
 	}
 	dataObj, err := clusterGetter.Get()
 	if err != nil {
@@ -236,9 +238,6 @@ func (o *ListLogsOptions) getRealFileFromContainer(pod *corev1.Pod, pattern stri
 	o.exec.Out = &out
 	o.exec.ErrOut = os.Stdout
 	o.exec.TTY = false
-	if err := o.exec.Validate(); err != nil {
-		return out.String(), err
-	}
 	if err := o.exec.Run(); err != nil {
 		return out.String(), err
 	}

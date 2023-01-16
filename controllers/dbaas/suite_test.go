@@ -43,7 +43,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
@@ -57,6 +59,7 @@ var ctx context.Context
 var cancel context.CancelFunc
 var testCtx testutil.TestContext
 var clusterRecorder record.EventRecorder
+var systemAccountReconciler *SystemAccountReconciler
 
 func init() {
 	viper.AutomaticEnv()
@@ -146,6 +149,20 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	err = (&components.StatefulSetReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("stateful-set-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&components.DeploymentReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("deployment-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
 	err = (&k8score.StorageClassReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
@@ -158,6 +175,15 @@ var _ = BeforeSuite(func() {
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("event-controller"),
 	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	// add SystemAccountReconciler
+	systemAccountReconciler = &SystemAccountReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("system-account-controller"),
+	}
+	err = systemAccountReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	testCtx = testutil.NewDefaultTestContext(k8sManager.GetClient())
@@ -182,65 +208,54 @@ var _ = AfterSuite(func() {
 
 // Helper functions to change fields in the desired state and status of resources.
 // Each helper is a wrapper of k8sClient.Patch.
+// Usage:
+// changeSpec(key, func(clusterDef *dbaasv1alpha1.ClusterDefinition) {
+//		// modify clusterDef
+// })
 
-func changeClusterDef(namespacedName types.NamespacedName,
-	action func(clusterDef *dbaasv1alpha1.ClusterDefinition)) error {
-	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
-	if err := k8sClient.Get(ctx, namespacedName, clusterDef); err != nil {
+func changeSpec[T intctrlutil.Object, PT intctrlutil.PObject[T]](namespacedName types.NamespacedName,
+	action func(pobj PT)) error {
+	var obj T
+	pobj := PT(&obj)
+	if err := k8sClient.Get(ctx, namespacedName, pobj); err != nil {
 		return err
 	}
-	patch := client.MergeFrom(clusterDef.DeepCopy())
-	action(clusterDef)
-	if err := k8sClient.Patch(ctx, clusterDef, patch); err != nil {
+	patch := client.MergeFrom(PT(pobj.DeepCopy()))
+	action(pobj)
+	if err := k8sClient.Patch(ctx, pobj, patch); err != nil {
 		return err
 	}
 	return nil
 }
 
-func changeCluster(namespacedName types.NamespacedName,
-	action func(cluster *dbaasv1alpha1.Cluster)) error {
-	cluster := &dbaasv1alpha1.Cluster{}
-	if err := k8sClient.Get(ctx, namespacedName, cluster); err != nil {
+func changeStatus[T intctrlutil.Object, PT intctrlutil.PObject[T]](namespacedName types.NamespacedName,
+	action func(pobj PT)) error {
+	var obj T
+	pobj := PT(&obj)
+	if err := k8sClient.Get(ctx, namespacedName, pobj); err != nil {
 		return err
 	}
-	patch := client.MergeFrom(cluster.DeepCopy())
-	action(cluster)
-	if err := k8sClient.Patch(ctx, cluster, patch); err != nil {
-		return err
-	}
-	return nil
-}
-
-func changeClusterStatus(namespacedName types.NamespacedName,
-	action func(cluster *dbaasv1alpha1.Cluster)) error {
-	cluster := &dbaasv1alpha1.Cluster{}
-	if err := k8sClient.Get(ctx, namespacedName, cluster); err != nil {
-		return err
-	}
-	patch := client.MergeFrom(cluster.DeepCopy())
-	action(cluster)
-	if err := k8sClient.Status().Patch(ctx, cluster, patch); err != nil {
+	patch := client.MergeFrom(PT(pobj.DeepCopy()))
+	action(pobj)
+	if err := k8sClient.Status().Patch(ctx, pobj, patch); err != nil {
 		return err
 	}
 	return nil
 }
 
-func changeOpsRequestStatus(namespacedName types.NamespacedName,
-	action func(cluster *dbaasv1alpha1.OpsRequest)) error {
-	opsRequest := &dbaasv1alpha1.OpsRequest{}
-	if err := k8sClient.Get(ctx, namespacedName, opsRequest); err != nil {
-		return err
-	}
-	patch := client.MergeFrom(opsRequest.DeepCopy())
-	action(opsRequest)
-	if err := k8sClient.Status().Patch(ctx, opsRequest, patch); err != nil {
-		return err
-	}
-	return nil
-}
+// Helper functions to check fields of resources when writing unit tests.
+// Each helper returns a Gomega assertion function, which should be passed into
+// Eventually() or Consistently() as the first parameter.
 
-// Helper functions to get fields from state or status of resources when writing unit tests.
-// Each helper returns a Gomega assertion function, which should be passed into Eventually() as the first parameter.
+func checkObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](namespacedName types.NamespacedName,
+	check func(g Gomega, pobj PT)) func(g Gomega) {
+	return func(g Gomega) {
+		var obj T
+		pobj := PT(&obj)
+		g.Expect(k8sClient.Get(ctx, namespacedName, pobj)).To(Succeed())
+		check(g, pobj)
+	}
+}
 
 func expectClusterStatusPhase(namespacedName types.NamespacedName) func(g Gomega) dbaasv1alpha1.Phase {
 	return func(g Gomega) dbaasv1alpha1.Phase {

@@ -214,8 +214,10 @@ var _ = Describe("lifecycle_utils", func() {
 
 		It("Normal test case, and add one volume", func() {
 			volumes["my_config"] = dbaasv1alpha1.ConfigTemplate{
-				Name:       "myConfig",
-				VolumeName: "myConfigVolume",
+				Name:                "myConfig",
+				ConfigTplRef:        "myConfig",
+				ConfigConstraintRef: "myConfig",
+				VolumeName:          "myConfigVolume",
 			}
 			ps := &sts.Spec.Template.Spec
 			err := checkAndUpdatePodVolumes(ps, volumes)
@@ -225,12 +227,16 @@ var _ = Describe("lifecycle_utils", func() {
 
 		It("Normal test case, and add two volume", func() {
 			volumes["my_config"] = dbaasv1alpha1.ConfigTemplate{
-				Name:       "myConfig",
-				VolumeName: "myConfigVolume",
+				Name:                "myConfig",
+				ConfigTplRef:        "myConfig",
+				ConfigConstraintRef: "myConfig",
+				VolumeName:          "myConfigVolume",
 			}
 			volumes["my_config1"] = dbaasv1alpha1.ConfigTemplate{
-				Name:       "myConfig",
-				VolumeName: "myConfigVolume2",
+				Name:                "myConfig",
+				ConfigTplRef:        "myConfig",
+				ConfigConstraintRef: "myConfig",
+				VolumeName:          "myConfigVolume2",
 			}
 			ps := &sts.Spec.Template.Spec
 			err := checkAndUpdatePodVolumes(ps, volumes)
@@ -251,8 +257,10 @@ var _ = Describe("lifecycle_utils", func() {
 					},
 				})
 			volumes[cmName] = dbaasv1alpha1.ConfigTemplate{
-				Name:       "configTplName",
-				VolumeName: replicaVolumeName,
+				Name:                "configTplName",
+				ConfigTplRef:        "configTplName",
+				ConfigConstraintRef: "configTplName",
+				VolumeName:          replicaVolumeName,
 			}
 			ps := &sts.Spec.Template.Spec
 			Expect(checkAndUpdatePodVolumes(ps, volumes)).ShouldNot(Succeed())
@@ -276,8 +284,10 @@ var _ = Describe("lifecycle_utils", func() {
 				})
 
 			volumes[cmName] = dbaasv1alpha1.ConfigTemplate{
-				Name:       "configTplName",
-				VolumeName: replicaVolumeName,
+				Name:                "configTplName",
+				ConfigTplRef:        "configTplName",
+				ConfigConstraintRef: "configTplName",
+				VolumeName:          replicaVolumeName,
 			}
 			ps := &sts.Spec.Template.Spec
 			err := checkAndUpdatePodVolumes(ps, volumes)
@@ -304,9 +314,11 @@ spec:
   components:
   - typeName: replicasets
     componentType: Stateful
-    configTemplateRefs: 
-    - name: mysql-tree-node-template-8.0 
-      volumeName: mysql-config
+    configSpec:
+      configTemplateRefs:
+      - name: mysql-tree-node-template-8.0
+        configTplRef: mysql-tree-node-template-8.0
+        volumeName: mysql-config
     defaultReplicas: 1
     podSpec:
       containers:
@@ -330,17 +342,17 @@ spec:
           - name: "MYSQL_ROOT_PASSWORD"
             valueFrom:
               secretKeyRef:
-                name: $(OPENDBAAS_MY_SECRET_NAME)
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
                 key: password
         command: ["/usr/bin/bash", "-c"]
         args:
           - >
             cluster_info="";
-            for (( i=0; i<$OPENDBAAS_REPLICASETS_PRIMARY_N; i++ )); do
+            for (( i=0; i<$KB_REPLICASETS_PRIMARY_N; i++ )); do
               if [ $i -ne 0 ]; then
                 cluster_info="$cluster_info;";
               fi;
-              host=$(eval echo \$OPENDBAAS_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
+              host=$(eval echo \$KB_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
               cluster_info="$cluster_info$host:13306";
             done;
             idx=0;
@@ -348,7 +360,7 @@ spec:
               for i in "${ADDR[@]}"; do
                 idx=$i;
               done;
-            done <<< "$OPENDBAAS_MY_POD_NAME";
+            done <<< "$KB_POD_NAME";
             echo $idx;
             cluster_info="$cluster_info@$(($idx+1))";
             echo $cluster_info;
@@ -383,9 +395,11 @@ spec:
   clusterDefinitionRef: cluster-definition
   components:
   - type: replicasets
-    configTemplateRefs: 
-    - name: mysql-tree-node-template-8.0 
-      volumeName: mysql-config
+    configSpec:
+      configTemplateRefs:
+      - name: mysql-tree-node-template-8.0
+        configTplRef: mysql-tree-node-template-8.0
+        volumeName: mysql-config
     podSpec:
       containers:
       - name: mysql
@@ -409,17 +423,17 @@ spec:
           - name: "MYSQL_ROOT_PASSWORD"
             valueFrom:
               secretKeyRef:
-                name: $(OPENDBAAS_MY_SECRET_NAME)
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
                 key: password
         command: ["/usr/bin/bash", "-c"]
         args:
           - >
             cluster_info="";
-            for (( i=0; i<$OPENDBAAS_REPLICASETS_PRIMARY_N; i++ )); do
+            for (( i=0; i<$KB_REPLICASETS_PRIMARY_N; i++ )); do
               if [ $i -ne 0 ]; then
                 cluster_info="$cluster_info;";
               fi;
-              host=$(eval echo \$OPENDBAAS_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
+              host=$(eval echo \$KB_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
               cluster_info="$cluster_info$host:13306";
             done;
             idx=0;
@@ -427,7 +441,7 @@ spec:
               for i in "${ADDR[@]}"; do
                 idx=$i;
               done;
-            done <<< "$OPENDBAAS_MY_POD_NAME";
+            done <<< "$KB_POD_NAME";
             echo $idx;
             cluster_info="$cluster_info@$(($idx+1))";
             echo $cluster_info;

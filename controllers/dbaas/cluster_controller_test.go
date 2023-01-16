@@ -47,10 +47,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("Cluster Controller", func() {
@@ -60,6 +64,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	const leader = "leader"
 	const follower = "follower"
+	const volumeName = "data"
 
 	clusterObjKey := types.NamespacedName{
 		Name:      "my-cluster",
@@ -109,37 +114,21 @@ var _ = Describe("Cluster Controller", func() {
 		return k8sClient.Patch(ctx, sc, patch)
 	}
 
-	assureCfgTplConfigMapObj := func(cmName string) *corev1.ConfigMap {
+	assureCfgTplConfigMapObj := func() *corev1.ConfigMap {
 		By("Assuring an cm obj")
-		clusterVersionYaml := `
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: mysql-tree-node-template-8.0
-  namespace: default
-data:
-  my.cnf: |-
-    [mysqld]
-    innodb-buffer-pool-size=512M
-    log-bin=master-bin
-    gtid_mode=OFF
-    consensus_auto_leader_transfer=ON
-    
-    pid-file=/var/run/mysqld/mysqld.pid
-    socket=/var/run/mysqld/mysqld.sock
+		cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("config/configcm.yaml",
+			testdata.WithNamespace(testCtx.DefaultNamespace))
+		Expect(err).Should(Succeed())
+		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigConstraint]("config/configtpl.yaml")
+		Expect(err).Should(Succeed())
 
-    port=3306
-    general_log=0
-    server-id=1
-    slow_query_log=0
-    
-    [client]
-    socket=/var/run/mysqld/mysqld.sock
-    host=localhost
-`
-		cfgCM := &corev1.ConfigMap{}
-		Expect(yaml.Unmarshal([]byte(clusterVersionYaml), cfgCM)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, cfgTpl)).Should(Succeed())
+
+		// update phase status
+		patch := client.MergeFrom(cfgTpl.DeepCopy())
+		cfgTpl.Status.Phase = dbaasv1alpha1.AvailablePhase
+		Expect(k8sClient.Status().Patch(context.Background(), cfgTpl, patch)).Should(Succeed())
 		return cfgCM
 	}
 
@@ -155,9 +144,13 @@ spec:
   components:
   - typeName: replicasets
     componentType: Stateful
-    configTemplateRefs: 
-    - name: mysql-tree-node-template-8.0 
-      volumeName: mysql-config
+    configSpec:
+      configTemplateRefs:
+      - name: mysql-tree-node-template-8.0
+        configTplRef: mysql-tree-node-template-8.0
+        configConstraintRef: mysql-tree-node-template-8.0
+        namespace: default
+        volumeName: mysql-config
     defaultReplicas: 1
     podSpec:
       containers:
@@ -232,9 +225,13 @@ spec:
   clusterDefinitionRef: cluster-definition
   components:
   - type: replicasets
-    configTemplateRefs: 
-    - name: mysql-tree-node-template-8.0 
-      volumeName: mysql-config
+    configSpec:
+      configTemplateRefs:
+      - name: mysql-tree-node-template-8.0
+        configTplRef: mysql-tree-node-template-8.0
+        configConstraintRef: mysql-tree-node-template-8.0
+        namespace: default
+        volumeName: mysql-config
     podSpec:
       containers:
       - name: mysql
@@ -257,7 +254,7 @@ spec:
 	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, types.NamespacedName) {
 		// setup Cluster obj required default ClusterDefinition and ClusterVersion objects if not provided
 		if clusterDefObj == nil {
-			assureCfgTplConfigMapObj("")
+			assureCfgTplConfigMapObj()
 			clusterDefObj = assureClusterDefObj()
 		}
 		if clusterVersionObj == nil {
@@ -458,7 +455,7 @@ spec:
 	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, types.NamespacedName) {
 		// setup Cluster obj required default ClusterDefinition and ClusterVersion objects if not provided
 		if clusterDefObj == nil {
-			assureCfgTplConfigMapObj("")
+			assureCfgTplConfigMapObj()
 			clusterDefObj = assureClusterDefWithConsensusObj()
 		}
 		if clusterVersionObj == nil {
@@ -486,7 +483,7 @@ spec:
 						Type: "replicasets",
 						VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{
 							{
-								Name: "data",
+								Name: volumeName,
 								Spec: &corev1.PersistentVolumeClaimSpec{
 									AccessModes: []corev1.PersistentVolumeAccessMode{
 										corev1.ReadWriteOnce,
@@ -643,7 +640,7 @@ spec:
 			_, _, _, key := createClusterNCheck()
 
 			By("Update the cluster's termination policy to DoNotTerminate")
-			Expect(changeCluster(key, func(cluster *dbaasv1alpha1.Cluster) {
+			Expect(changeSpec(key, func(cluster *dbaasv1alpha1.Cluster) {
 				cluster.Spec.TerminationPolicy = dbaasv1alpha1.DoNotTerminate
 			})).Should(Succeed())
 
@@ -656,14 +653,15 @@ spec:
 			checkClusterDoNotTerminate := func(g Gomega) {
 				fetched := &dbaasv1alpha1.Cluster{}
 				g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
-				g.Expect(fetched.Status.Phase == dbaasv1alpha1.DeletingPhase).To(BeTrue())
+				g.Expect(strings.Contains(fetched.Status.Message,
+					fmt.Sprintf("spec.terminationPolicy %s is preventing deletion.", fetched.Spec.TerminationPolicy)))
 				g.Expect(len(fetched.Finalizers) > 0).To(BeTrue())
 			}
 			Eventually(checkClusterDoNotTerminate, timeout, interval).Should(Succeed())
 			Consistently(checkClusterDoNotTerminate, waitDuration, interval).Should(Succeed())
 
 			By("Update the cluster's termination policy to WipeOut")
-			Expect(changeCluster(key, func(cluster *dbaasv1alpha1.Cluster) {
+			Expect(changeSpec(key, func(cluster *dbaasv1alpha1.Cluster) {
 				cluster.Spec.TerminationPolicy = dbaasv1alpha1.WipeOut
 			})).Should(Succeed())
 
@@ -676,7 +674,7 @@ spec:
 	})
 
 	changeClusterReplicas := func(clusterName types.NamespacedName, replicas int32) error {
-		return changeCluster(clusterName, func(cluster *dbaasv1alpha1.Cluster) {
+		return changeSpec(clusterName, func(cluster *dbaasv1alpha1.Cluster) {
 			if cluster.Spec.Components == nil || len(cluster.Spec.Components) == 0 {
 				cluster.Spec.Components = []dbaasv1alpha1.ClusterComponent{
 					{
@@ -744,10 +742,166 @@ spec:
 		})
 	})
 
-	Context("When horizontal scaling", func() {
-		It("Should create backup resources accordingly", func() {
+	createCustomizedClusterNCheck := func(customizeCluster func(toCreate *dbaasv1alpha1.Cluster)) (
+		*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, types.NamespacedName) {
+		By("Creating a cluster")
+		toCreate, cd, clusterVersion, key := newClusterObj(nil, nil)
+		customizeCluster(toCreate)
+		Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
+		fetchedG1 := &dbaasv1alpha1.Cluster{}
+		Eventually(func(g Gomega) {
+			g.Expect(k8sClient.Get(ctx, key, fetchedG1)).To(Succeed())
+			g.Expect(fetchedG1.Status.ObservedGeneration == 1).To(BeTrue())
+		}, timeout, interval).Should(Succeed())
+
+		return fetchedG1, cd, clusterVersion, key
+	}
+
+	Context("When horizontal scaling out a cluster", func() {
+		It("Should trigger a backup process(snapshot) and "+
+			"create pvcs from backup for newly created replicas", func() {
+			compName := "replicasets"
+
+			By("Creating a cluster with VolumeClaimTemplate")
+			var pvcSpec corev1.PersistentVolumeClaimSpec
+			pvcSpec.AccessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
+			pvcSpec.Resources.Requests = corev1.ResourceList{
+				corev1.ResourceStorage: resource.MustParse("1Gi"),
+			}
+			initialReplicas := int32(1)
+			_, clusterDef, _, key := createCustomizedClusterNCheck(func(toCreate *dbaasv1alpha1.Cluster) {
+				toCreate.Spec.Components = []dbaasv1alpha1.ClusterComponent{{
+					Name:     compName,
+					Type:     compName,
+					Replicas: &initialReplicas,
+					VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{{
+						Name: volumeName,
+						Spec: &pvcSpec,
+					}},
+				}}
+			})
+
+			By("Set HorizontalScalePolicy")
+			Expect(changeSpec(intctrlutil.GetNamespacedName(clusterDef),
+				func(clusterDef *dbaasv1alpha1.ClusterDefinition) {
+					clusterDef.Spec.Components[0].HorizontalScalePolicy =
+						&dbaasv1alpha1.HorizontalScalePolicy{Type: dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot}
+				}))
+
+			By("Creating a BackupPolicyTemplate")
+			backupPolicyTplKey := types.NamespacedName{Name: "test-backup-policy-template-mysql"}
+			backupPolicyTemplateYaml := fmt.Sprintf(`
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupPolicyTemplate
+metadata:
+  name: %s
+  labels:
+    clusterdefinition.kubeblocks.io/name: %s
+spec:
+  schedule: "0 2 * * *"
+  ttl: 168h0m0s
+  # !!DISCUSS Number of backup retries on fail.
+  onFailAttempted: 3
+  hooks:
+    ContainerName: mysql
+    image: rancher/kubectl:v1.23.7
+    preCommands:
+    - touch /data/mysql/data/.restore; sync
+  backupToolName: mysql-xtrabackup
+`, backupPolicyTplKey.Name, clusterDef.Name)
+			backupPolicyTemplate := dataprotectionv1alpha1.BackupPolicyTemplate{}
+			Expect(yaml.Unmarshal([]byte(backupPolicyTemplateYaml), &backupPolicyTemplate)).Should(Succeed())
+			Expect(testCtx.CheckedCreateObj(ctx, &backupPolicyTemplate)).Should(Succeed())
+
+			By("Creating PVC for the first replica")
+			for i := 0; i < int(initialReplicas); i++ {
+				pvcYAML := fmt.Sprintf(`
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: %s-%s-%s-%d
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: test-sc
+  volumeMode: Filesystem
+  volumeName: test-pvc
+`, volumeName, key.Name, compName, i)
+				pvc := corev1.PersistentVolumeClaim{}
+				Expect(yaml.Unmarshal([]byte(pvcYAML), &pvc)).Should(Succeed())
+				Expect(k8sClient.Create(ctx, &pvc)).Should(Succeed())
+			}
+
+			stsList := listAndCheckStatefulSet(key)
+			Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(initialReplicas))
+
+			updatedReplicas := int32(3)
+			By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
+			Expect(changeClusterReplicas(key, updatedReplicas)).Should(Succeed())
+
+			By("Checking BackupJob created")
+			Eventually(func() bool {
+				backupJobList := dataprotectionv1alpha1.BackupJobList{}
+				Expect(k8sClient.List(ctx, &backupJobList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				return len(backupJobList.Items) == 1
+			}, timeout, interval).Should(BeTrue())
+
+			By("Mocking VolumeSnapshot and set it as ReadyToUse")
+			snapshotKey := types.NamespacedName{Name: fmt.Sprintf("%s-%s-scaling",
+				key.Name, compName), Namespace: "default"}
+			pvcName := fmt.Sprintf("%s-%s-%s-0", volumeName, key.Name, compName)
+			volumeSnapshotYaml := fmt.Sprintf(`
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: %s
+  namespace: %s
+  labels:
+    app.kubernetes.io/created-by: kubeblocks
+    app.kubernetes.io/instance: %s
+    app.kubernetes.io/component-name: %s
+spec:
+  source:
+    persistentVolumeClaimName: %s
+`, snapshotKey.Name, snapshotKey.Namespace, key.Name, compName, pvcName)
+			volumeSnapshot := snapshotv1.VolumeSnapshot{}
+			Expect(yaml.Unmarshal([]byte(volumeSnapshotYaml), &volumeSnapshot)).Should(Succeed())
+			Expect(testCtx.CheckedCreateObj(ctx, &volumeSnapshot)).Should(Succeed())
+			readyToUse := true
+			volumeSnapshotStatus := snapshotv1.VolumeSnapshotStatus{ReadyToUse: &readyToUse}
+			volumeSnapshot.Status = &volumeSnapshotStatus
+			Expect(k8sClient.Status().Update(ctx, &volumeSnapshot)).Should(Succeed())
+
+			By("Checking cluster status and the number of replicas changed")
+			Eventually(func(g Gomega) {
+				fetched := &dbaasv1alpha1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
+				g.Expect(fetched.Status.ObservedGeneration == 2).To(BeTrue())
+			}, timeout, interval).Should(Succeed())
+			stsList = listAndCheckStatefulSet(key)
+			Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(updatedReplicas))
+
+			By("Deleting the cluster")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	// TODO move integration tests(which relies on a real K8s cluster) out of UT
+	Context("When horizontal scaling in real env", func() {
+		It("Should create backup resources accordingly", func() {
 			useExistingCluster, _ := strconv.ParseBool(os.Getenv("USE_EXISTING_CLUSTER"))
+			if !useExistingCluster {
+				return
+			}
 
 			configTplKey := types.NamespacedName{Name: "test-mysql-3node-tpl-8.0", Namespace: "default"}
 			configTplYAML := fmt.Sprintf(`
@@ -821,6 +975,7 @@ spec:
         builtIn: false
       configTemplateRefs:
         - name: %s
+          configTplRef: %s
           volumeName: mysql-config
       componentType: Consensus
       consensusSpec:
@@ -946,12 +1101,11 @@ spec:
                 - path: "annotations"
                   fieldRef:
                     fieldPath: metadata.annotations
-`, clusterDefKey.Name, configTplKey.Name)
+`, clusterDefKey.Name, configTplKey.Name, configTplKey.Name)
 			clusterDef := &dbaasv1alpha1.ClusterDefinition{}
 			Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDef)).Should(Succeed())
-			if useExistingCluster {
-				clusterDef.Spec.Components[0].HorizontalScalePolicy = &dbaasv1alpha1.HorizontalScalePolicy{Type: "Snapshot"}
-			}
+			clusterDef.Spec.Components[0].HorizontalScalePolicy =
+				&dbaasv1alpha1.HorizontalScalePolicy{Type: dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot}
 			Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
 
 			By("Create real ClusterVersion")
@@ -1117,6 +1271,14 @@ spec:
 			fetchedG1.Spec.Components[0].Replicas = &updatedReplicas
 			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
 
+			Eventually(func() bool {
+				backupJobList := dataprotectionv1alpha1.BackupJobList{}
+				Expect(k8sClient.List(ctx, &backupJobList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				return len(backupJobList.Items) == 1
+			}, timeout, interval).Should(BeTrue())
+
 			fetchedG2 := &dbaasv1alpha1.Cluster{}
 			Eventually(func() bool {
 				_ = k8sClient.Get(ctx, key, fetchedG2)
@@ -1163,15 +1325,13 @@ spec:
 				return fetchedG3.Status.ObservedGeneration == 3
 			}, timeout, interval).Should(BeTrue())
 
-			if useExistingCluster {
-				Eventually(func() bool {
-					backupJobList := dataprotectionv1alpha1.BackupJobList{}
-					Expect(k8sClient.List(ctx, &backupJobList, client.MatchingLabels{
-						"app.kubernetes.io/instance": key.Name,
-					}, client.InNamespace(key.Namespace))).Should(Succeed())
-					return len(backupJobList.Items) == 1
-				}, timeout, interval).Should(BeTrue())
-			}
+			Eventually(func() bool {
+				backupJobList := dataprotectionv1alpha1.BackupJobList{}
+				Expect(k8sClient.List(ctx, &backupJobList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				return len(backupJobList.Items) == 1
+			}, timeout, interval).Should(BeTrue())
 
 			Eventually(func() bool {
 				Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
@@ -1265,6 +1425,120 @@ spec:
 
 	Context("When updating cluster PVC storage size", func() {
 		It("Should update PVC request storage size accordingly", func() {
+
+			By("Mock a StorageClass which allows resize")
+			StorageClassYaml := `
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+   name: sc-mock
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+`
+			storageClass := &storagev1.StorageClass{}
+			Expect(yaml.Unmarshal([]byte(StorageClassYaml), storageClass)).Should(Succeed())
+			Expect(testCtx.CheckedCreateObj(ctx, storageClass)).Should(Succeed())
+
+			By("Creating a cluster with volume claim")
+			replicas := int32(2)
+			toCreate, _, _, key := newClusterObj(nil, nil)
+			toCreate.Spec.Components = make([]dbaasv1alpha1.ClusterComponent, 1)
+			toCreate.Spec.Components[0] = dbaasv1alpha1.ClusterComponent{
+				Name:     "replicasets",
+				Type:     "replicasets",
+				Replicas: &replicas,
+				VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{{
+					Name: volumeName,
+					Spec: &corev1.PersistentVolumeClaimSpec{
+						AccessModes: []corev1.PersistentVolumeAccessMode{
+							corev1.ReadWriteOnce,
+						},
+						StorageClassName: &storageClass.Name,
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse("1Gi"),
+							},
+						},
+					}},
+				},
+			}
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				fetchedG1 := &dbaasv1alpha1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, key, fetchedG1)).To(Succeed())
+				g.Expect(fetchedG1.Status.ObservedGeneration == 1).To(BeTrue())
+			}, timeout, interval).Should(Succeed())
+
+			By("Checking the replicas")
+			stsList := listAndCheckStatefulSet(key)
+			sts := &stsList.Items[0]
+			Expect(*sts.Spec.Replicas == replicas).Should(BeTrue())
+
+			By("Mock PVCs in Bound Status")
+			for i := 0; i < int(replicas); i++ {
+				pvcYAML := fmt.Sprintf(`
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: %s-%s-%d
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: %s
+`, volumeName, sts.Name, i, storageClass.Name)
+				pvc := corev1.PersistentVolumeClaim{}
+				Expect(yaml.Unmarshal([]byte(pvcYAML), &pvc)).Should(Succeed())
+				Expect(k8sClient.Create(ctx, &pvc)).Should(Succeed())
+				pvc.Status.Phase = corev1.ClaimBound // only bound pvc allows resize
+				Expect(k8sClient.Status().Update(ctx, &pvc)).Should(Succeed())
+			}
+
+			By("Updating the PVC storage size")
+			newStorageValue := resource.MustParse("2Gi")
+			Expect(changeSpec(key, func(cluster *dbaasv1alpha1.Cluster) {
+				comp := &cluster.Spec.Components[0]
+				comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
+			})).Should(Succeed())
+
+			By("Checking the resize operation finished")
+			Eventually(func(g Gomega) {
+				fetchedG2 := &dbaasv1alpha1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, key, fetchedG2)).To(Succeed())
+				g.Expect(fetchedG2.Status.ObservedGeneration == 2).To(BeTrue())
+			}, timeout*2, interval).Should(Succeed())
+
+			By("Checking PVCs are resized")
+			stsList = listAndCheckStatefulSet(key)
+			for _, sts := range stsList.Items {
+				for _, vct := range sts.Spec.VolumeClaimTemplates {
+					for i := *sts.Spec.Replicas - 1; i >= 0; i-- {
+						pvc := &corev1.PersistentVolumeClaim{}
+						pvcKey := types.NamespacedName{
+							Namespace: key.Namespace,
+							Name:      fmt.Sprintf("%s-%s-%d", vct.Name, sts.Name, i),
+						}
+						Expect(k8sClient.Get(ctx, pvcKey, pvc)).Should(Succeed())
+						Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(newStorageValue))
+					}
+				}
+			}
+
+			By("Deleting the cluster")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout*2, interval).Should(Succeed())
+		})
+	})
+
+	// TODO move integration tests(which relies on a real K8s cluster) out of UT
+	Context("When updating cluster PVC storage size in real K8s cluster", func() {
+		It("Should update PVC request storage size accordingly", func() {
 			By("Checking available storageclasses")
 			scList := &storagev1.StorageClassList{}
 			defaultStorageClass := &storagev1.StorageClass{}
@@ -1299,7 +1573,7 @@ spec:
 				Type: "replicasets",
 				VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{
 					{
-						Name: "data",
+						Name: volumeName,
 						Spec: &corev1.PersistentVolumeClaimSpec{
 							AccessModes: []corev1.PersistentVolumeAccessMode{
 								corev1.ReadWriteOnce,
@@ -1401,54 +1675,182 @@ spec:
 		})
 	})
 
-	// Consensus associate test cases
+	mockPodsForConsensusTest := func(cluster *dbaasv1alpha1.Cluster, number int) []corev1.Pod {
+		podYaml := `
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    controller-revision-hash: mock-version
+  name: my-name
+  namespace: default
+spec:
+  containers:
+  - args:
+    command:
+    - /bin/bash
+    - -c
+    env:
+    - name: KB_POD_NAME
+      valueFrom:
+        fieldRef:
+          apiVersion: v1
+          fieldPath: metadata.name
+    - name: KB_REPLICASETS_N
+      value: "3"
+    - name: KB_REPLICASETS_0_HOSTNAME
+      value: clusterepuglf-wesql-test-0
+    - name: KB_REPLICASETS_1_HOSTNAME
+      value: clusterepuglf-wesql-test-1
+    - name: KB_REPLICASETS_2_HOSTNAME
+      value: clusterepuglf-wesql-test-2
+    image: docker.io/apecloud/wesql-server:latest
+    imagePullPolicy: IfNotPresent
+    name: mysql
+    ports:
+    - containerPort: 3306
+      name: mysql
+      protocol: TCP
+    - containerPort: 13306
+      name: paxos
+      protocol: TCP
+    volumeMounts:
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-2rhsb
+      readOnly: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  restartPolicy: Always
+  serviceAccount: default
+  serviceAccountName: default
+
+  volumes:
+  - name: kube-api-access-2rhsb
+    projected:
+      defaultMode: 420
+      sources:
+      - serviceAccountToken:
+          expirationSeconds: 3607
+          path: token
+      - configMap:
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: kube-root-ca.crt
+      - downwardAPI:
+          items:
+          - fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+            path: namespace
+`
+		pods := make([]corev1.Pod, 0)
+		componentName := cluster.Spec.Components[0].Name
+		clusterName := cluster.Name
+		stsName := cluster.Name + "-" + componentName
+		for i := 0; i < number; i++ {
+			pod := corev1.Pod{}
+			Expect(yaml.Unmarshal([]byte(podYaml), &pod)).Should(Succeed())
+			pod.Name = stsName + "-" + strconv.Itoa(i)
+			pod.Labels[intctrlutil.AppInstanceLabelKey] = clusterName
+			pod.Labels[intctrlutil.AppComponentLabelKey] = componentName
+			pods = append(pods, pod)
+		}
+
+		return pods
+	}
+
+	mockRoleChangedEvent := func(key types.NamespacedName, sts *appsv1.StatefulSet) []corev1.Event {
+		eventYaml := `
+apiVersion: v1
+kind: Event
+metadata:
+  name: myevent
+  namespace: default
+type: Warning
+reason: Unhealthy
+reportingComponent: ""
+message: 'Readiness probe failed: {"event":"roleUnchanged","originalRole":"Leader","role":"Follower"}'
+involvedObject:
+  apiVersion: v1
+  fieldPath: spec.containers{kb-rolechangedcheck}
+  kind: Pod
+  name: wesql-main-2
+  namespace: default
+`
+		pods, err := consensusset.GetPodListByStatefulSet(ctx, k8sClient, sts)
+		Expect(err).To(Succeed())
+
+		events := make([]corev1.Event, 0)
+		for _, pod := range pods {
+			event := corev1.Event{}
+			Expect(yaml.Unmarshal([]byte(eventYaml), &event)).Should(Succeed())
+			event.Name = pod.Name + "-event"
+			event.InvolvedObject.Name = pod.Name
+			event.InvolvedObject.UID = pod.UID
+			events = append(events, event)
+		}
+		events[0].Message = `Readiness probe failed: {"event":"roleUnchanged","originalRole":"Leader","role":"Leader"}`
+		return events
+	}
+
+	getStsPodsName := func(sts *appsv1.StatefulSet) []string {
+		pods, err := consensusset.GetPodListByStatefulSet(ctx, k8sClient, sts)
+		Expect(err).To(Succeed())
+
+		names := make([]string, 0)
+		for _, pod := range pods {
+			names = append(names, pod.Name)
+		}
+		return names
+	}
+
 	Context("When creating cluster with componentType = Consensus", func() {
 		It("Should success with: "+
 			"1 pod with 'leader' role label set, "+
 			"2 pods with 'follower' role label set,"+
 			"1 service routes to 'leader' pod", func() {
 			By("Creating a cluster with componentType = Consensus")
+			replicas := 3
+
 			toCreate, _, _, key := newClusterWithConsensusObj(nil, nil)
 			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
-			By("Waiting the cluster is created")
-			cluster := &dbaasv1alpha1.Cluster{}
+			By("Waiting for cluster creation")
+			Eventually(func(g Gomega) {
+				fetched := &dbaasv1alpha1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
+				g.Expect(fetched.Status.ObservedGeneration == 1).To(BeTrue())
+			}, timeout, interval).Should(Succeed())
 
-			// TODO: testEnv doesn't support pod creation yet. remove the following codes when it does
-			if testEnv.UseExistingCluster == nil || !*testEnv.UseExistingCluster {
-				// create fake pods of StatefulSet
-				pods := createFakePod(toCreate, 3)
-				for _, pod := range pods {
-					Expect(testCtx.CreateObj(ctx, &pod)).Should(Succeed())
-				}
+			stsList := listAndCheckStatefulSet(key)
+			sts := &stsList.Items[0]
 
-				stsList := listAndCheckStatefulSet(key)
-				sts := &stsList.Items[0]
-				events := createFakeRoleChangedEvent(key, sts)
-				for _, event := range events {
-					Expect(testCtx.CreateObj(ctx, &event)).Should(Succeed())
-				}
-				// fake pods and stateful set creation done
-				time.Sleep(interval * 5)
+			By("Creating mock pods in StatefulSet")
+			pods := mockPodsForConsensusTest(toCreate, replicas)
+			for _, pod := range pods {
+				Expect(testCtx.CreateObj(ctx, &pod)).Should(Succeed())
+				// mock the status to pass the isReady(pod) check in consensus_set
+				pod.Status.Conditions = []corev1.PodCondition{{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionTrue,
+				}}
+				Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
+			}
 
-				Eventually(func() bool {
-					if err := k8sClient.Get(ctx, key, cluster); err != nil {
-						return false
-					}
-					return cluster.Status.Phase == dbaasv1alpha1.CreatingPhase
-				}, timeout*3, interval*5).Should(BeTrue())
+			By("Creating mock role changed events")
+			// pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] will be filled with the role
+			events := mockRoleChangedEvent(key, sts)
+			for _, event := range events {
+				Expect(testCtx.CreateObj(ctx, &event)).Should(Succeed())
+			}
 
-				podList := &corev1.PodList{}
-				Expect(k8sClient.List(ctx, podList, client.InNamespace(key.Namespace))).Should(Succeed())
-				pods = make([]corev1.Pod, 0)
-				for _, pod := range podList.Items {
-					if util.IsMemberOf(sts, &pod) {
-						pods = append(pods, pod)
-					}
-				}
-
+			By("Checking pods' role are changed accordingly")
+			Eventually(func(g Gomega) {
+				pods, err := consensusset.GetPodListByStatefulSet(ctx, k8sClient, sts)
+				g.Expect(err).To(Succeed())
 				// should have 3 pods
-				Expect(len(pods)).Should(Equal(3))
+				g.Expect(len(pods)).To(Equal(3))
 				// 1 leader
 				// 2 followers
 				leaderCount, followerCount := 0, 0
@@ -1460,21 +1862,68 @@ spec:
 						followerCount++
 					}
 				}
-				Expect(leaderCount).Should(Equal(1))
-				Expect(followerCount).Should(Equal(2))
+				g.Expect(leaderCount).Should(Equal(1))
+				g.Expect(followerCount).Should(Equal(2))
+			}, timeout, interval).Should(Succeed())
 
+			By("Updating StatefulSet's status")
+			sts.Status.UpdateRevision = "mock-version"
+			sts.Status.Replicas = int32(replicas)
+			sts.Status.AvailableReplicas = int32(replicas)
+			sts.Status.CurrentReplicas = int32(replicas)
+			sts.Status.ReadyReplicas = int32(replicas)
+			sts.Status.ObservedGeneration = sts.Generation
+			Expect(k8sClient.Status().Update(ctx, sts)).Should(Succeed())
+
+			By("Checking pods' role are updated in cluster status")
+			Eventually(func(g Gomega) {
+				fetched := &dbaasv1alpha1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
+				compName := fetched.Spec.Components[0].Name
+				g.Expect(fetched.Status.Components != nil).To(BeTrue())
+				g.Expect(fetched.Status.Components).To(HaveKey(compName))
+				consensusStatus := fetched.Status.Components[compName].ConsensusSetStatus
+				g.Expect(consensusStatus != nil).To(BeTrue())
+				g.Expect(consensusStatus.Leader.Pod).To(BeElementOf(getStsPodsName(sts)))
+				g.Expect(len(consensusStatus.Followers) == 2).To(BeTrue())
+				g.Expect(consensusStatus.Followers[0].Pod).To(BeElementOf(getStsPodsName(sts)))
+				g.Expect(consensusStatus.Followers[1].Pod).To(BeElementOf(getStsPodsName(sts)))
+			}, timeout, interval).Should(Succeed())
+
+			By("Waiting the cluster be running")
+			Eventually(func(g Gomega) {
+				fetched := &dbaasv1alpha1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
+				g.Expect(fetched.Status.Phase == dbaasv1alpha1.RunningPhase).To(BeTrue())
+			}, timeout, interval).Should(Succeed())
+
+			By("Deleting the cluster")
+			Eventually(func() error {
+				return deleteClusterNWait(key)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	// TODO move integration tests(which relies on a real K8s cluster) out of UT
+	Context("When creating cluster with componentType = Consensus in real K8s cluster", func() {
+		It("Should success with: "+
+			"1 pod with 'leader' role label set, "+
+			"2 pods with 'follower' role label set,"+
+			"1 service routes to 'leader' pod", func() {
+			if !testCtx.UsingExistingCluster() {
 				return
 			}
-			// end remove
 
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, key, cluster)
-				if err != nil {
-					return false
-				}
+			By("Creating a cluster with componentType = Consensus")
+			toCreate, _, _, key := newClusterWithConsensusObj(nil, nil)
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
 
-				return cluster.Status.Phase == dbaasv1alpha1.RunningPhase
-			}, timeout*3, interval*5).Should(BeTrue())
+			By("Waiting the cluster is created")
+			Eventually(func(g Gomega) {
+				fetched := &dbaasv1alpha1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
+				g.Expect(fetched.Status.Phase == dbaasv1alpha1.RunningPhase).To(BeTrue())
+			}, timeout*3, interval*5).Should(Succeed())
 
 			By("Checking pods' role label")
 			ip := getLocalIP()
@@ -1507,15 +1956,8 @@ spec:
 
 			stsList := listAndCheckStatefulSet(key)
 			sts := &stsList.Items[0]
-			podList := &corev1.PodList{}
-			Expect(k8sClient.List(ctx, podList, client.InNamespace(key.Namespace))).Should(Succeed())
-			pods := make([]corev1.Pod, 0)
-			for _, pod := range podList.Items {
-				if util.IsMemberOf(sts, &pod) {
-					pods = append(pods, pod)
-				}
-			}
-
+			pods, err := consensusset.GetPodListByStatefulSet(ctx, k8sClient, sts)
+			Expect(err).To(Succeed())
 			// should have 3 pods
 			Expect(len(pods)).Should(Equal(3))
 			// 1 leader
@@ -1553,13 +1995,13 @@ spec:
 			}
 			Expect(k8sClient.Delete(ctx, leaderPod)).Should(Succeed())
 			time.Sleep(interval * 2)
-			Eventually(func() bool {
-				Expect(k8sClient.Get(ctx, types.NamespacedName{
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{
 					Namespace: sts.Namespace,
 					Name:      sts.Name,
-				}, sts)).Should(Succeed())
-				return sts.Status.AvailableReplicas == 3
-			}, timeout, interval).Should(BeTrue())
+				}, sts)).To(Succeed())
+				g.Expect(sts.Status.AvailableReplicas == 3).To(BeTrue())
+			}, timeout, interval).Should(Succeed())
 
 			time.Sleep(interval * 2)
 			Expect(observeRoleOfServiceLoop(&svc)).Should(Equal(leader))
@@ -1716,8 +2158,13 @@ spec:
 		})
 	})
 
-	Context("When creating cluster with components", func() {
+	// TODO move integration tests(which relies on a real K8s cluster) out of UT
+	Context("When creating cluster with components in real K8s", func() {
 		It("Should create cluster with running status", func() {
+			if !testCtx.UsingExistingCluster() {
+				return
+			}
+
 			By("Checking the controller-manager status")
 			if !isCMAvailable() {
 				By("The controller-manager is not available, test skipped")
@@ -1752,130 +2199,6 @@ spec:
 		})
 	})
 })
-
-func createFakeRoleChangedEvent(key types.NamespacedName, sts *appsv1.StatefulSet) []corev1.Event {
-	eventYaml := `
-apiVersion: v1
-kind: Event
-metadata:
-  name: myevent
-  namespace: default
-type: Warning
-reason: Unhealthy
-reportingComponent: ""
-message: 'Readiness probe failed: {"event":"roleUnchanged","originalRole":"Leader","role":"Follower"}'
-involvedObject:
-  apiVersion: v1
-  fieldPath: spec.containers{kb-rolechangedcheck}
-  kind: Pod
-  name: wesql-main-2
-  namespace: default
-`
-	podList := &corev1.PodList{}
-	Expect(k8sClient.List(ctx, podList, client.InNamespace(key.Namespace))).Should(Succeed())
-	pods := make([]corev1.Pod, 0)
-	for _, pod := range podList.Items {
-		if util.IsMemberOf(sts, &pod) {
-			pods = append(pods, pod)
-		}
-	}
-	events := make([]corev1.Event, 0)
-	for _, pod := range pods {
-		event := corev1.Event{}
-		Expect(yaml.Unmarshal([]byte(eventYaml), &event)).Should(Succeed())
-		event.Name = pod.Name + "-event"
-		event.InvolvedObject.Name = pod.Name
-		event.InvolvedObject.UID = pod.UID
-		events = append(events, event)
-	}
-	events[0].Message = `Readiness probe failed: {"event":"roleUnchanged","originalRole":"Leader","role":"Leader"}`
-	return events
-}
-
-func createFakePod(cluster *dbaasv1alpha1.Cluster, number int) []corev1.Pod {
-	podYaml := `
-apiVersion: v1
-kind: Pod
-metadata:
-  labels:
-    controller-revision-hash: wesql-test-859d7565b6
-  name: my-name
-  namespace: default
-spec:
-  containers:
-  - args:
-    command:
-    - /bin/bash
-    - -c
-    env:
-    - name: KB_POD_NAME
-      valueFrom:
-        fieldRef:
-          apiVersion: v1
-          fieldPath: metadata.name
-    - name: KB_REPLICASETS_N
-      value: "3"
-    - name: KB_REPLICASETS_0_HOSTNAME
-      value: clusterepuglf-wesql-test-0
-    - name: KB_REPLICASETS_1_HOSTNAME
-      value: clusterepuglf-wesql-test-1
-    - name: KB_REPLICASETS_2_HOSTNAME
-      value: clusterepuglf-wesql-test-2
-    image: docker.io/apecloud/wesql-server:latest
-    imagePullPolicy: IfNotPresent
-    name: mysql
-    ports:
-    - containerPort: 3306
-      name: mysql
-      protocol: TCP
-    - containerPort: 13306
-      name: paxos
-      protocol: TCP
-    volumeMounts:
-    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-      name: kube-api-access-2rhsb
-      readOnly: true
-  dnsPolicy: ClusterFirst
-  enableServiceLinks: true
-  restartPolicy: Always
-  serviceAccount: default
-  serviceAccountName: default
-  
-  volumes:
-  - name: kube-api-access-2rhsb
-    projected:
-      defaultMode: 420
-      sources:
-      - serviceAccountToken:
-          expirationSeconds: 3607
-          path: token
-      - configMap:
-          items:
-          - key: ca.crt
-            path: ca.crt
-          name: kube-root-ca.crt
-      - downwardAPI:
-          items:
-          - fieldRef:
-              apiVersion: v1
-              fieldPath: metadata.namespace
-            path: namespace
-`
-	pods := make([]corev1.Pod, 0)
-	componentName := cluster.Spec.Components[0].Name
-	clusterName := cluster.Name
-	stsName := cluster.Name + "-" + componentName
-	for i := 0; i < number; i++ {
-		pod := corev1.Pod{}
-		Expect(yaml.Unmarshal([]byte(podYaml), &pod)).Should(Succeed())
-		pod.Name = stsName + "-" + strconv.Itoa(i)
-		pod.Labels[intctrlutil.AppInstanceLabelKey] = clusterName
-		pod.Labels[intctrlutil.AppComponentLabelKey] = componentName
-		pods = append(pods, pod)
-	}
-
-	return pods
-}
 
 const (
 	// configurations to connect to Mysql, either a data source name represent by URL.

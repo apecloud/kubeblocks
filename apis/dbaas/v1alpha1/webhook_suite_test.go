@@ -28,8 +28,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
-	admissionv1 "k8s.io/api/admissionregistration/v1"
+	admissionv1 "k8s.io/api/admission/v1"
+	admissionregv1 "k8s.io/api/admissionregistration/v1"
 
 	//+kubebuilder:scaffold:imports
 	"github.com/spf13/viper"
@@ -99,10 +99,10 @@ var _ = BeforeSuite(func() {
 	err = AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = admissionv1beta1.AddToScheme(scheme)
+	err = admissionv1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = admissionv1.AddToScheme(scheme)
+	err = admissionregv1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
@@ -165,12 +165,12 @@ var _ = BeforeSuite(func() {
 var _ = AfterSuite(func() {
 
 	By("cleanup webhook configuration")
-	validatingWebhook := &admissionv1.ValidatingWebhookConfiguration{}
+	validatingWebhook := &admissionregv1.ValidatingWebhookConfiguration{}
 	validatingWebhook.Name = "validating-webhook-configuration"
 	err := k8sClient.Delete(ctx, validatingWebhook)
 	Expect(err).NotTo(HaveOccurred())
 
-	mutatingWebhook := &admissionv1.MutatingWebhookConfiguration{}
+	mutatingWebhook := &admissionregv1.MutatingWebhookConfiguration{}
 	mutatingWebhook.Name = "mutating-webhook-configuration"
 	err = k8sClient.Delete(ctx, mutatingWebhook)
 	Expect(err).NotTo(HaveOccurred())

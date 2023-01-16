@@ -130,6 +130,7 @@ spec:
       - name: nginx
 `
 		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
+
 		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, clusterDefinition)).Should(Succeed())
 		return clusterDefinition
@@ -269,7 +270,7 @@ spec:
 			verticalScalingOpsRequest.Spec.VerticalScalingList = []dbaasv1alpha1.VerticalScaling{
 				{
 					ComponentOps: dbaasv1alpha1.ComponentOps{ComponentName: clusterObj.Spec.Components[0].Name}, // "wesql"
-					ResourceRequirements: &corev1.ResourceRequirements{
+					ResourceRequirements: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							"cpu":    resource.MustParse("400m"),
 							"memory": resource.MustParse("300Mi"),
@@ -293,12 +294,10 @@ spec:
 				timeout, interval).Should(Equal(dbaasv1alpha1.SucceedPhase))
 
 			By("check cluster resource requirements changed")
-			Eventually(func(g Gomega) {
-				fetchedCluster := &dbaasv1alpha1.Cluster{}
-				g.Expect(k8sClient.Get(ctx, key, fetchedCluster)).To(Succeed())
-				g.Expect(fetchedCluster.Spec.Components[0].Resources.Requests).To(Equal(
+			Eventually(checkObj(key, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
+				g.Expect(fetched.Spec.Components[0].Resources.Requests).To(Equal(
 					verticalScalingOpsRequest.Spec.VerticalScalingList[0].Requests))
-			}, timeout, interval).Should(Succeed())
+			}), timeout, interval).Should(Succeed())
 
 			By("test deleteClusterOpsRequestAnnotation function")
 			opsReconciler := OpsRequestReconciler{Client: k8sClient}
@@ -318,15 +317,15 @@ spec:
 })
 
 func mockOpsRequestSucceed(namespacedName types.NamespacedName) error {
-	return changeOpsRequestStatus(namespacedName,
+	return changeStatus(namespacedName,
 		func(or *dbaasv1alpha1.OpsRequest) {
 			or.Status.Phase = dbaasv1alpha1.SucceedPhase
-			or.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
+			or.Status.CompletionTimestamp = metav1.Time{Time: time.Now()}
 		})
 }
 
 func mockSetClusterStatusPhaseToRunning(namespacedName types.NamespacedName) error {
-	return changeClusterStatus(namespacedName,
+	return changeStatus(namespacedName,
 		func(c *dbaasv1alpha1.Cluster) {
 			c.Status.Phase = dbaasv1alpha1.RunningPhase
 			for componentKey, componentStatus := range c.Status.Components {

@@ -18,6 +18,7 @@ package dbaas
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 
@@ -173,6 +174,15 @@ func getEnvByName(args interface{}, envName string) (string, error) {
 	return "", nil
 }
 
+// getContainerMemory for general built-in
+func getContainerMemory(args interface{}) (int64, error) {
+	container, err := fromJSONObject[corev1.Container](args)
+	if err != nil {
+		return 0, err
+	}
+	return intctrlutil.GetMemorySize(*container), nil
+}
+
 // getArgByName for general built-in
 func getArgByName(args interface{}, argName string) string {
 	// TODO Support parse command args
@@ -216,13 +226,17 @@ func getAvailableContainerPorts(containers []corev1.Container, containerPorts []
 		return nil, err
 	}
 
-	iterAvailPort := func(p int32) int32 {
+	iterAvailPort := func(p int32) (int32, error) {
+		sentinel := p
 		for {
 			if _, ok := set[p]; !ok {
 				set[p] = true
-				return p
+				return p, nil
 			}
 			p++
+			if p == sentinel {
+				return -1, errors.New("no available port for container")
+			}
 			if p <= 0 || p > 65536 {
 				p = 1024
 			}
@@ -230,7 +244,9 @@ func getAvailableContainerPorts(containers []corev1.Container, containerPorts []
 	}
 
 	for i, p := range containerPorts {
-		containerPorts[i] = iterAvailPort(p)
+		if containerPorts[i], err = iterAvailPort(p); err != nil {
+			return []int32{}, err
+		}
 	}
 	return containerPorts, nil
 }
@@ -275,4 +291,17 @@ func fromJSONArray[T corev1.Container | corev1.Volume](args interface{}) ([]T, e
 	}
 
 	return list, nil
+}
+
+func getEnvReplacementMapForConnCrential(clusterName string) map[string]string {
+	return map[string]string{
+		"$(CONN_CREDENTIAL_SECRET_NAME)": fmt.Sprintf("%s-conn-credential", clusterName),
+	}
+}
+
+func getEnvReplacementMapForAccount(name, passwd string) map[string]string {
+	return map[string]string{
+		"$(USERNAME)": name,
+		"$(PASSWD)":   passwd,
+	}
 }

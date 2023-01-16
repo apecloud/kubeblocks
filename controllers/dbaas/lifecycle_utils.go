@@ -21,6 +21,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sethvargo/go-password/password"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/maps"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -39,9 +41,15 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
+	cfgutil "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -75,42 +83,6 @@ func getCacheCUETplValue(key string, valueCreator func() (*intctrlutil.CUETpl, e
 	}
 	cacheCtx[key] = v
 	return v, err
-}
-
-// mergeConfigTemplates merge ClusterVersion.Components[*].ConfigTemplateRefs and ClusterDefinition.Components[*].ConfigTemplateRefs
-func mergeConfigTemplates(clusterVersionTpl []dbaasv1alpha1.ConfigTemplate,
-	cdTpl []dbaasv1alpha1.ConfigTemplate) []dbaasv1alpha1.ConfigTemplate {
-	if len(clusterVersionTpl) == 0 {
-		return cdTpl
-	}
-
-	if len(cdTpl) == 0 {
-		return clusterVersionTpl
-	}
-
-	mergedCfgTpl := make([]dbaasv1alpha1.ConfigTemplate, 0, len(clusterVersionTpl)+len(cdTpl))
-	mergedTplMap := make(map[string]struct{}, cap(mergedCfgTpl))
-
-	for i := range clusterVersionTpl {
-		if _, ok := (mergedTplMap)[clusterVersionTpl[i].VolumeName]; ok {
-			// TODO: following error should be checked in validation webhook and record Warning event
-			// return nil, fmt.Errorf("ConfigTemplate require not same volumeName [%s]", clusterVersionTpl[i].Name)
-			continue
-		}
-		mergedCfgTpl = append(mergedCfgTpl, clusterVersionTpl[i])
-		mergedTplMap[clusterVersionTpl[i].VolumeName] = struct{}{}
-	}
-
-	for i := range cdTpl {
-		// ClusterVersion replace clusterDefinition
-		if _, ok := (mergedTplMap)[cdTpl[i].VolumeName]; ok {
-			continue
-		}
-		mergedCfgTpl = append(mergedCfgTpl, cdTpl[i])
-		mergedTplMap[cdTpl[i].VolumeName] = struct{}{}
-	}
-
-	return mergedCfgTpl
 }
 
 func getContainerByName(containers []corev1.Container, name string) (int, *corev1.Container) {
@@ -280,6 +252,8 @@ func mergeMonitorConfig(
 	}
 }
 
+// mergeComponents generates a new Component object, which is a mixture of
+// component-related configs from input Cluster, ClusterDef and ClusterVersion.
 func mergeComponents(
 	reqCtx intctrlutil.RequestCtx,
 	cluster *dbaasv1alpha1.Cluster,
@@ -309,7 +283,6 @@ func mergeComponents(
 		Service:               clusterDefCompObj.Service,
 		Probes:                clusterDefCompObj.Probes,
 		LogConfigs:            clusterDefCompObj.LogConfigs,
-		ConfigTemplates:       clusterDefCompObj.ConfigTemplateRefs,
 		HorizontalScalePolicy: clusterDefCompObj.HorizontalScalePolicy,
 	}
 
@@ -375,8 +348,12 @@ func mergeComponents(
 		}
 	}
 
+	if clusterDefCompObj.ConfigSpec != nil {
+		component.ConfigTemplates = clusterDefCompObj.ConfigSpec.ConfigTemplateRefs
+	}
+
 	if clusterVersionComp != nil {
-		component.ConfigTemplates = mergeConfigTemplates(clusterVersionComp.ConfigTemplateRefs, component.ConfigTemplates)
+		component.ConfigTemplates = operations.MergeConfigTemplates(clusterVersionComp.ConfigTemplateRefs, component.ConfigTemplates)
 		if clusterVersionComp.PodSpec != nil {
 			for _, c := range clusterVersionComp.PodSpec.Containers {
 				doContainerAttrOverride(c)
@@ -439,7 +416,7 @@ func mergeComponents(
 	if err != nil {
 		reqCtx.Log.Error(err, "build probe container failed.")
 	}
-	replaceValues(cluster, component)
+	replacePlaceholderTokens(cluster, component)
 
 	return component
 }
@@ -471,10 +448,8 @@ func getComponent(componentList []Component, name string) *Component {
 	return nil
 }
 
-func replaceValues(cluster *dbaasv1alpha1.Cluster, component *Component) {
-	namedValues := map[string]string{
-		"$(CONN_CREDENTIAL_SECRET_NAME)": fmt.Sprintf("%s-conn-credential", cluster.GetName()),
-	}
+func replacePlaceholderTokens(cluster *dbaasv1alpha1.Cluster, component *Component) {
+	namedValues := getEnvReplacementMapForConnCrential(cluster.GetName())
 
 	// replace env[].valueFrom.secretKeyRef.name variables
 	for _, cc := range [][]corev1.Container{component.PodSpec.InitContainers, component.PodSpec.Containers} {
@@ -520,15 +495,15 @@ func createCluster(
 		return false, err
 	}
 
-	clusterDefComp := clusterDefinition.Spec.Components
-	clusterCompTypes := cluster.GetTypeMappingComponents()
+	clusterDefComps := clusterDefinition.Spec.Components
+	clusterCompMap := cluster.GetTypeMappingComponents()
 
 	// add default component if unspecified in Cluster.spec.components
-	for _, c := range clusterDefComp {
+	for _, c := range clusterDefComps {
 		if c.DefaultReplicas <= 0 {
 			continue
 		}
-		if _, ok := clusterCompTypes[c.TypeName]; ok {
+		if _, ok := clusterCompMap[c.TypeName]; ok {
 			continue
 		}
 		r := c.DefaultReplicas
@@ -539,8 +514,8 @@ func createCluster(
 		})
 	}
 
-	appCompTypes := clusterVersion.GetTypeMappingComponents()
-	clusterCompTypes = cluster.GetTypeMappingComponents()
+	clusterCompMap = cluster.GetTypeMappingComponents()
+	clusterVersionCompMap := clusterVersion.GetTypeMappingComponents()
 
 	prepareComp := func(component *Component) error {
 		iParams := params
@@ -548,12 +523,12 @@ func createCluster(
 		return prepareComponentObjs(reqCtx, cli, &iParams)
 	}
 
-	for _, c := range clusterDefComp {
+	for _, c := range clusterDefComps {
 		typeName := c.TypeName
-		clusterVersionComponent := appCompTypes[typeName]
-		clusterComps := clusterCompTypes[typeName]
+		clusterVersionComp := clusterVersionCompMap[typeName]
+		clusterComps := clusterCompMap[typeName]
 		for _, clusterComp := range clusterComps {
-			if err := prepareComp(mergeComponents(reqCtx, cluster, clusterDefinition, &c, clusterVersionComponent, &clusterComp)); err != nil {
+			if err := prepareComp(mergeComponents(reqCtx, cluster, clusterDefinition, &c, clusterVersionComp, &clusterComp)); err != nil {
 				return false, err
 			}
 		}
@@ -605,6 +580,9 @@ func needBuildPDB(params *createParams) bool {
 	return existsPDBSpec(params.component.PodDisruptionBudgetSpec)
 }
 
+// prepareComponentObjs generate all necessary sub-resources objects used in component,
+// like Secret, ConfigMap, Service, StatefulSet, Deployment, Volume, PodDisruptionBudget etc.
+// Generated resources are cached in (obj.(*createParams)).applyObjs.
 func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) error {
 	params, ok := obj.(*createParams)
 	if !ok {
@@ -878,7 +856,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		cleanBackupResourcesIfNeeded := func() error {
 			if component.HorizontalScalePolicy == nil ||
 				component.HorizontalScalePolicy.Type != dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot ||
-				isSnapshotAvailable(cli, ctx) {
+				!isSnapshotAvailable(cli, ctx) {
 				return nil
 			}
 			// if all pvc bounded, clean backup resources
@@ -912,8 +890,10 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		tempAnnotations := stsObj.Spec.Template.Annotations
 		stsObj.Spec.Template = stsProto.Spec.Template
 		// keep the original template annotations.
-		// if annotations exist and are replaced, the statefulSet will be updated
-		stsObj.Spec.Template.Annotations = tempAnnotations
+		// if annotations exist and are replaced, the statefulSet will be updated.
+		if restartAnnotation, ok := tempAnnotations[intctrlutil.RestartAnnotationKey]; ok {
+			stsObj.Spec.Template.Annotations[intctrlutil.RestartAnnotationKey] = restartAnnotation
+		}
 		stsObj.Spec.Replicas = stsProto.Spec.Replicas
 		stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
 		if err := cli.Update(ctx, stsObj); err != nil {
@@ -1336,10 +1316,13 @@ func buildCfg(params createParams,
 	volumes := make(map[string]dbaasv1alpha1.ConfigTemplate, len(tpls))
 	// TODO Support Update ClusterVersionRef of Cluster
 	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
+	cfgLables := make(map[string]string, len(tpls))
 	for _, tpl := range tpls {
 		// Check config cm already exists
-		cmName := getInstanceCMName(obj, &tpl)
+		cmName := cfgcore.GetInstanceCMName(obj, &tpl)
 		volumes[cmName] = tpl
+		// Configuration.kubeblocks.io/cfg-tpl-${ctpl-name}: ${cm-instance-name}
+		cfgLables[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = cmName
 		isExist, err := isAlreadyExists(cmName, params.cluster.Namespace, ctx, cli)
 		if err != nil {
 			return nil, err
@@ -1361,9 +1344,146 @@ func buildCfg(params createParams,
 		}
 		configs = append(configs, cm)
 	}
+	if sts, ok := obj.(*appsv1.StatefulSet); ok {
+		updateStatefulLabelsWithTemplate(sts, cfgLables)
+	}
 
 	// Generate Pod Volumes for ConfigMap objects
-	return configs, checkAndUpdatePodVolumes(podSpec, volumes)
+	if err := checkAndUpdatePodVolumes(podSpec, volumes); err != nil {
+		return nil, cfgcore.WrapError(err, "failed to generate pod volume")
+	}
+
+	if err := updateConfigurationManagerWithComponent(params, podSpec, tpls, ctx, cli); err != nil {
+		return nil, cfgcore.WrapError(err, "failed to generate sidecar for configmap's reloader")
+	}
+
+	return configs, nil
+}
+
+func updateConfigurationManagerWithComponent(
+	params createParams,
+	podSpec *corev1.PodSpec,
+	cfgTemplates []dbaasv1alpha1.ConfigTemplate,
+	ctx context.Context,
+	cli client.Client) error {
+	var (
+		firstCfg        = 0
+		usingContainers []*corev1.Container
+
+		defaultVarRunVolumePath = "/var/run"
+		criEndpointVolumeName   = "cri-runtime-endpoint"
+		// criRuntimeEndpoint      = viper.GetString(cfgcore.CRIRuntimeEndpoint)
+		// criType                 = viper.GetString(cfgcore.ConfigCRIType)
+	)
+
+	reloadOptions, err := cfgutil.GetReloadOptions(cli, ctx, cfgTemplates)
+	if err != nil {
+		return err
+	}
+	if reloadOptions == nil {
+		return nil
+	}
+	if reloadOptions.UnixSignalTrigger == nil {
+		// TODO support other reload type
+		log.Log.Info("only unix signal type is supported!")
+		return nil
+	}
+
+	// Ignore useless configtemplate
+	for i, tpl := range cfgTemplates {
+		usingContainers = intctrlutil.GetPodContainerWithVolumeMount(podSpec, tpl.VolumeName)
+		if len(usingContainers) > 0 {
+			firstCfg = i
+			break
+		}
+	}
+
+	// No container using any config template
+	if len(usingContainers) == 0 {
+		log.Log.Info(fmt.Sprintf("tpl config is not used by any container, and pass. tpl configs: %v", cfgTemplates))
+		return nil
+	}
+
+	// Find first container using
+	// Find out which configurations are used by the container
+	volumeDirs := make([]corev1.VolumeMount, 0, len(cfgTemplates)+1)
+	container := usingContainers[0]
+	for i := firstCfg; i < len(cfgTemplates); i++ {
+		tpl := cfgTemplates[i]
+		// Ignore config template, e.g scripts configmap
+		if !cfgutil.NeedReloadVolume(tpl) {
+			continue
+		}
+		volume := intctrlutil.GetVolumeMountByVolume(container, tpl.VolumeName)
+		if volume != nil {
+			volumeDirs = append(volumeDirs, *volume)
+		}
+	}
+
+	// If you do not need to watch any configmap volume
+	if len(volumeDirs) == 0 {
+		log.Log.Info(fmt.Sprintf("volume for configmap is not used by any container, and pass. cm name: %v", cfgTemplates[firstCfg]))
+		return nil
+	}
+
+	unixSignalOption := reloadOptions.UnixSignalTrigger
+	configManagerArgs := cfgcm.BuildSignalArgs(*unixSignalOption, volumeDirs)
+
+	mountPath := defaultVarRunVolumePath
+	managerSidecar := &cfgcm.ConfigManagerSidecar{
+		ManagerName: cfgcore.ConfigSidecarName,
+		Image:       viper.GetString(cfgcore.ConfigSidecarIMAGE),
+		Args:        configManagerArgs,
+		// add cri sock path
+		Volumes: append(volumeDirs, corev1.VolumeMount{
+			Name:      criEndpointVolumeName,
+			MountPath: mountPath,
+		}),
+	}
+
+	if container, err = buildCfgManagerContainer(params, managerSidecar); err != nil {
+		return err
+	}
+
+	podVolumes := podSpec.Volumes
+	podVolumes, _ = intctrlutil.CheckAndUpdateVolume(podVolumes, criEndpointVolumeName, func(volumeName string) corev1.Volume {
+		return corev1.Volume{
+			Name: volumeName,
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: mountPath,
+				},
+			},
+		}
+	}, nil)
+	podSpec.Volumes = podVolumes
+
+	// Add sidecar to podTemplate
+	podSpec.Containers = append(podSpec.Containers, *container)
+
+	// This sidecar container will be able to view and signal processes from other containers
+	podSpec.ShareProcessNamespace = func() *bool { b := true; return &b }()
+	return nil
+}
+
+func updateStatefulLabelsWithTemplate(sts *appsv1.StatefulSet, allLabels map[string]string) {
+	// full configmap upgrade
+	existLabels := make(map[string]string)
+	for key, val := range sts.Labels {
+		if strings.HasPrefix(key, cfgcore.ConfigurationTplLabelPrefixKey) {
+			existLabels[key] = val
+		}
+	}
+
+	// delete not exist configmap label
+	deletedLabels := cfgcore.MapKeyDifference(existLabels, allLabels)
+	for l := range deletedLabels.Iter() {
+		delete(sts.Labels, l)
+	}
+
+	for key, val := range allLabels {
+		sts.Labels[key] = val
+	}
 }
 
 func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
@@ -1376,14 +1496,21 @@ func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
 	for j := 0; j < int(params.component.Replicas); j++ {
 		envData[prefix+strconv.Itoa(j)+"_HOSTNAME"] = fmt.Sprintf("%s.%s", params.cluster.Name+"-"+params.component.Name+"-"+strconv.Itoa(j), svcName)
 	}
+	// TODO following code seems to be redundant with updateConsensusRoleInfo in consensus_set_utils.go
 	// build consensus env from cluster.status
 	if params.cluster.Status.Components != nil {
-		if v, ok := params.cluster.Status.Components[params.component.Type]; ok {
+		if v, ok := params.cluster.Status.Components[params.component.Name]; ok {
 			consensusSetStatus := v.ConsensusSetStatus
 			if consensusSetStatus != nil {
-				envData[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
+				if consensusSetStatus.Leader.Pod != consensusset.ConsensusSetStatusDefaultPodName {
+					envData[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
+				}
+
 				followers := ""
 				for _, follower := range consensusSetStatus.Followers {
+					if follower.Pod == consensusset.ConsensusSetStatusDefaultPodName {
+						continue
+					}
 					if len(followers) > 0 {
 						followers += ","
 					}
@@ -1411,9 +1538,12 @@ func checkAndUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]dbaasv
 		err        error
 		podVolumes = podSpec.Volumes
 	)
-
+	// sort the volumes
+	volumeKeys := maps.Keys(volumes)
+	sort.Strings(volumeKeys)
 	// Update PodTemplate Volumes
-	for cmName, tpl := range volumes {
+	for _, cmName := range volumeKeys {
+		tpl := volumes[cmName]
 		if podVolumes, err = intctrlutil.CheckAndUpdateVolume(podVolumes, tpl.VolumeName, func(volumeName string) corev1.Volume {
 			return corev1.Volume{
 				Name: volumeName,
@@ -1459,11 +1589,6 @@ func isAlreadyExists(cmName string, namespace string, ctx context.Context, cli c
 	return true, nil
 }
 
-// {{statefull.Name}}-{{clusterVersion.Name}}-{{tpl.Name}}-"config"
-func getInstanceCMName(obj client.Object, tpl *dbaasv1alpha1.ConfigTemplate) string {
-	return fmt.Sprintf("%s-%s", obj.GetName(), tpl.VolumeName)
-}
-
 // generateConfigMapFromTpl render config file by config template provided by provider.
 func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder,
 	cmName string,
@@ -1473,21 +1598,20 @@ func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder,
 	cli client.Client) (*corev1.ConfigMap, error) {
 	// Render config template by TplEngine
 	// The template namespace must be the same as the ClusterDefinition namespace
-	configs, err := processConfigMapTemplate(ctx, cli, tplBuilder, client.ObjectKey{
-		Namespace: tplCfg.Namespace,
-		Name:      tplCfg.Name,
-	})
+	configs, err := processConfigMapTemplate(ctx, cli, tplBuilder, tplCfg)
 	if err != nil {
 		return nil, err
 	}
 
 	// Using ConfigMap cue template render to configmap of config
-	return generateConfigMapWithTemplate(configs, params, cmName, tplCfg.Name)
+	return buildConfigMapWithTemplate(configs, params, cmName, tplCfg)
 }
 
-func generateConfigMapWithTemplate(configs map[string]string,
+func buildConfigMapWithTemplate(
+	configs map[string]string,
 	params createParams,
-	cmName, templateName string) (*corev1.ConfigMap, error) {
+	cmName string,
+	tplCfg dbaasv1alpha1.ConfigTemplate) (*corev1.ConfigMap, error) {
 	const tplFile = "config_template.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
@@ -1509,10 +1633,12 @@ func generateConfigMapWithTemplate(configs map[string]string,
 			"namespace": params.cluster.GetNamespace(),
 		},
 		"component": {
-			"name":         params.component.Name,
-			"type":         params.component.Type,
-			"configName":   cmName,
-			"templateName": templateName,
+			"name":                  params.component.Name,
+			"type":                  params.component.Type,
+			"configName":            cmName,
+			"templateName":          tplCfg.ConfigTplRef,
+			"configConstraintsName": tplCfg.ConfigConstraintRef,
+			"configTemplateName":    tplCfg.Name,
 		},
 	}
 	configBytes, err := json.Marshal(configMeta)
@@ -1540,14 +1666,57 @@ func generateConfigMapWithTemplate(configs map[string]string,
 	return &cm, nil
 }
 
+func buildCfgManagerContainer(params createParams, sidecarRenderedParam *cfgcm.ConfigManagerSidecar) (*corev1.Container, error) {
+	const tplFile = "config_manager_sidecar.cue"
+	cueFS, _ := debme.FS(CueTemplates, "cue")
+	cueTpl, err := getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplFile))
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+	paramBytes, err := json.Marshal(sidecarRenderedParam)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = cueValue.Fill("parameter", paramBytes); err != nil {
+		return nil, err
+	}
+
+	containerStrByte, err := cueValue.Lookup("template")
+	if err != nil {
+		return nil, err
+	}
+	container := corev1.Container{}
+	if err = json.Unmarshal(containerStrByte, &container); err != nil {
+		return nil, err
+	}
+	return &container, nil
+}
+
 // processConfigMapTemplate Render config file using template engine
-func processConfigMapTemplate(ctx context.Context,
-	cli client.Client,
-	tplBuilder *configTemplateBuilder,
-	cmKey client.ObjectKey) (map[string]string, error) {
+func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder *configTemplateBuilder, tplCfg dbaasv1alpha1.ConfigTemplate) (map[string]string, error) {
+	cfgTemplate := &dbaasv1alpha1.ConfigConstraint{}
+	if len(tplCfg.ConfigConstraintRef) > 0 {
+		if err := cli.Get(ctx, client.ObjectKey{
+			Namespace: "",
+			Name:      tplCfg.ConfigConstraintRef,
+		}, cfgTemplate); err != nil {
+			return nil, cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", tplCfg)
+		}
+	}
+
+	// NOTE: not require checker configuration template status
+	configChecker := cfgcore.NewConfigValidator(&cfgTemplate.Spec)
 	cmObj := &corev1.ConfigMap{}
 	//  Require template configmap exist
-	if err := cli.Get(ctx, cmKey, cmObj); err != nil {
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: tplCfg.Namespace,
+		Name:      tplCfg.ConfigTplRef,
+	}, cmObj); err != nil {
 		return nil, err
 	}
 
@@ -1555,8 +1724,18 @@ func processConfigMapTemplate(ctx context.Context,
 		return map[string]string{}, nil
 	}
 
-	tplBuilder.setTplName(cmKey.Name)
-	return tplBuilder.render(cmObj.Data)
+	tplBuilder.setTplName(tplCfg.ConfigTplRef)
+	renderedCfg, err := tplBuilder.render(cmObj.Data)
+	if err != nil {
+		return nil, cfgcore.WrapError(err, "failed to render configmap")
+	}
+
+	// NOTE: It is necessary to verify the correctness of the data
+	if err := configChecker.Validate(renderedCfg); err != nil {
+		return nil, cfgcore.WrapError(err, "failed to validate configmap")
+	}
+
+	return renderedCfg, nil
 }
 
 // createBackup create backup resources required to do backup,
@@ -1779,7 +1958,7 @@ func isVolumeSnapshotReadyToUse(cli client.Client,
 	if err := cli.List(ctx, &vsList, ml); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
-	if len(vsList.Items) == 0 {
+	if len(vsList.Items) == 0 || vsList.Items[0].Status == nil {
 		return false, nil
 	}
 	return *vsList.Items[0].Status.ReadyToUse, nil

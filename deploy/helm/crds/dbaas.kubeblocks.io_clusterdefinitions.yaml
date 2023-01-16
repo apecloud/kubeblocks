@@ -55,18 +55,18 @@ spec:
                 description: List of components belonging to the cluster.
                 items:
                   description: ClusterDefinitionComponent is a group of pods, pods
-                    in one component usually share the same data
+                    belong to same component usually share the same data
                   properties:
                     antiAffinity:
                       default: false
                       description: antiAffinity defines components should have anti-affinity
-                        constraint to same component type.
+                        constraint for pods with same component type.
                       type: boolean
                     characterType:
-                      description: CharacterType defines well-known database component
-                        name, such as mongos(mongodb), proxy(redis), wesql(mysql)
-                        DBaas will generate proper monitor configs for wellknown CharacterType
-                        when BuiltIn is true.
+                      description: characterType defines well-known database component
+                        name, such as mongos(mongodb), proxy(redis), mariadb(mysql)
+                        KubeBlocks will generate proper monitor configs for well-known
+                        characterType when builtIn is true.
                       type: string
                     componentType:
                       default: Stateless
@@ -77,53 +77,70 @@ spec:
                       - Stateful
                       - Consensus
                       type: string
-                    configTemplateRefs:
-                      description: The configTemplateRefs field provided by provider,
-                        and finally this configTemplateRefs will be rendered into
-                        the user's own configuration file according to the user's
-                        cluster.
-                      items:
-                        properties:
-                          defaultMode:
-                            description: 'defaultMode is optional: mode bits used
-                              to set permissions on created files by default. Must
-                              be an octal value between 0000 and 0777 or a decimal
-                              value between 0 and 511. YAML accepts both octal and
-                              decimal values, JSON requires decimal values for mode
-                              bits. Defaults to 0644. Directories within the path
-                              are not affected by this setting. This might be in conflict
-                              with other options that affect the file mode, like fsGroup,
-                              and the result can be other mode bits set.'
-                            format: int32
-                            type: integer
-                          name:
-                            description: Specify the name of the referenced the configuration
-                              template ConfigMap object.
-                            maxLength: 63
-                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                            type: string
-                          namespace:
-                            default: default
-                            description: Specify the namespace of the referenced the
-                              configuration template ConfigMap object. An empty namespace
-                              is equivalent to the "default" namespace.
-                            maxLength: 63
-                            type: string
-                          volumeName:
-                            description: VolumeName is the volume name of PodTemplate,
-                              which the configuration file produced through the configuration
-                              template will be mounted to the corresponding volume.
-                              The volume name must be defined in podSpec.containers[*].volumeMounts.
-                            maxLength: 32
-                            type: string
-                        required:
-                        - name
-                        - volumeName
-                        type: object
-                      type: array
-                      x-kubernetes-list-map-keys:
-                      - name
-                      x-kubernetes-list-type: map
+                    configSpec:
+                      description: configSpec defines configuration related spec.
+                      properties:
+                        configTemplateRefs:
+                          description: The configTemplateRefs field provided by provider,
+                            and finally this configTemplateRefs will be rendered into
+                            the user's own configuration file according to the user's
+                            cluster.
+                          items:
+                            properties:
+                              configConstraintRef:
+                                description: Specify the name of the referenced the
+                                  configuration constraints object.
+                                maxLength: 63
+                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                type: string
+                              configTplRef:
+                                description: Specify the name of the referenced the
+                                  configuration template ConfigMap object.
+                                maxLength: 63
+                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                type: string
+                              defaultMode:
+                                description: 'defaultMode is optional: mode bits used
+                                  to set permissions on created files by default.
+                                  Must be an octal value between 0000 and 0777 or
+                                  a decimal value between 0 and 511. YAML accepts
+                                  both octal and decimal values, JSON requires decimal
+                                  values for mode bits. Defaults to 0644. Directories
+                                  within the path are not affected by this setting.
+                                  This might be in conflict with other options that
+                                  affect the file mode, like fsGroup, and the result
+                                  can be other mode bits set.'
+                                format: int32
+                                type: integer
+                              name:
+                                description: Specify the name of configuration template.
+                                maxLength: 63
+                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                type: string
+                              namespace:
+                                default: default
+                                description: Specify the namespace of the referenced
+                                  the configuration template ConfigMap object. An
+                                  empty namespace is equivalent to the "default" namespace.
+                                maxLength: 63
+                                type: string
+                              volumeName:
+                                description: VolumeName is the volume name of PodTemplate,
+                                  which the configuration file produced through the
+                                  configuration template will be mounted to the corresponding
+                                  volume. The volume name must be defined in podSpec.containers[*].volumeMounts.
+                                maxLength: 32
+                                type: string
+                            required:
+                            - configTplRef
+                            - name
+                            - volumeName
+                            type: object
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
+                      type: object
                     consensusSpec:
                       description: consensusSpec defines consensus related spec if
                         componentType is Consensus, required if componentType is Consensus.
@@ -236,8 +253,8 @@ spec:
                       type: object
                     defaultReplicas:
                       default: 0
-                      description: DefaultReplicas default replicas in this component
-                        if user not specify.
+                      description: defaultReplicas default replicas in this component
+                        when not specified.
                       format: int32
                       minimum: 0
                       type: integer
@@ -275,19 +292,19 @@ spec:
                           type: string
                       type: object
                     logConfigs:
-                      description: LogConfigs is detail log file config which provided
+                      description: logConfigs is detail log file config which provided
                         by provider.
                       items:
                         properties:
                           filePathPattern:
-                            description: FilePathPattern log file path pattern which
+                            description: filePathPattern log file path pattern which
                               indicate how to find this file corresponding to variable
                               (log path) in database kernel. please don't set this
                               casually.
                             maxLength: 4096
                             type: string
                           name:
-                            description: Name log type name, such as slow for MySQL
+                            description: name log type name, such as slow for MySQL
                               slow log file.
                             maxLength: 128
                             type: string
@@ -300,34 +317,34 @@ spec:
                       - name
                       x-kubernetes-list-type: map
                     maxReplicas:
-                      description: MaxReplicas maximum replicas pod for component
+                      description: maxReplicas maximum replicas pod for component
                         pod count.
                       format: int32
                       minimum: 0
                       type: integer
                     minReplicas:
                       default: 0
-                      description: MinReplicas minimum replicas for component pod
+                      description: minReplicas minimum replicas for component pod
                         count.
                       format: int32
                       minimum: 0
                       type: integer
                     monitor:
-                      description: Monitor is monitoring config which provided by
+                      description: monitor is monitoring config which provided by
                         provider.
                       properties:
                         builtIn:
                           default: false
-                          description: BuiltIn is a switch to enable KubeBlocks builtIn
-                            monitoring. If BuiltIn is true and CharacterType is wellknown,
+                          description: builtIn is a switch to enable KubeBlocks builtIn
+                            monitoring. If BuiltIn is true and CharacterType is well-known,
                             ExporterConfig and Sidecar container will generate automatically.
-                            Otherwise, provider should set BuiltIn to false and provide
+                            Otherwise, provider should set builtIn to false and provide
                             ExporterConfig and Sidecar container own.
                           type: boolean
                         exporterConfig:
-                          description: Exporter provided by provider, which specify
-                            necessary information to Time Series Database. ExporterConfig
-                            is valid when BuiltIn is false.
+                          description: exporterConfig provided by provider, which
+                            specify necessary information to Time Series Database.
+                            exporterConfig is valid when builtIn is false.
                           properties:
                             scrapePath:
                               default: /metrics
@@ -347,7 +364,7 @@ spec:
                           type: object
                       type: object
                     pdbSpec:
-                      description: PDBSpec pod disruption budget spec. This is mutually
+                      description: pdbSpec pod disruption budget spec. This is mutually
                         exclusive with the component type of Consensus.
                       properties:
                         maxUnavailable:
@@ -1949,13 +1966,13 @@ spec:
                                 type: string
                               ports:
                                 description: List of ports to expose from the container.
-                                  Exposing a port here gives the system additional
-                                  information about the network connections a container
-                                  uses, but is primarily informational. Not specifying
-                                  a port here DOES NOT prevent that port from being
-                                  exposed. Any port which is listening on the default
-                                  "0.0.0.0" address inside a container will be accessible
-                                  from the network. Cannot be updated.
+                                  Not specifying a port here DOES NOT prevent that
+                                  port from being exposed. Any port which is listening
+                                  on the default "0.0.0.0" address inside a container
+                                  will be accessible from the network. Modifying this
+                                  array with strategic merge patch may corrupt the
+                                  data. For more information See https://github.com/kubernetes/kubernetes/issues/108255.
+                                  Cannot be updated.
                                 items:
                                   description: ContainerPort represents a network
                                     port in a single container.
@@ -2734,9 +2751,7 @@ spec:
                             list cannot be specified when creating a pod, and it cannot
                             be modified by updating the pod spec. In order to add
                             an ephemeral container to an existing pod, use the pod's
-                            ephemeralcontainers subresource. This field is beta-level
-                            and available on clusters that haven't disabled the EphemeralContainers
-                            feature gate.
+                            ephemeralcontainers subresource.
                           items:
                             description: "An EphemeralContainer is a temporary container
                               that you may add to an existing Pod for user-initiated
@@ -2747,9 +2762,7 @@ spec:
                               container causes the Pod to exceed its resource allocation.
                               \n To add an ephemeral container, use the ephemeralcontainers
                               subresource of an existing Pod. Ephemeral containers
-                              may not be removed or restarted. \n This is a beta feature
-                              available on clusters that haven't disabled the EphemeralContainers
-                              feature gate."
+                              may not be removed or restarted."
                             properties:
                               args:
                                 description: 'Arguments to the entrypoint. The image''s
@@ -4094,6 +4107,19 @@ spec:
                           description: 'Use the host''s pid namespace. Optional: Default
                             to false.'
                           type: boolean
+                        hostUsers:
+                          description: 'Use the host''s user namespace. Optional:
+                            Default to true. If set to true or not present, the pod
+                            will be run in the host user namespace, useful for when
+                            the pod needs a feature only available to the host user
+                            namespace, such as loading a kernel module with CAP_SYS_MODULE.
+                            When set to false, a new userns is created for the pod.
+                            Setting false is useful for mitigating container breakout
+                            vulnerabilities even allowing users to run their containers
+                            as root without actually having root privileges on the
+                            host. This field is alpha-level and is only honored by
+                            servers that enable the UserNamespacesSupport feature.'
+                          type: boolean
                         hostname:
                           description: Specifies the hostname of the Pod If not specified,
                             the pod's hostname will be set to a system-defined value.
@@ -4728,13 +4754,13 @@ spec:
                                 type: string
                               ports:
                                 description: List of ports to expose from the container.
-                                  Exposing a port here gives the system additional
-                                  information about the network connections a container
-                                  uses, but is primarily informational. Not specifying
-                                  a port here DOES NOT prevent that port from being
-                                  exposed. Any port which is listening on the default
-                                  "0.0.0.0" address inside a container will be accessible
-                                  from the network. Cannot be updated.
+                                  Not specifying a port here DOES NOT prevent that
+                                  port from being exposed. Any port which is listening
+                                  on the default "0.0.0.0" address inside a container
+                                  will be accessible from the network. Modifying this
+                                  array with strategic merge patch may corrupt the
+                                  data. For more information See https://github.com/kubernetes/kubernetes/issues/108255.
+                                  Cannot be updated.
                                 items:
                                   description: ContainerPort represents a network
                                     port in a single container.
@@ -5475,18 +5501,17 @@ spec:
                             is set. \n If the OS field is set to linux, the following
                             fields must be unset: -securityContext.windowsOptions
                             \n If the OS field is set to windows, following fields
-                            must be unset: - spec.hostPID - spec.hostIPC - spec.securityContext.seLinuxOptions
-                            - spec.securityContext.seccompProfile - spec.securityContext.fsGroup
-                            - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls
-                            - spec.shareProcessNamespace - spec.securityContext.runAsUser
-                            - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups
-                            - spec.containers[*].securityContext.seLinuxOptions -
-                            spec.containers[*].securityContext.seccompProfile - spec.containers[*].securityContext.capabilities
-                            - spec.containers[*].securityContext.readOnlyRootFilesystem
+                            must be unset: - spec.hostPID - spec.hostIPC - spec.hostUsers
+                            - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile
+                            - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy
+                            - spec.securityContext.sysctls - spec.shareProcessNamespace
+                            - spec.securityContext.runAsUser - spec.securityContext.runAsGroup
+                            - spec.securityContext.supplementalGroups - spec.containers[*].securityContext.seLinuxOptions
+                            - spec.containers[*].securityContext.seccompProfile -
+                            spec.containers[*].securityContext.capabilities - spec.containers[*].securityContext.readOnlyRootFilesystem
                             - spec.containers[*].securityContext.privileged - spec.containers[*].securityContext.allowPrivilegeEscalation
                             - spec.containers[*].securityContext.procMount - spec.containers[*].securityContext.runAsUser
-                            - spec.containers[*].securityContext.runAsGroup This is
-                            a beta field and requires the IdentifyPodOS feature"
+                            - spec.containers[*].securityContext.runAsGroup"
                           properties:
                             name:
                               description: 'Name is the name of the operating system.
@@ -5909,6 +5934,20 @@ spec:
                                       The requirements are ANDed.
                                     type: object
                                 type: object
+                              matchLabelKeys:
+                                description: MatchLabelKeys is a set of pod label
+                                  keys to select the pods over which spreading will
+                                  be calculated. The keys are used to lookup values
+                                  from the incoming pod labels, those key-value labels
+                                  are ANDed with labelSelector to select the group
+                                  of existing pods over which spreading will be calculated
+                                  for the incoming pod. Keys that don't exist in the
+                                  incoming pod labels will be ignored. A null or empty
+                                  list means only match against labelSelector.
+                                items:
+                                  type: string
+                                type: array
+                                x-kubernetes-list-type: atomic
                               maxSkew:
                                 description: 'MaxSkew describes the degree to which
                                   pods may be unevenly distributed. When `whenUnsatisfiable=DoNotSchedule`,
@@ -5956,10 +5995,34 @@ spec:
                                   cannot be scheduled, because computed skew will
                                   be 3(3 - 0) if new Pod is scheduled to any of the
                                   three zones, it will violate MaxSkew. \n This is
-                                  an alpha field and requires enabling MinDomainsInPodTopologySpread
-                                  feature gate."
+                                  a beta field and requires the MinDomainsInPodTopologySpread
+                                  feature gate to be enabled (enabled by default)."
                                 format: int32
                                 type: integer
+                              nodeAffinityPolicy:
+                                description: "NodeAffinityPolicy indicates how we
+                                  will treat Pod's nodeAffinity/nodeSelector when
+                                  calculating pod topology spread skew. Options are:
+                                  - Honor: only nodes matching nodeAffinity/nodeSelector
+                                  are included in the calculations. - Ignore: nodeAffinity/nodeSelector
+                                  are ignored. All nodes are included in the calculations.
+                                  \n If this value is nil, the behavior is equivalent
+                                  to the Honor policy. This is a alpha-level feature
+                                  enabled by the NodeInclusionPolicyInPodTopologySpread
+                                  feature flag."
+                                type: string
+                              nodeTaintsPolicy:
+                                description: "NodeTaintsPolicy indicates how we will
+                                  treat node taints when calculating pod topology
+                                  spread skew. Options are: - Honor: nodes without
+                                  taints, along with tainted nodes for which the incoming
+                                  pod has a toleration, are included. - Ignore: node
+                                  taints are ignored. All nodes are included. \n If
+                                  this value is nil, the behavior is equivalent to
+                                  the Ignore policy. This is a alpha-level feature
+                                  enabled by the NodeInclusionPolicyInPodTopologySpread
+                                  feature flag."
+                                type: string
                               topologyKey:
                                 description: TopologyKey is the key of node labels.
                                   Nodes that have a label with this key and identical
@@ -5968,11 +6031,12 @@ spec:
                                   try to put balanced number of pods into each bucket.
                                   We define a domain as a particular instance of a
                                   topology. Also, we define an eligible domain as
-                                  a domain whose nodes match the node selector. e.g.
-                                  If TopologyKey is "kubernetes.io/hostname", each
-                                  Node is a domain of that topology. And, if TopologyKey
-                                  is "topology.kubernetes.io/zone", each zone is a
-                                  domain of that topology. It's a required field.
+                                  a domain whose nodes meet the requirements of nodeAffinityPolicy
+                                  and nodeTaintsPolicy. e.g. If TopologyKey is "kubernetes.io/hostname",
+                                  each Node is a domain of that topology. And, if
+                                  TopologyKey is "topology.kubernetes.io/zone", each
+                                  zone is a domain of that topology. It's a required
+                                  field.
                                 type: string
                               whenUnsatisfiable:
                                 description: 'WhenUnsatisfiable indicates how to deal
@@ -7697,7 +7761,7 @@ spec:
                       - containers
                       type: object
                     probes:
-                      description: Probes setting for db healthy checks.
+                      description: probes setting for healthy checks.
                       properties:
                         roleChangedProbe:
                           description: Probe for DB role changed check.
@@ -7905,14 +7969,23 @@ spec:
                             and requires `type` to be "ExternalName".
                           type: string
                         externalTrafficPolicy:
-                          description: externalTrafficPolicy denotes if this Service
-                            desires to route external traffic to node-local or cluster-wide
-                            endpoints. "Local" preserves the client source IP and
-                            avoids a second hop for LoadBalancer and Nodeport type
-                            services, but risks potentially imbalanced traffic spreading.
-                            "Cluster" obscures the client source IP and may cause
-                            a second hop to another node, but should have good overall
-                            load-spreading.
+                          description: externalTrafficPolicy describes how nodes distribute
+                            service traffic they receive on one of the Service's "externally-facing"
+                            addresses (NodePorts, ExternalIPs, and LoadBalancer IPs).
+                            If set to "Local", the proxy will configure the service
+                            in a way that assumes that external load balancers will
+                            take care of balancing the service traffic between nodes,
+                            and so each node will deliver traffic only to the node-local
+                            endpoints of the service, without masquerading the client
+                            source IP. (Traffic mistakenly sent to a node with no
+                            endpoints will be dropped.) The default value, "Cluster",
+                            uses the standard behavior of routing to all endpoints
+                            evenly (possibly modified by topology and other features).
+                            Note that traffic sent to an External IP or LoadBalancer
+                            IP from within the cluster will always get "Cluster" semantics,
+                            but clients sending to a NodePort from within the cluster
+                            may need to take traffic policy into account when picking
+                            a node.
                           type: string
                         healthCheckNodePort:
                           description: healthCheckNodePort specifies the healthcheck
@@ -7926,16 +7999,18 @@ spec:
                             field is specified when creating a Service which does
                             not need it, creation will fail. This field will be wiped
                             when updating a Service to no longer need it (e.g. changing
-                            type).
+                            type). This field cannot be updated once set.
                           format: int32
                           type: integer
                         internalTrafficPolicy:
-                          description: InternalTrafficPolicy specifies if the cluster
-                            internal traffic should be routed to all endpoints or
-                            node-local endpoints only. "Cluster" routes internal traffic
-                            to a Service to all endpoints. "Local" routes traffic
-                            to node-local endpoints only, traffic is dropped if no
-                            node-local endpoints are ready. The default value is "Cluster".
+                          description: InternalTrafficPolicy describes how nodes distribute
+                            service traffic they receive on the ClusterIP. If set
+                            to "Local", the proxy will assume that pods only want
+                            to talk to endpoints of the service on the same node as
+                            the pod, dropping the traffic if there are no local endpoints.
+                            The default value, "Cluster", uses the standard behavior
+                            of routing to all endpoints evenly (possibly modified
+                            by topology and other features).
                           type: string
                         ipFamilies:
                           description: "IPFamilies is a list of IP families (e.g.
@@ -8151,6 +8226,258 @@ spec:
                             fields do not apply to ExternalName services. More info:
                             https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types'
                           type: string
+                      type: object
+                    systemAccounts:
+                      description: Statement to create system account.
+                      properties:
+                        accounts:
+                          description: accounts defines system account config settings.
+                          items:
+                            description: SystemAccountConfig specifies how to create
+                              and delete system accounts.
+                            properties:
+                              name:
+                                description: name is the name of a system account.
+                                enum:
+                                - kbadmin
+                                - kbdataprotection
+                                - kbprobe
+                                - kbmonitoring
+                                - kbreplicator
+                                type: string
+                              provisionPolicy:
+                                description: provisionPolicy defines how to create
+                                  account.
+                                properties:
+                                  scope:
+                                    default: AnyPods
+                                    description: scope is the scope to provision account,
+                                      and the scope could be `anyPod` or `allPods`.
+                                    type: string
+                                  secretRef:
+                                    description: secretRef will be used when Type
+                                      is ReferToExisting.
+                                    properties:
+                                      name:
+                                        description: name refers to the name of secret.
+                                        type: string
+                                      namespace:
+                                        description: namespace refers to the namesapce
+                                          of secret.
+                                        type: string
+                                    required:
+                                    - name
+                                    - namespace
+                                    type: object
+                                  statements:
+                                    description: statements will be used when Type
+                                      is CreateByStmt.
+                                    properties:
+                                      creation:
+                                        description: creation specifies statement
+                                          how to create this account with required
+                                          privileges.
+                                        type: string
+                                      deletion:
+                                        description: deletion specifies statement
+                                          how to delete this account.
+                                        type: string
+                                    required:
+                                    - creation
+                                    - deletion
+                                    type: object
+                                  type:
+                                    description: type defines the way to provision
+                                      an account, either `CreateByStmt` or `ReferToExisting`.
+                                    type: string
+                                required:
+                                - scope
+                                - type
+                                type: object
+                            required:
+                            - name
+                            - provisionPolicy
+                            type: object
+                          minItems: 1
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
+                        cmdExecutorConfig:
+                          description: cmdExecutorConfig configs how to get client
+                            SDK and perform statements.
+                          properties:
+                            args:
+                              description: args is used to perform statements.
+                              items:
+                                type: string
+                              type: array
+                            command:
+                              description: command to perform statements.
+                              items:
+                                type: string
+                              minItems: 1
+                              type: array
+                            env:
+                              description: envs is a list of environment variables.
+                              items:
+                                description: EnvVar represents an environment variable
+                                  present in a Container.
+                                properties:
+                                  name:
+                                    description: Name of the environment variable.
+                                      Must be a C_IDENTIFIER.
+                                    type: string
+                                  value:
+                                    description: 'Variable references $(VAR_NAME)
+                                      are expanded using the previously defined environment
+                                      variables in the container and any service environment
+                                      variables. If a variable cannot be resolved,
+                                      the reference in the input string will be unchanged.
+                                      Double $$ are reduced to a single $, which allows
+                                      for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)"
+                                      will produce the string literal "$(VAR_NAME)".
+                                      Escaped references will never be expanded, regardless
+                                      of whether the variable exists or not. Defaults
+                                      to "".'
+                                    type: string
+                                  valueFrom:
+                                    description: Source for the environment variable's
+                                      value. Cannot be used if value is not empty.
+                                    properties:
+                                      configMapKeyRef:
+                                        description: Selects a key of a ConfigMap.
+                                        properties:
+                                          key:
+                                            description: The key to select.
+                                            type: string
+                                          name:
+                                            description: 'Name of the referent. More
+                                              info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                              TODO: Add other useful fields. apiVersion,
+                                              kind, uid?'
+                                            type: string
+                                          optional:
+                                            description: Specify whether the ConfigMap
+                                              or its key must be defined
+                                            type: boolean
+                                        required:
+                                        - key
+                                        type: object
+                                      fieldRef:
+                                        description: 'Selects a field of the pod:
+                                          supports metadata.name, metadata.namespace,
+                                          `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,
+                                          spec.nodeName, spec.serviceAccountName,
+                                          status.hostIP, status.podIP, status.podIPs.'
+                                        properties:
+                                          apiVersion:
+                                            description: Version of the schema the
+                                              FieldPath is written in terms of, defaults
+                                              to "v1".
+                                            type: string
+                                          fieldPath:
+                                            description: Path of the field to select
+                                              in the specified API version.
+                                            type: string
+                                        required:
+                                        - fieldPath
+                                        type: object
+                                      resourceFieldRef:
+                                        description: 'Selects a resource of the container:
+                                          only resources limits and requests (limits.cpu,
+                                          limits.memory, limits.ephemeral-storage,
+                                          requests.cpu, requests.memory and requests.ephemeral-storage)
+                                          are currently supported.'
+                                        properties:
+                                          containerName:
+                                            description: 'Container name: required
+                                              for volumes, optional for env vars'
+                                            type: string
+                                          divisor:
+                                            anyOf:
+                                            - type: integer
+                                            - type: string
+                                            description: Specifies the output format
+                                              of the exposed resources, defaults to
+                                              "1"
+                                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                            x-kubernetes-int-or-string: true
+                                          resource:
+                                            description: 'Required: resource to select'
+                                            type: string
+                                        required:
+                                        - resource
+                                        type: object
+                                      secretKeyRef:
+                                        description: Selects a key of a secret in
+                                          the pod's namespace
+                                        properties:
+                                          key:
+                                            description: The key of the secret to
+                                              select from.  Must be a valid secret
+                                              key.
+                                            type: string
+                                          name:
+                                            description: 'Name of the referent. More
+                                              info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                              TODO: Add other useful fields. apiVersion,
+                                              kind, uid?'
+                                            type: string
+                                          optional:
+                                            description: Specify whether the Secret
+                                              or its key must be defined
+                                            type: boolean
+                                        required:
+                                        - key
+                                        type: object
+                                    type: object
+                                required:
+                                - name
+                                type: object
+                              type: array
+                            image:
+                              description: image for Connector.
+                              type: string
+                          required:
+                          - command
+                          - image
+                          type: object
+                        passwordConfig:
+                          description: passwordConfig defines the pattern to generate
+                            password.
+                          properties:
+                            length:
+                              default: 10
+                              description: length defines the length of password.
+                              format: int32
+                              maximum: 32
+                              minimum: 8
+                              type: integer
+                            letterCase:
+                              default: MixedCases
+                              description: letterCase defines to use lower-cases,
+                                upper-cases or mixed-cases of letters.
+                              type: string
+                            numDigits:
+                              default: 2
+                              description: numDigits defines number of digits.
+                              format: int32
+                              maximum: 20
+                              minimum: 0
+                              type: integer
+                            numSymbols:
+                              default: 0
+                              description: numSymbols defines number of symbols.
+                              format: int32
+                              maximum: 20
+                              minimum: 0
+                              type: integer
+                          type: object
+                      required:
+                      - accounts
+                      - cmdExecutorConfig
+                      - passwordConfig
                       type: object
                     typeName:
                       description: Type name of the component, it can be any valid

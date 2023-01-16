@@ -175,7 +175,7 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	o := &OperationsOptions{BaseOptions: create.BaseOptions{IOStreams: streams}, OpsType: OpsTypeUpgrade}
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "upgrade"
-	inputs.Short = "Upgrade the cluster"
+	inputs.Short = "Upgrade the cluster version"
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
 		cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Reference cluster version (required)")

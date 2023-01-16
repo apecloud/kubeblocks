@@ -193,7 +193,7 @@ func (o *CreateOptions) Complete() error {
 	)
 
 	if len(o.ComponentsFilePath) > 0 {
-		if componentByte, err = multipleSourceComponents(o.ComponentsFilePath, o.IOStreams); err != nil {
+		if componentByte, err = MultipleSourceComponents(o.ComponentsFilePath, o.IOStreams.In); err != nil {
 			return err
 		}
 		if componentByte, err = yaml.YAMLToJSON(componentByte); err != nil {
@@ -221,12 +221,12 @@ func (o *CreateOptions) Complete() error {
 	return nil
 }
 
-// multipleSourceComponent get component data from multiple source, such as stdin, URI and local file
-func multipleSourceComponents(fileName string, streams genericclioptions.IOStreams) ([]byte, error) {
+// MultipleSourceComponents get component data from multiple source, such as stdin, URI and local file
+func MultipleSourceComponents(fileName string, in io.Reader) ([]byte, error) {
 	var data io.Reader
 	switch {
 	case fileName == "-":
-		data = streams.In
+		data = in
 	case strings.Index(fileName, "http://") == 0 || strings.Index(fileName, "https://") == 0:
 		resp, err := http.Get(fileName)
 		if err != nil {

@@ -52,7 +52,7 @@ const (
 )
 
 const (
-	consensusSetStatusDefaultPodName = "Unknown"
+	ConsensusSetStatusDefaultPodName = "Unknown"
 	RoleEmpty                        = ""
 )
 
@@ -66,7 +66,7 @@ const (
 	// unknownPriority           = 0
 )
 
-// GetPodListByStatefulSet get statefulSet pod list
+// GetPodListByStatefulSet gets statefulSet pod list
 func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet) ([]corev1.Pod, error) {
 	// get podList owned by stsObj
 	podList := &corev1.PodList{}
@@ -84,7 +84,7 @@ func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *app
 	return pods, nil
 }
 
-// handleConsensusSetUpdate handle ConsensusSet component when it to do updating
+// handleConsensusSetUpdate handles ConsensusSet component when it to do updating
 // return true means stateful set reconcile done
 func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, stsObj *appsv1.StatefulSet) (bool, error) {
 	// get typeName from stsObj.name
@@ -118,7 +118,7 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 	newConsensusSetStatus := &dbaasv1alpha1.ConsensusSetStatus{
 		Leader: dbaasv1alpha1.ConsensusMemberStatus{
 			Name:       "",
-			Pod:        consensusSetStatusDefaultPodName,
+			Pod:        ConsensusSetStatusDefaultPodName,
 			AccessMode: dbaasv1alpha1.None,
 		},
 	}
@@ -162,6 +162,24 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 	return plan.WalkOneStep()
 }
 
+// SortPods sorts pods by their role priority
+func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int) {
+	// make a Serial pod list,
+	// e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
+	sort.SliceStable(pods, func(i, j int) bool {
+		roleI := pods[i].Labels[intctrlutil.ConsensusSetRoleLabelKey]
+		roleJ := pods[j].Labels[intctrlutil.ConsensusSetRoleLabelKey]
+
+		if rolePriorityMap[roleI] == rolePriorityMap[roleJ] {
+			_, ordinal1 := intctrlutil.GetParentNameAndOrdinal(&pods[i])
+			_, ordinal2 := intctrlutil.GetParentNameAndOrdinal(&pods[j])
+			return ordinal1 < ordinal2
+		}
+
+		return rolePriorityMap[roleI] < rolePriorityMap[roleJ]
+	})
+}
+
 // generateConsensusUpdatePlan generates Update plan based on UpdateStrategy
 func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod,
 	component dbaasv1alpha1.ClusterDefinitionComponent) *util.Plan {
@@ -192,23 +210,8 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 		return true, nil
 	}
 
-	if component.ConsensusSpec == nil {
-		component.ConsensusSpec = &dbaasv1alpha1.ConsensusSetSpec{Leader: dbaasv1alpha1.DefaultLeader}
-	}
-	rolePriorityMap := composeRolePriorityMap(component)
-
-	// make a Serial pod list,
-	// e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
-	sort.SliceStable(pods, func(i, j int) bool {
-		roleI := pods[i].Labels[intctrlutil.ConsensusSetRoleLabelKey]
-		roleJ := pods[j].Labels[intctrlutil.ConsensusSetRoleLabelKey]
-
-		if rolePriorityMap[roleI] == rolePriorityMap[roleJ] {
-			return strings.Compare(pods[i].Name, pods[j].Name) < 0
-		}
-
-		return rolePriorityMap[roleI] < rolePriorityMap[roleJ]
-	})
+	rolePriorityMap := ComposeRolePriorityMap(component)
+	SortPods(pods, rolePriorityMap)
 
 	// generate plan by UpdateStrategy
 	switch component.ConsensusSpec.UpdateStrategy {
@@ -300,7 +303,12 @@ func generateConsensusSerialPlan(plan *util.Plan, pods []corev1.Pod) {
 	}
 }
 
-func composeRolePriorityMap(component dbaasv1alpha1.ClusterDefinitionComponent) map[string]int {
+// ComposeRolePriorityMap generates a priority map based on roles.
+func ComposeRolePriorityMap(component dbaasv1alpha1.ClusterDefinitionComponent) map[string]int {
+	if component.ConsensusSpec == nil {
+		component.ConsensusSpec = &dbaasv1alpha1.ConsensusSetSpec{Leader: dbaasv1alpha1.DefaultLeader}
+	}
+
 	rolePriorityMap := make(map[string]int, 0)
 	rolePriorityMap[RoleEmpty] = emptyPriority
 	rolePriorityMap[component.ConsensusSpec.Leader.Name] = leaderPriority
@@ -413,7 +421,7 @@ func initClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster, componentN
 	if componentStatus.ConsensusSetStatus == nil {
 		componentStatus.ConsensusSetStatus = &dbaasv1alpha1.ConsensusSetStatus{
 			Leader: dbaasv1alpha1.ConsensusMemberStatus{
-				Pod:        consensusSetStatusDefaultPodName,
+				Pod:        ConsensusSetStatusDefaultPodName,
 				AccessMode: dbaasv1alpha1.None,
 				Name:       "",
 			},
@@ -476,7 +484,7 @@ func setConsensusSetStatusLearner(consensusSetStatus *dbaasv1alpha1.ConsensusSet
 func resetConsensusSetStatusRole(consensusSetStatus *dbaasv1alpha1.ConsensusSetStatus, podName string) {
 	// reset leader
 	if consensusSetStatus.Leader.Pod == podName {
-		consensusSetStatus.Leader.Pod = consensusSetStatusDefaultPodName
+		consensusSetStatus.Leader.Pod = ConsensusSetStatusDefaultPodName
 		consensusSetStatus.Leader.AccessMode = dbaasv1alpha1.None
 		consensusSetStatus.Leader.Name = ""
 	}

@@ -1,18 +1,22 @@
 ## kbcli cluster describe
 
-Describe database cluster info
+Show details of a specific cluster
 
 ```
-kbcli cluster describe [flags]
+kbcli cluster describe NAME [flags]
+```
+
+### Examples
+
+```
+  # describe a specified cluster
+  kbcli cluster describe my-cluster
 ```
 
 ### Options
 
 ```
-      --all-namespaces    If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
-  -h, --help              help for describe
-  -l, --selector string   Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)
-      --show-events       If true, display events related to the described object. (default true)
+  -h, --help   help for describe
 ```
 
 ### Options inherited from parent commands
@@ -40,5 +44,5 @@ kbcli cluster describe [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Database cluster operation command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster operation command
 

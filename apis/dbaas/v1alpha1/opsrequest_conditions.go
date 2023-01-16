@@ -35,18 +35,25 @@ const (
 	ConditionTypeVerticalScaling   = "VerticalScaling"
 	ConditionTypeHorizontalScaling = "HorizontalScaling"
 	ConditionTypeVolumeExpanding   = "VolumeExpanding"
+	ConditionTypeReconfigure       = "Reconfigure"
 	ConditionTypeUpgrading         = "Upgrading"
 
 	// condition and event reasons
 
 	ReasonClusterPhaseMisMatch       = "ClusterPhaseMisMatch"
 	ReasonOpsTypeNotSupported        = "OpsTypeNotSupported"
+	ReasonValidateError              = "ValidateError"
 	ReasonClusterExistOtherOperation = "ClusterExistOtherOperation"
 	ReasonClusterNotFound            = "ClusterNotFound"
 	ReasonStarting                   = "Starting"
 	ReasonComponentFailed            = "ComponentFailed"
 	ReasonSuccessful                 = "Successful"
 	ReasonOpsRequestFailed           = "OpsRequestFailed"
+
+	ReasonReconfigureMerged  = "ReconfigureMerged"
+	ReasonReconfigureFailed  = "ReconfigureFailed"
+	ReasonReconfigureSucceed = "ReconfigureSucceed"
+	ReasonReconfigureRunning = "ReconfigureRunning"
 )
 
 func (r *OpsRequest) SetStatusCondition(condition metav1.Condition) {
@@ -166,5 +173,27 @@ func NewUpgradingCondition(ops *OpsRequest) *metav1.Condition {
 		Reason:             "UpgradingStarted",
 		LastTransitionTime: metav1.NewTime(time.Now()),
 		Message:            fmt.Sprintf("start upgrading in Cluster: %s", ops.Spec.ClusterRef),
+	}
+}
+
+// NewReconfigureCondition new a condition that the OpsRequest updating component configuration
+func NewReconfigureCondition(ops *OpsRequest) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeReconfigure,
+		Status:             metav1.ConditionTrue,
+		Reason:             "ReconfigureStarted",
+		LastTransitionTime: metav1.NewTime(time.Now()),
+		Message:            fmt.Sprintf("Start to reconfigure in Cluster: %s", ops.Spec.ClusterRef),
+	}
+}
+
+// NewReconfigureRunningCondition new a condition that the OpsRequest reconfigure workflow
+func NewReconfigureRunningCondition(ops *OpsRequest, reason string) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeReconfigure,
+		Status:             metav1.ConditionTrue,
+		Reason:             reason,
+		LastTransitionTime: metav1.NewTime(time.Now()),
+		Message:            fmt.Sprintf("Reconfiguring in Cluster: %s", ops.Spec.ClusterRef),
 	}
 }

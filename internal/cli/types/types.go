@@ -62,6 +62,7 @@ const (
 	// KindClusterVersion clusterVersion kind
 	KindClusterVersion = "ClusterVersion"
 
+	NameLabelKey                   = "app.kubernetes.io/name"
 	InstanceLabelKey               = "app.kubernetes.io/instance"
 	ConsensusSetRoleLabelKey       = "cs.dbaas.kubeblocks.io/role"
 	ConsensusSetAccessModeLabelKey = "cs.dbaas.kubeblocks.io/access-mode"
@@ -81,6 +82,8 @@ const (
 	ResourceBackupJobs     = "backupjobs"
 	ResourceRestoreJobs    = "restorejobs"
 	ResourceBackupPolicies = "backuppolicies"
+
+	None = "<none>"
 )
 
 var (

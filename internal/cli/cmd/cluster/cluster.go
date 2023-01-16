@@ -35,12 +35,16 @@ func init() {
 func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "cluster",
-		Short: "Database cluster operation command",
+		Short: "Cluster operation command",
 	}
 
 	// add subcommands
 	cmd.AddCommand(
 		NewListCmd(f, streams),
+		NewListInstancesCmd(f, streams),
+		NewListComponentsCmd(f, streams),
+		NewListEventsCmd(f, streams),
+		NewListUsersCmd(f, streams),
 		NewDescribeCmd(f, streams),
 		NewCreateCmd(f, streams),
 		NewDeleteCmd(f, streams),

@@ -47,6 +47,116 @@ type ClusterDefinitionSpec struct {
 	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
 }
 
+// SystemAccountSpec specifies information to create system accounts.
+type SystemAccountSpec struct {
+	// cmdExecutorConfig configs how to get client SDK and perform statements.
+	// +kubebuilder:validation:Required
+	CmdExecutorConfig *CmdExecutorConfig `json:"cmdExecutorConfig"`
+	// passwordConfig defines the pattern to generate password.
+	// +kubebuilder:validation:Required
+	PasswordConfig PasswordConfig `json:"passwordConfig"`
+	// accounts defines system account config settings.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	Accounts []SystemAccountConfig `json:"accounts" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+}
+
+// CmdExecutorConfig specifies how to perform creation and deletion statements.
+type CmdExecutorConfig struct {
+	// image for Connector.
+	// +kubebuilder:validation:Required
+	Image string `json:"image"`
+	// command to perform statements.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	Command []string `json:"command"`
+	// args is used to perform statements.
+	// +optional
+	Args []string `json:"args,omitempty"`
+	// envs is a list of environment variables.
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+}
+
+// PasswordConfig helps provide to customize complexity of passowrd generation pattern.
+type PasswordConfig struct {
+	// length defines the length of password.
+	// +kubebuilder:validation:Maximum=32
+	// +kubebuilder:validation:Minimum=8
+	// +kubebuilder:default=10
+	// +optional
+	Length int32 `json:"length,omitempty"`
+	//  numDigits defines number of digits.
+	// +kubebuilder:validation:Maximum=20
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=2
+	// +optional
+	NumDigits int32 `json:"numDigits,omitempty"`
+	// numSymbols defines number of symbols.
+	// +kubebuilder:validation:Maximum=20
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=0
+	// +optional
+	NumSymbols int32 `json:"numSymbols,omitempty"`
+	// letterCase defines to use lower-cases, upper-cases or mixed-cases of letters.
+	// +kubebuilder:default=MixedCases
+	// +optional
+	LetterCase LetterCase `json:"letterCase,omitempty"`
+}
+
+// SystemAccountConfig specifies how to create and delete system accounts.
+type SystemAccountConfig struct {
+	// name is the name of a system account.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum={kbadmin,kbdataprotection,kbprobe,kbmonitoring,kbreplicator}
+	Name AccountName `json:"name"`
+	// provisionPolicy defines how to create account.
+	// +kubebuilder:validation:Required
+	ProvisionPolicy ProvisionPolicy `json:"provisionPolicy"`
+}
+
+// ProvisionPolicy defines the policy details for creating accounts.
+type ProvisionPolicy struct {
+	// type defines the way to provision an account, either `CreateByStmt` or `ReferToExisting`.
+	// +kubebuilder:validation:Required
+	Type ProvisionPolicyType `json:"type"`
+	// scope is the scope to provision account, and the scope could be `anyPod` or `allPods`.
+	// +kubebuilder:default=AnyPods
+	Scope ProvisionScope `json:"scope"`
+	// statements will be used when Type is CreateByStmt.
+	// +optional
+	Statements *ProvisionStatements `json:"statements,omitempty"`
+	// secretRef will be used when Type is ReferToExisting.
+	// +optional
+	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
+}
+
+// ProvisionSecretRef defines the information of secret referred to.
+type ProvisionSecretRef struct {
+	// name refers to the name of secret.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+	// namespace refers to the namesapce of secret.
+	// +kubebuilder:validation:Required
+	Namespace string `json:"namespace"`
+}
+
+// ProvisionStatements defines the statements used to create accounts.
+type ProvisionStatements struct {
+	// creation specifies statement how to create this account with required privileges.
+	// +kubebuilder:validation:Required
+	CreationStatement string `json:"creation"`
+	// deletion specifies statement how to delete this account.
+	// +kubebuilder:validation:Required
+	DeletionStatement string `json:"deletion"`
+}
+
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
 type ClusterDefinitionStatus struct {
 	// ClusterDefinition phase -
@@ -66,11 +176,23 @@ type ClusterDefinitionStatus struct {
 }
 
 type ConfigTemplate struct {
-	// Specify the name of the referenced the configuration template ConfigMap object.
+	// Specify the name of configuration template.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
+
+	// Specify the name of the referenced the configuration template ConfigMap object.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	ConfigTplRef string `json:"configTplRef"`
+
+	// Specify the name of the referenced the configuration constraints object.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
+	ConfigConstraintRef string `json:"configConstraintRef,omitempty"`
 
 	// Specify the namespace of the referenced the configuration template ConfigMap object.
 	// An empty namespace is equivalent to the "default" namespace.
@@ -111,33 +233,44 @@ type ExporterConfig struct {
 }
 
 type MonitorConfig struct {
-	// BuiltIn is a switch to enable KubeBlocks builtIn monitoring.
-	// If BuiltIn is true and CharacterType is wellknown, ExporterConfig and Sidecar container will generate automatically.
-	// Otherwise, provider should set BuiltIn to false and provide ExporterConfig and Sidecar container own.
+	// builtIn is a switch to enable KubeBlocks builtIn monitoring.
+	// If BuiltIn is true and CharacterType is well-known, ExporterConfig and Sidecar container will generate automatically.
+	// Otherwise, provider should set builtIn to false and provide ExporterConfig and Sidecar container own.
 	// +kubebuilder:default=false
 	// +optional
 	BuiltIn bool `json:"builtIn,omitempty"`
 
-	// Exporter provided by provider, which specify necessary information to Time Series Database.
-	// ExporterConfig is valid when BuiltIn is false.
+	// exporterConfig provided by provider, which specify necessary information to Time Series Database.
+	// exporterConfig is valid when builtIn is false.
 	// +optional
 	Exporter *ExporterConfig `json:"exporterConfig,omitempty"`
 }
 
 type LogConfig struct {
-	// Name log type name, such as slow for MySQL slow log file.
+	// name log type name, such as slow for MySQL slow log file.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=128
 	Name string `json:"name"`
 
-	// FilePathPattern log file path pattern which indicate how to find this file
+	// filePathPattern log file path pattern which indicate how to find this file
 	// corresponding to variable (log path) in database kernel. please don't set this casually.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=4096
 	FilePathPattern string `json:"filePathPattern"`
 }
 
-// ClusterDefinitionComponent is a group of pods, pods in one component usually share the same data
+type ConfigurationSpec struct {
+	// The configTemplateRefs field provided by provider, and
+	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
+}
+
+// ClusterDefinitionComponent is a group of pods, pods belong to same component usually share the same data
 type ClusterDefinitionComponent struct {
 	// Type name of the component, it can be any valid string.
 	// +kubebuilder:validation:Required
@@ -152,46 +285,41 @@ type ClusterDefinitionComponent struct {
 	// +kubebuilder:default=Stateless
 	ComponentType ComponentType `json:"componentType"`
 
-	// CharacterType defines well-known database component name, such as mongos(mongodb), proxy(redis), wesql(mysql)
-	// DBaas will generate proper monitor configs for wellknown CharacterType when BuiltIn is true.
+	// characterType defines well-known database component name, such as mongos(mongodb), proxy(redis), mariadb(mysql)
+	// KubeBlocks will generate proper monitor configs for well-known characterType when builtIn is true.
 	// +optional
 	CharacterType string `json:"characterType,omitempty"`
 
-	// MinReplicas minimum replicas for component pod count.
+	// minReplicas minimum replicas for component pod count.
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	MinReplicas int32 `json:"minReplicas,omitempty"`
 
-	// MaxReplicas maximum replicas pod for component pod count.
+	// maxReplicas maximum replicas pod for component pod count.
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	MaxReplicas int32 `json:"maxReplicas,omitempty"`
 
-	// DefaultReplicas default replicas in this component if user not specify.
+	// defaultReplicas default replicas in this component when not specified.
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	DefaultReplicas int32 `json:"defaultReplicas,omitempty"`
 
-	// PDBSpec pod disruption budget spec. This is mutually exclusive with the component type of Consensus.
+	// pdbSpec pod disruption budget spec. This is mutually exclusive with the component type of Consensus.
 	// +optional
 	PDBSpec *policyv1.PodDisruptionBudgetSpec `json:"pdbSpec,omitempty"`
 
-	// The configTemplateRefs field provided by provider, and
-	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
+	// configSpec defines configuration related spec.
 	// +optional
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	ConfigSpec *ConfigurationSpec `json:"configSpec,omitempty"`
 
-	// Monitor is monitoring config which provided by provider.
+	// monitor is monitoring config which provided by provider.
 	// +optional
 	Monitor *MonitorConfig `json:"monitor,omitempty"`
 
-	// LogConfigs is detail log file config which provided by provider.
+	// logConfigs is detail log file config which provided by provider.
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
@@ -199,7 +327,7 @@ type ClusterDefinitionComponent struct {
 	// +listMapKey=name
 	LogConfigs []LogConfig `json:"logConfigs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// antiAffinity defines components should have anti-affinity constraint to same component type.
+	// antiAffinity defines components should have anti-affinity constraint for pods with same component type.
 	// +kubebuilder:default=false
 	// +optional
 	AntiAffinity bool `json:"antiAffinity,omitempty"`
@@ -214,17 +342,19 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Service *corev1.ServiceSpec `json:"service,omitempty"`
 
-	// Probes setting for db healthy checks.
+	// probes setting for healthy checks.
 	// +optional
 	Probes *ClusterDefinitionProbes `json:"probes,omitempty"`
 
 	// consensusSpec defines consensus related spec if componentType is Consensus, required if componentType is Consensus.
 	// +optional
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
-
 	// horizontalScalePolicy controls the behavior of horizontal scale.
 	// +optional
 	HorizontalScalePolicy *HorizontalScalePolicy `json:"horizontalScalePolicy,omitempty"`
+	// Statement to create system account.
+	// +optional
+	SystemAccounts *SystemAccountSpec `json:"systemAccounts,omitempty"`
 }
 
 type HorizontalScalePolicy struct {
@@ -286,7 +416,7 @@ type ClusterDefinitionProbe struct {
 
 	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
 	// +kubebuilder:default=3
-	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Minimum=2
 	FailureThreshold int32 `json:"failureThreshold,omitempty"`
 
 	// commands used to execute for probe.

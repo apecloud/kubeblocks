@@ -18,6 +18,7 @@ package testing
 
 import (
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -58,7 +59,7 @@ func FakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
 						Leader: dbaasv1alpha1.ConsensusMemberStatus{
 							Name:       "leader",
 							AccessMode: dbaasv1alpha1.ReadWrite,
-							Pod:        "leader-pod",
+							Pod:        fmt.Sprintf("%s-pod-0", name),
 						},
 					},
 				},
@@ -119,6 +120,7 @@ func FakePods(replicas int, namespace string, cluster string) *corev1.PodList {
 			types.InstanceLabelKey:         cluster,
 			types.ConsensusSetRoleLabelKey: role,
 			types.ComponentLabelKey:        ComponentName,
+			types.NameLabelKey:             "state.mysql-apecloud-wesql",
 		}
 		pod.Spec.NodeName = NodeName
 		pod.Spec.Containers = []corev1.Container{
@@ -145,6 +147,8 @@ func FakeSecrets(namespace string, cluster string) *corev1.SecretList {
 	secret.Data = map[string][]byte{
 		corev1.ServiceAccountTokenKey: []byte("fake-secret-token"),
 		"fake-secret-key":             []byte("fake-secret-value"),
+		"username":                    []byte("test-user"),
+		"password":                    []byte("test-password"),
 	}
 	return &corev1.SecretList{Items: []corev1.Secret{secret}}
 }
@@ -172,6 +176,7 @@ func FakeClusterDef() *dbaasv1alpha1.ClusterDefinition {
 			DefaultReplicas: 2,
 		},
 	}
+	clusterDef.Spec.Type = "state.mysql"
 	return clusterDef
 }
 
@@ -256,4 +261,38 @@ func FakePVCs() *corev1.PersistentVolumeClaimList {
 	}
 	pvcs.Items = append(pvcs.Items, pvc)
 	return pvcs
+}
+
+func FakeEvents() *corev1.EventList {
+	eventList := &corev1.EventList{}
+	fakeEvent := func(name string, createTime metav1.Time) corev1.Event {
+		e := corev1.Event{}
+		e.Name = name
+		e.Type = "Warning"
+		e.SetCreationTimestamp(createTime)
+		e.LastTimestamp = createTime
+		return e
+	}
+
+	parseTime := func(t string) time.Time {
+		time, _ := time.Parse(time.RFC3339, t)
+		return time
+	}
+
+	for _, e := range []struct {
+		name       string
+		createTime metav1.Time
+	}{
+		{
+			name:       "e1",
+			createTime: metav1.NewTime(parseTime("2023-01-04T00:00:00.000Z")),
+		},
+		{
+			name:       "e2",
+			createTime: metav1.NewTime(parseTime("2023-01-04T01:00:00.000Z")),
+		},
+	} {
+		eventList.Items = append(eventList.Items, fakeEvent(e.name, e.createTime))
+	}
+	return eventList
 }

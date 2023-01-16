@@ -21,47 +21,28 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/stateful"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/stateless"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/types"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
+	opsutil "github.com/apecloud/kubeblocks/controllers/dbaas/operations/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// Component is the interface to use for component status
-type Component interface {
-	// IsRunning when relevant k8s workloads changes, check whether the component is running.
-	// you can also reconcile the pods of component util the component is Running here.
-	IsRunning(obj client.Object) (bool, error)
-
-	// PodsReady check whether all pods of the component are ready.
-	PodsReady(obj client.Object) (bool, error)
-
-	// HandleProbeTimeoutWhenPodsReady if the component need role probe and the pods of component are ready,
-	// we should handle the component phase when the role probe timeout and return a bool.
-	// if return true, means probe has not timed out and need to requeue after an interval time to handle probe timeout again.
-	// else return false, means probe has timed out and need to update the component phase to Failed or Abnormal.
-	HandleProbeTimeoutWhenPodsReady() (bool, error)
-
-	// CalculatePhaseWhenPodsNotReady when the pods of component are not ready, calculate the component phase is Failed or Abnormal.
-	// if return an empty phase, means the pods of component are ready and skips it.
-	CalculatePhaseWhenPodsNotReady(componentName string) (dbaasv1alpha1.Phase, error)
-}
-
-// NewComponentByType new a component object by cluster, clusterDefinition and componentName
+// NewComponentByType news a component object by cluster, clusterDefinition and componentName
 func NewComponentByType(
 	ctx context.Context,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
 	componentDef *dbaasv1alpha1.ClusterDefinitionComponent,
-	componentName string) Component {
+	component *dbaasv1alpha1.ClusterComponent) types.Component {
 	switch componentDef.ComponentType {
 	case dbaasv1alpha1.Consensus:
-		component := util.GetComponentByName(cluster, componentName)
 		return consensusset.NewConsensusSet(ctx, cli, cluster, component, componentDef)
 	case dbaasv1alpha1.Stateful:
 		return stateful.NewStateful(ctx, cli, cluster)
@@ -71,12 +52,13 @@ func NewComponentByType(
 	return nil
 }
 
-// handleComponentStatusAndSyncCluster handle component status. if the component status changed, sync cluster.status.components
+// handleComponentStatusAndSyncCluster handles component status. if the component status changed, sync cluster.status.components
 func handleComponentStatusAndSyncCluster(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
+	recorder record.EventRecorder,
 	obj client.Object,
 	cluster *dbaasv1alpha1.Cluster,
-	component Component) (time.Duration, error) {
+	component types.Component) (time.Duration, error) {
 	var (
 		err                  error
 		labels               = obj.GetLabels()
@@ -94,28 +76,29 @@ func handleComponentStatusAndSyncCluster(reqCtx intctrlutil.RequestCtx,
 	if isRunning, err = component.IsRunning(obj); err != nil {
 		return requeueAfter, nil
 	}
-	if requeueWhenPodsReady, err = component.HandleProbeTimeoutWhenPodsReady(); err != nil {
-		return requeueAfter, nil
+	if podsReady {
+		if requeueWhenPodsReady, err = component.HandleProbeTimeoutWhenPodsReady(recorder); err != nil {
+			return requeueAfter, nil
+		}
 	}
+
 	if err = patchClusterComponentStatus(reqCtx, cli, cluster, component,
 		labels[intctrlutil.AppComponentLabelKey], isRunning, podsReady); err != nil {
 		return requeueAfter, err
 	}
 
-	if isRunning {
-		return requeueAfter, operations.MarkRunningOpsRequestAnnotation(reqCtx.Ctx, cli, cluster)
-	}
 	if requeueWhenPodsReady {
 		requeueAfter = time.Minute
 	}
-	return requeueAfter, nil
+
+	return requeueAfter, opsutil.MarkRunningOpsRequestAnnotation(reqCtx.Ctx, cli, cluster)
 }
 
-// patchClusterComponentStatus patch Cluster.status.component status
+// patchClusterComponentStatus patches Cluster.status.component status
 func patchClusterComponentStatus(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
-	component Component,
+	component types.Component,
 	componentName string,
 	componentIsRunning, podsIsReady bool) error {
 	// when component phase is changed, set needSyncStatusComponent to true, then patch cluster.status
@@ -128,9 +111,9 @@ func patchClusterComponentStatus(reqCtx intctrlutil.RequestCtx,
 	return cli.Status().Patch(reqCtx.Ctx, cluster, patch)
 }
 
-// NeedSyncStatusComponents Determine whether the component status needs to be modified
+// NeedSyncStatusComponents Determines whether the component status needs to be modified
 func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
-	component Component,
+	component types.Component,
 	componentName string,
 	componentIsRunning, podsIsReady bool) (bool, error) {
 	var (
@@ -146,8 +129,11 @@ func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
 		status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{}
 	}
 	if statusComponent, ok = status.Components[componentName]; !ok {
+		componentType := util.GetComponentTypeName(*cluster, componentName)
 		status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{Phase: cluster.Status.Phase,
-			PodsReady: &podsIsReady, PodsReadyTime: podsReadyTime}
+			PodsReady: &podsIsReady, PodsReadyTime: podsReadyTime,
+			Type: componentType,
+		}
 		return true, nil
 	}
 	var needSync bool
@@ -161,12 +147,13 @@ func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
 				needSync = true
 			}
 
-			// if no operations are running in cluster, means the component is Failed or Abnormal.
+			// if no operations are running in cluster and pods of component are not ready,
+			// means the component is Failed or Abnormal.
 			if util.IsCompleted(cluster.Status.Phase) {
-				if phase, err := component.CalculatePhaseWhenPodsNotReady(componentName); err != nil {
+				if phase, err := component.GetPhaseWhenPodsNotReady(componentName); err != nil {
 					return false, err
 				} else if phase != "" {
-					statusComponent.Phase = cluster.Status.Phase
+					statusComponent.Phase = phase
 					needSync = true
 				}
 			}
@@ -180,7 +167,7 @@ func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
 			needSync = true
 		}
 	}
-	if statusComponent.PodsReady != &podsIsReady {
+	if statusComponent.PodsReady == nil || *statusComponent.PodsReady != podsIsReady {
 		statusComponent.PodsReadyTime = podsReadyTime
 		needSync = true
 	}

@@ -105,7 +105,176 @@ var _ = Describe("clusterDefinition webhook", func() {
 			rel3 := int32(2)
 			clusterDef.Spec.Components[0].ConsensusSpec.Learner = &ConsensusMember{Name: "learner", AccessMode: None, Replicas: &rel3}
 			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
+		})
 
+		It("Validate Cluster Definition System Accounts", func() {
+			By("By creating a new clusterDefinition")
+			clusterDef, _ := createTestClusterDefinitionObj3(clusterDefinitionName3)
+			cmdExecConfig := &CmdExecutorConfig{
+				Image:   "mysql-8.0.30",
+				Command: []string{"mysql", "-e", "$(KB_ACCOUNT_STATEMENT)"},
+			}
+			By("By creating a new clusterDefinition with duplicated accounts")
+			mockAccounts := []SystemAccountConfig{
+				{
+					Name: AdminAccount,
+					ProvisionPolicy: ProvisionPolicy{
+						Type: CreateByStmt,
+						Statements: &ProvisionStatements{
+							CreationStatement: `CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; `,
+							DeletionStatement: "DROP USER IF EXISTS $(USERNAME);",
+						},
+					},
+				},
+				{
+					Name: AdminAccount,
+					ProvisionPolicy: ProvisionPolicy{
+						Type: CreateByStmt,
+						Statements: &ProvisionStatements{
+							CreationStatement: `CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; `,
+							DeletionStatement: "DROP USER IF EXISTS $(USERNAME);",
+						},
+					},
+				},
+			}
+			passwdConfig := PasswordConfig{
+				Length: 10,
+			}
+			clusterDef.Spec.Components[0].SystemAccounts = &SystemAccountSpec{
+				CmdExecutorConfig: cmdExecConfig,
+				PasswordConfig:    passwdConfig,
+				Accounts:          mockAccounts,
+			}
+			Expect(testCtx.CreateObj(ctx, clusterDef)).ShouldNot(Succeed())
+
+			// fix duplication error
+			mockAccounts[1].Name = ProbeAccount
+			By("By creating a new clusterDefinition with invalid password setting")
+			// test password config
+			invalidPasswdConfig := PasswordConfig{
+				Length:     10,
+				NumDigits:  10,
+				NumSymbols: 10,
+			}
+			clusterDef.Spec.Components[0].SystemAccounts = &SystemAccountSpec{
+				CmdExecutorConfig: cmdExecConfig,
+				PasswordConfig:    invalidPasswdConfig,
+				Accounts:          mockAccounts,
+			}
+			Expect(testCtx.CreateObj(ctx, clusterDef)).ShouldNot(Succeed())
+
+			By("By creating a new clusterDefinition with statements missing")
+			mockAccounts[0].ProvisionPolicy.Type = ReferToExisting
+			clusterDef.Spec.Components[0].SystemAccounts = &SystemAccountSpec{
+				CmdExecutorConfig: cmdExecConfig,
+				PasswordConfig:    passwdConfig,
+				Accounts:          mockAccounts,
+			}
+			Expect(testCtx.CreateObj(ctx, clusterDef)).ShouldNot(Succeed())
+			// reset account setting
+			mockAccounts[0].ProvisionPolicy.Type = CreateByStmt
+
+			By("By creating a new clusterDefinition with valid accounts")
+			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
+			// wait until ClusterDefinition created
+			Eventually(func() bool {
+				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName3}, clusterDef)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
+		})
+
+		It("Should webhook validate configSpec", func() {
+			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName + "-cfg-test")
+			tests := []struct {
+				name               string
+				tpls               []ConfigTemplate
+				wantErr            bool
+				expectedErrMessage string
+			}{{
+				name: "cm_duplicate_test",
+				tpls: []ConfigTemplate{
+					{
+						Name:                "tpl1",
+						ConfigTplRef:        "cm1",
+						VolumeName:          "volume1",
+						ConfigConstraintRef: "constraint1",
+					},
+					{
+						Name:                "tpl2",
+						ConfigTplRef:        "cm1",
+						VolumeName:          "volume2",
+						ConfigConstraintRef: "constraint1",
+					},
+				},
+				wantErr:            true,
+				expectedErrMessage: "configmap[cm1] already existed.",
+			}, {
+				name: "name_duplicate_test",
+				tpls: []ConfigTemplate{
+					{
+						Name:                "tpl1",
+						ConfigTplRef:        "cm1",
+						VolumeName:          "volume1",
+						ConfigConstraintRef: "constraint1",
+					},
+					{
+						Name:                "tpl1",
+						ConfigTplRef:        "cm2",
+						VolumeName:          "volume2",
+						ConfigConstraintRef: "constraint2",
+					},
+				},
+				wantErr:            true,
+				expectedErrMessage: "Duplicate value: map",
+			}, {
+				name: "volume_duplicate_test",
+				tpls: []ConfigTemplate{
+					{
+						Name:                "tpl1",
+						ConfigTplRef:        "cm1",
+						VolumeName:          "volume1",
+						ConfigConstraintRef: "constraint1",
+					},
+					{
+						Name:                "tpl2",
+						ConfigTplRef:        "cm2",
+						VolumeName:          "volume1",
+						ConfigConstraintRef: "constraint2",
+					},
+				},
+				wantErr:            true,
+				expectedErrMessage: "volume[volume1] already existed.",
+			}, {
+				name: "normal_test",
+				tpls: []ConfigTemplate{
+					{
+						Name:                "tpl1",
+						ConfigTplRef:        "cm1",
+						VolumeName:          "volume1",
+						ConfigConstraintRef: "constraint1",
+					},
+					{
+						Name:                "tpl2",
+						ConfigTplRef:        "cm2",
+						VolumeName:          "volume2",
+						ConfigConstraintRef: "constraint1",
+					},
+				},
+				wantErr: false,
+			}}
+
+			for _, tt := range tests {
+				clusterDef.Spec.Components[0].ConfigSpec = &ConfigurationSpec{
+					ConfigTemplateRefs: tt.tpls,
+				}
+				err := testCtx.CreateObj(ctx, clusterDef)
+				if tt.wantErr {
+					Expect(err).ShouldNot(Succeed())
+					Expect(err.Error()).Should(ContainSubstring(tt.expectedErrMessage))
+				} else {
+					Expect(err).Should(Succeed())
+				}
+			}
 		})
 	})
 })
@@ -178,6 +347,7 @@ spec:
         filePathPattern: /data/mysql/mysqld-slow.log
     configTemplateRefs:
       - name: mysql-tree-node-template-8.0
+        configTplRef: mysql-tree-node-template-8.0
         volumeName: mysql-config
     componentType: Consensus
     consensusSpec:

@@ -1504,13 +1504,13 @@ func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
 		if v, ok := params.cluster.Status.Components[params.component.Name]; ok {
 			consensusSetStatus := v.ConsensusSetStatus
 			if consensusSetStatus != nil {
-				if consensusSetStatus.Leader.Pod != consensusset.ConsensusSetStatusDefaultPodName {
+				if consensusSetStatus.Leader.Pod != consensusset.DefaultPodName {
 					envData[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
 				}
 
 				followers := ""
 				for _, follower := range consensusSetStatus.Followers {
-					if follower.Pod == consensusset.ConsensusSetStatusDefaultPodName {
+					if follower.Pod == consensusset.DefaultPodName {
 						continue
 					}
 					if len(followers) > 0 {

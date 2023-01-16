@@ -19,17 +19,21 @@ spec:
         ports:
           - protocol: TCP
             port: 3306
-      configTemplateRefs:
-        - name: mysql-primary-config-8.0.31
-          namespace: {{ .Release.Namespace }}
-          volumeName: primary
-        - name: mysql-secondary-config-8.0.31
-          namespace: {{ .Release.Namespace }}
-          volumeName: secondary
-        - name: mysql-scripts
-          namespace: {{ .Release.Namespace }}
-          volumeName: scripts
-          defaultMode: 493
+      configSpec:
+        configTemplateRefs:
+          - name: mysql-primary-config
+            configTplRef: mysql-primary-config-8.0.31
+            namespace: {{ .Release.Namespace }}
+            volumeName: primary
+          - name: mysql-secondary-config
+            configTplRef: mysql-secondary-config-8.0.31
+            namespace: {{ .Release.Namespace }}
+            volumeName: secondary
+          - name: mysql-scripts
+            configTplRef: mysql-scripts
+            namespace: {{ .Release.Namespace }}
+            volumeName: scripts
+            defaultMode: 493
       monitor:
         builtIn: false
         exporterConfig:

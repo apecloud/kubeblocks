@@ -101,7 +101,7 @@ func (o *DeleteOptions) complete() error {
 	if len(names) == 0 {
 		names = o.Names
 	}
-	if err = confirm(names, o.In); err != nil {
+	if err = Confirm(names, o.In); err != nil {
 		return err
 	}
 
@@ -173,8 +173,8 @@ func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav
 	return response, nil
 }
 
-// confirm let user double-check what to delete
-func confirm(names []string, in io.Reader) error {
+// Confirm let user double-check what to delete
+func Confirm(names []string, in io.Reader) error {
 	if len(names) == 0 {
 		return nil
 	}

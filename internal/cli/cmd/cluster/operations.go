@@ -30,6 +30,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
+	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
@@ -86,7 +87,7 @@ func (o *OperationsOptions) CompleteRestartOps() error {
 			return err
 		}
 	}
-	return nil
+	return delete.Confirm([]string{o.Name}, o.In)
 }
 
 func (o *OperationsOptions) validateUpgrade() error {
@@ -173,6 +174,9 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		o.buildCommonFlags(cmd)
 		cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Reference cluster version (required)")
 	}
+	inputs.Complete = func() error {
+		return delete.Confirm([]string{o.Name}, o.In)
+	}
 	return create.BuildCommand(inputs)
 }
 
@@ -189,6 +193,9 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 		cmd.Flags().StringVar(&o.LimitCPU, "limits.cpu", "", "CPU size limited by the component")
 		cmd.Flags().StringVar(&o.LimitMemory, "limits.memory", "", "Memory size limited by the component")
 	}
+	inputs.Complete = func() error {
+		return delete.Confirm([]string{o.Name}, o.In)
+	}
 	return create.BuildCommand(inputs)
 }
 
@@ -201,6 +208,9 @@ func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
 		cmd.Flags().IntVar(&o.Replicas, "replicas", -1, "Replicas with the specified components")
+	}
+	inputs.Complete = func() error {
+		return delete.Confirm([]string{o.Name}, o.In)
 	}
 	return create.BuildCommand(inputs)
 }
@@ -215,6 +225,9 @@ func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 		o.buildCommonFlags(cmd)
 		cmd.Flags().StringSliceVar(&o.VCTNames, "volume-claim-template-names", nil, "VolumeClaimTemplate names in components (required)")
 		cmd.Flags().StringVar(&o.Storage, "storage", "", "Volume storage size (required)")
+	}
+	inputs.Complete = func() error {
+		return delete.Confirm([]string{o.Name}, o.In)
 	}
 	return create.BuildCommand(inputs)
 }

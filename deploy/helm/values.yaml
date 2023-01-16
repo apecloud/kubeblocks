@@ -9,7 +9,7 @@ image:
   repository: docker.io/apecloud/kubeblocks
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+  tag: "latest"
 
 # runtime:
   # cri type: auto/containerd/docker

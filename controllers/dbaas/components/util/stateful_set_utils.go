@@ -32,9 +32,6 @@ import (
 // DescendingOrdinalSts is a sort.Interface that Sorts a list of StatefulSet based on the ordinals extracted from the statefulSet.
 type DescendingOrdinalSts []*appsv1.StatefulSet
 
-// statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
-var statefulPodRegex = regexp.MustCompile("(.*)-([0-9]+)$")
-
 // statefulSetRegex is a regular expression that extracts StatefulSet's ordinal from the Name of StatefulSet
 var statefulSetRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 

@@ -515,16 +515,7 @@ func (r *ClusterReconciler) deleteBackupPolicies(reqCtx intctrlutil.RequestCtx, 
 		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
 	}
 	// clean backupPolicies
-	backupPolicies := &dataprotectionv1alpha1.BackupPolicyList{}
-	if err := r.List(reqCtx.Ctx, backupPolicies, inNS, ml); err != nil {
-		return err
-	}
-	for _, policy := range backupPolicies.Items {
-		if err := r.Delete(reqCtx.Ctx, &policy); err != nil {
-			return err
-		}
-	}
-	return nil
+	return r.Client.DeleteAllOf(reqCtx.Ctx, &dataprotectionv1alpha1.BackupPolicy{}, inNS, ml)
 }
 
 func (r *ClusterReconciler) deleteBackups(reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster) error {

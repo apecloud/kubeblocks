@@ -49,6 +49,15 @@ type BackupPolicyReconciler struct {
 	Recorder record.EventRecorder
 }
 
+type backupPolicyOptions struct {
+	Name       string           `json:"name"`
+	Namespace  string           `json:"namespace"`
+	Cluster    string           `json:"cluster"`
+	Schedule   string           `json:"schedule"`
+	BackupType string           `json:"backupType"`
+	TTL        *metav1.Duration `json:"ttl"`
+}
+
 var (
 	//go:embed cue/*
 	cueTemplates embed.FS
@@ -130,10 +139,10 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// if backup policy is available, try to remove expired or oldest backups
 	if backupPolicy.Status.Phase == dataprotectionv1alpha1.ConfigAvailable {
-		if err := r.RemoveExpiredBackups(reqCtx); err != nil {
+		if err := r.removeExpiredBackups(reqCtx); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
-		if err := r.RemoveOldestBackups(reqCtx, backupPolicy); err != nil {
+		if err := r.removeOldestBackups(reqCtx, backupPolicy); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()
@@ -161,15 +170,6 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return intctrlutil.Reconciled()
 }
 
-type BackupPolicyOptions struct {
-	Name       string           `json:"name"`
-	Namespace  string           `json:"namespace"`
-	Cluster    string           `json:"cluster"`
-	Schedule   string           `json:"schedule"`
-	BackupType string           `json:"backupType"`
-	TTL        *metav1.Duration `json:"ttl"`
-}
-
 func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alpha1.BackupPolicy) (*batchv1.CronJob, error) {
 	tplFile := "cronjob.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
@@ -178,7 +178,7 @@ func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alph
 		return nil, err
 	}
 	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-	options := BackupPolicyOptions{
+	options := backupPolicyOptions{
 		Name:       backupPolicy.Name,
 		Namespace:  backupPolicy.Namespace,
 		Cluster:    backupPolicy.Spec.Target.LabelsSelector.MatchLabels[intctrlutil.AppInstanceLabelKey],
@@ -221,7 +221,7 @@ func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alph
 	return &cronjob, nil
 }
 
-func (r *BackupPolicyReconciler) RemoveExpiredBackups(reqCtx intctrlutil.RequestCtx) error {
+func (r *BackupPolicyReconciler) removeExpiredBackups(reqCtx intctrlutil.RequestCtx) error {
 	backups := dataprotectionv1alpha1.BackupList{}
 	if err := r.Client.List(reqCtx.Ctx, &backups,
 		client.InNamespace(reqCtx.Req.Namespace)); err != nil {
@@ -250,7 +250,7 @@ func buildBackupLabelsForRemove(backupPolicy *dataprotectionv1alpha1.BackupPolic
 	}
 }
 
-func (r *BackupPolicyReconciler) RemoveOldestBackups(reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) error {
+func (r *BackupPolicyReconciler) removeOldestBackups(reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) error {
 	if backupPolicy.Spec.BackupsHistoryLimit == 0 {
 		return nil
 	}

@@ -47,9 +47,13 @@ func checkResourceExists(
 // byBackupStartTime sorts a list of jobs by start timestamp, using their names as a tie breaker.
 type byBackupStartTime []dataprotectionv1alpha1.Backup
 
-func (o byBackupStartTime) Len() int      { return len(o) }
+// Len return the length of byBackupStartTime, for the sort.Sort
+func (o byBackupStartTime) Len() int { return len(o) }
+
+// Swap the items, for the sort.Sort
 func (o byBackupStartTime) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 
+// Less define how to compare items, for the sort.Sort
 func (o byBackupStartTime) Less(i, j int) bool {
 	if o[i].Status.StartTimestamp == nil && o[j].Status.StartTimestamp != nil {
 		return false
@@ -63,6 +67,7 @@ func (o byBackupStartTime) Less(i, j int) bool {
 	return o[i].Status.StartTimestamp.Before(o[j].Status.StartTimestamp)
 }
 
+// DeleteObjectBackground delete the object in the background, usually used in the Reconcile method
 func DeleteObjectBackground(cli client.Client, ctx context.Context, obj client.Object) error {
 	deletePropagation := metav1.DeletePropagationBackground
 	deleteOptions := &client.DeleteOptions{

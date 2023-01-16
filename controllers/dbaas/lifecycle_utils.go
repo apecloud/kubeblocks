@@ -1885,7 +1885,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		return
 	}
 
-gi	createBackup := func(backupPolicyName string) error {
+	createBackup := func(backupPolicyName string) error {
 		backupList := dataprotectionv1alpha1.BackupList{}
 		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.AppComponentLabelKey])
 		if err := cli.List(ctx, &backupList, ml); err != nil {

@@ -30,23 +30,21 @@
 ## What is KubeBlocks
 KubeBlocks is an open-source and cloud-prem tool that helps application developers and platform engineers build and manage Kubernetes native data platforms. Based on the best experience of public cloud fully managed services, KubeBlocks improves the service availability, resource utilization, and developer productivity of data platforms on Kubernetes.
 ### Goals
-Our goals are to: 
-- Improve Kubernetes' ability to manage stateful applications in an open-source and cloud-neutral manner
+- Enhance stateful applications control plane manageability on Kubernetes clusters, being open sourced and cloud neutral 
 - Manage data platforms without a high cognitive load of cloud computing, Kubernetes, and database knowledge 
 - Be community-driven, embracing extensibility, and providing domain functions without vendor lock-in
 - Reduce costs by only paying for the infrastructure and increasing the utilization of resources with flexible scheduling
 - Support the most popular databases, analytical software, and their bundled tools
-- Provide the most advanced user experience based on the concept of IaC and GitOps
+- Provide the most advanced user experience based on the concepts of IaC and GitOps
 ### Key Features
-- Running in Kubernetes clusters on public clouds such as AWS/GCP/Azure
+- Runs in Kubernetes clusters on public clouds such as AWS/GCP/Azure
 - 50% cost down under the same workload, compared with fully managed database services
-- A Kubernetes-style declarative API
-- Provide kbcli, an easy-to-use intuitive command-line tool
-- A complete experience of Day-2 automated operation and maintenance
-- Supports mainstream open-source database software, among which the experience of using KubeBlocks to manage MySQL database targets that of AWS Aurora.
-  - KubeBlocks supports asynchronous replication and synchronous replication with ReplicationSet and ConsensusSet
-  - KubeBlocks deploys MySQL to 3 available zones and ensures availability when a single AZ is unavailable (RTO is less than 30 seconds)
-  - KubeBlocks supports role configuration and complex topological relationships of Leader, Follower, and Learner
+- Operates with A Kubernetes-style declarative API
+- Provides kbcli, an easy-to-use intuitive command-line tool
+- Enables a complete experience of Day-2 automated operation and maintenance, such as lifecycle/backup/monitoring...
+- Supports mainstream open-source database software, such as MySQL, PostgreSQL, Redis and etc.
+  - KubeBlocks supports conventional replication and consensus replication with ReplicationSet and ConsensusSet
+  - KubeBlocks deploys MySQL to 3 available zones and ensures availability when a single AZ is unavailable (RTO is less than 30 seconds) and supports role configuration and complex topological relationships of Leader, Follower, and Learner
 
 For detailed feature information, see [Feature list](https://github.com/apecloud/kubeblocks/blob/support/rewrite_kb_introduction/docs/user_docs/Introduction/feature_list.md)
 

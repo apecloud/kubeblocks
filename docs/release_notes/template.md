@@ -56,7 +56,7 @@ to `backups.dataprotection.kubeblocks.io`
     kubectl delete crd appversions.dbaas.kubeblocks.io
     ```
     finally, we use the above backup of Clusters and OpsRequests to configure them.
-     ```
+    ```
     kubectl apply -f clusters.yaml
     ```
 ## Breaking Changes

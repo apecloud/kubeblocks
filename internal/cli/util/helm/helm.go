@@ -425,8 +425,10 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 			return "", errors.Wrapf(err, "failed to update CRD %s", obj.Name)
 		}
 
-		// update with original equals to target, so no crd deleted
-		if _, err := cfg.KubeClient.Update(target, target, false); err != nil {
+		// helm only use the original.Info part for looking up original CRD in Update interface
+		// so set original with target as they have same .Info part
+		original := target
+		if _, err := cfg.KubeClient.Update(original, target, false); err != nil {
 			return "", errors.Wrapf(err, "failed to update CRD %s", obj.Name)
 		}
 	}

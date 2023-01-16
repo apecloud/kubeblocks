@@ -20,7 +20,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	appv1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
@@ -32,8 +32,8 @@ var _ = Describe("kubeblocks objects", func() {
 		client := testing.FakeClientSet()
 		Expect(deleteDeploys(client, nil)).Should(Succeed())
 
-		mockDeploy := func(label map[string]string) *appv1.Deployment {
-			deploy := &appv1.Deployment{}
+		mockDeploy := func(label map[string]string) *appsv1.Deployment {
+			deploy := &appsv1.Deployment{}
 			deploy.SetLabels(label)
 			deploy.SetNamespace(namespace)
 			return deploy

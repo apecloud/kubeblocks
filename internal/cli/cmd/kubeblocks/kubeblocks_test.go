@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/spf13/cobra"
-	appv1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -280,8 +280,8 @@ var _ = Describe("kubeblocks", func() {
 		Expect(installed).Should(Equal(false))
 		Expect(version).Should(BeEmpty())
 
-		mockDeploy := func(version string) *appv1.Deployment {
-			deploy := &appv1.Deployment{}
+		mockDeploy := func(version string) *appsv1.Deployment {
+			deploy := &appsv1.Deployment{}
 			label := map[string]string{
 				"app.kubernetes.io/name": types.KubeBlocksChartName,
 			}

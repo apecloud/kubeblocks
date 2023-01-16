@@ -574,7 +574,9 @@ func existsPDBSpec(pdbSpec *policyv1.PodDisruptionBudgetSpec) bool {
 // needBuildPDB check whether the PodDisruptionBudget needs to be built
 func needBuildPDB(params *createParams) bool {
 	if params.component.ComponentType == dbaasv1alpha1.Consensus {
-		return false
+		// if MinReplicas is non-zero, build pdb
+		// TODO: add ut
+		return params.component.MinReplicas > 0
 	}
 	return existsPDBSpec(params.component.PodDisruptionBudgetSpec)
 }
@@ -1002,14 +1004,13 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		if err := controllerutil.SetOwnerReference(cluster, obj, scheme); err != nil {
 			return false, err
 		}
+		if !controllerutil.ContainsFinalizer(obj, dbClusterFinalizerName) {
+			controllerutil.AddFinalizer(obj, dbClusterFinalizerName)
+		}
 		if err := cli.Create(ctx, obj); err == nil {
 			continue
 		} else if !apierrors.IsAlreadyExists(err) {
 			return false, err
-		}
-
-		if !controllerutil.ContainsFinalizer(obj, dbClusterFinalizerName) {
-			controllerutil.AddFinalizer(obj, dbClusterFinalizerName)
 		}
 
 		// Secret kind objects should only be applied once

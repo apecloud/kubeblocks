@@ -149,3 +149,11 @@ func RestoreJobGVR() schema.GroupVersionResource {
 func OpsGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceOpsRequests}
 }
+
+func CRDGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{
+		Group:    "apiextensions.k8s.io",
+		Version:  VersionV1,
+		Resource: "customresourcedefinitions",
+	}
+}

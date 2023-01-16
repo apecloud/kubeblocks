@@ -21,7 +21,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"github.com/spf13/cobra"
 	appv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -165,10 +164,11 @@ var _ = Describe("kubeblocks", func() {
 
 		for _, c := range testCases {
 			client := testing.FakeDynamicClient(c.clusterDef, c.clusterVersion)
+			objs, _ := getKBObjects(testing.FakeClientSet(), client, "")
 			if c.expected != "" {
-				Expect(removeFinalizers(client)).Should(MatchError(MatchRegexp(c.expected)))
+				Expect(removeFinalizers(client, objs)).Should(MatchError(MatchRegexp(c.expected)))
 			} else {
-				Expect(removeFinalizers(client)).Should(Succeed())
+				Expect(removeFinalizers(client, objs)).Should(Succeed())
 			}
 		}
 	})
@@ -209,7 +209,8 @@ var _ = Describe("kubeblocks", func() {
 		}
 
 		client := testing.FakeDynamicClient(&clusterCrd, &clusterDefCrd, &clusterVersionCrd)
-		Expect(deleteCRDs(client)).Should(Succeed())
+		objs, _ := getKBObjects(testing.FakeClientSet(), client, "")
+		Expect(deleteCRDs(client, objs.crds)).Should(Succeed())
 	})
 
 	It("checkIfKubeBlocksInstalled", func() {
@@ -260,7 +261,7 @@ var _ = Describe("kubeblocks", func() {
 	It("deleteDeploys", func() {
 		const namespace = "test"
 		client := testing.FakeClientSet()
-		Expect(deleteDeploys(client, "")).Should(Succeed())
+		Expect(deleteDeploys(client, nil)).Should(Succeed())
 
 		mockDeploy := func(label map[string]string) *appv1.Deployment {
 			deploy := &appv1.Deployment{}
@@ -268,14 +269,17 @@ var _ = Describe("kubeblocks", func() {
 			deploy.SetNamespace(namespace)
 			return deploy
 		}
+
 		client = testing.FakeClientSet(mockDeploy(map[string]string{
 			"types.InstanceLabelKey": types.KubeBlocksChartName,
 		}))
-		Expect(deleteDeploys(client, namespace)).Should(Succeed())
+		objs, _ := getKBObjects(client, testing.FakeDynamicClient(), namespace)
+		Expect(deleteDeploys(client, objs.deploys)).Should(Succeed())
 
 		client = testing.FakeClientSet(mockDeploy(map[string]string{
 			"release": types.KubeBlocksChartName,
 		}))
-		Expect(deleteDeploys(client, namespace)).Should(Succeed())
+		objs, _ = getKBObjects(client, testing.FakeDynamicClient(), namespace)
+		Expect(deleteDeploys(client, objs.deploys)).Should(Succeed())
 	})
 })

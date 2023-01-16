@@ -17,6 +17,7 @@ limitations under the License.
 package kubeblocks
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -30,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -140,6 +140,7 @@ func (o *Options) preCheck() error {
 		Version:  types.VersionV1,
 		Resource: "customresourcedefinitions",
 	}
+	crs := map[string][]string{}
 	crdList, err := o.dynamic.Resource(crdGVR).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return err
@@ -162,11 +163,21 @@ func (o *Options) preCheck() error {
 			if err != nil {
 				return err
 			}
-			if len(objList.Items) > 0 {
-				return errors.Errorf("failed to uninstall, you should delete custom resource %s %s first", crd.GetName(), objList.Items[0].GetName())
+			for _, item := range objList.Items {
+				crs[crd.GetName()] = append(crs[crd.GetName()], item.GetName())
 			}
 		}
 	}
+
+	if len(crs) > 0 {
+		errMsg := bytes.Buffer{}
+		errMsg.WriteString("failed to uninstall, the following custom resources need to be removed first:\n")
+		for k, v := range crs {
+			errMsg.WriteString(fmt.Sprintf("  %s: %s\n", k, strings.Join(v, ",")))
+		}
+		return errors.Errorf(errMsg.String())
+	}
+
 	return nil
 }
 
@@ -191,6 +202,15 @@ func (o *InstallOptions) Run() error {
 		if _, err = o.Client.CoreV1().Namespaces().Get(context.TODO(), o.Namespace, metav1.GetOptions{}); err != nil {
 			return err
 		}
+	}
+
+	objs, err := getKBObjects(o.Client, o.dynamic, o.Namespace)
+	if err != nil {
+		fmt.Fprintf(o.ErrOut, "Detect whether there are resources left by KubeBlocks before: %s\n", err.Error())
+	}
+
+	if checkIfRemainedResource(objs) {
+		return fmt.Errorf("there are resources left by KubeBlocks before, try to run \"kbcli kubeblocks uninstall\" to clean up")
 	}
 
 	spinner := util.Spinner(o.Out, "Install KubeBlocks %s", o.Version)
@@ -268,114 +288,49 @@ Notes: Monitor components(Grafana/Prometheus/AlertManager) is not installed,
 }
 
 func (o *Options) run() error {
-	printErr := func(err error) {
-		if err == nil || apierrors.IsNotFound(err) {
+	printMsg := func(msg string, err error) {
+		spinner := util.Spinner(o.Out, msg)
+		if err == nil || apierrors.IsNotFound(err) ||
+			strings.Contains(err.Error(), "release: not found") {
+			spinner(true)
 			return
 		}
-		fmt.Fprintln(o.Out, err.Error())
+		spinner(false)
+		fmt.Fprintf(o.Out, "  %s\n", err.Error())
 	}
 
-	installed, version, _ := checkIfKubeBlocksInstalled(o.Client)
-	if installed {
-		fmt.Fprintf(o.Out, "Uninstall KubeBlocks %s\n", version)
-	}
-
-	// uninstall chart
+	_, version, _ := checkIfKubeBlocksInstalled(o.Client)
+	// uninstall helm release
 	chart := helm.InstallOpts{
 		Name:      types.KubeBlocksChartName,
 		Namespace: o.Namespace,
 	}
-	printErr(chart.UnInstall(o.HelmCfg))
+	printMsg(fmt.Sprintf("Uninstall helm release %s %s", types.KubeBlocksChartName, version),
+		chart.UnInstall(o.HelmCfg))
 
 	// remove repo
-	printErr(helm.RemoveRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}))
+	printMsg("Remove helm repo "+types.KubeBlocksChartName,
+		helm.RemoveRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}))
+
+	// get KubeBlocks objects and try to remove them
+	objs, err := getKBObjects(o.Client, o.dynamic, o.Namespace)
+	if err != nil {
+		fmt.Fprintf(o.ErrOut, "Get KubeBlocks Ojects throw some errors %s", err.Error())
+	}
 
 	// remove finalizers
-	printErr(removeFinalizers(o.dynamic))
+	printMsg("Remove ClusterDefinition and ClusterVersion", removeFinalizers(o.dynamic, objs))
 
 	// delete CRDs
-	printErr(deleteCRDs(o.dynamic))
+	printMsg("Remove CRDs", deleteCRDs(o.dynamic, objs.crds))
 
-	// delete remained deployments
-	printErr(deleteDeploys(o.Client, o.Namespace))
-	fmt.Fprintln(o.Out, "Successfully uninstall KubeBlocks")
+	// delete deployments
+	printMsg("Remove deployments", deleteDeploys(o.Client, objs.deploys))
+
+	// delete services
+	printMsg("Remove services", deleteServices(o.Client, objs.svcs))
+	fmt.Fprintln(o.Out, "Uninstall KubeBlocks done")
 	return nil
-}
-
-func removeFinalizers(client dynamic.Interface) error {
-	// patch clusterdefinition finalizer
-	ctx := context.Background()
-	cdList, err := client.Resource(types.ClusterDefGVR()).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-	for _, cd := range cdList.Items {
-		if _, err = client.Resource(types.ClusterDefGVR()).Patch(ctx, cd.GetName(), k8sapitypes.JSONPatchType,
-			[]byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{}); err != nil {
-			return err
-		}
-	}
-
-	// patch ClusterVersion's finalizer
-	clusterVersionList, err := client.Resource(types.ClusterVersionGVR()).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-	for _, clusterVersion := range clusterVersionList.Items {
-		if _, err = client.Resource(types.ClusterVersionGVR()).Patch(ctx, clusterVersion.GetName(), k8sapitypes.JSONPatchType,
-			[]byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{}); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func deleteCRDs(cli dynamic.Interface) error {
-	ctx := context.Background()
-	// delete crds
-	crdGVR := schema.GroupVersionResource{
-		Group:    "apiextensions.k8s.io",
-		Version:  types.VersionV1,
-		Resource: "customresourcedefinitions",
-	}
-	crdList, err := cli.Resource(crdGVR).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-	for _, crd := range crdList.Items {
-		if strings.Contains(crd.GetName(), "kubeblocks.io") {
-			if err = cli.Resource(crdGVR).Delete(ctx, crd.GetName(), metav1.DeleteOptions{}); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func deleteDeploys(client kubernetes.Interface, namespace string) error {
-	deleteFn := func(labelSelector string) error {
-		deploys, err := client.AppsV1().Deployments(namespace).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: labelSelector,
-		})
-		if err != nil {
-			return err
-		}
-
-		for _, pod := range deploys.Items {
-			if err = client.AppsV1().Deployments(namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{}); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	// delete all deployments which label matches app.kubernetes.io/instance=kubeblocks
-	if err := deleteFn(fmt.Sprintf("%s=%s", types.InstanceLabelKey, types.KubeBlocksChartName)); err != nil {
-		return err
-	}
-
-	// delete all deployments which label matches release=kubeblocks, like prometheus-server
-	return deleteFn(fmt.Sprintf("release=%s", types.KubeBlocksChartName))
 }
 
 func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {

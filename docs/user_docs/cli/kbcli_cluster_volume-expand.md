@@ -1,11 +1,20 @@
-## kbcli kubeblocks
+## kbcli cluster volume-expand
 
-KubeBlocks operation commands
+Expand volume with the specified components and volumeClaimTemplates in the cluster
+
+```
+kbcli cluster volume-expand [flags]
+```
 
 ### Options
 
 ```
-  -h, --help   help for kubeblocks
+      --component-names strings                Component names to this operations (required)
+  -h, --help                                  help for volume-expand
+      --name string                           OpsRequest name. if not specified, it will be randomly generated 
+      --storage string                        Volume storage size (required)
+      --ttlSecondsAfterSucceed int            Time to live after the OpsRequest succeed
+      --volume-claim-template-names strings   VolumeClaimTemplate names in components (required)
 ```
 
 ### Options inherited from parent commands
@@ -33,8 +42,5 @@ KubeBlocks operation commands
 
 ### SEE ALSO
 
-* [kbcli](kbcli.md)	 - KubeBlocks CLI
-* [kbcli kubeblocks install](kbcli_kubeblocks_install.md)	 - Install KubeBlocks
-* [kbcli kubeblocks uninstall](kbcli_kubeblocks_uninstall.md)	 - Uninstall KubeBlocks
-* [kbcli kubeblocks upgrade](kbcli_kubeblocks_upgrade.md)	 - Upgrade KubeBlocks
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster operation command
 

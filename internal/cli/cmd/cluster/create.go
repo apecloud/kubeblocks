@@ -249,7 +249,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	o := &CreateOptions{BaseOptions: create.BaseOptions{IOStreams: streams}}
 	inputs := create.Inputs{
 		Use:             "create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOut --components=file-path",
-		Short:           "Create a database cluster",
+		Short:           "Create a cluster",
 		Example:         clusterCreateExample,
 		CueTemplateName: CueTemplateName,
 		ResourceName:    types.ResourceClusters,

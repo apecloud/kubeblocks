@@ -1,11 +1,22 @@
-## kbcli kubeblocks
+## kbcli cluster vertical-scale
 
-KubeBlocks operation commands
+Vertical scale the specified components in the cluster
+
+```
+kbcli cluster vertical-scale [flags]
+```
 
 ### Options
 
 ```
-  -h, --help   help for kubeblocks
+      --component-names strings       Component names to this operations (required)
+  -h, --help                         help for vertical-scale
+      --limits.cpu string            CPU size limited by the component
+      --limits.memory string         Memory size limited by the component
+      --name string                  OpsRequest name. if not specified, it will be randomly generated 
+      --requests.cpu string          CPU size requested by the component
+      --requests.memory string       Memory size requested by the component
+      --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
 ```
 
 ### Options inherited from parent commands
@@ -33,8 +44,5 @@ KubeBlocks operation commands
 
 ### SEE ALSO
 
-* [kbcli](kbcli.md)	 - KubeBlocks CLI
-* [kbcli kubeblocks install](kbcli_kubeblocks_install.md)	 - Install KubeBlocks
-* [kbcli kubeblocks uninstall](kbcli_kubeblocks_uninstall.md)	 - Uninstall KubeBlocks
-* [kbcli kubeblocks upgrade](kbcli_kubeblocks_upgrade.md)	 - Upgrade KubeBlocks
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster operation command
 

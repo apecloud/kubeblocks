@@ -1,11 +1,22 @@
-## kbcli kubeblocks
+## kbcli cluster describe-ops
 
-KubeBlocks operation commands
+Show details of a specific OpsRequest
+
+```
+kbcli cluster describe-ops [flags]
+```
+
+### Examples
+
+```
+  # describe a specified OpsRequest
+  kbcli cluster describe-ops mysql-restart-82zxv
+```
 
 ### Options
 
 ```
-  -h, --help   help for kubeblocks
+  -h, --help   help for describe-ops
 ```
 
 ### Options inherited from parent commands
@@ -33,8 +44,5 @@ KubeBlocks operation commands
 
 ### SEE ALSO
 
-* [kbcli](kbcli.md)	 - KubeBlocks CLI
-* [kbcli kubeblocks install](kbcli_kubeblocks_install.md)	 - Install KubeBlocks
-* [kbcli kubeblocks uninstall](kbcli_kubeblocks_uninstall.md)	 - Uninstall KubeBlocks
-* [kbcli kubeblocks upgrade](kbcli_kubeblocks_upgrade.md)	 - Upgrade KubeBlocks
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster operation command
 

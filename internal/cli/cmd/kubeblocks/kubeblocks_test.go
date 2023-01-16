@@ -17,10 +17,13 @@ limitations under the License.
 package kubeblocks
 
 import (
+	"bytes"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/spf13/cobra"
+	appv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -89,18 +92,17 @@ var _ = Describe("kubeblocks", func() {
 				IOStreams: streams,
 				HelmCfg:   helm.FakeActionConfig(),
 				Namespace: "default",
+				Client:    testing.FakeClientSet(),
+				Dynamic:   testing.FakeDynamicClient(),
 			},
-			Version: version.DefaultKubeBlocksVersion,
-			Monitor: true,
+			Version:         version.DefaultKubeBlocksVersion,
+			Monitor:         true,
+			CreateNamespace: true,
 		}
 		Expect(o.Run()).Should(HaveOccurred())
 		Expect(len(o.Sets)).To(Equal(1))
 		Expect(o.Sets[0]).To(Equal(kMonitorParam))
-
-		notes, err := o.installChart()
-		Expect(err).Should(HaveOccurred())
-		Expect(notes).Should(Equal(""))
-
+		Expect(o.installChart()).Should(HaveOccurred())
 		o.printNotes()
 	})
 
@@ -139,10 +141,7 @@ var _ = Describe("kubeblocks", func() {
 		Expect(o.Upgrade()).Should(HaveOccurred())
 		Expect(len(o.Sets)).To(Equal(1))
 		Expect(o.Sets[0]).To(Equal(kMonitorParam))
-
-		notes, err := o.upgradeChart()
-		Expect(err).Should(HaveOccurred())
-		Expect(notes).Should(Equal(""))
+		Expect(o.upgradeChart()).Should(HaveOccurred())
 
 		o.printNotes()
 	})
@@ -169,9 +168,11 @@ var _ = Describe("kubeblocks", func() {
 			IOStreams: streams,
 			HelmCfg:   helm.FakeActionConfig(),
 			Namespace: "default",
+			Client:    testing.FakeClientSet(),
+			Dynamic:   testing.FakeDynamicClient(),
 		}
 
-		Expect(o.run()).Should(MatchError(MatchRegexp("release: not found")))
+		Expect(o.run()).Should(Succeed())
 	})
 
 	It("remove finalizer", func() {
@@ -204,10 +205,11 @@ var _ = Describe("kubeblocks", func() {
 
 		for _, c := range testCases {
 			client := testing.FakeDynamicClient(c.clusterDef, c.clusterVersion)
+			objs, _ := getKBObjects(testing.FakeClientSet(), client, "")
 			if c.expected != "" {
-				Expect(removeFinalizers(client)).Should(MatchError(MatchRegexp(c.expected)))
+				Expect(removeFinalizers(client, objs)).Should(MatchError(MatchRegexp(c.expected)))
 			} else {
-				Expect(removeFinalizers(client)).Should(Succeed())
+				Expect(removeFinalizers(client, objs)).Should(Succeed())
 			}
 		}
 	})
@@ -248,6 +250,77 @@ var _ = Describe("kubeblocks", func() {
 		}
 
 		client := testing.FakeDynamicClient(&clusterCrd, &clusterDefCrd, &clusterVersionCrd)
-		Expect(deleteCRDs(client)).Should(Succeed())
+		objs, _ := getKBObjects(testing.FakeClientSet(), client, "")
+		Expect(deleteCRDs(client, objs.crds)).Should(Succeed())
+	})
+
+	It("checkIfKubeBlocksInstalled", func() {
+		By("KubeBlocks is not installed")
+		client := testing.FakeClientSet()
+		installed, version, err := checkIfKubeBlocksInstalled(client)
+		Expect(err).Should(Succeed())
+		Expect(installed).Should(Equal(false))
+		Expect(version).Should(BeEmpty())
+
+		mockDeploy := func(version string) *appv1.Deployment {
+			deploy := &appv1.Deployment{}
+			label := map[string]string{
+				"app.kubernetes.io/name": types.KubeBlocksChartName,
+			}
+			if len(version) > 0 {
+				label["app.kubernetes.io/version"] = version
+			}
+			deploy.SetLabels(label)
+			return deploy
+		}
+
+		By("KubeBlocks is installed")
+		client = testing.FakeClientSet(mockDeploy(""))
+		installed, version, err = checkIfKubeBlocksInstalled(client)
+		Expect(err).Should(Succeed())
+		Expect(installed).Should(Equal(true))
+		Expect(version).Should(BeEmpty())
+
+		By("KubeBlocks 0.1.0 is installed")
+		client = testing.FakeClientSet(mockDeploy("0.1.0"))
+		installed, version, err = checkIfKubeBlocksInstalled(client)
+		Expect(err).Should(Succeed())
+		Expect(installed).Should(Equal(true))
+		Expect(version).Should(Equal("0.1.0"))
+	})
+
+	It("confirmUninstall", func() {
+		in := &bytes.Buffer{}
+		_, _ = in.Write([]byte("\n"))
+		Expect(confirmUninstall(in)).Should(HaveOccurred())
+
+		in.Reset()
+		_, _ = in.Write([]byte("uninstall-kubeblocks\n"))
+		Expect(confirmUninstall(in)).Should(Succeed())
+	})
+
+	It("deleteDeploys", func() {
+		const namespace = "test"
+		client := testing.FakeClientSet()
+		Expect(deleteDeploys(client, nil)).Should(Succeed())
+
+		mockDeploy := func(label map[string]string) *appv1.Deployment {
+			deploy := &appv1.Deployment{}
+			deploy.SetLabels(label)
+			deploy.SetNamespace(namespace)
+			return deploy
+		}
+
+		client = testing.FakeClientSet(mockDeploy(map[string]string{
+			"types.InstanceLabelKey": types.KubeBlocksChartName,
+		}))
+		objs, _ := getKBObjects(client, testing.FakeDynamicClient(), namespace)
+		Expect(deleteDeploys(client, objs.deploys)).Should(Succeed())
+
+		client = testing.FakeClientSet(mockDeploy(map[string]string{
+			"release": types.KubeBlocksChartName,
+		}))
+		objs, _ = getKBObjects(client, testing.FakeDynamicClient(), namespace)
+		Expect(deleteDeploys(client, objs.deploys)).Should(Succeed())
 	})
 })

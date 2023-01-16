@@ -1,0 +1,24 @@
+# permissions for end users to edit configconstraints.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: configconstraint-editor-role
+rules:
+- apiGroups:
+  - dbaas.infracreate.com
+  resources:
+  - configconstraints
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dbaas.infracreate.com
+  resources:
+  - configconstraints/status
+  verbs:
+  - get

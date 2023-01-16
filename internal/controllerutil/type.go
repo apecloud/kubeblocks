@@ -54,6 +54,9 @@ const (
 
 	// StorageClassAnnotationKey StorageClass annotation key in Cluster
 	StorageClassAnnotationKey = "kubeblocks.io/storage-class"
+
+	// RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
+	RestartAnnotationKey = "kubeblocks.io/restart"
 )
 
 const (
@@ -69,6 +72,8 @@ const (
 	ReasonCreatedCR = "CreatedCR"
 	// ReasonRunTaskFailed run task failed
 	ReasonRunTaskFailed = "RunTaskFailed"
+	// ReasonDeleteFailed delete failed
+	ReasonDeleteFailed = "DeleteFailed"
 )
 
 const (

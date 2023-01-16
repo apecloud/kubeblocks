@@ -55,21 +55,23 @@ import (
 
 // owned K8s core API resources controller-gen RBAC marker
 // full access on core API resources
-// +kubebuilder:rbac:groups=core,resources=secrets;configmaps;services;resourcequotas,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=services/status;resourcequotas/status,verbs=get
-// +kubebuilder:rbac:groups=core,resources=services/finalizers;secrets/finalizers;configmaps/finalizers;resourcequotas/finalizers,verbs=update
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=secrets/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=configmaps/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=services/status,verbs=get
+// +kubebuilder:rbac:groups=core,resources=services/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=core,resources=resourcequotas,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=resourcequotas/status,verbs=get
+// +kubebuilder:rbac:groups=core,resources=resourcequotas/finalizers,verbs=update
 
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/status,verbs=get
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/finalizers,verbs=update
-
-// read + update access
-// +kubebuilder:rbac:groups=core,resources=endpoints,verbs=get;list;watch;update;patch
-// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update;patch
-// +kubebuilder:rbac:groups=core,resources=pods/exec,verbs=create
-
-// read only + watch access
-// +kubebuilder:rbac:groups=core,resources=endpoints,verbs=get;list;watch
 
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get
@@ -82,6 +84,12 @@ import (
 // +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets/finalizers,verbs=update
 
+// read + update access
+// +kubebuilder:rbac:groups=core,resources=endpoints,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=core,resources=pods/exec,verbs=create
+
+// read only + watch access
 // +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 
 // ClusterReconciler reconciles a Cluster object
@@ -388,7 +396,6 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 		if cluster.Status.Phase != dbaasv1alpha1.DeletingPhase {
 			patch := client.MergeFrom(cluster.DeepCopy())
 			cluster.Status.ObservedGeneration = cluster.Generation
-			cluster.Status.Phase = dbaasv1alpha1.DeletingPhase
 			cluster.Status.Message = fmt.Sprintf("spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
 			if err := r.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
 				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -417,50 +424,43 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 		intctrlutil.AppNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
 	}
 	inNS := client.InNamespace(cluster.Namespace)
-	stsList := &appsv1.StatefulSetList{}
-	if err := r.List(reqCtx.Ctx, stsList, inNS, ml); err != nil {
+
+	if ret, err := removeFinalizer[appsv1.StatefulSet, *appsv1.StatefulSet, appsv1.StatefulSetList,
+		*appsv1.StatefulSetList, intctrlutil.StatefulSetListWrapper](r, reqCtx, inNS, ml); err != nil {
+		return ret, err
+	}
+
+	if ret, err := removeFinalizer[corev1.Service, *corev1.Service, corev1.ServiceList,
+		*corev1.ServiceList, intctrlutil.ServiceListWrapper](r, reqCtx, inNS, ml); err != nil {
+		return ret, err
+	}
+
+	if ret, err := removeFinalizer[corev1.Secret, *corev1.Secret, corev1.SecretList,
+		*corev1.SecretList, intctrlutil.SecretListWrapper](r, reqCtx, inNS, ml); err != nil {
+		return ret, err
+	}
+
+	return nil, nil
+}
+
+func removeFinalizer[T intctrlutil.Object, PT intctrlutil.PObject[T],
+	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L], W intctrlutil.ObjListWrapper[T, L]](
+	r *ClusterReconciler, reqCtx intctrlutil.RequestCtx, inNS client.InNamespace,
+	ml client.MatchingLabels) (*ctrl.Result, error) {
+	var objList L
+	if err := r.List(reqCtx.Ctx, PL(&objList), inNS, ml); err != nil {
 		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		return &res, err
 	}
-	for _, sts := range stsList.Items {
-		if !controllerutil.ContainsFinalizer(&sts, dbClusterFinalizerName) {
+	var wrapper W
+	for _, obj := range wrapper.GetItems(&objList) {
+		pobj := PT(&obj)
+		if !controllerutil.ContainsFinalizer(pobj, dbClusterFinalizerName) {
 			continue
 		}
-		patch := client.MergeFrom(sts.DeepCopy())
-		controllerutil.RemoveFinalizer(&sts, dbClusterFinalizerName)
-		if err := r.Patch(reqCtx.Ctx, &sts, patch); err != nil {
-			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-			return &res, err
-		}
-	}
-	svcList := &corev1.ServiceList{}
-	if err := r.List(reqCtx.Ctx, svcList, inNS, ml); err != nil {
-		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		return &res, err
-	}
-	for _, svc := range svcList.Items {
-		if !controllerutil.ContainsFinalizer(&svc, dbClusterFinalizerName) {
-			continue
-		}
-		patch := client.MergeFrom(svc.DeepCopy())
-		controllerutil.RemoveFinalizer(&svc, dbClusterFinalizerName)
-		if err := r.Patch(reqCtx.Ctx, &svc, patch); err != nil {
-			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-			return &res, err
-		}
-	}
-	secretList := &corev1.SecretList{}
-	if err := r.List(reqCtx.Ctx, secretList, inNS, ml); err != nil {
-		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		return &res, err
-	}
-	for _, secret := range secretList.Items {
-		if !controllerutil.ContainsFinalizer(&secret, dbClusterFinalizerName) {
-			continue
-		}
-		patch := client.MergeFrom(secret.DeepCopy())
-		controllerutil.RemoveFinalizer(&secret, dbClusterFinalizerName)
-		if err := r.Patch(reqCtx.Ctx, &secret, patch); err != nil {
+		patch := client.MergeFrom(PT(pobj.DeepCopy()))
+		controllerutil.RemoveFinalizer(pobj, dbClusterFinalizerName)
+		if err := r.Patch(reqCtx.Ctx, pobj, patch); err != nil {
 			res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 			return &res, err
 		}

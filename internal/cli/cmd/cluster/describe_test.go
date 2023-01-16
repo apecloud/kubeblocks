@@ -62,9 +62,6 @@ var _ = Describe("Expose", func() {
 			GroupVersion:         schema.GroupVersion{Group: types.Group, Version: types.Version},
 			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 			Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				if req.Method != "GET" {
-					return nil, nil
-				}
 				urlPrefix := "/api/v1/namespaces/" + namespace
 				mapping := map[string]*http.Response{
 					"/api/v1/nodes/" + testing.NodeName: httpResp(testing.FakeNode()),

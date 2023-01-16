@@ -24,6 +24,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -72,7 +73,7 @@ func (stateless *Stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int3
 }
 
 // HandleProbeTimeoutWhenPodsReady the stateless component has no role detection, empty implementation here.
-func (stateless *Stateless) HandleProbeTimeoutWhenPodsReady() (bool, error) {
+func (stateless *Stateless) HandleProbeTimeoutWhenPodsReady(recorder record.EventRecorder) (bool, error) {
 	return false, nil
 }
 

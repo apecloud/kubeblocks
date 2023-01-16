@@ -129,7 +129,7 @@ var _ = Describe("Stateful Component", func() {
 			Expect(isRunning == true).Should(BeTrue())
 
 			By("test handle probe timed out")
-			requeue, _ := stateful.HandleProbeTimeoutWhenPodsReady()
+			requeue, _ := stateful.HandleProbeTimeoutWhenPodsReady(nil)
 			Expect(requeue == false).Should(BeTrue())
 		})
 	})

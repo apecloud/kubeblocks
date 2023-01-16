@@ -24,14 +24,18 @@ spec:
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
-      configTemplateRefs:
-        - name: mysql-3node-tpl-8.0
-          namespace: {{ .Release.Namespace }}
-          volumeName: mysql-config
-        - name: wesql-scripts
-          namespace: {{ .Release.Namespace }}
-          volumeName: scripts
-          defaultMode: 493
+      configSpec:
+        configTemplateRefs:
+          - name: mysql-3node-tpl
+            configTplRef: mysql-3node-tpl-8.0
+            configConstraintRef: wesql-cfg-constraints-8.0
+            volumeName: mysql-config
+            namespace: {{ .Release.Namespace }}
+          - name: wesql-scripts
+            configTplRef: wesql-scripts
+            namespace: {{ .Release.Namespace }}
+            volumeName: scripts
+            defaultMode: 493
       defaultReplicas: 3
       componentType: Consensus
       consensusSpec:

@@ -202,6 +202,8 @@ func (r *OpsRequest) validateOps(ctx context.Context,
 		r.validateVolumeExpansion(allErrs, cluster)
 	case RestartType:
 		r.validateRestart(allErrs, cluster)
+	case ReconfiguringType:
+		r.validateReconfigure(allErrs, cluster)
 	}
 }
 
@@ -278,6 +280,17 @@ func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *
 	// validate component name is legal
 	r.validateComponentName(allErrs, cluster, supportedComponentMap, componentNames)
 
+}
+
+// validateVerticalScaling validate api is legal when spec.type is VerticalScaling
+func (r *OpsRequest) validateReconfigure(allErrs *field.ErrorList, cluster *Cluster) {
+	reconfigure := r.Spec.Reconfigure
+	if reconfigure == nil {
+		addInvalidError(allErrs, "spec.reconfigure", reconfigure, "can not be empty")
+		return
+	}
+
+	// TODO validate updated params
 }
 
 // compareRequestsAndLimits compares the resource requests and limits

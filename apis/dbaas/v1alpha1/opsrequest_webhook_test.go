@@ -89,6 +89,7 @@ var _ = Describe("OpsRequest webhook", func() {
 
 		By("By testing when spec.upgrade is null")
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("spec.upgrade"))
+		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: clusterVersionName}
 
 		By("Test Cluster Phase")
 		OpsRequestBehaviourMapper[UpgradeType] = OpsRequestBehaviour{

@@ -27,6 +27,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 const (
@@ -141,7 +142,8 @@ func FakeSecrets(namespace string, cluster string) *corev1.SecretList {
 	secret.Namespace = namespace
 	secret.Type = corev1.SecretTypeServiceAccountToken
 	secret.Labels = map[string]string{
-		types.InstanceLabelKey: cluster,
+		types.InstanceLabelKey:           cluster,
+		intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
 	}
 
 	secret.Data = map[string][]byte{

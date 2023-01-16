@@ -32,7 +32,18 @@ $kubeblocks_changes
 
 To upgrade to this release of KubeBlocks, follow the steps here to ensure a smooth upgrade.
 
-TODO: add upgrade steps
+Release Notes for `v0.3.0`:
+- Rename CRD name `backupjobs.dataprotection.kubeblocks.io` 
+to `backups.dataprotection.kubeblocks.io`
+  - upgrade kubeblocks following commands:
+      ```
+      helm upgrade --install kubeblocks kubeblocks/kubeblocks --version 0.3.0
+      ```
+  - after you upgrade kubeblocks, check CRD `backupjobs.dataprotection.kubeblocks.io` and delete it
+    ```
+    kubectl delete crd backupjobs.dataprotection.kubeblocks.io
+    ```
+  
 
 ## Breaking Changes
 

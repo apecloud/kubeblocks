@@ -846,11 +846,11 @@ spec:
 
 			By("Checking BackupJob created")
 			Eventually(func() bool {
-				backupJobList := dataprotectionv1alpha1.BackupJobList{}
-				Expect(k8sClient.List(ctx, &backupJobList, client.MatchingLabels{
+				backupList := dataprotectionv1alpha1.BackupList{}
+				Expect(k8sClient.List(ctx, &backupList, client.MatchingLabels{
 					"app.kubernetes.io/instance": key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				return len(backupJobList.Items) == 1
+				return len(backupList.Items) == 1
 			}, timeout, interval).Should(BeTrue())
 
 			By("Mocking VolumeSnapshot and set it as ReadyToUse")
@@ -1272,11 +1272,11 @@ spec:
 			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
 
 			Eventually(func() bool {
-				backupJobList := dataprotectionv1alpha1.BackupJobList{}
-				Expect(k8sClient.List(ctx, &backupJobList, client.MatchingLabels{
+				backupList := dataprotectionv1alpha1.BackupList{}
+				Expect(k8sClient.List(ctx, &backupList, client.MatchingLabels{
 					"app.kubernetes.io/instance": key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				return len(backupJobList.Items) == 1
+				return len(backupList.Items) == 1
 			}, timeout, interval).Should(BeTrue())
 
 			fetchedG2 := &dbaasv1alpha1.Cluster{}
@@ -1326,11 +1326,11 @@ spec:
 			}, timeout, interval).Should(BeTrue())
 
 			Eventually(func() bool {
-				backupJobList := dataprotectionv1alpha1.BackupJobList{}
-				Expect(k8sClient.List(ctx, &backupJobList, client.MatchingLabels{
+				backupList := dataprotectionv1alpha1.BackupList{}
+				Expect(k8sClient.List(ctx, &backupList, client.MatchingLabels{
 					"app.kubernetes.io/instance": key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
-				return len(backupJobList.Items) == 1
+				return len(backupList.Items) == 1
 			}, timeout, interval).Should(BeTrue())
 
 			Eventually(func() bool {

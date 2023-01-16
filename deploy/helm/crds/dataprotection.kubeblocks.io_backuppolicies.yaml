@@ -17,7 +17,20 @@ spec:
     singular: backuppolicy
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: STATUS
+      type: string
+    - jsonPath: .spec.schedule
+      name: SCHEDULE
+      type: string
+    - jsonPath: .status.lastScheduleTime
+      name: LAST SCHEDULE
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: BackupPolicy is the Schema for the backuppolicies API  (defined
@@ -48,6 +61,21 @@ spec:
                   one tool.
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
+              backupType:
+                default: snapshot
+                description: Backup Type. full or incremental or snapshot. if unset,
+                  default is snapshot.
+                enum:
+                - full
+                - incremental
+                - snapshot
+                type: string
+              backupsHistoryLimit:
+                default: 7
+                description: The number of automatic backups to retain. Value must
+                  be non-negative integer. 0 means NO limit on the number of backups.
+                format: int32
+                type: integer
               hooks:
                 description: execute hook commands for backup.
                 properties:
@@ -56,8 +84,8 @@ spec:
                     description: which container can exec command
                     type: string
                   image:
-                    default: rancher/kubectl:v1.23.7
-                    description: 'exec command with image TODO(dsj): use kubeblocks'
+                    default: docker.io/apecloud/kubeblocks
+                    description: exec command with image
                     type: string
                   postCommands:
                     description: post backup to perform commands
@@ -1630,17 +1658,19 @@ spec:
                   secret:
                     description: target db cluster access secret
                     properties:
-                      keyPassword:
-                        default: password
-                        description: which key name for password
-                        type: string
-                      keyUser:
-                        default: username
-                        description: which key name for user
-                        type: string
                       name:
                         description: the secret name
                         pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                        type: string
+                      passwordKeyword:
+                        default: password
+                        description: PasswordKeyword the map keyword of the password
+                          in the connection credential secret
+                        type: string
+                      userKeyword:
+                        default: username
+                        description: UserKeyword the map keyword of the user in the
+                          connection credential secret
                         type: string
                     required:
                     - name
@@ -1664,6 +1694,16 @@ spec:
             properties:
               failureReason:
                 description: the reason if backup policy check failed.
+                type: string
+              lastScheduleTime:
+                description: Information when was the last time the job was successfully
+                  scheduled.
+                format: date-time
+                type: string
+              lastSuccessfulTime:
+                description: Information when was the last time the job successfully
+                  completed.
+                format: date-time
                 type: string
               phase:
                 description: 'backup policy phase valid value: available, failed,

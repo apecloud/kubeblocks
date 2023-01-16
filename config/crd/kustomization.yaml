@@ -7,7 +7,7 @@ resources:
 - bases/dbaas.kubeblocks.io_clusterversions.yaml
 - bases/dataprotection.kubeblocks.io_backuptools.yaml
 - bases/dataprotection.kubeblocks.io_backuppolicies.yaml
-- bases/dataprotection.kubeblocks.io_backupjobs.yaml
+- bases/dataprotection.kubeblocks.io_backups.yaml
 - bases/dataprotection.kubeblocks.io_restorejobs.yaml
 - bases/dataprotection.kubeblocks.io_backuppolicytemplates.yaml
 - bases/dbaas.kubeblocks.io_opsrequests.yaml
@@ -22,7 +22,7 @@ patchesStrategicMerge:
 #- patches/webhook_in_clusterversions.yaml
 #- patches/webhook_in_backuptools.yaml
 #- patches/webhook_in_backuppolicies.yaml
-#- patches/webhook_in_backupjobs.yaml
+#- patches/webhook_in_backups.yaml
 #- patches/webhook_in_restorejobs.yaml
 #- patches/webhook_in_backuppolicytemplates.yaml
 #- patches/webhook_in_opsrequests.yaml
@@ -37,7 +37,7 @@ patchesStrategicMerge:
 #- patches/cainjection_in_clusterversions.yaml
 #- patches/cainjection_in_backuptools.yaml
 #- patches/cainjection_in_backuppolicies.yaml
-#- patches/cainjection_in_backupjobs.yaml
+#- patches/cainjection_in_backups.yaml
 #- patches/cainjection_in_restorejobs.yaml
 #- patches/cainjection_in_backuppolicytemplates.yaml
 #- patches/cainjection_in_opsrequests.yaml

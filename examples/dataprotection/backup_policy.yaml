@@ -34,10 +34,6 @@ spec:
     secret:
       # the secret name
       name: wesql-cluster
-      # which key name for user
-      keyUser: username
-      # which key name for password
-      keyPassword: password
 
   hooks:
     preCommands:

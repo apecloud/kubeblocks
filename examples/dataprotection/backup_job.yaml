@@ -1,11 +1,11 @@
 # Standard Kubernetes Kind declaration. Required.
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 # Standard Kubernetes Kind declaration. Required.
-kind: BackupJob
+kind: Backup
 # Standard Kubernetes metadata. Required.
 metadata:
   # Backup name. Maybe any valid Kubernetes object name. Required.
-  name: backup-job-demo
+  name: backup-demo
 
   labels:
     dataprotection.kubeblocks.io/backup-type: snapshot

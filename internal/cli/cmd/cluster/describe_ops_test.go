@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -101,11 +100,6 @@ var _ = Describe("Expose", func() {
 		Expect(o.namespace).Should(Equal(namespace))
 	})
 
-	getRandomStr := func() string {
-		seq, _ := password.Generate(6, 2, 0, true, true)
-		return seq
-	}
-
 	generateOpsObject := func(opsName string, opsType dbaasv1alpha1.OpsType) *dbaasv1alpha1.OpsRequest {
 		return &dbaasv1alpha1.OpsRequest{
 			ObjectMeta: metav1.ObjectMeta{
@@ -120,7 +114,7 @@ var _ = Describe("Expose", func() {
 	}
 
 	describeOps := func(opsType dbaasv1alpha1.OpsType, completeOps func(ops *dbaasv1alpha1.OpsRequest)) {
-		randomStr := getRandomStr()
+		randomStr := clitesting.GetRandomStr()
 		ops := generateOpsObject(opsName+randomStr, opsType)
 		completeOps(ops)
 		tf.FakeDynamicClient = clitesting.FakeDynamicClient(ops)

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,6 +46,11 @@ const (
 	KubeBlocksChartName = "fake-kubeblocks"
 	KubeBlocksChartURL  = "fake-kubeblocks-chart-url"
 )
+
+func GetRandomStr() string {
+	seq, _ := password.Generate(6, 2, 0, true, true)
+	return seq
+}
 
 func FakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
 	return &dbaasv1alpha1.Cluster{

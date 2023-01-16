@@ -53,7 +53,6 @@ const (
 
 const (
 	DefaultPodName = "Unknown"
-	RoleEmpty      = ""
 )
 
 const (
@@ -310,7 +309,7 @@ func ComposeRolePriorityMap(component dbaasv1alpha1.ClusterDefinitionComponent) 
 	}
 
 	rolePriorityMap := make(map[string]int, 0)
-	rolePriorityMap[RoleEmpty] = emptyPriority
+	rolePriorityMap[""] = emptyPriority
 	rolePriorityMap[component.ConsensusSpec.Leader.Name] = leaderPriority
 	if component.ConsensusSpec.Learner != nil {
 		rolePriorityMap[component.ConsensusSpec.Learner.Name] = learnerPriority

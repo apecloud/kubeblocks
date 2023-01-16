@@ -25,6 +25,7 @@ import (
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
+	"github.com/spf13/viper"
 )
 
 type fakeBinding struct{}
@@ -52,8 +53,8 @@ func TestInit(t *testing.T) {
 	if p.checkFailedThreshold != defaultCheckFailedThreshold {
 		t.Errorf("p.checkFailedThreshold init failed: %d", p.checkFailedThreshold)
 	}
-	if p.roleUnchangedThreshold != defaultRoleUnchangedThreshold {
-		t.Errorf("p.roleUnchangedThreshold init failed: %d", p.roleUnchangedThreshold)
+	if p.roleDetectionThreshold != defaultRoleDetectionThreshold {
+		t.Errorf("p.roleDetectionThreshold init failed: %d", p.roleDetectionThreshold)
 	}
 	if p.dbPort != testDbPort {
 		t.Errorf("p.dbPort init failed: %d", p.dbPort)
@@ -62,6 +63,7 @@ func TestInit(t *testing.T) {
 
 func TestInvoke(t *testing.T) {
 	p := mockProbeBase()
+	viper.SetDefault("KB_SERVICE_ROLES", "{\"follower\":\"Readonly\",\"leader\":\"ReadWrite\"}")
 	p.Init()
 
 	t.Run("runningCheck", func(t *testing.T) {

@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/sethvargo/go-password/password"
-	appv1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -310,7 +310,7 @@ spec:
 		return nil
 	}
 
-	assureStatefulSetObj := func() *appv1.StatefulSet {
+	assureStatefulSetObj := func() *appsv1.StatefulSet {
 		By("By assure an stateful obj")
 		statefulYaml := `
 apiVersion: apps/v1
@@ -574,7 +574,7 @@ spec:
           storage: 2Gi
       volumeMode: Filesystem
 `
-		statefulSet := &appv1.StatefulSet{}
+		statefulSet := &appsv1.StatefulSet{}
 		Expect(yaml.Unmarshal([]byte(statefulYaml), statefulSet)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, statefulSet)).Should(Succeed())
 		return statefulSet

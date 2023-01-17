@@ -28,28 +28,23 @@
 
 
 ## What is KubeBlocks
-**KubeBlocks**, running on Kubernetes, is an open-source data manangement platform. KubeBlocks greatly simplifies the process of deploying databases on Kubernetes. It offers a universal view for multicloud and on-premises databases with a consistent database developing and management experience.
-
+KubeBlocks is an open-source and cloud-prem tool that helps application developers and platform engineers build and manage Kubernetes native data platforms. Based on the best experience of public cloud fully managed services, KubeBlocks improves the service availability, resource utilization, and developer productivity of data platforms on Kubernetes.
 ### Goals
-- Enable developers using one platform to manage any database engines used
-- Provide consistent and easy-to-use declarative API
-- Create and use database clusters within minutes without a deep knowledge of Kubernetes
-- Relieve the burden of maintaining miscellaneous operators
-- Be community driven, open, and cloud neutral
-- Embrace extensibility and provide domain functions without vendor lock-in
-- Gain new contributors
+- Enhance stateful applications control plane manageability on Kubernetes clusters, being open sourced and cloud neutral 
+- Manage data platforms without a high cognitive load of cloud computing, Kubernetes, and database knowledge 
+- Be community-driven, embracing extensibility, and providing domain functions without vendor lock-in
+- Reduce costs by only paying for the infrastructure and increasing the utilization of resources with flexible scheduling
+- Support the most popular databases, analytical software, and their bundled tools
+- Provide the most advanced user experience based on the concepts of IaC and GitOps
 ### Key Features
-- Runs on a Kubernetes base on any cloud
-- Defines each supported database engine through a declarative API
-- Integrated DevOps tools and processes,such as Prometheus, Grafana and AlertManager for monitoring and alarming
-- Compatible with MySQL, PostgreSQL, Redis, MongoDB and other database engines
-- Accesses and manages any new database engines or plugins by defining CRD
-- High availability, based on the consistency X-Paxos protocol
-- Database life cycle management
-- Backup and restore
-- Supports resource overcommitment
-- Managed and optimized database security
-- Provides kbcli, an easy-to-use CLI command line tool
+- Runs in Kubernetes clusters on public clouds such as AWS/GCP/Azure
+- 50% cost down under the same workload, compared with fully managed database services
+- Operates with A Kubernetes-style declarative API
+- Provides kbcli, an easy-to-use intuitive command-line tool
+- Enables a complete experience of Day-2 automated operation and maintenance, such as lifecycle management, backup, and monitoring
+- Supports mainstream open-source database software, such as MySQL, PostgreSQL, Redis and etc.
+  - KubeBlocks supports conventional replication and consensus replication with ReplicationSet and ConsensusSet
+  - KubeBlocks deploys MySQL to 3 available zones and ensures availability when a single AZ is unavailable (RTO is less than 30 seconds) and supports role configuration and complex topological relationships of Leader, Follower, and Learner
 
 For detailed feature information, see [Feature list](https://github.com/apecloud/kubeblocks/blob/support/rewrite_kb_introduction/docs/user_docs/Introduction/feature_list.md)
 

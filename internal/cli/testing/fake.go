@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -45,6 +46,8 @@ const (
 
 	KubeBlocksChartName = "fake-kubeblocks"
 	KubeBlocksChartURL  = "fake-kubeblocks-chart-url"
+
+	BackupToolName = "fake-backup-tool"
 )
 
 func GetRandomStr() string {
@@ -195,6 +198,12 @@ func FakeClusterVersion() *dbaasv1alpha1.ClusterVersion {
 	cv.Spec.ClusterDefinitionRef = ClusterDefName
 	cv.SetCreationTimestamp(metav1.Now())
 	return cv
+}
+
+func FakeBackupTool() *dpv1alpha1.BackupTool {
+	tool := &dpv1alpha1.BackupTool{}
+	tool.Name = BackupToolName
+	return tool
 }
 
 func FakeServices() *corev1.ServiceList {

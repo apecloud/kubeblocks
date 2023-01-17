@@ -23,13 +23,14 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/spf13/cobra"
-	appv1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -37,7 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/version"
 )
 
-const nameSpace = "test"
+const namespace = "test"
 
 var _ = Describe("kubeblocks", func() {
 	var cmd *cobra.Command
@@ -46,7 +47,7 @@ var _ = Describe("kubeblocks", func() {
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
-		tf = cmdtesting.NewTestFactory().WithNamespace(nameSpace)
+		tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
 		tf.Client = &clientfake.RESTClient{}
 
 		// use a fake URL to test
@@ -99,7 +100,7 @@ var _ = Describe("kubeblocks", func() {
 			Monitor:         true,
 			CreateNamespace: true,
 		}
-		Expect(o.Run()).Should(HaveOccurred())
+		Expect(o.Install()).Should(HaveOccurred())
 		Expect(len(o.Sets)).To(Equal(1))
 		Expect(o.Sets[0]).To(Equal(kMonitorParam))
 		Expect(o.installChart()).Should(HaveOccurred())
@@ -159,7 +160,7 @@ var _ = Describe("kubeblocks", func() {
 			IOStreams: streams,
 		}
 		Expect(o.complete(tf, cmd)).Should(Succeed())
-		Expect(o.Namespace).Should(Equal(nameSpace))
+		Expect(o.Namespace).Should(Equal(namespace))
 		Expect(o.HelmCfg).ShouldNot(BeNil())
 	})
 
@@ -172,7 +173,7 @@ var _ = Describe("kubeblocks", func() {
 			Dynamic:   testing.FakeDynamicClient(),
 		}
 
-		Expect(o.run()).Should(Succeed())
+		Expect(o.uninstall()).Should(Succeed())
 	})
 
 	It("remove finalizer", func() {
@@ -180,31 +181,37 @@ var _ = Describe("kubeblocks", func() {
 		clusterDef.Finalizers = []string{"test"}
 		clusterVersion := testing.FakeClusterVersion()
 		clusterVersion.Finalizers = []string{"test"}
+		backupTool := testing.FakeBackupTool()
+		backupTool.Finalizers = []string{"test"}
 
 		testCases := []struct {
 			clusterDef     *dbaasv1alpha1.ClusterDefinition
 			clusterVersion *dbaasv1alpha1.ClusterVersion
+			backupTool     *dpv1alpha1.BackupTool
 			expected       string
 		}{
 			{
 				clusterDef:     testing.FakeClusterDef(),
 				clusterVersion: testing.FakeClusterVersion(),
+				backupTool:     testing.FakeBackupTool(),
 				expected:       "Unable to remove nonexistent key: finalizers",
 			},
 			{
 				clusterDef:     clusterDef,
 				clusterVersion: testing.FakeClusterVersion(),
+				backupTool:     testing.FakeBackupTool(),
 				expected:       "Unable to remove nonexistent key: finalizers",
 			},
 			{
 				clusterDef:     clusterDef,
 				clusterVersion: clusterVersion,
+				backupTool:     backupTool,
 				expected:       "",
 			},
 		}
 
 		for _, c := range testCases {
-			client := testing.FakeDynamicClient(c.clusterDef, c.clusterVersion)
+			client := testing.FakeDynamicClient(c.clusterDef, c.clusterVersion, c.backupTool)
 			objs, _ := getKBObjects(testing.FakeClientSet(), client, "")
 			if c.expected != "" {
 				Expect(removeFinalizers(client, objs)).Should(MatchError(MatchRegexp(c.expected)))
@@ -215,7 +222,7 @@ var _ = Describe("kubeblocks", func() {
 	})
 
 	It("delete crd", func() {
-		clusterCrd := v1.CustomResourceDefinition{
+		clusterCRD := v1.CustomResourceDefinition{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "CustomResourceDefinition",
 				APIVersion: "apiextensions.k8s.io/v1",
@@ -226,7 +233,7 @@ var _ = Describe("kubeblocks", func() {
 			Spec:   v1.CustomResourceDefinitionSpec{},
 			Status: v1.CustomResourceDefinitionStatus{},
 		}
-		clusterDefCrd := v1.CustomResourceDefinition{
+		clusterDefCRD := v1.CustomResourceDefinition{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "CustomResourceDefinition",
 				APIVersion: "apiextensions.k8s.io/v1",
@@ -237,7 +244,7 @@ var _ = Describe("kubeblocks", func() {
 			Spec:   v1.CustomResourceDefinitionSpec{},
 			Status: v1.CustomResourceDefinitionStatus{},
 		}
-		clusterVersionCrd := v1.CustomResourceDefinition{
+		clusterVersionCRD := v1.CustomResourceDefinition{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "CustomResourceDefinition",
 				APIVersion: "apiextensions.k8s.io/v1",
@@ -249,7 +256,18 @@ var _ = Describe("kubeblocks", func() {
 			Status: v1.CustomResourceDefinitionStatus{},
 		}
 
-		client := testing.FakeDynamicClient(&clusterCrd, &clusterDefCrd, &clusterVersionCrd)
+		backupToolCRD := v1.CustomResourceDefinition{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "CustomResourceDefinition",
+				APIVersion: "apiextensions.k8s.io/v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "backuptools.dataprotection.kubeblocks.io",
+			},
+			Spec:   v1.CustomResourceDefinitionSpec{},
+			Status: v1.CustomResourceDefinitionStatus{},
+		}
+		client := testing.FakeDynamicClient(&clusterCRD, &clusterDefCRD, &clusterVersionCRD, &backupToolCRD)
 		objs, _ := getKBObjects(testing.FakeClientSet(), client, "")
 		Expect(deleteCRDs(client, objs.crds)).Should(Succeed())
 	})
@@ -262,8 +280,8 @@ var _ = Describe("kubeblocks", func() {
 		Expect(installed).Should(Equal(false))
 		Expect(version).Should(BeEmpty())
 
-		mockDeploy := func(version string) *appv1.Deployment {
-			deploy := &appv1.Deployment{}
+		mockDeploy := func(version string) *appsv1.Deployment {
+			deploy := &appsv1.Deployment{}
 			label := map[string]string{
 				"app.kubernetes.io/name": types.KubeBlocksChartName,
 			}
@@ -297,30 +315,5 @@ var _ = Describe("kubeblocks", func() {
 		in.Reset()
 		_, _ = in.Write([]byte("uninstall-kubeblocks\n"))
 		Expect(confirmUninstall(in)).Should(Succeed())
-	})
-
-	It("deleteDeploys", func() {
-		const namespace = "test"
-		client := testing.FakeClientSet()
-		Expect(deleteDeploys(client, nil)).Should(Succeed())
-
-		mockDeploy := func(label map[string]string) *appv1.Deployment {
-			deploy := &appv1.Deployment{}
-			deploy.SetLabels(label)
-			deploy.SetNamespace(namespace)
-			return deploy
-		}
-
-		client = testing.FakeClientSet(mockDeploy(map[string]string{
-			"types.InstanceLabelKey": types.KubeBlocksChartName,
-		}))
-		objs, _ := getKBObjects(client, testing.FakeDynamicClient(), namespace)
-		Expect(deleteDeploys(client, objs.deploys)).Should(Succeed())
-
-		client = testing.FakeClientSet(mockDeploy(map[string]string{
-			"release": types.KubeBlocksChartName,
-		}))
-		objs, _ = getKBObjects(client, testing.FakeDynamicClient(), namespace)
-		Expect(deleteDeploys(client, objs.deploys)).Should(Succeed())
 	})
 })

@@ -228,7 +228,7 @@ configTemplate:
       binlog_order_commits?: string & "0" | "1" | "ON" | "OFF"
 
       // Whether the server logs full or minmal rows with row-based replication.
-      binlog_row_image?: string & "full" | "minimal" | "noblob"
+      binlog_row_image?: string & "FULL" | "MINIMAL" | "NOBLOB"
 
       // Controls whether metadata is logged using FULL or MINIMAL format. FULL causes all metadata to be logged; MINIMAL means that only metadata actually required by slave is logged. Default: MINIMAL.
       binlog_row_metadata: string & "FULL" | "MINIMAL" | *"MINIMAL"
@@ -484,7 +484,7 @@ configTemplate:
       innodb_buffer_pool_load_now?: int & 0 | 1
 
       // The size in bytes of the memory buffer innodb uses to cache data and indexes of its tables
-      innodb_buffer_pool_size?: int & >= 5242880 & <= 18446744073709551615
+      innodb_buffer_pool_size?: int & >= 5242880 & <= 18446744073709551615 @k8sResource(quantity)
 
       // Controls InnoDB change buffering
       innodb_change_buffering?: string & "inserts" | "deletes" | "purges" | "changes" | "all" | "none"

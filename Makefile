@@ -699,7 +699,7 @@ pull-all-images: # Pull required container images
 minikube-start: IMG_CACHE_CMD=image load --daemon=true
 minikube-start: pull-all-images minikube ## Start minikube cluster.
 ifneq (, $(shell which minikube))
-ifeq (, $(shell $(MINIKUBE) status -n minikube -ojson | jq -r '.Host' | grep Running))
+ifeq (, $(shell $(MINIKUBE) status -n minikube -ojson 2>/dev/null| jq -r '.Host' | grep Running))
 	$(MINIKUBE) start --kubernetes-version=$(K8S_VERSION) --registry-mirror=$(REGISTRY_MIRROR) --image-repository=$(MINIKUBE_IMAGE_REPO) $(MINIKUBE_START_ARGS)
 endif
 endif

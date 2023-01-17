@@ -120,6 +120,7 @@ var _ = Describe("OpsRequest Controller", func() {
 					cfgcore.CMConfigurationTplNameLabelKey, tpl.ConfigTplRef,
 					cfgcore.CMConfigurationConstraintsNameLabelKey, tpl.ConfigConstraintRef,
 					cfgcore.CMConfigurationISVTplLabelKey, tpl.Name,
+					cfgcore.CMConfigurationTypeLabelKey, cfgcore.ConfigInstanceType,
 				),
 			)
 			Expect(err).Should(Succeed())

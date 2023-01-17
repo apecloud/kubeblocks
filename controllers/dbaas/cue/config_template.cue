@@ -35,7 +35,7 @@ config: {
 			"app.kubernetes.io/managed-by":     "kubeblocks"
 
 			// configmap selector for ConfigureController
-			"configuration.kubeblocks.io/ins-configure": "true"
+			"configuration.kubeblocks.io/configuration-type": "instance"
 			// config template name
 			"configuration.kubeblocks.io/configuration-tpl-name":         "\(meta.component.templateName)"
 			"configuration.kubeblocks.io/configuration-constraints-name": "\(meta.component.configConstraintsName)"

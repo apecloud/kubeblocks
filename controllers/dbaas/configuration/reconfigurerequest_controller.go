@@ -49,7 +49,8 @@ var ConfigurationRequiredLabels = []string{
 	intctrlutil.AppInstanceLabelKey,
 	intctrlutil.AppComponentLabelKey,
 	cfgcore.CMConfigurationTplNameLabelKey,
-	cfgcore.CMConfigurationTplLabelKey,
+	cfgcore.CMConfigurationTypeLabelKey,
+	cfgcore.CMConfigurationISVTplLabelKey,
 }
 
 //+kubebuilder:rbac:groups=core,resources=configmap,verbs=get;list;watch;create;update;patch;delete

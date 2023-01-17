@@ -93,7 +93,7 @@ var _ = Describe("Reconfigure Controller", func() {
 						configHash = cm.Labels[cfgcore.CMInsConfigurationHashLabelKey]
 						return cm.Labels[intctrlutil.AppInstanceLabelKey] == clusterName &&
 							cm.Labels[cfgcore.CMConfigurationTplNameLabelKey] == testWrapper.CMName() &&
-							cm.Labels[cfgcore.CMInsConfigurationLabelKey] != "" &&
+							cm.Labels[cfgcore.CMConfigurationTypeLabelKey] != "" &&
 							cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey] == ReconfigureFirstConfigType &&
 							configHash != ""
 					})

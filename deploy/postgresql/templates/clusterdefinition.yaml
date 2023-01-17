@@ -49,6 +49,7 @@ spec:
           fsGroup: 1001
         containers:
           - name: postgresql
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
             securityContext:
               runAsUser: 1001            
             volumeMounts:
@@ -57,7 +58,7 @@ spec:
               - name: data
                 mountPath: /postgresql
               - name: postgresql-config
-                mountPath: /bitnami/postgresql/conf
+                mountPath: /postgresql/conf
             ports:
               - name: tcp-postgresql
                 containerPort: 5432
@@ -154,7 +155,6 @@ spec:
                   name: {{ .Values.primary.extraEnvVarsSecret }}
               {{- end }}
             {{- end }}
-     
           - name: metrics
             image:  {{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}

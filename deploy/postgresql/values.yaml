@@ -14,7 +14,7 @@
 image:
   registry: docker.io
   repository: bitnami/postgresql
-  tag: 14.5.0-debian-11-r19
+  tag: 14.6.0-debian-11-r22
   digest: ""
   ## Specify a imagePullPolicy
   ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
@@ -89,6 +89,9 @@ primary:
   ## @param primary.configuration PostgreSQL Primary main configuration to be injected as ConfigMap
   ##
   configuration: |-
+    # - Connection Settings -
+    listen_addresses = '*'
+    port = '5432'
     #archive_command = 'wal_dir=/pg/arcwal; [[ $(date +%H%M) == 1200 ]] && rm -rf ${wal_dir}/$(date -d"yesterday" +%Y%m%d); /bin/mkdir -p ${wal_dir}/$(date +%Y%m%d) && /usr/bin/lz4 -q -z %p > ${wal_dir}/$(date +%Y%m%d)/%f.lz4'
     #archive_mode = 'True'
     auto_explain.log_analyze = 'True'
@@ -203,7 +206,7 @@ metrics:
   image:
     registry: docker.io
     repository: bitnami/postgres-exporter
-    tag: 0.11.1-debian-11-r12
+    tag: 0.11.1-debian-11-r49
     digest: ""
     pullPolicy: IfNotPresent
     ## Optionally specify an array of imagePullSecrets.

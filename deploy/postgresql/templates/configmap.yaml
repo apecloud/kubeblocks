@@ -5,9 +5,9 @@ metadata:
 data:
   {{- if .Values.primary.configuration }}
   postgresql.conf: |-
-    {{- include "tplvalues.render" ( dict "value" .Values.primary.configuration "context" $ ) | nindent 4 }}
+    {{- .Values.primary.configuration | nindent 4 }}
   {{- end }}
   {{- if .Values.primary.pgHbaConfiguration }}
   pg_hba.conf: |
-    {{- include "tplvalues.render" ( dict "value" .Values.primary.pgHbaConfiguration "context" $ ) | nindent 4 }}
+    {{- .Values.primary.pgHbaConfiguration | nindent 4 }}
   {{- end }}

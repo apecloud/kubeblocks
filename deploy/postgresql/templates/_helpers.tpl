@@ -98,3 +98,14 @@ Get the password secret.
 {{- define "postgresql.secretName" -}}
 {{- printf "%s" (tpl .Values.auth.existingSecret $) -}}
 {{- end -}}
+
+{{/*
+Get the postgres-password key.
+*/}}
+{{- define "postgresql.postgresPassword" -}}
+{{- if .Values.auth.postgresPassword -}}
+    {{- printf "%s" .Values.auth.postgresPassword }}
+{{- else -}}
+    {{- "$(RANDOM_PASSWD)" -}}
+{{- end -}}
+{{- end -}}

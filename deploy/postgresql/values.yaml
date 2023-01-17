@@ -35,6 +35,9 @@ image:
 ## Authentication parameters
 ##
 auth:
+  ## @param auth.postgresPassword Password for the "postgres" admin user.
+  ##
+  postgresPassword: "postgres"
   ## @param auth.username Name for a custom user to create
   ##
   username: "custom_user"

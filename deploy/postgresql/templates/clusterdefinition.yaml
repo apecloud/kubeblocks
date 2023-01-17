@@ -9,7 +9,7 @@ spec:
   type: state.postgresql
   connectionCredential:
     username: postgres
-    postgres-password: "$(RANDOM_PASSWD)"
+    postgres-password: {{ (include "postgresql.postgresPassword" .) | quote  }}
   components:
     - typeName: postgresql
       componentType: Stateful

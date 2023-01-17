@@ -1,9 +1,9 @@
 ## kbcli cluster update
 
-Update the cluster
+Update the cluster settings, such as enable or disable monitor or log
 
 ```
-kbcli cluster update [flags]
+kbcli cluster update NAME [flags]
 ```
 
 ### Examples

@@ -161,7 +161,7 @@ func (r *OpsRequestReconciler) deleteClusterOpsRequestAnnotation(reqCtx intctrlu
 		Namespace: opsRequest.GetNamespace(),
 		Name:      opsRequest.Spec.ClusterRef,
 	}, cluster); err != nil {
-		return err
+		return client.IgnoreNotFound(err)
 	}
 	if opsRequestSlice, err = opsutil.GetOpsRequestSliceFromCluster(cluster); err != nil {
 		return err

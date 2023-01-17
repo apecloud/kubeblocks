@@ -3,7 +3,7 @@
 List supported log files in cluster
 
 ```
-kbcli cluster list-logs [flags]
+kbcli cluster list-logs NAME [flags]
 ```
 
 ### Examples

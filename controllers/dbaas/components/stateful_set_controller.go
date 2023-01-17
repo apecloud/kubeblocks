@@ -90,7 +90,8 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if component == nil {
 		return intctrlutil.Reconciled()
 	}
-	if requeueAfter, err := handleComponentStatusAndSyncCluster(reqCtx, r.Client, sts, cluster, component); err != nil {
+	if requeueAfter, err := handleComponentStatusAndSyncCluster(reqCtx, r.Client, r.Recorder,
+		sts, cluster, component); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	} else if requeueAfter != 0 {
 		// if the reconcileAction need requeue, do it

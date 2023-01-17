@@ -24,6 +24,7 @@ import (
 
 	"github.com/dapr/components-contrib/middleware"
 	"github.com/dapr/kit/logger"
+	"github.com/valyala/fasthttp"
 )
 
 const (
@@ -38,9 +39,9 @@ const (
 	statusCodeHeader = "Metadata.status-Code"
 )
 
-// NewProbeMiddleware returns a new probe middleware.
-func NewProbeMiddleware(log logger.Logger) middleware.Middleware {
-	return &Middleware{logger: log}
+type statusCodeWriter struct {
+	http.ResponseWriter
+	logger logger.Logger
 }
 
 // Middleware is an probe middleware.
@@ -48,11 +49,17 @@ type Middleware struct {
 	logger logger.Logger
 }
 
-type statusCodeWriter struct {
-	http.ResponseWriter
-	logger logger.Logger
+var _ middleware.Middleware = &Middleware{}
+
+// NewProbeMiddleware returns a new probe middleware.
+func NewProbeMiddleware(log logger.Logger) middleware.Middleware {
+	return &Middleware{logger: log}
 }
 
+// GetHandler returns the HTTP handler provided by the middleware.
+func (m *Middleware) GetHandler(metadata Metadata) (func(h fasthttp.RequestHandler) fasthttp.RequestHandler, error) {
+	return nil, nil
+}
 func (scw *statusCodeWriter) WriteHeader(statusCode int) {
 	header := scw.ResponseWriter.Header()
 	scw.logger.Debugf("response header: %v", header)
@@ -62,35 +69,4 @@ func (scw *statusCodeWriter) WriteHeader(statusCode int) {
 		delete(header, statusCodeHeader)
 	}
 	scw.ResponseWriter.WriteHeader(statusCode)
-}
-
-// GetHandler returns the HTTP handler provided by the middleware.
-func (m *Middleware) GetHandler(metadata middleware.Metadata) (func(next http.Handler) http.Handler, error) {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			url := r.URL
-			if r.Method == http.MethodGet && strings.HasPrefix(url.Path, bindingPath) {
-				var body string
-				r.Method = http.MethodPost
-				r.Body.Close()
-				switch operation := url.Query().Get("operation"); operation {
-				case statusCheckOperation:
-					body = `{"operation": "statusCheck", "metadata": {"sql" : ""}}`
-					r.Body = io.NopCloser(strings.NewReader(body))
-				case runningCheckOperation:
-					body = `{"operation": "runningCheck", "metadata": {"sql" : ""}}`
-					r.Body = io.NopCloser(strings.NewReader(body))
-				case roleCheckOperation:
-					body = `{"operation": "roleCheck", "metadata": {"sql" : ""}}`
-					r.Body = io.NopCloser(strings.NewReader(body))
-				default:
-					m.logger.Infof("unknown probe operation: %v", operation)
-				}
-			}
-
-			m.logger.Infof("request: %v", r)
-			scw := &statusCodeWriter{ResponseWriter: w, logger: m.logger}
-			next.ServeHTTP(scw, r)
-		})
-	}, nil
 }

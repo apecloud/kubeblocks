@@ -294,12 +294,10 @@ spec:
 				timeout, interval).Should(Equal(dbaasv1alpha1.SucceedPhase))
 
 			By("check cluster resource requirements changed")
-			Eventually(func(g Gomega) {
-				fetchedCluster := &dbaasv1alpha1.Cluster{}
-				g.Expect(k8sClient.Get(ctx, key, fetchedCluster)).To(Succeed())
-				g.Expect(fetchedCluster.Spec.Components[0].Resources.Requests).To(Equal(
+			Eventually(checkObj(key, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
+				g.Expect(fetched.Spec.Components[0].Resources.Requests).To(Equal(
 					verticalScalingOpsRequest.Spec.VerticalScalingList[0].Requests))
-			}, timeout, interval).Should(Succeed())
+			}), timeout, interval).Should(Succeed())
 
 			By("test deleteClusterOpsRequestAnnotation function")
 			opsReconciler := OpsRequestReconciler{Client: k8sClient}
@@ -319,7 +317,7 @@ spec:
 })
 
 func mockOpsRequestSucceed(namespacedName types.NamespacedName) error {
-	return changeOpsRequestStatus(namespacedName,
+	return changeStatus(namespacedName,
 		func(or *dbaasv1alpha1.OpsRequest) {
 			or.Status.Phase = dbaasv1alpha1.SucceedPhase
 			or.Status.CompletionTimestamp = metav1.Time{Time: time.Now()}
@@ -327,7 +325,7 @@ func mockOpsRequestSucceed(namespacedName types.NamespacedName) error {
 }
 
 func mockSetClusterStatusPhaseToRunning(namespacedName types.NamespacedName) error {
-	return changeClusterStatus(namespacedName,
+	return changeStatus(namespacedName,
 		func(c *dbaasv1alpha1.Cluster) {
 			c.Status.Phase = dbaasv1alpha1.RunningPhase
 			for componentKey, componentStatus := range c.Status.Components {

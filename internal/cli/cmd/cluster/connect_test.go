@@ -24,61 +24,127 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes/scheme"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/rest/fake"
+	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 var _ = Describe("connection", func() {
-	It("new connection command", func() {
-		tf := cmdtesting.NewTestFactory().WithNamespace("test")
-		defer tf.Cleanup()
+	const (
+		namespace   = "test"
+		clusterName = "test"
+	)
 
-		cmd := NewConnectCmd(tf, genericclioptions.NewTestIOStreamsDiscard())
+	var (
+		streams genericclioptions.IOStreams
+		tf      *cmdtesting.TestFactory
+	)
+
+	BeforeEach(func() {
+		tf = cmdtesting.NewTestFactory().WithNamespace("test")
+		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+		cluster := testing.FakeCluster(clusterName, namespace)
+		pods := testing.FakePods(3, namespace, clusterName)
+		httpResp := func(obj runtime.Object) *http.Response {
+			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}
+		}
+		tf.UnstructuredClient = &clientfake.RESTClient{
+			GroupVersion:         schema.GroupVersion{Group: types.Group, Version: types.Version},
+			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+			Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				urlPrefix := "/api/v1/namespaces/" + namespace
+				return map[string]*http.Response{
+					urlPrefix + "/services":        httpResp(testing.FakeServices()),
+					urlPrefix + "/secrets":         httpResp(testing.FakeSecrets(namespace, clusterName)),
+					urlPrefix + "/pods":            httpResp(pods),
+					urlPrefix + "/pods/test-pod-0": httpResp(findPod(pods, "test-pod-0")),
+				}[req.URL.Path], nil
+			}),
+		}
+
+		tf.Client = tf.UnstructuredClient
+		tf.FakeDynamicClient = testing.FakeDynamicClient(cluster, testing.FakeClusterDef(), testing.FakeClusterVersion())
+		streams = genericclioptions.NewTestIOStreamsDiscard()
+	})
+
+	AfterEach(func() {
+		tf.Cleanup()
+	})
+
+	It("new connection command", func() {
+		cmd := NewConnectCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 	})
 
-	It("connection options", func() {
-		tf := cmdtesting.NewTestFactory().WithNamespace("test")
-		defer tf.Cleanup()
-		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-		ns := scheme.Codecs.WithoutConversion()
-		tf.Client = &fake.RESTClient{
-			GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
-			NegotiatedSerializer: ns,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				body := cmdtesting.ObjBody(codec, execPod())
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
-			}),
-		}
-		tf.ClientConfigVal = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: scheme.Codecs, GroupVersion: &schema.GroupVersion{Version: "v1"}}}
+	It("connection", func() {
+		o := &ConnectOptions{ExecOptions: exec.NewExecOptions(tf, streams)}
 
-		o := &ConnectOptions{ExecOptions: exec.NewExecOptions(tf, genericclioptions.NewTestIOStreamsDiscard())}
-		input := &exec.ExecInput{
-			Use:      "connect",
-			Short:    "Connect to a database cluster",
-			Validate: o.validate,
-			Complete: o.complete,
-			AddFlags: o.addFlags,
-		}
-		cmd := o.Build(input)
-		Expect(cmd).ShouldNot(BeNil())
-		Expect(o.complete([]string{})).Should(HaveOccurred())
+		By("specified more than one cluster")
+		Expect(o.connect([]string{"c1", "c2"})).Should(HaveOccurred())
 
-		execOptions := o.ExecOptions
-		o.PodName = "foo"
-		Expect(execOptions.Complete([]string{"test"})).Should(Succeed())
-		Expect(execOptions.Validate()).Should(Succeed())
-		Expect(execOptions.Run()).Should(HaveOccurred())
+		By("without cluster name")
+		Expect(o.connect(nil)).Should(HaveOccurred())
+
+		By("specify cluster name")
+		Expect(o.ExecOptions.Complete()).Should(Succeed())
+		_ = o.connect([]string{clusterName})
+		Expect(len(o.ContainerName) > 0).Should(BeTrue())
+		Expect(o.Pod).ShouldNot(BeNil())
+	})
+
+	It("getEngineByPod", func() {
+		pod := mockPod()
+		e, err := getEngineByPod(pod)
+		Expect(err).Should(Succeed())
+		Expect(e.EngineName()).Should(Equal("mysql"))
+
+		pod.SetLabels(nil)
+		_, err = getEngineByPod(pod)
+		Expect(err).Should(HaveOccurred())
+	})
+
+	It("show example", func() {
+		o := &ConnectOptions{ExecOptions: exec.NewExecOptions(tf, streams)}
+		Expect(o.ExecOptions.Complete()).Should(Succeed())
+
+		By("without args")
+		Expect(o.runShowExample(nil)).Should(HaveOccurred())
+
+		By("specify more than one cluster")
+		Expect(o.runShowExample([]string{"c1", "c2"})).Should(HaveOccurred())
+
+		By("specify one cluster")
+		Expect(o.runShowExample([]string{clusterName})).Should(Succeed())
+	})
+
+	It("getUserAndPassword", func() {
+		const (
+			user     = "test-user"
+			password = "test-password"
+		)
+		secret := corev1.Secret{}
+		secret.Data = map[string][]byte{
+			"username": []byte(user),
+			"password": []byte(password),
+		}
+		secretList := &corev1.SecretList{}
+		secretList.Items = []corev1.Secret{secret}
+		u, p, err := getUserAndPassword(secretList)
+		Expect(err).Should(Succeed())
+		Expect(u).Should(Equal(user))
+		Expect(p).Should(Equal(password))
 	})
 })
 
-func execPod() *corev1.Pod {
+func mockPod() *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -101,4 +167,13 @@ func execPod() *corev1.Pod {
 			Phase: corev1.PodRunning,
 		},
 	}
+}
+
+func findPod(pods *corev1.PodList, name string) *corev1.Pod {
+	for i, pod := range pods.Items {
+		if pod.Name == name {
+			return &pods.Items[i]
+		}
+	}
+	return nil
 }

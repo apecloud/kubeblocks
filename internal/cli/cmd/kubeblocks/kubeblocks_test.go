@@ -101,7 +101,7 @@ var _ = Describe("kubeblocks", func() {
 		Expect(err).Should(HaveOccurred())
 		Expect(notes).Should(Equal(""))
 
-		o.printNotes("")
+		o.printNotes()
 	})
 
 	It("check uninstall", func() {

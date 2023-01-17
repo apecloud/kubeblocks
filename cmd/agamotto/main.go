@@ -309,7 +309,7 @@ func main() {
 
 	_ = level.Info(logger).Log("msg", "Listening on address", "address", *listenAddress)
 	srv := &http.Server{Addr: *listenAddress}
-	if err := web.ListenAndServe(srv, *webConfig, logger); err != nil {
+	if err := web.ListenAndServe(srv, webConfig, logger); err != nil {
 		_ = level.Error(logger).Log("msg", "Error starting HTTP server", "err", err)
 		os.Exit(1)
 	}

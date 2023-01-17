@@ -195,7 +195,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 
 		var engine *customizedEngine
-		var engineHasBeenCreated = false
+		replaceEnvsValues(cluster.Name, compDef.SystemAccounts)
 
 		for _, account := range compDef.SystemAccounts.Accounts {
 			accountID := account.Name.GetAccountID()
@@ -205,11 +205,9 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 			switch account.ProvisionPolicy.Type {
 			case dbaasv1alpha1.CreateByStmt:
-				if !engineHasBeenCreated {
+				if engine == nil {
 					execConfig := compDef.SystemAccounts.CmdExecutorConfig
-					replaceEnvsValues(cluster.Name, compDef.SystemAccounts)
 					engine = newCustomizedEngine(execConfig, cluster, compDecl.Name)
-					engineHasBeenCreated = true
 				}
 				if err := r.createByStmt(reqCtx, cluster, clusterdefinition.Spec.Type, clusterdefinition.Name, compDef, compDecl.Name, engine, account, svcEP, headlessEP); err != nil {
 					return err

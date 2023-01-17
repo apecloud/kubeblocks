@@ -24,7 +24,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/sethvargo/go-password/password"
-
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/types"

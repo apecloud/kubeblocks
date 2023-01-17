@@ -28,6 +28,8 @@ import (
 )
 
 const emptyString = ""
+const minAvailPort = 1024
+const maxAvailPort = 65535
 
 // calReverseRebaseBuffer Cal reserved memory for system
 func calReverseRebaseBuffer(memSizeMB, cpuNum int64) int64 {
@@ -227,6 +229,11 @@ func getAvailableContainerPorts(containers []corev1.Container, containerPorts []
 	}
 
 	iterAvailPort := func(p int32) (int32, error) {
+		// The TCP/IP port numbers below 1024 are privileged ports, which are special
+		// in that normal users are not allowed to run servers on them.
+		if p < minAvailPort || p > maxAvailPort {
+			p = minAvailPort
+		}
 		sentinel := p
 		for {
 			if _, ok := set[p]; !ok {
@@ -237,8 +244,8 @@ func getAvailableContainerPorts(containers []corev1.Container, containerPorts []
 			if p == sentinel {
 				return -1, errors.New("no available port for container")
 			}
-			if p <= 0 || p > 65536 {
-				p = 1024
+			if p > maxAvailPort {
+				p = minAvailPort
 			}
 		}
 	}
